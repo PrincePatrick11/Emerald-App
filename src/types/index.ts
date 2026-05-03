@@ -1,0 +1,182 @@
+export type ContentType = 'journal' | 'wiki' | 'operation';
+
+export interface JournalEntry {
+  id: string;
+  title: string;
+  content: string; // TipTap JSON serialized
+  created_at: string;
+  updated_at: string;
+  tags: string[];
+  moon_phase: string | null;
+  mood: string | null;
+  paradigm_id: string | null;
+  linked_operation_ids: string[] | null;
+  linked_wiki_ids: string[] | null;
+  is_bannung: boolean;
+  bannung_type_wiki_id: string | null;
+  is_meditation: boolean;
+  meditation_duration: number | null;
+  meditation_type_wiki_id: string | null;
+  deleted_at: string | null;
+  entry_number?: number;
+}
+
+export interface WikiArticle {
+  id: string;
+  title: string;
+  slug: string;
+  content: string; // TipTap JSON serialized
+  category: WikiCategory;
+  created_at: string;
+  updated_at: string;
+  tags: string[];
+  deleted_at: string | null;
+  cover_image?: string;
+  icon?: string;
+  entry_number?: number;
+}
+
+export interface OperationCategory {
+  id: string;
+  name: string;
+  emoji: string;
+  sort_order: number;
+  is_builtin: boolean;
+}
+
+export interface WikiCategoryDef {
+  id: string;
+  name: string;
+  emoji: string;
+  is_builtin: boolean;
+  sort_order: number;
+}
+
+export interface Operation {
+  id: string;
+  title: string;
+  content: string;
+  category_id: string;
+  created_at: string;
+  updated_at: string;
+  tags: string[];
+  deleted_at: string | null;
+  is_active: boolean;
+  end_date: string | null;
+  version: string | null;
+  entry_number?: number;
+  icon?: string;
+  cover_image?: string;
+  description?: string;
+  target_reveal_date?: string | null;
+  charging_technique_wiki_id?: string | null;
+  is_loaded?: boolean;
+  intention_text?: string;
+  letter_bank?: string[];
+  implemented_letters?: string[];
+  show_intention_in_properties?: boolean;
+  show_letter_bank_in_properties?: boolean;
+  show_sigil?: boolean;
+  drawing_data?: string | null;
+  thumbnail_data?: string | null;
+}
+
+export interface TrashedItem {
+  id: string;
+  title: string;
+  type: 'journal' | 'wiki' | 'tag' | 'operation' | 'creation' | 'wiki_category' | 'operation_category';
+  deleted_at: string;
+  category?: string; // wiki category slug | operation category name
+}
+
+export type WikiCategory = string;
+
+export interface Tag {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface InternalLink {
+  source_id: string;
+  source_type: ContentType;
+  target_id: string;
+  target_type: ContentType;
+}
+
+export interface Routine {
+  id: string;
+  name: string;
+  emoji: string;
+  content: string; // plain text; newlines → paragraphs on drop
+  tags: string[];
+  operation_ids: string[];
+  wiki_ids: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export type CustomPropertyType = 'text' | 'number' | 'date' | 'toggle' | 'checkbox';
+
+export interface CustomProperty {
+  id: string;
+  entry_id: string;
+  entry_type: 'journal' | 'wiki' | 'operation';
+  name: string;
+  type: CustomPropertyType;
+  value: string | null;
+  meta: string | null;  // JSON: type-specific config (e.g. {trueLabel, falseLabel} for checkbox)
+  show_in_entry: boolean;
+  sort_order: number;
+}
+
+
+export type MoonPhase =
+  | 'new'
+  | 'waxing_crescent'
+  | 'first_quarter'
+  | 'waxing_gibbous'
+  | 'full'
+  | 'waning_gibbous'
+  | 'last_quarter'
+  | 'waning_crescent';
+
+export type AltarItemCategory = 'candle' | 'crystal' | 'herb' | 'deity' | 'symbol' | 'tool' | 'other';
+
+export interface AltarRecord {
+  id: string;
+  title: string;
+  intention: string;
+  background_preset: string;
+  background_image_data: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AltarItem {
+  id: string;
+  name: string;
+  emoji: string;
+  category: AltarItemCategory;
+  note: string;
+  image_data?: string;
+}
+
+export interface AltarPlacement {
+  id: string;
+  altar_id?: string;
+  item_id: string;
+  name: string;
+  emoji: string;
+  category: string;
+  x: number;
+  y: number;
+  scale: number;
+  image_data?: string;
+}
+
+export interface ActiveView {
+  type: ContentType | 'home' | 'tags' | 'trash' | 'altar' | 'operations';
+  id?: string;
+  mode?: 'view' | 'edit';
+}

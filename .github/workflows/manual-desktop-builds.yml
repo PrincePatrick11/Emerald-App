@@ -1,0 +1,116 @@
+name: Manual Desktop Builds
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_macos:
+        description: Build macOS bundles
+        required: true
+        type: boolean
+        default: true
+      build_windows:
+        description: Build Windows bundles
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manual-desktop-builds-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-macos-intel:
+    if: ${{ inputs.build_macos }}
+    runs-on: macos-13
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin
+
+      - name: Install frontend dependencies
+        run: npm install --cache /tmp/npm-emerald-cache
+
+      - name: Build macOS Intel bundle
+        run: npm run tauri build -- --target x86_64-apple-darwin
+
+      - name: Upload macOS Intel artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: emerald-macos-intel
+          path: src-tauri/target/x86_64-apple-darwin/release/bundle/
+          if-no-files-found: error
+
+  build-macos-apple-silicon:
+    if: ${{ inputs.build_macos }}
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Install frontend dependencies
+        run: npm install --cache /tmp/npm-emerald-cache
+
+      - name: Build macOS Apple Silicon bundle
+        run: npm run tauri build -- --target aarch64-apple-darwin
+
+      - name: Upload macOS Apple Silicon artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: emerald-macos-apple-silicon
+          path: src-tauri/target/aarch64-apple-darwin/release/bundle/
+          if-no-files-found: error
+
+  build-windows:
+    if: ${{ inputs.build_windows }}
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Build Windows bundle
+        run: npm run tauri build -- --target x86_64-pc-windows-msvc
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: emerald-windows
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/
+          if-no-files-found: error

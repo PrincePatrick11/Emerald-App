@@ -1,0 +1,331 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --sidebar-left-width: 240px;
+    --sidebar-right-width: 300px;
+  }
+
+  * {
+    @apply border-stone-700;
+  }
+
+  body {
+    @apply bg-stone-900 text-stone-100 font-sans antialiased;
+    user-select: none;
+  }
+
+  .selectable {
+    user-select: text;
+  }
+
+  hr {
+    @apply border-stone-700/40;
+  }
+}
+
+@layer components {
+  .sidebar-item {
+    @apply flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-stone-400
+           hover:text-stone-100 hover:bg-stone-700/60 cursor-pointer transition-colors duration-150;
+  }
+
+  .sidebar-item.active {
+    @apply text-stone-100 bg-stone-700/80;
+  }
+
+  .btn-ghost {
+    @apply p-1.5 rounded-md text-stone-500 hover:text-stone-300 hover:bg-stone-700/60
+           transition-colors duration-150 cursor-pointer;
+  }
+
+  .panel {
+    @apply bg-stone-800/50 border border-stone-700/60 rounded-xl;
+  }
+
+  /* Primary action button — jade accent (xs size, for toolbars & headers) */
+  .btn-primary {
+    @apply flex items-center gap-1.5 px-3 py-1.5
+           bg-jade-900/40 hover:bg-jade-900/60
+           text-jade-400 text-xs font-medium rounded-lg
+           border border-jade-800/40 transition-colors duration-150;
+  }
+
+  /* Secondary action button — neutral stone */
+  .btn-secondary {
+    @apply flex items-center gap-1.5 px-3 py-1.5
+           bg-stone-800/80 hover:bg-stone-700/60
+           text-stone-300 text-xs font-medium rounded-lg
+           border border-stone-700/60 transition-colors duration-150;
+  }
+
+  /* Clickable panel / card — smooth hover with brighter border */
+  .panel-interactive {
+    @apply bg-stone-800/50 border border-stone-700/60 rounded-xl
+           cursor-pointer transition-all duration-150
+           hover:bg-stone-800/90 hover:border-stone-600/70;
+  }
+
+  /* Consistent small section label (JOURNAL, PROPERTIES, etc.) */
+  .label-xs {
+    @apply text-xs font-semibold uppercase tracking-wider text-stone-500;
+  }
+}
+
+/* TipTap Editor Styles */
+.tiptap {
+  @apply selectable outline-none min-h-[200px] font-serif text-stone-200 leading-relaxed;
+  font-size: 1.0625rem; /* 17px — Lora is denser than Cormorant, reads well slightly above base */
+}
+
+.tiptap p {
+  @apply mb-3;
+}
+
+.tiptap h1 { @apply text-2xl font-semibold text-stone-100 mb-3 mt-6; }
+.tiptap h2 { @apply text-xl font-semibold text-stone-100 mb-2 mt-5; }
+.tiptap h3 { @apply text-lg font-semibold text-stone-200 mb-2 mt-4; }
+
+.tiptap ul:not([data-type="taskList"]) { @apply list-disc pl-5 mb-3 space-y-1; }
+.tiptap ol { @apply list-decimal pl-5 mb-3 space-y-1; }
+
+/* Task List */
+.tiptap ul[data-type="taskList"] {
+  @apply list-none pl-0 mb-3 space-y-1;
+}
+
+.tiptap ul[data-type="taskList"] li {
+  @apply flex items-start gap-2;
+}
+
+.tiptap ul[data-type="taskList"] li > label {
+  @apply flex-shrink-0 mt-0.5 cursor-pointer;
+}
+
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"] {
+  @apply w-4 h-4 rounded border border-stone-600 bg-stone-700
+         cursor-pointer accent-jade-500;
+}
+
+.tiptap ul[data-type="taskList"] li[data-checked="true"] > div {
+  @apply line-through text-stone-500;
+}
+
+.tiptap blockquote {
+  @apply border-l-2 border-jade-700 pl-4 italic text-stone-400 my-4;
+}
+
+.tiptap code {
+  @apply bg-stone-700 text-jade-300 px-1.5 py-0.5 rounded text-sm font-mono;
+}
+
+.tiptap pre {
+  @apply bg-stone-700 rounded-lg p-4 my-4 overflow-x-auto;
+}
+
+.tiptap pre code {
+  @apply bg-transparent p-0;
+}
+
+.tiptap mark {
+  @apply bg-jade-950 text-jade-300 px-0.5 rounded;
+}
+
+.tiptap a.external-link {
+  @apply text-jade-500 underline underline-offset-2 cursor-pointer hover:text-jade-400;
+}
+
+/* Edit mode: show a subtle ↗ indicator after external links */
+.ProseMirror[contenteditable="true"] a.external-link::after {
+  content: '↗';
+  @apply text-jade-700 text-[0.6em] ml-0.5 align-super;
+  text-decoration: none;
+}
+
+.tiptap .internal-link {
+  @apply cursor-pointer;
+}
+
+/* Edit mode: [[Label(id)]] inline text representation */
+.internal-link-edit {
+  color: #00b87a;
+  font-style: italic;
+  cursor: text;
+  user-select: text;
+}
+
+.tiptap img {
+  @apply max-w-full rounded-lg;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply text-stone-600 float-left h-0 pointer-events-none;
+}
+
+/* Candle flame animation — replace .candle-placeholder with real animation when available */
+@keyframes flicker {
+  0%, 100% { opacity: 1;   transform: scaleY(1)    scaleX(1); }
+  25%       { opacity: .9;  transform: scaleY(1.04) scaleX(.97); }
+  50%       { opacity: .85; transform: scaleY(.96)  scaleX(1.03); }
+  75%       { opacity: .92; transform: scaleY(1.02) scaleX(.98); }
+}
+.candle-flame {
+  display: inline-block;
+  animation: flicker 1.8s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px #ff8c00) drop-shadow(0 0 14px #ff4500);
+  transform-origin: bottom center;
+}
+
+/* ── Light Mode Theme ─────────────────────────────────────────────────────── */
+html.light body {
+  background-color: #f5f0e8;
+  color: #1c1917;
+}
+
+/* Background overrides */
+html.light .bg-stone-900  { background-color: #f5f0e8; }
+html.light .bg-stone-800  { background-color: #ece6da; }
+
+/* Text overrides */
+html.light .text-stone-100 { color: #1c1917; }
+html.light .text-stone-200 { color: #292524; }
+html.light .text-stone-300 { color: #44403c; }
+html.light .text-stone-400 { color: #57534e; }
+html.light .text-stone-500 { color: #78716c; }
+html.light .text-stone-600 { color: #57534e; }
+
+/* Border overrides */
+html.light .border-stone-700 { border-color: #c5bdb4; }
+html.light .border-stone-600 { border-color: #a8a09a; }
+
+/* Sidebar items */
+html.light .sidebar-item {
+  color: #57534e;
+}
+html.light .sidebar-item:hover {
+  color: #1c1917;
+  background-color: rgba(0, 0, 0, 0.06);
+}
+html.light .sidebar-item.active {
+  color: #1c1917;
+  background-color: rgba(0, 0, 0, 0.09);
+}
+
+/* Panels */
+html.light .panel {
+  background-color: rgba(236, 230, 218, 0.7);
+  border-color: rgba(180, 170, 158, 0.6);
+}
+html.light .panel-interactive {
+  background-color: rgba(236, 230, 218, 0.7);
+  border-color: rgba(180, 170, 158, 0.6);
+}
+html.light .panel-interactive:hover {
+  background-color: rgba(225, 218, 205, 0.9);
+  border-color: rgba(160, 150, 138, 0.7);
+}
+
+/* Buttons */
+html.light .btn-ghost {
+  color: #78716c;
+}
+html.light .btn-ghost:hover {
+  color: #1c1917;
+  background-color: rgba(0, 0, 0, 0.06);
+}
+html.light .btn-secondary {
+  background-color: rgba(236, 230, 218, 0.8);
+  color: #44403c;
+  border-color: rgba(180, 170, 158, 0.6);
+}
+html.light .btn-secondary:hover {
+  background-color: rgba(225, 218, 205, 0.9);
+}
+
+/* TipTap editor */
+html.light .tiptap {
+  color: #1c1917;
+}
+html.light .tiptap h1,
+html.light .tiptap h2 { color: #1c1917; }
+html.light .tiptap h3 { color: #292524; }
+html.light .tiptap code {
+  background-color: rgba(0, 0, 0, 0.07);
+  color: #005c3a;
+}
+html.light .tiptap pre {
+  background-color: rgba(0, 0, 0, 0.07);
+}
+html.light .tiptap p.is-editor-empty:first-child::before {
+  color: #a8a09a;
+}
+
+/* Scrollbar in light mode */
+html.light ::-webkit-scrollbar-thumb {
+  background-color: #c5bdb4;
+}
+html.light ::-webkit-scrollbar-thumb:hover {
+  background-color: #a8a09a;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-stone-600 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-stone-500;
+}
+
+/* Internal link chip — shown in both edit and read mode */
+.internal-link-chip {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  gap: 2px;
+  cursor: pointer;
+  user-select: none;
+  text-decoration: none;
+  background-color: rgba(0, 160, 102, 0.09);
+  border-radius: 4px;
+  padding: 0 4px;
+  transition: background-color 0.15s;
+}
+
+.internal-link-chip:hover {
+  background-color: rgba(0, 160, 102, 0.18);
+}
+
+.internal-link-chip:hover .internal-link-label {
+  color: #00c47f;
+}
+
+.internal-link-icon {
+  font-size: 0.85em;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+.internal-link-icon img {
+  width: 1.1em;
+  height: 1.1em;
+  object-fit: cover;
+  border-radius: 2px;
+  display: block;
+}
+
+.internal-link-label {
+  color: #00e699;
+  font-weight: 500;
+}
+
