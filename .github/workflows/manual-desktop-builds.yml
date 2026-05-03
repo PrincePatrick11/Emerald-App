@@ -41,7 +41,7 @@ jobs:
           targets: x86_64-apple-darwin
 
       - name: Install frontend dependencies
-        run: npm install --cache /tmp/npm-emerald-cache
+        run: npm install
 
       - name: Build macOS Intel bundle
         run: npm run tauri build -- --target x86_64-apple-darwin
@@ -72,7 +72,7 @@ jobs:
           targets: aarch64-apple-darwin
 
       - name: Install frontend dependencies
-        run: npm install --cache /tmp/npm-emerald-cache
+        run: npm install
 
       - name: Build macOS Apple Silicon bundle
         run: npm run tauri build -- --target aarch64-apple-darwin
