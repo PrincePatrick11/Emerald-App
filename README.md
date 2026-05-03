@@ -6,6 +6,20 @@ Built with Tauri 2 + React 19. Your data stays on your machine in a local SQLite
 
 ---
 
+## Screenshots
+
+![Home](screenshots/home.png)
+
+![Journal Entry](screenshots/journal.png)
+
+![Wiki](screenshots/wiki.png)
+
+![Sigil Editor](screenshots/sigil.png)
+
+![Altar](screenshots/altar.png)
+
+---
+
 ## Features
 
 **Journal**
