@@ -1,113 +1,65 @@
 # Emerald
 
-A local-first desktop app for documenting magical practice — journal, wiki, operations, sigils, and altar tools, all in one place.
+> A private, local-first journal for magical practice.
 
-Built with Tauri 2 + React 19. Your data stays on your machine in a local SQLite database.
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
+![Tauri](https://img.shields.io/badge/Tauri-2.x-FFC131?logo=tauri&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
+
+Emerald is a desktop app for documenting your magical practice. Write journal entries, build a personal wiki, track rituals and operations, create sigils, and arrange a virtual altar — all stored locally in a SQLite database on your machine. No account, no cloud, no tracking.
 
 ---
 
 ## Screenshots
 
-![Home](screenshots/home.png)
-
-![Journal Entry](screenshots/journal.png)
-
-![Wiki](screenshots/wiki.png)
-
-![Sigil Editor](screenshots/sigil.png)
-
-![Altar](screenshots/altar.png)
+<p align="center">
+  <img src="screenshots/altar.png" width="49%" alt="Virtual Altar" />
+  <img src="screenshots/journal.png" width="49%" alt="Journal Entry" />
+</p>
+<p align="center">
+  <img src="screenshots/wiki.png" width="49%" alt="Wiki" />
+  <img src="screenshots/sigil.png" width="49%" alt="Sigil Editor" />
+</p>
+<p align="center">
+  <img src="screenshots/home.png" width="60%" alt="Home Dashboard" />
+</p>
 
 ---
 
 ## Features
 
-**Journal**
-Rich-text entries with moon phase tracking, paradigm/banishment/meditation classification, linked operations and wiki articles, tags, and custom properties. Full backlink graph across all content types.
+**Journal** — Rich-text entries with automatic moon phase tracking. Classify by paradigm, banishing technique, or meditation type. Link operations and wiki articles, add tags and custom properties. Full backlink graph across all content types.
 
-**Wiki**
-Personal knowledge base with 12 built-in category types (elements, herbs, deities, symbols, …) plus custom categories. Icons, cover images, and internal links from anywhere in the app.
+**Wiki** — A personal reference library with 12 built-in category types (deities, herbs, rituals, symbols, …) and custom categories. Articles support icons, cover images, and internal links from anywhere in the app.
 
-**Operations**
-Track rituals, workings, and practices with active/inactive status, end dates, versioning, and linked content. Sigils get a specialized editor inside Operations.
+**Operations** — Track rituals, workings, servitors, and sigils. Mark them active or inactive, set end dates and version numbers, link wiki articles and journal entries.
 
-**Sigil Workflow**
-Dedicated sigil creation flow inside Operations: intention text → letter reduction → canvas drawing → visibility and charging state management. Sigils are stored as operations with `category_id = 'sigils'`.
+**Sigil Workflow** — Write your intention, reduce the letters, draw the sigil on a canvas, set a reveal date, and link a charging technique — all in one dedicated editor inside Operations.
 
-**Altar**
-Multi-altar dashboard with a drag-and-drop item placement system. Background presets (midnight, ember, forest, moon) or custom images.
+**Altar** — A virtual altar canvas. Build a library of symbolic items, arrange them with drag-and-drop, and keep multiple altar setups with different backgrounds and intentions.
 
-**Routines**
-Reusable templates draggable directly into journal entries. Merges tags, linked operations, and linked wiki articles automatically on drop.
+**Routines** — Reusable content templates that drop into any journal entry, automatically merging tags and linked content.
 
-**Trash & Undo**
-All deletions are soft-deletes with a 5-second undo toast. Trash view with restore or permanent delete. 30-day auto-purge.
+**Export / Import** — Export as PDF, Markdown, or the lossless `.emerald` format with embedded images. Import back on any machine. Full database backup and restore via `.emeralddb`.
 
-**Export / Import**
-- **PDF** — print-ready layout with metadata, chips, and internal link rendering
-- **Markdown** — frontmatter with all properties, `[[wiki-link]]` style internal references
-- **Emerald format** — `.emerald` JSON with embedded images, full round-trip fidelity
+**Multi-Vault** — Keep separate databases for different projects or traditions.
 
-**Localisation**
-UI available in English, German, Spanish, and French (`en`, `de`, `es`, `fr`).
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Desktop shell | Tauri 2.x |
-| Frontend | React 19 + TypeScript |
-| Build | Vite 6 |
-| Styling | Tailwind CSS 3 |
-| Editor | TipTap v2 (ProseMirror) |
-| State | Zustand |
-| Database | SQLite via `tauri-plugin-sql` |
-| i18n | react-i18next |
-| Backend | Rust (`src-tauri/`) |
+**Localised** — English, German, Spanish, and French.
 
 ---
 
 ## Getting Started
 
-**Prerequisites:** Node.js, Rust toolchain, Tauri prerequisites for your OS ([tauri.app/start/prerequisites](https://tauri.app/start/prerequisites/))
+**Prerequisites:** Node.js · Rust toolchain · [Tauri prerequisites](https://tauri.app/start/prerequisites/)
 
 ```bash
-# Install dependencies
-npm install --cache /tmp/npm-emerald-cache
-
-# Run in development (separate dev DB, title "Emerald Dev")
-npm run tauri:dev
-
-# Production build
-npm run tauri build
+npm install
+npm run tauri:dev     # dev build — uses a separate database, title "Emerald Dev"
+npm run tauri build   # production build
 ```
 
-The dev configuration lives in `src-tauri/tauri.dev.conf.json` and keeps the dev app identity and database completely separate from any installed production build.
-
----
-
-## Project Structure
-
-```
-src/
-├── components/
-│   ├── layout/       AppShell, sidebars, main area, settings
-│   ├── editor/       TipTap extensions (internal links, images, drop)
-│   ├── views/        Journal, Wiki, Operations, Altar, Sigil, Trash, Home
-│   ├── sidebar/      Properties panels, backlinks, routines, wiki/ops panels
-│   ├── wiki/         WikiList
-│   └── ui/           ListToolbar, FilterPanel, ContextMenu, UndoToast
-├── store/            Zustand stores (one per domain)
-├── lib/              db.ts, links.ts, export.ts, emeraldFormat.ts, moonPhase.ts
-├── i18n/             Locale files (en, de, es, fr)
-└── types/            Shared TypeScript types
-
-src-tauri/
-├── src/lib.rs        Rust commands (image I/O, PDF export, mouse nav)
-└── capabilities/     Tauri IPC permission sets
-```
+The dev build keeps its own app identity (`com.emerald.magical-journal.dev`) and database, so it won't interfere with an installed production build.
 
 ---
 
@@ -115,23 +67,18 @@ src-tauri/
 
 | Document | Description |
 |---|---|
-| [Documentation/architecture.md](Documentation/architecture.md) | Architecture, key patterns, data flow, IPC surface |
-| [Documentation/database.md](Documentation/database.md) | Schema, migration model, conventions, sigil fields |
-| [Documentation/features.md](Documentation/features.md) | Feature guide (user-facing) |
-| [Documentation/internationalization.md](Documentation/internationalization.md) | Adding and managing i18n keys |
-| [Documentation/security.md](Documentation/security.md) | Security model, capability permissions, sanitization |
+| [Documentation/features.md](Documentation/features.md) | Full feature guide |
+| [Documentation/architecture.md](Documentation/architecture.md) | Architecture, patterns, and data flow |
+| [Documentation/database.md](Documentation/database.md) | SQLite schema and conventions |
+| [Documentation/internationalization.md](Documentation/internationalization.md) | Adding and managing translations |
+| [Documentation/security.md](Documentation/security.md) | Capability model and sandboxing |
 | [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) | Full SQLite schema reference |
 
 ---
 
-## Key Conventions (for contributors)
+## Contributing
 
-- **Tags** are stored as names (strings), not IDs — `entry.tags = ["Moon", "Ritual"]`
-- **Zustand selectors** — always `useStore((s) => s.field)`, never bare `useStore()`
-- **Hooks before early returns** — all `useState`/`useEffect`/`useRef`/`useMemo` calls must come before any conditional `return`
-- **Drag & drop** — Pointer Events only (HTML5 DnD is incompatible with Tauri/WKWebView)
-- **SQLite booleans** — stored as `INTEGER 0/1`; cast with `!!value` after store reads
-- **New i18n keys** — must be added to all four locale files simultaneously
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
 
 ---
 

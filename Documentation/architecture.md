@@ -36,10 +36,11 @@ src/
 │   ├── wiki/         WikiList (getCategoryEmoji helper)
 │   └── ui/           ListToolbar, FilterPanel, UndoToast, ContextMenu
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore,
-│                     altarStore, routineStore, customPropertyStore, undoStore, trashStore
+│                     altarStore, routineStore, customPropertyStore, undoStore,
+│                     trashStore, vaultStore
 ├── lib/              db.ts, links.ts, dragState.ts, altarDragState.ts,
 │                     routineDragState.ts, moonPhase.ts, export.ts,
-│                     exportData.ts, emeraldFormat.ts
+│                     exportData.ts, emeraldFormat.ts, vaultManager.ts, dbBackup.ts
 ├── i18n/             react-i18next setup + locales/en.json de.json es.json fr.json
 └── types/index.ts    Shared TypeScript interfaces
 
