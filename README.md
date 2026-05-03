@@ -16,17 +16,15 @@ Emerald is a desktop app for documenting your magical practice. Write journal en
 
 ## Screenshots
 
-<p align="center">
-  <img src="screenshots/altar.png" width="49%" alt="Virtual Altar" />
-  <img src="screenshots/journal.png" width="49%" alt="Journal Entry" />
-</p>
-<p align="center">
-  <img src="screenshots/wiki.png" width="49%" alt="Wiki" />
-  <img src="screenshots/sigil.png" width="49%" alt="Sigil Editor" />
-</p>
-<p align="center">
-  <img src="screenshots/home.png" width="60%" alt="Home Dashboard" />
-</p>
+![Altar](screenshots/altar.png)
+
+![Journal Entry](screenshots/journal.png)
+
+![Wiki](screenshots/wiki.png)
+
+![Sigil Editor](screenshots/sigil.png)
+
+![Home Dashboard](screenshots/home.png)
 
 ---
 
