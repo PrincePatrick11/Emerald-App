@@ -9,6 +9,9 @@
 
 Emerald is a desktop app for documenting your magical practice. Write journal entries, build a personal wiki, track rituals and operations, create sigils, and arrange a virtual altar — all stored locally in a SQLite database on your machine. No account, no cloud, no tracking.
 
+> [!WARNING]
+> **Early development.** Emerald is a personal project shared in the spirit of open source. It is functional and used daily, but not yet a polished release — expect rough edges, missing features, and breaking changes between versions. Use at your own risk and back up your data regularly.
+
 ---
 
 ## Screenshots
