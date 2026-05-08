@@ -63,10 +63,10 @@ export default function JournalView() {
 
   // Debounced auto-save
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const triggerAutoSave = useCallback(() => {
+  const triggerAutoSave = useCallback((payloadOverride?: typeof pendingRef.current) => {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     const id = entryIdRef.current;
-    const payload = pendingRef.current;
+    const payload = payloadOverride ?? pendingRef.current;
     const wasEditing = isEditingRef.current;
     autoSaveTimer.current = setTimeout(() => {
       if (!wasEditing || !id) return;
@@ -113,8 +113,11 @@ export default function JournalView() {
     const handler = (e: Event) => {
       const { tags: routineTags, operation_ids: routineOpIds = [], wiki_ids: routineWikiIds = [] } = (e as CustomEvent<{ tags: string[]; operation_ids: string[]; wiki_ids: string[] }>).detail;
       if (routineTags.length > 0) {
-        setTags((prev) => [...new Set([...prev, ...routineTags])]);
-        triggerAutoSave();
+        setTags((prev) => {
+          const nextTags = [...new Set([...prev, ...routineTags])];
+          triggerAutoSave({ ...pendingRef.current, tags: nextTags });
+          return nextTags;
+        });
       }
       if ((routineOpIds.length > 0 || routineWikiIds.length > 0) && entryIdRef.current) {
         const patch: Partial<import('../../types').JournalEntry> = {};
@@ -215,7 +218,7 @@ export default function JournalView() {
 
   const handleContentChange = useCallback((html: string) => {
     setContent(html);
-    triggerAutoSave();
+    triggerAutoSave({ ...pendingRef.current, content: html });
   }, [triggerAutoSave]);
 
   const enterEditMode = () => {
@@ -455,7 +458,7 @@ export default function JournalView() {
             autoFocus
             type="text"
             value={title}
-            onChange={(e) => { setTitle(e.target.value); triggerAutoSave(); }}
+            onChange={(e) => { const nextTitle = e.target.value; setTitle(nextTitle); triggerAutoSave({ ...pendingRef.current, title: nextTitle }); }}
             placeholder={t('journal.untitled')}
             className="w-full bg-transparent text-2xl font-semibold text-stone-100
                        placeholder-stone-700 outline-none selectable font-serif"
@@ -572,7 +575,7 @@ export default function JournalView() {
       <div className="px-8 pb-3 flex-shrink-0" onDoubleClick={enterEditMode}>
         <TagInput
           tags={tags}
-          onChange={(newTags) => { setTags(newTags); triggerAutoSave(); }}
+          onChange={(newTags) => { setTags(newTags); triggerAutoSave({ ...pendingRef.current, tags: newTags }); }}
           readOnly={true}
         />
       </div>

@@ -72,10 +72,10 @@ export default function WikiView() {
 
   // Debounced auto-save
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const triggerAutoSave = useCallback(() => {
+  const triggerAutoSave = useCallback((payloadOverride?: typeof pendingRef.current) => {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     const id = articleIdRef.current;
-    const payload = pendingRef.current;
+    const payload = payloadOverride ?? pendingRef.current;
     const wasEditing = isEditingRef.current;
     autoSaveTimer.current = setTimeout(() => {
       if (!wasEditing || !id) return;
@@ -128,8 +128,11 @@ export default function WikiView() {
     if (!isEditing || !article) return;
     const handler = (e: Event) => {
       const { tags: routineTags } = (e as CustomEvent<{ tags: string[] }>).detail;
-      setTags((prev) => [...new Set([...prev, ...routineTags])]);
-      triggerAutoSave();
+      setTags((prev) => {
+        const nextTags = [...new Set([...prev, ...routineTags])];
+        triggerAutoSave({ ...pendingRef.current, tags: nextTags });
+        return nextTags;
+      });
     };
     document.addEventListener('routine-drop', handler);
     return () => document.removeEventListener('routine-drop', handler);
@@ -184,7 +187,7 @@ export default function WikiView() {
 
   const handleContentChange = useCallback((html: string) => {
     setContent(html);
-    triggerAutoSave();
+    triggerAutoSave({ ...pendingRef.current, content: html });
   }, [triggerAutoSave]);
 
   const handleNew = async () => {
@@ -254,7 +257,7 @@ export default function WikiView() {
     const cat = await addWikiCategory(newWikiCatName.trim(), newWikiCatEmoji);
     setCategory(cat.id);
     setNewWikiCatName(''); setNewWikiCatEmoji('📄'); setAddingWikiCat(false); setShowWikiCatEmojiPicker(false);
-    triggerAutoSave();
+    triggerAutoSave({ ...pendingRef.current, category: cat.id });
   };
 
   if (!article) {
@@ -628,7 +631,7 @@ export default function WikiView() {
             autoFocus
             type="text"
             value={title}
-            onChange={(e) => { setTitle(e.target.value); triggerAutoSave(); }}
+            onChange={(e) => { const nextTitle = e.target.value; setTitle(nextTitle); triggerAutoSave({ ...pendingRef.current, title: nextTitle }); }}
             placeholder={t('wiki.untitled')}
             className="w-full bg-transparent text-2xl font-semibold text-stone-100
                        placeholder-stone-700 outline-none selectable font-serif"
@@ -649,7 +652,7 @@ export default function WikiView() {
       <div className="px-8 pb-3 flex-shrink-0" onDoubleClick={enterEditMode}>
         <TagInput
           tags={tags}
-          onChange={(newTags) => { setTags(newTags); triggerAutoSave(); }}
+          onChange={(newTags) => { setTags(newTags); triggerAutoSave({ ...pendingRef.current, tags: newTags }); }}
           readOnly={true}
         />
       </div>
