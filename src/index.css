@@ -286,6 +286,15 @@ html.light ::-webkit-scrollbar-thumb:hover {
   @apply bg-stone-500;
 }
 
+/* Hide scrollbars for areas that still need mouse/touchpad scrolling. */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* Internal link chip — shown in both edit and read mode */
 .internal-link-chip {
   display: inline-flex;
@@ -328,4 +337,3 @@ html.light ::-webkit-scrollbar-thumb:hover {
   color: #00e699;
   font-weight: 500;
 }
-

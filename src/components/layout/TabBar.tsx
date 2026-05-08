@@ -1,10 +1,13 @@
 import { BookOpen, Flame, Home, Library, MoreHorizontal, Plus, Tag, Trash2, Wand2, X } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { useAltarStore } from '../../store/altarStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
-import type { ActiveView } from '../../types';
+import type { ActiveView, MoonPhase } from '../../types';
+import { getCategoryEmoji } from '../wiki/WikiList';
 
 function getFallbackTitle(view: ActiveView) {
   switch (view.type) {
@@ -27,25 +30,12 @@ function getFallbackTitle(view: ActiveView) {
   }
 }
 
-function getIcon(view: ActiveView) {
-  switch (view.type) {
-    case 'home':
-      return <Home size={13} />;
-    case 'journal':
-      return <BookOpen size={13} />;
-    case 'wiki':
-      return <Library size={13} />;
-    case 'operations':
-      return <Wand2 size={13} />;
-    case 'altar':
-      return <Flame size={13} />;
-    case 'tags':
-      return <Tag size={13} />;
-    case 'trash':
-      return <Trash2 size={13} />;
-    default:
-      return <MoreHorizontal size={13} />;
+function renderIconValue(icon: string | null | undefined, fallback: ReactNode) {
+  if (!icon) return fallback;
+  if (icon.startsWith('data:') || icon.startsWith('blob:') || icon.startsWith('http') || icon.startsWith('/')) {
+    return <img src={icon} alt="" className="h-4 w-4 rounded object-cover" />;
   }
+  return <span className="text-sm leading-none">{icon}</span>;
 }
 
 export default function TabBar() {
@@ -53,6 +43,8 @@ export default function TabBar() {
   const getEntry = useJournalStore((s) => s.getEntry);
   const getArticle = useWikiStore((s) => s.getArticle);
   const getOperation = useOperationStore((s) => s.getOperation);
+  const operationCategories = useOperationStore((s) => s.categories);
+  const wikiCategories = useWikiStore((s) => s.wikiCategories);
   const altars = useAltarStore((s) => s.altars);
 
   if (tabs.length === 0) return null;
@@ -66,8 +58,45 @@ export default function TabBar() {
     return getFallbackTitle(view);
   };
 
+  const getIcon = (view: ActiveView) => {
+    if (view.type === 'journal' && view.id) {
+      const entry = getEntry(view.id);
+      return <span className="text-sm leading-none">{MOON_PHASE_SYMBOLS[entry?.moon_phase as MoonPhase] ?? '📓'}</span>;
+    }
+    if (view.type === 'wiki' && view.id) {
+      const article = getArticle(view.id);
+      const categoryIcon = wikiCategories.find((category) => category.id === article?.category)?.emoji
+        ?? getCategoryEmoji(article?.category as any);
+      return renderIconValue(article?.icon, <span className="text-sm leading-none">{categoryIcon}</span>);
+    }
+    if (view.type === 'operations' && view.id) {
+      const operation = getOperation(view.id);
+      const categoryIcon = operationCategories.find((category) => category.id === operation?.category_id)?.emoji ?? '⚡';
+      return renderIconValue(operation?.icon, <span className="text-sm leading-none">{categoryIcon}</span>);
+    }
+
+    switch (view.type) {
+      case 'home':
+        return <Home size={13} />;
+      case 'journal':
+        return <BookOpen size={13} />;
+      case 'wiki':
+        return <Library size={13} />;
+      case 'operations':
+        return <Wand2 size={13} />;
+      case 'altar':
+        return <Flame size={13} />;
+      case 'tags':
+        return <Tag size={13} />;
+      case 'trash':
+        return <Trash2 size={13} />;
+      default:
+        return <MoreHorizontal size={13} />;
+    }
+  };
+
   return (
-    <div className="h-10 flex items-end gap-1 overflow-x-auto overflow-y-hidden px-2 pt-2 bg-stone-900/95 border-b border-stone-700/60">
+    <div className="scrollbar-none h-10 flex items-end gap-1 overflow-x-auto overflow-y-hidden px-2 pt-2 bg-stone-900/95 border-b border-stone-700/60">
       {tabs.map((tab) => {
         const isActive = activeTabId === tab.id;
         const title = getTitle(tab.view);
