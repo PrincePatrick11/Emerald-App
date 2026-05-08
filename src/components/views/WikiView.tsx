@@ -74,10 +74,12 @@ export default function WikiView() {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const triggerAutoSave = useCallback(() => {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    const id = articleIdRef.current;
+    const payload = pendingRef.current;
+    const wasEditing = isEditingRef.current;
     autoSaveTimer.current = setTimeout(() => {
-      if (!isEditingRef.current) return;
-      const id = articleIdRef.current;
-      if (id) updateArticle(id, pendingRef.current);
+      if (!wasEditing || !id) return;
+      updateArticle(id, payload);
     }, 1500);
   }, [updateArticle]);
 

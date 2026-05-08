@@ -67,10 +67,12 @@ export default function OperationsView() {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const triggerAutoSave = useCallback(() => {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    const id = opIdRef.current;
+    const payload = pendingRef.current;
+    const wasEditing = isEditingRef.current;
     autoSaveTimer.current = setTimeout(() => {
-      if (!isEditingRef.current) return;
-      const id = opIdRef.current;
-      if (id) updateOperation(id, pendingRef.current);
+      if (!wasEditing || !id) return;
+      updateOperation(id, payload);
     }, 1500);
   }, [updateOperation]);
 

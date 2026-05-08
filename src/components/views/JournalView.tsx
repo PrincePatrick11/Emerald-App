@@ -65,10 +65,12 @@ export default function JournalView() {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const triggerAutoSave = useCallback(() => {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    const id = entryIdRef.current;
+    const payload = pendingRef.current;
+    const wasEditing = isEditingRef.current;
     autoSaveTimer.current = setTimeout(() => {
-      if (!isEditingRef.current) return;
-      const id = entryIdRef.current;
-      if (id) updateEntry(id, pendingRef.current);
+      if (!wasEditing || !id) return;
+      updateEntry(id, payload);
     }, 1500);
   }, [updateEntry]);
 
