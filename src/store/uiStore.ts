@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getTabKey, type OpenTab } from '../lib/tabs';
+import { createTabId, isContentView, type OpenTab } from '../lib/tabs';
 import type { ActiveView } from '../types';
 
 export type ViewMode = 'list' | 'cards' | 'timeline';
@@ -15,6 +15,7 @@ export type Theme = 'dark' | 'light';
 interface UIState {
   activeView: ActiveView;
   tabs: OpenTab[];
+  activeTabId: string | null;
   history: ActiveView[];
   historyIndex: number;
   rightSidebarOpen: boolean;
@@ -33,8 +34,11 @@ interface UIState {
   theme: Theme;
 
   setActiveView: (view: ActiveView) => void;
-  closeTab: (key: string) => void;
-  closeOtherTabs: (key: string) => void;
+  openViewInNewTab: (view: ActiveView) => void;
+  addTab: (view?: ActiveView) => void;
+  selectTab: (id: string) => void;
+  closeTab: (id: string) => void;
+  closeOtherTabs: (id: string) => void;
   navigateBack: () => void;
   navigateForward: () => void;
   toggleRightSidebar: () => void;
@@ -53,25 +57,49 @@ interface UIState {
   setTheme: (t: Theme) => void;
 }
 
-function loadSavedTabs(): OpenTab[] {
+function normalizeSavedTab(tab: unknown): OpenTab | null {
+  if (!tab || typeof tab !== 'object') return null;
+  const candidate = tab as { id?: string; key?: string; view?: ActiveView };
+  if (!candidate.view?.type) return null;
+  return { id: candidate.id ?? candidate.key ?? createTabId(), view: candidate.view };
+}
+
+function loadSavedTabs(): { tabs: OpenTab[]; activeTabId: string | null } {
   try {
     const raw = localStorage.getItem('open-tabs');
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as OpenTab[];
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((tab) => tab?.key && tab?.view?.type && tab.view.id);
+    const activeTabId = localStorage.getItem('active-tab-id');
+    if (!raw) return { tabs: [], activeTabId: null };
+    const parsed = JSON.parse(raw) as unknown[];
+    if (!Array.isArray(parsed)) return { tabs: [], activeTabId: null };
+    const tabs = parsed.map(normalizeSavedTab).filter((tab): tab is OpenTab => !!tab);
+    return { tabs, activeTabId: tabs.some((tab) => tab.id === activeTabId) ? activeTabId : tabs[0]?.id ?? null };
   } catch {
-    return [];
+    return { tabs: [], activeTabId: null };
   }
 }
 
-function saveTabs(tabs: OpenTab[]) {
+function saveTabs(tabs: OpenTab[], activeTabId: string | null) {
   localStorage.setItem('open-tabs', JSON.stringify(tabs));
+  if (activeTabId) localStorage.setItem('active-tab-id', activeTabId);
+  else localStorage.removeItem('active-tab-id');
 }
 
+function withNavigationState(s: UIState, view: ActiveView) {
+  const current = s.history[s.historyIndex];
+  const isNewPage = !current || current.type !== view.type || current.id !== view.id;
+  if (!isNewPage) return { activeView: view };
+  const history = [...s.history.slice(0, s.historyIndex + 1), view];
+  return { activeView: view, history, historyIndex: history.length - 1 };
+}
+
+const savedTabs = loadSavedTabs();
+
 export const useUIStore = create<UIState>((set) => ({
-  activeView: { type: 'home' },
-  tabs: loadSavedTabs(),
+  activeView: savedTabs.activeTabId
+    ? savedTabs.tabs.find((tab) => tab.id === savedTabs.activeTabId)?.view ?? { type: 'home' }
+    : { type: 'home' },
+  tabs: savedTabs.tabs,
+  activeTabId: savedTabs.activeTabId,
   history: [{ type: 'home' }],
   historyIndex: 0,
   rightSidebarOpen: true,
@@ -90,64 +118,85 @@ export const useUIStore = create<UIState>((set) => ({
   homeWikiPrefs:    { sort: 'alpha_asc', view: 'cards', count: 6 },
 
   setActiveView: (view) => set((s) => {
-    const current = s.history[s.historyIndex];
-    // Auto-open right sidebar when entering edit mode
-    const usesEditorSidebar =
-      view.type === 'journal' || view.type === 'wiki' || view.type === 'operations';
+    const usesEditorSidebar = view.type === 'journal' || view.type === 'wiki' || view.type === 'operations';
     const openSidebar = view.mode === 'edit' && usesEditorSidebar && !s.rightSidebarOpen
       ? { rightSidebarOpen: true }
       : {};
-    // Mode changes (read ↔ edit) don't create a history entry
-    const tabKey = getTabKey(view);
+
     let tabs = s.tabs;
-    if (tabKey) {
-      const nextTab = { key: tabKey, view };
-      const existingIndex = tabs.findIndex((tab) => tab.key === tabKey);
-      tabs = existingIndex >= 0
-        ? tabs.map((tab, index) => index === existingIndex ? nextTab : tab)
-        : [...tabs, nextTab];
-      saveTabs(tabs);
+    let activeTabId = s.activeTabId;
+    if (activeTabId) {
+      tabs = tabs.map((tab) => tab.id === activeTabId ? { ...tab, view } : tab);
+    } else if (isContentView(view)) {
+      activeTabId = createTabId();
+      tabs = [{ id: activeTabId, view }];
+    }
+    saveTabs(tabs, activeTabId);
+
+    return { ...withNavigationState(s, view), tabs, activeTabId, ...openSidebar };
+  }),
+
+  openViewInNewTab: (view) => set((s) => {
+    const id = createTabId();
+    const tabs = [...s.tabs, { id, view }];
+    saveTabs(tabs, id);
+    return { ...withNavigationState(s, view), tabs, activeTabId: id };
+  }),
+
+  addTab: (view = { type: 'home' }) => set((s) => {
+    const id = createTabId();
+    const tabs = [...s.tabs, { id, view }];
+    saveTabs(tabs, id);
+    return { ...withNavigationState(s, view), tabs, activeTabId: id };
+  }),
+
+  selectTab: (id) => set((s) => {
+    const tab = s.tabs.find((candidate) => candidate.id === id);
+    if (!tab) return {};
+    saveTabs(s.tabs, id);
+    return { ...withNavigationState(s, tab.view), activeTabId: id };
+  }),
+
+  closeTab: (id) => set((s) => {
+    const tabIndex = s.tabs.findIndex((tab) => tab.id === id);
+    if (tabIndex < 0) return {};
+    const tabs = s.tabs.filter((tab) => tab.id !== id);
+    if (s.activeTabId !== id) {
+      saveTabs(tabs, s.activeTabId);
+      return { tabs };
     }
 
-    const isNewPage = !current || current.type !== view.type || current.id !== view.id;
-    if (!isNewPage) return { activeView: view, tabs, ...openSidebar };
-    const newHistory = [...s.history.slice(0, s.historyIndex + 1), view];
-    return { activeView: view, tabs, history: newHistory, historyIndex: newHistory.length - 1, ...openSidebar };
-  }),
-
-  closeTab: (key) => set((s) => {
-    const tabIndex = s.tabs.findIndex((tab) => tab.key === key);
-    if (tabIndex < 0) return {};
-    const tabs = s.tabs.filter((tab) => tab.key !== key);
-    saveTabs(tabs);
-
-    const activeKey = getTabKey(s.activeView);
-    if (activeKey !== key) return { tabs };
-
     const nextTab = tabs[Math.min(tabIndex, tabs.length - 1)] ?? tabs[tabIndex - 1];
+    const activeTabId = nextTab?.id ?? null;
     const nextView = nextTab?.view ?? { type: 'home' as const };
-    const history = [...s.history.slice(0, s.historyIndex + 1), nextView];
-    return { tabs, activeView: nextView, history, historyIndex: history.length - 1 };
+    saveTabs(tabs, activeTabId);
+    return { ...withNavigationState(s, nextView), tabs, activeTabId };
   }),
 
-  closeOtherTabs: (key) => set((s) => {
-    const tab = s.tabs.find((candidate) => candidate.key === key);
+  closeOtherTabs: (id) => set((s) => {
+    const tab = s.tabs.find((candidate) => candidate.id === id);
     if (!tab) return {};
     const tabs = [tab];
-    saveTabs(tabs);
-    return { tabs, activeView: tab.view };
+    saveTabs(tabs, tab.id);
+    return { ...withNavigationState(s, tab.view), tabs, activeTabId: tab.id };
   }),
 
   navigateBack: () => set((s) => {
     if (s.historyIndex <= 0) return {};
-    const newIndex = s.historyIndex - 1;
-    return { historyIndex: newIndex, activeView: s.history[newIndex] };
+    const historyIndex = s.historyIndex - 1;
+    const activeView = s.history[historyIndex];
+    const tabs = s.activeTabId ? s.tabs.map((tab) => tab.id === s.activeTabId ? { ...tab, view: activeView } : tab) : s.tabs;
+    saveTabs(tabs, s.activeTabId);
+    return { historyIndex, activeView, tabs };
   }),
 
   navigateForward: () => set((s) => {
     if (s.historyIndex >= s.history.length - 1) return {};
-    const newIndex = s.historyIndex + 1;
-    return { historyIndex: newIndex, activeView: s.history[newIndex] };
+    const historyIndex = s.historyIndex + 1;
+    const activeView = s.history[historyIndex];
+    const tabs = s.activeTabId ? s.tabs.map((tab) => tab.id === s.activeTabId ? { ...tab, view: activeView } : tab) : s.tabs;
+    saveTabs(tabs, s.activeTabId);
+    return { historyIndex, activeView, tabs };
   }),
   toggleRightSidebar: () => set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),
   setRightSidebarTab: (tab) => set({ rightSidebarTab: tab }),

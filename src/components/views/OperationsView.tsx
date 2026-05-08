@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Trash2, PanelRightOpen, Check, X, Plus, Pencil, Copy } from 'lucide-react';
+import { Trash2, PanelRightOpen, Check, X, Plus, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import FilterPanel from '../ui/FilterPanel';
 import { getDb } from '../../lib/db';
@@ -22,7 +22,7 @@ import OperationSigilView from './OperationSigilView';
 
 export default function OperationsView() {
   const { t } = useTranslation();
-  const { activeView, setActiveView, toggleRightSidebar, operationsPrefs, setOperationsPrefs } = useUIStore();
+  const { activeView, setActiveView, openViewInNewTab, toggleRightSidebar, operationsPrefs, setOperationsPrefs } = useUIStore();
   const { operations, categories, createOperation, updateOperation, deleteOperation, restoreOperation, getOperation, addCategory, updateCategory, deleteCategory, restoreCategory } = useOperationStore();
   const pushUndo = useUndoStore((s) => s.push);
 
@@ -632,6 +632,7 @@ export default function OperationsView() {
           x={ctxMenu.x} y={ctxMenu.y}
           onClose={() => setCtxMenu(null)}
           actions={[
+            { label: 'Open in New Tab', icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'operations', id: ctxMenu.id, mode: 'view' }) },
             ...(operations.find((o) => o.id === ctxMenu.id)?.category_id === 'sigils'
               ? []
               : [{ label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) }]),

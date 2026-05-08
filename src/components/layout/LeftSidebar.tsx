@@ -13,6 +13,7 @@ import {
   Settings,
   Copy,
   Pencil,
+  PanelTopOpen,
 } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import { useUndoStore } from '../../store/undoStore';
@@ -27,7 +28,7 @@ import SettingsModal from './SettingsModal';
 
 export default function LeftSidebar() {
   const { t } = useTranslation();
-  const { activeView, setActiveView, searchQuery, setSearchQuery, navigateBack, navigateForward, historyIndex, history } = useUIStore();
+  const { activeView, setActiveView, openViewInNewTab, searchQuery, setSearchQuery, navigateBack, navigateForward, historyIndex, history } = useUIStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { entries, createEntry, updateEntry, deleteEntry, restoreEntry } = useJournalStore();
   const pushUndo = useUndoStore((s) => s.push);
@@ -262,6 +263,7 @@ export default function LeftSidebar() {
           x={ctxMenu.x} y={ctxMenu.y}
           onClose={() => setCtxMenu(null)}
           actions={[
+            { label: 'Open in New Tab', icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'journal', id: ctxMenu.id, mode: 'view' }) },
             { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
             { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
             { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },

@@ -1,22 +1,27 @@
-import { BookOpen, Flame, Library, MoreHorizontal, Wand2, X } from 'lucide-react';
+import { BookOpen, Flame, Home, Library, MoreHorizontal, Plus, Tag, Trash2, Wand2, X } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
-import { getTabKey } from '../../lib/tabs';
 import type { ActiveView } from '../../types';
 
 function getFallbackTitle(view: ActiveView) {
   switch (view.type) {
+    case 'home':
+      return 'Home';
     case 'journal':
-      return 'Untitled journal entry';
+      return view.id ? 'Untitled journal entry' : 'Journal';
     case 'wiki':
-      return 'Untitled wiki article';
+      return view.id ? 'Untitled wiki article' : 'Wiki';
     case 'operations':
-      return 'Untitled operation';
+      return view.id ? 'Untitled operation' : 'Operations';
     case 'altar':
-      return 'Untitled altar';
+      return view.id ? 'Untitled altar' : 'Altar';
+    case 'tags':
+      return 'Tags';
+    case 'trash':
+      return 'Trash';
     default:
       return 'Untitled';
   }
@@ -24,6 +29,8 @@ function getFallbackTitle(view: ActiveView) {
 
 function getIcon(view: ActiveView) {
   switch (view.type) {
+    case 'home':
+      return <Home size={13} />;
     case 'journal':
       return <BookOpen size={13} />;
     case 'wiki':
@@ -32,21 +39,23 @@ function getIcon(view: ActiveView) {
       return <Wand2 size={13} />;
     case 'altar':
       return <Flame size={13} />;
+    case 'tags':
+      return <Tag size={13} />;
+    case 'trash':
+      return <Trash2 size={13} />;
     default:
       return <MoreHorizontal size={13} />;
   }
 }
 
 export default function TabBar() {
-  const { activeView, tabs, setActiveView, closeTab, closeOtherTabs } = useUIStore();
+  const { tabs, activeTabId, selectTab, closeTab, closeOtherTabs, addTab } = useUIStore();
   const getEntry = useJournalStore((s) => s.getEntry);
   const getArticle = useWikiStore((s) => s.getArticle);
   const getOperation = useOperationStore((s) => s.getOperation);
   const altars = useAltarStore((s) => s.altars);
 
   if (tabs.length === 0) return null;
-
-  const activeKey = getTabKey(activeView);
 
   const getTitle = (view: ActiveView) => {
     if (!view.id) return getFallbackTitle(view);
@@ -60,21 +69,21 @@ export default function TabBar() {
   return (
     <div className="h-10 flex items-end gap-1 overflow-x-auto overflow-y-hidden px-2 pt-2 bg-stone-900/95 border-b border-stone-700/60">
       {tabs.map((tab) => {
-        const isActive = activeKey === tab.key;
+        const isActive = activeTabId === tab.id;
         const title = getTitle(tab.view);
         return (
           <div
-            key={tab.key}
-            className={`group flex w-52 flex-shrink-0 items-center gap-2 rounded-t-lg border px-3 py-2 text-xs transition-colors ${
+            key={tab.id}
+            className={`group flex min-w-32 max-w-56 flex-1 items-center gap-2 rounded-t-lg border px-3 py-2 text-xs transition-colors ${
               isActive
                 ? 'border-stone-700/80 border-b-stone-800 bg-stone-800 text-stone-100'
                 : 'border-stone-800/60 bg-stone-900/70 text-stone-500 hover:bg-stone-800/60 hover:text-stone-300'
             }`}
           >
             <button
-              onClick={() => setActiveView(tab.view)}
-              onAuxClick={(event) => { if (event.button === 1) closeTab(tab.key); }}
-              onDoubleClick={() => closeOtherTabs(tab.key)}
+              onClick={() => selectTab(tab.id)}
+              onAuxClick={(event) => { if (event.button === 1) closeTab(tab.id); }}
+              onDoubleClick={() => closeOtherTabs(tab.id)}
               className="flex min-w-0 flex-1 items-center gap-2 text-left"
               title={`${title}\nDouble-click to close other tabs`}
             >
@@ -83,7 +92,7 @@ export default function TabBar() {
               {tab.view.mode === 'edit' && <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-jade-500" title="Editing" />}
             </button>
             <button
-              onClick={() => closeTab(tab.key)}
+              onClick={() => closeTab(tab.id)}
               className="-mr-1 rounded p-0.5 text-stone-600 opacity-0 transition-colors hover:bg-stone-700 hover:text-stone-200 group-hover:opacity-100"
               title="Close tab"
             >
@@ -92,6 +101,13 @@ export default function TabBar() {
           </div>
         );
       })}
+      <button
+        onClick={() => addTab()}
+        className="mb-px flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-t-lg border border-stone-800/60 bg-stone-900/70 text-stone-500 transition-colors hover:bg-stone-800/60 hover:text-stone-200"
+        title="New tab"
+      >
+        <Plus size={15} />
+      </button>
     </div>
   );
 }

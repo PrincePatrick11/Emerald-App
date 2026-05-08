@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Trash2, PanelRightOpen, Check, X, Plus, Pencil, Copy } from 'lucide-react';
+import { Trash2, PanelRightOpen, Check, X, Plus, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import ListToolbar from '../ui/ListToolbar';
 import FilterPanel from '../ui/FilterPanel';
@@ -25,7 +25,7 @@ const WIKI_EMOJIS = [
 
 export default function WikiView() {
   const { t } = useTranslation();
-  const { activeView, setActiveView, toggleRightSidebar, wikiPrefs, setWikiPrefs } = useUIStore();
+  const { activeView, setActiveView, openViewInNewTab, toggleRightSidebar, wikiPrefs, setWikiPrefs } = useUIStore();
   const {
     articles, wikiCategories, createArticle, updateArticle, deleteArticle, restoreArticle, getArticle,
     addWikiCategory, updateWikiCategory, deleteWikiCategory, restoreWikiCategory,
@@ -554,6 +554,7 @@ export default function WikiView() {
           x={ctxMenu.x} y={ctxMenu.y}
           onClose={() => setCtxMenu(null)}
           actions={[
+            { label: 'Open in New Tab', icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'wiki', id: ctxMenu.id, mode: 'view' }) },
             { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
             { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
             { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },
