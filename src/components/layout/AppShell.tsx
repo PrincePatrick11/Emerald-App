@@ -47,6 +47,7 @@ async function runImageCleanup() {
 import LeftSidebar from './LeftSidebar';
 import RightSidebar from './RightSidebar';
 import MainArea from './MainArea';
+import TabBar from './TabBar';
 import UndoToast from '../ui/UndoToast';
 
 const LEFT_MIN = 180;
@@ -227,8 +228,11 @@ export default function AppShell() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 min-w-0 overflow-hidden">
-        <MainArea />
+      <main className="flex-1 min-w-0 overflow-hidden flex flex-col">
+        <TabBar />
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <MainArea />
+        </div>
       </main>
 
       {/* Right Sidebar */}
