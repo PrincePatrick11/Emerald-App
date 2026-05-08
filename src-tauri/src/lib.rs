@@ -131,6 +131,19 @@ fn read_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
+/// Ensures platform-specific app storage directories exist before frontend
+/// code writes vault metadata or opens SQLite databases.
+#[tauri::command]
+fn ensure_app_storage_dirs(app: tauri::AppHandle) -> Result<(), String> {
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(app_data_dir).map_err(|e| e.to_string())?;
+
+    let app_config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(app_config_dir).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 /// Triggers the system print dialog on the pdf-export window.
 #[tauri::command]
 fn trigger_print(app: tauri::AppHandle) -> Result<(), String> {
@@ -341,6 +354,7 @@ pub fn run() {
             cleanup_unused_images,
             write_file,
             read_file,
+            ensure_app_storage_dirs,
             open_pdf_export,
             trigger_print,
             update_menu_labels,

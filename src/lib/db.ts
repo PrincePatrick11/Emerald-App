@@ -1,4 +1,5 @@
 import Database from '@tauri-apps/plugin-sql';
+import { invoke } from '@tauri-apps/api/core';
 import { getActiveDbName } from './vaultManager';
 
 // Per-vault DB cache: SQLite identifier → Database instance
@@ -20,6 +21,7 @@ export async function getDb(): Promise<Database> {
   if (_initPromises.has(identifier)) return _initPromises.get(identifier)!;
 
   const promise = (async () => {
+    await invoke('ensure_app_storage_dirs');
     const db = await Database.load(identifier);
     await runMigrations(db);
     _dbCache.set(identifier, db);
