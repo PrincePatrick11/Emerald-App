@@ -96,40 +96,42 @@ export default function TabBar() {
   };
 
   return (
-    <div className="scrollbar-none h-10 flex items-end gap-1 overflow-x-auto overflow-y-hidden px-2 pt-2 bg-stone-900/95 border-b border-stone-700/60">
-      {tabs.map((tab) => {
-        const isActive = activeTabId === tab.id;
-        const title = getTitle(tab.view);
-        return (
-          <div
-            key={tab.id}
-            className={`group flex min-w-32 max-w-56 flex-1 items-center gap-2 rounded-t-lg border px-3 py-2 text-xs transition-colors ${
-              isActive
-                ? 'border-stone-700/80 border-b-stone-800 bg-stone-800 text-stone-100'
-                : 'border-stone-800/60 bg-stone-900/70 text-stone-500 hover:bg-stone-800/60 hover:text-stone-300'
-            }`}
-          >
-            <button
-              onClick={() => selectTab(tab.id)}
-              onAuxClick={(event) => { if (event.button === 1) closeTab(tab.id); }}
-              onDoubleClick={() => closeOtherTabs(tab.id)}
-              className="flex min-w-0 flex-1 items-center gap-2 text-left"
-              title={`${title}\nDouble-click to close other tabs`}
+    <div className="h-10 flex items-end gap-1 overflow-hidden px-2 pt-2 bg-stone-900/95 border-b border-stone-700/60">
+      <div className="scrollbar-none flex min-w-0 flex-1 items-end gap-1 overflow-x-auto overflow-y-hidden">
+        {tabs.map((tab) => {
+          const isActive = activeTabId === tab.id;
+          const title = getTitle(tab.view);
+          return (
+            <div
+              key={tab.id}
+              className={`group flex min-w-32 max-w-56 flex-1 items-center gap-2 rounded-t-lg border px-3 py-2 text-xs transition-colors ${
+                isActive
+                  ? 'border-stone-700/80 border-b-stone-800 bg-stone-800 text-stone-100'
+                  : 'border-stone-800/60 bg-stone-900/70 text-stone-500 hover:bg-stone-800/60 hover:text-stone-300'
+              }`}
             >
-              <span className="flex-shrink-0 text-stone-500">{getIcon(tab.view)}</span>
-              <span className="truncate">{title}</span>
-              {tab.view.mode === 'edit' && <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-jade-500" title="Editing" />}
-            </button>
-            <button
-              onClick={() => closeTab(tab.id)}
-              className="-mr-1 rounded p-0.5 text-stone-600 opacity-0 transition-colors hover:bg-stone-700 hover:text-stone-200 group-hover:opacity-100"
-              title="Close tab"
-            >
-              <X size={13} />
-            </button>
-          </div>
-        );
-      })}
+              <button
+                onClick={() => selectTab(tab.id)}
+                onAuxClick={(event) => { if (event.button === 1) closeTab(tab.id); }}
+                onDoubleClick={() => closeOtherTabs(tab.id)}
+                className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                title={`${title}\nDouble-click to close other tabs`}
+              >
+                <span className="flex-shrink-0 text-stone-500">{getIcon(tab.view)}</span>
+                <span className="truncate">{title}</span>
+                {tab.view.mode === 'edit' && <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-jade-500" title="Editing" />}
+              </button>
+              <button
+                onClick={() => closeTab(tab.id)}
+                className="-mr-1 rounded p-0.5 text-stone-600 opacity-0 transition-colors hover:bg-stone-700 hover:text-stone-200 group-hover:opacity-100"
+                title="Close tab"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
       <button
         onClick={() => addTab()}
         className="mb-px flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-t-lg border border-stone-800/60 bg-stone-900/70 text-stone-500 transition-colors hover:bg-stone-800/60 hover:text-stone-200"
