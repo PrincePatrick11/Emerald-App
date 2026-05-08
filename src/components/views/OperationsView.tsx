@@ -44,6 +44,7 @@ export default function OperationsView() {
   const [content, setContent] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+  const [loadedOperationId, setLoadedOperationId] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(true);
   const [endDate, setEndDate] = useState<string>('');
   const [version, setVersion] = useState<string>('');
@@ -104,6 +105,9 @@ export default function OperationsView() {
       setIsActive(operation.is_active ?? true);
       setEndDate(operation.end_date ?? '');
       setVersion(operation.version ?? '');
+      setLoadedOperationId(operation.id);
+    } else {
+      setLoadedOperationId(null);
     }
   }, [operation?.id]);
 
@@ -751,13 +755,15 @@ export default function OperationsView() {
 
       {/* Editor */}
       <div className="flex-1 overflow-hidden px-8 pb-8" onDoubleClick={enterEditMode}>
-        <RichEditor
-          key={operation.id}
-          content={content}
-          placeholder={t('operations.placeholder')}
-          onChange={handleContentChange}
-          editable={isEditing}
-        />
+        {loadedOperationId === operation.id && (
+          <RichEditor
+            key={operation.id}
+            content={content}
+            placeholder={t('operations.placeholder')}
+            onChange={handleContentChange}
+            editable={isEditing}
+          />
+        )}
       </div>
     </div>
   );

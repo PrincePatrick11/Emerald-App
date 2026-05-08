@@ -323,7 +323,7 @@ export default function RichEditor({
     if (editor && editor.getHTML() !== content) {
       editor.commands.setContent(content || '', false);
     }
-  }, [content]);
+  }, [content, editor]);
 
   useEffect(() => {
     editor?.setEditable(editable);

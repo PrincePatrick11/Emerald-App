@@ -50,6 +50,7 @@ export default function WikiView() {
   const [tags, setTags] = useState<string[]>([]);
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [icon, setIcon] = useState<string | null>(null);
+  const [loadedArticleId, setLoadedArticleId] = useState<string | null>(null);
 
   // Category management state
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
@@ -110,6 +111,9 @@ export default function WikiView() {
       setTags(article.tags ?? []);
       setCoverImage(article.cover_image ?? null);
       setIcon(article.icon ?? null);
+      setLoadedArticleId(article.id);
+    } else {
+      setLoadedArticleId(null);
     }
   }, [article?.id]);
 
@@ -659,13 +663,15 @@ export default function WikiView() {
 
       {/* Editor — double-click enters edit mode */}
       <div className="flex-1 overflow-hidden px-8 pb-8" onDoubleClick={enterEditMode}>
-        <RichEditor
-          key={article.id}
-          content={content}
-          placeholder={t('wiki.placeholder')}
-          onChange={handleContentChange}
-          editable={isEditing}
-        />
+        {loadedArticleId === article.id && (
+          <RichEditor
+            key={article.id}
+            content={content}
+            placeholder={t('wiki.placeholder')}
+            onChange={handleContentChange}
+            editable={isEditing}
+          />
+        )}
       </div>
     </div>
   );

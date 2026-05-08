@@ -48,6 +48,7 @@ export default function JournalView() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+  const [loadedEntryId, setLoadedEntryId] = useState<string | null>(null);
 
   // Always-fresh refs
   const pendingRef = useRef({ title, content, tags });
@@ -99,6 +100,9 @@ export default function JournalView() {
       setTitle(entry.title);
       setContent(entry.content);
       setTags(entry.tags ?? []);
+      setLoadedEntryId(entry.id);
+    } else {
+      setLoadedEntryId(null);
     }
   }, [entry?.id]);
 
@@ -585,13 +589,15 @@ export default function JournalView() {
 
       {/* Editor — double-click enters edit mode */}
       <div className="flex-1 overflow-hidden px-8 pb-8" onDoubleClick={enterEditMode}>
-        <RichEditor
-          key={entry.id}
-          content={content}
-          placeholder={t('journal.placeholder')}
-          onChange={handleContentChange}
-          editable={isEditing}
-        />
+        {loadedEntryId === entry.id && (
+          <RichEditor
+            key={entry.id}
+            content={content}
+            placeholder={t('journal.placeholder')}
+            onChange={handleContentChange}
+            editable={isEditing}
+          />
+        )}
       </div>
     </div>
   );
