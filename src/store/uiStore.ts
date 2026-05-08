@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { getTabKey, type OpenTab } from '../lib/tabs';
 import type { ActiveView } from '../types';
 
 export type ViewMode = 'list' | 'cards' | 'timeline';
@@ -13,6 +14,7 @@ export type Theme = 'dark' | 'light';
 
 interface UIState {
   activeView: ActiveView;
+  tabs: OpenTab[];
   history: ActiveView[];
   historyIndex: number;
   rightSidebarOpen: boolean;
@@ -31,6 +33,8 @@ interface UIState {
   theme: Theme;
 
   setActiveView: (view: ActiveView) => void;
+  closeTab: (key: string) => void;
+  closeOtherTabs: (key: string) => void;
   navigateBack: () => void;
   navigateForward: () => void;
   toggleRightSidebar: () => void;
@@ -49,8 +53,25 @@ interface UIState {
   setTheme: (t: Theme) => void;
 }
 
+function loadSavedTabs(): OpenTab[] {
+  try {
+    const raw = localStorage.getItem('open-tabs');
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as OpenTab[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((tab) => tab?.key && tab?.view?.type && tab.view.id);
+  } catch {
+    return [];
+  }
+}
+
+function saveTabs(tabs: OpenTab[]) {
+  localStorage.setItem('open-tabs', JSON.stringify(tabs));
+}
+
 export const useUIStore = create<UIState>((set) => ({
   activeView: { type: 'home' },
+  tabs: loadSavedTabs(),
   history: [{ type: 'home' }],
   historyIndex: 0,
   rightSidebarOpen: true,
@@ -77,10 +98,44 @@ export const useUIStore = create<UIState>((set) => ({
       ? { rightSidebarOpen: true }
       : {};
     // Mode changes (read ↔ edit) don't create a history entry
+    const tabKey = getTabKey(view);
+    let tabs = s.tabs;
+    if (tabKey) {
+      const nextTab = { key: tabKey, view };
+      const existingIndex = tabs.findIndex((tab) => tab.key === tabKey);
+      tabs = existingIndex >= 0
+        ? tabs.map((tab, index) => index === existingIndex ? nextTab : tab)
+        : [...tabs, nextTab];
+      saveTabs(tabs);
+    }
+
     const isNewPage = !current || current.type !== view.type || current.id !== view.id;
-    if (!isNewPage) return { activeView: view, ...openSidebar };
+    if (!isNewPage) return { activeView: view, tabs, ...openSidebar };
     const newHistory = [...s.history.slice(0, s.historyIndex + 1), view];
-    return { activeView: view, history: newHistory, historyIndex: newHistory.length - 1, ...openSidebar };
+    return { activeView: view, tabs, history: newHistory, historyIndex: newHistory.length - 1, ...openSidebar };
+  }),
+
+  closeTab: (key) => set((s) => {
+    const tabIndex = s.tabs.findIndex((tab) => tab.key === key);
+    if (tabIndex < 0) return {};
+    const tabs = s.tabs.filter((tab) => tab.key !== key);
+    saveTabs(tabs);
+
+    const activeKey = getTabKey(s.activeView);
+    if (activeKey !== key) return { tabs };
+
+    const nextTab = tabs[Math.min(tabIndex, tabs.length - 1)] ?? tabs[tabIndex - 1];
+    const nextView = nextTab?.view ?? { type: 'home' as const };
+    const history = [...s.history.slice(0, s.historyIndex + 1), nextView];
+    return { tabs, activeView: nextView, history, historyIndex: history.length - 1 };
+  }),
+
+  closeOtherTabs: (key) => set((s) => {
+    const tab = s.tabs.find((candidate) => candidate.key === key);
+    if (!tab) return {};
+    const tabs = [tab];
+    saveTabs(tabs);
+    return { tabs, activeView: tab.view };
   }),
 
   navigateBack: () => set((s) => {
