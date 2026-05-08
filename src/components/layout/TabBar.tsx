@@ -39,7 +39,7 @@ function renderIconValue(icon: string | null | undefined, fallback: ReactNode) {
 }
 
 export default function TabBar() {
-  const { tabs, activeTabId, selectTab, closeTab, closeOtherTabs, addTab } = useUIStore();
+  const { tabs, activeTabId, selectTab, closeTab, addTab } = useUIStore();
   const getEntry = useJournalStore((s) => s.getEntry);
   const getArticle = useWikiStore((s) => s.getArticle);
   const getOperation = useOperationStore((s) => s.getOperation);
@@ -96,8 +96,8 @@ export default function TabBar() {
   };
 
   return (
-    <div className="h-10 flex items-end gap-1 overflow-hidden px-2 pt-2 bg-stone-900/95 border-b border-stone-700/60">
-      <div className="scrollbar-none flex min-w-0 flex-1 items-end gap-1 overflow-x-auto overflow-y-hidden">
+    <div className="h-10 flex items-end overflow-hidden px-2 pt-2 bg-stone-900/95 border-b border-stone-700/60">
+      <div className="scrollbar-none flex min-w-0 max-w-full flex-initial items-end gap-1 overflow-x-auto overflow-y-hidden">
         {tabs.map((tab) => {
           const isActive = activeTabId === tab.id;
           const title = getTitle(tab.view);
@@ -113,9 +113,8 @@ export default function TabBar() {
               <button
                 onClick={() => selectTab(tab.id)}
                 onAuxClick={(event) => { if (event.button === 1) closeTab(tab.id); }}
-                onDoubleClick={() => closeOtherTabs(tab.id)}
                 className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                title={`${title}\nDouble-click to close other tabs`}
+                title={title}
               >
                 <span className="flex-shrink-0 text-stone-500">{getIcon(tab.view)}</span>
                 <span className="truncate">{title}</span>
@@ -134,7 +133,7 @@ export default function TabBar() {
       </div>
       <button
         onClick={() => addTab()}
-        className="mb-px flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-t-lg border border-stone-800/60 bg-stone-900/70 text-stone-500 transition-colors hover:bg-stone-800/60 hover:text-stone-200"
+        className="mb-px ml-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-t-lg border border-stone-800/60 bg-stone-900/70 text-stone-500 transition-colors hover:bg-stone-800/60 hover:text-stone-200"
         title="New tab"
       >
         <Plus size={15} />
