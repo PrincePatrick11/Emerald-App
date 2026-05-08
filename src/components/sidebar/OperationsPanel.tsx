@@ -10,7 +10,7 @@ import ContextMenu from '../ui/ContextMenu';
 export default function OperationsPanel({ onNavigate }: { onNavigate: (view: any) => void }) {
   const { t } = useTranslation();
   const { categories, operations, createOperation, updateOperation, deleteOperation, restoreOperation } = useOperationStore();
-  const { operationsSubTab, setOperationsSubTab } = useUIStore();
+  const { operationsSubTab, setOperationsSubTab, openViewInNewTab } = useUIStore();
   const pushUndo = useUndoStore((s) => s.push);
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -90,12 +90,18 @@ export default function OperationsPanel({ onNavigate }: { onNavigate: (view: any
               <div
                 key={op.id}
                 onPointerDown={(e) => {
-                  if (renamingId === op.id) return;
+                  if (renamingId === op.id || e.button !== 0) return;
                   e.preventDefault();
                   setDragItem({ id: op.id, entryType: 'operation', label: op.title, category: cat?.emoji });
                 }}
                 onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ id: op.id, x: e.clientX, y: e.clientY }); }}
                 onClick={() => { if (renamingId !== op.id) onNavigate({ type: 'operations', id: op.id, mode: 'view' }); }}
+                onAuxClick={(e) => {
+                  if (renamingId !== op.id && e.button === 1) {
+                    e.preventDefault();
+                    openViewInNewTab({ type: 'operations', id: op.id, mode: 'view' });
+                  }
+                }}
                 className="sidebar-item cursor-grab active:cursor-grabbing"
               >
                 {opIcon.startsWith('data:')

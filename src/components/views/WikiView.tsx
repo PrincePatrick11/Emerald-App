@@ -352,6 +352,12 @@ export default function WikiView() {
         <button
           key={a.id}
           onClick={() => setActiveView({ type: 'wiki', id: a.id, mode: 'view' })}
+          onAuxClick={(e) => {
+            if (e.button === 1) {
+              e.preventDefault();
+              openViewInNewTab({ type: 'wiki', id: a.id, mode: 'view' });
+            }
+          }}
           onContextMenu={(e) => openCtxMenu(e, a.id)}
           className={view === 'cards'
             ? 'panel-interactive px-4 py-4 text-left'

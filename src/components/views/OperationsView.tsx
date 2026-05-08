@@ -380,6 +380,12 @@ export default function OperationsView() {
         <button
           key={op.id}
           onClick={() => setActiveView({ type: 'operations', id: op.id, mode: 'view' })}
+          onAuxClick={(e) => {
+            if (e.button === 1) {
+              e.preventDefault();
+              openViewInNewTab({ type: 'operations', id: op.id, mode: 'view' });
+            }
+          }}
           onContextMenu={(e) => openCtxMenu(e, op.id)}
           className={view === 'cards'
             ? 'panel-interactive px-4 py-4 text-left'

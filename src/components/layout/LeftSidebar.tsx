@@ -190,10 +190,17 @@ export default function LeftSidebar() {
                 <button
                   key={entry.id}
                   onPointerDown={(e) => {
+                    if (e.button !== 0) return;
                     e.preventDefault();
                     setDragItem({ id: entry.id, entryType: 'journal', label: entry.title });
                   }}
                   onClick={() => setActiveView({ type: 'journal', id: entry.id, mode: 'view' })}
+                  onAuxClick={(e) => {
+                    if (e.button === 1) {
+                      e.preventDefault();
+                      openViewInNewTab({ type: 'journal', id: entry.id, mode: 'view' });
+                    }
+                  }}
                   onContextMenu={(e) => openCtxMenu(e, entry.id)}
                   className={`sidebar-item w-full text-left cursor-grab active:cursor-grabbing ${activeView.id === entry.id ? 'active' : ''}`}
                 >

@@ -19,7 +19,7 @@ export default function WikiPanel({
   wikiSubTab: string | null;
 }) {
   const { t } = useTranslation();
-  const { setWikiSubTab } = useUIStore();
+  const { setWikiSubTab, openViewInNewTab } = useUIStore();
   const { wikiCategories, createArticle, updateArticle, deleteArticle, restoreArticle } = useWikiStore();
   const pushUndo = useUndoStore((s) => s.push);
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -93,13 +93,19 @@ export default function WikiPanel({
               <div
                 key={article.id}
                 onPointerDown={(e) => {
-                  if (renamingId === article.id) return;
+                  if (renamingId === article.id || e.button !== 0) return;
                   e.preventDefault();
                   setDragItem({ id: article.id, entryType: 'wiki', label: article.title, category: article.category });
                 }}
                 onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ id: article.id, x: e.clientX, y: e.clientY }); }}
                 className="sidebar-item cursor-grab active:cursor-grabbing group"
                 onClick={() => { if (renamingId !== article.id) onNavigate({ type: 'wiki', id: article.id, mode: 'view' }); }}
+                onAuxClick={(e) => {
+                  if (renamingId !== article.id && e.button === 1) {
+                    e.preventDefault();
+                    openViewInNewTab({ type: 'wiki', id: article.id, mode: 'view' });
+                  }
+                }}
               >
                 {article.icon
                   ? <img src={article.icon} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
