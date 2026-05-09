@@ -7,6 +7,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useTagStore } from '../../store/tagStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useRoutineStore } from '../../store/routineStore';
+import { useTaskStore } from '../../store/taskStore';
 import { useVaultStore } from '../../store/vaultStore';
 // useJournalStore/useWikiStore/useOperationStore used for image cleanup below
 import { invoke } from '@tauri-apps/api/core';
@@ -67,6 +68,7 @@ export default function AppShell() {
   const fetchTags = useTagStore((s) => s.fetchTags);
   const fetchAll = useOperationStore((s) => s.fetchAll);
   const fetchRoutines = useRoutineStore((s) => s.fetchRoutines);
+  const fetchTasks = useTaskStore((s) => s.fetchTasks);
   const loadVaults = useVaultStore((s) => s.loadVaults);
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const navigateBack = useUIStore((s) => s.navigateBack);
@@ -92,7 +94,7 @@ export default function AppShell() {
   useEffect(() => {
     // Load vault metadata first so getDb() knows which DB file to open
     loadVaults().then(() =>
-      Promise.all([fetchEntries(), fetchArticles(), fetchTags(), fetchAll(), fetchRoutines()])
+      Promise.all([fetchEntries(), fetchArticles(), fetchTags(), fetchAll(), fetchRoutines(), fetchTasks()])
         .then(runImageCleanup)
     );
   }, []);

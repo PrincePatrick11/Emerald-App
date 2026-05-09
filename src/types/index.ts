@@ -84,7 +84,7 @@ export interface Operation {
 export interface TrashedItem {
   id: string;
   title: string;
-  type: 'journal' | 'wiki' | 'tag' | 'operation' | 'creation' | 'wiki_category' | 'operation_category';
+  type: 'journal' | 'wiki' | 'tag' | 'operation' | 'creation' | 'task' | 'wiki_category' | 'operation_category';
   deleted_at: string;
   category?: string; // wiki category slug | operation category name
 }
@@ -114,6 +114,21 @@ export interface Routine {
   wiki_ids: string[];
   created_at: string;
   updated_at: string;
+}
+
+export type TaskPriority = 'low' | 'normal' | 'high';
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string;
+  is_done: boolean;
+  priority: TaskPriority;
+  due_date: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  sort_order: number;
 }
 
 export type CustomPropertyType = 'text' | 'number' | 'date' | 'toggle' | 'checkbox';
@@ -176,7 +191,7 @@ export interface AltarPlacement {
 }
 
 export interface ActiveView {
-  type: ContentType | 'home' | 'tags' | 'trash' | 'altar' | 'operations';
+  type: ContentType | 'home' | 'tags' | 'trash' | 'altar' | 'operations' | 'tasks';
   id?: string;
   mode?: 'view' | 'edit';
 }

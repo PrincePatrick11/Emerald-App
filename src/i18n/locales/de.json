@@ -31,7 +31,8 @@
     "propertyUpdated": "Eigenschaft aktualisiert",
     "propertyDeleted": "Eigenschaft gelöscht",
     "categoryDeleted": "Kategorie gelöscht",
-    "tagDeleted": "Tag gelöscht"
+    "tagDeleted": "Tag gelöscht",
+    "taskDeleted": "Aufgabe in den Papierkorb verschoben"
   },
   "nav": {
     "journal": "Journal",
@@ -43,7 +44,8 @@
     "operations": "Operationen",
     "settings": "Einstellungen",
     "newEntry": "Neuer Eintrag",
-    "newArticle": "Neuer Artikel"
+    "newArticle": "Neuer Artikel",
+    "tasks": "Aufgaben"
   },
   "operations": {
     "title": "Operationen",
@@ -390,5 +392,36 @@
     "tabWiki": "Wiki",
     "tabOperations": "Operationen",
     "noResults": "Keine Einträge gefunden"
+  },
+  "tasks": {
+    "title": "Aufgaben",
+    "subtitle": "To-Do Dashboard",
+    "openCount": "offene Aufgaben",
+    "newPlaceholder": "Neue Aufgabe hinzufügen…",
+    "add": "Aufgabe hinzufügen",
+    "searchPlaceholder": "Aufgaben suchen…",
+    "loading": "Aufgaben werden geladen…",
+    "empty": "Hier sind keine Aufgaben.",
+    "emptyHint": "Lege oben eine Aufgabe an, um deine Liste zu starten.",
+    "descriptionPlaceholder": "Beschreibung…",
+    "markDone": "Als erledigt markieren",
+    "markOpen": "Wieder öffnen",
+    "moveToTrash": "In den Papierkorb verschieben",
+    "trashHint": "Gelöschte Aufgaben landen im Papierkorb und können dort wiederhergestellt werden.",
+    "filters": {
+      "open": "Offen",
+      "all": "Alle",
+      "done": "Erledigt"
+    },
+    "columns": {
+      "task": "Aufgabe",
+      "due": "Fällig",
+      "priority": "Priorität"
+    },
+    "priority": {
+      "low": "Niedrig",
+      "normal": "Normal",
+      "high": "Hoch"
+    }
   }
 }

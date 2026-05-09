@@ -31,7 +31,8 @@
     "propertyUpdated": "Property updated",
     "propertyDeleted": "Property deleted",
     "categoryDeleted": "Category deleted",
-    "tagDeleted": "Tag deleted"
+    "tagDeleted": "Tag deleted",
+    "taskDeleted": "Task moved to trash"
   },
   "nav": {
     "journal": "Journal",
@@ -43,7 +44,8 @@
     "operations": "Operations",
     "settings": "Settings",
     "newEntry": "New Entry",
-    "newArticle": "New Article"
+    "newArticle": "New Article",
+    "tasks": "Tasks"
   },
   "operations": {
     "title": "Operations",
@@ -390,5 +392,36 @@
     "tabWiki": "Wiki",
     "tabOperations": "Operations",
     "noResults": "No entries found"
+  },
+  "tasks": {
+    "title": "Tasks",
+    "subtitle": "To-do dashboard",
+    "openCount": "open tasks",
+    "newPlaceholder": "Add a new task…",
+    "add": "Add task",
+    "searchPlaceholder": "Search tasks…",
+    "loading": "Loading tasks…",
+    "empty": "No tasks here.",
+    "emptyHint": "Add a task above to start your list.",
+    "descriptionPlaceholder": "Description…",
+    "markDone": "Mark as done",
+    "markOpen": "Mark as open",
+    "moveToTrash": "Move to trash",
+    "trashHint": "Deleted tasks are moved to the trash and can be restored there.",
+    "filters": {
+      "open": "Open",
+      "all": "All",
+      "done": "Done"
+    },
+    "columns": {
+      "task": "Task",
+      "due": "Due",
+      "priority": "Priority"
+    },
+    "priority": {
+      "low": "Low",
+      "normal": "Normal",
+      "high": "High"
+    }
   }
 }

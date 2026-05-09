@@ -14,6 +14,7 @@ import {
   Copy,
   Pencil,
   PanelTopOpen,
+  ListTodo,
 } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import { useUndoStore } from '../../store/undoStore';
@@ -218,6 +219,13 @@ export default function LeftSidebar() {
 
       {/* Bottom nav — always visible */}
       <div className="flex-shrink-0 border-t border-stone-700/40 px-2 py-2">
+        <button
+          onClick={() => setActiveView({ type: 'tasks' })}
+          className={`sidebar-item w-full ${activeView.type === 'tasks' ? 'active' : ''}`}
+        >
+          <ListTodo size={14} />
+          {t('nav.tasks')}
+        </button>
         <button
           onClick={() => setActiveView({ type: 'operations' })}
           className={`sidebar-item w-full ${activeView.type === 'operations' ? 'active' : ''}`}

@@ -1,4 +1,4 @@
-import { BookOpen, Flame, Home, Library, MoreHorizontal, Plus, Tag, Trash2, Wand2, X } from 'lucide-react';
+import { BookOpen, Flame, Home, Library, ListTodo, MoreHorizontal, Plus, Tag, Trash2, Wand2, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { useAltarStore } from '../../store/altarStore';
@@ -19,6 +19,8 @@ function getFallbackTitle(view: ActiveView) {
       return view.id ? 'Untitled wiki article' : 'Wiki';
     case 'operations':
       return view.id ? 'Untitled operation' : 'Operations';
+    case 'tasks':
+      return 'Tasks';
     case 'altar':
       return view.id ? 'Untitled altar' : 'Altar';
     case 'tags':
@@ -84,6 +86,8 @@ export default function TabBar() {
         return <Library size={13} />;
       case 'operations':
         return <Wand2 size={13} />;
+      case 'tasks':
+        return <ListTodo size={13} />;
       case 'altar':
         return <Flame size={13} />;
       case 'tags':

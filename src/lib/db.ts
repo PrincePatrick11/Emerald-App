@@ -420,6 +420,29 @@ async function runMigrations(db: Database): Promise<void> {
   try { await db.execute(`ALTER TABLE routines ADD COLUMN operation_ids TEXT NOT NULL DEFAULT '[]'`); } catch { /* exists */ }
   try { await db.execute(`ALTER TABLE routines ADD COLUMN wiki_ids TEXT NOT NULL DEFAULT '[]'`); } catch { /* exists */ }
 
+  // Tasks / to-do module
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS tasks (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL DEFAULT 'Untitled Task',
+      description TEXT NOT NULL DEFAULT '',
+      is_done INTEGER NOT NULL DEFAULT 0,
+      priority TEXT NOT NULL DEFAULT 'normal',
+      due_date TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_tasks_deleted_done ON tasks(deleted_at, is_done)');
+  try { await db.execute(`ALTER TABLE tasks ADD COLUMN description TEXT NOT NULL DEFAULT ''`); } catch { /* exists */ }
+  try { await db.execute(`ALTER TABLE tasks ADD COLUMN is_done INTEGER NOT NULL DEFAULT 0`); } catch { /* exists */ }
+  try { await db.execute(`ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'`); } catch { /* exists */ }
+  try { await db.execute(`ALTER TABLE tasks ADD COLUMN due_date TEXT`); } catch { /* exists */ }
+  try { await db.execute(`ALTER TABLE tasks ADD COLUMN deleted_at TEXT`); } catch { /* exists */ }
+  try { await db.execute(`ALTER TABLE tasks ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`); } catch { /* exists */ }
+
   // Migration: paradigm_id + linked_operation_ids + linked_wiki_ids on journal entries
   try { await db.execute(`ALTER TABLE journal_entries ADD COLUMN paradigm_id TEXT`); } catch { /* exists */ }
   try { await db.execute(`ALTER TABLE journal_entries ADD COLUMN linked_operation_ids TEXT`); } catch { /* exists */ }
@@ -438,7 +461,7 @@ async function runMigrations(db: Database): Promise<void> {
 
   // Auto-purge trash items older than 30 days
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  for (const table of ['journal_entries', 'wiki_articles', 'tags', 'operations', 'creations', 'wiki_categories', 'operation_categories']) {
+  for (const table of ['journal_entries', 'wiki_articles', 'tags', 'operations', 'creations', 'tasks', 'wiki_categories', 'operation_categories']) {
     await db.execute(
       `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
       [cutoff]

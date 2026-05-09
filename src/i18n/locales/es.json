@@ -31,7 +31,8 @@
     "propertyUpdated": "Propiedad actualizada",
     "propertyDeleted": "Propiedad eliminada",
     "categoryDeleted": "Categoría eliminada",
-    "tagDeleted": "Etiqueta eliminada"
+    "tagDeleted": "Etiqueta eliminada",
+    "taskDeleted": "Tarea movida a la papelera"
   },
   "nav": {
     "journal": "Diario",
@@ -43,7 +44,8 @@
     "operations": "Operaciones",
     "settings": "Ajustes",
     "newEntry": "Nueva entrada",
-    "newArticle": "Nuevo artículo"
+    "newArticle": "Nuevo artículo",
+    "tasks": "Tareas"
   },
   "operations": {
     "title": "Operaciones",
@@ -390,5 +392,36 @@
     "tabWiki": "Wiki",
     "tabOperations": "Operaciones",
     "noResults": "No se encontraron entradas"
+  },
+  "tasks": {
+    "title": "Tareas",
+    "subtitle": "Panel de tareas",
+    "openCount": "tareas abiertas",
+    "newPlaceholder": "Añadir una nueva tarea…",
+    "add": "Añadir tarea",
+    "searchPlaceholder": "Buscar tareas…",
+    "loading": "Cargando tareas…",
+    "empty": "No hay tareas aquí.",
+    "emptyHint": "Añade una tarea arriba para empezar tu lista.",
+    "descriptionPlaceholder": "Descripción…",
+    "markDone": "Marcar como completada",
+    "markOpen": "Marcar como abierta",
+    "moveToTrash": "Mover a la papelera",
+    "trashHint": "Las tareas eliminadas se mueven a la papelera y se pueden restaurar allí.",
+    "filters": {
+      "open": "Abiertas",
+      "all": "Todas",
+      "done": "Completadas"
+    },
+    "columns": {
+      "task": "Tarea",
+      "due": "Vence",
+      "priority": "Prioridad"
+    },
+    "priority": {
+      "low": "Baja",
+      "normal": "Normal",
+      "high": "Alta"
+    }
   }
 }

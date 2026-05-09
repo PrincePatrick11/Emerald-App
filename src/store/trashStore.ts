@@ -4,6 +4,7 @@ import { useJournalStore } from './journalStore';
 import { useWikiStore } from './wikiStore';
 import { useTagStore } from './tagStore';
 import { useOperationStore } from './operationStore';
+import { useTaskStore } from './taskStore';
 import type { OperationCategory, WikiCategoryDef } from '../types';
 import type { TrashedItem } from '../types';
 
@@ -40,6 +41,9 @@ export const useTrashStore = create<TrashState>((set) => ({
       const creations = await db.select<{ id: string; title: string; deleted_at: string; tool_type: string }[]>(
         `SELECT id, title, deleted_at, tool_type FROM creations WHERE deleted_at IS NOT NULL`
       );
+      const tasks = await db.select<{ id: string; title: string; deleted_at: string }[]>(
+        `SELECT id, title, deleted_at FROM tasks WHERE deleted_at IS NOT NULL`
+      );
       const wikiCats = await db.select<(WikiCategoryDef & { deleted_at: string })[]>(
         `SELECT * FROM wiki_categories WHERE deleted_at IS NOT NULL`
       );
@@ -52,6 +56,7 @@ export const useTrashStore = create<TrashState>((set) => ({
         ...tags.map((r) => ({ id: r.id, title: r.name, deleted_at: r.deleted_at, type: 'tag' as const })),
         ...operations.map((r) => ({ ...r, type: 'operation' as const, category: r.category ?? undefined })),
         ...creations.map((r) => ({ ...r, type: 'creation' as const, category: r.tool_type })),
+        ...tasks.map((r) => ({ ...r, type: 'task' as const })),
         ...wikiCats.map((r) => ({ id: r.id, title: `${r.emoji} ${r.name}`, deleted_at: r.deleted_at, type: 'wiki_category' as const })),
         ...opCats.map((r) => ({ id: r.id, title: `${r.emoji} ${r.name}`, deleted_at: r.deleted_at, type: 'operation_category' as const })),
       ].sort((a, b) => b.deleted_at.localeCompare(a.deleted_at));
@@ -71,6 +76,8 @@ export const useTrashStore = create<TrashState>((set) => ({
     } else if (item.type === 'creation') {
       const db = await getDb();
       await db.execute('UPDATE creations SET deleted_at=NULL WHERE id=$1', [item.id]);
+    } else if (item.type === 'task') {
+      await useTaskStore.getState().restoreTask(item.id);
     } else if (item.type === 'wiki_category') {
       await useWikiStore.getState().restoreWikiCategory(item.id);
     } else if (item.type === 'operation_category') {
@@ -93,6 +100,8 @@ export const useTrashStore = create<TrashState>((set) => ({
     } else if (item.type === 'creation') {
       const db = await getDb();
       await db.execute('DELETE FROM creations WHERE id=$1', [item.id]);
+    } else if (item.type === 'task') {
+      await useTaskStore.getState().permanentlyDeleteTask(item.id);
     } else if (item.type === 'wiki_category') {
       await useWikiStore.getState().permanentlyDeleteWikiCategory(item.id);
     } else if (item.type === 'operation_category') {
@@ -119,6 +128,7 @@ export const useTrashStore = create<TrashState>((set) => ({
     await db.execute(`DELETE FROM tags WHERE deleted_at IS NOT NULL`);
     await db.execute(`DELETE FROM operations WHERE deleted_at IS NOT NULL`);
     await db.execute(`DELETE FROM creations WHERE deleted_at IS NOT NULL`);
+    await db.execute(`DELETE FROM tasks WHERE deleted_at IS NOT NULL`);
     await db.execute(`DELETE FROM wiki_categories WHERE deleted_at IS NOT NULL`);
     await db.execute(`DELETE FROM operation_categories WHERE deleted_at IS NOT NULL`);
     set({ items: [] });

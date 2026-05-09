@@ -31,7 +31,8 @@
     "propertyUpdated": "Propriété mise à jour",
     "propertyDeleted": "Propriété supprimée",
     "categoryDeleted": "Catégorie supprimée",
-    "tagDeleted": "Étiquette supprimée"
+    "tagDeleted": "Étiquette supprimée",
+    "taskDeleted": "Tâche déplacée dans la corbeille"
   },
   "nav": {
     "journal": "Journal",
@@ -43,7 +44,8 @@
     "operations": "Opérations",
     "settings": "Paramètres",
     "newEntry": "Nouvelle entrée",
-    "newArticle": "Nouvel article"
+    "newArticle": "Nouvel article",
+    "tasks": "Tâches"
   },
   "operations": {
     "title": "Opérations",
@@ -390,5 +392,36 @@
     "tabWiki": "Wiki",
     "tabOperations": "Opérations",
     "noResults": "Aucune entrée trouvée"
+  },
+  "tasks": {
+    "title": "Tâches",
+    "subtitle": "Tableau des tâches",
+    "openCount": "tâches ouvertes",
+    "newPlaceholder": "Ajouter une nouvelle tâche…",
+    "add": "Ajouter une tâche",
+    "searchPlaceholder": "Rechercher des tâches…",
+    "loading": "Chargement des tâches…",
+    "empty": "Aucune tâche ici.",
+    "emptyHint": "Ajoutez une tâche ci-dessus pour commencer votre liste.",
+    "descriptionPlaceholder": "Description…",
+    "markDone": "Marquer comme terminée",
+    "markOpen": "Marquer comme ouverte",
+    "moveToTrash": "Déplacer vers la corbeille",
+    "trashHint": "Les tâches supprimées sont déplacées dans la corbeille et peuvent y être restaurées.",
+    "filters": {
+      "open": "Ouvertes",
+      "all": "Toutes",
+      "done": "Terminées"
+    },
+    "columns": {
+      "task": "Tâche",
+      "due": "Échéance",
+      "priority": "Priorité"
+    },
+    "priority": {
+      "low": "Basse",
+      "normal": "Normale",
+      "high": "Haute"
+    }
   }
 }
