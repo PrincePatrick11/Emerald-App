@@ -8,6 +8,13 @@ import {
   removeVault as removeVaultFromFile,
 } from '../lib/vaultManager';
 import { resetDbCache, getDb } from '../lib/db';
+import { useJournalStore } from './journalStore';
+import { useWikiStore } from './wikiStore';
+import { useOperationStore } from './operationStore';
+import { useTagStore } from './tagStore';
+import { useRoutineStore } from './routineStore';
+import { useAltarStore } from './altarStore';
+import { useUIStore } from './uiStore';
 
 interface VaultStore {
   vaults: Vault[];
@@ -22,23 +29,6 @@ interface VaultStore {
 }
 
 async function reloadAllStores(): Promise<void> {
-  // Dynamic imports to avoid circular deps — each store is loaded lazily
-  const [
-    { useJournalStore },
-    { useWikiStore },
-    { useOperationStore },
-    { useTagStore },
-    { useRoutineStore },
-    { useAltarStore },
-  ] = await Promise.all([
-    import('./journalStore'),
-    import('./wikiStore'),
-    import('./operationStore'),
-    import('./tagStore'),
-    import('./routineStore'),
-    import('./altarStore'),
-  ]);
-
   await useTagStore.getState().fetchTags();
   await Promise.all([
     useWikiStore.getState().fetchCategories(),
@@ -76,7 +66,6 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     await getDb();
 
     // Navigate to home first to avoid stale open-entry state
-    const { useUIStore } = await import('./uiStore');
     useUIStore.getState().setActiveView({ type: 'home' });
 
     // Reload all data stores from the new DB

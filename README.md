@@ -46,6 +46,8 @@ Emerald is a desktop app for documenting your magical practice. Write journal en
 
 **Multi-Vault** — Keep separate databases for different projects or traditions.
 
+**Tabs & Workspace** — Open multiple entries, wiki articles, operations, sigils, and altars in browser-like tabs and resume your workspace after restart.
+
 **Localised** — English, German, Spanish, and French.
 
 ---
@@ -61,6 +63,12 @@ npm run tauri build   # production build
 ```
 
 The dev build keeps its own app identity (`com.emerald.magical-journal.dev`) and database, so it won't interfere with an installed production build.
+
+If you previously installed dependencies with `sudo`, Vite may fail with `EACCES` while writing to `node_modules/.vite-temp`. The npm scripts in this repo already use `--configLoader runner` to avoid that failure, but fixing ownership is still recommended:
+
+```bash
+sudo chown -R "$USER":staff node_modules
+```
 
 ---
 

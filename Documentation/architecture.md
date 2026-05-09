@@ -92,6 +92,32 @@ Tauri's WKWebView does not pass HTML5 drag events to JavaScript. All drag-and-dr
 2. The drop target registers `pointermove` and `pointerup` listeners on `document` while a drag is in progress.
 3. On `pointerup`, the target reads the drag state and applies the drop.
 
+### Tabs and Workspace State
+
+Emerald uses browser-like tabs to keep multiple pieces of content open at the same time. The tab state is managed in `uiStore`:
+
+- `tabs` stores the list of open tabs.
+- `activeTabId` stores which tab is currently selected.
+- Each tab contains an `ActiveView`, so a tab can represent a journal entry, wiki article, operation, sigil, altar, or a top-level view.
+
+Tab IDs and helper functions live in `src/lib/tabs.ts`.
+
+Tabs are persisted in `localStorage` using:
+
+- `open-tabs`
+- `active-tab-id`
+
+This keeps the user's workspace available after restarting the app without adding database tables or migrations.
+
+When `setActiveView()` is called while a tab is active, the current tab's view is updated. Opening content in a new tab creates a new tab with its own `ActiveView`. Selecting a tab restores that tab's view into the main area.
+
+Tabs and navigation history are related but separate:
+
+- Tabs represent the user's current workspace.
+- Navigation history represents back/forward movement within that workspace.
+
+This means users can keep several entries open while still using back/forward navigation inside the active tab context.
+
 ### Navigation History
 
 `uiStore` maintains a `history` array and `historyIndex`. `setActiveView` pushes a new entry only when the type or id changes — switching between read and edit mode for the same entry is not recorded as a new step. Mouse back/forward buttons are handled by a macOS NSEvent local monitor in `lib.rs` that emits `navigate-back` and `navigate-forward` Tauri events; `AppShell` listens for these and calls `uiStore.navigateBack()` / `navigateForward()`.

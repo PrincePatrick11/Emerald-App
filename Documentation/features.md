@@ -80,6 +80,25 @@ The altar is a virtual arrangement of symbolic objects on a canvas.
 
 **Intention.** A text field on each altar records your intention or purpose for that setup.
 
+## Tabs & Workspace
+
+Emerald supports browser-like tabs so you can keep several pieces of content open at the same time.
+
+Tabs can contain journal entries, wiki articles, operations, sigils, and altars. This makes it easier to work across related material without losing your current place — for example, writing a journal entry while referencing a wiki article and an active operation.
+
+You can:
+
+- Open supported items in tabs.
+- Switch between tabs without navigating away from your current workspace.
+- Close tabs individually.
+- Open entries, wiki articles, and operations in a new tab with middle-click.
+- Close a tab with middle-click on the tab itself.
+- Create a new empty tab from the tab bar.
+- Reopen the app and continue with the previously open tabs.
+
+If an item is already open, Emerald reuses the existing workspace context instead of forcing you to rebuild your working set from scratch.
+
+
 ## Routines
 
 Routines are reusable content blocks that you can drop into any journal entry.

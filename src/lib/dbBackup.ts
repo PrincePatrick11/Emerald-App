@@ -14,6 +14,14 @@ import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { getDb } from './db';
 import { getActiveDbName, addVault, invalidateVaultCache, type Vault } from './vaultManager';
+import { useVaultStore } from '../store/vaultStore';
+import { useJournalStore } from '../store/journalStore';
+import { useWikiStore } from '../store/wikiStore';
+import { useOperationStore } from '../store/operationStore';
+import { useTagStore } from '../store/tagStore';
+import { useRoutineStore } from '../store/routineStore';
+import { useAltarStore } from '../store/altarStore';
+import { useUIStore } from '../store/uiStore';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public types
@@ -652,7 +660,6 @@ export async function importDatabase(
     invalidateVaultCache();
 
     // 3. Switch to it (resets DB cache + runs migrations on new empty DB)
-    const { useVaultStore } = await import('../store/vaultStore');
     await useVaultStore.getState().loadVaults();
     await useVaultStore.getState().switchVault(vaultId);
 
@@ -669,18 +676,10 @@ export async function importDatabase(
   }
 
   // Reload all store data from the (now modified) active vault
-  const { useJournalStore } = await import('../store/journalStore');
-  const { useWikiStore } = await import('../store/wikiStore');
-  const { useOperationStore } = await import('../store/operationStore');
-  const { useTagStore } = await import('../store/tagStore');
-  const { useRoutineStore } = await import('../store/routineStore');
-  const { useAltarStore } = await import('../store/altarStore');
-
   const dbName = await getActiveDbName();
   console.log(`[backup] import complete (${mode}) into ${dbName}`);
 
   if (mode === 'replace') {
-    const { useUIStore } = await import('../store/uiStore');
     useUIStore.getState().setActiveView({ type: 'home' });
   }
 
