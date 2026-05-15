@@ -35,7 +35,7 @@ src/
 │   │                 LinkedOpsInput, LinkedWikiInput
 │   ├── wiki/         WikiList (getCategoryEmoji helper)
 │   └── ui/           ListToolbar, FilterPanel, UndoToast, ContextMenu
-├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore,
+├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, routineStore, customPropertyStore, undoStore,
 │                     trashStore, vaultStore
 ├── lib/              db.ts, links.ts, dragState.ts, altarDragState.ts,

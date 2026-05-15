@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { getDb } from '../lib/db';
 import { getMoonPhase } from '../lib/moonPhase';
 import { syncLinks } from '../lib/links';
+import { safeParseArray } from '../lib/helpers';
 import type { JournalEntry } from '../types';
 
 function generateId(): string {
@@ -36,11 +37,6 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       const rows = await db.select<JournalEntry[]>(
         'SELECT *, ROWID as entry_number FROM journal_entries WHERE deleted_at IS NULL ORDER BY created_at DESC'
       );
-      const safeParseArray = <T = unknown>(v: unknown): T[] => {
-        if (Array.isArray(v)) return v as T[];
-        if (typeof v === 'string') { try { return JSON.parse(v) as T[]; } catch { return []; } }
-        return [];
-      };
       const entries = rows.map((r) => ({
         ...r,
         tags: safeParseArray<string>(r.tags),

@@ -36,6 +36,8 @@ Emerald is a desktop app for documenting your magical practice. Write journal en
 
 **Operations** — Track rituals, workings, servitors, and sigils. Mark them active or inactive, set end dates and version numbers, link wiki articles and journal entries.
 
+**Tasks** — Hierarchical task manager with categories, priorities (Low/Medium/High), subtasks, and links to other content. Filter by category or priority, group by category, inline-edit titles. Soft-delete with trash recovery.
+
 **Sigil Workflow** — Write your intention, reduce the letters, draw the sigil on a canvas, set a reveal date, and link a charging technique — all in one dedicated editor inside Operations.
 
 **Altar** — A virtual altar canvas. Build a library of symbolic items, arrange them with drag-and-drop, and keep multiple altar setups with different backgrounds and intentions.

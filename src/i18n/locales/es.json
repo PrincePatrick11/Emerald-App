@@ -27,6 +27,7 @@
     "operationSaved": "Operación guardada",
     "operationDeleted": "Operación eliminada",
     "creationDeleted": "Creación eliminada",
+    "taskDeleted": "Tarea eliminada",
     "propertyAdded": "Propiedad añadida",
     "propertyUpdated": "Propiedad actualizada",
     "propertyDeleted": "Propiedad eliminada",
@@ -41,6 +42,7 @@
     "tags": "Etiquetas",
     "trash": "Papelera",
     "operations": "Operaciones",
+    "tasks": "Tareas",
     "settings": "Ajustes",
     "newEntry": "Nueva entrada",
     "newArticle": "Nuevo artículo"
@@ -390,5 +392,44 @@
     "tabWiki": "Wiki",
     "tabOperations": "Operaciones",
     "noResults": "No se encontraron entradas"
+  },
+  "tasks": {
+    "title": "Tareas",
+    "newTask": "Nueva tarea",
+    "newCategory": "Añadir categoría",
+    "empty": "Aún no hay tareas.",
+    "noResults": "Ninguna tarea coincide con tus filtros.",
+    "sort": {
+      "category": "Categoría",
+      "newest": "Más recientes",
+      "oldest": "Más antiguos",
+      "az": "A-Z",
+      "za": "Z-A",
+      "priority": "Prioridad"
+    },
+    "filter": {
+      "category": "Categoría",
+      "priority": "Prioridad",
+      "status": "Estado"
+    },
+    "priority": {
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja"
+    },
+    "status": {
+      "active": "Activa",
+      "completed": "Completada"
+    },
+    "markActive": "Marcar como activa",
+    "markCompleted": "Marcar como completada",
+    "addSubtask": "Añadir subtarea",
+    "links": "Enlaces",
+    "linkEntry": "Enlazar entrada",
+    "linkModalComingSoon": "El enlace a entradas estará disponible pronto.",
+    "hideCompleted": "Ocultar completadas",
+    "showCompleted": "Mostrar completadas",
+    "emptyCategory": "Sin tareas en esta categoría",
+    "uncategorized": "Sin categoría"
   }
 }

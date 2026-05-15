@@ -88,6 +88,30 @@ Each routine has a name, an emoji, plain-text content (Markdown is supported), a
 
 Dropping a routine into an open entry appends its content as formatted paragraphs and merges its tags, linked operations, and linked wiki articles into the current entry. The drop is triggered from the Routines panel in the right sidebar.
 
+## Tasks
+
+The Tasks module provides a hierarchical task manager with categories, priorities, and cross-references to Journal entries, Wiki articles, and Operations.
+
+**Categories.** A default "Allgemein" category is seeded on first launch. You can create, rename, and delete custom categories from the list view via the pencil button on each category header. Deleting a category moves its tasks to an uncategorized section — they are not lost. Categories show an emoji icon, a name, and a task count badge.
+
+**Subtasks.** Every task can have nested subtasks to any depth. Subtasks are indented under their parent and can be expanded or collapsed. Marking a parent task as completed recursively marks all subtasks as completed (and vice versa). Deleting a parent task also deletes all its descendants.
+
+**Priorities.** Each task has a priority: Low, Medium, or High. The priority is displayed as a colored flag icon (green, yellow, red) and can be changed via a dropdown on each task row.
+
+**Links.** A task can link to Journal entries, Wiki articles, and Operations. Linked entries appear as clickable chips on the task row — clicking navigates to the linked entry.
+
+**Toolbar.** The list supports a search bar, five sort orders (Category, Newest, Oldest, A–Z, Z–A, Priority), and a Show/Hide Completed toggle. Only the List view is available.
+
+**Filter panel.** Filters by category (multi-select chips) and priority (multi-select pill buttons). Active filters show a count badge on the filter toggle button. When a category filter is active, only the selected categories are shown in the grouped view.
+
+**Grouped view.** When sorted by Category, tasks are grouped under collapsible category headers. An always-visible "Uncategorized" section collects tasks without a category — it cannot be deleted.
+
+**Inline editing.** Double-click a task title to rename it inline. Press Enter to save, Escape to cancel.
+
+**Context menu.** Right-click any task to Mark as Completed/Active, Add Subtask, Link Entry, or Delete.
+
+**Trash integration.** Deleting a task (or category) soft-deletes it and sends it to the Trash view where it can be restored or permanently removed.
+
 ## Trash
 
 Deleting a journal entry, wiki article, or operation moves it to the Trash rather than removing it permanently. Trashed items are retained for 30 days and then automatically purged at startup.

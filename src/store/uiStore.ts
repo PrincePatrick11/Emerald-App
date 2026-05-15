@@ -26,6 +26,7 @@ interface UIState {
   journalPrefs: ListPrefs;
   wikiPrefs: ListPrefs;
   operationsPrefs: ListPrefs;
+  tasksPrefs: ListPrefs;
   altarPrefs: ListPrefs;
   trashPrefs: ListPrefs;
   homeJournalPrefs: HomeSectionPrefs;
@@ -49,6 +50,7 @@ interface UIState {
   setJournalPrefs: (p: Partial<ListPrefs>) => void;
   setWikiPrefs: (p: Partial<ListPrefs>) => void;
   setOperationsPrefs: (p: Partial<ListPrefs>) => void;
+  setTasksPrefs: (p: Partial<ListPrefs>) => void;
   setAltarPrefs: (p: Partial<ListPrefs>) => void;
   setTrashPrefs: (p: Partial<ListPrefs>) => void;
   setHomeJournalPrefs: (p: Partial<HomeSectionPrefs>) => void;
@@ -111,6 +113,7 @@ export const useUIStore = create<UIState>((set) => ({
   journalPrefs: { view: 'list', sort: 'date_desc' },
   wikiPrefs: { view: 'cards', sort: 'category' },
   operationsPrefs: { view: 'list', sort: 'category' },
+  tasksPrefs: { view: 'list', sort: 'category' },
   altarPrefs: { view: 'cards', sort: 'date_desc' },
   trashPrefs: { view: 'list', sort: 'date_desc' },
   homeJournalPrefs: { sort: 'date_desc', view: 'list', count: 5 },
@@ -206,6 +209,7 @@ export const useUIStore = create<UIState>((set) => ({
   setJournalPrefs: (p) => set((s) => ({ journalPrefs: { ...s.journalPrefs, ...p } })),
   setWikiPrefs: (p) => set((s) => ({ wikiPrefs: { ...s.wikiPrefs, ...p } })),
   setOperationsPrefs: (p) => set((s) => ({ operationsPrefs: { ...s.operationsPrefs, ...p } })),
+  setTasksPrefs: (p) => set((s) => ({ tasksPrefs: { ...s.tasksPrefs, ...p } })),
   setAltarPrefs: (p) => set((s) => ({ altarPrefs: { ...s.altarPrefs, ...p } })),
   setTrashPrefs: (p) => set((s) => ({ trashPrefs: { ...s.trashPrefs, ...p } })),
   setHomeJournalPrefs: (p) => set((s) => ({ homeJournalPrefs: { ...s.homeJournalPrefs, ...p } })),

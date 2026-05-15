@@ -1,16 +1,11 @@
 import { create } from 'zustand';
 import { getDb } from '../lib/db';
 import { syncLinks } from '../lib/links';
+import { safeParseArray } from '../lib/helpers';
 import type { Operation, OperationCategory } from '../types';
 
 function generateId() { return crypto.randomUUID(); }
 function nowIso() { return new Date().toISOString(); }
-
-function safeParseArray<T = unknown>(v: unknown): T[] {
-  if (Array.isArray(v)) return v as T[];
-  if (typeof v === 'string') { try { return JSON.parse(v) as T[]; } catch { return []; } }
-  return [];
-}
 
 function normalizeOperation(row: Operation): Operation {
   return {

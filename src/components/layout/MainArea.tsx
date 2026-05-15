@@ -6,6 +6,7 @@ import TagsView from '../views/TagsView';
 import TrashView from '../views/TrashView';
 import AltarView from '../views/AltarView';
 import OperationsView from '../views/OperationsView';
+import TasksView from '../views/TasksView';
 
 export default function MainArea() {
   const activeView = useUIStore((s) => s.activeView);
@@ -23,6 +24,8 @@ export default function MainArea() {
       return <AltarView />;
     case 'operations':
       return <OperationsView />;
+    case 'tasks':
+      return <TasksView />;
     default:
       return <HomeView />;
   }

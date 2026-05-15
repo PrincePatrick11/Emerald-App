@@ -8,11 +8,13 @@ interface Props {
   sort: SortMode;
   onView: (v: ViewMode) => void;
   onSort: (s: SortMode) => void;
+  viewOptions?: { value: ViewMode; label: string }[];
   search?: string;
   onSearch?: (v: string) => void;
   showFilters?: boolean;
   onToggleFilters?: () => void;
   activeFilterCount?: number;
+  extraActions?: React.ReactNode;
 }
 
 function Dropdown<T extends string>({
@@ -67,13 +69,13 @@ function Dropdown<T extends string>({
   );
 }
 
-export default function ListToolbar({ view, sort, onView, onSort, search, onSearch, showFilters, onToggleFilters, activeFilterCount = 0 }: Props) {
+export default function ListToolbar({ view, sort, onView, onSort, viewOptions: viewOptionsProp, search, onSearch, showFilters, onToggleFilters, activeFilterCount = 0, extraActions }: Props) {
   const { t } = useTranslation();
 
-  const viewOptions: { value: ViewMode; label: string }[] = [
-    { value: 'list', label: t('listView.list') },
-    { value: 'cards', label: t('listView.cards') },
-    { value: 'timeline', label: t('listView.timeline') },
+  const viewOptions = viewOptionsProp ?? [
+    { value: 'list' as const, label: t('listView.list') },
+    { value: 'cards' as const, label: t('listView.cards') },
+    { value: 'timeline' as const, label: t('listView.timeline') },
   ];
 
   const sortOptions: { value: SortMode; label: string }[] = [
@@ -86,7 +88,9 @@ export default function ListToolbar({ view, sort, onView, onSort, search, onSear
 
   return (
     <div className="flex items-center gap-2 px-8 py-2 border-b border-stone-700/40 bg-stone-900/40">
-      <Dropdown label={t('listView.view') + ': '} value={view} options={viewOptions} onChange={onView} />
+      {viewOptions.length > 1 && (
+        <Dropdown label={t('listView.view') + ': '} value={view} options={viewOptions} onChange={onView} />
+      )}
       <Dropdown label={t('listView.sort') + ': '} value={sort} options={sortOptions} onChange={onSort} />
       {onToggleFilters !== undefined && (
         <button
@@ -107,6 +111,7 @@ export default function ListToolbar({ view, sort, onView, onSort, search, onSear
           )}
         </button>
       )}
+      {extraActions}
       {onSearch !== undefined && (
         <div className="flex items-center gap-1.5 ml-2 flex-1 bg-stone-800/70 rounded-md px-2.5 py-1.5">
           <Search size={12} className="text-stone-600 flex-shrink-0" />

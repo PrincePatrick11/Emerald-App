@@ -4,6 +4,7 @@ import { useJournalStore } from './journalStore';
 import { useWikiStore } from './wikiStore';
 import { useTagStore } from './tagStore';
 import { useOperationStore } from './operationStore';
+import { useTaskStore } from './taskStore';
 import type { OperationCategory, WikiCategoryDef } from '../types';
 import type { TrashedItem } from '../types';
 
@@ -16,6 +17,30 @@ interface TrashState {
   permanentlyDelete: (item: TrashedItem) => Promise<void>;
   emptyTrash: () => Promise<void>;
 }
+
+const restoreHandlers: Record<string, (id: string) => Promise<void>> = {
+  journal:           async (id) => { await useJournalStore.getState().restoreEntry(id); },
+  wiki:              async (id) => { await useWikiStore.getState().restoreArticle(id); },
+  operation:         async (id) => { await useOperationStore.getState().restoreOperation(id); },
+  creation:          async (id) => { const db = await getDb(); await db.execute('UPDATE creations SET deleted_at=NULL WHERE id=$1', [id]); },
+  wiki_category:     async (id) => { await useWikiStore.getState().restoreWikiCategory(id); },
+  operation_category: async (id) => { await useOperationStore.getState().restoreCategory(id); },
+  tag:               async (id) => { await useTagStore.getState().restoreTag(id); },
+  task:              async (id) => { await useTaskStore.getState().restoreTask(id); },
+  task_category:     async (id) => { await useTaskStore.getState().restoreCategory(id); },
+};
+
+const permanentDeleteHandlers: Record<string, (id: string) => Promise<void>> = {
+  journal:           async (id) => { await useJournalStore.getState().permanentlyDeleteEntry(id); },
+  wiki:              async (id) => { await useWikiStore.getState().permanentlyDeleteArticle(id); },
+  operation:         async (id) => { await useOperationStore.getState().permanentlyDeleteOperation(id); },
+  creation:          async (id) => { const db = await getDb(); await db.execute('DELETE FROM creations WHERE id=$1', [id]); },
+  wiki_category:     async (id) => { await useWikiStore.getState().permanentlyDeleteWikiCategory(id); },
+  operation_category: async (id) => { await useOperationStore.getState().permanentlyDeleteCategory(id); },
+  tag:               async (id) => { await useTagStore.getState().permanentlyDeleteTag(id); },
+  task:              async (id) => { await useTaskStore.getState().permanentlyDeleteTask(id); },
+  task_category:     async (id) => { await useTaskStore.getState().permanentlyDeleteCategory(id); },
+};
 
 export const useTrashStore = create<TrashState>((set) => ({
   items: [],
@@ -46,6 +71,12 @@ export const useTrashStore = create<TrashState>((set) => ({
       const opCats = await db.select<(OperationCategory & { deleted_at: string })[]>(
         `SELECT * FROM operation_categories WHERE deleted_at IS NOT NULL`
       );
+      const tasks = await db.select<{ id: string; title: string; deleted_at: string }[]>(
+        `SELECT id, title, deleted_at FROM tasks WHERE deleted_at IS NOT NULL`
+      );
+      const taskCats = await db.select<{ id: string; name: string; emoji: string; deleted_at: string }[]>(
+        `SELECT id, name, emoji, deleted_at FROM task_categories WHERE deleted_at IS NOT NULL`
+      );
       const items: TrashedItem[] = [
         ...journal.map((r) => ({ ...r, type: 'journal' as const })),
         ...wiki.map((r) => ({ ...r, type: 'wiki' as const, category: r.category })),
@@ -54,6 +85,8 @@ export const useTrashStore = create<TrashState>((set) => ({
         ...creations.map((r) => ({ ...r, type: 'creation' as const, category: r.tool_type })),
         ...wikiCats.map((r) => ({ id: r.id, title: `${r.emoji} ${r.name}`, deleted_at: r.deleted_at, type: 'wiki_category' as const })),
         ...opCats.map((r) => ({ id: r.id, title: `${r.emoji} ${r.name}`, deleted_at: r.deleted_at, type: 'operation_category' as const })),
+        ...tasks.map((r) => ({ ...r, type: 'task' as const })),
+        ...taskCats.map((r) => ({ id: r.id, title: `${r.emoji} ${r.name}`, deleted_at: r.deleted_at, type: 'task_category' as const })),
       ].sort((a, b) => b.deleted_at.localeCompare(a.deleted_at));
       set({ items });
     } finally {
@@ -62,44 +95,16 @@ export const useTrashStore = create<TrashState>((set) => ({
   },
 
   restore: async (item) => {
-    if (item.type === 'journal') {
-      await useJournalStore.getState().restoreEntry(item.id);
-    } else if (item.type === 'wiki') {
-      await useWikiStore.getState().restoreArticle(item.id);
-    } else if (item.type === 'operation') {
-      await useOperationStore.getState().restoreOperation(item.id);
-    } else if (item.type === 'creation') {
-      const db = await getDb();
-      await db.execute('UPDATE creations SET deleted_at=NULL WHERE id=$1', [item.id]);
-    } else if (item.type === 'wiki_category') {
-      await useWikiStore.getState().restoreWikiCategory(item.id);
-    } else if (item.type === 'operation_category') {
-      await useOperationStore.getState().restoreCategory(item.id);
-    } else if (item.type === 'tag') {
-      await useTagStore.getState().restoreTag(item.id);
-    } else {
-      console.error('Unknown trash item type in restore():', item.type);
-    }
+    const handler = restoreHandlers[item.type];
+    if (!handler) { console.error('Unknown trash item type in restore():', item.type); return; }
+    await handler(item.id);
     set((s) => ({ items: s.items.filter((i) => i.id !== item.id) }));
   },
 
   permanentlyDelete: async (item) => {
-    if (item.type === 'journal') {
-      await useJournalStore.getState().permanentlyDeleteEntry(item.id);
-    } else if (item.type === 'wiki') {
-      await useWikiStore.getState().permanentlyDeleteArticle(item.id);
-    } else if (item.type === 'operation') {
-      await useOperationStore.getState().permanentlyDeleteOperation(item.id);
-    } else if (item.type === 'creation') {
-      const db = await getDb();
-      await db.execute('DELETE FROM creations WHERE id=$1', [item.id]);
-    } else if (item.type === 'wiki_category') {
-      await useWikiStore.getState().permanentlyDeleteWikiCategory(item.id);
-    } else if (item.type === 'operation_category') {
-      await useOperationStore.getState().permanentlyDeleteCategory(item.id);
-    } else {
-      await useTagStore.getState().permanentlyDeleteTag(item.id);
-    }
+    const handler = permanentDeleteHandlers[item.type];
+    if (!handler) { console.error('Unknown trash item type in permanentlyDelete():', item.type); return; }
+    await handler(item.id);
     set((s) => ({ items: s.items.filter((i) => i.id !== item.id) }));
   },
 
@@ -121,6 +126,9 @@ export const useTrashStore = create<TrashState>((set) => ({
     await db.execute(`DELETE FROM creations WHERE deleted_at IS NOT NULL`);
     await db.execute(`DELETE FROM wiki_categories WHERE deleted_at IS NOT NULL`);
     await db.execute(`DELETE FROM operation_categories WHERE deleted_at IS NOT NULL`);
+    await db.execute(`DELETE FROM task_links WHERE task_id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL)`);
+    await db.execute(`DELETE FROM tasks WHERE deleted_at IS NOT NULL`);
+    await db.execute(`DELETE FROM task_categories WHERE deleted_at IS NOT NULL`);
     set({ items: [] });
   },
 }));

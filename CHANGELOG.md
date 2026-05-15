@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- Tasks module with categories, priorities (Low/Medium/High), hierarchical subtasks, and cross-references to Journal, Wiki, and Operations
+- Category management: create, rename, delete with 2-click confirmation, uncategorized fallback
+- Task filtering by category (multi-select) and priority (multi-select)
+- Category-grouped list view with collapsible sections
+- Inline task title editing (double-click)
+- Task context menu (mark complete, add subtask, link entry, delete)
+- Link modal to connect tasks with Journal entries, Wiki articles, and Operations
+- Trash integration for tasks and task categories (soft-delete, restore, permanent delete)
+- `safeParseArray` helper extracted to `src/lib/helpers.ts`
+- `CategoryBase` interface in types, shared by OperationCategory, WikiCategoryDef, and TaskCategory
+
 ## [0.1.0] - 2026-05-03
 
 ### Added

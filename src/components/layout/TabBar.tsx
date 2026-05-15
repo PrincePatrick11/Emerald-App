@@ -1,9 +1,10 @@
-import { BookOpen, Flame, Home, Library, MoreHorizontal, Plus, Tag, Trash2, Wand2, X } from 'lucide-react';
+import { BookOpen, Flame, Home, Library, MoreHorizontal, Plus, Tag, Trash2, Wand2, X, CheckSquare } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { useAltarStore } from '../../store/altarStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useOperationStore } from '../../store/operationStore';
+import { useTaskStore } from '../../store/taskStore';
 import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
 import type { ActiveView, MoonPhase } from '../../types';
@@ -21,6 +22,8 @@ function getFallbackTitle(view: ActiveView) {
       return view.id ? 'Untitled operation' : 'Operations';
     case 'altar':
       return view.id ? 'Untitled altar' : 'Altar';
+    case 'tasks':
+      return view.id ? 'Untitled task' : 'Tasks';
     case 'tags':
       return 'Tags';
     case 'trash':
@@ -55,6 +58,7 @@ export default function TabBar() {
     if (view.type === 'wiki') return getArticle(view.id)?.title || getFallbackTitle(view);
     if (view.type === 'operations') return getOperation(view.id)?.title || getFallbackTitle(view);
     if (view.type === 'altar') return altars.find((altar) => altar.id === view.id)?.title || getFallbackTitle(view);
+    if (view.type === 'tasks') return useTaskStore.getState().getTask(view.id)?.title || getFallbackTitle(view);
     return getFallbackTitle(view);
   };
 
@@ -90,6 +94,8 @@ export default function TabBar() {
         return <Tag size={13} />;
       case 'trash':
         return <Trash2 size={13} />;
+      case 'tasks':
+        return <CheckSquare size={13} />;
       default:
         return <MoreHorizontal size={13} />;
     }

@@ -14,6 +14,7 @@ import {
   Copy,
   Pencil,
   PanelTopOpen,
+  CheckSquare,
 } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import { useUndoStore } from '../../store/undoStore';
@@ -231,6 +232,13 @@ export default function LeftSidebar() {
         >
           <Library size={14} />
           {t('nav.wiki')}
+        </button>
+        <button
+          onClick={() => setActiveView({ type: 'tasks' })}
+          className={`sidebar-item w-full ${activeView.type === 'tasks' ? 'active' : ''}`}
+        >
+          <CheckSquare size={14} />
+          {t('nav.tasks')}
         </button>
         <button
           onClick={() => setActiveView({ type: 'altar' })}

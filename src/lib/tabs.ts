@@ -10,5 +10,5 @@ export function createTabId(): string {
 }
 
 export function isContentView(view: ActiveView): boolean {
-  return !!view.id && ['journal', 'wiki', 'operations', 'altar'].includes(view.type);
+  return !!view.id && ['journal', 'wiki', 'operations', 'altar', 'tasks'].includes(view.type);
 }

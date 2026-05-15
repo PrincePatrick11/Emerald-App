@@ -36,7 +36,7 @@ export interface WikiArticle {
   entry_number?: number;
 }
 
-export interface OperationCategory {
+export interface CategoryBase {
   id: string;
   name: string;
   emoji: string;
@@ -44,13 +44,9 @@ export interface OperationCategory {
   is_builtin: boolean;
 }
 
-export interface WikiCategoryDef {
-  id: string;
-  name: string;
-  emoji: string;
-  is_builtin: boolean;
-  sort_order: number;
-}
+export interface OperationCategory extends CategoryBase {}
+
+export interface WikiCategoryDef extends CategoryBase {}
 
 export interface Operation {
   id: string;
@@ -84,9 +80,9 @@ export interface Operation {
 export interface TrashedItem {
   id: string;
   title: string;
-  type: 'journal' | 'wiki' | 'tag' | 'operation' | 'creation' | 'wiki_category' | 'operation_category';
+  type: 'journal' | 'wiki' | 'tag' | 'operation' | 'creation' | 'wiki_category' | 'operation_category' | 'task' | 'task_category';
   deleted_at: string;
-  category?: string; // wiki category slug | operation category name
+  category?: string;
 }
 
 export type WikiCategory = string;
@@ -175,8 +171,39 @@ export interface AltarPlacement {
   image_data?: string;
 }
 
+export type TaskPriority = 'low' | 'medium' | 'high';
+
+export interface TaskCategory extends CategoryBase {
+  deleted_at: string | null;
+}
+
+export interface TaskLink {
+  id: string;
+  task_id: string;
+  target_id: string;
+  target_type: ContentType;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string;
+  category_id: string;
+  priority: TaskPriority;
+  due_date: string | null;
+  completed: boolean;
+  completed_at: string | null;
+  parent_task_id: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  tags: string[];
+  deleted_at: string | null;
+  entry_number?: number;
+}
+
 export interface ActiveView {
-  type: ContentType | 'home' | 'tags' | 'trash' | 'altar' | 'operations';
+  type: ContentType | 'home' | 'tags' | 'trash' | 'altar' | 'operations' | 'tasks';
   id?: string;
   mode?: 'view' | 'edit';
 }
