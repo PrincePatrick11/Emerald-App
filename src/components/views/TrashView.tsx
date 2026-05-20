@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { Trash2, RotateCcw, BookOpen, Library, Tag, Wand2, FolderOpen, CheckSquare, Square, PenTool } from 'lucide-react';
+import { Trash2, RotateCcw, BookOpen, Library, Tag, Wand2, FolderOpen, CheckSquare, Square, PenTool, ListTodo } from 'lucide-react';
 import { useTrashStore } from '../../store/trashStore';
 import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
@@ -16,8 +16,9 @@ function typeIcon(type: TrashedItem['type']) {
   if (type === 'wiki') return <Library size={14} className="text-stone-500 flex-shrink-0" />;
   if (type === 'operation') return <Wand2 size={14} className="text-stone-500 flex-shrink-0" />;
   if (type === 'creation') return <PenTool size={14} className="text-stone-500 flex-shrink-0" />;
-  if (type === 'wiki_category' || type === 'operation_category')
+  if (type === 'wiki_category' || type === 'operation_category' || type === 'task_category')
     return <FolderOpen size={14} className="text-stone-500 flex-shrink-0" />;
+  if (type === 'task') return <ListTodo size={14} className="text-stone-500 flex-shrink-0" />;
   return <Tag size={14} className="text-stone-500 flex-shrink-0" />;
 }
 
@@ -118,7 +119,7 @@ function ItemRow({ item, confirmingId, setConfirmingId, restore, handlePermanent
           <>
             <button
               onClick={() => restore(item)}
-              className="flex items-center gap-1.5 text-xs text-jade-400 hover:text-jade-300 px-2.5 py-1.5 rounded hover:bg-jade-400/10 transition-colors"
+              className="trash-restore-btn flex items-center gap-1.5 text-xs text-jade-400 hover:text-jade-300 px-2.5 py-1.5 rounded hover:bg-jade-400/10 transition-colors"
             >
               <RotateCcw size={12} />
               {t('trash.restore')}
@@ -175,7 +176,7 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, handlePermanen
           </>
         ) : (
           <>
-            <button onClick={() => restore(item)} className="flex items-center gap-1 text-xs text-jade-400 hover:text-jade-300 px-2 py-1 rounded hover:bg-jade-400/10 transition-colors">
+            <button onClick={() => restore(item)} className="trash-restore-btn flex items-center gap-1 text-xs text-jade-400 hover:text-jade-300 px-2 py-1 rounded hover:bg-jade-400/10 transition-colors">
               <RotateCcw size={11} />{t('trash.restore')}
             </button>
             <button onClick={() => handlePermanentDelete(item)} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-400/10 transition-colors">
@@ -262,7 +263,8 @@ export default function TrashView() {
     const operations = sorted.filter((i) => i.type === 'operation');
     const creations  = sorted.filter((i) => i.type === 'creation');
     const tags       = sorted.filter((i) => i.type === 'tag');
-    const cats       = sorted.filter((i) => i.type === 'wiki_category' || i.type === 'operation_category');
+    const tasks      = sorted.filter((i) => i.type === 'task');
+    const cats       = sorted.filter((i) => i.type === 'wiki_category' || i.type === 'operation_category' || i.type === 'task_category');
 
     const renderItems = (subset: TrashedItem[]) =>
       viewMode === 'list'
@@ -324,6 +326,12 @@ export default function TrashView() {
           <>
             <SectionHeader label={t('nav.creation')} count={creations.length} />
             {renderItems(creations)}
+          </>
+        )}
+        {tasks.length > 0 && (
+          <>
+            <SectionHeader label={t('nav.tasks')} count={tasks.length} />
+            {renderItems(tasks)}
           </>
         )}
         {tags.length > 0 && (
@@ -396,7 +404,7 @@ export default function TrashView() {
               )}
               <button
                 onClick={handleBulkDelete}
-                className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-md hover:bg-red-400/10"
+                className="trash-bulk-delete-btn flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-md hover:bg-red-400/10"
               >
                 <Trash2 size={12} />
                 {confirmingBulkDelete
@@ -418,7 +426,7 @@ export default function TrashView() {
               )}
               <button
                 onClick={handleEmptyTrash}
-                className="text-xs text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-md hover:bg-red-400/10"
+                className="trash-empty-btn text-xs text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-md hover:bg-red-400/10"
               >
                 {confirmingEmpty ? t('trash.confirmYes') : t('trash.emptyTrash')}
               </button>

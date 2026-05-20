@@ -1,9 +1,7 @@
 import { create } from 'zustand';
 import { getDb } from '../lib/db';
+import { generateId, nowIso } from '../lib/helpers';
 import type { Routine } from '../types';
-
-function generateId(): string { return crypto.randomUUID(); }
-function nowIso(): string { return new Date().toISOString(); }
 
 interface RoutineState {
   routines: Routine[];

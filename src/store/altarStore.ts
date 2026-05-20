@@ -1,11 +1,9 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import { getDb } from '../lib/db';
+import { DEFAULT_ALTAR_BACKGROUND } from '../lib/altarConstants';
+import { generateId, nowIso } from '../lib/helpers';
 import type { AltarItem, AltarItemCategory, AltarPlacement, AltarRecord } from '../types';
-
-function generateId() { return crypto.randomUUID(); }
-function nowIso() { return new Date().toISOString(); }
-const DEFAULT_ALTAR_BACKGROUND = 'midnight';
 
 async function fetchPlacementsForAltar(altarId: string, items: AltarItem[]): Promise<AltarPlacement[]> {
   const db = await getDb();

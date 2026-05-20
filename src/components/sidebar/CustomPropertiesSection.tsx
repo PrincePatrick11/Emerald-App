@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { X, Check, Pencil, Trash2, Type, Hash, Calendar, ToggleLeft, CheckSquare } from 'lucide-react';
 import { useCustomPropertyStore } from '../../store/customPropertyStore';
 import { useUndoStore } from '../../store/undoStore';
+import { generateId } from '../../lib/helpers';
+import { CUSTOM_PROP_INPUT_CLASSES, CUSTOM_PROP_SMALL_INPUT_CLASSES } from '../../lib/styleClasses';
 import type { CustomProperty, CustomPropertyType } from '../../types';
 
 export const PROP_TYPE_ICONS: Record<string, React.ReactNode> = {
@@ -64,9 +66,7 @@ export function CustomPropertiesSection({
     await deleteProperty(propId);
   };
 
-  const inputCls =
-    'w-full bg-stone-800/60 rounded-md px-3 py-1.5 text-xs text-stone-300 outline-none ' +
-    'border border-stone-700/40 focus:border-stone-600 transition-colors placeholder-stone-700 [color-scheme:dark]';
+  const inputCls = CUSTOM_PROP_INPUT_CLASSES;
 
   return (
     <div>
@@ -95,18 +95,18 @@ export function CustomPropertiesSection({
               <button
                 onClick={() => setTypeDropdownOpen((o) => !o)}
                 title={t(`properties.types.${newType}`)}
-                className="w-8 h-8 flex items-center justify-center bg-stone-800/60 rounded-md border border-stone-700/40 hover:border-stone-600 text-stone-400 hover:text-stone-300 transition-colors"
+                className="custom-prop-type-btn w-8 h-8 flex items-center justify-center bg-stone-800/60 rounded-md border border-stone-700/40 hover:border-stone-600 text-stone-400 hover:text-stone-300 transition-colors"
               >
                 {PROP_TYPE_ICONS[newType]}
               </button>
               {typeDropdownOpen && (
-                <div className="absolute left-0 top-full mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl py-1 min-w-[130px]">
+                <div className="custom-prop-menu absolute left-0 top-full mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl py-1 min-w-[130px]">
                   {(['text', 'number', 'date', 'toggle', 'checkbox'] as CustomPropertyType[]).map((type) => (
                     <button
                       key={type}
                       onMouseDown={(e) => { e.preventDefault(); setNewType(type); setTypeDropdownOpen(false); }}
-                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-stone-700 transition-colors ${
-                        newType === type ? 'text-stone-200' : 'text-stone-400'
+                      className={`custom-prop-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors ${
+                        newType === type ? 'custom-prop-menu-item-active text-stone-200' : 'text-stone-400'
                       }`}
                     >
                       {PROP_TYPE_ICONS[type]}
@@ -134,13 +134,13 @@ export function CustomPropertiesSection({
                 value={newTrueLabel}
                 onChange={(e) => setNewTrueLabel(e.target.value)}
                 placeholder={t('properties.trueLabelPlaceholder') + ' *'}
-                className={`flex-1 min-w-0 bg-stone-800/60 rounded px-2 py-1 text-xs text-stone-400 outline-none border transition-colors placeholder-stone-700 ${!newTrueLabel.trim() ? 'border-red-800/60 focus:border-red-600' : 'border-stone-700/40 focus:border-stone-600'}`}
+                 className={`custom-prop-input flex-1 min-w-0 bg-stone-800/60 rounded px-2 py-1 text-xs text-stone-400 outline-none border transition-colors placeholder-stone-700 ${!newTrueLabel.trim() ? 'border-red-800/60 focus:border-red-600' : 'border-stone-700/40 focus:border-stone-600'}`}
               />
               <input
                 value={newFalseLabel}
                 onChange={(e) => setNewFalseLabel(e.target.value)}
                 placeholder={t('properties.falseLabelPlaceholder') + ' *'}
-                className={`flex-1 min-w-0 bg-stone-800/60 rounded px-2 py-1 text-xs text-stone-400 outline-none border transition-colors placeholder-stone-700 ${!newFalseLabel.trim() ? 'border-red-800/60 focus:border-red-600' : 'border-stone-700/40 focus:border-stone-600'}`}
+                 className={`custom-prop-input flex-1 min-w-0 bg-stone-800/60 rounded px-2 py-1 text-xs text-stone-400 outline-none border transition-colors placeholder-stone-700 ${!newFalseLabel.trim() ? 'border-red-800/60 focus:border-red-600' : 'border-stone-700/40 focus:border-stone-600'}`}
               />
             </div>
           )}
@@ -207,7 +207,7 @@ function CustomPropertyRow({
   const handleDelete = () => {
     const snapshot = { ...prop };
     onDelete(prop.id);
-    pushUndo({ id: crypto.randomUUID(), description: t('undo.propertyDeleted'), undo: () => onRestoreProperty(snapshot) });
+    pushUndo({ id: generateId(), description: t('undo.propertyDeleted'), undo: () => onRestoreProperty(snapshot) });
   };
 
   const handleToggleValue = () => {
@@ -218,13 +218,9 @@ function CustomPropertyRow({
     onUpdate(prop.id, { show_in_entry: checked });
   };
 
-  const inputCls =
-    'w-full bg-stone-800/60 rounded-md px-3 py-1.5 text-xs text-stone-300 outline-none ' +
-    'border border-stone-700/40 focus:border-stone-600 transition-colors [color-scheme:dark] placeholder-stone-700';
+  const inputCls = CUSTOM_PROP_INPUT_CLASSES;
 
-  const smallInputCls =
-    'flex-1 bg-stone-800/60 rounded px-2 py-1 text-xs text-stone-400 outline-none ' +
-    'border border-stone-700/40 focus:border-stone-600 transition-colors placeholder-stone-700';
+  const smallInputCls = CUSTOM_PROP_SMALL_INPUT_CLASSES;
 
   const meta = prop.meta ? JSON.parse(prop.meta) : {};
   const trueLabel  = meta.trueLabel  || '';
@@ -239,7 +235,7 @@ function CustomPropertyRow({
     <div>
       {/* ── Edit panel (pencil clicked) ── */}
       {editing ? (
-        <div className="bg-stone-800/40 rounded-md p-2 mb-1.5 space-y-2 border border-stone-700/40">
+        <div className="custom-prop-edit-panel bg-stone-800/40 rounded-md p-2 mb-1.5 space-y-2 border border-stone-700/40">
           <div className="flex items-center gap-1">
             <input
               autoFocus

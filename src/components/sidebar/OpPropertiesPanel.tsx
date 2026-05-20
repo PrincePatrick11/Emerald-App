@@ -9,6 +9,7 @@ import TagInput from '../editor/TagInput';
 import LinkedOpsInput from './LinkedOpsInput';
 import LinkedWikiInput from './LinkedWikiInput';
 import { CustomPropertiesSection } from './CustomPropertiesSection';
+import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 
 export default function OpPropertiesPanel() {
   const { t } = useTranslation();
@@ -76,9 +77,7 @@ export default function OpPropertiesPanel() {
     else if (entry)   updateEntry(entry.id,     { tags });
   };
 
-  const inputCls =
-    'w-full bg-stone-800/60 rounded-md px-3 py-1.5 text-xs text-stone-300 outline-none ' +
-    'border border-stone-700/40 focus:border-stone-600 transition-colors [color-scheme:dark] placeholder-stone-700';
+  const inputCls = OP_PROP_SELECT_CLASSES;
 
   return (
     <div className="space-y-5 px-1 py-2">

@@ -27,6 +27,7 @@
     "operationSaved": "Operation saved",
     "operationDeleted": "Operation deleted",
     "creationDeleted": "Creation deleted",
+    "taskDeleted": "Task deleted",
     "propertyAdded": "Property added",
     "propertyUpdated": "Property updated",
     "propertyDeleted": "Property deleted",
@@ -41,6 +42,7 @@
     "tags": "Tags",
     "trash": "Trash",
     "operations": "Operations",
+    "tasks": "Tasks",
     "settings": "Settings",
     "newEntry": "New Entry",
     "newArticle": "New Article"
@@ -331,6 +333,8 @@
     "importErrorInvalid": "File is not a valid Emerald backup.",
     "previewContains": "Contains:",
     "appearance": "Appearance",
+    "uiFont": "UI font",
+    "editorFont": "Editor body font",
     "themeDark": "Dark",
     "themeLight": "Light"
   },
@@ -390,5 +394,44 @@
     "tabWiki": "Wiki",
     "tabOperations": "Operations",
     "noResults": "No entries found"
+  },
+  "tasks": {
+    "title": "Tasks",
+    "newTask": "New Task",
+    "newCategory": "Add category",
+    "empty": "No tasks yet.",
+    "noResults": "No tasks match your filters.",
+    "sort": {
+      "category": "Category",
+      "newest": "Newest",
+      "oldest": "Oldest",
+      "az": "A-Z",
+      "za": "Z-A",
+      "priority": "Priority"
+    },
+    "filter": {
+      "category": "Category",
+      "priority": "Priority",
+      "status": "Status"
+    },
+    "priority": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "status": {
+      "active": "Active",
+      "completed": "Completed"
+    },
+    "markActive": "Mark as active",
+    "markCompleted": "Mark as completed",
+    "addSubtask": "Add subtask",
+    "links": "Links",
+    "linkEntry": "Link entry",
+    "linkModalComingSoon": "Linking to entries will be available soon.",
+    "hideCompleted": "Hide completed",
+    "showCompleted": "Show completed",
+    "emptyCategory": "No tasks in this category",
+    "uncategorized": "Uncategorized"
   }
 }

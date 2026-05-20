@@ -4,6 +4,7 @@ import { Trash2, PanelRightOpen, Check, X, Plus, Pencil, Copy, PanelTopOpen } fr
 import ContextMenu from '../ui/ContextMenu';
 import FilterPanel from '../ui/FilterPanel';
 import { getDb } from '../../lib/db';
+import { generateId } from '../../lib/helpers';
 
 const OPERATION_EMOJIS = [
   '⚡','🔯','👁️','🌙','☀️','🌟','✨','🔮','🌀','⚗️',
@@ -191,7 +192,7 @@ export default function OperationsView() {
 
   const handleCtxDelete = async (id: string) => {
     await deleteOperation(id);
-    pushUndo({ id: crypto.randomUUID(), description: t('undo.operationDeleted'), undo: () => restoreOperation(id) });
+    pushUndo({ id: generateId(), description: t('undo.operationDeleted'), undo: () => restoreOperation(id) });
     if (activeView.id === id) setActiveView({ type: 'operations' });
   };
 
@@ -221,7 +222,7 @@ export default function OperationsView() {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     const id = operation.id;
     await deleteOperation(id);
-    pushUndo({ id: crypto.randomUUID(), description: t('undo.operationDeleted'), undo: () => restoreOperation(id) });
+    pushUndo({ id: generateId(), description: t('undo.operationDeleted'), undo: () => restoreOperation(id) });
     setActiveView({ type: 'operations' });
   };
 
@@ -262,7 +263,7 @@ export default function OperationsView() {
     if (confirmDeleteCatId !== id) { setConfirmDeleteCatId(id); return; }
     setConfirmDeleteCatId(null);
     await deleteCategory(id);
-    pushUndo({ id: crypto.randomUUID(), description: t('undo.categoryDeleted'), undo: () => restoreCategory(id) });
+    pushUndo({ id: generateId(), description: t('undo.categoryDeleted'), undo: () => restoreCategory(id) });
   };
 
   // List view
@@ -704,10 +705,10 @@ export default function OperationsView() {
           <input autoFocus type="text" value={title}
             onChange={(e) => { const nextTitle = e.target.value; setTitle(nextTitle); triggerAutoSave({ ...pendingRef.current, title: nextTitle }); }}
             placeholder={t('operations.untitled')}
-            className="w-full bg-transparent text-2xl font-semibold text-stone-100
-                       placeholder-stone-700 outline-none selectable font-serif" />
+            className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100
+                       placeholder-stone-700 outline-none selectable" />
         ) : (
-          <h1 className="text-2xl font-semibold text-stone-100 font-serif cursor-text">
+          <h1 className="entry-view-title text-2xl font-semibold text-stone-100 cursor-text">
             {operation.title || t('operations.untitled')}
           </h1>
         )}

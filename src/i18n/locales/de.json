@@ -27,6 +27,7 @@
     "operationSaved": "Operation gespeichert",
     "operationDeleted": "Operation gelöscht",
     "creationDeleted": "Kreation gelöscht",
+    "taskDeleted": "Aufgabe gelöscht",
     "propertyAdded": "Eigenschaft hinzugefügt",
     "propertyUpdated": "Eigenschaft aktualisiert",
     "propertyDeleted": "Eigenschaft gelöscht",
@@ -41,6 +42,7 @@
     "tags": "Tags",
     "trash": "Papierkorb",
     "operations": "Operationen",
+    "tasks": "Aufgaben",
     "settings": "Einstellungen",
     "newEntry": "Neuer Eintrag",
     "newArticle": "Neuer Artikel"
@@ -331,6 +333,8 @@
     "importErrorInvalid": "Datei ist kein gültiges Emerald-Backup.",
     "previewContains": "Enthält:",
     "appearance": "Erscheinungsbild",
+    "uiFont": "UI-Schriftart",
+    "editorFont": "Editor-Textschrift",
     "themeDark": "Dunkel",
     "themeLight": "Hell"
   },
@@ -390,5 +394,44 @@
     "tabWiki": "Wiki",
     "tabOperations": "Operationen",
     "noResults": "Keine Einträge gefunden"
+  },
+  "tasks": {
+    "title": "Aufgaben",
+    "newTask": "Neue Aufgabe",
+    "newCategory": "Kategorie hinzufügen",
+    "empty": "Noch keine Aufgaben.",
+    "noResults": "Keine Aufgaben passen zu deinen Filtern.",
+    "sort": {
+      "category": "Kategorie",
+      "newest": "Neueste",
+      "oldest": "Älteste",
+      "az": "A-Z",
+      "za": "Z-A",
+      "priority": "Priorität"
+    },
+    "filter": {
+      "category": "Kategorie",
+      "priority": "Priorität",
+      "status": "Status"
+    },
+    "priority": {
+      "high": "Hoch",
+      "medium": "Mittel",
+      "low": "Niedrig"
+    },
+    "status": {
+      "active": "Aktiv",
+      "completed": "Erledigt"
+    },
+    "markActive": "Als aktiv markieren",
+    "markCompleted": "Als erledigt markieren",
+    "addSubtask": "Unteraufgabe hinzufügen",
+    "links": "Verlinkungen",
+    "linkEntry": "Eintrag verlinken",
+    "linkModalComingSoon": "Verlinkungen zu Einträgen sind bald verfügbar.",
+    "hideCompleted": "Erledigte ausblenden",
+    "showCompleted": "Erledigte anzeigen",
+    "emptyCategory": "Keine Aufgaben in dieser Kategorie",
+    "uncategorized": "Nicht zugeordnet"
   }
 }

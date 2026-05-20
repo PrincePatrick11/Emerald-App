@@ -15,6 +15,7 @@ import FilterPanel from '../ui/FilterPanel';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { getDb } from '../../lib/db';
+import { generateId } from '../../lib/helpers';
 import { format } from 'date-fns';
 import type { JournalEntry, MoonPhase } from '../../types';
 
@@ -190,7 +191,7 @@ export default function JournalView() {
 
   const handleCtxDelete = async (id: string) => {
     await deleteEntry(id);
-    pushUndo({ id: crypto.randomUUID(), description: t('undo.entryDeleted'), undo: () => restoreEntry(id) });
+    pushUndo({ id: generateId(), description: t('undo.entryDeleted'), undo: () => restoreEntry(id) });
     if (activeView.id === id) setActiveView({ type: 'journal' });
   };
 
@@ -216,7 +217,7 @@ export default function JournalView() {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     const id = entry.id;
     await deleteEntry(id);
-    pushUndo({ id: crypto.randomUUID(), description: t('undo.entryDeleted'), undo: () => restoreEntry(id) });
+    pushUndo({ id: generateId(), description: t('undo.entryDeleted'), undo: () => restoreEntry(id) });
     setActiveView({ type: 'journal' });
   };
 
@@ -464,11 +465,11 @@ export default function JournalView() {
             value={title}
             onChange={(e) => { const nextTitle = e.target.value; setTitle(nextTitle); triggerAutoSave({ ...pendingRef.current, title: nextTitle }); }}
             placeholder={t('journal.untitled')}
-            className="w-full bg-transparent text-2xl font-semibold text-stone-100
-                       placeholder-stone-700 outline-none selectable font-serif"
+            className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100
+                       placeholder-stone-700 outline-none selectable"
           />
         ) : (
-          <h1 className="text-2xl font-semibold text-stone-100 font-serif cursor-text"
+          <h1 className="entry-view-title text-2xl font-semibold text-stone-100 cursor-text"
               title={t('editor.doubleClickEdit')}>
             {entry.title || t('journal.untitled')}
           </h1>

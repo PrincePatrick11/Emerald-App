@@ -254,3 +254,50 @@ A sigil is an operation row with `category_id = 'sigils'`. The workflow proceeds
 5. **Loading**: `is_loaded` marks that the sigil has been "charged" or activated. `charging_technique_wiki_id` links to a wiki article describing the technique.
 
 Sidebar visibility of the intention and letter bank sections is controlled by `show_intention_in_properties` and `show_letter_bank_in_properties`. These are persisted on the row and must be respected as-is on load — never reset them.
+
+### task_categories
+
+Stores task categories. Soft-deleted rows have `deleted_at` set. A default "Allgemein" category (`id='general'`) is seeded on first run.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | TEXT PK | UUID or fixed string (`'general'`) |
+| name | TEXT | Display name |
+| emoji | TEXT | Default `'📋'` |
+| sort_order | INTEGER | Default `0` |
+| is_builtin | INTEGER | Reserved (currently `0`) |
+| deleted_at | TEXT | Soft-delete timestamp (ISO) |
+
+### tasks
+
+Stores individual tasks. Supports hierarchical nesting via `parent_task_id`. Completed state is stored as integer (`0`/`1`) and normalized to boolean in the store.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | TEXT PK | UUID |
+| title | TEXT | Default `'Untitled Task'` |
+| description | TEXT | Reserved (not rendered in UI) |
+| category_id | TEXT | References `task_categories.id`; becomes `''` when category deleted |
+| priority | TEXT | `'low'`, `'medium'`, `'high'` (default `'medium'`) |
+| due_date | TEXT | Reserved (not used in UI) |
+| completed | INTEGER | `0` or `1` |
+| completed_at | TEXT | ISO timestamp on completion |
+| parent_task_id | TEXT | Self-reference for subtasks |
+| sort_order | INTEGER | Default `0` |
+| created_at | TEXT | ISO 8601 |
+| updated_at | TEXT | ISO 8601, updated on edit |
+| tags | TEXT | JSON array (default `'[]'`) |
+| deleted_at | TEXT | Soft-delete timestamp (ISO) |
+
+### task_links
+
+Links tasks to Journal entries, Wiki articles, or Operations.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | TEXT PK | UUID |
+| task_id | TEXT | References `tasks.id` |
+| target_id | TEXT | ID of the linked entry |
+| target_type | TEXT | `'journal'`, `'wiki'`, or `'operation'` |
+
+Indexes: `idx_task_links_task` on `task_id`, `idx_task_links_target` on `target_id`.
