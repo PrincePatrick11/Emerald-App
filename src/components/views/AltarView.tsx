@@ -388,11 +388,11 @@ export default function AltarView() {
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full bg-transparent text-2xl font-semibold text-stone-100 placeholder-stone-700 outline-none selectable font-serif"
+            className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100 placeholder-stone-700 outline-none selectable"
             placeholder={t('altar.untitled')}
           />
         ) : (
-          <h1 className="w-full cursor-text text-2xl font-semibold text-stone-100 font-serif">
+          <h1 className="entry-view-title w-full cursor-text text-2xl font-semibold text-stone-100">
             {activeAltar.title || t('altar.untitled')}
           </h1>
         )}
@@ -409,7 +409,7 @@ export default function AltarView() {
           placeholder={t('altar.intentionPlaceholder')}
           rows={2}
           readOnly={!isEditing}
-          className="w-full bg-transparent text-sm text-stone-300 placeholder-stone-700 outline-none resize-none selectable font-serif leading-relaxed"
+          className="entry-view-body w-full bg-transparent text-sm text-stone-300 placeholder-stone-700 outline-none resize-none selectable leading-relaxed"
         />
       </div>
     </div>

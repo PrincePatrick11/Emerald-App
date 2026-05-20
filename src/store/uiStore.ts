@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createTabId, isContentView, type OpenTab } from '../lib/tabs';
-import { normalizeThemeId } from '../themes/theme';
+import { normalizeEditorFontId, normalizeThemeId, normalizeUIFontId } from '../themes/theme';
 import type { ActiveView } from '../types';
 
 export type ViewMode = 'list' | 'cards' | 'timeline';
@@ -12,6 +12,7 @@ export type HomeView = 'list' | 'cards';
 export interface HomeSectionPrefs { sort: HomeSort; view: HomeView; count: number; } // count 0 = all
 
 export type ThemeId = 'emerald-noctis' | 'emerald-parchment';
+export type FontId = 'inter' | 'source-sans-3' | 'nunito' | 'ibm-plex-sans' | 'alegreya' | 'cormorant-garamond' | 'lora' | 'merriweather';
 
 interface UIState {
   activeView: ActiveView;
@@ -34,6 +35,8 @@ interface UIState {
   homeOpsPrefs: HomeSectionPrefs;
   homeWikiPrefs: HomeSectionPrefs;
   theme: ThemeId;
+  uiFontId: FontId;
+  editorFontId: FontId;
 
   setActiveView: (view: ActiveView) => void;
   openViewInNewTab: (view: ActiveView) => void;
@@ -58,12 +61,22 @@ interface UIState {
   setHomeOpsPrefs: (p: Partial<HomeSectionPrefs>) => void;
   setHomeWikiPrefs: (p: Partial<HomeSectionPrefs>) => void;
   setTheme: (t: ThemeId) => void;
+  setUIFontId: (fontId: FontId) => void;
+  setEditorFontId: (fontId: FontId) => void;
 }
 
 function loadSavedTheme(): ThemeId {
   const rawThemeId = localStorage.getItem('theme-id');
   if (rawThemeId) return normalizeThemeId(rawThemeId);
   return normalizeThemeId(localStorage.getItem('theme'));
+}
+
+function loadSavedUIFontId(): FontId {
+  return normalizeUIFontId(localStorage.getItem('ui-font-id'));
+}
+
+function loadSavedEditorFontId(): FontId {
+  return normalizeEditorFontId(localStorage.getItem('editor-font-id'));
 }
 
 function normalizeSavedTab(tab: unknown): OpenTab | null {
@@ -117,6 +130,8 @@ export const useUIStore = create<UIState>((set) => ({
   wikiSubTab: null,
   searchQuery: '',
   theme: loadSavedTheme(),
+  uiFontId: loadSavedUIFontId(),
+  editorFontId: loadSavedEditorFontId(),
   journalPrefs: { view: 'list', sort: 'date_desc' },
   wikiPrefs: { view: 'cards', sort: 'category' },
   operationsPrefs: { view: 'list', sort: 'category' },
@@ -225,5 +240,13 @@ export const useUIStore = create<UIState>((set) => ({
   setTheme: (theme) => {
     localStorage.setItem('theme-id', theme);
     set({ theme });
+  },
+  setUIFontId: (fontId) => {
+    localStorage.setItem('ui-font-id', fontId);
+    set({ uiFontId: fontId });
+  },
+  setEditorFontId: (fontId) => {
+    localStorage.setItem('editor-font-id', fontId);
+    set({ editorFontId: fontId });
   },
 }));

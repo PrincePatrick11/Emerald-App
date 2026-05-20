@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Globe, Info, Database, Upload, Download, Check, AlertTriangle, ChevronDown, ChevronUp, Sun, Moon } from 'lucide-react';
+import { X, Globe, Info, Database, Upload, Download, Check, AlertTriangle, ChevronDown, ChevronUp, Sun, Moon, Type } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useVaultStore } from '../../store/vaultStore';
 import { useUIStore } from '../../store/uiStore';
-import { THEME_OPTIONS } from '../../themes/theme';
+import { FONT_OPTIONS, THEME_OPTIONS } from '../../themes/theme';
 import {
   type BackupOptions,
   type ImportMode,
@@ -39,6 +39,10 @@ export default function SettingsModal({ onClose }: Props) {
   // ── Theme state ────────────────────────────────────────────────────────────
   const theme = useUIStore((s) => s.theme);
   const setTheme = useUIStore((s) => s.setTheme);
+  const uiFontId = useUIStore((s) => s.uiFontId);
+  const editorFontId = useUIStore((s) => s.editorFontId);
+  const setUIFontId = useUIStore((s) => s.setUIFontId);
+  const setEditorFontId = useUIStore((s) => s.setEditorFontId);
 
   // ── Vault state ────────────────────────────────────────────────────────────
   const vaults = useVaultStore((s) => s.vaults);
@@ -72,6 +76,11 @@ export default function SettingsModal({ onClose }: Props) {
   const [importing, setImporting] = useState(false);
   const [importDone, setImportDone] = useState(false);
   const [importError, setImportError] = useState('');
+
+  const themeIcons = {
+    'emerald-noctis': Moon,
+    'emerald-parchment': Sun,
+  } as const;
 
   // ── Vault handlers ─────────────────────────────────────────────────────────
   async function handleSwitchVault(id: string) {
@@ -180,15 +189,14 @@ export default function SettingsModal({ onClose }: Props) {
               {t('settings.appearance')}
             </div>
             <div className="flex gap-2">
-              {([
-                { value: THEME_OPTIONS[0].id, label: THEME_OPTIONS[0].label, icon: Moon },
-                { value: THEME_OPTIONS[1].id, label: THEME_OPTIONS[1].label, icon: Sun },
-              ] as const).map(({ value, label, icon: Icon }) => (
+              {THEME_OPTIONS.map(({ id, label }) => {
+                const Icon = themeIcons[id];
+                return (
                 <button
-                  key={value}
-                  onClick={() => setTheme(value)}
+                  key={id}
+                  onClick={() => setTheme(id)}
                   className={`settings-choice-btn flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border transition-all duration-150 focus:outline-none focus:ring-2 ${
-                    theme === value
+                    theme === id
                       ? 'settings-choice-btn-active bg-jade-900/25 border-jade-700/50 text-jade-500 shadow-[0_0_0_1px_rgba(0,160,102,0.16)] focus:ring-jade-700/35'
                       : 'settings-choice-btn-idle border-stone-700/60 text-stone-400 hover:border-stone-500 hover:text-stone-300 focus:ring-jade-700/25'
                   }`}
@@ -196,7 +204,40 @@ export default function SettingsModal({ onClose }: Props) {
                   <Icon size={14} />
                   {label}
                 </button>
-              ))}
+                );
+              })}
+            </div>
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">
+                  <Type size={13} />
+                  {t('settings.uiFont')}
+                </label>
+                <select
+                  value={uiFontId}
+                  onChange={(e) => setUIFontId(e.target.value as typeof uiFontId)}
+                  className="w-full bg-stone-800/70 border border-stone-700/60 rounded-lg px-3 py-2 text-sm text-stone-200 outline-none focus:border-jade-600/60"
+                >
+                  {FONT_OPTIONS.map((font) => (
+                    <option key={font.id} value={font.id}>{font.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">
+                  <Type size={13} />
+                  {t('settings.editorFont')}
+                </label>
+                <select
+                  value={editorFontId}
+                  onChange={(e) => setEditorFontId(e.target.value as typeof editorFontId)}
+                  className="w-full bg-stone-800/70 border border-stone-700/60 rounded-lg px-3 py-2 text-sm text-stone-200 outline-none focus:border-jade-600/60"
+                >
+                  {FONT_OPTIONS.map((font) => (
+                    <option key={font.id} value={font.id}>{font.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </section>
 

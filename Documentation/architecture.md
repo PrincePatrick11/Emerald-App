@@ -214,6 +214,31 @@ Two modules centralise reusable Tailwind class strings to avoid duplication acro
 - **`src/lib/styleClasses.ts`** — Input and select class strings for custom properties and operation properties (`CUSTOM_PROP_INPUT_CLASSES`, `CUSTOM_PROP_SMALL_INPUT_CLASSES`, `OP_PROP_SELECT_CLASSES`).
 - **`src/lib/altarConstants.ts`** — Altar background presets (`ALTAR_BACKGROUND_PRESETS`, `ALTAR_BACKGROUND_STYLES`), category emoji mappings (`ALTAR_CATEGORY_EMOJI`, `CATEGORY_EMOJIS`), and the default background (`DEFAULT_ALTAR_BACKGROUND`).
 
+## Font System
+
+Emerald supports two independent font selections applied via CSS custom properties on `html`:
+
+```
+src/themes/theme.ts          # DEFAULT_UI_FONT_ID, DEFAULT_EDITOR_FONT_ID,
+                             # FONT_OPTIONS, normalizeUIFontId, normalizeEditorFontId,
+                             # applyUIFont, applyEditorFont
+src/index.css                # --font-ui and --font-editor variable definitions,
+                             # html[data-ui-font='…'] and html[data-editor-font='…'] selectors
+src/store/uiStore.ts         # uiFontId, editorFontId state + setters (localStorage: ui-font-id, editor-font-id)
+src/App.tsx                  # Subscribes to uiFontId/editorFontId and calls applyUIFont/applyEditorFont
+```
+
+**Application flow.** `App.tsx` subscribes to `uiStore.uiFontId` and `uiStore.editorFontId` and calls `applyUIFont()` / `applyEditorFont()` on every change. These functions set `document.documentElement.dataset.uiFont` and `dataset.editorFont`, which activate the matching CSS rules in `src/index.css`.
+
+**CSS variable mapping.** Each font ID defines a `--font-<id>` variable with the full font-family stack. The `data-ui-font` selector sets `--font-ui`; the `data-editor-font` selector sets `--font-editor`. Components reference these variables:
+
+- `--font-ui` is applied to the root `body` element (all UI chrome).
+- `--font-editor` is applied to `.tiptap`, `.entry-view-title`, and `.entry-view-body`.
+
+This means the editor font controls the TipTap editor body, entry titles in all detail views (journal, wiki, operations, sigil, altar), and the read-mode body text. There is no separate heading font — headings inherit the editor body font.
+
+**Defaults.** UI font defaults to **Inter**; editor body font defaults to **Lora**. Invalid or missing stored values fall back to these defaults via `normalizeUIFontId()` / `normalizeEditorFontId()`.
+
 ## IPC Command Surface
 
 All Rust commands are registered in `src-tauri/src/lib.rs` and invoked from TypeScript with `invoke()`.
@@ -221,7 +246,7 @@ All Rust commands are registered in `src-tauri/src/lib.rs` and invoked from Type
 | Command | Purpose |
 |---|---|
 | `save_image(data_url)` | Decode base64 data-URL, write `{sha256}.{ext}`, skip if exists. Returns absolute path. |
-| `copy_image_file(source)` | Read a file from an arbitrary path, write to images dir with SHA-256 name. Accepts png/jpg/gif/webp/svg only. |
+| `copy_image_file(source)` | Read a file from an arbitrary path, write to images dir with SHA-256 name. Accepts png/jpg/gif/webp/svg only. Rejects symlinks, canonicalizes the source path, and verifies it falls within allowed storage roots (home, documents, downloads, desktop, app data, app config). |
 | `read_image_as_base64(path)` | Read a file from the images dir and return it as a base64 data-URL. Path must be within the images directory (checked via `canonicalize`). |
 | `cleanup_unused_images(used_paths, min_age_secs?)` | Delete unreferenced files older than N seconds (default 300). Returns count deleted. |
 | `write_file(path, content)` | Write UTF-8 text to a user-selected path. Permitted extensions: `.md`, `.emerald`, `.emeralddb`, `.json`, `.txt`. Path must resolve within allowed storage roots. |

@@ -645,11 +645,11 @@ export default function WikiView() {
             value={title}
             onChange={(e) => { const nextTitle = e.target.value; setTitle(nextTitle); triggerAutoSave({ ...pendingRef.current, title: nextTitle }); }}
             placeholder={t('wiki.untitled')}
-            className="w-full bg-transparent text-2xl font-semibold text-stone-100
-                       placeholder-stone-700 outline-none selectable font-serif"
+            className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100
+                       placeholder-stone-700 outline-none selectable"
           />
         ) : (
-          <h1 className="text-2xl font-semibold text-stone-100 font-serif cursor-text"
+          <h1 className="entry-view-title text-2xl font-semibold text-stone-100 cursor-text"
               title={t('editor.doubleClickEdit')}>
             {article.title || t('wiki.untitled')}
           </h1>

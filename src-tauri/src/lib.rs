@@ -44,7 +44,7 @@ fn ext_for_path(path: &str) -> String {
         .to_lowercase()
 }
 
-fn resolve_allowed_text_roots(app: &tauri::AppHandle) -> Result<Vec<PathBuf>, String> {
+fn resolve_allowed_roots(app: &tauri::AppHandle) -> Result<Vec<PathBuf>, String> {
     let mut roots: Vec<PathBuf> = Vec::new();
 
     let mut push_root = |root: Result<PathBuf, _>| {
@@ -102,7 +102,19 @@ fn copy_image_file(app: tauri::AppHandle, source: String) -> Result<String, Stri
     if !matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg") {
         return Err("unsupported file type".to_string());
     }
-    let bytes = std::fs::read(&source).map_err(|e| format!("read {source}: {e}"))?;
+
+    let allowed_roots = resolve_allowed_roots(&app)?;
+    let source_path = PathBuf::from(&source);
+    let metadata = std::fs::symlink_metadata(&source_path).map_err(|_| "file not found".to_string())?;
+    if metadata.file_type().is_symlink() {
+        return Err("access denied: symlink targets are not allowed".to_string());
+    }
+    let canonical_source = std::fs::canonicalize(&source_path).map_err(|_| "unable to resolve path".to_string())?;
+    if !is_within_allowed_roots(&canonical_source, &allowed_roots) {
+        return Err("access denied: path outside allowed directories".to_string());
+    }
+
+    let bytes = std::fs::read(&canonical_source).map_err(|e| format!("read {source}: {e}"))?;
     let path = images_dir(&app)?.join(format!("{}.{}", sha256_hex(&bytes), ext));
 
     if !path.exists() {
@@ -143,7 +155,7 @@ fn write_file(app: tauri::AppHandle, path: String, content: String) -> Result<()
         return Err("unsupported file type".to_string());
     }
 
-    let allowed_roots = resolve_allowed_text_roots(&app)?;
+    let allowed_roots = resolve_allowed_roots(&app)?;
     let target = PathBuf::from(&path);
     let parent = target
         .parent()
@@ -190,7 +202,7 @@ fn read_file(app: tauri::AppHandle, path: String) -> Result<String, String> {
         return Err("unsupported file type".to_string());
     }
 
-    let allowed_roots = resolve_allowed_text_roots(&app)?;
+    let allowed_roots = resolve_allowed_roots(&app)?;
     let canonical = std::fs::canonicalize(&path).map_err(|_| "invalid path".to_string())?;
     if !is_within_allowed_roots(&canonical, &allowed_roots) {
         return Err("access denied: path outside allowed directories".to_string());

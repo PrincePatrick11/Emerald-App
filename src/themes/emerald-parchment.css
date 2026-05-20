@@ -65,4 +65,23 @@ html[data-theme='emerald-parchment'] {
   --panel-hover-bg: #f9f1e3;
   --panel-hover-border: rgba(131, 96, 62, 0.48);
   --panel-hover-shadow: 0 10px 24px rgba(114, 79, 43, 0.11);
+  --tabbar-bg: rgba(240, 225, 201, 0.9);
+  --tab-active-bg: rgba(249, 239, 223, 0.96);
+  --tab-active-text: #2f2114;
+  --tab-active-border: rgba(146, 107, 68, 0.44);
+  --tab-active-shadow: 0 -1px 0 rgba(255, 255, 255, 0.45), 0 8px 20px rgba(114, 79, 43, 0.13);
+  --tab-idle-bg: rgba(236, 219, 193, 0.82);
+  --tab-idle-text: #6b5036;
+  --tab-idle-border: rgba(154, 117, 80, 0.32);
+  --tab-idle-hover-bg: rgba(244, 230, 208, 0.95);
+  --tab-idle-hover-text: #3a2918;
+  --search-bg: rgba(248, 239, 223, 0.92);
+  --search-border: rgba(146, 107, 68, 0.38);
+  --search-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --settings-overlay: rgba(52, 34, 18, 0.32);
+  --settings-card-bg: rgba(248, 239, 223, 0.98);
+  --settings-card-border: rgba(146, 107, 68, 0.42);
+  --settings-card-shadow: 0 24px 54px rgba(96, 63, 30, 0.25);
+  --list-toolbar-bg: rgba(247, 236, 217, 0.92);
+  --list-toolbar-border: rgba(146, 107, 68, 0.36);
 }

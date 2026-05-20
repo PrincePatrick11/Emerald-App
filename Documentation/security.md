@@ -48,7 +48,11 @@ Three Rust commands enforce path restrictions:
 1. **Extension allowlist.** Only `.md`, `.emerald`, `.emeralddb`, `.json`, and `.txt` are permitted. Any other extension returns an `"unsupported file type"` error. This prevents these commands from being used as a general filesystem read/write primitive.
 2. **Root directory confinement.** The target path's parent (resolved to an absolute, canonical form) must fall within one of the allowed storage roots: home, documents, downloads, desktop, app data, or app config directories. If the resolved path escapes these roots, the command returns `"access denied: path outside allowed directories"`. For existing files, `write_file` additionally rejects symlinks and verifies the canonical target is within allowed roots.
 
-**`copy_image_file`** similarly checks that the source file has an image extension (`png`, `jpg`, `jpeg`, `gif`, `webp`, `svg`) before reading it.
+**`copy_image_file`** enforces three layers of validation before reading the source file:
+
+1. **Extension allowlist.** Only `png`, `jpg`, `jpeg`, `gif`, `webp`, and `svg` are permitted. Any other extension returns an `"unsupported file type"` error.
+2. **Symlink rejection.** The source path is checked with `symlink_metadata`; if it resolves to a symlink, the command returns `"access denied: symlink targets are not allowed"`.
+3. **Root directory confinement.** The source path is canonicalized and verified against the allowed storage roots (home, documents, downloads, desktop, app data, app config). If the resolved path escapes these roots, the command returns `"access denied: path outside allowed directories"`.
 
 ## HTML Escaping in Exports
 

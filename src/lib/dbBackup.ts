@@ -115,11 +115,27 @@ function extractImagePaths(html: string): string[] {
   return paths;
 }
 
-function buildDateFilter(dateFrom: string, dateTo: string): string {
+/**
+ * Builds a created_at filter clause with positional params.
+ *
+ * Note: placeholders start at $1, so callers must append this clause before
+ * adding any other positional parameters to the same query.
+ */
+function buildDateFilter(dateFrom: string, dateTo: string): { clause: string; params: string[] } {
   const parts: string[] = [];
-  if (dateFrom) parts.push(`created_at >= '${dateFrom}'`);
-  if (dateTo)   parts.push(`created_at <= '${dateTo}T23:59:59'`);
-  return parts.length ? `AND ${parts.join(' AND ')}` : '';
+  const params: string[] = [];
+  if (dateFrom) {
+    parts.push('created_at >= $1');
+    params.push(dateFrom);
+  }
+  if (dateTo) {
+    parts.push(`created_at <= $${params.length + 1}`);
+    params.push(`${dateTo}T23:59:59`);
+  }
+  return {
+    clause: parts.length ? `AND ${parts.join(' AND ')}` : '',
+    params,
+  };
 }
 
 function deletedFilter(includeDeleted: boolean): string {
@@ -135,13 +151,14 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
   const data: BackupFile['data'] = {};
   const allImagePaths = new Set<string>();
 
-  const df = buildDateFilter(options.dateFrom, options.dateTo);
-  const dd = deletedFilter(options.includeDeleted);
+  const { clause: dateClause, params: dateParams } = buildDateFilter(options.dateFrom, options.dateTo);
+  const deletedClause = deletedFilter(options.includeDeleted);
 
   // ── Journal ──────────────────────────────────────────────────────────────
   if (options.includeJournal) {
     data.journalEntries = await db.select<Row[]>(
-      `SELECT * FROM journal_entries WHERE 1=1 ${df} ${dd}`
+      `SELECT * FROM journal_entries WHERE 1=1 ${dateClause} ${deletedClause}`,
+      dateParams,
     );
     const ids = data.journalEntries.map((r) => `'${r.id}'`).join(',');
     if (ids) {
@@ -162,7 +179,8 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
   // ── Wiki ─────────────────────────────────────────────────────────────────
   if (options.includeWiki) {
     data.wikiArticles = await db.select<Row[]>(
-      `SELECT * FROM wiki_articles WHERE 1=1 ${df} ${dd}`
+      `SELECT * FROM wiki_articles WHERE 1=1 ${dateClause} ${deletedClause}`,
+      dateParams,
     );
     data.wikiCategories = await db.select<Row[]>(
       `SELECT * FROM wiki_categories WHERE deleted_at IS NULL`
@@ -188,7 +206,8 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
   // ── Operations ───────────────────────────────────────────────────────────
   if (options.includeOperations) {
     data.operations = await db.select<Row[]>(
-      `SELECT * FROM operations WHERE 1=1 ${df} ${dd}`
+      `SELECT * FROM operations WHERE 1=1 ${dateClause} ${deletedClause}`,
+      dateParams,
     );
     data.operationCategories = await db.select<Row[]>(
       `SELECT * FROM operation_categories WHERE deleted_at IS NULL`
@@ -216,14 +235,16 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
   // ── Routines ─────────────────────────────────────────────────────────────
   if (options.includeRoutines) {
     data.routines = await db.select<Row[]>(
-      `SELECT * FROM routines WHERE 1=1 ${df}`
+      `SELECT * FROM routines WHERE 1=1 ${dateClause}`,
+      dateParams,
     );
   }
 
   // ── Altars ───────────────────────────────────────────────────────────────
   if (options.includeAltars) {
     data.altars = await db.select<Row[]>(
-      `SELECT * FROM altars WHERE 1=1 ${df}`
+      `SELECT * FROM altars WHERE 1=1 ${dateClause}`,
+      dateParams,
     );
     // Only export items and placements that belong to the filtered altars
     const altarIds = data.altars.map((r) => `'${r.id}'`).join(',');

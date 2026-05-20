@@ -498,10 +498,10 @@ export default function OperationSigilView({ operation }: { operation: Operation
             value={title}
             onChange={(event) => { setTitle(event.target.value); triggerAutoSave(); }}
             placeholder={t('operations.untitled')}
-            className="w-full bg-transparent font-serif text-2xl font-semibold text-stone-100 outline-none placeholder-stone-700 selectable"
+            className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100 outline-none placeholder-stone-700 selectable"
           />
         ) : (
-          <h1 className="cursor-text font-serif text-2xl font-semibold text-stone-100" title={t('editor.doubleClickEdit')}>
+          <h1 className="entry-view-title cursor-text text-2xl font-semibold text-stone-100" title={t('editor.doubleClickEdit')}>
             {operation.title || t('operations.untitled')}
           </h1>
         )}
@@ -518,7 +518,7 @@ export default function OperationSigilView({ operation }: { operation: Operation
                     value={intentionText}
                     onChange={(event) => { setIntentionText(event.target.value); triggerAutoSave(); }}
                     placeholder={t('creation.intentionPlaceholder')}
-                    className="min-h-28 w-full rounded-xl border border-stone-700/50 bg-stone-900/70 px-3 py-2 text-sm text-stone-300 outline-none placeholder-stone-600 resize-y selectable"
+                    className="entry-view-body min-h-28 w-full rounded-xl border border-stone-700/50 bg-stone-900/70 px-3 py-2 text-sm text-stone-300 outline-none placeholder-stone-600 resize-y selectable"
                   />
                 </div>
 

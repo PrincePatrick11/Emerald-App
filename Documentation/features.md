@@ -173,6 +173,19 @@ Right-click any entry in the left sidebar or in any list view (List, Cards, Time
 
 **Delete.** Soft-deletes the entry and shows a 5-second undo toast in the bottom-right corner. If the deleted entry is currently open, the view navigates away.
 
+## Typography
+
+Emerald provides two independent font controls in Settings > Appearance:
+
+- **UI font** — Controls the typeface used across the application shell, sidebars, settings, lists, and all non-editor UI. Default: **Inter**.
+- **Editor body font** — Controls the typeface used in the TipTap rich-text editor body, entry titles, and the read-mode body of journal entries, wiki articles, operations, sigils, and the altar view. Default: **Lora**.
+
+Both dropdowns offer the same eight typefaces: Inter, Source Sans 3, Nunito, IBM Plex Sans, Alegreya, Cormorant Garamond, Lora, and Merriweather. Serif fonts (Alegreya, Cormorant Garamond, Lora, Merriweather) fall back to Georgia; sans-serif fonts fall back to Segoe UI / system-ui.
+
+There is no separate heading font setting. Headings inside the editor inherit the editor body font and are sized by TipTap's heading levels (h1, h2, h3). Entry view titles also use the editor body font via the `.entry-view-title` CSS class.
+
+Font preferences are stored in `localStorage` under the keys `ui-font-id` and `editor-font-id` and persist across sessions and vault switches.
+
 ## Theming
 
 Emerald ships with two named themes, selectable in Settings > Appearance:

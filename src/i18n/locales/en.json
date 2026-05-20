@@ -333,6 +333,8 @@
     "importErrorInvalid": "File is not a valid Emerald backup.",
     "previewContains": "Contains:",
     "appearance": "Appearance",
+    "uiFont": "UI font",
+    "editorFont": "Editor body font",
     "themeDark": "Dark",
     "themeLight": "Light"
   },
