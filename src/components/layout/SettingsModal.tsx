@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useVaultStore } from '../../store/vaultStore';
 import { useUIStore } from '../../store/uiStore';
 import { FONT_OPTIONS, THEME_OPTIONS } from '../../themes/theme';
+import packageJson from '../../../package.json';
 import {
   type BackupOptions,
   type ImportMode,
@@ -628,7 +629,7 @@ export default function SettingsModal({ onClose }: Props) {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-stone-500">{t('settings.version')}</span>
-                <span className="text-stone-300">1.0.0</span>
+                <span className="text-stone-300">{packageJson.version}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-stone-500">{t('settings.description')}</span>
