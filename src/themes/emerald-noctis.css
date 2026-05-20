@@ -1,9 +1,9 @@
 :root,
 html[data-theme='emerald-noctis'] {
-  --bg-app: #12100d;
-  --bg-surface-1: rgba(40, 35, 31, 0.58);
-  --bg-surface-2: rgba(31, 27, 24, 0.88);
-  --bg-elevated: rgba(30, 27, 24, 0.96);
+  --bg-app: #15110d;
+  --bg-surface-1: rgba(35, 29, 24, 0.64);
+  --bg-surface-2: rgba(29, 24, 20, 0.9);
+  --bg-elevated: rgba(27, 23, 19, 0.97);
   --text-primary: #f5f5f4;
   --text-secondary: #e7e5e4;
   --text-muted: #a8a29e;
@@ -58,4 +58,31 @@ html[data-theme='emerald-noctis'] {
   --select-option-text: #e7e5e4;
   --select-option-active-bg: rgba(0, 122, 77, 0.2);
   --select-option-active-text: #b8ffe2;
+  --shell-bg: radial-gradient(circle at 24% -14%, rgba(82, 62, 41, 0.12), transparent 54%), #15110d;
+  --sidebar-bg: linear-gradient(180deg, rgba(41, 34, 29, 0.95) 0%, rgba(30, 25, 21, 0.97) 100%);
+  --panel-bg: rgba(38, 32, 27, 0.78);
+  --panel-border: rgba(95, 81, 68, 0.5);
+  --panel-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+  --panel-hover-bg: rgba(45, 37, 32, 0.9);
+  --panel-hover-border: rgba(119, 101, 85, 0.58);
+  --panel-hover-shadow: 0 14px 30px rgba(0, 0, 0, 0.4);
+  --tabbar-bg: rgba(28, 23, 19, 0.86);
+  --tab-active-bg: rgba(50, 41, 35, 0.92);
+  --tab-active-text: #f6efe8;
+  --tab-active-border: rgba(144, 123, 101, 0.5);
+  --tab-active-shadow: 0 -1px 0 rgba(255, 243, 229, 0.08), 0 10px 22px rgba(0, 0, 0, 0.34);
+  --tab-idle-bg: rgba(43, 35, 30, 0.74);
+  --tab-idle-text: #bea792;
+  --tab-idle-border: rgba(102, 86, 71, 0.42);
+  --tab-idle-hover-bg: rgba(55, 45, 38, 0.9);
+  --tab-idle-hover-text: #e6d6c6;
+  --search-bg: rgba(34, 28, 24, 0.9);
+  --search-border: rgba(109, 91, 75, 0.5);
+  --search-inset: inset 0 1px 0 rgba(255, 241, 223, 0.06);
+  --settings-overlay: rgba(9, 7, 6, 0.7);
+  --settings-card-bg: rgba(30, 25, 21, 0.98);
+  --settings-card-border: rgba(112, 95, 79, 0.5);
+  --settings-card-shadow: 0 26px 72px rgba(0, 0, 0, 0.5);
+  --list-toolbar-bg: rgba(31, 25, 21, 0.9);
+  --list-toolbar-border: rgba(109, 91, 75, 0.46);
 }

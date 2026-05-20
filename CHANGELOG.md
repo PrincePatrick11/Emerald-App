@@ -21,6 +21,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Tailwind colour-class bridge for light mode in `src/index.css`
 - Shared style constants: `altarConstants.ts` (altar backgrounds, category emojis) and `styleClasses.ts` (input/select class strings)
 - `htmlEscape()` helper in `export.ts` — all user text in PDF export HTML is now entity-escaped
+- Theme documentation refresh in `Documentation/architecture.md` and `Documentation/features.md` covering token strategy, theme normalization flow, and Tailwind bridge behavior for both Emerald themes
 
 ### Changed
 - `write_file` and `read_file` now enforce root-directory confinement (home, documents, downloads, desktop, app data, app config) in addition to the extension allowlist
@@ -28,6 +29,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `.emeralddb` added to the permitted extension allowlist for `write_file` and `read_file`
 - Theme preference stored under `theme-id` (legacy `theme` key is migrated automatically)
 - PDF export metadata rendering hardened with stricter HTML escaping and image data-URL validation
+- Emerald Noctis theme refactored to mirror Emerald Parchment architecture with expanded component-level coverage (shell, sidebars, tabs, panels, settings surfaces, list/filter toolbars, and link modals)
+- Noctis visual tuning updated toward a warmer dark counterpart with adjusted global surface balance and tab-to-main alignment
+- Shared UI color rules in `src/index.css` migrated from hardcoded values to semantic CSS tokens for list toolbar, filter states, and wiki emoji/search controls
+- Theme ID normalization consolidated to a single source in `src/themes/theme.ts` and reused by `src/store/uiStore.ts` for localStorage resolution and legacy fallback mapping
 
 ## [0.1.0] - 2026-05-03
 

@@ -102,79 +102,79 @@
   .list-toolbar-chip,
   .list-toolbar-filter-idle,
   .list-toolbar-search {
-    background-color: rgba(41, 37, 36, 0.72);
-    color: #a8a29e;
-    border: 1px solid rgba(87, 83, 78, 0.5);
+    background-color: color-mix(in srgb, var(--bg-surface-1) 80%, transparent);
+    color: var(--text-muted);
+    border: 1px solid var(--border-soft);
   }
 
   .list-toolbar-chip:hover,
   .list-toolbar-filter-idle:hover {
-    background-color: rgba(68, 64, 60, 0.72);
-    color: #e7e5e4;
+    background-color: var(--interactive-hover);
+    color: var(--text-secondary);
   }
 
   .list-toolbar-chip-label,
   .list-toolbar-clear {
-    color: #78716c;
+    color: var(--text-subtle);
   }
 
   .list-toolbar-input {
-    color: #e7e5e4;
+    color: var(--text-secondary);
   }
 
   .list-toolbar-input::placeholder {
-    color: #78716c;
+    color: var(--text-subtle);
   }
 
   .list-toolbar-clear:hover {
-    color: #d6d3d1;
+    color: var(--text-primary);
   }
 
   .list-toolbar-menu {
-    background-color: #1c1917;
-    border: 1px solid rgba(87, 83, 78, 0.7);
-    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+    background-color: var(--menu-bg);
+    border: 1px solid var(--menu-border);
+    box-shadow: var(--menu-shadow);
   }
 
   .list-toolbar-option-active {
-    color: #00e699;
+    color: var(--menu-item-active-text);
   }
 
   .list-toolbar-option-idle {
-    color: #a8a29e;
+    color: var(--text-muted);
   }
 
   .list-toolbar-option-idle:hover {
-    color: #e7e5e4;
-    background-color: rgba(87, 83, 78, 0.5);
+    color: var(--menu-item-hover-text);
+    background-color: var(--menu-item-hover-bg);
   }
 
   .list-toolbar-filter-active {
-    background-color: rgba(0, 122, 77, 0.2);
-    border: 1px solid rgba(0, 122, 77, 0.48);
-    color: #9dffd5;
+    background-color: var(--menu-item-active-bg);
+    border: 1px solid color-mix(in srgb, var(--accent) 48%, transparent);
+    color: var(--menu-item-active-text);
   }
 
   .filter-chip-active {
-    background-color: rgba(0, 122, 77, 0.2);
-    border-color: rgba(0, 122, 77, 0.48);
-    color: #9dffd5;
+    background-color: var(--menu-item-active-bg);
+    border-color: color-mix(in srgb, var(--accent) 48%, transparent);
+    color: var(--menu-item-active-text);
   }
 
   .wiki-emoji-popover {
-    background-color: #1f1a17;
-    border-color: rgba(87, 83, 78, 0.75);
+    background-color: var(--menu-bg);
+    border-color: var(--menu-border);
   }
 
   .wiki-emoji-idle:hover,
   .wiki-emoji-active {
-    background-color: rgba(87, 83, 78, 0.55);
+    background-color: var(--menu-item-hover-bg);
   }
 
   .wiki-cat-input {
-    background-color: rgba(41, 37, 36, 0.72);
-    border: 1px solid rgba(87, 83, 78, 0.6);
-    color: #e7e5e4;
+    background-color: color-mix(in srgb, var(--bg-surface-1) 80%, transparent);
+    border: 1px solid var(--border-soft);
+    color: var(--text-secondary);
   }
 
   .home-item-title {
@@ -534,6 +534,385 @@ html[data-theme='emerald-parchment'] .border-stone-600 { border-color: var(--bor
 .custom-prop-menu-item-active {
   background-color: var(--menu-item-hover-bg);
   color: var(--menu-item-hover-text);
+}
+
+html[data-theme='emerald-noctis'] .app-shell {
+  background: var(--shell-bg);
+}
+
+html[data-theme='emerald-noctis'] .app-sidebar,
+html[data-theme='emerald-noctis'] .app-main {
+  position: relative;
+  z-index: 1;
+}
+
+html[data-theme='emerald-noctis'] .app-main {
+  background: linear-gradient(180deg, rgba(52, 41, 33, 0.16) 0%, rgba(33, 26, 21, 0.08) 100%);
+}
+
+html[data-theme='emerald-noctis'] .app-sidebar {
+  background: var(--sidebar-bg);
+}
+
+html[data-theme='emerald-noctis'] .app-sidebar-left {
+  box-shadow: 12px 0 30px rgba(0, 0, 0, 0.3);
+}
+
+html[data-theme='emerald-noctis'] .app-sidebar-right {
+  box-shadow: -12px 0 30px rgba(0, 0, 0, 0.28);
+}
+
+html[data-theme='emerald-noctis'] .sidebar-header,
+html[data-theme='emerald-noctis'] .sidebar-search,
+html[data-theme='emerald-noctis'] .tabbar,
+html[data-theme='emerald-noctis'] .settings-modal-card > div:first-child {
+  border-color: rgba(110, 93, 76, 0.44);
+}
+
+html[data-theme='emerald-noctis'] .sidebar-search-inner {
+  background: var(--search-bg);
+  border: 1px solid var(--search-border);
+  box-shadow: var(--search-inset);
+}
+
+html[data-theme='emerald-noctis'] .sidebar-search-input {
+  color: #ece2d8;
+}
+
+html[data-theme='emerald-noctis'] .sidebar-search-input::placeholder {
+  color: #9f8b76;
+}
+
+html[data-theme='emerald-noctis'] .panel,
+html[data-theme='emerald-noctis'] .panel-interactive {
+  background: var(--panel-bg);
+  border-color: var(--panel-border);
+  box-shadow: var(--panel-shadow);
+}
+
+html[data-theme='emerald-noctis'] .panel-interactive:hover {
+  background: var(--panel-hover-bg);
+  border-color: var(--panel-hover-border);
+  box-shadow: var(--panel-hover-shadow);
+}
+
+html[data-theme='emerald-noctis'] .tabbar {
+  background: var(--tabbar-bg);
+  backdrop-filter: blur(4px);
+}
+
+html[data-theme='emerald-noctis'] .tab-item-active {
+  background: var(--tab-active-bg);
+  color: var(--tab-active-text);
+  border-color: var(--tab-active-border);
+  box-shadow: var(--tab-active-shadow);
+}
+
+html[data-theme='emerald-noctis'] .tab-item-idle,
+html[data-theme='emerald-noctis'] .tab-add {
+  background: var(--tab-idle-bg);
+  color: var(--tab-idle-text);
+  border-color: var(--tab-idle-border);
+}
+
+html[data-theme='emerald-noctis'] .tab-add:hover,
+html[data-theme='emerald-noctis'] .tab-item-idle:hover {
+  background: var(--tab-idle-hover-bg);
+  color: var(--tab-idle-hover-text);
+}
+
+html[data-theme='emerald-noctis'] .sidebar-item {
+  color: #baa48f;
+  border: 1px solid transparent;
+}
+
+html[data-theme='emerald-noctis'] .sidebar-item:hover {
+  color: #f2e7db;
+  background: rgba(95, 78, 62, 0.18);
+  border-color: rgba(124, 102, 82, 0.46);
+}
+
+html[data-theme='emerald-noctis'] .sidebar-item.active {
+  color: #ddfff2;
+  background: rgba(0, 138, 87, 0.24);
+  border-color: rgba(0, 196, 127, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(0, 196, 127, 0.24);
+}
+
+html[data-theme='emerald-noctis'] .btn-ghost,
+html[data-theme='emerald-noctis'] .btn-secondary {
+  color: #b9a38e;
+}
+
+html[data-theme='emerald-noctis'] .btn-secondary {
+  background: rgba(46, 38, 32, 0.76);
+  border-color: rgba(113, 94, 77, 0.48);
+}
+
+html[data-theme='emerald-noctis'] .btn-secondary:hover {
+  color: #f3e9dd;
+  background: rgba(58, 47, 40, 0.9);
+  border-color: rgba(142, 121, 101, 0.58);
+}
+
+html[data-theme='emerald-noctis'] .btn-ghost:hover {
+  color: #f3e8dc;
+  background: rgba(104, 84, 68, 0.18);
+}
+
+html[data-theme='emerald-noctis'] input,
+html[data-theme='emerald-noctis'] textarea,
+html[data-theme='emerald-noctis'] select {
+  color: #e8ddd1;
+}
+
+html[data-theme='emerald-noctis'] input::placeholder,
+html[data-theme='emerald-noctis'] textarea::placeholder {
+  color: #9c8872;
+}
+
+html[data-theme='emerald-noctis'] .settings-modal {
+  background: var(--settings-overlay);
+}
+
+html[data-theme='emerald-noctis'] .settings-modal-card {
+  background: var(--settings-card-bg);
+  border-color: var(--settings-card-border);
+  box-shadow: var(--settings-card-shadow);
+}
+
+html[data-theme='emerald-noctis'] .settings-choice-btn-idle,
+html[data-theme='emerald-noctis'] .settings-vault-row-idle {
+  background: rgba(46, 38, 32, 0.82);
+  border-color: rgba(113, 94, 77, 0.48);
+  color: #c9b5a1;
+}
+
+html[data-theme='emerald-noctis'] .settings-choice-btn-idle:hover {
+  background: rgba(58, 48, 41, 0.9);
+  border-color: rgba(141, 119, 99, 0.54);
+  color: #f2e7da;
+}
+
+html[data-theme='emerald-noctis'] .settings-choice-btn-active,
+html[data-theme='emerald-noctis'] .settings-vault-row-active,
+html[data-theme='emerald-noctis'] .settings-cta-btn {
+  background: rgba(0, 138, 87, 0.28);
+  border-color: rgba(0, 196, 127, 0.44);
+  color: #d9ffef;
+}
+
+html[data-theme='emerald-noctis'] .settings-cta-btn:hover {
+  background: rgba(0, 138, 87, 0.38);
+  color: #f4fff9;
+}
+
+html[data-theme='emerald-noctis'] .list-toolbar,
+html[data-theme='emerald-noctis'] .filter-panel {
+  background: var(--list-toolbar-bg);
+  border-color: var(--list-toolbar-border);
+}
+
+html[data-theme='emerald-noctis'] .link-picker-modal,
+html[data-theme='emerald-noctis'] .tasks-link-modal {
+  background: rgba(28, 22, 19, 0.97);
+  border-color: rgba(114, 95, 78, 0.5);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.56);
+}
+
+html[data-theme='emerald-noctis'] .link-picker-modal > div:first-child,
+html[data-theme='emerald-noctis'] .link-picker-modal > div:nth-child(2),
+html[data-theme='emerald-noctis'] .link-picker-modal > div:nth-child(3),
+html[data-theme='emerald-noctis'] .tasks-link-modal > div:first-child,
+html[data-theme='emerald-noctis'] .tasks-link-modal > div:nth-child(2) {
+  border-color: rgba(110, 91, 74, 0.34);
+}
+
+html[data-theme='emerald-noctis'] .link-picker-modal .text-stone-300,
+html[data-theme='emerald-noctis'] .tasks-link-modal .text-stone-200 {
+  color: #e7ddd2;
+}
+
+html[data-theme='emerald-noctis'] .link-picker-modal .text-stone-500,
+html[data-theme='emerald-noctis'] .tasks-link-modal .text-stone-400,
+html[data-theme='emerald-noctis'] .tasks-link-modal .text-stone-500 {
+  color: #9f8a75;
+}
+
+html[data-theme='emerald-noctis'] .link-picker-modal .text-stone-600 {
+  color: #87715e;
+}
+
+html[data-theme='emerald-noctis'] .link-picker-modal .bg-stone-800,
+html[data-theme='emerald-noctis'] .tasks-link-modal input.bg-stone-800 {
+  background: rgba(45, 36, 31, 0.9);
+  border-color: rgba(113, 94, 77, 0.48);
+}
+
+html[data-theme='emerald-noctis'] .link-picker-modal input,
+html[data-theme='emerald-noctis'] .tasks-link-modal input {
+  color: #ecdfd1;
+}
+
+html[data-theme='emerald-noctis'] .link-picker-modal input::placeholder,
+html[data-theme='emerald-noctis'] .tasks-link-modal input::placeholder {
+  color: #927e6a;
+}
+
+html[data-theme='emerald-noctis'] .link-picker-tab-active,
+html[data-theme='emerald-noctis'] .tasks-link-tab-active {
+  background: rgba(0, 138, 87, 0.24);
+  color: #a7ffd8;
+}
+
+html[data-theme='emerald-noctis'] .link-picker-tab-active .link-picker-tab-count {
+  color: #68f1bc;
+}
+
+html[data-theme='emerald-noctis'] .link-picker-tab-idle,
+html[data-theme='emerald-noctis'] .tasks-link-tab-idle {
+  color: #ab957f;
+}
+
+html[data-theme='emerald-noctis'] .link-picker-tab-idle:hover,
+html[data-theme='emerald-noctis'] .tasks-link-tab-idle:hover {
+  background: rgba(88, 72, 58, 0.34);
+  color: #e8dccc;
+}
+
+html[data-theme='emerald-noctis'] .link-picker-row,
+html[data-theme='emerald-noctis'] .tasks-link-row {
+  color: #d8cabb;
+}
+
+html[data-theme='emerald-noctis'] .link-picker-label {
+  color: #e8dbcd;
+}
+
+html[data-theme='emerald-noctis'] .link-picker-row .text-xs {
+  color: #9f8a75;
+}
+
+html[data-theme='emerald-noctis'] .link-picker-row .text-stone-700 {
+  color: #7f6a57;
+}
+
+html[data-theme='emerald-noctis'] .link-picker-row:hover,
+html[data-theme='emerald-noctis'] .link-picker-row:focus-visible,
+html[data-theme='emerald-noctis'] .tasks-link-row:hover {
+  background: rgba(82, 67, 54, 0.34);
+}
+
+html[data-theme='emerald-noctis'] .link-picker-row:hover .link-picker-label,
+html[data-theme='emerald-noctis'] .link-picker-row:focus-visible .link-picker-label {
+  color: #f8efe5;
+}
+
+html[data-theme='emerald-noctis'] .link-picker-row:hover .text-xs,
+html[data-theme='emerald-noctis'] .link-picker-row:focus-visible .text-xs {
+  color: #c0ab96;
+}
+
+html[data-theme='emerald-noctis'] .home-item-title {
+  color: #ded0c1;
+}
+
+html[data-theme='emerald-noctis'] .home-item-meta {
+  color: #9b8571;
+}
+
+html[data-theme='emerald-noctis'] .panel-interactive:hover .home-item-title {
+  color: #f4e8db;
+}
+
+html[data-theme='emerald-noctis'] .right-sidebar-tab-active,
+html[data-theme='emerald-noctis'] .app-sidebar-right .bg-stone-700.text-stone-200 {
+  background: rgba(0, 138, 87, 0.24);
+  color: #b8ffe2;
+  border: 1px solid rgba(0, 196, 127, 0.34);
+}
+
+html[data-theme='emerald-noctis'] .right-sidebar-tab-idle,
+html[data-theme='emerald-noctis'] .task-action-btn,
+html[data-theme='emerald-noctis'] .linked-entry-menu-item,
+html[data-theme='emerald-noctis'] .context-menu-item-default,
+html[data-theme='emerald-noctis'] .custom-prop-menu-item,
+html[data-theme='emerald-noctis'] .altar-category-chip {
+  color: #b49d87;
+}
+
+html[data-theme='emerald-noctis'] .right-sidebar-tab-idle:hover,
+html[data-theme='emerald-noctis'] .app-sidebar-right .text-stone-500.hover\:text-stone-300:hover,
+html[data-theme='emerald-noctis'] .task-action-btn:hover,
+html[data-theme='emerald-noctis'] .custom-prop-type-btn:hover,
+html[data-theme='emerald-noctis'] .altar-category-chip:hover,
+html[data-theme='emerald-noctis'] .editor-toolbar-btn-idle:hover {
+  color: #eadfce;
+  background: rgba(104, 84, 68, 0.18);
+}
+
+html[data-theme='emerald-noctis'] .btn-primary,
+html[data-theme='emerald-noctis'] .bg-jade-900\/40,
+html[data-theme='emerald-noctis'] .bg-jade-500\/20,
+html[data-theme='emerald-noctis'] .bg-jade-500\/10 {
+  background: rgba(0, 138, 87, 0.3);
+  border-color: rgba(0, 196, 127, 0.44);
+  color: #dcfff0;
+}
+
+html[data-theme='emerald-noctis'] .btn-primary:hover,
+html[data-theme='emerald-noctis'] .hover\:bg-jade-900\/60:hover,
+html[data-theme='emerald-noctis'] .hover\:bg-jade-500\/30:hover,
+html[data-theme='emerald-noctis'] .hover\:bg-jade-500\/20:hover {
+  background: rgba(0, 138, 87, 0.42);
+  color: #f2fff9;
+}
+
+html[data-theme='emerald-noctis'] .tasks-linked-entry {
+  color: #9effd7;
+  background: rgba(0, 122, 77, 0.22);
+  border: 1px solid rgba(0, 196, 127, 0.24);
+}
+
+html[data-theme='emerald-noctis'] .tasks-linked-entry:hover {
+  color: #c5ffe9;
+  background: rgba(0, 122, 77, 0.34);
+}
+
+html[data-theme='emerald-noctis'] .tasks-category-trigger,
+html[data-theme='emerald-noctis'] .sigil-tool-toggle,
+html[data-theme='emerald-noctis'] .sigil-brush-controls,
+html[data-theme='emerald-noctis'] .op-prop-select,
+html[data-theme='emerald-noctis'] .custom-prop-input,
+html[data-theme='emerald-noctis'] .custom-prop-edit-panel,
+html[data-theme='emerald-noctis'] .custom-prop-type-btn,
+html[data-theme='emerald-noctis'] .altar-symbol-trigger,
+html[data-theme='emerald-noctis'] .altar-upload-item-btn,
+html[data-theme='emerald-noctis'] .altar-item-name-input {
+  background: rgba(45, 36, 31, 0.84);
+  border-color: rgba(113, 94, 77, 0.48);
+  color: #d8c8b8;
+}
+
+html[data-theme='emerald-noctis'] .op-prop-select:hover,
+html[data-theme='emerald-noctis'] .custom-prop-type-btn:hover,
+html[data-theme='emerald-noctis'] .altar-symbol-trigger:hover,
+html[data-theme='emerald-noctis'] .altar-upload-item-btn:hover {
+  border-color: rgba(142, 121, 101, 0.56);
+}
+
+html[data-theme='emerald-noctis'] .op-prop-select:focus {
+  border-color: rgba(0, 196, 127, 0.44);
+  box-shadow: 0 0 0 2px rgba(0, 196, 127, 0.18);
+}
+
+html[data-theme='emerald-noctis'] .context-menu-item-default:hover,
+html[data-theme='emerald-noctis'] .custom-prop-menu-item:hover,
+html[data-theme='emerald-noctis'] .custom-prop-menu-item-active,
+html[data-theme='emerald-noctis'] .altar-emoji-item:hover,
+html[data-theme='emerald-noctis'] .altar-emoji-item-active {
+  background: rgba(0, 122, 77, 0.2);
+  color: #b8ffe2;
 }
 
 /* Light mode redesign: stronger structure and readability */

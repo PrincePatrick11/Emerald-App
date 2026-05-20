@@ -130,7 +130,7 @@ Images are content-addressed and stored outside SQLite:
 
 ## Theming System
 
-Emerald uses CSS custom properties scoped to `html[data-theme]` for all visual theming. Two named themes ship with the app: **Emerald Noctis** (dark) and **Emerald Parchment** (light).
+Emerald uses CSS custom properties scoped to `html[data-theme]` for all visual theming. Two named themes ship with the app: **Emerald Noctis** (dark, default) and **Emerald Parchment** (light).
 
 ### Architecture
 
@@ -141,7 +141,43 @@ src/themes/
 └── theme.ts                # Theme helpers: DEFAULT_THEME_ID, THEME_OPTIONS, normalizeThemeId, applyTheme
 ```
 
-Each theme file defines the same set of CSS custom properties (`--bg-app`, `--text-primary`, `--accent`, `--border-soft`, etc.). Components reference these variables rather than hardcoded colours. The Noctis theme is attached to both `:root` and its `data-theme` selector, making it the visual default when no theme attribute is present.
+Each theme file defines the same set of CSS custom properties. Components reference these variables rather than hardcoded colours. The Noctis theme is attached to both `:root` and its `data-theme` selector, making it the visual default when no theme attribute is present. Parchment is scoped only to its `data-theme` selector.
+
+### Token Strategy
+
+CSS custom properties follow a tiered naming convention:
+
+| Tier | Prefix | Purpose | Examples |
+|---|---|---|---|
+| **Core surfaces** | `--bg-*` | App background, surface layers, elevated panels | `--bg-app`, `--bg-surface-1`, `--bg-surface-2`, `--bg-elevated` |
+| **Text** | `--text-*` | Text colour hierarchy from primary to subtle | `--text-primary`, `--text-secondary`, `--text-muted`, `--text-subtle` |
+| **Borders** | `--border-*` | Divider and edge styling | `--border-soft`, `--border-strong` |
+| **Interactive** | `--interactive-*` | Hover and active state backgrounds | `--interactive-hover`, `--interactive-active` |
+| **Accent** | `--accent*` | Primary action colour and contrast | `--accent`, `--accent-strong`, `--accent-contrast`, `--focus-ring` |
+| **Component** | `--<component>-*` | Per-component tokens for complex UI | `--link-chip-*`, `--editor-*`, `--menu-*`, `--panel-*`, `--tab-*`, `--settings-*`, `--danger-*`, `--select-option-*`, `--linked-chip-*` |
+| **Shell** | `--shell-*`, `--sidebar-*` | Top-level layout backgrounds | `--shell-bg`, `--sidebar-bg` |
+| **Utility** | `--scrollbar`, `--code-bg` | Shared utility tokens | `--scrollbar`, `--scrollbar-hover`, `--code-bg` |
+
+When adding a new themed component, define component-scoped tokens (e.g. `--my-component-bg`) in both theme files and reference them from CSS. Avoid adding hardcoded colours to component stylesheets.
+
+### Normalization Flow
+
+Theme resolution follows this pipeline in `src/themes/theme.ts`:
+
+```
+localStorage ('theme-id' or legacy 'theme')
+    ↓
+normalizeThemeId(raw)
+    ├─ raw is a valid ThemeId → return as-is
+    ├─ raw === 'light'        → return 'emerald-parchment'
+    └─ anything else          → return DEFAULT_THEME_ID ('emerald-noctis')
+    ↓
+applyTheme(themeId)
+    ↓
+document.documentElement.dataset.theme = themeId
+```
+
+`uiStore` calls `loadSavedTheme()` at initialization, which reads `localStorage.getItem('theme-id')` first, then falls back to the legacy `'theme'` key. `setTheme()` writes to `theme-id` only — the legacy key is never written to again.
 
 ### Theme application
 
@@ -157,17 +193,17 @@ useEffect(() => { applyTheme(theme); }, [theme]);
 
 ### Theme selection and persistence
 
-`uiStore` stores the current theme as `ThemeId` (`'emerald-noctis' | 'emerald-parchment'`). On startup, `loadSavedTheme()` reads `localStorage.getItem('theme-id')` and falls back to the legacy `'theme'` key (mapping `'light'` → `'emerald-parchment'`). The Settings modal renders the theme picker from `THEME_OPTIONS` exported by `theme.ts`.
+`uiStore` stores the current theme as `ThemeId` (`'emerald-noctis' | 'emerald-parchment'`). The Settings modal renders the theme picker from `THEME_OPTIONS` exported by `theme.ts`.
 
 ### Tailwind bridge
 
-Because the app uses many Tailwind utility classes with hardcoded stone/jade colours, `src/index.css` contains a large Tailwind bridge section that overrides those classes under `html[data-theme='emerald-parchment']`. This ensures that classes like `.bg-stone-900`, `.text-stone-100`, and `.border-stone-700` map to the correct theme variables in light mode. The Noctis theme does not need a bridge — its `:root` variables already match Tailwind's dark stone palette.
+Because the app uses many Tailwind utility classes with hardcoded stone/jade colours, `src/index.css` contains a large Tailwind bridge section that overrides those classes under each `html[data-theme='…']` selector. This ensures that classes like `.bg-stone-900`, `.text-stone-100`, and `.border-stone-700` map to the correct theme variables. Both themes require bridge overrides — Noctis for jade accent adjustments and component-specific refinements, Parchment for the full light-mode colour mapping.
 
 ### Adding a new theme
 
 1. Create `src/themes/emerald-<name>.css` with all required custom properties (copy an existing file as a template).
 2. Add the theme ID to the `ThemeId` union in `src/store/uiStore.ts`.
-3. Register it in `THEME_OPTIONS` and `normalizeThemeId` in `src/themes/theme.ts`.
+3. Register it in `THEME_OPTIONS` and add any legacy mapping in `normalizeThemeId` in `src/themes/theme.ts`.
 4. Import the new CSS file from `src/main.tsx` (or add it to `index.html`).
 5. Add Tailwind bridge overrides in `src/index.css` under `html[data-theme='emerald-<name>']` for any hardcoded utility classes the theme needs to override.
 

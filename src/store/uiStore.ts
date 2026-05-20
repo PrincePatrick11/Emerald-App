@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createTabId, isContentView, type OpenTab } from '../lib/tabs';
+import { normalizeThemeId } from '../themes/theme';
 import type { ActiveView } from '../types';
 
 export type ViewMode = 'list' | 'cards' | 'timeline';
@@ -60,12 +61,9 @@ interface UIState {
 }
 
 function loadSavedTheme(): ThemeId {
-  const themeId = localStorage.getItem('theme-id') as ThemeId | null;
-  if (themeId === 'emerald-noctis' || themeId === 'emerald-parchment') return themeId;
-
-  const legacyTheme = localStorage.getItem('theme');
-  if (legacyTheme === 'light') return 'emerald-parchment';
-  return 'emerald-noctis';
+  const rawThemeId = localStorage.getItem('theme-id');
+  if (rawThemeId) return normalizeThemeId(rawThemeId);
+  return normalizeThemeId(localStorage.getItem('theme'));
 }
 
 function normalizeSavedTab(tab: unknown): OpenTab | null {

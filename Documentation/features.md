@@ -182,4 +182,6 @@ Emerald ships with two named themes, selectable in Settings > Appearance:
 
 The theme preference is stored in `localStorage` under the key `theme-id` and persists across sessions and vault switches. Legacy `theme=light` preferences are automatically migrated to `emerald-parchment`.
 
-Each theme defines a complete set of CSS custom properties (backgrounds, text colours, borders, accents, scrollbar colours, menu styles, danger states, etc.) in separate files under `src/themes/`. Components reference these variables so the entire UI switches consistently. The light theme also includes a Tailwind utility bridge that overrides hardcoded Tailwind colour classes to match the parchment palette.
+Each theme defines a complete set of CSS custom properties (backgrounds, text colours, borders, accents, scrollbar colours, menu styles, danger states, etc.) in separate files under `src/themes/`. Components reference these variables so the entire UI switches consistently. A Tailwind utility bridge in `src/index.css` overrides hardcoded Tailwind colour classes for both themes.
+
+For the token naming strategy, normalization pipeline, and instructions for adding new themes, see [Architecture → Theming System](architecture.md#theming-system).
