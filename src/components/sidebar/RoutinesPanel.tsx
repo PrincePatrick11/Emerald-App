@@ -4,6 +4,7 @@ import { X, Check, Pencil, Trash2, Copy } from 'lucide-react';
 import { useRoutineStore } from '../../store/routineStore';
 import { useUndoStore } from '../../store/undoStore';
 import { setRoutineDragItem } from '../../lib/routineDragState';
+import { generateId } from '../../lib/helpers';
 import TagInput from '../editor/TagInput';
 import LinkedOpsInput from './LinkedOpsInput';
 import LinkedWikiInput from './LinkedWikiInput';
@@ -123,7 +124,7 @@ export default function RoutinesPanel() {
             onDelete={async (id) => {
               const snapshot = routines.find((r) => r.id === id);
               await deleteRoutine(id);
-              if (snapshot) pushUndo({ id: crypto.randomUUID(), description: 'Routine deleted', undo: () => restoreRoutine(snapshot) });
+              if (snapshot) pushUndo({ id: generateId(), description: 'Routine deleted', undo: () => restoreRoutine(snapshot) });
             }}
             onContextMenu={(e, id) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); }}
             isRenaming={renamingId === routine.id}
@@ -170,7 +171,7 @@ export default function RoutinesPanel() {
                 const id = ctxMenu.id;
                 const snapshot = routines.find((r) => r.id === id);
                 await deleteRoutine(id);
-                if (snapshot) pushUndo({ id: crypto.randomUUID(), description: 'Routine deleted', undo: () => restoreRoutine(snapshot) });
+                if (snapshot) pushUndo({ id: generateId(), description: 'Routine deleted', undo: () => restoreRoutine(snapshot) });
               },
             },
           ]}

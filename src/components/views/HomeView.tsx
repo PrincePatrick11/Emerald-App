@@ -9,6 +9,7 @@ import { useUndoStore } from '../../store/undoStore';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import ContextMenu from '../ui/ContextMenu';
 import { getMoonPhase, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
+import { generateId } from '../../lib/helpers';
 import { format } from 'date-fns';
 import type { MoonPhase } from '../../types';
 import type { HomeSort, HomeView, HomeSectionPrefs } from '../../store/uiStore';
@@ -45,20 +46,20 @@ function Dropdown<T extends string>({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs bg-stone-800/70 hover:bg-stone-700/70 text-stone-400 hover:text-stone-200 transition-colors"
+        className="list-toolbar-chip flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs transition-colors"
       >
-        <span className="text-stone-600 mr-0.5">{label}</span>
+        <span className="list-toolbar-chip-label mr-0.5">{label}</span>
         {selected}
-        <ChevronDown size={11} className="text-stone-600" />
+        <ChevronDown size={11} className="list-toolbar-chip-label" />
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 border border-stone-700/60 rounded-lg shadow-xl py-1 min-w-[120px]" style={{ backgroundColor: '#1c1917' }}>
+        <div className="list-toolbar-menu absolute top-full left-0 mt-1 z-50 rounded-lg shadow-xl py-1 min-w-[120px]">
           {options.map((o) => (
             <button
               key={o.value}
               onClick={() => { onChange(o.value); setOpen(false); }}
               className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
-                value === o.value ? 'text-jade-400' : 'text-stone-400 hover:text-stone-200 hover:bg-stone-700/50'
+                value === o.value ? 'list-toolbar-option-active' : 'list-toolbar-option-idle'
               }`}
             >
               {o.label}
@@ -192,13 +193,13 @@ export default function HomeView() {
   const handleDelete = async (target: CtxTarget) => {
     if (target.kind === 'journal') {
       await deleteEntry(target.id);
-      pushUndo({ id: crypto.randomUUID(), description: t('undo.entryDeleted'),     undo: () => restoreEntry(target.id) });
+      pushUndo({ id: generateId(), description: t('undo.entryDeleted'),     undo: () => restoreEntry(target.id) });
     } else if (target.kind === 'wiki') {
       await deleteArticle(target.id);
-      pushUndo({ id: crypto.randomUUID(), description: t('undo.articleDeleted'),   undo: () => restoreArticle(target.id) });
+      pushUndo({ id: generateId(), description: t('undo.articleDeleted'),   undo: () => restoreArticle(target.id) });
     } else if (target.kind === 'operation') {
       await deleteOperation(target.id);
-      pushUndo({ id: crypto.randomUUID(), description: t('undo.operationDeleted'), undo: () => restoreOperation(target.id) });
+      pushUndo({ id: generateId(), description: t('undo.operationDeleted'), undo: () => restoreOperation(target.id) });
     }
   };
 
@@ -273,10 +274,10 @@ export default function HomeView() {
                   <div className="flex items-center gap-3">
                     <span className="text-xl">{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-stone-200 truncate group-hover:text-stone-100">
+                      <div className="home-item-title text-sm font-medium truncate">
                         {entry.title}
                       </div>
-                      <div className="text-xs text-parchment-500/70 mt-0.5">
+                      <div className="home-item-meta text-xs mt-0.5">
                         {format(new Date(entry.created_at), 'MMM d, yyyy')}
                       </div>
                     </div>
@@ -294,8 +295,8 @@ export default function HomeView() {
                   className="panel-interactive px-3 py-3 text-left"
                 >
                   <div className="text-lg mb-1">{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</div>
-                  <div className="text-sm font-medium text-stone-200 truncate">{entry.title}</div>
-                  <div className="text-xs text-parchment-500/70 mt-0.5">
+                  <div className="home-item-title text-sm font-medium truncate">{entry.title}</div>
+                  <div className="home-item-meta text-xs mt-0.5">
                     {format(new Date(entry.created_at), 'MMM d, yyyy')}
                   </div>
                 </button>
@@ -336,10 +337,10 @@ export default function HomeView() {
                     <div className="flex items-center gap-3">
                       <span className="text-xl">{cat?.emoji ?? '⚡'}</span>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-stone-200 truncate group-hover:text-stone-100">
+                        <div className="home-item-title text-sm font-medium truncate">
                           {op.title}
                         </div>
-                        <div className="text-xs text-parchment-500/70 mt-0.5">
+                        <div className="home-item-meta text-xs mt-0.5">
                           {(cat ? (cat.is_builtin ? t(`operations.categories.${cat.id}`) : cat.name) : '')} · {format(new Date(op.updated_at), 'MMM d, yyyy')}
                         </div>
                       </div>
@@ -360,8 +361,8 @@ export default function HomeView() {
                     className="panel-interactive px-3 py-3 text-left"
                   >
                     <div className="text-lg mb-1">{cat?.emoji ?? '⚡'}</div>
-                    <div className="text-sm font-medium text-stone-200 truncate">{op.title}</div>
-                    <div className="text-xs text-parchment-500/70 mt-0.5">
+                    <div className="home-item-title text-sm font-medium truncate">{op.title}</div>
+                    <div className="home-item-meta text-xs mt-0.5">
                       {(cat ? (cat.is_builtin ? t(`operations.categories.${cat.id}`) : cat.name) : '')} · {format(new Date(op.updated_at), 'MMM d, yyyy')}
                     </div>
                   </button>
@@ -409,10 +410,10 @@ export default function HomeView() {
                         : <span className="text-xl flex-shrink-0">{icon}</span>
                       }
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-stone-200 truncate group-hover:text-stone-100">
+                        <div className="home-item-title text-sm font-medium truncate">
                           {article.title}
                         </div>
-                        <div className="text-xs text-parchment-500/70 capitalize mt-0.5">
+                        <div className="home-item-meta text-xs capitalize mt-0.5">
                           {catLabel} · {format(new Date(article.updated_at), 'MMM d, yyyy')}
                         </div>
                       </div>
@@ -438,8 +439,8 @@ export default function HomeView() {
                       ? <img src={article.icon} alt="" className="w-6 h-6 object-cover rounded mb-1" />
                       : <div className="text-lg mb-1">{icon}</div>
                     }
-                    <div className="text-sm font-medium text-stone-300 truncate">{article.title}</div>
-                    <div className="text-xs text-parchment-500/70 capitalize mt-0.5">
+                    <div className="home-item-title text-sm font-medium truncate">{article.title}</div>
+                    <div className="home-item-meta text-xs capitalize mt-0.5">
                       {catLabel} · {format(new Date(article.updated_at), 'MMM d, yyyy')}
                     </div>
                   </button>

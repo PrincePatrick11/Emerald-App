@@ -1,6 +1,6 @@
 use base64::{engine::general_purpose, Engine as _};
 use sha2::{Digest, Sha256};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -44,6 +44,34 @@ fn ext_for_path(path: &str) -> String {
         .to_lowercase()
 }
 
+fn resolve_allowed_roots(app: &tauri::AppHandle) -> Result<Vec<PathBuf>, String> {
+    let mut roots: Vec<PathBuf> = Vec::new();
+
+    let mut push_root = |root: Result<PathBuf, _>| {
+        if let Ok(path) = root {
+            let canonical = std::fs::canonicalize(&path).unwrap_or(path);
+            roots.push(canonical);
+        }
+    };
+
+    push_root(app.path().home_dir());
+    push_root(app.path().document_dir());
+    push_root(app.path().download_dir());
+    push_root(app.path().desktop_dir());
+    push_root(app.path().app_data_dir());
+    push_root(app.path().app_config_dir());
+
+    if roots.is_empty() {
+        return Err("no allowed storage roots available".to_string());
+    }
+
+    Ok(roots)
+}
+
+fn is_within_allowed_roots(path: &Path, allowed_roots: &[PathBuf]) -> bool {
+    allowed_roots.iter().any(|root| path.starts_with(root))
+}
+
 // ── commands ──────────────────────────────────────────────────────────────────
 
 /// Saves a base64 data-URL image.
@@ -74,7 +102,19 @@ fn copy_image_file(app: tauri::AppHandle, source: String) -> Result<String, Stri
     if !matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg") {
         return Err("unsupported file type".to_string());
     }
-    let bytes = std::fs::read(&source).map_err(|e| format!("read {source}: {e}"))?;
+
+    let allowed_roots = resolve_allowed_roots(&app)?;
+    let source_path = PathBuf::from(&source);
+    let metadata = std::fs::symlink_metadata(&source_path).map_err(|_| "file not found".to_string())?;
+    if metadata.file_type().is_symlink() {
+        return Err("access denied: symlink targets are not allowed".to_string());
+    }
+    let canonical_source = std::fs::canonicalize(&source_path).map_err(|_| "unable to resolve path".to_string())?;
+    if !is_within_allowed_roots(&canonical_source, &allowed_roots) {
+        return Err("access denied: path outside allowed directories".to_string());
+    }
+
+    let bytes = std::fs::read(&canonical_source).map_err(|e| format!("read {source}: {e}"))?;
     let path = images_dir(&app)?.join(format!("{}.{}", sha256_hex(&bytes), ext));
 
     if !path.exists() {
@@ -109,26 +149,66 @@ fn read_image_as_base64(app: tauri::AppHandle, path: String) -> Result<String, S
 /// Writes text content to a user-selected file path.
 /// Only .md, .emerald, .emeralddb, .json, and .txt extensions are permitted.
 #[tauri::command]
-fn write_file(path: String, content: String) -> Result<(), String> {
+fn write_file(app: tauri::AppHandle, path: String, content: String) -> Result<(), String> {
     let ext = ext_for_path(&path);
     if !matches!(ext.as_str(), "md" | "emerald" | "emeralddb" | "json" | "txt") {
         return Err("unsupported file type".to_string());
     }
-    if let Some(parent) = Path::new(&path).parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+
+    let allowed_roots = resolve_allowed_roots(&app)?;
+    let target = PathBuf::from(&path);
+    let parent = target
+        .parent()
+        .ok_or("invalid path")?;
+
+    let parent_abs = if parent.is_absolute() {
+        parent.to_path_buf()
+    } else {
+        std::env::current_dir().map_err(|e| e.to_string())?.join(parent)
+    };
+    if !is_within_allowed_roots(&parent_abs, &allowed_roots) {
+        return Err("access denied: path outside allowed directories".to_string());
     }
-    std::fs::write(&path, content.as_bytes()).map_err(|e| e.to_string())
+
+    std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let canonical_parent = std::fs::canonicalize(parent).map_err(|_| "invalid path".to_string())?;
+    if !is_within_allowed_roots(&canonical_parent, &allowed_roots) {
+        return Err("access denied: path outside allowed directories".to_string());
+    }
+
+    if target.exists() {
+        let metadata = std::fs::symlink_metadata(&target).map_err(|e| e.to_string())?;
+        if metadata.file_type().is_symlink() {
+            return Err("access denied: symlink targets are not allowed".to_string());
+        }
+        let canonical_target = std::fs::canonicalize(&target).map_err(|_| "invalid path".to_string())?;
+        if !is_within_allowed_roots(&canonical_target, &allowed_roots) {
+            return Err("access denied: path outside allowed directories".to_string());
+        }
+        return std::fs::write(canonical_target, content.as_bytes()).map_err(|e| e.to_string());
+    }
+
+    let filename = target.file_name().ok_or("invalid path")?;
+    let canonical_target = canonical_parent.join(filename);
+    std::fs::write(canonical_target, content.as_bytes()).map_err(|e| e.to_string())
 }
 
 /// Reads a text file and returns its contents as a UTF-8 string.
 /// Only .md, .emerald, .emeralddb, .json, and .txt extensions are permitted.
 #[tauri::command]
-fn read_file(path: String) -> Result<String, String> {
+fn read_file(app: tauri::AppHandle, path: String) -> Result<String, String> {
     let ext = ext_for_path(&path);
     if !matches!(ext.as_str(), "md" | "emerald" | "emeralddb" | "json" | "txt") {
         return Err("unsupported file type".to_string());
     }
-    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+
+    let allowed_roots = resolve_allowed_roots(&app)?;
+    let canonical = std::fs::canonicalize(&path).map_err(|_| "invalid path".to_string())?;
+    if !is_within_allowed_roots(&canonical, &allowed_roots) {
+        return Err("access denied: path outside allowed directories".to_string());
+    }
+
+    std::fs::read_to_string(canonical).map_err(|e| e.to_string())
 }
 
 /// Ensures platform-specific app storage directories exist before frontend

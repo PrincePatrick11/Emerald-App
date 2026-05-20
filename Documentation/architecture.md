@@ -33,14 +33,16 @@ src/
 │   ├── sidebar/      OpPropertiesPanel, RoutinesPanel, WikiPanel, OperationsPanel,
 │   │                 BacklinksPanel, AltarSidebarPanel, CustomPropertiesSection,
 │   │                 LinkedOpsInput, LinkedWikiInput
-│   ├── wiki/         WikiList (getCategoryEmoji helper)
+│   ├── wiki/         WikiList (rendering + category emoji helper)
 │   └── ui/           ListToolbar, FilterPanel, UndoToast, ContextMenu
-├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore,
+├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, routineStore, customPropertyStore, undoStore,
 │                     trashStore, vaultStore
 ├── lib/              db.ts, links.ts, dragState.ts, altarDragState.ts,
 │                     routineDragState.ts, moonPhase.ts, export.ts,
-│                     exportData.ts, emeraldFormat.ts, vaultManager.ts, dbBackup.ts
+│                     exportData.ts, emeraldFormat.ts, vaultManager.ts, dbBackup.ts,
+│                     helpers.ts, altarConstants.ts, styleClasses.ts
+├── themes/           emerald-noctis.css, emerald-parchment.css, theme.ts
 ├── i18n/             react-i18next setup + locales/en.json de.json es.json fr.json
 └── types/index.ts    Shared TypeScript interfaces
 
@@ -49,6 +51,10 @@ src-tauri/
 ```
 
 ## Key Architectural Patterns
+
+### Known Boundary Caveat
+
+`getCategoryEmoji` currently lives in `src/components/wiki/WikiList.tsx` and is imported by both UI and non-UI modules (for example export helpers). This works, but it is a layering compromise because a pure utility function is sourced from a component file. If category emoji mappings become more complex, move this helper into `src/lib/` (or a shared constants module) to keep library code independent from React component modules.
 
 ### Edit Mode Architecture
 
@@ -148,6 +154,117 @@ Images are content-addressed and stored outside SQLite:
 - **Deduplication**: because the filename is the SHA-256 of the raw bytes, uploading the same image twice produces one file.
 - **Cleanup**: `AppShell` calls `cleanup_unused_images` after all stores load. It collects every `src="..."` path from all content fields and passes that set to Rust, which deletes any files in the images directory that are not in the set and are older than 5 minutes. The age guard prevents deleting files belonging to unsaved new entries.
 
+## Theming System
+
+Emerald uses CSS custom properties scoped to `html[data-theme]` for all visual theming. Two named themes ship with the app: **Emerald Noctis** (dark, default) and **Emerald Parchment** (light).
+
+### Architecture
+
+```
+src/themes/
+├── emerald-noctis.css      # Dark theme — applied to :root and [data-theme='emerald-noctis']
+├── emerald-parchment.css   # Light theme — applied to [data-theme='emerald-parchment']
+└── theme.ts                # Theme helpers: DEFAULT_THEME_ID, THEME_OPTIONS, normalizeThemeId, applyTheme
+```
+
+Each theme file defines the same set of CSS custom properties. Components reference these variables rather than hardcoded colours. The Noctis theme is attached to both `:root` and its `data-theme` selector, making it the visual default when no theme attribute is present. Parchment is scoped only to its `data-theme` selector.
+
+### Token Strategy
+
+CSS custom properties follow a tiered naming convention:
+
+| Tier | Prefix | Purpose | Examples |
+|---|---|---|---|
+| **Core surfaces** | `--bg-*` | App background, surface layers, elevated panels | `--bg-app`, `--bg-surface-1`, `--bg-surface-2`, `--bg-elevated` |
+| **Text** | `--text-*` | Text colour hierarchy from primary to subtle | `--text-primary`, `--text-secondary`, `--text-muted`, `--text-subtle` |
+| **Borders** | `--border-*` | Divider and edge styling | `--border-soft`, `--border-strong` |
+| **Interactive** | `--interactive-*` | Hover and active state backgrounds | `--interactive-hover`, `--interactive-active` |
+| **Accent** | `--accent*` | Primary action colour and contrast | `--accent`, `--accent-strong`, `--accent-contrast`, `--focus-ring` |
+| **Component** | `--<component>-*` | Per-component tokens for complex UI | `--link-chip-*`, `--editor-*`, `--menu-*`, `--panel-*`, `--tab-*`, `--settings-*`, `--danger-*`, `--select-option-*`, `--linked-chip-*` |
+| **Shell** | `--shell-*`, `--sidebar-*` | Top-level layout backgrounds | `--shell-bg`, `--sidebar-bg` |
+| **Utility** | `--scrollbar`, `--code-bg` | Shared utility tokens | `--scrollbar`, `--scrollbar-hover`, `--code-bg` |
+
+When adding a new themed component, define component-scoped tokens (e.g. `--my-component-bg`) in both theme files and reference them from CSS. Avoid adding hardcoded colours to component stylesheets.
+
+### Normalization Flow
+
+Theme resolution follows this pipeline in `src/themes/theme.ts`:
+
+```
+localStorage ('theme-id' or legacy 'theme')
+    ↓
+normalizeThemeId(raw)
+    ├─ raw is a valid ThemeId → return as-is
+    ├─ raw === 'light'        → return 'emerald-parchment'
+    └─ anything else          → return DEFAULT_THEME_ID ('emerald-noctis')
+    ↓
+applyTheme(themeId)
+    ↓
+document.documentElement.dataset.theme = themeId
+```
+
+`uiStore` calls `loadSavedTheme()` at initialization, which reads `localStorage.getItem('theme-id')` first, then falls back to the legacy `'theme'` key. `setTheme()` writes to `theme-id` only — the legacy key is never written to again.
+
+### Theme application
+
+`App.tsx` subscribes to `uiStore.theme` and calls `applyTheme(themeId)` on every change:
+
+```ts
+// App.tsx
+const theme = useUIStore((s) => s.theme);
+useEffect(() => { applyTheme(theme); }, [theme]);
+```
+
+`applyTheme` sets `document.documentElement.dataset.theme = themeId`, which activates the matching `html[data-theme='…']` CSS rules.
+
+### Theme selection and persistence
+
+`uiStore` stores the current theme as `ThemeId` (`'emerald-noctis' | 'emerald-parchment'`). The Settings modal renders the theme picker from `THEME_OPTIONS` exported by `theme.ts`.
+
+### Tailwind bridge
+
+Because the app uses many Tailwind utility classes with hardcoded stone/jade colours, `src/index.css` contains a large Tailwind bridge section that overrides those classes under each `html[data-theme='…']` selector. This ensures that classes like `.bg-stone-900`, `.text-stone-100`, and `.border-stone-700` map to the correct theme variables. Both themes require bridge overrides — Noctis for jade accent adjustments and component-specific refinements, Parchment for the full light-mode colour mapping.
+
+### Adding a new theme
+
+1. Create `src/themes/emerald-<name>.css` with all required custom properties (copy an existing file as a template).
+2. Add the theme ID to the `ThemeId` union in `src/store/uiStore.ts`.
+3. Register it in `THEME_OPTIONS` and add any legacy mapping in `normalizeThemeId` in `src/themes/theme.ts`.
+4. Import the new CSS file from `src/main.tsx` (or add it to `index.html`).
+5. Add Tailwind bridge overrides in `src/index.css` under `html[data-theme='emerald-<name>']` for any hardcoded utility classes the theme needs to override.
+
+### Shared style constants
+
+Two modules centralise reusable Tailwind class strings to avoid duplication across components:
+
+- **`src/lib/styleClasses.ts`** — Input and select class strings for custom properties and operation properties (`CUSTOM_PROP_INPUT_CLASSES`, `CUSTOM_PROP_SMALL_INPUT_CLASSES`, `OP_PROP_SELECT_CLASSES`).
+- **`src/lib/altarConstants.ts`** — Altar background presets (`ALTAR_BACKGROUND_PRESETS`, `ALTAR_BACKGROUND_STYLES`), category emoji mappings (`ALTAR_CATEGORY_EMOJI`, `CATEGORY_EMOJIS`), and the default background (`DEFAULT_ALTAR_BACKGROUND`).
+
+## Font System
+
+Emerald supports two independent font selections applied via CSS custom properties on `html`:
+
+```
+src/themes/theme.ts          # DEFAULT_UI_FONT_ID, DEFAULT_EDITOR_FONT_ID,
+                             # FONT_OPTIONS, normalizeUIFontId, normalizeEditorFontId,
+                             # applyUIFont, applyEditorFont
+src/index.css                # --font-ui and --font-editor variable definitions,
+                             # html[data-ui-font='…'] and html[data-editor-font='…'] selectors
+src/store/uiStore.ts         # uiFontId, editorFontId state + setters (localStorage: ui-font-id, editor-font-id)
+src/App.tsx                  # Subscribes to uiFontId/editorFontId and calls applyUIFont/applyEditorFont
+```
+
+**Application flow.** `App.tsx` subscribes to `uiStore.uiFontId` and `uiStore.editorFontId` and calls `applyUIFont()` / `applyEditorFont()` on every change. These functions set `document.documentElement.dataset.uiFont` and `dataset.editorFont`, which activate the matching CSS rules in `src/index.css`.
+
+**CSS variable mapping.** Each font ID defines a `--font-<id>` variable with the full font-family stack. The `data-ui-font` selector sets `--font-ui`; the `data-editor-font` selector sets `--font-editor`. Components reference these variables:
+
+- `--font-ui` is applied to the root `body` element (all UI chrome).
+- `--font-editor` is applied to `.tiptap`, `.entry-view-title`, and `.entry-view-body`.
+
+This means the editor font controls the TipTap editor body, entry titles in all detail views (journal, wiki, operations, sigil, altar), and the read-mode body text. There is no separate heading font — headings inherit the editor body font.
+
+**Defaults.** UI font defaults to **Inter**; editor body font defaults to **Lora**. Invalid or missing stored values fall back to these defaults via `normalizeUIFontId()` / `normalizeEditorFontId()`.
+
 ## IPC Command Surface
 
 All Rust commands are registered in `src-tauri/src/lib.rs` and invoked from TypeScript with `invoke()`.
@@ -155,13 +272,15 @@ All Rust commands are registered in `src-tauri/src/lib.rs` and invoked from Type
 | Command | Purpose |
 |---|---|
 | `save_image(data_url)` | Decode base64 data-URL, write `{sha256}.{ext}`, skip if exists. Returns absolute path. |
-| `copy_image_file(source)` | Read a file from an arbitrary path, write to images dir with SHA-256 name. Accepts png/jpg/gif/webp/svg only. |
+| `copy_image_file(source)` | Read a file from an arbitrary path, write to images dir with SHA-256 name. Accepts png/jpg/gif/webp/svg only. Rejects symlinks, canonicalizes the source path, and verifies it falls within allowed storage roots (home, documents, downloads, desktop, app data, app config). |
 | `read_image_as_base64(path)` | Read a file from the images dir and return it as a base64 data-URL. Path must be within the images directory (checked via `canonicalize`). |
 | `cleanup_unused_images(used_paths, min_age_secs?)` | Delete unreferenced files older than N seconds (default 300). Returns count deleted. |
-| `write_file(path, content)` | Write UTF-8 text to a user-selected path. Permitted extensions: `.md`, `.emerald`, `.json`, `.txt`. |
-| `read_file(path)` | Read a file and return its UTF-8 content. Same extension allowlist as `write_file`. |
+| `write_file(path, content)` | Write UTF-8 text to a user-selected path. Permitted extensions: `.md`, `.emerald`, `.emeralddb`, `.json`, `.txt`. Path must resolve within allowed storage roots. |
+| `read_file(path)` | Read a file and return its UTF-8 content. Same extension allowlist and root confinement as `write_file`. |
+| `ensure_app_storage_dirs()` | Create app data and app config directories if they don't exist. Called before frontend writes vault metadata or opens SQLite. |
 | `open_pdf_export(html)` | Store the HTML in a static `Mutex<String>`, open a new `pdf-export` window that serves it over a custom `export-html://` URI scheme. |
 | `trigger_print()` | Call `window.print()` on the `pdf-export` window. Invoked by a button in the print window HTML. |
+| `update_menu_labels(...)` | Update native menu item labels for i18n (edit, view, export, import submenus and their items). |
 
 Tauri menu events (not `invoke`) are emitted by the native menu and received in `AppShell` via `listen()`:
 

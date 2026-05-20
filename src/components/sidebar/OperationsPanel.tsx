@@ -5,6 +5,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
 import { setDragItem } from '../../lib/dragState';
+import { generateId } from '../../lib/helpers';
 import ContextMenu from '../ui/ContextMenu';
 
 export default function OperationsPanel({ onNavigate }: { onNavigate: (view: any) => void }) {
@@ -163,7 +164,7 @@ export default function OperationsPanel({ onNavigate }: { onNavigate: (view: any
               onClick: async () => {
                 const id = ctxMenu.id;
                 await deleteOperation(id);
-                pushUndo({ id: crypto.randomUUID(), description: t('undo.operationDeleted'), undo: () => restoreOperation(id) });
+                pushUndo({ id: generateId(), description: t('undo.operationDeleted'), undo: () => restoreOperation(id) });
               },
             },
           ]}

@@ -18,6 +18,12 @@ function htmlEscape(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
+function sanitizeDataImageUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  return /^data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+$/.test(trimmed) ? trimmed : null;
+}
+
 const FILE_SRC_RE = /src="([^"]+)"/g;
 
 async function embedImages(html: string): Promise<string> {
@@ -109,10 +115,11 @@ function exportFilename(title: string, date: string, ext: string): string {
 
 // Render a chip for the metadata header (icon can be data-URL or emoji)
 function chip(data: ChipData, extra = ''): string {
-  const iconHtml = data.icon?.startsWith('data:')
-    ? `<img src="${data.icon}" class="chip-img">`
-    : data.icon ? `<span class="chip-emoji">${data.icon}</span>` : '';
-  return `<span class="chip${extra ? ' ' + extra : ''}">${iconHtml}<span class="chip-label">${data.label}</span></span>`;
+  const safeIconDataUrl = sanitizeDataImageUrl(data.icon);
+  const iconHtml = safeIconDataUrl
+    ? `<img src="${safeIconDataUrl}" class="chip-img">`
+    : data.icon ? `<span class="chip-emoji">${htmlEscape(data.icon)}</span>` : '';
+  return `<span class="chip${extra ? ' ' + extra : ''}">${iconHtml}<span class="chip-label">${htmlEscape(data.label)}</span></span>`;
 }
 
 function formatCustomPropValue(prop: { type: string; value: string | null; meta: string | null }): string {
@@ -158,11 +165,12 @@ function buildTopBar(data: ExportData): string {
   }
 
   // Render icon: data-URL → <img>, else emoji text
-  const iconHtml = (data.entryIcon?.startsWith('data:') && (data.wikiCategory || data.opCategory))
-    ? `<img src="${data.entryIcon}" class="topbar-icon-img">`
-    : `<span class="topbar-icon">${icon}</span>`;
+  const safeEntryIcon = sanitizeDataImageUrl(data.entryIcon);
+  const iconHtml = (safeEntryIcon && (data.wikiCategory || data.opCategory))
+    ? `<img src="${safeEntryIcon}" class="topbar-icon-img">`
+    : `<span class="topbar-icon">${htmlEscape(icon)}</span>`;
 
-  const suffix = moonName ? ` · ${moonName}` : '';
+  const suffix = moonName ? ` · ${htmlEscape(moonName)}` : '';
   return `<div class="entry-topbar">${iconHtml}<span class="topbar-date">${dateStr}${suffix}</span></div>`;
 }
 
@@ -183,7 +191,7 @@ function buildMetaHtml(data: ExportData): string {
     propChips.push(`<span class="chip chip-${data.isActive ? 'active' : 'stone'}">${data.isActive ? 'Active' : 'Inactive'}</span>`);
   }
   if (data.endDate) propChips.push(`<span class="chip chip-stone">Ends ${format(new Date(data.endDate), 'MMM d, yyyy')}</span>`);
-  if (data.version)  propChips.push(`<span class="chip chip-stone">v${data.version}</span>`);
+  if (data.version)  propChips.push(`<span class="chip chip-stone">v${htmlEscape(data.version)}</span>`);
   if (propChips.length) parts.push(`<div class="meta-row">${propChips.join('')}</div>`);
 
   // Linked ops
@@ -196,13 +204,13 @@ function buildMetaHtml(data: ExportData): string {
   }
   // Tags
   if (data.tagNames?.length) {
-    const tags = data.tagNames.map(t => `<span class="tag">${t}</span>`).join('');
+    const tags = data.tagNames.map(t => `<span class="tag">${htmlEscape(t)}</span>`).join('');
     parts.push(`<div class="meta-row">${tags}</div>`);
   }
   // Custom props
   if (data.customProps?.length) {
     const badges = data.customProps.map(p =>
-      `<span class="prop-badge"><span class="prop-name">${p.name}</span><span class="prop-val">${formatCustomPropValue(p)}</span></span>`
+      `<span class="prop-badge"><span class="prop-name">${htmlEscape(p.name)}</span><span class="prop-val">${htmlEscape(formatCustomPropValue(p))}</span></span>`
     ).join('');
     parts.push(`<div class="meta-row">${badges}</div>`);
   }

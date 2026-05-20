@@ -444,4 +444,69 @@ async function runMigrations(db: Database): Promise<void> {
       [cutoff]
     );
   }
+
+  // Task categories table
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS task_categories (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      emoji TEXT NOT NULL DEFAULT '📋',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      is_builtin INTEGER NOT NULL DEFAULT 0,
+      deleted_at TEXT
+    )
+  `);
+
+  // Tasks table
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS tasks (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL DEFAULT 'Untitled Task',
+      description TEXT NOT NULL DEFAULT '',
+      category_id TEXT NOT NULL,
+      priority TEXT NOT NULL DEFAULT 'medium',
+      due_date TEXT,
+      completed INTEGER NOT NULL DEFAULT 0,
+      completed_at TEXT,
+      parent_task_id TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      tags TEXT NOT NULL DEFAULT '[]',
+      deleted_at TEXT
+    )
+  `);
+
+  // Task links table
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS task_links (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      target_type TEXT NOT NULL
+    )
+  `);
+
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_task_links_task ON task_links(task_id)'
+  );
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_task_links_target ON task_links(target_id)'
+  );
+
+  // Seed default category (idempotent)
+  await db.execute(
+    `INSERT OR IGNORE INTO task_categories (id, name, emoji, sort_order, is_builtin) VALUES ($1,$2,$3,$4,$5)`,
+    ['general', 'Allgemein', '📋', 0, 0]
+  );
+
+  // Auto-purge tasks from trash
+  await db.execute(
+    `DELETE FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
+    [cutoff]
+  );
+  await db.execute(
+    `DELETE FROM task_categories WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
+    [cutoff]
+  );
 }

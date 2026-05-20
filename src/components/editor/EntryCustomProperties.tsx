@@ -100,7 +100,7 @@ function EditableProp({
         value={prop.value ?? ''}
         onChange={(e) => onUpdate(prop.id, { value: e.target.value || null })}
         placeholder="…"
-        className="bg-transparent text-xs text-stone-300 outline-none placeholder-stone-700 min-w-0 w-24 [color-scheme:dark]"
+        className="bg-transparent text-xs text-stone-300 outline-none placeholder-stone-700 min-w-0 w-24"
       />
     </div>
   );

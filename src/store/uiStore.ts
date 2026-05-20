@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createTabId, isContentView, type OpenTab } from '../lib/tabs';
+import { normalizeEditorFontId, normalizeThemeId, normalizeUIFontId } from '../themes/theme';
 import type { ActiveView } from '../types';
 
 export type ViewMode = 'list' | 'cards' | 'timeline';
@@ -10,7 +11,8 @@ export type HomeSort = 'date_desc' | 'date_asc' | 'alpha_asc' | 'alpha_desc';
 export type HomeView = 'list' | 'cards';
 export interface HomeSectionPrefs { sort: HomeSort; view: HomeView; count: number; } // count 0 = all
 
-export type Theme = 'dark' | 'light';
+export type ThemeId = 'emerald-noctis' | 'emerald-parchment';
+export type FontId = 'inter' | 'source-sans-3' | 'nunito' | 'ibm-plex-sans' | 'alegreya' | 'cormorant-garamond' | 'lora' | 'merriweather';
 
 interface UIState {
   activeView: ActiveView;
@@ -26,12 +28,15 @@ interface UIState {
   journalPrefs: ListPrefs;
   wikiPrefs: ListPrefs;
   operationsPrefs: ListPrefs;
+  tasksPrefs: ListPrefs;
   altarPrefs: ListPrefs;
   trashPrefs: ListPrefs;
   homeJournalPrefs: HomeSectionPrefs;
   homeOpsPrefs: HomeSectionPrefs;
   homeWikiPrefs: HomeSectionPrefs;
-  theme: Theme;
+  theme: ThemeId;
+  uiFontId: FontId;
+  editorFontId: FontId;
 
   setActiveView: (view: ActiveView) => void;
   openViewInNewTab: (view: ActiveView) => void;
@@ -49,12 +54,29 @@ interface UIState {
   setJournalPrefs: (p: Partial<ListPrefs>) => void;
   setWikiPrefs: (p: Partial<ListPrefs>) => void;
   setOperationsPrefs: (p: Partial<ListPrefs>) => void;
+  setTasksPrefs: (p: Partial<ListPrefs>) => void;
   setAltarPrefs: (p: Partial<ListPrefs>) => void;
   setTrashPrefs: (p: Partial<ListPrefs>) => void;
   setHomeJournalPrefs: (p: Partial<HomeSectionPrefs>) => void;
   setHomeOpsPrefs: (p: Partial<HomeSectionPrefs>) => void;
   setHomeWikiPrefs: (p: Partial<HomeSectionPrefs>) => void;
-  setTheme: (t: Theme) => void;
+  setTheme: (t: ThemeId) => void;
+  setUIFontId: (fontId: FontId) => void;
+  setEditorFontId: (fontId: FontId) => void;
+}
+
+function loadSavedTheme(): ThemeId {
+  const rawThemeId = localStorage.getItem('theme-id');
+  if (rawThemeId) return normalizeThemeId(rawThemeId);
+  return normalizeThemeId(localStorage.getItem('theme'));
+}
+
+function loadSavedUIFontId(): FontId {
+  return normalizeUIFontId(localStorage.getItem('ui-font-id'));
+}
+
+function loadSavedEditorFontId(): FontId {
+  return normalizeEditorFontId(localStorage.getItem('editor-font-id'));
 }
 
 function normalizeSavedTab(tab: unknown): OpenTab | null {
@@ -107,10 +129,13 @@ export const useUIStore = create<UIState>((set) => ({
   operationsSubTab: null,
   wikiSubTab: null,
   searchQuery: '',
-  theme: (localStorage.getItem('theme') as Theme) ?? 'dark',
+  theme: loadSavedTheme(),
+  uiFontId: loadSavedUIFontId(),
+  editorFontId: loadSavedEditorFontId(),
   journalPrefs: { view: 'list', sort: 'date_desc' },
   wikiPrefs: { view: 'cards', sort: 'category' },
   operationsPrefs: { view: 'list', sort: 'category' },
+  tasksPrefs: { view: 'list', sort: 'category' },
   altarPrefs: { view: 'cards', sort: 'date_desc' },
   trashPrefs: { view: 'list', sort: 'date_desc' },
   homeJournalPrefs: { sort: 'date_desc', view: 'list', count: 5 },
@@ -206,13 +231,22 @@ export const useUIStore = create<UIState>((set) => ({
   setJournalPrefs: (p) => set((s) => ({ journalPrefs: { ...s.journalPrefs, ...p } })),
   setWikiPrefs: (p) => set((s) => ({ wikiPrefs: { ...s.wikiPrefs, ...p } })),
   setOperationsPrefs: (p) => set((s) => ({ operationsPrefs: { ...s.operationsPrefs, ...p } })),
+  setTasksPrefs: (p) => set((s) => ({ tasksPrefs: { ...s.tasksPrefs, ...p } })),
   setAltarPrefs: (p) => set((s) => ({ altarPrefs: { ...s.altarPrefs, ...p } })),
   setTrashPrefs: (p) => set((s) => ({ trashPrefs: { ...s.trashPrefs, ...p } })),
   setHomeJournalPrefs: (p) => set((s) => ({ homeJournalPrefs: { ...s.homeJournalPrefs, ...p } })),
   setHomeOpsPrefs:     (p) => set((s) => ({ homeOpsPrefs:     { ...s.homeOpsPrefs,     ...p } })),
   setHomeWikiPrefs:    (p) => set((s) => ({ homeWikiPrefs:    { ...s.homeWikiPrefs,    ...p } })),
   setTheme: (theme) => {
-    localStorage.setItem('theme', theme);
+    localStorage.setItem('theme-id', theme);
     set({ theme });
+  },
+  setUIFontId: (fontId) => {
+    localStorage.setItem('ui-font-id', fontId);
+    set({ uiFontId: fontId });
+  },
+  setEditorFontId: (fontId) => {
+    localStorage.setItem('editor-font-id', fontId);
+    set({ editorFontId: fontId });
   },
 }));

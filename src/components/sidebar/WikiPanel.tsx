@@ -5,6 +5,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useUndoStore } from '../../store/undoStore';
 import { setDragItem } from '../../lib/dragState';
+import { generateId } from '../../lib/helpers';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import ContextMenu from '../ui/ContextMenu';
 import type { WikiArticle } from '../../types';
@@ -169,7 +170,7 @@ export default function WikiPanel({
               onClick: async () => {
                 const id = ctxMenu.id;
                 await deleteArticle(id);
-                pushUndo({ id: crypto.randomUUID(), description: t('undo.articleDeleted'), undo: () => restoreArticle(id) });
+                pushUndo({ id: generateId(), description: t('undo.articleDeleted'), undo: () => restoreArticle(id) });
               },
             },
           ]}

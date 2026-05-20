@@ -7,6 +7,7 @@ import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useUIStore } from '../../store/uiStore';
 import { useUndoStore } from '../../store/undoStore';
+import { generateId } from '../../lib/helpers';
 import ContextMenu from '../ui/ContextMenu';
 
 const TAG_COLORS = [
@@ -87,7 +88,7 @@ export default function TagsView() {
     await deleteTag(tag.name);
     if (selectedTag === tag.name) setSelectedTag(null);
     pushUndo({
-      id: crypto.randomUUID(),
+      id: generateId(),
       description: t('undo.tagDeleted'),
       undo: () => restoreTag(tag.id),
     });
@@ -102,15 +103,15 @@ export default function TagsView() {
             <Tag size={16} className="text-stone-500" />
             <h1 className="text-sm font-semibold text-stone-200">{t('nav.tags')}</h1>
           </div>
-          <div className="flex items-center gap-2 bg-stone-700/40 rounded-lg px-3 py-2">
+          <div className="tags-search flex items-center gap-2 bg-stone-700/40 rounded-lg px-3 py-2">
             <Search size={12} className="text-stone-500 flex-shrink-0" />
-            <input
-              type="text"
-              placeholder={t('tags.search')}
-              value={tagSearch}
-              onChange={(e) => setTagSearch(e.target.value)}
-              className="bg-transparent text-xs text-stone-300 placeholder-stone-600 outline-none w-full selectable"
-            />
+              <input
+                type="text"
+                placeholder={t('tags.search')}
+                value={tagSearch}
+                onChange={(e) => setTagSearch(e.target.value)}
+                className="tags-search-input bg-transparent text-xs text-stone-300 placeholder-stone-600 outline-none w-full selectable"
+              />
             {tagSearch && (
               <button onClick={() => setTagSearch('')} className="text-stone-600 hover:text-stone-400">
                 <X size={11} />
@@ -196,7 +197,7 @@ export default function TagsView() {
               {colorPickerId === tag.id && (
                 <div
                   data-color-picker
-                  className="absolute left-2 top-full mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 flex flex-wrap gap-1.5 w-40"
+                  className="tag-color-popover absolute left-2 top-full mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 flex flex-wrap gap-1.5 w-40"
                 >
                   {TAG_COLORS.map((c) => (
                     <button

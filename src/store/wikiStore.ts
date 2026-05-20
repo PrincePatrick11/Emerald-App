@@ -1,15 +1,8 @@
 import { create } from 'zustand';
 import { getDb } from '../lib/db';
 import { syncLinks } from '../lib/links';
+import { generateId, nowIso } from '../lib/helpers';
 import type { WikiArticle, WikiCategory, WikiCategoryDef } from '../types';
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
 
 function slugify(title: string): string {
   return title
@@ -218,7 +211,7 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     const db = await getDb();
     const cat = get().wikiCategories.find((c) => c.id === id);
     if (!cat || cat.is_builtin) return;
-    await db.execute('UPDATE wiki_categories SET deleted_at=$1 WHERE id=$2', [new Date().toISOString(), id]);
+    await db.execute('UPDATE wiki_categories SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
     set((s) => ({ wikiCategories: s.wikiCategories.filter((c) => c.id !== id) }));
   },
 

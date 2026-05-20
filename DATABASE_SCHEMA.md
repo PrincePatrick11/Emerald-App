@@ -244,6 +244,49 @@ entry_number INTEGER
 ```
 **Do not write new data here.** The active sigil workflow lives under `operations` with `category_id='sigils'`. Table is kept for backward compatibility with old user data only.
 
+### task_categories
+
+```
+id TEXT PRIMARY KEY
+name TEXT NOT NULL
+emoji TEXT NOT NULL DEFAULT '📋'
+sort_order INTEGER NOT NULL DEFAULT 0
+is_builtin INTEGER NOT NULL DEFAULT 0
+deleted_at TEXT
+```
+
+Seed: `INSERT OR IGNORE` a default `general` / `Allgemein` / 📋 category on first run.
+
+### tasks
+
+```
+id TEXT PRIMARY KEY
+title TEXT NOT NULL DEFAULT 'Untitled Task'
+description TEXT NOT NULL DEFAULT ''
+category_id TEXT NOT NULL
+priority TEXT NOT NULL DEFAULT 'medium'   -- 'low' | 'medium' | 'high'
+due_date TEXT
+completed INTEGER NOT NULL DEFAULT 0
+completed_at TEXT
+parent_task_id TEXT                       -- self-reference for subtask nesting
+sort_order INTEGER NOT NULL DEFAULT 0
+created_at TEXT NOT NULL
+updated_at TEXT NOT NULL
+tags TEXT NOT NULL DEFAULT '[]'
+deleted_at TEXT
+```
+
+### task_links
+
+```
+id TEXT PRIMARY KEY
+task_id TEXT NOT NULL
+target_id TEXT NOT NULL
+target_type TEXT NOT NULL                 -- 'journal' | 'wiki' | 'operation'
+```
+
+Indexes: `idx_task_links_task` on `task_id`, `idx_task_links_target` on `target_id`.
+
 ## Image Storage
 
 Handled natively in `src-tauri/src/lib.rs`:

@@ -266,12 +266,12 @@ function ToolbarBtn({
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className={`p-1.5 rounded-md transition-colors duration-100 ${
+      className={`editor-toolbar-btn p-1.5 rounded-md transition-colors duration-100 ${
         active
-          ? 'bg-stone-700 text-stone-100'
+          ? 'editor-toolbar-btn-active bg-stone-700 text-stone-100'
           : disabled
-          ? 'text-stone-700 cursor-not-allowed'
-          : 'text-stone-500 hover:text-stone-300 hover:bg-stone-700/60'
+          ? 'editor-toolbar-btn-disabled text-stone-700 cursor-not-allowed'
+          : 'editor-toolbar-btn-idle text-stone-500 hover:text-stone-300 hover:bg-stone-700/60'
       }`}
     >
       {children}

@@ -3,28 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { X, Library, Link2, Wand2, SlidersHorizontal, Repeat2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
-import type { AltarItemCategory } from '../../types';
+import { ALTAR_CATEGORY_EMOJI, ALTAR_CATEGORIES, CATEGORY_EMOJIS } from '../../lib/altarConstants';
 import OpPropertiesPanel from '../sidebar/OpPropertiesPanel';
 import RoutinesPanel from '../sidebar/RoutinesPanel';
 import WikiPanel from '../sidebar/WikiPanel';
 import BacklinksPanel from '../sidebar/BacklinksPanel';
 import OperationsPanel from '../sidebar/OperationsPanel';
 import AltarSidebarPanel from '../sidebar/AltarSidebarPanel';
-
-const ALTAR_CATEGORY_EMOJI: Record<AltarItemCategory, string> = {
-  candle: '🕯️', crystal: '🔮', herb: '🌿', deity: '✨',
-  symbol: '🌙', tool: '⚗️', other: '📿',
-};
-const ALTAR_CATEGORIES: AltarItemCategory[] = ['candle', 'crystal', 'herb', 'deity', 'symbol', 'tool', 'other'];
-const CATEGORY_EMOJIS: Record<AltarItemCategory, string[]> = {
-  candle:  ['🕯️','🔥','🕎','💡','🪔'],
-  crystal: ['🔮','💎','💜','🌟','⭐','🪨'],
-  herb:    ['🌿','🍃','🌱','🌾','🪴','🌺','🍀'],
-  deity:   ['👁️','☀️','🌙','🦅','🐉','🦋','🌟','⚡'],
-  symbol:  ['☯️','🔱','⚡','🌀','🔯','🪬','☽','🌈'],
-  tool:    ['⚗️','🪄','🗡️','🏺','📜','🔑','🪬','🧿'],
-  other:   ['📿','💫','🌀','🎭','🌈','🧿','🫧','✨'],
-};
 
 export { ALTAR_CATEGORY_EMOJI, ALTAR_CATEGORIES, CATEGORY_EMOJIS };
 
@@ -56,12 +41,12 @@ export default function RightSidebar() {
               key={id}
               onClick={() => setRightSidebarTab(id)}
               title={label}
-              className={`p-2 rounded-md transition-colors ${
-                rightSidebarTab === id
-                  ? 'bg-stone-700 text-stone-200'
-                  : 'text-stone-500 hover:text-stone-300'
-              }`}
-            >
+                className={`p-2 rounded-md transition-colors ${
+                  rightSidebarTab === id
+                    ? 'right-sidebar-tab-active bg-stone-700 text-stone-200'
+                    : 'right-sidebar-tab-idle text-stone-500 hover:text-stone-300'
+                }`}
+              >
               {icon}
             </button>
           ))}

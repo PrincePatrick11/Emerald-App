@@ -1,16 +1,8 @@
 import { create } from 'zustand';
 import { getDb } from '../lib/db';
 import { syncLinks } from '../lib/links';
+import { generateId, nowIso, safeParseArray } from '../lib/helpers';
 import type { Operation, OperationCategory } from '../types';
-
-function generateId() { return crypto.randomUUID(); }
-function nowIso() { return new Date().toISOString(); }
-
-function safeParseArray<T = unknown>(v: unknown): T[] {
-  if (Array.isArray(v)) return v as T[];
-  if (typeof v === 'string') { try { return JSON.parse(v) as T[]; } catch { return []; } }
-  return [];
-}
 
 function normalizeOperation(row: Operation): Operation {
   return {
@@ -187,7 +179,7 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     const db = await getDb();
     const cat = get().categories.find((c) => c.id === id);
     if (!cat || (cat.is_builtin as unknown as number)) return;
-    await db.execute('UPDATE operation_categories SET deleted_at=$1 WHERE id=$2', [new Date().toISOString(), id]);
+    await db.execute('UPDATE operation_categories SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
     set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }));
   },
 

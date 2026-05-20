@@ -46,7 +46,7 @@ export default function LinkedOpsInput({
             const cat = categories.find((c) => c.id === op.category_id);
             const opIcon = op.icon || cat?.emoji || '⚡';
             return (
-              <span key={op.id} className="flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-stone-800/60 border border-stone-700/40 text-stone-300">
+              <span key={op.id} className="linked-entry-chip flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-stone-800/60 border border-stone-700/40 text-stone-300">
                 {opIcon.startsWith('data:')
                   ? <img src={opIcon} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
                   : <span>{opIcon}</span>}
@@ -72,7 +72,7 @@ export default function LinkedOpsInput({
           className={inputCls}
         />
         {open && (
-          <div className="absolute top-full left-0 right-0 mt-1 z-50 border border-stone-700/60 rounded-lg shadow-xl py-1 max-h-40 overflow-y-auto" style={{ backgroundColor: '#1c1917' }}>
+          <div className="linked-entry-menu absolute top-full left-0 right-0 mt-1 z-50 border border-stone-700/60 rounded-lg shadow-xl py-1 max-h-40 overflow-y-auto">
             {filtered.length === 0 ? (
               <p className="text-xs text-stone-600 px-3 py-2">{t('search.noResultsShort')}</p>
             ) : filtered.map((op) => {
@@ -82,7 +82,7 @@ export default function LinkedOpsInput({
                 <button
                   key={op.id}
                   onMouseDown={(e) => { e.preventDefault(); onChange([...ids, op.id]); setQuery(''); setOpen(false); }}
-                  className="w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs text-stone-400 hover:text-stone-200 hover:bg-stone-700/50"
+                  className="linked-entry-menu-item w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs text-stone-400 hover:text-stone-200"
                 >
                   {opIcon.startsWith('data:')
                     ? <img src={opIcon} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />

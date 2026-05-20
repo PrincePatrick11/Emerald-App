@@ -107,6 +107,30 @@ Each routine has a name, an emoji, plain-text content (Markdown is supported), a
 
 Dropping a routine into an open entry appends its content as formatted paragraphs and merges its tags, linked operations, and linked wiki articles into the current entry. The drop is triggered from the Routines panel in the right sidebar.
 
+## Tasks
+
+The Tasks module provides a hierarchical task manager with categories, priorities, and cross-references to Journal entries, Wiki articles, and Operations.
+
+**Categories.** A default "Allgemein" category is seeded on first launch. You can create, rename, and delete custom categories from the list view via the pencil button on each category header. Deleting a category moves its tasks to an uncategorized section — they are not lost. Categories show an emoji icon, a name, and a task count badge.
+
+**Subtasks.** Every task can have nested subtasks to any depth. Subtasks are indented under their parent and can be expanded or collapsed. Marking a parent task as completed recursively marks all subtasks as completed (and vice versa). Deleting a parent task also deletes all its descendants.
+
+**Priorities.** Each task has a priority: Low, Medium, or High. The priority is displayed as a colored flag icon (green, yellow, red) and can be changed via a dropdown on each task row.
+
+**Links.** A task can link to Journal entries, Wiki articles, and Operations. Linked entries appear as clickable chips on the task row — clicking navigates to the linked entry.
+
+**Toolbar.** The list supports a search bar, five sort orders (Category, Newest, Oldest, A–Z, Z–A, Priority), and a Show/Hide Completed toggle. Only the List view is available.
+
+**Filter panel.** Filters by category (multi-select chips) and priority (multi-select pill buttons). Active filters show a count badge on the filter toggle button. When a category filter is active, only the selected categories are shown in the grouped view.
+
+**Grouped view.** When sorted by Category, tasks are grouped under collapsible category headers. An always-visible "Uncategorized" section collects tasks without a category — it cannot be deleted.
+
+**Inline editing.** Double-click a task title to rename it inline. Press Enter to save, Escape to cancel.
+
+**Context menu.** Right-click any task to Mark as Completed/Active, Add Subtask, Link Entry, or Delete.
+
+**Trash integration.** Deleting a task (or category) soft-deletes it and sends it to the Trash view where it can be restored or permanently removed.
+
 ## Trash
 
 Deleting a journal entry, wiki article, or operation moves it to the Trash rather than removing it permanently. Trashed items are retained for 30 days and then automatically purged at startup.
@@ -156,6 +180,8 @@ On import, image data-URLs are re-saved into the local image directory (with SHA
 
 Parses a Markdown file exported by Emerald (or following the same structure). The `# Title` line becomes the entry title. Key-value lines before the `---` separator are parsed as metadata. Unrecognised metadata keys become custom text properties. The body below `---` is parsed from Markdown to HTML using `marked`.
 
+Note: this path is parser-based (Markdown -> HTML) and is not identical to Emerald JSON import sanitisation. Metadata rendered into PDF export is escaped before interpolation.
+
 ## Context Menus
 
 Right-click any entry in the left sidebar or in any list view (List, Cards, Timeline layouts) to get a context menu with three actions:
@@ -165,3 +191,29 @@ Right-click any entry in the left sidebar or in any list view (List, Cards, Time
 **Rename.** Activates an inline text input directly in the list item. Press Enter or click away to save; press Escape to cancel.
 
 **Delete.** Soft-deletes the entry and shows a 5-second undo toast in the bottom-right corner. If the deleted entry is currently open, the view navigates away.
+
+## Typography
+
+Emerald provides two independent font controls in Settings > Appearance:
+
+- **UI font** — Controls the typeface used across the application shell, sidebars, settings, lists, and all non-editor UI. Default: **Inter**.
+- **Editor body font** — Controls the typeface used in the TipTap rich-text editor body, entry titles, and the read-mode body of journal entries, wiki articles, operations, sigils, and the altar view. Default: **Lora**.
+
+Both dropdowns offer the same eight typefaces: Inter, Source Sans 3, Nunito, IBM Plex Sans, Alegreya, Cormorant Garamond, Lora, and Merriweather. Serif fonts (Alegreya, Cormorant Garamond, Lora, Merriweather) fall back to Georgia; sans-serif fonts fall back to Segoe UI / system-ui.
+
+There is no separate heading font setting. Headings inside the editor inherit the editor body font and are sized by TipTap's heading levels (h1, h2, h3). Entry view titles also use the editor body font via the `.entry-view-title` CSS class.
+
+Font preferences are stored in `localStorage` under the keys `ui-font-id` and `editor-font-id` and persist across sessions and vault switches.
+
+## Theming
+
+Emerald ships with two named themes, selectable in Settings > Appearance:
+
+- **Emerald Noctis** — Dark theme with warm stone tones and jade green accents. This is the default.
+- **Emerald Parchment** — Light theme with parchment-like warm beige backgrounds, structured panel shadows, and adapted accent colours.
+
+The theme preference is stored in `localStorage` under the key `theme-id` and persists across sessions and vault switches. Legacy `theme=light` preferences are automatically migrated to `emerald-parchment`.
+
+Each theme defines a complete set of CSS custom properties (backgrounds, text colours, borders, accents, scrollbar colours, menu styles, danger states, etc.) in separate files under `src/themes/`. Components reference these variables so the entire UI switches consistently. A Tailwind utility bridge in `src/index.css` overrides hardcoded Tailwind colour classes for both themes.
+
+For the token naming strategy, normalization pipeline, and instructions for adding new themes, see [Architecture → Theming System](architecture.md#theming-system).

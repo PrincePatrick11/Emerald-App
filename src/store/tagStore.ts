@@ -3,11 +3,8 @@ import { getDb } from '../lib/db';
 import { useJournalStore } from './journalStore';
 import { useWikiStore } from './wikiStore';
 import { useOperationStore } from './operationStore';
+import { generateId, nowIso } from '../lib/helpers';
 import type { Tag } from '../types';
-
-function generateId() {
-  return crypto.randomUUID();
-}
 
 const TAG_COLORS = [
   '#00e699', '#8347ff', '#3b82f6', '#f43f5e',
@@ -74,7 +71,7 @@ export const useTagStore = create<TagState>((set, get) => ({
 
   deleteTag: async (name) => {
     const db = await getDb();
-    const now = new Date().toISOString();
+    const now = nowIso();
 
     // Collect affected entry IDs before removing the tag
     const { entries, updateEntry } = useJournalStore.getState();

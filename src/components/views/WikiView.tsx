@@ -5,6 +5,7 @@ import ContextMenu from '../ui/ContextMenu';
 import ListToolbar from '../ui/ListToolbar';
 import FilterPanel from '../ui/FilterPanel';
 import { getDb } from '../../lib/db';
+import { generateId } from '../../lib/helpers';
 
 import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
@@ -185,7 +186,7 @@ export default function WikiView() {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     const id = article.id;
     await deleteArticle(id);
-    pushUndo({ id: crypto.randomUUID(), description: t('undo.articleDeleted'), undo: () => restoreArticle(id) });
+    pushUndo({ id: generateId(), description: t('undo.articleDeleted'), undo: () => restoreArticle(id) });
     setActiveView({ type: 'wiki' });
   };
 
@@ -227,7 +228,7 @@ export default function WikiView() {
 
   const handleCtxDelete = async (id: string) => {
     await deleteArticle(id);
-    pushUndo({ id: crypto.randomUUID(), description: t('undo.articleDeleted'), undo: () => restoreArticle(id) });
+    pushUndo({ id: generateId(), description: t('undo.articleDeleted'), undo: () => restoreArticle(id) });
     if (activeView.id === id) setActiveView({ type: 'wiki' });
   };
 
@@ -253,7 +254,7 @@ export default function WikiView() {
     if (confirmDeleteCatId !== id) { setConfirmDeleteCatId(id); return; }
     setConfirmDeleteCatId(null);
     await deleteWikiCategory(id);
-    pushUndo({ id: crypto.randomUUID(), description: t('undo.categoryDeleted'), undo: () => restoreWikiCategory(id) });
+    pushUndo({ id: generateId(), description: t('undo.categoryDeleted'), undo: () => restoreWikiCategory(id) });
   };
 
   const handleAddWikiCat = async () => {
@@ -448,12 +449,12 @@ export default function WikiView() {
                     {newWikiCatEmoji}
                   </button>
                   {showWikiCatEmojiPicker && (
-                    <div className="absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 w-52">
+                    <div className="wiki-emoji-popover absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 w-52">
                       <div className="flex flex-wrap gap-1">
                         {WIKI_EMOJIS.map((e) => (
                           <button key={e}
                             onClick={() => { setNewWikiCatEmoji(e); setShowWikiCatEmojiPicker(false); }}
-                            className={`text-base p-1 rounded hover:bg-stone-700 transition-colors ${newWikiCatEmoji === e ? 'bg-stone-700' : ''}`}
+                            className={`text-base p-1 rounded transition-colors ${newWikiCatEmoji === e ? 'wiki-emoji-active' : 'wiki-emoji-idle'}`}
                           >{e}</button>
                         ))}
                       </div>
@@ -465,7 +466,7 @@ export default function WikiView() {
                     onChange={(e) => setNewWikiCatName(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddWikiCat(); if (e.key === 'Escape') { setAddingWikiCat(false); setShowWikiCatEmojiPicker(false); } }}
                     placeholder="Name…"
-                    className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none font-semibold uppercase tracking-wider"
+                    className="wiki-cat-input flex-1 rounded px-2 py-0.5 text-xs outline-none font-semibold uppercase tracking-wider"
                   />
                   <button onClick={handleAddWikiCat} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
                   <button onClick={() => { setAddingWikiCat(false); setShowWikiCatEmojiPicker(false); }} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
@@ -490,13 +491,13 @@ export default function WikiView() {
                         {editCatEmoji}
                       </button>
                       {showEditEmojiPicker && (
-                        <div className="absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 w-52">
+                        <div className="wiki-emoji-popover absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 w-52">
                           <div className="flex flex-wrap gap-1">
                             {WIKI_EMOJIS.map((e) => (
                               <button key={e}
                                 onClick={() => { setEditCatEmoji(e); setShowEditEmojiPicker(false); }}
-                                className={`text-base p-1 rounded hover:bg-stone-700 transition-colors ${editCatEmoji === e ? 'bg-stone-700' : ''}`}
-                              >{e}</button>
+                                className={`text-base p-1 rounded transition-colors ${editCatEmoji === e ? 'wiki-emoji-active' : 'wiki-emoji-idle'}`}
+                               >{e}</button>
                             ))}
                           </div>
                         </div>
@@ -506,7 +507,7 @@ export default function WikiView() {
                         value={editCatName}
                         onChange={(e) => setEditCatName(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditCat(); if (e.key === 'Escape') { setEditingCatId(null); setShowEditEmojiPicker(false); } }}
-                        className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none font-semibold uppercase tracking-wider"
+                        className="wiki-cat-input flex-1 rounded px-2 py-0.5 text-xs outline-none font-semibold uppercase tracking-wider"
                       />
                       <button onClick={handleSaveEditCat} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
                       <button onClick={() => { setEditingCatId(null); setShowEditEmojiPicker(false); }} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
@@ -644,11 +645,11 @@ export default function WikiView() {
             value={title}
             onChange={(e) => { const nextTitle = e.target.value; setTitle(nextTitle); triggerAutoSave({ ...pendingRef.current, title: nextTitle }); }}
             placeholder={t('wiki.untitled')}
-            className="w-full bg-transparent text-2xl font-semibold text-stone-100
-                       placeholder-stone-700 outline-none selectable font-serif"
+            className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100
+                       placeholder-stone-700 outline-none selectable"
           />
         ) : (
-          <h1 className="text-2xl font-semibold text-stone-100 font-serif cursor-text"
+          <h1 className="entry-view-title text-2xl font-semibold text-stone-100 cursor-text"
               title={t('editor.doubleClickEdit')}>
             {article.title || t('wiki.untitled')}
           </h1>
