@@ -10,7 +10,7 @@ export type HomeSort = 'date_desc' | 'date_asc' | 'alpha_asc' | 'alpha_desc';
 export type HomeView = 'list' | 'cards';
 export interface HomeSectionPrefs { sort: HomeSort; view: HomeView; count: number; } // count 0 = all
 
-export type Theme = 'dark' | 'light';
+export type ThemeId = 'emerald-noctis' | 'emerald-parchment';
 
 interface UIState {
   activeView: ActiveView;
@@ -32,7 +32,7 @@ interface UIState {
   homeJournalPrefs: HomeSectionPrefs;
   homeOpsPrefs: HomeSectionPrefs;
   homeWikiPrefs: HomeSectionPrefs;
-  theme: Theme;
+  theme: ThemeId;
 
   setActiveView: (view: ActiveView) => void;
   openViewInNewTab: (view: ActiveView) => void;
@@ -56,7 +56,16 @@ interface UIState {
   setHomeJournalPrefs: (p: Partial<HomeSectionPrefs>) => void;
   setHomeOpsPrefs: (p: Partial<HomeSectionPrefs>) => void;
   setHomeWikiPrefs: (p: Partial<HomeSectionPrefs>) => void;
-  setTheme: (t: Theme) => void;
+  setTheme: (t: ThemeId) => void;
+}
+
+function loadSavedTheme(): ThemeId {
+  const themeId = localStorage.getItem('theme-id') as ThemeId | null;
+  if (themeId === 'emerald-noctis' || themeId === 'emerald-parchment') return themeId;
+
+  const legacyTheme = localStorage.getItem('theme');
+  if (legacyTheme === 'light') return 'emerald-parchment';
+  return 'emerald-noctis';
 }
 
 function normalizeSavedTab(tab: unknown): OpenTab | null {
@@ -109,7 +118,7 @@ export const useUIStore = create<UIState>((set) => ({
   operationsSubTab: null,
   wikiSubTab: null,
   searchQuery: '',
-  theme: (localStorage.getItem('theme') as Theme) ?? 'dark',
+  theme: loadSavedTheme(),
   journalPrefs: { view: 'list', sort: 'date_desc' },
   wikiPrefs: { view: 'cards', sort: 'category' },
   operationsPrefs: { view: 'list', sort: 'category' },
@@ -216,7 +225,7 @@ export const useUIStore = create<UIState>((set) => ({
   setHomeOpsPrefs:     (p) => set((s) => ({ homeOpsPrefs:     { ...s.homeOpsPrefs,     ...p } })),
   setHomeWikiPrefs:    (p) => set((s) => ({ homeWikiPrefs:    { ...s.homeWikiPrefs,    ...p } })),
   setTheme: (theme) => {
-    localStorage.setItem('theme', theme);
+    localStorage.setItem('theme-id', theme);
     set({ theme });
   },
 }));

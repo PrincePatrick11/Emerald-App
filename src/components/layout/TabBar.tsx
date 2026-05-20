@@ -102,7 +102,7 @@ export default function TabBar() {
   };
 
   return (
-    <div className="h-10 flex items-end overflow-hidden px-2 pt-2 bg-stone-900/95 border-b border-stone-700/60">
+    <div className="tabbar h-10 flex items-end overflow-hidden px-2 pt-2 bg-stone-900/95 border-b border-stone-700/60">
       <div className="scrollbar-none flex min-w-0 max-w-full flex-initial items-end gap-1 overflow-x-auto overflow-y-hidden">
         {tabs.map((tab) => {
           const isActive = activeTabId === tab.id;
@@ -110,11 +110,11 @@ export default function TabBar() {
           return (
             <div
               key={tab.id}
-              className={`group flex min-w-32 max-w-56 flex-1 items-center gap-2 rounded-t-lg border px-3 py-2 text-xs transition-colors ${
-                isActive
-                  ? 'border-stone-700/80 border-b-stone-800 bg-stone-800 text-stone-100'
-                  : 'border-stone-800/60 bg-stone-900/70 text-stone-500 hover:bg-stone-800/60 hover:text-stone-300'
-              }`}
+                className={`tab-item group flex min-w-32 max-w-56 flex-1 items-center gap-2 rounded-t-lg border px-3 py-2 text-xs transition-colors ${
+                  isActive
+                    ? 'tab-item-active border-stone-700/80 border-b-stone-800 bg-stone-800 text-stone-100'
+                    : 'tab-item-idle border-stone-800/60 bg-stone-900/70 text-stone-500 hover:bg-stone-800/60 hover:text-stone-300'
+                }`}
             >
               <button
                 onClick={() => selectTab(tab.id)}
@@ -139,7 +139,7 @@ export default function TabBar() {
       </div>
       <button
         onClick={() => addTab()}
-        className="mb-px ml-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-t-lg border border-stone-800/60 bg-stone-900/70 text-stone-500 transition-colors hover:bg-stone-800/60 hover:text-stone-200"
+        className="tab-add mb-px ml-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-t-lg border border-stone-800/60 bg-stone-900/70 text-stone-500 transition-colors hover:bg-stone-800/60 hover:text-stone-200"
         title="New tab"
       >
         <Plus size={15} />

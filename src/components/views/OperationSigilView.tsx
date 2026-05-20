@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
+import { generateId } from '../../lib/helpers';
 import type { Operation } from '../../types';
 
 type DrawMode = 'draw' | 'erase';
@@ -165,16 +166,7 @@ function DrawingCanvas({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-stone-700/50 bg-stone-950/80">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,230,153,0.08),transparent_55%)]" />
-      <div
-        className="absolute inset-0 opacity-20"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(120,113,108,0.16) 1px, transparent 1px), linear-gradient(90deg, rgba(120,113,108,0.16) 1px, transparent 1px)',
-          backgroundSize: '30px 30px',
-        }}
-      />
+    <div className="sigil-canvas-shell relative overflow-hidden rounded-xl border border-stone-700/50 bg-stone-950/80">
       <canvas
         ref={canvasRef}
         width={1200}
@@ -183,7 +175,7 @@ function DrawingCanvas({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
-        className={`relative block aspect-[3/2] w-full touch-none bg-transparent ${editable ? 'cursor-crosshair' : 'cursor-default'}`}
+        className={`sigil-canvas relative block aspect-[3/2] w-full touch-none bg-transparent ${editable ? 'cursor-crosshair' : 'cursor-default'}`}
       />
     </div>
   );
@@ -352,7 +344,7 @@ export default function OperationSigilView({ operation }: { operation: Operation
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     const id = operation.id;
     await deleteOperation(id);
-    pushUndo({ id: crypto.randomUUID(), description: t('undo.operationDeleted'), undo: () => restoreOperation(id) });
+    pushUndo({ id: generateId(), description: t('undo.operationDeleted'), undo: () => restoreOperation(id) });
     setActiveView({ type: 'operations' });
   };
 
@@ -629,10 +621,10 @@ export default function OperationSigilView({ operation }: { operation: Operation
             {isEditing && (
               <>
                 <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-1 rounded-lg border border-stone-700/40 bg-stone-800/70 p-1">
+                  <div className="sigil-tool-toggle flex items-center gap-1 rounded-lg border border-stone-700/40 bg-stone-800/70 p-1">
                     <button
                       onClick={() => setDrawMode('draw')}
-                      className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
+                      className={`sigil-tool-btn flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
                         drawMode === 'draw' ? 'bg-stone-700 text-stone-100' : 'text-stone-400 hover:text-stone-200'
                       }`}
                     >
@@ -641,7 +633,7 @@ export default function OperationSigilView({ operation }: { operation: Operation
                     </button>
                     <button
                       onClick={() => setDrawMode('erase')}
-                      className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
+                      className={`sigil-tool-btn flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
                         drawMode === 'erase' ? 'bg-stone-700 text-stone-100' : 'text-stone-400 hover:text-stone-200'
                       }`}
                     >
@@ -649,7 +641,7 @@ export default function OperationSigilView({ operation }: { operation: Operation
                       {t('creation.tools.erase')}
                     </button>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-stone-400">
+                  <div className="sigil-brush-controls flex items-center gap-2 text-xs text-stone-400">
                     <span>{t('creation.brushSize')}</span>
                     <input
                       type="range"
@@ -657,7 +649,7 @@ export default function OperationSigilView({ operation }: { operation: Operation
                       max={48}
                       value={brushSize}
                       onChange={(event) => setBrushSize(Number(event.target.value))}
-                      className="accent-jade-400"
+                      className="sigil-brush-slider accent-jade-400"
                     />
                     <span className="w-7 text-right text-stone-500">{brushSize}</span>
                   </div>

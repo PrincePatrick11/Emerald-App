@@ -6,23 +6,20 @@ import { format } from 'date-fns';
 import { useAltarStore } from '../../store/altarStore';
 import { useUIStore } from '../../store/uiStore';
 import { getAltarDragItem, setAltarDragItem, subscribeAltarDrag } from '../../lib/altarDragState';
+import { ALTAR_BACKGROUND_PRESETS, ALTAR_BACKGROUND_STYLES, DEFAULT_ALTAR_BACKGROUND } from '../../lib/altarConstants';
 import type { AltarItem, AltarPlacement, AltarRecord } from '../../types';
 import ListToolbar from '../ui/ListToolbar';
 import ContextMenu from '../ui/ContextMenu';
 
-const ALTAR_BACKGROUND_STYLES: Record<string, string> = {
-  midnight: 'radial-gradient(ellipse at 50% 30%, #1a1a2e 0%, #0d0d15 60%, #0a0a0f 100%)',
-  ember: 'radial-gradient(circle at 50% 24%, #4a2917 0%, #25140f 42%, #120d10 100%)',
-  forest: 'radial-gradient(circle at 50% 22%, #183126 0%, #0d1a16 48%, #09110f 100%)',
-  moon: 'radial-gradient(circle at 50% 18%, #2b253d 0%, #171222 44%, #0b0a12 100%)',
-};
-
 function getAltarBackgroundStyleWithImage(altar: AltarRecord | null, imageSrc: string | null | undefined): string {
-  if (!altar) return ALTAR_BACKGROUND_STYLES.midnight;
+  if (!altar) return ALTAR_BACKGROUND_STYLES[DEFAULT_ALTAR_BACKGROUND];
   if (imageSrc?.startsWith('data:')) {
     return `linear-gradient(rgba(10, 10, 15, 0.35), rgba(10, 10, 15, 0.55)), url("${imageSrc}") center / cover no-repeat`;
   }
-  return ALTAR_BACKGROUND_STYLES[altar.background_preset] ?? ALTAR_BACKGROUND_STYLES.midnight;
+  const preset = ALTAR_BACKGROUND_PRESETS.includes(altar.background_preset as (typeof ALTAR_BACKGROUND_PRESETS)[number])
+    ? altar.background_preset as (typeof ALTAR_BACKGROUND_PRESETS)[number]
+    : DEFAULT_ALTAR_BACKGROUND;
+  return ALTAR_BACKGROUND_STYLES[preset];
 }
 
 export default function AltarView() {

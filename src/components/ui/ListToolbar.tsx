@@ -42,22 +42,22 @@ function Dropdown<T extends string>({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs bg-stone-800/70 hover:bg-stone-700/70 text-stone-400 hover:text-stone-200 transition-colors"
+        className="list-toolbar-chip flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs transition-colors"
       >
-        <span className="text-stone-600 mr-0.5">{label}</span>
+        <span className="list-toolbar-chip-label mr-0.5">{label}</span>
         {selected}
-        <ChevronDown size={11} className="text-stone-600" />
+        <ChevronDown size={11} className="list-toolbar-chip-label" />
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-stone-850 border border-stone-700/60 rounded-lg shadow-xl py-1 min-w-[130px]" style={{ backgroundColor: '#1c1917' }}>
+        <div className="list-toolbar-menu absolute top-full left-0 mt-1 z-50 rounded-lg py-1 min-w-[130px]">
           {options.map((o) => (
             <button
               key={o.value}
               onClick={() => { onChange(o.value); setOpen(false); }}
               className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
                 value === o.value
-                  ? 'text-jade-400'
-                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-700/50'
+                  ? 'list-toolbar-option-active'
+                  : 'list-toolbar-option-idle'
               }`}
             >
               {o.label}
@@ -87,7 +87,7 @@ export default function ListToolbar({ view, sort, onView, onSort, viewOptions: v
   ];
 
   return (
-    <div className="flex items-center gap-2 px-8 py-2 border-b border-stone-700/40 bg-stone-900/40">
+    <div className="list-toolbar flex items-center gap-2 px-8 py-2 border-b border-stone-700/40 bg-stone-900/40">
       {viewOptions.length > 1 && (
         <Dropdown label={t('listView.view') + ': '} value={view} options={viewOptions} onChange={onView} />
       )}
@@ -95,10 +95,10 @@ export default function ListToolbar({ view, sort, onView, onSort, viewOptions: v
       {onToggleFilters !== undefined && (
         <button
           onClick={onToggleFilters}
-          className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+          className={`list-toolbar-filter relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs transition-colors ${
             showFilters || activeFilterCount > 0
-              ? 'bg-jade-900/50 border border-jade-800/40 text-jade-400'
-              : 'bg-stone-800/70 hover:bg-stone-700/70 text-stone-400 hover:text-stone-200'
+              ? 'list-toolbar-filter-active'
+              : 'list-toolbar-filter-idle'
           }`}
           title={t('filters.toggle')}
         >
@@ -113,17 +113,17 @@ export default function ListToolbar({ view, sort, onView, onSort, viewOptions: v
       )}
       {extraActions}
       {onSearch !== undefined && (
-        <div className="flex items-center gap-1.5 ml-2 flex-1 bg-stone-800/70 rounded-md px-2.5 py-1.5">
-          <Search size={12} className="text-stone-600 flex-shrink-0" />
+        <div className="list-toolbar-search flex items-center gap-1.5 ml-2 flex-1 rounded-md px-2.5 py-1.5">
+          <Search size={12} className="list-toolbar-chip-label flex-shrink-0" />
           <input
             type="text"
             placeholder={t('search.placeholder')}
             value={search ?? ''}
             onChange={(e) => onSearch(e.target.value)}
-            className="bg-transparent text-xs text-stone-300 placeholder-stone-600 outline-none w-full selectable"
+            className="list-toolbar-input bg-transparent text-xs outline-none w-full selectable"
           />
           {search && (
-            <button onClick={() => onSearch('')} className="text-stone-600 hover:text-stone-400 transition-colors flex-shrink-0">
+            <button onClick={() => onSearch('')} className="list-toolbar-clear transition-colors flex-shrink-0">
               <X size={11} />
             </button>
           )}

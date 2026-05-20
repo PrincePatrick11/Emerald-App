@@ -46,18 +46,18 @@ export default function ContextMenu({ x, y, actions, onClose }: Props) {
   return (
     <div
       ref={ref}
-      className="fixed z-[9999] border border-stone-700/60 rounded-lg shadow-2xl py-1 min-w-[160px]"
-      style={{ left: pos.left, top: pos.top, backgroundColor: '#1c1917' }}
+      className="context-menu fixed z-[9999] border border-stone-700/60 rounded-lg shadow-2xl py-1 min-w-[160px]"
+      style={{ left: pos.left, top: pos.top }}
     >
       {actions.map((action, i) => (
         <button
           key={i}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={() => { action.onClick(); onClose(); }}
-          className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2.5 transition-colors ${
+          className={`context-menu-item w-full text-left px-3 py-2 text-xs flex items-center gap-2.5 transition-colors ${
             action.danger
-              ? 'text-red-400 hover:text-red-300 hover:bg-red-900/20'
-              : 'text-stone-300 hover:text-stone-100 hover:bg-stone-700/50'
+              ? 'context-menu-item-danger text-red-400 hover:text-red-300 hover:bg-red-900/20'
+              : 'context-menu-item-default text-stone-300 hover:text-stone-100 hover:bg-stone-700/50'
           }`}
         >
           {action.icon}

@@ -204,7 +204,7 @@ export default function AppShell() {
 
   return (
     <div
-      className="flex h-screen w-screen overflow-hidden bg-stone-900 relative"
+      className="app-shell flex h-screen w-screen overflow-hidden bg-stone-900 relative"
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
@@ -216,7 +216,7 @@ export default function AppShell() {
 
       {/* Left Sidebar */}
       <aside
-        className="flex-shrink-0 border-r border-stone-700/60 relative"
+        className="app-sidebar app-sidebar-left flex-shrink-0 border-r border-stone-700/60 relative"
         style={{ width: leftWidth }}
       >
         <LeftSidebar />
@@ -228,7 +228,7 @@ export default function AppShell() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 min-w-0 overflow-hidden flex flex-col">
+      <main className="app-main flex-1 min-w-0 overflow-hidden flex flex-col">
         <TabBar />
         <div className="flex-1 min-h-0 overflow-hidden">
           <MainArea />
@@ -238,7 +238,7 @@ export default function AppShell() {
       {/* Right Sidebar */}
       {rightSidebarOpen && (
         <aside
-          className="flex-shrink-0 border-l border-stone-700/60 animate-slide-in relative"
+          className="app-sidebar app-sidebar-right flex-shrink-0 border-l border-stone-700/60 animate-slide-in relative"
           style={{ width: rightWidth }}
         >
           {/* Resize handle */}

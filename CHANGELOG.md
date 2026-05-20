@@ -16,6 +16,18 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Trash integration for tasks and task categories (soft-delete, restore, permanent delete)
 - `safeParseArray` helper extracted to `src/lib/helpers.ts`
 - `CategoryBase` interface in types, shared by OperationCategory, WikiCategoryDef, and TaskCategory
+- Named themes: **Emerald Noctis** (dark, default) and **Emerald Parchment** (light), replacing the generic dark/light toggle
+- Split theme CSS files under `src/themes/` with shared CSS custom property architecture
+- Tailwind colour-class bridge for light mode in `src/index.css`
+- Shared style constants: `altarConstants.ts` (altar backgrounds, category emojis) and `styleClasses.ts` (input/select class strings)
+- `htmlEscape()` helper in `export.ts` — all user text in PDF export HTML is now entity-escaped
+
+### Changed
+- `write_file` and `read_file` now enforce root-directory confinement (home, documents, downloads, desktop, app data, app config) in addition to the extension allowlist
+- `write_file` rejects symlink targets and verifies canonical paths against allowed roots
+- `.emeralddb` added to the permitted extension allowlist for `write_file` and `read_file`
+- Theme preference stored under `theme-id` (legacy `theme` key is migrated automatically)
+- PDF export metadata rendering hardened with stricter HTML escaping and image data-URL validation
 
 ## [0.1.0] - 2026-05-03
 

@@ -161,6 +161,8 @@ On import, image data-URLs are re-saved into the local image directory (with SHA
 
 Parses a Markdown file exported by Emerald (or following the same structure). The `# Title` line becomes the entry title. Key-value lines before the `---` separator are parsed as metadata. Unrecognised metadata keys become custom text properties. The body below `---` is parsed from Markdown to HTML using `marked`.
 
+Note: this path is parser-based (Markdown -> HTML) and is not identical to Emerald JSON import sanitisation. Metadata rendered into PDF export is escaped before interpolation.
+
 ## Context Menus
 
 Right-click any entry in the left sidebar or in any list view (List, Cards, Timeline layouts) to get a context menu with three actions:
@@ -170,3 +172,14 @@ Right-click any entry in the left sidebar or in any list view (List, Cards, Time
 **Rename.** Activates an inline text input directly in the list item. Press Enter or click away to save; press Escape to cancel.
 
 **Delete.** Soft-deletes the entry and shows a 5-second undo toast in the bottom-right corner. If the deleted entry is currently open, the view navigates away.
+
+## Theming
+
+Emerald ships with two named themes, selectable in Settings > Appearance:
+
+- **Emerald Noctis** — Dark theme with warm stone tones and jade green accents. This is the default.
+- **Emerald Parchment** — Light theme with parchment-like warm beige backgrounds, structured panel shadows, and adapted accent colours.
+
+The theme preference is stored in `localStorage` under the key `theme-id` and persists across sessions and vault switches. Legacy `theme=light` preferences are automatically migrated to `emerald-parchment`.
+
+Each theme defines a complete set of CSS custom properties (backgrounds, text colours, borders, accents, scrollbar colours, menu styles, danger states, etc.) in separate files under `src/themes/`. Components reference these variables so the entire UI switches consistently. The light theme also includes a Tailwind utility bridge that overrides hardcoded Tailwind colour classes to match the parchment palette.

@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Globe, Info, Database, Upload, Download, Check, AlertTriangle, ChevronDown, ChevronUp, Sun, Moon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useVaultStore } from '../../store/vaultStore';
 import { useUIStore } from '../../store/uiStore';
+import { THEME_OPTIONS } from '../../themes/theme';
 import {
   type BackupOptions,
   type ImportMode,
@@ -149,14 +151,14 @@ export default function SettingsModal({ onClose }: Props) {
     setExportOpts((o) => ({ ...o, [key]: !o[key] }));
   }
 
-  return (
+  const modal = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      className="settings-modal fixed inset-0 z-[9999] flex items-center justify-center bg-black/60"
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-stone-900 border border-stone-700/60 rounded-xl shadow-2xl w-[520px] max-h-[88vh] flex flex-col">
+      <div className="settings-modal-card bg-stone-900 border border-stone-700/60 rounded-xl shadow-2xl w-[520px] max-h-[88vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-stone-700/60 shrink-0">
           <h2 className="font-semibold text-stone-100 text-base">{t('nav.settings')}</h2>
@@ -179,16 +181,16 @@ export default function SettingsModal({ onClose }: Props) {
             </div>
             <div className="flex gap-2">
               {([
-                { value: 'dark', label: t('settings.themeDark'), icon: Moon },
-                { value: 'light', label: t('settings.themeLight'), icon: Sun },
+                { value: THEME_OPTIONS[0].id, label: THEME_OPTIONS[0].label, icon: Moon },
+                { value: THEME_OPTIONS[1].id, label: THEME_OPTIONS[1].label, icon: Sun },
               ] as const).map(({ value, label, icon: Icon }) => (
                 <button
                   key={value}
                   onClick={() => setTheme(value)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                  className={`settings-choice-btn flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border transition-all duration-150 focus:outline-none focus:ring-2 ${
                     theme === value
-                      ? 'bg-jade-500/20 border-jade-500/50 text-jade-400'
-                      : 'border-stone-700/60 text-stone-400 hover:border-stone-500 hover:text-stone-300'
+                      ? 'settings-choice-btn-active bg-jade-900/25 border-jade-700/50 text-jade-500 shadow-[0_0_0_1px_rgba(0,160,102,0.16)] focus:ring-jade-700/35'
+                      : 'settings-choice-btn-idle border-stone-700/60 text-stone-400 hover:border-stone-500 hover:text-stone-300 focus:ring-jade-700/25'
                   }`}
                 >
                   <Icon size={14} />
@@ -214,10 +216,10 @@ export default function SettingsModal({ onClose }: Props) {
                 <button
                   key={code}
                   onClick={() => i18n.changeLanguage(code)}
-                  className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                  className={`settings-choice-btn px-3 py-1.5 rounded-lg text-sm border transition-colors ${
                     i18n.language === code
-                      ? 'bg-jade-500/20 border-jade-500/50 text-jade-400'
-                      : 'border-stone-700/60 text-stone-400 hover:border-stone-500 hover:text-stone-300'
+                      ? 'settings-choice-btn-active bg-jade-500/20 border-jade-500/50 text-jade-400'
+                      : 'settings-choice-btn-idle border-stone-700/60 text-stone-400 hover:border-stone-500 hover:text-stone-300'
                   }`}
                 >
                   {label}
@@ -240,10 +242,10 @@ export default function SettingsModal({ onClose }: Props) {
                 return (
                   <div
                     key={v.id}
-                    className={`flex items-center gap-2 rounded-lg px-3 py-2 border transition-colors ${
+                    className={`settings-vault-row flex items-center gap-2 rounded-lg px-3 py-2 border transition-colors ${
                       isActive
-                        ? 'bg-jade-500/10 border-jade-500/30'
-                        : 'bg-stone-800/40 border-stone-700/40'
+                        ? 'settings-vault-row-active bg-jade-500/10 border-jade-500/30'
+                        : 'settings-vault-row-idle bg-stone-800/40 border-stone-700/40'
                     }`}
                   >
                     {isRenaming ? (
@@ -259,17 +261,17 @@ export default function SettingsModal({ onClose }: Props) {
                         className="flex-1 bg-stone-800 border border-stone-600 rounded px-2 py-0.5 text-sm text-stone-200 outline-none focus:border-jade-500/60"
                       />
                     ) : (
-                      <span className={`flex-1 text-sm truncate ${isActive ? 'text-jade-300' : 'text-stone-300'}`}>
+                      <span className={`settings-vault-name flex-1 text-sm truncate ${isActive ? 'text-jade-300' : 'text-stone-300'}`}>
                         {v.name}
                       </span>
                     )}
                     {isActive && (
-                      <span className="text-xs text-jade-500 shrink-0">{t('settings.vaultActive')}</span>
+                      <span className="settings-vault-active text-xs text-jade-500 shrink-0">{t('settings.vaultActive')}</span>
                     )}
                     {!isRenaming && (
                       <button
                         onClick={() => startRename(v.id, v.name)}
-                        className="text-xs text-stone-500 hover:text-stone-300 transition-colors shrink-0"
+                        className="settings-vault-action text-xs text-stone-500 hover:text-stone-300 transition-colors shrink-0"
                       >
                         {t('settings.vaultRename')}
                       </button>
@@ -400,7 +402,7 @@ export default function SettingsModal({ onClose }: Props) {
                     <button
                       onClick={handleExport}
                       disabled={exporting}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-jade-500/20 border border-jade-500/40 text-jade-400 text-xs hover:bg-jade-500/30 transition-colors disabled:opacity-50"
+                      className="settings-cta-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-jade-500/20 border border-jade-500/40 text-jade-400 text-xs hover:bg-jade-500/30 transition-colors disabled:opacity-50"
                     >
                       <Download size={13} />
                       {exporting ? t('settings.exporting') : t('settings.exportBtn')}
@@ -554,7 +556,7 @@ export default function SettingsModal({ onClose }: Props) {
                         <button
                           onClick={handleImport}
                           disabled={importing}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-jade-500/20 border border-jade-500/40 text-jade-400 text-xs hover:bg-jade-500/30 transition-colors disabled:opacity-50"
+                          className="settings-cta-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-jade-500/20 border border-jade-500/40 text-jade-400 text-xs hover:bg-jade-500/30 transition-colors disabled:opacity-50"
                         >
                           <Upload size={13} />
                           {importing ? t('settings.importing') : t('settings.importBtn')}
@@ -598,4 +600,6 @@ export default function SettingsModal({ onClose }: Props) {
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 }

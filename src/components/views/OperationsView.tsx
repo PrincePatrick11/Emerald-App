@@ -4,6 +4,7 @@ import { Trash2, PanelRightOpen, Check, X, Plus, Pencil, Copy, PanelTopOpen } fr
 import ContextMenu from '../ui/ContextMenu';
 import FilterPanel from '../ui/FilterPanel';
 import { getDb } from '../../lib/db';
+import { generateId } from '../../lib/helpers';
 
 const OPERATION_EMOJIS = [
   '⚡','🔯','👁️','🌙','☀️','🌟','✨','🔮','🌀','⚗️',
@@ -191,7 +192,7 @@ export default function OperationsView() {
 
   const handleCtxDelete = async (id: string) => {
     await deleteOperation(id);
-    pushUndo({ id: crypto.randomUUID(), description: t('undo.operationDeleted'), undo: () => restoreOperation(id) });
+    pushUndo({ id: generateId(), description: t('undo.operationDeleted'), undo: () => restoreOperation(id) });
     if (activeView.id === id) setActiveView({ type: 'operations' });
   };
 
@@ -221,7 +222,7 @@ export default function OperationsView() {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     const id = operation.id;
     await deleteOperation(id);
-    pushUndo({ id: crypto.randomUUID(), description: t('undo.operationDeleted'), undo: () => restoreOperation(id) });
+    pushUndo({ id: generateId(), description: t('undo.operationDeleted'), undo: () => restoreOperation(id) });
     setActiveView({ type: 'operations' });
   };
 
@@ -262,7 +263,7 @@ export default function OperationsView() {
     if (confirmDeleteCatId !== id) { setConfirmDeleteCatId(id); return; }
     setConfirmDeleteCatId(null);
     await deleteCategory(id);
-    pushUndo({ id: crypto.randomUUID(), description: t('undo.categoryDeleted'), undo: () => restoreCategory(id) });
+    pushUndo({ id: generateId(), description: t('undo.categoryDeleted'), undo: () => restoreCategory(id) });
   };
 
   // List view

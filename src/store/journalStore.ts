@@ -2,16 +2,8 @@ import { create } from 'zustand';
 import { getDb } from '../lib/db';
 import { getMoonPhase } from '../lib/moonPhase';
 import { syncLinks } from '../lib/links';
-import { safeParseArray } from '../lib/helpers';
+import { generateId, nowIso, safeParseArray } from '../lib/helpers';
 import type { JournalEntry } from '../types';
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
 
 interface JournalState {
   entries: JournalEntry[];

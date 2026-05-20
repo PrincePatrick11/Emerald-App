@@ -4,32 +4,17 @@ import { useTranslation } from 'react-i18next';
 import { X, Plus, Check, ImagePlus } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import { setAltarDragItem } from '../../lib/altarDragState';
+import {
+  ALTAR_BACKGROUND_PRESETS,
+  ALTAR_BACKGROUND_STYLES,
+  DEFAULT_ALTAR_BACKGROUND,
+  ALTAR_CATEGORIES,
+  ALTAR_CATEGORY_EMOJI,
+  CATEGORY_EMOJIS,
+} from '../../lib/altarConstants';
 import { useUIStore } from '../../store/uiStore';
 import { AltarItemVisual } from '../views/AltarView';
 import type { AltarItem, AltarItemCategory } from '../../types';
-
-const ALTAR_BACKGROUND_PRESETS = ['midnight', 'ember', 'forest', 'moon'] as const;
-const ALTAR_BACKGROUND_STYLES: Record<(typeof ALTAR_BACKGROUND_PRESETS)[number], string> = {
-  midnight: 'radial-gradient(ellipse at 50% 30%, #1a1a2e 0%, #0d0d15 60%, #0a0a0f 100%)',
-  ember: 'radial-gradient(circle at 50% 24%, #4a2917 0%, #25140f 42%, #120d10 100%)',
-  forest: 'radial-gradient(circle at 50% 22%, #183126 0%, #0d1a16 48%, #09110f 100%)',
-  moon: 'radial-gradient(circle at 50% 18%, #2b253d 0%, #171222 44%, #0b0a12 100%)',
-};
-
-const ALTAR_CATEGORY_EMOJI: Record<AltarItemCategory, string> = {
-  candle: '🕯️', crystal: '🔮', herb: '🌿', deity: '✨',
-  symbol: '🌙', tool: '⚗️', other: '📿',
-};
-const ALTAR_CATEGORIES: AltarItemCategory[] = ['candle', 'crystal', 'herb', 'deity', 'symbol', 'tool', 'other'];
-const CATEGORY_EMOJIS: Record<AltarItemCategory, string[]> = {
-  candle:  ['🕯️','🔥','🕎','💡','🪔'],
-  crystal: ['🔮','💎','💜','🌟','⭐','🪨'],
-  herb:    ['🌿','🍃','🌱','🌾','🪴','🌺','🍀'],
-  deity:   ['👁️','☀️','🌙','🦅','🐉','🦋','🌟','⚡'],
-  symbol:  ['☯️','🔱','⚡','🌀','🔯','🪬','☽','🌈'],
-  tool:    ['⚗️','🪄','🗡️','🏺','📜','🔑','🪬','🧿'],
-  other:   ['📿','💫','🌀','🎭','🌈','🧿','🫧','✨'],
-};
 
 export default function AltarSidebarPanel() {
   const { t } = useTranslation();
@@ -147,18 +132,18 @@ export default function AltarSidebarPanel() {
           </p>
           <div className="mt-2 grid grid-cols-2 gap-2">
             {ALTAR_BACKGROUND_PRESETS.map((preset) => {
-              const selected = !activeAltar.background_image_data && (activeAltar.background_preset || 'midnight') === preset;
+                const selected = !activeAltar.background_image_data && (activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND) === preset;
               return (
                 <button
                   key={preset}
                   onClick={() => updateBackgroundPreset(preset)}
-                  className={`overflow-hidden rounded-lg border transition-colors ${
-                    selected ? 'border-jade-600/70 ring-1 ring-jade-700/40' : 'border-stone-700/50'
-                  } hover:border-stone-500/60`}
+                    className={`altar-bg-preset overflow-hidden rounded-lg border transition-colors ${
+                      selected ? 'border-jade-600/70 ring-1 ring-jade-700/40' : 'border-stone-700/50'
+                    } hover:border-stone-500/60`}
                   title={t(`altar.backgrounds.${preset}`)}
                 >
                   <div className="h-14 w-full" style={{ background: ALTAR_BACKGROUND_STYLES[preset] }} />
-                  <div className="border-t border-stone-800/70 bg-stone-900/80 px-2 py-1 text-left text-[11px] text-stone-300">
+                  <div className="altar-bg-preset-label border-t border-stone-800/70 bg-stone-900/80 px-2 py-1 text-left text-[11px] text-stone-300">
                     {t(`altar.backgrounds.${preset}`)}
                   </div>
                 </button>
@@ -168,17 +153,17 @@ export default function AltarSidebarPanel() {
           <div className="mt-2 flex items-center gap-2">
             <button
               onClick={() => backgroundInputRef.current?.click()}
-              className={`flex-1 rounded-lg border px-3 py-2 text-xs transition-colors ${
-                activeAltar.background_image_data
-                  ? 'border-jade-600/70 bg-jade-950/20 text-jade-300'
-                  : 'border-stone-700/60 bg-stone-900/60 text-stone-300'
+               className={`altar-upload-bg-btn flex-1 rounded-lg border px-3 py-2 text-xs transition-colors ${
+                 activeAltar.background_image_data
+                   ? 'border-jade-600/70 bg-jade-950/20 text-jade-300'
+                   : 'border-stone-700/60 bg-stone-900/60 text-stone-300'
               } hover:border-stone-500/60`}
             >
               {t('altar.uploadBackground')}
             </button>
             {activeAltar.background_image_data && (
               <button
-                onClick={() => updateBackgroundPreset('midnight')}
+                onClick={() => updateBackgroundPreset(DEFAULT_ALTAR_BACKGROUND)}
                 className="btn-ghost text-xs"
               >
                 {t('altar.usePreset')}
@@ -212,22 +197,22 @@ export default function AltarSidebarPanel() {
             <div className="relative flex-1">
               <button
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="w-full flex items-center gap-2 bg-stone-800/60 rounded-lg px-3 py-2 text-sm hover:bg-stone-700/60 transition-colors"
+                className="altar-symbol-trigger w-full flex items-center gap-2 bg-stone-800/60 rounded-lg px-3 py-2 text-sm hover:bg-stone-700/60 transition-colors"
               >
                 {newImageData
                   ? <img src={newImageData} alt="" className="w-6 h-6 object-contain rounded" />
                   : <span className="text-xl">{newEmoji || ALTAR_CATEGORY_EMOJI[newCategory]}</span>
                 }
-                <span className="text-xs text-stone-500">{t('altar.chooseEmoji')}</span>
+                <span className="altar-symbol-trigger-label text-xs text-stone-500">{t('altar.chooseEmoji')}</span>
               </button>
               {showEmojiPicker && (
-                <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2">
+                 <div className="altar-emoji-menu absolute top-full left-0 right-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2">
                   <div className="flex flex-wrap gap-1">
                     {CATEGORY_EMOJIS[newCategory].map((e) => (
                       <button
                         key={e}
                         onClick={() => { setNewEmoji(e); setNewImageData(null); setShowEmojiPicker(false); }}
-                        className={`text-xl p-1 rounded hover:bg-stone-700 transition-colors ${newEmoji === e ? 'bg-stone-700' : ''}`}
+                         className={`altar-emoji-item text-xl p-1 rounded transition-colors ${newEmoji === e ? 'altar-emoji-item-active bg-stone-700' : ''}`}
                       >
                         {e}
                       </button>
@@ -239,7 +224,7 @@ export default function AltarSidebarPanel() {
             {/* Image upload button */}
             <button
               onClick={() => { setShowEmojiPicker(false); imageInputRef.current?.click(); }}
-              className="flex-shrink-0 flex items-center gap-1 px-2 py-2 bg-stone-800/60 rounded-lg hover:bg-stone-700/60 transition-colors text-stone-500 hover:text-stone-300"
+              className="altar-upload-item-btn flex-shrink-0 flex items-center gap-1 px-2 py-2 bg-stone-800/60 rounded-lg hover:bg-stone-700/60 transition-colors text-stone-500 hover:text-stone-300"
               title={t('altar.uploadImage')}
             >
               <ImagePlus size={14} />
@@ -252,7 +237,7 @@ export default function AltarSidebarPanel() {
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') resetAdding(); }}
             placeholder={t('altar.itemName')}
-            className="w-full bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable"
+            className="altar-item-name-input w-full bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable"
           />
 
           <div className="flex flex-wrap gap-1">
@@ -260,7 +245,7 @@ export default function AltarSidebarPanel() {
               <button
                 key={cat}
                 onClick={() => { setNewCategory(cat); setNewEmoji(''); setShowEmojiPicker(false); }}
-                className={`text-xs px-2 py-1 rounded-md transition-colors ${
+                className={`altar-category-chip text-xs px-2 py-1 rounded-md transition-colors ${
                   newCategory === cat ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'
                 }`}
                 title={t(`altar.categories.${cat}`)}

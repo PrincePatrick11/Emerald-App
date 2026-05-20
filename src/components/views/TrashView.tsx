@@ -119,7 +119,7 @@ function ItemRow({ item, confirmingId, setConfirmingId, restore, handlePermanent
           <>
             <button
               onClick={() => restore(item)}
-              className="flex items-center gap-1.5 text-xs text-jade-400 hover:text-jade-300 px-2.5 py-1.5 rounded hover:bg-jade-400/10 transition-colors"
+              className="trash-restore-btn flex items-center gap-1.5 text-xs text-jade-400 hover:text-jade-300 px-2.5 py-1.5 rounded hover:bg-jade-400/10 transition-colors"
             >
               <RotateCcw size={12} />
               {t('trash.restore')}
@@ -176,7 +176,7 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, handlePermanen
           </>
         ) : (
           <>
-            <button onClick={() => restore(item)} className="flex items-center gap-1 text-xs text-jade-400 hover:text-jade-300 px-2 py-1 rounded hover:bg-jade-400/10 transition-colors">
+            <button onClick={() => restore(item)} className="trash-restore-btn flex items-center gap-1 text-xs text-jade-400 hover:text-jade-300 px-2 py-1 rounded hover:bg-jade-400/10 transition-colors">
               <RotateCcw size={11} />{t('trash.restore')}
             </button>
             <button onClick={() => handlePermanentDelete(item)} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-400/10 transition-colors">
@@ -404,7 +404,7 @@ export default function TrashView() {
               )}
               <button
                 onClick={handleBulkDelete}
-                className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-md hover:bg-red-400/10"
+                className="trash-bulk-delete-btn flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-md hover:bg-red-400/10"
               >
                 <Trash2 size={12} />
                 {confirmingBulkDelete
@@ -426,7 +426,7 @@ export default function TrashView() {
               )}
               <button
                 onClick={handleEmptyTrash}
-                className="text-xs text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-md hover:bg-red-400/10"
+                className="trash-empty-btn text-xs text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-md hover:bg-red-400/10"
               >
                 {confirmingEmpty ? t('trash.confirmYes') : t('trash.emptyTrash')}
               </button>

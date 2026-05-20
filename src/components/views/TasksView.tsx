@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTaskStore } from '../../store/taskStore';
 import { useUIStore } from '../../store/uiStore';
@@ -6,6 +6,7 @@ import { useUndoStore } from '../../store/undoStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
+import { generateId } from '../../lib/helpers';
 import ListToolbar from '../ui/ListToolbar';
 import FilterPanel from '../ui/FilterPanel';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
@@ -21,6 +22,18 @@ const TASK_EMOJIS = [
   '🌺','🐍','🧹','🌿','📝','🌈','⭐','🪬','☯️','🔱',
   '🌑','🎯','💡','🔔','🛡️','⚔️','🏺','🧪','📖','🎵',
 ];
+
+const TASK_PRIORITY_COLORS: Record<string, string> = {
+  high: 'text-red-400',
+  medium: 'text-yellow-400',
+  low: 'text-green-400',
+};
+
+const TASK_PRIORITY_PILL_CLASSES: Record<string, string> = {
+  high: 'task-priority-pill task-priority-pill-high',
+  medium: 'task-priority-pill task-priority-pill-medium',
+  low: 'task-priority-pill task-priority-pill-low',
+};
 
 export default function TasksView() {
   const { t } = useTranslation();
@@ -151,7 +164,7 @@ export default function TasksView() {
     if (confirmDeleteCatId !== id) { setConfirmDeleteCatId(id); return; }
     setConfirmDeleteCatId(null);
     await deleteCategory(id);
-    pushUndo({ id: crypto.randomUUID(), description: t('undo.categoryDeleted'), undo: () => restoreCategory(id) });
+    pushUndo({ id: generateId(), description: t('undo.categoryDeleted'), undo: () => restoreCategory(id) });
   };
 
   const toggleExpand = useCallback((id: string) => {
@@ -173,6 +186,19 @@ export default function TasksView() {
   }, []);
 
   const activeFilterCount = filterCategory.size + filterPriority.size;
+
+  const resolveTaskLinkTitle = useCallback((targetType: string, targetId: string) => {
+    if (targetType === 'journal') {
+      return journalEntries.find((entry) => entry.id === targetId)?.title ?? 'Unknown';
+    }
+    if (targetType === 'wiki') {
+      return wikiArticles.find((article) => article.id === targetId)?.title ?? 'Unknown';
+    }
+    if (targetType === 'operation') {
+      return operations.find((operation) => operation.id === targetId)?.title ?? 'Unknown';
+    }
+    return 'Unknown';
+  }, [journalEntries, wikiArticles, operations]);
 
   return (
     <div className="flex flex-col h-full">
@@ -327,6 +353,7 @@ export default function TasksView() {
                     expandedTasks={expandedTasks}
                     setCtxMenu={setCtxMenu}
                     setLinkModal={setLinkModal}
+                    resolveTaskLinkTitle={resolveTaskLinkTitle}
                     t={t}
                   />
                 ))}
@@ -425,6 +452,7 @@ export default function TasksView() {
                           expandedTasks={expandedTasks}
                           setCtxMenu={setCtxMenu}
                           setLinkModal={setLinkModal}
+                          resolveTaskLinkTitle={resolveTaskLinkTitle}
                           t={t}
                         />
                       )) 
@@ -446,6 +474,7 @@ export default function TasksView() {
                 expandedTasks={expandedTasks}
                 setCtxMenu={setCtxMenu}
                 setLinkModal={setLinkModal}
+                resolveTaskLinkTitle={resolveTaskLinkTitle}
                 t={t}
               />
             ))}</div>}
@@ -504,17 +533,23 @@ interface TaskRowProps {
   expandedTasks: Set<string>;
   setCtxMenu: (menu: { id: string; x: number; y: number; actions: ContextMenuAction[] } | null) => void;
   setLinkModal: (modal: { taskId: string } | null) => void;
+  resolveTaskLinkTitle: (targetType: string, targetId: string) => string;
   t: (key: string) => string;
 }
 
-function TaskRow({
+const TaskRow = memo(function TaskRow({
   task, editingId, editValue, setEditValue, setEditingId,
-  handleSaveEdit, toggleExpand, expandedTasks, setCtxMenu, setLinkModal, t,
+  handleSaveEdit, toggleExpand, expandedTasks, setCtxMenu, setLinkModal, resolveTaskLinkTitle, t,
 }: TaskRowProps) {
-  const { updateTask, getCategory, categories, getSubtasks, deleteTask, restoreTask, links, createTask, toggleComplete } = useTaskStore();
-  const journalEntries = useJournalStore((s) => s.entries);
-  const wikiArticles = useWikiStore((s) => s.articles);
-  const operations = useOperationStore((s) => s.operations);
+  const updateTask = useTaskStore((s) => s.updateTask);
+  const getCategory = useTaskStore((s) => s.getCategory);
+  const categories = useTaskStore((s) => s.categories);
+  const getSubtasks = useTaskStore((s) => s.getSubtasks);
+  const deleteTask = useTaskStore((s) => s.deleteTask);
+  const restoreTask = useTaskStore((s) => s.restoreTask);
+  const links = useTaskStore((s) => s.links);
+  const createTask = useTaskStore((s) => s.createTask);
+  const toggleComplete = useTaskStore((s) => s.toggleComplete);
   const pushUndo = useUndoStore((s) => s.push);
   const subtasks = getSubtasks(task.id);
   const hasSubtasks = subtasks.length > 0;
@@ -525,7 +560,7 @@ function TaskRow({
   const handleDelete = async () => {
     await deleteTask(task.id);
     pushUndo({
-      id: crypto.randomUUID(),
+      id: generateId(),
       description: t('undo.taskDeleted'),
       undo: () => restoreTask(task.id),
     });
@@ -538,20 +573,10 @@ function TaskRow({
     setEditValue(subtask.title);
   };
 
-  const resolvedLinks = taskLinks.map((link) => {
-    let title = 'Unknown';
-    if (link.target_type === 'journal') {
-      const entry = journalEntries.find((e) => e.id === link.target_id);
-      title = entry?.title ?? 'Unknown';
-    } else if (link.target_type === 'wiki') {
-      const article = wikiArticles.find((a) => a.id === link.target_id);
-      title = article?.title ?? 'Unknown';
-    } else if (link.target_type === 'operation') {
-      const op = operations.find((o) => o.id === link.target_id);
-      title = op?.title ?? 'Unknown';
-    }
-    return { ...link, title };
-  });
+  const resolvedLinks = useMemo(() => taskLinks.map((link) => ({
+    ...link,
+    title: resolveTaskLinkTitle(link.target_type, link.target_id),
+  })), [taskLinks, resolveTaskLinkTitle]);
 
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
   const [showCategoryMenu, setShowCategoryMenu] = useState(false);
@@ -579,18 +604,6 @@ function TaskRow({
   const handleCategoryChange = async (categoryId: string) => {
     await updateTask(task.id, { category_id: categoryId });
     setShowCategoryMenu(false);
-  };
-
-  const priorityColors: Record<string, string> = {
-    high: 'text-red-400',
-    medium: 'text-yellow-400',
-    low: 'text-green-400',
-  };
-
-  const priorityBg: Record<string, string> = {
-    high: 'bg-red-400/10 text-red-400',
-    medium: 'bg-yellow-400/10 text-yellow-400',
-    low: 'bg-green-400/10 text-green-400',
   };
 
   const priorityLabels: Record<string, string> = {
@@ -685,7 +698,7 @@ function TaskRow({
             {resolvedLinks.map((link) => (
               <span
                 key={link.id}
-                className="text-xs text-jade-400/70 hover:text-jade-400 cursor-pointer px-1.5 py-0.5 rounded bg-jade-900/20 hover:bg-jade-900/40 transition-colors"
+                className="tasks-linked-entry text-xs cursor-pointer px-1.5 py-0.5 rounded transition-colors"
                 title={`${link.target_type}: ${link.title}`}
                 onClick={() => {
                   const typeMap: Record<string, string> = { journal: 'journal', wiki: 'wiki', operation: 'operations' };
@@ -701,7 +714,7 @@ function TaskRow({
         <div className="flex items-center gap-1.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={handleCreateSubtaskLocal}
-            className="text-stone-500 hover:text-jade-400 p-0.5"
+            className="task-action-btn text-stone-500 hover:text-jade-400 p-0.5"
             title={t('tasks.addSubtask')}
           >
             <Plus size={12} />
@@ -710,21 +723,21 @@ function TaskRow({
           <div className="relative" ref={categoryRef}>
             <button
               onClick={() => setShowCategoryMenu((o) => !o)}
-              className="text-xs text-stone-500 hover:text-stone-300 px-1.5 py-0.5 rounded hover:bg-stone-700/50"
+              className="tasks-category-trigger text-xs text-stone-500 hover:text-stone-300 px-1.5 py-0.5 rounded hover:bg-stone-700/50"
               title={t('tasks.filter.category')}
             >
               {currentCategory ? `${currentCategory.emoji} ${currentCategory.name}` : '—'}
             </button>
             {showCategoryMenu && (
-              <div className="absolute right-0 top-full mt-1 z-50 bg-stone-850 border border-stone-700/60 rounded-lg shadow-xl py-1 min-w-[140px]" style={{ backgroundColor: '#1c1917' }}>
+              <div className="tasks-menu absolute right-0 top-full mt-1 z-50 rounded-lg shadow-xl py-1 min-w-[140px]">
                 {categories.map((cat) => (
                   <button
                     key={cat.id}
                     onClick={() => handleCategoryChange(cat.id)}
                     className={`w-full text-left px-3 py-1.5 text-xs transition-colors flex items-center gap-2 ${
                       task.category_id === cat.id
-                        ? 'text-jade-400'
-                        : 'text-stone-400 hover:text-stone-200 hover:bg-stone-700/50'
+                        ? 'tasks-menu-item-active text-jade-400'
+                        : 'tasks-menu-item-idle text-stone-400 hover:text-stone-200'
                     }`}
                   >
                     <span>{cat.emoji}</span>
@@ -737,7 +750,7 @@ function TaskRow({
 
           <button
             onClick={() => setLinkModal({ taskId: task.id })}
-            className="text-stone-500 hover:text-jade-400 p-0.5"
+            className="task-action-btn text-stone-500 hover:text-jade-400 p-0.5"
             title={t('tasks.linkEntry')}
           >
             <Link2 size={12} />
@@ -746,21 +759,21 @@ function TaskRow({
           <div className="relative" ref={priorityRef}>
             <button
               onClick={() => setShowPriorityMenu((o) => !o)}
-              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${priorityBg[task.priority]} hover:opacity-80`}
+              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${TASK_PRIORITY_PILL_CLASSES[task.priority]}`}
               title={t('tasks.priority.' + task.priority)}
             >
               <Flag size={11} />
             </button>
             {showPriorityMenu && (
-              <div className="absolute right-0 top-full mt-1 z-50 bg-stone-850 border border-stone-700/60 rounded-lg shadow-xl py-1 min-w-[120px]" style={{ backgroundColor: '#1c1917' }}>
+              <div className="tasks-menu absolute right-0 top-full mt-1 z-50 rounded-lg shadow-xl py-1 min-w-[120px]">
                 {(['high', 'medium', 'low'] as TaskPriority[]).map((p) => (
                   <button
                     key={p}
                     onClick={() => handlePriorityChange(p)}
                     className={`w-full text-left px-3 py-1.5 text-xs transition-colors flex items-center gap-2 ${
                       task.priority === p
-                        ? priorityColors[p]
-                        : 'text-stone-400 hover:text-stone-200 hover:bg-stone-700/50'
+                        ? `tasks-menu-item-active ${TASK_PRIORITY_COLORS[p]}`
+                        : 'tasks-menu-item-idle text-stone-400 hover:text-stone-200'
                     }`}
                   >
                     <Flag size={11} />
@@ -773,7 +786,7 @@ function TaskRow({
 
           <button
             onClick={handleDelete}
-            className="text-stone-500 hover:text-red-400 p-0.5"
+            className="task-action-btn text-stone-500 hover:text-red-400 p-0.5"
             title={t('contextMenu.delete')}
           >
             <Trash2 size={12} />
@@ -796,6 +809,7 @@ function TaskRow({
               expandedTasks={expandedTasks}
               setCtxMenu={setCtxMenu}
               setLinkModal={setLinkModal}
+              resolveTaskLinkTitle={resolveTaskLinkTitle}
               t={t}
             />
           ))}
@@ -803,7 +817,7 @@ function TaskRow({
       )}
     </div>
   );
-}
+});
 
 interface LinkModalProps {
   taskId: string;
@@ -838,7 +852,7 @@ function LinkModal({ taskId, onClose, addLink, journalEntries, wikiArticles, ope
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="bg-stone-900 border border-stone-700 rounded-lg shadow-xl w-96 max-h-[80vh] flex flex-col"
+        className="tasks-link-modal bg-stone-900 border border-stone-700 rounded-lg shadow-xl w-96 max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-stone-700/40">
@@ -855,8 +869,8 @@ function LinkModal({ taskId, onClose, addLink, journalEntries, wikiArticles, ope
               onClick={() => setActiveTab(tab)}
               className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
                 activeTab === tab
-                  ? 'text-jade-400 border-b-2 border-jade-400'
-                  : 'text-stone-400 hover:text-stone-200'
+                  ? 'tasks-link-tab-active text-jade-400 border-b-2 border-jade-400'
+                  : 'tasks-link-tab-idle text-stone-400 hover:text-stone-200'
               }`}
             >
               {tab === 'journal' ? t('nav.journal') : tab === 'wiki' ? t('nav.wiki') : t('nav.operations')}
@@ -883,7 +897,7 @@ function LinkModal({ taskId, onClose, addLink, journalEntries, wikiArticles, ope
               <button
                 key={item.id}
                 onClick={() => handleLink(item.id)}
-                className="w-full text-left px-3 py-2 text-sm text-stone-300 hover:bg-stone-700/50 rounded transition-colors"
+                className="tasks-link-row w-full text-left px-3 py-2 text-sm text-stone-300 hover:bg-stone-700/50 rounded transition-colors"
               >
                 {item.title}
               </button>

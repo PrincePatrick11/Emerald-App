@@ -22,6 +22,7 @@ import { useState } from 'react';
 import { useUIStore } from '../../store/uiStore';
 import { useJournalStore } from '../../store/journalStore';
 import { setDragItem } from '../../lib/dragState';
+import { generateId } from '../../lib/helpers';
 import { format } from 'date-fns';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import type { MoonPhase } from '../../types';
@@ -81,7 +82,7 @@ export default function LeftSidebar() {
 
   const handleCtxDelete = async (id: string) => {
     await deleteEntry(id);
-    pushUndo({ id: crypto.randomUUID(), description: t('undo.entryDeleted'), undo: () => restoreEntry(id) });
+    pushUndo({ id: generateId(), description: t('undo.entryDeleted'), undo: () => restoreEntry(id) });
     if (activeView.id === id) setActiveView({ type: 'journal' });
   };
 
@@ -97,7 +98,7 @@ export default function LeftSidebar() {
   return (
     <div className="flex flex-col h-full">
       {/* App Logo */}
-      <div className="px-3 h-14 flex items-center gap-1 border-b border-stone-700/60">
+      <div className="sidebar-header px-3 h-14 flex items-center gap-1 border-b border-stone-700/60">
         <button
           onClick={() => setActiveView({ type: 'home' })}
           className="flex items-center gap-2 hover:opacity-80 transition-opacity mr-1"
@@ -128,15 +129,15 @@ export default function LeftSidebar() {
       </div>
 
       {/* Search */}
-      <div className="px-3 py-3 border-b border-stone-700/60">
-        <div className="flex items-center gap-2 bg-stone-700/40 rounded-lg px-3 py-2">
+      <div className="sidebar-search px-3 py-3 border-b border-stone-700/60">
+        <div className="sidebar-search-inner flex items-center gap-2 bg-stone-700/40 rounded-lg px-3 py-2">
           <Search size={14} className="text-stone-500 flex-shrink-0" />
           <input
             type="text"
             placeholder={t('search.placeholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-transparent text-sm text-stone-300 placeholder-stone-600 outline-none w-full selectable"
+            className="sidebar-search-input bg-transparent text-sm text-stone-300 placeholder-stone-600 outline-none w-full selectable"
           />
         </div>
       </div>

@@ -48,7 +48,7 @@ export default function LinkedWikiInput({
       {selectedArticles.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {selectedArticles.map((article) => (
-            <span key={article.id} className="flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-stone-800/60 border border-stone-700/40 text-stone-300">
+            <span key={article.id} className="linked-entry-chip flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-stone-800/60 border border-stone-700/40 text-stone-300">
               <span>{articleIcon(article)}</span>
               <span className="truncate max-w-[110px]">{article.title}</span>
               <button
@@ -70,14 +70,14 @@ export default function LinkedWikiInput({
           className={inputCls}
         />
         {open && (
-          <div className="absolute top-full left-0 right-0 mt-1 z-50 border border-stone-700/60 rounded-lg shadow-xl py-1 max-h-40 overflow-y-auto" style={{ backgroundColor: '#1c1917' }}>
+          <div className="linked-entry-menu absolute top-full left-0 right-0 mt-1 z-50 border border-stone-700/60 rounded-lg shadow-xl py-1 max-h-40 overflow-y-auto">
             {filtered.length === 0 ? (
               <p className="text-xs text-stone-600 px-3 py-2">{t('search.noResultsShort')}</p>
             ) : filtered.map((article) => (
               <button
                 key={article.id}
                 onMouseDown={(e) => { e.preventDefault(); onChange([...ids, article.id]); setQuery(''); setOpen(false); }}
-                className="w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs text-stone-400 hover:text-stone-200 hover:bg-stone-700/50"
+                className="linked-entry-menu-item w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs text-stone-400 hover:text-stone-200"
               >
                 <span>{articleIcon(article)}</span>
                 <span className="truncate">{article.title}</span>

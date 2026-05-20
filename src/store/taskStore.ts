@@ -1,10 +1,7 @@
 import { create } from 'zustand';
 import { getDb } from '../lib/db';
-import { safeParseArray } from '../lib/helpers';
+import { generateId, nowIso, safeParseArray } from '../lib/helpers';
 import type { Task, TaskCategory, TaskLink } from '../types';
-
-function generateId() { return crypto.randomUUID(); }
-function nowIso() { return new Date().toISOString(); }
 
 function normalizeTask(row: Task): Task {
   return {

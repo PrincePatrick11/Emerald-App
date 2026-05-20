@@ -37,10 +37,10 @@ function Chip({
   return (
     <button
       onClick={() => onToggle(chip.value)}
-      className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${
+      className={`filter-chip flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${
         active
-          ? 'bg-jade-900/50 border-jade-800/40 text-jade-400'
-          : 'bg-stone-800/60 border-stone-700/60 text-stone-500 hover:text-stone-300 hover:border-stone-600'
+          ? 'filter-chip-active bg-jade-900/50 border-jade-800/40 text-jade-400'
+          : 'filter-chip-idle bg-stone-800/60 border-stone-700/60 text-stone-500 hover:text-stone-300 hover:border-stone-600'
       }`}
     >
       {chip.emoji && <span className="text-sm leading-none">{chip.emoji}</span>}
@@ -68,7 +68,7 @@ export default function FilterPanel({
   const { t } = useTranslation();
 
   return (
-    <div className="px-8 py-3 border-b border-stone-700/40 bg-stone-900/50 flex flex-wrap gap-x-6 gap-y-3 items-start">
+    <div className="filter-panel px-8 py-3 border-b border-stone-700/40 bg-stone-900/50 flex flex-wrap gap-x-6 gap-y-3 items-start">
       {/* Primary chips (category / moon phase) */}
       {chips && chips.length > 0 && (
         <div className="flex flex-col gap-1.5">

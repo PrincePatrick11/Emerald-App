@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getDb } from '../lib/db';
+import { generateId } from '../lib/helpers';
 import type { CustomProperty, CustomPropertyType } from '../types';
 
 interface CustomPropertyState {
@@ -25,7 +26,7 @@ export const useCustomPropertyStore = create<CustomPropertyState>((set, get) => 
 
   addProperty: async (entryId, entryType, name, type, meta = null, showInEntry = false) => {
     const db = await getDb();
-    const id = crypto.randomUUID();
+    const id = generateId();
     const sort_order = get().properties.length;
     await db.execute(
       `INSERT INTO custom_properties (id, entry_id, entry_type, name, type, value, meta, show_in_entry, sort_order) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
