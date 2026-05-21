@@ -28,7 +28,7 @@ The wiki stores reference articles about anything relevant to your practice: rit
 
 **Categories.** Each article belongs to one category. Twelve built-in categories cover the most common types. You can add custom categories from the list view. Category sort groups articles by category with inline category management.
 
-**Icons.** Articles can have a custom icon — either an emoji character or an image uploaded from your files. The icon appears in list views, in internal link chips, and in journal entry metadata.
+**Icons.** Articles can have a custom icon: either an emoji character or an image. Image icons render only when the icon value is a local-safe source (`/` path), a `data:image/...` URL, or a `blob:` URL. Remote `http://` and `https://` icon URLs are not rendered as images.
 
 **Cover Images.** A banner image displayed at the top of the article in read mode. Stored as a file in the app's image directory.
 
@@ -46,7 +46,7 @@ Operations track magical workings: rituals in progress, ongoing practices, servi
 
 **End Date and Version.** Optional fields available for all operations. End date is a calendar date; version is a free-form string (e.g. `1.0`, `draft`).
 
-**Icon and Cover Image.** Same as wiki articles.
+**Icon and Cover Image.** Operations support the same icon and cover image model as wiki articles. The operation icon is used in Operations list views and in the Home dashboard operation section. Custom operation icons now take precedence; when no custom icon is set, Emerald falls back to the operation category emoji.
 
 ### Sigil Workflow
 

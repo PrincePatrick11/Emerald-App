@@ -21,6 +21,11 @@ import EntryCustomProperties from '../editor/EntryCustomProperties';
 import { format } from 'date-fns';
 import OperationSigilView from './OperationSigilView';
 
+function isImageIcon(icon: string | null | undefined) {
+  if (!icon) return false;
+  return icon.startsWith('data:image/') || icon.startsWith('blob:') || icon.startsWith('/');
+}
+
 export default function OperationsView() {
   const { t } = useTranslation();
   const { activeView, setActiveView, openViewInNewTab, toggleRightSidebar, operationsPrefs, setOperationsPrefs } = useUIStore();
@@ -346,7 +351,7 @@ export default function OperationsView() {
 
     const renderOp = (op: typeof operations[0]) => {
       const cat = catById[op.category_id];
-      const emoji = cat?.emoji ?? '⚡';
+      const iconValue = op.icon || cat?.emoji || '⚡';
       const catDisplayName = cat ? opCatName(cat) : '';
       const isSigil = op.category_id === 'sigils';
       const dateStr = `${catDisplayName}${catDisplayName ? ' · ' : ''}${format(new Date(op.updated_at), 'MMM d, yyyy')}`;
@@ -356,7 +361,10 @@ export default function OperationsView() {
         <div key={op.id} className={view === 'cards' ? 'panel-interactive px-4 py-4 text-left' : 'panel-interactive w-full flex items-center gap-3 px-4 py-3'}>
           {view === 'cards' ? (
             <>
-              <div className="text-xl mb-2">{emoji}</div>
+              {isImageIcon(iconValue)
+                ? <img src={iconValue} alt="" className="w-6 h-6 object-cover rounded mb-2" />
+                : <div className="text-xl mb-2">{iconValue}</div>
+              }
               <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
                 onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
                 className="text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1" />
@@ -367,7 +375,10 @@ export default function OperationsView() {
             </>
           ) : (
             <>
-              <span className="text-base flex-shrink-0">{emoji}</span>
+              {isImageIcon(iconValue)
+                ? <img src={iconValue} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
+                : <span className="text-base flex-shrink-0">{iconValue}</span>
+              }
               <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
                 onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
                 className="flex-1 bg-transparent text-sm text-stone-300 outline-none selectable" />
@@ -401,12 +412,14 @@ export default function OperationsView() {
                     {op.thumbnail_data && op.show_sigil ? (
                       <img src={op.thumbnail_data} alt="" className="h-full w-full object-contain" />
                     ) : (
-                      <span className="text-xl">{emoji}</span>
+                      <span className="text-xl">{iconValue}</span>
                     )}
                   </div>
                 </div>
               ) : (
-                <div className="text-xl mb-2">{emoji}</div>
+                isImageIcon(iconValue)
+                  ? <img src={iconValue} alt="" className="w-6 h-6 object-cover rounded mb-2" />
+                  : <div className="text-xl mb-2">{iconValue}</div>
               )}
               <div className="text-sm font-medium text-stone-200 truncate mb-1">{op.title}</div>
               {isSigil ? (
@@ -436,7 +449,10 @@ export default function OperationsView() {
             </>
           ) : (
             <>
-              <span className="text-base flex-shrink-0">{emoji}</span>
+              {isImageIcon(iconValue)
+                ? <img src={iconValue} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
+                : <span className="text-base flex-shrink-0">{iconValue}</span>
+              }
               <span className="flex-1 text-sm text-stone-300 truncate">{op.title}</span>
               {isSigil ? (
                 <span className="text-xs text-parchment-500/70 flex-shrink-0">
@@ -657,15 +673,16 @@ export default function OperationsView() {
   }
 
   const currentCat = getCatById(isEditing ? categoryId : operation.category_id);
+  const operationIcon = operation.icon || currentCat?.emoji || '⚡';
 
   return (
     <div className="h-full flex flex-col">
       {/* Topbar */}
       <div className="flex items-center justify-between px-6 h-14 border-b border-stone-700/60 flex-shrink-0">
         <div className="flex items-center gap-2 text-xs text-stone-600">
-          {operation.icon
-            ? <img src={operation.icon} alt="" className="w-5 h-5 object-cover rounded" />
-            : <span>{currentCat?.emoji ?? '⚡'}</span>
+          {isImageIcon(operationIcon)
+            ? <img src={operationIcon} alt="" className="w-5 h-5 object-cover rounded" />
+            : <span>{operationIcon}</span>
           }
           <span>{currentCat?.name ?? '—'}</span>
           <span>·</span>

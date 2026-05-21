@@ -19,6 +19,11 @@ type CtxTarget =
   | { kind: 'wiki'; id: string }
   | { kind: 'operation'; id: string };
 
+function isImageIcon(icon: string | null | undefined) {
+  if (!icon) return false;
+  return icon.startsWith('data:image/') || icon.startsWith('blob:') || icon.startsWith('/');
+}
+
 // ── Dropdown (same style as ListToolbar) ──────────────────────────────────────
 
 function Dropdown<T extends string>({
@@ -327,6 +332,7 @@ export default function HomeView() {
             <div className="space-y-2">
               {opsItems.map((op) => {
                 const cat = categories.find((c) => c.id === op.category_id);
+                const icon = op.icon || cat?.emoji || '⚡';
                 return (
                   <button
                     key={op.id}
@@ -335,7 +341,10 @@ export default function HomeView() {
                     className="panel-interactive w-full text-left px-4 py-3 group"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-xl">{cat?.emoji ?? '⚡'}</span>
+                      {isImageIcon(icon)
+                        ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded flex-shrink-0" />
+                        : <span className="text-xl">{icon}</span>
+                      }
                       <div className="flex-1 min-w-0">
                         <div className="home-item-title text-sm font-medium truncate">
                           {op.title}
@@ -353,6 +362,7 @@ export default function HomeView() {
             <div className="grid grid-cols-3 gap-2">
               {opsItems.map((op) => {
                 const cat = categories.find((c) => c.id === op.category_id);
+                const icon = op.icon || cat?.emoji || '⚡';
                 return (
                   <button
                     key={op.id}
@@ -360,7 +370,10 @@ export default function HomeView() {
                     onContextMenu={(e) => openCtx(e, { kind: 'operation', id: op.id })}
                     className="panel-interactive px-3 py-3 text-left"
                   >
-                    <div className="text-lg mb-1">{cat?.emoji ?? '⚡'}</div>
+                    {isImageIcon(icon)
+                      ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded mb-1" />
+                      : <div className="text-lg mb-1">{icon}</div>
+                    }
                     <div className="home-item-title text-sm font-medium truncate">{op.title}</div>
                     <div className="home-item-meta text-xs mt-0.5">
                       {(cat ? (cat.is_builtin ? t(`operations.categories.${cat.id}`) : cat.name) : '')} · {format(new Date(op.updated_at), 'MMM d, yyyy')}
@@ -405,8 +418,8 @@ export default function HomeView() {
                     className="panel-interactive w-full text-left px-4 py-3 group"
                   >
                     <div className="flex items-center gap-3">
-                      {article.icon
-                        ? <img src={article.icon} alt="" className="w-6 h-6 object-cover rounded flex-shrink-0" />
+                      {isImageIcon(article.icon)
+                        ? <img src={article.icon!} alt="" className="w-6 h-6 object-cover rounded flex-shrink-0" />
                         : <span className="text-xl flex-shrink-0">{icon}</span>
                       }
                       <div className="flex-1 min-w-0">
@@ -435,8 +448,8 @@ export default function HomeView() {
                     onContextMenu={(e) => openCtx(e, { kind: 'wiki', id: article.id })}
                     className="panel-interactive px-3 py-3 text-left"
                   >
-                    {article.icon
-                      ? <img src={article.icon} alt="" className="w-6 h-6 object-cover rounded mb-1" />
+                    {isImageIcon(article.icon)
+                      ? <img src={article.icon!} alt="" className="w-6 h-6 object-cover rounded mb-1" />
                       : <div className="text-lg mb-1">{icon}</div>
                     }
                     <div className="home-item-title text-sm font-medium truncate">{article.title}</div>

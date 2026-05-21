@@ -26,6 +26,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Draggable tab reordering in the tab bar with animated movement
 
 ### Changed
+- Wiki and Operation custom icons now render image icons only from safe local/data/blob sources (`/`, `data:image/...`, `blob:`); remote `http(s)` URLs are treated as non-image icons
+- Operations and Home dashboard operation cards/lists now consistently use custom operation icons first, then category emoji fallback
 - `write_file` and `read_file` now enforce root-directory confinement (home, documents, downloads, desktop, app data, app config) in addition to the extension allowlist
 - `write_file` rejects symlink targets and verifies canonical paths against allowed roots
 - `.emeralddb` added to the permitted extension allowlist for `write_file` and `read_file`

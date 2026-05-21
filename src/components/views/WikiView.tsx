@@ -24,6 +24,11 @@ const WIKI_EMOJIS = [
   '📖','📄','🌸','🦋','🐉','🏺','🌺','💫','🌀','🎭',
 ];
 
+function isImageIcon(icon: string | null | undefined) {
+  if (!icon) return false;
+  return icon.startsWith('data:image/') || icon.startsWith('blob:') || icon.startsWith('/');
+}
+
 export default function WikiView() {
   const { t } = useTranslation();
   const { activeView, setActiveView, openViewInNewTab, toggleRightSidebar, wikiPrefs, setWikiPrefs } = useUIStore();
@@ -323,7 +328,7 @@ export default function WikiView() {
 
     const renderArticle = (a: typeof articles[0]) => {
       const cat = catById[a.category];
-      const iconEl = a.icon ? <img src={a.icon} alt="" className="w-5 h-5 object-cover rounded inline" /> : (cat?.emoji ?? '📄');
+      const iconEl = isImageIcon(a.icon) ? <img src={a.icon!} alt="" className="w-5 h-5 object-cover rounded inline" /> : (cat?.emoji ?? '📄');
       const catLabel = cat ? (cat.is_builtin ? t(`wiki.categories.${cat.id}`) : cat.name) : a.category;
       const dateStr = `${catLabel} · ${format(new Date(a.updated_at), 'MMM d, yyyy')}`;
       if (renamingId === a.id) return (
@@ -331,7 +336,7 @@ export default function WikiView() {
           {view === 'cards' ? (
             <>
               <div className="flex items-center gap-2 mb-2">
-                {a.icon ? <img src={a.icon} alt="" className="w-6 h-6 object-cover rounded" /> : <span className="text-xl">{cat?.emoji ?? '📄'}</span>}
+                {isImageIcon(a.icon) ? <img src={a.icon!} alt="" className="w-6 h-6 object-cover rounded" /> : <span className="text-xl">{cat?.emoji ?? '📄'}</span>}
               </div>
               <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
                 onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
@@ -368,7 +373,7 @@ export default function WikiView() {
           {view === 'cards' ? (
             <>
               <div className="flex items-center gap-2 mb-2">
-                {a.icon ? <img src={a.icon} alt="" className="w-6 h-6 object-cover rounded" /> : <span className="text-xl">{cat?.emoji ?? '📄'}</span>}
+                {isImageIcon(a.icon) ? <img src={a.icon!} alt="" className="w-6 h-6 object-cover rounded" /> : <span className="text-xl">{cat?.emoji ?? '📄'}</span>}
               </div>
               <div className="text-sm font-medium text-stone-200 truncate mb-1">{a.title}</div>
               <div className="text-xs text-parchment-500/70">{dateStr}</div>
@@ -580,8 +585,8 @@ export default function WikiView() {
       {/* Topbar */}
       <div className="flex items-center justify-between px-6 h-14 border-b border-stone-700/60 flex-shrink-0">
         <div className="flex items-center gap-2 text-xs text-stone-600">
-          {article.icon
-            ? <img src={article.icon} alt="" className="w-5 h-5 object-cover rounded" />
+          {isImageIcon(article.icon)
+            ? <img src={article.icon!} alt="" className="w-5 h-5 object-cover rounded" />
             : <span>{currentCat?.emoji ?? getCategoryEmoji(article.category)}</span>
           }
           <span className="capitalize">{currentCat?.name ?? article.category}</span>
