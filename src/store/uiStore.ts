@@ -42,6 +42,7 @@ interface UIState {
   openViewInNewTab: (view: ActiveView) => void;
   addTab: (view?: ActiveView) => void;
   selectTab: (id: string) => void;
+  setTabsOrder: (ids: string[]) => void;
   closeTab: (id: string) => void;
   closeOtherTabs: (id: string) => void;
   navigateBack: () => void;
@@ -180,6 +181,21 @@ export const useUIStore = create<UIState>((set) => ({
     if (!tab) return {};
     saveTabs(s.tabs, id);
     return { ...withNavigationState(s, tab.view), activeTabId: id };
+  }),
+
+  setTabsOrder: (ids) => set((s) => {
+    if (ids.length !== s.tabs.length) {
+      if (import.meta.env.DEV) console.warn('setTabsOrder: length mismatch');
+      return {};
+    }
+    const tabMap = new Map(s.tabs.map((tab) => [tab.id, tab]));
+    const tabs = ids.map((id) => tabMap.get(id)).filter((tab): tab is OpenTab => !!tab);
+    if (tabs.length !== s.tabs.length || new Set(ids).size !== ids.length) {
+      if (import.meta.env.DEV) console.warn('setTabsOrder: invalid reorder payload');
+      return {};
+    }
+    saveTabs(tabs, s.activeTabId);
+    return { tabs };
   }),
 
   closeTab: (id) => set((s) => {

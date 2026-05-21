@@ -1,5 +1,6 @@
 import { BookOpen, Flame, Home, Library, MoreHorizontal, Plus, Tag, Trash2, Wand2, X, CheckSquare } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { LazyMotion, Reorder, domAnimation } from 'framer-motion';
+import { type ReactNode } from 'react';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { useAltarStore } from '../../store/altarStore';
 import { useJournalStore } from '../../store/journalStore';
@@ -42,10 +43,11 @@ function renderIconValue(icon: string | null | undefined, fallback: ReactNode) {
 }
 
 export default function TabBar() {
-  const { tabs, activeTabId, selectTab, closeTab, addTab } = useUIStore();
+  const { tabs, activeTabId, selectTab, closeTab, addTab, setTabsOrder } = useUIStore();
   const getEntry = useJournalStore((s) => s.getEntry);
   const getArticle = useWikiStore((s) => s.getArticle);
   const getOperation = useOperationStore((s) => s.getOperation);
+  const getTask = useTaskStore((s) => s.getTask);
   const operationCategories = useOperationStore((s) => s.categories);
   const wikiCategories = useWikiStore((s) => s.wikiCategories);
   const altars = useAltarStore((s) => s.altars);
@@ -58,7 +60,7 @@ export default function TabBar() {
     if (view.type === 'wiki') return getArticle(view.id)?.title || getFallbackTitle(view);
     if (view.type === 'operations') return getOperation(view.id)?.title || getFallbackTitle(view);
     if (view.type === 'altar') return altars.find((altar) => altar.id === view.id)?.title || getFallbackTitle(view);
-    if (view.type === 'tasks') return useTaskStore.getState().getTask(view.id)?.title || getFallbackTitle(view);
+    if (view.type === 'tasks') return getTask(view.id)?.title || getFallbackTitle(view);
     return getFallbackTitle(view);
   };
 
@@ -103,40 +105,51 @@ export default function TabBar() {
 
   return (
     <div className="tabbar h-10 flex items-end overflow-hidden px-2 pt-2 bg-stone-900/95 border-b border-stone-700/60">
-      <div className="scrollbar-none flex min-w-0 max-w-full flex-initial items-end gap-1 overflow-x-auto overflow-y-hidden">
-        {tabs.map((tab) => {
-          const isActive = activeTabId === tab.id;
-          const title = getTitle(tab.view);
-          return (
-            <div
-              key={tab.id}
+      <LazyMotion features={domAnimation}>
+        <Reorder.Group
+          axis="x"
+          values={tabs.map((tab) => tab.id)}
+          onReorder={setTabsOrder}
+          className="scrollbar-none flex min-w-0 max-w-full flex-initial items-end gap-1 overflow-x-auto overflow-y-hidden"
+        >
+          {tabs.map((tab) => {
+            const isActive = activeTabId === tab.id;
+            const title = getTitle(tab.view);
+            return (
+              <Reorder.Item
+                key={tab.id}
+                value={tab.id}
+                whileDrag={{ scale: 1.005 }}
+                transition={{ type: 'spring', stiffness: 520, damping: 38, mass: 0.65 }}
+                style={{ position: 'relative' }}
                 className={`tab-item group flex min-w-32 max-w-56 flex-1 items-center gap-2 rounded-t-lg border px-3 py-2 text-xs transition-colors ${
                   isActive
                     ? 'tab-item-active border-stone-700/80 border-b-stone-800 bg-stone-800 text-stone-100'
                     : 'tab-item-idle border-stone-800/60 bg-stone-900/70 text-stone-500 hover:bg-stone-800/60 hover:text-stone-300'
                 }`}
-            >
-              <button
-                onClick={() => selectTab(tab.id)}
-                onAuxClick={(event) => { if (event.button === 1) closeTab(tab.id); }}
-                className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                title={title}
               >
-                <span className="flex-shrink-0 text-stone-500">{getIcon(tab.view)}</span>
-                <span className="truncate">{title}</span>
-                {tab.view.mode === 'edit' && <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-jade-500" title="Editing" />}
-              </button>
-              <button
-                onClick={() => closeTab(tab.id)}
-                className="-mr-1 rounded p-0.5 text-stone-600 opacity-0 transition-colors hover:bg-stone-700 hover:text-stone-200 group-hover:opacity-100"
-                title="Close tab"
-              >
-                <X size={13} />
-              </button>
-            </div>
-          );
-        })}
-      </div>
+                <button
+                  onClick={() => selectTab(tab.id)}
+                  onAuxClick={(event) => { if (event.button === 1) closeTab(tab.id); }}
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  title={title}
+                >
+                  <span className="flex-shrink-0 text-stone-500">{getIcon(tab.view)}</span>
+                  <span className="truncate">{title}</span>
+                  {tab.view.mode === 'edit' && <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-jade-500" title="Editing" />}
+                </button>
+                <button
+                  onClick={() => closeTab(tab.id)}
+                  className="-mr-1 rounded p-0.5 text-stone-600 opacity-0 transition-colors hover:bg-stone-700 hover:text-stone-200 group-hover:opacity-100"
+                  title="Close tab"
+                >
+                  <X size={13} />
+                </button>
+              </Reorder.Item>
+            );
+          })}
+        </Reorder.Group>
+      </LazyMotion>
       <button
         onClick={() => addTab()}
         className="tab-add mb-px ml-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-t-lg border border-stone-800/60 bg-stone-900/70 text-stone-500 transition-colors hover:bg-stone-800/60 hover:text-stone-200"

@@ -15,6 +15,7 @@ Emerald is a desktop app built on Tauri v2 (Rust backend) and React 19 (TypeScri
 | Database | SQLite via `tauri-plugin-sql` |
 | Internationalisation | react-i18next |
 | Icons | lucide-react |
+| UI motion / drag reordering | framer-motion |
 | Date formatting | date-fns |
 | Markdown parsing | marked |
 | Markdown serialisation | turndown |
@@ -114,6 +115,8 @@ Tabs are persisted in `localStorage` using:
 - `active-tab-id`
 
 This keeps the user's workspace available after restarting the app without adding database tables or migrations.
+
+Tab reordering is implemented in `src/components/layout/TabBar.tsx` with Framer Motion (`LazyMotion`, `Reorder.Group`, `Reorder.Item`). `Reorder.Group` emits the reordered tab ID list via `onReorder`, and `uiStore.setTabsOrder(ids)` validates the payload (length and uniqueness) before rebuilding the tab array and saving it through `saveTabs(...)`. Because `saveTabs` writes the full `tabs` array to `open-tabs`, tab order persists across restarts.
 
 When `setActiveView()` is called while a tab is active, the current tab's view is updated. Opening content in a new tab creates a new tab with its own `ActiveView`. Selecting a tab restores that tab's view into the main area.
 

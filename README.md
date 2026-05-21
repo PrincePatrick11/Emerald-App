@@ -48,7 +48,7 @@ Emerald is a desktop app for documenting your magical practice. Write journal en
 
 **Multi-Vault** — Keep separate databases for different projects or traditions.
 
-**Tabs & Workspace** — Open multiple entries, wiki articles, operations, sigils, and altars in browser-like tabs and resume your workspace after restart.
+**Tabs & Workspace** — Open multiple entries, wiki articles, operations, sigils, and altars in browser-like tabs. Reorder tabs with drag-and-drop (animated) and resume the same tab set and tab order after restart.
 
 **Localised** — English, German, Spanish, and French.
 
