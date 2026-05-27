@@ -70,15 +70,31 @@ Servitors use the `servitors` built-in category and use the standard operations 
 
 The altar is a virtual arrangement of symbolic objects on a canvas.
 
-**Altar library.** You manage a personal library of items (candles, crystals, herbs, deities, symbols, tools, and other objects). Each item has a name, an emoji, a category, an optional note, and an optional uploaded image.
+**Altar library.** You manage a personal library of items (candles, crystals, herbs, deities, symbols, tools, table objects, and other objects). Each item has a name, an emoji, a category, an optional note, and an optional uploaded image.
 
-**Placing items.** In edit mode, drag items from the library panel onto the altar canvas. Items can be repositioned by dragging and scaled with a handle.
+Library editing uses a modal flow for **add / edit / delete** actions. In edit mode, the library strip is docked under the canvas, supports resize, and persists height in `localStorage` (`altar-library-height`).
+
+Library tiles use a compact fixed footprint (**70×85 px**) to keep more items visible.
+
+**Placing items.** In edit mode, drag items from the library panel onto the altar canvas. Items can be repositioned by dragging, scaled with a handle, rotated, layered (`z-index`), adjusted for opacity, hidden, and locked.
+
+Locked placements are click-through on the canvas (pointer events disabled), so interactions pass to items behind them.
+
+**Inspector and placement controls.** The right sidebar includes a placed-elements list and an inline inspector rendered directly under the selected row. Inspector fields include `x`, `y`, `scale`, `rotation`, `opacity`, and `z-index`, plus layer ordering controls.
+
+**Grid and snapping.** Edit mode adds grid overlay controls (toggle, size, opacity, color) and snap-to-grid. Grid size, opacity, and color persist in `localStorage` (`altar-grid-size`, `altar-grid-opacity`, `altar-grid-color`).
 
 **Multiple altars.** You can create several named altars and switch between them. Each altar has its own title, intention text, background, and set of placements.
 
 **Backgrounds.** Four built-in presets (Midnight, Ember, Forest, Moon) and the option to upload a custom background image.
 
+Custom backgrounds are persisted as file-backed image paths (legacy inline data URLs are migrated). Background previews use a cached preview map for reliable rendering.
+
 **Intention.** A text field on each altar records your intention or purpose for that setup.
+
+**View mode and full-window mode.** Full-window altar mode is only available in view mode. Entering edit mode exits full-window mode automatically. Grid controls are edit-only and hidden in read/view mode.
+
+For implementation and architecture details, see [Documentation/altar.md](altar.md).
 
 ## Tabs & Workspace
 

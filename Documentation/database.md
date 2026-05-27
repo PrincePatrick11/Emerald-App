@@ -207,7 +207,7 @@ The item library — reusable items that can be placed onto any altar.
 | id | TEXT PK | UUID |
 | name | TEXT | |
 | emoji | TEXT | |
-| category | TEXT | One of: `'candle'`, `'crystal'`, `'herb'`, `'deity'`, `'symbol'`, `'tool'`, `'other'` |
+| category | TEXT | One of: `'candle'`, `'crystal'`, `'herb'`, `'deity'`, `'symbol'`, `'tool'`, `'table'`, `'other'` |
 | note | TEXT | |
 | image_data | TEXT | Optional image as base64 data-URL |
 | created_at | TEXT | ISO 8601 |
@@ -223,7 +223,16 @@ Positions an item on a specific altar. Multiple placements of the same item (on 
 | item_id | TEXT | FK → altar_items.id |
 | x | REAL | Percentage position (0–100) |
 | y | REAL | Percentage position (0–100) |
-| scale | REAL | Scale factor; default 1 |
+| scale | REAL | Legacy scalar (retained for compatibility) |
+| z_index | INTEGER | Render order (higher value renders above lower value) |
+| width | REAL | Placement width (clamped in store: `2..500`) |
+| height | REAL | Placement height (clamped in store: `2..500`) |
+| rotation | REAL | Rotation in degrees (clamped: `-360..360`) |
+| opacity | REAL | Opacity (clamped: `0.05..1`) |
+| locked | INTEGER | `0/1`; locked items are non-interactive on canvas |
+| hidden | INTEGER | `0/1`; hidden items stay persisted but not rendered |
+
+Altar placement coordinates remain percentage-based for responsive rendering. `altar_id` scopes each placement to a specific altar in the multi-altar model.
 
 ## Legacy Tables
 

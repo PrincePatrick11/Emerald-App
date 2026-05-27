@@ -195,7 +195,7 @@ Old inline data-URL values are migrated to file-backed paths during `fetchAltars
 id TEXT PRIMARY KEY
 name TEXT
 emoji TEXT
-category TEXT
+category TEXT                          — candle | crystal | herb | deity | symbol | tool | table | other
 note TEXT
 image_data TEXT                       — absolute file path when custom image is used
 created_at TEXT
@@ -208,7 +208,14 @@ item_id TEXT
 altar_id TEXT
 x REAL                                — percentage of canvas width
 y REAL                                — percentage of canvas height
-scale REAL
+scale REAL                            — legacy scalar, retained for compatibility
+z_index INTEGER                       — layer order
+width REAL                            — visual width
+height REAL                           — visual height
+rotation REAL                         — degrees
+opacity REAL                          — 0.05..1 (clamped in store)
+locked INTEGER                        — 0/1
+hidden INTEGER                        — 0/1
 ```
 Coordinates are percentages for responsive rendering. `altar_id` was added in migration from single-altar to multi-altar model.
 

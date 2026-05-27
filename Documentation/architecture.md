@@ -243,6 +243,24 @@ Two modules centralise reusable Tailwind class strings to avoid duplication acro
 - **`src/lib/styleClasses.ts`** — Input and select class strings for custom properties and operation properties (`CUSTOM_PROP_INPUT_CLASSES`, `CUSTOM_PROP_SMALL_INPUT_CLASSES`, `OP_PROP_SELECT_CLASSES`).
 - **`src/lib/altarConstants.ts`** — Altar background presets (`ALTAR_BACKGROUND_PRESETS`, `ALTAR_BACKGROUND_STYLES`), category emoji mappings (`ALTAR_CATEGORY_EMOJI`, `CATEGORY_EMOJIS`), and the default background (`DEFAULT_ALTAR_BACKGROUND`).
 
+## Altar UI Composition
+
+Altar rendering and editing were split into focused components:
+
+- **`src/components/altar/AltarItemVisual.tsx`** — shared visual renderer for altar items (emoji/image and candle animation treatment).
+- **`src/components/altar/AltarCanvas.tsx`** — canvas scene rendering, placement transforms, drag/drop interactions, lock handling, and grid overlay drawing.
+- **`src/components/altar/AltarLibraryStrip.tsx`** — docked library strip under canvas (edit mode), compact tiles, and modal CRUD for altar items.
+
+Supporting hooks:
+
+- **`src/components/altar/useAltarBackgroundPreview.ts`** — background image preview resolution.
+
+Store integration details:
+
+- `uiStore` provides altar scene UI controls (grid size/opacity/color, snap toggle, fullscreen toggle).
+- Altar screens consume `uiStore` with granular selectors to reduce unrelated rerenders.
+- `altarStore` remains source of truth for altar records, items, placements, and placement patch clamping.
+
 ## Font System
 
 Emerald supports two independent font selections applied via CSS custom properties on `html`:

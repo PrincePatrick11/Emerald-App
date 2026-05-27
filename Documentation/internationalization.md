@@ -79,7 +79,7 @@ The translation files follow this top-level structure (from `en.json`):
 | `undo` | Undo toast messages |
 | `nav` | Sidebar navigation labels |
 | `operations` | All operations UI strings, including `categories.sigils` and `categories.servitors` |
-| `altar` | All altar UI strings, including item categories and background presets |
+| `altar` | All altar UI strings, including item categories (`table` included), background presets, inspector labels, grid controls, and lock/show/hide actions |
 | `journal` | Journal UI strings |
 | `creation` | Sigil editor strings (shown for sigil operations) |
 | `wiki` | Wiki UI strings, including `categories.*` for all built-in wiki category IDs |

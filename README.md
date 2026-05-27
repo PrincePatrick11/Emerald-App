@@ -79,6 +79,7 @@ sudo chown -R "$USER":staff node_modules
 | Document | Description |
 |---|---|
 | [Documentation/features.md](Documentation/features.md) | Full feature guide |
+| [Documentation/altar.md](Documentation/altar.md) | Altar behavior, editing flows, and layout controls |
 | [Documentation/architecture.md](Documentation/architecture.md) | Architecture, patterns, and data flow |
 | [Documentation/database.md](Documentation/database.md) | SQLite schema and conventions |
 | [Documentation/internationalization.md](Documentation/internationalization.md) | Adding and managing translations |

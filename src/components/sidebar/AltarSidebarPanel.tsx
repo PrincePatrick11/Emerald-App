@@ -9,7 +9,8 @@ import {
   DEFAULT_ALTAR_BACKGROUND,
 } from '../../lib/altarConstants';
 import { useUIStore } from '../../store/uiStore';
-import { AltarItemVisual } from '../views/AltarView';
+import { AltarItemVisual } from '../altar/AltarItemVisual';
+import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
 
 export default function AltarSidebarPanel() {
   const { t } = useTranslation();
@@ -18,7 +19,6 @@ export default function AltarSidebarPanel() {
     activeAltarId,
     placements,
     selectedPlacementId,
-    fetchAltars,
     updateAltar,
     selectPlacement,
     updatePlacement,
@@ -53,33 +53,12 @@ export default function AltarSidebarPanel() {
       return {};
     }
   });
-  const [customBackgroundPreview, setCustomBackgroundPreview] = useState<string | null>(null);
+  const customBackgroundSource = activeAltar?.background_image_data || (activeAltar ? customBackgroundMap[activeAltar.id] : null);
+  const customBackgroundPreview = useBackgroundPreview(customBackgroundSource);
   const [inspectorDraft, setInspectorDraft] = useState({ x: '', y: '', scalePercent: '', rotation: '', opacity: '', zIndex: '' });
   const selectedPlacement = placements.find((p) => p.id === selectedPlacementId) ?? null;
   const sortedPlacements = [...placements].sort((a, b) => b.z_index - a.z_index);
-
-  useEffect(() => { fetchAltars(); }, [fetchAltars]);
-
-  useEffect(() => {
-    const source = activeAltar?.background_image_data || (activeAltar ? customBackgroundMap[activeAltar.id] : null);
-    if (!source) {
-      setCustomBackgroundPreview(null);
-      return;
-    }
-    if (source.startsWith('data:')) {
-      setCustomBackgroundPreview(source);
-      return;
-    }
-    let cancelled = false;
-    invoke<string>('read_image_as_base64', { path: source })
-      .then((dataUrl) => {
-        if (!cancelled) setCustomBackgroundPreview(dataUrl);
-      })
-      .catch(() => {
-        if (!cancelled) setCustomBackgroundPreview(null);
-      });
-    return () => { cancelled = true; };
-  }, [activeAltar?.id, activeAltar?.background_image_data, customBackgroundMap]);
+  const hasCustomBackground = !!(activeAltar && (activeAltar.background_image_data || customBackgroundMap[activeAltar.id]));
 
   useEffect(() => {
     localStorage.setItem('altar-custom-backgrounds', JSON.stringify(customBackgroundMap));
@@ -169,7 +148,18 @@ export default function AltarSidebarPanel() {
       updatePlacement(selectedPlacement.id, { z_index: normalized });
       return;
     }
-    updatePlacement(selectedPlacement.id, { [key]: key === 'opacity' ? next / 100 : next });
+    if (key === 'x' || key === 'y') {
+      const normalized = Math.max(0, Math.min(100, next));
+      updatePlacement(selectedPlacement.id, { [key]: normalized });
+      return;
+    }
+    if (key === 'rotation') {
+      const normalized = Math.max(-360, Math.min(360, next));
+      updatePlacement(selectedPlacement.id, { rotation: normalized });
+      return;
+    }
+    const normalizedOpacity = Math.max(0, Math.min(100, next)) / 100;
+    updatePlacement(selectedPlacement.id, { opacity: normalizedOpacity });
   };
 
   const updatePlacementScalePercent = (value: string) => {
@@ -262,7 +252,7 @@ export default function AltarSidebarPanel() {
                 >
                   <div
                     className="h-14 w-full flex items-center justify-center bg-gradient-to-br from-stone-800/80 via-stone-900/70 to-stone-950/80"
-                    style={customBackgroundPreview ? { backgroundImage: `url(${customBackgroundPreview})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+                    style={customBackgroundPreview ? { backgroundImage: `url("${customBackgroundPreview}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
                   >
                     {!customBackgroundPreview && <ImageIcon size={16} className="text-stone-300" />}
                   </div>
@@ -275,7 +265,7 @@ export default function AltarSidebarPanel() {
                     </span>
                   )}
                 </div>
-                {isEditing && (
+                {isEditing && hasCustomBackground && (
                   <div className="grid grid-cols-2 gap-1">
                     <button
                       onClick={() => backgroundInputRef.current?.click()}
@@ -311,7 +301,7 @@ export default function AltarSidebarPanel() {
                   className="h-14 w-full"
                   style={
                     activeAltar.background_image_data
-                      ? { backgroundImage: `url(${customBackgroundPreview ?? ''})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                      ? { backgroundImage: `url("${customBackgroundPreview ?? ''}")`, backgroundSize: 'cover', backgroundPosition: 'center' }
                       : { background: ALTAR_BACKGROUND_STYLES[(activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND) as (typeof ALTAR_BACKGROUND_PRESETS)[number]] }
                   }
                 >
