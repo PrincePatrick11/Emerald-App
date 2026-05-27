@@ -69,8 +69,12 @@ export default function AppShell() {
   const fetchRoutines = useRoutineStore((s) => s.fetchRoutines);
   const loadVaults = useVaultStore((s) => s.loadVaults);
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
+  const activeView = useUIStore((s) => s.activeView);
+  const altarWindowFullscreen = useUIStore((s) => s.altarWindowFullscreen);
+  const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
   const navigateBack = useUIStore((s) => s.navigateBack);
   const navigateForward = useUIStore((s) => s.navigateForward);
+  const isAltarWindowFullscreen = activeView.type === 'altar' && activeView.mode === 'view' && altarWindowFullscreen;
 
   const [leftWidth, setLeftWidth] = useState(() =>
     loadSavedWidth('sidebar-left-width', LEFT_MIN, LEFT_DEFAULT)
@@ -128,9 +132,10 @@ export default function AppShell() {
       setRightWidth(RIGHT_DEFAULT);
       localStorage.removeItem('sidebar-left-width');
       localStorage.removeItem('sidebar-right-width');
+      setAltarWindowFullscreen(false);
     });
     return () => { unlisten.then(fn => fn()); };
-  }, []);
+  }, [setAltarWindowFullscreen]);
 
   useEffect(() => {
     const unlistenPdf = listen('export-pdf', async () => {
@@ -214,29 +219,29 @@ export default function AppShell() {
         style={{ background: 'linear-gradient(to right, transparent, rgba(0,166,102,0.45) 30%, rgba(0,230,153,0.3) 50%, rgba(0,166,102,0.45) 70%, transparent)' }}
       />
 
-      {/* Left Sidebar */}
-      <aside
-        className="app-sidebar app-sidebar-left flex-shrink-0 border-r border-stone-700/60 relative"
-        style={{ width: leftWidth }}
-      >
-        <LeftSidebar />
-        {/* Resize handle */}
-        <div
-          onPointerDown={onLeftPointerDown}
-          className="absolute top-0 right-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"
-        />
-      </aside>
+      {!isAltarWindowFullscreen && (
+        <aside
+          className="app-sidebar app-sidebar-left flex-shrink-0 border-r border-stone-700/60 relative"
+          style={{ width: leftWidth }}
+        >
+          <LeftSidebar />
+          <div
+            onPointerDown={onLeftPointerDown}
+            className="absolute top-0 right-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"
+          />
+        </aside>
+      )}
 
       {/* Main Content */}
       <main className="app-main flex-1 min-w-0 overflow-hidden flex flex-col">
-        <TabBar />
+        {!isAltarWindowFullscreen && <TabBar />}
         <div className="flex-1 min-h-0 overflow-hidden">
           <MainArea />
         </div>
       </main>
 
       {/* Right Sidebar */}
-      {rightSidebarOpen && (
+      {rightSidebarOpen && !isAltarWindowFullscreen && (
         <aside
           className="app-sidebar app-sidebar-right flex-shrink-0 border-l border-stone-700/60 animate-slide-in relative"
           style={{ width: rightWidth }}

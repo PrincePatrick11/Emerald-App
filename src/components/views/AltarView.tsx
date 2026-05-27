@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { useTranslation } from 'react-i18next';
-import { Check, Copy, PanelRightOpen, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Check, Copy, Maximize2, Minimize2, PanelRightOpen, Pencil, Plus, RotateCw, Trash2, X, MoveDiagonal2, ImagePlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAltarStore } from '../../store/altarStore';
 import { useUIStore } from '../../store/uiStore';
 import { getAltarDragItem, setAltarDragItem, subscribeAltarDrag } from '../../lib/altarDragState';
-import { ALTAR_BACKGROUND_PRESETS, ALTAR_BACKGROUND_STYLES, DEFAULT_ALTAR_BACKGROUND } from '../../lib/altarConstants';
-import type { AltarItem, AltarPlacement, AltarRecord } from '../../types';
+import { ALTAR_BACKGROUND_PRESETS, ALTAR_BACKGROUND_STYLES, DEFAULT_ALTAR_BACKGROUND, ALTAR_CATEGORIES, ALTAR_CATEGORY_EMOJI, CATEGORY_EMOJIS } from '../../lib/altarConstants';
+import type { AltarItem, AltarItemCategory, AltarPlacement, AltarRecord } from '../../types';
 import ListToolbar from '../ui/ListToolbar';
 import ContextMenu from '../ui/ContextMenu';
 
@@ -29,17 +30,14 @@ export default function AltarView() {
     activeAltarId,
     placements,
     previewPlacements,
-    intention,
     fetchAltars,
     createAltar,
     duplicateAltar,
     setActiveAltar,
     updateAltar,
     deleteAltar,
-    saveIntention,
-    setIntentionLocal,
   } = useAltarStore();
-  const { activeView, setActiveView, toggleRightSidebar, altarPrefs, setAltarPrefs } = useUIStore();
+  const { activeView, setActiveView, toggleRightSidebar, altarPrefs, setAltarPrefs, altarCanvasGrid, altarCanvasGridSize, altarCanvasGridOpacity, altarCanvasGridColor, altarSnapToGrid, altarWindowFullscreen, setAltarWindowFullscreen } = useUIStore();
 
   const [search, setSearch] = useState('');
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -61,8 +59,11 @@ export default function AltarView() {
   useEffect(() => {
     if (!activeAltar) return;
     setTitle(activeAltar.title);
-    setIntentionLocal(activeAltar.intention);
-  }, [activeAltar?.id, activeAltar?.title, activeAltar?.intention, setIntentionLocal]);
+  }, [activeAltar?.id, activeAltar?.title]);
+
+  useEffect(() => {
+    if (isEditing && altarWindowFullscreen) setAltarWindowFullscreen(false);
+  }, [isEditing, altarWindowFullscreen, setAltarWindowFullscreen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -130,14 +131,12 @@ export default function AltarView() {
   const handleDone = async () => {
     if (!activeAltar) return;
     await updateAltar(activeAltar.id, { title: title.trim() || t('altar.untitled') });
-    await saveIntention(intention);
     setActiveView({ type: 'altar', id: activeAltar.id, mode: 'view' });
   };
 
   const handleCancel = () => {
     if (!activeAltar) return;
     setTitle(activeAltar.title);
-    setIntentionLocal(activeAltar.intention);
     setActiveView({ type: 'altar', id: activeAltar.id, mode: 'view' });
   };
 
@@ -159,7 +158,7 @@ export default function AltarView() {
         {previewItems.slice(0, compact ? 1 : 7).map((placement) => {
           const size = compact
             ? 16
-            : Math.max(18, Math.min(42, Math.round(20 * (placement.scale ?? 1))));
+            : Math.max(16, Math.min(52, Math.round((placement.width ?? 8) * 2)));
           return (
             <div
               key={placement.id}
@@ -370,6 +369,13 @@ export default function AltarView() {
             </>
           ) : (
             <>
+              <button
+                onClick={() => setAltarWindowFullscreen(!altarWindowFullscreen)}
+                className="btn-ghost"
+                title={altarWindowFullscreen ? t('altar.exitWindowFullscreen') : t('altar.windowFullscreen')}
+              >
+                {altarWindowFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+              </button>
               <button onClick={enterEditMode} className="btn-ghost" title={t('editor.edit')}>
                 <Pencil size={15} />
               </button>
@@ -381,44 +387,337 @@ export default function AltarView() {
         </div>
       </div>
 
-      <div className="px-6 pt-6 pb-4 border-b border-stone-700/30" onDoubleClick={enterEditMode}>
-        {isEditing ? (
-          <input
-            autoFocus
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100 placeholder-stone-700 outline-none selectable"
-            placeholder={t('altar.untitled')}
-          />
-        ) : (
-          <h1 className="entry-view-title w-full cursor-text text-2xl font-semibold text-stone-100">
-            {activeAltar.title || t('altar.untitled')}
-          </h1>
-        )}
-      </div>
+      {!altarWindowFullscreen && (
+        <div className="px-6 pt-6 pb-4 border-b border-stone-700/30" onDoubleClick={enterEditMode}>
+          {isEditing ? (
+            <input
+              autoFocus
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100 placeholder-stone-700 outline-none selectable"
+              placeholder={t('altar.untitled')}
+            />
+          ) : (
+            <h1 className="entry-view-title w-full cursor-text text-2xl font-semibold text-stone-100">
+              {activeAltar.title || t('altar.untitled')}
+            </h1>
+          )}
+        </div>
+      )}
 
-      <AltarCanvas altar={activeAltar} backgroundSrc={getPreviewSrc(activeAltar)} placements={placements} editable={isEditing} />
+      <AltarCanvas altar={activeAltar} backgroundSrc={getPreviewSrc(activeAltar)} placements={placements} editable={isEditing} showGrid={altarCanvasGrid} gridSize={altarCanvasGridSize} gridOpacity={altarCanvasGridOpacity} gridColor={altarCanvasGridColor} snapToGrid={altarSnapToGrid} />
 
-      <div className="flex-shrink-0 border-t border-stone-700/60 px-6 py-4">
-        <p className="text-xs text-stone-600 mb-1.5">{t('altar.intention')}</p>
-        <textarea
-          value={intention}
-          onChange={(e) => setIntentionLocal(e.target.value)}
-          onBlur={() => { if (isEditing) saveIntention(intention); }}
-          placeholder={t('altar.intentionPlaceholder')}
-          rows={2}
-          readOnly={!isEditing}
-          className="entry-view-body w-full bg-transparent text-sm text-stone-300 placeholder-stone-700 outline-none resize-none selectable leading-relaxed"
-        />
-      </div>
+      {isEditing && !altarWindowFullscreen && <AltarLibraryStrip editable={isEditing} />}
     </div>
   );
 }
 
-function AltarCanvas({ altar, backgroundSrc, placements, editable }: { altar: AltarRecord | null; backgroundSrc: string | null; placements: AltarPlacement[]; editable: boolean }) {
+function AltarLibraryStrip({ editable }: { editable: boolean }) {
+  const LIBRARY_DEFAULT_HEIGHT = 240;
   const { t } = useTranslation();
-  const { placeItem, movePlacement, savePlacementPosition, removePlacement, updatePlacementScale } = useAltarStore();
+  const { items, addItem, updateItem, deleteItem } = useAltarStore();
+  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
+  const [activeCategoryTab, setActiveCategoryTab] = useState<'all' | AltarItemCategory>('all');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmoji, setEditEmoji] = useState('');
+  const [editCategory, setEditCategory] = useState<AltarItemCategory>('other');
+  const [editImageData, setEditImageData] = useState<string | null>(null);
+  const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
+  const editImageInputRef = useRef<HTMLInputElement>(null);
+  const [isResizeHotspot, setIsResizeHotspot] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [panelHeight, setPanelHeight] = useState(() => {
+    const saved = Number(localStorage.getItem('altar-library-height'));
+    if (Number.isFinite(saved) && saved >= 160 && saved <= 460) return saved;
+    return LIBRARY_DEFAULT_HEIGHT;
+  });
+
+  const handleImageFile = (file: File, onResult: (data: string) => void) => {
+    const reader = new FileReader();
+    reader.onloadend = () => onResult(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleDelete = async (item: AltarItem) => {
+    if (!editable) return;
+    if (confirmDeleteId !== item.id) {
+      setConfirmDeleteId(item.id);
+      return;
+    }
+    setConfirmDeleteId(null);
+    if (editingItemId === item.id) {
+      setEditingItemId(null);
+      setIsItemModalOpen(false);
+    }
+    await deleteItem(item.id);
+  };
+
+  const handleEditImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    handleImageFile(file, (data) => setEditImageData(data));
+    e.target.value = '';
+  };
+
+  const openEditModal = (item: AltarItem) => {
+    setIsItemModalOpen(true);
+    setEditingItemId(item.id);
+    setEditName(item.name);
+    setEditEmoji(item.emoji);
+    setEditCategory(item.category as AltarItemCategory);
+    setEditImageData(item.image_data ?? null);
+    setShowEditEmojiPicker(false);
+    setConfirmDeleteId(null);
+  };
+
+  const openCreateModal = () => {
+    setIsItemModalOpen(true);
+    setEditingItemId(null);
+    setEditName('');
+    setEditCategory('other');
+    setEditEmoji('');
+    setEditImageData(null);
+    setShowEditEmojiPicker(false);
+    setConfirmDeleteId(null);
+  };
+
+  const saveEditModal = async () => {
+    if (!editName.trim()) return;
+    if (editingItemId) {
+      await updateItem(editingItemId, {
+        name: editName.trim(),
+        emoji: editEmoji || ALTAR_CATEGORY_EMOJI[editCategory],
+        category: editCategory,
+        image_data: editImageData ?? undefined,
+      });
+    } else {
+      await addItem(
+        editName.trim(),
+        editEmoji || ALTAR_CATEGORY_EMOJI[editCategory],
+        editCategory,
+        undefined,
+        editImageData ?? undefined
+      );
+    }
+    setIsItemModalOpen(false);
+    setEditingItemId(null);
+  };
+
+  const startResize = (event: React.MouseEvent) => {
+    event.preventDefault();
+    setIsResizing(true);
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    const startY = event.clientY;
+    const startHeight = panelHeight;
+
+    const onMove = (moveEvent: MouseEvent) => {
+      const delta = startY - moveEvent.clientY;
+      const nextHeight = Math.max(160, Math.min(460, startHeight + delta));
+      setPanelHeight(nextHeight);
+    };
+
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      setIsResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  useEffect(() => {
+    localStorage.setItem('altar-library-height', String(panelHeight));
+  }, [panelHeight]);
+
+  useEffect(() => {
+    const unlisten = listen('reset-sidebar-widths', () => {
+      setPanelHeight(LIBRARY_DEFAULT_HEIGHT);
+      localStorage.removeItem('altar-library-height');
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
+  const handlePanelMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const nearTopEdge = event.clientY - bounds.top <= 6;
+    if (!nearTopEdge) return;
+    startResize(event);
+  };
+
+  const handlePanelMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    setIsResizeHotspot(event.clientY - bounds.top <= 6);
+  };
+
+  const filteredItems = activeCategoryTab === 'all'
+    ? items
+    : items.filter((item) => item.category === activeCategoryTab);
+
+  return (
+    <div
+      className={`relative flex-shrink-0 border-t border-stone-700/60 px-6 py-3 flex flex-col min-h-0 ${isResizing || isResizeHotspot ? 'cursor-row-resize' : 'cursor-default'}`}
+      style={{ height: panelHeight }}
+      onMouseDown={handlePanelMouseDown}
+      onMouseMove={handlePanelMouseMove}
+      onMouseLeave={() => setIsResizeHotspot(false)}
+    >
+      <div
+        className={`pointer-events-none absolute top-0 left-0 right-0 h-1 transition-colors ${(isResizing || isResizeHotspot) ? 'bg-jade-500/20' : 'bg-transparent'}`}
+      />
+      <input ref={editImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleEditImageChange} />
+
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{t('altar.libraryTitle')}</p>
+        </div>
+        <button onClick={openCreateModal} className="btn-ghost flex-shrink-0" title={t('altar.addItem')}>
+          <Plus size={14} />
+        </button>
+      </div>
+
+      <div className="mb-3 flex gap-1 overflow-x-auto pb-1">
+        <button
+          onClick={() => setActiveCategoryTab('all')}
+          className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap ${activeCategoryTab === 'all' ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}
+        >
+          {t('altar.all')}
+        </button>
+        {ALTAR_CATEGORIES.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setActiveCategoryTab(cat)}
+            className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap ${activeCategoryTab === cat ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}
+            title={t(`altar.categories.${cat}`)}
+          >
+            {ALTAR_CATEGORY_EMOJI[cat]} {t(`altar.categories.${cat}`)}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+        {filteredItems.length === 0 && <p className="text-xs text-stone-700 px-2 py-3">{t('altar.noItems')}</p>}
+        <div className="grid [grid-template-columns:repeat(auto-fill,70px)] gap-1.5 justify-start">
+          {filteredItems.map((item) => (
+            <div key={item.id} onPointerDown={(e) => {
+              if (!editable) return;
+              e.preventDefault();
+              setAltarDragItem(item);
+            }} className={`group w-[70px] h-[85px] rounded-md border border-stone-700/60 bg-stone-900/40 px-1.5 py-2 flex flex-col ${editable ? 'cursor-grab active:cursor-grabbing' : 'cursor-default opacity-90'}`}>
+              <div className="mb-1 w-full h-12 flex items-center justify-center overflow-hidden rounded-sm bg-stone-950/35">
+                {item.image_data ? (
+                  <img src={item.image_data} alt="" className="h-full w-full object-contain" draggable={false} />
+                ) : (
+                  <span className={`leading-none select-none ${item.category === 'candle' ? 'candle-flame' : ''}`} style={{ fontSize: 34 }}>
+                    {item.emoji}
+                  </span>
+                )}
+              </div>
+              <div className="mt-auto flex items-center gap-1">
+                <span className="flex-1 truncate text-[10px] text-stone-300">{item.name}</span>
+                {editable ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEditModal(item);
+                    }}
+                    className="text-stone-600 hover:text-stone-300 transition-colors p-0.5"
+                    title={t('editor.edit')}
+                  >
+                    <Pencil size={10} />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {isItemModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onMouseDown={() => { setIsItemModalOpen(false); setEditingItemId(null); }}>
+          <div className="w-full max-w-md rounded-xl border border-stone-700/80 bg-stone-900 p-4 space-y-3" onMouseDown={(e) => e.stopPropagation()}>
+            <p className="text-sm font-semibold text-stone-200">{editingItemId ? t('editor.edit') : t('altar.addItem')}</p>
+
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <button onClick={() => setShowEditEmojiPicker(!showEditEmojiPicker)} className="w-full flex items-center gap-2 bg-stone-800/60 rounded-lg px-3 py-2 text-sm hover:bg-stone-700/60 transition-colors">
+                  {editImageData ? <img src={editImageData} alt="" className="w-6 h-6 object-contain rounded" /> : <span className="text-xl">{editEmoji || ALTAR_CATEGORY_EMOJI[editCategory]}</span>}
+                  <span className="text-xs text-stone-500">{t('altar.chooseEmoji')}</span>
+                </button>
+                {showEditEmojiPicker && (
+                  <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2">
+                    <div className="flex flex-wrap gap-1">
+                      {CATEGORY_EMOJIS[editCategory].map((emoji) => (
+                        <button key={emoji} onClick={() => { setEditEmoji(emoji); setEditImageData(null); setShowEditEmojiPicker(false); }} className={`text-xl p-1 rounded transition-colors ${editEmoji === emoji ? 'bg-stone-700' : ''}`}>
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <button onClick={() => editImageInputRef.current?.click()} className="flex-shrink-0 flex items-center gap-1 px-2 py-2 bg-stone-800/60 rounded-lg hover:bg-stone-700/60 transition-colors text-stone-500 hover:text-stone-300" title={t('altar.uploadImage')}>
+                <ImagePlus size={14} />
+              </button>
+            </div>
+
+            <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t('altar.itemName')} className="w-full bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" />
+
+            <div className="flex flex-wrap gap-1">
+              {ALTAR_CATEGORIES.map((cat) => (
+                <button key={cat} onClick={() => { setEditCategory(cat); setEditEmoji(''); setShowEditEmojiPicker(false); }} className={`text-xs px-2 py-1 rounded-md transition-colors ${editCategory === cat ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`} title={t(`altar.categories.${cat}`)}>
+                  {ALTAR_CATEGORY_EMOJI[cat]} {t(`altar.categories.${cat}`)}
+                </button>
+              ))}
+            </div>
+
+            {editingItemId && confirmDeleteId === editingItemId ? (
+              <div className="flex items-center justify-between rounded-lg border border-red-700/40 bg-red-950/20 px-3 py-2">
+                <span className="text-xs text-red-300">{t('altar.removeElement')}?</span>
+                <span className="flex items-center gap-2">
+                  <button onClick={() => {
+                    const target = items.find((item) => item.id === editingItemId);
+                    if (target) handleDelete(target);
+                  }} className="text-xs text-red-300 hover:text-red-200">{t('trash.confirmYes')}</button>
+                  <button onClick={() => setConfirmDeleteId(null)} className="text-xs text-stone-400 hover:text-stone-200">{t('trash.confirmNo')}</button>
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                {editingItemId ? (
+                  <button onClick={() => setConfirmDeleteId(editingItemId)} className="text-xs text-red-400 hover:text-red-300">{t('altar.removeElement')}</button>
+                ) : <span />}
+                <div className="flex items-center gap-1">
+                  <button onClick={() => { setIsItemModalOpen(false); setEditingItemId(null); }} className="btn-ghost"><X size={13} /></button>
+                  <button onClick={saveEditModal} className="btn-ghost text-jade-400"><Check size={13} /></button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const normalized = hex.replace('#', '');
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+  return { r, g, b };
+}
+
+function AltarCanvas({ altar, backgroundSrc, placements, editable, showGrid, gridSize, gridOpacity, gridColor, snapToGrid }: { altar: AltarRecord | null; backgroundSrc: string | null; placements: AltarPlacement[]; editable: boolean; showGrid: boolean; gridSize: number; gridOpacity: number; gridColor: string; snapToGrid: boolean }) {
+  const { t } = useTranslation();
+  const { placeItem, movePlacement, savePlacementPosition, updatePlacement, selectPlacement, selectedPlacementId } = useAltarStore();
+  const gridRgb = hexToRgb(gridColor);
   const canvasRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef<string | null>(null);
   const [sidebarDragItem, setSidebarDragItem] = useState<AltarItem | null>(null);
@@ -426,10 +725,17 @@ function AltarCanvas({ altar, backgroundSrc, placements, editable }: { altar: Al
 
   const coordsToPercent = (clientX: number, clientY: number) => {
     const rect = canvasRef.current!.getBoundingClientRect();
-    return {
-      x: Math.max(3, Math.min(97, ((clientX - rect.left) / rect.width) * 100)),
-      y: Math.max(3, Math.min(97, ((clientY - rect.top) / rect.height) * 100)),
-    };
+    let x = Math.max(3, Math.min(97, ((clientX - rect.left) / rect.width) * 100));
+    let y = Math.max(3, Math.min(97, ((clientY - rect.top) / rect.height) * 100));
+    if (snapToGrid) {
+      const stepX = (gridSize / rect.width) * 100;
+      const stepY = (gridSize / rect.height) * 100;
+      if (stepX > 0) x = Math.round(x / stepX) * stepX;
+      if (stepY > 0) y = Math.round(y / stepY) * stepY;
+      x = Math.max(3, Math.min(97, x));
+      y = Math.max(3, Math.min(97, y));
+    }
+    return { x, y };
   };
 
   useEffect(() => subscribeAltarDrag(setSidebarDragItem), []);
@@ -485,12 +791,22 @@ function AltarCanvas({ altar, backgroundSrc, placements, editable }: { altar: Al
       ref={canvasRef}
       className="flex-1 relative overflow-hidden select-none"
       style={{ background: getAltarBackgroundStyleWithImage(altar, backgroundSrc) }}
+      onMouseDown={() => selectPlacement(null)}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
       <div className="absolute bottom-[28%] left-[8%] right-[8%] h-px bg-gradient-to-r from-transparent via-stone-700/50 to-transparent pointer-events-none" />
       <div className="absolute bottom-[26%] left-[12%] right-[12%] h-px bg-gradient-to-r from-transparent via-stone-800/30 to-transparent pointer-events-none" />
+      {showGrid && (
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: `linear-gradient(to right, rgba(${gridRgb.r},${gridRgb.g},${gridRgb.b},${gridOpacity}) 1px, transparent 1px), linear-gradient(to bottom, rgba(${gridRgb.r},${gridRgb.g},${gridRgb.b},${gridOpacity}) 1px, transparent 1px)`,
+            backgroundSize: `${gridSize}px ${gridSize}px`,
+          }}
+        />
+      )}
 
       {editable && sidebarDragItem && (
         <div className="absolute inset-2 border border-dashed border-stone-600/40 rounded-lg pointer-events-none z-10" />
@@ -502,14 +818,16 @@ function AltarCanvas({ altar, backgroundSrc, placements, editable }: { altar: Al
         </p>
       )}
 
-      {placements.map((p) => (
+      {[...placements].sort((a, b) => a.z_index - b.z_index).map((p) => (
         <PlacedItem
           key={p.id}
           placement={p}
           editable={editable}
+          selected={selectedPlacementId === p.id}
           onStartDrag={() => { draggingRef.current = p.id; }}
-          onRemove={() => removePlacement(p.id)}
-          onScaleChange={(scale) => updatePlacementScale(p.id, scale)}
+          onSelect={() => selectPlacement(p.id)}
+          onResize={(width, height) => updatePlacement(p.id, { width, height })}
+          onRotate={(rotation) => updatePlacement(p.id, { rotation })}
         />
       ))}
 
@@ -528,47 +846,142 @@ function AltarCanvas({ altar, backgroundSrc, placements, editable }: { altar: Al
 
 const BASE_SIZE = 40;
 
-function PlacedItem({ placement, editable, onStartDrag, onRemove, onScaleChange }: {
+function PlacedItem({ placement, editable, selected, onStartDrag, onSelect, onResize, onRotate }: {
   placement: AltarPlacement;
   editable: boolean;
+  selected: boolean;
   onStartDrag: () => void;
-  onRemove: () => void;
-  onScaleChange: (scale: number) => void;
+  onSelect: () => void;
+  onResize: (width: number, height: number) => void;
+  onRotate: (rotation: number) => void;
 }) {
+  const { t } = useTranslation();
   const [hovered, setHovered] = useState(false);
-  const scale = placement.scale ?? 1;
-  const displaySize = Math.round(BASE_SIZE * scale);
+  const [isRotating, setIsRotating] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const width = placement.width ?? 8;
+  const height = placement.height ?? 8;
+  const displayWidth = Math.round(BASE_SIZE * (width / 8));
+  const displayHeight = Math.round(BASE_SIZE * (height / 8));
 
   const handleWheel = (e: React.WheelEvent) => {
-    if (!editable) return;
+    if (!editable || placement.locked) return;
     e.stopPropagation();
-    const delta = e.deltaY < 0 ? 0.15 : -0.15;
-    const newScale = Math.round(Math.max(0.3, Math.min(16, scale + delta)) * 100) / 100;
-    onScaleChange(newScale);
+    const delta = e.deltaY < 0 ? 0.4 : -0.4;
+    const nextWidth = Math.round(Math.max(2, Math.min(500, width + delta)) * 100) / 100;
+    const nextHeight = Math.round(Math.max(2, Math.min(500, height + delta)) * 100) / 100;
+    onResize(nextWidth, nextHeight);
+  };
+
+  const startRotate = (event: React.MouseEvent) => {
+    if (!editable || placement.locked) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect();
+    const root = rootRef.current;
+    if (!root) return;
+    const rect = root.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    const onMove = (moveEvent: MouseEvent) => {
+      const angle = (Math.atan2(moveEvent.clientY - centerY, moveEvent.clientX - centerX) * 180) / Math.PI + 90;
+      let normalized = Math.round((((angle % 360) + 360) % 360) * 10) / 10;
+      if (moveEvent.shiftKey) {
+        normalized = Math.round(normalized / 15) * 15;
+      }
+      onRotate(normalized);
+    };
+
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      setIsRotating(false);
+    };
+
+    setIsRotating(true);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  const startResize = (event: React.MouseEvent) => {
+    if (!editable || placement.locked) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startWidth = width;
+    const startHeight = height;
+    const startSize = (startWidth + startHeight) / 2;
+
+    const onMove = (moveEvent: MouseEvent) => {
+      const delta = (moveEvent.clientX - startX + (moveEvent.clientY - startY)) / 2;
+      const nextSize = Math.max(2, Math.min(500, startSize + (delta * 8) / BASE_SIZE));
+      const normalized = Math.round(nextSize * 100) / 100;
+      onResize(normalized, normalized);
+    };
+
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
   };
 
   return (
     <div
-      className="absolute flex items-center justify-center cursor-grab active:cursor-grabbing"
+      ref={rootRef}
+      className={`absolute flex items-center justify-center ${editable && !placement.locked ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
       style={{
         left: `${placement.x}%`,
         top: `${placement.y}%`,
-        transform: 'translate(-50%, -50%)',
-        width: displaySize,
-        height: displaySize,
+        transform: `translate(-50%, -50%) rotate(${placement.rotation ?? 0}deg)`,
+        width: displayWidth,
+        height: displayHeight,
+        zIndex: placement.z_index,
+        display: placement.hidden ? 'none' : undefined,
+        pointerEvents: placement.locked ? 'none' : undefined,
       }}
-      onMouseDown={(e) => { if (!editable) return; e.preventDefault(); onStartDrag(); }}
+      onMouseDown={(e) => {
+        e.stopPropagation();
+        if (placement.locked) return;
+        onSelect();
+        if (!editable) return;
+        e.preventDefault();
+        onStartDrag();
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onWheel={handleWheel}
     >
-      <AltarItemVisual item={placement} size={displaySize} candleAnimate={placement.category === 'candle'} />
-      {editable && hovered && (
+      <div style={{ opacity: placement.opacity ?? 1 }}>
+        <AltarItemVisual item={placement} size={Math.max(displayWidth, displayHeight)} candleAnimate={placement.category === 'candle'} />
+      </div>
+      {(selected || (editable && hovered)) && <span className="absolute inset-0 rounded border border-jade-500/50 pointer-events-none" />}
+      {editable && isRotating && (
+        <span className="absolute -top-16 left-1/2 -translate-x-1/2 rounded bg-stone-950 border border-jade-500/60 px-2 py-0.5 text-[11px] font-semibold text-jade-200 shadow-lg pointer-events-none">
+          {Math.round((placement.rotation ?? 0) * 10) / 10}°
+        </span>
+      )}
+      {editable && selected && !placement.locked && (
         <button
-          onMouseDown={(e) => { e.stopPropagation(); onRemove(); }}
-          className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-stone-800 border border-stone-600 rounded-full flex items-center justify-center text-stone-400 hover:text-red-400 hover:border-red-700 transition-colors z-10"
+          onMouseDown={startRotate}
+          className="absolute -top-8 left-1/2 -translate-x-1/2 w-4 h-4 bg-stone-800 border border-stone-600 rounded-full text-stone-300 hover:text-jade-300 hover:border-jade-600 transition-colors z-10 flex items-center justify-center"
+          title={t('altar.rotate')}
         >
-          <X size={9} />
+          <RotateCw size={9} />
+        </button>
+      )}
+      {editable && selected && !placement.locked && (
+        <button
+          onMouseDown={startResize}
+          className="absolute -bottom-2 -right-2 w-4 h-4 bg-stone-800 border border-stone-600 rounded-full text-stone-300 hover:text-jade-300 hover:border-jade-600 transition-colors z-10 flex items-center justify-center"
+          title={t('altar.scale')}
+        >
+          <MoveDiagonal2 size={9} />
         </button>
       )}
     </div>

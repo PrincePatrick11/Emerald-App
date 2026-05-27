@@ -13,10 +13,10 @@ export const ALTAR_BACKGROUND_STYLES: Record<(typeof ALTAR_BACKGROUND_PRESETS)[n
 
 export const ALTAR_CATEGORY_EMOJI: Record<AltarItemCategory, string> = {
   candle: '🕯️', crystal: '🔮', herb: '🌿', deity: '✨',
-  symbol: '🌙', tool: '⚗️', other: '📿',
+  symbol: '🌙', tool: '⚗️', table: '🪵', other: '📿',
 };
 
-export const ALTAR_CATEGORIES: AltarItemCategory[] = ['candle', 'crystal', 'herb', 'deity', 'symbol', 'tool', 'other'];
+export const ALTAR_CATEGORIES: AltarItemCategory[] = ['candle', 'crystal', 'herb', 'deity', 'symbol', 'tool', 'table', 'other'];
 
 export const CATEGORY_EMOJIS: Record<AltarItemCategory, string[]> = {
   candle: ['🕯️', '🔥', '🕎', '💡', '🪔'],
@@ -25,5 +25,6 @@ export const CATEGORY_EMOJIS: Record<AltarItemCategory, string[]> = {
   deity: ['👁️', '☀️', '🌙', '🦅', '🐉', '🦋', '🌟', '⚡'],
   symbol: ['☯️', '🔱', '⚡', '🌀', '🔯', '🪬', '☽', '🌈'],
   tool: ['⚗️', '🪄', '🗡️', '🏺', '📜', '🔑', '🪬', '🧿'],
+  table: ['🪵', '🪑', '🧺', '🪟', '🛖', '🪜'],
   other: ['📿', '💫', '🌀', '🎭', '🌈', '🧿', '🫧', '✨'],
 };

@@ -141,6 +141,27 @@ async function runMigrations(db: Database): Promise<void> {
     await db.execute(`ALTER TABLE altar_placements ADD COLUMN scale REAL NOT NULL DEFAULT 1`);
   } catch { /* already exists */ }
   try {
+    await db.execute(`ALTER TABLE altar_placements ADD COLUMN z_index INTEGER NOT NULL DEFAULT 0`);
+  } catch { /* already exists */ }
+  try {
+    await db.execute(`ALTER TABLE altar_placements ADD COLUMN width REAL NOT NULL DEFAULT 8`);
+  } catch { /* already exists */ }
+  try {
+    await db.execute(`ALTER TABLE altar_placements ADD COLUMN height REAL NOT NULL DEFAULT 8`);
+  } catch { /* already exists */ }
+  try {
+    await db.execute(`ALTER TABLE altar_placements ADD COLUMN rotation REAL NOT NULL DEFAULT 0`);
+  } catch { /* already exists */ }
+  try {
+    await db.execute(`ALTER TABLE altar_placements ADD COLUMN opacity REAL NOT NULL DEFAULT 1`);
+  } catch { /* already exists */ }
+  try {
+    await db.execute(`ALTER TABLE altar_placements ADD COLUMN locked INTEGER NOT NULL DEFAULT 0`);
+  } catch { /* already exists */ }
+  try {
+    await db.execute(`ALTER TABLE altar_placements ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0`);
+  } catch { /* already exists */ }
+  try {
     await db.execute(`ALTER TABLE altar_placements ADD COLUMN altar_id TEXT`);
   } catch { /* already exists */ }
   try {
