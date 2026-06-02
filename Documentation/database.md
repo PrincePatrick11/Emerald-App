@@ -194,7 +194,7 @@ Primary key: `(source_id, target_id)`. Index: `idx_links_target` on `(target_id)
 | title | TEXT | |
 | intention | TEXT | Free-text intention for the altar |
 | background_preset | TEXT | One of `'midnight'`, `'ember'`, `'forest'`, `'moon'` |
-| background_image_data | TEXT | Custom background as base64 data-URL, nullable |
+| background_image_data | TEXT | **Legacy name** — now stores an absolute file path, not inline base64. Old data-URL values are migrated to file-backed paths during `fetchAltars()`. |
 | created_at | TEXT | ISO 8601 |
 | updated_at | TEXT | ISO 8601 |
 
@@ -225,14 +225,23 @@ Positions an item on a specific altar. Multiple placements of the same item (on 
 | y | REAL | Percentage position (0–100) |
 | scale | REAL | Legacy scalar (retained for compatibility) |
 | z_index | INTEGER | Render order (higher value renders above lower value) |
-| width | REAL | Placement width (clamped in store: `2..500`) |
-| height | REAL | Placement height (clamped in store: `2..500`) |
+| width | REAL | Placement width (schema default `8`; store default `40`; clamped: `2..500`) |
+| height | REAL | Placement height (schema default `8`; store default `40`; clamped: `2..500`) |
 | rotation | REAL | Rotation in degrees (clamped: `-360..360`) |
 | opacity | REAL | Opacity (clamped: `0.05..1`) |
 | locked | INTEGER | `0/1`; locked items are non-interactive on canvas |
 | hidden | INTEGER | `0/1`; hidden items stay persisted but not rendered |
 
-Altar placement coordinates remain percentage-based for responsive rendering. `altar_id` scopes each placement to a specific altar in the multi-altar model.
+Altar placement coordinates remain percentage-based for responsive rendering. `altar_id` was added via migration to support the multi-altar model — the initial `CREATE TABLE` only included `id`, `item_id`, `x`, and `y`; all other columns were added in subsequent migrations.
+
+### altar_intentions (legacy)
+
+| Column | Type | Notes |
+|---|---|---|
+| date | TEXT PK | ISO date string |
+| text | TEXT | Intention text |
+
+Kept for backward compatibility. New intention data lives on `altars.intention`. Migration copies the latest legacy row into the first altar on load.
 
 ## Legacy Tables
 
@@ -310,3 +319,77 @@ Links tasks to Journal entries, Wiki articles, or Operations.
 | target_type | TEXT | `'journal'`, `'wiki'`, or `'operation'` |
 
 Indexes: `idx_task_links_task` on `task_id`, `idx_task_links_target` on `target_id`.
+
+## Image Storage
+
+Handled natively in `src-tauri/src/lib.rs`. Images are SHA-256-deduplicated — identical images are stored only once regardless of how many entries reference them. The UI may hold a data-URL for display, but persistence always uses file paths.
+
+| Command | Behaviour |
+|---|---|
+| `save_image(data_url)` | Decodes base64, writes `{appDataDir}/images/{sha256}.{ext}`, skips if already exists |
+| `copy_image_file(source)` | Copies an existing file into storage with the same dedupe logic |
+| `read_image_as_base64(path)` | Reads a stored file and returns a data-URL for rendering |
+| `cleanup_unused_images(used_paths, min_age_secs?)` | Deletes unreferenced files older than N seconds (default 300 s) |
+
+## Multi-Vault System
+
+Vault metadata is stored outside SQLite in `{appDataDir}/vaults.json`:
+
+```json
+{
+  "vaults": [
+    { "id": "default", "name": "Emerald", "dbName": "emerald.db", "createdAt": "..." },
+    { "id": "uuid",    "name": "My Vault", "dbName": "emerald-uuid.db", "createdAt": "..." }
+  ],
+  "activeVaultId": "default"
+}
+```
+
+- `id='default'` / `dbName='emerald.db'` is bootstrapped on first run for backward compatibility.
+- `getActiveDbName()` in `vaultManager.ts` is called by `getDb()` to resolve the correct DB file.
+- `resetDbCache()` in `db.ts` must be called before switching vaults; clears the per-vault `Map<identifier, Database>` cache.
+- `runMigrations()` is idempotent — called on every `getDb()` cache miss, safe on both existing and empty DBs.
+- All tables in all vaults share the same schema.
+
+## DB Backup / Restore (`.emeralddb`)
+
+Full vault snapshots are exported and imported via Settings → Backup.
+
+**File format** — self-contained JSON with extension `.emeralddb`:
+
+```json
+{
+  "version": "1",
+  "type": "backup",
+  "exportedAt": "2026-04-18T...",
+  "filters": { "includeJournal": true, "includeWiki": true, "..." : "..." },
+  "data": {
+    "journalEntries": [], "wikiArticles": [], "wikiCategories": [],
+    "operations": [], "operationCategories": [], "tags": [],
+    "customProperties": [], "routines": [],
+    "altars": [], "altarItems": [], "altarPlacements": [], "links": []
+  },
+  "images": { "/abs/path/img.png": "data:image/png;base64,..." }
+}
+```
+
+**Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Routines / Altars / Tags`, `dateFrom`, `dateTo`, `includeDeleted`. Altars and routines are date-filtered on `created_at`. `altar_items` and `altar_placements` are scoped to exported altars.
+
+**Import modes:**
+
+| Mode | Behaviour |
+|---|---|
+| `replace` | Deletes only tables for which the backup contains data (partial-backup-safe), then inserts all rows. |
+| `merge` | Generates an 8-char base36 timestamp prefix (`Date.now().toString(36).slice(-8)`). All entry IDs are prefixed; all cross-references and wiki slugs are remapped. Categories and tags use `INSERT OR IGNORE` by original ID/name. |
+| `add-vault` | Creates a new vault DB → `switchVault()` → runs replace logic on the empty DB. User ends up in the new vault. |
+
+Images are restored via `save_image` (SHA-256 dedup — identical images are written to disk only once).
+
+## Rules for Future Schema Changes
+
+- Prefer additive migrations (new columns, new tables) over destructive changes.
+- Never rename a column already in production without a lazy migration strategy.
+- New boolean fields: `INTEGER NOT NULL DEFAULT 0` (or `1` if the safe default is true).
+- New array/object fields: `TEXT` stored as a JSON string.
+- New image-backed fields: reuse the file-based pipeline (`save_image` / `copy_image_file`) — never store base64 blobs in SQLite.
+- When adding a column to a table that may already exist: wrap in `try { ALTER TABLE … ADD COLUMN … } catch { /* exists */ }`.

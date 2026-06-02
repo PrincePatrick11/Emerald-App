@@ -3,7 +3,34 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [Unreleased] — 0.1.3
+
+### Added
+- Altar inspector `z-index` input and expanded placement controls (`x/y`, scale, rotation, opacity, z-order)
+- New Altar item category: `table` with i18n labels in all supported locales
+- Altar grid controls (overlay toggle, size, opacity, color) with persisted preferences (`altar-grid-size`, `altar-grid-opacity`, `altar-grid-color`)
+- Modal-based Altar item add/edit/delete workflow in the docked library strip
+- Extracted Altar components and hooks for maintainability: `AltarItemVisual`, `AltarCanvas`, `AltarLibraryStrip`, and background preview hooks
+
+### Changed
+- Draggable tab reordering in the tab bar with animated movement
+- Wiki and Operation custom icons now render image icons only from safe local/data/blob sources (`/`, `data:image/...`, `blob:`); remote `http(s)` URLs are treated as non-image icons
+- Operations and Home dashboard operation cards/lists now consistently use custom operation icons first, then category emoji fallback
+- Altar inspector now renders inline under the selected placed-element row in the sidebar
+- Altar library moved under the canvas in edit mode and switched to compact tile sizing (70×85)
+- Altar placement defaults/limits updated (default size 40; width/height clamped with max 500; numeric patch clamping centralized in store)
+- Locked Altar placements are now click-through on canvas (`pointer-events: none`)
+- Full-window Altar mode behavior refined: edit mode exits full-window, and edit-only controls (including grid options) remain hidden in view mode
+- Custom background preview map and custom-background chip rendering hardened for consistent persistence previews
+- Fixed-scene Altar rendering experiment rolled back; responsive percentage-based scene rendering retained
+- Altar delete/edit flows consolidated around modal interactions and in-context confirmations
+- Altar UI store consumption refactored toward granular selectors to reduce rerenders
+
+### Known Issues
+- Remaining Altar edge case: element drift can still occur during some resize transitions
+- Non-fatal build warning remains after Altar refactor (details currently unknown)
+
+## [0.1.2] - 2026-05-20
 
 ### Added
 - Tasks module with categories, priorities (Low/Medium/High), hierarchical subtasks, and cross-references to Journal, Wiki, and Operations
@@ -23,19 +50,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `htmlEscape()` helper in `export.ts` — all user text in PDF export HTML is now entity-escaped
 - Theme documentation refresh in `Documentation/architecture.md` and `Documentation/features.md` covering token strategy, theme normalization flow, and Tailwind bridge behavior for both Emerald themes
 - Typography settings: independent UI font and editor body font dropdowns in Settings > Appearance with 8 typefaces (Inter, Source Sans 3, Nunito, IBM Plex Sans, Alegreya, Cormorant Garamond, Lora, Merriweather); stored as `ui-font-id` and `editor-font-id` in localStorage
-- Draggable tab reordering in the tab bar with animated movement
-- Altar inspector `z-index` input and expanded placement controls (`x/y`, scale, rotation, opacity, z-order)
-- New Altar item category: `table` with i18n labels in all supported locales
-- Altar grid controls (overlay toggle, size, opacity, color) with persisted preferences (`altar-grid-size`, `altar-grid-opacity`, `altar-grid-color`)
-- Modal-based Altar item add/edit/delete workflow in the docked library strip
-- Extracted Altar components and hooks for maintainability: `AltarItemVisual`, `AltarCanvas`, `AltarLibraryStrip`, and background preview hooks
 
 ### Changed
-- Wiki and Operation custom icons now render image icons only from safe local/data/blob sources (`/`, `data:image/...`, `blob:`); remote `http(s)` URLs are treated as non-image icons
-- Operations and Home dashboard operation cards/lists now consistently use custom operation icons first, then category emoji fallback
-- `write_file` and `read_file` now enforce root-directory confinement (home, documents, downloads, desktop, app data, app config) in addition to the extension allowlist
-- `write_file` rejects symlink targets and verifies canonical paths against allowed roots
-- `.emeralddb` added to the permitted extension allowlist for `write_file` and `read_file`
 - Theme preference stored under `theme-id` (legacy `theme` key is migrated automatically)
 - PDF export metadata rendering hardened with stricter HTML escaping and image data-URL validation
 - Emerald Noctis theme refactored to mirror Emerald Parchment architecture with expanded component-level coverage (shell, sidebars, tabs, panels, settings surfaces, list/filter toolbars, and link modals)
@@ -44,21 +60,22 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Theme ID normalization consolidated to a single source in `src/themes/theme.ts` and reused by `src/store/uiStore.ts` for localStorage resolution and legacy fallback mapping
 - `dbBackup.ts` date filter (`buildDateFilter`) now uses positional SQL parameters (`$1`, `$2`) instead of string interpolation for `created_at` range queries
 - `copy_image_file` Rust command hardened: rejects symlink sources, canonicalizes paths, and verifies confinement within allowed storage roots before reading
+- `write_file` and `read_file` now enforce root-directory confinement (home, documents, downloads, desktop, app data, app config) in addition to the extension allowlist
+- `write_file` rejects symlink targets and verifies canonical paths against allowed roots
+- `.emeralddb` added to the permitted extension allowlist for `write_file` and `read_file`
 - Heading font setting removed from Settings; entry titles and editor headings now inherit the editor body font
-- Tab order is now persisted across app restarts via the existing `open-tabs` localStorage workspace state
-- Altar inspector now renders inline under the selected placed-element row in the sidebar
-- Altar library moved under the canvas in edit mode and switched to compact tile sizing (70×85)
-- Altar placement defaults/limits updated (default size 40; width/height clamped with max 500; numeric patch clamping centralized in store)
-- Locked Altar placements are now click-through on canvas (`pointer-events: none`)
-- Full-window Altar mode behavior refined: edit mode exits full-window, and edit-only controls (including grid options) remain hidden in view mode
-- Custom background preview map and custom-background chip rendering hardened for consistent persistence previews
-- Fixed-scene Altar rendering experiment rolled back; responsive percentage-based scene rendering retained
-- Altar delete/edit flows consolidated around modal interactions and in-context confirmations
-- Altar UI store consumption refactored toward granular selectors to reduce rerenders
 
-### Known Issues
-- Remaining Altar edge case: element drift can still occur during some resize transitions
-- Non-fatal build warning remains after Altar refactor (details currently unknown)
+## [0.1.1] - 2026-05-09
+
+### Added
+- Browser-like content tabs for opening multiple entries simultaneously
+- Middle-click on any entry opens it in a new tab
+- Tab order persisted across app restarts via the existing `open-tabs` localStorage workspace state
+
+### Changed
+- Editors render only after loading the matching content, preventing stale-state flicker
+- App storage directories are ensured before opening SQLite
+- Autosave no longer writes to newly opened entries until they are fully loaded
 
 ## [0.1.0] - 2026-05-03
 

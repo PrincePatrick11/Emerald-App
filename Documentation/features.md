@@ -94,8 +94,6 @@ Custom backgrounds are persisted as file-backed image paths (legacy inline data 
 
 **View mode and full-window mode.** Full-window altar mode is only available in view mode. Entering edit mode exits full-window mode automatically. Grid controls are edit-only and hidden in read/view mode.
 
-For implementation and architecture details, see [Documentation/altar.md](altar.md).
-
 ## Tabs & Workspace
 
 Emerald supports browser-like tabs so you can keep several pieces of content open at the same time.

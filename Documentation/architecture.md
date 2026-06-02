@@ -255,6 +255,8 @@ Supporting hooks:
 
 - **`src/components/altar/useAltarBackgroundPreview.ts`** — background image preview resolution.
 
+A fixed-scene rendering experiment (absolute pixel sizing) was rolled back. Altar placement coordinates remain percentage-based (`x/y` as 0–100) for responsive canvas scaling.
+
 Store integration details:
 
 - `uiStore` provides altar scene UI controls (grid size/opacity/color, snap toggle, fullscreen toggle).

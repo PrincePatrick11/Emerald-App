@@ -95,6 +95,8 @@ The translation files follow this top-level structure (from `en.json`):
 | `contextMenu` | Context menu action labels |
 | `backlinks` | Backlinks panel strings |
 | `trash` | Trash view strings |
+| `linkPicker` | Internal link picker modal (title, search placeholder, tab labels, no-results message) |
+| `menu` | Native menu item labels (Edit, View, Export, Import submenus and their items) |
 
 ## Interpolation
 
