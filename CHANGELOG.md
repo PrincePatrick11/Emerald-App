@@ -14,6 +14,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - Draggable tab reordering in the tab bar with animated movement
+- Altar "bring forward" / "send backward" layer reordering coalesced into a single atomic database write per click, replacing the previous two-write sequence
+- Database schema migrations refactored into a versioned, ordered list tracked via a `schema_version` table; existing vaults upgrade transparently on first open
 - Wiki and Operation custom icons now render image icons only from safe local/data/blob sources (`/`, `data:image/...`, `blob:`); remote `http(s)` URLs are treated as non-image icons
 - Operations and Home dashboard operation cards/lists now consistently use custom operation icons first, then category emoji fallback
 - Altar inspector now renders inline under the selected placed-element row in the sidebar

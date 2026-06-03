@@ -99,6 +99,7 @@ interface AltarState {
   sendPlacementBackward: (id: string) => Promise<void>;
   bringPlacementToFront: (id: string) => Promise<void>;
   sendPlacementToBack: (id: string) => Promise<void>;
+  _swapPlacementZIndex: (idA: string, idB: string) => Promise<void>;
   removePlacement: (id: string) => Promise<void>;
   saveIntention: (text: string) => Promise<void>;
   setIntentionLocal: (text: string) => void;
@@ -411,23 +412,47 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   },
 
   bringPlacementForward: async (id) => {
-    const placements = [...get().placements].sort((a, b) => a.z_index - b.z_index);
-    const index = placements.findIndex((p) => p.id === id);
-    if (index < 0 || index === placements.length - 1) return;
-    const current = placements[index];
-    const next = placements[index + 1];
-    await get().updatePlacement(current.id, { z_index: next.z_index });
-    await get().updatePlacement(next.id, { z_index: current.z_index });
+    const sorted = [...get().placements].sort((a, b) => a.z_index - b.z_index);
+    const index = sorted.findIndex((p) => p.id === id);
+    if (index < 0 || index === sorted.length - 1) return;
+    await get()._swapPlacementZIndex(sorted[index].id, sorted[index + 1].id);
   },
 
   sendPlacementBackward: async (id) => {
-    const placements = [...get().placements].sort((a, b) => a.z_index - b.z_index);
-    const index = placements.findIndex((p) => p.id === id);
+    const sorted = [...get().placements].sort((a, b) => a.z_index - b.z_index);
+    const index = sorted.findIndex((p) => p.id === id);
     if (index <= 0) return;
-    const current = placements[index];
-    const prev = placements[index - 1];
-    await get().updatePlacement(current.id, { z_index: prev.z_index });
-    await get().updatePlacement(prev.id, { z_index: current.z_index });
+    await get()._swapPlacementZIndex(sorted[index - 1].id, sorted[index].id);
+  },
+
+  _swapPlacementZIndex: async (idA, idB) => {
+    const a = get().placements.find((p) => p.id === idA);
+    const b = get().placements.find((p) => p.id === idB);
+    if (!a || !b || a.z_index === b.z_index) return;
+    const db = await getDb();
+    await db.execute(
+      'UPDATE altar_placements SET z_index = CASE id WHEN $1 THEN $2 WHEN $3 THEN $4 END WHERE id IN ($1, $3)',
+      [idA, b.z_index, idB, a.z_index]
+    );
+    set((s) => ({
+      placements: s.placements.map((p) => {
+        if (p.id === idA) return { ...p, z_index: b.z_index };
+        if (p.id === idB) return { ...p, z_index: a.z_index };
+        return p;
+      }),
+      previewPlacements: Object.fromEntries(
+        Object.entries(s.previewPlacements).map(([altarId, list]) => [
+          altarId,
+          list.map((p) => {
+            if (p.id === idA) return { ...p, z_index: b.z_index };
+            if (p.id === idB) return { ...p, z_index: a.z_index };
+            return p;
+          }),
+        ])
+      ),
+    }));
+    const activeAltarId = get().activeAltarId;
+    if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
   },
 
   bringPlacementToFront: async (id) => {

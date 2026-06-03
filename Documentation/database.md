@@ -8,13 +8,15 @@ Emerald uses a single SQLite file, `emerald.db`, located in the OS application d
 
 `runMigrations` is a single sequential async function. It:
 
-1. Creates all tables with `CREATE TABLE IF NOT EXISTS` — safe to run on an existing database.
-2. Applies each column addition with `ALTER TABLE … ADD COLUMN` wrapped in a try/catch, ignoring the error when the column already exists.
-3. Runs data migrations (e.g. backfilling `entry_number`, replacing old UUID-based built-in category IDs with fixed string IDs).
-4. Seeds built-in records (wiki categories, operation categories) only when the count is zero.
-5. Auto-purges trash items older than 30 days at startup.
+1. Creates the `schema_version(version PRIMARY KEY, name, applied_at)` tracking table on first run.
+2. Reads the highest applied version (0 on a fresh database).
+3. Iterates through the ordered `MIGRATIONS` array in `src/lib/db.ts`, running only entries whose version is above the current one. Each entry is an `async (db) => { … }` callback that may contain DDL, data backfills, or seed inserts.
+4. After each successful migration, writes a row into `schema_version` with the version, name, and ISO timestamp.
+5. Calls the separate `runPeriodicCleanup(db)` function, which auto-purges trashed rows older than 30 days across all soft-delete-aware tables. This is **not** a migration — it is idempotent and time-dependent, so it runs on every vault open.
 
-There is no version table or migration counter. Each migration is idempotent by design.
+The current schema version is **17**. New schema changes must be added as a new entry in the `MIGRATIONS` array with a strictly higher version number and a unique `name`.
+
+**Upgrades from older versions.** Vaults that predate the `schema_version` table will see all migrations run on first open. `ALTER TABLE … ADD COLUMN` against an already-present column raises a "duplicate column" error; this is detected by `isAlreadyAppliedError` (matches `duplicate column name`, `already exists`, or a pre-existing table) and the migration is marked applied anyway. The data migrations themselves are idempotent and re-run safely: `entry_number` is only backfilled where `NULL`, the UUID → fixed-string category ID rewrite is a no-op once the fixed IDs exist, and the `custom_properties.type = 'checkbox' → 'toggle'` rename is a single `UPDATE` that is a no-op once the migration has run.
 
 ## Tables
 
@@ -392,4 +394,4 @@ Images are restored via `save_image` (SHA-256 dedup — identical images are wri
 - New boolean fields: `INTEGER NOT NULL DEFAULT 0` (or `1` if the safe default is true).
 - New array/object fields: `TEXT` stored as a JSON string.
 - New image-backed fields: reuse the file-based pipeline (`save_image` / `copy_image_file`) — never store base64 blobs in SQLite.
-- When adding a column to a table that may already exist: wrap in `try { ALTER TABLE … ADD COLUMN … } catch { /* exists */ }`.
+- New columns: add a new entry to the `MIGRATIONS` array in `src/lib/db.ts` with the next sequential version number, a unique `name`, and an `up(db)` callback. Do **not** use the legacy `try { ALTER TABLE … ADD COLUMN … } catch { /* exists */ }` pattern — that was retired when the versioned migration system was introduced.

@@ -22,6 +22,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
   const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
   const editImageInputRef = useRef<HTMLInputElement>(null);
   const [isResizeHotspot, setIsResizeHotspot] = useState(false);
+  const isResizeHotspotRef = useRef(false);
   const [isResizing, setIsResizing] = useState(false);
   const [panelHeight, setPanelHeight] = useState(() => {
     const saved = Number(localStorage.getItem('altar-library-height'));
@@ -147,7 +148,10 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
 
   const handlePanelMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
-    setIsResizeHotspot(event.clientY - bounds.top <= 6);
+    const nextHotspot = event.clientY - bounds.top <= 6;
+    if (nextHotspot === isResizeHotspotRef.current) return;
+    isResizeHotspotRef.current = nextHotspot;
+    setIsResizeHotspot(nextHotspot);
   };
 
   const filteredItems = activeCategoryTab === 'all'
@@ -160,7 +164,11 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
       style={{ height: panelHeight }}
       onMouseDown={handlePanelMouseDown}
       onMouseMove={handlePanelMouseMove}
-      onMouseLeave={() => setIsResizeHotspot(false)}
+      onMouseLeave={() => {
+        if (!isResizeHotspotRef.current) return;
+        isResizeHotspotRef.current = false;
+        setIsResizeHotspot(false);
+      }}
     >
       <div className={`pointer-events-none absolute top-0 left-0 right-0 h-1 transition-colors ${(isResizing || isResizeHotspot) ? 'bg-jade-500/20' : 'bg-transparent'}`} />
       <input ref={editImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleEditImageChange} />
