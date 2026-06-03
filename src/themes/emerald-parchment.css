@@ -66,10 +66,10 @@ html[data-theme='emerald-parchment'] {
   --panel-hover-border: rgba(131, 96, 62, 0.48);
   --panel-hover-shadow: 0 10px 24px rgba(114, 79, 43, 0.11);
   --tabbar-bg: rgba(240, 225, 201, 0.9);
-  --tab-active-bg: rgba(249, 239, 223, 0.96);
+  --tab-active-bg: #f5ecdc;
   --tab-active-text: #2f2114;
   --tab-active-border: rgba(146, 107, 68, 0.44);
-  --tab-active-shadow: 0 -1px 0 rgba(255, 255, 255, 0.45), 0 8px 20px rgba(114, 79, 43, 0.13);
+  --tab-active-shadow: 0 -1px 0 rgba(255, 255, 255, 0.45);
   --tab-idle-bg: rgba(236, 219, 193, 0.82);
   --tab-idle-text: #6b5036;
   --tab-idle-border: rgba(154, 117, 80, 0.32);

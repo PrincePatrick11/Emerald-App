@@ -67,10 +67,10 @@ html[data-theme='emerald-noctis'] {
   --panel-hover-border: rgba(119, 101, 85, 0.58);
   --panel-hover-shadow: 0 14px 30px rgba(0, 0, 0, 0.4);
   --tabbar-bg: rgba(28, 23, 19, 0.86);
-  --tab-active-bg: rgba(50, 41, 35, 0.92);
+  --tab-active-bg: #1a1510;
   --tab-active-text: #f6efe8;
   --tab-active-border: rgba(144, 123, 101, 0.5);
-  --tab-active-shadow: 0 -1px 0 rgba(255, 243, 229, 0.08), 0 10px 22px rgba(0, 0, 0, 0.34);
+  --tab-active-shadow: 0 -1px 0 rgba(255, 243, 229, 0.08);
   --tab-idle-bg: rgba(43, 35, 30, 0.74);
   --tab-idle-text: #bea792;
   --tab-idle-border: rgba(102, 86, 71, 0.42);

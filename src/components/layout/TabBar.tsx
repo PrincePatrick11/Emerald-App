@@ -104,7 +104,7 @@ export default function TabBar() {
   };
 
   return (
-    <div className="tabbar h-10 flex items-end overflow-hidden px-2 pt-2 bg-stone-900/95 border-b border-stone-700/60">
+    <div className="tabbar relative h-10 flex items-end overflow-hidden px-2 pt-2">
       <LazyMotion features={domAnimation}>
         <Reorder.Group
           axis="x"
@@ -124,7 +124,7 @@ export default function TabBar() {
                 style={{ position: 'relative' }}
                 className={`tab-item group flex min-w-32 max-w-56 flex-1 items-center gap-2 rounded-t-lg border px-3 py-2 text-xs transition-colors ${
                   isActive
-                    ? 'tab-item-active border-stone-700/80 border-b-stone-800 bg-stone-800 text-stone-100'
+                    ? 'tab-item-active border-stone-700/80 bg-stone-800 text-stone-100'
                     : 'tab-item-idle border-stone-800/60 bg-stone-900/70 text-stone-500 hover:bg-stone-800/60 hover:text-stone-300'
                 }`}
               >

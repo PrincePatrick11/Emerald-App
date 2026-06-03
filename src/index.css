@@ -610,7 +610,6 @@ html[data-theme='emerald-noctis'] .app-sidebar-right {
 
 html[data-theme='emerald-noctis'] .sidebar-header,
 html[data-theme='emerald-noctis'] .sidebar-search,
-html[data-theme='emerald-noctis'] .tabbar,
 html[data-theme='emerald-noctis'] .settings-modal-card > div:first-child {
   border-color: rgba(110, 93, 76, 0.44);
 }
@@ -644,14 +643,28 @@ html[data-theme='emerald-noctis'] .panel-interactive:hover {
 
 html[data-theme='emerald-noctis'] .tabbar {
   background: var(--tabbar-bg);
-  backdrop-filter: blur(4px);
+}
+
+html[data-theme='emerald-noctis'] .tabbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: rgba(110, 93, 76, 0.44);
+  pointer-events: none;
+  z-index: 0;
 }
 
 html[data-theme='emerald-noctis'] .tab-item-active {
   background: var(--tab-active-bg);
   color: var(--tab-active-text);
   border-color: var(--tab-active-border);
+  border-bottom-color: transparent;
   box-shadow: var(--tab-active-shadow);
+  position: relative;
+  z-index: 1;
 }
 
 html[data-theme='emerald-noctis'] .tab-item-idle,
@@ -659,6 +672,7 @@ html[data-theme='emerald-noctis'] .tab-add {
   background: var(--tab-idle-bg);
   color: var(--tab-idle-text);
   border-color: var(--tab-idle-border);
+  border-bottom-color: transparent;
 }
 
 html[data-theme='emerald-noctis'] .tab-add:hover,
@@ -986,7 +1000,6 @@ html[data-theme='emerald-parchment'] .app-sidebar-right {
 
 html[data-theme='emerald-parchment'] .sidebar-header,
 html[data-theme='emerald-parchment'] .sidebar-search,
-html[data-theme='emerald-parchment'] .tabbar,
 html[data-theme='emerald-parchment'] .settings-modal-card > div:first-child {
   border-color: rgba(145, 108, 70, 0.32);
 }
@@ -1022,22 +1035,39 @@ html[data-theme='emerald-parchment'] .tabbar {
   background: var(--tabbar-bg);
 }
 
+html[data-theme='emerald-parchment'] .tabbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: rgba(145, 108, 70, 0.32);
+  pointer-events: none;
+  z-index: 0;
+}
+
 html[data-theme='emerald-parchment'] .tab-item-active {
   background: var(--tab-active-bg);
   color: var(--tab-active-text);
   border-color: var(--tab-active-border);
+  border-bottom-color: transparent;
   box-shadow: var(--tab-active-shadow);
+  position: relative;
+  z-index: 1;
 }
 
 html[data-theme='emerald-parchment'] .tab-item-idle {
   background: var(--tab-idle-bg);
   color: var(--tab-idle-text);
   border-color: var(--tab-idle-border);
+  border-bottom-color: transparent;
 }
 
 html[data-theme='emerald-parchment'] .tab-add {
   background: var(--tab-idle-bg);
   border-color: var(--tab-idle-border);
+  border-bottom-color: transparent;
   color: var(--tab-idle-text);
 }
 
