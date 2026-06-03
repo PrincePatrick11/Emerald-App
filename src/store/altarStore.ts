@@ -80,9 +80,11 @@ interface AltarState {
 
   fetchAltars: () => Promise<void>;
   setActiveAltar: (id: string) => Promise<void>;
+  clearActiveAltar: () => void;
   createAltar: () => Promise<AltarRecord>;
   duplicateAltar: (id: string) => Promise<AltarRecord | null>;
   updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'intention' | 'background_preset' | 'background_image_data'>>) => Promise<void>;
+  bumpAltarUpdatedAt: (id: string) => Promise<void>;
   deleteAltar: (id: string) => Promise<void>;
 
   addItem: (name: string, emoji: string, category: AltarItemCategory, note?: string, imageData?: string) => Promise<AltarItem>;
@@ -125,7 +127,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
         console.error('Failed to migrate altar background image:', altar.id, error);
       }
     }
-    const activeAltarId = get().activeAltarId ?? altars[0]?.id ?? null;
+    const activeAltarId = get().activeAltarId ?? null;
     const activeAltar = altars.find((altar) => altar.id === activeAltarId) ?? null;
     const placements = activeAltar ? await fetchPlacementsForAltar(activeAltar.id, items) : [];
     const previewResults = await Promise.allSettled(
@@ -153,6 +155,10 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     if (!active) return;
     const placements = await fetchPlacementsForAltar(id, items);
     set({ activeAltarId: id, placements, selectedPlacementId: null, intention: active.intention });
+  },
+
+  clearActiveAltar: () => {
+    set({ activeAltarId: null, placements: [], selectedPlacementId: null, intention: '' });
   },
 
   createAltar: async () => {
@@ -246,6 +252,19 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     set((s) => ({
       altars: s.altars.map((entry) => (entry.id === id ? updated : entry)).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
       intention: s.activeAltarId === id ? updated.intention : s.intention,
+    }));
+  },
+
+  bumpAltarUpdatedAt: async (id) => {
+    const db = await getDb();
+    const altar = get().altars.find((entry) => entry.id === id);
+    if (!altar) return;
+    const updated_at = nowIso();
+    await db.execute('UPDATE altars SET updated_at=$1 WHERE id=$2', [updated_at, id]);
+    set((s) => ({
+      altars: s.altars
+        .map((entry) => (entry.id === id ? { ...entry, updated_at } : entry))
+        .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
     }));
   },
 
@@ -349,7 +368,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
         [altarId]: [...(s.previewPlacements[altarId] ?? []), placement],
       },
     }));
-    await get().updateAltar(altarId, {});
+    await get().bumpAltarUpdatedAt(altarId);
   },
 
   selectPlacement: (id) => set({ selectedPlacementId: id }),
@@ -368,7 +387,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const db = await getDb();
     await db.execute('UPDATE altar_placements SET x=$1, y=$2 WHERE id=$3', [x, y, id]);
     const activeAltarId = get().activeAltarId;
-    if (activeAltarId) await get().updateAltar(activeAltarId, {});
+    if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
   },
 
   updatePlacement: async (id, patch) => {
@@ -388,7 +407,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       ),
     }));
     const activeAltarId = get().activeAltarId;
-    if (activeAltarId) await get().updateAltar(activeAltarId, {});
+    if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
   },
 
   bringPlacementForward: async (id) => {
@@ -438,7 +457,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       ),
     }));
     const activeAltarId = get().activeAltarId;
-    if (activeAltarId) await get().updateAltar(activeAltarId, {});
+    if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
   },
 
   saveIntention: async (text) => {

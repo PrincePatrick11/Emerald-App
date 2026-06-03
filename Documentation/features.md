@@ -70,6 +70,8 @@ Servitors use the `servitors` built-in category and use the standard operations 
 
 The altar is a virtual arrangement of symbolic objects on a canvas.
 
+**Dashboard.** Opening the Altar section shows a dashboard listing all your altars with search, sort, and view-mode options. Click any altar to open it; use the breadcrumb back button or the Altar entry in the left sidebar to return to the dashboard.
+
 **Altar library.** You manage a personal library of items (candles, crystals, herbs, deities, symbols, tools, table objects, and other objects). Each item has a name, an emoji, a category, an optional note, and an optional uploaded image.
 
 Library editing uses a modal flow for **add / edit / delete** actions. In edit mode, the library strip is docked under the canvas, supports resize, and persists height in `localStorage` (`altar-library-height`).

@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Copy, Maximize2, Minimize2, PanelRightOpen, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { useShallow } from 'zustand/shallow';
+import { Check, Maximize2, Minimize2, PanelRightOpen, Pencil, Plus, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAltarStore } from '../../store/altarStore';
 import { useUIStore } from '../../store/uiStore';
-import { ALTAR_BACKGROUND_PRESETS, ALTAR_BACKGROUND_STYLES, DEFAULT_ALTAR_BACKGROUND } from '../../lib/altarConstants';
+import { DEFAULT_ALTAR_BACKGROUND, ALTAR_BACKGROUND_PRESETS, ALTAR_BACKGROUND_STYLES } from '../../lib/altarConstants';
 import type { AltarRecord } from '../../types';
 import ListToolbar from '../ui/ListToolbar';
 import ContextMenu from '../ui/ContextMenu';
-import { AltarItemVisual } from '../altar/AltarItemVisual';
 import { AltarCanvas } from '../altar/AltarCanvas';
 import { AltarLibraryStrip } from '../altar/AltarLibraryStrip';
-import { useAltarPreviewMap } from '../altar/useAltarBackgroundPreview';
+import { AltarCard, AltarListRow, AltarContextMenuActions } from '../altar/AltarCard';
+import { getCachedBackgroundPreview } from '../altar/useAltarBackgroundPreview';
 
 function getAltarBackgroundStyleWithImage(altar: AltarRecord | null, imageSrc: string | null | undefined): string {
   if (!altar) return ALTAR_BACKGROUND_STYLES[DEFAULT_ALTAR_BACKGROUND];
@@ -24,42 +25,22 @@ function getAltarBackgroundStyleWithImage(altar: AltarRecord | null, imageSrc: s
   return ALTAR_BACKGROUND_STYLES[preset];
 }
 
-function AltarRenameField({ value, onChange, onCommit, onCancel, className }: {
-  value: string;
-  onChange: (value: string) => void;
-  onCommit: () => void;
-  onCancel: () => void;
-  className: string;
-}) {
-  return (
-    <input
-      autoFocus
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      onBlur={onCommit}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') onCommit();
-        if (event.key === 'Escape') onCancel();
-      }}
-      className={className}
-    />
-  );
-}
-
 export default function AltarView() {
   const { t } = useTranslation();
-  const {
-    altars,
-    activeAltarId,
-    placements,
-    previewPlacements,
-    fetchAltars,
-    createAltar,
-    duplicateAltar,
-    setActiveAltar,
-    updateAltar,
-    deleteAltar,
-  } = useAltarStore();
+  const altars = useAltarStore((s) => s.altars);
+  const activeAltarId = useAltarStore((s) => s.activeAltarId);
+  const previewPlacements = useAltarStore((s) => s.previewPlacements);
+  const { fetchAltars, createAltar, duplicateAltar, setActiveAltar, clearActiveAltar, updateAltar, deleteAltar } = useAltarStore(
+    useShallow((s) => ({
+      fetchAltars: s.fetchAltars,
+      createAltar: s.createAltar,
+      duplicateAltar: s.duplicateAltar,
+      setActiveAltar: s.setActiveAltar,
+      clearActiveAltar: s.clearActiveAltar,
+      updateAltar: s.updateAltar,
+      deleteAltar: s.deleteAltar,
+    })),
+  );
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const toggleRightSidebar = useUIStore((s) => s.toggleRightSidebar);
@@ -78,14 +59,17 @@ export default function AltarView() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [title, setTitle] = useState('');
-  const backgroundPreviewMap = useAltarPreviewMap(altars);
 
   useEffect(() => { fetchAltars(); }, [fetchAltars]);
   useEffect(() => {
-    if (activeView.id && activeView.id !== activeAltarId) {
-      setActiveAltar(activeView.id).catch(console.error);
+    if (activeView.id) {
+      if (activeView.id !== activeAltarId) {
+        setActiveAltar(activeView.id).catch(console.error);
+      }
+    } else if (activeAltarId !== null) {
+      clearActiveAltar();
     }
-  }, [activeView.id, activeAltarId, setActiveAltar]);
+  }, [activeView.id, activeAltarId, setActiveAltar, clearActiveAltar]);
 
   const activeAltar = altars.find((altar) => altar.id === activeAltarId) ?? null;
   const isEditing = activeView.mode === 'edit';
@@ -153,44 +137,11 @@ export default function AltarView() {
     setActiveView({ type: 'altar', id: activeAltar.id, mode: 'view' });
   };
 
-  const getPreviewSrc = (altar: AltarRecord) => {
-    if (!altar.background_image_data) return null;
-    if (altar.background_image_data.startsWith('data:')) return altar.background_image_data;
-    return backgroundPreviewMap[altar.background_image_data] ?? null;
-  };
-
-  const renderPreviewScene = (altar: AltarRecord, compact = false) => {
-    const previewItems = previewPlacements[altar.id] ?? [];
-    return (
-      <div
-        className={`relative overflow-hidden rounded-lg border border-stone-700/40 ${compact ? 'h-8 w-8' : 'h-36 w-full'}`}
-        style={{ background: getAltarBackgroundStyleWithImage(altar, getPreviewSrc(altar)) }}
-      >
-        <div className="absolute bottom-[28%] left-[8%] right-[8%] h-px bg-gradient-to-r from-transparent via-stone-700/50 to-transparent pointer-events-none" />
-        <div className="absolute bottom-[26%] left-[12%] right-[12%] h-px bg-gradient-to-r from-transparent via-stone-800/30 to-transparent pointer-events-none" />
-        {previewItems.slice(0, compact ? 1 : 7).map((placement) => {
-          const size = compact
-            ? 16
-            : Math.max(16, Math.min(52, Math.round((placement.width ?? 8) * 2)));
-          return (
-            <div
-              key={placement.id}
-              className="absolute flex items-center justify-center"
-              style={{
-                left: `${placement.x}%`,
-                top: `${placement.y}%`,
-                transform: 'translate(-50%, -50%)',
-                width: size,
-                height: size,
-              }}
-            >
-              <AltarItemVisual item={placement} size={size} candleAnimate={placement.category === 'candle'} />
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
+  const backgroundSrc = activeAltar
+    ? (activeAltar.background_image_data?.startsWith('data:')
+        ? activeAltar.background_image_data
+        : getCachedBackgroundPreview(activeAltar.background_image_data))
+    : null;
 
   if (!activeAltar) {
     const filtered = search
@@ -265,66 +216,35 @@ export default function AltarView() {
                   {altarPrefs.view === 'cards' ? (
                     <div className="grid grid-cols-3 gap-3">
                       {items.map((altar) => (
-                        renamingId === altar.id ? (
-                          <div key={altar.id} className="panel-interactive px-4 py-4 text-left">
-                            <AltarRenameField
-                              value={renameValue}
-                              onChange={setRenameValue}
-                              onCommit={commitRename}
-                              onCancel={() => setRenamingId(null)}
-                              className="mb-2 w-full bg-transparent text-sm font-medium text-stone-200 outline-none selectable"
-                            />
-                            <p className="text-xs text-stone-600">{format(new Date(altar.updated_at), 'MMM d, yyyy')}</p>
-                          </div>
-                        ) : (
-                          <button
-                            key={altar.id}
-                            onClick={() => openAltar(altar)}
-                            onContextMenu={(event) => { event.preventDefault(); setCtxMenu({ id: altar.id, x: event.clientX, y: event.clientY }); }}
-                            className="panel-interactive px-4 py-4 text-left"
-                          >
-                            <div className="mb-3">
-                              {renderPreviewScene(altar)}
-                            </div>
-                            <div className="text-sm font-medium text-stone-200 truncate">{altar.title}</div>
-                            <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                              <span className="text-parchment-500/70">{format(new Date(altar.updated_at), 'MMM d, yyyy')}</span>
-                            </div>
-                            {altar.intention && (
-                              <p className="mt-2 max-h-8 overflow-hidden text-xs leading-4 text-stone-500">{altar.intention}</p>
-                            )}
-                          </button>
-                        )
+                        <AltarCard
+                          key={altar.id}
+                          altar={altar}
+                          previewItems={previewPlacements[altar.id] ?? []}
+                          isRenaming={renamingId === altar.id}
+                          renameValue={renameValue}
+                          onChangeRename={setRenameValue}
+                          onCommitRename={commitRename}
+                          onCancelRename={() => setRenamingId(null)}
+                          onOpen={() => openAltar(altar)}
+                          onContextMenu={(event) => { event.preventDefault(); setCtxMenu({ id: altar.id, x: event.clientX, y: event.clientY }); }}
+                        />
                       ))}
                     </div>
                   ) : (
                     <div className="space-y-1.5">
                       {items.map((altar) => (
-                        renamingId === altar.id ? (
-                          <div key={altar.id} className="panel-interactive flex items-center gap-3 px-4 py-3">
-                            <AltarRenameField
-                              value={renameValue}
-                              onChange={setRenameValue}
-                              onCommit={commitRename}
-                              onCancel={() => setRenamingId(null)}
-                              className="flex-1 bg-transparent text-sm text-stone-300 outline-none selectable"
-                            />
-                            <span className="text-xs text-parchment-500/70">{format(new Date(altar.updated_at), 'MMM d, yyyy')}</span>
-                          </div>
-                        ) : (
-                          <button
-                            key={altar.id}
-                            onClick={() => openAltar(altar)}
-                            onContextMenu={(event) => { event.preventDefault(); setCtxMenu({ id: altar.id, x: event.clientX, y: event.clientY }); }}
-                            className="panel-interactive w-full text-left flex items-center gap-3 px-4 py-3"
-                          >
-                            <span className="flex-shrink-0">
-                              {renderPreviewScene(altar, true)}
-                            </span>
-                            <span className="flex-1 text-sm text-stone-300 truncate">{altar.title}</span>
-                            <span className="text-xs text-stone-600">{format(new Date(altar.updated_at), 'MMM d, yyyy')}</span>
-                          </button>
-                        )
+                        <AltarListRow
+                          key={altar.id}
+                          altar={altar}
+                          previewItems={previewPlacements[altar.id] ?? []}
+                          isRenaming={renamingId === altar.id}
+                          renameValue={renameValue}
+                          onChangeRename={setRenameValue}
+                          onCommitRename={commitRename}
+                          onCancelRename={() => setRenamingId(null)}
+                          onOpen={() => openAltar(altar)}
+                          onContextMenu={(event) => { event.preventDefault(); setCtxMenu({ id: altar.id, x: event.clientX, y: event.clientY }); }}
+                        />
                       ))}
                     </div>
                   )}
@@ -339,14 +259,12 @@ export default function AltarView() {
             x={ctxMenu.x}
             y={ctxMenu.y}
             onClose={() => setCtxMenu(null)}
-            actions={[
-              { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
-              { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: () => {
-                const altar = altars.find((entry) => entry.id === ctxMenu.id);
-                if (altar) startRename(altar);
-              } },
-              { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(ctxMenu.id), danger: true },
-            ]}
+            actions={AltarContextMenuActions({
+              altar: altars.find((a) => a.id === ctxMenu.id) ?? altars[0],
+              onDuplicate: handleDuplicate,
+              onRename: startRename,
+              onDelete: handleDelete,
+            })}
           />
         )}
       </div>
@@ -411,10 +329,9 @@ export default function AltarView() {
         </div>
       )}
 
-      <AltarCanvas altar={activeAltar} backgroundSrc={getPreviewSrc(activeAltar)} placements={placements} editable={isEditing} showGrid={altarCanvasGrid} gridSize={altarCanvasGridSize} gridOpacity={altarCanvasGridOpacity} gridColor={altarCanvasGridColor} snapToGrid={altarSnapToGrid} getBackgroundStyle={getAltarBackgroundStyleWithImage} />
+      <AltarCanvas altar={activeAltar} backgroundSrc={backgroundSrc} editable={isEditing} showGrid={altarCanvasGrid} gridSize={altarCanvasGridSize} gridOpacity={altarCanvasGridOpacity} gridColor={altarCanvasGridColor} snapToGrid={altarSnapToGrid} getBackgroundStyle={getAltarBackgroundStyleWithImage} />
 
       {isEditing && !altarWindowFullscreen && <AltarLibraryStrip editable={isEditing} />}
     </div>
   );
 }
-

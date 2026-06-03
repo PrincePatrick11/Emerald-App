@@ -1,57 +1,54 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import type { AltarRecord } from '../../types';
 
-export function useAltarPreviewMap(altars: AltarRecord[]) {
-  const [previewMap, setPreviewMap] = useState<Record<string, string>>({});
+const cache = new Map<string, string>();
+const inFlight = new Map<string, Promise<void>>();
+const listeners = new Set<() => void>();
 
-  useEffect(() => {
-    let cancelled = false;
-    const pending = altars.filter((altar) =>
-      !!altar.background_image_data &&
-      !altar.background_image_data.startsWith('data:') &&
-      !previewMap[altar.background_image_data]
-    );
-
-    pending.forEach((altar) => {
-      invoke<string>('read_image_as_base64', { path: altar.background_image_data })
-        .then((dataUrl) => {
-          if (cancelled) return;
-          setPreviewMap((current) => current[altar.background_image_data!] ? current : {
-            ...current,
-            [altar.background_image_data!]: dataUrl,
-          });
-        })
-        .catch((error) => console.error('Failed to load altar background:', altar.background_image_data, error));
-    });
-
-    return () => { cancelled = true; };
-  }, [altars, previewMap]);
-
-  return previewMap;
+function notify() {
+  listeners.forEach((fn) => fn());
 }
 
-export function useBackgroundPreview(source: string | null | undefined) {
-  const [preview, setPreview] = useState<string | null>(null);
+function loadPreview(path: string) {
+  if (cache.has(path) || inFlight.has(path)) return;
+  const promise = invoke<string>('read_image_as_base64', { path })
+    .then((dataUrl) => {
+      cache.set(path, dataUrl);
+    })
+    .catch((error) => {
+      console.error('Failed to load background preview:', path, error);
+    })
+    .finally(() => {
+      inFlight.delete(path);
+      notify();
+    });
+  inFlight.set(path, promise);
+}
 
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+}
+
+function readSnapshot(source: string | null | undefined): string | null {
+  if (!source) return null;
+  if (source.startsWith('data:')) return source;
+  if (cache.has(source)) return cache.get(source) ?? null;
+  loadPreview(source);
+  return null;
+}
+
+function getServerSnapshot(): string | null {
+  return null;
+}
+
+export function getCachedBackgroundPreview(path: string | null | undefined): string | null {
+  return readSnapshot(path);
+}
+
+export function useBackgroundPreview(source: string | null | undefined): string | null {
   useEffect(() => {
-    if (!source) {
-      setPreview(null);
-      return;
-    }
-    if (source.startsWith('data:')) {
-      setPreview(source);
-      return;
-    }
-    let cancelled = false;
-    invoke<string>('read_image_as_base64', { path: source })
-      .then((dataUrl) => { if (!cancelled) setPreview(dataUrl); })
-      .catch((error) => {
-        console.error('Failed to load background preview:', source, error);
-        if (!cancelled) setPreview(null);
-      });
-    return () => { cancelled = true; };
+    if (source && !source.startsWith('data:')) loadPreview(source);
   }, [source]);
-
-  return preview;
+  return useSyncExternalStore(subscribe, () => readSnapshot(source), getServerSnapshot);
 }

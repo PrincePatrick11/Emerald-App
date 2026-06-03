@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, Lock, Unlock, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Trash2, Check, Image as ImageIcon, Pencil } from 'lucide-react';
+import { useShallow } from 'zustand/shallow';
+import { Check, Image as ImageIcon, Pencil, Trash2 } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import {
   ALTAR_BACKGROUND_PRESETS,
@@ -9,16 +10,14 @@ import {
   DEFAULT_ALTAR_BACKGROUND,
 } from '../../lib/altarConstants';
 import { useUIStore } from '../../store/uiStore';
-import { AltarItemVisual } from '../altar/AltarItemVisual';
 import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
+import { PlacedElementRow, PlacedElementInspector } from './PlacedElementRow';
 
 export default function AltarSidebarPanel() {
   const { t } = useTranslation();
+  const placements = useAltarStore((s) => s.placements);
+  const selectedPlacementId = useAltarStore((s) => s.selectedPlacementId);
   const {
-    altars,
-    activeAltarId,
-    placements,
-    selectedPlacementId,
     updateAltar,
     selectPlacement,
     updatePlacement,
@@ -27,7 +26,18 @@ export default function AltarSidebarPanel() {
     sendPlacementBackward,
     bringPlacementToFront,
     sendPlacementToBack,
-  } = useAltarStore();
+  } = useAltarStore(
+    useShallow((s) => ({
+      updateAltar: s.updateAltar,
+      selectPlacement: s.selectPlacement,
+      updatePlacement: s.updatePlacement,
+      removePlacement: s.removePlacement,
+      bringPlacementForward: s.bringPlacementForward,
+      sendPlacementBackward: s.sendPlacementBackward,
+      bringPlacementToFront: s.bringPlacementToFront,
+      sendPlacementToBack: s.sendPlacementToBack,
+    })),
+  );
   const activeView = useUIStore((s) => s.activeView);
   const altarCanvasGrid = useUIStore((s) => s.altarCanvasGrid);
   const altarCanvasGridSize = useUIStore((s) => s.altarCanvasGridSize);
@@ -40,7 +50,7 @@ export default function AltarSidebarPanel() {
   const setAltarCanvasGridColor = useUIStore((s) => s.setAltarCanvasGridColor);
   const setAltarSnapToGrid = useUIStore((s) => s.setAltarSnapToGrid);
   const isEditing = activeView.type === 'altar' && activeView.mode === 'edit';
-  const activeAltar = altars.find((altar) => altar.id === activeAltarId) ?? null;
+  const activeAltar = useAltarStore((s) => s.altars.find((a) => a.id === s.activeAltarId) ?? null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
   const noticeTimerRef = useRef<number | null>(null);
   const [backgroundNotice, setBackgroundNotice] = useState<string | null>(null);
@@ -55,9 +65,14 @@ export default function AltarSidebarPanel() {
   });
   const customBackgroundSource = activeAltar?.background_image_data || (activeAltar ? customBackgroundMap[activeAltar.id] : null);
   const customBackgroundPreview = useBackgroundPreview(customBackgroundSource);
-  const [inspectorDraft, setInspectorDraft] = useState({ x: '', y: '', scalePercent: '', rotation: '', opacity: '', zIndex: '' });
-  const selectedPlacement = placements.find((p) => p.id === selectedPlacementId) ?? null;
-  const sortedPlacements = [...placements].sort((a, b) => b.z_index - a.z_index);
+  const sortedPlacements = useMemo(
+    () => [...placements].sort((a, b) => b.z_index - a.z_index),
+    [placements],
+  );
+  const selectedPlacement = useMemo(
+    () => sortedPlacements.find((p) => p.id === selectedPlacementId) ?? null,
+    [sortedPlacements, selectedPlacementId],
+  );
   const hasCustomBackground = !!(activeAltar && (activeAltar.background_image_data || customBackgroundMap[activeAltar.id]));
 
   useEffect(() => {
@@ -73,22 +88,6 @@ export default function AltarSidebarPanel() {
     if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current);
     noticeTimerRef.current = window.setTimeout(() => setBackgroundNotice(null), 1800);
   };
-
-  useEffect(() => {
-    if (!selectedPlacement) {
-      setInspectorDraft({ x: '', y: '', scalePercent: '', rotation: '', opacity: '', zIndex: '' });
-      return;
-    }
-    const scalePercent = Math.round((((selectedPlacement.width + selectedPlacement.height) / 2) / 40) * 100);
-    setInspectorDraft({
-      x: selectedPlacement.x.toFixed(1),
-      y: selectedPlacement.y.toFixed(1),
-      scalePercent: scalePercent.toString(),
-      rotation: selectedPlacement.rotation.toFixed(0),
-      opacity: Math.round(selectedPlacement.opacity * 100).toString(),
-      zIndex: selectedPlacement.z_index.toString(),
-    });
-  }, [selectedPlacement]);
 
   const handleImageFile = (file: File, onResult: (data: string) => void) => {
     const reader = new FileReader();
@@ -138,55 +137,8 @@ export default function AltarSidebarPanel() {
     updateAltar(activeAltar.id, { background_preset: DEFAULT_ALTAR_BACKGROUND, background_image_data: null }).catch(console.error);
   };
 
-  const updatePlacementNumber = (key: 'x' | 'y' | 'rotation' | 'opacity' | 'z_index', value: string) => {
-    if (!selectedPlacement) return;
-    const next = Number(value);
-    if (Number.isNaN(next)) return;
-    if (key === 'z_index') {
-      const normalized = Math.max(0, Math.round(next));
-      setInspectorDraft((current) => ({ ...current, zIndex: normalized.toString() }));
-      updatePlacement(selectedPlacement.id, { z_index: normalized });
-      return;
-    }
-    if (key === 'x' || key === 'y') {
-      const normalized = Math.max(0, Math.min(100, next));
-      updatePlacement(selectedPlacement.id, { [key]: normalized });
-      return;
-    }
-    if (key === 'rotation') {
-      const normalized = Math.max(-360, Math.min(360, next));
-      updatePlacement(selectedPlacement.id, { rotation: normalized });
-      return;
-    }
-    const normalizedOpacity = Math.max(0, Math.min(100, next)) / 100;
-    updatePlacement(selectedPlacement.id, { opacity: normalizedOpacity });
-  };
-
-  const updatePlacementScalePercent = (value: string) => {
-    if (!selectedPlacement) return;
-    const percent = Number(value);
-    if (Number.isNaN(percent)) return;
-    const normalized = (Math.max(10, Math.min(1250, percent)) / 100) * 40;
-    updatePlacement(selectedPlacement.id, { width: normalized, height: normalized });
-  };
-
-  const bindInspectorInput = (field: keyof typeof inspectorDraft, apply: () => void) => ({
-    value: inspectorDraft[field],
-    onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
-      const value = event.target.value;
-      setInspectorDraft((current) => ({ ...current, [field]: value }));
-    },
-    onBlur: apply,
-    onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => {
-      if (event.key === 'Enter') {
-        event.currentTarget.blur();
-      }
-    },
-  });
-
   return (
     <div className="flex flex-col h-full">
-      {/* Hidden file inputs */}
       <input
         ref={backgroundInputRef}
         type="file"
@@ -428,81 +380,30 @@ export default function AltarSidebarPanel() {
             )}
             {sortedPlacements.map((placement) => (
               <div key={placement.id} className="space-y-1">
-                <div
-                  onClick={() => { if (isEditing) selectPlacement(placement.id); }}
-                  className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors ${isEditing ? 'cursor-pointer' : 'cursor-default'} ${selectedPlacementId === placement.id ? 'bg-stone-700/70 text-stone-100' : 'bg-stone-900/40 text-stone-300'} ${isEditing ? 'hover:bg-stone-800/60' : ''}`}
-                >
-                  <AltarItemVisual item={placement} size={16} candleAnimate={placement.category === 'candle'} />
-                  <span className="flex-1 truncate text-xs">{placement.name}</span>
-                  <span className="text-[10px] text-stone-500">z{placement.z_index}</span>
-                  {isEditing && <span className="flex items-center gap-0.5" onClick={(event) => event.stopPropagation()}>
-                    <button
-                      onClick={() => updatePlacement(placement.id, { hidden: !placement.hidden })}
-                      className="text-stone-500 hover:text-stone-300"
-                      title={placement.hidden ? t('altar.show') : t('altar.hide')}
-                    >
-                      {placement.hidden ? <EyeOff size={12} /> : <Eye size={12} />}
-                    </button>
-                    <button
-                      onClick={() => updatePlacement(placement.id, { locked: !placement.locked })}
-                      className="text-stone-500 hover:text-stone-300"
-                      title={placement.locked ? t('altar.unlock') : t('altar.lock')}
-                    >
-                      {placement.locked ? <Lock size={12} /> : <Unlock size={12} />}
-                    </button>
-                    <button
-                      onClick={() => removePlacement(placement.id)}
-                      className="text-stone-500 hover:text-red-400"
-                      title={t('altar.removeElement')}
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </span>}
-                </div>
-
+                <PlacedElementRow
+                  placement={placement}
+                  isEditing={isEditing}
+                  isSelected={selectedPlacementId === placement.id}
+                  onSelect={() => selectPlacement(placement.id)}
+                  onToggleHidden={() => updatePlacement(placement.id, { hidden: !placement.hidden })}
+                  onToggleLocked={() => updatePlacement(placement.id, { locked: !placement.locked })}
+                  onRemove={() => removePlacement(placement.id)}
+                />
                 {isEditing && selectedPlacementId === placement.id && selectedPlacement && (
-                  <div className="rounded-lg border border-stone-700/60 bg-stone-900/40 p-2.5 space-y-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">{t('altar.inspector')}</p>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <label className="space-y-1">
-                        <span className="text-[10px] uppercase tracking-wider text-stone-500">{t('altar.inspectorX')}</span>
-                        <input {...bindInspectorInput('x', () => updatePlacementNumber('x', inspectorDraft.x))} className="w-full bg-stone-800/60 rounded px-2 py-1 text-xs" aria-label="x" />
-                      </label>
-                      <label className="space-y-1">
-                        <span className="text-[10px] uppercase tracking-wider text-stone-500">{t('altar.inspectorY')}</span>
-                        <input {...bindInspectorInput('y', () => updatePlacementNumber('y', inspectorDraft.y))} className="w-full bg-stone-800/60 rounded px-2 py-1 text-xs" aria-label="y" />
-                      </label>
-                      <label className="space-y-1">
-                        <span className="text-[10px] uppercase tracking-wider text-stone-500">{t('altar.inspectorScale')}</span>
-                        <input {...bindInspectorInput('scalePercent', () => updatePlacementScalePercent(inspectorDraft.scalePercent))} className="w-full bg-stone-800/60 rounded px-2 py-1 text-xs" aria-label="scale" />
-                      </label>
-                      <label className="space-y-1">
-                        <span className="text-[10px] uppercase tracking-wider text-stone-500">{t('altar.inspectorRotation')}</span>
-                        <input {...bindInspectorInput('rotation', () => updatePlacementNumber('rotation', inspectorDraft.rotation))} className="w-full bg-stone-800/60 rounded px-2 py-1 text-xs" aria-label="rotation" />
-                      </label>
-                      <label className="space-y-1">
-                        <span className="text-[10px] uppercase tracking-wider text-stone-500">{t('altar.inspectorOpacity')}</span>
-                        <input {...bindInspectorInput('opacity', () => updatePlacementNumber('opacity', inspectorDraft.opacity))} className="w-full bg-stone-800/60 rounded px-2 py-1 text-xs" aria-label="opacity" />
-                      </label>
-                      <label className="space-y-1">
-                        <span className="text-[10px] uppercase tracking-wider text-stone-500">{t('altar.inspectorZIndex')}</span>
-                        <input {...bindInspectorInput('zIndex', () => updatePlacementNumber('z_index', inspectorDraft.zIndex))} className="w-full bg-stone-800/60 rounded px-2 py-1 text-xs" aria-label="z-index" />
-                      </label>
-                    </div>
-                    <div className="grid grid-cols-4 gap-1">
-                      <button onClick={() => bringPlacementToFront(placement.id)} className="btn-ghost" title={t('altar.toFront')}><ChevronsUp size={12} /></button>
-                      <button onClick={() => bringPlacementForward(placement.id)} className="btn-ghost" title={t('altar.forward')}><ArrowUp size={12} /></button>
-                      <button onClick={() => sendPlacementBackward(placement.id)} className="btn-ghost" title={t('altar.backward')}><ArrowDown size={12} /></button>
-                      <button onClick={() => sendPlacementToBack(placement.id)} className="btn-ghost" title={t('altar.toBack')}><ChevronsDown size={12} /></button>
-                    </div>
-                  </div>
+                  <PlacedElementInspector
+                    placement={selectedPlacement}
+                    onUpdate={(patch) => updatePlacement(placement.id, patch)}
+                    onBringToFront={() => bringPlacementToFront(placement.id)}
+                    onBringForward={() => bringPlacementForward(placement.id)}
+                    onSendBackward={() => sendPlacementBackward(placement.id)}
+                    onSendToBack={() => sendPlacementToBack(placement.id)}
+                  />
                 )}
               </div>
             ))}
           </div>
         </div>
       )}
-
     </div>
   );
 }

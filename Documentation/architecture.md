@@ -250,10 +250,14 @@ Altar rendering and editing were split into focused components:
 - **`src/components/altar/AltarItemVisual.tsx`** — shared visual renderer for altar items (emoji/image and candle animation treatment).
 - **`src/components/altar/AltarCanvas.tsx`** — canvas scene rendering, placement transforms, drag/drop interactions, lock handling, and grid overlay drawing.
 - **`src/components/altar/AltarLibraryStrip.tsx`** — docked library strip under canvas (edit mode), compact tiles, and modal CRUD for altar items.
+- **`src/components/altar/AltarCard.tsx`** — `AltarCard`, `AltarListRow`, and the shared context-menu action builder for the altar dashboard.
+- **`src/components/altar/AltarCardPreview.tsx`** — preview scene used by the dashboard cards and list rows (background + placed items, both compact and full-size variants).
+- **`src/components/altar/AltarRenameField.tsx`** — inline rename input used by the dashboard cards and list rows.
+- **`src/components/sidebar/PlacedElementRow.tsx`** — `PlacedElementRow` and `PlacedElementInspector` for the sidebar's placed-elements list and its inline inspector.
 
 Supporting hooks:
 
-- **`src/components/altar/useAltarBackgroundPreview.ts`** — background image preview resolution.
+- **`src/components/altar/useAltarBackgroundPreview.ts`** — background image preview resolution. Backed by a module-level cache (`cache: Map<path, dataUrl>`, `inFlight: Map<path, Promise>`) so the same path is read from Tauri at most once per session and consumers re-render via `useSyncExternalStore` when a load resolves.
 
 A fixed-scene rendering experiment (absolute pixel sizing) was rolled back. Altar placement coordinates remain percentage-based (`x/y` as 0–100) for responsive canvas scaling.
 
@@ -261,7 +265,7 @@ Store integration details:
 
 - `uiStore` provides altar scene UI controls (grid size/opacity/color, snap toggle, fullscreen toggle).
 - Altar screens consume `uiStore` with granular selectors to reduce unrelated rerenders.
-- `altarStore` remains source of truth for altar records, items, placements, and placement patch clamping.
+- `altarStore` remains source of truth for altar records, items, placements, and placement patch clamping. The store exposes `clearActiveAltar` and `bumpAltarUpdatedAt` actions; the latter updates only the `updated_at` column on placement edits without re-running the full altar update path.
 
 ## Font System
 

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/shallow';
 import { MoveDiagonal2, RotateCw } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import { getAltarDragItem, setAltarDragItem, subscribeAltarDrag } from '../../lib/altarDragState';
@@ -11,7 +12,6 @@ const BASE_SIZE = 40;
 export function AltarCanvas({
   altar,
   backgroundSrc,
-  placements,
   editable,
   showGrid,
   gridSize,
@@ -22,7 +22,6 @@ export function AltarCanvas({
 }: {
   altar: AltarRecord | null;
   backgroundSrc: string | null;
-  placements: AltarPlacement[];
   editable: boolean;
   showGrid: boolean;
   gridSize: number;
@@ -32,12 +31,36 @@ export function AltarCanvas({
   getBackgroundStyle: (altar: AltarRecord | null, imageSrc: string | null | undefined) => string;
 }) {
   const { t } = useTranslation();
-  const { placeItem, movePlacement, savePlacementPosition, updatePlacement, selectPlacement, selectedPlacementId } = useAltarStore();
+  const placements = useAltarStore((s) => s.placements);
+  const selectedPlacementId = useAltarStore((s) => s.selectedPlacementId);
+  const { placeItem, movePlacement, savePlacementPosition, updatePlacement, selectPlacement } = useAltarStore(
+    useShallow((s) => ({
+      placeItem: s.placeItem,
+      movePlacement: s.movePlacement,
+      savePlacementPosition: s.savePlacementPosition,
+      updatePlacement: s.updatePlacement,
+      selectPlacement: s.selectPlacement,
+    })),
+  );
   const gridRgb = hexToRgb(gridColor);
   const canvasRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef<string | null>(null);
   const [sidebarDragItem, setSidebarDragItem] = useState<AltarItem | null>(null);
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
+  const sortedPlacements = useMemo(
+    () => [...placements].sort((a, b) => a.z_index - b.z_index),
+    [placements],
+  );
+  const handleStartDrag = useCallback((id: string) => () => { draggingRef.current = id; }, []);
+  const handleSelect = useCallback((id: string) => () => selectPlacement(id), [selectPlacement]);
+  const handleResize = useCallback(
+    (id: string) => (width: number, height: number) => updatePlacement(id, { width, height }),
+    [updatePlacement],
+  );
+  const handleRotate = useCallback(
+    (id: string) => (rotation: number) => updatePlacement(id, { rotation }),
+    [updatePlacement],
+  );
 
   const coordsToPercent = (clientX: number, clientY: number) => {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -134,16 +157,16 @@ export function AltarCanvas({
         </p>
       )}
 
-      {[...placements].sort((a, b) => a.z_index - b.z_index).map((p) => (
+      {sortedPlacements.map((p) => (
         <PlacedItem
           key={p.id}
           placement={p}
           editable={editable}
           selected={selectedPlacementId === p.id}
-          onStartDrag={() => { draggingRef.current = p.id; }}
-          onSelect={() => selectPlacement(p.id)}
-          onResize={(width, height) => updatePlacement(p.id, { width, height })}
-          onRotate={(rotation) => updatePlacement(p.id, { rotation })}
+          onStartDrag={handleStartDrag(p.id)}
+          onSelect={handleSelect(p.id)}
+          onResize={handleResize(p.id)}
+          onRotate={handleRotate(p.id)}
         />
       ))}
 
@@ -160,7 +183,7 @@ export function AltarCanvas({
   );
 }
 
-function PlacedItem({ placement, editable, selected, onStartDrag, onSelect, onResize, onRotate }: {
+const PlacedItem = memo(function PlacedItem({ placement, editable, selected, onStartDrag, onSelect, onResize, onRotate }: {
   placement: AltarPlacement;
   editable: boolean;
   selected: boolean;
@@ -300,7 +323,7 @@ function PlacedItem({ placement, editable, selected, onStartDrag, onSelect, onRe
       )}
     </div>
   );
-}
+});
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const normalized = hex.replace('#', '');

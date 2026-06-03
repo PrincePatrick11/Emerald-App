@@ -25,6 +25,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fixed-scene Altar rendering experiment rolled back; responsive percentage-based scene rendering retained
 - Altar delete/edit flows consolidated around modal interactions and in-context confirmations
 - Altar UI store consumption refactored toward granular selectors to reduce rerenders
+- Altar placed-element rows and inline inspector extracted into `PlacedElementRow` and `PlacedElementInspector` so typing in inspector inputs no longer re-renders unrelated rows
+- Altar dashboard cards and list rows extracted into `AltarCard`, `AltarListRow`, and `AltarCardPreview`; altar background previews resolved from a shared module-level cache so they survive view re-mounts and vault switches
+
+### Fixed
+- Altar dashboard was unreachable: opening the app, switching to the altar section, or clicking the back button always landed on a single altar. The dashboard (list of all altars) is now reachable from the back button and the altar entry in the left sidebar.
 
 ### Known Issues
 - Remaining Altar edge case: element drift can still occur during some resize transitions
