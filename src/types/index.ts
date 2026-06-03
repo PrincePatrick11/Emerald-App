@@ -147,6 +147,11 @@ export interface AltarRecord {
   background_image_data: string | null;
   created_at: string;
   updated_at: string;
+  grid_enabled: boolean;
+  grid_size: number;
+  grid_opacity: number;
+  grid_color: string;
+  snap_to_grid: boolean;
 }
 
 export interface AltarItem {

@@ -2,6 +2,10 @@ import type { AltarItemCategory } from '../types';
 
 export const DEFAULT_ALTAR_BACKGROUND = 'midnight' as const;
 
+export const DEFAULT_GRID_SIZE = 32;
+export const DEFAULT_GRID_OPACITY = 0.06;
+export const DEFAULT_GRID_COLOR = '#dce8e2';
+
 export const ALTAR_BACKGROUND_PRESETS = ['midnight', 'ember', 'forest', 'moon'] as const;
 
 export const ALTAR_BACKGROUND_STYLES: Record<(typeof ALTAR_BACKGROUND_PRESETS)[number], string> = {

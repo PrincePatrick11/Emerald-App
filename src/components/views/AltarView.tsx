@@ -46,11 +46,6 @@ export default function AltarView() {
   const toggleRightSidebar = useUIStore((s) => s.toggleRightSidebar);
   const altarPrefs = useUIStore((s) => s.altarPrefs);
   const setAltarPrefs = useUIStore((s) => s.setAltarPrefs);
-  const altarCanvasGrid = useUIStore((s) => s.altarCanvasGrid);
-  const altarCanvasGridSize = useUIStore((s) => s.altarCanvasGridSize);
-  const altarCanvasGridOpacity = useUIStore((s) => s.altarCanvasGridOpacity);
-  const altarCanvasGridColor = useUIStore((s) => s.altarCanvasGridColor);
-  const altarSnapToGrid = useUIStore((s) => s.altarSnapToGrid);
   const altarWindowFullscreen = useUIStore((s) => s.altarWindowFullscreen);
   const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
 
@@ -329,7 +324,7 @@ export default function AltarView() {
         </div>
       )}
 
-      <AltarCanvas altar={activeAltar} backgroundSrc={backgroundSrc} editable={isEditing} showGrid={altarCanvasGrid} gridSize={altarCanvasGridSize} gridOpacity={altarCanvasGridOpacity} gridColor={altarCanvasGridColor} snapToGrid={altarSnapToGrid} getBackgroundStyle={getAltarBackgroundStyleWithImage} />
+      <AltarCanvas altar={activeAltar} backgroundSrc={backgroundSrc} editable={isEditing} showGrid={activeAltar.grid_enabled} gridSize={activeAltar.grid_size} gridOpacity={activeAltar.grid_opacity} gridColor={activeAltar.grid_color} snapToGrid={activeAltar.snap_to_grid} getBackgroundStyle={getAltarBackgroundStyleWithImage} />
 
       {isEditing && !altarWindowFullscreen && <AltarLibraryStrip editable={isEditing} />}
     </div>

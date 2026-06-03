@@ -13,6 +13,25 @@ import { useUIStore } from '../../store/uiStore';
 import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
 import { PlacedElementRow, PlacedElementInspector } from './PlacedElementRow';
 
+function ToggleRow({ label, checked, onClick }: { label: string; checked: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="mt-2 w-full rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2 transition-colors hover:border-stone-500/70"
+    >
+      <span className="flex items-center justify-between gap-3">
+        <span className="text-xs text-stone-300">{label}</span>
+        <span
+          className={`relative h-5 w-9 rounded-full border transition-colors ${checked ? 'border-jade-600/70 bg-jade-900/45' : 'border-stone-600 bg-stone-800/80'}`}
+          aria-hidden="true"
+        >
+          <span className={`absolute top-0.5 h-3.5 w-3.5 rounded-full transition-all ${checked ? 'left-[18px] bg-jade-300' : 'left-0.5 bg-stone-400'}`} />
+        </span>
+      </span>
+    </button>
+  );
+}
+
 export default function AltarSidebarPanel() {
   const { t } = useTranslation();
   const placements = useAltarStore((s) => s.placements);
@@ -38,19 +57,11 @@ export default function AltarSidebarPanel() {
       sendPlacementToBack: s.sendPlacementToBack,
     })),
   );
+  const updateAltarGrid = useAltarStore((s) => s.updateAltarGrid);
   const activeView = useUIStore((s) => s.activeView);
-  const altarCanvasGrid = useUIStore((s) => s.altarCanvasGrid);
-  const altarCanvasGridSize = useUIStore((s) => s.altarCanvasGridSize);
-  const altarCanvasGridOpacity = useUIStore((s) => s.altarCanvasGridOpacity);
-  const altarCanvasGridColor = useUIStore((s) => s.altarCanvasGridColor);
-  const altarSnapToGrid = useUIStore((s) => s.altarSnapToGrid);
-  const setAltarCanvasGrid = useUIStore((s) => s.setAltarCanvasGrid);
-  const setAltarCanvasGridSize = useUIStore((s) => s.setAltarCanvasGridSize);
-  const setAltarCanvasGridOpacity = useUIStore((s) => s.setAltarCanvasGridOpacity);
-  const setAltarCanvasGridColor = useUIStore((s) => s.setAltarCanvasGridColor);
-  const setAltarSnapToGrid = useUIStore((s) => s.setAltarSnapToGrid);
   const isEditing = activeView.type === 'altar' && activeView.mode === 'edit';
   const activeAltar = useAltarStore((s) => s.altars.find((a) => a.id === s.activeAltarId) ?? null);
+  const gridOpacityPercent = Math.round((activeAltar?.grid_opacity ?? 0) * 100);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
   const noticeTimerRef = useRef<number | null>(null);
   const [backgroundNotice, setBackgroundNotice] = useState<string | null>(null);
@@ -138,7 +149,7 @@ export default function AltarSidebarPanel() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" onClick={(e) => { if (e.target === e.currentTarget) selectPlacement(null); }}>
       <input
         ref={backgroundInputRef}
         type="file"
@@ -276,23 +287,12 @@ export default function AltarSidebarPanel() {
               <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-stone-500">
                 {t('altar.gridOptions')}
               </p>
-              <button
-                onClick={() => setAltarCanvasGrid(!altarCanvasGrid)}
-                className="mt-2 w-full rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2 transition-colors hover:border-stone-500/70"
-              >
-                <span className="flex items-center justify-between gap-3">
-                  <span className="text-xs text-stone-300">{t('altar.gridOverlay')}</span>
-                  <span
-                    className={`relative h-5 w-9 rounded-full border transition-colors ${altarCanvasGrid ? 'border-jade-600/70 bg-jade-900/45' : 'border-stone-600 bg-stone-800/80'}`}
-                    aria-hidden="true"
-                  >
-                    <span
-                      className={`absolute top-0.5 h-3.5 w-3.5 rounded-full transition-all ${altarCanvasGrid ? 'left-[18px] bg-jade-300' : 'left-0.5 bg-stone-400'}`}
-                    />
-                  </span>
-                </span>
-              </button>
-              {altarCanvasGrid && (
+              <ToggleRow
+                label={t('altar.gridOverlay')}
+                checked={activeAltar.grid_enabled}
+                onClick={() => updateAltarGrid(activeAltar.id, { grid_enabled: !activeAltar.grid_enabled })}
+              />
+              {activeAltar.grid_enabled && (
                 <div className="mt-2 rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2">
                   <div className="mb-1 flex items-center justify-between">
                 <span className="text-[11px] uppercase tracking-wider text-stone-500">{t('altar.gridSize')}</span>
@@ -300,9 +300,9 @@ export default function AltarSidebarPanel() {
                   type="number"
                   min={8}
                   max={128}
-                  value={altarCanvasGridSize}
+                  value={activeAltar.grid_size}
                   disabled={!isEditing}
-                  onChange={(event) => setAltarCanvasGridSize(Number(event.target.value) || 8)}
+                  onChange={(event) => updateAltarGrid(activeAltar.id, { grid_size: Number(event.target.value) || 8 })}
                   className="w-14 rounded bg-stone-800/70 px-1.5 py-0.5 text-right text-xs text-stone-300 outline-none"
                 />
               </div>
@@ -310,9 +310,9 @@ export default function AltarSidebarPanel() {
                 type="range"
                 min={8}
                 max={128}
-                value={altarCanvasGridSize}
+                value={activeAltar.grid_size}
                 disabled={!isEditing}
-                onChange={(event) => setAltarCanvasGridSize(Number(event.target.value))}
+                onChange={(event) => updateAltarGrid(activeAltar.id, { grid_size: Number(event.target.value) })}
                 className="w-full"
               />
               <div className="mt-2 mb-1 flex items-center justify-between">
@@ -321,9 +321,9 @@ export default function AltarSidebarPanel() {
                   type="number"
                   min={1}
                   max={25}
-                  value={Math.round(altarCanvasGridOpacity * 100)}
+                  value={gridOpacityPercent}
                   disabled={!isEditing}
-                  onChange={(event) => setAltarCanvasGridOpacity((Number(event.target.value) || 1) / 100)}
+                  onChange={(event) => updateAltarGrid(activeAltar.id, { grid_opacity: (Number(event.target.value) || 1) / 100 })}
                   className="w-14 rounded bg-stone-800/70 px-1.5 py-0.5 text-right text-xs text-stone-300 outline-none"
                 />
               </div>
@@ -331,39 +331,28 @@ export default function AltarSidebarPanel() {
                 type="range"
                 min={1}
                 max={25}
-                value={Math.round(altarCanvasGridOpacity * 100)}
+                value={gridOpacityPercent}
                 disabled={!isEditing}
-                onChange={(event) => setAltarCanvasGridOpacity(Number(event.target.value) / 100)}
+                onChange={(event) => updateAltarGrid(activeAltar.id, { grid_opacity: Number(event.target.value) / 100 })}
                 className="w-full"
               />
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-[11px] uppercase tracking-wider text-stone-500">{t('altar.gridColor')}</span>
                 <input
                   type="color"
-                  value={altarCanvasGridColor}
+                  value={activeAltar.grid_color}
                   disabled={!isEditing}
-                  onChange={(event) => setAltarCanvasGridColor(event.target.value)}
+                  onChange={(event) => updateAltarGrid(activeAltar.id, { grid_color: event.target.value })}
                   className="h-6 w-10 rounded border border-stone-700 bg-stone-800 p-0"
                 />
               </div>
                 </div>
               )}
-              <button
-                onClick={() => setAltarSnapToGrid(!altarSnapToGrid)}
-                className="mt-2 w-full rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2 transition-colors hover:border-stone-500/70"
-              >
-                <span className="flex items-center justify-between gap-3">
-                  <span className="text-xs text-stone-300">{t('altar.snapToGrid')}</span>
-                  <span
-                    className={`relative h-5 w-9 rounded-full border transition-colors ${altarSnapToGrid ? 'border-jade-600/70 bg-jade-900/45' : 'border-stone-600 bg-stone-800/80'}`}
-                    aria-hidden="true"
-                  >
-                    <span
-                      className={`absolute top-0.5 h-3.5 w-3.5 rounded-full transition-all ${altarSnapToGrid ? 'left-[18px] bg-jade-300' : 'left-0.5 bg-stone-400'}`}
-                    />
-                  </span>
-                </span>
-              </button>
+              <ToggleRow
+                label={t('altar.snapToGrid')}
+                checked={activeAltar.snap_to_grid}
+                onClick={() => updateAltarGrid(activeAltar.id, { snap_to_grid: !activeAltar.snap_to_grid })}
+              />
             </>
           )}
         </div>
@@ -374,7 +363,7 @@ export default function AltarSidebarPanel() {
           <p className="pt-4 text-[11px] font-semibold uppercase tracking-wider text-stone-500">
             {t('altar.placedElements')}
           </p>
-          <div className="mt-2 flex-1 min-h-0 overflow-y-auto space-y-1 pr-1">
+          <div className="mt-2 flex-1 min-h-0 overflow-y-auto space-y-1 pr-1" onClick={(e) => { if (e.target === e.currentTarget) selectPlacement(null); }}>
             {sortedPlacements.length === 0 && (
               <p className="px-2 py-2 text-xs text-stone-600">{t('altar.noPlacedElements')}</p>
             )}

@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import { getDb } from '../lib/db';
-import { DEFAULT_ALTAR_BACKGROUND } from '../lib/altarConstants';
-import { generateId, nowIso } from '../lib/helpers';
+import { DEFAULT_ALTAR_BACKGROUND, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE } from '../lib/altarConstants';
+import { boolToInt, generateId, isValidHexColor, nowIso } from '../lib/helpers';
 import type { AltarItem, AltarItemCategory, AltarPlacement, AltarRecord } from '../types';
 
 const DEFAULT_PLACEMENT_SIZE = 40;
@@ -54,6 +54,11 @@ function normalizeAltar(altar: AltarRecord): AltarRecord {
     ...altar,
     background_preset: altar.background_preset || DEFAULT_ALTAR_BACKGROUND,
     background_image_data: altar.background_image_data ?? null,
+    grid_enabled: Boolean(altar.grid_enabled),
+    grid_size: altar.grid_size ?? DEFAULT_GRID_SIZE,
+    grid_opacity: altar.grid_opacity ?? DEFAULT_GRID_OPACITY,
+    grid_color: isValidHexColor(altar.grid_color) ? altar.grid_color : DEFAULT_GRID_COLOR,
+    snap_to_grid: Boolean(altar.snap_to_grid),
   };
 }
 
@@ -84,6 +89,7 @@ interface AltarState {
   createAltar: () => Promise<AltarRecord>;
   duplicateAltar: (id: string) => Promise<AltarRecord | null>;
   updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'intention' | 'background_preset' | 'background_image_data'>>) => Promise<void>;
+  updateAltarGrid: (id: string, patch: Partial<Pick<AltarRecord, 'grid_enabled' | 'grid_size' | 'grid_opacity' | 'grid_color' | 'snap_to_grid'>>) => Promise<void>;
   bumpAltarUpdatedAt: (id: string) => Promise<void>;
   deleteAltar: (id: string) => Promise<void>;
 
@@ -173,10 +179,15 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       background_image_data: null,
       created_at: now,
       updated_at: now,
+      grid_enabled: false,
+      grid_size: DEFAULT_GRID_SIZE,
+      grid_opacity: DEFAULT_GRID_OPACITY,
+      grid_color: DEFAULT_GRID_COLOR,
+      snap_to_grid: false,
     };
     await db.execute(
-      'INSERT INTO altars (id, title, intention, background_preset, background_image_data, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-      [altar.id, altar.title, altar.intention, altar.background_preset, altar.background_image_data, altar.created_at, altar.updated_at]
+      'INSERT INTO altars (id, title, intention, background_preset, background_image_data, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
+      [altar.id, altar.title, altar.intention, altar.background_preset, altar.background_image_data, altar.created_at, altar.updated_at, 0, altar.grid_size, altar.grid_opacity, altar.grid_color, 0]
     );
     set((s) => ({ altars: [altar, ...s.altars], activeAltarId: altar.id, placements: [], selectedPlacementId: null, intention: '' }));
     return altar;
@@ -197,11 +208,16 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       background_image_data: source.background_image_data ?? null,
       created_at: now,
       updated_at: now,
+      grid_enabled: source.grid_enabled,
+      grid_size: source.grid_size,
+      grid_opacity: source.grid_opacity,
+      grid_color: source.grid_color,
+      snap_to_grid: source.snap_to_grid,
     };
 
     await db.execute(
-      'INSERT INTO altars (id, title, intention, background_preset, background_image_data, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-      [copy.id, copy.title, copy.intention, copy.background_preset, copy.background_image_data, copy.created_at, copy.updated_at]
+      'INSERT INTO altars (id, title, intention, background_preset, background_image_data, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
+      [copy.id, copy.title, copy.intention, copy.background_preset, copy.background_image_data, copy.created_at, copy.updated_at, copy.grid_enabled ? 1 : 0, copy.grid_size, copy.grid_opacity, copy.grid_color, copy.snap_to_grid ? 1 : 0]
     );
 
     const sourcePlacements = await db.select<{
@@ -253,6 +269,28 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     set((s) => ({
       altars: s.altars.map((entry) => (entry.id === id ? updated : entry)).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
       intention: s.activeAltarId === id ? updated.intention : s.intention,
+    }));
+  },
+
+  updateAltarGrid: async (id, patch) => {
+    const db = await getDb();
+    const altar = get().altars.find((entry) => entry.id === id);
+    if (!altar) return;
+    const next: AltarRecord = {
+      ...altar,
+      grid_enabled: Boolean(patch.grid_enabled ?? altar.grid_enabled),
+      grid_size: Math.max(8, Math.min(128, Math.round(patch.grid_size ?? altar.grid_size))),
+      grid_opacity: Math.max(0.01, Math.min(0.25, patch.grid_opacity ?? altar.grid_opacity)),
+      grid_color: patch.grid_color !== undefined && isValidHexColor(patch.grid_color) ? patch.grid_color : altar.grid_color,
+      snap_to_grid: Boolean(patch.snap_to_grid ?? altar.snap_to_grid),
+      updated_at: nowIso(),
+    };
+    await db.execute(
+      'UPDATE altars SET grid_enabled=$1, grid_size=$2, grid_opacity=$3, grid_color=$4, snap_to_grid=$5, updated_at=$6 WHERE id=$7',
+      [boolToInt(next.grid_enabled), next.grid_size, next.grid_opacity, next.grid_color, boolToInt(next.snap_to_grid), next.updated_at, id]
+    );
+    set((s) => ({
+      altars: s.altars.map((entry) => (entry.id === id ? next : entry)).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
     }));
   },
 
@@ -386,7 +424,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
 
   savePlacementPosition: async (id, x, y) => {
     const db = await getDb();
-    await db.execute('UPDATE altar_placements SET x=$1, y=$2 WHERE id=$3', [x, y, id]);
+    const safe = clampPlacementPatch({ x, y });
+    await db.execute('UPDATE altar_placements SET x=$1, y=$2 WHERE id=$3', [safe.x, safe.y, id]);
     const activeAltarId = get().activeAltarId;
     if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
   },

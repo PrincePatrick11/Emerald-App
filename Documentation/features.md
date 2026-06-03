@@ -84,7 +84,9 @@ Locked placements are click-through on the canvas (pointer events disabled), so 
 
 **Inspector and placement controls.** The right sidebar includes a placed-elements list and an inline inspector rendered directly under the selected row. Inspector fields include `x`, `y`, `scale`, `rotation`, `opacity`, and `z-index`, plus layer ordering controls.
 
-**Grid and snapping.** Edit mode adds grid overlay controls (toggle, size, opacity, color) and snap-to-grid. Grid size, opacity, and color persist in `localStorage` (`altar-grid-size`, `altar-grid-opacity`, `altar-grid-color`).
+**Selecting elements in view mode.** Clicking a row in the placed-elements sidebar highlights the corresponding element on the canvas with a jade border even when in view mode (not only in edit mode). Clicking an empty area of the canvas or the sidebar deselects.
+
+**Grid and snapping.** Each altar stores its own grid configuration: overlay toggle, size (8–128 px), opacity (1–25%), color, and snap-to-grid. Settings are saved immediately to the database and persist per altar, so switching between altars always restores that altar's own grid state. Grid controls are visible only in edit mode.
 
 **Multiple altars.** You can create several named altars and switch between them. Each altar has its own title, intention text, background, and set of placements.
 

@@ -89,21 +89,23 @@ async function runMigrations(db: Database): Promise<void> {
  * the migration system — these are idempotent, time-dependent, and not part
  * of the schema's historical record.
  */
+// Table names interpolated into SQL — must stay a hardcoded literal list.
+const CLEANUP_TABLES = [
+  'journal_entries',
+  'wiki_articles',
+  'tags',
+  'operations',
+  'creations',
+  'wiki_categories',
+  'operation_categories',
+  'tasks',
+  'task_categories',
+] as const;
+
 async function runPeriodicCleanup(db: Database): Promise<void> {
   // Auto-purge trash items older than 30 days
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const tables = [
-    'journal_entries',
-    'wiki_articles',
-    'tags',
-    'operations',
-    'creations',
-    'wiki_categories',
-    'operation_categories',
-    'tasks',
-    'task_categories',
-  ];
-  for (const table of tables) {
+  for (const table of CLEANUP_TABLES) {
     await db.execute(
       `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
       [cutoff]
@@ -582,6 +584,18 @@ const MIGRATIONS: Migration[] = [
         "INSERT OR IGNORE INTO task_categories (id, name, emoji, sort_order, is_builtin) VALUES ($1,$2,$3,$4,$5)",
         ['general', 'Allgemein', '📋', 0, 0]
       );
+    },
+  },
+  {
+    version: 18,
+    name: 'altar_grid_options_per_altar',
+    up: async (db) => {
+      // Keep numeric defaults in sync with DEFAULT_GRID_* in altarConstants.ts
+      await db.execute("ALTER TABLE altars ADD COLUMN grid_enabled INTEGER NOT NULL DEFAULT 0");
+      await db.execute("ALTER TABLE altars ADD COLUMN grid_size REAL NOT NULL DEFAULT 32");
+      await db.execute("ALTER TABLE altars ADD COLUMN grid_opacity REAL NOT NULL DEFAULT 0.06");
+      await db.execute("ALTER TABLE altars ADD COLUMN grid_color TEXT NOT NULL DEFAULT '#dce8e2'");
+      await db.execute("ALTER TABLE altars ADD COLUMN snap_to_grid INTEGER NOT NULL DEFAULT 0");
     },
   },
 ];

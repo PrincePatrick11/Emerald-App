@@ -13,3 +13,11 @@ export function generateId(): string {
 export function nowIso(): string {
   return new Date().toISOString();
 }
+
+export function isValidHexColor(s: string): boolean {
+  return /^#[0-9a-fA-F]{6}$/.test(s);
+}
+
+export function boolToInt(v: boolean): 0 | 1 {
+  return v ? 1 : 0;
+}

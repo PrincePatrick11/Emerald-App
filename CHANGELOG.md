@@ -8,7 +8,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - Altar inspector `z-index` input and expanded placement controls (`x/y`, scale, rotation, opacity, z-order)
 - New Altar item category: `table` with i18n labels in all supported locales
-- Altar grid controls (overlay toggle, size, opacity, color) with persisted preferences (`altar-grid-size`, `altar-grid-opacity`, `altar-grid-color`)
+- Altar grid controls (overlay toggle, size, opacity, color, snap-to-grid) stored per altar in the database (migration v18)
 - Modal-based Altar item add/edit/delete workflow in the docked library strip
 - Extracted Altar components and hooks for maintainability: `AltarItemVisual`, `AltarCanvas`, `AltarLibraryStrip`, and background preview hooks
 
@@ -23,6 +23,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Altar placement defaults/limits updated (default size 40; width/height clamped with max 500; numeric patch clamping centralized in store)
 - Locked Altar placements are now click-through on canvas (`pointer-events: none`)
 - Full-window Altar mode behavior refined: edit mode exits full-window, and edit-only controls (including grid options) remain hidden in view mode
+- Altar placed-element rows are now selectable in view mode (not only edit mode); clicking a row in the sidebar highlights the element on the canvas with a jade border; clicking empty canvas or sidebar area deselects
+- Altar grid settings (enabled, size, opacity, color, snap-to-grid) migrated from `uiStore` / localStorage to per-altar database columns so each altar remembers its own grid configuration independently
+- `updateAltarGrid(id, patch)` added to `altarStore` as the sole write path for altar grid fields; values are clamped and validated before persistence
 - Custom background preview map and custom-background chip rendering hardened for consistent persistence previews
 - Fixed-scene Altar rendering experiment rolled back; responsive percentage-based scene rendering retained
 - Altar delete/edit flows consolidated around modal interactions and in-context confirmations

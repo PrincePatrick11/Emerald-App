@@ -24,8 +24,8 @@ export const PlacedElementRow = memo(function PlacedElementRow({
   const { t } = useTranslation();
   return (
     <div
-      onClick={() => { if (isEditing) onSelect(); }}
-      className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors ${isEditing ? 'cursor-pointer' : 'cursor-default'} ${isSelected ? 'bg-stone-700/70 text-stone-100' : 'bg-stone-900/40 text-stone-300'} ${isEditing ? 'hover:bg-stone-800/60' : ''}`}
+      onClick={onSelect}
+      className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors cursor-pointer ${isSelected ? 'bg-stone-700/70 text-stone-100' : 'bg-stone-900/40 text-stone-300 hover:bg-stone-800/60'}`}
     >
       <AltarItemVisual item={placement} size={16} candleAnimate={placement.category === 'candle'} />
       <span className="flex-1 truncate text-xs">{placement.name}</span>

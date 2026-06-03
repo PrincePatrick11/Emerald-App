@@ -241,7 +241,7 @@ Because the app uses many Tailwind utility classes with hardcoded stone/jade col
 Two modules centralise reusable Tailwind class strings to avoid duplication across components:
 
 - **`src/lib/styleClasses.ts`** — Input and select class strings for custom properties and operation properties (`CUSTOM_PROP_INPUT_CLASSES`, `CUSTOM_PROP_SMALL_INPUT_CLASSES`, `OP_PROP_SELECT_CLASSES`).
-- **`src/lib/altarConstants.ts`** — Altar background presets (`ALTAR_BACKGROUND_PRESETS`, `ALTAR_BACKGROUND_STYLES`), category emoji mappings (`ALTAR_CATEGORY_EMOJI`, `CATEGORY_EMOJIS`), and the default background (`DEFAULT_ALTAR_BACKGROUND`).
+- **`src/lib/altarConstants.ts`** — Altar background presets (`ALTAR_BACKGROUND_PRESETS`, `ALTAR_BACKGROUND_STYLES`), category emoji mappings (`ALTAR_CATEGORY_EMOJI`, `CATEGORY_EMOJIS`), the default background (`DEFAULT_ALTAR_BACKGROUND`), and the canonical grid defaults (`DEFAULT_GRID_SIZE`, `DEFAULT_GRID_OPACITY`, `DEFAULT_GRID_COLOR`). The SQL migration defaults for altar grid columns must stay in sync with these constants.
 
 ## Altar UI Composition
 
@@ -263,9 +263,9 @@ A fixed-scene rendering experiment (absolute pixel sizing) was rolled back. Alta
 
 Store integration details:
 
-- `uiStore` provides altar scene UI controls (grid size/opacity/color, snap toggle, fullscreen toggle).
+- `uiStore` provides altar scene UI controls (fullscreen toggle). Grid settings were moved out of `uiStore` in 0.1.3 — see below.
 - Altar screens consume `uiStore` with granular selectors to reduce unrelated rerenders.
-- `altarStore` remains source of truth for altar records, items, placements, and placement patch clamping. The store exposes `clearActiveAltar` and `bumpAltarUpdatedAt` actions; the latter updates only the `updated_at` column on placement edits without re-running the full altar update path.
+- `altarStore` is the source of truth for altar records, items, placements, placement patch clamping, and — as of migration v18 — per-altar grid configuration. The store exposes `clearActiveAltar`, `bumpAltarUpdatedAt`, and `updateAltarGrid` actions. `bumpAltarUpdatedAt` updates only the `updated_at` column on placement edits. `updateAltarGrid(id, patch)` is the sole write path for the five grid fields; it clamps all numeric values, validates the hex color, sets `updated_at`, and sorts the in-memory altar list by `updated_at`.
 
 ## Font System
 

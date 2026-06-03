@@ -31,11 +31,6 @@ interface UIState {
   tasksPrefs: ListPrefs;
   altarPrefs: ListPrefs;
   trashPrefs: ListPrefs;
-  altarCanvasGrid: boolean;
-  altarCanvasGridSize: number;
-  altarCanvasGridOpacity: number;
-  altarCanvasGridColor: string;
-  altarSnapToGrid: boolean;
   altarWindowFullscreen: boolean;
   homeJournalPrefs: HomeSectionPrefs;
   homeOpsPrefs: HomeSectionPrefs;
@@ -64,11 +59,6 @@ interface UIState {
   setTasksPrefs: (p: Partial<ListPrefs>) => void;
   setAltarPrefs: (p: Partial<ListPrefs>) => void;
   setTrashPrefs: (p: Partial<ListPrefs>) => void;
-  setAltarCanvasGrid: (enabled: boolean) => void;
-  setAltarCanvasGridSize: (size: number) => void;
-  setAltarCanvasGridOpacity: (opacity: number) => void;
-  setAltarCanvasGridColor: (color: string) => void;
-  setAltarSnapToGrid: (enabled: boolean) => void;
   setAltarWindowFullscreen: (enabled: boolean) => void;
   setHomeJournalPrefs: (p: Partial<HomeSectionPrefs>) => void;
   setHomeOpsPrefs: (p: Partial<HomeSectionPrefs>) => void;
@@ -92,22 +82,6 @@ function loadSavedEditorFontId(): FontId {
   return normalizeEditorFontId(localStorage.getItem('editor-font-id'));
 }
 
-function loadSavedAltarGridSize(): number {
-  const saved = Number(localStorage.getItem('altar-grid-size'));
-  if (!Number.isFinite(saved)) return 32;
-  return Math.max(8, Math.min(128, Math.round(saved)));
-}
-
-function loadSavedAltarGridOpacity(): number {
-  const saved = Number(localStorage.getItem('altar-grid-opacity'));
-  if (!Number.isFinite(saved)) return 0.06;
-  return Math.max(0.01, Math.min(0.25, saved));
-}
-
-function loadSavedAltarGridColor(): string {
-  const saved = localStorage.getItem('altar-grid-color') || '#dce8e2';
-  return /^#[0-9a-fA-F]{6}$/.test(saved) ? saved : '#dce8e2';
-}
 
 function normalizeSavedTab(tab: unknown): OpenTab | null {
   if (!tab || typeof tab !== 'object') return null;
@@ -168,11 +142,6 @@ export const useUIStore = create<UIState>((set) => ({
   tasksPrefs: { view: 'list', sort: 'category' },
   altarPrefs: { view: 'cards', sort: 'date_desc' },
   trashPrefs: { view: 'list', sort: 'date_desc' },
-  altarCanvasGrid: false,
-  altarCanvasGridSize: loadSavedAltarGridSize(),
-  altarCanvasGridOpacity: loadSavedAltarGridOpacity(),
-  altarCanvasGridColor: loadSavedAltarGridColor(),
-  altarSnapToGrid: false,
   altarWindowFullscreen: false,
   homeJournalPrefs: { sort: 'date_desc', view: 'list', count: 5 },
   homeOpsPrefs:     { sort: 'date_desc', view: 'list', count: 5 },
@@ -285,23 +254,6 @@ export const useUIStore = create<UIState>((set) => ({
   setTasksPrefs: (p) => set((s) => ({ tasksPrefs: { ...s.tasksPrefs, ...p } })),
   setAltarPrefs: (p) => set((s) => ({ altarPrefs: { ...s.altarPrefs, ...p } })),
   setTrashPrefs: (p) => set((s) => ({ trashPrefs: { ...s.trashPrefs, ...p } })),
-  setAltarCanvasGrid: (enabled) => set({ altarCanvasGrid: enabled }),
-  setAltarCanvasGridSize: (size) => {
-    const next = Math.max(8, Math.min(128, Math.round(size)));
-    localStorage.setItem('altar-grid-size', String(next));
-    set({ altarCanvasGridSize: next });
-  },
-  setAltarCanvasGridOpacity: (opacity) => {
-    const next = Math.max(0.01, Math.min(0.25, opacity));
-    localStorage.setItem('altar-grid-opacity', String(next));
-    set({ altarCanvasGridOpacity: next });
-  },
-  setAltarCanvasGridColor: (color) => {
-    const next = /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#dce8e2';
-    localStorage.setItem('altar-grid-color', next);
-    set({ altarCanvasGridColor: next });
-  },
-  setAltarSnapToGrid: (enabled) => set({ altarSnapToGrid: enabled }),
   setAltarWindowFullscreen: (enabled) => set({ altarWindowFullscreen: enabled }),
   setHomeJournalPrefs: (p) => set((s) => ({ homeJournalPrefs: { ...s.homeJournalPrefs, ...p } })),
   setHomeOpsPrefs:     (p) => set((s) => ({ homeOpsPrefs:     { ...s.homeOpsPrefs,     ...p } })),

@@ -50,6 +50,7 @@ credentials.json
 
 # Claude / AI tooling (not part of the project)
 .claude/
+.opencode/
 agents/
 AGENTS.md
 AI_HANDOFF.md
