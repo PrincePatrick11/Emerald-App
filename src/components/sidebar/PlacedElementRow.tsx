@@ -1,6 +1,7 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, Lock, Unlock, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Lock, Unlock, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Trash2, Copy } from 'lucide-react';
 import type { AltarPlacement } from '../../types';
 import { AltarItemVisual } from '../altar/AltarItemVisual';
 
@@ -11,6 +12,7 @@ export const PlacedElementRow = memo(function PlacedElementRow({
   onSelect,
   onToggleHidden,
   onToggleLocked,
+  onDuplicate,
   onRemove,
 }: {
   placement: AltarPlacement;
@@ -19,41 +21,89 @@ export const PlacedElementRow = memo(function PlacedElementRow({
   onSelect: () => void;
   onToggleHidden: () => void;
   onToggleLocked: () => void;
+  onDuplicate: () => void;
   onRemove: () => void;
 }) {
   const { t } = useTranslation();
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    window.addEventListener('click', close);
+    window.addEventListener('contextmenu', close);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('contextmenu', close);
+    };
+  }, [contextMenu]);
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (!isEditing) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
   return (
-    <div
-      onClick={onSelect}
-      className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors cursor-pointer ${isSelected ? 'bg-stone-700/70 text-stone-100' : 'bg-stone-900/40 text-stone-300 hover:bg-stone-800/60'}`}
-    >
-      <AltarItemVisual item={placement} size={16} candleAnimate={placement.category === 'candle'} />
-      <span className="flex-1 truncate text-xs">{placement.name}</span>
-      <span className="text-[10px] text-stone-500">z{placement.z_index}</span>
-      {isEditing && <span className="flex items-center gap-0.5" onClick={(event) => event.stopPropagation()}>
-        <button
-          onClick={onToggleHidden}
-          className="text-stone-500 hover:text-stone-300"
-          title={placement.hidden ? t('altar.show') : t('altar.hide')}
+    <>
+      <div
+        onClick={onSelect}
+        onContextMenu={handleContextMenu}
+        className={`w-full flex items-center gap-2 rounded-md px-2 py-2 text-left transition-colors cursor-pointer ${isSelected ? 'bg-stone-700/70 text-stone-100' : 'bg-stone-900/40 text-stone-300 hover:bg-stone-800/60'}`}
+      >
+        <AltarItemVisual item={placement} size={20} candleAnimate={placement.category === 'candle'} />
+        <span className="flex-1 truncate text-sm">{placement.name}</span>
+        <span className="text-[10px] text-stone-500">z{placement.z_index}</span>
+        {isEditing && <span className="flex items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
+          <button
+            onClick={onDuplicate}
+            className="text-stone-500 hover:text-stone-300"
+            title={t('altar.duplicateElement')}
+          >
+            <Copy size={12} />
+          </button>
+          <button
+            onClick={onToggleLocked}
+            className="text-stone-500 hover:text-stone-300"
+            title={placement.locked ? t('altar.unlock') : t('altar.lock')}
+          >
+            {placement.locked ? <Lock size={12} /> : <Unlock size={12} />}
+          </button>
+          <button
+            onClick={onToggleHidden}
+            className="text-stone-500 hover:text-stone-300"
+            title={placement.hidden ? t('altar.show') : t('altar.hide')}
+          >
+            {placement.hidden ? <EyeOff size={12} /> : <Eye size={12} />}
+          </button>
+        </span>}
+      </div>
+      {contextMenu && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x, zIndex: 9999 }}
+          className="min-w-[140px] rounded-lg border border-stone-700 bg-stone-900 py-1 shadow-xl"
+          onClick={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
         >
-          {placement.hidden ? <EyeOff size={12} /> : <Eye size={12} />}
-        </button>
-        <button
-          onClick={onToggleLocked}
-          className="text-stone-500 hover:text-stone-300"
-          title={placement.locked ? t('altar.unlock') : t('altar.lock')}
-        >
-          {placement.locked ? <Lock size={12} /> : <Unlock size={12} />}
-        </button>
-        <button
-          onClick={onRemove}
-          className="text-stone-500 hover:text-red-400"
-          title={t('altar.removeElement')}
-        >
-          <Trash2 size={12} />
-        </button>
-      </span>}
-    </div>
+          <button
+            onClick={() => { onDuplicate(); setContextMenu(null); }}
+            className="w-full px-3 py-1.5 text-left text-xs text-stone-300 hover:bg-stone-800"
+          >
+            Duplicate
+          </button>
+          <button
+            onClick={() => { onRemove(); setContextMenu(null); }}
+            className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:bg-stone-800"
+          >
+            Remove
+          </button>
+        </div>,
+        document.body
+      )}
+    </>
   );
 });
 
@@ -64,6 +114,7 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
   onBringForward,
   onSendBackward,
   onSendToBack,
+  onRemove,
 }: {
   placement: AltarPlacement;
   onUpdate: (patch: { x?: number; y?: number; width?: number; height?: number; rotation?: number; opacity?: number; z_index?: number }) => void;
@@ -71,6 +122,7 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
   onBringForward: () => void;
   onSendBackward: () => void;
   onSendToBack: () => void;
+  onRemove: () => void;
 }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState({
@@ -137,7 +189,16 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
 
   return (
     <div className="rounded-lg border border-stone-700/60 bg-stone-900/40 p-2.5 space-y-2">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">{t('altar.inspector')}</p>
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">{t('altar.inspector')}</p>
+        <button
+          onClick={onRemove}
+          className="text-stone-500 hover:text-red-400"
+          title={t('altar.removeElement')}
+        >
+          <Trash2 size={13} />
+        </button>
+      </div>
       <div className="grid grid-cols-2 gap-1.5">
         <label className="space-y-1">
           <span className="text-[10px] uppercase tracking-wider text-stone-500">{t('altar.inspectorX')}</span>

@@ -8,6 +8,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - Altar edit mode: per-altar **snap rotation angle** setting — a toggle plus a 1–180° step input and slider; when active, dragging the rotation handle snaps to the configured angle instead of free rotation (Shift still snaps to 15° when the toggle is off)
 - Altar edit mode: per-altar **scale to grid** toggle — resizing a placement snaps its display size to multiples of `gridSize × 2`
+- Altar edit mode: **Duplicate** button on each placed-element row — creates a copy with the same size, rotation, and opacity, offset +2% in both axes, placed on top (`z_index = max + 1`), unlocked, visible, and immediately selected
+- Altar edit mode: **right-click context menu** on placed-element rows — shows "Duplicate" and "Remove" actions; portal-rendered at fixed position, closes on next click or right-click anywhere
+- Altar sidebar: **collapsible sections** — "Background" / "Change Background", "Grid Options", and "Placed Elements" can each be toggled open or closed with a chevron button; all three default to open
 - Breadcrumb link back to the list view in OperationsView, WikiView, and JournalView (topbar, left of the entry title area)
 - `contextMenu.openInNewTab` translation key added to all four locales (de/en/es/fr); the "Open in New Tab" context menu item is now fully localised
 - `isImageIcon` helper extracted to `src/lib/helpers.ts` and shared across OperationsView and WikiView
@@ -33,12 +36,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Database schema migrations refactored into a versioned, ordered list tracked via a `schema_version` table; existing vaults upgrade transparently on first open
 - Wiki and Operation custom icons now render image icons only from safe local/data/blob sources (`/`, `data:image/...`, `blob:`); remote `http(s)` URLs are treated as non-image icons
 - Operations and Home dashboard operation cards/lists now consistently use custom operation icons first, then category emoji fallback
-- Altar inspector now renders inline under the selected placed-element row in the sidebar
+- Altar inspector now renders inline under the selected placed-element row in the sidebar; the delete button for the selected element was moved from the row into the inspector header (top-right corner)
 - Altar library moved under the canvas in edit mode and switched to compact tile sizing (70×85)
 - Altar placement defaults/limits updated (default size 40; width/height clamped with max 500; numeric patch clamping centralized in store)
 - Locked Altar placements are now click-through on canvas (`pointer-events: none`)
 - Full-window Altar mode behavior refined: edit mode exits full-window, and edit-only controls (including grid options) remain hidden in view mode
 - Altar placed-element rows are now selectable in view mode (not only edit mode); clicking a row in the sidebar highlights the element on the canvas with a jade border; clicking empty canvas or sidebar area deselects
+- Clicking an already-selected placed-element row a second time deselects it (inspector closes)
+- Placed-element rows in the sidebar use larger touch targets (`px-2 py-2`), a 20 px item visual, and `text-sm` labels; icon buttons are spaced with `gap-1.5`
+- Button order in placed-element rows (edit mode) changed to: Duplicate → Lock → Eye
+- Altar sidebar "Background" section header shows "Background" in view mode and "Change Background" in edit mode (`altar.background` i18n key added to all four locales)
 - Altar grid settings (enabled, size, opacity, color, snap-to-grid) migrated from `uiStore` / localStorage to per-altar database columns so each altar remembers its own grid configuration independently
 - `updateAltarGrid(id, patch)` is the sole write path for all altar grid/snap fields (grid options + rotation snap + scale to grid); values are clamped and validated before persistence
 - Altar canvas drag performance: `movePlacement` no longer rebuilds the `previewPlacements` map on every pointer move event (60–120 Hz); the preview is synced once on mouse-up via `savePlacementPosition`, eliminating per-frame full-view re-renders during drag

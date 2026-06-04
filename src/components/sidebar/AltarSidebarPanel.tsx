@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
-import { Check, Image as ImageIcon, Pencil, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Image as ImageIcon, Pencil, Trash2 } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import {
   ALTAR_BACKGROUND_PRESETS,
@@ -40,6 +40,7 @@ export default function AltarSidebarPanel() {
     updateAltar,
     selectPlacement,
     updatePlacement,
+    duplicatePlacement,
     removePlacement,
     bringPlacementForward,
     sendPlacementBackward,
@@ -50,6 +51,7 @@ export default function AltarSidebarPanel() {
       updateAltar: s.updateAltar,
       selectPlacement: s.selectPlacement,
       updatePlacement: s.updatePlacement,
+      duplicatePlacement: s.duplicatePlacement,
       removePlacement: s.removePlacement,
       bringPlacementForward: s.bringPlacementForward,
       sendPlacementBackward: s.sendPlacementBackward,
@@ -65,6 +67,9 @@ export default function AltarSidebarPanel() {
   const backgroundInputRef = useRef<HTMLInputElement>(null);
   const noticeTimerRef = useRef<number | null>(null);
   const [backgroundNotice, setBackgroundNotice] = useState<string | null>(null);
+  const [backgroundOpen, setBackgroundOpen] = useState(true);
+  const [gridOpen, setGridOpen] = useState(true);
+  const [placementsOpen, setPlacementsOpen] = useState(true);
   const [customBackgroundMap, setCustomBackgroundMap] = useState<Record<string, string>>(() => {
     try {
       const raw = localStorage.getItem('altar-custom-backgrounds');
@@ -165,10 +170,14 @@ export default function AltarSidebarPanel() {
 
       {activeAltar && (
         <div className="px-3 pb-5">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
-            {t('altar.changeBackground')}
-          </p>
-          {isEditing ? (
+          <button
+            onClick={() => setBackgroundOpen((v) => !v)}
+            className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
+          >
+            {backgroundOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            {isEditing ? t('altar.changeBackground') : t('altar.background')}
+          </button>
+          {backgroundOpen && (isEditing ? (
             <div className="mt-2 grid grid-cols-2 gap-2">
               {ALTAR_BACKGROUND_PRESETS.map((preset) => {
                   const selected = !activeAltar.background_image_data && (activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND) === preset;
@@ -280,13 +289,18 @@ export default function AltarSidebarPanel() {
                 </span>
               </div>
             </div>
-          )}
+          ))}
           {backgroundNotice && <p className="mt-2 text-xs text-jade-300">{backgroundNotice}</p>}
           {isEditing && (
             <>
-              <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-stone-500">
+              <button
+                onClick={() => setGridOpen((v) => !v)}
+                className="mt-4 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
+              >
+                {gridOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                 {t('altar.gridOptions')}
-              </p>
+              </button>
+              {gridOpen && <>
               <ToggleRow
                 label={t('altar.gridOverlay')}
                 checked={activeAltar.grid_enabled}
@@ -386,17 +400,22 @@ export default function AltarSidebarPanel() {
                 checked={activeAltar.snap_scale_to_grid}
                 onClick={() => updateAltarGrid(activeAltar.id, { snap_scale_to_grid: !activeAltar.snap_scale_to_grid })}
               />
+              </>}
             </>
           )}
         </div>
       )}
 
       {activeAltar && (
-        <div className="flex-1 min-h-0 px-3 pb-4 border-t border-stone-700/60 flex flex-col">
-          <p className="pt-4 text-[11px] font-semibold uppercase tracking-wider text-stone-500">
+        <div className="min-h-0 px-3 pb-4 border-t border-stone-700/60 flex flex-col" style={{ flex: placementsOpen ? '1 1 0' : '0 0 auto' }}>
+          <button
+            onClick={() => setPlacementsOpen((v) => !v)}
+            className="pt-4 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
+          >
+            {placementsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             {t('altar.placedElements')}
-          </p>
-          <div className="mt-2 flex-1 min-h-0 overflow-y-auto space-y-1 pr-1" onClick={(e) => { if (e.target === e.currentTarget) selectPlacement(null); }}>
+          </button>
+          {placementsOpen && <div className="mt-2 flex-1 min-h-0 overflow-y-auto space-y-1 pr-1" onClick={(e) => { if (e.target === e.currentTarget) selectPlacement(null); }}>
             {sortedPlacements.length === 0 && (
               <p className="px-2 py-2 text-xs text-stone-600">{t('altar.noPlacedElements')}</p>
             )}
@@ -406,9 +425,10 @@ export default function AltarSidebarPanel() {
                   placement={placement}
                   isEditing={isEditing}
                   isSelected={selectedPlacementId === placement.id}
-                  onSelect={() => selectPlacement(placement.id)}
+                  onSelect={() => selectPlacement(selectedPlacementId === placement.id ? null : placement.id)}
                   onToggleHidden={() => updatePlacement(placement.id, { hidden: !placement.hidden })}
                   onToggleLocked={() => updatePlacement(placement.id, { locked: !placement.locked })}
+                  onDuplicate={() => duplicatePlacement(placement.id)}
                   onRemove={() => removePlacement(placement.id)}
                 />
                 {isEditing && selectedPlacementId === placement.id && selectedPlacement && (
@@ -419,11 +439,12 @@ export default function AltarSidebarPanel() {
                     onBringForward={() => bringPlacementForward(placement.id)}
                     onSendBackward={() => sendPlacementBackward(placement.id)}
                     onSendToBack={() => sendPlacementToBack(placement.id)}
+                    onRemove={() => removePlacement(placement.id)}
                   />
                 )}
               </div>
             ))}
-          </div>
+          </div>}
         </div>
       )}
     </div>

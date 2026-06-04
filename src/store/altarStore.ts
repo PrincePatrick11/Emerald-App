@@ -109,6 +109,7 @@ interface AltarState {
   bringPlacementToFront: (id: string) => Promise<void>;
   sendPlacementToBack: (id: string) => Promise<void>;
   _swapPlacementZIndex: (idA: string, idB: string) => Promise<void>;
+  duplicatePlacement: (id: string) => Promise<void>;
   removePlacement: (id: string) => Promise<void>;
   saveIntention: (text: string) => Promise<void>;
   setIntentionLocal: (text: string) => void;
@@ -534,6 +535,50 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     }
     const refreshedMin = get().placements.reduce((min, p) => Math.min(min, p.z_index), 0);
     await get().updatePlacement(id, { z_index: Math.max(0, refreshedMin - 1) });
+  },
+
+  duplicatePlacement: async (id) => {
+    const db = await getDb();
+    const altarId = get().activeAltarId;
+    if (!altarId) return;
+    const source = get().placements.find((p) => p.id === id);
+    if (!source) return;
+    const newId = generateId();
+    const maxZ = get().placements.reduce((max, p) => Math.max(max, p.z_index), -1);
+    const nextZ = maxZ + 1;
+    const newX = Math.min(100, source.x + 2);
+    const newY = Math.min(100, source.y + 2);
+    await db.execute(
+      'INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
+      [newId, altarId, source.item_id, newX, newY, nextZ, source.width, source.height, source.rotation, source.opacity, 0, 0]
+    );
+    const copy: AltarPlacement = {
+      id: newId,
+      altar_id: altarId,
+      item_id: source.item_id,
+      name: source.name,
+      emoji: source.emoji,
+      category: source.category,
+      x: newX,
+      y: newY,
+      z_index: nextZ,
+      width: source.width,
+      height: source.height,
+      rotation: source.rotation,
+      opacity: source.opacity,
+      locked: false,
+      hidden: false,
+      image_data: source.image_data,
+    };
+    set((s) => ({
+      placements: [...s.placements, copy],
+      selectedPlacementId: newId,
+      previewPlacements: {
+        ...s.previewPlacements,
+        [altarId]: [...(s.previewPlacements[altarId] ?? []), copy],
+      },
+    }));
+    await get().bumpAltarUpdatedAt(altarId);
   },
 
   removePlacement: async (id) => {

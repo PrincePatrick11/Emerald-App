@@ -258,7 +258,7 @@ Altar rendering and editing were split into focused components:
 - **`src/components/altar/AltarCard.tsx`** — `AltarCard`, `AltarListRow`, and the shared context-menu action builder for the altar dashboard.
 - **`src/components/altar/AltarCardPreview.tsx`** — preview scene used by the dashboard cards and list rows (background + placed items, both compact and full-size variants).
 - **`src/components/altar/AltarRenameField.tsx`** — inline rename input used by the dashboard cards and list rows.
-- **`src/components/sidebar/PlacedElementRow.tsx`** — `PlacedElementRow` and `PlacedElementInspector` for the sidebar's placed-elements list and its inline inspector.
+- **`src/components/sidebar/PlacedElementRow.tsx`** — `PlacedElementRow` and `PlacedElementInspector` for the sidebar's placed-elements list and its inline inspector. `PlacedElementRow` manages its own right-click context-menu state (position + portal render via `createPortal`). The delete button lives in `PlacedElementInspector`'s header, not in the row, so the row surface stays uncluttered.
 
 Supporting hooks:
 
@@ -270,7 +270,7 @@ Store integration details:
 
 - `uiStore` provides altar scene UI controls (fullscreen toggle). Grid settings were moved out of `uiStore` in 0.1.3 — see below.
 - Altar screens consume `uiStore` with granular selectors to reduce unrelated rerenders.
-- `altarStore` is the source of truth for altar records, items, placements, placement patch clamping, and per-altar grid/snap configuration. The store exposes `clearActiveAltar`, `bumpAltarUpdatedAt`, and `updateAltarGrid` actions. `bumpAltarUpdatedAt` updates only the `updated_at` column on placement edits. `updateAltarGrid(id, patch)` is the sole write path for all eight altar settings fields (grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid); it clamps all numeric values, validates the hex color, sets `updated_at`, and sorts the in-memory altar list by `updated_at`.
+- `altarStore` is the source of truth for altar records, items, placements, placement patch clamping, and per-altar grid/snap configuration. The store exposes `clearActiveAltar`, `bumpAltarUpdatedAt`, `updateAltarGrid`, and `duplicatePlacement` actions. `bumpAltarUpdatedAt` updates only the `updated_at` column on placement edits. `updateAltarGrid(id, patch)` is the sole write path for all eight altar settings fields (grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid); it clamps all numeric values, validates the hex color, sets `updated_at`, and sorts the in-memory altar list by `updated_at`. `duplicatePlacement(id)` inserts a new row into `altar_placements` with a fresh UUID, copies width/height/rotation/opacity from the source, positions it +2% in both axes (capped at 100), assigns `z_index = max + 1`, sets locked and hidden to false, and immediately selects the new element.
 
 **Altar drag performance.** `movePlacement` updates only the `placements` slice (used by `AltarCanvas`) on every pointer-move event. It intentionally does not touch `previewPlacements` (used by `AltarCard` thumbnails), because rebuilding that map at 60–120 Hz causes `AltarView` to re-render at pointer rate. `savePlacementPosition` (called on mouse-up) syncs the final position into `previewPlacements`, which is sufficient for thumbnail accuracy.
 

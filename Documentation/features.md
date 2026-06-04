@@ -82,9 +82,15 @@ Library tiles use a compact fixed footprint (**70×85 px**) to keep more items v
 
 Locked placements are click-through on the canvas (pointer events disabled), so interactions pass to items behind them.
 
-**Inspector and placement controls.** The right sidebar includes a placed-elements list and an inline inspector rendered directly under the selected row. Inspector fields include `x`, `y`, `scale`, `rotation`, `opacity`, and `z-index`, plus layer ordering controls.
+**Inspector and placement controls.** The right sidebar includes a placed-elements list and an inline inspector rendered directly under the selected row. Inspector fields include `x`, `y`, `scale`, `rotation`, `opacity`, and `z-index`, plus layer ordering controls. The delete button for the selected element is in the inspector header (top-right corner).
 
-**Selecting elements in view mode.** Clicking a row in the placed-elements sidebar highlights the corresponding element on the canvas with a jade border even when in view mode (not only in edit mode). Clicking an empty area of the canvas or the sidebar deselects.
+**Duplicate.** In edit mode, each placed-element row has a Duplicate button (copy icon). Duplicating a placement creates a copy with identical size, rotation, and opacity, offset +2% in both axes, placed on top of all other elements, unlocked, visible, and immediately selected. The same action is available via right-click on any row.
+
+**Row actions (edit mode).** Each placed-element row shows three icon buttons from left to right: Duplicate, Lock/Unlock, Eye/Hide. Right-clicking a row opens a context menu with "Duplicate" and "Remove" entries (portal-rendered at fixed position, auto-closes on the next click anywhere).
+
+**Selecting elements.** Clicking a row in the placed-elements sidebar highlights the corresponding element on the canvas with a jade border in both view and edit mode. Clicking the same row again deselects it (the inspector closes). Clicking an empty area of the canvas or the sidebar also deselects.
+
+**Sidebar sections.** The altar sidebar groups controls into three collapsible sections — Background, Grid Options, and Placed Elements — each with a chevron toggle. All three default to open. In view mode the background section header reads "Background"; in edit mode it reads "Change Background".
 
 **Grid and snapping.** Each altar stores its own grid configuration: overlay toggle, size (8–128 px), opacity (1–25%), color, snap-to-grid, rotation snap, and scale to grid. Settings are saved immediately to the database and persist per altar, so switching between altars always restores that altar's own grid state. Grid controls are visible only in edit mode.
 
