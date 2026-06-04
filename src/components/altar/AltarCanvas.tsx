@@ -18,6 +18,9 @@ export function AltarCanvas({
   gridOpacity,
   gridColor,
   snapToGrid,
+  rotationSnapEnabled,
+  rotationSnapAngle,
+  snapScaleToGrid,
   getBackgroundStyle,
 }: {
   altar: AltarRecord | null;
@@ -28,6 +31,9 @@ export function AltarCanvas({
   gridOpacity: number;
   gridColor: string;
   snapToGrid: boolean;
+  rotationSnapEnabled: boolean;
+  rotationSnapAngle: number;
+  snapScaleToGrid: boolean;
   getBackgroundStyle: (altar: AltarRecord | null, imageSrc: string | null | undefined) => string;
 }) {
   const { t } = useTranslation();
@@ -51,18 +57,33 @@ export function AltarCanvas({
     () => [...placements].sort((a, b) => a.z_index - b.z_index),
     [placements],
   );
-  const handleStartDrag = useCallback((id: string) => () => { draggingRef.current = id; }, []);
-  const handleSelect = useCallback((id: string) => () => selectPlacement(id), [selectPlacement]);
-  const handleResize = useCallback(
-    (id: string) => (width: number, height: number) => updatePlacement(id, { width, height }),
-    [updatePlacement],
+  // Stable callbacks that accept `id` as a parameter so they can be passed
+  // down once to PlacedItem rather than recreated per-item inside the map.
+  // PlacedItem calls e.g. onStartDrag() — we give it the bound version below
+  // via useMemo so memo() can bail out when nothing changed.
+  const handleStartDragById = useCallback((id: string) => { draggingRef.current = id; }, []);
+  const handleSelectById = useCallback((id: string) => { selectPlacement(id); }, [selectPlacement]);
+  const handleResizeById = useCallback(
+    (id: string, width: number, height: number) => {
+      if (snapScaleToGrid && gridSize > 0) {
+        const displaySize = BASE_SIZE * (width / 8);
+        const snapUnit = gridSize * 2;
+        const snapped = Math.max(snapUnit, Math.round(displaySize / snapUnit) * snapUnit);
+        const snappedUnit = (snapped / BASE_SIZE) * 8;
+        const clamped = Math.max(2, Math.min(500, Math.round(snappedUnit * 100) / 100));
+        updatePlacement(id, { width: clamped, height: clamped });
+      } else {
+        updatePlacement(id, { width, height });
+      }
+    },
+    [updatePlacement, snapScaleToGrid, gridSize],
   );
-  const handleRotate = useCallback(
-    (id: string) => (rotation: number) => updatePlacement(id, { rotation }),
+  const handleRotateById = useCallback(
+    (id: string, rotation: number) => updatePlacement(id, { rotation }),
     [updatePlacement],
   );
 
-  const coordsToPercent = (clientX: number, clientY: number) => {
+  const coordsToPercent = useCallback((clientX: number, clientY: number) => {
     const rect = canvasRef.current!.getBoundingClientRect();
     let x = Math.max(3, Math.min(97, ((clientX - rect.left) / rect.width) * 100));
     let y = Math.max(3, Math.min(97, ((clientY - rect.top) / rect.height) * 100));
@@ -75,7 +96,7 @@ export function AltarCanvas({
       y = Math.max(3, Math.min(97, y));
     }
     return { x, y };
-  };
+  }, [snapToGrid, gridSize]);
 
   useEffect(() => subscribeAltarDrag(setSidebarDragItem), []);
 
@@ -163,10 +184,12 @@ export function AltarCanvas({
           placement={p}
           editable={editable}
           selected={selectedPlacementId === p.id}
-          onStartDrag={handleStartDrag(p.id)}
-          onSelect={handleSelect(p.id)}
-          onResize={handleResize(p.id)}
-          onRotate={handleRotate(p.id)}
+          rotationSnapEnabled={rotationSnapEnabled}
+          rotationSnapAngle={rotationSnapAngle}
+          onStartDrag={handleStartDragById}
+          onSelect={handleSelectById}
+          onResize={handleResizeById}
+          onRotate={handleRotateById}
         />
       ))}
 
@@ -183,14 +206,18 @@ export function AltarCanvas({
   );
 }
 
-const PlacedItem = memo(function PlacedItem({ placement, editable, selected, onStartDrag, onSelect, onResize, onRotate }: {
+const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rotationSnapEnabled, rotationSnapAngle, onStartDrag, onSelect, onResize, onRotate }: {
   placement: AltarPlacement;
   editable: boolean;
   selected: boolean;
-  onStartDrag: () => void;
-  onSelect: () => void;
-  onResize: (width: number, height: number) => void;
-  onRotate: (rotation: number) => void;
+  rotationSnapEnabled: boolean;
+  rotationSnapAngle: number;
+  // Callbacks now accept `id` so a single stable reference can be shared
+  // across all PlacedItem instances, letting React.memo bail out correctly.
+  onStartDrag: (id: string) => void;
+  onSelect: (id: string) => void;
+  onResize: (id: string, width: number, height: number) => void;
+  onRotate: (id: string, rotation: number) => void;
 }) {
   const { t } = useTranslation();
   const [hovered, setHovered] = useState(false);
@@ -207,14 +234,14 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, onS
     const delta = e.deltaY < 0 ? 0.4 : -0.4;
     const nextWidth = Math.round(Math.max(2, Math.min(500, width + delta)) * 100) / 100;
     const nextHeight = Math.round(Math.max(2, Math.min(500, height + delta)) * 100) / 100;
-    onResize(nextWidth, nextHeight);
+    onResize(placement.id, nextWidth, nextHeight);
   };
 
   const startRotate = (event: React.MouseEvent) => {
     if (!editable || placement.locked) return;
     event.preventDefault();
     event.stopPropagation();
-    onSelect();
+    onSelect(placement.id);
     const root = rootRef.current;
     if (!root) return;
     const rect = root.getBoundingClientRect();
@@ -224,10 +251,12 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, onS
     const onMove = (moveEvent: MouseEvent) => {
       const angle = (Math.atan2(moveEvent.clientY - centerY, moveEvent.clientX - centerX) * 180) / Math.PI + 90;
       let normalized = Math.round((((angle % 360) + 360) % 360) * 10) / 10;
-      if (moveEvent.shiftKey) {
+      if (rotationSnapEnabled && rotationSnapAngle > 0) {
+        normalized = Math.round(normalized / rotationSnapAngle) * rotationSnapAngle;
+      } else if (moveEvent.shiftKey) {
         normalized = Math.round(normalized / 15) * 15;
       }
-      onRotate(normalized);
+      onRotate(placement.id, normalized);
     };
 
     const onUp = () => {
@@ -245,7 +274,7 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, onS
     if (!editable || placement.locked) return;
     event.preventDefault();
     event.stopPropagation();
-    onSelect();
+    onSelect(placement.id);
     const startX = event.clientX;
     const startY = event.clientY;
     const startWidth = width;
@@ -256,7 +285,7 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, onS
       const delta = (moveEvent.clientX - startX + (moveEvent.clientY - startY)) / 2;
       const nextSize = Math.max(2, Math.min(500, startSize + (delta * 8) / BASE_SIZE));
       const normalized = Math.round(nextSize * 100) / 100;
-      onResize(normalized, normalized);
+      onResize(placement.id, normalized, normalized);
     };
 
     const onUp = () => {
@@ -285,10 +314,10 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, onS
       onMouseDown={(e) => {
         e.stopPropagation();
         if (placement.locked) return;
-        onSelect();
+        onSelect(placement.id);
         if (!editable) return;
         e.preventDefault();
-        onStartDrag();
+        onStartDrag(placement.id);
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}

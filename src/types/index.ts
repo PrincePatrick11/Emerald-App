@@ -152,6 +152,9 @@ export interface AltarRecord {
   grid_opacity: number;
   grid_color: string;
   snap_to_grid: boolean;
+  rotation_snap_enabled: boolean;
+  rotation_snap_angle: number;
+  snap_scale_to_grid: boolean;
 }
 
 export interface AltarItem {

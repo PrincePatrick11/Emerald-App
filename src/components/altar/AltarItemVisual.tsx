@@ -1,4 +1,9 @@
-export function AltarItemVisual({
+import { memo } from 'react';
+
+// memo prevents re-renders when item reference changes but values are the same,
+// which happens on every drag frame for non-dragged items due to the placements
+// array being replaced in the store on each movePlacement call.
+export const AltarItemVisual = memo(function AltarItemVisual({
   item,
   size = 24,
   candleAnimate = false,
@@ -27,4 +32,4 @@ export function AltarItemVisual({
       {item.emoji}
     </span>
   );
-}
+});

@@ -59,6 +59,9 @@ function normalizeAltar(altar: AltarRecord): AltarRecord {
     grid_opacity: altar.grid_opacity ?? DEFAULT_GRID_OPACITY,
     grid_color: isValidHexColor(altar.grid_color) ? altar.grid_color : DEFAULT_GRID_COLOR,
     snap_to_grid: Boolean(altar.snap_to_grid),
+    rotation_snap_enabled: Boolean(altar.rotation_snap_enabled),
+    rotation_snap_angle: altar.rotation_snap_angle ?? 15,
+    snap_scale_to_grid: Boolean(altar.snap_scale_to_grid),
   };
 }
 
@@ -89,7 +92,7 @@ interface AltarState {
   createAltar: () => Promise<AltarRecord>;
   duplicateAltar: (id: string) => Promise<AltarRecord | null>;
   updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'intention' | 'background_preset' | 'background_image_data'>>) => Promise<void>;
-  updateAltarGrid: (id: string, patch: Partial<Pick<AltarRecord, 'grid_enabled' | 'grid_size' | 'grid_opacity' | 'grid_color' | 'snap_to_grid'>>) => Promise<void>;
+  updateAltarGrid: (id: string, patch: Partial<Pick<AltarRecord, 'grid_enabled' | 'grid_size' | 'grid_opacity' | 'grid_color' | 'snap_to_grid' | 'rotation_snap_enabled' | 'rotation_snap_angle' | 'snap_scale_to_grid'>>) => Promise<void>;
   bumpAltarUpdatedAt: (id: string) => Promise<void>;
   deleteAltar: (id: string) => Promise<void>;
 
@@ -184,10 +187,13 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       grid_opacity: DEFAULT_GRID_OPACITY,
       grid_color: DEFAULT_GRID_COLOR,
       snap_to_grid: false,
+      rotation_snap_enabled: false,
+      rotation_snap_angle: 15,
+      snap_scale_to_grid: false,
     };
     await db.execute(
-      'INSERT INTO altars (id, title, intention, background_preset, background_image_data, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
-      [altar.id, altar.title, altar.intention, altar.background_preset, altar.background_image_data, altar.created_at, altar.updated_at, 0, altar.grid_size, altar.grid_opacity, altar.grid_color, 0]
+      'INSERT INTO altars (id, title, intention, background_preset, background_image_data, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)',
+      [altar.id, altar.title, altar.intention, altar.background_preset, altar.background_image_data, altar.created_at, altar.updated_at, 0, altar.grid_size, altar.grid_opacity, altar.grid_color, 0, 0, altar.rotation_snap_angle, 0]
     );
     set((s) => ({ altars: [altar, ...s.altars], activeAltarId: altar.id, placements: [], selectedPlacementId: null, intention: '' }));
     return altar;
@@ -213,11 +219,14 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       grid_opacity: source.grid_opacity,
       grid_color: source.grid_color,
       snap_to_grid: source.snap_to_grid,
+      rotation_snap_enabled: source.rotation_snap_enabled,
+      rotation_snap_angle: source.rotation_snap_angle,
+      snap_scale_to_grid: source.snap_scale_to_grid,
     };
 
     await db.execute(
-      'INSERT INTO altars (id, title, intention, background_preset, background_image_data, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
-      [copy.id, copy.title, copy.intention, copy.background_preset, copy.background_image_data, copy.created_at, copy.updated_at, copy.grid_enabled ? 1 : 0, copy.grid_size, copy.grid_opacity, copy.grid_color, copy.snap_to_grid ? 1 : 0]
+      'INSERT INTO altars (id, title, intention, background_preset, background_image_data, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)',
+      [copy.id, copy.title, copy.intention, copy.background_preset, copy.background_image_data, copy.created_at, copy.updated_at, copy.grid_enabled ? 1 : 0, copy.grid_size, copy.grid_opacity, copy.grid_color, copy.snap_to_grid ? 1 : 0, copy.rotation_snap_enabled ? 1 : 0, copy.rotation_snap_angle, copy.snap_scale_to_grid ? 1 : 0]
     );
 
     const sourcePlacements = await db.select<{
@@ -283,11 +292,14 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       grid_opacity: Math.max(0.01, Math.min(0.25, patch.grid_opacity ?? altar.grid_opacity)),
       grid_color: patch.grid_color !== undefined && isValidHexColor(patch.grid_color) ? patch.grid_color : altar.grid_color,
       snap_to_grid: Boolean(patch.snap_to_grid ?? altar.snap_to_grid),
+      rotation_snap_enabled: Boolean(patch.rotation_snap_enabled ?? altar.rotation_snap_enabled),
+      rotation_snap_angle: Math.max(1, Math.min(180, Math.round(patch.rotation_snap_angle ?? altar.rotation_snap_angle))),
+      snap_scale_to_grid: Boolean(patch.snap_scale_to_grid ?? altar.snap_scale_to_grid),
       updated_at: nowIso(),
     };
     await db.execute(
-      'UPDATE altars SET grid_enabled=$1, grid_size=$2, grid_opacity=$3, grid_color=$4, snap_to_grid=$5, updated_at=$6 WHERE id=$7',
-      [boolToInt(next.grid_enabled), next.grid_size, next.grid_opacity, next.grid_color, boolToInt(next.snap_to_grid), next.updated_at, id]
+      'UPDATE altars SET grid_enabled=$1, grid_size=$2, grid_opacity=$3, grid_color=$4, snap_to_grid=$5, rotation_snap_enabled=$6, rotation_snap_angle=$7, snap_scale_to_grid=$8, updated_at=$9 WHERE id=$10',
+      [boolToInt(next.grid_enabled), next.grid_size, next.grid_opacity, next.grid_color, boolToInt(next.snap_to_grid), boolToInt(next.rotation_snap_enabled), next.rotation_snap_angle, boolToInt(next.snap_scale_to_grid), next.updated_at, id]
     );
     set((s) => ({
       altars: s.altars.map((entry) => (entry.id === id ? next : entry)).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
@@ -414,11 +426,14 @@ export const useAltarStore = create<AltarState>((set, get) => ({
 
   movePlacement: (id, x, y) => {
     const safePatch = clampPlacementPatch({ x, y });
+    // Only update the live `placements` slice used by AltarCanvas.
+    // `previewPlacements` (used by AltarCard thumbnails) is intentionally NOT
+    // updated here because movePlacement fires at 60-120 Hz during drag and
+    // rebuilding the entire previewPlacements map every frame causes AltarView
+    // to re-render at pointer rate. The preview is synced on mouse-up via
+    // savePlacementPosition, which is sufficient for thumbnail accuracy.
     set((s) => ({
       placements: s.placements.map((p) => (p.id === id ? { ...p, ...safePatch } : p)),
-      previewPlacements: Object.fromEntries(
-        Object.entries(s.previewPlacements).map(([altarId, placements]) => [altarId, placements.map((p) => (p.id === id ? { ...p, ...safePatch } : p))])
-      ),
     }));
   },
 
@@ -426,6 +441,17 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const db = await getDb();
     const safe = clampPlacementPatch({ x, y });
     await db.execute('UPDATE altar_placements SET x=$1, y=$2 WHERE id=$3', [safe.x, safe.y, id]);
+    // Sync the final drag position into previewPlacements now that the drag is
+    // complete. This is the only place we need to pay the per-altar map rebuild
+    // cost, and it runs at most once per drag gesture (on mouse-up).
+    set((s) => ({
+      previewPlacements: Object.fromEntries(
+        Object.entries(s.previewPlacements).map(([altarId, placements]) => [
+          altarId,
+          placements.map((p) => (p.id === id ? { ...p, ...safe } : p)),
+        ])
+      ),
+    }));
     const activeAltarId = get().activeAltarId;
     if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
   },

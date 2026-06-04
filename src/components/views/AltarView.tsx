@@ -324,7 +324,7 @@ export default function AltarView() {
         </div>
       )}
 
-      <AltarCanvas altar={activeAltar} backgroundSrc={backgroundSrc} editable={isEditing} showGrid={activeAltar.grid_enabled} gridSize={activeAltar.grid_size} gridOpacity={activeAltar.grid_opacity} gridColor={activeAltar.grid_color} snapToGrid={activeAltar.snap_to_grid} getBackgroundStyle={getAltarBackgroundStyleWithImage} />
+      <AltarCanvas altar={activeAltar} backgroundSrc={backgroundSrc} editable={isEditing} showGrid={activeAltar.grid_enabled} gridSize={activeAltar.grid_size} gridOpacity={activeAltar.grid_opacity} gridColor={activeAltar.grid_color} snapToGrid={activeAltar.snap_to_grid} rotationSnapEnabled={activeAltar.rotation_snap_enabled} rotationSnapAngle={activeAltar.rotation_snap_angle} snapScaleToGrid={activeAltar.snap_scale_to_grid} getBackgroundStyle={getAltarBackgroundStyleWithImage} />
 
       {isEditing && !altarWindowFullscreen && <AltarLibraryStrip editable={isEditing} />}
     </div>

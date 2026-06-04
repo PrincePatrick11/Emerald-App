@@ -86,7 +86,11 @@ Locked placements are click-through on the canvas (pointer events disabled), so 
 
 **Selecting elements in view mode.** Clicking a row in the placed-elements sidebar highlights the corresponding element on the canvas with a jade border even when in view mode (not only in edit mode). Clicking an empty area of the canvas or the sidebar deselects.
 
-**Grid and snapping.** Each altar stores its own grid configuration: overlay toggle, size (8–128 px), opacity (1–25%), color, and snap-to-grid. Settings are saved immediately to the database and persist per altar, so switching between altars always restores that altar's own grid state. Grid controls are visible only in edit mode.
+**Grid and snapping.** Each altar stores its own grid configuration: overlay toggle, size (8–128 px), opacity (1–25%), color, snap-to-grid, rotation snap, and scale to grid. Settings are saved immediately to the database and persist per altar, so switching between altars always restores that altar's own grid state. Grid controls are visible only in edit mode.
+
+- *Snap to grid* — moves place items on grid intersections.
+- *Snap rotation angle* — when enabled, dragging the rotation handle snaps to a configurable angle step (1–180°, default 15°). When disabled, rotation is free; holding Shift still snaps to 15° steps.
+- *Scale to grid* — when enabled, resizing a placement snaps its display size to the nearest multiple of `gridSize × 2`.
 
 **Multiple altars.** You can create several named altars and switch between them. Each altar has its own title, intention text, background, and set of placements.
 

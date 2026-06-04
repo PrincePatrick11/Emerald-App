@@ -353,6 +353,39 @@ export default function AltarSidebarPanel() {
                 checked={activeAltar.snap_to_grid}
                 onClick={() => updateAltarGrid(activeAltar.id, { snap_to_grid: !activeAltar.snap_to_grid })}
               />
+              <ToggleRow
+                label={t('altar.rotationSnap')}
+                checked={activeAltar.rotation_snap_enabled}
+                onClick={() => updateAltarGrid(activeAltar.id, { rotation_snap_enabled: !activeAltar.rotation_snap_enabled })}
+              />
+              {activeAltar.rotation_snap_enabled && (
+                <div className="mt-2 rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-[11px] uppercase tracking-wider text-stone-500">{t('altar.rotationSnapAngle')}</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={180}
+                      value={activeAltar.rotation_snap_angle}
+                      onChange={(e) => updateAltarGrid(activeAltar.id, { rotation_snap_angle: Number(e.target.value) || 15 })}
+                      className="w-14 rounded bg-stone-800/70 px-1.5 py-0.5 text-right text-xs text-stone-300 outline-none"
+                    />
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={180}
+                    value={activeAltar.rotation_snap_angle}
+                    onChange={(e) => updateAltarGrid(activeAltar.id, { rotation_snap_angle: Number(e.target.value) })}
+                    className="w-full"
+                  />
+                </div>
+              )}
+              <ToggleRow
+                label={t('altar.snapScaleToGrid')}
+                checked={activeAltar.snap_scale_to_grid}
+                onClick={() => updateAltarGrid(activeAltar.id, { snap_scale_to_grid: !activeAltar.snap_scale_to_grid })}
+              />
             </>
           )}
         </div>

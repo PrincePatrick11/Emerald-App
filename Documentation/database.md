@@ -14,7 +14,7 @@ Emerald uses a single SQLite file, `emerald.db`, located in the OS application d
 4. After each successful migration, writes a row into `schema_version` with the version, name, and ISO timestamp.
 5. Calls the separate `runPeriodicCleanup(db)` function, which auto-purges trashed rows older than 30 days across all soft-delete-aware tables. This is **not** a migration — it is idempotent and time-dependent, so it runs on every vault open.
 
-The current schema version is **18**. New schema changes must be added as a new entry in the `MIGRATIONS` array with a strictly higher version number and a unique `name`.
+The current schema version is **19**. New schema changes must be added as a new entry in the `MIGRATIONS` array with a strictly higher version number and a unique `name`.
 
 **Upgrades from older versions.** Vaults that predate the `schema_version` table will see all migrations run on first open. `ALTER TABLE … ADD COLUMN` against an already-present column raises a "duplicate column" error; this is detected by `isAlreadyAppliedError` (matches `duplicate column name`, `already exists`, or a pre-existing table) and the migration is marked applied anyway. The data migrations themselves are idempotent and re-run safely: `entry_number` is only backfilled where `NULL`, the UUID → fixed-string category ID rewrite is a no-op once the fixed IDs exist, and the `custom_properties.type = 'checkbox' → 'toggle'` rename is a single `UPDATE` that is a no-op once the migration has run.
 
@@ -204,8 +204,11 @@ Primary key: `(source_id, target_id)`. Index: `idx_links_target` on `(target_id)
 | grid_opacity | REAL | Grid line opacity; default `0.06`; clamped `0.01..0.25`. |
 | grid_color | TEXT | Hex colour string; default `'#dce8e2'`. Validated as `#rrggbb` on write. |
 | snap_to_grid | INTEGER | Boolean `0/1`; default `0`. Whether placements snap to the grid. |
+| rotation_snap_enabled | INTEGER | Boolean `0/1`; default `0`. Whether rotation handle snaps to a fixed angle step. |
+| rotation_snap_angle | REAL | Angle step in degrees when `rotation_snap_enabled = 1`; default `15`; clamped `1..180`. |
+| snap_scale_to_grid | INTEGER | Boolean `0/1`; default `0`. Whether resizing snaps element size to multiples of `gridSize × 2`. |
 
-Grid columns were added in migration v18 (`altar_grid_options_per_altar`). Default values in the migration must stay in sync with the constants `DEFAULT_GRID_SIZE`, `DEFAULT_GRID_OPACITY`, and `DEFAULT_GRID_COLOR` in `src/lib/altarConstants.ts`. Writes go exclusively through `altarStore.updateAltarGrid(id, patch)`, which clamps all numeric values and validates the hex color before executing the SQL update.
+Grid columns were added in migration v18 (`altar_grid_options_per_altar`). Rotation snap and scale-to-grid columns were added in migration v19 (`altar_rotation_snap_and_scale_to_grid`). Default values in the migrations must stay in sync with the constants `DEFAULT_GRID_SIZE`, `DEFAULT_GRID_OPACITY`, and `DEFAULT_GRID_COLOR` in `src/lib/altarConstants.ts`. Writes go exclusively through `altarStore.updateAltarGrid(id, patch)`, which clamps all numeric values and validates the hex color before executing the SQL update.
 
 ### altar_items
 

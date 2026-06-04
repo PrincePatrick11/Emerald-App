@@ -6,12 +6,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] — 0.1.3
 
 ### Added
+- Altar edit mode: per-altar **snap rotation angle** setting — a toggle plus a 1–180° step input and slider; when active, dragging the rotation handle snaps to the configured angle instead of free rotation (Shift still snaps to 15° when the toggle is off)
+- Altar edit mode: per-altar **scale to grid** toggle — resizing a placement snaps its display size to multiples of `gridSize × 2`
 - Breadcrumb link back to the list view in OperationsView, WikiView, and JournalView (topbar, left of the entry title area)
 - `contextMenu.openInNewTab` translation key added to all four locales (de/en/es/fr); the "Open in New Tab" context menu item is now fully localised
 - `isImageIcon` helper extracted to `src/lib/helpers.ts` and shared across OperationsView and WikiView
 - Altar inspector `z-index` input and expanded placement controls (`x/y`, scale, rotation, opacity, z-order)
 - New Altar item category: `table` with i18n labels in all supported locales
-- Altar grid controls (overlay toggle, size, opacity, color, snap-to-grid) stored per altar in the database (migration v18)
+- Altar grid controls (overlay toggle, size, opacity, color, snap-to-grid, rotation snap, scale to grid) stored per altar in the database (grid columns migration v18; rotation/scale columns migration v19)
 - Modal-based Altar item add/edit/delete workflow in the docked library strip
 - Extracted Altar components and hooks for maintainability: `AltarItemVisual`, `AltarCanvas`, `AltarLibraryStrip`, and background preview hooks
 
@@ -38,7 +40,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Full-window Altar mode behavior refined: edit mode exits full-window, and edit-only controls (including grid options) remain hidden in view mode
 - Altar placed-element rows are now selectable in view mode (not only edit mode); clicking a row in the sidebar highlights the element on the canvas with a jade border; clicking empty canvas or sidebar area deselects
 - Altar grid settings (enabled, size, opacity, color, snap-to-grid) migrated from `uiStore` / localStorage to per-altar database columns so each altar remembers its own grid configuration independently
-- `updateAltarGrid(id, patch)` added to `altarStore` as the sole write path for altar grid fields; values are clamped and validated before persistence
+- `updateAltarGrid(id, patch)` is the sole write path for all altar grid/snap fields (grid options + rotation snap + scale to grid); values are clamped and validated before persistence
+- Altar canvas drag performance: `movePlacement` no longer rebuilds the `previewPlacements` map on every pointer move event (60–120 Hz); the preview is synced once on mouse-up via `savePlacementPosition`, eliminating per-frame full-view re-renders during drag
+- `AltarItemVisual` wrapped in `React.memo`; `PlacedItem` callbacks refactored to stable `useCallback` references with an `id` parameter so `React.memo` on `PlacedItem` now bails out correctly — only the actively dragged element re-renders during a drag gesture
 - Custom background preview map and custom-background chip rendering hardened for consistent persistence previews
 - Fixed-scene Altar rendering experiment rolled back; responsive percentage-based scene rendering retained
 - Altar delete/edit flows consolidated around modal interactions and in-context confirmations

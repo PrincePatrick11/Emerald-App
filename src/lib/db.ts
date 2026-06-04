@@ -598,4 +598,13 @@ const MIGRATIONS: Migration[] = [
       await db.execute("ALTER TABLE altars ADD COLUMN snap_to_grid INTEGER NOT NULL DEFAULT 0");
     },
   },
+  {
+    version: 19,
+    name: 'altar_rotation_snap_and_scale_to_grid',
+    up: async (db) => {
+      await db.execute("ALTER TABLE altars ADD COLUMN rotation_snap_enabled INTEGER NOT NULL DEFAULT 0");
+      await db.execute("ALTER TABLE altars ADD COLUMN rotation_snap_angle REAL NOT NULL DEFAULT 15");
+      await db.execute("ALTER TABLE altars ADD COLUMN snap_scale_to_grid INTEGER NOT NULL DEFAULT 0");
+    },
+  },
 ];
