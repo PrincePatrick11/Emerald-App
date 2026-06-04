@@ -42,7 +42,8 @@ src/
 ├── lib/              db.ts, links.ts, dragState.ts, altarDragState.ts,
 │                     routineDragState.ts, moonPhase.ts, export.ts,
 │                     exportData.ts, emeraldFormat.ts, vaultManager.ts, dbBackup.ts,
-│                     helpers.ts, altarConstants.ts, styleClasses.ts
+│                     helpers.ts (incl. isImageIcon, safeParseArray, generateId),
+│                     altarConstants.ts, styleClasses.ts
 ├── themes/           emerald-noctis.css, emerald-parchment.css, theme.ts
 ├── i18n/             react-i18next setup + locales/en.json de.json es.json fr.json
 └── types/index.ts    Shared TypeScript interfaces
@@ -83,9 +84,13 @@ All `useState`, `useEffect`, `useRef`, `useMemo`, and `useCallback` calls must a
 
 The editor writes the current title and content into a ref on every render. A debounced timer (1.5 s) reads from the ref when it fires, never from a closure. This means the save always uses the latest content regardless of when the timer was scheduled.
 
+`triggerAutoSave()` takes no arguments. Callers must not pass a snapshot of `pendingRef.current` as an argument — doing so would capture stale state at call time and cause the debounced write to overwrite changes made between the call and the timer firing (for example, a sidebar category change made 200 ms after the title change would be lost). All three views that use this pattern (JournalView, WikiView, OperationsView) read `pendingRef.current` and `isEditingRef.current` exclusively inside the timer callback.
+
 ### Internal Links
 
-`createInternalLinkExtension(getItems, getIcon, getLabel)` creates a TipTap extension that renders linked entries as inline chips. Callbacks are ref-backed so they always see the current store state. Each chip stores `data-type="internalLink"`, `data-id`, `data-entry-type`, `data-label`, and `data-icon` attributes.
+`createInternalLinkExtension(getItems, getIcon, getLabel)` creates a TipTap extension that renders linked entries as inline chips. Callbacks are typed via the `InternalLinkOptions` interface (no `as any` cast) and are ref-backed so they always see the current store state. Each chip stores `data-type="internalLink"`, `data-id`, `data-entry-type`, `data-label`, and `data-icon` attributes.
+
+Chips are rendered identically in both edit mode and view mode — the `[[Label(id)]]` raw-text edit representation was removed. The node view no longer tracks `editor.isEditable` via `useState`/`useEffect`; editability checks (e.g. click handling) read `editor.isEditable` directly at event time.
 
 After every save, `syncLinks(sourceId, sourceType, htmlContent)` in `src/lib/links.ts` parses the saved HTML, deletes the old link rows for that source, and inserts fresh rows. This keeps the `links` table accurate without requiring a separate link-tracking mechanism.
 

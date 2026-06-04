@@ -449,7 +449,9 @@ export default function OperationSigilView({ operation }: { operation: Operation
           <button onClick={() => setActiveView({ type: 'operations' })} className="text-stone-500 transition-colors hover:text-stone-300">
             {t('nav.operations')}
           </button>
+          {currentCategory?.emoji && <span>{currentCategory.emoji}</span>}
           <span>{currentCategory?.is_builtin ? t(`operations.categories.${currentCategory.id}`) : currentCategory?.name ?? '—'}</span>
+          <span>·</span>
           <span>{format(new Date(operation.updated_at), 'MMM d, yyyy')}</span>
           {isEditing && <span className="ml-1 italic text-stone-700">{t('editor.editing')}</span>}
         </div>

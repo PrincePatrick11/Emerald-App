@@ -81,12 +81,12 @@ export default function OpPropertiesPanel() {
 
   return (
     <div className="space-y-5 px-1 py-2">
-      {sigilOperation && (
+      {op && (
         <div>
           <p className="label-xs mb-2">{t('properties.category')}</p>
           <select
-            value={sigilOperation.category_id}
-            onChange={(e) => updateOperation(sigilOperation.id, { category_id: e.target.value })}
+            value={op.category_id}
+            onChange={(e) => updateOperation(op.id, { category_id: e.target.value })}
             className={inputCls + ' cursor-pointer'}
           >
             {opCategories.map((c) => (
@@ -244,21 +244,6 @@ export default function OpPropertiesPanel() {
         </div>
       )}
 
-      {/* ── Operations: Category ── */}
-      {op && !sigilOperation && (
-        <div>
-          <p className="label-xs mb-2">{t('properties.category')}</p>
-          <select
-            value={op.category_id}
-            onChange={(e) => updateOperation(op.id, { category_id: e.target.value })}
-            className={inputCls + ' cursor-pointer'}
-          >
-            {opCategories.map((c) => (
-              <option key={c.id} value={c.id}>{c.emoji} {c.is_builtin ? t(`operations.categories.${c.id}`) : c.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
 
       {/* ── Wiki/Op: Icon ── */}
       {(article || (op && !sigilOperation)) && (

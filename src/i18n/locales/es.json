@@ -382,6 +382,7 @@
     "themeLight": "Claro"
   },
   "contextMenu": {
+    "openInNewTab": "Abrir en nueva pestaña",
     "duplicate": "Duplicar",
     "rename": "Renombrar",
     "delete": "Eliminar"

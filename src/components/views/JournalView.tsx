@@ -65,14 +65,12 @@ export default function JournalView() {
 
   // Debounced auto-save
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const triggerAutoSave = useCallback((payloadOverride?: typeof pendingRef.current) => {
+  const triggerAutoSave = useCallback(() => {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     const id = entryIdRef.current;
-    const payload = payloadOverride ?? pendingRef.current;
-    const wasEditing = isEditingRef.current;
     autoSaveTimer.current = setTimeout(() => {
-      if (!wasEditing || !id) return;
-      updateEntry(id, payload);
+      if (!isEditingRef.current || !id) return;
+      updateEntry(id, pendingRef.current);
     }, 1500);
   }, [updateEntry]);
 
@@ -120,7 +118,7 @@ export default function JournalView() {
       if (routineTags.length > 0) {
         setTags((prev) => {
           const nextTags = [...new Set([...prev, ...routineTags])];
-          triggerAutoSave({ ...pendingRef.current, tags: nextTags });
+          triggerAutoSave();
           return nextTags;
         });
       }
@@ -223,7 +221,7 @@ export default function JournalView() {
 
   const handleContentChange = useCallback((html: string) => {
     setContent(html);
-    triggerAutoSave({ ...pendingRef.current, content: html });
+    triggerAutoSave();
   }, [triggerAutoSave]);
 
   const enterEditMode = () => {
@@ -241,12 +239,12 @@ export default function JournalView() {
         )
       : entries;
 
-    const catFiltered = filterPhases.length === 0
+    const phaseFiltered = filterPhases.length === 0
       ? searchFiltered
       : searchFiltered.filter((e) => e.moon_phase != null && filterPhases.includes(e.moon_phase));
 
     const filtered = filterPropSlots.some((s) => s.name && s.value)
-      ? catFiltered.filter((e) =>
+      ? phaseFiltered.filter((e) =>
           filterPropSlots.filter((s) => s.name && s.value).every(({ name, value }) =>
             allPropRows.some(
               (r) => r.entry_id === e.id && r.name === name &&
@@ -254,7 +252,7 @@ export default function JournalView() {
             )
           )
         )
-      : catFiltered;
+      : phaseFiltered;
 
     const phaseChips = MOON_PHASE_ORDER
       .filter((p) => entries.some((e) => e.moon_phase === p))
@@ -416,6 +414,9 @@ export default function JournalView() {
       {/* Topbar */}
       <div className="flex items-center justify-between px-6 h-14 border-b border-stone-700/60 flex-shrink-0">
         <div className="flex items-center gap-2 text-xs text-stone-600">
+          <button onClick={() => setActiveView({ type: 'journal' })} className="text-stone-500 transition-colors hover:text-stone-300">
+            {t('nav.journal')}
+          </button>
           <span>{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</span>
           <span>{format(new Date(entry.created_at), 'MMMM d, yyyy')}</span>
           {entry.moon_phase && <span>· {t(`moonPhase.${entry.moon_phase}`)}</span>}
@@ -463,7 +464,7 @@ export default function JournalView() {
             autoFocus
             type="text"
             value={title}
-            onChange={(e) => { const nextTitle = e.target.value; setTitle(nextTitle); triggerAutoSave({ ...pendingRef.current, title: nextTitle }); }}
+            onChange={(e) => { const nextTitle = e.target.value; setTitle(nextTitle); triggerAutoSave(); }}
             placeholder={t('journal.untitled')}
             className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100
                        placeholder-stone-700 outline-none selectable"
@@ -580,7 +581,7 @@ export default function JournalView() {
       <div className="px-8 pb-3 flex-shrink-0" onDoubleClick={enterEditMode}>
         <TagInput
           tags={tags}
-          onChange={(newTags) => { setTags(newTags); triggerAutoSave({ ...pendingRef.current, tags: newTags }); }}
+          onChange={(newTags) => { setTags(newTags); triggerAutoSave(); }}
           readOnly={true}
         />
       </div>

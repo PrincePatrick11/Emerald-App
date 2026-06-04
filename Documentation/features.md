@@ -98,6 +98,18 @@ Custom backgrounds are persisted as file-backed image paths (legacy inline data 
 
 **View mode and full-window mode.** Full-window altar mode is only available in view mode. Entering edit mode exits full-window mode automatically. Grid controls are edit-only and hidden in read/view mode.
 
+## Navigation
+
+**Left sidebar structure.** The left sidebar is divided into three fixed zones:
+
+1. A non-scrollable nav block at the top containing links to Journal, Tasks, Operations, Wiki, and Altar.
+2. A scrollable list of journal entries below the nav block.
+3. An icon-only row at the bottom containing Settings (left), Tags (centre), and Trash (right-aligned). These three items show only icons (no labels); hover titles are provided via `title` attributes.
+
+**Breadcrumb back links.** When an entry is open in JournalView, WikiView, or OperationsView, the topbar shows a clickable breadcrumb that navigates back to the corresponding list view (e.g. clicking "Journal" returns to the journal entry list without closing the tab).
+
+**Internal link chips.** Links inserted with `[[` are rendered as styled chips in both edit mode and view mode. There is no raw `[[Label(id)]]` text representation in edit mode.
+
 ## Tabs & Workspace
 
 Emerald supports browser-like tabs so you can keep several pieces of content open at the same time.

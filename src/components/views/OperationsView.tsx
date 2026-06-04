@@ -4,7 +4,7 @@ import { Trash2, PanelRightOpen, Check, X, Plus, Pencil, Copy, PanelTopOpen } fr
 import ContextMenu from '../ui/ContextMenu';
 import FilterPanel from '../ui/FilterPanel';
 import { getDb } from '../../lib/db';
-import { generateId } from '../../lib/helpers';
+import { generateId, isImageIcon } from '../../lib/helpers';
 
 const OPERATION_EMOJIS = [
   '⚡','🔯','👁️','🌙','☀️','🌟','✨','🔮','🌀','⚗️',
@@ -21,10 +21,6 @@ import EntryCustomProperties from '../editor/EntryCustomProperties';
 import { format } from 'date-fns';
 import OperationSigilView from './OperationSigilView';
 
-function isImageIcon(icon: string | null | undefined) {
-  if (!icon) return false;
-  return icon.startsWith('data:image/') || icon.startsWith('blob:') || icon.startsWith('/');
-}
 
 export default function OperationsView() {
   const { t } = useTranslation();
@@ -72,14 +68,12 @@ export default function OperationsView() {
   opIdRef.current = operation?.id;
 
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const triggerAutoSave = useCallback((payloadOverride?: typeof pendingRef.current) => {
+  const triggerAutoSave = useCallback(() => {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     const id = opIdRef.current;
-    const payload = payloadOverride ?? pendingRef.current;
-    const wasEditing = isEditingRef.current;
     autoSaveTimer.current = setTimeout(() => {
-      if (!wasEditing || !id) return;
-      updateOperation(id, payload);
+      if (!isEditingRef.current || !id) return;
+      updateOperation(id, pendingRef.current);
     }, 1500);
   }, [updateOperation]);
 
@@ -135,7 +129,7 @@ export default function OperationsView() {
       const { tags: routineTags } = (e as CustomEvent<{ tags: string[] }>).detail;
       setTags((prev) => {
         const nextTags = [...new Set([...prev, ...routineTags])];
-        triggerAutoSave({ ...pendingRef.current, tags: nextTags });
+        triggerAutoSave();
         return nextTags;
       });
     };
@@ -233,7 +227,7 @@ export default function OperationsView() {
 
   const handleContentChange = useCallback((html: string) => {
     setContent(html);
-    triggerAutoSave({ ...pendingRef.current, content: html });
+    triggerAutoSave();
   }, [triggerAutoSave]);
 
   const enterEditMode = () => {
@@ -245,7 +239,7 @@ export default function OperationsView() {
     const cat = await addCategory(newCatName.trim(), newCatEmoji);
     setCategoryId(cat.id);
     setNewCatName(''); setNewCatEmoji('⚡'); setAddingCategory(false); setShowCatEmojiPicker(false);
-    triggerAutoSave({ ...pendingRef.current, category_id: cat.id });
+    triggerAutoSave();
   };
 
   const getCatById = (id: string) => categories.find((c) => c.id === id);
@@ -655,7 +649,7 @@ export default function OperationsView() {
           x={ctxMenu.x} y={ctxMenu.y}
           onClose={() => setCtxMenu(null)}
           actions={[
-            { label: 'Open in New Tab', icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'operations', id: ctxMenu.id, mode: 'view' }) },
+            { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'operations', id: ctxMenu.id, mode: 'view' }) },
             ...(operations.find((o) => o.id === ctxMenu.id)?.category_id === 'sigils'
               ? []
               : [{ label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) }]),
@@ -680,11 +674,14 @@ export default function OperationsView() {
       {/* Topbar */}
       <div className="flex items-center justify-between px-6 h-14 border-b border-stone-700/60 flex-shrink-0">
         <div className="flex items-center gap-2 text-xs text-stone-600">
+          <button onClick={() => setActiveView({ type: 'operations' })} className="text-stone-500 transition-colors hover:text-stone-300">
+            {t('nav.operations')}
+          </button>
           {isImageIcon(operationIcon)
             ? <img src={operationIcon} alt="" className="w-5 h-5 object-cover rounded" />
             : <span>{operationIcon}</span>
           }
-          <span>{currentCat?.name ?? '—'}</span>
+          <span>{currentCat?.is_builtin ? t(`operations.categories.${currentCat.id}`) : currentCat?.name ?? '—'}</span>
           <span>·</span>
           <span>{format(new Date(operation.updated_at), 'MMM d, yyyy')}</span>
           {isEditing && <span className="text-stone-700 italic ml-1">{t('editor.editing')}</span>}
@@ -715,12 +712,11 @@ export default function OperationsView() {
         </div>
       </div>
 
-
       {/* Title */}
       <div className="px-8 pt-6 pb-4 flex-shrink-0" onDoubleClick={enterEditMode}>
         {isEditing ? (
           <input autoFocus type="text" value={title}
-            onChange={(e) => { const nextTitle = e.target.value; setTitle(nextTitle); triggerAutoSave({ ...pendingRef.current, title: nextTitle }); }}
+            onChange={(e) => { const nextTitle = e.target.value; setTitle(nextTitle); triggerAutoSave(); }}
             placeholder={t('operations.untitled')}
             className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100
                        placeholder-stone-700 outline-none selectable" />
@@ -775,7 +771,7 @@ export default function OperationsView() {
 
       {/* Tags */}
       <div className="px-8 pb-3 flex-shrink-0" onDoubleClick={enterEditMode}>
-        <TagInput tags={tags} onChange={(newTags) => { setTags(newTags); triggerAutoSave({ ...pendingRef.current, tags: newTags }); }} readOnly={true} />
+        <TagInput tags={tags} onChange={(newTags) => { setTags(newTags); triggerAutoSave(); }} readOnly={true} />
       </div>
 
       {/* Editor */}

@@ -5,7 +5,7 @@ import ContextMenu from '../ui/ContextMenu';
 import ListToolbar from '../ui/ListToolbar';
 import FilterPanel from '../ui/FilterPanel';
 import { getDb } from '../../lib/db';
-import { generateId } from '../../lib/helpers';
+import { generateId, isImageIcon } from '../../lib/helpers';
 
 import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
@@ -24,10 +24,6 @@ const WIKI_EMOJIS = [
   '📖','📄','🌸','🦋','🐉','🏺','🌺','💫','🌀','🎭',
 ];
 
-function isImageIcon(icon: string | null | undefined) {
-  if (!icon) return false;
-  return icon.startsWith('data:image/') || icon.startsWith('blob:') || icon.startsWith('/');
-}
 
 export default function WikiView() {
   const { t } = useTranslation();
@@ -79,14 +75,12 @@ export default function WikiView() {
 
   // Debounced auto-save
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const triggerAutoSave = useCallback((payloadOverride?: typeof pendingRef.current) => {
+  const triggerAutoSave = useCallback(() => {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     const id = articleIdRef.current;
-    const payload = payloadOverride ?? pendingRef.current;
-    const wasEditing = isEditingRef.current;
     autoSaveTimer.current = setTimeout(() => {
-      if (!wasEditing || !id) return;
-      updateArticle(id, payload);
+      if (!isEditingRef.current || !id) return;
+      updateArticle(id, pendingRef.current);
     }, 1500);
   }, [updateArticle]);
 
@@ -140,7 +134,7 @@ export default function WikiView() {
       const { tags: routineTags } = (e as CustomEvent<{ tags: string[] }>).detail;
       setTags((prev) => {
         const nextTags = [...new Set([...prev, ...routineTags])];
-        triggerAutoSave({ ...pendingRef.current, tags: nextTags });
+        triggerAutoSave();
         return nextTags;
       });
     };
@@ -197,7 +191,7 @@ export default function WikiView() {
 
   const handleContentChange = useCallback((html: string) => {
     setContent(html);
-    triggerAutoSave({ ...pendingRef.current, content: html });
+    triggerAutoSave();
   }, [triggerAutoSave]);
 
   const handleNew = async () => {
@@ -267,7 +261,7 @@ export default function WikiView() {
     const cat = await addWikiCategory(newWikiCatName.trim(), newWikiCatEmoji);
     setCategory(cat.id);
     setNewWikiCatName(''); setNewWikiCatEmoji('📄'); setAddingWikiCat(false); setShowWikiCatEmojiPicker(false);
-    triggerAutoSave({ ...pendingRef.current, category: cat.id });
+    triggerAutoSave();
   };
 
   if (!article) {
@@ -566,7 +560,7 @@ export default function WikiView() {
           x={ctxMenu.x} y={ctxMenu.y}
           onClose={() => setCtxMenu(null)}
           actions={[
-            { label: 'Open in New Tab', icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'wiki', id: ctxMenu.id, mode: 'view' }) },
+            { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'wiki', id: ctxMenu.id, mode: 'view' }) },
             { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
             { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
             { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },
@@ -585,13 +579,16 @@ export default function WikiView() {
       {/* Topbar */}
       <div className="flex items-center justify-between px-6 h-14 border-b border-stone-700/60 flex-shrink-0">
         <div className="flex items-center gap-2 text-xs text-stone-600">
+          <button onClick={() => setActiveView({ type: 'wiki' })} className="text-stone-500 transition-colors hover:text-stone-300">
+            {t('nav.wiki')}
+          </button>
           {isImageIcon(article.icon)
             ? <img src={article.icon!} alt="" className="w-5 h-5 object-cover rounded" />
             : <span>{currentCat?.emoji ?? getCategoryEmoji(article.category)}</span>
           }
           <span className="capitalize">{currentCat?.name ?? article.category}</span>
           <span>·</span>
-          <span>Updated {format(new Date(article.updated_at), 'MMM d, yyyy')}</span>
+          <span>{format(new Date(article.updated_at), 'MMM d, yyyy')}</span>
           {isEditing && <span className="text-stone-700 italic ml-1">{t('editor.editing')}</span>}
         </div>
         <div className="flex items-center gap-1">
@@ -648,7 +645,7 @@ export default function WikiView() {
             autoFocus
             type="text"
             value={title}
-            onChange={(e) => { const nextTitle = e.target.value; setTitle(nextTitle); triggerAutoSave({ ...pendingRef.current, title: nextTitle }); }}
+            onChange={(e) => { const nextTitle = e.target.value; setTitle(nextTitle); triggerAutoSave(); }}
             placeholder={t('wiki.untitled')}
             className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100
                        placeholder-stone-700 outline-none selectable"
@@ -669,7 +666,7 @@ export default function WikiView() {
       <div className="px-8 pb-3 flex-shrink-0" onDoubleClick={enterEditMode}>
         <TagInput
           tags={tags}
-          onChange={(newTags) => { setTags(newTags); triggerAutoSave({ ...pendingRef.current, tags: newTags }); }}
+          onChange={(newTags) => { setTags(newTags); triggerAutoSave(); }}
           readOnly={true}
         />
       </div>

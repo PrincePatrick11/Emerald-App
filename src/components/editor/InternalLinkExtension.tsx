@@ -3,7 +3,6 @@ import { mergeAttributes } from '@tiptap/core';
 import { ReactRenderer, ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewRendererProps } from '@tiptap/react';
 import tippy, { type Instance } from 'tippy.js';
-import { useState, useEffect } from 'react';
 import SuggestionList, {
   type SuggestionItem,
   type SuggestionListRef,
@@ -15,28 +14,17 @@ function getDefaultIcon(entryType: string): string {
   return '⚡';
 }
 
+interface InternalLinkOptions {
+  getIcon?: (id: string, entryType: string) => string | null;
+  getLabel?: (id: string, entryType: string) => string | null;
+}
+
 function InternalLinkNodeView({ node, editor, extension }: NodeViewRendererProps) {
   const { id, entryType, label } = node.attrs;
 
-  // Track editability so the NodeView re-renders when the editor switches modes.
-  const [isEditable, setIsEditable] = useState(editor.isEditable);
-  useEffect(() => {
-    const handleUpdate = () => setIsEditable(editor.isEditable);
-    editor.on('update', handleUpdate);
-    // Also listen to transaction events which fire on setEditable()
-    editor.on('transaction', handleUpdate);
-    return () => {
-      editor.off('update', handleUpdate);
-      editor.off('transaction', handleUpdate);
-    };
-  }, [editor]);
-
   // Look up icon and label live from the store via extension callbacks,
   // so both always reflect the latest state without re-parsing stored HTML.
-  const getIcon = (extension as any).options.getIcon as
-    ((id: string, entryType: string) => string | null) | undefined;
-  const getLabel = (extension as any).options.getLabel as
-    ((id: string, entryType: string) => string | null) | undefined;
+  const { getIcon, getLabel } = (extension as unknown as { options: InternalLinkOptions }).options;
   const icon = getIcon?.(id, entryType) ?? getDefaultIcon(entryType);
   const displayLabel = getLabel?.(id, entryType) ?? label;
 
@@ -53,23 +41,8 @@ function InternalLinkNodeView({ node, editor, extension }: NodeViewRendererProps
     }
   };
 
-  // Edit mode: render as [[Label(id)]] inline text so the user sees Markdown-style syntax.
-  if (isEditable) {
-    return (
-      <NodeViewWrapper
-        as="span"
-        className="internal-link-edit"
-        onClick={handleClick}
-        data-drag-handle
-      >
-        [[{displayLabel}({id})]]
-      </NodeViewWrapper>
-    );
-  }
-
-  // Read mode: render as a pretty chip with icon.
   return (
-    <NodeViewWrapper as="span" className="internal-link-chip" onClick={handleClick}>
+    <NodeViewWrapper as="span" className="internal-link-chip" onClick={handleClick} data-drag-handle>
       <span className="internal-link-icon">
         {icon?.startsWith('data:') ? <img src={icon} alt="" /> : icon}
       </span>

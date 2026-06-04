@@ -382,6 +382,7 @@
     "oldest": "Oldest"
   },
   "contextMenu": {
+    "openInNewTab": "Open in New Tab",
     "duplicate": "Duplicate",
     "rename": "Rename",
     "delete": "Delete"

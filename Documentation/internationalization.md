@@ -92,7 +92,7 @@ The translation files follow this top-level structure (from `en.json`):
 | `filters` | Filter panel strings |
 | `settings` | Settings modal strings |
 | `home` | Home view strings |
-| `contextMenu` | Context menu action labels |
+| `contextMenu` | Context menu action labels, including `openInNewTab` |
 | `backlinks` | Backlinks panel strings |
 | `trash` | Trash view strings |
 | `linkPicker` | Internal link picker modal (title, search placeholder, tab labels, no-results message) |

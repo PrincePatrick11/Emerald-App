@@ -142,31 +142,57 @@ export default function LeftSidebar() {
         </div>
       </div>
 
-      {/* Journal entries list */}
-      <nav className="flex-1 overflow-y-auto py-2 px-2">
-        <div>
-          <div className="flex items-center justify-between px-2 py-1.5">
-            <button
-              onClick={() => setActiveView({ type: 'journal' })}
-              className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-wider transition-colors ${
-                isJournal && !activeView.id
-                  ? 'text-stone-300'
-                  : 'text-stone-600 hover:text-stone-400'
-              }`}
-            >
-              <BookOpen size={13} />
-              {t('nav.journal')}
-            </button>
-            <button
-              onClick={handleNewJournalEntry}
-              className="btn-ghost"
-              title={t('journal.newEntry')}
-            >
-              <Plus size={14} />
-            </button>
-          </div>
+      {/* Main nav links — fixed, non-scrollable */}
+      <div className="flex-shrink-0 px-2 py-2 border-b border-stone-700/40">
+        <div className="flex items-center">
+          <button
+            onClick={() => setActiveView({ type: 'journal' })}
+            className={`sidebar-item flex-1 ${isJournal && !activeView.id ? 'active' : ''}`}
+          >
+            <BookOpen size={14} />
+            {t('nav.journal')}
+          </button>
+          <button
+            onClick={handleNewJournalEntry}
+            className="btn-ghost"
+            title={t('journal.newEntry')}
+          >
+            <Plus size={14} />
+          </button>
+        </div>
+        <button
+          onClick={() => setActiveView({ type: 'tasks' })}
+          className={`sidebar-item w-full ${activeView.type === 'tasks' ? 'active' : ''}`}
+        >
+          <CheckSquare size={14} />
+          {t('nav.tasks')}
+        </button>
+        <button
+          onClick={() => setActiveView({ type: 'operations' })}
+          className={`sidebar-item w-full ${activeView.type === 'operations' ? 'active' : ''}`}
+        >
+          <Wand2 size={14} />
+          {t('nav.operations')}
+        </button>
+        <button
+          onClick={() => setActiveView({ type: 'wiki' })}
+          className={`sidebar-item w-full ${activeView.type === 'wiki' ? 'active' : ''}`}
+        >
+          <Library size={14} />
+          {t('nav.wiki')}
+        </button>
+        <button
+          onClick={() => setActiveView({ type: 'altar' })}
+          className={`sidebar-item w-full ${activeView.type === 'altar' ? 'active' : ''}`}
+        >
+          <Flame size={14} />
+          {t('nav.altar')}
+        </button>
+      </div>
 
-          <div className="space-y-0.5 mt-1">
+      {/* Journal entries list — scrollable */}
+      <nav className="flex-1 overflow-y-auto py-2 px-2">
+        <div className="space-y-0.5">
             {filteredEntries.map((entry) => {
               const icon = <span className="text-base leading-none flex-shrink-0">{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</span>;
               const date = <div className="text-xs text-stone-600 mt-0.5">{format(new Date(entry.created_at), 'MMM d, yyyy')}</div>;
@@ -215,60 +241,31 @@ export default function LeftSidebar() {
               );
             })}
           </div>
-        </div>
       </nav>
 
       {/* Bottom nav — always visible */}
       <div className="flex-shrink-0 border-t border-stone-700/40 px-2 py-2">
-        <button
-          onClick={() => setActiveView({ type: 'operations' })}
-          className={`sidebar-item w-full ${activeView.type === 'operations' ? 'active' : ''}`}
-        >
-          <Wand2 size={14} />
-          {t('nav.operations')}
-        </button>
-        <button
-          onClick={() => setActiveView({ type: 'wiki' })}
-          className={`sidebar-item w-full ${activeView.type === 'wiki' ? 'active' : ''}`}
-        >
-          <Library size={14} />
-          {t('nav.wiki')}
-        </button>
-        <button
-          onClick={() => setActiveView({ type: 'tasks' })}
-          className={`sidebar-item w-full ${activeView.type === 'tasks' ? 'active' : ''}`}
-        >
-          <CheckSquare size={14} />
-          {t('nav.tasks')}
-        </button>
-        <button
-          onClick={() => setActiveView({ type: 'altar' })}
-          className={`sidebar-item w-full ${activeView.type === 'altar' ? 'active' : ''}`}
-        >
-          <Flame size={14} />
-          {t('nav.altar')}
-        </button>
-        <button
-          onClick={() => setActiveView({ type: 'tags' })}
-          className={`sidebar-item w-full ${activeView.type === 'tags' ? 'active' : ''}`}
-        >
-          <Tag size={14} />
-          {t('nav.tags')}
-        </button>
-        <button
-          onClick={() => setActiveView({ type: 'trash' })}
-          className={`sidebar-item w-full ${activeView.type === 'trash' ? 'active' : ''}`}
-        >
-          <Trash2 size={14} />
-          {t('nav.trash')}
-        </button>
-        <div className="mt-1 pt-1 border-t border-stone-700/40">
+        <div className="flex items-center px-1 py-1">
           <button
             onClick={() => setSettingsOpen(true)}
-            className="sidebar-item w-full text-stone-500 hover:text-stone-300"
+            title={t('nav.settings')}
+            className="p-2 rounded-md transition-colors text-stone-500 hover:text-stone-300 hover:bg-stone-700/40"
           >
-            <Settings size={14} />
-            {t('nav.settings')}
+            <Settings size={18} />
+          </button>
+          <button
+            onClick={() => setActiveView({ type: 'tags' })}
+            title={t('nav.tags')}
+            className={`p-2 rounded-md transition-colors ${activeView.type === 'tags' ? 'text-stone-300 bg-stone-700/60' : 'text-stone-500 hover:text-stone-300 hover:bg-stone-700/40'}`}
+          >
+            <Tag size={18} />
+          </button>
+          <button
+            onClick={() => setActiveView({ type: 'trash' })}
+            title={t('nav.trash')}
+            className={`ml-auto p-2 rounded-md transition-colors ${activeView.type === 'trash' ? 'text-stone-300 bg-stone-700/60' : 'text-stone-500 hover:text-stone-300 hover:bg-stone-700/40'}`}
+          >
+            <Trash2 size={18} />
           </button>
         </div>
       </div>
@@ -279,7 +276,7 @@ export default function LeftSidebar() {
           x={ctxMenu.x} y={ctxMenu.y}
           onClose={() => setCtxMenu(null)}
           actions={[
-            { label: 'Open in New Tab', icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'journal', id: ctxMenu.id, mode: 'view' }) },
+            { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'journal', id: ctxMenu.id, mode: 'view' }) },
             { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
             { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
             { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },

@@ -1,3 +1,8 @@
+export function isImageIcon(icon: string | null | undefined): boolean {
+  if (!icon) return false;
+  return icon.startsWith('data:image/') || icon.startsWith('blob:') || icon.startsWith('/');
+}
+
 export function safeParseArray<T = unknown>(v: unknown): T[] {
   if (Array.isArray(v)) return v as T[];
   if (typeof v === 'string') {

@@ -6,13 +6,25 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] — 0.1.3
 
 ### Added
+- Breadcrumb link back to the list view in OperationsView, WikiView, and JournalView (topbar, left of the entry title area)
+- `contextMenu.openInNewTab` translation key added to all four locales (de/en/es/fr); the "Open in New Tab" context menu item is now fully localised
+- `isImageIcon` helper extracted to `src/lib/helpers.ts` and shared across OperationsView and WikiView
 - Altar inspector `z-index` input and expanded placement controls (`x/y`, scale, rotation, opacity, z-order)
 - New Altar item category: `table` with i18n labels in all supported locales
 - Altar grid controls (overlay toggle, size, opacity, color, snap-to-grid) stored per altar in the database (migration v18)
 - Modal-based Altar item add/edit/delete workflow in the docked library strip
 - Extracted Altar components and hooks for maintainability: `AltarItemVisual`, `AltarCanvas`, `AltarLibraryStrip`, and background preview hooks
 
+### Fixed
+- Category selection in OpPropertiesPanel reset to "Sigils" after 1.5 s whenever any sidebar field was changed on a newly created operation. Root cause: `triggerAutoSave` captured `pendingRef.current` at call time, so the debounced write overwrote the sidebar change. The ref is now read when the timer fires, not when `triggerAutoSave` is called. The same bug was present in WikiView and JournalView and is fixed there too.
+- `OperationSigilView` breadcrumb was missing the category emoji and the separator dot between the category name and the date; both are now rendered.
+- Built-in operation category names in the OperationsView breadcrumb (e.g. "Sigils", "Servitors") were displayed from the raw database seed value instead of the i18n key; they now go through `t('operations.categories.{id}')`.
+- WikiView breadcrumb showed "Updated MMM d, yyyy"; the "Updated " prefix has been removed so it shows the date only.
+- InternalLinkExtension rendered `[[Label(id)]]` raw text in edit mode instead of the chip used in view mode; chips are now shown in both modes.
+- Altar dashboard was unreachable: opening the app, switching to the altar section, or clicking the back button always landed on a single altar. The dashboard (list of all altars) is now reachable from the back button and the altar entry in the left sidebar.
+
 ### Changed
+- LeftSidebar restructured: Journal, Tasks, Operations, Wiki, and Altar are now in a fixed non-scrollable nav block at the top; the journal entries list scrolls independently below it; Settings, Tags, and Trash are condensed into an icon-only row at the bottom (size 18, no text labels; Trash is right-aligned).
 - Draggable tab reordering in the tab bar with animated movement
 - Tab bar refined: the active tab now visually flows into the main content panel below (matching color, no separator line) while inactive tabs remain clearly separated by a 1px divider; the `backdrop-filter: blur` and active-tab drop shadow were removed as they contradicted the seamless effect
 - Altar "bring forward" / "send backward" layer reordering coalesced into a single atomic database write per click, replacing the previous two-write sequence
@@ -33,9 +45,6 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Altar UI store consumption refactored toward granular selectors to reduce rerenders
 - Altar placed-element rows and inline inspector extracted into `PlacedElementRow` and `PlacedElementInspector` so typing in inspector inputs no longer re-renders unrelated rows
 - Altar dashboard cards and list rows extracted into `AltarCard`, `AltarListRow`, and `AltarCardPreview`; altar background previews resolved from a shared module-level cache so they survive view re-mounts and vault switches
-
-### Fixed
-- Altar dashboard was unreachable: opening the app, switching to the altar section, or clicking the back button always landed on a single altar. The dashboard (list of all altars) is now reachable from the back button and the altar entry in the left sidebar.
 
 ### Known Issues
 - Remaining Altar edge case: element drift can still occur during some resize transitions
