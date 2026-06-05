@@ -92,6 +92,8 @@ Locked placements are click-through on the canvas (pointer events disabled), so 
 
 **Sidebar sections.** The altar sidebar groups controls into three collapsible sections — Background, Grid Options, and Placed Elements — each with a chevron toggle. All three default to open. In view mode the background section header reads "Background"; in edit mode it reads "Change Background".
 
+**Canvas resolution.** Each altar stores a native canvas resolution (e.g. `1920x1080`). In edit mode the sidebar shows a collapsible "Canvas Options" section where you can pick a ratio (16:9, 4:3, 3:2, 1:1, 2:3, 9:16) and a size (Small / Medium / Large / Very Large), or enter a fully custom width × height up to 7680×4320. The canvas is displayed at native size and scaled uniformly to fit the viewport via CSS transform. Dashboard preview cards reflect the altar's aspect ratio rather than using a fixed height.
+
 **Grid and snapping.** Each altar stores its own grid configuration: overlay toggle, size (8–128 px), opacity (1–25%), color, snap-to-grid, rotation snap, and scale to grid. Settings are saved immediately to the database and persist per altar, so switching between altars always restores that altar's own grid state. Grid controls are visible only in edit mode.
 
 - *Snap to grid* — moves place items on grid intersections.

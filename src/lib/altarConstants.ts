@@ -2,6 +2,43 @@ import type { AltarItemCategory } from '../types';
 
 export const DEFAULT_ALTAR_BACKGROUND = 'midnight' as const;
 
+export const DEFAULT_ALTAR_RESOLUTION = '1920x1080';
+// BASE_RESOLUTION_WIDTH is the reference width at which BASE_SIZE (40px) in AltarCanvas gives correct proportions.
+export const BASE_RESOLUTION_WIDTH = 1920;
+export const MAX_ALTAR_RESOLUTION_W = 7680;
+export const MAX_ALTAR_RESOLUTION_H = 4320;
+
+export const ALTAR_RATIOS = ['16:9', '4:3', '3:2', '1:1', '2:3', '9:16'] as const;
+export type AltarRatio = (typeof ALTAR_RATIOS)[number];
+
+export const ALTAR_SIZE_KEYS = ['sm', 'md', 'lg', 'xl'] as const;
+export type AltarSizeKey = (typeof ALTAR_SIZE_KEYS)[number];
+
+export const ALTAR_RESOLUTION_MAP: Record<AltarSizeKey, Record<AltarRatio, string>> = {
+  sm: { '16:9': '640x360',   '4:3': '640x480',   '3:2': '600x400',   '1:1': '640x640',   '2:3': '400x600',   '9:16': '360x640'  },
+  md: { '16:9': '1280x720',  '4:3': '1024x768',  '3:2': '1200x800',  '1:1': '1024x1024', '2:3': '800x1200',  '9:16': '720x1280' },
+  lg: { '16:9': '1920x1080', '4:3': '1600x1200', '3:2': '1800x1200', '1:1': '1600x1600', '2:3': '1200x1800', '9:16': '1080x1920'},
+  xl: { '16:9': '3840x2160', '4:3': '3200x2400', '3:2': '3600x2400', '1:1': '3200x3200', '2:3': '2400x3600', '9:16': '2160x3840'},
+};
+
+export function sizeAndRatioFromResolution(res: string): { size: AltarSizeKey; ratio: AltarRatio } | null {
+  for (const size of ALTAR_SIZE_KEYS) {
+    for (const ratio of ALTAR_RATIOS) {
+      if (ALTAR_RESOLUTION_MAP[size][ratio] === res) return { size, ratio };
+    }
+  }
+  return null;
+}
+
+// Format: 'WxH' with lowercase 'x', e.g. '1920x1080'. Values are clamped to MAX_ALTAR_RESOLUTION_W/H.
+export function parseResolution(res: string): { w: number; h: number } {
+  if (!/^\d+x\d+$/.test(res)) return { w: 1920, h: 1080 };
+  const parts = res.split('x');
+  const w = Math.max(1, Math.min(MAX_ALTAR_RESOLUTION_W, Number(parts[0])));
+  const h = Math.max(1, Math.min(MAX_ALTAR_RESOLUTION_H, Number(parts[1])));
+  return { w, h };
+}
+
 export const DEFAULT_GRID_SIZE = 32;
 export const DEFAULT_GRID_OPACITY = 0.06;
 export const DEFAULT_GRID_COLOR = '#dce8e2';

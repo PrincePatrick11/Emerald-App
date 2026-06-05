@@ -74,7 +74,7 @@ export default function AppShell() {
   const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
   const navigateBack = useUIStore((s) => s.navigateBack);
   const navigateForward = useUIStore((s) => s.navigateForward);
-  const isAltarWindowFullscreen = activeView.type === 'altar' && activeView.mode === 'view' && altarWindowFullscreen;
+  const isAltarWindowFullscreen = activeView.type === 'altar' && activeView.mode !== 'edit' && altarWindowFullscreen;
 
   const [leftWidth, setLeftWidth] = useState(() =>
     loadSavedWidth('sidebar-left-width', LEFT_MIN, LEFT_DEFAULT)

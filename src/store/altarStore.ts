@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import { getDb } from '../lib/db';
-import { DEFAULT_ALTAR_BACKGROUND, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE } from '../lib/altarConstants';
+import { DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE, parseResolution } from '../lib/altarConstants';
 import { boolToInt, generateId, isValidHexColor, nowIso } from '../lib/helpers';
 import type { AltarItem, AltarItemCategory, AltarPlacement, AltarRecord } from '../types';
 
@@ -62,6 +62,7 @@ function normalizeAltar(altar: AltarRecord): AltarRecord {
     rotation_snap_enabled: Boolean(altar.rotation_snap_enabled),
     rotation_snap_angle: altar.rotation_snap_angle ?? 15,
     snap_scale_to_grid: Boolean(altar.snap_scale_to_grid),
+    resolution: /^\d+x\d+$/.test(altar.resolution ?? '') ? altar.resolution : DEFAULT_ALTAR_RESOLUTION,
   };
 }
 
@@ -93,6 +94,7 @@ interface AltarState {
   duplicateAltar: (id: string) => Promise<AltarRecord | null>;
   updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'intention' | 'background_preset' | 'background_image_data'>>) => Promise<void>;
   updateAltarGrid: (id: string, patch: Partial<Pick<AltarRecord, 'grid_enabled' | 'grid_size' | 'grid_opacity' | 'grid_color' | 'snap_to_grid' | 'rotation_snap_enabled' | 'rotation_snap_angle' | 'snap_scale_to_grid'>>) => Promise<void>;
+  updateAltarResolution: (id: string, resolution: string) => Promise<void>;
   bumpAltarUpdatedAt: (id: string) => Promise<void>;
   deleteAltar: (id: string) => Promise<void>;
 
@@ -191,10 +193,11 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       rotation_snap_enabled: false,
       rotation_snap_angle: 15,
       snap_scale_to_grid: false,
+      resolution: DEFAULT_ALTAR_RESOLUTION,
     };
     await db.execute(
-      'INSERT INTO altars (id, title, intention, background_preset, background_image_data, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)',
-      [altar.id, altar.title, altar.intention, altar.background_preset, altar.background_image_data, altar.created_at, altar.updated_at, 0, altar.grid_size, altar.grid_opacity, altar.grid_color, 0, 0, altar.rotation_snap_angle, 0]
+      'INSERT INTO altars (id, title, intention, background_preset, background_image_data, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid, resolution) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',
+      [altar.id, altar.title, altar.intention, altar.background_preset, altar.background_image_data, altar.created_at, altar.updated_at, 0, altar.grid_size, altar.grid_opacity, altar.grid_color, 0, 0, altar.rotation_snap_angle, 0, altar.resolution]
     );
     set((s) => ({ altars: [altar, ...s.altars], activeAltarId: altar.id, placements: [], selectedPlacementId: null, intention: '' }));
     return altar;
@@ -223,11 +226,12 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       rotation_snap_enabled: source.rotation_snap_enabled,
       rotation_snap_angle: source.rotation_snap_angle,
       snap_scale_to_grid: source.snap_scale_to_grid,
+      resolution: source.resolution ?? DEFAULT_ALTAR_RESOLUTION,
     };
 
     await db.execute(
-      'INSERT INTO altars (id, title, intention, background_preset, background_image_data, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)',
-      [copy.id, copy.title, copy.intention, copy.background_preset, copy.background_image_data, copy.created_at, copy.updated_at, copy.grid_enabled ? 1 : 0, copy.grid_size, copy.grid_opacity, copy.grid_color, copy.snap_to_grid ? 1 : 0, copy.rotation_snap_enabled ? 1 : 0, copy.rotation_snap_angle, copy.snap_scale_to_grid ? 1 : 0]
+      'INSERT INTO altars (id, title, intention, background_preset, background_image_data, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid, resolution) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',
+      [copy.id, copy.title, copy.intention, copy.background_preset, copy.background_image_data, copy.created_at, copy.updated_at, copy.grid_enabled ? 1 : 0, copy.grid_size, copy.grid_opacity, copy.grid_color, copy.snap_to_grid ? 1 : 0, copy.rotation_snap_enabled ? 1 : 0, copy.rotation_snap_angle, copy.snap_scale_to_grid ? 1 : 0, copy.resolution]
     );
 
     const sourcePlacements = await db.select<{
@@ -304,6 +308,21 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     );
     set((s) => ({
       altars: s.altars.map((entry) => (entry.id === id ? next : entry)).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
+    }));
+  },
+
+  updateAltarResolution: async (id, resolution) => {
+    const db = await getDb();
+    const altar = get().altars.find((entry) => entry.id === id);
+    if (!altar) return;
+    const { w, h } = parseResolution(resolution);
+    const safeRes = `${w}x${h}`;
+    const updated_at = nowIso();
+    await db.execute('UPDATE altars SET resolution=$1, updated_at=$2 WHERE id=$3', [safeRes, updated_at, id]);
+    set((s) => ({
+      altars: s.altars
+        .map((entry) => (entry.id === id ? { ...entry, resolution: safeRes, updated_at } : entry))
+        .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
     }));
   },
 

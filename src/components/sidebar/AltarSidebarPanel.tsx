@@ -5,9 +5,15 @@ import { useShallow } from 'zustand/shallow';
 import { Check, ChevronDown, ChevronRight, Image as ImageIcon, Pencil, Trash2 } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import {
+  ALTAR_RATIOS,
+  ALTAR_SIZE_KEYS,
+  ALTAR_RESOLUTION_MAP,
+  sizeAndRatioFromResolution,
   ALTAR_BACKGROUND_PRESETS,
   ALTAR_BACKGROUND_STYLES,
   DEFAULT_ALTAR_BACKGROUND,
+  DEFAULT_ALTAR_RESOLUTION,
+  parseResolution,
 } from '../../lib/altarConstants';
 import { useUIStore } from '../../store/uiStore';
 import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
@@ -60,6 +66,7 @@ export default function AltarSidebarPanel() {
     })),
   );
   const updateAltarGrid = useAltarStore((s) => s.updateAltarGrid);
+  const updateAltarResolution = useAltarStore((s) => s.updateAltarResolution);
   const activeView = useUIStore((s) => s.activeView);
   const isEditing = activeView.type === 'altar' && activeView.mode === 'edit';
   const activeAltar = useAltarStore((s) => s.altars.find((a) => a.id === s.activeAltarId) ?? null);
@@ -69,7 +76,10 @@ export default function AltarSidebarPanel() {
   const [backgroundNotice, setBackgroundNotice] = useState<string | null>(null);
   const [backgroundOpen, setBackgroundOpen] = useState(true);
   const [gridOpen, setGridOpen] = useState(true);
+  const [canvasOptionsOpen, setCanvasOptionsOpen] = useState(true);
   const [placementsOpen, setPlacementsOpen] = useState(true);
+  const [customW, setCustomW] = useState('');
+  const [customH, setCustomH] = useState('');
   const [customBackgroundMap, setCustomBackgroundMap] = useState<Record<string, string>>(() => {
     try {
       const raw = localStorage.getItem('altar-custom-backgrounds');
@@ -90,6 +100,25 @@ export default function AltarSidebarPanel() {
     [sortedPlacements, selectedPlacementId],
   );
   const hasCustomBackground = !!(activeAltar && (activeAltar.background_image_data || customBackgroundMap[activeAltar.id]));
+  const currentRes = activeAltar?.resolution ?? DEFAULT_ALTAR_RESOLUTION;
+  const canvasPreset = sizeAndRatioFromResolution(currentRes);
+  const isCustom = canvasPreset === null;
+  const parsedCustom = parseResolution(currentRes);
+  const wVal = customW || (isCustom ? String(parsedCustom.w) : '');
+  const hVal = customH || (isCustom ? String(parsedCustom.h) : '');
+  const applyCustom = (wStr: string, hStr: string) => {
+    if (!activeAltar) return;
+    const w = Number(wStr);
+    const h = Number(hStr);
+    if (w > 0 && h > 0) {
+      updateAltarResolution(activeAltar.id, `${w}x${h}`);
+      setCustomW(''); setCustomH('');
+    }
+  };
+  const inputClass = `w-full rounded border bg-stone-900/45 px-2 py-1.5 text-[11px] text-stone-300 outline-none placeholder:text-stone-600 ${isCustom ? 'border-jade-600/70' : 'border-stone-700/60'}`;
+  const safeBackgroundUrl = customBackgroundPreview?.startsWith('data:') || customBackgroundPreview?.startsWith('tauri://')
+    ? `url("${customBackgroundPreview}")`
+    : null;
 
   useEffect(() => {
     localStorage.setItem('altar-custom-backgrounds', JSON.stringify(customBackgroundMap));
@@ -154,7 +183,7 @@ export default function AltarSidebarPanel() {
   };
 
   return (
-    <div className="flex flex-col h-full" onClick={(e) => { if (e.target === e.currentTarget) selectPlacement(null); }}>
+    <div onClick={(e) => { if (e.target === e.currentTarget) selectPlacement(null); }}>
       <input
         ref={backgroundInputRef}
         type="file"
@@ -170,6 +199,98 @@ export default function AltarSidebarPanel() {
 
       {activeAltar && (
         <div className="px-3 pb-5">
+          {isEditing && (
+            <>
+              <button
+                onClick={() => setCanvasOptionsOpen((v) => !v)}
+                className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
+              >
+                {canvasOptionsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                {t('altar.canvasOptions')}
+              </button>
+              {canvasOptionsOpen && (
+                <div className="mt-2 space-y-3">
+                  <div>
+                    <p className="mb-1.5 text-[11px] uppercase tracking-wider text-stone-500">{t('altar.ratio')}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {ALTAR_RATIOS.map((r) => {
+                        const active = canvasPreset?.ratio === r;
+                        return (
+                          <button
+                            key={r}
+                            onClick={() => {
+                              updateAltarResolution(activeAltar.id, ALTAR_RESOLUTION_MAP[canvasPreset?.size ?? 'lg'][r]);
+                              setCustomW(''); setCustomH('');
+                            }}
+                            className={`rounded border px-2 py-1 text-[11px] font-medium transition-colors ${
+                              active
+                                ? 'border-jade-600/70 bg-jade-900/40 text-jade-300'
+                                : 'border-stone-700/60 bg-stone-900/45 text-stone-400 hover:border-stone-500/70 hover:text-stone-300'
+                            }`}
+                          >
+                            {r}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="mb-1.5 text-[11px] uppercase tracking-wider text-stone-500">{t('altar.size')}</p>
+                    <div className="grid grid-cols-4 gap-1">
+                      {ALTAR_SIZE_KEYS.map((s) => {
+                        const active = canvasPreset?.size === s;
+                        return (
+                          <button
+                            key={s}
+                            onClick={() => {
+                              updateAltarResolution(activeAltar.id, ALTAR_RESOLUTION_MAP[s][canvasPreset?.ratio ?? '16:9']);
+                              setCustomW(''); setCustomH('');
+                            }}
+                            className={`rounded border px-1 py-1.5 text-[11px] font-medium transition-colors ${
+                              active
+                                ? 'border-jade-600/70 bg-jade-900/40 text-jade-300'
+                                : 'border-stone-700/60 bg-stone-900/45 text-stone-400 hover:border-stone-500/70 hover:text-stone-300'
+                            }`}
+                          >
+                            {t(`altar.size${s.charAt(0).toUpperCase()}${s.slice(1)}`)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="mb-1.5 text-[11px] uppercase tracking-wider text-stone-500">{t('altar.customResolution')}</p>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min={1}
+                        max={7680}
+                        value={wVal}
+                        placeholder="W"
+                        onChange={(e) => setCustomW(e.target.value)}
+                        onBlur={() => applyCustom(customW || wVal, customH || hVal)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { applyCustom(customW || wVal, customH || hVal); e.currentTarget.blur(); } }}
+                        className={inputClass}
+                      />
+                      <span className="text-[11px] text-stone-500">×</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={4320}
+                        value={hVal}
+                        placeholder="H"
+                        onChange={(e) => setCustomH(e.target.value)}
+                        onBlur={() => applyCustom(customW || wVal, customH || hVal)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { applyCustom(customW || wVal, customH || hVal); e.currentTarget.blur(); } }}
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          <div className={isEditing ? 'mt-4' : ''}>
           <button
             onClick={() => setBackgroundOpen((v) => !v)}
             className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
@@ -224,9 +345,9 @@ export default function AltarSidebarPanel() {
                 >
                   <div
                     className="h-14 w-full flex items-center justify-center bg-gradient-to-br from-stone-800/80 via-stone-900/70 to-stone-950/80"
-                    style={customBackgroundPreview ? { backgroundImage: `url("${customBackgroundPreview}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+                    style={safeBackgroundUrl ? { backgroundImage: safeBackgroundUrl, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
                   >
-                    {!customBackgroundPreview && <ImageIcon size={16} className="text-stone-300" />}
+                    {!safeBackgroundUrl && <ImageIcon size={16} className="text-stone-300" />}
                   </div>
                   <div className="altar-bg-preset-label border-t border-stone-800/70 bg-stone-900/80 px-2 py-1 text-left text-[11px] text-stone-300">
                     {t('altar.customBackground')}
@@ -272,8 +393,8 @@ export default function AltarSidebarPanel() {
                 <div
                   className="h-14 w-full"
                   style={
-                    activeAltar.background_image_data
-                      ? { backgroundImage: `url("${customBackgroundPreview ?? ''}")`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                    activeAltar.background_image_data && safeBackgroundUrl
+                      ? { backgroundImage: safeBackgroundUrl, backgroundSize: 'cover', backgroundPosition: 'center' }
                       : { background: ALTAR_BACKGROUND_STYLES[(activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND) as (typeof ALTAR_BACKGROUND_PRESETS)[number]] }
                   }
                 >
@@ -291,6 +412,7 @@ export default function AltarSidebarPanel() {
             </div>
           ))}
           {backgroundNotice && <p className="mt-2 text-xs text-jade-300">{backgroundNotice}</p>}
+          </div>
           {isEditing && (
             <>
               <button
@@ -407,7 +529,7 @@ export default function AltarSidebarPanel() {
       )}
 
       {activeAltar && (
-        <div className="min-h-0 px-3 pb-4 border-t border-stone-700/60 flex flex-col" style={{ flex: placementsOpen ? '1 1 0' : '0 0 auto' }}>
+        <div className="px-3 pb-4 border-t border-stone-700/60">
           <button
             onClick={() => setPlacementsOpen((v) => !v)}
             className="pt-4 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
@@ -415,7 +537,7 @@ export default function AltarSidebarPanel() {
             {placementsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             {t('altar.placedElements')}
           </button>
-          {placementsOpen && <div className="mt-2 flex-1 min-h-0 overflow-y-auto space-y-1 pr-1" onClick={(e) => { if (e.target === e.currentTarget) selectPlacement(null); }}>
+          {placementsOpen && <div className="mt-2 space-y-1 pr-1" onClick={(e) => { if (e.target === e.currentTarget) selectPlacement(null); }}>
             {sortedPlacements.length === 0 && (
               <p className="px-2 py-2 text-xs text-stone-600">{t('altar.noPlacedElements')}</p>
             )}

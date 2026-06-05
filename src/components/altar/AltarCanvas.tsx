@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/shallow';
 import { MoveDiagonal2, RotateCw } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import { getAltarDragItem, setAltarDragItem, subscribeAltarDrag } from '../../lib/altarDragState';
+import { parseResolution, BASE_RESOLUTION_WIDTH } from '../../lib/altarConstants';
 import type { AltarItem, AltarPlacement, AltarRecord } from '../../types';
 import { AltarItemVisual } from './AltarItemVisual';
 
@@ -21,6 +22,8 @@ export function AltarCanvas({
   rotationSnapEnabled,
   rotationSnapAngle,
   snapScaleToGrid,
+  resolution,
+  cssScale,
   getBackgroundStyle,
 }: {
   altar: AltarRecord | null;
@@ -34,6 +37,8 @@ export function AltarCanvas({
   rotationSnapEnabled: boolean;
   rotationSnapAngle: number;
   snapScaleToGrid: boolean;
+  resolution: string;
+  cssScale: number;
   getBackgroundStyle: (altar: AltarRecord | null, imageSrc: string | null | undefined) => string;
 }) {
   const { t } = useTranslation();
@@ -49,6 +54,8 @@ export function AltarCanvas({
     })),
   );
   const gridRgb = hexToRgb(gridColor);
+  const { w: nativeW, h: nativeH } = parseResolution(resolution);
+  const canvasScale = nativeW / BASE_RESOLUTION_WIDTH;
   const canvasRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef<string | null>(null);
   const [sidebarDragItem, setSidebarDragItem] = useState<AltarItem | null>(null);
@@ -66,17 +73,18 @@ export function AltarCanvas({
   const handleResizeById = useCallback(
     (id: string, width: number, height: number) => {
       if (snapScaleToGrid && gridSize > 0) {
-        const displaySize = BASE_SIZE * (width / 8);
+        const scaledBase = BASE_SIZE * canvasScale;
+        const displaySize = scaledBase * (width / 8);
         const snapUnit = gridSize * 2;
         const snapped = Math.max(snapUnit, Math.round(displaySize / snapUnit) * snapUnit);
-        const snappedUnit = (snapped / BASE_SIZE) * 8;
+        const snappedUnit = (snapped / scaledBase) * 8;
         const clamped = Math.max(2, Math.min(500, Math.round(snappedUnit * 100) / 100));
         updatePlacement(id, { width: clamped, height: clamped });
       } else {
         updatePlacement(id, { width, height });
       }
     },
-    [updatePlacement, snapScaleToGrid, gridSize],
+    [updatePlacement, snapScaleToGrid, gridSize, canvasScale],
   );
   const handleRotateById = useCallback(
     (id: string, rotation: number) => updatePlacement(id, { rotation }),
@@ -88,15 +96,16 @@ export function AltarCanvas({
     let x = Math.max(3, Math.min(97, ((clientX - rect.left) / rect.width) * 100));
     let y = Math.max(3, Math.min(97, ((clientY - rect.top) / rect.height) * 100));
     if (snapToGrid) {
-      const stepX = (gridSize / rect.width) * 100;
-      const stepY = (gridSize / rect.height) * 100;
+      // Use native (unscaled) dimensions for correct grid snap steps
+      const stepX = (gridSize / nativeW) * 100;
+      const stepY = (gridSize / nativeH) * 100;
       if (stepX > 0) x = Math.round(x / stepX) * stepX;
       if (stepY > 0) y = Math.round(y / stepY) * stepY;
       x = Math.max(3, Math.min(97, x));
       y = Math.max(3, Math.min(97, y));
     }
     return { x, y };
-  }, [snapToGrid, gridSize]);
+  }, [snapToGrid, gridSize, nativeW, nativeH]);
 
   useEffect(() => subscribeAltarDrag(setSidebarDragItem), []);
 
@@ -149,7 +158,7 @@ export function AltarCanvas({
   return (
     <div
       ref={canvasRef}
-      className="flex-1 relative overflow-hidden select-none"
+      className="w-full h-full relative overflow-hidden select-none"
       style={{ background: getBackgroundStyle(altar, backgroundSrc) }}
       onMouseDown={() => selectPlacement(null)}
       onMouseMove={handleMouseMove}
@@ -186,6 +195,8 @@ export function AltarCanvas({
           selected={selectedPlacementId === p.id}
           rotationSnapEnabled={rotationSnapEnabled}
           rotationSnapAngle={rotationSnapAngle}
+          canvasScale={canvasScale}
+          cssScale={cssScale}
           onStartDrag={handleStartDragById}
           onSelect={handleSelectById}
           onResize={handleResizeById}
@@ -206,27 +217,41 @@ export function AltarCanvas({
   );
 }
 
-const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rotationSnapEnabled, rotationSnapAngle, onStartDrag, onSelect, onResize, onRotate }: {
+interface PlacedItemProps {
   placement: AltarPlacement;
   editable: boolean;
   selected: boolean;
   rotationSnapEnabled: boolean;
   rotationSnapAngle: number;
-  // Callbacks now accept `id` so a single stable reference can be shared
+  canvasScale: number;
+  cssScale: number;
+  // Callbacks accept `id` so a single stable reference can be shared
   // across all PlacedItem instances, letting React.memo bail out correctly.
   onStartDrag: (id: string) => void;
   onSelect: (id: string) => void;
   onResize: (id: string, width: number, height: number) => void;
   onRotate: (id: string, rotation: number) => void;
-}) {
+}
+
+const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rotationSnapEnabled, rotationSnapAngle, canvasScale, cssScale, onStartDrag, onSelect, onResize, onRotate }: PlacedItemProps) {
   const { t } = useTranslation();
   const [hovered, setHovered] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const width = placement.width ?? 8;
   const height = placement.height ?? 8;
-  const displayWidth = Math.round(BASE_SIZE * (width / 8));
-  const displayHeight = Math.round(BASE_SIZE * (height / 8));
+  const scaledBase = BASE_SIZE * canvasScale;
+  const displayWidth = Math.round(scaledBase * (width / 8));
+  const displayHeight = Math.round(scaledBase * (height / 8));
+  // Buttons must be a fixed screen-pixel size regardless of canvas resolution.
+  // cssScale is the CSS transform factor applied to the canvas container, so
+  // dividing by it converts screen pixels → native canvas pixels.
+  const safeScale = cssScale > 0 ? cssScale : 1;
+  const btnSize = Math.round(26 / safeScale);
+  const iconSize = Math.round(14 / safeScale);
+  const rotateTopOffset = -Math.round(38 / safeScale);
+  const resizeEdgeOffset = -Math.round(10 / safeScale);
+  const tooltipTopOffset = -Math.round(75 / safeScale);
 
   const handleWheel = (e: React.WheelEvent) => {
     if (!editable || placement.locked) return;
@@ -283,7 +308,7 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rot
 
     const onMove = (moveEvent: MouseEvent) => {
       const delta = (moveEvent.clientX - startX + (moveEvent.clientY - startY)) / 2;
-      const nextSize = Math.max(2, Math.min(500, startSize + (delta * 8) / BASE_SIZE));
+      const nextSize = Math.max(2, Math.min(500, startSize + (delta * 8) / scaledBase));
       const normalized = Math.round(nextSize * 100) / 100;
       onResize(placement.id, normalized, normalized);
     };
@@ -328,26 +353,28 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rot
       </div>
       {(selected || (editable && hovered)) && <span className="absolute inset-0 rounded border border-jade-500/50 pointer-events-none" />}
       {editable && isRotating && (
-        <span className="absolute -top-16 left-1/2 -translate-x-1/2 rounded bg-stone-950 border border-jade-500/60 px-2 py-0.5 text-[11px] font-semibold text-jade-200 shadow-lg pointer-events-none">
+        <span style={{ top: tooltipTopOffset, fontSize: Math.round(14 / safeScale), padding: `${Math.round(4 / safeScale)}px ${Math.round(10 / safeScale)}px` }} className="absolute left-1/2 -translate-x-1/2 rounded bg-stone-950 border border-jade-500/60 font-semibold text-jade-200 shadow-lg pointer-events-none whitespace-nowrap">
           {Math.round((placement.rotation ?? 0) * 10) / 10}°
         </span>
       )}
       {editable && selected && !placement.locked && (
         <button
           onMouseDown={startRotate}
-          className="absolute -top-8 left-1/2 -translate-x-1/2 w-4 h-4 bg-stone-800 border border-stone-600 rounded-full text-stone-300 hover:text-jade-300 hover:border-jade-600 transition-colors z-10 flex items-center justify-center"
+          style={{ width: btnSize, height: btnSize, top: rotateTopOffset, left: '50%', transform: 'translateX(-50%)' }}
+          className="absolute bg-stone-800 border border-stone-600 rounded-full text-stone-300 hover:text-jade-300 hover:border-jade-600 transition-colors z-10 flex items-center justify-center"
           title={t('altar.rotate')}
         >
-          <RotateCw size={9} />
+          <RotateCw size={iconSize} />
         </button>
       )}
       {editable && selected && !placement.locked && (
         <button
           onMouseDown={startResize}
-          className="absolute -bottom-2 -right-2 w-4 h-4 bg-stone-800 border border-stone-600 rounded-full text-stone-300 hover:text-jade-300 hover:border-jade-600 transition-colors z-10 flex items-center justify-center"
+          style={{ width: btnSize, height: btnSize, bottom: resizeEdgeOffset, right: resizeEdgeOffset }}
+          className="absolute bg-stone-800 border border-stone-600 rounded-full text-stone-300 hover:text-jade-300 hover:border-jade-600 transition-colors z-10 flex items-center justify-center"
           title={t('altar.scale')}
         >
-          <MoveDiagonal2 size={9} />
+          <MoveDiagonal2 size={iconSize} />
         </button>
       )}
     </div>

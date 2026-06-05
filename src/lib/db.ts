@@ -607,4 +607,20 @@ const MIGRATIONS: Migration[] = [
       await db.execute("ALTER TABLE altars ADD COLUMN snap_scale_to_grid INTEGER NOT NULL DEFAULT 0");
     },
   },
+  {
+    // aspect_ratio column is unused — ratio is always derived from resolution via parseResolution.
+    // Kept for backwards compatibility with existing DBs; do not read or write this column.
+    version: 20,
+    name: 'altar_aspect_ratio',
+    up: async (db) => {
+      await db.execute("ALTER TABLE altars ADD COLUMN aspect_ratio TEXT NOT NULL DEFAULT '16:9'");
+    },
+  },
+  {
+    version: 21,
+    name: 'altar_resolution',
+    up: async (db) => {
+      await db.execute("ALTER TABLE altars ADD COLUMN resolution TEXT NOT NULL DEFAULT '1920x1080'");
+    },
+  },
 ];

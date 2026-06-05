@@ -19,6 +19,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Altar grid controls (overlay toggle, size, opacity, color, snap-to-grid, rotation snap, scale to grid) stored per altar in the database (grid columns migration v18; rotation/scale columns migration v19)
 - Modal-based Altar item add/edit/delete workflow in the docked library strip
 - Extracted Altar components and hooks for maintainability: `AltarItemVisual`, `AltarCanvas`, `AltarLibraryStrip`, and background preview hooks
+- Altar sidebar: **Canvas Options** collapsible section (edit mode only) — lets you pick a canvas ratio (16:9, 4:3, 3:2, 1:1, 2:3, 9:16) and size (Small/Medium/Large/Very Large), or enter a fully custom width × height up to 7680×4320; the resulting `resolution` is saved per altar in the database (migration v21)
+- `parseResolution`, `ALTAR_RATIOS`, `ALTAR_SIZE_KEYS`, `ALTAR_RESOLUTION_MAP`, `sizeAndRatioFromResolution`, `DEFAULT_ALTAR_RESOLUTION`, `BASE_RESOLUTION_WIDTH`, `MAX_ALTAR_RESOLUTION_W`, and `MAX_ALTAR_RESOLUTION_H` exported from `altarConstants.ts`
+- `updateAltarResolution` action on `altarStore` — validates and clamps the resolution string before persisting
 
 ### Fixed
 - Category selection in OpPropertiesPanel reset to "Sigils" after 1.5 s whenever any sidebar field was changed on a newly created operation. Root cause: `triggerAutoSave` captured `pendingRef.current` at call time, so the debounced write overwrote the sidebar change. The ref is now read when the timer fires, not when `triggerAutoSave` is called. The same bug was present in WikiView and JournalView and is fixed there too.
@@ -27,8 +30,20 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - WikiView breadcrumb showed "Updated MMM d, yyyy"; the "Updated " prefix has been removed so it shows the date only.
 - InternalLinkExtension rendered `[[Label(id)]]` raw text in edit mode instead of the chip used in view mode; chips are now shown in both modes.
 - Altar dashboard was unreachable: opening the app, switching to the altar section, or clicking the back button always landed on a single altar. The dashboard (list of all altars) is now reachable from the back button and the altar entry in the left sidebar.
+- Altar full-window mode did not activate when opening an altar directly (i.e. when `activeView.mode` is `undefined` rather than `'view'`); the check is now `mode !== 'edit'` so full-window works in all non-edit contexts.
+- Altar canvas appeared vertically centred in the viewport by default; it now starts at the top edge in normal mode and centres only in full-window mode.
+- Altar dashboard preview cards used a fixed `h-36` height regardless of the altar's aspect ratio; cards now use CSS `aspect-ratio` derived from the altar's stored resolution, so portrait and square canvases display proportionally.
+- `parseResolution` now validates the input with a strict regex (`/^\d+x\d+$/`) and clamps width/height to the allowed maximum (7680×4320), preventing malformed strings or oversized values from reaching the canvas layout.
+- Custom background URL was interpolated into CSS without validation; `AltarSidebarPanel` now checks that the value starts with `data:` or `tauri://` before using it in a CSS `backgroundImage` rule.
+- German locale used `"Aufloesung"` instead of `"Auflösung"`; French locale used `"Resolution"` instead of `"Résolution"`; Spanish locale used `"Resolucion"` instead of `"Resolución"`.
+- Altar resize and rotate control handles were rendered at a fixed pixel size regardless of how much the canvas was scaled by CSS transform, making them appear oversized on small viewports. Handle sizes, icon sizes, offsets, and the rotation tooltip are now derived from `cssScale` so they remain visually consistent at any zoom level.
 
 ### Changed
+- Altar canvas rendering: the canvas now renders at its native resolution (e.g. 1920×1080) and is scaled down to fit the viewport via a single CSS `transform: scale()` on a wrapping div. This replaces the previous percentage-based stretching approach and means placement coordinates, grid snap steps, handle sizes, and font sizes all operate in native pixels — eliminating rounding artefacts at non-standard viewports.
+- `AltarCanvas` accepts two new props: `resolution` (the altar's stored resolution string) and `cssScale` (the current CSS scale factor). Snap-to-grid step sizes and scale-to-grid snapping now use the native canvas dimensions rather than the DOM element's CSS dimensions.
+- `canvasTransform` in `AltarView` now stores `nativeW` and `nativeH` alongside `scale`, `offsetX`, and `offsetY` and is initialised with `{ scale:1, offsetX:0, offsetY:0, nativeW:1920, nativeH:1080 }`, eliminating a flash on first render.
+- `altarWindowFullscreen` is synced into a `useRef` (`altarWindowFullscreenRef`) that is read inside the `ResizeObserver` callback, so toggling full-window mode no longer tears down and recreates the observer.
+- `PlacedItemProps` interface for the internal `PlacedItem` component in `AltarCanvas` is now declared as a named interface rather than an inline object type.
 - LeftSidebar restructured: Journal, Tasks, Operations, Wiki, and Altar are now in a fixed non-scrollable nav block at the top; the journal entries list scrolls independently below it; Settings, Tags, and Trash are condensed into an icon-only row at the bottom (size 18, no text labels; Trash is right-aligned).
 - Draggable tab reordering in the tab bar with animated movement
 - Tab bar refined: the active tab now visually flows into the main content panel below (matching color, no separator line) while inactive tabs remain clearly separated by a 1px divider; the `backdrop-filter: blur` and active-tab drop shadow were removed as they contradicted the seamless effect

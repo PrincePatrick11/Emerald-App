@@ -246,7 +246,7 @@ Because the app uses many Tailwind utility classes with hardcoded stone/jade col
 Two modules centralise reusable Tailwind class strings to avoid duplication across components:
 
 - **`src/lib/styleClasses.ts`** — Input and select class strings for custom properties and operation properties (`CUSTOM_PROP_INPUT_CLASSES`, `CUSTOM_PROP_SMALL_INPUT_CLASSES`, `OP_PROP_SELECT_CLASSES`).
-- **`src/lib/altarConstants.ts`** — Altar background presets (`ALTAR_BACKGROUND_PRESETS`, `ALTAR_BACKGROUND_STYLES`), category emoji mappings (`ALTAR_CATEGORY_EMOJI`, `CATEGORY_EMOJIS`), the default background (`DEFAULT_ALTAR_BACKGROUND`), and the canonical grid defaults (`DEFAULT_GRID_SIZE`, `DEFAULT_GRID_OPACITY`, `DEFAULT_GRID_COLOR`). The SQL migration defaults for altar grid columns must stay in sync with these constants.
+- **`src/lib/altarConstants.ts`** — Altar background presets (`ALTAR_BACKGROUND_PRESETS`, `ALTAR_BACKGROUND_STYLES`), category emoji mappings (`ALTAR_CATEGORY_EMOJI`, `CATEGORY_EMOJIS`), the default background (`DEFAULT_ALTAR_BACKGROUND`), canonical grid defaults (`DEFAULT_GRID_SIZE`, `DEFAULT_GRID_OPACITY`, `DEFAULT_GRID_COLOR`), and the resolution system: `DEFAULT_ALTAR_RESOLUTION` (`'1920x1080'`), `BASE_RESOLUTION_WIDTH` (1920), `MAX_ALTAR_RESOLUTION_W` (7680), `MAX_ALTAR_RESOLUTION_H` (4320), `ALTAR_RATIOS`, `ALTAR_SIZE_KEYS`, `ALTAR_RESOLUTION_MAP`, `sizeAndRatioFromResolution`, and `parseResolution`. The SQL migration defaults for altar grid and resolution columns must stay in sync with these constants. `parseResolution` validates the input string against `/^\d+x\d+$/` and clamps both dimensions before returning `{ w, h }`.
 
 ## Altar UI Composition
 
@@ -264,7 +264,7 @@ Supporting hooks:
 
 - **`src/components/altar/useAltarBackgroundPreview.ts`** — background image preview resolution. Backed by a module-level cache (`cache: Map<path, dataUrl>`, `inFlight: Map<path, Promise>`) so the same path is read from Tauri at most once per session and consumers re-render via `useSyncExternalStore` when a load resolves.
 
-A fixed-scene rendering experiment (absolute pixel sizing) was rolled back. Altar placement coordinates remain percentage-based (`x/y` as 0–100) for responsive canvas scaling.
+**Altar canvas scaling model.** The canvas container in `AltarView` is rendered at the altar's native resolution (from `altars.resolution`, e.g. 1920×1080). A `ResizeObserver` on the viewport div computes a uniform `scale` factor (`Math.min(vw/nw, vh/nh)`), an `offsetX` centering value, and an `offsetY` that is 0 in normal mode and `(vh − nh×s)/2` in full-window mode. These are stored as `canvasTransform` (`{ scale, offsetX, offsetY, nativeW, nativeH }`) with a default of `{ scale:1, offsetX:0, offsetY:0, nativeW:1920, nativeH:1080 }` to avoid a flash on first render. The canvas container receives a `transform: translate(offsetX, offsetY) scale(scale)` with `transform-origin: 0 0`. `AltarCanvas` receives `resolution` (the raw string) and `cssScale` (the numeric scale factor). Inside `AltarCanvas`, all snap calculations use the native pixel dimensions; placement handle sizes (rotate button, resize handle, tooltip) are divided by `cssScale` so they appear at a constant screen-pixel size regardless of zoom level. Altar placement coordinates (`x/y`) remain percentage-based (0–100) for compatibility with existing data.
 
 Store integration details:
 

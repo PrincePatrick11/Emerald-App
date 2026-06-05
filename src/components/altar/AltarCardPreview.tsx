@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import type { AltarPlacement, AltarRecord } from '../../types';
-import { ALTAR_BACKGROUND_PRESETS, ALTAR_BACKGROUND_STYLES, DEFAULT_ALTAR_BACKGROUND } from '../../lib/altarConstants';
+import { ALTAR_BACKGROUND_PRESETS, ALTAR_BACKGROUND_STYLES, DEFAULT_ALTAR_BACKGROUND, parseResolution } from '../../lib/altarConstants';
 import { AltarItemVisual } from './AltarItemVisual';
 import { useBackgroundPreview } from './useAltarBackgroundPreview';
 
@@ -27,11 +27,12 @@ export const AltarCardPreview = memo(function AltarCardPreview({
   const previewSrc = useBackgroundPreview(altar.background_image_data);
   const hasImage = !!previewSrc?.startsWith('data:');
   const background = hasImage && previewSrc ? buildImageStyle(previewSrc) : resolvePresetStyle(altar);
+  const { w, h } = parseResolution(altar.resolution ?? '1920x1080');
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg border border-stone-700/40 ${compact ? 'h-8 w-8' : 'h-36 w-full'}`}
-      style={{ background }}
+      className={`relative overflow-hidden rounded-lg border border-stone-700/40 ${compact ? 'h-8 w-8' : 'w-full'}`}
+      style={{ background, ...(compact ? {} : { aspectRatio: `${w}/${h}` }) }}
     >
       <div className="absolute bottom-[28%] left-[8%] right-[8%] h-px bg-gradient-to-r from-transparent via-stone-700/50 to-transparent pointer-events-none" />
       <div className="absolute bottom-[26%] left-[12%] right-[12%] h-px bg-gradient-to-r from-transparent via-stone-800/30 to-transparent pointer-events-none" />

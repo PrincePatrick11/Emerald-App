@@ -54,6 +54,14 @@ Three Rust commands enforce path restrictions:
 2. **Symlink rejection.** The source path is checked with `symlink_metadata`; if it resolves to a symlink, the command returns `"access denied: symlink targets are not allowed"`.
 3. **Root directory confinement.** The source path is canonicalized and verified against the allowed storage roots (home, documents, downloads, desktop, app data, app config). If the resolved path escapes these roots, the command returns `"access denied: path outside allowed directories"`.
 
+## Frontend Input Validation
+
+Two additional validation rules protect against malformed or oversized data in the altar canvas subsystem:
+
+**Resolution strings.** `parseResolution` in `altarConstants.ts` validates the input against `/^\d+x\d+$/` before splitting on `x`. Inputs that contain additional separators (e.g. `1920x10x80`) or non-numeric characters are rejected and fall back to `1920x1080`. Both dimensions are then clamped to the allowed maximum (7680 wide, 4320 tall), preventing extremely large canvas sizes that could cause layout thrashing or DoS-like memory pressure in the ResizeObserver loop.
+
+**Custom background URL.** `AltarSidebarPanel` checks that the resolved custom background preview string starts with `data:` or `tauri://` before constructing a CSS `backgroundImage: url(...)` rule. Values that fail this check are not interpolated into CSS, preventing content-injection via unexpected URL schemes.
+
 ## HTML Escaping in Exports
 
 All user-provided text that is interpolated into the PDF export HTML template is passed through `htmlEscape()` in `src/lib/export.ts`. This function replaces `&`, `<`, `>`, `"`, and `'` with their corresponding HTML entities. It is applied to:

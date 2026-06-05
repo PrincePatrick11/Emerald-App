@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
 import { Check, Maximize2, Minimize2, PanelRightOpen, Pencil, Plus, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAltarStore } from '../../store/altarStore';
 import { useUIStore } from '../../store/uiStore';
-import { DEFAULT_ALTAR_BACKGROUND, ALTAR_BACKGROUND_PRESETS, ALTAR_BACKGROUND_STYLES } from '../../lib/altarConstants';
+import { DEFAULT_ALTAR_BACKGROUND, ALTAR_BACKGROUND_PRESETS, ALTAR_BACKGROUND_STYLES, DEFAULT_ALTAR_RESOLUTION, parseResolution } from '../../lib/altarConstants';
 import type { AltarRecord } from '../../types';
 import ListToolbar from '../ui/ListToolbar';
 import ContextMenu from '../ui/ContextMenu';
@@ -54,6 +54,9 @@ export default function AltarView() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [title, setTitle] = useState('');
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const altarWindowFullscreenRef = useRef(altarWindowFullscreen);
+  const [canvasTransform, setCanvasTransform] = useState<{ scale: number; offsetX: number; offsetY: number; nativeW: number; nativeH: number }>({ scale: 1, offsetX: 0, offsetY: 0, nativeW: 1920, nativeH: 1080 });
 
   useEffect(() => { fetchAltars(); }, [fetchAltars]);
   useEffect(() => {
@@ -74,9 +77,25 @@ export default function AltarView() {
     setTitle(activeAltar.title);
   }, [activeAltar?.id, activeAltar?.title]);
 
+  useEffect(() => { altarWindowFullscreenRef.current = altarWindowFullscreen; }, [altarWindowFullscreen]);
+
   useEffect(() => {
     if (isEditing && altarWindowFullscreen) setAltarWindowFullscreen(false);
   }, [isEditing, altarWindowFullscreen, setAltarWindowFullscreen]);
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const res = activeAltar?.resolution ?? DEFAULT_ALTAR_RESOLUTION;
+    const { w, h } = parseResolution(res);
+    const obs = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      const s = Math.min(width / w, height / h);
+      setCanvasTransform({ scale: s, offsetX: (width - w * s) / 2, offsetY: altarWindowFullscreenRef.current ? (height - h * s) / 2 : 0, nativeW: w, nativeH: h });
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [activeAltar?.id, activeAltar?.resolution]);
 
   const handleNew = async () => {
     const altar = await createAltar();
@@ -324,7 +343,17 @@ export default function AltarView() {
         </div>
       )}
 
-      <AltarCanvas altar={activeAltar} backgroundSrc={backgroundSrc} editable={isEditing} showGrid={activeAltar.grid_enabled} gridSize={activeAltar.grid_size} gridOpacity={activeAltar.grid_opacity} gridColor={activeAltar.grid_color} snapToGrid={activeAltar.snap_to_grid} rotationSnapEnabled={activeAltar.rotation_snap_enabled} rotationSnapAngle={activeAltar.rotation_snap_angle} snapScaleToGrid={activeAltar.snap_scale_to_grid} getBackgroundStyle={getAltarBackgroundStyleWithImage} />
+      <div ref={viewportRef} className="flex-1 relative overflow-hidden min-h-0">
+        <div style={{
+          position: 'absolute',
+          width: canvasTransform.nativeW,
+          height: canvasTransform.nativeH,
+          transformOrigin: '0 0',
+          transform: `translate(${canvasTransform.offsetX}px, ${canvasTransform.offsetY}px) scale(${canvasTransform.scale})`,
+        }}>
+          <AltarCanvas altar={activeAltar} backgroundSrc={backgroundSrc} editable={isEditing} showGrid={activeAltar.grid_enabled} gridSize={activeAltar.grid_size} gridOpacity={activeAltar.grid_opacity} gridColor={activeAltar.grid_color} snapToGrid={activeAltar.snap_to_grid} rotationSnapEnabled={activeAltar.rotation_snap_enabled} rotationSnapAngle={activeAltar.rotation_snap_angle} snapScaleToGrid={activeAltar.snap_scale_to_grid} resolution={activeAltar.resolution} cssScale={canvasTransform.scale} getBackgroundStyle={getAltarBackgroundStyleWithImage} />
+        </div>
+      </div>
 
       {isEditing && !altarWindowFullscreen && <AltarLibraryStrip editable={isEditing} />}
     </div>
