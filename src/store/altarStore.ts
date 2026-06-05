@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import { getDb } from '../lib/db';
-import { DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE, parseResolution } from '../lib/altarConstants';
+import { ALTAR_RATIOS, DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE, isRatioFormat, parseResolution } from '../lib/altarConstants';
 import { boolToInt, generateId, isValidHexColor, nowIso } from '../lib/helpers';
 import type { AltarItem, AltarItemCategory, AltarPlacement, AltarRecord } from '../types';
 
@@ -62,7 +62,7 @@ function normalizeAltar(altar: AltarRecord): AltarRecord {
     rotation_snap_enabled: Boolean(altar.rotation_snap_enabled),
     rotation_snap_angle: altar.rotation_snap_angle ?? 15,
     snap_scale_to_grid: Boolean(altar.snap_scale_to_grid),
-    resolution: /^\d+x\d+$/.test(altar.resolution ?? '') ? altar.resolution : DEFAULT_ALTAR_RESOLUTION,
+    resolution: (/^\d+x\d+$/.test(altar.resolution ?? '') || /^\d+:\d+$/.test(altar.resolution ?? '')) ? altar.resolution : DEFAULT_ALTAR_RESOLUTION,
   };
 }
 
@@ -315,8 +315,13 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const db = await getDb();
     const altar = get().altars.find((entry) => entry.id === id);
     if (!altar) return;
-    const { w, h } = parseResolution(resolution);
-    const safeRes = `${w}x${h}`;
+    let safeRes: string;
+    if (isRatioFormat(resolution) && (ALTAR_RATIOS as readonly string[]).includes(resolution)) {
+      safeRes = resolution;
+    } else {
+      const { w, h } = parseResolution(resolution);
+      safeRes = `${w}x${h}`;
+    }
     const updated_at = nowIso();
     await db.execute('UPDATE altars SET resolution=$1, updated_at=$2 WHERE id=$3', [safeRes, updated_at, id]);
     set((s) => ({

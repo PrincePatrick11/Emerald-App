@@ -5,7 +5,7 @@ import { Check, Maximize2, Minimize2, PanelRightOpen, Pencil, Plus, X } from 'lu
 import { format } from 'date-fns';
 import { useAltarStore } from '../../store/altarStore';
 import { useUIStore } from '../../store/uiStore';
-import { DEFAULT_ALTAR_BACKGROUND, ALTAR_BACKGROUND_PRESETS, ALTAR_BACKGROUND_STYLES, DEFAULT_ALTAR_RESOLUTION, parseResolution } from '../../lib/altarConstants';
+import { DEFAULT_ALTAR_BACKGROUND, ALTAR_BACKGROUND_PRESETS, ALTAR_BACKGROUND_STYLES, DEFAULT_ALTAR_RESOLUTION, parseResolution, isRatioFormat } from '../../lib/altarConstants';
 import type { AltarRecord } from '../../types';
 import ListToolbar from '../ui/ListToolbar';
 import ContextMenu from '../ui/ContextMenu';
@@ -87,11 +87,20 @@ export default function AltarView() {
     const el = viewportRef.current;
     if (!el) return;
     const res = activeAltar?.resolution ?? DEFAULT_ALTAR_RESOLUTION;
-    const { w, h } = parseResolution(res);
     const obs = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
-      const s = Math.min(width / w, height / h);
-      setCanvasTransform({ scale: s, offsetX: (width - w * s) / 2, offsetY: altarWindowFullscreenRef.current ? (height - h * s) / 2 : 0, nativeW: w, nativeH: h });
+      if (isRatioFormat(res)) {
+        const [rw, rh] = res.split(':').map(Number);
+        const fitW = Math.min(width, height * rw / rh);
+        const fitH = fitW * rh / rw;
+        const nativeW = Math.round(fitW);
+        const nativeH = Math.round(fitH);
+        setCanvasTransform({ scale: 1, offsetX: (width - nativeW) / 2, offsetY: altarWindowFullscreenRef.current ? (height - nativeH) / 2 : 0, nativeW, nativeH });
+      } else {
+        const { w, h } = parseResolution(res);
+        const s = Math.min(width / w, height / h);
+        setCanvasTransform({ scale: s, offsetX: (width - w * s) / 2, offsetY: altarWindowFullscreenRef.current ? (height - h * s) / 2 : 0, nativeW: w, nativeH: h });
+      }
     });
     obs.observe(el);
     return () => obs.disconnect();
@@ -99,7 +108,7 @@ export default function AltarView() {
 
   const handleNew = async () => {
     const altar = await createAltar();
-    setActiveView({ type: 'altar', id: altar.id });
+    setActiveView({ type: 'altar', id: altar.id, mode: 'edit' });
   };
 
   const openAltar = async (altar: AltarRecord) => {
@@ -351,7 +360,7 @@ export default function AltarView() {
           transformOrigin: '0 0',
           transform: `translate(${canvasTransform.offsetX}px, ${canvasTransform.offsetY}px) scale(${canvasTransform.scale})`,
         }}>
-          <AltarCanvas altar={activeAltar} backgroundSrc={backgroundSrc} editable={isEditing} showGrid={activeAltar.grid_enabled} gridSize={activeAltar.grid_size} gridOpacity={activeAltar.grid_opacity} gridColor={activeAltar.grid_color} snapToGrid={activeAltar.snap_to_grid} rotationSnapEnabled={activeAltar.rotation_snap_enabled} rotationSnapAngle={activeAltar.rotation_snap_angle} snapScaleToGrid={activeAltar.snap_scale_to_grid} resolution={activeAltar.resolution} cssScale={canvasTransform.scale} getBackgroundStyle={getAltarBackgroundStyleWithImage} />
+          <AltarCanvas altar={activeAltar} backgroundSrc={backgroundSrc} editable={isEditing} showGrid={activeAltar.grid_enabled} gridSize={activeAltar.grid_size} gridOpacity={activeAltar.grid_opacity} gridColor={activeAltar.grid_color} snapToGrid={activeAltar.snap_to_grid} rotationSnapEnabled={activeAltar.rotation_snap_enabled} rotationSnapAngle={activeAltar.rotation_snap_angle} snapScaleToGrid={activeAltar.snap_scale_to_grid} resolution={activeAltar.resolution} nativeW={canvasTransform.nativeW} nativeH={canvasTransform.nativeH} cssScale={canvasTransform.scale} getBackgroundStyle={getAltarBackgroundStyleWithImage} />
         </div>
       </div>
 

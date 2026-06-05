@@ -1,42 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
-import { Check, ChevronDown, ChevronRight, Image as ImageIcon, Pencil, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Grid3x3, Image as ImageIcon, Magnet, Pencil, RotateCw, Scaling, Trash2 } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import {
   ALTAR_RATIOS,
-  ALTAR_SIZE_KEYS,
-  ALTAR_RESOLUTION_MAP,
-  sizeAndRatioFromResolution,
   ALTAR_BACKGROUND_PRESETS,
   ALTAR_BACKGROUND_STYLES,
   DEFAULT_ALTAR_BACKGROUND,
-  DEFAULT_ALTAR_RESOLUTION,
-  parseResolution,
+  ratioFromResolution,
 } from '../../lib/altarConstants';
 import { useUIStore } from '../../store/uiStore';
 import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
 import { PlacedElementRow, PlacedElementInspector } from './PlacedElementRow';
 
-function ToggleRow({ label, checked, onClick }: { label: string; checked: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="mt-2 w-full rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2 transition-colors hover:border-stone-500/70"
-    >
-      <span className="flex items-center justify-between gap-3">
-        <span className="text-xs text-stone-300">{label}</span>
-        <span
-          className={`relative h-5 w-9 rounded-full border transition-colors ${checked ? 'border-jade-600/70 bg-jade-900/45' : 'border-stone-600 bg-stone-800/80'}`}
-          aria-hidden="true"
-        >
-          <span className={`absolute top-0.5 h-3.5 w-3.5 rounded-full transition-all ${checked ? 'left-[18px] bg-jade-300' : 'left-0.5 bg-stone-400'}`} />
-        </span>
-      </span>
-    </button>
-  );
-}
 
 export default function AltarSidebarPanel() {
   const { t } = useTranslation();
@@ -48,10 +26,6 @@ export default function AltarSidebarPanel() {
     updatePlacement,
     duplicatePlacement,
     removePlacement,
-    bringPlacementForward,
-    sendPlacementBackward,
-    bringPlacementToFront,
-    sendPlacementToBack,
   } = useAltarStore(
     useShallow((s) => ({
       updateAltar: s.updateAltar,
@@ -59,10 +33,6 @@ export default function AltarSidebarPanel() {
       updatePlacement: s.updatePlacement,
       duplicatePlacement: s.duplicatePlacement,
       removePlacement: s.removePlacement,
-      bringPlacementForward: s.bringPlacementForward,
-      sendPlacementBackward: s.sendPlacementBackward,
-      bringPlacementToFront: s.bringPlacementToFront,
-      sendPlacementToBack: s.sendPlacementToBack,
     })),
   );
   const updateAltarGrid = useAltarStore((s) => s.updateAltarGrid);
@@ -78,8 +48,9 @@ export default function AltarSidebarPanel() {
   const [gridOpen, setGridOpen] = useState(true);
   const [canvasOptionsOpen, setCanvasOptionsOpen] = useState(true);
   const [placementsOpen, setPlacementsOpen] = useState(true);
-  const [customW, setCustomW] = useState('');
-  const [customH, setCustomH] = useState('');
+  const [dragState, setDragState] = useState<{ fromId: string; overIndex: number } | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const visualPlacementsRef = useRef<typeof sortedPlacements>([]);
   const [customBackgroundMap, setCustomBackgroundMap] = useState<Record<string, string>>(() => {
     try {
       const raw = localStorage.getItem('altar-custom-backgrounds');
@@ -99,23 +70,55 @@ export default function AltarSidebarPanel() {
     () => sortedPlacements.find((p) => p.id === selectedPlacementId) ?? null,
     [sortedPlacements, selectedPlacementId],
   );
+  const visualPlacements = useMemo(() => {
+    if (!dragState) return sortedPlacements;
+    const list = [...sortedPlacements];
+    const fromIdx = list.findIndex((p) => p.id === dragState.fromId);
+    if (fromIdx < 0) return sortedPlacements;
+    const [item] = list.splice(fromIdx, 1);
+    list.splice(Math.min(dragState.overIndex, list.length), 0, item);
+    return list;
+  }, [dragState, sortedPlacements]);
+  useEffect(() => { visualPlacementsRef.current = visualPlacements; }, [visualPlacements]);
+
+  const startDrag = useCallback((e: React.PointerEvent, fromId: string) => {
+    e.preventDefault();
+    const sorted = sortedPlacements;
+    const fromIndex = sorted.findIndex((p) => p.id === fromId);
+    setDragState({ fromId, overIndex: fromIndex });
+
+    const getOverIndex = (clientY: number): number => {
+      if (!listRef.current) return fromIndex;
+      const wrappers = Array.from(listRef.current.children) as HTMLElement[];
+      let best = 0, bestDist = Infinity;
+      wrappers.forEach((wrapper, i) => {
+        const row = (wrapper.firstElementChild as HTMLElement | null) ?? wrapper;
+        const rect = row.getBoundingClientRect();
+        const dist = Math.abs(clientY - (rect.top + rect.height / 2));
+        if (dist < bestDist) { bestDist = dist; best = i; }
+      });
+      return best;
+    };
+
+    const onMove = (ev: PointerEvent) => {
+      setDragState((prev) => prev ? { ...prev, overIndex: getOverIndex(ev.clientY) } : null);
+    };
+    const onUp = () => {
+      const finalOrder = visualPlacementsRef.current;
+      const maxZ = finalOrder.length - 1;
+      finalOrder.forEach((p, i) => {
+        const newZ = maxZ - i;
+        if (p.z_index !== newZ) updatePlacement(p.id, { z_index: newZ });
+      });
+      setDragState(null);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  }, [sortedPlacements, updatePlacement]);
+
   const hasCustomBackground = !!(activeAltar && (activeAltar.background_image_data || customBackgroundMap[activeAltar.id]));
-  const currentRes = activeAltar?.resolution ?? DEFAULT_ALTAR_RESOLUTION;
-  const canvasPreset = sizeAndRatioFromResolution(currentRes);
-  const isCustom = canvasPreset === null;
-  const parsedCustom = parseResolution(currentRes);
-  const wVal = customW || (isCustom ? String(parsedCustom.w) : '');
-  const hVal = customH || (isCustom ? String(parsedCustom.h) : '');
-  const applyCustom = (wStr: string, hStr: string) => {
-    if (!activeAltar) return;
-    const w = Number(wStr);
-    const h = Number(hStr);
-    if (w > 0 && h > 0) {
-      updateAltarResolution(activeAltar.id, `${w}x${h}`);
-      setCustomW(''); setCustomH('');
-    }
-  };
-  const inputClass = `w-full rounded border bg-stone-900/45 px-2 py-1.5 text-[11px] text-stone-300 outline-none placeholder:text-stone-600 ${isCustom ? 'border-jade-600/70' : 'border-stone-700/60'}`;
   const safeBackgroundUrl = customBackgroundPreview?.startsWith('data:') || customBackgroundPreview?.startsWith('tauri://')
     ? `url("${customBackgroundPreview}")`
     : null;
@@ -209,82 +212,25 @@ export default function AltarSidebarPanel() {
                 {t('altar.canvasOptions')}
               </button>
               {canvasOptionsOpen && (
-                <div className="mt-2 space-y-3">
-                  <div>
-                    <p className="mb-1.5 text-[11px] uppercase tracking-wider text-stone-500">{t('altar.ratio')}</p>
-                    <div className="flex flex-wrap gap-1">
-                      {ALTAR_RATIOS.map((r) => {
-                        const active = canvasPreset?.ratio === r;
-                        return (
-                          <button
-                            key={r}
-                            onClick={() => {
-                              updateAltarResolution(activeAltar.id, ALTAR_RESOLUTION_MAP[canvasPreset?.size ?? 'lg'][r]);
-                              setCustomW(''); setCustomH('');
-                            }}
-                            className={`rounded border px-2 py-1 text-[11px] font-medium transition-colors ${
-                              active
-                                ? 'border-jade-600/70 bg-jade-900/40 text-jade-300'
-                                : 'border-stone-700/60 bg-stone-900/45 text-stone-400 hover:border-stone-500/70 hover:text-stone-300'
-                            }`}
-                          >
-                            {r}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="mb-1.5 text-[11px] uppercase tracking-wider text-stone-500">{t('altar.size')}</p>
-                    <div className="grid grid-cols-4 gap-1">
-                      {ALTAR_SIZE_KEYS.map((s) => {
-                        const active = canvasPreset?.size === s;
-                        return (
-                          <button
-                            key={s}
-                            onClick={() => {
-                              updateAltarResolution(activeAltar.id, ALTAR_RESOLUTION_MAP[s][canvasPreset?.ratio ?? '16:9']);
-                              setCustomW(''); setCustomH('');
-                            }}
-                            className={`rounded border px-1 py-1.5 text-[11px] font-medium transition-colors ${
-                              active
-                                ? 'border-jade-600/70 bg-jade-900/40 text-jade-300'
-                                : 'border-stone-700/60 bg-stone-900/45 text-stone-400 hover:border-stone-500/70 hover:text-stone-300'
-                            }`}
-                          >
-                            {t(`altar.size${s.charAt(0).toUpperCase()}${s.slice(1)}`)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="mb-1.5 text-[11px] uppercase tracking-wider text-stone-500">{t('altar.customResolution')}</p>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        min={1}
-                        max={7680}
-                        value={wVal}
-                        placeholder="W"
-                        onChange={(e) => setCustomW(e.target.value)}
-                        onBlur={() => applyCustom(customW || wVal, customH || hVal)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { applyCustom(customW || wVal, customH || hVal); e.currentTarget.blur(); } }}
-                        className={inputClass}
-                      />
-                      <span className="text-[11px] text-stone-500">×</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={4320}
-                        value={hVal}
-                        placeholder="H"
-                        onChange={(e) => setCustomH(e.target.value)}
-                        onBlur={() => applyCustom(customW || wVal, customH || hVal)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { applyCustom(customW || wVal, customH || hVal); e.currentTarget.blur(); } }}
-                        className={inputClass}
-                      />
-                    </div>
+                <div className="mt-2">
+                  <p className="mb-1.5 text-[11px] uppercase tracking-wider text-stone-500">{t('altar.ratio')}</p>
+                  <div className="grid grid-cols-3 gap-1">
+                    {ALTAR_RATIOS.map((r) => {
+                      const active = ratioFromResolution(activeAltar.resolution) === r;
+                      return (
+                        <button
+                          key={r}
+                          onClick={() => updateAltarResolution(activeAltar.id, r)}
+                          className={`rounded border py-1.5 text-[11px] font-medium text-center transition-colors ${
+                            active
+                              ? 'border-jade-600/70 bg-jade-900/40 text-jade-300'
+                              : 'border-stone-700/60 bg-stone-900/45 text-stone-400 hover:border-stone-500/70 hover:text-stone-300'
+                          }`}
+                        >
+                          {r}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -299,86 +245,77 @@ export default function AltarSidebarPanel() {
             {isEditing ? t('altar.changeBackground') : t('altar.background')}
           </button>
           {backgroundOpen && (isEditing ? (
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              {ALTAR_BACKGROUND_PRESETS.map((preset) => {
+            <div className="mt-2 space-y-1.5">
+              <div className="grid grid-cols-4 gap-1.5">
+                {ALTAR_BACKGROUND_PRESETS.map((preset) => {
                   const selected = !activeAltar.background_image_data && (activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND) === preset;
-                return (
-                  <button
-                    key={preset}
-                    onClick={() => { if (isEditing) updateBackgroundPreset(preset); }}
-                    disabled={!isEditing}
-                    className={`relative altar-bg-preset overflow-hidden rounded-lg border transition-colors ${
-                      selected ? 'border-jade-600/70 ring-1 ring-jade-700/40' : 'border-stone-700/50'
-                      } ${isEditing ? 'hover:border-stone-500/60' : 'opacity-85 cursor-default'}`}
-                    title={t(`altar.backgrounds.${preset}`)}
+                  return (
+                    <button
+                      key={preset}
+                      onClick={() => { if (isEditing) updateBackgroundPreset(preset); }}
+                      disabled={!isEditing}
+                      className={`relative overflow-hidden rounded-md border transition-colors ${
+                        selected ? 'border-jade-600/70 ring-1 ring-jade-700/40' : 'border-stone-700/50 hover:border-stone-500/60'
+                      }`}
+                      title={t(`altar.backgrounds.${preset}`)}
+                    >
+                      <div className="h-9 w-full" style={{ background: ALTAR_BACKGROUND_STYLES[preset] }} />
+                      {selected && (
+                        <span className="absolute right-1 top-1 rounded-full border border-jade-600/60 bg-jade-900/70 p-0.5 text-jade-200">
+                          <Check size={8} />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {hasCustomBackground ? (
+                <div className="flex items-center gap-1.5">
+                  <div
+                    onClick={activateCustomBackground}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activateCustomBackground(); }
+                    }}
+                    className={`relative h-9 w-12 flex-shrink-0 overflow-hidden rounded-md border cursor-pointer transition-colors ${
+                      activeAltar.background_image_data
+                        ? 'border-jade-600/70 ring-1 ring-jade-700/40'
+                        : 'border-stone-700/50 hover:border-stone-500/60'
+                    }`}
+                    title={t('altar.customBackground')}
                   >
-                    <div className="h-14 w-full" style={{ background: ALTAR_BACKGROUND_STYLES[preset] }} />
-                    <div className="altar-bg-preset-label border-t border-stone-800/70 bg-stone-900/80 px-2 py-1 text-left text-[11px] text-stone-300">
-                      {t(`altar.backgrounds.${preset}`)}
-                    </div>
-                    {selected && (
-                      <span className="absolute right-1.5 top-1.5 rounded-full border border-jade-600/60 bg-jade-900/70 p-0.5 text-jade-200">
-                        <Check size={10} />
+                    <div
+                      className="h-full w-full bg-gradient-to-br from-stone-800/80 via-stone-900/70 to-stone-950/80"
+                      style={safeBackgroundUrl ? { backgroundImage: safeBackgroundUrl, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+                    />
+                    {activeAltar.background_image_data && (
+                      <span className="absolute right-0.5 top-0.5 rounded-full border border-jade-600/60 bg-jade-900/70 p-0.5 text-jade-200">
+                        <Check size={7} />
                       </span>
                     )}
-                  </button>
-                );
-              })}
-              <div className="space-y-1">
-                <div
-                  onClick={activateCustomBackground}
-                  role="button"
-                  tabIndex={isEditing ? 0 : -1}
-                  onKeyDown={(event) => {
-                    if (!isEditing) return;
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      activateCustomBackground();
-                    }
-                  }}
-                  className={`relative altar-bg-preset overflow-hidden rounded-lg border transition-colors ${
-                    activeAltar.background_image_data
-                      ? 'border-jade-600/70 ring-1 ring-jade-700/40'
-                      : 'border-stone-700/50'
-                  } ${isEditing ? 'hover:border-stone-500/60 cursor-pointer' : 'opacity-85 cursor-default'}`}
-                  title={t('altar.customBackground')}
-                >
-                  <div
-                    className="h-14 w-full flex items-center justify-center bg-gradient-to-br from-stone-800/80 via-stone-900/70 to-stone-950/80"
-                    style={safeBackgroundUrl ? { backgroundImage: safeBackgroundUrl, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+                  </div>
+                  <button
+                    onClick={() => backgroundInputRef.current?.click()}
+                    className="flex flex-1 items-center justify-center gap-1 rounded border border-stone-600/70 bg-stone-800/70 py-1.5 text-[10px] uppercase tracking-wide text-stone-300 hover:border-stone-400 transition-colors"
                   >
-                    {!safeBackgroundUrl && <ImageIcon size={16} className="text-stone-300" />}
-                  </div>
-                  <div className="altar-bg-preset-label border-t border-stone-800/70 bg-stone-900/80 px-2 py-1 text-left text-[11px] text-stone-300">
-                    {t('altar.customBackground')}
-                  </div>
-                  {activeAltar.background_image_data && (
-                    <span className="absolute right-1.5 top-1.5 rounded-full border border-jade-600/60 bg-jade-900/70 p-0.5 text-jade-200">
-                      <Check size={10} />
-                    </span>
-                  )}
+                    <Pencil size={9} />{t('altar.change')}
+                  </button>
+                  <button
+                    onClick={removeCustomBackground}
+                    className="flex flex-1 items-center justify-center gap-1 rounded border border-red-700/60 bg-red-950/30 py-1.5 text-[10px] uppercase tracking-wide text-red-200 hover:border-red-500 transition-colors"
+                  >
+                    <Trash2 size={9} />{t('altar.remove')}
+                  </button>
                 </div>
-                {isEditing && hasCustomBackground && (
-                  <div className="grid grid-cols-2 gap-1">
-                    <button
-                      onClick={() => backgroundInputRef.current?.click()}
-                      className="flex items-center justify-center gap-1 rounded border border-stone-600/70 bg-stone-800/70 px-1 py-0.5 text-[9px] uppercase tracking-wide text-stone-200 hover:border-stone-400"
-                      title={t('altar.change')}
-                    >
-                      <Pencil size={8} />
-                      <span>{t('altar.change')}</span>
-                    </button>
-                    <button
-                      onClick={removeCustomBackground}
-                      className="flex items-center justify-center gap-1 rounded border border-red-700/60 bg-red-950/30 px-1 py-0.5 text-[9px] uppercase tracking-wide text-red-200 hover:border-red-500"
-                      title={t('altar.remove')}
-                    >
-                      <Trash2 size={8} />
-                      <span>{t('altar.remove')}</span>
-                    </button>
-                  </div>
-                )}
-              </div>
+              ) : (
+                <button
+                  onClick={() => backgroundInputRef.current?.click()}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-md border border-stone-700/50 bg-stone-900/45 py-1.5 text-[11px] text-stone-400 hover:border-stone-500/60 hover:text-stone-300 transition-colors"
+                >
+                  <ImageIcon size={12} />{t('altar.customBackground')}
+                </button>
+              )}
             </div>
           ) : (
             <div className="mt-2">
@@ -423,11 +360,24 @@ export default function AltarSidebarPanel() {
                 {t('altar.gridOptions')}
               </button>
               {gridOpen && <>
-              <ToggleRow
-                label={t('altar.gridOverlay')}
-                checked={activeAltar.grid_enabled}
-                onClick={() => updateAltarGrid(activeAltar.id, { grid_enabled: !activeAltar.grid_enabled })}
-              />
+              <div className="mt-2 grid grid-cols-4 gap-1">
+                {([
+                  { key: 'grid_enabled' as const, icon: Grid3x3, label: 'Grid', title: t('altar.gridOverlay'), toggle: () => updateAltarGrid(activeAltar.id, { grid_enabled: !activeAltar.grid_enabled }), active: activeAltar.grid_enabled },
+                  { key: 'snap_to_grid' as const, icon: Magnet, label: 'Snap', title: t('altar.snapToGrid'), toggle: () => updateAltarGrid(activeAltar.id, { snap_to_grid: !activeAltar.snap_to_grid }), active: activeAltar.snap_to_grid },
+                  { key: 'rotation_snap_enabled' as const, icon: RotateCw, label: 'Rotate', title: t('altar.rotationSnap'), toggle: () => updateAltarGrid(activeAltar.id, { rotation_snap_enabled: !activeAltar.rotation_snap_enabled }), active: activeAltar.rotation_snap_enabled },
+                  { key: 'snap_scale_to_grid' as const, icon: Scaling, label: 'Scale', title: t('altar.snapScaleToGrid'), toggle: () => updateAltarGrid(activeAltar.id, { snap_scale_to_grid: !activeAltar.snap_scale_to_grid }), active: activeAltar.snap_scale_to_grid },
+                ] as const).map(({ key, icon: Icon, label, title, toggle, active }) => (
+                  <button
+                    key={key}
+                    onClick={toggle}
+                    title={title}
+                    className={`flex flex-col items-center gap-0.5 rounded-md border px-1 py-1.5 transition-colors ${active ? 'border-jade-600/70 bg-jade-900/40 text-jade-300' : 'border-stone-700/60 bg-stone-900/45 text-stone-500 hover:border-stone-500/70 hover:text-stone-300'}`}
+                  >
+                    <Icon size={13} />
+                    <span className="text-[9px] leading-none">{label}</span>
+                  </button>
+                ))}
+              </div>
               {activeAltar.grid_enabled && (
                 <div className="mt-2 rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2">
                   <div className="mb-1 flex items-center justify-between">
@@ -484,16 +434,6 @@ export default function AltarSidebarPanel() {
               </div>
                 </div>
               )}
-              <ToggleRow
-                label={t('altar.snapToGrid')}
-                checked={activeAltar.snap_to_grid}
-                onClick={() => updateAltarGrid(activeAltar.id, { snap_to_grid: !activeAltar.snap_to_grid })}
-              />
-              <ToggleRow
-                label={t('altar.rotationSnap')}
-                checked={activeAltar.rotation_snap_enabled}
-                onClick={() => updateAltarGrid(activeAltar.id, { rotation_snap_enabled: !activeAltar.rotation_snap_enabled })}
-              />
               {activeAltar.rotation_snap_enabled && (
                 <div className="mt-2 rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2">
                   <div className="mb-1 flex items-center justify-between">
@@ -517,11 +457,6 @@ export default function AltarSidebarPanel() {
                   />
                 </div>
               )}
-              <ToggleRow
-                label={t('altar.snapScaleToGrid')}
-                checked={activeAltar.snap_scale_to_grid}
-                onClick={() => updateAltarGrid(activeAltar.id, { snap_scale_to_grid: !activeAltar.snap_scale_to_grid })}
-              />
               </>}
             </>
           )}
@@ -537,31 +472,28 @@ export default function AltarSidebarPanel() {
             {placementsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             {t('altar.placedElements')}
           </button>
-          {placementsOpen && <div className="mt-2 space-y-1 pr-1" onClick={(e) => { if (e.target === e.currentTarget) selectPlacement(null); }}>
+          {placementsOpen && <div ref={listRef} className="mt-2 space-y-1 pr-1" onClick={(e) => { if (e.target === e.currentTarget) selectPlacement(null); }}>
             {sortedPlacements.length === 0 && (
               <p className="px-2 py-2 text-xs text-stone-600">{t('altar.noPlacedElements')}</p>
             )}
-            {sortedPlacements.map((placement) => (
+            {visualPlacements.map((placement) => (
               <div key={placement.id} className="space-y-1">
                 <PlacedElementRow
                   placement={placement}
                   isEditing={isEditing}
                   isSelected={selectedPlacementId === placement.id}
+                  isDragging={dragState?.fromId === placement.id}
                   onSelect={() => selectPlacement(selectedPlacementId === placement.id ? null : placement.id)}
                   onToggleHidden={() => updatePlacement(placement.id, { hidden: !placement.hidden })}
                   onToggleLocked={() => updatePlacement(placement.id, { locked: !placement.locked })}
                   onDuplicate={() => duplicatePlacement(placement.id)}
                   onRemove={() => removePlacement(placement.id)}
+                  onGripPointerDown={(e) => startDrag(e, placement.id)}
                 />
                 {isEditing && selectedPlacementId === placement.id && selectedPlacement && (
                   <PlacedElementInspector
                     placement={selectedPlacement}
                     onUpdate={(patch) => updatePlacement(placement.id, patch)}
-                    onBringToFront={() => bringPlacementToFront(placement.id)}
-                    onBringForward={() => bringPlacementForward(placement.id)}
-                    onSendBackward={() => sendPlacementBackward(placement.id)}
-                    onSendToBack={() => sendPlacementToBack(placement.id)}
-                    onRemove={() => removePlacement(placement.id)}
                   />
                 )}
               </div>

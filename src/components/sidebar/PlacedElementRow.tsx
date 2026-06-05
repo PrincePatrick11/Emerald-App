@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, Lock, Unlock, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Trash2, Copy } from 'lucide-react';
+import { Eye, EyeOff, Lock, Unlock, Trash2, Copy, GripVertical } from 'lucide-react';
 import type { AltarPlacement } from '../../types';
 import { AltarItemVisual } from '../altar/AltarItemVisual';
 
@@ -9,20 +9,24 @@ export const PlacedElementRow = memo(function PlacedElementRow({
   placement,
   isEditing,
   isSelected,
+  isDragging,
   onSelect,
   onToggleHidden,
   onToggleLocked,
   onDuplicate,
   onRemove,
+  onGripPointerDown,
 }: {
   placement: AltarPlacement;
   isEditing: boolean;
   isSelected: boolean;
+  isDragging: boolean;
   onSelect: () => void;
   onToggleHidden: () => void;
   onToggleLocked: () => void;
   onDuplicate: () => void;
   onRemove: () => void;
+  onGripPointerDown: (e: React.PointerEvent) => void;
 }) {
   const { t } = useTranslation();
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -51,34 +55,57 @@ export const PlacedElementRow = memo(function PlacedElementRow({
       <div
         onClick={onSelect}
         onContextMenu={handleContextMenu}
-        className={`w-full flex items-center gap-2 rounded-md px-2 py-2 text-left transition-colors cursor-pointer ${isSelected ? 'bg-stone-700/70 text-stone-100' : 'bg-stone-900/40 text-stone-300 hover:bg-stone-800/60'}`}
+        className={`w-full flex items-center gap-2 rounded border px-2 py-1.5 text-left transition-all cursor-pointer select-none ${
+          isDragging
+            ? 'border-jade-500/60 bg-jade-900/20 text-stone-300 opacity-50 scale-[0.98]'
+            : isSelected
+              ? 'border-jade-600/70 bg-jade-900/40 text-jade-300'
+              : 'border-stone-700/60 bg-stone-900/45 text-stone-400 hover:border-stone-500/70 hover:text-stone-300'
+        }`}
       >
-        <AltarItemVisual item={placement} size={20} candleAnimate={placement.category === 'candle'} />
-        <span className="flex-1 truncate text-sm">{placement.name}</span>
-        <span className="text-[10px] text-stone-500">z{placement.z_index}</span>
-        {isEditing && <span className="flex items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
-          <button
-            onClick={onDuplicate}
-            className="text-stone-500 hover:text-stone-300"
-            title={t('altar.duplicateElement')}
+        {isEditing && (
+          <span
+            onPointerDown={onGripPointerDown}
+            className={`flex-shrink-0 cursor-grab active:cursor-grabbing touch-none transition-colors ${isSelected ? 'hover:text-jade-200' : 'text-stone-600 hover:text-stone-400'}`}
+            onClick={(e) => e.stopPropagation()}
           >
-            <Copy size={12} />
-          </button>
-          <button
-            onClick={onToggleLocked}
-            className="text-stone-500 hover:text-stone-300"
-            title={placement.locked ? t('altar.unlock') : t('altar.lock')}
-          >
-            {placement.locked ? <Lock size={12} /> : <Unlock size={12} />}
-          </button>
-          <button
-            onClick={onToggleHidden}
-            className="text-stone-500 hover:text-stone-300"
-            title={placement.hidden ? t('altar.show') : t('altar.hide')}
-          >
-            {placement.hidden ? <EyeOff size={12} /> : <Eye size={12} />}
-          </button>
-        </span>}
+            <GripVertical size={12} />
+          </span>
+        )}
+        <AltarItemVisual item={placement} size={16} candleAnimate={placement.category === 'candle'} />
+        <span className="flex-1 truncate text-[11px] font-medium">{placement.name}</span>
+        {isEditing && (
+          <span className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={onDuplicate}
+              className={`transition-colors ${isSelected ? 'hover:text-jade-200' : 'text-stone-500 hover:text-stone-300'}`}
+              title={t('altar.duplicateElement')}
+            >
+              <Copy size={11} />
+            </button>
+            <button
+              onClick={onToggleLocked}
+              className={`transition-colors ${placement.locked ? 'text-amber-400 hover:text-amber-300' : isSelected ? 'hover:text-jade-200' : 'text-stone-500 hover:text-stone-300'}`}
+              title={placement.locked ? t('altar.unlock') : t('altar.lock')}
+            >
+              {placement.locked ? <Lock size={11} /> : <Unlock size={11} />}
+            </button>
+            <button
+              onClick={onToggleHidden}
+              className={`transition-colors ${placement.hidden ? 'text-stone-300 hover:text-stone-100' : isSelected ? 'hover:text-jade-200' : 'text-stone-500 hover:text-stone-300'}`}
+              title={placement.hidden ? t('altar.show') : t('altar.hide')}
+            >
+              {placement.hidden ? <EyeOff size={11} /> : <Eye size={11} />}
+            </button>
+            <button
+              onClick={onRemove}
+              className={`ml-3 transition-colors ${isSelected ? 'hover:text-red-400' : 'text-stone-500 hover:text-red-400'}`}
+              title={t('altar.removeElement')}
+            >
+              <Trash2 size={11} />
+            </button>
+          </span>
+        )}
       </div>
       {contextMenu && createPortal(
         <div
@@ -110,19 +137,9 @@ export const PlacedElementRow = memo(function PlacedElementRow({
 export const PlacedElementInspector = memo(function PlacedElementInspector({
   placement,
   onUpdate,
-  onBringToFront,
-  onBringForward,
-  onSendBackward,
-  onSendToBack,
-  onRemove,
 }: {
   placement: AltarPlacement;
-  onUpdate: (patch: { x?: number; y?: number; width?: number; height?: number; rotation?: number; opacity?: number; z_index?: number }) => void;
-  onBringToFront: () => void;
-  onBringForward: () => void;
-  onSendBackward: () => void;
-  onSendToBack: () => void;
-  onRemove: () => void;
+  onUpdate: (patch: { x?: number; y?: number; width?: number; height?: number; rotation?: number; opacity?: number }) => void;
 }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState({
@@ -131,7 +148,6 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
     scalePercent: '',
     rotation: '',
     opacity: '',
-    zIndex: '',
   });
 
   useEffect(() => {
@@ -142,19 +158,12 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
       scalePercent: scalePercent.toString(),
       rotation: placement.rotation.toFixed(0),
       opacity: Math.round(placement.opacity * 100).toString(),
-      zIndex: placement.z_index.toString(),
     });
   }, [placement.id]);
 
-  const applyNumber = (key: 'x' | 'y' | 'rotation' | 'opacity' | 'z_index', value: string) => {
+  const applyNumber = (key: 'x' | 'y' | 'rotation' | 'opacity', value: string) => {
     const next = Number(value);
     if (Number.isNaN(next)) return;
-    if (key === 'z_index') {
-      const normalized = Math.max(0, Math.round(next));
-      setDraft((current) => ({ ...current, zIndex: normalized.toString() }));
-      onUpdate({ z_index: normalized });
-      return;
-    }
     if (key === 'x' || key === 'y') {
       const normalized = Math.max(0, Math.min(100, next));
       onUpdate({ [key]: normalized });
@@ -187,49 +196,53 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
     },
   });
 
+  const inputClass = 'w-full rounded border border-jade-800/50 bg-jade-950/50 px-1.5 py-1 text-[11px] text-jade-100 outline-none focus:border-jade-600/60 placeholder:text-jade-700';
+
+  const opacityPercent = Math.max(5, Math.min(100, Number(draft.opacity) || 100));
+
   return (
-    <div className="rounded-lg border border-stone-700/60 bg-stone-900/40 p-2.5 space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">{t('altar.inspector')}</p>
-        <button
-          onClick={onRemove}
-          className="text-stone-500 hover:text-red-400"
-          title={t('altar.removeElement')}
-        >
-          <Trash2 size={13} />
-        </button>
-      </div>
-      <div className="grid grid-cols-2 gap-1.5">
-        <label className="space-y-1">
-          <span className="text-[10px] uppercase tracking-wider text-stone-500">{t('altar.inspectorX')}</span>
-          <input {...bindInput('x', () => applyNumber('x', draft.x))} className="w-full bg-stone-800/60 rounded px-2 py-1 text-xs" aria-label="x" />
-        </label>
-        <label className="space-y-1">
-          <span className="text-[10px] uppercase tracking-wider text-stone-500">{t('altar.inspectorY')}</span>
-          <input {...bindInput('y', () => applyNumber('y', draft.y))} className="w-full bg-stone-800/60 rounded px-2 py-1 text-xs" aria-label="y" />
-        </label>
-        <label className="space-y-1">
-          <span className="text-[10px] uppercase tracking-wider text-stone-500">{t('altar.inspectorScale')}</span>
-          <input {...bindInput('scalePercent', () => applyScalePercent(draft.scalePercent))} className="w-full bg-stone-800/60 rounded px-2 py-1 text-xs" aria-label="scale" />
-        </label>
-        <label className="space-y-1">
-          <span className="text-[10px] uppercase tracking-wider text-stone-500">{t('altar.inspectorRotation')}</span>
-          <input {...bindInput('rotation', () => applyNumber('rotation', draft.rotation))} className="w-full bg-stone-800/60 rounded px-2 py-1 text-xs" aria-label="rotation" />
-        </label>
-        <label className="space-y-1">
-          <span className="text-[10px] uppercase tracking-wider text-stone-500">{t('altar.inspectorOpacity')}</span>
-          <input {...bindInput('opacity', () => applyNumber('opacity', draft.opacity))} className="w-full bg-stone-800/60 rounded px-2 py-1 text-xs" aria-label="opacity" />
-        </label>
-        <label className="space-y-1">
-          <span className="text-[10px] uppercase tracking-wider text-stone-500">{t('altar.inspectorZIndex')}</span>
-          <input {...bindInput('zIndex', () => applyNumber('z_index', draft.zIndex))} className="w-full bg-stone-800/60 rounded px-2 py-1 text-xs" aria-label="z-index" />
-        </label>
-      </div>
+    <div className="rounded border border-jade-700/50 bg-jade-950/40 px-2 py-1.5 space-y-1.5">
       <div className="grid grid-cols-4 gap-1">
-        <button onClick={onBringToFront} className="btn-ghost" title={t('altar.toFront')}><ChevronsUp size={12} /></button>
-        <button onClick={onBringForward} className="btn-ghost" title={t('altar.forward')}><ArrowUp size={12} /></button>
-        <button onClick={onSendBackward} className="btn-ghost" title={t('altar.backward')}><ArrowDown size={12} /></button>
-        <button onClick={onSendToBack} className="btn-ghost" title={t('altar.toBack')}><ChevronsDown size={12} /></button>
+        {([
+          { field: 'x'            as const, label: t('altar.inspectorX'),        apply: () => applyNumber('x', draft.x),             unit: '%' },
+          { field: 'y'            as const, label: t('altar.inspectorY'),        apply: () => applyNumber('y', draft.y),             unit: '%' },
+          { field: 'rotation'     as const, label: t('altar.inspectorRotation'), apply: () => applyNumber('rotation', draft.rotation), unit: '°' },
+          { field: 'scalePercent' as const, label: t('altar.inspectorScale'),    apply: () => applyScalePercent(draft.scalePercent),  unit: '%' },
+        ]).map(({ field, label, apply, unit }) => (
+          <label key={field} className="space-y-0.5">
+            <span className="text-[9px] uppercase tracking-wider text-jade-300">{label}</span>
+            <div className="relative">
+              <input {...bindInput(field, apply)} className={inputClass + (unit ? ' pr-4' : '')} aria-label={field} />
+              {unit && <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-jade-300 pointer-events-none">{unit}</span>}
+            </div>
+          </label>
+        ))}
+      </div>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <span className="text-[9px] uppercase tracking-wider text-jade-300">{t('altar.inspectorOpacity')}</span>
+          <span className="text-[9px] tabular-nums text-jade-100">{opacityPercent}%</span>
+        </div>
+        <div className="relative h-4 flex items-center">
+          <div className="absolute inset-x-0 h-1 rounded-full bg-jade-900/60" />
+          <div className="absolute left-0 h-1 rounded-full bg-jade-600/60" style={{ width: `${opacityPercent}%` }} />
+          <div
+            className="absolute h-2.5 w-2.5 rounded-full bg-jade-500 border border-jade-400/50 shadow pointer-events-none"
+            style={{ left: `calc(${opacityPercent}% - 5px)` }}
+          />
+          <input
+            type="range"
+            min={5}
+            max={100}
+            value={opacityPercent}
+            onChange={(e) => {
+              const val = e.target.value;
+              setDraft((d) => ({ ...d, opacity: val }));
+              applyNumber('opacity', val);
+            }}
+            className="absolute inset-x-0 w-full opacity-0 cursor-pointer h-4"
+          />
+        </div>
       </div>
     </div>
   );

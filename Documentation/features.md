@@ -82,17 +82,19 @@ Library tiles use a compact fixed footprint (**70×85 px**) to keep more items v
 
 Locked placements are click-through on the canvas (pointer events disabled), so interactions pass to items behind them.
 
-**Inspector and placement controls.** The right sidebar includes a placed-elements list and an inline inspector rendered directly under the selected row. Inspector fields include `x`, `y`, `scale`, `rotation`, `opacity`, and `z-index`, plus layer ordering controls. The delete button for the selected element is in the inspector header (top-right corner).
+**Inspector and placement controls.** The right sidebar includes a placed-elements list and an inline inspector rendered directly under the selected row. The inspector shows a compact 4-column grid of `x (%)`, `y (%)`, `rot (°)`, `scale (%)`, plus a jade-styled opacity slider. Layer order is controlled by dragging rows in the list (see below); Z-order buttons are not shown in the inspector. The delete button is in the placed-element row, not the inspector.
 
 **Duplicate.** In edit mode, each placed-element row has a Duplicate button (copy icon). Duplicating a placement creates a copy with identical size, rotation, and opacity, offset +2% in both axes, placed on top of all other elements, unlocked, visible, and immediately selected. The same action is available via right-click on any row.
 
-**Row actions (edit mode).** Each placed-element row shows three icon buttons from left to right: Duplicate, Lock/Unlock, Eye/Hide. Right-clicking a row opens a context menu with "Duplicate" and "Remove" entries (portal-rendered at fixed position, auto-closes on the next click anywhere).
+**Row actions (edit mode).** Each placed-element row shows, from left to right: a grip handle for drag-to-reorder, then the item visual and name, then Duplicate, Lock/Unlock, Eye/Hide, and Trash icon buttons. Right-clicking a row opens a context menu with "Duplicate" and "Remove" entries (portal-rendered at fixed position, auto-closes on the next click anywhere).
+
+**Drag-to-reorder Z-order.** In edit mode, rows in the placed-elements list can be dragged up or down via the grip icon on the left edge. Dropping a row at a new position immediately reassigns Z-index values for all placements so that the visual stacking order matches the list order (top of list = highest Z-index). This replaces the previous layer-order buttons.
 
 **Selecting elements.** Clicking a row in the placed-elements sidebar highlights the corresponding element on the canvas with a jade border in both view and edit mode. Clicking the same row again deselects it (the inspector closes). Clicking an empty area of the canvas or the sidebar also deselects.
 
 **Sidebar sections.** The altar sidebar groups controls into three collapsible sections — Background, Grid Options, and Placed Elements — each with a chevron toggle. All three default to open. In view mode the background section header reads "Background"; in edit mode it reads "Change Background".
 
-**Canvas resolution.** Each altar stores a native canvas resolution (e.g. `1920x1080`). In edit mode the sidebar shows a collapsible "Canvas Options" section where you can pick a ratio (16:9, 4:3, 3:2, 1:1, 2:3, 9:16) and a size (Small / Medium / Large / Very Large), or enter a fully custom width × height up to 7680×4320. The canvas is displayed at native size and scaled uniformly to fit the viewport via CSS transform. Dashboard preview cards reflect the altar's aspect ratio rather than using a fixed height.
+**Canvas resolution.** Each altar stores a canvas resolution in its database row. In edit mode the sidebar shows a collapsible "Canvas Options" section with six aspect-ratio buttons (16:9, 4:3, 3:2, 1:1, 2:3, 9:16). Selecting a ratio stores it directly as a string (e.g. `"16:9"`); the canvas then fills the available viewport at that proportion with `scale: 1` and a dynamic native size. Legacy pixel-format resolutions (e.g. `"1920x1080"`) continue to work as before — the canvas renders at that fixed native size and is scaled to fit the viewport via CSS transform. Dashboard preview cards reflect the altar's aspect ratio.
 
 **Grid and snapping.** Each altar stores its own grid configuration: overlay toggle, size (8–128 px), opacity (1–25%), color, snap-to-grid, rotation snap, and scale to grid. Settings are saved immediately to the database and persist per altar, so switching between altars always restores that altar's own grid state. Grid controls are visible only in edit mode.
 

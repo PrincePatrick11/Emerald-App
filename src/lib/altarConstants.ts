@@ -39,6 +39,19 @@ export function parseResolution(res: string): { w: number; h: number } {
   return { w, h };
 }
 
+// Returns true if the string is a ratio like '16:9' rather than a WxH resolution.
+export function isRatioFormat(res: string): boolean {
+  return /^\d+:\d+$/.test(res);
+}
+
+// Returns the AltarRatio for any stored resolution format (ratio string or WxH).
+export function ratioFromResolution(res: string): AltarRatio | null {
+  if (isRatioFormat(res)) {
+    return ALTAR_RATIOS.includes(res as AltarRatio) ? (res as AltarRatio) : null;
+  }
+  return sizeAndRatioFromResolution(res)?.ratio ?? null;
+}
+
 export const DEFAULT_GRID_SIZE = 32;
 export const DEFAULT_GRID_OPACITY = 0.06;
 export const DEFAULT_GRID_COLOR = '#dce8e2';

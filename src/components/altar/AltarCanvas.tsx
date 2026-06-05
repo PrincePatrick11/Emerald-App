@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/shallow';
 import { MoveDiagonal2, RotateCw } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import { getAltarDragItem, setAltarDragItem, subscribeAltarDrag } from '../../lib/altarDragState';
-import { parseResolution, BASE_RESOLUTION_WIDTH } from '../../lib/altarConstants';
+import { BASE_RESOLUTION_WIDTH } from '../../lib/altarConstants';
 import type { AltarItem, AltarPlacement, AltarRecord } from '../../types';
 import { AltarItemVisual } from './AltarItemVisual';
 
@@ -23,6 +23,8 @@ export function AltarCanvas({
   rotationSnapAngle,
   snapScaleToGrid,
   resolution,
+  nativeW,
+  nativeH,
   cssScale,
   getBackgroundStyle,
 }: {
@@ -38,6 +40,8 @@ export function AltarCanvas({
   rotationSnapAngle: number;
   snapScaleToGrid: boolean;
   resolution: string;
+  nativeW: number;
+  nativeH: number;
   cssScale: number;
   getBackgroundStyle: (altar: AltarRecord | null, imageSrc: string | null | undefined) => string;
 }) {
@@ -54,7 +58,6 @@ export function AltarCanvas({
     })),
   );
   const gridRgb = hexToRgb(gridColor);
-  const { w: nativeW, h: nativeH } = parseResolution(resolution);
   const canvasScale = nativeW / BASE_RESOLUTION_WIDTH;
   const canvasRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef<string | null>(null);
