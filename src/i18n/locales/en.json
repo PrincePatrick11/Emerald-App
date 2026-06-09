@@ -107,6 +107,7 @@
     "removeCustomBackground": "Remove custom background",
     "backgroundUpdated": "Background updated",
     "backgroundUpdateFailed": "Background update failed",
+    "imageTooLarge": "Image too large (max {{max}})",
     "gridOverlay": "Grid overlay",
     "gridOptions": "Grid options",
     "gridSize": "Grid size",

@@ -11,6 +11,7 @@ import {
   DEFAULT_ALTAR_BACKGROUND,
   ratioFromResolution,
 } from '../../lib/altarConstants';
+import { readFileAsDataUrl } from '../../lib/helpers';
 import { useUIStore } from '../../store/uiStore';
 import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
 import { PlacedElementRow, PlacedElementInspector } from './PlacedElementRow';
@@ -50,16 +51,12 @@ export default function AltarSidebarPanel() {
   const [placementsOpen, setPlacementsOpen] = useState(true);
   const [dragState, setDragState] = useState<{ fromId: string; overIndex: number } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // keeps onUp closure current without re-subscribing drag listeners
   const visualPlacementsRef = useRef<typeof sortedPlacements>([]);
-  const [customBackgroundMap, setCustomBackgroundMap] = useState<Record<string, string>>(() => {
-    try {
-      const raw = localStorage.getItem('altar-custom-backgrounds');
-      const parsed = raw ? JSON.parse(raw) : {};
-      return parsed && typeof parsed === 'object' ? parsed as Record<string, string> : {};
-    } catch {
-      return {};
-    }
-  });
+  // In-memory cache of previously uploaded background paths for the current session.
+  // Allows re-activating a custom background after switching to a preset without
+  // re-uploading. Not persisted — the active path is authoritative in the DB.
+  const [customBackgroundMap, setCustomBackgroundMap] = useState<Record<string, string>>({});
   const customBackgroundSource = activeAltar?.background_image_data || (activeAltar ? customBackgroundMap[activeAltar.id] : null);
   const customBackgroundPreview = useBackgroundPreview(customBackgroundSource);
   const sortedPlacements = useMemo(
@@ -119,13 +116,9 @@ export default function AltarSidebarPanel() {
   }, [sortedPlacements, updatePlacement]);
 
   const hasCustomBackground = !!(activeAltar && (activeAltar.background_image_data || customBackgroundMap[activeAltar.id]));
-  const safeBackgroundUrl = customBackgroundPreview?.startsWith('data:') || customBackgroundPreview?.startsWith('tauri://')
+  const safeBackgroundUrl = customBackgroundPreview?.startsWith('data:image/') || customBackgroundPreview?.startsWith('tauri://')
     ? `url("${customBackgroundPreview}")`
     : null;
-
-  useEffect(() => {
-    localStorage.setItem('altar-custom-backgrounds', JSON.stringify(customBackgroundMap));
-  }, [customBackgroundMap]);
 
   useEffect(() => () => {
     if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current);
@@ -137,12 +130,6 @@ export default function AltarSidebarPanel() {
     noticeTimerRef.current = window.setTimeout(() => setBackgroundNotice(null), 1800);
   };
 
-  const handleImageFile = (file: File, onResult: (data: string) => void) => {
-    const reader = new FileReader();
-    reader.onloadend = () => onResult(reader.result as string);
-    reader.readAsDataURL(file);
-  };
-
   const updateBackgroundPreset = async (preset: (typeof ALTAR_BACKGROUND_PRESETS)[number]) => {
     if (!activeAltar) return;
     await updateAltar(activeAltar.id, { background_preset: preset, background_image_data: null });
@@ -150,18 +137,21 @@ export default function AltarSidebarPanel() {
 
   const handleBackgroundUpload = (file: File) => {
     if (!activeAltar) return;
-    handleImageFile(file, (data) => {
-      invoke<string>('save_image', { dataUrl: data })
-        .then((savedPath) => {
-          setCustomBackgroundMap((current) => ({ ...current, [activeAltar.id]: savedPath }));
-          return updateAltar(activeAltar.id, { background_preset: 'custom', background_image_data: savedPath });
-        })
-        .then(() => showBackgroundNotice(t('altar.backgroundUpdated')))
-        .catch((error) => {
-          console.error(error);
-          showBackgroundNotice(t('altar.backgroundUpdateFailed'));
-        });
-    });
+    if (file.size > 5 * 1024 * 1024) {
+      showBackgroundNotice(t('altar.imageTooLarge', { max: '5 MB' }));
+      return;
+    }
+    readFileAsDataUrl(file)
+      .then((data) => invoke<string>('save_image', { dataUrl: data }))
+      .then((savedPath) => {
+        setCustomBackgroundMap((current) => ({ ...current, [activeAltar.id]: savedPath }));
+        return updateAltar(activeAltar.id, { background_preset: 'custom', background_image_data: savedPath });
+      })
+      .then(() => showBackgroundNotice(t('altar.backgroundUpdated')))
+      .catch((error) => {
+        console.error(error);
+        showBackgroundNotice(t('altar.backgroundUpdateFailed'));
+      });
   };
 
   const activateCustomBackground = () => {

@@ -99,7 +99,7 @@ export const AltarListRow = memo(function AltarListRow({
   );
 });
 
-export function AltarContextMenuActions({
+export function buildAltarContextMenuActions({
   t,
   altar,
   onDuplicate,

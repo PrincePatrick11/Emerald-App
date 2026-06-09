@@ -228,7 +228,7 @@ The item library — reusable items that can be placed onto any altar.
 
 ### altar_categories
 
-Defines the item categories available in the altar library. Categories are user-managed: they can be created, renamed, and deleted. Renaming a category cascades to all `altar_items` rows that reference the old name. Deleting a category reassigns all affected items to the first remaining category (or `'other'` as a final fallback).
+Defines the item categories available in the altar library. Categories are user-managed: they can be created, renamed, and deleted. Renaming a category cascades to all `altar_items` rows that reference the old name. Deleting a category does **not** reassign items — their `category` string is left unchanged. Items whose category no longer matches any row in this table surface under the "Uncategorized" pseudo-tab in the library strip.
 
 | Column | Type | Notes |
 |---|---|---|

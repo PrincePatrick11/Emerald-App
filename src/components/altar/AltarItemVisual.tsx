@@ -12,7 +12,7 @@ export const AltarItemVisual = memo(function AltarItemVisual({
   size?: number;
   candleAnimate?: boolean;
 }) {
-  if (item.image_data) {
+  if (item.image_data?.startsWith('data:image/')) {
     return (
       <img
         src={item.image_data}

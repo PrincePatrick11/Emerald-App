@@ -5,6 +5,7 @@ import { MoveDiagonal2, RotateCw } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import { getAltarDragItem, setAltarDragItem, subscribeAltarDrag } from '../../lib/altarDragState';
 import { BASE_RESOLUTION_WIDTH } from '../../lib/altarConstants';
+import { hexToRgb } from '../../lib/helpers';
 import type { AltarItem, AltarPlacement, AltarRecord } from '../../types';
 import { AltarItemVisual } from './AltarItemVisual';
 
@@ -96,18 +97,17 @@ export function AltarCanvas({
 
   const coordsToPercent = useCallback((clientX: number, clientY: number) => {
     const rect = canvasRef.current!.getBoundingClientRect();
-    let x = Math.max(3, Math.min(97, ((clientX - rect.left) / rect.width) * 100));
-    let y = Math.max(3, Math.min(97, ((clientY - rect.top) / rect.height) * 100));
+    const rawX = ((clientX - rect.left) / rect.width) * 100;
+    const rawY = ((clientY - rect.top) / rect.height) * 100;
     if (snapToGrid) {
       // Use native (unscaled) dimensions for correct grid snap steps
       const stepX = (gridSize / nativeW) * 100;
       const stepY = (gridSize / nativeH) * 100;
-      if (stepX > 0) x = Math.round(x / stepX) * stepX;
-      if (stepY > 0) y = Math.round(y / stepY) * stepY;
-      x = Math.max(3, Math.min(97, x));
-      y = Math.max(3, Math.min(97, y));
+      const snappedX = stepX > 0 ? Math.round(rawX / stepX) * stepX : rawX;
+      const snappedY = stepY > 0 ? Math.round(rawY / stepY) * stepY : rawY;
+      return { x: Math.max(3, Math.min(97, snappedX)), y: Math.max(3, Math.min(97, snappedY)) };
     }
-    return { x, y };
+    return { x: Math.max(3, Math.min(97, rawX)), y: Math.max(3, Math.min(97, rawY)) };
   }, [snapToGrid, gridSize, nativeW, nativeH]);
 
   useEffect(() => subscribeAltarDrag(setSidebarDragItem), []);
@@ -384,10 +384,3 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rot
   );
 });
 
-function hexToRgb(hex: string): { r: number; g: number; b: number } {
-  const normalized = hex.replace('#', '');
-  const r = parseInt(normalized.slice(0, 2), 16);
-  const g = parseInt(normalized.slice(2, 4), 16);
-  const b = parseInt(normalized.slice(4, 6), 16);
-  return { r, g, b };
-}

@@ -7,6 +7,32 @@ import type { AltarCategory, AltarItem, AltarItemCategory, AltarPlacement, Altar
 
 const DEFAULT_PLACEMENT_SIZE = 40;
 
+function mapEachPreview(
+  prev: Record<string, AltarPlacement[]>,
+  fn: (p: AltarPlacement) => AltarPlacement,
+): Record<string, AltarPlacement[]> {
+  return Object.fromEntries(
+    Object.entries(prev).map(([id, list]) => [id, list.map(fn)]),
+  );
+}
+
+function filterEachPreview(
+  prev: Record<string, AltarPlacement[]>,
+  fn: (p: AltarPlacement) => boolean,
+): Record<string, AltarPlacement[]> {
+  return Object.fromEntries(
+    Object.entries(prev).map(([id, list]) => [id, list.filter(fn)]),
+  );
+}
+
+async function insertAltarRow(altar: AltarRecord): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    'INSERT INTO altars (id, title, intention, background_preset, background_image_data, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid, resolution) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',
+    [altar.id, altar.title, altar.intention, altar.background_preset, altar.background_image_data, altar.created_at, altar.updated_at, boolToInt(altar.grid_enabled), altar.grid_size, altar.grid_opacity, altar.grid_color, boolToInt(altar.snap_to_grid), boolToInt(altar.rotation_snap_enabled), altar.rotation_snap_angle, boolToInt(altar.snap_scale_to_grid), altar.resolution],
+  );
+}
+
 async function fetchPlacementsForAltar(altarId: string, items: AltarItem[]): Promise<AltarPlacement[]> {
   const db = await getDb();
   const rows = await db.select<{
@@ -62,7 +88,7 @@ function normalizeAltar(altar: AltarRecord): AltarRecord {
     rotation_snap_enabled: Boolean(altar.rotation_snap_enabled),
     rotation_snap_angle: altar.rotation_snap_angle ?? 15,
     snap_scale_to_grid: Boolean(altar.snap_scale_to_grid),
-    resolution: (/^\d+x\d+$/.test(altar.resolution ?? '') || /^\d+:\d+$/.test(altar.resolution ?? '')) ? altar.resolution : DEFAULT_ALTAR_RESOLUTION,
+    resolution: (/^\d+x\d+$/.test(altar.resolution ?? '') || isRatioFormat(altar.resolution ?? '')) ? altar.resolution : DEFAULT_ALTAR_RESOLUTION,
   };
 }
 
@@ -115,7 +141,7 @@ interface AltarState {
   sendPlacementBackward: (id: string) => Promise<void>;
   bringPlacementToFront: (id: string) => Promise<void>;
   sendPlacementToBack: (id: string) => Promise<void>;
-  _swapPlacementZIndex: (idA: string, idB: string) => Promise<void>;
+  swapPlacementZIndex: (idA: string, idB: string) => Promise<void>;
   duplicatePlacement: (id: string) => Promise<void>;
   removePlacement: (id: string) => Promise<void>;
   saveIntention: (text: string) => Promise<void>;
@@ -159,11 +185,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       set((s) => ({
         items: s.items.map((i) => i.category === old.name ? { ...i, category: name } : i),
         placements: s.placements.map((p) => p.category === old.name ? { ...p, category: name } : p),
-        previewPlacements: Object.fromEntries(
-          Object.entries(s.previewPlacements).map(([altarId, list]) => [
-            altarId, list.map((p) => p.category === old.name ? { ...p, category: name } : p),
-          ])
-        ),
+        previewPlacements: mapEachPreview(s.previewPlacements, (p) => p.category === old.name ? { ...p, category: name } : p),
       }));
     }
     set((s) => ({ categories: s.categories.map((c) => c.id === id ? { ...c, name, emoji } : c) }));
@@ -227,7 +249,6 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   },
 
   createAltar: async () => {
-    const db = await getDb();
     const now = nowIso();
     const altar: AltarRecord = {
       id: generateId(),
@@ -247,16 +268,12 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       snap_scale_to_grid: false,
       resolution: DEFAULT_ALTAR_RESOLUTION,
     };
-    await db.execute(
-      'INSERT INTO altars (id, title, intention, background_preset, background_image_data, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid, resolution) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',
-      [altar.id, altar.title, altar.intention, altar.background_preset, altar.background_image_data, altar.created_at, altar.updated_at, 0, altar.grid_size, altar.grid_opacity, altar.grid_color, 0, 0, altar.rotation_snap_angle, 0, altar.resolution]
-    );
+    await insertAltarRow(altar);
     set((s) => ({ altars: [altar, ...s.altars], activeAltarId: altar.id, placements: [], selectedPlacementId: null, intention: '' }));
     return altar;
   },
 
   duplicateAltar: async (id) => {
-    const db = await getDb();
     const source = get().altars.find((altar) => altar.id === id);
     if (!source) return null;
 
@@ -281,11 +298,9 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       resolution: source.resolution ?? DEFAULT_ALTAR_RESOLUTION,
     };
 
-    await db.execute(
-      'INSERT INTO altars (id, title, intention, background_preset, background_image_data, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid, resolution) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',
-      [copy.id, copy.title, copy.intention, copy.background_preset, copy.background_image_data, copy.created_at, copy.updated_at, copy.grid_enabled ? 1 : 0, copy.grid_size, copy.grid_opacity, copy.grid_color, copy.snap_to_grid ? 1 : 0, copy.rotation_snap_enabled ? 1 : 0, copy.rotation_snap_angle, copy.snap_scale_to_grid ? 1 : 0, copy.resolution]
-    );
+    await insertAltarRow(copy);
 
+    const db = await getDb();
     const sourcePlacements = await db.select<{
       item_id: string;
       x: number;
@@ -437,12 +452,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     set((s) => ({
       items: s.items.map((i) => (i.id === id ? updated : i)).sort((a, b) => a.name.localeCompare(b.name)),
       placements: s.placements.map((p) => (p.item_id === id ? { ...p, name: updated.name, emoji: updated.emoji, category: updated.category, image_data: updated.image_data } : p)),
-      previewPlacements: Object.fromEntries(
-        Object.entries(s.previewPlacements).map(([altarId, placements]) => [
-          altarId,
-          placements.map((p) => (p.item_id === id ? { ...p, name: updated.name, emoji: updated.emoji, category: updated.category, image_data: updated.image_data } : p)),
-        ])
-      ),
+      previewPlacements: mapEachPreview(s.previewPlacements, (p) => p.item_id === id ? { ...p, name: updated.name, emoji: updated.emoji, category: updated.category, image_data: updated.image_data } : p),
     }));
   },
 
@@ -453,9 +463,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     set((s) => ({
       items: s.items.filter((i) => i.id !== id),
       placements: s.placements.filter((p) => p.item_id !== id),
-      previewPlacements: Object.fromEntries(
-        Object.entries(s.previewPlacements).map(([altarId, placements]) => [altarId, placements.filter((p) => p.item_id !== id)])
-      ),
+      previewPlacements: filterEachPreview(s.previewPlacements, (p) => p.item_id !== id),
     }));
   },
 
@@ -522,12 +530,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     // complete. This is the only place we need to pay the per-altar map rebuild
     // cost, and it runs at most once per drag gesture (on mouse-up).
     set((s) => ({
-      previewPlacements: Object.fromEntries(
-        Object.entries(s.previewPlacements).map(([altarId, placements]) => [
-          altarId,
-          placements.map((p) => (p.id === id ? { ...p, ...safe } : p)),
-        ])
-      ),
+      previewPlacements: mapEachPreview(s.previewPlacements, (p) => p.id === id ? { ...p, ...safe } : p),
     }));
     const activeAltarId = get().activeAltarId;
     if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
@@ -545,9 +548,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     );
     set((s) => ({
       placements: s.placements.map((p) => (p.id === id ? { ...p, ...safePatch } : p)),
-      previewPlacements: Object.fromEntries(
-        Object.entries(s.previewPlacements).map(([altarId, placements]) => [altarId, placements.map((p) => (p.id === id ? { ...p, ...safePatch } : p))])
-      ),
+      previewPlacements: mapEachPreview(s.previewPlacements, (p) => p.id === id ? { ...p, ...safePatch } : p),
     }));
     const activeAltarId = get().activeAltarId;
     if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
@@ -557,24 +558,24 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const sorted = [...get().placements].sort((a, b) => a.z_index - b.z_index);
     const index = sorted.findIndex((p) => p.id === id);
     if (index < 0 || index === sorted.length - 1) return;
-    await get()._swapPlacementZIndex(sorted[index].id, sorted[index + 1].id);
+    await get().swapPlacementZIndex(sorted[index].id, sorted[index + 1].id);
   },
 
   sendPlacementBackward: async (id) => {
     const sorted = [...get().placements].sort((a, b) => a.z_index - b.z_index);
     const index = sorted.findIndex((p) => p.id === id);
     if (index <= 0) return;
-    await get()._swapPlacementZIndex(sorted[index - 1].id, sorted[index].id);
+    await get().swapPlacementZIndex(sorted[index - 1].id, sorted[index].id);
   },
 
-  _swapPlacementZIndex: async (idA, idB) => {
+  swapPlacementZIndex: async (idA, idB) => {
     const a = get().placements.find((p) => p.id === idA);
     const b = get().placements.find((p) => p.id === idB);
     if (!a || !b || a.z_index === b.z_index) return;
     const db = await getDb();
     await db.execute(
       'UPDATE altar_placements SET z_index = CASE id WHEN $1 THEN $2 WHEN $3 THEN $4 END WHERE id IN ($1, $3)',
-      [idA, b.z_index, idB, a.z_index]
+      [idA, b.z_index, idB, a.z_index],
     );
     set((s) => ({
       placements: s.placements.map((p) => {
@@ -582,16 +583,11 @@ export const useAltarStore = create<AltarState>((set, get) => ({
         if (p.id === idB) return { ...p, z_index: a.z_index };
         return p;
       }),
-      previewPlacements: Object.fromEntries(
-        Object.entries(s.previewPlacements).map(([altarId, list]) => [
-          altarId,
-          list.map((p) => {
-            if (p.id === idA) return { ...p, z_index: b.z_index };
-            if (p.id === idB) return { ...p, z_index: a.z_index };
-            return p;
-          }),
-        ])
-      ),
+      previewPlacements: mapEachPreview(s.previewPlacements, (p) => {
+        if (p.id === idA) return { ...p, z_index: b.z_index };
+        if (p.id === idB) return { ...p, z_index: a.z_index };
+        return p;
+      }),
     }));
     const activeAltarId = get().activeAltarId;
     if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
@@ -603,14 +599,40 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   },
 
   sendPlacementToBack: async (id) => {
-    const minZ = get().placements.reduce((min, p) => Math.min(min, p.z_index), 0);
+    const placements = get().placements;
+    if (placements.length === 0) return;
+
+    const minZ = placements.reduce((min, p) => Math.min(min, p.z_index), Infinity);
     const shift = minZ <= 0 ? 1 - minZ : 0;
-    if (shift !== 0) {
-      const updateJobs = get().placements.map((p) => get().updatePlacement(p.id, { z_index: p.z_index + shift }));
-      await Promise.all(updateJobs);
+    // Target goes just below the minimum of all other placements.
+    const targetZ = Math.max(0, minZ + shift - 1);
+
+    const newZMap = new Map<string, number>(
+      placements.map((p) => [p.id, p.id === id ? targetZ : p.z_index + shift]),
+    );
+
+    // Single bulk UPDATE — one CASE branch per placement, one timestamp bump.
+    const db = await getDb();
+    const params: (string | number)[] = [];
+    let caseExpr = '';
+    const inParams: string[] = [];
+    for (const [pid, z] of newZMap) {
+      const idIdx = params.length + 1;
+      params.push(pid, z);
+      caseExpr += ` WHEN $${idIdx} THEN $${idIdx + 1}`;
+      inParams.push(`$${idIdx}`);
     }
-    const refreshedMin = get().placements.reduce((min, p) => Math.min(min, p.z_index), 0);
-    await get().updatePlacement(id, { z_index: Math.max(0, refreshedMin - 1) });
+    await db.execute(
+      `UPDATE altar_placements SET z_index = CASE id${caseExpr} END WHERE id IN (${inParams.join(',')})`,
+      params,
+    );
+
+    set((s) => ({
+      placements: s.placements.map((p) => ({ ...p, z_index: newZMap.get(p.id) ?? p.z_index })),
+      previewPlacements: mapEachPreview(s.previewPlacements, (p) => ({ ...p, z_index: newZMap.get(p.id) ?? p.z_index })),
+    }));
+    const activeAltarId = get().activeAltarId;
+    if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
   },
 
   duplicatePlacement: async (id) => {
@@ -663,9 +685,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     set((s) => ({
       placements: s.placements.filter((p) => p.id !== id),
       selectedPlacementId: s.selectedPlacementId === id ? null : s.selectedPlacementId,
-      previewPlacements: Object.fromEntries(
-        Object.entries(s.previewPlacements).map(([altarId, placements]) => [altarId, placements.filter((p) => p.id !== id)])
-      ),
+      previewPlacements: filterEachPreview(s.previewPlacements, (p) => p.id !== id),
     }));
     const activeAltarId = get().activeAltarId;
     if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);

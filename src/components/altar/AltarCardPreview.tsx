@@ -1,19 +1,8 @@
 import { memo } from 'react';
 import type { AltarPlacement, AltarRecord } from '../../types';
-import { ALTAR_BACKGROUND_PRESETS, ALTAR_BACKGROUND_STYLES, DEFAULT_ALTAR_BACKGROUND, parseResolution } from '../../lib/altarConstants';
+import { getAltarBackgroundStyle, parseResolution } from '../../lib/altarConstants';
 import { AltarItemVisual } from './AltarItemVisual';
 import { useBackgroundPreview } from './useAltarBackgroundPreview';
-
-function resolvePresetStyle(altar: AltarRecord): string {
-  const preset = ALTAR_BACKGROUND_PRESETS.includes(altar.background_preset as (typeof ALTAR_BACKGROUND_PRESETS)[number])
-    ? altar.background_preset as (typeof ALTAR_BACKGROUND_PRESETS)[number]
-    : DEFAULT_ALTAR_BACKGROUND;
-  return ALTAR_BACKGROUND_STYLES[preset];
-}
-
-function buildImageStyle(imageSrc: string): string {
-  return `linear-gradient(rgba(10, 10, 15, 0.35), rgba(10, 10, 15, 0.55)), url("${imageSrc}") center / cover no-repeat`;
-}
 
 export const AltarCardPreview = memo(function AltarCardPreview({
   altar,
@@ -25,8 +14,7 @@ export const AltarCardPreview = memo(function AltarCardPreview({
   compact?: boolean;
 }) {
   const previewSrc = useBackgroundPreview(altar.background_image_data);
-  const hasImage = !!previewSrc?.startsWith('data:');
-  const background = hasImage && previewSrc ? buildImageStyle(previewSrc) : resolvePresetStyle(altar);
+  const background = getAltarBackgroundStyle(altar, previewSrc);
   const { w, h } = parseResolution(altar.resolution ?? '1920x1080');
 
   return (

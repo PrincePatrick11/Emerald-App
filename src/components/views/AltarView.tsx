@@ -5,25 +5,14 @@ import { Check, Maximize2, Minimize2, PanelRightOpen, Pencil, Plus, X } from 'lu
 import { format } from 'date-fns';
 import { useAltarStore } from '../../store/altarStore';
 import { useUIStore } from '../../store/uiStore';
-import { DEFAULT_ALTAR_BACKGROUND, ALTAR_BACKGROUND_PRESETS, ALTAR_BACKGROUND_STYLES, DEFAULT_ALTAR_RESOLUTION, parseResolution, isRatioFormat } from '../../lib/altarConstants';
+import { getAltarBackgroundStyle, DEFAULT_ALTAR_RESOLUTION, parseResolution, isRatioFormat } from '../../lib/altarConstants';
 import type { AltarRecord } from '../../types';
 import ListToolbar from '../ui/ListToolbar';
 import ContextMenu from '../ui/ContextMenu';
 import { AltarCanvas } from '../altar/AltarCanvas';
 import { AltarLibraryStrip } from '../altar/AltarLibraryStrip';
-import { AltarCard, AltarListRow, AltarContextMenuActions } from '../altar/AltarCard';
+import { AltarCard, AltarListRow, buildAltarContextMenuActions } from '../altar/AltarCard';
 import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
-
-function getAltarBackgroundStyleWithImage(altar: AltarRecord | null, imageSrc: string | null | undefined): string {
-  if (!altar) return ALTAR_BACKGROUND_STYLES[DEFAULT_ALTAR_BACKGROUND];
-  if (imageSrc?.startsWith('data:')) {
-    return `linear-gradient(rgba(10, 10, 15, 0.35), rgba(10, 10, 15, 0.55)), url("${imageSrc}") center / cover no-repeat`;
-  }
-  const preset = ALTAR_BACKGROUND_PRESETS.includes(altar.background_preset as (typeof ALTAR_BACKGROUND_PRESETS)[number])
-    ? altar.background_preset as (typeof ALTAR_BACKGROUND_PRESETS)[number]
-    : DEFAULT_ALTAR_BACKGROUND;
-  return ALTAR_BACKGROUND_STYLES[preset];
-}
 
 export default function AltarView() {
   const { t } = useTranslation();
@@ -55,6 +44,7 @@ export default function AltarView() {
   const [renameValue, setRenameValue] = useState('');
   const [title, setTitle] = useState('');
   const viewportRef = useRef<HTMLDivElement>(null);
+  // ref keeps ResizeObserver callback current without re-observing on fullscreen toggle
   const altarWindowFullscreenRef = useRef(altarWindowFullscreen);
   const [canvasTransform, setCanvasTransform] = useState<{ scale: number; offsetX: number; offsetY: number; nativeW: number; nativeH: number }>({ scale: 1, offsetX: 0, offsetY: 0, nativeW: 1920, nativeH: 1080 });
 
@@ -287,7 +277,7 @@ export default function AltarView() {
             x={ctxMenu.x}
             y={ctxMenu.y}
             onClose={() => setCtxMenu(null)}
-            actions={AltarContextMenuActions({
+            actions={buildAltarContextMenuActions({
               t,
               altar: altars.find((a) => a.id === ctxMenu.id) ?? altars[0],
               onDuplicate: handleDuplicate,
@@ -366,7 +356,24 @@ export default function AltarView() {
           transformOrigin: '0 0',
           transform: `translate(${canvasTransform.offsetX}px, ${canvasTransform.offsetY}px) scale(${canvasTransform.scale})`,
         }}>
-          <AltarCanvas altar={activeAltar} backgroundSrc={backgroundSrc} editable={isEditing} showGrid={activeAltar.grid_enabled} gridSize={activeAltar.grid_size} gridOpacity={activeAltar.grid_opacity} gridColor={activeAltar.grid_color} snapToGrid={activeAltar.snap_to_grid} rotationSnapEnabled={activeAltar.rotation_snap_enabled} rotationSnapAngle={activeAltar.rotation_snap_angle} snapScaleToGrid={activeAltar.snap_scale_to_grid} resolution={activeAltar.resolution} nativeW={canvasTransform.nativeW} nativeH={canvasTransform.nativeH} cssScale={canvasTransform.scale} getBackgroundStyle={getAltarBackgroundStyleWithImage} />
+          <AltarCanvas
+            altar={activeAltar}
+            backgroundSrc={backgroundSrc}
+            editable={isEditing}
+            showGrid={activeAltar.grid_enabled}
+            gridSize={activeAltar.grid_size}
+            gridOpacity={activeAltar.grid_opacity}
+            gridColor={activeAltar.grid_color}
+            snapToGrid={activeAltar.snap_to_grid}
+            rotationSnapEnabled={activeAltar.rotation_snap_enabled}
+            rotationSnapAngle={activeAltar.rotation_snap_angle}
+            snapScaleToGrid={activeAltar.snap_scale_to_grid}
+            resolution={activeAltar.resolution}
+            nativeW={canvasTransform.nativeW}
+            nativeH={canvasTransform.nativeH}
+            cssScale={canvasTransform.scale}
+            getBackgroundStyle={getAltarBackgroundStyle}
+          />
         </div>
       </div>
 

@@ -107,6 +107,7 @@
     "removeCustomBackground": "Benutzerdefinierten Hintergrund entfernen",
     "backgroundUpdated": "Hintergrund aktualisiert",
     "backgroundUpdateFailed": "Hintergrund konnte nicht aktualisiert werden",
+    "imageTooLarge": "Bild zu groß (max. {{max}})",
     "gridOverlay": "Raster-Overlay",
     "gridOptions": "Grid Options",
     "gridSize": "Rastergroesse",

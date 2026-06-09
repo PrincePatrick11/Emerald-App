@@ -107,6 +107,7 @@
     "removeCustomBackground": "Supprimer l'arriere-plan personnalise",
     "backgroundUpdated": "Arriere-plan mis a jour",
     "backgroundUpdateFailed": "Echec de mise a jour de l'arriere-plan",
+    "imageTooLarge": "Image trop volumineuse (max {{max}})",
     "gridOverlay": "Grille superposee",
     "gridOptions": "Options de grille",
     "gridSize": "Taille de grille",

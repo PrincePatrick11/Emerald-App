@@ -31,6 +31,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Altar placed-elements list: **drag-to-reorder** Z-order — grip icon on each row; dragging a row repositions it in the list and immediately reassigns Z-index values across all placements (Pointer Events, no HTML5 drag API)
 
 ### Fixed
+- Altar background CSS rule was constructed without validating the image source; `getAltarBackgroundStyle` in `altarConstants.ts` now enforces a `data:image/` prefix before interpolating into CSS, and all call sites use this single utility. (`altarConstants.ts`, `AltarCardPreview.tsx`, `AltarCanvas.tsx`)
+- Altar item images in `AltarItemVisual` and `AltarLibraryStrip` were rendered as `<img>` regardless of the `image_data` value; they now only render when the value starts with `data:image/`.
+- No file-size limit was enforced when uploading altar images; item images are now capped at 2 MB and background images at 5 MB before being processed.
+- `customBackgroundMap` was seeded from and written back to `localStorage`, creating a dual source of truth with the database; the map is now in-memory only (in-session re-activation still works; the active path remains authoritative in the DB).
+- `hexToRgb` in `AltarCanvas` accepted any string without validation and silently produced invalid RGB values; it is now moved to `helpers.ts`, validates with `isValidHexColor` first, and returns `{r:0,g:0,b:0}` for invalid input.
 - Custom altar background images were deleted by the image cleanup routine on startup — altar `background_image_data` paths were not included in the used-paths set passed to `cleanup_unused_images`. (`AppShell.tsx`)
 - Altar canvas did not display a custom background until an unrelated re-render triggered one; the background view is now reactive via `useSyncExternalStore` in `useBackgroundPreview`. (`AltarView.tsx`)
 - Right-clicking a placed-element row in the Altar dashboard caused the app to go black — a React Rules of Hooks violation in `AltarContextMenuActions`, which called `useTranslation()` inside a conditional render path. (`AltarCard.tsx`)
@@ -44,7 +49,6 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Altar canvas appeared vertically centred in the viewport by default; it now starts at the top edge in normal mode and centres only in full-window mode.
 - Altar dashboard preview cards used a fixed `h-36` height regardless of the altar's aspect ratio; cards now use CSS `aspect-ratio` derived from the altar's stored resolution, so portrait and square canvases display proportionally.
 - `parseResolution` now validates the input with a strict regex (`/^\d+x\d+$/`) and clamps width/height to the allowed maximum (7680×4320), preventing malformed strings or oversized values from reaching the canvas layout.
-- Custom background URL was interpolated into CSS without validation; `AltarSidebarPanel` now checks that the value starts with `data:` or `tauri://` before using it in a CSS `backgroundImage` rule.
 - German locale used `"Aufloesung"` instead of `"Auflösung"`; French locale used `"Resolution"` instead of `"Résolution"`; Spanish locale used `"Resolucion"` instead of `"Resolución"`.
 - Altar resize and rotate control handles were rendered at a fixed pixel size regardless of how much the canvas was scaled by CSS transform, making them appear oversized on small viewports. Handle sizes, icon sizes, offsets, and the rotation tooltip are now derived from `cssScale` so they remain visually consistent at any zoom level.
 
@@ -66,6 +70,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - LeftSidebar restructured: Journal, Tasks, Operations, Wiki, and Altar are now in a fixed non-scrollable nav block at the top; the journal entries list scrolls independently below it; Settings, Tags, and Trash are condensed into an icon-only row at the bottom (size 18, no text labels; Trash is right-aligned).
 - Draggable tab reordering in the tab bar with animated movement
 - Tab bar refined: the active tab now visually flows into the main content panel below (matching color, no separator line) while inactive tabs remain clearly separated by a 1px divider; the `backdrop-filter: blur` and active-tab drop shadow were removed as they contradicted the seamless effect
+- `AltarLibraryStrip` modal UI split into dedicated `ItemModal` and `CategoryModal` sub-components; each manages its own form state so the strip no longer holds modal-level state
+- `AltarContextMenuActions` renamed to `buildAltarContextMenuActions` to reflect that it is a plain function, not a component
+- `insertAltarRow` helper centralises the altar INSERT SQL; `createAltar` and `duplicateAltar` both use it instead of duplicating the statement
+- `sendPlacementToBack` now issues a single bulk `UPDATE … CASE` SQL plus one `bumpAltarUpdatedAt` call instead of N+1 individual writes
+- `_swapPlacementZIndex` renamed to `swapPlacementZIndex` (private-by-convention underscore removed)
+- `readFileAsDataUrl` utility added to `helpers.ts`; replaces the duplicated `FileReader` + Promise pattern previously inlined in `AltarLibraryStrip` and `AltarSidebarPanel`
+- `hexToRgb` moved from `AltarCanvas.tsx` to `helpers.ts`; `isValidHexColor` guard added
+- `mapEachPreview` and `filterEachPreview` helpers added to `altarStore.ts` to replace eight duplicated `Object.fromEntries(Object.entries(…).map/filter(…))` patterns
+- `normalizeAltar` in `altarStore.ts` uses the shared `isRatioFormat()` from `altarConstants.ts` instead of a duplicate inline regex
+- `getAltarBackgroundStyle` in `altarConstants.ts` is now the single source of truth for background CSS; local `buildImageStyle` and `resolvePresetStyle` helpers removed from `AltarCardPreview`; `hasImage` guard removed (the utility handles the null/invalid-src case internally)
 - Altar "bring forward" / "send backward" layer reordering coalesced into a single atomic database write per click, replacing the previous two-write sequence
 - Database schema migrations refactored into a versioned, ordered list tracked via a `schema_version` table; existing vaults upgrade transparently on first open
 - Wiki and Operation custom icons now render image icons only from safe local/data/blob sources (`/`, `data:image/...`, `blob:`); remote `http(s)` URLs are treated as non-image icons

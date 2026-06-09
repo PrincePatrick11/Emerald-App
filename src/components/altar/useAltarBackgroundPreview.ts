@@ -1,6 +1,10 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 
+// Both maps grow for the lifetime of the session with no eviction.
+// For a typical user with a handful of altars and backgrounds, the memory
+// footprint is negligible. If long sessions with many unique backgrounds
+// become a concern, a simple LRU cap (e.g. 50 entries) could be added.
 const cache = new Map<string, string>();
 const inFlight = new Map<string, Promise<void>>();
 const listeners = new Set<() => void>();

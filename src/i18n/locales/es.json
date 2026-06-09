@@ -107,6 +107,7 @@
     "removeCustomBackground": "Quitar fondo personalizado",
     "backgroundUpdated": "Fondo actualizado",
     "backgroundUpdateFailed": "No se pudo actualizar el fondo",
+    "imageTooLarge": "Imagen demasiado grande (max. {{max}})",
     "gridOverlay": "Superposicion de cuadricula",
     "gridOptions": "Opciones de cuadricula",
     "gridSize": "Tamano de cuadricula",

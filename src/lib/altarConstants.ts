@@ -1,3 +1,5 @@
+import type { AltarRecord } from '../types';
+
 export const DEFAULT_ALTAR_BACKGROUND = 'midnight' as const;
 
 export const DEFAULT_ALTAR_RESOLUTION = '1920x1080';
@@ -62,6 +64,28 @@ export const ALTAR_BACKGROUND_STYLES: Record<(typeof ALTAR_BACKGROUND_PRESETS)[n
   forest: 'radial-gradient(circle at 50% 22%, #183126 0%, #0d1a16 48%, #09110f 100%)',
   moon: 'radial-gradient(circle at 50% 18%, #2b253d 0%, #171222 44%, #0b0a12 100%)',
 };
+
+const OVERLAY_GRADIENT = 'linear-gradient(rgba(10, 10, 15, 0.35), rgba(10, 10, 15, 0.55))';
+
+/**
+ * Returns a CSS `background` value for an altar canvas or card preview.
+ * Only `data:image/` URIs are accepted as image sources — anything else falls
+ * back to the altar's preset so that no arbitrary content is interpolated into
+ * the CSS string.
+ */
+export function getAltarBackgroundStyle(
+  altar: Pick<AltarRecord, 'background_preset'> | null,
+  imageSrc: string | null | undefined,
+): string {
+  if (!altar) return ALTAR_BACKGROUND_STYLES[DEFAULT_ALTAR_BACKGROUND];
+  if (imageSrc?.startsWith('data:image/')) {
+    return `${OVERLAY_GRADIENT}, url("${imageSrc}") center / cover no-repeat`;
+  }
+  const preset = ALTAR_BACKGROUND_PRESETS.includes(altar.background_preset as (typeof ALTAR_BACKGROUND_PRESETS)[number])
+    ? altar.background_preset as (typeof ALTAR_BACKGROUND_PRESETS)[number]
+    : DEFAULT_ALTAR_BACKGROUND;
+  return ALTAR_BACKGROUND_STYLES[preset];
+}
 
 // Emoji suggestions per category name (for the item edit emoji picker).
 // Only covers the default category names; custom categories fall back to FALLBACK_CATEGORY_EMOJIS.

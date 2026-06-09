@@ -56,11 +56,17 @@ Three Rust commands enforce path restrictions:
 
 ## Frontend Input Validation
 
-Two additional validation rules protect against malformed or oversized data in the altar canvas subsystem:
+Several validation rules protect against malformed, oversized, or untrusted data in the altar canvas subsystem:
 
 **Resolution strings.** `parseResolution` in `altarConstants.ts` validates the input against `/^\d+x\d+$/` before splitting on `x`. Inputs that contain additional separators (e.g. `1920x10x80`) or non-numeric characters are rejected and fall back to `1920x1080`. Both dimensions are then clamped to the allowed maximum (7680 wide, 4320 tall), preventing extremely large canvas sizes that could cause layout thrashing or DoS-like memory pressure in the ResizeObserver loop.
 
-**Custom background URL.** `AltarSidebarPanel` checks that the resolved custom background preview string starts with `data:` or `tauri://` before constructing a CSS `backgroundImage: url(...)` rule. Values that fail this check are not interpolated into CSS, preventing content-injection via unexpected URL schemes.
+**Background CSS interpolation.** All background CSS construction goes through `getAltarBackgroundStyle` in `altarConstants.ts`. For image-backed backgrounds, the function enforces that the source value starts with `data:image/` before interpolating it into a CSS `backgroundImage: url(...)` rule. Values that fail this check are treated as "no background" rather than interpolated, preventing unexpected URL scheme injection. This single utility replaces the per-call-site guard that previously existed only in `AltarSidebarPanel`.
+
+**Item image rendering.** `AltarItemVisual` and `AltarLibraryStrip` only render an `<img>` element when `item.image_data` starts with `data:image/`. Any other value (empty string, legacy path, unexpected scheme) is skipped and falls back to the emoji display.
+
+**Upload size limits.** File uploads in the altar module are rejected before processing if they exceed the size cap: 2 MB for item images (`AltarLibraryStrip`) and 5 MB for background images (`AltarSidebarPanel`). This prevents large files from being stored as base64 data-URLs in the database.
+
+**`hexToRgb` validation.** `hexToRgb` in `src/lib/helpers.ts` calls `isValidHexColor` before parsing. Strings that are not a valid 6-digit hex colour return `{r:0, g:0, b:0}` rather than producing `NaN` values that could propagate into CSS `rgba(...)` rules.
 
 ## HTML Escaping in Exports
 
