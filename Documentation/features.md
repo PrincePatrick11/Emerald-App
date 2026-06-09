@@ -78,7 +78,7 @@ The altar is a virtual arrangement of symbolic objects on a canvas.
 
 - Hover a category tab in the library strip to reveal a pencil icon that opens the inline rename/delete editor.
 - Click the "+ Category" button at the end of the tab row to add a new category; choose a name and pick an emoji from the palette.
-- Deleting a category moves all its items to the next available category automatically — no items are lost.
+- Deleting a category does not reassign its items. Items whose category no longer matches any existing category become visible under an **Uncategorized** tab that appears automatically in the library strip. The tab disappears once no uncategorized items remain.
 - Renaming a category updates all items already assigned to it.
 
 Library editing uses a modal flow for **add / edit / delete** actions on individual items. In edit mode, the library strip is docked under the canvas, supports resize, and persists height in `localStorage` (`altar-library-height`). When uploading an image for a new item, if the name field is empty the filename (without extension) is pre-filled and selected so you can confirm or edit it immediately.
@@ -117,7 +117,7 @@ Custom backgrounds are persisted as file-backed image paths (legacy inline data 
 
 **Intention.** A text field on each altar records your intention or purpose for that setup.
 
-**View mode and full-window mode.** Full-window altar mode is only available in view mode. Entering edit mode exits full-window mode automatically. Grid controls are edit-only and hidden in read/view mode.
+**View mode and full-window mode.** Full-window altar mode is only available in view mode. Entering edit mode exits full-window mode automatically. Pressing **Escape** while in full-window mode also exits it. Grid controls are edit-only and hidden in read/view mode.
 
 ## Navigation
 

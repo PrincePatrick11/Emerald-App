@@ -173,20 +173,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const db = await getDb();
     const cat = get().categories.find((c) => c.id === id);
     if (!cat) return;
-    const remaining = get().categories.filter((c) => c.id !== id);
-    const fallback = remaining[0]?.name ?? 'other';
-    await db.execute('UPDATE altar_items SET category=$1 WHERE category=$2', [fallback, cat.name]);
     await db.execute('DELETE FROM altar_categories WHERE id=$1', [id]);
-    set((s) => ({
-      categories: remaining,
-      items: s.items.map((i) => i.category === cat.name ? { ...i, category: fallback } : i),
-      placements: s.placements.map((p) => p.category === cat.name ? { ...p, category: fallback } : p),
-      previewPlacements: Object.fromEntries(
-        Object.entries(s.previewPlacements).map(([altarId, list]) => [
-          altarId, list.map((p) => p.category === cat.name ? { ...p, category: fallback } : p),
-        ])
-      ),
-    }));
+    set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }));
   },
 
   fetchAltars: async () => {

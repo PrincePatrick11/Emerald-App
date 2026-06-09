@@ -6,6 +6,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] — 0.1.3
 
 ### Added
+- Altar library: **Escape** key exits full-window mode — pressing Escape while an altar is in full-window view returns to normal view mode without requiring mouse interaction
+- Altar library: **Uncategorized** pseudo-tab — when one or more library items have a category string that no longer matches any existing category (e.g. after that category was deleted), an "Uncategorized" filter tab appears automatically in the library strip; it disappears again once all affected items are reassigned or removed
 - Altar library: dynamic item categories — create, rename, and delete categories from the library strip; 8 built-in categories (Candle, Crystal, Herb, Deity, Symbol, Tool, Table, Other) are pre-seeded in the database on first run
 - Altar library strip: hover a category tab to reveal a pencil edit button; a "+ Category" button appends new categories
 - Altar library: the add-item button now shows an "Element" label (previously unlabelled)
@@ -47,6 +49,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Altar resize and rotate control handles were rendered at a fixed pixel size regardless of how much the canvas was scaled by CSS transform, making them appear oversized on small viewports. Handle sizes, icon sizes, offsets, and the rotation tooltip are now derived from `cssScale` so they remain visually consistent at any zoom level.
 
 ### Changed
+- Altar library: deleting a category no longer reassigns its items — items keep their original `category` string and become visible under the new Uncategorized tab instead of being silently moved to another category
 - `AltarItemCategory` type widened from a fixed literal union to `string`; the valid values are now driven by the `altar_categories` table rather than a hardcoded constant
 - `ALTAR_CATEGORIES` constant and `ALTAR_CATEGORY_EMOJI` map removed from `altarConstants.ts`; replaced by `CATEGORY_EMOJIS` (emoji suggestions keyed by default category name), `FALLBACK_CATEGORY_EMOJIS` (fallback array for custom categories), and `ALTAR_CAT_EMOJIS` (palette for the category emoji picker); Symbol category emoji corrected from `☽` to `🌙` (migration v23)
 - Altar canvas rendering: the canvas now renders at its native resolution (e.g. 1920×1080) and is scaled down to fit the viewport via a single CSS `transform: scale()` on a wrapping div. This replaces the previous percentage-based stretching approach and means placement coordinates, grid snap steps, handle sizes, and font sizes all operate in native pixels — eliminating rounding artefacts at non-standard viewports.

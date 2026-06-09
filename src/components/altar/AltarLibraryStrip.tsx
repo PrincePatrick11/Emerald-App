@@ -47,7 +47,16 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
     return CATEGORY_EMOJIS[catName] ?? FALLBACK_CATEGORY_EMOJIS;
   };
 
+  const UNCATEGORIZED_TAB = '__uncategorized__';
+
   const defaultCategory = categories[0]?.name ?? '';
+  const hasUncategorized = items.some((i) => !categories.find((c) => c.name === i.category));
+
+  useEffect(() => {
+    if (activeCategoryTab === UNCATEGORIZED_TAB && !hasUncategorized) {
+      setActiveCategoryTab('all');
+    }
+  }, [hasUncategorized, activeCategoryTab]);
 
   const handleImageFile = (file: File, onResult: (data: string) => void) => {
     const reader = new FileReader();
@@ -164,7 +173,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
     }
     const cat = categories.find((c) => c.id === editingCatId);
     await deleteCategory(editingCatId);
-    if (cat && activeCategoryTab === cat.name) setActiveCategoryTab('all');
+    if (cat && activeCategoryTab === cat.name) setActiveCategoryTab(UNCATEGORIZED_TAB);
     setShowCatEmojiPicker(false);
     setIsCatModalOpen(false);
   };
@@ -224,7 +233,9 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
 
   const filteredItems = activeCategoryTab === 'all'
     ? items
-    : items.filter((item) => item.category === activeCategoryTab);
+    : activeCategoryTab === UNCATEGORIZED_TAB
+      ? items.filter((i) => !categories.find((c) => c.name === i.category))
+      : items.filter((item) => item.category === activeCategoryTab);
 
   return (
     <div
@@ -252,6 +263,14 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
             <button onClick={(e) => { e.stopPropagation(); openEditCategoryModal(cat); }} className="absolute -right-1 -top-1 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-stone-700 text-stone-400 hover:text-stone-200 transition-colors" title={t('editor.edit')}><Pencil size={8} /></button>
           </div>
         ))}
+        {hasUncategorized && (
+          <button
+            onClick={() => setActiveCategoryTab(UNCATEGORIZED_TAB)}
+            className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap ${activeCategoryTab === UNCATEGORIZED_TAB ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}
+          >
+            {t('altar.uncategorized')}
+          </button>
+        )}
         <button onClick={openAddCategoryModal} className="px-2 py-1 rounded-md text-xs text-stone-600 hover:text-stone-400 transition-colors whitespace-nowrap flex-shrink-0 flex items-center gap-1" title={t('altar.addCategory')}><Plus size={11} />{t('altar.category')}</button>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto pr-1">

@@ -84,6 +84,15 @@ export default function AltarView() {
   }, [isEditing, altarWindowFullscreen, setAltarWindowFullscreen]);
 
   useEffect(() => {
+    if (!altarWindowFullscreen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setAltarWindowFullscreen(false);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [altarWindowFullscreen, setAltarWindowFullscreen]);
+
+  useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
     const res = activeAltar?.resolution ?? DEFAULT_ALTAR_RESOLUTION;
