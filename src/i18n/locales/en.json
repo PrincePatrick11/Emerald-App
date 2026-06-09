@@ -4,7 +4,9 @@
   },
   "common": {
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "delete": "Delete",
+    "deleteConfirm": "Delete?"
   },
   "listView": {
     "view": "View",
@@ -75,6 +77,10 @@
   "altar": {
     "library": "Library",
     "addItem": "Add item",
+    "element": "Element",
+    "category": "Category",
+    "addCategory": "Add category",
+    "categoryName": "Category name…",
     "newAltar": "New altar",
     "libraryTitle": "Altar Library",
     "itemName": "Name…",

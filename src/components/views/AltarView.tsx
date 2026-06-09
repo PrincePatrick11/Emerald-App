@@ -12,7 +12,7 @@ import ContextMenu from '../ui/ContextMenu';
 import { AltarCanvas } from '../altar/AltarCanvas';
 import { AltarLibraryStrip } from '../altar/AltarLibraryStrip';
 import { AltarCard, AltarListRow, AltarContextMenuActions } from '../altar/AltarCard';
-import { getCachedBackgroundPreview } from '../altar/useAltarBackgroundPreview';
+import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
 
 function getAltarBackgroundStyleWithImage(altar: AltarRecord | null, imageSrc: string | null | undefined): string {
   if (!altar) return ALTAR_BACKGROUND_STYLES[DEFAULT_ALTAR_BACKGROUND];
@@ -160,11 +160,7 @@ export default function AltarView() {
     setActiveView({ type: 'altar', id: activeAltar.id, mode: 'view' });
   };
 
-  const backgroundSrc = activeAltar
-    ? (activeAltar.background_image_data?.startsWith('data:')
-        ? activeAltar.background_image_data
-        : getCachedBackgroundPreview(activeAltar.background_image_data))
-    : null;
+  const backgroundSrc = useBackgroundPreview(activeAltar?.background_image_data ?? null);
 
   if (!activeAltar) {
     const filtered = search
@@ -283,6 +279,7 @@ export default function AltarView() {
             y={ctxMenu.y}
             onClose={() => setCtxMenu(null)}
             actions={AltarContextMenuActions({
+              t,
               altar: altars.find((a) => a.id === ctxMenu.id) ?? altars[0],
               onDuplicate: handleDuplicate,
               onRename: startRename,

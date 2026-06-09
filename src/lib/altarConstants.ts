@@ -1,5 +1,3 @@
-import type { AltarItemCategory } from '../types';
-
 export const DEFAULT_ALTAR_BACKGROUND = 'midnight' as const;
 
 export const DEFAULT_ALTAR_RESOLUTION = '1920x1080';
@@ -65,20 +63,26 @@ export const ALTAR_BACKGROUND_STYLES: Record<(typeof ALTAR_BACKGROUND_PRESETS)[n
   moon: 'radial-gradient(circle at 50% 18%, #2b253d 0%, #171222 44%, #0b0a12 100%)',
 };
 
-export const ALTAR_CATEGORY_EMOJI: Record<AltarItemCategory, string> = {
-  candle: '🕯️', crystal: '🔮', herb: '🌿', deity: '✨',
-  symbol: '🌙', tool: '⚗️', table: '🪵', other: '📿',
-};
-
-export const ALTAR_CATEGORIES: AltarItemCategory[] = ['candle', 'crystal', 'herb', 'deity', 'symbol', 'tool', 'table', 'other'];
-
-export const CATEGORY_EMOJIS: Record<AltarItemCategory, string[]> = {
+// Emoji suggestions per category name (for the item edit emoji picker).
+// Only covers the default category names; custom categories fall back to FALLBACK_CATEGORY_EMOJIS.
+export const CATEGORY_EMOJIS: Record<string, string[]> = {
   candle: ['🕯️', '🔥', '🕎', '💡', '🪔'],
   crystal: ['🔮', '💎', '💜', '🌟', '⭐', '🪨'],
   herb: ['🌿', '🍃', '🌱', '🌾', '🪴', '🌺', '🍀'],
   deity: ['👁️', '☀️', '🌙', '🦅', '🐉', '🦋', '🌟', '⚡'],
-  symbol: ['☯️', '🔱', '⚡', '🌀', '🔯', '🪬', '☽', '🌈'],
+  symbol: ['☯️', '🔱', '⚡', '🌀', '🔯', '🪬', '🌙', '🌈'],
   tool: ['⚗️', '🪄', '🗡️', '🏺', '📜', '🔑', '🪬', '🧿'],
   table: ['🪵', '🪑', '🧺', '🪟', '🛖', '🪜'],
   other: ['📿', '💫', '🌀', '🎭', '🌈', '🧿', '🫧', '✨'],
 };
+
+export const FALLBACK_CATEGORY_EMOJIS = ['✨', '🌟', '💫', '🔮', '🌙', '⚡', '🌀', '🎭'];
+
+// Emoji palette for the altar category picker
+export const ALTAR_CAT_EMOJIS = [
+  '🕯️','🔮','🌿','✨','🌙','🔔','🪵','📦',
+  '🔥','💎','🌺','👁️','☀️','🌕','⚡','🌀',
+  '⚗️','🗡️','📜','🔑','🪄','🧿','🌊','💀',
+  '🐍','🦅','🌈','⭐','🪬','☯️','🔱','🌑',
+  '📖','🌸','🦋','🐉','🏺','💫','🎭','🐾',
+];

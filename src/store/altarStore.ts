@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getDb } from '../lib/db';
 import { ALTAR_RATIOS, DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE, isRatioFormat, parseResolution } from '../lib/altarConstants';
 import { boolToInt, generateId, isValidHexColor, nowIso } from '../lib/helpers';
-import type { AltarItem, AltarItemCategory, AltarPlacement, AltarRecord } from '../types';
+import type { AltarCategory, AltarItem, AltarItemCategory, AltarPlacement, AltarRecord } from '../types';
 
 const DEFAULT_PLACEMENT_SIZE = 40;
 
@@ -86,8 +86,13 @@ interface AltarState {
   selectedPlacementId: string | null;
   previewPlacements: Record<string, AltarPlacement[]>;
   intention: string;
+  categories: AltarCategory[];
 
   fetchAltars: () => Promise<void>;
+  fetchCategories: () => Promise<void>;
+  addCategory: (name: string, emoji: string) => Promise<AltarCategory>;
+  updateCategory: (id: string, name: string, emoji: string) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
   setActiveAltar: (id: string) => Promise<void>;
   clearActiveAltar: () => void;
   createAltar: () => Promise<AltarRecord>;
@@ -125,8 +130,67 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   selectedPlacementId: null,
   previewPlacements: {},
   intention: '',
+  categories: [],
+
+  fetchCategories: async () => {
+    const db = await getDb();
+    const rows = await db.select<AltarCategory[]>('SELECT id, name, emoji FROM altar_categories ORDER BY created_at ASC, name ASC');
+    set({ categories: rows });
+  },
+
+  addCategory: async (name, emoji) => {
+    const db = await getDb();
+    const cat: AltarCategory = { id: generateId(), name, emoji };
+    await db.execute(
+      'INSERT INTO altar_categories (id, name, emoji, created_at) VALUES ($1,$2,$3,$4)',
+      [cat.id, cat.name, cat.emoji, nowIso()]
+    );
+    set((s) => ({ categories: [...s.categories, cat] }));
+    return cat;
+  },
+
+  updateCategory: async (id, name, emoji) => {
+    const db = await getDb();
+    const old = get().categories.find((c) => c.id === id);
+    await db.execute('UPDATE altar_categories SET name=$1, emoji=$2 WHERE id=$3', [name, emoji, id]);
+    if (old && old.name !== name) {
+      // Update all items that referenced the old category name
+      await db.execute('UPDATE altar_items SET category=$1 WHERE category=$2', [name, old.name]);
+      set((s) => ({
+        items: s.items.map((i) => i.category === old.name ? { ...i, category: name } : i),
+        placements: s.placements.map((p) => p.category === old.name ? { ...p, category: name } : p),
+        previewPlacements: Object.fromEntries(
+          Object.entries(s.previewPlacements).map(([altarId, list]) => [
+            altarId, list.map((p) => p.category === old.name ? { ...p, category: name } : p),
+          ])
+        ),
+      }));
+    }
+    set((s) => ({ categories: s.categories.map((c) => c.id === id ? { ...c, name, emoji } : c) }));
+  },
+
+  deleteCategory: async (id) => {
+    const db = await getDb();
+    const cat = get().categories.find((c) => c.id === id);
+    if (!cat) return;
+    const remaining = get().categories.filter((c) => c.id !== id);
+    const fallback = remaining[0]?.name ?? 'other';
+    await db.execute('UPDATE altar_items SET category=$1 WHERE category=$2', [fallback, cat.name]);
+    await db.execute('DELETE FROM altar_categories WHERE id=$1', [id]);
+    set((s) => ({
+      categories: remaining,
+      items: s.items.map((i) => i.category === cat.name ? { ...i, category: fallback } : i),
+      placements: s.placements.map((p) => p.category === cat.name ? { ...p, category: fallback } : p),
+      previewPlacements: Object.fromEntries(
+        Object.entries(s.previewPlacements).map(([altarId, list]) => [
+          altarId, list.map((p) => p.category === cat.name ? { ...p, category: fallback } : p),
+        ])
+      ),
+    }));
+  },
 
   fetchAltars: async () => {
+    await get().fetchCategories();
     const db = await getDb();
     const items = await db.select<AltarItem[]>('SELECT * FROM altar_items ORDER BY name ASC');
     const altars = (await db.select<AltarRecord[]>('SELECT * FROM altars ORDER BY updated_at DESC, created_at DESC')).map(normalizeAltar);

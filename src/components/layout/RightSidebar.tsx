@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { X, Library, Link2, Wand2, SlidersHorizontal, Repeat2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
-import { ALTAR_CATEGORY_EMOJI, ALTAR_CATEGORIES, CATEGORY_EMOJIS } from '../../lib/altarConstants';
 import OpPropertiesPanel from '../sidebar/OpPropertiesPanel';
 import RoutinesPanel from '../sidebar/RoutinesPanel';
 import WikiPanel from '../sidebar/WikiPanel';
@@ -11,7 +10,6 @@ import BacklinksPanel from '../sidebar/BacklinksPanel';
 import OperationsPanel from '../sidebar/OperationsPanel';
 import AltarSidebarPanel from '../sidebar/AltarSidebarPanel';
 
-export { ALTAR_CATEGORY_EMOJI, ALTAR_CATEGORIES, CATEGORY_EMOJIS };
 
 export default function RightSidebar() {
   const { t } = useTranslation();

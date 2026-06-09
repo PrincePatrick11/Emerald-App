@@ -1,26 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useTranslation } from 'react-i18next';
-import { Check, ImagePlus, Pencil, Plus, X } from 'lucide-react';
+import { Check, ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import { setAltarDragItem } from '../../lib/altarDragState';
-import { ALTAR_CATEGORIES, ALTAR_CATEGORY_EMOJI, CATEGORY_EMOJIS } from '../../lib/altarConstants';
-import type { AltarItem, AltarItemCategory } from '../../types';
+import { ALTAR_CAT_EMOJIS, CATEGORY_EMOJIS, FALLBACK_CATEGORY_EMOJIS } from '../../lib/altarConstants';
+import type { AltarCategory, AltarItem } from '../../types';
 
 export function AltarLibraryStrip({ editable }: { editable: boolean }) {
   const LIBRARY_DEFAULT_HEIGHT = 240;
   const { t } = useTranslation();
-  const { items, addItem, updateItem, deleteItem } = useAltarStore();
+  const { items, categories, addItem, updateItem, deleteItem, addCategory, updateCategory, deleteCategory } = useAltarStore();
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
-  const [activeCategoryTab, setActiveCategoryTab] = useState<'all' | AltarItemCategory>('all');
+  const [activeCategoryTab, setActiveCategoryTab] = useState<'all' | string>('all');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editEmoji, setEditEmoji] = useState('');
-  const [editCategory, setEditCategory] = useState<AltarItemCategory>('other');
+  const [editCategory, setEditCategory] = useState<string>('');
   const [editImageData, setEditImageData] = useState<string | null>(null);
   const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
   const editImageInputRef = useRef<HTMLInputElement>(null);
+  const editNameInputRef = useRef<HTMLInputElement>(null);
   const [isResizeHotspot, setIsResizeHotspot] = useState(false);
   const isResizeHotspotRef = useRef(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -29,6 +30,24 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
     if (Number.isFinite(saved) && saved >= 160 && saved <= 460) return saved;
     return LIBRARY_DEFAULT_HEIGHT;
   });
+
+  // Category modal state
+  const [isCatModalOpen, setIsCatModalOpen] = useState(false);
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [catModalName, setCatModalName] = useState('');
+  const [catModalEmoji, setCatModalEmoji] = useState('📦');
+  const [showCatEmojiPicker, setShowCatEmojiPicker] = useState(false);
+  const [confirmDeleteCatId, setConfirmDeleteCatId] = useState<string | null>(null);
+
+  const getCategoryEmoji = (catName: string): string => {
+    return categories.find((c) => c.name === catName)?.emoji ?? '✨';
+  };
+
+  const getEmojiSuggestions = (catName: string): string[] => {
+    return CATEGORY_EMOJIS[catName] ?? FALLBACK_CATEGORY_EMOJIS;
+  };
+
+  const defaultCategory = categories[0]?.name ?? '';
 
   const handleImageFile = (file: File, onResult: (data: string) => void) => {
     const reader = new FileReader();
@@ -54,6 +73,10 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
     const file = e.target.files?.[0];
     if (!file) return;
     handleImageFile(file, (data) => setEditImageData(data));
+    if (!editName.trim()) {
+      setEditName(file.name.replace(/\.[^.]+$/, ''));
+      setTimeout(() => editNameInputRef.current?.select(), 0);
+    }
     e.target.value = '';
   };
 
@@ -62,7 +85,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
     setEditingItemId(item.id);
     setEditName(item.name);
     setEditEmoji(item.emoji);
-    setEditCategory(item.category as AltarItemCategory);
+    setEditCategory(item.category);
     setEditImageData(item.image_data ?? null);
     setShowEditEmojiPicker(false);
     setConfirmDeleteId(null);
@@ -72,7 +95,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
     setIsItemModalOpen(true);
     setEditingItemId(null);
     setEditName('');
-    setEditCategory('other');
+    setEditCategory(defaultCategory);
     setEditEmoji('');
     setEditImageData(null);
     setShowEditEmojiPicker(false);
@@ -81,17 +104,18 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
 
   const saveEditModal = async () => {
     if (!editName.trim()) return;
+    const fallbackEmoji = getCategoryEmoji(editCategory);
     if (editingItemId) {
       await updateItem(editingItemId, {
         name: editName.trim(),
-        emoji: editEmoji || ALTAR_CATEGORY_EMOJI[editCategory],
+        emoji: editEmoji || fallbackEmoji,
         category: editCategory,
         image_data: editImageData ?? undefined,
       });
     } else {
       await addItem(
         editName.trim(),
-        editEmoji || ALTAR_CATEGORY_EMOJI[editCategory],
+        editEmoji || fallbackEmoji,
         editCategory,
         undefined,
         editImageData ?? undefined
@@ -99,6 +123,50 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
     }
     setIsItemModalOpen(false);
     setEditingItemId(null);
+  };
+
+  const openAddCategoryModal = () => {
+    setEditingCatId(null);
+    setCatModalName('');
+    setCatModalEmoji('📦');
+    setShowCatEmojiPicker(false);
+    setConfirmDeleteCatId(null);
+    setIsCatModalOpen(true);
+  };
+
+  const openEditCategoryModal = (cat: AltarCategory) => {
+    setEditingCatId(cat.id);
+    setCatModalName(cat.name);
+    setCatModalEmoji(cat.emoji);
+    setShowCatEmojiPicker(false);
+    setConfirmDeleteCatId(null);
+    setIsCatModalOpen(true);
+  };
+
+  const saveCategoryModal = async () => {
+    if (!catModalName.trim()) return;
+    const emoji = catModalEmoji.trim() || '📦';
+    if (editingCatId) {
+      await updateCategory(editingCatId, catModalName.trim(), emoji);
+    } else {
+      const cat = await addCategory(catModalName.trim(), emoji);
+      setActiveCategoryTab(cat.name);
+    }
+    setShowCatEmojiPicker(false);
+    setIsCatModalOpen(false);
+  };
+
+  const handleDeleteCategory = async () => {
+    if (!editingCatId) return;
+    if (confirmDeleteCatId !== editingCatId) {
+      setConfirmDeleteCatId(editingCatId);
+      return;
+    }
+    const cat = categories.find((c) => c.id === editingCatId);
+    await deleteCategory(editingCatId);
+    if (cat && activeCategoryTab === cat.name) setActiveCategoryTab('all');
+    setShowCatEmojiPicker(false);
+    setIsCatModalOpen(false);
   };
 
   const startResize = (event: React.MouseEvent) => {
@@ -174,13 +242,17 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
       <input ref={editImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleEditImageChange} />
       <div className="mb-3 flex items-start justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{t('altar.libraryTitle')}</p>
-        <button onClick={openCreateModal} className="btn-ghost flex-shrink-0" title={t('altar.addItem')}><Plus size={14} /></button>
+        <button onClick={openCreateModal} className="btn-ghost flex-shrink-0 flex items-center gap-1 text-xs" title={t('altar.addItem')}><Plus size={12} />{t('altar.element')}</button>
       </div>
       <div className="mb-3 flex gap-1 overflow-x-auto pb-1">
         <button onClick={() => setActiveCategoryTab('all')} className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap ${activeCategoryTab === 'all' ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{t('altar.all')}</button>
-        {ALTAR_CATEGORIES.map((cat) => (
-          <button key={cat} onClick={() => setActiveCategoryTab(cat)} className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap ${activeCategoryTab === cat ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`} title={t(`altar.categories.${cat}`)}>{ALTAR_CATEGORY_EMOJI[cat]} {t(`altar.categories.${cat}`)}</button>
+        {categories.map((cat) => (
+          <div key={cat.id} className="group relative flex items-center">
+            <button onClick={() => setActiveCategoryTab(cat.name)} className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap ${activeCategoryTab === cat.name ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{cat.emoji} {cat.name}</button>
+            <button onClick={(e) => { e.stopPropagation(); openEditCategoryModal(cat); }} className="absolute -right-1 -top-1 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-stone-700 text-stone-400 hover:text-stone-200 transition-colors" title={t('editor.edit')}><Pencil size={8} /></button>
+          </div>
         ))}
+        <button onClick={openAddCategoryModal} className="px-2 py-1 rounded-md text-xs text-stone-600 hover:text-stone-400 transition-colors whitespace-nowrap flex-shrink-0 flex items-center gap-1" title={t('altar.addCategory')}><Plus size={11} />{t('altar.category')}</button>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto pr-1">
         {filteredItems.length === 0 && <p className="text-xs text-stone-700 px-2 py-3">{t('altar.noItems')}</p>}
@@ -199,6 +271,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
         </div>
       </div>
 
+      {/* Item create/edit modal */}
       {isItemModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onMouseDown={() => { setIsItemModalOpen(false); setEditingItemId(null); }}>
           <div className="w-full max-w-md rounded-xl border border-stone-700/80 bg-stone-900 p-4 space-y-3" onMouseDown={(e) => e.stopPropagation()}>
@@ -206,13 +279,13 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <button onClick={() => setShowEditEmojiPicker(!showEditEmojiPicker)} className="w-full flex items-center gap-2 bg-stone-800/60 rounded-lg px-3 py-2 text-sm hover:bg-stone-700/60 transition-colors">
-                  {editImageData ? <img src={editImageData} alt="" className="w-6 h-6 object-contain rounded" /> : <span className="text-xl">{editEmoji || ALTAR_CATEGORY_EMOJI[editCategory]}</span>}
+                  {editImageData ? <img src={editImageData} alt="" className="w-6 h-6 object-contain rounded" /> : <span className="text-xl">{editEmoji || getCategoryEmoji(editCategory)}</span>}
                   <span className="text-xs text-stone-500">{t('altar.chooseEmoji')}</span>
                 </button>
                 {showEditEmojiPicker && (
                   <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2">
                     <div className="flex flex-wrap gap-1">
-                      {CATEGORY_EMOJIS[editCategory].map((emoji) => (
+                      {getEmojiSuggestions(editCategory).map((emoji) => (
                         <button key={emoji} onClick={() => { setEditEmoji(emoji); setEditImageData(null); setShowEditEmojiPicker(false); }} className={`text-xl p-1 rounded transition-colors ${editEmoji === emoji ? 'bg-stone-700' : ''}`}>{emoji}</button>
                       ))}
                     </div>
@@ -221,10 +294,10 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
               </div>
               <button onClick={() => editImageInputRef.current?.click()} className="flex-shrink-0 flex items-center gap-1 px-2 py-2 bg-stone-800/60 rounded-lg hover:bg-stone-700/60 transition-colors text-stone-500 hover:text-stone-300" title={t('altar.uploadImage')}><ImagePlus size={14} /></button>
             </div>
-            <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t('altar.itemName')} className="w-full bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" />
+            <input ref={editNameInputRef} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t('altar.itemName')} className="w-full bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" />
             <div className="flex flex-wrap gap-1">
-              {ALTAR_CATEGORIES.map((cat) => (
-                <button key={cat} onClick={() => { setEditCategory(cat); setEditEmoji(''); setShowEditEmojiPicker(false); }} className={`text-xs px-2 py-1 rounded-md transition-colors ${editCategory === cat ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`} title={t(`altar.categories.${cat}`)}>{ALTAR_CATEGORY_EMOJI[cat]} {t(`altar.categories.${cat}`)}</button>
+              {categories.map((cat) => (
+                <button key={cat.id} onClick={() => { setEditCategory(cat.name); setEditEmoji(''); setShowEditEmojiPicker(false); }} className={`text-xs px-2 py-1 rounded-md transition-colors ${editCategory === cat.name ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{cat.emoji} {cat.name}</button>
               ))}
             </div>
             {editingItemId && confirmDeleteId === editingItemId ? (
@@ -241,6 +314,51 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
                 <div className="flex items-center gap-1">
                   <button onClick={() => { setIsItemModalOpen(false); setEditingItemId(null); }} className="btn-ghost"><X size={13} /></button>
                   <button onClick={saveEditModal} className="btn-ghost text-jade-400"><Check size={13} /></button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Category create/edit modal */}
+      {isCatModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onMouseDown={() => { setIsCatModalOpen(false); setShowCatEmojiPicker(false); setConfirmDeleteCatId(null); }}>
+          <div className="w-full max-w-xs rounded-xl border border-stone-700/80 bg-stone-900 p-4 space-y-3" onMouseDown={(e) => e.stopPropagation()}>
+            <p className="text-sm font-semibold text-stone-200">{editingCatId ? t('editor.edit') : (t('altar.addCategory') ?? 'Add Category')}</p>
+            <div className="flex gap-2 items-center">
+              <div className="relative flex-shrink-0">
+                <button onClick={() => setShowCatEmojiPicker(!showCatEmojiPicker)} className="w-10 h-10 flex items-center justify-center text-2xl bg-stone-800/60 rounded-lg hover:bg-stone-700/60 transition-colors">{catModalEmoji}</button>
+                {showCatEmojiPicker && (
+                  <div className="absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 w-52">
+                    <div className="flex flex-wrap gap-1">
+                      {ALTAR_CAT_EMOJIS.map((e) => (
+                        <button key={e} onClick={() => { setCatModalEmoji(e); setShowCatEmojiPicker(false); }} className={`text-xl p-1 rounded transition-colors ${catModalEmoji === e ? 'bg-stone-700' : 'hover:bg-stone-700/50'}`}>{e}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <input value={catModalName} onChange={(e) => setCatModalName(e.target.value)} placeholder={t('altar.categoryName') ?? 'Category name'} className="flex-1 bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" onKeyDown={(e) => { if (e.key === 'Enter') saveCategoryModal(); }} autoFocus />
+            </div>
+            {editingCatId && confirmDeleteCatId === editingCatId ? (
+              <div className="flex items-center justify-between rounded-lg border border-red-700/40 bg-red-950/20 px-3 py-2">
+                <span className="text-xs text-red-300">{t('common.deleteConfirm')}</span>
+                <span className="flex items-center gap-2">
+                  <button onClick={handleDeleteCategory} className="text-xs text-red-300 hover:text-red-200">{t('trash.confirmYes')}</button>
+                  <button onClick={() => setConfirmDeleteCatId(null)} className="text-xs text-stone-400 hover:text-stone-200">{t('trash.confirmNo')}</button>
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                {editingCatId ? (
+                  <button onClick={handleDeleteCategory} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300">
+                    <Trash2 size={11} /> {t('common.delete')}
+                  </button>
+                ) : <span />}
+                <div className="flex items-center gap-1">
+                  <button onClick={() => { setIsCatModalOpen(false); setShowCatEmojiPicker(false); setConfirmDeleteCatId(null); }} className="btn-ghost"><X size={13} /></button>
+                  <button onClick={saveCategoryModal} className="btn-ghost text-jade-400"><Check size={13} /></button>
                 </div>
               </div>
             )}

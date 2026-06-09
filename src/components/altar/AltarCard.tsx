@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { format } from 'date-fns';
 import { Copy, Pencil, Trash2 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type { AltarPlacement, AltarRecord } from '../../types';
 import { AltarCardPreview } from './AltarCardPreview';
 import { AltarRenameField } from './AltarRenameField';
@@ -100,17 +100,18 @@ export const AltarListRow = memo(function AltarListRow({
 });
 
 export function AltarContextMenuActions({
+  t,
   altar,
   onDuplicate,
   onRename,
   onDelete,
 }: {
+  t: TFunction;
   altar: AltarRecord;
   onDuplicate: (id: string) => void;
   onRename: (altar: AltarRecord) => void;
   onDelete: (id: string) => void;
 }) {
-  const { t } = useTranslation();
   return [
     { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => onDuplicate(altar.id) },
     { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: () => onRename(altar) },

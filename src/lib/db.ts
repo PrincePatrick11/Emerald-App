@@ -623,4 +623,67 @@ const MIGRATIONS: Migration[] = [
       await db.execute("ALTER TABLE altars ADD COLUMN resolution TEXT NOT NULL DEFAULT '1920x1080'");
     },
   },
+  {
+    version: 22,
+    name: 'altar_categories_table',
+    up: async (db) => {
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS altar_categories (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          emoji TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        )
+      `);
+      const catCount = await db.select<{ n: number }[]>('SELECT COUNT(*) as n FROM altar_categories');
+      if ((catCount[0]?.n ?? 0) === 0) {
+        const now = new Date().toISOString();
+        for (const [id, name, emoji] of [
+          ['candle',  'Candle',  '🕯️'],
+          ['crystal', 'Crystal', '🔮'],
+          ['herb',    'Herb',    '🌿'],
+          ['deity',   'Deity',   '✨'],
+          ['symbol',  'Symbol',  '🌙'],
+          ['tool',    'Tool',    '🔔'],
+          ['table',   'Table',   '🪵'],
+          ['other',   'Other',   '📦'],
+        ]) {
+          await db.execute(
+            'INSERT OR IGNORE INTO altar_categories (id, name, emoji, created_at) VALUES ($1,$2,$3,$4)',
+            [id, name, emoji, now]
+          );
+        }
+      }
+    },
+  },
+  {
+    version: 23,
+    name: 'altar_categories_capitalize_and_fix_emojis',
+    up: async (db) => {
+      // Capitalize default category names and sync altar_items.category to match
+      for (const [id, oldName, newName] of [
+        ['candle',  'candle',  'Candle'],
+        ['crystal', 'crystal', 'Crystal'],
+        ['herb',    'herb',    'Herb'],
+        ['deity',   'deity',   'Deity'],
+        ['symbol',  'symbol',  'Symbol'],
+        ['tool',    'tool',    'Tool'],
+        ['table',   'table',   'Table'],
+        ['other',   'other',   'Other'],
+      ]) {
+        await db.execute(
+          'UPDATE altar_categories SET name=$1 WHERE id=$2 AND name=$3',
+          [newName, id, oldName]
+        );
+        await db.execute(
+          'UPDATE altar_items SET category=$1 WHERE category=$2',
+          [newName, oldName]
+        );
+      }
+      // Fix text symbol ☽ → emoji 🌙 for the symbol category
+      await db.execute(
+        "UPDATE altar_categories SET emoji='🌙' WHERE id='symbol' AND emoji='☽'"
+      );
+    },
+  },
 ];

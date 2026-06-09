@@ -14,7 +14,7 @@ Emerald uses a single SQLite file, `emerald.db`, located in the OS application d
 4. After each successful migration, writes a row into `schema_version` with the version, name, and ISO timestamp.
 5. Calls the separate `runPeriodicCleanup(db)` function, which auto-purges trashed rows older than 30 days across all soft-delete-aware tables. This is **not** a migration — it is idempotent and time-dependent, so it runs on every vault open.
 
-The current schema version is **21**. New schema changes must be added as a new entry in the `MIGRATIONS` array with a strictly higher version number and a unique `name`.
+The current schema version is **23**. New schema changes must be added as a new entry in the `MIGRATIONS` array with a strictly higher version number and a unique `name`.
 
 **Upgrades from older versions.** Vaults that predate the `schema_version` table will see all migrations run on first open. `ALTER TABLE … ADD COLUMN` against an already-present column raises a "duplicate column" error; this is detected by `isAlreadyAppliedError` (matches `duplicate column name`, `already exists`, or a pre-existing table) and the migration is marked applied anyway. The data migrations themselves are idempotent and re-run safely: `entry_number` is only backfilled where `NULL`, the UUID → fixed-string category ID rewrite is a no-op once the fixed IDs exist, and the `custom_properties.type = 'checkbox' → 'toggle'` rename is a single `UPDATE` that is a no-op once the migration has run.
 
@@ -210,7 +210,7 @@ Primary key: `(source_id, target_id)`. Index: `idx_links_target` on `(target_id)
 | aspect_ratio | TEXT | **Deprecated.** Added in migration v20 but never written or read by the application. The ratio is always derived from `resolution` via `parseResolution`. Kept for backwards compatibility with existing databases. |
 | resolution | TEXT | Canvas native size in `WxH` format (e.g. `'1920x1080'`); default `'1920x1080'`; clamped to max 7680×4320. Added in migration v21 (`altar_resolution`). |
 
-Grid columns were added in migration v18 (`altar_grid_options_per_altar`). Rotation snap and scale-to-grid columns were added in migration v19 (`altar_rotation_snap_and_scale_to_grid`). The `resolution` column was added in migration v21 (`altar_resolution`). Default values in the migrations must stay in sync with the constants `DEFAULT_GRID_SIZE`, `DEFAULT_GRID_OPACITY`, `DEFAULT_GRID_COLOR`, and `DEFAULT_ALTAR_RESOLUTION` in `src/lib/altarConstants.ts`. Grid writes go exclusively through `altarStore.updateAltarGrid(id, patch)`. Resolution writes go exclusively through `altarStore.updateAltarResolution(id, resolution)`, which validates the format with a regex, clamps both dimensions via `parseResolution`, and updates `updated_at`.
+Grid columns were added in migration v18 (`altar_grid_options_per_altar`). Rotation snap and scale-to-grid columns were added in migration v19 (`altar_rotation_snap_and_scale_to_grid`). The `resolution` column was added in migration v21 (`altar_resolution`). Default values in the migrations must stay in sync with the constants `DEFAULT_GRID_SIZE`, `DEFAULT_GRID_OPACITY`, `DEFAULT_GRID_COLOR`, and `DEFAULT_ALTAR_RESOLUTION` in `src/lib/altarConstants.ts`. Grid writes go exclusively through `altarStore.updateAltarGrid(id, patch)`. Resolution writes go exclusively through `altarStore.updateAltarResolution(id, resolution)`, which validates the format with a regex, clamps both dimensions via `parseResolution`, and updates `updated_at`. The `altar_categories` table was introduced in migration v22 and its default rows were capitalized and emoji-corrected in migration v23.
 
 ### altar_items
 
@@ -221,10 +221,23 @@ The item library — reusable items that can be placed onto any altar.
 | id | TEXT PK | UUID |
 | name | TEXT | |
 | emoji | TEXT | |
-| category | TEXT | One of: `'candle'`, `'crystal'`, `'herb'`, `'deity'`, `'symbol'`, `'tool'`, `'table'`, `'other'` |
+| category | TEXT | Name of a category from `altar_categories` (e.g. `'Candle'`, `'Crystal'`). Stored by name, not by ID. Updated automatically when a category is renamed or deleted. |
 | note | TEXT | |
 | image_data | TEXT | Optional image as base64 data-URL |
 | created_at | TEXT | ISO 8601 |
+
+### altar_categories
+
+Defines the item categories available in the altar library. Categories are user-managed: they can be created, renamed, and deleted. Renaming a category cascades to all `altar_items` rows that reference the old name. Deleting a category reassigns all affected items to the first remaining category (or `'other'` as a final fallback).
+
+| Column | Type | Notes |
+|---|---|---|
+| id | TEXT PK | UUID for user-created rows; fixed strings (`'candle'`, `'crystal'`, etc.) for the 8 default rows |
+| name | TEXT | Display name; stored by name on `altar_items.category` |
+| emoji | TEXT | Representative emoji shown on the category tab |
+| created_at | TEXT | ISO 8601; used for ordering (oldest first) |
+
+Eight default rows are seeded by migration v22 (`altar_categories_table`): Candle `🕯️`, Crystal `🔮`, Herb `🌿`, Deity `✨`, Symbol `🌙`, Tool `🔔`, Table `🪵`, Other `📦`. Migration v23 (`altar_categories_capitalize_and_fix_emojis`) capitalizes any lowercase names left by earlier builds and corrects the Symbol emoji from `☽` to `🌙`.
 
 ### altar_placements
 

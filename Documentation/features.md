@@ -72,9 +72,16 @@ The altar is a virtual arrangement of symbolic objects on a canvas.
 
 **Dashboard.** Opening the Altar section shows a dashboard listing all your altars with search, sort, and view-mode options. Click any altar to open it; use the breadcrumb back button or the Altar entry in the left sidebar to return to the dashboard.
 
-**Altar library.** You manage a personal library of items (candles, crystals, herbs, deities, symbols, tools, table objects, and other objects). Each item has a name, an emoji, a category, an optional note, and an optional uploaded image.
+**Altar library.** You manage a personal library of items. Each item has a name, an emoji, a category, an optional note, and an optional uploaded image.
 
-Library editing uses a modal flow for **add / edit / delete** actions. In edit mode, the library strip is docked under the canvas, supports resize, and persists height in `localStorage` (`altar-library-height`).
+**Item categories** are fully dynamic. The library ships with eight default categories — Candle, Crystal, Herb, Deity, Symbol, Tool, Table, Other — but you can create, rename, and delete categories at any time:
+
+- Hover a category tab in the library strip to reveal a pencil icon that opens the inline rename/delete editor.
+- Click the "+ Category" button at the end of the tab row to add a new category; choose a name and pick an emoji from the palette.
+- Deleting a category moves all its items to the next available category automatically — no items are lost.
+- Renaming a category updates all items already assigned to it.
+
+Library editing uses a modal flow for **add / edit / delete** actions on individual items. In edit mode, the library strip is docked under the canvas, supports resize, and persists height in `localStorage` (`altar-library-height`). When uploading an image for a new item, if the name field is empty the filename (without extension) is pre-filled and selected so you can confirm or edit it immediately.
 
 Library tiles use a compact fixed footprint (**70×85 px**) to keep more items visible.
 

@@ -6,6 +6,7 @@ import { useWikiStore } from '../../store/wikiStore';
 import { useUIStore } from '../../store/uiStore';
 import { useTagStore } from '../../store/tagStore';
 import { useOperationStore } from '../../store/operationStore';
+import { useAltarStore } from '../../store/altarStore';
 import { useRoutineStore } from '../../store/routineStore';
 import { useVaultStore } from '../../store/vaultStore';
 // useJournalStore/useWikiStore/useOperationStore used for image cleanup below
@@ -21,8 +22,14 @@ async function runImageCleanup() {
     const { entries } = useJournalStore.getState();
     const { articles } = useWikiStore.getState();
     const { operations } = useOperationStore.getState();
+    const { altars } = useAltarStore.getState();
 
     const usedPaths = new Set<string>();
+    for (const altar of altars) {
+      if (altar.background_image_data && !altar.background_image_data.startsWith('data:')) {
+        usedPaths.add(altar.background_image_data);
+      }
+    }
     for (const item of [...entries, ...articles, ...operations]) {
       const content: string = (item as { content?: string }).content ?? '';
       if (!content) continue;
@@ -67,6 +74,7 @@ export default function AppShell() {
   const fetchTags = useTagStore((s) => s.fetchTags);
   const fetchAll = useOperationStore((s) => s.fetchAll);
   const fetchRoutines = useRoutineStore((s) => s.fetchRoutines);
+  const fetchAltars = useAltarStore((s) => s.fetchAltars);
   const loadVaults = useVaultStore((s) => s.loadVaults);
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const activeView = useUIStore((s) => s.activeView);
@@ -96,7 +104,7 @@ export default function AppShell() {
   useEffect(() => {
     // Load vault metadata first so getDb() knows which DB file to open
     loadVaults().then(() =>
-      Promise.all([fetchEntries(), fetchArticles(), fetchTags(), fetchAll(), fetchRoutines()])
+      Promise.all([fetchEntries(), fetchArticles(), fetchTags(), fetchAll(), fetchRoutines(), fetchAltars()])
         .then(runImageCleanup)
     );
   }, []);

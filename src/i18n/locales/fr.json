@@ -4,7 +4,9 @@
   },
   "common": {
     "yes": "Oui",
-    "no": "Non"
+    "no": "Non",
+    "delete": "Supprimer",
+    "deleteConfirm": "Supprimer ?"
   },
   "listView": {
     "view": "Vue",
@@ -75,6 +77,10 @@
   "altar": {
     "library": "Bibliothèque",
     "addItem": "Ajouter un objet",
+    "element": "Élément",
+    "category": "Catégorie",
+    "addCategory": "Ajouter une catégorie",
+    "categoryName": "Nom de la catégorie…",
     "newAltar": "Nouvel autel",
     "libraryTitle": "Bibliothèque de l'autel",
     "itemName": "Nom…",

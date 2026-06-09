@@ -74,12 +74,12 @@ The translation files follow this top-level structure (from `en.json`):
 | Key | Contents |
 |---|---|
 | `app` | Application name |
-| `common` | Shared yes/no labels |
+| `common` | Shared labels including `yes`, `no`, `delete`, `deleteConfirm` |
 | `listView` | View/sort mode labels for list toolbar |
 | `undo` | Undo toast messages |
 | `nav` | Sidebar navigation labels |
 | `operations` | All operations UI strings, including `categories.sigils` and `categories.servitors` |
-| `altar` | All altar UI strings, including item categories (`table` included), background presets, inspector labels (`inspectorX`, `inspectorY`, `inspectorScale`, `inspectorRotation`, `inspectorOpacity` — unit annotations are rendered in the UI, not in the key values), grid controls (`rotationSnap`, `rotationSnapAngle`, `snapScaleToGrid`), canvas options controls (`canvasOptions`, `ratio`), lock/show/hide actions, `background` (view-mode section header), and `duplicateElement` (duplicate button tooltip and context menu label) |
+| `altar` | All altar UI strings, including `element` (add-item button label), `category` (category field label), `addCategory` (new-category button), `categoryName` (category name input placeholder), background presets, inspector labels (`inspectorX`, `inspectorY`, `inspectorScale`, `inspectorRotation`, `inspectorOpacity` — unit annotations are rendered in the UI, not in the key values), grid controls (`rotationSnap`, `rotationSnapAngle`, `snapScaleToGrid`), canvas options controls (`canvasOptions`, `ratio`), lock/show/hide actions, `background` (view-mode section header), and `duplicateElement` (duplicate button tooltip and context menu label) |
 | `journal` | Journal UI strings |
 | `creation` | Sigil editor strings (shown for sigil operations) |
 | `wiki` | Wiki UI strings, including `categories.*` for all built-in wiki category IDs |

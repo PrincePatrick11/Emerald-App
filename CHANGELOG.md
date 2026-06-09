@@ -6,6 +6,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] — 0.1.3
 
 ### Added
+- Altar library: dynamic item categories — create, rename, and delete categories from the library strip; 8 built-in categories (Candle, Crystal, Herb, Deity, Symbol, Tool, Table, Other) are pre-seeded in the database on first run
+- Altar library strip: hover a category tab to reveal a pencil edit button; a "+ Category" button appends new categories
+- Altar library: the add-item button now shows an "Element" label (previously unlabelled)
+- Altar library: when uploading an image for a library item, if the name field is empty the filename (without extension) is pre-filled and selected automatically. (`AltarLibraryStrip.tsx`)
 - Altar edit mode: per-altar **snap rotation angle** setting — a toggle plus a 1–180° step input and slider; when active, dragging the rotation handle snaps to the configured angle instead of free rotation (Shift still snaps to 15° when the toggle is off)
 - Altar edit mode: per-altar **scale to grid** toggle — resizing a placement snaps its display size to multiples of `gridSize × 2`
 - Altar edit mode: **Duplicate** button on each placed-element row — creates a copy with the same size, rotation, and opacity, offset +2% in both axes, placed on top (`z_index = max + 1`), unlocked, visible, and immediately selected
@@ -25,6 +29,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Altar placed-elements list: **drag-to-reorder** Z-order — grip icon on each row; dragging a row repositions it in the list and immediately reassigns Z-index values across all placements (Pointer Events, no HTML5 drag API)
 
 ### Fixed
+- Custom altar background images were deleted by the image cleanup routine on startup — altar `background_image_data` paths were not included in the used-paths set passed to `cleanup_unused_images`. (`AppShell.tsx`)
+- Altar canvas did not display a custom background until an unrelated re-render triggered one; the background view is now reactive via `useSyncExternalStore` in `useBackgroundPreview`. (`AltarView.tsx`)
+- Right-clicking a placed-element row in the Altar dashboard caused the app to go black — a React Rules of Hooks violation in `AltarContextMenuActions`, which called `useTranslation()` inside a conditional render path. (`AltarCard.tsx`)
 - Category selection in OpPropertiesPanel reset to "Sigils" after 1.5 s whenever any sidebar field was changed on a newly created operation. Root cause: `triggerAutoSave` captured `pendingRef.current` at call time, so the debounced write overwrote the sidebar change. The ref is now read when the timer fires, not when `triggerAutoSave` is called. The same bug was present in WikiView and JournalView and is fixed there too.
 - `OperationSigilView` breadcrumb was missing the category emoji and the separator dot between the category name and the date; both are now rendered.
 - Built-in operation category names in the OperationsView breadcrumb (e.g. "Sigils", "Servitors") were displayed from the raw database seed value instead of the i18n key; they now go through `t('operations.categories.{id}')`.
@@ -40,6 +47,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Altar resize and rotate control handles were rendered at a fixed pixel size regardless of how much the canvas was scaled by CSS transform, making them appear oversized on small viewports. Handle sizes, icon sizes, offsets, and the rotation tooltip are now derived from `cssScale` so they remain visually consistent at any zoom level.
 
 ### Changed
+- `AltarItemCategory` type widened from a fixed literal union to `string`; the valid values are now driven by the `altar_categories` table rather than a hardcoded constant
+- `ALTAR_CATEGORIES` constant and `ALTAR_CATEGORY_EMOJI` map removed from `altarConstants.ts`; replaced by `CATEGORY_EMOJIS` (emoji suggestions keyed by default category name), `FALLBACK_CATEGORY_EMOJIS` (fallback array for custom categories), and `ALTAR_CAT_EMOJIS` (palette for the category emoji picker); Symbol category emoji corrected from `☽` to `🌙` (migration v23)
 - Altar canvas rendering: the canvas now renders at its native resolution (e.g. 1920×1080) and is scaled down to fit the viewport via a single CSS `transform: scale()` on a wrapping div. This replaces the previous percentage-based stretching approach and means placement coordinates, grid snap steps, handle sizes, and font sizes all operate in native pixels — eliminating rounding artefacts at non-standard viewports.
 - `AltarCanvas` accepts `nativeW` and `nativeH` props (resolved in `AltarView`) in addition to `resolution` and `cssScale`. `canvasScale` is now computed from the pre-resolved `nativeW`/`nativeH` values rather than calling `parseResolution` inside the canvas, so ratio-format resolutions are handled correctly.
 - `AltarView` `ResizeObserver` handles both ratio-format resolutions (e.g. `"16:9"`) and pixel-format resolutions (e.g. `"1920x1080"`): ratio mode derives `nativeW`/`nativeH` dynamically from the viewport size and sets `scale: 1`; pixel mode continues to compute a CSS `scale` factor as before.

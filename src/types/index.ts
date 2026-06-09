@@ -137,7 +137,13 @@ export type MoonPhase =
   | 'last_quarter'
   | 'waning_crescent';
 
-export type AltarItemCategory = 'candle' | 'crystal' | 'herb' | 'deity' | 'symbol' | 'tool' | 'table' | 'other';
+export type AltarItemCategory = string;
+
+export interface AltarCategory {
+  id: string;
+  name: string;
+  emoji: string;
+}
 
 export interface AltarRecord {
   id: string;
