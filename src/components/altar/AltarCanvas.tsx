@@ -168,8 +168,6 @@ export function AltarCanvas({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      <div className="absolute bottom-[28%] left-[8%] right-[8%] h-px bg-gradient-to-r from-transparent via-stone-700/50 to-transparent pointer-events-none" />
-      <div className="absolute bottom-[26%] left-[12%] right-[12%] h-px bg-gradient-to-r from-transparent via-stone-800/30 to-transparent pointer-events-none" />
       {showGrid && (
         <div
           className="absolute inset-0 pointer-events-none"
@@ -184,13 +182,7 @@ export function AltarCanvas({
         <div className="absolute inset-2 border border-dashed border-stone-600/40 rounded-lg pointer-events-none z-10" />
       )}
 
-      {placements.length === 0 && !sidebarDragItem && (
-        <p className="absolute inset-0 flex items-center justify-center text-stone-800 text-sm pointer-events-none">
-          {t('altar.dropHint')}
-        </p>
-      )}
-
-      {sortedPlacements.map((p) => (
+{sortedPlacements.map((p) => (
         <PlacedItem
           key={p.id}
           placement={p}

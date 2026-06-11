@@ -111,7 +111,9 @@ Locked placements are click-through on the canvas (pointer events disabled), so 
 
 **Multiple altars.** You can create several named altars and switch between them. Each altar has its own title, intention text, background, and set of placements.
 
-**Backgrounds.** Four built-in presets (Midnight, Ember, Forest, Moon) and the option to upload a custom background image.
+**Backgrounds.** Four built-in colour presets (Midnight, Ember, Forest, Moon) plus 17 photographic image presets, and the option to upload a custom background image.
+
+The image presets are organised thematically — Forest & Nature, Mountains, Caves & Grottos, Magic & Portals, Temples & Halls — and displayed as a 4-column thumbnail grid below the colour presets in the sidebar. Thumbnails (160×90 px) are served from `public/backgrounds/thumbs/`; the full-resolution image is only loaded by the canvas when that preset is active. Each preset has a localised display name in all four supported languages.
 
 Custom backgrounds are persisted as file-backed image paths (legacy inline data URLs are migrated). Background previews use a cached preview map for reliable rendering.
 

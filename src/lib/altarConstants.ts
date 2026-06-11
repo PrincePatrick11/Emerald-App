@@ -58,6 +58,33 @@ export const DEFAULT_GRID_COLOR = '#dce8e2';
 
 export const ALTAR_BACKGROUND_PRESETS = ['midnight', 'ember', 'forest', 'moon'] as const;
 
+export const ALTAR_IMAGE_PRESETS = [
+  // Wald & Natur
+  'sacred_grove_light',
+  'bamboo_grove_bench',
+  'light_forest_mist',
+  'mushroom_forest_ritual',
+  'world_tree_roots',
+  // Berge
+  'mountain_altar_summit',
+  'mountain_altar_night',
+  // Höhlen & Grotten
+  'dark_grotto_shrine',
+  'stalactite_cave_mosaic',
+  // Magie & Portale
+  'light_gate_magic',
+  'magic_arch_violet',
+  'magic_hall_portal',
+  // Tempel & Hallen
+  'marble_temple_arch',
+  'temple_dark_arch',
+  'temple_stairway',
+  'stone_hall_sun',
+  'chapel_red_carpet',
+] as const;
+
+export type AltarImagePresetName = (typeof ALTAR_IMAGE_PRESETS)[number];
+
 export const ALTAR_BACKGROUND_STYLES: Record<(typeof ALTAR_BACKGROUND_PRESETS)[number], string> = {
   midnight: 'radial-gradient(ellipse at 50% 30%, #1a1a2e 0%, #0d0d15 60%, #0a0a0f 100%)',
   ember: 'radial-gradient(circle at 50% 24%, #4a2917 0%, #25140f 42%, #120d10 100%)',
@@ -80,6 +107,9 @@ export function getAltarBackgroundStyle(
   if (!altar) return ALTAR_BACKGROUND_STYLES[DEFAULT_ALTAR_BACKGROUND];
   if (imageSrc?.startsWith('data:image/')) {
     return `${OVERLAY_GRADIENT}, url("${imageSrc}") center / cover no-repeat`;
+  }
+  if (ALTAR_IMAGE_PRESETS.includes(altar.background_preset as AltarImagePresetName)) {
+    return `${OVERLAY_GRADIENT}, url("/backgrounds/${altar.background_preset}.webp") center / cover no-repeat`;
   }
   const preset = ALTAR_BACKGROUND_PRESETS.includes(altar.background_preset as (typeof ALTAR_BACKGROUND_PRESETS)[number])
     ? altar.background_preset as (typeof ALTAR_BACKGROUND_PRESETS)[number]

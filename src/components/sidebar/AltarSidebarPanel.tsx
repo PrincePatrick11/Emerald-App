@@ -8,6 +8,7 @@ import {
   ALTAR_RATIOS,
   ALTAR_BACKGROUND_PRESETS,
   ALTAR_BACKGROUND_STYLES,
+  ALTAR_IMAGE_PRESETS,
   DEFAULT_ALTAR_BACKGROUND,
   ratioFromResolution,
 } from '../../lib/altarConstants';
@@ -130,7 +131,7 @@ export default function AltarSidebarPanel() {
     noticeTimerRef.current = window.setTimeout(() => setBackgroundNotice(null), 1800);
   };
 
-  const updateBackgroundPreset = async (preset: (typeof ALTAR_BACKGROUND_PRESETS)[number]) => {
+  const updateBackgroundPreset = async (preset: string) => {
     if (!activeAltar) return;
     await updateAltar(activeAltar.id, { background_preset: preset, background_image_data: null });
   };
@@ -259,6 +260,35 @@ export default function AltarSidebarPanel() {
                   );
                 })}
               </div>
+              <div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {ALTAR_IMAGE_PRESETS.map((name) => {
+                    const selected = !activeAltar.background_image_data && activeAltar.background_preset === name;
+                    return (
+                      <button
+                        key={name}
+                        onClick={() => { if (isEditing) updateBackgroundPreset(name); }}
+                        disabled={!isEditing}
+                        className={`relative overflow-hidden rounded-md border transition-colors ${
+                          selected ? 'border-jade-600/70 ring-1 ring-jade-700/40' : 'border-stone-700/50 hover:border-stone-500/60'
+                        }`}
+                        title={t(`altar.backgrounds.${name}`)}
+                      >
+                        <img
+                          src={`/backgrounds/thumbs/${name}.webp`}
+                          alt={t(`altar.backgrounds.${name}`)}
+                          className="h-9 w-full object-cover"
+                        />
+                        {selected && (
+                          <span className="absolute right-1 top-1 rounded-full border border-jade-600/60 bg-jade-900/70 p-0.5 text-jade-200">
+                            <Check size={8} />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               {hasCustomBackground ? (
                 <div className="flex items-center gap-1.5">
                   <div
@@ -322,7 +352,9 @@ export default function AltarSidebarPanel() {
                   style={
                     activeAltar.background_image_data && safeBackgroundUrl
                       ? { backgroundImage: safeBackgroundUrl, backgroundSize: 'cover', backgroundPosition: 'center' }
-                      : { background: ALTAR_BACKGROUND_STYLES[(activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND) as (typeof ALTAR_BACKGROUND_PRESETS)[number]] }
+                      : ALTAR_IMAGE_PRESETS.includes(activeAltar.background_preset as (typeof ALTAR_IMAGE_PRESETS)[number])
+                        ? { backgroundImage: `url("/backgrounds/thumbs/${activeAltar.background_preset}.webp")`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                        : { background: ALTAR_BACKGROUND_STYLES[(activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND) as (typeof ALTAR_BACKGROUND_PRESETS)[number]] }
                   }
                 >
                   {!activeAltar.background_image_data && <div className="h-full w-full" />}
@@ -330,7 +362,7 @@ export default function AltarSidebarPanel() {
                 <div className="altar-bg-preset-label border-t border-stone-800/70 bg-stone-900/80 px-2 py-1 text-left text-[11px] text-stone-300">
                   {activeAltar.background_image_data
                     ? t('altar.customBackground')
-                    : t(`altar.backgrounds.${(activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND) as (typeof ALTAR_BACKGROUND_PRESETS)[number]}`)}
+                    : t(`altar.backgrounds.${activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND}`)}
                 </div>
                 <span className="absolute right-1.5 top-1.5 rounded-full border border-jade-600/60 bg-jade-900/70 p-0.5 text-jade-200">
                   <Check size={10} />
