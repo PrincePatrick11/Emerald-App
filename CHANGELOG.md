@@ -52,6 +52,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Altar dashboard preview cards used a fixed `h-36` height regardless of the altar's aspect ratio; cards now use CSS `aspect-ratio` derived from the altar's stored resolution, so portrait and square canvases display proportionally.
 - `parseResolution` now validates the input with a strict regex (`/^\d+x\d+$/`) and clamps width/height to the allowed maximum (7680×4320), preventing malformed strings or oversized values from reaching the canvas layout.
 - German locale used `"Aufloesung"` instead of `"Auflösung"`; French locale used `"Resolution"` instead of `"Résolution"`; Spanish locale used `"Resolucion"` instead of `"Resolución"`.
+- `backgroundOverlay` translation key was missing from `de.json`, `es.json`, and `fr.json`; all three locales now carry the key ("Hintergrund-Overlay" / "Superposición de fondo" / "Superposition de fond").
+- `mushroom_forest_ritual` translation key removed from all four locale files; the corresponding preset no longer exists.
 - Altar resize and rotate control handles were rendered at a fixed pixel size regardless of how much the canvas was scaled by CSS transform, making them appear oversized on small viewports. Handle sizes, icon sizes, offsets, and the rotation tooltip are now derived from `cssScale` so they remain visually consistent at any zoom level.
 
 ### Changed
