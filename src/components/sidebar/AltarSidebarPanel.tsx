@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
-import { Check, ChevronDown, ChevronRight, Grid3x3, Image as ImageIcon, Magnet, Pencil, RotateCw, Scaling, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Grid3x3, Image as ImageIcon, Magnet, Pencil, RotateCw, Scaling, Trash2, X } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import {
   ALTAR_RATIOS,
@@ -10,6 +10,14 @@ import {
   ALTAR_BACKGROUND_STYLES,
   ALTAR_IMAGE_PRESETS,
   DEFAULT_ALTAR_BACKGROUND,
+  DEFAULT_BACKGROUND_OVERLAY,
+  GRADIENT_PRESET_COLORS,
+  LEGACY_GRADIENT_COLORS,
+  generateGradientStyle,
+  isGradientPreset,
+  getGradientColor,
+  parseResolution,
+  isRatioFormat,
   ratioFromResolution,
 } from '../../lib/altarConstants';
 import { readFileAsDataUrl } from '../../lib/helpers';
@@ -44,9 +52,13 @@ export default function AltarSidebarPanel() {
   const activeAltar = useAltarStore((s) => s.altars.find((a) => a.id === s.activeAltarId) ?? null);
   const gridOpacityPercent = Math.round((activeAltar?.grid_opacity ?? 0) * 100);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
-  const noticeTimerRef = useRef<number | null>(null);
+const noticeTimerRef = useRef<number | null>(null);
   const [backgroundNotice, setBackgroundNotice] = useState<string | null>(null);
   const [backgroundOpen, setBackgroundOpen] = useState(true);
+  const [gradientModalOpen, setGradientModalOpen] = useState(false);
+  const [gradientOriginalColor, setGradientOriginalColor] = useState<string>(GRADIENT_PRESET_COLORS[0]);
+  const [gradientOriginalPreset, setGradientOriginalPreset] = useState<string>('');
+  const [overlayOpen, setOverlayOpen] = useState(true);
   const [gridOpen, setGridOpen] = useState(true);
   const [canvasOptionsOpen, setCanvasOptionsOpen] = useState(true);
   const [placementsOpen, setPlacementsOpen] = useState(true);
@@ -58,6 +70,7 @@ export default function AltarSidebarPanel() {
   // Allows re-activating a custom background after switching to a preset without
   // re-uploading. Not persisted — the active path is authoritative in the DB.
   const [customBackgroundMap, setCustomBackgroundMap] = useState<Record<string, string>>({});
+  const [gradientColorMap, setGradientColorMap] = useState<Record<string, string>>({});
   const customBackgroundSource = activeAltar?.background_image_data || (activeAltar ? customBackgroundMap[activeAltar.id] : null);
   const customBackgroundPreview = useBackgroundPreview(customBackgroundSource);
   const sortedPlacements = useMemo(
@@ -238,19 +251,23 @@ export default function AltarSidebarPanel() {
           {backgroundOpen && (isEditing ? (
             <div className="mt-2 space-y-1.5">
               <div className="grid grid-cols-4 gap-1.5">
-                {ALTAR_BACKGROUND_PRESETS.map((preset) => {
-                  const selected = !activeAltar.background_image_data && (activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND) === preset;
+                {ALTAR_IMAGE_PRESETS.map((name) => {
+                  const selected = !activeAltar.background_image_data && activeAltar.background_preset === name;
                   return (
                     <button
-                      key={preset}
-                      onClick={() => { if (isEditing) updateBackgroundPreset(preset); }}
+                      key={name}
+                      onClick={() => { if (isEditing) updateBackgroundPreset(name); }}
                       disabled={!isEditing}
                       className={`relative overflow-hidden rounded-md border transition-colors ${
                         selected ? 'border-jade-600/70 ring-1 ring-jade-700/40' : 'border-stone-700/50 hover:border-stone-500/60'
                       }`}
-                      title={t(`altar.backgrounds.${preset}`)}
+                      title={t(`altar.backgrounds.${name}`)}
                     >
-                      <div className="h-9 w-full" style={{ background: ALTAR_BACKGROUND_STYLES[preset] }} />
+                      <img
+                        src={`/backgrounds/thumbs/${name}.webp`}
+                        alt={t(`altar.backgrounds.${name}`)}
+                        className="h-9 w-full object-cover"
+                      />
                       {selected && (
                         <span className="absolute right-1 top-1 rounded-full border border-jade-600/60 bg-jade-900/70 p-0.5 text-jade-200">
                           <Check size={8} />
@@ -260,35 +277,155 @@ export default function AltarSidebarPanel() {
                   );
                 })}
               </div>
-              <div>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {ALTAR_IMAGE_PRESETS.map((name) => {
-                    const selected = !activeAltar.background_image_data && activeAltar.background_preset === name;
-                    return (
+              {(() => {
+                const currentPreset = activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND;
+                const isLegacyGradient = ALTAR_BACKGROUND_PRESETS.includes(currentPreset as (typeof ALTAR_BACKGROUND_PRESETS)[number]);
+                const isGradientActive = !activeAltar.background_image_data && (isGradientPreset(currentPreset) || isLegacyGradient);
+                const activeGradientColor = isGradientPreset(currentPreset)
+                  ? getGradientColor(currentPreset)
+                  : isLegacyGradient
+                    ? LEGACY_GRADIENT_COLORS[currentPreset as (typeof ALTAR_BACKGROUND_PRESETS)[number]]
+                    : GRADIENT_PRESET_COLORS[0];
+                const lastGradientColor = gradientColorMap[activeAltar.id] ?? (isGradientActive ? activeGradientColor : null);
+                const hasGradient = lastGradientColor !== null;
+                const displayColor = lastGradientColor ?? GRADIENT_PRESET_COLORS[0];
+
+                const applyGradient = (color: string) => {
+                  setGradientColorMap((prev) => ({ ...prev, [activeAltar.id]: color }));
+                  updateBackgroundPreset(`gradient:${color}`);
+                };
+                const removeGradient = () => {
+                  setGradientColorMap((prev) => { const next = { ...prev }; delete next[activeAltar.id]; return next; });
+                  if (isGradientActive) updateBackgroundPreset(ALTAR_IMAGE_PRESETS[0]);
+                };
+                const openModal = () => {
+                  setGradientOriginalColor(displayColor);
+                  setGradientOriginalPreset(activeAltar.background_preset);
+                  setGradientModalOpen(true);
+                };
+
+                return (
+                  <>
+                    {hasGradient ? (
+                      <div className="flex items-center gap-1.5">
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => { if (isEditing) applyGradient(displayColor); }}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (isEditing) applyGradient(displayColor); } }}
+                          className={`relative h-9 w-12 flex-shrink-0 overflow-hidden rounded-md border cursor-pointer transition-colors ${
+                            isGradientActive ? 'border-jade-600/70 ring-1 ring-jade-700/40' : 'border-stone-700/50 hover:border-stone-500/60'
+                          }`}
+                          title={t('altar.backgrounds.gradient')}
+                        >
+                          <div className="h-full w-full" style={{ background: generateGradientStyle(displayColor) }} />
+                          {isGradientActive && (
+                            <span className="absolute right-0.5 top-0.5 rounded-full border border-jade-600/60 bg-jade-900/70 p-0.5 text-jade-200">
+                              <Check size={7} />
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={openModal}
+                          className="flex flex-1 items-center justify-center gap-1 rounded border border-stone-600/70 bg-stone-800/70 py-1.5 text-[10px] uppercase tracking-wide text-stone-300 hover:border-stone-400 transition-colors"
+                        >
+                          <Pencil size={9} />{t('altar.change')}
+                        </button>
+                        <button
+                          onClick={removeGradient}
+                          className="flex flex-1 items-center justify-center gap-1 rounded border border-red-700/60 bg-red-950/30 py-1.5 text-[10px] uppercase tracking-wide text-red-200 hover:border-red-500 transition-colors"
+                        >
+                          <Trash2 size={9} />{t('altar.remove')}
+                        </button>
+                      </div>
+                    ) : (
                       <button
-                        key={name}
-                        onClick={() => { if (isEditing) updateBackgroundPreset(name); }}
+                        onClick={() => { if (isEditing) openModal(); }}
                         disabled={!isEditing}
-                        className={`relative overflow-hidden rounded-md border transition-colors ${
-                          selected ? 'border-jade-600/70 ring-1 ring-jade-700/40' : 'border-stone-700/50 hover:border-stone-500/60'
-                        }`}
-                        title={t(`altar.backgrounds.${name}`)}
+                        className="flex w-full items-center justify-center gap-1.5 rounded-md border border-stone-700/50 bg-stone-900/45 py-1.5 text-[11px] text-stone-400 hover:border-stone-500/60 hover:text-stone-300 transition-colors"
                       >
-                        <img
-                          src={`/backgrounds/thumbs/${name}.webp`}
-                          alt={t(`altar.backgrounds.${name}`)}
-                          className="h-9 w-full object-cover"
-                        />
-                        {selected && (
-                          <span className="absolute right-1 top-1 rounded-full border border-jade-600/60 bg-jade-900/70 p-0.5 text-jade-200">
-                            <Check size={8} />
-                          </span>
-                        )}
+                        <div className="h-3 w-5 rounded-sm flex-shrink-0" style={{ background: generateGradientStyle(GRADIENT_PRESET_COLORS[0]) }} />
+                        {t('altar.backgrounds.gradient')}
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
+                    )}
+                    {gradientModalOpen && (() => {
+                      const res = activeAltar.resolution;
+                      const { w, h } = isRatioFormat(res)
+                        ? { w: Number(res.split(':')[0]), h: Number(res.split(':')[1]) }
+                        : parseResolution(res);
+                      const maxW = 240;
+                      const previewW = w >= h ? maxW : Math.round(128 * w / h);
+                      const previewH = w >= h ? Math.round(maxW * h / w) : 128;
+                      return (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                          <div className="bg-stone-900 border border-stone-700 rounded-xl shadow-2xl w-72 overflow-hidden">
+                            <div className="px-4 py-3 border-b border-stone-700/60">
+                              <span className="text-sm font-medium text-stone-300">{t('altar.backgrounds.gradient')}</span>
+                            </div>
+                            <div className="p-4 space-y-3">
+                              <div className="flex justify-center">
+                                <div
+                                  className="rounded-lg overflow-hidden border border-stone-700/50"
+                                  style={{ width: previewW, height: previewH, background: generateGradientStyle(displayColor) }}
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {GRADIENT_PRESET_COLORS.map((color) => (
+                                  <button
+                                    key={color}
+                                    onClick={() => applyGradient(color)}
+                                    title={color}
+                                    className={`h-6 w-6 flex-shrink-0 rounded-full border-2 transition-all ${
+                                      displayColor === color ? 'border-jade-400 scale-110' : 'border-stone-600 hover:border-stone-400'
+                                    }`}
+                                    style={{ backgroundColor: color }}
+                                  />
+                                ))}
+                                <button
+                                  title={t('altar.customColor')}
+                                  className={`relative flex h-6 w-6 flex-shrink-0 cursor-pointer items-center justify-center rounded-full border-2 transition-all ${
+                                    !GRADIENT_PRESET_COLORS.includes(displayColor as (typeof GRADIENT_PRESET_COLORS)[number])
+                                      ? 'border-jade-400 scale-110'
+                                      : 'border-stone-600 hover:border-stone-400'
+                                  }`}
+                                  style={
+                                    !GRADIENT_PRESET_COLORS.includes(displayColor as (typeof GRADIENT_PRESET_COLORS)[number])
+                                      ? { backgroundColor: displayColor }
+                                      : { backgroundColor: '#44403c' }
+                                  }
+                                >
+                                  <input
+                                    type="color"
+                                    value={displayColor}
+                                    onChange={(e) => applyGradient(e.target.value)}
+                                    className="absolute inset-0 h-full w-full cursor-pointer rounded-full opacity-0"
+                                  />
+                                  {GRADIENT_PRESET_COLORS.includes(displayColor as (typeof GRADIENT_PRESET_COLORS)[number]) && (
+                                    <span className="text-[10px] leading-none text-stone-400 pointer-events-none">+</span>
+                                  )}
+                                </button>
+                              </div>
+                              <div className="flex items-center justify-end gap-1">
+                                <button onClick={() => {
+                                  // Revert: restore original preset and colorMap entry
+                                  updateAltar(activeAltar.id, { background_preset: gradientOriginalPreset || DEFAULT_ALTAR_BACKGROUND, background_image_data: null }).catch(console.error);
+                                  if (isGradientPreset(gradientOriginalPreset) || ALTAR_BACKGROUND_PRESETS.includes(gradientOriginalPreset as (typeof ALTAR_BACKGROUND_PRESETS)[number])) {
+                                    setGradientColorMap((prev) => ({ ...prev, [activeAltar.id]: gradientOriginalColor }));
+                                  } else {
+                                    setGradientColorMap((prev) => { const next = { ...prev }; delete next[activeAltar.id]; return next; });
+                                  }
+                                  setGradientModalOpen(false);
+                                }} className="btn-ghost"><X size={13} /></button>
+                                <button onClick={() => { applyGradient(displayColor); setGradientModalOpen(false); }} className="btn-ghost text-jade-400"><Check size={13} /></button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </>
+                );
+              })()}
               {hasCustomBackground ? (
                 <div className="flex items-center gap-1.5">
                   <div
@@ -349,20 +486,25 @@ export default function AltarSidebarPanel() {
               >
                 <div
                   className="h-14 w-full"
-                  style={
-                    activeAltar.background_image_data && safeBackgroundUrl
-                      ? { backgroundImage: safeBackgroundUrl, backgroundSize: 'cover', backgroundPosition: 'center' }
-                      : ALTAR_IMAGE_PRESETS.includes(activeAltar.background_preset as (typeof ALTAR_IMAGE_PRESETS)[number])
-                        ? { backgroundImage: `url("/backgrounds/thumbs/${activeAltar.background_preset}.webp")`, backgroundSize: 'cover', backgroundPosition: 'center' }
-                        : { background: ALTAR_BACKGROUND_STYLES[(activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND) as (typeof ALTAR_BACKGROUND_PRESETS)[number]] }
-                  }
+                  style={(() => {
+                    const p = activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND;
+                    if (activeAltar.background_image_data && safeBackgroundUrl)
+                      return { backgroundImage: safeBackgroundUrl, backgroundSize: 'cover', backgroundPosition: 'center' };
+                    if (ALTAR_IMAGE_PRESETS.includes(p as (typeof ALTAR_IMAGE_PRESETS)[number]))
+                      return { backgroundImage: `url("/backgrounds/thumbs/${p}.webp")`, backgroundSize: 'cover', backgroundPosition: 'center' };
+                    if (isGradientPreset(p))
+                      return { background: generateGradientStyle(getGradientColor(p)) };
+                    return { background: ALTAR_BACKGROUND_STYLES[(p) as (typeof ALTAR_BACKGROUND_PRESETS)[number]] ?? ALTAR_BACKGROUND_STYLES[DEFAULT_ALTAR_BACKGROUND] };
+                  })()}
                 >
                   {!activeAltar.background_image_data && <div className="h-full w-full" />}
                 </div>
                 <div className="altar-bg-preset-label border-t border-stone-800/70 bg-stone-900/80 px-2 py-1 text-left text-[11px] text-stone-300">
                   {activeAltar.background_image_data
                     ? t('altar.customBackground')
-                    : t(`altar.backgrounds.${activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND}`)}
+                    : isGradientPreset(activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND)
+                      ? t('altar.backgrounds.gradient')
+                      : t(`altar.backgrounds.${activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND}`)}
                 </div>
                 <span className="absolute right-1.5 top-1.5 rounded-full border border-jade-600/60 bg-jade-900/70 p-0.5 text-jade-200">
                   <Check size={10} />
@@ -374,6 +516,39 @@ export default function AltarSidebarPanel() {
           </div>
           {isEditing && (
             <>
+              <button
+                onClick={() => setOverlayOpen((v) => !v)}
+                className="mt-4 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
+              >
+                {overlayOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                {t('altar.backgroundOverlay')}
+              </button>
+              {overlayOpen && (() => {
+                const overlayPercent = Math.round((activeAltar.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY) * 100);
+                return (
+                  <div className="mt-2 space-y-1">
+                    <div className="flex items-center justify-end">
+                      <span className="text-[11px] tabular-nums text-stone-300">{overlayPercent}%</span>
+                    </div>
+                    <div className="relative h-4 flex items-center">
+                      <div className="absolute inset-x-0 h-1 rounded-full bg-stone-800/80" />
+                      <div className="absolute left-0 h-1 rounded-full bg-jade-600/60" style={{ width: `${overlayPercent}%` }} />
+                      <div
+                        className="absolute h-2.5 w-2.5 rounded-full bg-jade-500 border border-jade-400/50 shadow pointer-events-none"
+                        style={{ left: `calc(${overlayPercent}% - 5px)` }}
+                      />
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={overlayPercent}
+                        onChange={(e) => updateAltar(activeAltar.id, { background_overlay: Number(e.target.value) / 100 })}
+                        className="absolute inset-x-0 w-full opacity-0 cursor-pointer h-4"
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
               <button
                 onClick={() => setGridOpen((v) => !v)}
                 className="mt-4 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
@@ -401,82 +576,87 @@ export default function AltarSidebarPanel() {
                 ))}
               </div>
               {activeAltar.grid_enabled && (
-                <div className="mt-2 rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2">
-                  <div className="mb-1 flex items-center justify-between">
-                <span className="text-[11px] uppercase tracking-wider text-stone-500">{t('altar.gridSize')}</span>
-                <input
-                  type="number"
-                  min={8}
-                  max={128}
-                  value={activeAltar.grid_size}
-                  disabled={!isEditing}
-                  onChange={(event) => updateAltarGrid(activeAltar.id, { grid_size: Number(event.target.value) || 8 })}
-                  className="w-14 rounded bg-stone-800/70 px-1.5 py-0.5 text-right text-xs text-stone-300 outline-none"
-                />
-              </div>
-              <input
-                type="range"
-                min={8}
-                max={128}
-                value={activeAltar.grid_size}
-                disabled={!isEditing}
-                onChange={(event) => updateAltarGrid(activeAltar.id, { grid_size: Number(event.target.value) })}
-                className="w-full"
-              />
-              <div className="mt-2 mb-1 flex items-center justify-between">
-                <span className="text-[11px] uppercase tracking-wider text-stone-500">{t('altar.gridOpacity')}</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={25}
-                  value={gridOpacityPercent}
-                  disabled={!isEditing}
-                  onChange={(event) => updateAltarGrid(activeAltar.id, { grid_opacity: (Number(event.target.value) || 1) / 100 })}
-                  className="w-14 rounded bg-stone-800/70 px-1.5 py-0.5 text-right text-xs text-stone-300 outline-none"
-                />
-              </div>
-              <input
-                type="range"
-                min={1}
-                max={25}
-                value={gridOpacityPercent}
-                disabled={!isEditing}
-                onChange={(event) => updateAltarGrid(activeAltar.id, { grid_opacity: Number(event.target.value) / 100 })}
-                className="w-full"
-              />
-              <div className="mt-2 flex items-center justify-between">
-                <span className="text-[11px] uppercase tracking-wider text-stone-500">{t('altar.gridColor')}</span>
-                <input
-                  type="color"
-                  value={activeAltar.grid_color}
-                  disabled={!isEditing}
-                  onChange={(event) => updateAltarGrid(activeAltar.id, { grid_color: event.target.value })}
-                  className="h-6 w-10 rounded border border-stone-700 bg-stone-800 p-0"
-                />
-              </div>
+                <div className="mt-2 rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2 space-y-2">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] uppercase tracking-wider text-stone-500">{t('altar.gridSize')}</span>
+                      <span className="text-[11px] tabular-nums text-stone-300">{activeAltar.grid_size}px</span>
+                    </div>
+                    <div className="relative h-4 flex items-center">
+                      <div className="absolute inset-x-0 h-1 rounded-full bg-stone-800/80" />
+                      <div className="absolute left-0 h-1 rounded-full bg-jade-600/60" style={{ width: `${((activeAltar.grid_size - 8) / 120) * 100}%` }} />
+                      <div
+                        className="absolute h-2.5 w-2.5 rounded-full bg-jade-500 border border-jade-400/50 shadow pointer-events-none"
+                        style={{ left: `calc(${((activeAltar.grid_size - 8) / 120) * 100}% - 5px)` }}
+                      />
+                      <input
+                        type="range"
+                        min={8}
+                        max={128}
+                        value={activeAltar.grid_size}
+                        disabled={!isEditing}
+                        onChange={(event) => updateAltarGrid(activeAltar.id, { grid_size: Number(event.target.value) })}
+                        className="absolute inset-x-0 w-full opacity-0 cursor-pointer h-4 disabled:cursor-default"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] uppercase tracking-wider text-stone-500">{t('altar.gridOpacity')}</span>
+                      <span className="text-[11px] tabular-nums text-stone-300">{gridOpacityPercent}%</span>
+                    </div>
+                    <div className="relative h-4 flex items-center">
+                      <div className="absolute inset-x-0 h-1 rounded-full bg-stone-800/80" />
+                      <div className="absolute left-0 h-1 rounded-full bg-jade-600/60" style={{ width: `${((gridOpacityPercent - 1) / 24) * 100}%` }} />
+                      <div
+                        className="absolute h-2.5 w-2.5 rounded-full bg-jade-500 border border-jade-400/50 shadow pointer-events-none"
+                        style={{ left: `calc(${((gridOpacityPercent - 1) / 24) * 100}% - 5px)` }}
+                      />
+                      <input
+                        type="range"
+                        min={1}
+                        max={25}
+                        value={gridOpacityPercent}
+                        disabled={!isEditing}
+                        onChange={(event) => updateAltarGrid(activeAltar.id, { grid_opacity: Number(event.target.value) / 100 })}
+                        className="absolute inset-x-0 w-full opacity-0 cursor-pointer h-4 disabled:cursor-default"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] uppercase tracking-wider text-stone-500">{t('altar.gridColor')}</span>
+                    <input
+                      type="color"
+                      value={activeAltar.grid_color}
+                      disabled={!isEditing}
+                      onChange={(event) => updateAltarGrid(activeAltar.id, { grid_color: event.target.value })}
+                      className="h-6 w-10 rounded border border-stone-700 bg-stone-800 p-0"
+                    />
+                  </div>
                 </div>
               )}
               {activeAltar.rotation_snap_enabled && (
-                <div className="mt-2 rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2">
-                  <div className="mb-1 flex items-center justify-between">
+                <div className="mt-2 rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2 space-y-1">
+                  <div className="flex items-center justify-between">
                     <span className="text-[11px] uppercase tracking-wider text-stone-500">{t('altar.rotationSnapAngle')}</span>
+                    <span className="text-[11px] tabular-nums text-stone-300">{activeAltar.rotation_snap_angle}°</span>
+                  </div>
+                  <div className="relative h-4 flex items-center">
+                    <div className="absolute inset-x-0 h-1 rounded-full bg-stone-800/80" />
+                    <div className="absolute left-0 h-1 rounded-full bg-jade-600/60" style={{ width: `${((activeAltar.rotation_snap_angle - 1) / 179) * 100}%` }} />
+                    <div
+                      className="absolute h-2.5 w-2.5 rounded-full bg-jade-500 border border-jade-400/50 shadow pointer-events-none"
+                      style={{ left: `calc(${((activeAltar.rotation_snap_angle - 1) / 179) * 100}% - 5px)` }}
+                    />
                     <input
-                      type="number"
+                      type="range"
                       min={1}
                       max={180}
                       value={activeAltar.rotation_snap_angle}
-                      onChange={(e) => updateAltarGrid(activeAltar.id, { rotation_snap_angle: Number(e.target.value) || 15 })}
-                      className="w-14 rounded bg-stone-800/70 px-1.5 py-0.5 text-right text-xs text-stone-300 outline-none"
+                      onChange={(e) => updateAltarGrid(activeAltar.id, { rotation_snap_angle: Number(e.target.value) })}
+                      className="absolute inset-x-0 w-full opacity-0 cursor-pointer h-4"
                     />
                   </div>
-                  <input
-                    type="range"
-                    min={1}
-                    max={180}
-                    value={activeAltar.rotation_snap_angle}
-                    onChange={(e) => updateAltarGrid(activeAltar.id, { rotation_snap_angle: Number(e.target.value) })}
-                    className="w-full"
-                  />
                 </div>
               )}
               </>}

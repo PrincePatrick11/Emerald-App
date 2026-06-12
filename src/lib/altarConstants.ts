@@ -52,19 +52,53 @@ export function ratioFromResolution(res: string): AltarRatio | null {
   return sizeAndRatioFromResolution(res)?.ratio ?? null;
 }
 
+export const DEFAULT_BACKGROUND_OVERLAY = 0.2;
+
 export const DEFAULT_GRID_SIZE = 32;
 export const DEFAULT_GRID_OPACITY = 0.06;
 export const DEFAULT_GRID_COLOR = '#dce8e2';
 
 export const ALTAR_BACKGROUND_PRESETS = ['midnight', 'ember', 'forest', 'moon'] as const;
 
+// Swatch colors for the gradient picker — muted dark ROYGBIV
+export const GRADIENT_PRESET_COLORS = ['#4a1a1a', '#4a2a10', '#3d3510', '#1a3d26', '#1a2a4a', '#1e1a4a', '#3d1a4a'] as const;
+
+// Maps legacy preset names to their representative hex color for the gradient picker
+export const LEGACY_GRADIENT_COLORS: Record<(typeof ALTAR_BACKGROUND_PRESETS)[number], string> = {
+  midnight: '#1e1e3c',
+  ember: '#4a2917',
+  forest: '#183126',
+  moon: '#2b253d',
+};
+
+/** Returns true if the preset uses the new `gradient:#rrggbb` format. */
+export function isGradientPreset(preset: string): boolean {
+  return preset.startsWith('gradient:');
+}
+
+/** Extracts the hex color from a `gradient:#rrggbb` preset string. */
+export function getGradientColor(preset: string): string {
+  return preset.slice('gradient:'.length);
+}
+
+/** Generates a radial-gradient CSS value from a hex color. */
+export function generateGradientStyle(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const r2 = Math.round(r * 0.5).toString(16).padStart(2, '0');
+  const g2 = Math.round(g * 0.5).toString(16).padStart(2, '0');
+  const b2 = Math.round(b * 0.5).toString(16).padStart(2, '0');
+  return `radial-gradient(circle at 50% 25%, ${hex} 0%, #${r2}${g2}${b2} 50%, #0a0a0f 100%)`;
+}
+
+
 export const ALTAR_IMAGE_PRESETS = [
   // Wald & Natur
   'sacred_grove_light',
   'bamboo_grove_bench',
   'light_forest_mist',
-  'mushroom_forest_ritual',
-  'world_tree_roots',
+'world_tree_roots',
   // Berge
   'mountain_altar_summit',
   'mountain_altar_night',
@@ -92,7 +126,11 @@ export const ALTAR_BACKGROUND_STYLES: Record<(typeof ALTAR_BACKGROUND_PRESETS)[n
   moon: 'radial-gradient(circle at 50% 18%, #2b253d 0%, #171222 44%, #0b0a12 100%)',
 };
 
-const OVERLAY_GRADIENT = 'linear-gradient(rgba(10, 10, 15, 0.35), rgba(10, 10, 15, 0.55))';
+function buildOverlayGradient(opacity: number): string {
+  const top = Math.round(opacity * 60) / 100;
+  const bottom = opacity;
+  return `linear-gradient(rgba(10,10,15,${top}),rgba(10,10,15,${bottom}))`;
+}
 
 /**
  * Returns a CSS `background` value for an altar canvas or card preview.
@@ -101,16 +139,22 @@ const OVERLAY_GRADIENT = 'linear-gradient(rgba(10, 10, 15, 0.35), rgba(10, 10, 1
  * the CSS string.
  */
 export function getAltarBackgroundStyle(
-  altar: Pick<AltarRecord, 'background_preset'> | null,
+  altar: Pick<AltarRecord, 'background_preset' | 'background_overlay'> | null,
   imageSrc: string | null | undefined,
 ): string {
   if (!altar) return ALTAR_BACKGROUND_STYLES[DEFAULT_ALTAR_BACKGROUND];
+  const overlay = altar.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY;
+  const overlayLayer = overlay > 0 ? `${buildOverlayGradient(overlay)}, ` : '';
   if (imageSrc?.startsWith('data:image/')) {
-    return `${OVERLAY_GRADIENT}, url("${imageSrc}") center / cover no-repeat`;
+    return `${overlayLayer}url("${imageSrc}") center / cover no-repeat`;
   }
   if (ALTAR_IMAGE_PRESETS.includes(altar.background_preset as AltarImagePresetName)) {
-    return `${OVERLAY_GRADIENT}, url("/backgrounds/${altar.background_preset}.webp") center / cover no-repeat`;
+    return `${overlayLayer}url("/backgrounds/${altar.background_preset}.webp") center / cover no-repeat`;
   }
+  if (isGradientPreset(altar.background_preset)) {
+    return generateGradientStyle(getGradientColor(altar.background_preset));
+  }
+  // Legacy preset names — keep using the original hardcoded styles
   const preset = ALTAR_BACKGROUND_PRESETS.includes(altar.background_preset as (typeof ALTAR_BACKGROUND_PRESETS)[number])
     ? altar.background_preset as (typeof ALTAR_BACKGROUND_PRESETS)[number]
     : DEFAULT_ALTAR_BACKGROUND;

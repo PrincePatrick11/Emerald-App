@@ -6,7 +6,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] — 0.1.3
 
 ### Added
-- Altar backgrounds: **17 photographic image presets** (forest, mountains, caves, magic portals, temples, and halls) selectable from a 4-column thumbnail grid below the colour presets in the sidebar; each preset has a localised name in all four languages (EN/DE/ES/FR)
+- Altar sidebar: **Background Overlay** collapsible section (edit mode only) — a jade-styled slider (0–100%) lets you control the darkness of a gradient overlay on top of the altar background image; the value is persisted per altar in the database (0.0–1.0, default 0.2)
+- Altar backgrounds: **16 photographic image presets** (forest, mountains, caves, magic portals, temples, and halls) selectable from a 4-column thumbnail grid below the colour presets in the sidebar; each preset has a localised name in all four languages (EN/DE/ES/FR)
 - Altar library: **Escape** key exits full-window mode — pressing Escape while an altar is in full-window view returns to normal view mode without requiring mouse interaction
 - Altar library: **Uncategorized** pseudo-tab — when one or more library items have a category string that no longer matches any existing category (e.g. after that category was deleted), an "Uncategorized" filter tab appears automatically in the library strip; it disappears again once all affected items are reassigned or removed
 - Altar library: dynamic item categories — create, rename, and delete categories from the library strip; 8 built-in categories (Candle, Crystal, Herb, Deity, Symbol, Tool, Table, Other) are pre-seeded in the database on first run
@@ -54,6 +55,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Altar resize and rotate control handles were rendered at a fixed pixel size regardless of how much the canvas was scaled by CSS transform, making them appear oversized on small viewports. Handle sizes, icon sizes, offsets, and the rotation tooltip are now derived from `cssScale` so they remain visually consistent at any zoom level.
 
 ### Changed
+- Altar sidebar sliders (Grid Size, Grid Opacity, Rotation Snap Angle, Background Overlay) now use the same custom track/fill/thumb design as the opacity slider in the placed-elements inspector — a relative container with an absolute track, fill bar, and thumb, and a transparent `<input type="range">` overlaid for interaction
+- Altar inspector panel (placed-element fields, labels, unit symbols) now uses stone colour tokens throughout; jade highlight is reserved for the selected row border and background only; opacity slider track uses `stone-800/80` for the empty portion; unit symbols (`%`, `°`) and opacity value use `stone-500`/`stone-300`; inspector label font size increased from `text-[9px]` to `text-[10px]`
+- Altar backgrounds: `mushroom_forest_ritual` image preset removed; preset count reduced from 17 to 16
 - Altar canvas: empty-canvas "Drag items…" hint text removed; two decorative floor lines removed from the canvas scene
 - Altar library: deleting a category no longer reassigns its items — items keep their original `category` string and become visible under the new Uncategorized tab instead of being silently moved to another category
 - `AltarItemCategory` type widened from a fixed literal union to `string`; the valid values are now driven by the `altar_categories` table rather than a hardcoded constant

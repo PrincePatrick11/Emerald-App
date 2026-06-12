@@ -686,4 +686,11 @@ const MIGRATIONS: Migration[] = [
       );
     },
   },
+  {
+    version: 25,
+    name: 'altar_background_overlay',
+    up: async (db) => {
+      await db.execute('ALTER TABLE altars ADD COLUMN background_overlay REAL NOT NULL DEFAULT 0.2');
+    },
+  },
 ];

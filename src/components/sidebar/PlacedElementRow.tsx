@@ -196,12 +196,12 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
     },
   });
 
-  const inputClass = 'w-full rounded border border-jade-800/50 bg-jade-950/50 px-1.5 py-1 text-[11px] text-jade-100 outline-none focus:border-jade-600/60 placeholder:text-jade-700';
+  const inputClass = 'w-full rounded border border-stone-700/50 bg-stone-800/50 px-1.5 py-1 text-[11px] text-stone-200 outline-none focus:border-stone-500/60 placeholder:text-stone-600';
 
   const opacityPercent = Math.max(5, Math.min(100, Number(draft.opacity) || 100));
 
   return (
-    <div className="rounded border border-jade-700/50 bg-jade-950/40 px-2 py-1.5 space-y-1.5">
+    <div className="rounded border border-stone-700/50 bg-stone-900/40 px-2 py-1.5 space-y-1.5">
       <div className="grid grid-cols-4 gap-1">
         {([
           { field: 'x'            as const, label: t('altar.inspectorX'),        apply: () => applyNumber('x', draft.x),             unit: '%' },
@@ -210,21 +210,21 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
           { field: 'scalePercent' as const, label: t('altar.inspectorScale'),    apply: () => applyScalePercent(draft.scalePercent),  unit: '%' },
         ]).map(({ field, label, apply, unit }) => (
           <label key={field} className="space-y-0.5">
-            <span className="text-[9px] uppercase tracking-wider text-jade-300">{label}</span>
+            <span className="text-[10px] uppercase tracking-wider text-stone-500">{label}</span>
             <div className="relative">
               <input {...bindInput(field, apply)} className={inputClass + (unit ? ' pr-4' : '')} aria-label={field} />
-              {unit && <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-jade-300 pointer-events-none">{unit}</span>}
+              {unit && <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-stone-500 pointer-events-none">{unit}</span>}
             </div>
           </label>
         ))}
       </div>
       <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <span className="text-[9px] uppercase tracking-wider text-jade-300">{t('altar.inspectorOpacity')}</span>
-          <span className="text-[9px] tabular-nums text-jade-100">{opacityPercent}%</span>
+          <span className="text-[10px] uppercase tracking-wider text-stone-500">{t('altar.inspectorOpacity')}</span>
+          <span className="text-[10px] tabular-nums text-stone-300">{opacityPercent}%</span>
         </div>
         <div className="relative h-4 flex items-center">
-          <div className="absolute inset-x-0 h-1 rounded-full bg-jade-900/60" />
+          <div className="absolute inset-x-0 h-1 rounded-full bg-stone-800/80" />
           <div className="absolute left-0 h-1 rounded-full bg-jade-600/60" style={{ width: `${opacityPercent}%` }} />
           <div
             className="absolute h-2.5 w-2.5 rounded-full bg-jade-500 border border-jade-400/50 shadow pointer-events-none"

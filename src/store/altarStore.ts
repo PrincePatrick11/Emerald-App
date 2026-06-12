@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import { getDb } from '../lib/db';
-import { ALTAR_RATIOS, DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE, isRatioFormat, parseResolution } from '../lib/altarConstants';
+import { ALTAR_RATIOS, DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE, isRatioFormat, parseResolution } from '../lib/altarConstants';
 import { boolToInt, generateId, isValidHexColor, nowIso } from '../lib/helpers';
 import type { AltarCategory, AltarItem, AltarItemCategory, AltarPlacement, AltarRecord } from '../types';
 
@@ -28,8 +28,8 @@ function filterEachPreview(
 async function insertAltarRow(altar: AltarRecord): Promise<void> {
   const db = await getDb();
   await db.execute(
-    'INSERT INTO altars (id, title, intention, background_preset, background_image_data, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid, resolution) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',
-    [altar.id, altar.title, altar.intention, altar.background_preset, altar.background_image_data, altar.created_at, altar.updated_at, boolToInt(altar.grid_enabled), altar.grid_size, altar.grid_opacity, altar.grid_color, boolToInt(altar.snap_to_grid), boolToInt(altar.rotation_snap_enabled), altar.rotation_snap_angle, boolToInt(altar.snap_scale_to_grid), altar.resolution],
+    'INSERT INTO altars (id, title, intention, background_preset, background_image_data, background_overlay, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid, resolution) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)',
+    [altar.id, altar.title, altar.intention, altar.background_preset, altar.background_image_data, altar.background_overlay, altar.created_at, altar.updated_at, boolToInt(altar.grid_enabled), altar.grid_size, altar.grid_opacity, altar.grid_color, boolToInt(altar.snap_to_grid), boolToInt(altar.rotation_snap_enabled), altar.rotation_snap_angle, boolToInt(altar.snap_scale_to_grid), altar.resolution],
   );
 }
 
@@ -80,6 +80,7 @@ function normalizeAltar(altar: AltarRecord): AltarRecord {
     ...altar,
     background_preset: altar.background_preset || DEFAULT_ALTAR_BACKGROUND,
     background_image_data: altar.background_image_data ?? null,
+    background_overlay: altar.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY,
     grid_enabled: Boolean(altar.grid_enabled),
     grid_size: altar.grid_size ?? DEFAULT_GRID_SIZE,
     grid_opacity: altar.grid_opacity ?? DEFAULT_GRID_OPACITY,
@@ -123,7 +124,7 @@ interface AltarState {
   clearActiveAltar: () => void;
   createAltar: () => Promise<AltarRecord>;
   duplicateAltar: (id: string) => Promise<AltarRecord | null>;
-  updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'intention' | 'background_preset' | 'background_image_data'>>) => Promise<void>;
+  updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'intention' | 'background_preset' | 'background_image_data' | 'background_overlay'>>) => Promise<void>;
   updateAltarGrid: (id: string, patch: Partial<Pick<AltarRecord, 'grid_enabled' | 'grid_size' | 'grid_opacity' | 'grid_color' | 'snap_to_grid' | 'rotation_snap_enabled' | 'rotation_snap_angle' | 'snap_scale_to_grid'>>) => Promise<void>;
   updateAltarResolution: (id: string, resolution: string) => Promise<void>;
   bumpAltarUpdatedAt: (id: string) => Promise<void>;
@@ -256,6 +257,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       intention: '',
       background_preset: DEFAULT_ALTAR_BACKGROUND,
       background_image_data: null,
+      background_overlay: DEFAULT_BACKGROUND_OVERLAY,
       created_at: now,
       updated_at: now,
       grid_enabled: false,
@@ -285,6 +287,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       intention: source.intention,
       background_preset: source.background_preset || DEFAULT_ALTAR_BACKGROUND,
       background_image_data: source.background_image_data ?? null,
+      background_overlay: source.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY,
       created_at: now,
       updated_at: now,
       grid_enabled: source.grid_enabled,
@@ -344,8 +347,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     if (!altar) return;
     const updated: AltarRecord = { ...altar, ...patch, updated_at: nowIso() };
     await db.execute(
-      'UPDATE altars SET title=$1, intention=$2, background_preset=$3, background_image_data=$4, updated_at=$5 WHERE id=$6',
-      [updated.title, updated.intention, updated.background_preset || DEFAULT_ALTAR_BACKGROUND, updated.background_image_data ?? null, updated.updated_at, id]
+      'UPDATE altars SET title=$1, intention=$2, background_preset=$3, background_image_data=$4, background_overlay=$5, updated_at=$6 WHERE id=$7',
+      [updated.title, updated.intention, updated.background_preset || DEFAULT_ALTAR_BACKGROUND, updated.background_image_data ?? null, updated.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY, updated.updated_at, id]
     );
     set((s) => ({
       altars: s.altars.map((entry) => (entry.id === id ? updated : entry)).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
