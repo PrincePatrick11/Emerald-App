@@ -68,6 +68,12 @@ Several validation rules protect against malformed, oversized, or untrusted data
 
 **`hexToRgb` validation.** `hexToRgb` in `src/lib/helpers.ts` calls `isValidHexColor` before parsing. Strings that are not a valid 6-digit hex colour return `{r:0, g:0, b:0}` rather than producing `NaN` values that could propagate into CSS `rgba(...)` rules.
 
+**Thumbnail `src` binding.** Dashboard altar cards (`AltarCard`, `AltarListRow`) only bind `thumbnail_data` to an `<img src>` attribute when the value starts with `data:image/`. Any other stored value (file path, `tauri://` URI, empty string) skips the `<img>` element entirely and falls back to the live `AltarCardPreview`. This prevents unexpected scheme injection through the `src` attribute.
+
+**`getGradientColor` validation.** `getGradientColor` in `altarConstants.ts` now validates the extracted hex colour against `/^#[0-9a-fA-F]{6}$/` and returns `null` for values that do not match. Call sites (`getAltarBackgroundStyle`, `renderAltarThumbnail`) treat a `null` return as an invalid preset and fall back to the default background. This prevents malformed `gradient:` preset strings from reaching canvas colour parsing or CSS interpolation.
+
+**Thumbnail size cap.** `AltarView.handleDone` skips the `updateAltar` call for the thumbnail patch when `thumbnailData.length > 524288` (512 KB). This bounds the size of data stored in `altars.thumbnail_data` and prevents oversized blobs from accumulating in the SQLite file.
+
 ## HTML Escaping in Exports
 
 All user-provided text that is interpolated into the PDF export HTML template is passed through `htmlEscape()` in `src/lib/export.ts`. This function replaces `&`, `<`, `>`, `"`, and `'` with their corresponding HTML entities. It is applied to:

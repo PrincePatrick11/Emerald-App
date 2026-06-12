@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import type { AltarPlacement, AltarRecord } from '../../types';
-import { getAltarBackgroundStyle, parseResolution } from '../../lib/altarConstants';
+import { getAltarBackgroundStyle, resolveResolutionPixels } from '../../lib/altarConstants';
 import { AltarItemVisual } from './AltarItemVisual';
 import { useBackgroundPreview } from './useAltarBackgroundPreview';
 
@@ -15,7 +15,7 @@ export const AltarCardPreview = memo(function AltarCardPreview({
 }) {
   const previewSrc = useBackgroundPreview(altar.background_image_data);
   const background = getAltarBackgroundStyle(altar, previewSrc);
-  const { w, h } = parseResolution(altar.resolution ?? '1920x1080');
+  const { w, h } = resolveResolutionPixels(altar.resolution ?? '1920x1080');
 
   return (
     <div

@@ -43,6 +43,7 @@ export default function AltarView() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [title, setTitle] = useState('');
+  const captureRef = useRef<(() => Promise<string | null>) | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   // ref keeps ResizeObserver callback current without re-observing on fullscreen toggle
   const altarWindowFullscreenRef = useRef(altarWindowFullscreen);
@@ -147,10 +148,30 @@ export default function AltarView() {
     setActiveView({ type: 'altar', id: activeAltar.id, mode: 'edit' });
   };
 
-  const handleDone = async () => {
+  const handleDone = () => {
     if (!activeAltar) return;
-    await updateAltar(activeAltar.id, { title: title.trim() || t('altar.untitled') });
-    setActiveView({ type: 'altar', id: activeAltar.id, mode: 'view' });
+    const altarId = activeAltar.id;
+    const savedTitle = title.trim() || t('altar.untitled');
+
+    // Kick off the capture NOW, while the canvas DOM is still mounted, but do
+    // not await it — the Promise floats in the background.
+    const capturePromise: Promise<string | null> = captureRef.current
+      ? captureRef.current()
+      : Promise.resolve(null);
+
+    // Save the title and navigate immediately so the user sees no freeze.
+    updateAltar(altarId, { title: savedTitle }).catch(console.error);
+    setActiveView({ type: 'altar', id: altarId, mode: 'view' });
+
+    // When the thumbnail resolves (after the view has already switched), patch
+    // just the thumbnail field. Cap at 512 KB to keep the DB file size bounded.
+    capturePromise
+      .then((thumbnailData) => {
+        if (thumbnailData !== null && thumbnailData.length <= 524288) {
+          updateAltar(altarId, { thumbnail_data: thumbnailData }).catch(console.error);
+        }
+      })
+      .catch(console.error);
   };
 
   const handleCancel = () => {
@@ -357,6 +378,7 @@ export default function AltarView() {
           transform: `translate(${canvasTransform.offsetX}px, ${canvasTransform.offsetY}px) scale(${canvasTransform.scale})`,
         }}>
           <AltarCanvas
+            captureRef={captureRef}
             altar={activeAltar}
             backgroundSrc={backgroundSrc}
             editable={isEditing}

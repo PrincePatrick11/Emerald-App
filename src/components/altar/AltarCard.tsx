@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { Copy, Pencil, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 import type { AltarPlacement, AltarRecord } from '../../types';
+import { resolveResolutionPixels } from '../../lib/altarConstants';
 import { AltarCardPreview } from './AltarCardPreview';
 import { AltarRenameField } from './AltarRenameField';
 
@@ -50,7 +51,10 @@ export const AltarCard = memo(function AltarCard({
   return (
     <button onClick={onOpen} onContextMenu={onContextMenu} className={`${baseClass} px-4 py-4`}>
       <div className="mb-3">
-        <AltarCardPreview altar={altar} previewItems={previewItems} />
+        {altar.thumbnail_data?.startsWith('data:image/')
+          ? <img src={altar.thumbnail_data} alt="" draggable={false}
+              className="max-h-44 w-auto max-w-full mx-auto block rounded-lg border border-stone-700/40" />
+          : <div className="max-h-44 overflow-hidden rounded-lg"><AltarCardPreview altar={altar} previewItems={previewItems} /></div>}
       </div>
       <div className="text-sm font-medium text-stone-200 truncate">{altar.title}</div>
       <div className="mt-2 flex flex-wrap gap-2 text-xs">
@@ -88,10 +92,15 @@ export const AltarListRow = memo(function AltarListRow({
       </div>
     );
   }
+  const { w: resW, h: resH } = resolveResolutionPixels(altar.resolution ?? '1920x1080');
   return (
     <button onClick={onOpen} onContextMenu={onContextMenu} className={`${baseClass} w-full flex items-center gap-3 px-4 py-3`}>
       <span className="flex-shrink-0">
-        <AltarCardPreview altar={altar} previewItems={previewItems} compact />
+        {altar.thumbnail_data?.startsWith('data:image/')
+        ? <img src={altar.thumbnail_data} alt="" draggable={false}
+            className="h-8 rounded object-cover border border-stone-700/40"
+            style={{ aspectRatio: `${resW}/${resH}` }} />
+        : <AltarCardPreview altar={altar} previewItems={previewItems} compact />}
       </span>
       <span className="flex-1 text-sm text-stone-300 truncate">{altar.title}</span>
       <span className="text-xs text-stone-600">{format(new Date(altar.updated_at), 'MMM d, yyyy')}</span>

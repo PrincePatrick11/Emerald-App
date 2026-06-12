@@ -72,6 +72,8 @@ The altar is a virtual arrangement of symbolic objects on a canvas.
 
 **Dashboard.** Opening the Altar section shows a dashboard listing all your altars with search, sort, and view-mode options. Click any altar to open it; use the breadcrumb back button or the Altar entry in the left sidebar to return to the dashboard.
 
+Dashboard cards and list rows show a **thumbnail preview** of each altar. The thumbnail is captured automatically on each save using a native Canvas 2D renderer and stored in the database. Altars that have not yet been saved after this feature was introduced show a live `AltarCardPreview` fallback instead. Changing the canvas aspect ratio clears the stored thumbnail so the card always shows the correct proportions. Card thumbnails are capped at a maximum height of 176 px and scale proportionally without cropping.
+
 **Altar library.** You manage a personal library of items. Each item has a name, an emoji, a category, an optional note, and an optional uploaded image.
 
 **Item categories** are fully dynamic. The library ships with eight default categories — Candle, Crystal, Herb, Deity, Symbol, Tool, Table, Other — but you can create, rename, and delete categories at any time:

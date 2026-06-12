@@ -1,15 +1,178 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
 import { MoveDiagonal2, RotateCw } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import { getAltarDragItem, setAltarDragItem, subscribeAltarDrag } from '../../lib/altarDragState';
-import { BASE_RESOLUTION_WIDTH } from '../../lib/altarConstants';
+import {
+  ALTAR_IMAGE_PRESETS,
+  BASE_RESOLUTION_WIDTH,
+  DEFAULT_ALTAR_RESOLUTION,
+  DEFAULT_BACKGROUND_OVERLAY,
+  getGradientColor,
+  isGradientPreset,
+  resolveResolutionPixels,
+} from '../../lib/altarConstants';
+import type { AltarImagePresetName } from '../../lib/altarConstants';
 import { hexToRgb } from '../../lib/helpers';
 import type { AltarItem, AltarPlacement, AltarRecord } from '../../types';
 import { AltarItemVisual } from './AltarItemVisual';
+import { getCachedBackgroundPreview } from './useAltarBackgroundPreview';
 
 const BASE_SIZE = 40;
+
+// ---------------------------------------------------------------------------
+// Altar thumbnail renderer — draws directly to a Canvas 2D context from
+// store data instead of relying on DOM capture (no external library needed).
+// ---------------------------------------------------------------------------
+
+const THUMBNAIL_W = 1000;
+
+const PRESET_GRAD: Record<string, { cx: number; cy: number; stops: [string, number][] }> = {
+  midnight: { cx: 0.5, cy: 0.30, stops: [['#1a1a2e', 0], ['#0d0d15', 0.6], ['#0a0a0f', 1]] },
+  ember:    { cx: 0.5, cy: 0.24, stops: [['#4a2917', 0], ['#25140f', 0.42], ['#120d10', 1]] },
+  forest:   { cx: 0.5, cy: 0.22, stops: [['#183126', 0], ['#0d1a16', 0.48], ['#09110f', 1]] },
+  moon:     { cx: 0.5, cy: 0.18, stops: [['#2b253d', 0], ['#171222', 0.44], ['#0b0a12', 1]] },
+};
+
+function _radialGrad(
+  ctx: CanvasRenderingContext2D,
+  w: number, h: number,
+  cx: number, cy: number,
+  stops: [string, number][],
+) {
+  const r = Math.sqrt(w * w + h * h);
+  const g = ctx.createRadialGradient(cx * w, cy * h, 0, cx * w, cy * h, r);
+  for (const [color, pos] of stops) g.addColorStop(pos, color);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+}
+
+function _loadImg(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+async function _drawCover(ctx: CanvasRenderingContext2D, src: string, w: number, h: number) {
+  const img = await _loadImg(src);
+  const ia = img.naturalWidth / img.naturalHeight;
+  const ca = w / h;
+  let sx, sy, sw, sh;
+  if (ia > ca) { sh = img.naturalHeight; sw = sh * ca; sx = (img.naturalWidth - sw) / 2; sy = 0; }
+  else          { sw = img.naturalWidth;  sh = sw / ca; sx = 0; sy = (img.naturalHeight - sh) / 2; }
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+}
+
+async function renderAltarThumbnail(
+  altar: AltarRecord,
+  backgroundSrc: string | null,
+  placements: AltarPlacement[],
+  nativeW: number,
+  nativeH: number,
+): Promise<string | null> {
+  const outH = Math.round(THUMBNAIL_W * nativeH / nativeW);
+  const canvas = document.createElement('canvas');
+  canvas.width = THUMBNAIL_W;
+  canvas.height = outH;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  // 1. Background
+  const preset = altar.background_preset;
+  try {
+    if (backgroundSrc?.startsWith('data:image/')) {
+      await _drawCover(ctx, backgroundSrc, THUMBNAIL_W, outH);
+    } else if (ALTAR_IMAGE_PRESETS.includes(preset as AltarImagePresetName)) {
+      await _drawCover(ctx, `/backgrounds/${preset}.webp`, THUMBNAIL_W, outH);
+    } else if (isGradientPreset(preset)) {
+      const hex = getGradientColor(preset);
+      if (!hex) throw new Error('invalid gradient color');
+      const { r, g, b } = hexToRgb(hex);
+      _radialGrad(ctx, THUMBNAIL_W, outH, 0.5, 0.25, [
+        [hex, 0],
+        [`rgb(${Math.round(r * 0.5)},${Math.round(g * 0.5)},${Math.round(b * 0.5)})`, 0.5],
+        ['#0a0a0f', 1],
+      ]);
+    } else {
+      const cfg = PRESET_GRAD[preset] ?? PRESET_GRAD.midnight;
+      _radialGrad(ctx, THUMBNAIL_W, outH, cfg.cx, cfg.cy, cfg.stops);
+    }
+  } catch {
+    const cfg = PRESET_GRAD.midnight;
+    _radialGrad(ctx, THUMBNAIL_W, outH, cfg.cx, cfg.cy, cfg.stops);
+  }
+
+  // 2. Overlay
+  const overlay = altar.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY;
+  if (overlay > 0) {
+    const topA = Math.round(overlay * 60) / 100;
+    const og = ctx.createLinearGradient(0, 0, 0, outH);
+    og.addColorStop(0, `rgba(10,10,15,${topA})`);
+    og.addColorStop(1, `rgba(10,10,15,${overlay})`);
+    ctx.fillStyle = og;
+    ctx.fillRect(0, 0, THUMBNAIL_W, outH);
+  }
+
+  // 3. Placements — same size formula as PlacedItem in AltarCanvas
+  const canvasScale = nativeW / BASE_RESOLUTION_WIDTH;
+  const scaledBase = BASE_SIZE * canvasScale;
+  const scaleX = THUMBNAIL_W / nativeW;
+  const scaleY = outH / nativeH;
+
+  for (const p of [...placements].sort((a, b) => a.z_index - b.z_index)) {
+    if (p.hidden) continue;
+    const drawW = Math.round(scaledBase * (p.width  / 8) * scaleX);
+    const drawH = Math.round(scaledBase * (p.height / 8) * scaleY);
+    const cx = (p.x / 100) * THUMBNAIL_W;
+    const cy = (p.y / 100) * outH;
+    const rot = ((p.rotation ?? 0) * Math.PI) / 180;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    if (rot !== 0) ctx.rotate(rot);
+    ctx.globalAlpha = p.opacity ?? 1;
+
+    if (p.image_data?.startsWith('data:image/')) {
+      try {
+        const img = await _loadImg(p.image_data);
+        // object-contain: fit within the box preserving aspect ratio
+        const ia = img.naturalWidth / img.naturalHeight;
+        const da = drawW / drawH;
+        const [rw, rh] = ia > da ? [drawW, drawW / ia] : [drawH * ia, drawH];
+        ctx.drawImage(img, -rw / 2, -rh / 2, rw, rh);
+      } catch {
+        _drawEmoji(ctx, p.emoji, drawW);
+      }
+    } else {
+      _drawEmoji(ctx, p.emoji, drawW);
+    }
+
+    ctx.restore();
+  }
+
+  // 4. Encode — toBlob is async in Chromium, avoids blocking the main thread
+  return new Promise<string | null>((resolve) => {
+    canvas.toBlob((blob) => {
+      if (!blob) { resolve(null); return; }
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    }, 'image/webp', 0.9);
+  });
+}
+
+function _drawEmoji(ctx: CanvasRenderingContext2D, emoji: string, size: number) {
+  // fontSize matches AltarItemVisual: Math.round(size * 0.8)
+  ctx.font = `${Math.round(size * 0.8)}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(emoji, 0, 0);
+}
 
 export function AltarCanvas({
   altar,
@@ -28,6 +191,7 @@ export function AltarCanvas({
   nativeH,
   cssScale,
   getBackgroundStyle,
+  captureRef,
 }: {
   altar: AltarRecord | null;
   backgroundSrc: string | null;
@@ -45,6 +209,7 @@ export function AltarCanvas({
   nativeH: number;
   cssScale: number;
   getBackgroundStyle: (altar: AltarRecord | null, imageSrc: string | null | undefined) => string;
+  captureRef?: React.MutableRefObject<(() => Promise<string | null>) | null>;
 }) {
   const { t } = useTranslation();
   const placements = useAltarStore((s) => s.placements);
@@ -111,6 +276,24 @@ export function AltarCanvas({
   }, [snapToGrid, gridSize, nativeW, nativeH]);
 
   useEffect(() => subscribeAltarDrag(setSidebarDragItem), []);
+
+  useEffect(() => {
+    if (!captureRef) return;
+    captureRef.current = async (): Promise<string | null> => {
+      try {
+        const { placements, activeAltarId, altars } = useAltarStore.getState();
+        const altar = altars.find((a) => a.id === activeAltarId) ?? null;
+        if (!altar) return null;
+        const { w: nativeW, h: nativeH } = resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
+        const backgroundSrc = getCachedBackgroundPreview(altar.background_image_data);
+        return renderAltarThumbnail(altar, backgroundSrc, placements, nativeW, nativeH);
+      } catch (err) {
+        console.error('[AltarCanvas] thumbnail capture failed:', err);
+        return null;
+      }
+    };
+    return () => { captureRef.current = null; };
+  }, [captureRef]);
 
   useEffect(() => {
     if (!editable || !sidebarDragItem) {
@@ -182,7 +365,7 @@ export function AltarCanvas({
         <div className="absolute inset-2 border border-dashed border-stone-600/40 rounded-lg pointer-events-none z-10" />
       )}
 
-{sortedPlacements.map((p) => (
+      {sortedPlacements.map((p) => (
         <PlacedItem
           key={p.id}
           placement={p}
@@ -199,14 +382,15 @@ export function AltarCanvas({
         />
       ))}
 
-      {editable && sidebarDragItem && ghostPos && (
+      {editable && sidebarDragItem && ghostPos && createPortal(
         <div
           className="fixed pointer-events-none z-50 flex flex-col items-center gap-0.5 opacity-75"
           style={{ left: ghostPos.x, top: ghostPos.y, transform: 'translate(-50%, -50%)' }}
         >
           <AltarItemVisual item={sidebarDragItem} size={32} />
           <span className="text-xs text-stone-400 whitespace-nowrap">{sidebarDragItem.name}</span>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

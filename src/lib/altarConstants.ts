@@ -44,6 +44,15 @@ export function isRatioFormat(res: string): boolean {
   return /^\d+:\d+$/.test(res);
 }
 
+// Resolves any resolution string (WxH or ratio like '4:3') to pixel dimensions.
+// Ratio formats are mapped to their lg canonical size (e.g. '4:3' → 1600×1200).
+export function resolveResolutionPixels(res: string): { w: number; h: number } {
+  if (isRatioFormat(res) && ALTAR_RATIOS.includes(res as AltarRatio)) {
+    return parseResolution(ALTAR_RESOLUTION_MAP.lg[res as AltarRatio]);
+  }
+  return parseResolution(res);
+}
+
 // Returns the AltarRatio for any stored resolution format (ratio string or WxH).
 export function ratioFromResolution(res: string): AltarRatio | null {
   if (isRatioFormat(res)) {
@@ -76,9 +85,10 @@ export function isGradientPreset(preset: string): boolean {
   return preset.startsWith('gradient:');
 }
 
-/** Extracts the hex color from a `gradient:#rrggbb` preset string. */
-export function getGradientColor(preset: string): string {
-  return preset.slice('gradient:'.length);
+/** Extracts and validates the hex color from a `gradient:#rrggbb` preset string. Returns null if the color is not a valid 6-digit hex. */
+export function getGradientColor(preset: string): string | null {
+  const color = preset.slice('gradient:'.length);
+  return /^#[0-9a-fA-F]{6}$/.test(color) ? color : null;
 }
 
 /** Generates a radial-gradient CSS value from a hex color. */
@@ -152,7 +162,9 @@ export function getAltarBackgroundStyle(
     return `${overlayLayer}url("/backgrounds/${altar.background_preset}.webp") center / cover no-repeat`;
   }
   if (isGradientPreset(altar.background_preset)) {
-    return generateGradientStyle(getGradientColor(altar.background_preset));
+    const hex = getGradientColor(altar.background_preset);
+    if (!hex) return ALTAR_BACKGROUND_STYLES[DEFAULT_ALTAR_BACKGROUND];
+    return generateGradientStyle(hex);
   }
   // Legacy preset names — keep using the original hardcoded styles
   const preset = ALTAR_BACKGROUND_PRESETS.includes(altar.background_preset as (typeof ALTAR_BACKGROUND_PRESETS)[number])

@@ -90,6 +90,7 @@ function normalizeAltar(altar: AltarRecord): AltarRecord {
     rotation_snap_angle: altar.rotation_snap_angle ?? 15,
     snap_scale_to_grid: Boolean(altar.snap_scale_to_grid),
     resolution: (/^\d+x\d+$/.test(altar.resolution ?? '') || isRatioFormat(altar.resolution ?? '')) ? altar.resolution : DEFAULT_ALTAR_RESOLUTION,
+    thumbnail_data: altar.thumbnail_data ?? null,
   };
 }
 
@@ -124,7 +125,7 @@ interface AltarState {
   clearActiveAltar: () => void;
   createAltar: () => Promise<AltarRecord>;
   duplicateAltar: (id: string) => Promise<AltarRecord | null>;
-  updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'intention' | 'background_preset' | 'background_image_data' | 'background_overlay'>>) => Promise<void>;
+  updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'intention' | 'background_preset' | 'background_image_data' | 'background_overlay' | 'thumbnail_data'>>) => Promise<void>;
   updateAltarGrid: (id: string, patch: Partial<Pick<AltarRecord, 'grid_enabled' | 'grid_size' | 'grid_opacity' | 'grid_color' | 'snap_to_grid' | 'rotation_snap_enabled' | 'rotation_snap_angle' | 'snap_scale_to_grid'>>) => Promise<void>;
   updateAltarResolution: (id: string, resolution: string) => Promise<void>;
   bumpAltarUpdatedAt: (id: string) => Promise<void>;
@@ -347,8 +348,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     if (!altar) return;
     const updated: AltarRecord = { ...altar, ...patch, updated_at: nowIso() };
     await db.execute(
-      'UPDATE altars SET title=$1, intention=$2, background_preset=$3, background_image_data=$4, background_overlay=$5, updated_at=$6 WHERE id=$7',
-      [updated.title, updated.intention, updated.background_preset || DEFAULT_ALTAR_BACKGROUND, updated.background_image_data ?? null, updated.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY, updated.updated_at, id]
+      'UPDATE altars SET title=$1, intention=$2, background_preset=$3, background_image_data=$4, background_overlay=$5, updated_at=$6, thumbnail_data=$7 WHERE id=$8',
+      [updated.title, updated.intention, updated.background_preset || DEFAULT_ALTAR_BACKGROUND, updated.background_image_data ?? null, updated.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY, updated.updated_at, updated.thumbnail_data ?? null, id]
     );
     set((s) => ({
       altars: s.altars.map((entry) => (entry.id === id ? updated : entry)).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
@@ -393,10 +394,10 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       safeRes = `${w}x${h}`;
     }
     const updated_at = nowIso();
-    await db.execute('UPDATE altars SET resolution=$1, updated_at=$2 WHERE id=$3', [safeRes, updated_at, id]);
+    await db.execute('UPDATE altars SET resolution=$1, updated_at=$2, thumbnail_data=NULL WHERE id=$3', [safeRes, updated_at, id]);
     set((s) => ({
       altars: s.altars
-        .map((entry) => (entry.id === id ? { ...entry, resolution: safeRes, updated_at } : entry))
+        .map((entry) => (entry.id === id ? { ...entry, resolution: safeRes, updated_at, thumbnail_data: null } : entry))
         .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
     }));
   },

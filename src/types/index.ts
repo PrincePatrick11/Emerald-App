@@ -163,6 +163,7 @@ export interface AltarRecord {
   rotation_snap_angle: number;
   snap_scale_to_grid: boolean;
   resolution: string;
+  thumbnail_data?: string | null;
 }
 
 export interface AltarItem {
