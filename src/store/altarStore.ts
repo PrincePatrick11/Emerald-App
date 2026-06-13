@@ -354,10 +354,15 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       'UPDATE altars SET title=$1, intention=$2, background_preset=$3, background_image_data=$4, background_overlay=$5, background_overlay_color=$6, updated_at=$7, thumbnail_data=$8 WHERE id=$9',
       [updated.title, updated.intention, updated.background_preset || DEFAULT_ALTAR_BACKGROUND, updated.background_image_data ?? null, updated.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY, updated.background_overlay_color ?? DEFAULT_OVERLAY_COLOR, updated.updated_at, updated.thumbnail_data ?? null, id]
     );
-    set((s) => ({
-      altars: s.altars.map((entry) => (entry.id === id ? updated : entry)).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
-      intention: s.activeAltarId === id ? updated.intention : s.intention,
-    }));
+    set((s) => {
+      const cur = s.altars.find(e => e.id === id);
+      if (!cur) return s;
+      const next = { ...cur, ...patch, updated_at: updated.updated_at };
+      return {
+        altars: s.altars.map(e => e.id === id ? next : e).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
+        intention: s.activeAltarId === id ? next.intention : s.intention,
+      };
+    });
   },
 
   updateAltarGrid: async (id, patch) => {

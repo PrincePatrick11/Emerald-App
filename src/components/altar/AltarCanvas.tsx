@@ -27,7 +27,7 @@ const BASE_SIZE = 40;
 // store data instead of relying on DOM capture (no external library needed).
 // ---------------------------------------------------------------------------
 
-const THUMBNAIL_W = 1000;
+const THUMBNAIL_W = 640;
 
 const PRESET_GRAD: Record<string, { cx: number; cy: number; stops: [string, number][] }> = {
   midnight: { cx: 0.5, cy: 0.30, stops: [['#1a1a2e', 0], ['#0d0d15', 0.6], ['#0a0a0f', 1]] },
@@ -157,15 +157,41 @@ async function renderAltarThumbnail(
     ctx.restore();
   }
 
-  // 4. Encode — toBlob is async in Chromium, avoids blocking the main thread
-  return new Promise<string | null>((resolve) => {
-    canvas.toBlob((blob) => {
-      if (!blob) { resolve(null); return; }
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.readAsDataURL(blob);
-    }, 'image/webp', 0.9);
-  });
+  // 4. Encode — prefer WebP; fall back to JPEG if the runtime doesn't support
+  //    WebP encoding (WKWebView may silently yield PNG, which has no quality
+  //    knob and can be very large for photo backgrounds).
+  const toDataUrl = (format: string, quality: number): Promise<string | null> =>
+    new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (!blob) { resolve(null); return; }
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      }, format, quality);
+    });
+
+  // Probe WebP support with one call — if the result isn't actually WebP, the
+  // runtime fell back to PNG (lossless, unaffected by quality) and we skip
+  // straight to JPEG which has reliable quality control.
+  const probe = await toDataUrl('image/webp', 0.85);
+  if (probe !== null) {
+    if (probe.startsWith('data:image/webp')) {
+      if (probe.length <= 524288) return probe;
+      for (const q of [0.65, 0.45]) {
+        const r = await toDataUrl('image/webp', q);
+        if (r !== null && r.length <= 524288) return r;
+      }
+    } else if (probe.length <= 524288) {
+      return probe; // PNG fallback was small enough (e.g. gradient with no items)
+    }
+  }
+
+  // JPEG: lossy, quality-controllable, universally supported.
+  for (const q of [0.85, 0.65, 0.45]) {
+    const r = await toDataUrl('image/jpeg', q);
+    if (r !== null && r.length <= 524288) return r;
+  }
+  return null;
 }
 
 function _drawEmoji(ctx: CanvasRenderingContext2D, emoji: string, size: number) {

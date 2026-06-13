@@ -148,30 +148,32 @@ export default function AltarView() {
     setActiveView({ type: 'altar', id: activeAltar.id, mode: 'edit' });
   };
 
-  const handleDone = () => {
+  const handleDone = async () => {
     if (!activeAltar) return;
     const altarId = activeAltar.id;
     const savedTitle = title.trim() || t('altar.untitled');
 
-    // Kick off the capture NOW, while the canvas DOM is still mounted, but do
-    // not await it — the Promise floats in the background.
+    // Start capture immediately (before any navigation or store writes) so it
+    // reads the correct altar state.  The Promise runs in the background while
+    // we navigate away and write the title — no UI freeze.
     const capturePromise: Promise<string | null> = captureRef.current
       ? captureRef.current()
       : Promise.resolve(null);
 
-    // Save the title and navigate immediately so the user sees no freeze.
-    updateAltar(altarId, { title: savedTitle }).catch(console.error);
     setActiveView({ type: 'altar', id: altarId, mode: 'view' });
 
-    // When the thumbnail resolves (after the view has already switched), patch
-    // just the thumbnail field. Cap at 512 KB to keep the DB file size bounded.
-    capturePromise
-      .then((thumbnailData) => {
-        if (thumbnailData !== null && thumbnailData.length <= 524288) {
-          updateAltar(altarId, { thumbnail_data: thumbnailData }).catch(console.error);
-        }
-      })
-      .catch(console.error);
+    try {
+      // Write title first so it's visible on the dashboard immediately.
+      await updateAltar(altarId, { title: savedTitle });
+      // Then write thumbnail once capture finishes — sequential to avoid the
+      // title write (which snapshots the whole row) overwriting the new thumbnail.
+      const thumbnailData = await capturePromise;
+      if (thumbnailData !== null && thumbnailData.length <= 524288) {
+        await updateAltar(altarId, { thumbnail_data: thumbnailData });
+      }
+    } catch (err) {
+      console.error('[handleDone]', err);
+    }
   };
 
   const handleCancel = () => {
