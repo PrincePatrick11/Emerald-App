@@ -136,10 +136,13 @@ export const ALTAR_BACKGROUND_STYLES: Record<(typeof ALTAR_BACKGROUND_PRESETS)[n
   moon: 'radial-gradient(circle at 50% 18%, #2b253d 0%, #171222 44%, #0b0a12 100%)',
 };
 
-function buildOverlayGradient(opacity: number): string {
+export const DEFAULT_OVERLAY_COLOR = 'dark';
+
+function buildOverlayGradient(opacity: number, color: string = DEFAULT_OVERLAY_COLOR): string {
   const top = Math.round(opacity * 60) / 100;
   const bottom = opacity;
-  return `linear-gradient(rgba(10,10,15,${top}),rgba(10,10,15,${bottom}))`;
+  const rgb = color === 'light' ? '255,255,255' : '10,10,15';
+  return `linear-gradient(rgba(${rgb},${top}),rgba(${rgb},${bottom}))`;
 }
 
 /**
@@ -149,12 +152,12 @@ function buildOverlayGradient(opacity: number): string {
  * the CSS string.
  */
 export function getAltarBackgroundStyle(
-  altar: Pick<AltarRecord, 'background_preset' | 'background_overlay'> | null,
+  altar: Pick<AltarRecord, 'background_preset' | 'background_overlay' | 'background_overlay_color'> | null,
   imageSrc: string | null | undefined,
 ): string {
   if (!altar) return ALTAR_BACKGROUND_STYLES[DEFAULT_ALTAR_BACKGROUND];
   const overlay = altar.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY;
-  const overlayLayer = overlay > 0 ? `${buildOverlayGradient(overlay)}, ` : '';
+  const overlayLayer = overlay > 0 ? `${buildOverlayGradient(overlay, altar.background_overlay_color)}, ` : '';
   if (imageSrc?.startsWith('data:image/')) {
     return `${overlayLayer}url("${imageSrc}") center / cover no-repeat`;
   }
@@ -164,13 +167,13 @@ export function getAltarBackgroundStyle(
   if (isGradientPreset(altar.background_preset)) {
     const hex = getGradientColor(altar.background_preset);
     if (!hex) return ALTAR_BACKGROUND_STYLES[DEFAULT_ALTAR_BACKGROUND];
-    return generateGradientStyle(hex);
+    return `${overlayLayer}${generateGradientStyle(hex)}`;
   }
   // Legacy preset names — keep using the original hardcoded styles
   const preset = ALTAR_BACKGROUND_PRESETS.includes(altar.background_preset as (typeof ALTAR_BACKGROUND_PRESETS)[number])
     ? altar.background_preset as (typeof ALTAR_BACKGROUND_PRESETS)[number]
     : DEFAULT_ALTAR_BACKGROUND;
-  return ALTAR_BACKGROUND_STYLES[preset];
+  return `${overlayLayer}${ALTAR_BACKGROUND_STYLES[preset]}`;
 }
 
 // Emoji suggestions per category name (for the item edit emoji picker).

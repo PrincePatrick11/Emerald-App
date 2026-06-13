@@ -109,7 +109,12 @@
     "backgroundUpdated": "Fondo actualizado",
     "backgroundUpdateFailed": "No se pudo actualizar el fondo",
     "imageTooLarge": "Imagen demasiado grande (max. {{max}})",
-    "backgroundOverlay": "Superposición de fondo",
+    "backgroundOverlay": "Opacidad",
+    "overlayOptions": "Opciones de overlay",
+    "overlay": {
+      "dark": "Oscuro",
+      "light": "Claro"
+    },
     "gridOverlay": "Superposicion de cuadricula",
     "gridOptions": "Opciones de cuadricula",
     "gridSize": "Tamano de cuadricula",

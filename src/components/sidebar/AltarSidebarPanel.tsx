@@ -55,11 +55,11 @@ export default function AltarSidebarPanel() {
 const noticeTimerRef = useRef<number | null>(null);
   const [backgroundNotice, setBackgroundNotice] = useState<string | null>(null);
   const [backgroundOpen, setBackgroundOpen] = useState(true);
+  const [overlayOpen, setOverlayOpen] = useState(true);
   const [gradientModalOpen, setGradientModalOpen] = useState(false);
   const [gradientOriginalColor, setGradientOriginalColor] = useState<string>(GRADIENT_PRESET_COLORS[0]);
   const [gradientOriginalPreset, setGradientOriginalPreset] = useState<string>('');
-  const [overlayOpen, setOverlayOpen] = useState(true);
-  const [gridOpen, setGridOpen] = useState(true);
+const [gridOpen, setGridOpen] = useState(true);
   const [canvasOptionsOpen, setCanvasOptionsOpen] = useState(true);
   const [placementsOpen, setPlacementsOpen] = useState(true);
   const [dragState, setDragState] = useState<{ fromId: string; overIndex: number } | null>(null);
@@ -307,13 +307,13 @@ const noticeTimerRef = useRef<number | null>(null);
                 return (
                   <>
                     {hasGradient ? (
-                      <div className="flex items-center gap-1.5">
+                      <div className="grid grid-cols-4 items-center gap-1.5">
                         <div
                           role="button"
                           tabIndex={0}
                           onClick={() => { if (isEditing) applyGradient(displayColor); }}
                           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (isEditing) applyGradient(displayColor); } }}
-                          className={`relative h-9 w-12 flex-shrink-0 overflow-hidden rounded-md border cursor-pointer transition-colors ${
+                          className={`relative h-9 overflow-hidden rounded-md border cursor-pointer transition-colors ${
                             isGradientActive ? 'border-jade-600/70 ring-1 ring-jade-700/40' : 'border-stone-700/50 hover:border-stone-500/60'
                           }`}
                           title={t('altar.backgrounds.gradient')}
@@ -325,18 +325,20 @@ const noticeTimerRef = useRef<number | null>(null);
                             </span>
                           )}
                         </div>
+                        <div className="col-span-3 flex gap-1.5">
                         <button
                           onClick={openModal}
-                          className="flex flex-1 items-center justify-center gap-1 rounded border border-stone-600/70 bg-stone-800/70 py-1.5 text-[10px] uppercase tracking-wide text-stone-300 hover:border-stone-400 transition-colors"
+                          className="flex flex-1 items-center justify-center gap-1 rounded border border-stone-600/70 bg-stone-800/70 py-1 text-[10px] uppercase tracking-wide text-stone-300 hover:border-stone-400 transition-colors"
                         >
                           <Pencil size={9} />{t('altar.change')}
                         </button>
                         <button
                           onClick={removeGradient}
-                          className="flex flex-1 items-center justify-center gap-1 rounded border border-red-700/60 bg-red-950/30 py-1.5 text-[10px] uppercase tracking-wide text-red-200 hover:border-red-500 transition-colors"
+                          className="flex flex-1 items-center justify-center gap-1 rounded border border-red-700/60 bg-red-950/30 py-1 text-[10px] uppercase tracking-wide text-red-200 hover:border-red-500 transition-colors"
                         >
                           <Trash2 size={9} />{t('altar.remove')}
                         </button>
+                        </div>
                       </div>
                     ) : (
                       <button
@@ -427,7 +429,7 @@ const noticeTimerRef = useRef<number | null>(null);
                 );
               })()}
               {hasCustomBackground ? (
-                <div className="flex items-center gap-1.5">
+                <div className="grid grid-cols-4 items-center gap-1.5">
                   <div
                     onClick={activateCustomBackground}
                     role="button"
@@ -435,7 +437,7 @@ const noticeTimerRef = useRef<number | null>(null);
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activateCustomBackground(); }
                     }}
-                    className={`relative h-9 w-12 flex-shrink-0 overflow-hidden rounded-md border cursor-pointer transition-colors ${
+                    className={`relative h-9 overflow-hidden rounded-md border cursor-pointer transition-colors ${
                       activeAltar.background_image_data
                         ? 'border-jade-600/70 ring-1 ring-jade-700/40'
                         : 'border-stone-700/50 hover:border-stone-500/60'
@@ -452,18 +454,20 @@ const noticeTimerRef = useRef<number | null>(null);
                       </span>
                     )}
                   </div>
+                  <div className="col-span-3 flex gap-1.5">
                   <button
                     onClick={() => backgroundInputRef.current?.click()}
-                    className="flex flex-1 items-center justify-center gap-1 rounded border border-stone-600/70 bg-stone-800/70 py-1.5 text-[10px] uppercase tracking-wide text-stone-300 hover:border-stone-400 transition-colors"
+                    className="flex flex-1 items-center justify-center gap-1 rounded border border-stone-600/70 bg-stone-800/70 py-1 text-[10px] uppercase tracking-wide text-stone-300 hover:border-stone-400 transition-colors"
                   >
                     <Pencil size={9} />{t('altar.change')}
                   </button>
                   <button
                     onClick={removeCustomBackground}
-                    className="flex flex-1 items-center justify-center gap-1 rounded border border-red-700/60 bg-red-950/30 py-1.5 text-[10px] uppercase tracking-wide text-red-200 hover:border-red-500 transition-colors"
+                    className="flex flex-1 items-center justify-center gap-1 rounded border border-red-700/60 bg-red-950/30 py-1 text-[10px] uppercase tracking-wide text-red-200 hover:border-red-500 transition-colors"
                   >
                     <Trash2 size={9} />{t('altar.remove')}
                   </button>
+                  </div>
                 </div>
               ) : (
                 <button
@@ -521,30 +525,53 @@ const noticeTimerRef = useRef<number | null>(null);
                 className="mt-4 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
               >
                 {overlayOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                {t('altar.backgroundOverlay')}
+                {t('altar.overlayOptions')}
               </button>
               {overlayOpen && (() => {
                 const overlayPercent = Math.round((activeAltar.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY) * 100);
+                const overlayColor = activeAltar.background_overlay_color ?? 'dark';
                 return (
-                  <div className="mt-2 space-y-1">
-                    <div className="flex items-center justify-end">
-                      <span className="text-[11px] tabular-nums text-stone-300">{overlayPercent}%</span>
+                  <div className="mt-2 rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2 space-y-2">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] uppercase tracking-wider text-stone-500">{t('altar.backgroundOverlay')}</span>
+                        <span className="text-[11px] tabular-nums text-stone-300">{overlayPercent}%</span>
+                      </div>
+                      <div className="relative h-4 flex items-center">
+                        <div className="absolute inset-x-0 h-1 rounded-full bg-stone-800/80" />
+                        <div className="absolute left-0 h-1 rounded-full bg-jade-600/60" style={{ width: `${overlayPercent}%` }} />
+                        <div
+                          className="absolute h-2.5 w-2.5 rounded-full bg-jade-500 border border-jade-400/50 shadow pointer-events-none"
+                          style={{ left: `calc(${overlayPercent}% - 5px)` }}
+                        />
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={overlayPercent}
+                          onChange={(e) => updateAltar(activeAltar.id, { background_overlay: Number(e.target.value) / 100 })}
+                          className="absolute inset-x-0 w-full opacity-0 cursor-pointer h-4"
+                        />
+                      </div>
                     </div>
-                    <div className="relative h-4 flex items-center">
-                      <div className="absolute inset-x-0 h-1 rounded-full bg-stone-800/80" />
-                      <div className="absolute left-0 h-1 rounded-full bg-jade-600/60" style={{ width: `${overlayPercent}%` }} />
-                      <div
-                        className="absolute h-2.5 w-2.5 rounded-full bg-jade-500 border border-jade-400/50 shadow pointer-events-none"
-                        style={{ left: `calc(${overlayPercent}% - 5px)` }}
-                      />
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={overlayPercent}
-                        onChange={(e) => updateAltar(activeAltar.id, { background_overlay: Number(e.target.value) / 100 })}
-                        className="absolute inset-x-0 w-full opacity-0 cursor-pointer h-4"
-                      />
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {(['dark', 'light'] as const).map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => updateAltar(activeAltar.id, { background_overlay_color: color })}
+                          className={`flex items-center justify-center gap-1.5 rounded border py-1 text-[10px] uppercase tracking-wide transition-colors ${
+                            overlayColor === color
+                              ? 'border-jade-600/70 bg-jade-900/40 text-jade-300'
+                              : 'border-stone-700/60 bg-stone-900/45 text-stone-400 hover:border-stone-500/70 hover:text-stone-300'
+                          }`}
+                        >
+                          <span
+                            className="h-3 w-3 rounded-full border border-stone-600/60 flex-shrink-0"
+                            style={{ background: color === 'dark' ? '#0a0a0f' : '#ffffff' }}
+                          />
+                          {t(`altar.overlay.${color}`)}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 );

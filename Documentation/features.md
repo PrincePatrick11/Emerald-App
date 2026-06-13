@@ -119,7 +119,12 @@ The image presets are organised thematically — Forest & Nature, Mountains, Cav
 
 Custom backgrounds are persisted as file-backed image paths (legacy inline data URLs are migrated). Background previews use a cached preview map for reliable rendering.
 
-**Background Overlay.** In edit mode, the sidebar exposes a collapsible "Background Overlay" section with a jade-styled slider (0–100%). The overlay renders as a dark linear-gradient layered on top of the background image, making item placements easier to see against busy backgrounds. The value is stored per altar as a `0.0–1.0` real number in the database and defaults to `0.2`.
+**Overlay Options.** In edit mode, the sidebar exposes a collapsible "Overlay Options" section (between Background and Grid Options) containing two controls grouped in a bordered box:
+
+- *Opacity slider* — adjusts the overlay intensity from 0–100%. The value is stored per altar as a `0.0–1.0` real number and defaults to `0.2`.
+- *Dark / Light toggle* — switches the overlay color between a dark gradient (`rgba(10,10,15,…)`, the default) and a light gradient (`rgba(255,255,255,…)`). Stored per altar in `background_overlay_color` (values: `'dark'` or `'light'`).
+
+The overlay is applied on top of all background types — colour presets, gradient presets, photographic image presets, and custom background images.
 
 **Intention.** A text field on each altar records your intention or purpose for that setup.
 

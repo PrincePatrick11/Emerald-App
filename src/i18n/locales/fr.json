@@ -109,7 +109,12 @@
     "backgroundUpdated": "Arriere-plan mis a jour",
     "backgroundUpdateFailed": "Echec de mise a jour de l'arriere-plan",
     "imageTooLarge": "Image trop volumineuse (max {{max}})",
-    "backgroundOverlay": "Superposition de fond",
+    "backgroundOverlay": "Opacite",
+    "overlayOptions": "Options d'overlay",
+    "overlay": {
+      "dark": "Sombre",
+      "light": "Clair"
+    },
     "gridOverlay": "Grille superposee",
     "gridOptions": "Options de grille",
     "gridSize": "Taille de grille",

@@ -152,6 +152,7 @@ export interface AltarRecord {
   background_preset: string;
   background_image_data: string | null;
   background_overlay: number;
+  background_overlay_color: string;
   created_at: string;
   updated_at: string;
   grid_enabled: boolean;

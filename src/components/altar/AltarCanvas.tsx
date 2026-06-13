@@ -111,9 +111,11 @@ async function renderAltarThumbnail(
   const overlay = altar.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY;
   if (overlay > 0) {
     const topA = Math.round(overlay * 60) / 100;
+    const isLight = altar.background_overlay_color === 'light';
+    const rgb = isLight ? '255,255,255' : '10,10,15';
     const og = ctx.createLinearGradient(0, 0, 0, outH);
-    og.addColorStop(0, `rgba(10,10,15,${topA})`);
-    og.addColorStop(1, `rgba(10,10,15,${overlay})`);
+    og.addColorStop(0, `rgba(${rgb},${topA})`);
+    og.addColorStop(1, `rgba(${rgb},${overlay})`);
     ctx.fillStyle = og;
     ctx.fillRect(0, 0, THUMBNAIL_W, outH);
   }

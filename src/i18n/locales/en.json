@@ -109,7 +109,12 @@
     "backgroundUpdated": "Background updated",
     "backgroundUpdateFailed": "Background update failed",
     "imageTooLarge": "Image too large (max {{max}})",
-    "backgroundOverlay": "Background overlay",
+    "backgroundOverlay": "Opacity",
+    "overlayOptions": "Overlay options",
+    "overlay": {
+      "dark": "Dark",
+      "light": "Light"
+    },
     "gridOverlay": "Grid overlay",
     "gridOptions": "Grid options",
     "gridSize": "Grid size",

@@ -109,7 +109,12 @@
     "backgroundUpdated": "Hintergrund aktualisiert",
     "backgroundUpdateFailed": "Hintergrund konnte nicht aktualisiert werden",
     "imageTooLarge": "Bild zu groß (max. {{max}})",
-    "backgroundOverlay": "Hintergrund-Overlay",
+    "backgroundOverlay": "Deckkraft",
+    "overlayOptions": "Overlay-Optionen",
+    "overlay": {
+      "dark": "Dunkel",
+      "light": "Hell"
+    },
     "gridOverlay": "Raster-Overlay",
     "gridOptions": "Grid Options",
     "gridSize": "Rastergroesse",

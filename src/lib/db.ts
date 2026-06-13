@@ -700,4 +700,11 @@ const MIGRATIONS: Migration[] = [
       await db.execute('ALTER TABLE altars ADD COLUMN thumbnail_data TEXT');
     },
   },
+  {
+    version: 27,
+    name: 'altar_background_overlay_color',
+    up: async (db) => {
+      await db.execute("ALTER TABLE altars ADD COLUMN background_overlay_color TEXT NOT NULL DEFAULT 'dark'");
+    },
+  },
 ];

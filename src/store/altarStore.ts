@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import { getDb } from '../lib/db';
-import { ALTAR_RATIOS, DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE, isRatioFormat, parseResolution } from '../lib/altarConstants';
+import { ALTAR_RATIOS, DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY, DEFAULT_OVERLAY_COLOR, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE, isRatioFormat, parseResolution } from '../lib/altarConstants';
 import { boolToInt, generateId, isValidHexColor, nowIso } from '../lib/helpers';
 import type { AltarCategory, AltarItem, AltarItemCategory, AltarPlacement, AltarRecord } from '../types';
 
@@ -81,6 +81,7 @@ function normalizeAltar(altar: AltarRecord): AltarRecord {
     background_preset: altar.background_preset || DEFAULT_ALTAR_BACKGROUND,
     background_image_data: altar.background_image_data ?? null,
     background_overlay: altar.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY,
+    background_overlay_color: altar.background_overlay_color ?? DEFAULT_OVERLAY_COLOR,
     grid_enabled: Boolean(altar.grid_enabled),
     grid_size: altar.grid_size ?? DEFAULT_GRID_SIZE,
     grid_opacity: altar.grid_opacity ?? DEFAULT_GRID_OPACITY,
@@ -125,7 +126,7 @@ interface AltarState {
   clearActiveAltar: () => void;
   createAltar: () => Promise<AltarRecord>;
   duplicateAltar: (id: string) => Promise<AltarRecord | null>;
-  updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'intention' | 'background_preset' | 'background_image_data' | 'background_overlay' | 'thumbnail_data'>>) => Promise<void>;
+  updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'intention' | 'background_preset' | 'background_image_data' | 'background_overlay' | 'background_overlay_color' | 'thumbnail_data'>>) => Promise<void>;
   updateAltarGrid: (id: string, patch: Partial<Pick<AltarRecord, 'grid_enabled' | 'grid_size' | 'grid_opacity' | 'grid_color' | 'snap_to_grid' | 'rotation_snap_enabled' | 'rotation_snap_angle' | 'snap_scale_to_grid'>>) => Promise<void>;
   updateAltarResolution: (id: string, resolution: string) => Promise<void>;
   bumpAltarUpdatedAt: (id: string) => Promise<void>;
@@ -259,6 +260,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       background_preset: DEFAULT_ALTAR_BACKGROUND,
       background_image_data: null,
       background_overlay: DEFAULT_BACKGROUND_OVERLAY,
+      background_overlay_color: DEFAULT_OVERLAY_COLOR,
       created_at: now,
       updated_at: now,
       grid_enabled: false,
@@ -289,6 +291,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       background_preset: source.background_preset || DEFAULT_ALTAR_BACKGROUND,
       background_image_data: source.background_image_data ?? null,
       background_overlay: source.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY,
+      background_overlay_color: source.background_overlay_color ?? DEFAULT_OVERLAY_COLOR,
       created_at: now,
       updated_at: now,
       grid_enabled: source.grid_enabled,
@@ -348,8 +351,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     if (!altar) return;
     const updated: AltarRecord = { ...altar, ...patch, updated_at: nowIso() };
     await db.execute(
-      'UPDATE altars SET title=$1, intention=$2, background_preset=$3, background_image_data=$4, background_overlay=$5, updated_at=$6, thumbnail_data=$7 WHERE id=$8',
-      [updated.title, updated.intention, updated.background_preset || DEFAULT_ALTAR_BACKGROUND, updated.background_image_data ?? null, updated.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY, updated.updated_at, updated.thumbnail_data ?? null, id]
+      'UPDATE altars SET title=$1, intention=$2, background_preset=$3, background_image_data=$4, background_overlay=$5, background_overlay_color=$6, updated_at=$7, thumbnail_data=$8 WHERE id=$9',
+      [updated.title, updated.intention, updated.background_preset || DEFAULT_ALTAR_BACKGROUND, updated.background_image_data ?? null, updated.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY, updated.background_overlay_color ?? DEFAULT_OVERLAY_COLOR, updated.updated_at, updated.thumbnail_data ?? null, id]
     );
     set((s) => ({
       altars: s.altars.map((entry) => (entry.id === id ? updated : entry)).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
