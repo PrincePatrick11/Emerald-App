@@ -718,4 +718,11 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    version: 29,
+    name: 'altar_icon_data',
+    up: async (db) => {
+      await db.execute('ALTER TABLE altars ADD COLUMN icon_data TEXT DEFAULT NULL');
+    },
+  },
 ];

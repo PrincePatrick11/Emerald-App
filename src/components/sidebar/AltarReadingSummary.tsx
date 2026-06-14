@@ -181,6 +181,16 @@ export default function AltarReadingSummary() {
       <SectionTitle label={t('altar.summary')} />
 
       <div className="flex flex-col gap-1.5">
+        {activeAltar.icon_data && (
+          <SummaryRow
+            label="Favicon"
+            value={
+              activeAltar.icon_data.startsWith('data:')
+                ? <img src={activeAltar.icon_data} alt="" className="w-5 h-5 object-cover rounded border border-stone-700/40" />
+                : <span className="text-base leading-none">{activeAltar.icon_data}</span>
+            }
+          />
+        )}
         <SummaryRow
           label={t('altar.summaryRatio')}
           value={resolution}

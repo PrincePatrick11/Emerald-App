@@ -10,6 +10,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
 import type { ActiveView, MoonPhase } from '../../types';
 import { getCategoryEmoji } from '../wiki/WikiList';
+import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
 
 function getFallbackTitle(view: ActiveView) {
   switch (view.type) {
@@ -40,6 +41,17 @@ function renderIconValue(icon: string | null | undefined, fallback: ReactNode) {
     return <img src={icon} alt="" className="h-4 w-4 rounded object-cover" />;
   }
   return <span className="text-sm leading-none">{icon}</span>;
+}
+
+function AltarTabIcon({ iconData }: { iconData: string | null | undefined }) {
+  const preview = useBackgroundPreview(iconData ?? null);
+  if (!iconData) return <Flame size={13} />;
+  // emoji: no slash, no data: prefix
+  if (!iconData.startsWith('/') && !iconData.startsWith('data:')) {
+    return <span className="text-sm leading-none">{iconData}</span>;
+  }
+  const src = iconData.startsWith('data:') ? iconData : preview;
+  return src ? <img src={src} alt="" className="h-4 w-4 rounded object-cover" /> : <Flame size={13} />;
 }
 
 export default function TabBar() {
@@ -79,6 +91,11 @@ export default function TabBar() {
       const operation = getOperation(view.id);
       const categoryIcon = operationCategories.find((category) => category.id === operation?.category_id)?.emoji ?? '⚡';
       return renderIconValue(operation?.icon, <span className="text-sm leading-none">{categoryIcon}</span>);
+    }
+
+    if (view.type === 'altar' && view.id) {
+      const altar = altars.find((a) => a.id === view.id);
+      return <AltarTabIcon iconData={altar?.icon_data} />;
     }
 
     switch (view.type) {

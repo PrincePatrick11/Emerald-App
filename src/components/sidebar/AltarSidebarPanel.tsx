@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
-import { Check, ChevronDown, ChevronRight, Grid3x3, Image as ImageIcon, Magnet, Pencil, RotateCw, Scaling, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Grid3x3, Image as ImageIcon, ImagePlus, Magnet, Pencil, RotateCw, Scaling, Trash2, X } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import {
   ALTAR_RATIOS,
@@ -26,6 +26,8 @@ import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
 import { PlacedElementRow, PlacedElementInspector } from './PlacedElementRow';
 import AltarReadingSummary from './AltarReadingSummary';
 
+
+const ALTAR_ICON_EMOJIS = ['🕯️','🔮','🌙','⭐','✨','🌺','🌸','🌼','🌿','🪷','🫧','🌊','🔥','🌑','🌕','☀️','⚡','🌈','🦋','🕊️','🌹','🍀','🪄','💫','🌌','🏔️','🫀','🐉','🦅','🌻'];
 
 export default function AltarSidebarPanel() {
   const { t } = useTranslation();
@@ -53,6 +55,8 @@ export default function AltarSidebarPanel() {
   const activeAltar = useAltarStore((s) => s.altars.find((a) => a.id === s.activeAltarId) ?? null);
   const gridOpacityPercent = Math.round((activeAltar?.grid_opacity ?? 0) * 100);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
+  const iconInputRef = useRef<HTMLInputElement>(null);
+  const [showIconPicker, setShowIconPicker] = useState(false);
 const noticeTimerRef = useRef<number | null>(null);
   const [backgroundNotice, setBackgroundNotice] = useState<string | null>(null);
   const [backgroundOpen, setBackgroundOpen] = useState(true);
@@ -61,6 +65,7 @@ const noticeTimerRef = useRef<number | null>(null);
   const [gradientOriginalColor, setGradientOriginalColor] = useState<string>(GRADIENT_PRESET_COLORS[0]);
   const [gradientOriginalPreset, setGradientOriginalPreset] = useState<string>('');
 const [gridOpen, setGridOpen] = useState(true);
+  const [faviconOpen, setFaviconOpen] = useState(true);
   const [canvasOptionsOpen, setCanvasOptionsOpen] = useState(true);
   const [placementsOpen, setPlacementsOpen] = useState(true);
   const [dragState, setDragState] = useState<{ fromId: string; overIndex: number } | null>(null);
@@ -169,6 +174,15 @@ const [gridOpen, setGridOpen] = useState(true);
       });
   };
 
+  const handleIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeAltar) return;
+    const reader = new FileReader();
+    reader.onloadend = () => updateAltar(activeAltar.id, { icon_data: reader.result as string });
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
   const activateCustomBackground = () => {
     if (!activeAltar) return;
     const savedPath = customBackgroundMap[activeAltar.id];
@@ -205,11 +219,63 @@ const [gridOpen, setGridOpen] = useState(true);
           e.target.value = '';
         }}
       />
+      <input
+        ref={iconInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleIconUpload}
+      />
 
       {activeAltar && isEditing && (
         <div className="px-3 pb-5">
           {isEditing && (
             <>
+              <button
+                onClick={() => setFaviconOpen((v) => !v)}
+                className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
+              >
+                {faviconOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                Favicon
+              </button>
+              {faviconOpen && (
+                <div className="mt-2 mb-4">
+                  {activeAltar.icon_data ? (
+                    <div className="flex items-center gap-2">
+                      {activeAltar.icon_data.startsWith('data:')
+                        ? <img src={activeAltar.icon_data} alt="" className="w-10 h-10 object-cover rounded-lg border border-stone-700/40 flex-shrink-0" />
+                        : <span className="text-4xl leading-none w-10 h-10 flex items-center justify-center flex-shrink-0">{activeAltar.icon_data}</span>}
+                      <div className="flex flex-col gap-0.5">
+                        <button onClick={() => iconInputRef.current?.click()} className="text-xs text-stone-500 hover:text-stone-300 transition-colors text-left">Bild ändern</button>
+                        <button onClick={() => setShowIconPicker((v) => !v)} className="text-xs text-stone-500 hover:text-stone-300 transition-colors text-left">Emoji wählen</button>
+                        <button onClick={() => updateAltar(activeAltar.id, { icon_data: null })} className="text-xs text-stone-500 hover:text-red-400 transition-colors text-left">Favicon entfernen</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => iconInputRef.current?.click()} className="flex items-center gap-1.5 text-xs text-stone-600 hover:text-stone-400 transition-colors">
+                        <ImagePlus size={13} /> Bild hinzufügen
+                      </button>
+                      <button onClick={() => setShowIconPicker((v) => !v)} className="flex items-center gap-1.5 text-xs text-stone-600 hover:text-stone-400 transition-colors">
+                        ✨ Emoji wählen
+                      </button>
+                    </div>
+                  )}
+                  {showIconPicker && (
+                    <div className="mt-2 bg-stone-800/60 border border-stone-700/40 rounded-lg p-2">
+                      <div className="flex flex-wrap gap-1">
+                        {ALTAR_ICON_EMOJIS.map((e) => (
+                          <button
+                            key={e}
+                            onClick={() => { updateAltar(activeAltar.id, { icon_data: e }); setShowIconPicker(false); }}
+                            className={`text-lg p-1 rounded hover:bg-stone-700 transition-colors ${activeAltar.icon_data === e ? 'bg-stone-700' : ''}`}
+                          >{e}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               <button
                 onClick={() => setCanvasOptionsOpen((v) => !v)}
                 className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"

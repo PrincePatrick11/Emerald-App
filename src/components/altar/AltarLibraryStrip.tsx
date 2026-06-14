@@ -416,11 +416,12 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
 
   const defaultCategory = categories[0]?.name ?? '';
 
+  const selectedCatName = categories.find((c) => c.id === activeCategoryTab)?.name;
   const filteredItems = activeCategoryTab === 'all'
     ? items
     : activeCategoryTab === UNCATEGORIZED_TAB
       ? items.filter((i) => !categories.find((c) => c.name === i.category))
-      : items.filter((item) => item.category === activeCategoryTab);
+      : items.filter((item) => item.category === selectedCatName);
 
   return (
     <div
@@ -453,7 +454,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
                 onPointerDown={(e) => handleCatPointerDown(e, cat.id)}
                 className={`group relative flex items-center select-none ${dragCatId === cat.id ? 'opacity-40' : 'opacity-100'}`}
               >
-                <button onClick={() => setActiveCategoryTab(cat.name)} className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap cursor-grab ${activeCategoryTab === cat.name ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{cat.emoji} {cat.name}</button>
+                <button onClick={() => setActiveCategoryTab(cat.id)} className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap cursor-grab ${activeCategoryTab === cat.id ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{cat.emoji} {cat.name}</button>
                 <button onClick={(e) => { e.stopPropagation(); openEditCategoryModal(cat); }} className="absolute -right-1 -top-1 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-stone-700 text-stone-400 hover:text-stone-200 transition-colors" title={t('editor.edit')}><Pencil size={8} /></button>
               </div>
             ))}

@@ -103,8 +103,11 @@ Locked placements are click-through on the canvas (pointer events disabled), so 
 
 **Selecting elements.** Clicking a row in the placed-elements sidebar highlights the corresponding element on the canvas with a jade border in both view and edit mode. Clicking the same row again deselects it (the inspector closes). Clicking an empty area of the canvas or the sidebar also deselects.
 
+**Favicon.** Each altar can have a custom favicon displayed in its tab in the tab bar and as the first row in the view-mode summary panel. To set one, open the altar in edit mode and expand the collapsible "Favicon" section at the top of the sidebar. You can pick from a grid of 30 spiritual emojis or upload an image (stored directly as base64). When a favicon is set, the tab shows it instead of the default flame icon; when none is set, the flame icon is used as a fallback.
+
 **Sidebar in view mode.** When viewing an altar outside edit mode, the right sidebar shows a compact **summary panel** instead of the full editor. It displays:
 
+- **Favicon** — shown as the first row when a favicon is set (emoji or image thumbnail).
 - **Enter Fullscreen** — a dedicated fullscreen toggle at the top, so the view is accessible without reaching for the header button.
 - **Ratio** — the current aspect ratio (e.g. `16:9`).
 - **Background** — the active background name with a small swatch preview (image, gradient, or preset).

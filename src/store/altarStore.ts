@@ -127,7 +127,7 @@ interface AltarState {
   clearActiveAltar: () => void;
   createAltar: () => Promise<AltarRecord>;
   duplicateAltar: (id: string) => Promise<AltarRecord | null>;
-  updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'intention' | 'background_preset' | 'background_image_data' | 'background_overlay' | 'background_overlay_color' | 'thumbnail_data'>>) => Promise<void>;
+  updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'intention' | 'background_preset' | 'background_image_data' | 'background_overlay' | 'background_overlay_color' | 'thumbnail_data' | 'icon_data'>>) => Promise<void>;
   updateAltarGrid: (id: string, patch: Partial<Pick<AltarRecord, 'grid_enabled' | 'grid_size' | 'grid_opacity' | 'grid_color' | 'snap_to_grid' | 'rotation_snap_enabled' | 'rotation_snap_angle' | 'snap_scale_to_grid'>>) => Promise<void>;
   updateAltarResolution: (id: string, resolution: string) => Promise<void>;
   bumpAltarUpdatedAt: (id: string) => Promise<void>;
@@ -364,8 +364,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     if (!altar) return;
     const updated: AltarRecord = { ...altar, ...patch, updated_at: nowIso() };
     await db.execute(
-      'UPDATE altars SET title=$1, intention=$2, background_preset=$3, background_image_data=$4, background_overlay=$5, background_overlay_color=$6, updated_at=$7, thumbnail_data=$8 WHERE id=$9',
-      [updated.title, updated.intention, updated.background_preset || DEFAULT_ALTAR_BACKGROUND, updated.background_image_data ?? null, updated.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY, updated.background_overlay_color ?? DEFAULT_OVERLAY_COLOR, updated.updated_at, updated.thumbnail_data ?? null, id]
+      'UPDATE altars SET title=$1, intention=$2, background_preset=$3, background_image_data=$4, background_overlay=$5, background_overlay_color=$6, updated_at=$7, thumbnail_data=$8, icon_data=$9 WHERE id=$10',
+      [updated.title, updated.intention, updated.background_preset || DEFAULT_ALTAR_BACKGROUND, updated.background_image_data ?? null, updated.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY, updated.background_overlay_color ?? DEFAULT_OVERLAY_COLOR, updated.updated_at, updated.thumbnail_data ?? null, updated.icon_data ?? null, id]
     );
     set((s) => {
       const cur = s.altars.find(e => e.id === id);

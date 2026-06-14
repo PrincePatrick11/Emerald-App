@@ -165,6 +165,7 @@ export interface AltarRecord {
   snap_scale_to_grid: boolean;
   resolution: string;
   thumbnail_data?: string | null;
+  icon_data?: string | null;
 }
 
 export interface AltarItem {
