@@ -707,4 +707,15 @@ const MIGRATIONS: Migration[] = [
       await db.execute("ALTER TABLE altars ADD COLUMN background_overlay_color TEXT NOT NULL DEFAULT 'dark'");
     },
   },
+  {
+    version: 28,
+    name: 'altar_categories_sort_order',
+    up: async (db) => {
+      await db.execute('ALTER TABLE altar_categories ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
+      const rows = await db.select<{ id: string }[]>('SELECT id FROM altar_categories ORDER BY created_at ASC, name ASC');
+      for (let i = 0; i < rows.length; i++) {
+        await db.execute('UPDATE altar_categories SET sort_order=$1 WHERE id=$2', [i, rows[i].id]);
+      }
+    },
+  },
 ];

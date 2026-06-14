@@ -79,9 +79,11 @@ Dashboard cards and list rows show a **thumbnail preview** of each altar. The th
 **Item categories** are fully dynamic. The library ships with eight default categories — Candle, Crystal, Herb, Deity, Symbol, Tool, Table, Other — but you can create, rename, and delete categories at any time:
 
 - Hover a category tab in the library strip to reveal a pencil icon that opens the inline rename/delete editor.
-- Click the "+ Category" button at the end of the tab row to add a new category; choose a name and pick an emoji from the palette.
+- Drag a category tab left or right to change its position in the tab row. Tabs animate smoothly into their new slots and the order is saved immediately to the database.
+- Click the "+ Category" button — always visible to the right of the scrollable tab row — to add a new category; choose a name and pick an emoji from the palette.
 - Deleting a category does not reassign its items. Items whose category no longer matches any existing category become visible under an **Uncategorized** tab that appears automatically in the library strip. The tab disappears once no uncategorized items remain.
 - Renaming a category updates all items already assigned to it.
+- When there are more categories than can fit on screen, the tab row scrolls horizontally. The scrollbar is hidden; gradient fade overlays on the left and right edges indicate that more tabs are available in that direction.
 
 Library editing uses a modal flow for **add / edit / delete** actions on individual items. In edit mode, the library strip is docked under the canvas, supports resize, and persists height in `localStorage` (`altar-library-height`). When uploading an image for a new item, if the name field is empty the filename (without extension) is pre-filled and selected so you can confirm or edit it immediately.
 

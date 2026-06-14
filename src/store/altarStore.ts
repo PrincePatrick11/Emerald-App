@@ -122,6 +122,7 @@ interface AltarState {
   addCategory: (name: string, emoji: string) => Promise<AltarCategory>;
   updateCategory: (id: string, name: string, emoji: string) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
+  reorderCategories: (ids: string[]) => Promise<void>;
   setActiveAltar: (id: string) => Promise<void>;
   clearActiveAltar: () => void;
   createAltar: () => Promise<AltarRecord>;
@@ -163,19 +164,31 @@ export const useAltarStore = create<AltarState>((set, get) => ({
 
   fetchCategories: async () => {
     const db = await getDb();
-    const rows = await db.select<AltarCategory[]>('SELECT id, name, emoji FROM altar_categories ORDER BY created_at ASC, name ASC');
+    const rows = await db.select<AltarCategory[]>('SELECT id, name, emoji FROM altar_categories ORDER BY sort_order ASC, created_at ASC, name ASC');
     set({ categories: rows });
   },
 
   addCategory: async (name, emoji) => {
     const db = await getDb();
     const cat: AltarCategory = { id: generateId(), name, emoji };
+    const maxRow = await db.select<{ m: number }[]>('SELECT COALESCE(MAX(sort_order), -1) as m FROM altar_categories');
+    const sortOrder = (maxRow[0]?.m ?? -1) + 1;
     await db.execute(
-      'INSERT INTO altar_categories (id, name, emoji, created_at) VALUES ($1,$2,$3,$4)',
-      [cat.id, cat.name, cat.emoji, nowIso()]
+      'INSERT INTO altar_categories (id, name, emoji, created_at, sort_order) VALUES ($1,$2,$3,$4,$5)',
+      [cat.id, cat.name, cat.emoji, nowIso(), sortOrder]
     );
     set((s) => ({ categories: [...s.categories, cat] }));
     return cat;
+  },
+
+  reorderCategories: async (ids) => {
+    const db = await getDb();
+    for (let i = 0; i < ids.length; i++) {
+      await db.execute('UPDATE altar_categories SET sort_order=$1 WHERE id=$2', [i, ids[i]]);
+    }
+    const current = get().categories;
+    const sorted = ids.map((id) => current.find((c) => c.id === id)!).filter(Boolean);
+    set({ categories: sorted });
   },
 
   updateCategory: async (id, name, emoji) => {
