@@ -72,7 +72,7 @@ The altar is a virtual arrangement of symbolic objects on a canvas.
 
 **Dashboard.** Opening the Altar section shows a dashboard listing all your altars with search, sort, and view-mode options. Click any altar to open it; use the breadcrumb back button or the Altar entry in the left sidebar to return to the dashboard.
 
-Dashboard cards and list rows show a **thumbnail preview** of each altar. The thumbnail is captured automatically on each save using a native Canvas 2D renderer and stored in the database. Altars that have not yet been saved after this feature was introduced show a live `AltarCardPreview` fallback instead. Changing the canvas aspect ratio clears the stored thumbnail so the card always shows the correct proportions. Card thumbnails are capped at a maximum height of 176 px and scale proportionally without cropping.
+Dashboard cards and list rows show a **thumbnail preview** of each altar. The thumbnail is captured automatically whenever you leave edit mode — whether via the Done button, Cancel, the back-arrow breadcrumb, or switching to a different module — using a native Canvas 2D renderer and stored in the database. Altars that have not yet been saved after this feature was introduced show a live `AltarCardPreview` fallback instead. Changing the canvas aspect ratio clears the stored thumbnail so the card always shows the correct proportions. Card thumbnails are capped at a maximum height of 176 px and scale proportionally without cropping.
 
 **Altar library.** You manage a personal library of items. Each item has a name, an emoji, a category, an optional note, and an optional uploaded image.
 
@@ -101,7 +101,18 @@ Locked placements are click-through on the canvas (pointer events disabled), so 
 
 **Selecting elements.** Clicking a row in the placed-elements sidebar highlights the corresponding element on the canvas with a jade border in both view and edit mode. Clicking the same row again deselects it (the inspector closes). Clicking an empty area of the canvas or the sidebar also deselects.
 
-**Sidebar sections.** The altar sidebar groups controls into three collapsible sections — Background, Grid Options, and Placed Elements — each with a chevron toggle. All three default to open. In view mode the background section header reads "Background"; in edit mode it reads "Change Background".
+**Sidebar in view mode.** When viewing an altar outside edit mode, the right sidebar shows a compact **summary panel** instead of the full editor. It displays:
+
+- **Enter Fullscreen** — a dedicated fullscreen toggle at the top, so the view is accessible without reaching for the header button.
+- **Ratio** — the current aspect ratio (e.g. `16:9`).
+- **Background** — the active background name with a small swatch preview (image, gradient, or preset).
+- **Overlay** — opacity percentage and color (dark/light).
+- **Grid** — active/inactive status and grid size.
+- **Elements** — count of placed items.
+
+A note at the bottom reminds you to switch to edit mode to change these settings. The header fullscreen button is hidden when the sidebar is open, since the sidebar already provides one.
+
+**Sidebar in edit mode.** The full editor panel — Canvas Options, Change Background, Overlay Options, Grid Options, and Placed Elements — is visible only when the altar is in edit mode. Each section is collapsible with a chevron toggle.
 
 **Canvas resolution.** Each altar stores a canvas resolution in its database row. In edit mode the sidebar shows a collapsible "Canvas Options" section with six aspect-ratio buttons (16:9, 4:3, 3:2, 1:1, 2:3, 9:16). Selecting a ratio stores it directly as a string (e.g. `"16:9"`); the canvas then fills the available viewport at that proportion with `scale: 1` and a dynamic native size. Legacy pixel-format resolutions (e.g. `"1920x1080"`) continue to work as before — the canvas renders at that fixed native size and is scaled to fit the viewport via CSS transform. Dashboard preview cards reflect the altar's aspect ratio.
 
@@ -128,7 +139,7 @@ The overlay is applied on top of all background types — colour presets, gradie
 
 **Intention.** A text field on each altar records your intention or purpose for that setup.
 
-**View mode and full-window mode.** Full-window altar mode is only available in view mode. Entering edit mode exits full-window mode automatically. Pressing **Escape** while in full-window mode also exits it. Grid controls are edit-only and hidden in read/view mode.
+**View mode and full-window mode.** Full-window altar mode is only available in view mode. Entering edit mode exits full-window mode automatically. Pressing **Escape** while in full-window mode also exits it. Grid controls and all edit panels are hidden in read/view mode. The fullscreen toggle is accessible both in the altar header (when the sidebar is closed) and in the sidebar summary (when the sidebar is open).
 
 ## Navigation
 

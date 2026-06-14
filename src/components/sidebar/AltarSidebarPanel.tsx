@@ -24,6 +24,7 @@ import { readFileAsDataUrl } from '../../lib/helpers';
 import { useUIStore } from '../../store/uiStore';
 import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
 import { PlacedElementRow, PlacedElementInspector } from './PlacedElementRow';
+import AltarReadingSummary from './AltarReadingSummary';
 
 
 export default function AltarSidebarPanel() {
@@ -191,6 +192,7 @@ const [gridOpen, setGridOpen] = useState(true);
 
   return (
     <div onClick={(e) => { if (e.target === e.currentTarget) selectPlacement(null); }}>
+      {activeAltar && !isEditing && <AltarReadingSummary />}
       <input
         ref={backgroundInputRef}
         type="file"
@@ -204,7 +206,7 @@ const [gridOpen, setGridOpen] = useState(true);
         }}
       />
 
-      {activeAltar && (
+      {activeAltar && isEditing && (
         <div className="px-3 pb-5">
           {isEditing && (
             <>
@@ -692,7 +694,7 @@ const [gridOpen, setGridOpen] = useState(true);
         </div>
       )}
 
-      {activeAltar && (
+      {activeAltar && isEditing && (
         <div className="px-3 pb-4 border-t border-stone-700/60">
           <button
             onClick={() => setPlacementsOpen((v) => !v)}

@@ -9,7 +9,7 @@ import { getAltarBackgroundStyle, DEFAULT_ALTAR_RESOLUTION, parseResolution, isR
 import type { AltarRecord } from '../../types';
 import ListToolbar from '../ui/ListToolbar';
 import ContextMenu from '../ui/ContextMenu';
-import { AltarCanvas } from '../altar/AltarCanvas';
+import { AltarCanvas, captureCurrentAltar } from '../altar/AltarCanvas';
 import { AltarLibraryStrip } from '../altar/AltarLibraryStrip';
 import { AltarCard, AltarListRow, buildAltarContextMenuActions } from '../altar/AltarCard';
 import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
@@ -33,6 +33,7 @@ export default function AltarView() {
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const toggleRightSidebar = useUIStore((s) => s.toggleRightSidebar);
+  const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const altarPrefs = useUIStore((s) => s.altarPrefs);
   const setAltarPrefs = useUIStore((s) => s.setAltarPrefs);
   const altarWindowFullscreen = useUIStore((s) => s.altarWindowFullscreen);
@@ -43,13 +44,34 @@ export default function AltarView() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [title, setTitle] = useState('');
-  const captureRef = useRef<(() => Promise<string | null>) | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   // ref keeps ResizeObserver callback current without re-observing on fullscreen toggle
   const altarWindowFullscreenRef = useRef(altarWindowFullscreen);
   const [canvasTransform, setCanvasTransform] = useState<{ scale: number; offsetX: number; offsetY: number; nativeW: number; nativeH: number }>({ scale: 1, offsetX: 0, offsetY: 0, nativeW: 1920, nativeH: 1080 });
+  // Set to true while handleDone/handleCancel are running their own capture so the
+  // isEditing cleanup effect doesn't fire a redundant second capture.
+  const thumbnailSavingRef = useRef(false);
 
   useEffect(() => { fetchAltars(); }, [fetchAltars]);
+
+  // Must be placed BEFORE the activeView.id effect so that when both run in the same
+  // commit (e.g. back-button press), getState() is called before clearActiveAltar().
+  const isEditing = activeView.mode === 'edit';
+  useEffect(() => {
+    if (!isEditing) return;
+    return () => {
+      if (thumbnailSavingRef.current) return; // handleDone / handleCancel already owns it
+      const altarId = useAltarStore.getState().activeAltarId;
+      if (!altarId) return;
+      captureCurrentAltar()
+        .then((thumbnailData) => {
+          if (thumbnailData !== null && thumbnailData.length <= 524288)
+            useAltarStore.getState().updateAltar(altarId, { thumbnail_data: thumbnailData });
+        })
+        .catch(console.error);
+    };
+  }, [isEditing]);
+
   useEffect(() => {
     if (activeView.id) {
       if (activeView.id !== activeAltarId) {
@@ -61,7 +83,6 @@ export default function AltarView() {
   }, [activeView.id, activeAltarId, setActiveAltar, clearActiveAltar]);
 
   const activeAltar = altars.find((altar) => altar.id === activeAltarId) ?? null;
-  const isEditing = activeView.mode === 'edit';
 
   useEffect(() => {
     if (!activeAltar) return;
@@ -150,36 +171,38 @@ export default function AltarView() {
 
   const handleDone = async () => {
     if (!activeAltar) return;
+    thumbnailSavingRef.current = true;
     const altarId = activeAltar.id;
-    const savedTitle = title.trim() || t('altar.untitled');
-
-    // Start capture immediately (before any navigation or store writes) so it
-    // reads the correct altar state.  The Promise runs in the background while
-    // we navigate away and write the title — no UI freeze.
-    const capturePromise: Promise<string | null> = captureRef.current
-      ? captureRef.current()
-      : Promise.resolve(null);
-
+    const capturePromise = captureCurrentAltar(); // start before any state changes
     setActiveView({ type: 'altar', id: altarId, mode: 'view' });
-
     try {
-      // Write title first so it's visible on the dashboard immediately.
-      await updateAltar(altarId, { title: savedTitle });
-      // Then write thumbnail once capture finishes — sequential to avoid the
-      // title write (which snapshots the whole row) overwriting the new thumbnail.
+      await updateAltar(altarId, { title: title.trim() || t('altar.untitled') });
       const thumbnailData = await capturePromise;
-      if (thumbnailData !== null && thumbnailData.length <= 524288) {
+      if (thumbnailData !== null && thumbnailData.length <= 524288)
         await updateAltar(altarId, { thumbnail_data: thumbnailData });
-      }
     } catch (err) {
       console.error('[handleDone]', err);
+    } finally {
+      thumbnailSavingRef.current = false;
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (!activeAltar) return;
+    thumbnailSavingRef.current = true;
+    const altarId = activeAltar.id;
     setTitle(activeAltar.title);
-    setActiveView({ type: 'altar', id: activeAltar.id, mode: 'view' });
+    const capturePromise = captureCurrentAltar(); // start before navigation
+    setActiveView({ type: 'altar', id: altarId, mode: 'view' });
+    try {
+      const thumbnailData = await capturePromise;
+      if (thumbnailData !== null && thumbnailData.length <= 524288)
+        await updateAltar(altarId, { thumbnail_data: thumbnailData });
+    } catch (err) {
+      console.error('[handleCancel]', err);
+    } finally {
+      thumbnailSavingRef.current = false;
+    }
   };
 
   const backgroundSrc = useBackgroundPreview(activeAltar?.background_image_data ?? null);
@@ -334,13 +357,15 @@ export default function AltarView() {
             </>
           ) : (
             <>
-              <button
-                onClick={() => setAltarWindowFullscreen(!altarWindowFullscreen)}
-                className="btn-ghost"
-                title={altarWindowFullscreen ? t('altar.exitWindowFullscreen') : t('altar.windowFullscreen')}
-              >
-                {altarWindowFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-              </button>
+              {!rightSidebarOpen && (
+                <button
+                  onClick={() => setAltarWindowFullscreen(!altarWindowFullscreen)}
+                  className="btn-ghost"
+                  title={altarWindowFullscreen ? t('altar.exitWindowFullscreen') : t('altar.windowFullscreen')}
+                >
+                  {altarWindowFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                </button>
+              )}
               <button onClick={enterEditMode} className="btn-ghost" title={t('editor.edit')}>
                 <Pencil size={15} />
               </button>
@@ -380,7 +405,6 @@ export default function AltarView() {
           transform: `translate(${canvasTransform.offsetX}px, ${canvasTransform.offsetY}px) scale(${canvasTransform.scale})`,
         }}>
           <AltarCanvas
-            captureRef={captureRef}
             altar={activeAltar}
             backgroundSrc={backgroundSrc}
             editable={isEditing}

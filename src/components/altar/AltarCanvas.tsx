@@ -194,6 +194,22 @@ async function renderAltarThumbnail(
   return null;
 }
 
+/** Reads the active altar from the store and renders its thumbnail.
+ *  Safe to call from anywhere — uses an off-screen canvas independent of the DOM. */
+export async function captureCurrentAltar(): Promise<string | null> {
+  try {
+    const { placements, activeAltarId, altars } = useAltarStore.getState();
+    const altar = altars.find((a) => a.id === activeAltarId) ?? null;
+    if (!altar) return null;
+    const { w: nativeW, h: nativeH } = resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
+    const backgroundSrc = getCachedBackgroundPreview(altar.background_image_data);
+    return renderAltarThumbnail(altar, backgroundSrc, placements, nativeW, nativeH);
+  } catch (err) {
+    console.error('[captureCurrentAltar]', err);
+    return null;
+  }
+}
+
 function _drawEmoji(ctx: CanvasRenderingContext2D, emoji: string, size: number) {
   // fontSize matches AltarItemVisual: Math.round(size * 0.8)
   ctx.font = `${Math.round(size * 0.8)}px serif`;
@@ -219,7 +235,6 @@ export function AltarCanvas({
   nativeH,
   cssScale,
   getBackgroundStyle,
-  captureRef,
 }: {
   altar: AltarRecord | null;
   backgroundSrc: string | null;
@@ -237,7 +252,6 @@ export function AltarCanvas({
   nativeH: number;
   cssScale: number;
   getBackgroundStyle: (altar: AltarRecord | null, imageSrc: string | null | undefined) => string;
-  captureRef?: React.MutableRefObject<(() => Promise<string | null>) | null>;
 }) {
   const { t } = useTranslation();
   const placements = useAltarStore((s) => s.placements);
@@ -304,24 +318,6 @@ export function AltarCanvas({
   }, [snapToGrid, gridSize, nativeW, nativeH]);
 
   useEffect(() => subscribeAltarDrag(setSidebarDragItem), []);
-
-  useEffect(() => {
-    if (!captureRef) return;
-    captureRef.current = async (): Promise<string | null> => {
-      try {
-        const { placements, activeAltarId, altars } = useAltarStore.getState();
-        const altar = altars.find((a) => a.id === activeAltarId) ?? null;
-        if (!altar) return null;
-        const { w: nativeW, h: nativeH } = resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
-        const backgroundSrc = getCachedBackgroundPreview(altar.background_image_data);
-        return renderAltarThumbnail(altar, backgroundSrc, placements, nativeW, nativeH);
-      } catch (err) {
-        console.error('[AltarCanvas] thumbnail capture failed:', err);
-        return null;
-      }
-    };
-    return () => { captureRef.current = null; };
-  }, [captureRef]);
 
   useEffect(() => {
     if (!editable || !sidebarDragItem) {
