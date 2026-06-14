@@ -68,16 +68,17 @@ async function _drawCover(ctx: CanvasRenderingContext2D, src: string, w: number,
   ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
 }
 
-async function renderAltarThumbnail(
+async function _renderAltar(
   altar: AltarRecord,
   backgroundSrc: string | null,
   placements: AltarPlacement[],
   nativeW: number,
   nativeH: number,
-): Promise<string | null> {
-  const outH = Math.round(THUMBNAIL_W * nativeH / nativeW);
+  outW: number,
+): Promise<HTMLCanvasElement | null> {
+  const outH = Math.round(outW * nativeH / nativeW);
   const canvas = document.createElement('canvas');
-  canvas.width = THUMBNAIL_W;
+  canvas.width = outW;
   canvas.height = outH;
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
@@ -86,25 +87,25 @@ async function renderAltarThumbnail(
   const preset = altar.background_preset;
   try {
     if (backgroundSrc?.startsWith('data:image/')) {
-      await _drawCover(ctx, backgroundSrc, THUMBNAIL_W, outH);
+      await _drawCover(ctx, backgroundSrc, outW, outH);
     } else if (ALTAR_IMAGE_PRESETS.includes(preset as AltarImagePresetName)) {
-      await _drawCover(ctx, `/backgrounds/${preset}.webp`, THUMBNAIL_W, outH);
+      await _drawCover(ctx, `/backgrounds/${preset}.webp`, outW, outH);
     } else if (isGradientPreset(preset)) {
       const hex = getGradientColor(preset);
       if (!hex) throw new Error('invalid gradient color');
       const { r, g, b } = hexToRgb(hex);
-      _radialGrad(ctx, THUMBNAIL_W, outH, 0.5, 0.25, [
+      _radialGrad(ctx, outW, outH, 0.5, 0.25, [
         [hex, 0],
         [`rgb(${Math.round(r * 0.5)},${Math.round(g * 0.5)},${Math.round(b * 0.5)})`, 0.5],
         ['#0a0a0f', 1],
       ]);
     } else {
       const cfg = PRESET_GRAD[preset] ?? PRESET_GRAD.midnight;
-      _radialGrad(ctx, THUMBNAIL_W, outH, cfg.cx, cfg.cy, cfg.stops);
+      _radialGrad(ctx, outW, outH, cfg.cx, cfg.cy, cfg.stops);
     }
   } catch {
     const cfg = PRESET_GRAD.midnight;
-    _radialGrad(ctx, THUMBNAIL_W, outH, cfg.cx, cfg.cy, cfg.stops);
+    _radialGrad(ctx, outW, outH, cfg.cx, cfg.cy, cfg.stops);
   }
 
   // 2. Overlay
@@ -117,20 +118,20 @@ async function renderAltarThumbnail(
     og.addColorStop(0, `rgba(${rgb},${topA})`);
     og.addColorStop(1, `rgba(${rgb},${overlay})`);
     ctx.fillStyle = og;
-    ctx.fillRect(0, 0, THUMBNAIL_W, outH);
+    ctx.fillRect(0, 0, outW, outH);
   }
 
   // 3. Placements — same size formula as PlacedItem in AltarCanvas
   const canvasScale = nativeW / BASE_RESOLUTION_WIDTH;
   const scaledBase = BASE_SIZE * canvasScale;
-  const scaleX = THUMBNAIL_W / nativeW;
+  const scaleX = outW / nativeW;
   const scaleY = outH / nativeH;
 
   for (const p of [...placements].sort((a, b) => a.z_index - b.z_index)) {
     if (p.hidden) continue;
     const drawW = Math.round(scaledBase * (p.width  / 8) * scaleX);
     const drawH = Math.round(scaledBase * (p.height / 8) * scaleY);
-    const cx = (p.x / 100) * THUMBNAIL_W;
+    const cx = (p.x / 100) * outW;
     const cy = (p.y / 100) * outH;
     const rot = ((p.rotation ?? 0) * Math.PI) / 180;
 
@@ -142,7 +143,6 @@ async function renderAltarThumbnail(
     if (p.image_data?.startsWith('data:image/')) {
       try {
         const img = await _loadImg(p.image_data);
-        // object-contain: fit within the box preserving aspect ratio
         const ia = img.naturalWidth / img.naturalHeight;
         const da = drawW / drawH;
         const [rw, rh] = ia > da ? [drawW, drawW / ia] : [drawH * ia, drawH];
@@ -157,9 +157,20 @@ async function renderAltarThumbnail(
     ctx.restore();
   }
 
-  // 4. Encode — prefer WebP; fall back to JPEG if the runtime doesn't support
-  //    WebP encoding (WKWebView may silently yield PNG, which has no quality
-  //    knob and can be very large for photo backgrounds).
+  return canvas;
+}
+
+
+async function renderAltarThumbnail(
+  altar: AltarRecord,
+  backgroundSrc: string | null,
+  placements: AltarPlacement[],
+  nativeW: number,
+  nativeH: number,
+): Promise<string | null> {
+  const canvas = await _renderAltar(altar, backgroundSrc, placements, nativeW, nativeH, THUMBNAIL_W);
+  if (!canvas) return null;
+
   const toDataUrl = (format: string, quality: number): Promise<string | null> =>
     new Promise((resolve) => {
       canvas.toBlob((blob) => {
@@ -182,16 +193,39 @@ async function renderAltarThumbnail(
         if (r !== null && r.length <= 524288) return r;
       }
     } else if (probe.length <= 524288) {
-      return probe; // PNG fallback was small enough (e.g. gradient with no items)
+      return probe;
     }
   }
 
-  // JPEG: lossy, quality-controllable, universally supported.
   for (const q of [0.85, 0.65, 0.45]) {
     const r = await toDataUrl('image/jpeg', q);
     if (r !== null && r.length <= 524288) return r;
   }
   return null;
+}
+
+/** Renders the active altar at full native resolution for file export. Returns JPEG at high quality. */
+export async function exportCurrentAltarImage(): Promise<string | null> {
+  try {
+    const { placements, activeAltarId, altars } = useAltarStore.getState();
+    const altar = altars.find((a) => a.id === activeAltarId) ?? null;
+    if (!altar) return null;
+    const { w: nativeW, h: nativeH } = resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
+    const backgroundSrc = getCachedBackgroundPreview(altar.background_image_data);
+    const canvas = await _renderAltar(altar, backgroundSrc, placements, nativeW, nativeH, nativeW);
+    if (!canvas) return null;
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (!blob) { resolve(null); return; }
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      }, 'image/jpeg', 0.97);
+    });
+  } catch (err) {
+    console.error('[exportCurrentAltarImage]', err);
+    return null;
+  }
 }
 
 /** Reads the active altar from the store and renders its thumbnail.

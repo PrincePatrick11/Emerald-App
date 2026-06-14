@@ -193,6 +193,58 @@ fn write_file(app: tauri::AppHandle, path: String, content: String) -> Result<()
     std::fs::write(canonical_target, content.as_bytes()).map_err(|e| e.to_string())
 }
 
+/// Exports a base64 data-URL image to a user-chosen path on disk.
+/// Only .png, .jpg, .jpeg, and .webp extensions are permitted.
+/// Path must resolve to within the allowed user directories.
+#[tauri::command]
+fn export_image(app: tauri::AppHandle, path: String, data_url: String) -> Result<(), String> {
+    let ext = ext_for_path(&path);
+    if !matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp") {
+        return Err("unsupported file type".to_string());
+    }
+
+    let (_mime_part, b64) = data_url
+        .strip_prefix("data:")
+        .and_then(|s| s.split_once(','))
+        .ok_or("Invalid data URL")?;
+    let bytes = general_purpose::STANDARD.decode(b64).map_err(|e| e.to_string())?;
+
+    let allowed_roots = resolve_allowed_roots(&app)?;
+    let target = PathBuf::from(&path);
+    let parent = target.parent().ok_or("invalid path")?;
+
+    let parent_abs = if parent.is_absolute() {
+        parent.to_path_buf()
+    } else {
+        std::env::current_dir().map_err(|e| e.to_string())?.join(parent)
+    };
+    if !is_within_allowed_roots(&parent_abs, &allowed_roots) {
+        return Err("access denied: path outside allowed directories".to_string());
+    }
+
+    std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let canonical_parent = std::fs::canonicalize(parent).map_err(|_| "invalid path".to_string())?;
+    if !is_within_allowed_roots(&canonical_parent, &allowed_roots) {
+        return Err("access denied: path outside allowed directories".to_string());
+    }
+
+    if target.exists() {
+        let metadata = std::fs::symlink_metadata(&target).map_err(|e| e.to_string())?;
+        if metadata.file_type().is_symlink() {
+            return Err("access denied: symlink targets are not allowed".to_string());
+        }
+        let canonical_target = std::fs::canonicalize(&target).map_err(|_| "invalid path".to_string())?;
+        if !is_within_allowed_roots(&canonical_target, &allowed_roots) {
+            return Err("access denied: path outside allowed directories".to_string());
+        }
+        return std::fs::write(canonical_target, &bytes).map_err(|e| e.to_string());
+    }
+
+    let filename = target.file_name().ok_or("invalid path")?;
+    let canonical_target = canonical_parent.join(filename);
+    std::fs::write(canonical_target, &bytes).map_err(|e| e.to_string())
+}
+
 /// Reads a text file and returns its contents as a UTF-8 string.
 /// Only .md, .emerald, .emeralddb, .json, and .txt extensions are permitted.
 #[tauri::command]
@@ -432,6 +484,7 @@ pub fn run() {
             copy_image_file,
             read_image_as_base64,
             cleanup_unused_images,
+            export_image,
             write_file,
             read_file,
             ensure_app_storage_dirs,

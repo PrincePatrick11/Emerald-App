@@ -110,6 +110,8 @@ Locked placements are click-through on the canvas (pointer events disabled), so 
 - **Grid** — active/inactive status and grid size.
 - **Elements** — count of placed items.
 
+A **Save Image…** button above the summary grid exports the current altar at full native resolution as a JPEG file (quality 0.97, no size cap) via the native OS save dialog. The default filename is `AltarTitle_YYYY-MM-DD.jpg`. The button shows in-progress, success, and error feedback states inline.
+
 A note at the bottom reminds you to switch to edit mode to change these settings. The header fullscreen button is hidden when the sidebar is open, since the sidebar already provides one.
 
 **Sidebar in edit mode.** The full editor panel — Canvas Options, Change Background, Overlay Options, Grid Options, and Placed Elements — is visible only when the altar is in edit mode. Each section is collapsible with a chevron toggle.

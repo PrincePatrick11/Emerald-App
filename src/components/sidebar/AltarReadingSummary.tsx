@@ -1,6 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Maximize2, Minimize2, Sliders } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
+import { save } from '@tauri-apps/plugin-dialog';
+import { Check, Download, Maximize2, Minimize2 } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import { useUIStore } from '../../store/uiStore';
 import {
@@ -14,6 +16,7 @@ import {
   isGradientPreset,
 } from '../../lib/altarConstants';
 import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
+import { exportCurrentAltarImage } from '../altar/AltarCanvas';
 
 interface SummaryRowProps {
   label: string;
@@ -23,7 +26,7 @@ interface SummaryRowProps {
 
 function SummaryRow({ label, value, badge }: SummaryRowProps) {
   return (
-    <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-stone-900/40 border border-stone-800/60">
+    <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-stone-900/45 border border-stone-700/60">
       <span className="text-[11px] uppercase tracking-wider text-stone-500">{label}</span>
       <div className="flex items-center gap-1.5">
         {badge && (
@@ -37,24 +40,23 @@ function SummaryRow({ label, value, badge }: SummaryRowProps) {
             {badge.label}
           </span>
         )}
-        <span className="text-[12px] font-medium text-stone-200 text-right">{value}</span>
+        <span className="text-[11px] font-medium text-stone-300 text-right tabular-nums">{value}</span>
       </div>
     </div>
   );
 }
 
-function SectionTitle({ icon, label }: { icon: React.ReactNode; label: string }) {
+function SectionTitle({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-1.5 px-1 pt-3 pb-1.5">
-      <span className="text-stone-500">{icon}</span>
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-stone-500">{label}</span>
+    <div className="flex items-center gap-1 pt-3 pb-1">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">{label}</span>
     </div>
   );
 }
 
 function BackgroundRow({ label, name, style }: { label: string; name: string; style: React.CSSProperties }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-stone-900/40 border border-stone-800/60">
+    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-stone-900/45 border border-stone-700/60">
       <span className="text-[11px] uppercase tracking-wider text-stone-500">{label}</span>
       <div className="ml-auto flex items-center gap-1.5">
         <div
@@ -62,7 +64,7 @@ function BackgroundRow({ label, name, style }: { label: string; name: string; st
           style={style}
           aria-hidden="true"
         />
-        <span className="text-[12px] font-medium text-stone-200 text-right truncate">{name}</span>
+        <span className="text-[11px] font-medium text-stone-300 text-right truncate">{name}</span>
       </div>
     </div>
   );
@@ -75,7 +77,30 @@ export default function AltarReadingSummary() {
   const altarWindowFullscreen = useUIStore((s) => s.altarWindowFullscreen);
   const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
 
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
   const customBackgroundPreview = useBackgroundPreview(activeAltar?.background_image_data ?? null);
+
+  const handleSaveImage = async () => {
+    if (saveState === 'saving') return;
+    setSaveState('saving');
+    try {
+      const dataUrl = await exportCurrentAltarImage();
+      if (!dataUrl) throw new Error('capture failed');
+      const safeName = (activeAltar?.title ?? 'altar').replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'altar';
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filePath = await save({
+        defaultPath: `${safeName}_${dateStr}.jpg`,
+        filters: [{ name: 'JPEG Image', extensions: ['jpg'] }],
+      });
+      if (!filePath) { setSaveState('idle'); return; }
+      await invoke('export_image', { path: filePath, dataUrl });
+      setSaveState('done');
+      setTimeout(() => setSaveState('idle'), 2000);
+    } catch {
+      setSaveState('error');
+      setTimeout(() => setSaveState('idle'), 2000);
+    }
+  };
 
   const backgroundInfo = useMemo(() => {
     if (!activeAltar) return null;
@@ -117,7 +142,7 @@ export default function AltarReadingSummary() {
   const resolution = activeAltar.resolution;
 
   return (
-    <div className="flex flex-col gap-1 px-3 pb-5">
+    <div className="flex flex-col gap-1.5 px-3 pb-5">
       <button
         onClick={() => setAltarWindowFullscreen(!altarWindowFullscreen)}
         className={`mt-3 flex w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-[12px] font-semibold transition-colors ${
@@ -131,7 +156,29 @@ export default function AltarReadingSummary() {
         {t('altar.enterFullscreen')}
       </button>
 
-      <SectionTitle icon={<Sliders size={11} />} label={t('altar.summary')} />
+      <button
+        onClick={handleSaveImage}
+        disabled={saveState === 'saving'}
+        className={`flex w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-[12px] font-semibold transition-colors ${
+          saveState === 'done'
+            ? 'border-jade-600/60 bg-jade-900/40 text-jade-200'
+            : saveState === 'error'
+              ? 'border-red-700/60 bg-red-950/30 text-red-300'
+              : 'border-stone-700/60 bg-stone-900/45 text-stone-300 hover:border-stone-500/70 hover:text-stone-100 disabled:opacity-50 disabled:cursor-not-allowed'
+        }`}
+        title={t('altar.saveImage')}
+      >
+        {saveState === 'done' ? <Check size={14} /> : <Download size={14} />}
+        {saveState === 'saving'
+          ? t('altar.saveImageSaving')
+          : saveState === 'done'
+            ? t('altar.saveImageDone')
+            : saveState === 'error'
+              ? t('altar.saveImageError')
+              : t('altar.saveImage')}
+      </button>
+
+      <SectionTitle label={t('altar.summary')} />
 
       <div className="flex flex-col gap-1.5">
         <SummaryRow

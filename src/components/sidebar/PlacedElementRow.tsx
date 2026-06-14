@@ -149,17 +149,19 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
     rotation: '',
     opacity: '',
   });
+  const focusedFieldRef = useRef<string | null>(null);
 
   useEffect(() => {
     const scalePercent = Math.round((((placement.width + placement.height) / 2) / 40) * 100);
-    setDraft({
-      x: placement.x.toFixed(1),
-      y: placement.y.toFixed(1),
-      scalePercent: scalePercent.toString(),
-      rotation: placement.rotation.toFixed(0),
-      opacity: Math.round(placement.opacity * 100).toString(),
-    });
-  }, [placement.id]);
+    const f = focusedFieldRef.current;
+    setDraft((d) => ({
+      x:            f === 'x'            ? d.x            : placement.x.toFixed(1),
+      y:            f === 'y'            ? d.y            : placement.y.toFixed(1),
+      scalePercent: f === 'scalePercent' ? d.scalePercent : scalePercent.toString(),
+      rotation:     f === 'rotation'     ? d.rotation     : placement.rotation.toFixed(0),
+      opacity:      f === 'opacity'      ? d.opacity      : Math.round(placement.opacity * 100).toString(),
+    }));
+  }, [placement.id, placement.x, placement.y, placement.width, placement.height, placement.rotation, placement.opacity]);
 
   const applyNumber = (key: 'x' | 'y' | 'rotation' | 'opacity', value: string) => {
     const next = Number(value);
@@ -190,7 +192,8 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
     onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
       setDraft((current) => ({ ...current, [field]: event.target.value }));
     },
-    onBlur: apply,
+    onFocus: () => { focusedFieldRef.current = field; },
+    onBlur: () => { focusedFieldRef.current = null; apply(); },
     onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === 'Enter') event.currentTarget.blur();
     },
