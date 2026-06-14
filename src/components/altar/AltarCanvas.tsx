@@ -10,6 +10,8 @@ import {
   BASE_RESOLUTION_WIDTH,
   DEFAULT_ALTAR_RESOLUTION,
   DEFAULT_BACKGROUND_OVERLAY,
+  DEFAULT_GRID_COLOR,
+  DEFAULT_GRID_OPACITY,
   getGradientColor,
   isGradientPreset,
   resolveResolutionPixels,
@@ -121,7 +123,25 @@ async function _renderAltar(
     ctx.fillRect(0, 0, outW, outH);
   }
 
-  // 3. Placements — same size formula as PlacedItem in AltarCanvas
+  // 3. Grid
+  if (altar.grid_enabled && (altar.grid_size ?? 0) > 0) {
+    const gridSize = altar.grid_size!;
+    const { w: refW, h: refH } = resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
+    const numCols = Math.max(1, Math.round(refW / gridSize));
+    const numRows = Math.max(1, Math.round(refH / gridSize));
+    const { r, g, b } = hexToRgb(altar.grid_color ?? DEFAULT_GRID_COLOR);
+    const opacity = altar.grid_opacity ?? DEFAULT_GRID_OPACITY;
+    ctx.save();
+    ctx.strokeStyle = `rgba(${r},${g},${b},${opacity})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 1; i < numCols; i++) { const x = (i / numCols) * outW; ctx.moveTo(x, 0); ctx.lineTo(x, outH); }
+    for (let i = 1; i < numRows; i++) { const y = (i / numRows) * outH; ctx.moveTo(0, y); ctx.lineTo(outW, y); }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 4. Placements — same size formula as PlacedItem in AltarCanvas
   const canvasScale = nativeW / BASE_RESOLUTION_WIDTH;
   const scaledBase = BASE_SIZE * canvasScale;
   const scaleX = outW / nativeW;
@@ -300,6 +320,26 @@ export function AltarCanvas({
     })),
   );
   const gridRgb = hexToRgb(gridColor);
+
+  // Reference resolution: stable across window resizes so grid/snap stay consistent.
+  const { w: refW, h: refH } = useMemo(
+    () => resolveResolutionPixels(resolution ?? DEFAULT_ALTAR_RESOLUTION),
+    [resolution],
+  );
+  const gridNumCols  = Math.max(1, Math.round(refW / gridSize));
+  const gridNumRows  = Math.max(1, Math.round(refH / gridSize));
+  const gridCellW    = refW / gridNumCols;
+  const gridCellH    = refH / gridNumRows;
+  const gridScaledBase = BASE_SIZE * (refW / BASE_RESOLUTION_WIDTH);
+
+  const gridPath = useMemo(() => {
+    if (!showGrid || gridSize <= 0) return '';
+    const parts: string[] = [];
+    for (let i = 1; i < gridNumCols; i++) parts.push(`M${(i / gridNumCols) * nativeW},0V${nativeH}`);
+    for (let i = 1; i < gridNumRows; i++) parts.push(`M0,${(i / gridNumRows) * nativeH}H${nativeW}`);
+    return parts.join(' ');
+  }, [showGrid, gridNumCols, gridNumRows, nativeW, nativeH]);
+
   const canvasScale = nativeW / BASE_RESOLUTION_WIDTH;
   const canvasRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef<string | null>(null);
@@ -318,18 +358,17 @@ export function AltarCanvas({
   const handleResizeById = useCallback(
     (id: string, width: number, height: number) => {
       if (snapScaleToGrid && gridSize > 0) {
-        const scaledBase = BASE_SIZE * canvasScale;
-        const displaySize = scaledBase * (width / 8);
-        const snapUnit = gridSize * 2;
-        const snapped = Math.max(snapUnit, Math.round(displaySize / snapUnit) * snapUnit);
-        const snappedUnit = (snapped / scaledBase) * 8;
-        const clamped = Math.max(2, Math.min(500, Math.round(snappedUnit * 100) / 100));
-        updatePlacement(id, { width: clamped, height: clamped });
+        // Determine N (cells to span) from width, apply same N to height → snaps as a box.
+        const displayW = gridScaledBase * (width / 8);
+        const N = Math.max(2, Math.round(displayW / gridCellW / 2) * 2);
+        const clampedW = Math.max(2, Math.min(500, Math.round((N * gridCellW / gridScaledBase) * 8 * 100) / 100));
+        const clampedH = Math.max(2, Math.min(500, Math.round((N * gridCellH / gridScaledBase) * 8 * 100) / 100));
+        updatePlacement(id, { width: clampedW, height: clampedH });
       } else {
         updatePlacement(id, { width, height });
       }
     },
-    [updatePlacement, snapScaleToGrid, gridSize, canvasScale],
+    [updatePlacement, snapScaleToGrid, gridCellW, gridCellH, gridScaledBase],
   );
   const handleRotateById = useCallback(
     (id: string, rotation: number) => updatePlacement(id, { rotation }),
@@ -341,15 +380,14 @@ export function AltarCanvas({
     const rawX = ((clientX - rect.left) / rect.width) * 100;
     const rawY = ((clientY - rect.top) / rect.height) * 100;
     if (snapToGrid) {
-      // Use native (unscaled) dimensions for correct grid snap steps
-      const stepX = (gridSize / nativeW) * 100;
-      const stepY = (gridSize / nativeH) * 100;
+      const stepX = 100 / gridNumCols;
+      const stepY = 100 / gridNumRows;
       const snappedX = stepX > 0 ? Math.round(rawX / stepX) * stepX : rawX;
       const snappedY = stepY > 0 ? Math.round(rawY / stepY) * stepY : rawY;
       return { x: Math.max(3, Math.min(97, snappedX)), y: Math.max(3, Math.min(97, snappedY)) };
     }
     return { x: Math.max(3, Math.min(97, rawX)), y: Math.max(3, Math.min(97, rawY)) };
-  }, [snapToGrid, gridSize, nativeW, nativeH]);
+  }, [snapToGrid, gridNumCols, gridNumRows]);
 
   useEffect(() => subscribeAltarDrag(setSidebarDragItem), []);
 
@@ -409,14 +447,18 @@ export function AltarCanvas({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      {showGrid && (
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            backgroundImage: `linear-gradient(to right, rgba(${gridRgb.r},${gridRgb.g},${gridRgb.b},${gridOpacity}) 1px, transparent 1px), linear-gradient(to bottom, rgba(${gridRgb.r},${gridRgb.g},${gridRgb.b},${gridOpacity}) 1px, transparent 1px)`,
-            backgroundSize: `${gridSize}px ${gridSize}px`,
-          }}
-        />
+      {showGrid && gridPath && (
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d={gridPath}
+            stroke={`rgba(${gridRgb.r},${gridRgb.g},${gridRgb.b},${gridOpacity})`}
+            strokeWidth="1"
+            fill="none"
+          />
+        </svg>
       )}
 
       {editable && sidebarDragItem && (

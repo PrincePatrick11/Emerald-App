@@ -120,9 +120,13 @@ A note at the bottom reminds you to switch to edit mode to change these settings
 
 **Grid and snapping.** Each altar stores its own grid configuration: overlay toggle, size (8–128 px), opacity (1–25%), color, snap-to-grid, rotation snap, and scale to grid. Settings are saved immediately to the database and persist per altar, so switching between altars always restores that altar's own grid state. Grid controls are visible only in edit mode.
 
-- *Snap to grid* — moves place items on grid intersections.
+The grid is rendered as an SVG overlay directly in the canvas, with lines placed at exact percentage positions derived from a stable reference resolution. This means the grid renders without edge artefacts on Retina displays and does not change its cell count when the window is resized.
+
+- *Snap to grid* — snaps item positions precisely to the nearest grid intersection. Step sizes match the visual grid lines exactly.
 - *Snap rotation angle* — when enabled, dragging the rotation handle snaps to a configurable angle step (1–180°, default 15°). When disabled, rotation is free; holding Shift still snaps to 15° steps.
-- *Scale to grid* — when enabled, resizing a placement snaps its display size to the nearest multiple of `gridSize × 2`.
+- *Scale to grid* — when enabled, resizing a placement snaps to the nearest whole number of grid cells on both axes, so items always align to the grid as a box.
+
+The grid is also visible in exported images and captured thumbnails — the same grid settings (`grid_enabled`, `grid_size`, `grid_color`, `grid_opacity`) are applied by the Canvas 2D renderer that produces thumbnails and the "Save Image" export.
 
 **Multiple altars.** You can create several named altars and switch between them. Each altar has its own title, intention text, background, and set of placements.
 
