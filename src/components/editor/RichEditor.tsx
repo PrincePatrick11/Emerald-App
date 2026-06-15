@@ -11,7 +11,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { ExternalLink, Pencil, Trash2, Check, X } from 'lucide-react';
+import { ExternalLink, Pencil, Trash2, Check, X, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 async function persistImage(dataUrl: string): Promise<string> {
   return invoke<string>('save_image', { dataUrl });
@@ -32,6 +33,7 @@ import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useUIStore } from '../../store/uiStore';
+import { isAcceptedImageFile } from '../../lib/helpers';
 
 interface LinkPopupState {
   href: string;
@@ -57,6 +59,7 @@ export default function RichEditor({
   const operations = useOperationStore((s) => s.operations);
   const categories = useOperationStore((s) => s.categories);
   const setActiveView = useUIStore((s) => s.setActiveView);
+  const { t } = useTranslation();
 
   // Link popup state (edit mode only)
   const [linkPopup, setLinkPopup] = useState<LinkPopupState | null>(null);
@@ -165,7 +168,7 @@ export default function RichEditor({
         if (!imageItem) return false;
         event.preventDefault();
         const file = imageItem.getAsFile();
-        if (!file) return false;
+        if (!file || !isAcceptedImageFile(file)) return false;
         const reader = new FileReader();
         reader.onload = async () => {
           try {
@@ -334,6 +337,7 @@ export default function RichEditor({
   editorRef.current = editor;
 
   const [fileDragOver, setFileDragOver] = useState(false);
+  const [dragFormatError, setDragFormatError] = useState(false);
   useEffect(() => {
     if (!editable) return;
     const unlistenRef = { fn: undefined as (() => void) | undefined };
@@ -349,7 +353,7 @@ export default function RichEditor({
           setFileDragOver(false);
           const { paths } = event.payload;
           const imagePaths = paths.filter((p) => /\.(png|jpe?g|gif|webp|svg)$/i.test(p));
-          if (!imagePaths.length) return;
+          if (!imagePaths.length) { setDragFormatError(true); return; }
 
           const ed = editorRef.current;
           if (!ed) return;
@@ -519,6 +523,34 @@ export default function RichEditor({
           }}
           onClose={() => setLinkPickerOpen(false)}
         />
+      )}
+
+      {/* Drag-drop format error modal */}
+      {dragFormatError && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setDragFormatError(false)}>
+          <div className="bg-stone-900 border border-stone-700 rounded-xl shadow-2xl w-72 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-stone-700/60">
+              <div className="flex items-center gap-2 text-red-400">
+                <AlertCircle size={14} />
+                <span className="text-sm font-medium">{t('common.unsupportedImageFormat')}</span>
+              </div>
+              <button onClick={() => setDragFormatError(false)} className="text-stone-500 hover:text-stone-300 transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="px-4 py-3">
+              <p className="text-xs text-stone-400">PNG, JPEG, GIF, WebP, SVG</p>
+            </div>
+            <div className="px-4 pb-4">
+              <button
+                onClick={() => setDragFormatError(false)}
+                className="w-full rounded-md border border-stone-700/60 bg-stone-800/60 py-1.5 text-xs font-medium text-stone-300 hover:bg-stone-700/60 transition-colors"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Floating ghost following cursor during drag */}

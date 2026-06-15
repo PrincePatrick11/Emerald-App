@@ -7,7 +7,7 @@ import { Check, ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import { setAltarDragItem } from '../../lib/altarDragState';
 import { ALTAR_CAT_EMOJIS, CATEGORY_EMOJIS, FALLBACK_CATEGORY_EMOJIS } from '../../lib/altarConstants';
-import { readFileAsDataUrl } from '../../lib/helpers';
+import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
 import type { AltarCategory, AltarItem } from '../../types';
 
 const LIBRARY_DEFAULT_HEIGHT = 240;
@@ -47,6 +47,11 @@ function ItemModal({
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!isAcceptedImageFile(file)) {
+      setImageError(t('common.unsupportedImageFormat'));
+      e.target.value = '';
+      return;
+    }
     if (file.size > IMAGE_MAX_BYTES) {
       setImageError(t('altar.imageTooLarge', { max: '2 MB' }));
       e.target.value = '';
@@ -111,7 +116,7 @@ function ItemModal({
           <button onClick={() => imageInputRef.current?.click()} className="flex-shrink-0 flex items-center gap-1 px-2 py-2 bg-stone-800/60 rounded-lg hover:bg-stone-700/60 transition-colors text-stone-500 hover:text-stone-300" title={t('altar.uploadImage')}><ImagePlus size={14} /></button>
         </div>
         {imageError && <p className="text-xs text-red-400">{imageError}</p>}
-        <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+        <input ref={imageInputRef} type="file" accept={ACCEPTED_IMAGE_MIME} className="hidden" onChange={handleImageChange} />
         <input ref={nameInputRef} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t('altar.itemName')} className="w-full bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" />
         <div className="flex flex-wrap gap-1">
           {categories.map((cat) => (

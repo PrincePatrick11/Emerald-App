@@ -224,8 +224,8 @@ async function renderAltarThumbnail(
   return null;
 }
 
-/** Renders the active altar at full native resolution for file export. Returns JPEG at high quality. */
-export async function exportCurrentAltarImage(): Promise<string | null> {
+/** Renders the active altar at full native resolution for file export. */
+export async function exportCurrentAltarImage(format: 'jpeg' | 'png' | 'webp' = 'jpeg'): Promise<string | null> {
   try {
     const { placements, activeAltarId, altars } = useAltarStore.getState();
     const altar = altars.find((a) => a.id === activeAltarId) ?? null;
@@ -234,13 +234,15 @@ export async function exportCurrentAltarImage(): Promise<string | null> {
     const backgroundSrc = getCachedBackgroundPreview(altar.background_image_data);
     const canvas = await _renderAltar(altar, backgroundSrc, placements, nativeW, nativeH, nativeW);
     if (!canvas) return null;
+    const mime = format === 'png' ? 'image/png' : format === 'webp' ? 'image/webp' : 'image/jpeg';
+    const quality = format === 'png' ? undefined : format === 'webp' ? 0.92 : 0.97;
     return new Promise((resolve) => {
       canvas.toBlob((blob) => {
         if (!blob) { resolve(null); return; }
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
         reader.readAsDataURL(blob);
-      }, 'image/jpeg', 0.97);
+      }, mime, quality);
     });
   } catch (err) {
     console.error('[exportCurrentAltarImage]', err);

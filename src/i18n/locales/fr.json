@@ -6,7 +6,8 @@
     "yes": "Oui",
     "no": "Non",
     "delete": "Supprimer",
-    "deleteConfirm": "Supprimer ?"
+    "deleteConfirm": "Supprimer ?",
+    "unsupportedImageFormat": "Format non supporté. Autorisé : PNG, JPEG, GIF, WebP, SVG"
   },
   "listView": {
     "view": "Vue",
@@ -150,6 +151,7 @@
     "summaryActive": "Actif",
     "summaryInactive": "Inactif",
     "summaryEditToChange": "Passez en mode édition pour modifier ces paramètres.",
+    "saveImageFormat": "Format",
     "saveImage": "Enregistrer l'image …",
     "saveImageSaving": "Enregistrement …",
     "saveImageDone": "Enregistré",

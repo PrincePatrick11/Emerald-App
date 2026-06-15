@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
+import { useTranslation } from 'react-i18next';
+import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
 import {
   Bold,
   Italic,
@@ -28,9 +30,11 @@ interface Props {
 }
 
 export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker }: Props) {
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [linkInputOpen, setLinkInputOpen] = useState(false);
   const [linkHref, setLinkHref] = useState('');
+  const [imageError, setImageError] = useState<string | null>(null);
   const linkInputRef = useRef<HTMLInputElement>(null);
 
   const handleLinkButtonClick = () => {
@@ -63,6 +67,12 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
   const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!isAcceptedImageFile(file)) {
+      setImageError(t('common.unsupportedImageFormat'));
+      window.setTimeout(() => setImageError(null), 2500);
+      e.target.value = '';
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => onInsertImage(reader.result as string);
     reader.readAsDataURL(file);
@@ -211,7 +221,7 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept={ACCEPTED_IMAGE_MIME}
         className="hidden"
         onChange={handleImageFile}
       />
@@ -236,6 +246,10 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
           <Redo size={14} />
         </ToolbarBtn>
       </ToolbarGroup>
+
+      {imageError && (
+        <span className="ml-auto text-[10px] text-red-400">{imageError}</span>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useState } from 'react';
+import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
 import { useTranslation } from 'react-i18next';
 import { X, ImagePlus, Eye, EyeOff } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
@@ -24,6 +25,7 @@ export default function OpPropertiesPanel() {
   const updateEntry  = useJournalStore((s) => s.updateEntry);
   const iconInputRef = useRef<HTMLInputElement>(null);
   const coverImageInputRef = useRef<HTMLInputElement>(null);
+  const [imageNotice, setImageNotice] = useState<string | null>(null);
 
   const op      = activeView.type === 'operations' && activeView.id ? operations.find((o) => o.id === activeView.id) : null;
   const article = activeView.type === 'wiki'       && activeView.id ? articles.find((a) => a.id === activeView.id)   : null;
@@ -42,9 +44,15 @@ export default function OpPropertiesPanel() {
     return <p className="text-xs text-stone-600 px-2 py-3">{t('properties.noEntry')}</p>;
   }
 
+  const showImageNotice = (msg: string) => {
+    setImageNotice(msg);
+    window.setTimeout(() => setImageNotice(null), 2500);
+  };
+
   const handleIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!isAcceptedImageFile(file)) { showImageNotice(t('common.unsupportedImageFormat')); e.target.value = ''; return; }
     const reader = new FileReader();
     reader.onloadend = () => {
       const data = reader.result as string;
@@ -58,6 +66,7 @@ export default function OpPropertiesPanel() {
   const handleCoverImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!isAcceptedImageFile(file)) { showImageNotice(t('common.unsupportedImageFormat')); e.target.value = ''; return; }
     const reader = new FileReader();
     reader.onloadend = () => {
       const data = reader.result as string;
@@ -249,7 +258,7 @@ export default function OpPropertiesPanel() {
       {(article || (op && !sigilOperation)) && (
         <div>
           <p className="label-xs mb-2">{t('properties.icon')}</p>
-          <input ref={iconInputRef} type="file" accept="image/*" className="hidden" onChange={handleIconUpload} />
+          <input ref={iconInputRef} type="file" accept={ACCEPTED_IMAGE_MIME} className="hidden" onChange={handleIconUpload} />
           {(() => {
             const currentIcon = article?.icon ?? op?.icon;
             return currentIcon ? (
@@ -273,7 +282,7 @@ export default function OpPropertiesPanel() {
       {(article || (op && !sigilOperation)) && (
         <div>
           <p className="label-xs mb-2">{t('properties.coverImage')}</p>
-          <input ref={coverImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverImageUpload} />
+          <input ref={coverImageInputRef} type="file" accept={ACCEPTED_IMAGE_MIME} className="hidden" onChange={handleCoverImageUpload} />
           {(() => {
             const currentCover = article?.cover_image ?? op?.cover_image;
             return currentCover ? (
@@ -292,6 +301,8 @@ export default function OpPropertiesPanel() {
           })()}
         </div>
       )}
+
+      {imageNotice && <p className="text-xs text-red-400">{imageNotice}</p>}
 
       {/* ── Fixed: Operation-specific properties ── */}
       {op && !sigilOperation && (

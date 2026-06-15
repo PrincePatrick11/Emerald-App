@@ -20,7 +20,7 @@ import {
   isRatioFormat,
   ratioFromResolution,
 } from '../../lib/altarConstants';
-import { readFileAsDataUrl } from '../../lib/helpers';
+import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
 import { useUIStore } from '../../store/uiStore';
 import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
 import { PlacedElementRow, PlacedElementInspector } from './PlacedElementRow';
@@ -185,6 +185,10 @@ const [gridOpen, setGridOpen] = useState(true);
 
   const handleBackgroundUpload = (file: File) => {
     if (!activeAltar) return;
+    if (!isAcceptedImageFile(file)) {
+      showBackgroundNotice(t('common.unsupportedImageFormat'));
+      return;
+    }
     if (file.size > 5 * 1024 * 1024) {
       showBackgroundNotice(t('altar.imageTooLarge', { max: '5 MB' }));
       return;
@@ -205,6 +209,7 @@ const [gridOpen, setGridOpen] = useState(true);
   const handleIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !activeAltar) return;
+    if (!isAcceptedImageFile(file)) { e.target.value = ''; return; }
     const reader = new FileReader();
     reader.onloadend = () => updateAltar(activeAltar.id, { icon_data: reader.result as string });
     reader.readAsDataURL(file);
@@ -238,7 +243,7 @@ const [gridOpen, setGridOpen] = useState(true);
       <input
         ref={backgroundInputRef}
         type="file"
-        accept="image/*"
+        accept={ACCEPTED_IMAGE_MIME}
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -250,7 +255,7 @@ const [gridOpen, setGridOpen] = useState(true);
       <input
         ref={iconInputRef}
         type="file"
-        accept="image/*"
+        accept={ACCEPTED_IMAGE_MIME}
         className="hidden"
         onChange={handleIconUpload}
       />

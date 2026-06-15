@@ -115,7 +115,7 @@ Locked placements are click-through on the canvas (pointer events disabled), so 
 - **Grid** — active/inactive status and grid size.
 - **Elements** — count of placed items.
 
-A **Save Image…** button above the summary grid exports the current altar at full native resolution as a JPEG file (quality 0.97, no size cap) via the native OS save dialog. The default filename is `AltarTitle_YYYY-MM-DD.jpg`. The button shows in-progress, success, and error feedback states inline.
+A **Save Image…** button above the summary grid exports the current altar at full native resolution via the native OS save dialog. Three format buttons — **JPEG**, **PNG**, and **WebP** — sit directly below the save button in the same card block. The active format is highlighted with a jade ring. JPEG uses quality 0.97, WebP uses 0.92, PNG is lossless. The suggested filename and the OS save dialog filter adapt to the selected format (e.g. `AltarTitle_YYYY-MM-DD.png`). The button shows in-progress, success, and error feedback states inline.
 
 A note at the bottom reminds you to switch to edit mode to change these settings. The header fullscreen button is hidden when the sidebar is open, since the sidebar already provides one.
 
@@ -268,6 +268,19 @@ On import, image data-URLs are re-saved into the local image directory (with SHA
 Parses a Markdown file exported by Emerald (or following the same structure). The `# Title` line becomes the entry title. Key-value lines before the `---` separator are parsed as metadata. Unrecognised metadata keys become custom text properties. The body below `---` is parsed from Markdown to HTML using `marked`.
 
 Note: this path is parser-based (Markdown -> HTML) and is not identical to Emerald JSON import sanitisation. Metadata rendered into PDF export is escaped before interpolation.
+
+## Image Upload Validation
+
+All image upload inputs across the app accept only these MIME types: **PNG**, **JPEG**, **GIF**, **WebP**, and **SVG**. Files with any other MIME type are rejected before being processed. This applies to:
+
+- Altar background and icon uploads (`AltarSidebarPanel`)
+- Altar library item images (`AltarLibraryStrip`)
+- Operation and wiki article icons and cover images (`OpPropertiesPanel`)
+- Editor image insert via the toolbar (`EditorToolbar`)
+- Paste events in the rich-text editor (`RichEditor`)
+- Finder drag-and-drop into the rich-text editor (`RichEditor`)
+
+When a rejected file is selected via a file picker, an inline error message appears near the upload control and clears automatically after 2.5 seconds. When all files dragged from Finder into the rich editor have unsupported formats, a modal popup appears (backdrop-blur overlay, alert icon, list of allowed formats, OK button) instead of silently ignoring the drop.
 
 ## Context Menus
 

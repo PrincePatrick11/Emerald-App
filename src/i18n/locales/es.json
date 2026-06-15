@@ -6,7 +6,8 @@
     "yes": "Sí",
     "no": "No",
     "delete": "Eliminar",
-    "deleteConfirm": "¿Eliminar?"
+    "deleteConfirm": "¿Eliminar?",
+    "unsupportedImageFormat": "Formato no compatible. Permitido: PNG, JPEG, GIF, WebP, SVG"
   },
   "listView": {
     "view": "Vista",
@@ -150,6 +151,7 @@
     "summaryActive": "Activo",
     "summaryInactive": "Inactivo",
     "summaryEditToChange": "Cambia al modo edición para modificar estos ajustes.",
+    "saveImageFormat": "Formato",
     "saveImage": "Guardar imagen …",
     "saveImageSaving": "Guardando …",
     "saveImageDone": "Guardado",
