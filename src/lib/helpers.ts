@@ -27,12 +27,12 @@ export function boolToInt(v: boolean): 0 | 1 {
   return v ? 1 : 0;
 }
 
-export const ACCEPTED_IMAGE_MIME = 'image/png,image/jpeg,image/gif,image/webp,image/svg+xml';
+const ACCEPTED_IMAGE_MIME_LIST = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml'] as const;
 
-const ACCEPTED_IMAGE_MIME_LIST = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml'];
+export const ACCEPTED_IMAGE_MIME = ACCEPTED_IMAGE_MIME_LIST.join(',');
 
 export function isAcceptedImageFile(file: File): boolean {
-  return ACCEPTED_IMAGE_MIME_LIST.includes(file.type);
+  return (ACCEPTED_IMAGE_MIME_LIST as readonly string[]).includes(file.type);
 }
 
 export function readFileAsDataUrl(file: File): Promise<string> {

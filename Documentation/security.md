@@ -51,7 +51,7 @@ Three Rust commands enforce path restrictions:
 **`export_image`** enforces three layers of validation before writing:
 
 1. **Extension allowlist.** Only `.png`, `.jpg`, `.jpeg`, and `.webp` are permitted. Any other extension returns an `"unsupported file type"` error.
-2. **Root directory confinement.** The target path's parent is resolved to an absolute canonical form and verified against the allowed storage roots (home, documents, downloads, desktop, app data, app config). Symlink targets are rejected. If the resolved path escapes these roots, the command returns `"access denied: path outside allowed directories"`.
+2. **Root directory confinement.** The target path's parent is resolved using `is_within_allowed_roots` before `create_dir_all`, and then re-verified against the canonical path after `create_dir_all`. Only the post-canonicalize check is the authoritative gate; the pre-check guards against obviously-wrong paths being materialized on disk. Symlink targets are rejected. If the resolved path escapes these roots, the command returns `"access denied: path outside allowed directories"`.
 3. **Binary write.** The base64 payload is decoded from the data-URL by Rust before writing, so no text encoding or newline injection can alter the file content.
 
 **`copy_image_file`** enforces three layers of validation before reading the source file:
@@ -69,6 +69,8 @@ Several validation rules protect against malformed, oversized, or untrusted data
 **Background CSS interpolation.** All background CSS construction goes through `getAltarBackgroundStyle` in `altarConstants.ts`. For image-backed backgrounds, the function enforces that the source value starts with `data:image/` before interpolating it into a CSS `backgroundImage: url(...)` rule. Values that fail this check are treated as "no background" rather than interpolated, preventing unexpected URL scheme injection. This single utility replaces the per-call-site guard that previously existed only in `AltarSidebarPanel`.
 
 **Item image rendering.** `AltarItemVisual` and `AltarLibraryStrip` only render an `<img>` element when `item.image_data` starts with `data:image/`. Any other value (empty string, legacy path, unexpected scheme) is skipped and falls back to the emoji display.
+
+**SVG upload blocking for altar icons.** In `AltarSidebarPanel`, icon uploads check `file.type === 'image/svg+xml'` after the general MIME allowlist check and reject SVG files before reading the data. SVG data-URLs are also skipped when rendering the icon preview `<img>` — the element is shown only when `icon_data` starts with `data:image/` and does not start with `data:image/svg+xml`. This prevents SVG-based script execution via favicon uploads while still allowing SVG through other upload paths that use the shared `isAcceptedImageFile` helper.
 
 **Upload size limits.** File uploads in the altar module are rejected before processing if they exceed the size cap: 2 MB for item images (`AltarLibraryStrip`) and 5 MB for background images (`AltarSidebarPanel`). This prevents large files from being stored as base64 data-URLs in the database.
 
@@ -96,6 +98,8 @@ The content HTML itself (the TipTap editor output) is not re-escaped — it is t
 ## HTML Sanitisation
 
 All HTML that enters the app from outside is sanitised with DOMPurify before being stored or displayed.
+
+**PDF export (`src/lib/export.ts`).** Before the entry content HTML is written into the print window template, it is passed through `DOMPurify.sanitize`. The configuration allowlists TipTap internal-link attributes — `data-type`, `data-id`, `data-entry-type`, `data-label`, `data-icon`, `data-entry-number`, and `data-href` — so internal-link chips survive sanitisation intact. This closes a potential injection path if an editor extension or import produces unexpected HTML before it reaches the print window.
 
 **Emerald import (`src/lib/emeraldFormat.ts`).** After image paths are remapped, the content string is passed through `DOMPurify.sanitize`. The sanitisation configuration preserves TipTap-specific attributes (`data-type`, `data-id`, `data-entry-type`, `data-label`, `data-icon`) and strips everything else that DOMPurify would remove by default (script tags, event handler attributes, etc.).
 

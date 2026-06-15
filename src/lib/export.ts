@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { save, message } from '@tauri-apps/plugin-dialog';
 import TurndownService from 'turndown';
 import { format } from 'date-fns';
+import DOMPurify from 'dompurify';
 import type { ExportData, ChipData } from './exportData';
 import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
@@ -381,7 +382,9 @@ export async function exportAsPDF(data: ExportData): Promise<void> {
     ${topBarHtml}
     <h1 class="entry-title">${escapedTitle}${numStr}</h1>
     ${metaHtml}
-    <div class="entry-content">${embeddedContent}</div>
+    <div class="entry-content">${DOMPurify.sanitize(embeddedContent, {
+      ADD_ATTR: ['data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon', 'data-entry-number', 'data-href'],
+    })}</div>
   </div>
   <script>${TRANSFORM_LINKS_JS}<\/script>
 </body>

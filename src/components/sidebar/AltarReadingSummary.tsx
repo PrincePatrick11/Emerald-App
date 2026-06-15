@@ -177,13 +177,7 @@ export default function AltarReadingSummary() {
           title={t('altar.saveImage')}
         >
           {saveState === 'done' ? <Check size={14} /> : <Download size={14} />}
-          {saveState === 'saving'
-            ? t('altar.saveImageSaving')
-            : saveState === 'done'
-              ? t('altar.saveImageDone')
-              : saveState === 'error'
-                ? t('altar.saveImageError')
-                : t('altar.saveImage')}
+          {({ idle: t('altar.saveImage'), saving: t('altar.saveImageSaving'), done: t('altar.saveImageDone'), error: t('altar.saveImageError') } as const)[saveState]}
         </button>
 
         <div className="flex divide-x divide-stone-700/60 rounded-b-md border border-t-0 border-stone-700/60">

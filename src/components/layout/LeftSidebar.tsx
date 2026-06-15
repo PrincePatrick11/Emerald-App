@@ -244,7 +244,7 @@ export default function LeftSidebar() {
       </nav>
 
       {/* Bottom nav — always visible */}
-      <div className="flex-shrink-0 border-t border-stone-700/40 px-2 py-2">
+      <div className="sidebar-bottom-bar flex-shrink-0 border-t border-stone-700/40 px-2 py-2">
         <div className="flex items-center px-1 py-1">
           <button
             onClick={() => setSettingsOpen(true)}

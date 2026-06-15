@@ -119,13 +119,13 @@ export const PlacedElementRow = memo(function PlacedElementRow({
             onClick={() => { onDuplicate(); setContextMenu(null); }}
             className="w-full px-3 py-1.5 text-left text-xs text-stone-300 hover:bg-stone-800"
           >
-            Duplicate
+            {t('altar.duplicateElement')}
           </button>
           <button
             onClick={() => { onRemove(); setContextMenu(null); }}
             className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:bg-stone-800"
           >
-            Remove
+            {t('altar.removeElement')}
           </button>
         </div>,
         document.body

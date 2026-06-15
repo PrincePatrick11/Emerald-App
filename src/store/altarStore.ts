@@ -28,8 +28,8 @@ function filterEachPreview(
 async function insertAltarRow(altar: AltarRecord): Promise<void> {
   const db = await getDb();
   await db.execute(
-    'INSERT INTO altars (id, title, intention, background_preset, background_image_data, background_overlay, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid, resolution) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)',
-    [altar.id, altar.title, altar.intention, altar.background_preset, altar.background_image_data, altar.background_overlay, altar.created_at, altar.updated_at, boolToInt(altar.grid_enabled), altar.grid_size, altar.grid_opacity, altar.grid_color, boolToInt(altar.snap_to_grid), boolToInt(altar.rotation_snap_enabled), altar.rotation_snap_angle, boolToInt(altar.snap_scale_to_grid), altar.resolution],
+    'INSERT INTO altars (id, title, intention, background_preset, background_image_data, background_overlay, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid, resolution, thumbnail_data, icon_data) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)',
+    [altar.id, altar.title, altar.intention, altar.background_preset, altar.background_image_data, altar.background_overlay, altar.created_at, altar.updated_at, boolToInt(altar.grid_enabled), altar.grid_size, altar.grid_opacity, altar.grid_color, boolToInt(altar.snap_to_grid), boolToInt(altar.rotation_snap_enabled), altar.rotation_snap_angle, boolToInt(altar.snap_scale_to_grid), altar.resolution, altar.thumbnail_data ?? null, altar.icon_data ?? null],
   );
 }
 
@@ -170,6 +170,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
 
   addCategory: async (name, emoji) => {
     const db = await getDb();
+    const existing = get().categories.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    if (existing) throw new Error(`Category "${name}" already exists`);
     const cat: AltarCategory = { id: generateId(), name, emoji };
     const maxRow = await db.select<{ m: number }[]>('SELECT COALESCE(MAX(sort_order), -1) as m FROM altar_categories');
     const sortOrder = (maxRow[0]?.m ?? -1) + 1;
@@ -183,9 +185,19 @@ export const useAltarStore = create<AltarState>((set, get) => ({
 
   reorderCategories: async (ids) => {
     const db = await getDb();
+    const params: (string | number)[] = [];
+    let caseExpr = '';
+    const inParams: string[] = [];
     for (let i = 0; i < ids.length; i++) {
-      await db.execute('UPDATE altar_categories SET sort_order=$1 WHERE id=$2', [i, ids[i]]);
+      const idIdx = params.length + 1;
+      params.push(ids[i], i);
+      caseExpr += ` WHEN $${idIdx} THEN $${idIdx + 1}`;
+      inParams.push(`$${idIdx}`);
     }
+    await db.execute(
+      `UPDATE altar_categories SET sort_order = CASE id${caseExpr} END WHERE id IN (${inParams.join(',')})`,
+      params,
+    );
     const current = get().categories;
     const sorted = ids.map((id) => current.find((c) => c.id === id)!).filter(Boolean);
     set({ categories: sorted });
@@ -194,6 +206,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   updateCategory: async (id, name, emoji) => {
     const db = await getDb();
     const old = get().categories.find((c) => c.id === id);
+    const conflict = get().categories.find((c) => c.id !== id && c.name.toLowerCase() === name.toLowerCase());
+    if (conflict) throw new Error(`Category "${name}" already exists`);
     await db.execute('UPDATE altar_categories SET name=$1, emoji=$2 WHERE id=$3', [name, emoji, id]);
     if (old && old.name !== name) {
       // Update all items that referenced the old category name
@@ -316,6 +330,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       rotation_snap_angle: source.rotation_snap_angle,
       snap_scale_to_grid: source.snap_scale_to_grid,
       resolution: source.resolution ?? DEFAULT_ALTAR_RESOLUTION,
+      thumbnail_data: source.thumbnail_data ?? null,
+      icon_data: source.icon_data ?? null,
     };
 
     await insertAltarRow(copy);

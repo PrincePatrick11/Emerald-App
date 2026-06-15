@@ -309,7 +309,6 @@ export function AltarCanvas({
   cssScale: number;
   getBackgroundStyle: (altar: AltarRecord | null, imageSrc: string | null | undefined) => string;
 }) {
-  const { t } = useTranslation();
   const placements = useAltarStore((s) => s.placements);
   const selectedPlacementId = useAltarStore((s) => s.selectedPlacementId);
   const { placeItem, movePlacement, savePlacementPosition, updatePlacement, selectPlacement } = useAltarStore(
@@ -422,22 +421,22 @@ export function AltarCanvas({
       document.removeEventListener('pointermove', handlePointerMove);
       document.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [editable, sidebarDragItem, placeItem]);
+  }, [editable, sidebarDragItem, placeItem, coordsToPercent]);
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!editable) return;
     if (!draggingRef.current) return;
     const { x, y } = coordsToPercent(e.clientX, e.clientY);
     movePlacement(draggingRef.current, x, y);
-  };
+  }, [editable, coordsToPercent, movePlacement]);
 
-  const handleMouseUp = (e: React.MouseEvent) => {
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
     if (!editable) return;
     if (!draggingRef.current) return;
     const { x, y } = coordsToPercent(e.clientX, e.clientY);
     savePlacementPosition(draggingRef.current, x, y);
     draggingRef.current = null;
-  };
+  }, [editable, coordsToPercent, savePlacementPosition]);
 
   return (
     <div

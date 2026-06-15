@@ -161,15 +161,6 @@ fn write_file(app: tauri::AppHandle, path: String, content: String) -> Result<()
         .parent()
         .ok_or("invalid path")?;
 
-    let parent_abs = if parent.is_absolute() {
-        parent.to_path_buf()
-    } else {
-        std::env::current_dir().map_err(|e| e.to_string())?.join(parent)
-    };
-    if !is_within_allowed_roots(&parent_abs, &allowed_roots) {
-        return Err("access denied: path outside allowed directories".to_string());
-    }
-
     std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     let canonical_parent = std::fs::canonicalize(parent).map_err(|_| "invalid path".to_string())?;
     if !is_within_allowed_roots(&canonical_parent, &allowed_roots) {
@@ -209,18 +200,11 @@ fn export_image(app: tauri::AppHandle, path: String, data_url: String) -> Result
         .ok_or("Invalid data URL")?;
     let bytes = general_purpose::STANDARD.decode(b64).map_err(|e| e.to_string())?;
 
+    let final_bytes = bytes;
+
     let allowed_roots = resolve_allowed_roots(&app)?;
     let target = PathBuf::from(&path);
     let parent = target.parent().ok_or("invalid path")?;
-
-    let parent_abs = if parent.is_absolute() {
-        parent.to_path_buf()
-    } else {
-        std::env::current_dir().map_err(|e| e.to_string())?.join(parent)
-    };
-    if !is_within_allowed_roots(&parent_abs, &allowed_roots) {
-        return Err("access denied: path outside allowed directories".to_string());
-    }
 
     std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     let canonical_parent = std::fs::canonicalize(parent).map_err(|_| "invalid path".to_string())?;
@@ -237,12 +221,12 @@ fn export_image(app: tauri::AppHandle, path: String, data_url: String) -> Result
         if !is_within_allowed_roots(&canonical_target, &allowed_roots) {
             return Err("access denied: path outside allowed directories".to_string());
         }
-        return std::fs::write(canonical_target, &bytes).map_err(|e| e.to_string());
+        return std::fs::write(canonical_target, &final_bytes).map_err(|e| e.to_string());
     }
 
     let filename = target.file_name().ok_or("invalid path")?;
     let canonical_target = canonical_parent.join(filename);
-    std::fs::write(canonical_target, &bytes).map_err(|e| e.to_string())
+    std::fs::write(canonical_target, &final_bytes).map_err(|e| e.to_string())
 }
 
 /// Reads a text file and returns its contents as a UTF-8 string.

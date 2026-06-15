@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { listen } from '@tauri-apps/api/event';
 import { useTranslation } from 'react-i18next';
@@ -164,15 +164,22 @@ function CategoryModal({
   const [catEmoji, setCatEmoji] = useState(category?.emoji ?? '📦');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [nameError, setNameError] = useState('');
 
   const save = async () => {
     if (!catName.trim()) return;
+    setNameError('');
     const emoji = catEmoji.trim() || '📦';
-    if (category) {
-      await updateCategory(category.id, catName.trim(), emoji);
-    } else {
-      const cat = await addCategory(catName.trim(), emoji);
-      onTabChange(cat.name);
+    try {
+      if (category) {
+        await updateCategory(category.id, catName.trim(), emoji);
+      } else {
+        const cat = await addCategory(catName.trim(), emoji);
+        onTabChange(cat.name);
+      }
+    } catch (e) {
+      setNameError(e instanceof Error ? e.message : String(e));
+      return;
     }
     setShowEmojiPicker(false);
     onClose();
@@ -204,8 +211,9 @@ function CategoryModal({
               </div>
             )}
           </div>
-          <input value={catName} onChange={(e) => setCatName(e.target.value)} placeholder={t('altar.categoryName') ?? 'Category name'} className="flex-1 bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" onKeyDown={(e) => { if (e.key === 'Enter') save(); }} autoFocus />
+          <input value={catName} onChange={(e) => { setCatName(e.target.value); setNameError(''); }} placeholder={t('altar.categoryName') ?? 'Category name'} className="flex-1 bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" onKeyDown={(e) => { if (e.key === 'Enter') save(); }} autoFocus />
         </div>
+        {nameError && <p className="text-xs text-red-400">{nameError}</p>}
         {category && confirmDelete ? (
           <div className="flex items-center justify-between rounded-lg border border-red-700/40 bg-red-950/20 px-3 py-2">
             <span className="text-xs text-red-300">{t('common.deleteConfirm')}</span>
@@ -408,16 +416,16 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
     ? liveOrder.map((id) => categories.find((c) => c.id === id)).filter((c): c is AltarCategory => !!c)
     : categories;
 
-  const checkCatScroll = () => {
+  const checkCatScroll = useCallback(() => {
     const el = catScrollRef.current;
     if (!el) return;
     setCatScrollState({
       left: el.scrollLeft > 0,
       right: el.scrollLeft < el.scrollWidth - el.clientWidth - 1,
     });
-  };
+  }, []);
 
-  useEffect(() => { checkCatScroll(); }, [displayCategories]);
+  useEffect(() => { checkCatScroll(); }, [displayCategories, checkCatScroll]);
 
   const defaultCategory = categories[0]?.name ?? '';
 

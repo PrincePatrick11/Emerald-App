@@ -5,6 +5,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — 0.1.3
 
+### Security
+- PDF export: HTML content is now sanitised with DOMPurify before being written into the export template. TipTap internal-link attributes (`data-type`, `data-id`, `data-entry-type`, `data-label`, `data-icon`, `data-entry-number`, `data-href`) are explicitly allowlisted so link chips survive the sanitisation pass intact (`src/lib/export.ts`).
+- Altar favicon and icon uploads: SVG files are rejected at the upload step (`file.type === 'image/svg+xml'` returns early). SVG data-URLs are also filtered out from the rendered `<img>` element in the reading-summary panel, preventing SVG-based injection via the icon field (`AltarSidebarPanel.tsx`).
+- Rust `write_file` and `export_image`: removed redundant pre-`canonicalize` parent-directory checks that ran before `create_dir_all`; the post-`canonicalize` confinement check that runs after directory creation is sufficient and avoids TOCTOU issues (`src-tauri/src/lib.rs`).
+
 ### Added
 - Altar: **per-altar favicon** — each altar can have a custom favicon: either one of 30 curated spiritual emojis (selectable from an inline grid) or an uploaded image stored directly as base64. The favicon appears in the tab bar in place of the generic flame icon and as the first row in the view-mode summary panel. Set, change, or remove it via the collapsible "Favicon" section at the top of the sidebar in edit mode. Stored in `altars.icon_data` (migration v29).
 - Altar library: **drag-to-reorder category tabs** — drag any category tab left or right to change its position; tabs animate smoothly into their new slots with a FLIP transition (150 ms ease); the new order is persisted immediately to the database and survives app restarts
@@ -82,6 +87,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `backgroundOverlay` translation key was missing from `de.json`, `es.json`, and `fr.json`; all three locales now carry the key ("Hintergrund-Overlay" / "Superposición de fondo" / "Superposition de fond").
 - `mushroom_forest_ritual` translation key removed from all four locale files; the corresponding preset no longer exists.
 - Altar resize and rotate control handles were rendered at a fixed pixel size regardless of how much the canvas was scaled by CSS transform, making them appear oversized on small viewports. Handle sizes, icon sizes, offsets, and the rotation tooltip are now derived from `cssScale` so they remain visually consistent at any zoom level.
+- Altar library "Add Category" modal: when `save()` threw on a duplicate category name, the error was swallowed and the modal stayed open silently. The save function is now wrapped in try/catch; a `nameError` state displays the error message inline beneath the input, and typing in the input clears the error immediately (`AltarLibraryStrip.tsx`).
+- Duplicating an altar now copies the thumbnail preview and the favicon icon to the new altar — previously both fields were left NULL so the new card showed no preview and no tab icon (`altarStore.ts`, `insertAltarRow`).
 
 ### Added
 - Altar sidebar: **section states persisted per altar** — the open/closed state of all six collapsible sidebar sections (Background, Overlay, Grid, Favicon, Canvas Options, Placements) is now stored in `localStorage` under the key `altar-sidebar-sections-<altarId>` and restored when switching between altars. Sections default to open when no stored state exists for an altar.
@@ -107,6 +114,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `AltarView` `ResizeObserver` handles both ratio-format resolutions (e.g. `"16:9"`) and pixel-format resolutions (e.g. `"1920x1080"`): ratio mode derives `nativeW`/`nativeH` dynamically from the viewport size and sets `scale: 1`; pixel mode continues to compute a CSS `scale` factor as before.
 - `canvasTransform` in `AltarView` now stores `nativeW` and `nativeH` alongside `scale`, `offsetX`, and `offsetY` and is initialised with `{ scale:1, offsetX:0, offsetY:0, nativeW:1920, nativeH:1080 }`, eliminating a flash on first render.
 - `altarWindowFullscreen` is synced into a `useRef` (`altarWindowFullscreenRef`) that is read inside the `ResizeObserver` callback, so toggling full-window mode no longer tears down and recreates the observer.
+- `reorderCategories` in `altarStore` now issues a single bulk `UPDATE … CASE` statement for all reordered tabs instead of N individual `UPDATE` calls, reducing database round-trips on every drag-to-reorder action.
+- `handleMouseMove` and `handleMouseUp` in `AltarCanvas` are now wrapped in `useCallback`; `coordsToPercent` was added to the dependency array of the sidebar-drag `useEffect` where it was previously missing.
+- "Duplicate" and "Remove" labels in placed-element row context menus now use the i18n keys `altar.duplicateElement` / `altar.removeElement` instead of hardcoded English strings (`PlacedElementRow.tsx`).
+- `ACCEPTED_IMAGE_MIME_LIST` in `helpers.ts` is declared `as const`; `ACCEPTED_IMAGE_MIME` is derived from it, making the two values a single source of truth.
 - `PlacedItemProps` interface for the internal `PlacedItem` component in `AltarCanvas` is now declared as a named interface rather than an inline object type.
 - Creating a new altar via the "+" button now opens the altar immediately in edit mode instead of view mode.
 - Altar sidebar Canvas Options section simplified: size preset buttons (Small/Medium/Large/Very Large) and the custom W×H inputs are removed; only the six ratio buttons remain (full-width, 3-column grid). Selecting a ratio stores the ratio string directly in the database.

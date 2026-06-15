@@ -209,7 +209,7 @@ const [gridOpen, setGridOpen] = useState(true);
   const handleIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !activeAltar) return;
-    if (!isAcceptedImageFile(file)) { e.target.value = ''; return; }
+    if (!isAcceptedImageFile(file) || file.type === 'image/svg+xml') { e.target.value = ''; return; }
     const reader = new FileReader();
     reader.onloadend = () => updateAltar(activeAltar.id, { icon_data: reader.result as string });
     reader.readAsDataURL(file);
@@ -262,8 +262,7 @@ const [gridOpen, setGridOpen] = useState(true);
 
       {activeAltar && isEditing && (
         <div className="px-3 pb-5">
-          {isEditing && (
-            <>
+          <>
               <button
                 onClick={() => setFaviconOpen((v) => !v)}
                 className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
@@ -275,7 +274,7 @@ const [gridOpen, setGridOpen] = useState(true);
                 <div className="mt-2 mb-4">
                   {activeAltar.icon_data ? (
                     <div className="flex items-center gap-2">
-                      {activeAltar.icon_data.startsWith('data:')
+                      {activeAltar.icon_data.startsWith('data:image/') && !activeAltar.icon_data.startsWith('data:image/svg+xml')
                         ? <img src={activeAltar.icon_data} alt="" className="w-10 h-10 object-cover rounded-lg border border-stone-700/40 flex-shrink-0" />
                         : <span className="text-4xl leading-none w-10 h-10 flex items-center justify-center flex-shrink-0">{activeAltar.icon_data}</span>}
                       <div className="flex flex-col gap-0.5">
@@ -339,8 +338,7 @@ const [gridOpen, setGridOpen] = useState(true);
                   </div>
                 </div>
               )}
-            </>
-          )}
+          </>
           <div className={isEditing ? 'mt-4' : ''}>
           <button
             onClick={() => setBackgroundOpen((v) => !v)}
@@ -598,7 +596,7 @@ const [gridOpen, setGridOpen] = useState(true);
                     if (ALTAR_IMAGE_PRESETS.includes(p as (typeof ALTAR_IMAGE_PRESETS)[number]))
                       return { backgroundImage: `url("/backgrounds/thumbs/${p}.webp")`, backgroundSize: 'cover', backgroundPosition: 'center' };
                     if (isGradientPreset(p))
-                      return { background: generateGradientStyle(getGradientColor(p)) };
+                      return { background: generateGradientStyle(getGradientColor(p) ?? '#ffffff') };
                     return { background: ALTAR_BACKGROUND_STYLES[(p) as (typeof ALTAR_BACKGROUND_PRESETS)[number]] ?? ALTAR_BACKGROUND_STYLES[DEFAULT_ALTAR_BACKGROUND] };
                   })()}
                 >

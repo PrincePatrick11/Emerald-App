@@ -234,6 +234,8 @@ export default function AltarView() {
         )
       : [['', sorted] as const];
 
+    const filteredCount = filtered.length;
+
     return (
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between px-8 h-14 border-b border-stone-700/60">
@@ -265,7 +267,7 @@ export default function AltarView() {
                 {t('altar.start')}
               </button>
             </div>
-          ) : filtered.length === 0 ? (
+          ) : filteredCount === 0 ? (
             <p className="text-center py-20 text-stone-600 text-sm">{t('search.noResults')}</p>
           ) : (
             <div className="space-y-6">
