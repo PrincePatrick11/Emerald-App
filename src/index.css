@@ -1796,3 +1796,115 @@ html[data-theme='emerald-parchment'] .tiptap :not(pre) > code {
   color: var(--editor-code-text);
   border: 1px solid rgba(0, 122, 77, 0.2);
 }
+
+/* ── Altar Sidebar control buttons ────────────────────────────────────────── */
+
+html[data-theme='emerald-parchment'] .bg-stone-900\/45 {
+  background-color: #f3e6cf;
+}
+
+html[data-theme='emerald-parchment'] .border-stone-700\/40,
+html[data-theme='emerald-parchment'] .border-stone-700\/50,
+html[data-theme='emerald-parchment'] .border-stone-700\/60 {
+  border-color: rgba(145, 108, 70, 0.34);
+}
+
+html[data-theme='emerald-parchment'] .border-stone-600\/70 {
+  border-color: rgba(145, 108, 70, 0.42);
+}
+
+html[data-theme='emerald-parchment'] .hover\:border-stone-500\/60:hover,
+html[data-theme='emerald-parchment'] .hover\:border-stone-500\/70:hover {
+  border-color: rgba(131, 96, 62, 0.48);
+}
+
+html[data-theme='emerald-parchment'] .hover\:border-stone-400:hover {
+  border-color: rgba(131, 96, 62, 0.56);
+}
+
+html[data-theme='emerald-parchment'] .text-jade-300 {
+  color: #ecfff7;
+}
+
+html[data-theme='emerald-parchment'] .border-jade-600\/70 {
+  border-color: rgba(0, 138, 87, 0.6);
+}
+
+html[data-theme='emerald-parchment'] .ring-jade-700\/40 {
+  --tw-ring-color: rgba(0, 138, 87, 0.4);
+}
+
+html[data-theme='emerald-parchment'] .bg-stone-700,
+html[data-theme='emerald-parchment'] .hover\:bg-stone-700:hover {
+  background-color: var(--interactive-active);
+}
+
+html[data-theme='emerald-parchment'] .bg-red-950\/30 {
+  background-color: rgba(220, 76, 63, 0.09);
+}
+
+html[data-theme='emerald-parchment'] .text-red-200 {
+  color: var(--danger-text);
+}
+
+html[data-theme='emerald-parchment'] .border-red-700\/60 {
+  border-color: var(--danger-border);
+}
+
+html[data-theme='emerald-parchment'] .hover\:border-red-500:hover {
+  border-color: var(--danger-hover-border);
+}
+
+html[data-theme='emerald-parchment'] .bg-jade-900\/30,
+html[data-theme='emerald-parchment'] .bg-jade-900\/50 {
+  background: #159165;
+  border-color: rgba(0, 138, 87, 0.6);
+  color: #ecfff7;
+}
+
+html[data-theme='emerald-parchment'] .hover\:bg-jade-900\/50:hover {
+  background: #0f7a54;
+}
+
+html[data-theme='emerald-parchment'] .border-jade-600\/60,
+html[data-theme='emerald-parchment'] .border-jade-700\/60 {
+  border-color: rgba(0, 138, 87, 0.6);
+}
+
+html[data-theme='emerald-parchment'] .hover\:border-jade-500\/70:hover {
+  border-color: rgba(0, 138, 87, 0.7);
+}
+
+html[data-theme='emerald-parchment'] .text-jade-200 {
+  color: #ecfff7;
+}
+
+html[data-theme='emerald-parchment'] .ring-jade-500\/60 {
+  --tw-ring-color: rgba(0, 138, 87, 0.44);
+}
+
+html[data-theme='emerald-parchment'] .bg-stone-800\/80 {
+  background-color: rgba(145, 108, 70, 0.2);
+}
+
+html[data-theme='emerald-parchment'] .hover\:bg-stone-800\/40:hover {
+  background-color: #f1e4cf;
+}
+
+html[data-theme='emerald-parchment'] .hover\:text-stone-100:hover {
+  color: var(--text-primary);
+}
+
+html[data-theme='emerald-parchment'] .bg-stone-950\/35 {
+  background-color: rgba(145, 108, 70, 0.1);
+}
+
+html[data-theme='emerald-parchment'] .from-stone-900 {
+  --tw-gradient-from: #d8c4a0 var(--tw-gradient-from-position);
+  --tw-gradient-to: rgba(216, 196, 160, 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+html[data-theme='emerald-parchment'] .altar-cat-scroll-fade {
+  width: 3.5rem;
+}
