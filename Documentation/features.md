@@ -206,7 +206,7 @@ The Tasks module provides a hierarchical task manager with categories, prioritie
 
 **Links.** A task can link to Journal entries, Wiki articles, and Operations. Linked entries appear as clickable chips on the task row — clicking navigates to the linked entry.
 
-**Toolbar.** The list supports a search bar, five sort orders (Category, Newest, Oldest, A–Z, Z–A, Priority), and a Show/Hide Completed toggle. Only the List view is available.
+**Toolbar.** The list supports a search bar, five sort orders (Category, Newest, Oldest, A–Z, Z–A), and a Show/Hide Completed toggle. Only the List view is available.
 
 **Filter panel.** Filters by category (multi-select chips) and priority (multi-select pill buttons). Active filters show a count badge on the filter toggle button. When a category filter is active, only the selected categories are shown in the grouped view.
 

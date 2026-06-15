@@ -4,7 +4,7 @@ Emerald supports four languages: English (`en`), German (`de`), Spanish (`es`), 
 
 ## Setup
 
-Translations are managed with `react-i18next`. The setup lives in `src/i18n/index.ts`, which imports all four locale files and registers them. `AppShell` (or any root component) calls `i18n.changeLanguage(lang)` when the user changes the setting.
+Translations are managed with `react-i18next`. The setup lives in `src/i18n/index.ts`, which imports all four locale files and registers them. `SettingsModal` calls `i18n.changeLanguage(lang)` when the user changes the setting.
 
 Translation files are at:
 
@@ -80,6 +80,7 @@ The translation files follow this top-level structure (from `en.json`):
 | `nav` | Sidebar navigation labels |
 | `operations` | All operations UI strings, including `categories.sigils` and `categories.servitors` |
 | `altar` | All altar UI strings, including `element` (add-item button label), `category` (category field label), `addCategory` (new-category button), `categoryName` (category name input placeholder), `uncategorized` (label for the pseudo-tab that collects items whose category no longer exists), `backgroundOverlay` (opacity slider label inside the Overlay Options box), `overlayOptions` (collapsible section header, formerly "Background Overlay"), `overlay.dark` / `overlay.light` (labels for the overlay color toggle buttons), `enterFullscreen` (label for the fullscreen button in the reading summary sidebar), reading summary labels (`summary`, `summaryRatio`, `summaryBackground`, `summaryOverlay`, `summaryGrid`, `summaryElements`, `summaryActive`, `summaryInactive`, `summaryEditToChange`), Save Image button states (`saveImage`, `saveImageSaving`, `saveImageDone`, `saveImageError`), `saveImageFormat` (label for the format picker group below the save button), background presets under `altar.backgrounds.*` — four colour-gradient preset keys (`midnight`, `ember`, `forest`, `moon`) plus 16 image preset keys (e.g. `bamboo_grove_bench`, `mountain_altar_summit`, `dark_grotto_shrine`, `light_gate_magic`, `marble_temple_arch`, …), inspector labels (`inspectorX`, `inspectorY`, `inspectorScale`, `inspectorRotation`, `inspectorOpacity` — unit annotations are rendered in the UI, not in the key values), grid controls (`rotationSnap`, `rotationSnapAngle`, `snapScaleToGrid`), canvas options controls (`canvasOptions`, `ratio`), lock/show/hide actions, `background` (view-mode section header), `duplicateElement` (duplicate button tooltip and context menu label), and `removeElement` (remove button tooltip and context menu label — replaces the previously hardcoded "Remove" string in `PlacedElementRow`) |
+| `tasks` | Tasks module UI strings |
 | `journal` | Journal UI strings |
 | `creation` | Sigil editor strings (shown for sigil operations) |
 | `wiki` | Wiki UI strings, including `categories.*` for all built-in wiki category IDs |
