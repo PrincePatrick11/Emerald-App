@@ -40,6 +40,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Altar placed-elements list: **drag-to-reorder** Z-order — grip icon on each row; dragging a row repositions it in the list and immediately reassigns Z-index values across all placements (Pointer Events, no HTML5 drag API)
 
 ### Fixed
+- Altar fullscreen: the Exit Fullscreen button was not visible when the right sidebar was open before entering fullscreen — the header button was gated on `!rightSidebarOpen`, which was `false` during fullscreen. The Minimize2 button now appears unconditionally whenever `altarWindowFullscreen` is true; the Maximize2 button only appears when not in fullscreen and the sidebar is closed.
+- Altar sidebar: the "Canvas Options" section header lacked top margin when the "Favicon" section was collapsed, causing it to visually merge with the Favicon toggle. The Canvas Options button now carries `mt-4`, consistent with all other section headers in the sidebar.
 - Altar library: selecting a category tab when two categories share the same name caused both tabs to appear active simultaneously. Category tabs now use the category's UUID as the selection key, not the display name.
 - Altar grid: half-columns and half-rows appeared at the canvas edges — the previous CSS `background-size` tile approach accumulated sub-pixel rounding errors, especially on Retina displays. The grid is now rendered as a single SVG `<path>` element with lines placed at exact percentage positions, eliminating edge artefacts entirely.
 - Altar grid: the visual grid changed shape on window resize because the CSS tile size was computed from the live container dimensions. Grid line count is now derived from a stable reference resolution (`resolveResolutionPixels`) that is independent of container size, so the grid scales with the canvas without changing cell count.
@@ -78,6 +80,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `backgroundOverlay` translation key was missing from `de.json`, `es.json`, and `fr.json`; all three locales now carry the key ("Hintergrund-Overlay" / "Superposición de fondo" / "Superposition de fond").
 - `mushroom_forest_ritual` translation key removed from all four locale files; the corresponding preset no longer exists.
 - Altar resize and rotate control handles were rendered at a fixed pixel size regardless of how much the canvas was scaled by CSS transform, making them appear oversized on small viewports. Handle sizes, icon sizes, offsets, and the rotation tooltip are now derived from `cssScale` so they remain visually consistent at any zoom level.
+
+### Added
+- Altar sidebar: **section states persisted per altar** — the open/closed state of all six collapsible sidebar sections (Background, Overlay, Grid, Favicon, Canvas Options, Placements) is now stored in `localStorage` under the key `altar-sidebar-sections-<altarId>` and restored when switching between altars. Sections default to open when no stored state exists for an altar.
 
 ### Changed
 - Altar library strip category row: the scrollbar is hidden; gradient fade overlays on the left and right edges appear when content is scrollable in that direction, indicating overflow without a visible scrollbar; the `+ Category` button is anchored outside the scroll container so it stays in view regardless of scroll position

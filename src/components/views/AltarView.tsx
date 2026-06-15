@@ -357,13 +357,21 @@ export default function AltarView() {
             </>
           ) : (
             <>
-              {!rightSidebarOpen && (
+              {altarWindowFullscreen ? (
                 <button
-                  onClick={() => setAltarWindowFullscreen(!altarWindowFullscreen)}
+                  onClick={() => setAltarWindowFullscreen(false)}
                   className="btn-ghost"
-                  title={altarWindowFullscreen ? t('altar.exitWindowFullscreen') : t('altar.windowFullscreen')}
+                  title={t('altar.exitWindowFullscreen')}
                 >
-                  {altarWindowFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                  <Minimize2 size={15} />
+                </button>
+              ) : !rightSidebarOpen && (
+                <button
+                  onClick={() => setAltarWindowFullscreen(true)}
+                  className="btn-ghost"
+                  title={t('altar.windowFullscreen')}
+                >
+                  <Maximize2 size={15} />
                 </button>
               )}
               <button onClick={enterEditMode} className="btn-ghost" title={t('editor.edit')}>

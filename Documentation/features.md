@@ -119,7 +119,7 @@ A **Save Image…** button above the summary grid exports the current altar at f
 
 A note at the bottom reminds you to switch to edit mode to change these settings. The header fullscreen button is hidden when the sidebar is open, since the sidebar already provides one.
 
-**Sidebar in edit mode.** The full editor panel — Canvas Options, Change Background, Overlay Options, Grid Options, and Placed Elements — is visible only when the altar is in edit mode. Each section is collapsible with a chevron toggle.
+**Sidebar in edit mode.** The full editor panel — Canvas Options, Change Background, Overlay Options, Grid Options, and Placed Elements — is visible only when the altar is in edit mode. Each section is collapsible with a chevron toggle. The open/closed state of all six sections (Background, Overlay, Grid, Favicon, Canvas Options, Placements) is saved per altar in `localStorage` and restored when you switch back to that altar. Sections default to open the first time an altar is opened.
 
 **Canvas resolution.** Each altar stores a canvas resolution in its database row. In edit mode the sidebar shows a collapsible "Canvas Options" section with six aspect-ratio buttons (16:9, 4:3, 3:2, 1:1, 2:3, 9:16). Selecting a ratio stores it directly as a string (e.g. `"16:9"`); the canvas then fills the available viewport at that proportion with `scale: 1` and a dynamic native size. Legacy pixel-format resolutions (e.g. `"1920x1080"`) continue to work as before — the canvas renders at that fixed native size and is scaled to fit the viewport via CSS transform. Dashboard preview cards reflect the altar's aspect ratio.
 
@@ -150,7 +150,7 @@ The overlay is applied on top of all background types — colour presets, gradie
 
 **Intention.** A text field on each altar records your intention or purpose for that setup.
 
-**View mode and full-window mode.** Full-window altar mode is only available in view mode. Entering edit mode exits full-window mode automatically. Pressing **Escape** while in full-window mode also exits it. Grid controls and all edit panels are hidden in read/view mode. The fullscreen toggle is accessible both in the altar header (when the sidebar is closed) and in the sidebar summary (when the sidebar is open).
+**View mode and full-window mode.** Full-window altar mode is only available in view mode. Entering edit mode exits full-window mode automatically. Pressing **Escape** while in full-window mode also exits it. Grid controls and all edit panels are hidden in read/view mode. The fullscreen toggle is accessible both in the altar header and in the sidebar summary. In the header: the Exit Fullscreen (Minimize2) button is always visible while fullscreen is active — regardless of whether the sidebar is open — and the Enter Fullscreen (Maximize2) button appears only when not in fullscreen and the sidebar is closed.
 
 ## Navigation
 

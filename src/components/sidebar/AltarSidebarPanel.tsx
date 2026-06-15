@@ -68,6 +68,34 @@ const [gridOpen, setGridOpen] = useState(true);
   const [faviconOpen, setFaviconOpen] = useState(true);
   const [canvasOptionsOpen, setCanvasOptionsOpen] = useState(true);
   const [placementsOpen, setPlacementsOpen] = useState(true);
+  const altarId = activeAltar?.id;
+  const altarIdRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    altarIdRef.current = altarId;
+    if (!altarId) return;
+    try {
+      const stored = localStorage.getItem(`altar-sidebar-sections-${altarId}`);
+      const s = stored ? JSON.parse(stored) : {};
+      setBackgroundOpen(typeof s.backgroundOpen === 'boolean' ? s.backgroundOpen : true);
+      setOverlayOpen(typeof s.overlayOpen === 'boolean' ? s.overlayOpen : true);
+      setGridOpen(typeof s.gridOpen === 'boolean' ? s.gridOpen : true);
+      setFaviconOpen(typeof s.faviconOpen === 'boolean' ? s.faviconOpen : true);
+      setCanvasOptionsOpen(typeof s.canvasOptionsOpen === 'boolean' ? s.canvasOptionsOpen : true);
+      setPlacementsOpen(typeof s.placementsOpen === 'boolean' ? s.placementsOpen : true);
+    } catch {}
+  }, [altarId]);
+
+  useEffect(() => {
+    const id = altarIdRef.current;
+    if (!id) return;
+    localStorage.setItem(`altar-sidebar-sections-${id}`, JSON.stringify({
+      backgroundOpen, overlayOpen, gridOpen, faviconOpen, canvasOptionsOpen, placementsOpen,
+    }));
+  // altarIdRef ist absichtlich nicht in den Deps – nur Section-Toggles sollen speichern, nicht der Altar-Wechsel
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backgroundOpen, overlayOpen, gridOpen, faviconOpen, canvasOptionsOpen, placementsOpen]);
+
   const [dragState, setDragState] = useState<{ fromId: string; overIndex: number } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   // keeps onUp closure current without re-subscribing drag listeners
@@ -278,7 +306,7 @@ const [gridOpen, setGridOpen] = useState(true);
               )}
               <button
                 onClick={() => setCanvasOptionsOpen((v) => !v)}
-                className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
+                className="flex items-center gap-1 mt-4 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
               >
                 {canvasOptionsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                 {t('altar.canvasOptions')}
