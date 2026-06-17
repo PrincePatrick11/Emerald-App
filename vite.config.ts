@@ -1,12 +1,25 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
+// Vite 6 adds crossorigin to module scripts and preloads by default.
+// In Tauri's custom protocol (tauri:// / https://tauri.localhost), this can
+// trigger CORS checks that fail on some WebView2/WKWebView versions.
+function stripCrossOrigin(): Plugin {
+  return {
+    name: 'strip-crossorigin',
+    transformIndexHtml: {
+      order: 'post',
+      handler: (html: string) => html.replace(/ crossorigin(?:="[^"]*")?/g, ''),
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [react()],
+  plugins: [react(), stripCrossOrigin()],
   build: {
     rollupOptions: {
       output: {

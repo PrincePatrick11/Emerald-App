@@ -480,11 +480,18 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             install_mouse_nav_monitor(app.handle().clone());
 
+            #[cfg(target_os = "macos")]
             let app_submenu = Submenu::with_items(app, "Emerald", true, &[
                 &PredefinedMenuItem::about(app, None, None)?,
                 &PredefinedMenuItem::separator(app)?,
                 &PredefinedMenuItem::hide(app, None)?,
                 &PredefinedMenuItem::hide_others(app, None)?,
+                &PredefinedMenuItem::separator(app)?,
+                &PredefinedMenuItem::quit(app, None)?,
+            ])?;
+            #[cfg(not(target_os = "macos"))]
+            let app_submenu = Submenu::with_items(app, "Emerald", true, &[
+                &PredefinedMenuItem::about(app, None, None)?,
                 &PredefinedMenuItem::separator(app)?,
                 &PredefinedMenuItem::quit(app, None)?,
             ])?;
