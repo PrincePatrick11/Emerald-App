@@ -113,7 +113,7 @@ export default function AltarReadingSummary() {
     if (!activeAltar) return null;
     const preset = activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND;
     if (activeAltar.background_image_data) {
-      const safeUrl = customBackgroundPreview?.startsWith('data:image/') || customBackgroundPreview?.startsWith('tauri://')
+      const safeUrl = customBackgroundPreview?.startsWith('data:image/')
         ? `url("${customBackgroundPreview}")`
         : null;
       return {

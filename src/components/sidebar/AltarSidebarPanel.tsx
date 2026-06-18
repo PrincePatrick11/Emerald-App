@@ -164,7 +164,7 @@ const [gridOpen, setGridOpen] = useState(true);
   }, [sortedPlacements, updatePlacement]);
 
   const hasCustomBackground = !!(activeAltar && (activeAltar.background_image_data || customBackgroundMap[activeAltar.id]));
-  const safeBackgroundUrl = customBackgroundPreview?.startsWith('data:image/') || customBackgroundPreview?.startsWith('tauri://')
+  const safeBackgroundUrl = customBackgroundPreview?.startsWith('data:image/')
     ? `url("${customBackgroundPreview}")`
     : null;
 
