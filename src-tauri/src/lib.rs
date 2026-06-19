@@ -129,7 +129,11 @@ fn copy_image_file(app: tauri::AppHandle, source: String) -> Result<String, Stri
 fn read_image_as_base64(app: tauri::AppHandle, path: String) -> Result<String, String> {
     let allowed_dir = std::fs::canonicalize(images_dir(&app)?)
         .map_err(|e| e.to_string())?;
-    let canon = std::fs::canonicalize(&path)
+    let path_buf = PathBuf::from(&path);
+    if !path_buf.exists() {
+        return Err("file not found".to_string());
+    }
+    let canon = std::fs::canonicalize(&path_buf)
         .map_err(|_| "invalid path".to_string())?;
     if !canon.starts_with(&allowed_dir) {
         return Err("access denied: path outside images directory".to_string());

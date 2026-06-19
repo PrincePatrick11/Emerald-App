@@ -6,6 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 // footprint is negligible. If long sessions with many unique backgrounds
 // become a concern, a simple LRU cap (e.g. 50 entries) could be added.
 const cache = new Map<string, string>();
+const failed = new Set<string>();
 const inFlight = new Map<string, Promise<void>>();
 const listeners = new Set<() => void>();
 
@@ -14,13 +15,16 @@ function notify() {
 }
 
 function loadPreview(path: string) {
-  if (cache.has(path) || inFlight.has(path)) return;
+  if (cache.has(path) || failed.has(path) || inFlight.has(path)) return;
   const promise = invoke<string>('read_image_as_base64', { path })
     .then((dataUrl) => {
       cache.set(path, dataUrl);
     })
     .catch((error) => {
-      console.error('Failed to load background preview:', path, error);
+      failed.add(path);
+      if (error !== 'file not found') {
+        console.error('Failed to load background preview:', path, error);
+      }
     })
     .finally(() => {
       inFlight.delete(path);
@@ -38,6 +42,7 @@ function readSnapshot(source: string | null | undefined): string | null {
   if (!source) return null;
   if (source.startsWith('data:')) return source;
   if (cache.has(source)) return cache.get(source) ?? null;
+  if (failed.has(source)) return null;
   loadPreview(source);
   return null;
 }

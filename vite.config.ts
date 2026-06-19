@@ -26,9 +26,8 @@ export default defineConfig(async () => ({
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
           if (id.includes("@tiptap") || id.includes("prosemirror")) return "tiptap";
-          if (id.includes("react") || id.includes("scheduler")) return "react-vendor";
           if (id.includes("@tauri-apps")) return "tauri";
-          if (id.includes("i18next") || id.includes("react-i18next")) return "i18n";
+          if (id.includes("i18next")) return "i18n";
           return "vendor";
         },
       },
