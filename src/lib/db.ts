@@ -725,4 +725,45 @@ const MIGRATIONS: Migration[] = [
       await db.execute('ALTER TABLE altars ADD COLUMN icon_data TEXT DEFAULT NULL');
     },
   },
+  {
+    // Guard migration: ensures all altar_placements columns from v3/v4 exist.
+    // Needed for DBs where v3 was recorded as applied but run against older code
+    // that didn't include all of these columns yet.
+    version: 30,
+    name: 'altar_placements_column_guard',
+    up: async (db) => {
+      const cols = await db.select<{ name: string }[]>('PRAGMA table_info(altar_placements)');
+      const has = new Set(cols.map(c => c.name));
+      if (!has.has('scale'))     await db.execute('ALTER TABLE altar_placements ADD COLUMN scale REAL NOT NULL DEFAULT 1');
+      if (!has.has('z_index'))   await db.execute('ALTER TABLE altar_placements ADD COLUMN z_index INTEGER NOT NULL DEFAULT 0');
+      if (!has.has('width'))     await db.execute('ALTER TABLE altar_placements ADD COLUMN width REAL NOT NULL DEFAULT 8');
+      if (!has.has('height'))    await db.execute('ALTER TABLE altar_placements ADD COLUMN height REAL NOT NULL DEFAULT 8');
+      if (!has.has('rotation'))  await db.execute('ALTER TABLE altar_placements ADD COLUMN rotation REAL NOT NULL DEFAULT 0');
+      if (!has.has('opacity'))   await db.execute('ALTER TABLE altar_placements ADD COLUMN opacity REAL NOT NULL DEFAULT 1');
+      if (!has.has('locked'))    await db.execute('ALTER TABLE altar_placements ADD COLUMN locked INTEGER NOT NULL DEFAULT 0');
+      if (!has.has('hidden'))    await db.execute('ALTER TABLE altar_placements ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
+      if (!has.has('altar_id'))  await db.execute('ALTER TABLE altar_placements ADD COLUMN altar_id TEXT');
+    },
+  },
+  {
+    // Belt-and-suspenders follow-up to v30: uses try/catch per column instead of
+    // PRAGMA so it is immune to any result-format quirks in plugin-sql.
+    // Runs unconditionally on DBs that had v30 applied but columns still missing.
+    version: 31,
+    name: 'altar_placements_column_guard_v2',
+    up: async (db) => {
+      const tryAdd = async (sql: string) => {
+        try { await db.execute(sql); } catch { /* column already exists — ignore */ }
+      };
+      await tryAdd('ALTER TABLE altar_placements ADD COLUMN scale REAL NOT NULL DEFAULT 1');
+      await tryAdd('ALTER TABLE altar_placements ADD COLUMN z_index INTEGER NOT NULL DEFAULT 0');
+      await tryAdd('ALTER TABLE altar_placements ADD COLUMN width REAL NOT NULL DEFAULT 8');
+      await tryAdd('ALTER TABLE altar_placements ADD COLUMN height REAL NOT NULL DEFAULT 8');
+      await tryAdd('ALTER TABLE altar_placements ADD COLUMN rotation REAL NOT NULL DEFAULT 0');
+      await tryAdd('ALTER TABLE altar_placements ADD COLUMN opacity REAL NOT NULL DEFAULT 1');
+      await tryAdd('ALTER TABLE altar_placements ADD COLUMN locked INTEGER NOT NULL DEFAULT 0');
+      await tryAdd('ALTER TABLE altar_placements ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
+      await tryAdd('ALTER TABLE altar_placements ADD COLUMN altar_id TEXT');
+    },
+  },
 ];
