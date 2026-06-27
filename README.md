@@ -18,7 +18,7 @@ Emerald is a desktop app for documenting your magical practice. Write journal en
 
 <table>
   <tr>
-    <td><img src="screenshots/theme_dark.png"/></td>
+    <td><a href="iscreenshots/theme_dark.png" target="_blank"><img src="screenshots/theme_dark.png"/></a></td>
     <td><img src="screenshots/theme_light.png"/></td>
   </tr>
   <tr>
