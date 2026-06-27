@@ -25,9 +25,13 @@ Emerald is a desktop app for documenting your magical practice. Write journal en
 
 <img src="screenshots/settings_language.png" width="100%"/>
 
-<h3 align="center">Typical Journal Entry.</h3>
+<h3 align="center">Journal Entry. Link your Entries.</h3>
 
 <img src="screenshots/journal.png" width="100%"/>
+
+<h3 align="center">Wiki Entry.</h3>
+
+<img src="screenshots/wiki_entry.png" width="100%"/>
 
 <h3 align="center">Sigil Editor in the Operations Module</h3>
 
@@ -47,25 +51,29 @@ Emerald is a desktop app for documenting your magical practice. Write journal en
 
 ## Features
 
-**Journal** — Rich-text entries with automatic moon phase tracking. Classify by paradigm, banishing technique, or meditation type. Link operations and wiki articles, add tags and custom properties. Full backlink graph across all content types.
+**Journal** — Rich-text entries (TipTap) with automatic moon phase tracking. Attach paradigm, banishing technique, and meditation type via linked wiki articles. Add free-form tags, custom properties (text, number, date, toggle, checkbox), and internal links to operations and wiki articles. Three list layouts (List, Cards, Timeline) with sort, filter by moon phase or property value, and full-text search.
 
-**Wiki** — A personal reference library with 12 built-in category types (deities, herbs, rituals, symbols, …) and custom categories. Articles support icons, cover images, and internal links from anywhere in the app.
+**Wiki** — A personal reference library with 12 built-in category types (deities, herbs, rituals, symbols, …) and unlimited custom categories. Articles support emoji or image icons, cover images, and show backlinks from any content in the app.
 
-**Operations** — Track rituals, workings, servitors, and sigils. Mark them active or inactive, set end dates and version numbers, link wiki articles and journal entries.
+**Operations** — Track rituals, workings, servitors, and sigils. Mark them active or inactive, set end dates and version strings, and attach icons and cover images. Link wiki articles and journal entries.
 
-**Tasks** — Hierarchical task manager with categories, priorities (Low/Medium/High), subtasks, and links to other content. Filter by category or priority, group by category, inline-edit titles. Soft-delete with trash recovery.
+**Sigil Workflow** — Write your intention, auto-reduce unique letters into a letter bank, draw the sigil on a canvas, set a reveal date, link a charging technique, and mark it as loaded — all in a dedicated editor inside Operations.
 
-**Sigil Workflow** — Write your intention, reduce the letters, draw the sigil on a canvas, set a reveal date, and link a charging technique — all in one dedicated editor inside Operations.
+**Altar** — A virtual canvas for your sacred space. Build a personal item library with fully dynamic, reorderable categories. Drag items onto the canvas and adjust position, scale, rotation, opacity, and layer order. Keep multiple altar setups with customisable backgrounds (7 gradient presets, 16 photographic presets, or a custom upload) and a dark/light overlay. Snap items to a configurable grid. Export any altar as JPEG, PNG, or WebP at full native resolution. Dashboard shows live thumbnail previews of all altars.
 
-**Altar** — A virtual altar canvas. Build a library of symbolic items, arrange them with drag-and-drop, and keep multiple altar setups with different backgrounds and intentions.
+**Tasks** — Hierarchical task manager with unlimited subtask depth, categories, and three priority levels (Low / Medium / High). Link tasks to journal entries, wiki articles, or operations. Filter by category and priority, inline-edit titles. Soft-delete with trash recovery.
 
-**Routines** — Reusable content templates that drop into any journal entry, automatically merging tags and linked content.
+**Backlinks** — Every journal entry, wiki article, and operation shows all content that references it in a live sidebar panel.
 
-**Export / Import** — Export as PDF, Markdown, or the lossless `.emerald` format with embedded images. Import back on any machine. Full database backup and restore via `.emeralddb`.
+**Routines** — Reusable content templates that drop into any journal entry, automatically merging body text, tags, and linked content.
 
-**Multi-Vault** — Keep separate databases for different projects or traditions.
+**Export / Import** — Export entries as PDF, Markdown, or the lossless `.emerald` format with embedded images. Import back on any machine. Full database backup and restore via `.emeralddb`.
 
-**Tabs & Workspace** — Open multiple entries, wiki articles, operations, sigils, and altars in browser-like tabs. Reorder tabs with drag-and-drop (animated) and resume the same tab set and tab order after restart.
+**Multi-Vault** — Keep separate SQLite databases for different projects or traditions, switchable from inside the app.
+
+**Tabs & Workspace** — Open journal entries, wiki articles, operations, sigils, and altars in browser-like tabs. Reorder with drag-and-drop, open with middle-click, close with middle-click, and resume the full workspace after restart.
+
+**Theming & Typography** — Two built-in themes: Emerald Noctis (dark, default) and Emerald Parchment (light). Independent font controls for the UI shell and the editor body, with 8 typeface options.
 
 **Localised** — English, German, Spanish, and French.
 
