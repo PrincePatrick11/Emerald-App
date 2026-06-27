@@ -114,7 +114,6 @@ The dev build uses a separate app identity (`com.emerald.magical-journal.dev`) a
 | [Documentation/database.md](Documentation/database.md) | SQLite schema and conventions |
 | [Documentation/internationalization.md](Documentation/internationalization.md) | Adding and managing translations |
 | [Documentation/security.md](Documentation/security.md) | Capability model and sandboxing |
-| [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) | Full SQLite schema reference |
 
 ---
 
