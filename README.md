@@ -16,34 +16,24 @@ Emerald is a desktop app for documenting your magical practice. Write journal en
 
 ## Screenshots
 
-![Altar](screenshots/altar.png)
-
-![Journal Entry](screenshots/journal.png)
-
-![Wiki](screenshots/wiki.png)
-
-![Sigil Editor](screenshots/sigil.png)
-
-![Home Dashboard](screenshots/home.png)
-
 <table>
   <tr>
-    <td><img src="screenshots/theme_dark.png" width="50%"/></td>
-    <td><img src="screenshots/theme_light.png" width="50%"/></td>
+    <td><img src="screenshots/theme_dark.png"/></td>
+    <td><img src="screenshots/theme_light.png"/></td>
   </tr>
   <tr>
-    <td><img src="screenshots/journal.png" width="100%"/></td>
+    <td><img src="screenshots/journal.png"/></td>
   </tr>
   <tr>
-    <td><img src="screenshots/sigil.png" width="100%"/></td>
+    <td><img src="screenshots/sigil.png"/></td>
   </tr>
   <tr>
-    <td><img src="screenshots/altar_1.png" width="100%"/></td>
+    <td><img src="screenshots/altar_1.png"/></td>
   </tr>
-    <td><img src="screenshots/altar_2.png" width="50%"/></td>
-    <td><img src="screenshots/altar_3.png" width="50%"/></td>
+    <td><img src="screenshots/altar_2.png"/></td>
+    <td><img src="screenshots/altar_3.png"/></td>
   <tr>
-    <td><img src="screenshots/settings_language.png" width="100%"/></td>
+    <td><img src="screenshots/settings_language.png"/></td>
   </tr>
 </table>
 
