@@ -1,13 +1,13 @@
 # Emerald
 
-> A private, local-first journal for magical practice.
+> A private workspace for your magical practice, built for practitioners of every tradition.
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
 ![Tauri](https://img.shields.io/badge/Tauri-2.x-FFC131?logo=tauri&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
 
-Emerald is a desktop app for documenting your magical practice. Write journal entries, build a personal wiki, track rituals and operations, create sigils, and arrange a virtual altar — all stored locally in a SQLite database on your machine. No account, no cloud, no tracking.
+Emerald is the private workspace for your magical practice. A journal, personal wiki, ritual tracker, sigil workshop, and virtual altar — all in one app, all on your machine. Built for practitioners of every tradition. No account, no cloud, no tracking.
 
 > [!WARNING]
 > **Early development.** Emerald is a personal project shared in the spirit of open source. It is functional and used daily, but not yet a polished release — expect rough edges, missing features, and breaking changes between versions. Use at your own risk and back up your data regularly.
@@ -21,7 +21,7 @@ Emerald is a desktop app for documenting your magical practice. Write journal en
 
 <img src="screenshots/theme_dark.png" width="49%"/> <img src="screenshots/theme_light.png" width="49%"/>
 
-<h3 align="center">Set Theme, Font, Language, Database in the Language. Export / Import your Data.</h3>
+<h3 align="center">Set Theme, Font, Language and Database. Export / Import your Data.</h3>
 
 <img src="screenshots/settings_language.png" width="100%"/>
 
@@ -81,21 +81,27 @@ Emerald is a desktop app for documenting your magical practice. Write journal en
 
 ## Getting Started
 
+### Download
+
+Pre-built binaries for macOS, Windows, and Linux are on the [Releases](../../releases) page.
+
+**macOS** — The app is not notarised. Gatekeeper will block it on first launch.
+Right-click the app in Finder → **Open** → confirm. After the first approval it opens normally.
+Alternatively, run `sudo xattr -cr /Applications/Emerald.app` in Terminal.
+
+**Windows** — SmartScreen may show a warning. Click **More info → Run anyway**.
+
+### Build from source
+
 **Prerequisites:** Node.js · Rust toolchain · [Tauri prerequisites](https://tauri.app/start/prerequisites/)
 
 ```bash
 npm install
-npm run tauri:dev     # dev build — uses a separate database, title "Emerald Dev"
+npm run tauri:dev     # dev build — separate database, title "Emerald Dev"
 npm run tauri build   # production build
 ```
 
-The dev build keeps its own app identity (`com.emerald.magical-journal.dev`) and database, so it won't interfere with an installed production build.
-
-If you previously installed dependencies with `sudo`, Vite may fail with `EACCES` while writing to `node_modules/.vite-temp`. The npm scripts in this repo already use `--configLoader runner` to avoid that failure, but fixing ownership is still recommended:
-
-```bash
-sudo chown -R "$USER":staff node_modules
-```
+The dev build uses a separate app identity (`com.emerald.magical-journal.dev`) and database, so it won't interfere with an installed production build.
 
 ---
 
@@ -104,7 +110,6 @@ sudo chown -R "$USER":staff node_modules
 | Document | Description |
 |---|---|
 | [Documentation/features.md](Documentation/features.md) | Full feature guide |
-| [Documentation/altar.md](Documentation/altar.md) | Altar behavior, editing flows, and layout controls |
 | [Documentation/architecture.md](Documentation/architecture.md) | Architecture, patterns, and data flow |
 | [Documentation/database.md](Documentation/database.md) | SQLite schema and conventions |
 | [Documentation/internationalization.md](Documentation/internationalization.md) | Adding and managing translations |
