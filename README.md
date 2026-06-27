@@ -15,31 +15,31 @@ Emerald is a desktop app for documenting your magical practice. Write journal en
 ---
 
 ## Screenshots
-*All the Entries here are examples and partly AI generated.*
+<p align="center"><em>All the Entries here are examples and partly AI generated.</em></p>
+
+<h3 align="center">Dark & Light Theme</h3>
 
 <img src="screenshots/theme_dark.png" width="49%"/> <img src="screenshots/theme_light.png" width="49%"/>
 
-Dark & Light Theme
+<h3 align="center">Set Theme, Font, Language, Database in the Language. Export / Import your Data.</h3>
 
 <img src="screenshots/settings_language.png" width="100%"/>
 
-Set Theme, Font, Language, Database in the Language. Export / Import your Data.
+<h3 align="center">Typical Journal Entry.</h3>
 
 <img src="screenshots/journal.png" width="100%"/>
 
-Typical Journal Entry.
+<h3 align="center">Sigil Editor in the Operations Module</h3>
 
 <img src="screenshots/sigil.png" width="100%"/>
 
-Sigil Editor in the Operations Module
+<h3 align="center">Create your custom Altar</h3>
 
 <img src="screenshots/altar_1.png" width="100%"/>
 
-Create your custom Altar
+<h3 align="center">Some Altar Examples</h3>
 
 <img src="screenshots/altar_2.png" width="49%"/> <img src="screenshots/altar_3.png" width="49%"/>
-
-Some Altar Examples
 
 
 
