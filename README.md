@@ -16,24 +16,26 @@ Emerald is a desktop app for documenting your magical practice. Write journal en
 
 ## Screenshots
 
-<table>
+<table border="0" cellspacing="0" cellpadding="8" width="100%">
   <tr>
-    <td><a href="screenshots/theme_dark.png" target="_blank"><img src="screenshots/theme_dark.png"/></a></td>
-    <td><img src="screenshots/theme_light.png"/></td>
+    <td width="50%"><a href="screenshots/theme_dark.png"><img src="screenshots/theme_dark.png" width="100%"/></a></td>
+    <td width="50%"><a href="screenshots/theme_light.png"><img src="screenshots/theme_light.png" width="100%"/></a></td>
   </tr>
   <tr>
-    <td><img src="screenshots/journal.png"/></td>
+    <td colspan="2"><a href="screenshots/journal.png"><img src="screenshots/journal.png" width="100%"/></a></td>
   </tr>
   <tr>
-    <td><img src="screenshots/sigil.png"/></td>
+    <td colspan="2"><a href="screenshots/sigil.png"><img src="screenshots/sigil.png" width="100%"/></a></td>
   </tr>
   <tr>
-    <td><img src="screenshots/altar_1.png"/></td>
+    <td colspan="2"><a href="screenshots/altar_1.png"><img src="screenshots/altar_1.png" width="100%"/></a></td>
   </tr>
-    <td><img src="screenshots/altar_2.png"/></td>
-    <td><img src="screenshots/altar_3.png"/></td>
   <tr>
-    <td><img src="screenshots/settings_language.png"/></td>
+    <td width="50%"><a href="screenshots/altar_2.png"><img src="screenshots/altar_2.png" width="100%"/></a></td>
+    <td width="50%"><a href="screenshots/altar_3.png"><img src="screenshots/altar_3.png" width="100%"/></a></td>
+  </tr>
+  <tr>
+    <td colspan="2"><a href="screenshots/settings_language.png"><img src="screenshots/settings_language.png" width="100%"/></a></td>
   </tr>
 </table>
 
