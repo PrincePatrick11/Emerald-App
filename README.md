@@ -37,7 +37,7 @@ Emerald is a desktop app for documenting your magical practice. Write journal en
 
 <img src="screenshots/altar_1.png" width="100%"/>
 
-<h3 align="center">Some Altar Examples</h3>
+<h5 align="center">Some Altar Examples</h5>
 
 <img src="screenshots/altar_2.png" width="49%"/> <img src="screenshots/altar_3.png" width="49%"/>
 
