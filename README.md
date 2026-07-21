@@ -111,6 +111,7 @@ The dev build uses a separate app identity (`com.emerald.magical-journal.dev`) a
 |---|---|
 | [Documentation/features.md](Documentation/features.md) | Full feature guide |
 | [Documentation/architecture.md](Documentation/architecture.md) | Architecture, patterns, and data flow |
+| [Documentation/design.md](Documentation/design.md) | Design tokens, component patterns, and known inconsistencies |
 | [Documentation/database.md](Documentation/database.md) | SQLite schema and conventions |
 | [Documentation/internationalization.md](Documentation/internationalization.md) | Adding and managing translations |
 | [Documentation/security.md](Documentation/security.md) | Capability model and sandboxing |
