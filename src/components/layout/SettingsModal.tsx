@@ -28,6 +28,7 @@ const DEFAULT_EXPORT_OPTIONS: BackupOptions = {
   includeOperations: true,
   includeRoutines: true,
   includeAltars: true,
+  includeTasks: true,
   includeTags: true,
   dateFrom: '',
   dateTo: '',
@@ -70,7 +71,7 @@ export default function SettingsModal({ onClose }: Props) {
   const [newVaultName, setNewVaultName] = useState('');
   const [importTypeFilters, setImportTypeFilters] = useState<ImportTypeFilters>({
     includeJournal: true, includeWiki: true, includeOperations: true,
-    includeRoutines: true, includeAltars: true, includeTags: true,
+    includeRoutines: true, includeAltars: true, includeTasks: true, includeTags: true,
   });
   const [excludedWikiCats] = useState<Set<string>>(new Set());
   const [excludedOpCats] = useState<Set<string>>(new Set());
@@ -124,7 +125,7 @@ export default function SettingsModal({ onClose }: Props) {
       if (!result) return;
       setImportedFile({ backup: result.backup, preview: result.preview });
       setNewVaultName(t('settings.importedVault'));
-      setImportTypeFilters({ includeJournal: true, includeWiki: true, includeOperations: true, includeRoutines: true, includeAltars: true, includeTags: true });
+      setImportTypeFilters({ includeJournal: true, includeWiki: true, includeOperations: true, includeRoutines: true, includeAltars: true, includeTasks: true, includeTags: true });
     } catch {
       setImportError(t('settings.importErrorInvalid'));
     }
@@ -379,6 +380,7 @@ export default function SettingsModal({ onClose }: Props) {
                           ['includeOperations', 'settings.includeOperations'],
                           ['includeRoutines', 'settings.includeRoutines'],
                           ['includeAltars', 'settings.includeAltars'],
+                          ['includeTasks', 'settings.includeTasks'],
                           ['includeTags', 'settings.includeTags'],
                         ] as [keyof BackupOptions, string][]
                       ).map(([key, labelKey]) => (
@@ -495,6 +497,7 @@ export default function SettingsModal({ onClose }: Props) {
                           importedFile.preview.opsCount && `${importedFile.preview.opsCount} O`,
                           importedFile.preview.routinesCount && `${importedFile.preview.routinesCount} R`,
                           importedFile.preview.altarsCount && `${importedFile.preview.altarsCount} A`,
+                          importedFile.preview.taskCount && `${importedFile.preview.taskCount} T`,
                         ].filter(Boolean).join(', ')}
                       </span>
                     )}
@@ -517,6 +520,7 @@ export default function SettingsModal({ onClose }: Props) {
                             ['includeOperations', 'settings.includeOperations'],
                             ['includeRoutines', 'settings.includeRoutines'],
                             ['includeAltars', 'settings.includeAltars'],
+                            ['includeTasks', 'settings.includeTasks'],
                             ['includeTags', 'settings.includeTags'],
                           ] as [keyof ImportTypeFilters, string][]
                         ).map(([key, labelKey]) => (

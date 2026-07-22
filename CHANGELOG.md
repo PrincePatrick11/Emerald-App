@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- Settings → Backup: a new **Tasks** checkbox (enabled by default) controls whether the Tasks module is included in `.emeralddb` exports and imports. The import preview now also shows the number of tasks in the backup file. Labels for the new checkbox are localised in EN / DE / ES / FR (`settings.includeTasks`).
+
+### Fixed
+- `.emeralddb` backup export did not include Tasks at all — the backup pipeline had fallen out of sync after the Tasks module was added, so `tasks`, `task_categories`, and `task_links` were silently dropped from the export. All three tables are now exported, with `task_links` scoped to the exported task IDs and soft-deleted rows filtered out. On import, `useTaskStore` is reloaded so the imported tasks are visible in the UI immediately. (`src/lib/dbBackup.ts`)
+- Altar backup coverage was also out of sync: the `altar_categories` table was missing from the export, and the path-remap for altar image columns was incomplete (only `background_image_data` was being remapped). The new `thumbnail_data` and `icon_data` columns are now part of the altar image-field set, and `altar_categories` is exported, filtered, deleted, and re-inserted alongside the rest of the altar tables. (`src/lib/dbBackup.ts`)
+
 ## [0.1.3] - 2026-06-15
 
 ### Security

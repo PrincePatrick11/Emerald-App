@@ -407,6 +407,7 @@
     "includeOperations": "Operations",
     "includeRoutines": "Routines",
     "includeAltars": "Altars",
+    "includeTasks": "Tasks",
     "includeTags": "Tags",
     "importInclude": "Include",
     "importCategories": "Categories to import",

@@ -399,13 +399,15 @@ Full vault snapshots are exported and imported via Settings → Backup.
     "journalEntries": [], "wikiArticles": [], "wikiCategories": [],
     "operations": [], "operationCategories": [], "tags": [],
     "customProperties": [], "routines": [],
-    "altars": [], "altarItems": [], "altarPlacements": [], "links": []
+    "altars": [], "altarCategories": [], "altarItems": [], "altarPlacements": [],
+    "tasks": [], "taskCategories": [], "taskLinks": [],
+    "links": []
   },
   "images": { "/abs/path/img.png": "data:image/png;base64,..." }
 }
 ```
 
-**Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Routines / Altars / Tags`, `dateFrom`, `dateTo`, `includeDeleted`. Altars and routines are date-filtered on `created_at`. `altar_items` and `altar_placements` are scoped to exported altars.
+**Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Routines / Altars / Tasks / Tags`, `dateFrom`, `dateTo`, `includeDeleted`. Altars, routines, and tasks are date-filtered on `created_at`. `altar_items` and `altar_placements` are scoped to exported altars; `task_links` is scoped to exported task IDs. Soft-deleted rows in `task_categories` and `tasks` are excluded; `altar_categories` has no soft-delete column and is exported in full.
 
 **Import modes:**
 
@@ -415,7 +417,7 @@ Full vault snapshots are exported and imported via Settings → Backup.
 | `merge` | Generates an 8-char base36 timestamp prefix (`Date.now().toString(36).slice(-8)`). All entry IDs are prefixed; all cross-references and wiki slugs are remapped. Categories and tags use `INSERT OR IGNORE` by original ID/name. |
 | `add-vault` | Creates a new vault DB → `switchVault()` → runs replace logic on the empty DB. User ends up in the new vault. |
 
-Images are restored via `save_image` (SHA-256 dedup — identical images are written to disk only once).
+Images are restored via `save_image` (SHA-256 dedup — identical images are written to disk only once). The path-remap covers all image-bearing columns: journal `content`; wiki `content` / `icon` / `cover_image`; operation `content` / `icon` / `cover_image` / `drawing_data` / `thumbnail_data`; altar `background_image_data` / `thumbnail_data` / `icon_data`; altar library item `image_data`. Absolute paths from the backup are rewritten to point at the local image directory.
 
 ## Rules for Future Schema Changes
 
