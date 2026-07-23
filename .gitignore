@@ -26,6 +26,11 @@ dist-ssr
 # Tauri
 src-tauri/target/
 
+# Local scratch / temp / notes (not for version control)
+tmp/
+notes/
+*.local.md
+
 # SQLite DB (user data, not for version control)
 *.db
 *.db-shm

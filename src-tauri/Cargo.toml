@@ -34,7 +34,38 @@ base64 = "0.22"
 sha2 = "0.10"
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
+tokio = { version = "1", features = ["rt", "time", "sync"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"
 block = "0.1"
+# objc2 family is already pulled in transitively by Tauri 2; we promote it
+# to a direct dep so we can define a custom WKNavigationDelegate for the
+# PDF export (see `pdf_export/macos.rs`). Versions match Tauri's
+# Cargo.lock at the time of writing.
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-web-kit = "0.3"
+objc2-core-foundation = "0.3"
+block2 = "0.6"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# webview2-com + windows let us drive the same WebView2 the app already
+# uses to render the PDF via `ICoreWebView2_7::PrintToPdf` (see
+# `pdf_export::windows`). Versions are pinned to whatever Tauri 2
+# itself already pulls in (see Cargo.lock: webview2-com 0.38.2, windows
+# 0.61.3 at the time of writing) — Tauri recommends pinning minor
+# versions when reaching into the platform webview via `with_webview`.
+webview2-com = "0.38"
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# webkit2gtk + gtk drive the app's own WebKit webview via
+# `WebKitPrintOperation` to render PDFs (see `pdf_export/linux.rs`).
+# Versions match what Tauri 2 itself pulls in (see Cargo.lock).
+webkit2gtk = "2.0"
+gtk = "0.18"
+javascriptcore-rs = "1.1"

@@ -1,13 +1,18 @@
 use base64::{engine::general_purpose, Engine as _};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 
-// ── PDF export state ──────────────────────────────────────────────────────────
-
-static EXPORT_HTML: Mutex<String> = Mutex::new(String::new());
+/// Native-webview PDF export. Each platform owns its own implementation
+/// in `pdf_export/{windows,macos,linux}.rs`, all behind the same
+/// `pub async fn export_pdf` signature; `mod.rs` does the
+/// per-`#[cfg(target_os)]` re-export.
+///
+/// See `tmp/pdf-export-native-webview.md` for the design history (the
+/// plan that replaced the old bundled `wkhtmltopdf.exe` subprocess with
+/// driving the app's own webview).
+mod pdf_export;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -264,36 +269,21 @@ fn ensure_app_storage_dirs(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Triggers the system print dialog on the pdf-export window.
+/// Renders the given HTML to a PDF file at `path` by driving the
+/// platform's own webview. See `pdf_export::{windows,macos,linux}.rs`
+/// for the per-platform implementation; `pdf_export::mod.rs` does the
+/// `#[cfg(target_os = "…")]` re-export so this is a one-liner.
+///
+/// The frontend first prompts the user for a save location via the
+/// `dialog` plugin and passes the chosen path here. The pre-migration
+/// implementation bundled a `wkhtmltopdf.exe` subprocess (~42 MB, LGPL,
+/// 2015-era Qt WebKit, no working macOS build); it was replaced because
+/// the app's own WebView2 / WKWebView / WebKitGTK does the same job
+/// with smaller install, modern CSS, and native color emoji. See
+/// `tmp/pdf-export-native-webview.md` for the migration plan.
 #[tauri::command]
-fn trigger_print(app: tauri::AppHandle) -> Result<(), String> {
-    if let Some(w) = app.get_webview_window("pdf-export") {
-        w.print().map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-/// Opens a new window that renders the given HTML and immediately triggers
-/// the system print dialog — on macOS the user can "Save as PDF" there.
-#[tauri::command]
-fn open_pdf_export(app: tauri::AppHandle, html: String) -> Result<(), String> {
-    *EXPORT_HTML.lock().map_err(|e| e.to_string())? = html;
-
-    // Close any leftover export window
-    if let Some(w) = app.get_webview_window("pdf-export") {
-        w.close().ok();
-    }
-
-    let url = url::Url::parse("export-html://localhost/")
-        .map_err(|e| e.to_string())?;
-
-    tauri::WebviewWindowBuilder::new(&app, "pdf-export", tauri::WebviewUrl::CustomProtocol(url))
-        .title("Export as PDF")
-        .inner_size(816.0, 1100.0)
-        .build()
-        .map_err(|e| e.to_string())?;
-
-    Ok(())
+async fn export_pdf(app: tauri::AppHandle, html: String, path: String) -> Result<(), String> {
+    pdf_export::export_pdf(&app, html, path).await
 }
 
 /// Deletes image files in the images dir that are not in `used_paths`
@@ -401,6 +391,29 @@ fn install_mouse_nav_monitor(app_handle: tauri::AppHandle) {
     }
 }
 
+/// Toggles the enabled state of the three "Export to …" menu items.
+/// Called by the frontend whenever the active view changes, so the items
+/// are only clickable when a journal / wiki / operations entry is open.
+#[tauri::command]
+fn set_export_menu_enabled(app: tauri::AppHandle, enabled: bool) {
+    use tauri::menu::MenuItemKind;
+    let Some(menu) = app.menu() else { return };
+
+    for kind in menu.items().unwrap_or_default() {
+        if let MenuItemKind::Submenu(sub) = &kind {
+            if sub.id().0.as_str() != "export-submenu" { continue; }
+            for child in sub.items().unwrap_or_default() {
+                if let MenuItemKind::MenuItem(item) = &child {
+                    let child_id = item.id().0.as_str();
+                    if matches!(child_id, "export-pdf" | "export-markdown" | "export-emerald") {
+                        item.set_enabled(enabled).ok();
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[tauri::command]
 fn update_menu_labels(
     app: tauri::AppHandle,
@@ -456,14 +469,6 @@ fn update_menu_labels(
 
 pub fn run() {
     tauri::Builder::default()
-        .register_uri_scheme_protocol("export-html", |_app, _request| {
-            let html = EXPORT_HTML.lock().unwrap().clone();
-            tauri::http::Response::builder()
-                .status(200)
-                .header("content-type", "text/html; charset=utf-8")
-                .body(html.into_bytes())
-                .unwrap()
-        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_sql::Builder::new().build())
@@ -476,8 +481,8 @@ pub fn run() {
             write_file,
             read_file,
             ensure_app_storage_dirs,
-            open_pdf_export,
-            trigger_print,
+            export_pdf,
+            set_export_menu_enabled,
             update_menu_labels,
         ])
         .setup(|app| {
@@ -514,25 +519,27 @@ pub fn run() {
                 None::<&str>,
             )?;
             let view_submenu = Submenu::with_id_and_items(app, "view-submenu", "View", true, &[&reset_item])?;
+            // Export items start disabled — the frontend enables them once a
+            // journal / wiki / operations entry is actually open.
             let export_pdf_item = MenuItem::with_id(
                 app,
                 "export-pdf",
                 "Export as PDF…",
-                true,
+                false,
                 None::<&str>,
             )?;
             let export_md_item = MenuItem::with_id(
                 app,
                 "export-markdown",
                 "Export as Markdown…",
-                true,
+                false,
                 None::<&str>,
             )?;
             let export_emerald_item = MenuItem::with_id(
                 app,
                 "export-emerald",
                 "Export as Emerald…",
-                true,
+                false,
                 None::<&str>,
             )?;
             let export_submenu = Submenu::with_id_and_items(

@@ -11,7 +11,7 @@ import { useRoutineStore } from '../../store/routineStore';
 import { useVaultStore } from '../../store/vaultStore';
 // useJournalStore/useWikiStore/useOperationStore used for image cleanup below
 import { invoke } from '@tauri-apps/api/core';
-import { exportAsPDF, exportAsMarkdown, noEntryMessage } from '../../lib/export';
+import { exportAsPDF, exportAsMarkdown, noEntryMessage, exportErrorMessage } from '../../lib/export';
 import { collectExportData } from '../../lib/exportData';
 import { exportAsEmerald, importFromEmerald, importFromMarkdown } from '../../lib/emeraldFormat';
 
@@ -125,6 +125,19 @@ export default function AppShell() {
     }).catch(() => {/* desktop-only, ignore in browser preview */});
   }, [i18n.language, t]);
 
+  // Enable "Export to …" only while a journal / wiki / operations entry
+  // is actually open. On the home view, trash, altar, tags, etc. they are
+  // greyed out and unclickable.
+  useEffect(() => {
+    const isEntryView =
+      (activeView.type === 'journal' ||
+       activeView.type === 'wiki' ||
+       activeView.type === 'operations') &&
+      !!activeView.id;
+    invoke('set_export_menu_enabled', { enabled: isEntryView })
+      .catch(() => {/* desktop-only, ignore in browser preview */});
+  }, [activeView.type, activeView.id]);
+
   useEffect(() => {
     const unlistenBack = listen('navigate-back', () => navigateBack());
     const unlistenFwd  = listen('navigate-forward', () => navigateForward());
@@ -149,25 +162,25 @@ export default function AppShell() {
     const unlistenPdf = listen('export-pdf', async () => {
       const data = await collectExportData();
       if (!data) { noEntryMessage(); return; }
-      exportAsPDF(data).catch(console.error);
+      exportAsPDF(data).catch(err => exportErrorMessage(err, 'PDF export'));
     });
 
     const unlistenMd = listen('export-markdown', async () => {
       const data = await collectExportData();
       if (!data) { noEntryMessage(); return; }
-      exportAsMarkdown(data).catch(console.error);
+      exportAsMarkdown(data).catch(err => exportErrorMessage(err, 'Markdown export'));
     });
 
     const unlistenEmerald = listen('export-emerald', () => {
-      exportAsEmerald().catch(console.error);
+      exportAsEmerald().catch(err => exportErrorMessage(err, 'Emerald export'));
     });
 
     const unlistenImportEmerald = listen('import-emerald', () => {
-      importFromEmerald().catch(console.error);
+      importFromEmerald().catch(err => exportErrorMessage(err, 'Emerald import'));
     });
 
     const unlistenImportMd = listen('import-markdown', () => {
-      importFromMarkdown().catch(console.error);
+      importFromMarkdown().catch(err => exportErrorMessage(err, 'Markdown import'));
     });
 
     return () => {

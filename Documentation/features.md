@@ -237,7 +237,9 @@ All export and import actions are in the native application menu.
 
 ### PDF Export
 
-Opens a preview window showing the entry with its metadata formatted as a print document. A "Save as PDF" button triggers the system print dialog where you can choose a file destination. Images in the entry are embedded as base64 before the preview is generated. Internal link chips are rendered as styled spans.
+Prompts a native save dialog for the destination and writes the PDF directly to disk — there is no preview window and no system print dialog. The PDF is rendered by the app's own webview (WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux), so emoji render as proper colored glyphs (Segoe UI Emoji / Apple Color Emoji / Noto Color Emoji) without any frontend rasterisation. The suggested filename is `<Title>_YYYY-MM-DD.pdf`; the user picks the actual location in the OS save dialog. Images in the entry are embedded as base64 before the PDF is generated; internal link chips are rendered as styled spans inside the content.
+
+Like the Markdown and Emerald exports, the PDF export menu items are only available while a Journal / Wiki / Operations entry is actually open — they are disabled on the home view, the altar, the tag manager, and the trash.
 
 ### Markdown Export
 

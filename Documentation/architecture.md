@@ -53,7 +53,13 @@ src/
 └── types/index.ts    Shared TypeScript interfaces
 
 src-tauri/
-└── src/lib.rs        All Rust commands and application setup
+└── src/
+    ├── lib.rs           Tauri commands, native menu, mouse nav monitor, application setup
+    └── pdf_export/      Native-webview PDF export (one file per platform, #[cfg(target_os)] dispatch)
+        ├── mod.rs           #[cfg(target_os = "…")] re-export of the platform `export_pdf`
+        ├── windows.rs       WebView2 + ICoreWebView2_7::PrintToPdf
+        ├── macos.rs         WKWebView createPDFWithConfiguration
+        └── linux.rs         WebKitGTK WebKitPrintOperation (PrintOperationAction::Export)
 ```
 
 ## Key Architectural Patterns
@@ -342,8 +348,7 @@ All Rust commands are registered in `src-tauri/src/lib.rs` and invoked from Type
 | `write_file(path, content)` | Write UTF-8 text to a user-selected path. Permitted extensions: `.md`, `.emerald`, `.emeralddb`, `.json`, `.txt`. Path must resolve within allowed storage roots. |
 | `read_file(path)` | Read a file and return its UTF-8 content. Same extension allowlist and root confinement as `write_file`. |
 | `ensure_app_storage_dirs()` | Create app data and app config directories if they don't exist. Called before frontend writes vault metadata or opens SQLite. |
-| `open_pdf_export(html)` | Store the HTML in a static `Mutex<String>`, open a new `pdf-export` window that serves it over a custom `export-html://` URI scheme. |
-| `trigger_print()` | Call `window.print()` on the `pdf-export` window. Invoked by a button in the print window HTML. |
+| `export_pdf(html, path)` | Render the supplied HTML to a PDF at `path` by driving the app's own webview. The frontend first prompts the user for a save location via the `dialog` plugin and passes the chosen path here. Per-platform implementations live in `src-tauri/src/pdf_export/{windows,macos,linux}.rs`, all behind the same `pub async fn export_pdf` signature; `mod.rs` does the `#[cfg(target_os = "…")]` re-export so `lib.rs` calls `pdf_export::export_pdf` without knowing which platform it's on. |
 | `update_menu_labels(...)` | Update native menu item labels for i18n (edit, view, export, import submenus and their items). |
 
 Tauri menu events (not `invoke`) are emitted by the native menu and received in `AppShell` via `listen()`:
@@ -358,3 +363,51 @@ Tauri menu events (not `invoke`) are emitted by the native menu and received in 
 | `reset-sidebar-widths` | View > Reset View |
 | `navigate-back` | Mouse back button (macOS NSEvent monitor) |
 | `navigate-forward` | Mouse forward button (macOS NSEvent monitor) |
+
+## PDF Export
+
+Emerald renders PDFs by driving the app's own embedded webview rather than bundling a separate HTML-to-PDF engine. The implementation is split across one module file per platform, dispatched at compile time by `#[cfg(target_os = "…")]` in `src-tauri/src/pdf_export/mod.rs`, so `lib.rs` only has to call `pdf_export::export_pdf(&app, html, path).await` regardless of the host OS.
+
+### Flow (all platforms)
+
+```
+frontend export.ts:exportAsPDF
+    ↓  build full HTML (DOMPurify, transformInternalLinks, embedImages)
+frontend save() dialog → user picks destination path
+    ↓  invoke('export_pdf', { html, path })
+src-tauri/src/lib.rs:export_pdf
+    ↓  pdf_export::export_pdf(&app, html, path).await
+src-tauri/src/pdf_export/{windows,macos,linux}.rs
+    ↓  write HTML to a unique temp file (file:// URL)
+    ↓  build a hidden WebviewWindow pointing at that file
+    ↓  wait for PageLoadEvent::Finished via tokio::sync::oneshot
+    ↓  with_webview(...) → call platform's native PDF API
+    ↓  close the hidden window + remove the temp file
+    ↓  return Result<(), String> → frontend toasts success/failure
+```
+
+All three platforms share the same shape — hidden webview, oneshot-coordinated page-load wait, `with_webview` to reach the platform webview, native PDF API call, hidden window + temp file cleanup in a `Drop`-style guard. The differences are entirely in step 4 (the platform webview API).
+
+### Per-platform implementations
+
+- **Windows (`src-tauri/src/pdf_export/windows.rs`)** — builds a hidden `WebviewWindow` with `WebviewWindowBuilder`, waits for `PageLoadEvent::Finished` via a `oneshot` signalled from `on_page_load`, then calls `with_webview` to reach the WebView2 controller. Casts the core to `ICoreWebView2_7` and invokes `PrintToPdf(PCWSTR, settings, ICoreWebView2PrintToPdfCompletedHandler)`. The COM completion handler runs on a worker thread; the Rust side bridges it back to async with a second `oneshot` wrapped in `Arc<Mutex<Option<_>>>` so the handler can move it out. Two timeouts cap the operation: 30 s for the page-load wait and 120 s for `PrintToPdf` itself.
+- **macOS (`src-tauri/src/pdf_export/macos.rs`)** — same shape. Reaches the `WKWebView` pointer via `with_webview` and calls `createPDFWithConfiguration:completionHandler:`. The completion handler runs on a background queue and is bridged back to async with a `block2::ConcreteBlock` + `oneshot`. The hidden `WKWebView` is written to disk via `NSData.writeToFile:atomically:` inside the completion handler. `MainThreadMarker` is acquired inside the `with_webview` closure because that closure dispatches us to the AppKit main thread.
+- **Linux (`src-tauri/src/pdf_export/linux.rs`)** — same shape. Uses `WebKitPrintOperation` configured with `PrintOperationOutputFormat::Pdf` and `output_uri = "file://<path>"`, then calls `print(PrintOperationAction::Export)`. The synchronous Rust binding blocks inside `with_webview` until the operation finishes writing the PDF; a post-check `stat`s the output file and returns an error if it landed as a zero-byte PDF (the WebKit print API can succeed while producing an empty file). Supported distro matrix: Ubuntu 22.04 LTS and 24.04 LTS.
+
+### Frontend responsibilities
+
+Because the hidden webview inherits the app CSP (`script-src 'self'`, see `tauri.conf.json`), the frontend does everything that the old print-window approach did with inline JavaScript before it hands the HTML to Rust:
+
+- `transformInternalLinks(html)` in `src/lib/export.ts` walks every `<span data-type="internalLink">` and bakes the chip (icon `<img>`/`<span>` + label `<span>`) into the DOM. This replaces the `TRANSFORM_LINKS_JS` inline `<script>` that the old print window ran, and is required because the new webview's CSP blocks inline scripts.
+- `embedImages(html)` resolves every file-backed `src="…"` to a base64 data-URL via the `read_image_as_base64` IPC command before export. The hidden webview runs on a `file://` URL and would otherwise not have access to images stored outside the document directory.
+- `resolveInternalLinkIcons(html)` fills in missing `data-icon` attributes from the live store state at export time, so chips saved without an icon still render correctly.
+- DOMPurify sanitisation runs in TypeScript before the HTML is passed to the backend, with the TipTap internal-link attributes explicitly allowlisted so chips survive the pass intact.
+
+### Menu enablement gating
+
+The three "Export as …" menu items (`export-pdf`, `export-markdown`, `export-emerald`) are only meaningful when a Journal / Wiki / Operations entry is actually open. The gating is done in two places:
+
+- **Rust (`src-tauri/src/lib.rs`)** — the menu items are constructed with `enabled: false` in the `setup` block, so they start greyed out. The `set_export_menu_enabled(app, enabled)` Tauri command walks the `export-submenu` and toggles each of the three items.
+- **Frontend (`src/components/layout/AppShell.tsx`)** — a `useEffect` keyed on `activeView.type` and `activeView.id` calls `invoke('set_export_menu_enabled', { enabled })` with `enabled = (activeView.type ∈ {journal, wiki, operations}) && !!activeView.id`. The effect re-runs on every view change.
+
+This wiring predates the PDF export migration and is unchanged by it; the migration only replaced the *implementation* behind `export-pdf`, not the gate.

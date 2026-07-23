@@ -104,6 +104,52 @@ function resolveInternalLinkIcons(html: string): string {
   return doc.body.innerHTML;
 }
 
+/**
+ * Replaces the inner content of every `<span data-type="internalLink">` with
+ * the visible chip elements (icon `<img>` or `<span>` + label `<span>`) and
+ * strips the now-redundant `data-icon` / `data-label` attributes.
+ *
+ * This used to run as an inline `<script>` in the export HTML
+ * (`TRANSFORM_LINKS_JS`). The native-webview PDF path drives the app's own
+ * webview, which applies the app CSP — `script-src 'self'` blocks inline
+ * scripts. Doing the transformation in TypeScript here keeps the rendered
+ * chip identical to the live app and lets us drop the inline script (and
+ * the `img.emoji` rasterization CSS that came with the old wkhtmltopdf
+ * path) entirely.
+ */
+function transformInternalLinks(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const links = doc.querySelectorAll<HTMLElement>('span[data-type="internalLink"]');
+  if (!links.length) return html;
+
+  for (const el of Array.from(links)) {
+    const icon  = el.getAttribute('data-icon')  || '';
+    const label = el.getAttribute('data-label') || el.textContent || '';
+
+    // Drop attributes the CSS no longer reads — they're now baked into the children.
+    el.removeAttribute('data-icon');
+    el.removeAttribute('data-label');
+
+    el.textContent = '';
+    if (icon.startsWith('data:')) {
+      const img = doc.createElement('img');
+      img.src = icon;
+      img.className = 'il-icon-img';
+      el.appendChild(img);
+    } else if (icon) {
+      const sp = doc.createElement('span');
+      sp.textContent = icon;
+      sp.className = 'il-icon-emoji';
+      el.appendChild(sp);
+    }
+    const lbl = doc.createElement('span');
+    lbl.textContent = label;
+    el.appendChild(lbl);
+  }
+
+  return doc.body.innerHTML;
+}
+
 function safeFilename(title: string): string {
   return title.replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'export';
 }
@@ -229,6 +275,12 @@ const PRINT_CSS = `
     color: #111;
     background: #f0f0f0;
   }
+  /* No more img.emoji rasterization — the native webview renders
+     Segoe UI Emoji / Apple Color Emoji / Noto Color Emoji directly, so
+     emoji glyphs flow like any other text and the flex containers
+     (align-items: baseline) keep them on the text baseline. The whole
+     canvas-rasterize-and-position-shift dance (see git history of the
+     pre-native-webview branch) evaporates with the engine swap. */
   #toolbar {
     position: fixed; top: 0; left: 0; right: 0; z-index: 100;
     background: #1c1c1e; padding: 0 24px;
@@ -252,7 +304,7 @@ const PRINT_CSS = `
   .entry-number { font-size: 0.5em; font-weight: normal; color: #999; margin-left: 0.4em; vertical-align: middle; }
   /* Top bar: 🌕 January 15, 2026 · Full Moon — plain, like the main view */
   .entry-topbar {
-    display: flex; align-items: center; gap: 6px;
+    display: flex; align-items: baseline; gap: 6px;
     margin-bottom: 0.5em;
     font-family: system-ui, sans-serif;
     font-size: 0.9em; color: #666;
@@ -265,7 +317,7 @@ const PRINT_CSS = `
   .meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
   .meta-date { font-size: 0.85em; color: #666; font-style: italic; margin-right: 4px; }
   .chip {
-    display: inline-flex; align-items: center; gap: 4px;
+    display: inline-flex; align-items: baseline; gap: 4px;
     font-family: system-ui,sans-serif; font-size: 0.78em;
     background: #f2f2f2; border: 1px solid #ddd; border-radius: 6px;
     padding: 2px 8px; color: #333; white-space: nowrap;
@@ -307,7 +359,7 @@ const PRINT_CSS = `
   .entry-content li { margin-bottom: 0.2em; }
   /* Internal link chips — jade accent like in the app */
   .entry-content span[data-type="internalLink"] {
-    display: inline-flex; align-items: center; gap: 4px;
+    display: inline-flex; align-items: baseline; gap: 4px;
     font-family: system-ui,sans-serif; font-size: 0.82em;
     background: #e6faf3; border: 1px solid #99dfc0; border-radius: 5px;
     padding: 1px 7px; color: #006b42; vertical-align: middle;
@@ -335,32 +387,29 @@ const PRINT_CSS = `
   }
 `;
 
-// JS that runs in the print window to transform internal link nodes into chips
-const TRANSFORM_LINKS_JS = `
-  document.querySelectorAll('span[data-type="internalLink"]').forEach(function(el) {
-    var icon  = el.getAttribute('data-icon') || '';
-    var label = el.getAttribute('data-label') || el.textContent || '';
-    el.textContent = '';
-    if (icon && icon.startsWith('data:')) {
-      var img = document.createElement('img');
-      img.src = icon; img.className = 'il-icon-img';
-      el.appendChild(img);
-    } else if (icon) {
-      var sp = document.createElement('span');
-      sp.textContent = icon; sp.className = 'il-icon-emoji';
-      el.appendChild(sp);
-    }
-    var lbl = document.createElement('span');
-    lbl.textContent = label;
-    el.appendChild(lbl);
-  });
-`;
+// JS that used to run in the print window to transform internal link
+// nodes into chips. Removed in Phase 4 of the native-webview migration —
+// the equivalent transformation now runs in TypeScript via
+// `transformInternalLinks` before the HTML is handed to the backend,
+// because the new webview's CSP blocks inline scripts. The function is
+// kept (translated to TS) so the rendered chip matches the live app.
 
 // ── PDF export ──────────────────────────────────────────────────────────────
+//
+// Direct PDF write via the platform's own webview. The user picks where
+// to save in a native dialog and the PDF is generated on disk by the Rust
+// side — no print dialog, no printer selection, no extra window. Same UX
+// shape as the Markdown / Emerald exports.
 
 export async function exportAsPDF(data: ExportData): Promise<void> {
-  const resolvedContent = resolveInternalLinkIcons(data.content);
-  const embeddedContent = await embedImages(resolvedContent);
+  const resolvedContent  = resolveInternalLinkIcons(data.content);
+  const embeddedContent  = await embedImages(resolvedContent);
+  // Pre-render the internal-link chips in TS — the new webview's CSP
+  // (`script-src 'self'`) blocks inline scripts, so the JS that used to
+  // live in `TRANSFORM_LINKS_JS` now has to run before we hand the HTML
+  // to the backend.
+  const transformedContent = transformInternalLinks(embeddedContent);
+
   const topBarHtml = buildTopBar(data);
   const metaHtml   = buildMetaHtml(data);
   const numStr     = data.entryNumber ? `<span class="entry-number">#${data.entryNumber}</span>` : '';
@@ -374,23 +423,33 @@ export async function exportAsPDF(data: ExportData): Promise<void> {
   <style>${PRINT_CSS}</style>
 </head>
 <body>
-  <div id="toolbar">
-    <span>${escapedTitle}</span>
-    <button id="print-btn" onclick="window.__TAURI_INTERNALS__.invoke('trigger_print')">Save as PDF…</button>
-  </div>
   <div id="page">
     ${topBarHtml}
     <h1 class="entry-title">${escapedTitle}${numStr}</h1>
     ${metaHtml}
-    <div class="entry-content">${DOMPurify.sanitize(embeddedContent, {
+    <div class="entry-content">${DOMPurify.sanitize(transformedContent, {
       ADD_ATTR: ['data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon', 'data-entry-number', 'data-href'],
     })}</div>
   </div>
-  <script>${TRANSFORM_LINKS_JS}<\/script>
 </body>
 </html>`;
 
-  await invoke('open_pdf_export', { html: fullHtml });
+  // Same UX as Markdown / Emerald: native save dialog first, then render.
+  const path = await save({
+    defaultPath: exportFilename(data.title, data.createdAt, 'pdf'),
+    filters: [{ name: 'PDF', extensions: ['pdf'] }],
+  });
+  if (!path) return;
+
+  console.log('[emerald] export_pdf: invoking with', { bytes: fullHtml.length, path });
+  try {
+    await invoke('export_pdf', { html: fullHtml, path });
+    console.log('[emerald] export_pdf: success, file at', path);
+    await message(`PDF saved:\n${path}`, { title: 'Export', kind: 'info' });
+  } catch (err) {
+    console.error('[emerald] export_pdf: failed', err);
+    throw err; // re-throw so the caller's exportErrorMessage shows a toast
+  }
 }
 
 // ── Markdown export ─────────────────────────────────────────────────────────
@@ -460,4 +519,10 @@ export async function noEntryMessage(): Promise<void> {
   await message('Please open a journal entry, wiki article, or operation first.', {
     title: 'Export', kind: 'info',
   });
+}
+
+/** Show a non-blocking error toast for an export failure. */
+export async function exportErrorMessage(err: unknown, kind: string): Promise<void> {
+  const detail = err instanceof Error ? err.message : String(err);
+  await message(detail, { title: `${kind} failed`, kind: 'error' });
 }

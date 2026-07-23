@@ -2,7 +2,7 @@
 
 ## Capability Model
 
-Tauri 2 uses a capability file to declare which permissions each window receives. Emerald defines two capability files:
+Tauri 2 uses a capability file to declare which permissions each window receives. Emerald defines one capability file:
 
 **`src-tauri/capabilities/default.json`** — applied to the `main` window:
 
@@ -24,18 +24,7 @@ Tauri 2 uses a capability file to declare which permissions each window receives
 
 SQLite permissions must be declared explicitly. `sql:default` alone grants read-only access; write access requires `sql:allow-execute` in addition to `sql:allow-select`. Omitting any of these permissions causes silent failures at runtime.
 
-**`src-tauri/capabilities/pdf-export.json`** — applied to the `pdf-export` window:
-
-```json
-{
-  "windows": ["pdf-export"],
-  "permissions": [
-    "core:default"
-  ]
-}
-```
-
-The PDF export window receives only `core:default`. It cannot access the filesystem, open dialogs, or query the database. Its sole IPC action is calling `trigger_print()`, which is invoked through `__TAURI_INTERNALS__.invoke` in the hardcoded HTML served to that window. This window is opened programmatically by `open_pdf_export` and its content is HTML generated in the main process — it never loads external URLs.
+PDF export runs in a hidden window built and torn down by the per-platform `export_pdf` command, so it operates entirely under the main process's existing capability set — no extra capability entry is required.
 
 ## Path Confinement
 
@@ -93,13 +82,13 @@ All user-provided text that is interpolated into the PDF export HTML template is
 - Version strings
 - Icon emoji characters (when not a data-URL image)
 
-The content HTML itself (the TipTap editor output) is not re-escaped — it is trusted HTML already produced by the editor and sanitised on import. Image `src` attributes that are file paths are resolved to base64 data-URLs via `embedImages()` before the print window is opened.
+The content HTML itself (the TipTap editor output) is not re-escaped — it is trusted HTML already produced by the editor and sanitised on import. Image `src` attributes that are file paths are resolved to base64 data-URLs via `embedImages()` before the HTML is handed to the export backend.
 
 ## HTML Sanitisation
 
 All HTML that enters the app from outside is sanitised with DOMPurify before being stored or displayed.
 
-**PDF export (`src/lib/export.ts`).** Before the entry content HTML is written into the print window template, it is passed through `DOMPurify.sanitize`. The configuration allowlists TipTap internal-link attributes — `data-type`, `data-id`, `data-entry-type`, `data-label`, `data-icon`, `data-entry-number`, and `data-href` — so internal-link chips survive sanitisation intact. This closes a potential injection path if an editor extension or import produces unexpected HTML before it reaches the print window.
+**PDF export (`src/lib/export.ts`).** Before the entry content HTML is handed to the `export_pdf` IPC command, it is passed through `DOMPurify.sanitize`. The configuration allowlists TipTap internal-link attributes — `data-type`, `data-id`, `data-entry-type`, `data-label`, `data-icon`, `data-entry-number`, and `data-href` — so internal-link chips survive sanitisation intact. This closes a potential injection path if an editor extension or import produces unexpected HTML before it reaches the export backend.
 
 **Emerald import (`src/lib/emeraldFormat.ts`).** After image paths are remapped, the content string is passed through `DOMPurify.sanitize`. The sanitisation configuration preserves TipTap-specific attributes (`data-type`, `data-id`, `data-entry-type`, `data-label`, `data-icon`) and strips everything else that DOMPurify would remove by default (script tags, event handler attributes, etc.).
 
@@ -109,7 +98,7 @@ All HTML that enters the app from outside is sanitised with DOMPurify before bei
 
 ## Content Security Policy
 
-The main window has CSP enabled through Tauri's default configuration. The PDF export window is served over a custom `export-html://` URI scheme with a `text/html` response constructed entirely in Rust — it never fetches external resources.
+The main window has CSP enabled through Tauri's default configuration. The export HTML for PDF export is written to a unique file in the OS temp directory and loaded by a hidden webview over a `file://` URL — it never fetches external resources and is removed from disk as soon as the export finishes. Because the hidden webview inherits the same CSP as the main window (`script-src 'self'` — see `tauri.conf.json`), inline scripts in the export HTML are blocked; the frontend therefore pre-renders the internal-link chip transformation in TypeScript (`transformInternalLinks` in `src/lib/export.ts`) before handing the HTML to the backend.
 
 ## File Dialog Safety
 

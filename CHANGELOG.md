@@ -8,6 +8,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - Settings → Backup: a new **Tasks** checkbox (enabled by default) controls whether the Tasks module is included in `.emeralddb` exports and imports. The import preview now also shows the number of tasks in the backup file. Labels for the new checkbox are localised in EN / DE / ES / FR (`settings.includeTasks`).
 
+### Changed
+- PDF export now uses the app's own webview (WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux). The export flow matches the Markdown and Emerald exports: a native save dialog asks for the destination and the PDF is written straight to disk — no preview window, no system print dialog, no printer selection step. Emoji render natively in the PDF (Segoe UI Emoji / Apple Color Emoji / Noto Color Emoji), so emoji inside entries and chips display as proper colored glyphs. See [Architecture → PDF Export](Documentation/architecture.md#pdf-export) for the per-platform implementation notes.
+
 ### Fixed
 - `.emeralddb` backup export did not include Tasks at all — the backup pipeline had fallen out of sync after the Tasks module was added, so `tasks`, `task_categories`, and `task_links` were silently dropped from the export. All three tables are now exported, with `task_links` scoped to the exported task IDs and soft-deleted rows filtered out. On import, `useTaskStore` is reloaded so the imported tasks are visible in the UI immediately. (`src/lib/dbBackup.ts`)
 - Altar backup coverage was also out of sync: the `altar_categories` table was missing from the export, and the path-remap for altar image columns was incomplete (only `background_image_data` was being remapped). The new `thumbnail_data` and `icon_data` columns are now part of the altar image-field set, and `altar_categories` is exported, filtered, deleted, and re-inserted alongside the rest of the altar tables. (`src/lib/dbBackup.ts`)
