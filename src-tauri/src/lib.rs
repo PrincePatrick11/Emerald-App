@@ -390,11 +390,12 @@ fn install_mouse_nav_monitor(app_handle: tauri::AppHandle) {
     }
 }
 
-/// Toggles the enabled state of the three "Export to …" menu items.
-/// Called by the frontend whenever the active view changes, so the items
-/// are only clickable when a journal / wiki / operations entry is open.
+/// Toggles the enabled state of the "Export to …" menu items. `entry_enabled`
+/// covers PDF/Markdown (journal / wiki / operations only); `emerald_enabled`
+/// covers the shared Emerald export, which is also available while an
+/// Altar's reading view is open. Called by the frontend on every view change.
 #[tauri::command]
-fn set_export_menu_enabled(app: tauri::AppHandle, enabled: bool) {
+fn set_export_menu_enabled(app: tauri::AppHandle, entry_enabled: bool, emerald_enabled: bool) {
     use tauri::menu::MenuItemKind;
     let Some(menu) = app.menu() else { return };
 
@@ -403,9 +404,10 @@ fn set_export_menu_enabled(app: tauri::AppHandle, enabled: bool) {
             if sub.id().0.as_str() != "export-submenu" { continue; }
             for child in sub.items().unwrap_or_default() {
                 if let MenuItemKind::MenuItem(item) = &child {
-                    let child_id = item.id().0.as_str();
-                    if matches!(child_id, "export-pdf" | "export-markdown" | "export-emerald") {
-                        item.set_enabled(enabled).ok();
+                    match item.id().0.as_str() {
+                        "export-pdf" | "export-markdown" => { item.set_enabled(entry_enabled).ok(); }
+                        "export-emerald" => { item.set_enabled(emerald_enabled).ok(); }
+                        _ => {}
                     }
                 }
             }

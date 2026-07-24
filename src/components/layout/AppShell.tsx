@@ -130,24 +130,20 @@ export default function AppShell() {
     }).catch(() => {/* desktop-only, ignore in browser preview */});
   }, [i18n.language, t]);
 
-  // Enable "Export to …" only while a journal / wiki / operations entry
-  // is actually open. On the home view, trash, altar, tags, etc. they are
-  // greyed out and unclickable.
+  // Enable "Export to PDF/Markdown" only while a journal / wiki / operations
+  // entry is actually open; "Export as Emerald" is shared between those
+  // entry types and an Altar's reading view (not while editing it — matches
+  // where the Save Image UI used to live). "Export as Image" is altar-only.
   useEffect(() => {
     const isEntryView =
       (activeView.type === 'journal' ||
        activeView.type === 'wiki' ||
        activeView.type === 'operations') &&
       !!activeView.id;
-    invoke('set_export_menu_enabled', { enabled: isEntryView })
-      .catch(() => {/* desktop-only, ignore in browser preview */});
-  }, [activeView.type, activeView.id]);
-
-  // Enable "Export as Image" only while an Altar's reading view is open
-  // (not while editing it — matches where the Save Image UI used to live).
-  useEffect(() => {
     const isAltarReadingView =
       activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit';
+    invoke('set_export_menu_enabled', { entryEnabled: isEntryView, emeraldEnabled: isEntryView || isAltarReadingView })
+      .catch(() => {/* desktop-only, ignore in browser preview */});
     invoke('set_altar_export_menu_enabled', { enabled: isAltarReadingView })
       .catch(() => {/* desktop-only, ignore in browser preview */});
   }, [activeView.type, activeView.id, activeView.mode]);

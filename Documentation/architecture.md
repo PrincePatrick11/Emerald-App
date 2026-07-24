@@ -405,12 +405,12 @@ Because the hidden webview inherits the app CSP (`script-src 'self'`, see `tauri
 
 ### Menu enablement gating
 
-The three "Export as …" menu items (`export-pdf`, `export-markdown`, `export-emerald`) are only meaningful when a Journal / Wiki / Operations entry is actually open. The gating is done in two places:
+The three "Export as …" menu items (`export-pdf`, `export-markdown`, `export-emerald`) share one submenu but are not all gated identically: PDF and Markdown are entry-only, while Emerald is also available for altars. The gating is done in two places:
 
-- **Rust (`src-tauri/src/lib.rs`)** — the menu items are constructed with `enabled: false` in the `setup` block, so they start greyed out. The `set_export_menu_enabled(app, enabled)` Tauri command walks the `export-submenu` and toggles each of the three items.
-- **Frontend (`src/components/layout/AppShell.tsx`)** — a `useEffect` keyed on `activeView.type` and `activeView.id` calls `invoke('set_export_menu_enabled', { enabled })` with `enabled = (activeView.type ∈ {journal, wiki, operations}) && !!activeView.id`. The effect re-runs on every view change.
+- **Rust (`src-tauri/src/lib.rs`)** — the menu items are constructed with `enabled: false` in the `setup` block, so they start greyed out. The `set_export_menu_enabled(app, entry_enabled, emerald_enabled)` Tauri command walks the `export-submenu` and sets `export-pdf` / `export-markdown` from `entry_enabled` and `export-emerald` from `emerald_enabled` independently.
+- **Frontend (`src/components/layout/AppShell.tsx`)** — a single `useEffect` keyed on `activeView.type`, `activeView.id`, and `activeView.mode` calls `invoke('set_export_menu_enabled', { entryEnabled, emeraldEnabled })` with `entryEnabled = (activeView.type ∈ {journal, wiki, operations}) && !!activeView.id` and `emeraldEnabled = entryEnabled || (activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit')`. The same effect also calls `set_altar_export_menu_enabled` (see below), since both depend on the same view-state inputs.
 
-This wiring predates the PDF export migration and is unchanged by it; the migration only replaced the *implementation* behind `export-pdf`, not the gate.
+This wiring predates the PDF export migration and is unchanged by it; the migration only replaced the *implementation* behind `export-pdf`, not the gate. There is still only one `export-emerald` menu item — it is not duplicated per content type; `exportAsEmerald()` in `src/lib/emeraldFormat.ts` branches internally on `activeView.type` to export either the open entry or the open altar.
 
 **Altar "Export as Image" submenu.** A nested `Submenu` (id `export-altar-image`, containing `MenuItem`s `export-altar-jpeg` / `export-altar-png` / `export-altar-webp`) sits inside `export-submenu`, separated from the entry-export items by a `PredefinedMenuItem::separator`. It follows the same two-place gating pattern, but with a different condition — it is only meaningful while an Altar is open in **reading view** (not edit mode):
 

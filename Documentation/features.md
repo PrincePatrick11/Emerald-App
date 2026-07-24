@@ -239,11 +239,11 @@ All export and import actions are in the native application menu.
 
 Prompts a native save dialog for the destination and writes the PDF directly to disk — there is no preview window and no system print dialog. The PDF is rendered by the app's own webview (WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux), so emoji render as proper colored glyphs (Segoe UI Emoji / Apple Color Emoji / Noto Color Emoji) without any frontend rasterisation. The suggested filename is `<Title>_YYYY-MM-DD.pdf`; the user picks the actual location in the OS save dialog. Images in the entry are embedded as base64 before the PDF is generated; internal link chips are rendered as styled spans inside the content.
 
-Like the Markdown and Emerald exports, the PDF export menu items are only available while a Journal / Wiki / Operations entry is actually open — they are disabled on the home view, the altar, the tag manager, and the trash.
+The PDF export menu item is only available while a Journal / Wiki / Operations entry is actually open — it is disabled on the home view, the altar, the tag manager, and the trash.
 
 ### Altar Image Export
 
-A nested **Export as Image** submenu (Export → Export as Image → JPEG… / PNG… / WebP…) renders the currently open altar at full native resolution and prompts a native save dialog for the destination. Unlike the other Export items, this submenu is enabled only while an Altar is open in **reading view** — it is disabled while editing an altar, while any non-altar content is open, and when no altar is open.
+A nested **Export as Image** submenu (Export → Export as Image → JPEG… / PNG… / WebP…) renders the currently open altar at full native resolution and prompts a native save dialog for the destination. This submenu is enabled only while an Altar is open in **reading view** — it is disabled while editing an altar, while any non-altar content is open, and when no altar is open.
 
 ### Markdown Export
 
@@ -251,23 +251,34 @@ Saves a `.md` file with a frontmatter block followed by the entry body. Frontmat
 
 ### Emerald Format
 
-The Emerald format (`.emerald` file extension) is a JSON file that captures the full entry including all metadata and embedded images. It is designed for lossless transfer between Emerald installations.
+The Emerald format (`.emerald` file extension) is a JSON file that captures the full entry — or, for altars, the full altar — including all metadata and embedded images. It is designed for lossless transfer between Emerald installations.
+
+The single **Export → Export as Emerald…** menu item is shared between Journal/Wiki/Operations entries and altars: it is enabled whenever a Journal / Wiki / Operations entry is open, or an Altar is open in reading view, and exports whichever of the two is currently active.
 
 The file structure:
 
 ```json
 {
   "version": "1",
-  "type": "journal | wiki | operations",
+  "type": "journal | wiki | operations | altar",
   "title": "…",
   "createdAt": "ISO 8601",
-  "content": "HTML string",
+  "content": "HTML string (intention text for altars)",
   "images": { "/absolute/path/to/image.png": "data:image/png;base64,…" },
   "meta": { … }
 }
 ```
 
-On import, image data-URLs are re-saved into the local image directory (with SHA-256 deduplication), HTML is sanitised with DOMPurify, and linked entries are resolved by ID first and then by title as a fallback. Tags are synced into the local tags table. Custom properties are recreated in the same order.
+For `journal` / `wiki` / `operations`, on import image data-URLs are re-saved into the local image directory (with SHA-256 deduplication), HTML is sanitised with DOMPurify, and linked entries are resolved by ID first and then by title as a fallback. Tags are synced into the local tags table. Custom properties are recreated in the same order.
+
+For `altar`, `meta` carries the background preset/image/overlay, grid and snapping settings, resolution, the categories used by the placed items (name + emoji), and the full list of placed items (each with name, emoji, category, note, optional image, and placement geometry — position, size, rotation, opacity, z-index, locked/hidden). Only the background image is a local file path in the database, so it alone is round-tripped through `images` like content images; the icon, thumbnail, and every item image are already inline `data:` URLs in the database and are embedded directly.
+
+On import a new altar is created and populated:
+- Any exported category not already present locally (matched case-insensitively by name) is created first, so items land in the right category instead of "Uncategorized".
+- Altar items are matched against the existing library by name + category + image content (compared as the literal `data:` URL, not a resolved file), reusing an existing item where possible and creating a new one otherwise — the item's id is not used for matching, since it proves nothing about content when importing from an unrelated vault. This means re-importing the same file repeatedly, or importing into a different vault that already has the same items, does not pile up duplicate library items, while items that merely share a name/category but have different artwork are correctly kept separate.
+- If the import fails partway through, the newly created altar and any newly created (not reused) library items are rolled back, so a failed import doesn't leave orphaned items behind in the shared item library.
+
+Import for all types goes through the same **Import → From Emerald…** menu item — the target type is read from the file itself, so no separate altar import entry point is needed.
 
 ### Import from Markdown
 
