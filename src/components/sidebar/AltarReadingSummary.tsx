@@ -1,8 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { invoke } from '@tauri-apps/api/core';
-import { save } from '@tauri-apps/plugin-dialog';
-import { Check, Download, Maximize2, Minimize2 } from 'lucide-react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import { useUIStore } from '../../store/uiStore';
 import {
@@ -16,7 +14,6 @@ import {
   isGradientPreset,
 } from '../../lib/altarConstants';
 import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
-import { exportCurrentAltarImage } from '../altar/AltarCanvas';
 
 interface SummaryRowProps {
   label: string;
@@ -77,37 +74,7 @@ export default function AltarReadingSummary() {
   const altarWindowFullscreen = useUIStore((s) => s.altarWindowFullscreen);
   const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
 
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
-  const [imageFormat, setImageFormat] = useState<'jpeg' | 'png' | 'webp'>('jpeg');
   const customBackgroundPreview = useBackgroundPreview(activeAltar?.background_image_data ?? null);
-
-  const handleSaveImage = async () => {
-    if (saveState === 'saving') return;
-    setSaveState('saving');
-    try {
-      const dataUrl = await exportCurrentAltarImage(imageFormat);
-      if (!dataUrl) throw new Error('capture failed');
-      const safeName = (activeAltar?.title ?? 'altar').replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'altar';
-      const dateStr = new Date().toISOString().slice(0, 10);
-      const ext = imageFormat === 'jpeg' ? 'jpg' : imageFormat;
-      const filterMap = {
-        jpeg: { name: 'JPEG Image', extensions: ['jpg'] },
-        png:  { name: 'PNG Image',  extensions: ['png'] },
-        webp: { name: 'WebP Image', extensions: ['webp'] },
-      };
-      const filePath = await save({
-        defaultPath: `${safeName}_${dateStr}.${ext}`,
-        filters: [filterMap[imageFormat]],
-      });
-      if (!filePath) { setSaveState('idle'); return; }
-      await invoke('export_image', { path: filePath, dataUrl });
-      setSaveState('done');
-      setTimeout(() => setSaveState('idle'), 2000);
-    } catch {
-      setSaveState('error');
-      setTimeout(() => setSaveState('idle'), 2000);
-    }
-  };
 
   const backgroundInfo = useMemo(() => {
     if (!activeAltar) return null;
@@ -162,40 +129,6 @@ export default function AltarReadingSummary() {
         {altarWindowFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         {t('altar.enterFullscreen')}
       </button>
-
-      <div className="flex flex-col">
-        <button
-          onClick={handleSaveImage}
-          disabled={saveState === 'saving'}
-          className={`flex w-full items-center justify-center gap-2 rounded-t-md border px-3 py-2 text-[12px] font-semibold transition-colors ${
-            saveState === 'done'
-              ? 'border-jade-600/60 bg-jade-900/40 text-jade-200'
-              : saveState === 'error'
-                ? 'border-red-700/60 bg-red-950/30 text-red-300'
-                : 'border-stone-700/60 bg-stone-900/45 text-stone-300 hover:border-stone-500/70 hover:text-stone-100 disabled:opacity-50 disabled:cursor-not-allowed'
-          }`}
-          title={t('altar.saveImage')}
-        >
-          {saveState === 'done' ? <Check size={14} /> : <Download size={14} />}
-          {({ idle: t('altar.saveImage'), saving: t('altar.saveImageSaving'), done: t('altar.saveImageDone'), error: t('altar.saveImageError') } as const)[saveState]}
-        </button>
-
-        <div className="flex divide-x divide-stone-700/60 rounded-b-md border border-t-0 border-stone-700/60">
-          {(['jpeg', 'png', 'webp'] as const).map((fmt) => (
-            <button
-              key={fmt}
-              onClick={() => setImageFormat(fmt)}
-              className={`flex-1 py-1 text-center text-[10px] font-medium uppercase tracking-wider transition-colors first:rounded-bl-md last:rounded-br-md ${
-                imageFormat === fmt
-                  ? 'ring-1 ring-inset ring-jade-500/60 bg-jade-900/40 text-jade-300'
-                  : 'bg-stone-900/45 text-stone-400 hover:bg-stone-800/40 hover:text-stone-300'
-              }`}
-            >
-              {fmt.toUpperCase()}
-            </button>
-          ))}
-        </div>
-      </div>
 
       <SectionTitle label={t('altar.summary')} />
 

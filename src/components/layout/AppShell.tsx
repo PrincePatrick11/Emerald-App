@@ -14,6 +14,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { exportAsPDF, exportAsMarkdown, noEntryMessage, exportErrorMessage } from '../../lib/export';
 import { collectExportData } from '../../lib/exportData';
 import { exportAsEmerald, importFromEmerald, importFromMarkdown } from '../../lib/emeraldFormat';
+import { saveAltarImage } from '../../lib/altarExport';
 
 const LOCAL_PATH_RE = /src="([^"]+)"/g;
 
@@ -120,6 +121,10 @@ export default function AppShell() {
       exportPdf:       t('menu.exportPdf'),
       exportMarkdown:  t('menu.exportMarkdown'),
       exportEmerald:   t('menu.exportEmerald'),
+      exportAltarImage: t('menu.exportAltarImage'),
+      exportAltarJpeg: t('menu.exportAltarJpeg'),
+      exportAltarPng:  t('menu.exportAltarPng'),
+      exportAltarWebp: t('menu.exportAltarWebp'),
       importMarkdown:  t('menu.importMarkdown'),
       importEmerald:   t('menu.importEmerald'),
     }).catch(() => {/* desktop-only, ignore in browser preview */});
@@ -137,6 +142,15 @@ export default function AppShell() {
     invoke('set_export_menu_enabled', { enabled: isEntryView })
       .catch(() => {/* desktop-only, ignore in browser preview */});
   }, [activeView.type, activeView.id]);
+
+  // Enable "Export as Image" only while an Altar's reading view is open
+  // (not while editing it — matches where the Save Image UI used to live).
+  useEffect(() => {
+    const isAltarReadingView =
+      activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit';
+    invoke('set_altar_export_menu_enabled', { enabled: isAltarReadingView })
+      .catch(() => {/* desktop-only, ignore in browser preview */});
+  }, [activeView.type, activeView.id, activeView.mode]);
 
   useEffect(() => {
     const unlistenBack = listen('navigate-back', () => navigateBack());
@@ -175,6 +189,18 @@ export default function AppShell() {
       exportAsEmerald().catch(err => exportErrorMessage(err, 'Emerald export'));
     });
 
+    const unlistenAltarJpeg = listen('export-altar-jpeg', () => {
+      saveAltarImage('jpeg').catch(err => exportErrorMessage(err, 'Image export'));
+    });
+
+    const unlistenAltarPng = listen('export-altar-png', () => {
+      saveAltarImage('png').catch(err => exportErrorMessage(err, 'Image export'));
+    });
+
+    const unlistenAltarWebp = listen('export-altar-webp', () => {
+      saveAltarImage('webp').catch(err => exportErrorMessage(err, 'Image export'));
+    });
+
     const unlistenImportEmerald = listen('import-emerald', () => {
       importFromEmerald().catch(err => exportErrorMessage(err, 'Emerald import'));
     });
@@ -187,6 +213,9 @@ export default function AppShell() {
       unlistenPdf.then(fn => fn());
       unlistenMd.then(fn => fn());
       unlistenEmerald.then(fn => fn());
+      unlistenAltarJpeg.then(fn => fn());
+      unlistenAltarPng.then(fn => fn());
+      unlistenAltarWebp.then(fn => fn());
       unlistenImportEmerald.then(fn => fn());
       unlistenImportMd.then(fn => fn());
     };

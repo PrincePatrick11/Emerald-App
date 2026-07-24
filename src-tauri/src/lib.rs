@@ -413,6 +413,35 @@ fn set_export_menu_enabled(app: tauri::AppHandle, enabled: bool) {
     }
 }
 
+/// Toggles the enabled state of the "Export as Image" submenu (and its
+/// JPEG/PNG/WebP children). Called by the frontend whenever the active
+/// view changes, so it's only clickable while an Altar's reading view is open.
+#[tauri::command]
+fn set_altar_export_menu_enabled(app: tauri::AppHandle, enabled: bool) {
+    use tauri::menu::MenuItemKind;
+    let Some(menu) = app.menu() else { return };
+
+    for kind in menu.items().unwrap_or_default() {
+        if let MenuItemKind::Submenu(sub) = &kind {
+            if sub.id().0.as_str() != "export-submenu" { continue; }
+            for child in sub.items().unwrap_or_default() {
+                if let MenuItemKind::Submenu(image_sub) = &child {
+                    if image_sub.id().0.as_str() != "export-altar-image" { continue; }
+                    image_sub.set_enabled(enabled).ok();
+                    for leaf in image_sub.items().unwrap_or_default() {
+                        if let MenuItemKind::MenuItem(item) = &leaf {
+                            let leaf_id = item.id().0.as_str();
+                            if matches!(leaf_id, "export-altar-jpeg" | "export-altar-png" | "export-altar-webp") {
+                                item.set_enabled(enabled).ok();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[tauri::command]
 fn update_menu_labels(
     app: tauri::AppHandle,
@@ -424,6 +453,10 @@ fn update_menu_labels(
     export_pdf: String,
     export_markdown: String,
     export_emerald: String,
+    export_altar_image: String,
+    export_altar_jpeg: String,
+    export_altar_png: String,
+    export_altar_webp: String,
     import_markdown: String,
     import_emerald: String,
 ) {
@@ -460,6 +493,23 @@ fn update_menu_labels(
                     if let Some(text) = new_child_text {
                         item.set_text(text).ok();
                     }
+                } else if let MenuItemKind::Submenu(image_sub) = &child {
+                    if image_sub.id().0.as_str() != "export-altar-image" { continue; }
+                    image_sub.set_text(export_altar_image.as_str()).ok();
+                    for leaf in image_sub.items().unwrap_or_default() {
+                        if let MenuItemKind::MenuItem(item) = &leaf {
+                            let leaf_id = item.id().0.as_str().to_owned();
+                            let new_leaf_text = match leaf_id.as_str() {
+                                "export-altar-jpeg" => Some(export_altar_jpeg.as_str()),
+                                "export-altar-png"  => Some(export_altar_png.as_str()),
+                                "export-altar-webp" => Some(export_altar_webp.as_str()),
+                                _ => None,
+                            };
+                            if let Some(text) = new_leaf_text {
+                                item.set_text(text).ok();
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -482,6 +532,7 @@ pub fn run() {
             ensure_app_storage_dirs,
             export_pdf,
             set_export_menu_enabled,
+            set_altar_export_menu_enabled,
             update_menu_labels,
         ])
         .setup(|app| {
@@ -541,12 +592,48 @@ pub fn run() {
                 false,
                 None::<&str>,
             )?;
+            // Altar image export — starts disabled, the frontend enables it
+            // only while an Altar's reading view is open.
+            let export_altar_jpeg_item = MenuItem::with_id(
+                app,
+                "export-altar-jpeg",
+                "JPEG…",
+                false,
+                None::<&str>,
+            )?;
+            let export_altar_png_item = MenuItem::with_id(
+                app,
+                "export-altar-png",
+                "PNG…",
+                false,
+                None::<&str>,
+            )?;
+            let export_altar_webp_item = MenuItem::with_id(
+                app,
+                "export-altar-webp",
+                "WebP…",
+                false,
+                None::<&str>,
+            )?;
+            let export_altar_image_submenu = Submenu::with_id_and_items(
+                app,
+                "export-altar-image",
+                "Export as Image",
+                false,
+                &[&export_altar_jpeg_item, &export_altar_png_item, &export_altar_webp_item],
+            )?;
             let export_submenu = Submenu::with_id_and_items(
                 app,
                 "export-submenu",
                 "Export",
                 true,
-                &[&export_pdf_item, &export_md_item, &export_emerald_item],
+                &[
+                    &export_pdf_item,
+                    &export_md_item,
+                    &export_emerald_item,
+                    &PredefinedMenuItem::separator(app)?,
+                    &export_altar_image_submenu,
+                ],
             )?;
             let import_md_item = MenuItem::with_id(
                 app,
@@ -578,6 +665,9 @@ pub fn run() {
                     "export-pdf"           => { app.emit("export-pdf", ()).ok(); }
                     "export-markdown"      => { app.emit("export-markdown", ()).ok(); }
                     "export-emerald"       => { app.emit("export-emerald", ()).ok(); }
+                    "export-altar-jpeg"    => { app.emit("export-altar-jpeg", ()).ok(); }
+                    "export-altar-png"     => { app.emit("export-altar-png", ()).ok(); }
+                    "export-altar-webp"    => { app.emit("export-altar-webp", ()).ok(); }
                     "import-markdown"      => { app.emit("import-markdown", ()).ok(); }
                     "import-emerald"       => { app.emit("import-emerald", ()).ok(); }
                     _ => {}

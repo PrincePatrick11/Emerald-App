@@ -115,9 +115,9 @@ Locked placements are click-through on the canvas (pointer events disabled), so 
 - **Grid** — active/inactive status and grid size.
 - **Elements** — count of placed items.
 
-A **Save Image…** button above the summary grid exports the current altar at full native resolution via the native OS save dialog. Three format buttons — **JPEG**, **PNG**, and **WebP** — sit directly below the save button in the same card block. The active format is highlighted with a jade ring. JPEG uses quality 0.97, WebP uses 0.92, PNG is lossless. The suggested filename and the OS save dialog filter adapt to the selected format (e.g. `AltarTitle_YYYY-MM-DD.png`). The button shows in-progress, success, and error feedback states inline.
-
 A note at the bottom reminds you to switch to edit mode to change these settings. The header fullscreen button is hidden when the sidebar is open, since the sidebar already provides one.
+
+Exporting the altar as an image (JPEG / PNG / WebP) is done from the native application menu, not the sidebar — see [Export and Import](#export-and-import) below. The export renders the current altar at full native resolution via the native OS save dialog. JPEG uses quality 0.97, WebP uses 0.92, PNG is lossless. The suggested filename and the OS save dialog filter adapt to the selected format (e.g. `AltarTitle_YYYY-MM-DD.png`).
 
 **Sidebar in edit mode.** The full editor panel — Canvas Options, Change Background, Overlay Options, Grid Options, and Placed Elements — is visible only when the altar is in edit mode. Each section is collapsible with a chevron toggle. The open/closed state of all six sections (Background, Overlay, Grid, Favicon, Canvas Options, Placements) is saved per altar in `localStorage` and restored when you switch back to that altar. Sections default to open the first time an altar is opened.
 
@@ -131,7 +131,7 @@ The grid is rendered as an SVG overlay directly in the canvas, with lines placed
 - *Snap rotation angle* — when enabled, dragging the rotation handle snaps to a configurable angle step (1–180°, default 15°). When disabled, rotation is free; holding Shift still snaps to 15° steps.
 - *Scale to grid* — when enabled, resizing a placement snaps to the nearest whole number of grid cells on both axes, so items always align to the grid as a box.
 
-The grid is also visible in exported images and captured thumbnails — the same grid settings (`grid_enabled`, `grid_size`, `grid_color`, `grid_opacity`) are applied by the Canvas 2D renderer that produces thumbnails and the "Save Image" export.
+The grid is also visible in exported images and captured thumbnails — the same grid settings (`grid_enabled`, `grid_size`, `grid_color`, `grid_opacity`) are applied by the Canvas 2D renderer that produces thumbnails and the altar image export (Export → Export as Image).
 
 **Multiple altars.** You can create several named altars and switch between them. Each altar has its own title, intention text, background, and set of placements.
 
@@ -240,6 +240,10 @@ All export and import actions are in the native application menu.
 Prompts a native save dialog for the destination and writes the PDF directly to disk — there is no preview window and no system print dialog. The PDF is rendered by the app's own webview (WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux), so emoji render as proper colored glyphs (Segoe UI Emoji / Apple Color Emoji / Noto Color Emoji) without any frontend rasterisation. The suggested filename is `<Title>_YYYY-MM-DD.pdf`; the user picks the actual location in the OS save dialog. Images in the entry are embedded as base64 before the PDF is generated; internal link chips are rendered as styled spans inside the content.
 
 Like the Markdown and Emerald exports, the PDF export menu items are only available while a Journal / Wiki / Operations entry is actually open — they are disabled on the home view, the altar, the tag manager, and the trash.
+
+### Altar Image Export
+
+A nested **Export as Image** submenu (Export → Export as Image → JPEG… / PNG… / WebP…) renders the currently open altar at full native resolution and prompts a native save dialog for the destination. Unlike the other Export items, this submenu is enabled only while an Altar is open in **reading view** — it is disabled while editing an altar, while any non-altar content is open, and when no altar is open.
 
 ### Markdown Export
 

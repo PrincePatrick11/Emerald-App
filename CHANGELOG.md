@@ -9,6 +9,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Settings → Backup: a new **Tasks** checkbox (enabled by default) controls whether the Tasks module is included in `.emeralddb` exports and imports. The import preview now also shows the number of tasks in the backup file. Labels for the new checkbox are localised in EN / DE / ES / FR (`settings.includeTasks`).
 
 ### Changed
+- Altar reading view: the **Save Image** export (JPEG / PNG / WebP) moved from a button in the right sidebar into the native application menu, under **Export → Export as Image**. The submenu is enabled only while an Altar is open in reading view — it stays disabled while editing an altar or when no altar is open, matching how the other Export menu items are gated.
 - PDF export now uses the app's own webview (WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux). The export flow matches the Markdown and Emerald exports: a native save dialog asks for the destination and the PDF is written straight to disk — no preview window, no system print dialog, no printer selection step. Emoji render natively in the PDF (Segoe UI Emoji / Apple Color Emoji / Noto Color Emoji), so emoji inside entries and chips display as proper colored glyphs. Windows is implemented and tested end-to-end; the macOS and Linux implementations are in place but not yet verified on real hardware. See [Architecture → PDF Export](Documentation/architecture.md#pdf-export) for the per-platform implementation notes.
 
 ### Fixed
