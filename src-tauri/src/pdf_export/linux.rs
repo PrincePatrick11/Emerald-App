@@ -6,8 +6,6 @@
 //! via a oneshot, then use `with_webview` to grab the `WebView` and run a
 //! `PrintOperation` configured for PDF output to the user-chosen path.
 //!
-//! Plan: `tmp/pdf-export-native-webview.md` Phase 3.
-//!
 //! ⚠️  Untested in this session — written blind, because we have no
 //! Linux box available. The Windows path is tested; this one needs a
 //! real Linux (Ubuntu 22.04 LTS or 24.04 LTS per the plan's supported

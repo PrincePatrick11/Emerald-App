@@ -279,8 +279,7 @@ fn ensure_app_storage_dirs(app: tauri::AppHandle) -> Result<(), String> {
 /// implementation bundled a `wkhtmltopdf.exe` subprocess (~42 MB, LGPL,
 /// 2015-era Qt WebKit, no working macOS build); it was replaced because
 /// the app's own WebView2 / WKWebView / WebKitGTK does the same job
-/// with smaller install, modern CSS, and native color emoji. See
-/// `tmp/pdf-export-native-webview.md` for the migration plan.
+/// with smaller install, modern CSS, and native color emoji.
 #[tauri::command]
 async fn export_pdf(app: tauri::AppHandle, html: String, path: String) -> Result<(), String> {
     pdf_export::export_pdf(&app, html, path).await

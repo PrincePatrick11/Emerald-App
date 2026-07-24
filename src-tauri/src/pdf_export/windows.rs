@@ -1,7 +1,7 @@
 //! Windows PDF export — drives the app's own WebView2 (Edge / Chromium) to
 //! render the export HTML to a PDF file via `ICoreWebView2_7::PrintToPdf`.
 //!
-//! Flow (see `tmp/pdf-export-native-webview.md` Phase 1 for the design):
+//! Flow:
 //!   1. Build a hidden `WebviewWindow` with the export HTML.
 //!   2. Wait for `PageLoadEvent::Finished` (signaled via a `oneshot` channel
 //!      from the window's `on_page_load` callback).
