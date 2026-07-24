@@ -348,7 +348,7 @@ All Rust commands are registered in `src-tauri/src/lib.rs` and invoked from Type
 | `write_file(path, content)` | Write UTF-8 text to a user-selected path. Permitted extensions: `.md`, `.emerald`, `.emeralddb`, `.json`, `.txt`. Path must resolve within allowed storage roots. |
 | `read_file(path)` | Read a file and return its UTF-8 content. Same extension allowlist and root confinement as `write_file`. |
 | `ensure_app_storage_dirs()` | Create app data and app config directories if they don't exist. Called before frontend writes vault metadata or opens SQLite. |
-| `export_pdf(html, path)` | Render the supplied HTML to a PDF at `path` by driving the app's own webview. The frontend first prompts the user for a save location via the `dialog` plugin and passes the chosen path here. Per-platform implementations live in `src-tauri/src/pdf_export/{windows,macos,linux}.rs`, all behind the same `pub async fn export_pdf` signature; `mod.rs` does the `#[cfg(target_os = "…")]` re-export so `lib.rs` calls `pdf_export::export_pdf` without knowing which platform it's on. |
+| `export_pdf(html, path, page_size?)` | Render the supplied HTML to a PDF at `path` by driving the app's own webview. The frontend first prompts the user for a save location via the `dialog` plugin and passes the chosen path here. `page_size`, an optional `(width_in, height_in)` tuple in inches, overrides the default Letter/Portrait page with a custom size — used only by the Altar PDF export (see below); Journal/Wiki/Operations export calls it without `page_size` and gets the old default behavior. Per-platform implementations live in `src-tauri/src/pdf_export/{windows,macos,linux}.rs`, all behind the same `pub async fn export_pdf` signature; `mod.rs` does the `#[cfg(target_os = "…")]` re-export so `lib.rs` calls `pdf_export::export_pdf` without knowing which platform it's on. |
 | `update_menu_labels(...)` | Update native menu item labels for i18n (edit, view, export, import submenus and their items). |
 
 Tauri menu events (not `invoke`) are emitted by the native menu and received in `AppShell` via `listen()`:
@@ -366,17 +366,19 @@ Tauri menu events (not `invoke`) are emitted by the native menu and received in 
 
 ## PDF Export
 
-Emerald renders PDFs by driving the app's own embedded webview rather than bundling a separate HTML-to-PDF engine. The implementation is split across one module file per platform, dispatched at compile time by `#[cfg(target_os = "…")]` in `src-tauri/src/pdf_export/mod.rs`, so `lib.rs` only has to call `pdf_export::export_pdf(&app, html, path).await` regardless of the host OS.
+Emerald renders PDFs by driving the app's own embedded webview rather than bundling a separate HTML-to-PDF engine. The implementation is split across one module file per platform, dispatched at compile time by `#[cfg(target_os = "…")]` in `src-tauri/src/pdf_export/mod.rs`, so `lib.rs` only has to call `pdf_export::export_pdf(&app, html, path, page_size).await` regardless of the host OS.
 
-### Flow (all platforms)
+The same command backs two distinct export flows, distinguished by what's currently open (see [Menu enablement gating](#menu-enablement-gating) below): Journal/Wiki/Operations entries export their text content at the default Letter/Portrait page size; an open Altar (reading view) instead exports its rendered image at a page size matching the altar's own aspect ratio, via the optional `page_size` parameter.
+
+### Flow — Journal / Wiki / Operations (entry text)
 
 ```
 frontend export.ts:exportAsPDF
     ↓  build full HTML (DOMPurify, transformInternalLinks, embedImages)
 frontend save() dialog → user picks destination path
-    ↓  invoke('export_pdf', { html, path })
+    ↓  invoke('export_pdf', { html, path })   // no page_size → default Letter/Portrait
 src-tauri/src/lib.rs:export_pdf
-    ↓  pdf_export::export_pdf(&app, html, path).await
+    ↓  pdf_export::export_pdf(&app, html, path, None).await
 src-tauri/src/pdf_export/{windows,macos,linux}.rs
     ↓  write HTML to a unique temp file (file:// URL)
     ↓  build a hidden WebviewWindow pointing at that file
@@ -386,13 +388,29 @@ src-tauri/src/pdf_export/{windows,macos,linux}.rs
     ↓  return Result<(), String> → frontend toasts success/failure
 ```
 
-All three platforms share the same shape — hidden webview, oneshot-coordinated page-load wait, `with_webview` to reach the platform webview, native PDF API call, hidden window + temp file cleanup in a `Drop`-style guard. The differences are entirely in step 4 (the platform webview API).
+### Flow — Altar (rendered image)
+
+```
+frontend altarExport.ts:saveAltarPDF
+    ↓  exportCurrentAltarImage('png')  // same capture path as "Export as Image"
+    ↓  pdfPageSizeForResolution(resolution) → [widthIn, heightIn]
+    ↓  build minimal HTML: single <img> filling the page (object-fit: cover, 2% overscan
+    ↓    to hide a rounding-induced hairline gap at some aspect ratios)
+frontend save() dialog → user picks destination path
+    ↓  invoke('export_pdf', { html, path, pageSize: [widthIn, heightIn] })
+src-tauri/src/lib.rs:export_pdf
+    ↓  pdf_export::export_pdf(&app, html, path, Some((widthIn, heightIn))).await
+    ↓  (same hidden-webview flow as above; Windows applies page_size as a
+    ↓   custom print media size, macOS/Linux currently ignore it — see below)
+```
+
+All three platforms share the same shape — hidden webview, oneshot-coordinated page-load wait, `with_webview` to reach the platform webview, native PDF API call, hidden window + temp file cleanup in a `Drop`-style guard. The differences are entirely in step 4 (the platform webview API) and in how (or whether) `page_size` is honored.
 
 ### Per-platform implementations
 
-- **Windows (`src-tauri/src/pdf_export/windows.rs`)** — implemented and tested end-to-end. Builds a hidden `WebviewWindow` with `WebviewWindowBuilder`, waits for `PageLoadEvent::Finished` via a `oneshot` signalled from `on_page_load`, then calls `with_webview` to reach the WebView2 controller. Casts the core to `ICoreWebView2_7` and invokes `PrintToPdf(PCWSTR, settings, ICoreWebView2PrintToPdfCompletedHandler)`. The COM completion handler runs on a worker thread; the Rust side bridges it back to async with a second `oneshot` wrapped in `Arc<Mutex<Option<_>>>` so the handler can move it out. Two timeouts cap the operation: 30 s for the page-load wait and 120 s for `PrintToPdf` itself.
-- **macOS (`src-tauri/src/pdf_export/macos.rs`)** — implemented, but **not yet verified on real hardware**. Same shape. Reaches the `WKWebView` pointer via `with_webview` and calls `createPDFWithConfiguration:completionHandler:`. The completion handler runs on a background queue and is bridged back to async with a `block2::ConcreteBlock` + `oneshot`. The hidden `WKWebView` is written to disk via `NSData.writeToFile:atomically:` inside the completion handler. `MainThreadMarker` is acquired inside the `with_webview` closure because that closure dispatches us to the AppKit main thread.
-- **Linux (`src-tauri/src/pdf_export/linux.rs`)** — implemented, but **not yet verified on real hardware**. Same shape. Uses `WebKitPrintOperation` configured with `PrintOperationOutputFormat::Pdf` and `output_uri = "file://<path>"`, then calls `print(PrintOperationAction::Export)`. The synchronous Rust binding blocks inside `with_webview` until the operation finishes writing the PDF; a post-check `stat`s the output file and returns an error if it landed as a zero-byte PDF (the WebKit print API can succeed while producing an empty file). Supported distro matrix: Ubuntu 22.04 LTS and 24.04 LTS.
+- **Windows (`src-tauri/src/pdf_export/windows.rs`)** — implemented and tested end-to-end. Builds a hidden `WebviewWindow` with `WebviewWindowBuilder`, waits for `PageLoadEvent::Finished` via a `oneshot` signalled from `on_page_load`, then calls `with_webview` to reach the WebView2 controller. Casts the core to `ICoreWebView2_7` and invokes `PrintToPdf(PCWSTR, settings, ICoreWebView2PrintToPdfCompletedHandler)`. When `page_size` is `Some`, it is applied as a custom media size before printing: `ICoreWebView2_2::Environment` → `ICoreWebView2Environment6::CreatePrintSettings` builds an `ICoreWebView2PrintSettings`, cast to `ICoreWebView2PrintSettings2` to call `SetMediaSize(COREWEBVIEW2_PRINT_MEDIA_SIZE_CUSTOM)`, then `SetPageWidth`/`SetPageHeight` (inches) and all four margins set to 0. If building the custom settings fails for any reason, the export falls back to `PrintToPdf`'s default Letter/Portrait settings rather than aborting. The COM completion handler runs on a worker thread; the Rust side bridges it back to async with a second `oneshot` wrapped in `Arc<Mutex<Option<_>>>` so the handler can move it out. Two timeouts cap the operation: 30 s for the page-load wait and 120 s for `PrintToPdf` itself.
+- **macOS (`src-tauri/src/pdf_export/macos.rs`)** — implemented, but **not yet verified on real hardware**. Same shape. Reaches the `WKWebView` pointer via `with_webview` and calls `createPDFWithConfiguration:completionHandler:`. The completion handler runs on a background queue and is bridged back to async with a `block2::ConcreteBlock` + `oneshot`. The hidden `WKWebView` is written to disk via `NSData.writeToFile:atomically:` inside the completion handler. `MainThreadMarker` is acquired inside the `with_webview` closure because that closure dispatches us to the AppKit main thread. `page_size` is accepted but currently unused (`_page_size`) — honoring it would need `WKPDFConfiguration.rect` sized in points; left for a future change since this path can't be verified without real hardware.
+- **Linux (`src-tauri/src/pdf_export/linux.rs`)** — implemented, but **not yet verified on real hardware**. Same shape. Uses `WebKitPrintOperation` configured with `PrintOperationOutputFormat::Pdf` and `output_uri = "file://<path>"`, then calls `print(PrintOperationAction::Export)`. The synchronous Rust binding blocks inside `with_webview` until the operation finishes writing the PDF; a post-check `stat`s the output file and returns an error if it landed as a zero-byte PDF (the WebKit print API can succeed while producing an empty file). Supported distro matrix: Ubuntu 22.04 LTS and 24.04 LTS. `page_size` is accepted but currently unused (`_page_size`) — honoring it would need a custom `GtkPaperSize`; left for a future change, same verification caveat as above.
 
 ### Frontend responsibilities
 
@@ -405,12 +423,12 @@ Because the hidden webview inherits the app CSP (`script-src 'self'`, see `tauri
 
 ### Menu enablement gating
 
-The three "Export as …" menu items (`export-pdf`, `export-markdown`, `export-emerald`) share one submenu but are not all gated identically: PDF and Markdown are entry-only, while Emerald is also available for altars. The gating is done in two places:
+The three "Export as …" menu items (`export-pdf`, `export-markdown`, `export-emerald`) share one submenu but are not all gated identically: Markdown is entry-only, while PDF and Emerald are also available for altars. There is no separate "Export Altar as PDF" menu item — `export-pdf` is reused and its handler branches on what's currently open. The gating is done in two places:
 
-- **Rust (`src-tauri/src/lib.rs`)** — the menu items are constructed with `enabled: false` in the `setup` block, so they start greyed out. The `set_export_menu_enabled(app, entry_enabled, emerald_enabled)` Tauri command walks the `export-submenu` and sets `export-pdf` / `export-markdown` from `entry_enabled` and `export-emerald` from `emerald_enabled` independently.
-- **Frontend (`src/components/layout/AppShell.tsx`)** — a single `useEffect` keyed on `activeView.type`, `activeView.id`, and `activeView.mode` calls `invoke('set_export_menu_enabled', { entryEnabled, emeraldEnabled })` with `entryEnabled = (activeView.type ∈ {journal, wiki, operations}) && !!activeView.id` and `emeraldEnabled = entryEnabled || (activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit')`. The same effect also calls `set_altar_export_menu_enabled` (see below), since both depend on the same view-state inputs.
+- **Rust (`src-tauri/src/lib.rs`)** — the menu items are constructed with `enabled: false` in the `setup` block, so they start greyed out. The `set_export_menu_enabled(app, entry_enabled, pdf_enabled, emerald_enabled)` Tauri command walks the `export-submenu` and sets `export-markdown` from `entry_enabled`, `export-pdf` from `pdf_enabled`, and `export-emerald` from `emerald_enabled`, all independently.
+- **Frontend (`src/components/layout/AppShell.tsx`)** — a single `useEffect` keyed on `activeView.type`, `activeView.id`, and `activeView.mode` calls `invoke('set_export_menu_enabled', { entryEnabled, pdfEnabled, emeraldEnabled })` with `entryEnabled = (activeView.type ∈ {journal, wiki, operations}) && !!activeView.id`, and both `pdfEnabled` and `emeraldEnabled` set to `entryEnabled || (activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit')`. The same effect also calls `set_altar_export_menu_enabled` (see below), since all three depend on the same view-state inputs. The `export-pdf` listener itself re-reads `useUIStore.getState().activeView` at click time: if it resolves to an Altar reading view, it calls `saveAltarPDF()` (`src/lib/altarExport.ts`) instead of the usual `exportAsPDF(data)` path.
 
-This wiring predates the PDF export migration and is unchanged by it; the migration only replaced the *implementation* behind `export-pdf`, not the gate. There is still only one `export-emerald` menu item — it is not duplicated per content type; `exportAsEmerald()` in `src/lib/emeraldFormat.ts` branches internally on `activeView.type` to export either the open entry or the open altar.
+There is still only one `export-emerald` menu item — it is not duplicated per content type; `exportAsEmerald()` in `src/lib/emeraldFormat.ts` branches internally on `activeView.type` to export either the open entry or the open altar. The same one-menu-item-branches-internally pattern now also applies to `export-pdf`.
 
 **Altar "Export as Image" submenu.** A nested `Submenu` (id `export-altar-image`, containing `MenuItem`s `export-altar-jpeg` / `export-altar-png` / `export-altar-webp`) sits inside `export-submenu`, separated from the entry-export items by a `PredefinedMenuItem::separator`. It follows the same two-place gating pattern, but with a different condition — it is only meaningful while an Altar is open in **reading view** (not edit mode):
 

@@ -280,9 +280,14 @@ fn ensure_app_storage_dirs(app: tauri::AppHandle) -> Result<(), String> {
 /// 2015-era Qt WebKit, no working macOS build); it was replaced because
 /// the app's own WebView2 / WKWebView / WebKitGTK does the same job
 /// with smaller install, modern CSS, and native color emoji.
+///
+/// `page_size`, when present, is `(width_in, height_in)` in inches and
+/// overrides the default Letter/Portrait page with a custom size —
+/// used by the Altar PDF export so the page matches the altar's own
+/// aspect ratio instead of leaving it letterboxed on a portrait page.
 #[tauri::command]
-async fn export_pdf(app: tauri::AppHandle, html: String, path: String) -> Result<(), String> {
-    pdf_export::export_pdf(&app, html, path).await
+async fn export_pdf(app: tauri::AppHandle, html: String, path: String, page_size: Option<(f64, f64)>) -> Result<(), String> {
+    pdf_export::export_pdf(&app, html, path, page_size).await
 }
 
 /// Deletes image files in the images dir that are not in `used_paths`
@@ -391,11 +396,13 @@ fn install_mouse_nav_monitor(app_handle: tauri::AppHandle) {
 }
 
 /// Toggles the enabled state of the "Export to …" menu items. `entry_enabled`
-/// covers PDF/Markdown (journal / wiki / operations only); `emerald_enabled`
-/// covers the shared Emerald export, which is also available while an
-/// Altar's reading view is open. Called by the frontend on every view change.
+/// covers Markdown (journal / wiki / operations only); `pdf_enabled` covers
+/// PDF, which is also available while an Altar's reading view is open (it
+/// exports the rendered altar image instead of entry content in that case);
+/// `emerald_enabled` covers the shared Emerald export, also available for an
+/// open Altar. Called by the frontend on every view change.
 #[tauri::command]
-fn set_export_menu_enabled(app: tauri::AppHandle, entry_enabled: bool, emerald_enabled: bool) {
+fn set_export_menu_enabled(app: tauri::AppHandle, entry_enabled: bool, pdf_enabled: bool, emerald_enabled: bool) {
     use tauri::menu::MenuItemKind;
     let Some(menu) = app.menu() else { return };
 
@@ -405,7 +412,8 @@ fn set_export_menu_enabled(app: tauri::AppHandle, entry_enabled: bool, emerald_e
             for child in sub.items().unwrap_or_default() {
                 if let MenuItemKind::MenuItem(item) = &child {
                     match item.id().0.as_str() {
-                        "export-pdf" | "export-markdown" => { item.set_enabled(entry_enabled).ok(); }
+                        "export-pdf" => { item.set_enabled(pdf_enabled).ok(); }
+                        "export-markdown" => { item.set_enabled(entry_enabled).ok(); }
                         "export-emerald" => { item.set_enabled(emerald_enabled).ok(); }
                         _ => {}
                     }
@@ -572,7 +580,8 @@ pub fn run() {
             )?;
             let view_submenu = Submenu::with_id_and_items(app, "view-submenu", "View", true, &[&reset_item])?;
             // Export items start disabled — the frontend enables them once a
-            // journal / wiki / operations entry is actually open.
+            // journal / wiki / operations entry is actually open (PDF is also
+            // enabled while an Altar's reading view is open).
             let export_pdf_item = MenuItem::with_id(
                 app,
                 "export-pdf",

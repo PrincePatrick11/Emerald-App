@@ -239,7 +239,11 @@ All export and import actions are in the native application menu.
 
 Prompts a native save dialog for the destination and writes the PDF directly to disk — there is no preview window and no system print dialog. The PDF is rendered by the app's own webview (WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux), so emoji render as proper colored glyphs (Segoe UI Emoji / Apple Color Emoji / Noto Color Emoji) without any frontend rasterisation. The suggested filename is `<Title>_YYYY-MM-DD.pdf`; the user picks the actual location in the OS save dialog. Images in the entry are embedded as base64 before the PDF is generated; internal link chips are rendered as styled spans inside the content.
 
-The PDF export menu item is only available while a Journal / Wiki / Operations entry is actually open — it is disabled on the home view, the altar, the tag manager, and the trash.
+The **Export → Export as PDF…** menu item is available while a Journal / Wiki / Operations entry is open, or while an Altar is open in **reading view** (not while editing it) — it is disabled on the home view, the tag manager, and the trash. For Journal/Wiki/Operations it exports the entry text as described above; for an open Altar it instead exports the rendered altar image as a single-page PDF (see Altar PDF Export below).
+
+### Altar PDF Export
+
+When an Altar is open in reading view, **Export → Export as PDF…** renders the altar the same way the image export does (full native resolution) and embeds that image as a single page in a PDF instead of exporting text content. The PDF page size is derived from the altar's own pixel aspect ratio rather than a fixed portrait page: the long edge is 11", and the short edge follows the aspect ratio, so a portrait altar (e.g. 9:16) produces a portrait page and a landscape altar (e.g. 16:9) produces a landscape page. On Windows this custom page size is applied natively in the print pipeline; on macOS and Linux the export still succeeds but currently uses the platform's default page size (not yet verified on real hardware). There is no separate "Export Altar as PDF" menu item — the existing Export as PDF item is reused and switches behavior based on what's currently open.
 
 ### Altar Image Export
 

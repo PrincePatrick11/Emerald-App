@@ -14,7 +14,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { exportAsPDF, exportAsMarkdown, noEntryMessage, exportErrorMessage } from '../../lib/export';
 import { collectExportData } from '../../lib/exportData';
 import { exportAsEmerald, importFromEmerald, importFromMarkdown } from '../../lib/emeraldFormat';
-import { saveAltarImage } from '../../lib/altarExport';
+import { saveAltarImage, saveAltarPDF } from '../../lib/altarExport';
 
 const LOCAL_PATH_RE = /src="([^"]+)"/g;
 
@@ -130,10 +130,12 @@ export default function AppShell() {
     }).catch(() => {/* desktop-only, ignore in browser preview */});
   }, [i18n.language, t]);
 
-  // Enable "Export to PDF/Markdown" only while a journal / wiki / operations
-  // entry is actually open; "Export as Emerald" is shared between those
-  // entry types and an Altar's reading view (not while editing it — matches
-  // where the Save Image UI used to live). "Export as Image" is altar-only.
+  // Enable "Export to Markdown" only while a journal / wiki / operations
+  // entry is actually open. "Export as PDF" and "Export as Emerald" are
+  // shared between those entry types and an Altar's reading view (not while
+  // editing it — matches where the Save Image UI used to live): for an open
+  // Altar, PDF exports the rendered altar image instead of entry content.
+  // "Export as Image" is altar-only.
   useEffect(() => {
     const isEntryView =
       (activeView.type === 'journal' ||
@@ -142,8 +144,11 @@ export default function AppShell() {
       !!activeView.id;
     const isAltarReadingView =
       activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit';
-    invoke('set_export_menu_enabled', { entryEnabled: isEntryView, emeraldEnabled: isEntryView || isAltarReadingView })
-      .catch(() => {/* desktop-only, ignore in browser preview */});
+    invoke('set_export_menu_enabled', {
+      entryEnabled: isEntryView,
+      pdfEnabled: isEntryView || isAltarReadingView,
+      emeraldEnabled: isEntryView || isAltarReadingView,
+    }).catch(() => {/* desktop-only, ignore in browser preview */});
     invoke('set_altar_export_menu_enabled', { enabled: isAltarReadingView })
       .catch(() => {/* desktop-only, ignore in browser preview */});
   }, [activeView.type, activeView.id, activeView.mode]);
@@ -170,6 +175,12 @@ export default function AppShell() {
 
   useEffect(() => {
     const unlistenPdf = listen('export-pdf', async () => {
+      const view = useUIStore.getState().activeView;
+      const isAltarReadingView = view.type === 'altar' && !!view.id && view.mode !== 'edit';
+      if (isAltarReadingView) {
+        saveAltarPDF().catch(err => exportErrorMessage(err, 'PDF export'));
+        return;
+      }
       const data = await collectExportData();
       if (!data) { noEntryMessage(); return; }
       exportAsPDF(data).catch(err => exportErrorMessage(err, 'PDF export'));

@@ -35,10 +35,16 @@ const PAGE_LOAD_TIMEOUT: Duration = Duration::from_secs(30);
 /// Maximum time we'll wait for `createPDFWithConfiguration:` to finish.
 const PRINT_TIMEOUT: Duration = Duration::from_secs(120);
 
+/// `page_size` — `(width_in, height_in)` in inches, used on Windows to size
+/// the PDF page to the Altar's own aspect ratio (see `windows.rs`). Not yet
+/// wired up here (would need `WKPDFConfiguration.rect`, sized in points);
+/// left unused pending real-device verification, same caveat as the rest
+/// of this file.
 pub async fn export_pdf(
     app: &AppHandle,
     html: String,
     path: String,
+    _page_size: Option<(f64, f64)>,
 ) -> Result<(), String> {
     eprintln!(
         "emerald pdf-export (wkwebview): invoked ({} bytes html → {})",
