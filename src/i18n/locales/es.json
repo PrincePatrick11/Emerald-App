@@ -493,6 +493,11 @@
     "tabOperations": "Operaciones",
     "noResults": "No se encontraron entradas"
   },
+  "importDestination": {
+    "title": "Elegir destino",
+    "description": "«{{title}}» no especifica dónde importarlo. ¿Dónde debería importarse?",
+    "cancel": "Cancelar"
+  },
   "tasks": {
     "title": "Tareas",
     "newTask": "Nueva tarea",

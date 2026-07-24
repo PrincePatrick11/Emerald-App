@@ -235,11 +235,13 @@ Tags and categories also support soft-delete and restoration.
 
 All export and import actions are in the native application menu.
 
+> **Operations export is temporarily disabled.** Export (Markdown, PDF, Emerald) currently only works for Journal and Wiki entries and for altars. Opening an Operations entry leaves all three "Export as …" menu items greyed out — export for that module isn't wired up correctly yet, so the items are disabled rather than left to produce a broken result. This is a temporary state, not a permanent design decision; the menu items will re-enable for Operations once that export path is implemented. Import (Markdown and Emerald) is unaffected and still supports Operations as a destination.
+
 ### PDF Export
 
 Prompts a native save dialog for the destination and writes the PDF directly to disk — there is no preview window and no system print dialog. The PDF is rendered by the app's own webview (WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux), so emoji render as proper colored glyphs (Segoe UI Emoji / Apple Color Emoji / Noto Color Emoji) without any frontend rasterisation. The suggested filename is `<Title>_YYYY-MM-DD.pdf`; the user picks the actual location in the OS save dialog. Images in the entry are embedded as base64 before the PDF is generated; internal link chips are rendered as styled spans inside the content.
 
-The **Export → Export as PDF…** menu item is available while a Journal / Wiki / Operations entry is open, or while an Altar is open in **reading view** (not while editing it) — it is disabled on the home view, the tag manager, and the trash. For Journal/Wiki/Operations it exports the entry text as described above; for an open Altar it instead exports the rendered altar image as a single-page PDF (see Altar PDF Export below).
+The **Export → Export as PDF…** menu item is available while a Journal / Wiki entry is open, or while an Altar is open in **reading view** (not while editing it) — it is disabled on the home view, the tag manager, the trash, and (for now, see note above) while an Operations entry is open. For Journal/Wiki it exports the entry text as described above; for an open Altar it instead exports the rendered altar image as a single-page PDF (see Altar PDF Export below).
 
 ### Altar PDF Export
 
@@ -257,7 +259,7 @@ Saves a `.md` file with a frontmatter block followed by the entry body. Frontmat
 
 The Emerald format (`.emerald` file extension) is a JSON file that captures the full entry — or, for altars, the full altar — including all metadata and embedded images. It is designed for lossless transfer between Emerald installations.
 
-The single **Export → Export as Emerald…** menu item is shared between Journal/Wiki/Operations entries and altars: it is enabled whenever a Journal / Wiki / Operations entry is open, or an Altar is open in reading view, and exports whichever of the two is currently active.
+The single **Export → Export as Emerald…** menu item is shared between Journal/Wiki entries and altars: it is enabled whenever a Journal / Wiki entry is open, or an Altar is open in reading view, and exports whichever of the two is currently active. (Operations is temporarily excluded — see the note at the top of this section.)
 
 The file structure:
 
@@ -289,6 +291,8 @@ Import for all types goes through the same **Import → From Emerald…** menu i
 Parses a Markdown file exported by Emerald (or following the same structure). The `# Title` line becomes the entry title. Key-value lines before the `---` separator are parsed as metadata. Unrecognised metadata keys become custom text properties. The body below `---` is parsed from Markdown to HTML using `marked`.
 
 Note: this path is parser-based (Markdown -> HTML) and is not identical to Emerald JSON import sanitisation. Metadata rendered into PDF export is escaped before interpolation.
+
+**Destination confirmation.** The frontmatter's `type` key determines where the entry is imported. If `type` is present and is one of `journal`, `wiki`, or `operations`, the import proceeds directly into that module. If `type` is missing or set to anything else (Altar is not a valid Markdown-import destination), a modal appears showing the detected title and asking you to choose Journal, Wiki, or Operations; cancelling the modal aborts the import entirely — no entry is created. This only applies to Markdown import: `.emerald` files always carry a definite `type`, so importing from that format never prompts.
 
 ### Vault Backup (`.emeralddb`)
 

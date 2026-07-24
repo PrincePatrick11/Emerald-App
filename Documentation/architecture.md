@@ -37,10 +37,10 @@ src/
 │   │                 CustomPropertiesSection, LinkedOpsInput, LinkedWikiInput,
 │   │                 PlacedElementRow
 │   ├── wiki/         WikiList (rendering + category emoji helper)
-│   └── ui/           ListToolbar, FilterPanel, UndoToast, ContextMenu
+│   └── ui/           ListToolbar, FilterPanel, UndoToast, ContextMenu, ImportDestinationModal
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, routineStore, customPropertyStore, undoStore,
-│                     trashStore, vaultStore
+│                     trashStore, vaultStore, importStore
 ├── lib/              db.ts, links.ts, tabs.ts, dragState.ts, altarDragState.ts,
 │                     routineDragState.ts, moonPhase.ts, export.ts,
 │                     exportData.ts, emeraldFormat.ts, vaultManager.ts, dbBackup.ts,
@@ -426,7 +426,9 @@ Because the hidden webview inherits the app CSP (`script-src 'self'`, see `tauri
 The three "Export as …" menu items (`export-pdf`, `export-markdown`, `export-emerald`) share one submenu but are not all gated identically: Markdown is entry-only, while PDF and Emerald are also available for altars. There is no separate "Export Altar as PDF" menu item — `export-pdf` is reused and its handler branches on what's currently open. The gating is done in two places:
 
 - **Rust (`src-tauri/src/lib.rs`)** — the menu items are constructed with `enabled: false` in the `setup` block, so they start greyed out. The `set_export_menu_enabled(app, entry_enabled, pdf_enabled, emerald_enabled)` Tauri command walks the `export-submenu` and sets `export-markdown` from `entry_enabled`, `export-pdf` from `pdf_enabled`, and `export-emerald` from `emerald_enabled`, all independently.
-- **Frontend (`src/components/layout/AppShell.tsx`)** — a single `useEffect` keyed on `activeView.type`, `activeView.id`, and `activeView.mode` calls `invoke('set_export_menu_enabled', { entryEnabled, pdfEnabled, emeraldEnabled })` with `entryEnabled = (activeView.type ∈ {journal, wiki, operations}) && !!activeView.id`, and both `pdfEnabled` and `emeraldEnabled` set to `entryEnabled || (activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit')`. The same effect also calls `set_altar_export_menu_enabled` (see below), since all three depend on the same view-state inputs. The `export-pdf` listener itself re-reads `useUIStore.getState().activeView` at click time: if it resolves to an Altar reading view, it calls `saveAltarPDF()` (`src/lib/altarExport.ts`) instead of the usual `exportAsPDF(data)` path.
+- **Frontend (`src/components/layout/AppShell.tsx`)** — a single `useEffect` keyed on `activeView.type`, `activeView.id`, and `activeView.mode` calls `invoke('set_export_menu_enabled', { entryEnabled, pdfEnabled, emeraldEnabled })` with `entryEnabled = (activeView.type ∈ {journal, wiki}) && !!activeView.id`, and both `pdfEnabled` and `emeraldEnabled` set to `entryEnabled || (activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit')`. The same effect also calls `set_altar_export_menu_enabled` (see below), since all three depend on the same view-state inputs. The `export-pdf` listener itself re-reads `useUIStore.getState().activeView` at click time: if it resolves to an Altar reading view, it calls `saveAltarPDF()` (`src/lib/altarExport.ts`) instead of the usual `exportAsPDF(data)` path.
+
+  **Operations is temporarily excluded from `entryEnabled`.** `operations` was removed from the type set that satisfies `isEntryView`, so all three "Export as …" items are disabled whenever an Operations entry is open — export for that module isn't finished/correct yet. This is a stopgap, not a permanent restriction: re-add `activeView.type === 'operations'` to the `isEntryView` check once Operations export is implemented and verified. Journal, Wiki, and the Altar reading-view export path are unaffected.
 
 There is still only one `export-emerald` menu item — it is not duplicated per content type; `exportAsEmerald()` in `src/lib/emeraldFormat.ts` branches internally on `activeView.type` to export either the open entry or the open altar. The same one-menu-item-branches-internally pattern now also applies to `export-pdf`.
 
@@ -436,3 +438,7 @@ There is still only one `export-emerald` menu item — it is not duplicated per 
 - **Frontend** — a separate `useEffect` keyed on `activeView.type`, `activeView.id`, and `activeView.mode` calls `invoke('set_altar_export_menu_enabled', { enabled })` with `enabled = activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit'`.
 - Clicking a leaf item emits `export-altar-jpeg` / `export-altar-png` / `export-altar-webp`, which `AppShell.tsx` listens for and forwards to `saveAltarImage(format)` (`src/lib/altarExport.ts`) — the same `exportCurrentAltarImage()` capture path formerly wired to the in-sidebar "Save Image" button.
 - `update_menu_labels` was extended with `export_altar_image` / `export_altar_jpeg` / `export_altar_png` / `export_altar_webp` params and traverses into the nested submenu to relabel it and its children on language change.
+
+### Bridging imperative menu-event code to a React modal
+
+`import-markdown` is a Tauri menu event, so its handler (`importFromMarkdown()` in `src/lib/emeraldFormat.ts`) runs as plain imperative code with no component tree to render a confirmation dialog into. When the parsed file's frontmatter has no usable `type`, the import needs the user to pick a destination before it can continue — `src/store/importStore.ts` bridges this gap with a promise-based Zustand store: `askDestination(title)` sets `pending = { title, resolve }` and returns a `Promise<ImportDestinationType | null>` that does not resolve until the store's `choose(type)` or `cancel()` action is called. `ImportDestinationModal` (mounted globally in `AppShell`, alongside `UndoToast`) subscribes to `pending` and renders only when it's non-null; clicking an option calls `choose`, clicking outside/Escape/Cancel calls `cancel` (resolves `null`). `importFromMarkdown()` awaits the promise and treats `null` as a full import abort (`return` before any DB write). This pattern — an imperative caller `await`s a store method, a mounted-once modal component resolves it — is the template for any future case where non-component code needs a blocking user decision.

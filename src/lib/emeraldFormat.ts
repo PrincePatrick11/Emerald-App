@@ -10,6 +10,7 @@ import { useOperationStore } from '../store/operationStore';
 import { useTagStore } from '../store/tagStore';
 import { useCustomPropertyStore } from '../store/customPropertyStore';
 import { useAltarStore } from '../store/altarStore';
+import { useImportStore } from '../store/importStore';
 import { getDb } from './db';
 import { generateId } from './helpers';
 import {
@@ -738,7 +739,22 @@ export async function importFromMarkdown(): Promise<void> {
 
   const bodyMd = lines.slice(bodyStart).join('\n').trim();
   const html   = await marked.parse(bodyMd) as string;
-  const type   = (frontMeta['type'] ?? 'journal') as EmeraldFile['type'];
+
+  // Markdown import only supports journal/wiki/operations as a destination
+  // (unlike .emerald files, which also carry 'altar'). A missing or
+  // unrecognised `type` frontmatter key is ambiguous, so ask the user
+  // instead of silently defaulting to journal.
+  const rawType = frontMeta['type'];
+  const validTypes = ['journal', 'wiki', 'operations'];
+  let type: EmeraldFile['type'];
+  if (rawType && validTypes.includes(rawType)) {
+    type = rawType as EmeraldFile['type'];
+  } else {
+    const chosen = await useImportStore.getState().askDestination(title);
+    if (!chosen) return;
+    type = chosen;
+  }
+
   const tagNames = await ensureTagNames(
     (frontMeta['tags'] ?? '').split(',').map(t => t.trim()).filter(Boolean),
   );

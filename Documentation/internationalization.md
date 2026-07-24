@@ -97,6 +97,7 @@ The translation files follow this top-level structure (from `en.json`):
 | `backlinks` | Backlinks panel strings |
 | `trash` | Trash view strings |
 | `linkPicker` | Internal link picker modal (title, search placeholder, tab labels, no-results message) |
+| `importDestination` | Markdown-import destination-picker modal (`title`, `description` — interpolates `{{title}}`, `cancel`); reuses `linkPicker.tabJournal` / `tabWiki` / `tabOperations` for the option labels rather than duplicating them |
 | `menu` | Native menu item labels (Edit, View, Export, Import submenus and their items), including the nested `exportAltarImage` submenu (`exportAltarJpeg`, `exportAltarPng`, `exportAltarWebp`) |
 
 ## Interpolation
