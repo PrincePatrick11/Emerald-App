@@ -9,6 +9,7 @@ import { getAltarBackgroundStyle, DEFAULT_ALTAR_RESOLUTION, parseResolution, isR
 import type { AltarRecord } from '../../types';
 import ListToolbar from '../ui/ListToolbar';
 import ContextMenu from '../ui/ContextMenu';
+import Button from '../ui/Button';
 import { AltarCanvas, captureCurrentAltar } from '../altar/AltarCanvas';
 import { AltarLibraryStrip } from '../altar/AltarLibraryStrip';
 import { AltarCard, AltarListRow, buildAltarContextMenuActions } from '../altar/AltarCard';
@@ -241,12 +242,12 @@ export default function AltarView() {
         <div className="flex items-center justify-between px-8 h-14 border-b border-stone-700/60">
           <h1 className="text-lg font-semibold text-stone-100">{t('nav.altar')}</h1>
           <div className="flex items-center gap-1">
-            <button onClick={handleNew} className="btn-primary">
+            <Button onClick={handleNew} variant="primary">
               <Plus size={13} />{t('altar.newAltar')}
-            </button>
-            <button onClick={toggleRightSidebar} className="btn-ghost ml-1">
+            </Button>
+            <Button onClick={toggleRightSidebar} variant="ghost" className="ml-1">
               <PanelRightOpen size={16} />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -350,38 +351,38 @@ export default function AltarView() {
         <div className="flex items-center gap-1">
           {isEditing ? (
             <>
-              <button onClick={handleDone} className="flex items-center gap-1.5 rounded-md border border-jade-800/40 bg-jade-900/40 px-3 py-1.5 text-xs font-medium text-jade-400 transition-colors hover:bg-jade-900/60">
+              <Button onClick={handleDone} variant="primary">
                 <Check size={13} />{t('editor.done')}
-              </button>
-              <button onClick={handleCancel} className="btn-ghost">
+              </Button>
+              <Button onClick={handleCancel} variant="ghost">
                 <X size={15} />
-              </button>
+              </Button>
             </>
           ) : (
             <>
               {altarWindowFullscreen ? (
-                <button
+                <Button
                   onClick={() => setAltarWindowFullscreen(false)}
-                  className="btn-ghost"
+                  variant="ghost"
                   title={t('altar.exitWindowFullscreen')}
                 >
                   <Minimize2 size={15} />
-                </button>
+                </Button>
               ) : !rightSidebarOpen && (
-                <button
+                <Button
                   onClick={() => setAltarWindowFullscreen(true)}
-                  className="btn-ghost"
+                  variant="ghost"
                   title={t('altar.windowFullscreen')}
                 >
                   <Maximize2 size={15} />
-                </button>
+                </Button>
               )}
-              <button onClick={enterEditMode} className="btn-ghost" title={t('editor.edit')}>
+              <Button onClick={enterEditMode} variant="ghost" title={t('editor.edit')}>
                 <Pencil size={15} />
-              </button>
-              <button onClick={toggleRightSidebar} className="btn-ghost">
+              </Button>
+              <Button onClick={toggleRightSidebar} variant="ghost">
                 <PanelRightOpen size={16} />
-              </button>
+              </Button>
             </>
           )}
         </div>

@@ -38,7 +38,8 @@ src/
 │   │                 PlacedElementRow
 │   ├── wiki/         WikiList (rendering + category emoji helper)
 │   └── ui/           ListToolbar, FilterPanel, UndoToast, ContextMenu, ImportDestinationModal,
-│                     Modal (shared modal wrapper), EmojiPicker (shared emoji-picker popover)
+│                     Modal (shared modal wrapper), EmojiPicker (shared emoji-picker popover),
+│                     Button (shared primary/secondary/ghost/danger button)
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, routineStore, customPropertyStore, undoStore,
 │                     trashStore, vaultStore, importStore

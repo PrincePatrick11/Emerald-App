@@ -5,6 +5,7 @@ import { useCustomPropertyStore } from '../../store/customPropertyStore';
 import { useUndoStore } from '../../store/undoStore';
 import { generateId } from '../../lib/helpers';
 import { CUSTOM_PROP_INPUT_CLASSES, CUSTOM_PROP_SMALL_INPUT_CLASSES } from '../../lib/styleClasses';
+import Button from '../ui/Button';
 import type { CustomProperty, CustomPropertyType } from '../../types';
 
 export const PROP_TYPE_ICONS: Record<string, React.ReactNode> = {
@@ -154,12 +155,12 @@ export function CustomPropertiesSection({
             {t('properties.showInEntry')}
           </label>
           <div className="flex justify-end gap-1">
-            <button onClick={handleAdd} className="flex items-center gap-1 btn-ghost text-jade-400 text-xs">
+            <Button onClick={handleAdd} variant="ghost" className="flex items-center gap-1 text-jade-400 text-xs">
               <Check size={12} /> {t('properties.add')}
-            </button>
-            <button onClick={resetForm} className="btn-ghost text-xs">
+            </Button>
+            <Button onClick={resetForm} variant="ghost" className="text-xs">
               <X size={12} />
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
@@ -265,9 +266,9 @@ function CustomPropertyRow({
               />
               {t('properties.showInEntry')}
             </label>
-            <button onClick={handleDelete} className="flex items-center gap-1 text-xs text-stone-700 hover:text-red-400 transition-colors">
+            <Button onClick={handleDelete} variant="danger" className="flex items-center gap-1 text-xs">
               <Trash2 size={11} /> Delete
-            </button>
+            </Button>
           </div>
           {/* Toggle label editors — only in edit mode */}
           {prop.type === 'toggle' && (

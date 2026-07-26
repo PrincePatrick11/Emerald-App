@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Globe, Info, Database, Upload, Download, Check, AlertTriangle, ChevronDown, ChevronUp, Sun, Moon, Type } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Modal from '../ui/Modal';
+import Button from '../ui/Button';
 import { useVaultStore } from '../../store/vaultStore';
 import { useUIStore } from '../../store/uiStore';
 import { FONT_OPTIONS, THEME_OPTIONS } from '../../themes/theme';
@@ -317,12 +318,13 @@ export default function SettingsModal({ onClose }: Props) {
                       <span className="text-xs text-stone-500 shrink-0">{t('settings.vaultSwitching')}</span>
                     )}
                     {!isActive && vaults.length > 1 && !isRenaming && (
-                      <button
+                      <Button
                         onClick={() => removeVault(v.id)}
-                        className="text-xs text-stone-600 hover:text-red-400 transition-colors shrink-0"
+                        variant="danger"
+                        className="text-xs shrink-0"
                       >
                         {t('settings.vaultDelete')}
-                      </button>
+                      </Button>
                     )}
                   </div>
                 );
@@ -429,14 +431,14 @@ export default function SettingsModal({ onClose }: Props) {
                   </label>
 
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
                       onClick={handleExport}
                       disabled={exporting}
-                      className="settings-cta-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-jade-500/20 border border-jade-500/40 text-jade-400 text-xs hover:bg-jade-500/30 transition-colors disabled:opacity-50"
+                      variant="primary"
                     >
                       <Download size={13} />
                       {exporting ? t('settings.exporting') : t('settings.exportBtn')}
-                    </button>
+                    </Button>
                     {exportDone && (
                       <span className="text-xs text-jade-400 flex items-center gap-1">
                         <Check size={12} /> {t('settings.exportDone')}
@@ -585,14 +587,14 @@ export default function SettingsModal({ onClose }: Props) {
 
                       {/* Import button */}
                       <div className="flex items-center gap-2">
-                        <button
+                        <Button
                           onClick={handleImport}
                           disabled={importing}
-                          className="settings-cta-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-jade-500/20 border border-jade-500/40 text-jade-400 text-xs hover:bg-jade-500/30 transition-colors disabled:opacity-50"
+                          variant="primary"
                         >
                           <Upload size={13} />
                           {importing ? t('settings.importing') : t('settings.importBtn')}
-                        </button>
+                        </Button>
                         {importDone && (
                           <span className="text-xs text-jade-400 flex items-center gap-1">
                             <Check size={12} /> {t('settings.importDone')}

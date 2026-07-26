@@ -2,6 +2,7 @@ import { BookOpen, Library, Wand2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useImportStore, type ImportDestinationType } from '../../store/importStore';
 import Modal from './Modal';
+import Button from './Button';
 
 const OPTIONS: { type: ImportDestinationType; icon: React.ReactNode; labelKey: string }[] = [
   { type: 'journal', icon: <BookOpen size={12} />, labelKey: 'linkPicker.tabJournal' },
@@ -38,9 +39,9 @@ export default function ImportDestinationModal() {
       </div>
 
       <div className="flex justify-end px-4 py-3 border-t border-stone-700/40">
-        <button onClick={cancel} className="btn-secondary">
+        <Button onClick={cancel} variant="secondary">
           {t('importDestination.cancel')}
-        </button>
+        </Button>
       </div>
     </Modal>
   );

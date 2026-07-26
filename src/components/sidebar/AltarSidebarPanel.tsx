@@ -21,6 +21,7 @@ import {
   ratioFromResolution,
 } from '../../lib/altarConstants';
 import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
+import Button from '../ui/Button';
 import { useUIStore } from '../../store/uiStore';
 import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
 import { PlacedElementRow, PlacedElementInspector } from './PlacedElementRow';
@@ -282,7 +283,7 @@ const [gridOpen, setGridOpen] = useState(true);
                           <div className="flex flex-col gap-0.5">
                             <button onClick={() => iconInputRef.current?.click()} className="text-xs text-stone-500 hover:text-stone-300 transition-colors text-left">{t('altar.changeImage')}</button>
                             <button onClick={toggle} className="text-xs text-stone-500 hover:text-stone-300 transition-colors text-left">{t('altar.chooseEmoji')}</button>
-                            <button onClick={() => updateAltar(activeAltar.id, { icon_data: null })} className="text-xs text-stone-500 hover:text-red-400 transition-colors text-left">{t('altar.removeFavicon')}</button>
+                            <Button onClick={() => updateAltar(activeAltar.id, { icon_data: null })} variant="danger" className="text-xs text-left">{t('altar.removeFavicon')}</Button>
                           </div>
                         </div>
                       ) : (
@@ -422,12 +423,13 @@ const [gridOpen, setGridOpen] = useState(true);
                         >
                           <Pencil size={9} />{t('altar.change')}
                         </button>
-                        <button
+                        <Button
                           onClick={removeGradient}
-                          className="flex flex-1 items-center justify-center gap-1 rounded border border-red-700/60 bg-red-950/30 py-1 text-[10px] uppercase tracking-wide text-red-200 hover:border-red-500 transition-colors"
+                          variant="danger"
+                          className="flex flex-1 items-center justify-center gap-1 rounded border py-1 text-[10px] uppercase tracking-wide bg-[var(--danger-bg)] border-[var(--danger-border)] hover:border-[var(--danger-hover-border)]"
                         >
                           <Trash2 size={9} />{t('altar.remove')}
-                        </button>
+                        </Button>
                         </div>
                       </div>
                     ) : (
@@ -508,8 +510,8 @@ const [gridOpen, setGridOpen] = useState(true);
                                 </button>
                               </div>
                               <div className="flex items-center justify-end gap-1">
-                                <button onClick={revertAndClose} className="btn-ghost"><X size={13} /></button>
-                                <button onClick={() => { applyGradient(displayColor); setGradientModalOpen(false); }} className="btn-ghost text-jade-400"><Check size={13} /></button>
+                                <Button onClick={revertAndClose} variant="ghost"><X size={13} /></Button>
+                                <Button onClick={() => { applyGradient(displayColor); setGradientModalOpen(false); }} variant="ghost" className="text-jade-400"><Check size={13} /></Button>
                               </div>
                         </Modal>
                       );
@@ -550,12 +552,13 @@ const [gridOpen, setGridOpen] = useState(true);
                   >
                     <Pencil size={9} />{t('altar.change')}
                   </button>
-                  <button
+                  <Button
                     onClick={removeCustomBackground}
-                    className="flex flex-1 items-center justify-center gap-1 rounded border border-red-700/60 bg-red-950/30 py-1 text-[10px] uppercase tracking-wide text-red-200 hover:border-red-500 transition-colors"
+                    variant="danger"
+                    className="flex flex-1 items-center justify-center gap-1 rounded border py-1 text-[10px] uppercase tracking-wide bg-[var(--danger-bg)] border-[var(--danger-border)] hover:border-[var(--danger-hover-border)]"
                   >
                     <Trash2 size={9} />{t('altar.remove')}
-                  </button>
+                  </Button>
                   </div>
                 </div>
               ) : (

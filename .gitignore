@@ -55,6 +55,7 @@ credentials.json
 
 # Claude / AI tooling (not part of the project)
 .claude/
+.mcp.json
 .opencode/
 agents/
 AGENTS.md

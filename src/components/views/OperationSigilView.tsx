@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import Button from '../ui/Button';
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
@@ -455,38 +456,39 @@ export default function OperationSigilView({ operation }: { operation: Operation
           <span>{format(new Date(operation.updated_at), 'MMM d, yyyy')}</span>
           {isEditing && <span className="ml-1 italic text-stone-700">{t('editor.editing')}</span>}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           {isEditing ? (
             <>
-              <button onClick={handleDone} className="flex items-center gap-1.5 rounded-md border border-jade-800/40 bg-jade-900/40 px-3 py-1.5 text-xs font-medium text-jade-400 transition-colors hover:bg-jade-900/60">
+              <Button onClick={handleDone} variant="primary">
                 <Check size={13} />
                 {t('editor.done')}
-              </button>
-              <button onClick={handleDelete} className="btn-ghost text-red-600 hover:text-red-400" title={t('editor.delete')}>
+              </Button>
+              <Button onClick={handleDelete} variant="danger" title={t('editor.delete')}>
                 <Trash2 size={15} />
-              </button>
-              <button onClick={handleCancel} className="btn-ghost">
+              </Button>
+              <Button onClick={handleCancel} variant="ghost">
                 <X size={15} />
-              </button>
+              </Button>
             </>
           ) : (
             <>
               {!operation.is_loaded && (
-                <button onClick={enterEditMode} className="btn-ghost" title={t('editor.edit')}>
+                <Button onClick={enterEditMode} variant="ghost" title={t('editor.edit')}>
                   <Pencil size={15} />
-                </button>
+                </Button>
               )}
               {operation.is_loaded && (
-                <button
+                <Button
                   onClick={sigilVisible ? handleHideSigil : handleShowSigil}
-                  className="btn-ghost text-xs"
+                  variant="ghost"
+                  className="text-xs"
                 >
                   {sigilVisible ? t('creation.hideSigil') : t('creation.showSigil')}
-                </button>
+                </Button>
               )}
-              <button onClick={toggleRightSidebar} className="btn-ghost">
+              <Button onClick={toggleRightSidebar} variant="ghost">
                 <PanelRightOpen size={15} />
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -536,12 +538,12 @@ export default function OperationSigilView({ operation }: { operation: Operation
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <button onClick={handlePrepareManualLetters} className="btn-secondary">
+                <Button onClick={handlePrepareManualLetters} variant="secondary">
                   {t('creation.addLetter')}
-                </button>
-                <button onClick={handlePrepareLetters} className="btn-primary">
+                </Button>
+                <Button onClick={handlePrepareLetters} variant="primary">
                   {t('creation.prepareLetters')}
-                </button>
+                </Button>
               </div>
 
               <div className="space-y-3">
@@ -610,13 +612,13 @@ export default function OperationSigilView({ operation }: { operation: Operation
                     placeholder={t('creation.timerSeconds')}
                   />
                 </div>
-                <button
+                <Button
                   onClick={handleSigilLoaded}
                   disabled={!operation.target_reveal_date}
-                  className="btn-secondary disabled:cursor-not-allowed disabled:opacity-40"
+                  variant="secondary"
                 >
                   {loadCountdown != null ? `${loadCountdown}s` : t('creation.loadSigille')}
-                </button>
+                </Button>
               </div>
             )}
 
@@ -655,18 +657,18 @@ export default function OperationSigilView({ operation }: { operation: Operation
                     />
                     <span className="w-7 text-right text-stone-500">{brushSize}</span>
                   </div>
-                  <button onClick={handleUndoStroke} disabled={historyIndex <= 0} className="btn-ghost text-xs disabled:cursor-not-allowed disabled:opacity-40">
+                  <Button onClick={handleUndoStroke} disabled={historyIndex <= 0} variant="ghost" className="text-xs">
                     <Undo2 size={13} />
                     {t('creation.undo')}
-                  </button>
-                  <button onClick={handleRedoStroke} disabled={historyIndex >= drawingHistory.length - 1} className="btn-ghost text-xs disabled:cursor-not-allowed disabled:opacity-40">
+                  </Button>
+                  <Button onClick={handleRedoStroke} disabled={historyIndex >= drawingHistory.length - 1} variant="ghost" className="text-xs">
                     <Redo2 size={13} />
                     {t('creation.redo')}
-                  </button>
-                  <button onClick={() => setClearVersion((value) => value + 1)} className="btn-ghost text-xs">
+                  </Button>
+                  <Button onClick={() => setClearVersion((value) => value + 1)} variant="ghost" className="text-xs">
                     <RotateCcw size={13} />
                     {t('creation.clear')}
-                  </button>
+                  </Button>
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">

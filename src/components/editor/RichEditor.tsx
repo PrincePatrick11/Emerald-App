@@ -18,6 +18,7 @@ async function persistImage(dataUrl: string): Promise<string> {
   return invoke<string>('save_image', { dataUrl });
 }
 import EditorToolbar from './EditorToolbar';
+import Button from '../ui/Button';
 import LinkPickerModal from './LinkPickerModal';
 import { createInternalLinkExtension } from './InternalLinkExtension';
 import { ExternalDropExtension } from './ExternalDropExtension';
@@ -494,13 +495,14 @@ export default function RichEditor({
               >
                 <Pencil size={11} />
               </button>
-              <button
+              <Button
                 onClick={handleLinkRemove}
-                className="p-1 text-stone-500 hover:text-red-400"
+                variant="danger"
+                className="p-1"
                 title="Link entfernen"
               >
                 <Trash2 size={11} />
-              </button>
+              </Button>
             </>
           )}
         </div>

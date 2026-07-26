@@ -4,6 +4,7 @@ import { Trash2, PanelRightOpen, Check, X, Plus, Pencil, Copy, PanelTopOpen } fr
 import ContextMenu from '../ui/ContextMenu';
 import FilterPanel from '../ui/FilterPanel';
 import EmojiPicker from '../ui/EmojiPicker';
+import Button from '../ui/Button';
 import { getDb } from '../../lib/db';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { useUIStore } from '../../store/uiStore';
@@ -460,10 +461,10 @@ export default function OperationsView() {
         <div className="flex items-center justify-between px-8 h-14 border-b border-stone-700/60">
           <h1 className="text-lg font-semibold text-stone-100">{t('nav.operations')}</h1>
           <div className="flex items-center gap-1">
-            <button onClick={handleNew} className="btn-primary">
+            <Button onClick={handleNew} variant="primary">
               <Plus size={13} />{t('operations.new')}
-            </button>
-            <button onClick={toggleRightSidebar} className="btn-ghost ml-1"><PanelRightOpen size={16} /></button>
+            </Button>
+            <Button onClick={toggleRightSidebar} variant="ghost" className="ml-1"><PanelRightOpen size={16} /></Button>
           </div>
         </div>
 
@@ -571,18 +572,18 @@ export default function OperationsView() {
                         onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditCat(); if (e.key === 'Escape') { setEditingCatId(null); } }}
                         className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none font-semibold uppercase tracking-wider"
                       />
-                      <button onClick={handleSaveEditCat} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
-                      <button onClick={() => setEditingCatId(null)} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
+                      <Button onClick={handleSaveEditCat} variant="ghost" className="text-jade-400"><Check size={12} /></Button>
+                      <Button onClick={() => setEditingCatId(null)} variant="ghost"><X size={12} /></Button>
                       {!(cat.is_builtin as unknown as number) && (
                         confirmDeleteCatId === cat.id ? (
                           <>
-                            <button onClick={() => handleDeleteCat(cat.id)} className="text-xs text-red-400 hover:text-red-300 px-1">{t('trash.confirmYes')}</button>
-                            <button onClick={() => setConfirmDeleteCatId(null)} className="text-xs text-stone-500 hover:text-stone-300">{t('trash.confirmNo')}</button>
+                            <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="text-xs px-1">{t('trash.confirmYes')}</Button>
+                            <Button onClick={() => setConfirmDeleteCatId(null)} variant="ghost" className="text-xs">{t('trash.confirmNo')}</Button>
                           </>
                         ) : (
-                          <button onClick={() => handleDeleteCat(cat.id)} className="text-stone-500 hover:text-red-400 transition-colors p-0.5 ml-1">
+                          <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="p-0.5 ml-1">
                             <Trash2 size={12} />
-                          </button>
+                          </Button>
                         )
                       )}
                     </div>
@@ -665,27 +666,25 @@ export default function OperationsView() {
           <span>{format(new Date(operation.updated_at), 'MMM d, yyyy')}</span>
           {isEditing && <span className="text-stone-700 italic ml-1">{t('editor.editing')}</span>}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           {isEditing ? (
             <>
-              <button onClick={handleDone}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-jade-900/40 hover:bg-jade-900/60
-                           text-jade-400 text-xs font-medium rounded-md border border-jade-800/40 transition-colors">
+              <Button onClick={handleDone} variant="primary">
                 <Check size={13} />{t('editor.done')}
-              </button>
-              <button onClick={handleDelete} className="btn-ghost text-red-600 hover:text-red-400">
+              </Button>
+              <Button onClick={handleDelete} variant="danger">
                 <Trash2 size={15} />
-              </button>
-              <button onClick={handleCancel} className="btn-ghost"><X size={15} /></button>
+              </Button>
+              <Button onClick={handleCancel} variant="ghost"><X size={15} /></Button>
             </>
           ) : (
             <>
-              <button onClick={enterEditMode} className="btn-ghost" title={t('editor.edit')}>
+              <Button onClick={enterEditMode} variant="ghost" title={t('editor.edit')}>
                 <Pencil size={15} />
-              </button>
-              <button onClick={toggleRightSidebar} className="btn-ghost">
+              </Button>
+              <Button onClick={toggleRightSidebar} variant="ghost">
                 <PanelRightOpen size={15} />
-              </button>
+              </Button>
             </>
           )}
         </div>

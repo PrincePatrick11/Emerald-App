@@ -54,9 +54,9 @@ Damit existieren für die "Primärfarbe" faktisch drei unabhängig gepflegte Wer
 `tailwind.config.js` definiert keine eigene `spacing`, `borderRadius` oder `boxShadow` Skala — jede Stelle im Code wählt einen Tailwind-Default-Wert frei. Beobachtete tatsächliche Verteilung:
 
 **Border-Radius**, für optisch vergleichbare "Container"-Elemente:
-- `rounded-md`: Dropdown-Trigger (`ListToolbar.tsx`), kleine Tab-Buttons (`AltarLibraryStrip.tsx:172`), Undo-Button in `UndoToast.tsx:25`
-- `rounded-lg`: Context-Menu (`ContextMenu.tsx:49`), die meisten Buttons (`.btn-primary`, `.btn-secondary`, `index.css:106,111`), Settings-Reihen
-- `rounded-xl`: `.panel`/`.panel-interactive` (`index.css:96,125`), alle drei Modal-Cards (Settings, LinkPicker, Altar-Item), aber auch der Undo-Toast (`UndoToast.tsx:21`)
+- `rounded-md`: Dropdown-Trigger (`ListToolbar.tsx`), kleine Tab-Buttons (`AltarLibraryStrip.tsx:172`), `.btn-danger` (`index.css`)
+- `rounded-lg`: Context-Menu (`ContextMenu.tsx:49`), `.btn-primary`/`.btn-secondary` (`index.css`, jetzt auch der Undo-Button in `UndoToast.tsx` über `<Button variant="primary">`), Settings-Reihen
+- `rounded-xl`: `.panel`/`.panel-interactive` (`index.css:96,125`), alle drei Modal-Cards (Settings, LinkPicker, Altar-Item), aber auch der Undo-Toast selbst (`UndoToast.tsx`)
 - `rounded-full`: Filter-Chips (`FilterPanel.tsx`)
 
 Es gibt keine erkennbare Regel, wann `md`/`lg`/`xl` verwendet wird — z. B. ist `ContextMenu` (`rounded-lg`) und `UndoToast` (`rounded-xl`) beides ein kleines, schwebendes Overlay-Element mit ähnlicher Funktion, aber unterschiedlichem Radius.
@@ -69,13 +69,11 @@ Es gibt keine erkennbare Regel, wann `md`/`lg`/`xl` verwendet wird — z. B. ist
 
 ### Buttons
 
-Kein geteiltes `<Button>`-Component. Drei CSS-Utility-Klassen existieren in `index.css` (`.btn-primary`, `.btn-secondary`, `.btn-ghost`), werden aber nicht durchgängig verwendet:
+Geteilte Komponente: `src/components/ui/Button.tsx`. Ein dünner Wrapper mit vier Varianten (`primary` / `secondary` / `ghost` / `danger`), die auf die bestehenden CSS-Klassen `.btn-primary`, `.btn-secondary`, `.btn-ghost` sowie die neue `.btn-danger`-Klasse (`index.css`, basierend auf den bereits themed `--danger-*`-CSS-Variablen — es waren keine Theme-Datei-Änderungen nötig) abbilden. `type` ist standardmäßig `'button'`; `className` wird an die Varianten-Klasse angehängt statt sie zu ersetzen, sodass Aufrufer weiterhin Layout/Spacing pro Stelle mitgeben können. Eine gemeinsame `:disabled`-Regel (`opacity-50 cursor-not-allowed pointer-events-none`) gilt für alle vier Varianten.
 
-- `HomeView.tsx:239-243` ("Neuer Eintrag"-Button) dupliziert die `.btn-primary`-Optik komplett inline (`bg-jade-900/40 hover:bg-jade-900/60 text-jade-400 text-sm font-medium rounded-lg border border-jade-800/40`) statt die Klasse `.btn-primary` zu nutzen.
-- `SettingsModal.tsx:447` nutzt eine eigene Klasse `.settings-cta-btn` gemischt mit rohen Tailwind-Utilities (`bg-jade-500/20 border-jade-500/40`), ein drittes visuelles Muster für einen inhaltlich ähnlichen "primären" Button.
-- `UndoToast.tsx:25` repliziert wiederum eine eigene Variante (`bg-jade-900/40 ... rounded-md`, mit `rounded-md` statt dem sonst für Primary-Buttons üblichen `rounded-lg`).
+Über Journal, Wiki, Operations, Tasks, Altar, Trash, Settings sowie die geteilten `Modal`/`FilterPanel`/`RichEditor`-Komponenten sind 109 vormals rohe `<button>`-Elemente auf `<Button>` migriert. Dabei wurden fünf verschiedene Ad-hoc-Rot-Behandlungen für "löschen" (`text-red-400`, `text-red-600`, `text-stone-500 hover:text-red-400`, bordered `bg-red-950/30`-Pills u. a., verstreut über Trash/Operations/Wiki/Tasks/Altar/Settings) auf `<Button variant="danger">` konsolidiert, und drei vormals inline-duplizierte "primary"-Button-Rezepte (`HomeView`s "New Entry", `UndoToast`s Action-Button, Settings' Export/Import-Buttons) nutzen jetzt `<Button variant="primary">`. Die dadurch toten CSS-Klassen `.trash-empty-btn`, `.trash-bulk-delete-btn` und `.settings-cta-btn` wurden entfernt.
 
-Aktive/inaktive Zustände (z. B. Tab-artige Buttons in `AltarLibraryStrip.tsx:172,174,219`, `SettingsModal.tsx:199-201,261`) werden jeweils lokal per Ternary im `className`-Template neu implementiert statt über eine gemeinsame Komponente/Klasse.
+Aktive/inaktive Zustände (z. B. Tab-artige Buttons in `AltarLibraryStrip.tsx:172,174,219`, `SettingsModal.tsx:199-201,261`) werden weiterhin jeweils lokal per Ternary im `className`-Template implementiert — das ist bewusst außerhalb des `Button`-Scopes, da diese Buttons einen `active`-Toggle-State abbilden, den die vier Basis-Varianten nicht kennen. Ebenfalls bewusst nicht migriert: `AltarCanvas.tsx`s Rotations-/Resize-Drag-Handles (dynamisch dimensioniert, keine semantischen Buttons), `EditorToolbar.tsx`s `ToolbarBtn` (hat ebenfalls einen `active`-Toggle-State), sowie `ContextMenu.tsx`-Menüeinträge und andere volle-Breite Menü-/Chip-/Tab-/Nav-Item-Patterns (`LinkedOpsInput`, `LinkedWikiInput`, `BacklinksPanel`, `SuggestionList`, `TagInput`, die WikiPanel-/OperationsPanel-Untertabs, die `TabBar`-Tableiste, `AltarReadingSummary`s Fullscreen-Toggle) — das sind strukturell andere Komponententypen (Listenzeilen, Chips, Toggles), keine generischen Aktions-Buttons.
 
 ### Panels / Cards
 
@@ -115,9 +113,9 @@ Sachliche Zusammenfassung der oben belegten Abweichungen, ohne Priorisierung:
 
 1. **Primärfarbe an drei Stellen unabhängig gepflegt**: `jade`-Tailwind-Skala, `--accent`-CSS-Vars pro Theme, und Bridge-Overrides in `index.css` (z. B. `index.css:900-906`, `1343-1348`) — alle drei können bei einer Farbänderung auseinanderlaufen.
 2. **`parchment`-Tailwind-Skala ungenutzt**: Definiert in `tailwind.config.js:29-41`, aber das Parchment-Theme verwendet eigene CSS-Var-Werte, die nicht auf diese Skala mappen.
-3. **Kein geteiltes Button-Component**: `.btn-primary`/`.btn-secondary`/`.btn-ghost` existieren, werden aber an mehreren Stellen (`HomeView.tsx:239-243`, `SettingsModal.tsx:447`, `UndoToast.tsx:25`) durch eigene, leicht abweichende Inline-Varianten ersetzt.
-4. **Border-Radius ohne erkennbare Regel** zwischen `rounded-md`/`lg`/`xl` für konzeptionell ähnliche Container (z. B. `ContextMenu` vs. `UndoToast`).
-5. **Icon-Größen rein ad-hoc** (10–18px), keine Skala, teils uneinheitlich innerhalb derselben Datei.
-6. **`JetBrains Mono` totes Config**: in `tailwind.config.js:46` deklariert, aber nirgends per Font-Link geladen.
+3. **Border-Radius ohne erkennbare Regel** zwischen `rounded-md`/`lg`/`xl` für konzeptionell ähnliche Container (z. B. `ContextMenu` vs. `UndoToast`).
+4. **Icon-Größen rein ad-hoc** (10–18px), keine Skala, teils uneinheitlich innerhalb derselben Datei.
+5. **`JetBrains Mono` totes Config**: in `tailwind.config.js:46` deklariert, aber nirgends per Font-Link geladen.
 
 (Ehemaliger Punkt "drei unabhängige Modal-Implementierungen" ist behoben — siehe [Modals / Dialogs](#modals--dialogs) oben.)
+(Ehemaliger Punkt "kein geteiltes Button-Component" ist behoben — siehe [Buttons](#buttons) oben.)

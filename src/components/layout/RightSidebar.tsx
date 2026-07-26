@@ -9,6 +9,7 @@ import WikiPanel from '../sidebar/WikiPanel';
 import BacklinksPanel from '../sidebar/BacklinksPanel';
 import OperationsPanel from '../sidebar/OperationsPanel';
 import AltarSidebarPanel from '../sidebar/AltarSidebarPanel';
+import Button from '../ui/Button';
 
 
 export default function RightSidebar() {
@@ -49,9 +50,9 @@ export default function RightSidebar() {
             </button>
           ))}
         </div>
-        <button onClick={toggleRightSidebar} className="btn-ghost">
+        <Button onClick={toggleRightSidebar} variant="ghost">
           <X size={15} />
-        </button>
+        </Button>
       </div>
 
       {/* Content */}

@@ -11,6 +11,7 @@ import LinkedOpsInput from './LinkedOpsInput';
 import LinkedWikiInput from './LinkedWikiInput';
 import { CustomPropertiesSection } from './CustomPropertiesSection';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
+import Button from '../ui/Button';
 
 export default function OpPropertiesPanel() {
   const { t } = useTranslation();
@@ -266,7 +267,7 @@ export default function OpPropertiesPanel() {
                 <img src={currentIcon} alt="" className="w-10 h-10 object-cover rounded-lg border border-stone-700/40" />
                 <div className="flex flex-col gap-0.5">
                   <button onClick={() => iconInputRef.current?.click()} className="text-xs text-stone-500 hover:text-stone-300 transition-colors text-left">{t('wiki.changeIcon')}</button>
-                  <button onClick={() => article ? updateArticle(article.id, { icon: undefined }) : op && updateOperation(op.id, { icon: undefined })} className="text-xs text-stone-500 hover:text-red-400 transition-colors text-left">{t('wiki.removeIcon')}</button>
+                  <Button onClick={() => article ? updateArticle(article.id, { icon: undefined }) : op && updateOperation(op.id, { icon: undefined })} variant="danger" className="text-xs text-left">{t('wiki.removeIcon')}</Button>
                 </div>
               </div>
             ) : (
@@ -290,7 +291,7 @@ export default function OpPropertiesPanel() {
                 <img src={currentCover} alt="" className="w-full h-24 object-cover rounded-lg border border-stone-700/40" />
                 <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity bg-stone-900/60 rounded-lg">
                   <button onClick={() => coverImageInputRef.current?.click()} className="flex items-center gap-1 text-xs text-stone-200 px-2 py-1 bg-stone-800/80 rounded hover:bg-stone-700"><ImagePlus size={12} /> {t('properties.change')}</button>
-                  <button onClick={() => article ? updateArticle(article.id, { cover_image: undefined }) : op && updateOperation(op.id, { cover_image: undefined })} className="flex items-center gap-1 text-xs text-red-400 px-2 py-1 bg-stone-800/80 rounded hover:bg-stone-700"><X size={12} /> {t('properties.remove')}</button>
+                  <Button onClick={() => article ? updateArticle(article.id, { cover_image: undefined }) : op && updateOperation(op.id, { cover_image: undefined })} variant="danger" className="flex items-center gap-1 px-2 py-1"><X size={12} /> {t('properties.remove')}</Button>
                 </div>
               </div>
             ) : (
@@ -412,12 +413,13 @@ export default function OpPropertiesPanel() {
       {!sigilOperation && <hr className="border-stone-700/40" />}
 
       {sigilOperation?.is_loaded && (
-        <button
+        <Button
           onClick={() => updateOperation(sigilOperation.id, { is_loaded: false, show_sigil: true, show_intention_in_properties: true, show_letter_bank_in_properties: true })}
-          className="w-full rounded-md border border-red-900/40 bg-red-950/40 px-3 py-2 text-xs font-medium text-red-300 transition-colors hover:bg-red-950/60"
+          variant="danger"
+          className="w-full rounded-md border px-3 py-2 text-xs font-medium bg-[var(--danger-bg)] border-[var(--danger-border)] hover:border-[var(--danger-hover-border)]"
         >
           {t('creation.unloadSigil')}
-        </button>
+        </Button>
       )}
 
       {/* ── Custom properties ── */}

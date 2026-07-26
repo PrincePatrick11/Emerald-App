@@ -10,6 +10,7 @@ import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../
 import type { AltarCategory, AltarItem } from '../../types';
 import Modal from '../ui/Modal';
 import EmojiPicker from '../ui/EmojiPicker';
+import Button from '../ui/Button';
 
 const LIBRARY_DEFAULT_HEIGHT = 240;
 const UNCATEGORIZED_TAB = '__uncategorized__' as const;
@@ -126,20 +127,20 @@ function ItemModal({
           <div className="flex items-center justify-between rounded-lg border border-red-700/40 bg-red-950/20 px-3 py-2">
             <span className="text-xs text-red-300">{t('common.deleteConfirm')}</span>
             <span className="flex items-center gap-2">
-              <button onClick={doDelete} className="text-xs text-red-300 hover:text-red-200">{t('trash.confirmYes')}</button>
-              <button onClick={() => setConfirmDelete(false)} className="text-xs text-stone-400 hover:text-stone-200">{t('trash.confirmNo')}</button>
+              <Button onClick={doDelete} variant="danger" className="text-xs">{t('trash.confirmYes')}</Button>
+              <Button onClick={() => setConfirmDelete(false)} variant="ghost" className="text-xs">{t('trash.confirmNo')}</Button>
             </span>
           </div>
         ) : (
           <div className="flex items-center justify-between">
             {item ? (
-              <button onClick={doDelete} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300">
+              <Button onClick={doDelete} variant="danger" className="flex items-center gap-1 text-xs">
                 <Trash2 size={11} /> {t('common.delete')}
-              </button>
+              </Button>
             ) : <span />}
             <div className="flex items-center gap-1">
-              <button onClick={onClose} className="btn-ghost"><X size={13} /></button>
-              <button onClick={save} className="btn-ghost text-jade-400"><Check size={13} /></button>
+              <Button onClick={onClose} variant="ghost"><X size={13} /></Button>
+              <Button onClick={save} variant="ghost" className="text-jade-400"><Check size={13} /></Button>
             </div>
           </div>
         )}
@@ -216,20 +217,20 @@ function CategoryModal({
           <div className="flex items-center justify-between rounded-lg border border-red-700/40 bg-red-950/20 px-3 py-2">
             <span className="text-xs text-red-300">{t('common.deleteConfirm')}</span>
             <span className="flex items-center gap-2">
-              <button onClick={doDelete} className="text-xs text-red-300 hover:text-red-200">{t('trash.confirmYes')}</button>
-              <button onClick={() => setConfirmDelete(false)} className="text-xs text-stone-400 hover:text-stone-200">{t('trash.confirmNo')}</button>
+              <Button onClick={doDelete} variant="danger" className="text-xs">{t('trash.confirmYes')}</Button>
+              <Button onClick={() => setConfirmDelete(false)} variant="ghost" className="text-xs">{t('trash.confirmNo')}</Button>
             </span>
           </div>
         ) : (
           <div className="flex items-center justify-between">
             {category ? (
-              <button onClick={doDelete} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300">
+              <Button onClick={doDelete} variant="danger" className="flex items-center gap-1 text-xs">
                 <Trash2 size={11} /> {t('common.delete')}
-              </button>
+              </Button>
             ) : <span />}
             <div className="flex items-center gap-1">
-              <button onClick={onClose} className="btn-ghost"><X size={13} /></button>
-              <button onClick={save} className="btn-ghost text-jade-400"><Check size={13} /></button>
+              <Button onClick={onClose} variant="ghost"><X size={13} /></Button>
+              <Button onClick={save} variant="ghost" className="text-jade-400"><Check size={13} /></Button>
             </div>
           </div>
         )}
@@ -448,7 +449,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
       <div className={`pointer-events-none absolute top-0 left-0 right-0 h-1 transition-colors ${(isResizing || isResizeHotspot) ? 'bg-jade-500/20' : 'bg-transparent'}`} />
       <div className="mb-3 flex items-start justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{t('altar.libraryTitle')}</p>
-        <button onClick={openCreateModal} className="btn-ghost flex-shrink-0 flex items-center gap-1 text-xs" title={t('altar.addItem')}><Plus size={12} />{t('altar.element')}</button>
+        <Button onClick={openCreateModal} variant="ghost" className="flex-shrink-0 flex items-center gap-1 text-xs" title={t('altar.addItem')}><Plus size={12} />{t('altar.element')}</Button>
       </div>
       <div className="mb-3 flex items-center gap-1">
         <div className="relative flex-1 min-w-0">

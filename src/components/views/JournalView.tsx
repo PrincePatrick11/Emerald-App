@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Trash2, PanelRightOpen, Check, X, Plus, Copy, Pencil } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
+import Button from '../ui/Button';
 import { useUIStore } from '../../store/uiStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
@@ -291,10 +292,10 @@ export default function JournalView() {
         <div className="flex items-center justify-between px-8 h-14 border-b border-stone-700/60">
           <h1 className="text-lg font-semibold text-stone-100">{t('journal.title')}</h1>
           <div className="flex items-center gap-1">
-            <button onClick={handleNew} className="btn-primary">
+            <Button onClick={handleNew} variant="primary">
               <Plus size={13} />{t('journal.newEntry')}
-            </button>
-            <button onClick={toggleRightSidebar} className="btn-ghost ml-1"><PanelRightOpen size={16} /></button>
+            </Button>
+            <Button onClick={toggleRightSidebar} variant="ghost" className="ml-1"><PanelRightOpen size={16} /></Button>
           </div>
         </div>
 
@@ -422,36 +423,28 @@ export default function JournalView() {
           {entry.moon_phase && <span>· {t(`moonPhase.${entry.moon_phase}`)}</span>}
           {isEditing && <span className="text-stone-700 italic ml-1">{t('editor.editing')}</span>}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           {isEditing ? (
             <>
-              <button
-                onClick={handleDone}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-jade-900/40 hover:bg-jade-900/60
-                           text-jade-400 text-xs font-medium rounded-md border border-jade-800/40 transition-colors"
-              >
+              <Button onClick={handleDone} variant="primary">
                 <Check size={13} />
                 {t('editor.done')}
-              </button>
-              <button
-                onClick={handleDelete}
-                className="btn-ghost text-red-600 hover:text-red-400"
-                title={t('editor.delete')}
-              >
+              </Button>
+              <Button onClick={handleDelete} variant="danger" title={t('editor.delete')}>
                 <Trash2 size={15} />
-              </button>
-              <button onClick={handleCancel} className="btn-ghost">
+              </Button>
+              <Button onClick={handleCancel} variant="ghost">
                 <X size={15} />
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button onClick={enterEditMode} className="btn-ghost" title={t('editor.edit')}>
+              <Button onClick={enterEditMode} variant="ghost" title={t('editor.edit')}>
                 <Pencil size={15} />
-              </button>
-              <button onClick={toggleRightSidebar} className="btn-ghost">
+              </Button>
+              <Button onClick={toggleRightSidebar} variant="ghost">
                 <PanelRightOpen size={15} />
-              </button>
+              </Button>
             </>
           )}
         </div>

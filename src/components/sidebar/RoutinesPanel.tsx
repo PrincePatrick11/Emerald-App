@@ -10,6 +10,7 @@ import LinkedOpsInput from './LinkedOpsInput';
 import LinkedWikiInput from './LinkedWikiInput';
 import ContextMenu from '../ui/ContextMenu';
 import EmojiPicker from '../ui/EmojiPicker';
+import Button from '../ui/Button';
 
 export default function RoutinesPanel() {
   const { t } = useTranslation();
@@ -77,12 +78,12 @@ export default function RoutinesPanel() {
           <LinkedWikiInput ids={newWikiIds} onChange={setNewWikiIds} inputCls={inputCls} />
           <TagInput tags={newTags} onChange={setNewTags} />
           <div className="flex justify-end gap-1">
-            <button onClick={handleCreate} className="flex items-center gap-1 btn-ghost text-jade-400 text-xs">
+            <Button onClick={handleCreate} variant="ghost" className="flex items-center gap-1 text-jade-400 text-xs">
               <Check size={12} /> Save
-            </button>
-            <button onClick={() => { setAdding(false); setNewName(''); setNewEmoji('📋'); setNewContent(''); setNewTags([]); setNewOpIds([]); setNewWikiIds([]); }} className="btn-ghost text-xs">
+            </Button>
+            <Button onClick={() => { setAdding(false); setNewName(''); setNewEmoji('📋'); setNewContent(''); setNewTags([]); setNewOpIds([]); setNewWikiIds([]); }} variant="ghost" className="text-xs">
               <X size={12} />
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
@@ -281,19 +282,19 @@ function RoutineRow({
           <div className="flex items-center justify-between">
             {confirmDelete ? (
               <div className="flex items-center gap-1">
-                <button onClick={() => onDelete(routine.id)} className="text-xs text-red-400 hover:text-red-300 transition-colors">Delete?</button>
-                <button onClick={() => setConfirmDelete(false)} className="btn-ghost text-xs"><X size={11} /></button>
+                <Button onClick={() => onDelete(routine.id)} variant="danger" className="text-xs">Delete?</Button>
+                <Button onClick={() => setConfirmDelete(false)} variant="ghost" className="text-xs"><X size={11} /></Button>
               </div>
             ) : (
-              <button onClick={() => setConfirmDelete(true)} className="flex items-center gap-1 text-xs text-stone-700 hover:text-red-400 transition-colors">
+              <Button onClick={() => setConfirmDelete(true)} variant="danger" className="flex items-center gap-1 text-xs">
                 <Trash2 size={11} /> Delete
-              </button>
+              </Button>
             )}
             <div className="flex gap-1">
-              <button onClick={handleSave} className="flex items-center gap-1 btn-ghost text-jade-400 text-xs">
+              <Button onClick={handleSave} variant="ghost" className="flex items-center gap-1 text-jade-400 text-xs">
                 <Check size={12} /> Save
-              </button>
-              <button onClick={onToggle} className="btn-ghost text-xs"><X size={12} /></button>
+              </Button>
+              <Button onClick={onToggle} variant="ghost" className="text-xs"><X size={12} /></Button>
             </div>
           </div>
         </div>

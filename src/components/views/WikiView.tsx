@@ -5,6 +5,7 @@ import ContextMenu from '../ui/ContextMenu';
 import ListToolbar from '../ui/ListToolbar';
 import FilterPanel from '../ui/FilterPanel';
 import EmojiPicker from '../ui/EmojiPicker';
+import Button from '../ui/Button';
 import { getDb } from '../../lib/db';
 import { generateId, isImageIcon } from '../../lib/helpers';
 
@@ -378,10 +379,10 @@ export default function WikiView() {
         <div className="flex items-center justify-between px-8 h-14 border-b border-stone-700/60">
           <h1 className="text-lg font-semibold text-stone-100">{t('wiki.title')}</h1>
           <div className="flex items-center gap-1">
-            <button onClick={handleNew} className="btn-primary">
+            <Button onClick={handleNew} variant="primary">
               <Plus size={13} />{t('wiki.newArticle')}
-            </button>
-            <button onClick={toggleRightSidebar} className="btn-ghost ml-1"><PanelRightOpen size={16} /></button>
+            </Button>
+            <Button onClick={toggleRightSidebar} variant="ghost" className="ml-1"><PanelRightOpen size={16} /></Button>
           </div>
         </div>
 
@@ -491,13 +492,13 @@ export default function WikiView() {
                       {!cat.is_builtin && (
                         confirmDeleteCatId === cat.id ? (
                           <>
-                            <button onClick={() => handleDeleteCat(cat.id)} className="text-xs text-red-400 hover:text-red-300 px-1">{t('trash.confirmYes')}</button>
-                            <button onClick={() => setConfirmDeleteCatId(null)} className="text-xs text-stone-500 hover:text-stone-300">{t('trash.confirmNo')}</button>
+                            <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="text-xs px-1">{t('trash.confirmYes')}</Button>
+                            <Button onClick={() => setConfirmDeleteCatId(null)} variant="ghost" className="text-xs">{t('trash.confirmNo')}</Button>
                           </>
                         ) : (
-                          <button onClick={() => handleDeleteCat(cat.id)} className="text-stone-500 hover:text-red-400 transition-colors p-0.5 ml-1">
+                          <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="p-0.5 ml-1">
                             <Trash2 size={12} />
-                          </button>
+                          </Button>
                         )
                       )}
                     </div>
@@ -569,35 +570,28 @@ export default function WikiView() {
           <span>{format(new Date(article.updated_at), 'MMM d, yyyy')}</span>
           {isEditing && <span className="text-stone-700 italic ml-1">{t('editor.editing')}</span>}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           {isEditing ? (
             <>
-              <button
-                onClick={handleDone}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-jade-900/40 hover:bg-jade-900/60
-                           text-jade-400 text-xs font-medium rounded-md border border-jade-800/40 transition-colors"
-              >
+              <Button onClick={handleDone} variant="primary">
                 <Check size={13} />
                 {t('editor.done')}
-              </button>
-              <button
-                onClick={handleDelete}
-                className="btn-ghost text-red-600 hover:text-red-400"
-              >
+              </Button>
+              <Button onClick={handleDelete} variant="danger">
                 <Trash2 size={15} />
-              </button>
-              <button onClick={handleCancel} className="btn-ghost">
+              </Button>
+              <Button onClick={handleCancel} variant="ghost">
                 <X size={15} />
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button onClick={enterEditMode} className="btn-ghost" title={t('editor.edit')}>
+              <Button onClick={enterEditMode} variant="ghost" title={t('editor.edit')}>
                 <Pencil size={15} />
-              </button>
-              <button onClick={toggleRightSidebar} className="btn-ghost">
+              </Button>
+              <Button onClick={toggleRightSidebar} variant="ghost">
                 <PanelRightOpen size={15} />
-              </button>
+              </Button>
             </>
           )}
         </div>

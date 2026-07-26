@@ -12,6 +12,7 @@ import FilterPanel from '../ui/FilterPanel';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import LinkPickerModal from '../editor/LinkPickerModal';
 import EmojiPicker from '../ui/EmojiPicker';
+import Button from '../ui/Button';
 import {
   Plus, ChevronDown, ChevronRight, Flag, Trash2,
   CheckSquare, Square, X, Check, Link2, Pencil,
@@ -196,9 +197,9 @@ export default function TasksView() {
       <div className="flex items-center justify-between px-8 h-14 border-b border-stone-700/60">
         <h1 className="text-lg font-semibold text-stone-100">{t('nav.tasks')}</h1>
         <div className="flex items-center gap-1">
-          <button onClick={() => handleCreateTask()} className="btn-primary">
+          <Button onClick={() => handleCreateTask()} variant="primary">
             <Plus size={13} />{t('tasks.newTask')}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -372,19 +373,18 @@ export default function TasksView() {
                         onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditCat(); if (e.key === 'Escape') { setEditingCatId(null); } }}
                         className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none"
                       />
-                      <button onClick={handleSaveEditCat} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
-                      <button onClick={() => setEditingCatId(null)} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
+                      <Button onClick={handleSaveEditCat} variant="ghost" className="text-jade-400"><Check size={12} /></Button>
+                      <Button onClick={() => setEditingCatId(null)} variant="ghost"><X size={12} /></Button>
                       {confirmDeleteCatId === cat.id ? (
                           <>
-                            <button onClick={() => handleDeleteCat(cat.id)} className="text-xs text-red-400 hover:text-red-300 px-1">{t('trash.confirmYes')}</button>
-                            <button onClick={() => setConfirmDeleteCatId(null)} className="text-xs text-stone-500 hover:text-stone-300">{t('trash.confirmNo')}</button>
+                            <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="text-xs px-1">{t('trash.confirmYes')}</Button>
+                            <Button onClick={() => setConfirmDeleteCatId(null)} variant="ghost" className="text-xs">{t('trash.confirmNo')}</Button>
                           </>
                         ) : (
-                          <button onClick={() => handleDeleteCat(cat.id)} className="text-stone-500 hover:text-red-400 transition-colors p-0.5 ml-1">
+                          <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="p-0.5 ml-1">
                             <Trash2 size={12} />
-                          </button>
-                        )
-                      }
+                          </Button>
+                        )}
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 mb-2">
@@ -397,13 +397,14 @@ export default function TasksView() {
                       <span className="w-5 text-center flex-shrink-0 text-base">{cat.emoji}</span>
                       <p className="text-xs text-stone-600 font-semibold uppercase tracking-wider flex-1">{cat.name}</p>
                       <span className="text-xs text-stone-500">({catTasks.length})</span>
-                      <button
+                      <Button
                         onClick={() => handleCreateTask(cat.id)}
-                        className="ml-auto btn-ghost p-1"
+                        variant="ghost"
+                        className="ml-auto p-1"
                         title={t('tasks.newTask')}
                       >
                         <Plus size={14} />
-                      </button>
+                      </Button>
                       <button
                         onClick={() => startEditCat(cat)}
                         className="text-stone-500 hover:text-stone-300 transition-colors p-0.5"

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import Button from './Button';
 
 interface ModalProps {
   title: string;
@@ -46,9 +47,9 @@ export default function Modal({
           <h2 className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
             {title}
           </h2>
-          <button onClick={onClose} className="btn-ghost">
+          <Button onClick={onClose} variant="ghost">
             <X size={16} />
-          </button>
+          </Button>
         </div>
         <div className={bodyClassName ?? 'flex-1 overflow-y-auto'}>{children}</div>
       </div>

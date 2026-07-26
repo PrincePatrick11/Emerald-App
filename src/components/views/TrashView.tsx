@@ -8,6 +8,7 @@ import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { formatDistanceToNow, differenceInDays, format } from 'date-fns';
 import ListToolbar from '../ui/ListToolbar';
+import Button from '../ui/Button';
 import type { TrashedItem } from '../../types';
 import type { SortMode } from '../../store/uiStore';
 
@@ -102,18 +103,20 @@ function ItemRow({ item, confirmingId, setConfirmingId, restore, handlePermanent
         {confirming ? (
           <>
             <span className="text-xs text-stone-400">{t('trash.sure')}</span>
-            <button
+            <Button
               onClick={() => handlePermanentDelete(item)}
-              className="text-xs text-red-400 hover:text-red-300 px-2.5 py-1.5 rounded hover:bg-red-400/10 transition-colors"
+              variant="danger"
+              className="text-xs px-2.5 py-1.5"
             >
               {t('trash.confirmYes')}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setConfirmingId(null)}
-              className="text-xs text-stone-500 hover:text-stone-300 px-2 py-1.5 rounded"
+              variant="ghost"
+              className="text-xs px-2 py-1.5"
             >
               {t('trash.confirmNo')}
-            </button>
+            </Button>
           </>
         ) : (
           <>
@@ -124,12 +127,13 @@ function ItemRow({ item, confirmingId, setConfirmingId, restore, handlePermanent
               <RotateCcw size={12} />
               {t('trash.restore')}
             </button>
-            <button
+            <Button
               onClick={() => handlePermanentDelete(item)}
-              className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 px-2.5 py-1.5 rounded hover:bg-red-400/10 transition-colors"
+              variant="danger"
+              className="flex items-center gap-1.5 px-2.5 py-1.5"
             >
               <Trash2 size={12} />
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -167,21 +171,21 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, handlePermanen
         {confirming ? (
           <>
             <span className="text-xs text-stone-400">{t('trash.sure')}</span>
-            <button onClick={() => handlePermanentDelete(item)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-400/10 transition-colors">
+            <Button onClick={() => handlePermanentDelete(item)} variant="danger" className="text-xs px-2 py-1">
               {t('trash.confirmYes')}
-            </button>
-            <button onClick={() => setConfirmingId(null)} className="text-xs text-stone-500 hover:text-stone-300 px-2 py-1 rounded">
+            </Button>
+            <Button onClick={() => setConfirmingId(null)} variant="ghost" className="text-xs px-2 py-1">
               {t('trash.confirmNo')}
-            </button>
+            </Button>
           </>
         ) : (
           <>
             <button onClick={() => restore(item)} className="trash-restore-btn flex items-center gap-1 text-xs text-jade-400 hover:text-jade-300 px-2 py-1 rounded hover:bg-jade-400/10 transition-colors">
               <RotateCcw size={11} />{t('trash.restore')}
             </button>
-            <button onClick={() => handlePermanentDelete(item)} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-400/10 transition-colors">
+            <Button onClick={() => handlePermanentDelete(item)} variant="danger" className="flex items-center gap-1 px-2 py-1">
               <Trash2 size={11} />
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -402,19 +406,20 @@ export default function TrashView() {
               {confirmingBulkDelete && (
                 <span className="text-xs text-stone-400">{t('trash.sure')}</span>
               )}
-              <button
+              <Button
                 onClick={handleBulkDelete}
-                className="trash-bulk-delete-btn flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-md hover:bg-red-400/10"
+                variant="danger"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--danger-bg)] border border-[var(--danger-border)] hover:border-[var(--danger-hover-border)]"
               >
                 <Trash2 size={12} />
                 {confirmingBulkDelete
                   ? t('trash.confirmYes')
                   : t('trash.deleteSelected', { count: selectedIds.size })}
-              </button>
+              </Button>
               {confirmingBulkDelete && (
-                <button onClick={() => setConfirmingBulkDelete(false)} className="text-xs text-stone-500 hover:text-stone-300 px-2 py-1.5 rounded-md">
+                <Button onClick={() => setConfirmingBulkDelete(false)} variant="ghost" className="text-xs px-2 py-1.5 rounded-md">
                   {t('trash.confirmNo')}
-                </button>
+                </Button>
               )}
               <div className="w-px h-4 bg-stone-700" />
             </>
@@ -424,16 +429,17 @@ export default function TrashView() {
               {confirmingEmpty && (
                 <span className="text-xs text-stone-400">{t('trash.confirmEmpty')}</span>
               )}
-              <button
+              <Button
                 onClick={handleEmptyTrash}
-                className="trash-empty-btn text-xs text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-md hover:bg-red-400/10"
+                variant="danger"
+                className="text-xs px-3 py-1.5 rounded-md bg-[var(--danger-bg)] border border-[var(--danger-border)] hover:border-[var(--danger-hover-border)]"
               >
                 {confirmingEmpty ? t('trash.confirmYes') : t('trash.emptyTrash')}
-              </button>
+              </Button>
               {confirmingEmpty && (
-                <button onClick={() => setConfirmingEmpty(false)} className="text-xs text-stone-500 hover:text-stone-300 px-2 py-1.5 rounded-md">
+                <Button onClick={() => setConfirmingEmpty(false)} variant="ghost" className="text-xs px-2 py-1.5 rounded-md">
                   {t('trash.confirmNo')}
-                </button>
+                </Button>
               )}
             </div>
           )}
