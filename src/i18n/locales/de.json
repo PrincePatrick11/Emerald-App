@@ -7,7 +7,9 @@
     "no": "Nein",
     "delete": "Löschen",
     "deleteConfirm": "Löschen?",
-    "unsupportedImageFormat": "Format nicht unterstützt. Erlaubt: PNG, JPEG, GIF, WebP, SVG"
+    "unsupportedImageFormat": "Format nicht unterstützt. Erlaubt: PNG, JPEG, GIF, WebP, SVG",
+    "searchEmoji": "Emoji suchen…",
+    "noEmojiResults": "Keine Treffer"
   },
   "listView": {
     "view": "Ansicht",

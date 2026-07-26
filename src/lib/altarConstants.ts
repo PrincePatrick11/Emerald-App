@@ -175,27 +175,3 @@ export function getAltarBackgroundStyle(
     : DEFAULT_ALTAR_BACKGROUND;
   return `${overlayLayer}${ALTAR_BACKGROUND_STYLES[preset]}`;
 }
-
-// Emoji suggestions per category name (for the item edit emoji picker).
-// Only covers the default category names; custom categories fall back to FALLBACK_CATEGORY_EMOJIS.
-export const CATEGORY_EMOJIS: Record<string, string[]> = {
-  candle: ['🕯️', '🔥', '🕎', '💡', '🪔'],
-  crystal: ['🔮', '💎', '💜', '🌟', '⭐', '🪨'],
-  herb: ['🌿', '🍃', '🌱', '🌾', '🪴', '🌺', '🍀'],
-  deity: ['👁️', '☀️', '🌙', '🦅', '🐉', '🦋', '🌟', '⚡'],
-  symbol: ['☯️', '🔱', '⚡', '🌀', '🔯', '🪬', '🌙', '🌈'],
-  tool: ['⚗️', '🪄', '🗡️', '🏺', '📜', '🔑', '🪬', '🧿'],
-  table: ['🪵', '🪑', '🧺', '🪟', '🛖', '🪜'],
-  other: ['📿', '💫', '🌀', '🎭', '🌈', '🧿', '🫧', '✨'],
-};
-
-export const FALLBACK_CATEGORY_EMOJIS = ['✨', '🌟', '💫', '🔮', '🌙', '⚡', '🌀', '🎭'];
-
-// Emoji palette for the altar category picker
-export const ALTAR_CAT_EMOJIS = [
-  '🕯️','🔮','🌿','✨','🌙','🔔','🪵','📦',
-  '🔥','💎','🌺','👁️','☀️','🌕','⚡','🌀',
-  '⚗️','🗡️','📜','🔑','🪄','🧿','🌊','💀',
-  '🐍','🦅','🌈','⭐','🪬','☯️','🔱','🌑',
-  '📖','🌸','🦋','🐉','🏺','💫','🎭','🐾',
-];

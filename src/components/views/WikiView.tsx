@@ -4,6 +4,7 @@ import { Trash2, PanelRightOpen, Check, X, Plus, Pencil, Copy, PanelTopOpen } fr
 import ContextMenu from '../ui/ContextMenu';
 import ListToolbar from '../ui/ListToolbar';
 import FilterPanel from '../ui/FilterPanel';
+import EmojiPicker from '../ui/EmojiPicker';
 import { getDb } from '../../lib/db';
 import { generateId, isImageIcon } from '../../lib/helpers';
 
@@ -16,13 +17,6 @@ import EntryCustomProperties from '../editor/EntryCustomProperties';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import { format } from 'date-fns';
 import type { WikiCategory } from '../../types';
-
-const WIKI_EMOJIS = [
-  '⚡','🔯','👁️','🌙','☀️','🌟','✨','🔮','🌀','⚗️',
-  '🗡️','📜','🕯️','🔑','🪄','🧿','🌊','🔥','💀','🌺',
-  '🐍','🦅','🌿','💎','🌈','⭐','🪬','☯️','🔱','🌑',
-  '📖','📄','🌸','🦋','🐉','🏺','🌺','💫','🌀','🎭',
-];
 
 
 export default function WikiView() {
@@ -58,12 +52,10 @@ export default function WikiView() {
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [editCatName, setEditCatName] = useState('');
   const [editCatEmoji, setEditCatEmoji] = useState('📄');
-  const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
   const [confirmDeleteCatId, setConfirmDeleteCatId] = useState<string | null>(null);
   const [addingWikiCat, setAddingWikiCat] = useState(false);
   const [newWikiCatName, setNewWikiCatName] = useState('');
   const [newWikiCatEmoji, setNewWikiCatEmoji] = useState('📄');
-  const [showWikiCatEmojiPicker, setShowWikiCatEmojiPicker] = useState(false);
 
   // Always-fresh refs
   const pendingRef = useRef({ title, content, category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined });
@@ -239,14 +231,12 @@ export default function WikiView() {
     setEditingCatId(cat.id);
     setEditCatName(cat.name);
     setEditCatEmoji(cat.emoji);
-    setShowEditEmojiPicker(false);
   };
 
   const handleSaveEditCat = async () => {
     if (!editingCatId || !editCatName.trim()) return;
     await updateWikiCategory(editingCatId, editCatName.trim(), editCatEmoji);
     setEditingCatId(null);
-    setShowEditEmojiPicker(false);
   };
 
   const handleDeleteCat = async (id: string) => {
@@ -260,7 +250,7 @@ export default function WikiView() {
     if (!newWikiCatName.trim()) return;
     const cat = await addWikiCategory(newWikiCatName.trim(), newWikiCatEmoji);
     setCategory(cat.id);
-    setNewWikiCatName(''); setNewWikiCatEmoji('📄'); setAddingWikiCat(false); setShowWikiCatEmojiPicker(false);
+    setNewWikiCatName(''); setNewWikiCatEmoji('📄'); setAddingWikiCat(false);
     triggerAutoSave();
   };
 
@@ -440,35 +430,29 @@ export default function WikiView() {
             <div className="space-y-6">
               {/* Add category */}
               {addingWikiCat ? (
-                <div className="relative flex items-center gap-2 mb-2">
-                  <button
-                    onClick={() => setShowWikiCatEmojiPicker(!showWikiCatEmojiPicker)}
-                    className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
-                  >
-                    {newWikiCatEmoji}
-                  </button>
-                  {showWikiCatEmojiPicker && (
-                    <div className="wiki-emoji-popover absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 w-52">
-                      <div className="flex flex-wrap gap-1">
-                        {WIKI_EMOJIS.map((e) => (
-                          <button key={e}
-                            onClick={() => { setNewWikiCatEmoji(e); setShowWikiCatEmojiPicker(false); }}
-                            className={`text-base p-1 rounded transition-colors ${newWikiCatEmoji === e ? 'wiki-emoji-active' : 'wiki-emoji-idle'}`}
-                          >{e}</button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                <div className="flex items-center gap-2 mb-2">
+                  <EmojiPicker
+                    value={newWikiCatEmoji}
+                    onChange={setNewWikiCatEmoji}
+                    trigger={({ toggle }) => (
+                      <button
+                        onClick={toggle}
+                        className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
+                      >
+                        {newWikiCatEmoji}
+                      </button>
+                    )}
+                  />
                   <input
                     autoFocus
                     value={newWikiCatName}
                     onChange={(e) => setNewWikiCatName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddWikiCat(); if (e.key === 'Escape') { setAddingWikiCat(false); setShowWikiCatEmojiPicker(false); } }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddWikiCat(); if (e.key === 'Escape') { setAddingWikiCat(false); } }}
                     placeholder="Name…"
                     className="wiki-cat-input flex-1 rounded px-2 py-0.5 text-xs outline-none font-semibold uppercase tracking-wider"
                   />
                   <button onClick={handleAddWikiCat} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
-                  <button onClick={() => { setAddingWikiCat(false); setShowWikiCatEmojiPicker(false); }} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
+                  <button onClick={() => setAddingWikiCat(false)} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
                 </div>
               ) : (
                 <button
@@ -482,34 +466,28 @@ export default function WikiView() {
               {groupedByCat.map(({ cat, arts }) => (
                 <div key={cat.id}>
                   {editingCatId === cat.id ? (
-                    <div className="relative flex items-center gap-2 mb-2">
-                      <button
-                        onClick={() => setShowEditEmojiPicker(!showEditEmojiPicker)}
-                        className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
-                      >
-                        {editCatEmoji}
-                      </button>
-                      {showEditEmojiPicker && (
-                        <div className="wiki-emoji-popover absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 w-52">
-                          <div className="flex flex-wrap gap-1">
-                            {WIKI_EMOJIS.map((e) => (
-                              <button key={e}
-                                onClick={() => { setEditCatEmoji(e); setShowEditEmojiPicker(false); }}
-                                className={`text-base p-1 rounded transition-colors ${editCatEmoji === e ? 'wiki-emoji-active' : 'wiki-emoji-idle'}`}
-                               >{e}</button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                    <div className="flex items-center gap-2 mb-2">
+                      <EmojiPicker
+                        value={editCatEmoji}
+                        onChange={setEditCatEmoji}
+                        trigger={({ toggle }) => (
+                          <button
+                            onClick={toggle}
+                            className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
+                          >
+                            {editCatEmoji}
+                          </button>
+                        )}
+                      />
                       <input
                         autoFocus
                         value={editCatName}
                         onChange={(e) => setEditCatName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditCat(); if (e.key === 'Escape') { setEditingCatId(null); setShowEditEmojiPicker(false); } }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditCat(); if (e.key === 'Escape') { setEditingCatId(null); } }}
                         className="wiki-cat-input flex-1 rounded px-2 py-0.5 text-xs outline-none font-semibold uppercase tracking-wider"
                       />
                       <button onClick={handleSaveEditCat} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
-                      <button onClick={() => { setEditingCatId(null); setShowEditEmojiPicker(false); }} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
+                      <button onClick={() => setEditingCatId(null)} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
                       {!cat.is_builtin && (
                         confirmDeleteCatId === cat.id ? (
                           <>

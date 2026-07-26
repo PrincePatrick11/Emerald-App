@@ -26,9 +26,7 @@ import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
 import { PlacedElementRow, PlacedElementInspector } from './PlacedElementRow';
 import AltarReadingSummary from './AltarReadingSummary';
 import Modal from '../ui/Modal';
-
-
-const ALTAR_ICON_EMOJIS = ['🕯️','🔮','🌙','⭐','✨','🌺','🌸','🌼','🌿','🪷','🫧','🌊','🔥','🌑','🌕','☀️','⚡','🌈','🦋','🕊️','🌹','🍀','🪄','💫','🌌','🏔️','🫀','🐉','🦅','🌻'];
+import EmojiPicker from '../ui/EmojiPicker';
 
 export default function AltarSidebarPanel() {
   const { t } = useTranslation();
@@ -57,7 +55,6 @@ export default function AltarSidebarPanel() {
   const gridOpacityPercent = Math.round((activeAltar?.grid_opacity ?? 0) * 100);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
-  const [showIconPicker, setShowIconPicker] = useState(false);
 const noticeTimerRef = useRef<number | null>(null);
   const [backgroundNotice, setBackgroundNotice] = useState<string | null>(null);
   const [backgroundOpen, setBackgroundOpen] = useState(true);
@@ -273,40 +270,33 @@ const [gridOpen, setGridOpen] = useState(true);
               </button>
               {faviconOpen && (
                 <div className="mt-2 mb-4">
-                  {activeAltar.icon_data ? (
-                    <div className="flex items-center gap-2">
-                      {activeAltar.icon_data.startsWith('data:image/') && !activeAltar.icon_data.startsWith('data:image/svg+xml')
-                        ? <img src={activeAltar.icon_data} alt="" className="w-10 h-10 object-cover rounded-lg border border-stone-700/40 flex-shrink-0" />
-                        : <span className="text-4xl leading-none w-10 h-10 flex items-center justify-center flex-shrink-0">{activeAltar.icon_data}</span>}
-                      <div className="flex flex-col gap-0.5">
-                        <button onClick={() => iconInputRef.current?.click()} className="text-xs text-stone-500 hover:text-stone-300 transition-colors text-left">{t('altar.changeImage')}</button>
-                        <button onClick={() => setShowIconPicker((v) => !v)} className="text-xs text-stone-500 hover:text-stone-300 transition-colors text-left">{t('altar.chooseEmoji')}</button>
-                        <button onClick={() => updateAltar(activeAltar.id, { icon_data: null })} className="text-xs text-stone-500 hover:text-red-400 transition-colors text-left">{t('altar.removeFavicon')}</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <button onClick={() => iconInputRef.current?.click()} className="flex items-center gap-1.5 text-xs text-stone-600 hover:text-stone-400 transition-colors">
-                        <ImagePlus size={13} /> {t('altar.addImage')}
-                      </button>
-                      <button onClick={() => setShowIconPicker((v) => !v)} className="flex items-center gap-1.5 text-xs text-stone-600 hover:text-stone-400 transition-colors">
-                        ✨ {t('altar.chooseEmoji')}
-                      </button>
-                    </div>
-                  )}
-                  {showIconPicker && (
-                    <div className="mt-2 bg-stone-800/60 border border-stone-700/40 rounded-lg p-2">
-                      <div className="flex flex-wrap gap-1">
-                        {ALTAR_ICON_EMOJIS.map((e) => (
-                          <button
-                            key={e}
-                            onClick={() => { updateAltar(activeAltar.id, { icon_data: e }); setShowIconPicker(false); }}
-                            className={`text-lg p-1 rounded hover:bg-stone-700 transition-colors ${activeAltar.icon_data === e ? 'bg-stone-700' : ''}`}
-                          >{e}</button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <EmojiPicker
+                    value={activeAltar.icon_data ?? ''}
+                    onChange={(emoji) => updateAltar(activeAltar.id, { icon_data: emoji })}
+                    trigger={({ toggle }) => (
+                      activeAltar.icon_data ? (
+                        <div className="flex items-center gap-2">
+                          {activeAltar.icon_data.startsWith('data:image/') && !activeAltar.icon_data.startsWith('data:image/svg+xml')
+                            ? <img src={activeAltar.icon_data} alt="" className="w-10 h-10 object-cover rounded-lg border border-stone-700/40 flex-shrink-0" />
+                            : <span className="text-4xl leading-none w-10 h-10 flex items-center justify-center flex-shrink-0">{activeAltar.icon_data}</span>}
+                          <div className="flex flex-col gap-0.5">
+                            <button onClick={() => iconInputRef.current?.click()} className="text-xs text-stone-500 hover:text-stone-300 transition-colors text-left">{t('altar.changeImage')}</button>
+                            <button onClick={toggle} className="text-xs text-stone-500 hover:text-stone-300 transition-colors text-left">{t('altar.chooseEmoji')}</button>
+                            <button onClick={() => updateAltar(activeAltar.id, { icon_data: null })} className="text-xs text-stone-500 hover:text-red-400 transition-colors text-left">{t('altar.removeFavicon')}</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => iconInputRef.current?.click()} className="flex items-center gap-1.5 text-xs text-stone-600 hover:text-stone-400 transition-colors">
+                            <ImagePlus size={13} /> {t('altar.addImage')}
+                          </button>
+                          <button onClick={toggle} className="flex items-center gap-1.5 text-xs text-stone-600 hover:text-stone-400 transition-colors">
+                            ✨ {t('altar.chooseEmoji')}
+                          </button>
+                        </div>
+                      )
+                    )}
+                  />
                 </div>
               )}
               <button

@@ -3,14 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { Trash2, PanelRightOpen, Check, X, Plus, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import FilterPanel from '../ui/FilterPanel';
+import EmojiPicker from '../ui/EmojiPicker';
 import { getDb } from '../../lib/db';
 import { generateId, isImageIcon } from '../../lib/helpers';
-
-const OPERATION_EMOJIS = [
-  '⚡','🔯','👁️','🌙','☀️','🌟','✨','🔮','🌀','⚗️',
-  '🗡️','📜','🕯️','🔑','🪄','🧿','🌊','🔥','💀','🌺',
-  '🐍','🦅','🌿','💎','🌈','⭐','🪬','☯️','🔱','🌑',
-];
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
@@ -53,11 +48,9 @@ export default function OperationsView() {
   const [addingCategory, setAddingCategory] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [newCatEmoji, setNewCatEmoji] = useState('⚡');
-  const [showCatEmojiPicker, setShowCatEmojiPicker] = useState(false);
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [editCatName, setEditCatName] = useState('');
   const [editCatEmoji, setEditCatEmoji] = useState('⚡');
-  const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
   const [confirmDeleteCatId, setConfirmDeleteCatId] = useState<string | null>(null);
 
   const pendingRef = useRef({ title, content, category_id: categoryId, tags, is_active: isActive, end_date: endDate || null, version: version || null });
@@ -238,7 +231,7 @@ export default function OperationsView() {
     if (!newCatName.trim()) return;
     const cat = await addCategory(newCatName.trim(), newCatEmoji);
     setCategoryId(cat.id);
-    setNewCatName(''); setNewCatEmoji('⚡'); setAddingCategory(false); setShowCatEmojiPicker(false);
+    setNewCatName(''); setNewCatEmoji('⚡'); setAddingCategory(false);
     triggerAutoSave();
   };
 
@@ -248,14 +241,12 @@ export default function OperationsView() {
     setEditingCatId(cat.id);
     setEditCatName(cat.name);
     setEditCatEmoji(cat.emoji);
-    setShowEditEmojiPicker(false);
   };
 
   const handleSaveEditCat = async () => {
     if (!editingCatId || !editCatName.trim()) return;
     await updateCategory(editingCatId, editCatName.trim(), editCatEmoji);
     setEditingCatId(null);
-    setShowEditEmojiPicker(false);
   };
 
   const handleDeleteCat = async (id: string) => {
@@ -524,35 +515,29 @@ export default function OperationsView() {
             <div className="space-y-6">
               {/* Add category */}
               {addingCategory ? (
-                <div className="relative flex items-center gap-2 mb-2">
-                  <button
-                    onClick={() => setShowCatEmojiPicker(!showCatEmojiPicker)}
-                    className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
-                  >
-                    {newCatEmoji}
-                  </button>
-                  {showCatEmojiPicker && (
-                    <div className="absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 w-52">
-                      <div className="flex flex-wrap gap-1">
-                        {OPERATION_EMOJIS.map((e) => (
-                          <button key={e}
-                            onClick={() => { setNewCatEmoji(e); setShowCatEmojiPicker(false); }}
-                            className={`text-base p-1 rounded hover:bg-stone-700 transition-colors ${newCatEmoji === e ? 'bg-stone-700' : ''}`}
-                          >{e}</button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                <div className="flex items-center gap-2 mb-2">
+                  <EmojiPicker
+                    value={newCatEmoji}
+                    onChange={setNewCatEmoji}
+                    trigger={({ toggle }) => (
+                      <button
+                        onClick={toggle}
+                        className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
+                      >
+                        {newCatEmoji}
+                      </button>
+                    )}
+                  />
                   <input
                     autoFocus
                     value={newCatName}
                     onChange={(e) => setNewCatName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(); if (e.key === 'Escape') { setAddingCategory(false); setShowCatEmojiPicker(false); } }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(); if (e.key === 'Escape') { setAddingCategory(false); } }}
                     placeholder="Name…"
                     className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none font-semibold uppercase tracking-wider"
                   />
                   <button onClick={handleAddCategory} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
-                  <button onClick={() => { setAddingCategory(false); setShowCatEmojiPicker(false); }} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
+                  <button onClick={() => setAddingCategory(false)} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
                 </div>
               ) : (
                 <button
@@ -566,34 +551,28 @@ export default function OperationsView() {
               {groupedByCat.map(({ cat, ops }) => (
                 <div key={cat.id}>
                   {editingCatId === cat.id ? (
-                    <div className="relative flex items-center gap-2 mb-2">
-                      <button
-                        onClick={() => setShowEditEmojiPicker(!showEditEmojiPicker)}
-                        className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
-                      >
-                        {editCatEmoji}
-                      </button>
-                      {showEditEmojiPicker && (
-                        <div className="absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 w-52">
-                          <div className="flex flex-wrap gap-1">
-                            {OPERATION_EMOJIS.map((e) => (
-                              <button key={e}
-                                onClick={() => { setEditCatEmoji(e); setShowEditEmojiPicker(false); }}
-                                className={`text-base p-1 rounded hover:bg-stone-700 transition-colors ${editCatEmoji === e ? 'bg-stone-700' : ''}`}
-                              >{e}</button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                    <div className="flex items-center gap-2 mb-2">
+                      <EmojiPicker
+                        value={editCatEmoji}
+                        onChange={setEditCatEmoji}
+                        trigger={({ toggle }) => (
+                          <button
+                            onClick={toggle}
+                            className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
+                          >
+                            {editCatEmoji}
+                          </button>
+                        )}
+                      />
                       <input
                         autoFocus
                         value={editCatName}
                         onChange={(e) => setEditCatName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditCat(); if (e.key === 'Escape') { setEditingCatId(null); setShowEditEmojiPicker(false); } }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditCat(); if (e.key === 'Escape') { setEditingCatId(null); } }}
                         className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none font-semibold uppercase tracking-wider"
                       />
                       <button onClick={handleSaveEditCat} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
-                      <button onClick={() => { setEditingCatId(null); setShowEditEmojiPicker(false); }} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
+                      <button onClick={() => setEditingCatId(null)} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
                       {!(cat.is_builtin as unknown as number) && (
                         confirmDeleteCatId === cat.id ? (
                           <>

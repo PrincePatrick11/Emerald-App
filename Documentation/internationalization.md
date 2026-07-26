@@ -74,7 +74,7 @@ The translation files follow this top-level structure (from `en.json`):
 | Key | Contents |
 |---|---|
 | `app` | Application name |
-| `common` | Shared labels including `yes`, `no`, `delete`, `deleteConfirm`, `unsupportedImageFormat` |
+| `common` | Shared labels including `yes`, `no`, `delete`, `deleteConfirm`, `unsupportedImageFormat`, `searchEmoji` (placeholder for the shared `EmojiPicker` search field), `noEmojiResults` (shown when an emoji search yields no matches) |
 | `listView` | View/sort mode labels for list toolbar |
 | `undo` | Undo toast messages |
 | `nav` | Sidebar navigation labels |

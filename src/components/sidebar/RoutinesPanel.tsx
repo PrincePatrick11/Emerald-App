@@ -9,12 +9,7 @@ import TagInput from '../editor/TagInput';
 import LinkedOpsInput from './LinkedOpsInput';
 import LinkedWikiInput from './LinkedWikiInput';
 import ContextMenu from '../ui/ContextMenu';
-
-export const ROUTINE_EMOJIS = [
-  '📋','🔁','⭐','🌙','☀️','🌟','✨','🔮','🌀','⚗️',
-  '🕯️','🔑','🪄','🧿','🌊','🔥','🌺','🌿','💎','📖',
-  '🗺️','⏰','🧘','💪','🎯','🃏','🧲','🔔','🌈','🪬',
-];
+import EmojiPicker from '../ui/EmojiPicker';
 
 export default function RoutinesPanel() {
   const { t } = useTranslation();
@@ -27,7 +22,6 @@ export default function RoutinesPanel() {
   const [newTags, setNewTags] = useState<string[]>([]);
   const [newOpIds, setNewOpIds] = useState<string[]>([]);
   const [newWikiIds, setNewWikiIds] = useState<string[]>([]);
-  const [showAddEmojiPicker, setShowAddEmojiPicker] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -43,7 +37,7 @@ export default function RoutinesPanel() {
   const handleCreate = async () => {
     if (!newName.trim()) return;
     await createRoutine(newName.trim(), newEmoji, newContent, newTags, newOpIds, newWikiIds);
-    setNewName(''); setNewEmoji('📋'); setNewContent(''); setNewTags([]); setNewOpIds([]); setNewWikiIds([]); setShowAddEmojiPicker(false);
+    setNewName(''); setNewEmoji('📋'); setNewContent(''); setNewTags([]); setNewOpIds([]); setNewWikiIds([]);
     setAdding(false);
   };
 
@@ -53,29 +47,21 @@ export default function RoutinesPanel() {
       {adding ? (
         <div className="bg-stone-800/40 rounded-md p-2 space-y-2 border border-stone-700/40">
           <div className="flex items-center gap-1.5">
-            <div className="relative flex-shrink-0">
-              <button
-                onClick={() => setShowAddEmojiPicker(!showAddEmojiPicker)}
-                className="w-9 h-8 bg-stone-800/60 rounded text-base text-center hover:bg-stone-700/60 transition-colors border border-stone-700/40"
-              >{newEmoji}</button>
-              {showAddEmojiPicker && (
-                <div className="absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 w-52">
-                  <div className="flex flex-wrap gap-1">
-                    {ROUTINE_EMOJIS.map((e) => (
-                      <button key={e}
-                        onClick={() => { setNewEmoji(e); setShowAddEmojiPicker(false); }}
-                        className={`text-base p-1 rounded hover:bg-stone-700 transition-colors ${newEmoji === e ? 'bg-stone-700' : ''}`}
-                      >{e}</button>
-                    ))}
-                  </div>
-                </div>
+            <EmojiPicker
+              value={newEmoji}
+              onChange={setNewEmoji}
+              trigger={({ toggle }) => (
+                <button
+                  onClick={toggle}
+                  className="w-9 h-8 bg-stone-800/60 rounded text-base text-center hover:bg-stone-700/60 transition-colors border border-stone-700/40"
+                >{newEmoji}</button>
               )}
-            </div>
+            />
             <input
               autoFocus
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') { setAdding(false); setNewName(''); setNewEmoji('📋'); setNewContent(''); setNewTags([]); setShowAddEmojiPicker(false); } }}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') { setAdding(false); setNewName(''); setNewEmoji('📋'); setNewContent(''); setNewTags([]); } }}
               placeholder={t('routines.namePlaceholder')}
               className={inputCls}
             />
@@ -94,7 +80,7 @@ export default function RoutinesPanel() {
             <button onClick={handleCreate} className="flex items-center gap-1 btn-ghost text-jade-400 text-xs">
               <Check size={12} /> Save
             </button>
-            <button onClick={() => { setAdding(false); setNewName(''); setNewEmoji('📋'); setNewContent(''); setNewTags([]); setNewOpIds([]); setNewWikiIds([]); setShowAddEmojiPicker(false); }} className="btn-ghost text-xs">
+            <button onClick={() => { setAdding(false); setNewName(''); setNewEmoji('📋'); setNewContent(''); setNewTags([]); setNewOpIds([]); setNewWikiIds([]); }} className="btn-ghost text-xs">
               <X size={12} />
             </button>
           </div>
@@ -207,7 +193,6 @@ function RoutineRow({
   const [editTags, setEditTags] = useState<string[]>(routine.tags);
   const [editOpIds, setEditOpIds] = useState<string[]>(routine.operation_ids ?? []);
   const [editWikiIds, setEditWikiIds] = useState<string[]>(routine.wiki_ids ?? []);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
@@ -216,7 +201,6 @@ function RoutineRow({
       setEditContent(routine.content); setEditTags(routine.tags);
       setEditOpIds(routine.operation_ids ?? []);
       setEditWikiIds(routine.wiki_ids ?? []);
-      setShowEmojiPicker(false);
       setConfirmDelete(false);
     }
   }, [expanded, routine.id]);
@@ -268,24 +252,16 @@ function RoutineRow({
       {expanded && (
         <div className="bg-stone-800/40 rounded-md p-2 mt-0.5 space-y-2 border border-stone-700/40">
           <div className="flex items-center gap-1.5">
-            <div className="relative flex-shrink-0">
-              <button
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="w-9 h-8 bg-stone-800/60 rounded text-base text-center hover:bg-stone-700/60 transition-colors border border-stone-700/40"
-              >{editEmoji}</button>
-              {showEmojiPicker && (
-                <div className="absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 w-52">
-                  <div className="flex flex-wrap gap-1">
-                    {ROUTINE_EMOJIS.map((e) => (
-                      <button key={e}
-                        onClick={() => { setEditEmoji(e); setShowEmojiPicker(false); }}
-                        className={`text-base p-1 rounded hover:bg-stone-700 transition-colors ${editEmoji === e ? 'bg-stone-700' : ''}`}
-                      >{e}</button>
-                    ))}
-                  </div>
-                </div>
+            <EmojiPicker
+              value={editEmoji}
+              onChange={setEditEmoji}
+              trigger={({ toggle }) => (
+                <button
+                  onClick={toggle}
+                  className="w-9 h-8 bg-stone-800/60 rounded text-base text-center hover:bg-stone-700/60 transition-colors border border-stone-700/40"
+                >{editEmoji}</button>
               )}
-            </div>
+            />
             <input
               value={editName}
               onChange={(e) => setEditName(e.target.value)}

@@ -38,7 +38,7 @@ src/
 │   │                 PlacedElementRow
 │   ├── wiki/         WikiList (rendering + category emoji helper)
 │   └── ui/           ListToolbar, FilterPanel, UndoToast, ContextMenu, ImportDestinationModal,
-│                     Modal (shared modal wrapper)
+│                     Modal (shared modal wrapper), EmojiPicker (shared emoji-picker popover)
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, routineStore, customPropertyStore, undoStore,
 │                     trashStore, vaultStore, importStore
@@ -48,7 +48,9 @@ src/
 │                     helpers.ts (incl. isImageIcon, safeParseArray, generateId,
 │                                      hexToRgb, isValidHexColor, readFileAsDataUrl,
 │                                      ACCEPTED_IMAGE_MIME, isAcceptedImageFile),
-│                     altarConstants.ts, altarExport.ts, styleClasses.ts
+│                     altarConstants.ts, altarExport.ts, styleClasses.ts,
+│                     emojiSearchData/{en,de,es,fr}.json (localised emoji search datasets,
+│                                      generated from emojibase-data, lazy-loaded per locale)
 ├── themes/           emerald-noctis.css, emerald-parchment.css, theme.ts
 ├── i18n/             react-i18next setup + locales/en.json de.json es.json fr.json
 └── types/index.ts    Shared TypeScript interfaces
