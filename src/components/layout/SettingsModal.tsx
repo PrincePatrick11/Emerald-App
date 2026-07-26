@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { createPortal } from 'react-dom';
-import { X, Globe, Info, Database, Upload, Download, Check, AlertTriangle, ChevronDown, ChevronUp, Sun, Moon, Type } from 'lucide-react';
+import { Globe, Info, Database, Upload, Download, Check, AlertTriangle, ChevronDown, ChevronUp, Sun, Moon, Type } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import Modal from '../ui/Modal';
 import { useVaultStore } from '../../store/vaultStore';
 import { useUIStore } from '../../store/uiStore';
 import { FONT_OPTIONS, THEME_OPTIONS } from '../../themes/theme';
@@ -163,27 +163,13 @@ export default function SettingsModal({ onClose }: Props) {
   }
 
   const modal = (
-    <div
-      className="settings-modal fixed inset-0 z-[9999] flex items-center justify-center bg-black/60"
-      onPointerDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+    <Modal
+      title={t('nav.settings')}
+      onClose={onClose}
+      widthClassName="w-[520px]"
+      maxHeightClassName="max-h-[88vh]"
+      bodyClassName="flex-1 overflow-y-auto px-5 py-4 space-y-6"
     >
-      <div className="settings-modal-card bg-stone-900 border border-stone-700/60 rounded-xl shadow-2xl w-[520px] max-h-[88vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-700/60 shrink-0">
-          <h2 className="font-semibold text-stone-100 text-base">{t('nav.settings')}</h2>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-md text-stone-500 hover:text-stone-300 hover:bg-stone-700/60 transition-colors"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
-
           {/* ── Appearance ───────────────────────────────────────────────── */}
           <section>
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">
@@ -199,7 +185,7 @@ export default function SettingsModal({ onClose }: Props) {
                   onClick={() => setTheme(id)}
                   className={`settings-choice-btn flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border transition-all duration-150 focus:outline-none focus:ring-2 ${
                     theme === id
-                      ? 'settings-choice-btn-active bg-jade-900/25 border-jade-700/50 text-jade-500 shadow-[0_0_0_1px_rgba(0,160,102,0.16)] focus:ring-jade-700/35'
+                      ? 'settings-choice-btn-active bg-jade-500/20 border-jade-500/50 text-jade-400 focus:ring-jade-500/35'
                       : 'settings-choice-btn-idle border-stone-700/60 text-stone-400 hover:border-stone-500 hover:text-stone-300 focus:ring-jade-700/25'
                   }`}
                 >
@@ -218,7 +204,7 @@ export default function SettingsModal({ onClose }: Props) {
                 <select
                   value={uiFontId}
                   onChange={(e) => setUIFontId(e.target.value as typeof uiFontId)}
-                  className="w-full bg-stone-800/70 border border-stone-700/60 rounded-lg px-3 py-2 text-sm text-stone-200 outline-none focus:border-jade-600/60"
+                  className="w-full bg-stone-800/70 border border-stone-700/60 rounded-lg px-3 py-2 text-sm text-stone-200 outline-none focus:border-jade-500/60"
                 >
                   {FONT_OPTIONS.map((font) => (
                     <option key={font.id} value={font.id}>{font.label}</option>
@@ -233,7 +219,7 @@ export default function SettingsModal({ onClose }: Props) {
                 <select
                   value={editorFontId}
                   onChange={(e) => setEditorFontId(e.target.value as typeof editorFontId)}
-                  className="w-full bg-stone-800/70 border border-stone-700/60 rounded-lg px-3 py-2 text-sm text-stone-200 outline-none focus:border-jade-600/60"
+                  className="w-full bg-stone-800/70 border border-stone-700/60 rounded-lg px-3 py-2 text-sm text-stone-200 outline-none focus:border-jade-500/60"
                 >
                   {FONT_OPTIONS.map((font) => (
                     <option key={font.id} value={font.id}>{font.label}</option>
@@ -259,10 +245,10 @@ export default function SettingsModal({ onClose }: Props) {
                 <button
                   key={code}
                   onClick={() => i18n.changeLanguage(code)}
-                  className={`settings-choice-btn px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                  className={`settings-choice-btn px-3 py-1.5 rounded-lg text-sm border transition-all duration-150 focus:outline-none focus:ring-2 ${
                     i18n.language === code
-                      ? 'settings-choice-btn-active bg-jade-500/20 border-jade-500/50 text-jade-400'
-                      : 'settings-choice-btn-idle border-stone-700/60 text-stone-400 hover:border-stone-500 hover:text-stone-300'
+                      ? 'settings-choice-btn-active bg-jade-500/20 border-jade-500/50 text-jade-400 focus:ring-jade-500/35'
+                      : 'settings-choice-btn-idle border-stone-700/60 text-stone-400 hover:border-stone-500 hover:text-stone-300 focus:ring-jade-700/25'
                   }`}
                 >
                   {label}
@@ -301,7 +287,7 @@ export default function SettingsModal({ onClose }: Props) {
                           if (e.key === 'Escape') setRenamingId(null);
                         }}
                         onBlur={() => commitRename(v.id)}
-                        className="flex-1 bg-stone-800 border border-stone-600 rounded px-2 py-0.5 text-sm text-stone-200 outline-none focus:border-jade-500/60"
+                        className="flex-1 bg-stone-800 border border-stone-700/60 rounded px-2 py-1 text-sm text-stone-200 outline-none focus:border-jade-500/60"
                       />
                     ) : (
                       <span className={`settings-vault-name flex-1 text-sm truncate ${isActive ? 'text-jade-300' : 'text-stone-300'}`}>
@@ -641,11 +627,8 @@ export default function SettingsModal({ onClose }: Props) {
               </div>
             </div>
           </section>
-
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 
-  return createPortal(modal, document.body);
+  return modal;
 }

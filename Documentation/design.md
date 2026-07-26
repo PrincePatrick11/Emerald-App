@@ -83,15 +83,11 @@ Aktive/inaktive Zustände (z. B. Tab-artige Buttons in `AltarLibraryStrip.tsx:17
 
 ### Modals / Dialogs
 
-Kein geteilter Modal-Wrapper — drei unabhängige Implementierungen:
+Geteilter Modal-Wrapper: `src/components/ui/Modal.tsx`. Ein Overlay (`bg-black/50 backdrop-blur-sm`), eine `.modal-card` (`index.css`, theme-var-basiert: `background-color: var(--bg-surface-2)`, `border-color: var(--border-soft)`, `shadow-2xl`, `rounded-xl`) mit Header (Titel + Close-X), `createPortal` nach `document.body`, und Escape-to-close sind damit für alle Modals einheitlich. Genutzt von `SettingsModal`, `LinkPickerModal`, `ImportDestinationModal`, `AltarLibraryStrip` (`ItemModal` und `CategoryModal`) und dem Gradient-Hintergrund-Picker in `AltarSidebarPanel`.
 
-| | Overlay | Backdrop-Blur | Card | Portal |
-|---|---|---|---|---|
-| `SettingsModal.tsx:166,171` | `bg-black/60` | nein | `rounded-xl shadow-2xl w-[520px]` | `createPortal` |
-| `LinkPickerModal.tsx:107,110` | `bg-black/50` | `backdrop-blur-sm` | `rounded-xl shadow-2xl w-[560px]` | nein |
-| `AltarLibraryStrip.tsx:195-196` | `bg-black/55` | nein | `rounded-xl` (kein `shadow-*`) | nein |
+`.modal-card` selbst hat kein `overflow-hidden` in der Basisklasse, da einzelne Modals einen Popover-Inhalt haben, der die Card-Grenzen verlassen muss (z. B. der Altar-Kategorie-Emoji-Picker). `overflow-hidden` wird stattdessen pro Modal per `className`-Prop opt-in gesetzt (`LinkPickerModal`, `ImportDestinationModal`, der Altar-Gradient-Picker).
 
-Overlay-Opacity (50/55/60), Blur-Einsatz und Portal-Nutzung unterscheiden sich in allen drei Fällen.
+Verbleibende Abweichung: `LinkPickerModal`s interne Elemente (Suchfeld, Tab-Textfarben) nutzen weiterhin rohe Tailwind-`stone-*`-Utility-Klassen statt Theme-CSS-Variablen — nur der äußere Wrapper (Overlay/Card/Header/Portal) wurde vereinheitlicht, nicht der komplette Innenaufbau jedes Modals.
 
 ### Icons (lucide-react)
 
@@ -104,7 +100,8 @@ Sachliche Zusammenfassung der oben belegten Abweichungen, ohne Priorisierung:
 1. **Primärfarbe an drei Stellen unabhängig gepflegt**: `jade`-Tailwind-Skala, `--accent`-CSS-Vars pro Theme, und Bridge-Overrides in `index.css` (z. B. `index.css:900-906`, `1343-1348`) — alle drei können bei einer Farbänderung auseinanderlaufen.
 2. **`parchment`-Tailwind-Skala ungenutzt**: Definiert in `tailwind.config.js:29-41`, aber das Parchment-Theme verwendet eigene CSS-Var-Werte, die nicht auf diese Skala mappen.
 3. **Kein geteiltes Button-Component**: `.btn-primary`/`.btn-secondary`/`.btn-ghost` existieren, werden aber an mehreren Stellen (`HomeView.tsx:239-243`, `SettingsModal.tsx:447`, `UndoToast.tsx:25`) durch eigene, leicht abweichende Inline-Varianten ersetzt.
-4. **Drei unabhängige Modal-Implementierungen** mit unterschiedlicher Overlay-Opacity, Backdrop-Blur und Portal-Nutzung (siehe Tabelle oben).
-5. **Border-Radius ohne erkennbare Regel** zwischen `rounded-md`/`lg`/`xl` für konzeptionell ähnliche Container (z. B. `ContextMenu` vs. `UndoToast`).
-6. **Icon-Größen rein ad-hoc** (10–18px), keine Skala, teils uneinheitlich innerhalb derselben Datei.
-7. **`JetBrains Mono` totes Config**: in `tailwind.config.js:46` deklariert, aber nirgends per Font-Link geladen.
+4. **Border-Radius ohne erkennbare Regel** zwischen `rounded-md`/`lg`/`xl` für konzeptionell ähnliche Container (z. B. `ContextMenu` vs. `UndoToast`).
+5. **Icon-Größen rein ad-hoc** (10–18px), keine Skala, teils uneinheitlich innerhalb derselben Datei.
+6. **`JetBrains Mono` totes Config**: in `tailwind.config.js:46` deklariert, aber nirgends per Font-Link geladen.
+
+(Ehemaliger Punkt "drei unabhängige Modal-Implementierungen" ist behoben — siehe [Modals / Dialogs](#modals--dialogs) oben.)

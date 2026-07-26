@@ -9,6 +9,7 @@ import { setAltarDragItem } from '../../lib/altarDragState';
 import { ALTAR_CAT_EMOJIS, CATEGORY_EMOJIS, FALLBACK_CATEGORY_EMOJIS } from '../../lib/altarConstants';
 import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
 import type { AltarCategory, AltarItem } from '../../types';
+import Modal from '../ui/Modal';
 
 const LIBRARY_DEFAULT_HEIGHT = 240;
 const UNCATEGORIZED_TAB = '__uncategorized__' as const;
@@ -92,9 +93,12 @@ function ItemModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onMouseDown={onClose}>
-      <div className="w-full max-w-md rounded-xl border border-stone-700/80 bg-stone-900 p-4 space-y-3" onMouseDown={(e) => e.stopPropagation()}>
-        <p className="text-sm font-semibold text-stone-200">{item ? t('editor.edit') : t('altar.addItem')}</p>
+    <Modal
+      title={item ? t('editor.edit') : t('altar.addItem')}
+      onClose={onClose}
+      widthClassName="w-full max-w-md"
+      bodyClassName="p-4 space-y-3"
+    >
         <div className="flex gap-2">
           <div className="relative flex-1">
             <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="w-full flex items-center gap-2 bg-stone-800/60 rounded-lg px-3 py-2 text-sm hover:bg-stone-700/60 transition-colors">
@@ -107,7 +111,7 @@ function ItemModal({
               <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2">
                 <div className="flex flex-wrap gap-1">
                   {getEmojiSuggestions(editCategory).map((emoji) => (
-                    <button key={emoji} onClick={() => { setEditEmoji(emoji); setEditImageData(null); setShowEmojiPicker(false); }} className={`text-xl p-1 rounded transition-colors ${editEmoji === emoji ? 'bg-stone-700' : ''}`}>{emoji}</button>
+                    <button key={emoji} onClick={() => { setEditEmoji(emoji); setEditImageData(null); setShowEmojiPicker(false); }} className={`text-xl p-1 rounded transition-colors ${editEmoji === emoji ? 'bg-stone-700' : 'hover:bg-stone-700/50'}`}>{emoji}</button>
                   ))}
                 </div>
               </div>
@@ -125,7 +129,7 @@ function ItemModal({
         </div>
         {item && confirmDelete ? (
           <div className="flex items-center justify-between rounded-lg border border-red-700/40 bg-red-950/20 px-3 py-2">
-            <span className="text-xs text-red-300">{t('altar.removeElement')}?</span>
+            <span className="text-xs text-red-300">{t('common.deleteConfirm')}</span>
             <span className="flex items-center gap-2">
               <button onClick={doDelete} className="text-xs text-red-300 hover:text-red-200">{t('trash.confirmYes')}</button>
               <button onClick={() => setConfirmDelete(false)} className="text-xs text-stone-400 hover:text-stone-200">{t('trash.confirmNo')}</button>
@@ -133,15 +137,18 @@ function ItemModal({
           </div>
         ) : (
           <div className="flex items-center justify-between">
-            {item ? <button onClick={doDelete} className="text-xs text-red-400 hover:text-red-300">{t('altar.removeElement')}</button> : <span />}
+            {item ? (
+              <button onClick={doDelete} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300">
+                <Trash2 size={11} /> {t('common.delete')}
+              </button>
+            ) : <span />}
             <div className="flex items-center gap-1">
               <button onClick={onClose} className="btn-ghost"><X size={13} /></button>
               <button onClick={save} className="btn-ghost text-jade-400"><Check size={13} /></button>
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -195,15 +202,18 @@ function CategoryModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onMouseDown={() => { onClose(); setShowEmojiPicker(false); }}>
-      <div className="w-full max-w-xs rounded-xl border border-stone-700/80 bg-stone-900 p-4 space-y-3" onMouseDown={(e) => e.stopPropagation()}>
-        <p className="text-sm font-semibold text-stone-200">{category ? t('editor.edit') : (t('altar.addCategory') ?? 'Add Category')}</p>
+    <Modal
+      title={category ? t('editor.edit') : (t('altar.addCategory') ?? 'Add Category')}
+      onClose={() => { onClose(); setShowEmojiPicker(false); }}
+      widthClassName="w-full max-w-xs"
+      bodyClassName="p-4 space-y-3"
+    >
         <div className="flex gap-2 items-center">
           <div className="relative flex-shrink-0">
             <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="w-10 h-10 flex items-center justify-center text-2xl bg-stone-800/60 rounded-lg hover:bg-stone-700/60 transition-colors">{catEmoji}</button>
             {showEmojiPicker && (
-              <div className="absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 w-52">
-                <div className="flex flex-wrap gap-1">
+              <div className="absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 w-fit">
+                <div className="grid grid-cols-4 gap-1">
                   {ALTAR_CAT_EMOJIS.map((e) => (
                     <button key={e} onClick={() => { setCatEmoji(e); setShowEmojiPicker(false); }} className={`text-xl p-1 rounded transition-colors ${catEmoji === e ? 'bg-stone-700' : 'hover:bg-stone-700/50'}`}>{e}</button>
                   ))}
@@ -235,8 +245,7 @@ function CategoryModal({
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
 

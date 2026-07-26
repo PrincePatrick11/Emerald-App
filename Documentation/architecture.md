@@ -37,7 +37,8 @@ src/
 │   │                 CustomPropertiesSection, LinkedOpsInput, LinkedWikiInput,
 │   │                 PlacedElementRow
 │   ├── wiki/         WikiList (rendering + category emoji helper)
-│   └── ui/           ListToolbar, FilterPanel, UndoToast, ContextMenu, ImportDestinationModal
+│   └── ui/           ListToolbar, FilterPanel, UndoToast, ContextMenu, ImportDestinationModal,
+│                     Modal (shared modal wrapper)
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, routineStore, customPropertyStore, undoStore,
 │                     trashStore, vaultStore, importStore

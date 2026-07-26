@@ -10,6 +10,7 @@ import { generateId } from '../../lib/helpers';
 import ListToolbar from '../ui/ListToolbar';
 import FilterPanel from '../ui/FilterPanel';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
+import LinkPickerModal from '../editor/LinkPickerModal';
 import {
   Plus, ChevronDown, ChevronRight, Flag, Trash2,
   CheckSquare, Square, X, Check, Link2, Pencil,
@@ -508,14 +509,9 @@ export default function TasksView() {
       )}
 
       {linkModal && (
-        <LinkModal
-          taskId={linkModal.taskId}
+        <LinkPickerModal
+          onSelect={(item) => { addLink(linkModal.taskId, item.id, item.entryType); }}
           onClose={() => setLinkModal(null)}
-          addLink={addLink}
-          journalEntries={journalEntries}
-          wikiArticles={wikiArticles}
-          operations={operations}
-          t={t}
         />
       )}
     </div>
@@ -819,92 +815,3 @@ const TaskRow = memo(function TaskRow({
   );
 });
 
-interface LinkModalProps {
-  taskId: string;
-  onClose: () => void;
-  addLink: (taskId: string, targetId: string, targetType: 'journal' | 'wiki' | 'operation') => Promise<void>;
-  journalEntries: any[];
-  wikiArticles: any[];
-  operations: any[];
-  t: (key: string) => string;
-}
-
-function LinkModal({ taskId, onClose, addLink, journalEntries, wikiArticles, operations, t }: LinkModalProps) {
-  const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'journal' | 'wiki' | 'operation'>('journal');
-
-  const filtered = (() => {
-    const q = search.toLowerCase();
-    if (activeTab === 'journal') {
-      return journalEntries.filter((e) => e.title.toLowerCase().includes(q));
-    }
-    if (activeTab === 'wiki') {
-      return wikiArticles.filter((a) => a.title.toLowerCase().includes(q));
-    }
-    return operations.filter((o) => o.title.toLowerCase().includes(q));
-  })();
-
-  const handleLink = async (targetId: string) => {
-    await addLink(taskId, targetId, activeTab);
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        className="tasks-link-modal bg-stone-900 border border-stone-700 rounded-lg shadow-xl w-96 max-h-[80vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-stone-700/40">
-          <h3 className="text-sm font-semibold text-stone-200">{t('tasks.linkEntry')}</h3>
-          <button onClick={onClose} className="btn-ghost p-1">
-            <X size={14} />
-          </button>
-        </div>
-
-        <div className="flex border-b border-stone-700/40">
-          {(['journal', 'wiki', 'operation'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
-                activeTab === tab
-                  ? 'tasks-link-tab-active text-jade-400 border-b-2 border-jade-400'
-                  : 'tasks-link-tab-idle text-stone-400 hover:text-stone-200'
-              }`}
-            >
-              {tab === 'journal' ? t('nav.journal') : tab === 'wiki' ? t('nav.wiki') : t('nav.operations')}
-            </button>
-          ))}
-        </div>
-
-        <div className="px-4 py-2">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('search.placeholder')}
-            className="w-full bg-stone-800 border border-stone-600 rounded px-2 py-1.5 text-sm text-stone-200 outline-none focus:border-jade-500"
-            autoFocus
-          />
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-2 pb-2">
-          {filtered.length === 0 ? (
-            <p className="text-xs text-stone-500 px-2 py-4 text-center">{t('search.noResults')}</p>
-          ) : (
-            filtered.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => handleLink(item.id)}
-                className="tasks-link-row w-full text-left px-3 py-2 text-sm text-stone-300 hover:bg-stone-700/50 rounded transition-colors"
-              >
-                {item.title}
-              </button>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}

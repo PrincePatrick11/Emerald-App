@@ -98,6 +98,15 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     border-color: var(--border-soft);
   }
 
+  /* Modal card — floating dialog surface, higher opacity than .panel to stay legible over the dimmed backdrop.
+     No overflow-hidden here: some modals (e.g. Altar's emoji picker) need a popover to escape the card bounds.
+     Pass "overflow-hidden" via Modal's className prop for modals that don't have such a popover. */
+  .modal-card {
+    @apply border rounded-xl shadow-2xl;
+    background-color: var(--bg-surface-2);
+    border-color: var(--border-soft);
+  }
+
   /* Primary action button — jade accent (xs size, for toolbars & headers) */
   .btn-primary {
     @apply flex items-center gap-1.5 px-3 py-1.5
@@ -609,8 +618,7 @@ html[data-theme='emerald-noctis'] .app-sidebar-right {
 }
 
 html[data-theme='emerald-noctis'] .sidebar-header,
-html[data-theme='emerald-noctis'] .sidebar-search,
-html[data-theme='emerald-noctis'] .settings-modal-card > div:first-child {
+html[data-theme='emerald-noctis'] .sidebar-search {
   border-color: rgba(110, 93, 76, 0.44);
 }
 
@@ -741,16 +749,6 @@ html[data-theme='emerald-noctis'] textarea::placeholder {
   color: #9c8872;
 }
 
-html[data-theme='emerald-noctis'] .settings-modal {
-  background: var(--settings-overlay);
-}
-
-html[data-theme='emerald-noctis'] .settings-modal-card {
-  background: var(--settings-card-bg);
-  border-color: var(--settings-card-border);
-  box-shadow: var(--settings-card-shadow);
-}
-
 html[data-theme='emerald-noctis'] .settings-choice-btn-idle,
 html[data-theme='emerald-noctis'] .settings-vault-row-idle {
   background: rgba(46, 38, 32, 0.82);
@@ -783,29 +781,11 @@ html[data-theme='emerald-noctis'] .filter-panel {
   border-color: var(--list-toolbar-border);
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal,
-html[data-theme='emerald-noctis'] .tasks-link-modal {
-  background: rgba(28, 22, 19, 0.97);
-  border-color: rgba(114, 95, 78, 0.5);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.56);
-}
-
-html[data-theme='emerald-noctis'] .link-picker-modal > div:first-child,
-html[data-theme='emerald-noctis'] .link-picker-modal > div:nth-child(2),
-html[data-theme='emerald-noctis'] .link-picker-modal > div:nth-child(3),
-html[data-theme='emerald-noctis'] .tasks-link-modal > div:first-child,
-html[data-theme='emerald-noctis'] .tasks-link-modal > div:nth-child(2) {
-  border-color: rgba(110, 91, 74, 0.34);
-}
-
-html[data-theme='emerald-noctis'] .link-picker-modal .text-stone-300,
-html[data-theme='emerald-noctis'] .tasks-link-modal .text-stone-200 {
+html[data-theme='emerald-noctis'] .link-picker-modal .text-stone-300 {
   color: #e7ddd2;
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal .text-stone-500,
-html[data-theme='emerald-noctis'] .tasks-link-modal .text-stone-400,
-html[data-theme='emerald-noctis'] .tasks-link-modal .text-stone-500 {
+html[data-theme='emerald-noctis'] .link-picker-modal .text-stone-500 {
   color: #9f8a75;
 }
 
@@ -813,24 +793,20 @@ html[data-theme='emerald-noctis'] .link-picker-modal .text-stone-600 {
   color: #87715e;
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal .bg-stone-800,
-html[data-theme='emerald-noctis'] .tasks-link-modal input.bg-stone-800 {
+html[data-theme='emerald-noctis'] .link-picker-modal .bg-stone-800 {
   background: rgba(45, 36, 31, 0.9);
   border-color: rgba(113, 94, 77, 0.48);
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal input,
-html[data-theme='emerald-noctis'] .tasks-link-modal input {
+html[data-theme='emerald-noctis'] .link-picker-modal input {
   color: #ecdfd1;
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal input::placeholder,
-html[data-theme='emerald-noctis'] .tasks-link-modal input::placeholder {
+html[data-theme='emerald-noctis'] .link-picker-modal input::placeholder {
   color: #927e6a;
 }
 
-html[data-theme='emerald-noctis'] .link-picker-tab-active,
-html[data-theme='emerald-noctis'] .tasks-link-tab-active {
+html[data-theme='emerald-noctis'] .link-picker-tab-active {
   background: rgba(0, 138, 87, 0.24);
   color: #a7ffd8;
 }
@@ -839,19 +815,16 @@ html[data-theme='emerald-noctis'] .link-picker-tab-active .link-picker-tab-count
   color: #68f1bc;
 }
 
-html[data-theme='emerald-noctis'] .link-picker-tab-idle,
-html[data-theme='emerald-noctis'] .tasks-link-tab-idle {
+html[data-theme='emerald-noctis'] .link-picker-tab-idle {
   color: #ab957f;
 }
 
-html[data-theme='emerald-noctis'] .link-picker-tab-idle:hover,
-html[data-theme='emerald-noctis'] .tasks-link-tab-idle:hover {
+html[data-theme='emerald-noctis'] .link-picker-tab-idle:hover {
   background: rgba(88, 72, 58, 0.34);
   color: #e8dccc;
 }
 
-html[data-theme='emerald-noctis'] .link-picker-row,
-html[data-theme='emerald-noctis'] .tasks-link-row {
+html[data-theme='emerald-noctis'] .link-picker-row {
   color: #d8cabb;
 }
 
@@ -868,8 +841,7 @@ html[data-theme='emerald-noctis'] .link-picker-row .text-stone-700 {
 }
 
 html[data-theme='emerald-noctis'] .link-picker-row:hover,
-html[data-theme='emerald-noctis'] .link-picker-row:focus-visible,
-html[data-theme='emerald-noctis'] .tasks-link-row:hover {
+html[data-theme='emerald-noctis'] .link-picker-row:focus-visible {
   background: rgba(82, 67, 54, 0.34);
 }
 
@@ -1009,8 +981,7 @@ html[data-theme='emerald-parchment'] .app-sidebar-right {
 }
 
 html[data-theme='emerald-parchment'] .sidebar-header,
-html[data-theme='emerald-parchment'] .sidebar-search,
-html[data-theme='emerald-parchment'] .settings-modal-card > div:first-child {
+html[data-theme='emerald-parchment'] .sidebar-search {
   border-color: rgba(145, 108, 70, 0.32);
 }
 
@@ -1176,16 +1147,6 @@ html[data-theme='emerald-parchment'] .tiptap code {
 html[data-theme='emerald-parchment'] .tiptap pre {
   background-color: rgba(134, 98, 62, 0.12);
   border-color: rgba(150, 112, 73, 0.34);
-}
-
-html[data-theme='emerald-parchment'] .settings-modal {
-  background: var(--settings-overlay);
-}
-
-html[data-theme='emerald-parchment'] .settings-modal-card {
-  background: var(--settings-card-bg);
-  border-color: var(--settings-card-border);
-  box-shadow: var(--settings-card-shadow);
 }
 
 html[data-theme='emerald-parchment'] .settings-choice-btn-idle {
@@ -1489,11 +1450,6 @@ html[data-theme='emerald-parchment'] .wiki-cat-input {
   color: #342416;
 }
 
-html[data-theme='emerald-parchment'] .link-picker-modal {
-  background: #f8efdf;
-  border-color: rgba(145, 108, 70, 0.38);
-}
-
 html[data-theme='emerald-parchment'] .link-picker-tab-active {
   background: var(--link-picker-tab-active-bg);
   color: var(--link-picker-tab-active-text);
@@ -1511,31 +1467,6 @@ html[data-theme='emerald-parchment'] .link-picker-tab-idle {
 html[data-theme='emerald-parchment'] .link-picker-tab-idle:hover {
   background: var(--link-picker-tab-idle-hover-bg);
   color: var(--link-picker-tab-idle-hover-text);
-}
-
-html[data-theme='emerald-parchment'] .tasks-link-modal {
-  background: #f8efdf;
-  border-color: rgba(145, 108, 70, 0.38);
-}
-
-html[data-theme='emerald-parchment'] .tasks-link-tab-active {
-  background: #d6eee1;
-  color: #075e3d;
-  border-bottom-color: transparent;
-}
-
-html[data-theme='emerald-parchment'] .tasks-link-tab-idle {
-  color: #5b432d;
-}
-
-html[data-theme='emerald-parchment'] .tasks-link-tab-idle:hover {
-  color: #2f2114;
-  background: #e8dac4;
-}
-
-html[data-theme='emerald-parchment'] .tasks-link-row:hover {
-  background: #eadcc6;
-  color: #2f2114;
 }
 
 html[data-theme='emerald-parchment'] .tasks-menu-item-active.text-jade-400 {

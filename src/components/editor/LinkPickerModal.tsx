@@ -8,6 +8,7 @@ import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import type { MoonPhase } from '../../types';
 import type { SuggestionItem } from './SuggestionList';
 import { useTranslation } from 'react-i18next';
+import Modal from '../ui/Modal';
 
 type Tab = 'all' | 'journal' | 'wiki' | 'operation';
 
@@ -32,15 +33,6 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
   useEffect(() => {
     searchRef.current?.focus();
   }, []);
-
-  // Close on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [onClose]);
 
   const allItems = useMemo<SuggestionItem[]>(() => [
     ...entries
@@ -103,19 +95,14 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
   ];
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    <Modal
+      title={t('linkPicker.title')}
+      onClose={onClose}
+      widthClassName="w-[560px]"
+      maxHeightClassName="max-h-[75vh]"
+      bodyClassName="flex-1 flex flex-col overflow-hidden"
+      className="link-picker-modal overflow-hidden"
     >
-      <div className="link-picker-modal bg-stone-900 border border-stone-700 rounded-xl shadow-2xl w-[560px] max-h-[75vh] flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-stone-700/60">
-          <span className="text-sm font-medium text-stone-300">{t('linkPicker.title')}</span>
-          <button onClick={onClose} className="p-1 text-stone-500 hover:text-stone-300 rounded">
-            <X size={14} />
-          </button>
-        </div>
-
         {/* Search */}
         <div className="px-4 py-2.5 border-b border-stone-700/40">
           <div className="flex items-center gap-2 bg-stone-800 rounded-lg px-3 py-1.5">
@@ -208,7 +195,6 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -78,10 +78,6 @@ html[data-theme='emerald-parchment'] {
   --search-bg: rgba(248, 239, 223, 0.92);
   --search-border: rgba(146, 107, 68, 0.38);
   --search-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  --settings-overlay: rgba(52, 34, 18, 0.32);
-  --settings-card-bg: rgba(248, 239, 223, 0.98);
-  --settings-card-border: rgba(146, 107, 68, 0.42);
-  --settings-card-shadow: 0 24px 54px rgba(96, 63, 30, 0.25);
   --list-toolbar-bg: rgba(247, 236, 217, 0.92);
   --list-toolbar-border: rgba(146, 107, 68, 0.36);
 }
