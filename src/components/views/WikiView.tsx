@@ -11,6 +11,7 @@ import { generateId, isImageIcon } from '../../lib/helpers';
 import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useUndoStore } from '../../store/undoStore';
+import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import RichEditor from '../editor/RichEditor';
 import TagInput from '../editor/TagInput';
 import EntryCustomProperties from '../editor/EntryCustomProperties';
@@ -48,15 +49,6 @@ export default function WikiView() {
   const [icon, setIcon] = useState<string | null>(null);
   const [loadedArticleId, setLoadedArticleId] = useState<string | null>(null);
 
-  // Category management state
-  const [editingCatId, setEditingCatId] = useState<string | null>(null);
-  const [editCatName, setEditCatName] = useState('');
-  const [editCatEmoji, setEditCatEmoji] = useState('📄');
-  const [confirmDeleteCatId, setConfirmDeleteCatId] = useState<string | null>(null);
-  const [addingWikiCat, setAddingWikiCat] = useState(false);
-  const [newWikiCatName, setNewWikiCatName] = useState('');
-  const [newWikiCatEmoji, setNewWikiCatEmoji] = useState('📄');
-
   // Always-fresh refs
   const pendingRef = useRef({ title, content, category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined });
   pendingRef.current = { title, content, category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined };
@@ -75,6 +67,26 @@ export default function WikiView() {
       updateArticle(id, pendingRef.current);
     }, 1500);
   }, [updateArticle]);
+
+  const {
+    addingCategory: addingWikiCat, setAddingCategory: setAddingWikiCat,
+    newCatName: newWikiCatName, setNewCatName: setNewWikiCatName,
+    newCatEmoji: newWikiCatEmoji, setNewCatEmoji: setNewWikiCatEmoji,
+    editingCatId, setEditingCatId,
+    editCatName, setEditCatName,
+    editCatEmoji, setEditCatEmoji,
+    confirmDeleteCatId, setConfirmDeleteCatId,
+    handleAddCategory: handleAddWikiCat,
+    startEditCat,
+    handleSaveEditCat,
+    handleDeleteCat,
+  } = useCategoryEditor(
+    { addCategory: addWikiCategory, updateCategory: updateWikiCategory, deleteCategory: deleteWikiCategory, restoreCategory: restoreWikiCategory },
+    {
+      defaultEmoji: '📄',
+      onAdded: (cat) => { setCategory(cat.id); triggerAutoSave(); },
+    },
+  );
 
   const prevRef = useRef<{ id: string; isEditing: boolean } | null>(null);
 
@@ -225,33 +237,6 @@ export default function WikiView() {
 
   const enterEditMode = () => {
     if (!isEditing && article) setActiveView({ type: 'wiki', id: article.id, mode: 'edit' });
-  };
-
-  const startEditCat = (cat: typeof wikiCategories[0]) => {
-    setEditingCatId(cat.id);
-    setEditCatName(cat.name);
-    setEditCatEmoji(cat.emoji);
-  };
-
-  const handleSaveEditCat = async () => {
-    if (!editingCatId || !editCatName.trim()) return;
-    await updateWikiCategory(editingCatId, editCatName.trim(), editCatEmoji);
-    setEditingCatId(null);
-  };
-
-  const handleDeleteCat = async (id: string) => {
-    if (confirmDeleteCatId !== id) { setConfirmDeleteCatId(id); return; }
-    setConfirmDeleteCatId(null);
-    await deleteWikiCategory(id);
-    pushUndo({ id: generateId(), description: t('undo.categoryDeleted'), undo: () => restoreWikiCategory(id) });
-  };
-
-  const handleAddWikiCat = async () => {
-    if (!newWikiCatName.trim()) return;
-    const cat = await addWikiCategory(newWikiCatName.trim(), newWikiCatEmoji);
-    setCategory(cat.id);
-    setNewWikiCatName(''); setNewWikiCatEmoji('📄'); setAddingWikiCat(false);
-    triggerAutoSave();
   };
 
   if (!article) {

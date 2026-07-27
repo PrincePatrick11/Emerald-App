@@ -10,7 +10,7 @@ import { getCategoryEmoji } from '../components/wiki/WikiList';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-function htmlEscape(str: string): string {
+export function htmlEscape(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -441,10 +441,8 @@ export async function exportAsPDF(data: ExportData): Promise<void> {
   });
   if (!path) return;
 
-  console.log('[emerald] export_pdf: invoking with', { bytes: fullHtml.length, path });
   try {
     await invoke('export_pdf', { html: fullHtml, path });
-    console.log('[emerald] export_pdf: success, file at', path);
     await message(`PDF saved:\n${path}`, { title: 'Export', kind: 'info' });
   } catch (err) {
     console.error('[emerald] export_pdf: failed', err);

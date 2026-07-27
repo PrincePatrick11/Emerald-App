@@ -3,6 +3,7 @@ import { save, message } from '@tauri-apps/plugin-dialog';
 import { useAltarStore } from '../store/altarStore';
 import { exportCurrentAltarImage } from '../components/altar/AltarCanvas';
 import { DEFAULT_ALTAR_RESOLUTION, resolveResolutionPixels } from './altarConstants';
+import { htmlEscape } from './export';
 
 // Long edge of the generated PDF page, in inches — same ballpark as a
 // Letter/A4 sheet. The short edge is derived from the altar's own pixel
@@ -50,6 +51,7 @@ export async function saveAltarImage(format: 'jpeg' | 'png' | 'webp'): Promise<v
   if (!filePath) return;
 
   await invoke('export_image', { path: filePath, dataUrl });
+  await message(`Image saved:\n${filePath}`, { title: 'Export', kind: 'info' });
 }
 
 export async function saveAltarPDF(): Promise<void> {
@@ -74,7 +76,7 @@ export async function saveAltarPDF(): Promise<void> {
 
   const [widthIn, heightIn] = pdfPageSizeForResolution(activeAltar.resolution);
 
-  const escapedTitle = activeAltar.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const escapedTitle = htmlEscape(activeAltar.title);
   const html = `<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -104,4 +106,5 @@ export async function saveAltarPDF(): Promise<void> {
 </html>`;
 
   await invoke('export_pdf', { html, path: filePath, pageSize: [widthIn, heightIn] });
+  await message(`PDF saved:\n${filePath}`, { title: 'Export', kind: 'info' });
 }

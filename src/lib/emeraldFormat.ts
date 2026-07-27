@@ -18,6 +18,7 @@ import {
   DEFAULT_OVERLAY_COLOR, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE,
 } from './altarConstants';
 import { MOON_PHASE_SYMBOLS } from './moonPhase';
+import { noAltarOpenMessage } from './altarExport';
 import type { CustomPropertyType } from '../types';
 
 // ── File format ──────────────────────────────────────────────────────────────
@@ -235,7 +236,7 @@ async function exportAltarAsEmerald(): Promise<void> {
   const { altars, activeAltarId, items, placements, categories } = useAltarStore.getState();
   const altar = altars.find(a => a.id === activeAltarId);
   if (!altar) {
-    await message('Please open an Altar first.', { title: 'Export', kind: 'info' });
+    await noAltarOpenMessage();
     return;
   }
 

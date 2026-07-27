@@ -7,6 +7,7 @@ import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { generateId } from '../../lib/helpers';
+import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import Dashboard from '../ui/Dashboard';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import LinkPickerModal from '../editor/LinkPickerModal';
@@ -16,7 +17,7 @@ import {
   Plus, ChevronDown, ChevronRight, Flag, Trash2,
   CheckSquare, Square, X, Check, Link2, Pencil,
 } from 'lucide-react';
-import type { Task, TaskPriority, TaskCategory } from '../../types';
+import type { Task, TaskPriority } from '../../types';
 
 const TASK_PRIORITY_COLORS: Record<string, string> = {
   high: 'text-red-400',
@@ -41,10 +42,23 @@ export default function TasksView() {
     updateCategory, deleteCategory, restoreCategory,
   } = useTaskStore();
 
-  const pushUndo = useUndoStore((s) => s.push);
   const journalEntries = useJournalStore((s) => s.entries);
   const wikiArticles = useWikiStore((s) => s.articles);
   const operations = useOperationStore((s) => s.operations);
+
+  const {
+    addingCategory, setAddingCategory,
+    newCatName, setNewCatName,
+    newCatEmoji, setNewCatEmoji,
+    editingCatId, setEditingCatId,
+    editCatName, setEditCatName,
+    editCatEmoji, setEditCatEmoji,
+    confirmDeleteCatId, setConfirmDeleteCatId,
+    handleAddCategory,
+    startEditCat,
+    handleSaveEditCat,
+    handleDeleteCat,
+  } = useCategoryEditor({ addCategory, updateCategory, deleteCategory, restoreCategory }, { defaultEmoji: '📋' });
 
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number; actions: ContextMenuAction[] } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -55,14 +69,7 @@ export default function TasksView() {
   const [filterCategory, setFilterCategory] = useState<Set<string>>(new Set());
   const [filterPriority, setFilterPriority] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
-  const [addingCategory, setAddingCategory] = useState(false);
-  const [newCatName, setNewCatName] = useState('');
-  const [newCatEmoji, setNewCatEmoji] = useState('📋');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
-  const [editingCatId, setEditingCatId] = useState<string | null>(null);
-  const [editCatName, setEditCatName] = useState('');
-  const [editCatEmoji, setEditCatEmoji] = useState('📋');
-  const [confirmDeleteCatId, setConfirmDeleteCatId] = useState<string | null>(null);
   const [linkModal, setLinkModal] = useState<{ taskId: string } | null>(null);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -123,38 +130,6 @@ export default function TasksView() {
       await updateTask(id, { title: editValue.trim() });
     }
     setEditingId(null);
-  };
-
-  const handleAddCategory = async () => {
-    if (!newCatName.trim()) return;
-    try {
-      await addCategory(newCatName.trim(), newCatEmoji);
-    } catch (err) {
-      console.error('[TasksView] handleAddCategory failed:', err);
-      return;
-    }
-    setNewCatName('');
-    setNewCatEmoji('📋');
-    setAddingCategory(false);
-  };
-
-  const startEditCat = (cat: TaskCategory) => {
-    setEditingCatId(cat.id);
-    setEditCatName(cat.name);
-    setEditCatEmoji(cat.emoji);
-  };
-
-  const handleSaveEditCat = async () => {
-    if (!editingCatId || !editCatName.trim()) return;
-    await updateCategory(editingCatId, editCatName.trim(), editCatEmoji);
-    setEditingCatId(null);
-  };
-
-  const handleDeleteCat = async (id: string) => {
-    if (confirmDeleteCatId !== id) { setConfirmDeleteCatId(id); return; }
-    setConfirmDeleteCatId(null);
-    await deleteCategory(id);
-    pushUndo({ id: generateId(), description: t('undo.categoryDeleted'), undo: () => restoreCategory(id) });
   };
 
   const toggleExpand = useCallback((id: string) => {
@@ -468,10 +443,6 @@ export default function TasksView() {
         }}
         items={sortedTasks}
         itemKey={(task) => task.id}
-        renderItem={() => null}
-        isEmpty={false}
-        emptyState={{ message: '' }}
-        hasNoResults={false}
         grouping={{ mode: 'custom', render: renderTasksContent }}
         contextMenuSlot={ctxMenu && (
           <ContextMenu

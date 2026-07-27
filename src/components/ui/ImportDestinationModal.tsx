@@ -21,7 +21,7 @@ export default function ImportDestinationModal() {
   return (
     <Modal title={t('importDestination.title')} onClose={cancel} widthClassName="w-[420px]" className="overflow-hidden">
       <div className="px-4 py-3">
-        <p className="text-sm text-stone-400 mb-3">
+        <p className="text-sm mb-3" style={{ color: 'var(--text-muted)' }}>
           {t('importDestination.description', { title: pending.title })}
         </p>
         <div className="space-y-1">
@@ -29,16 +29,16 @@ export default function ImportDestinationModal() {
             <button
               key={opt.type}
               onClick={() => choose(opt.type)}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-left text-stone-200 hover:bg-stone-800 transition-colors"
+              className="context-menu-item-default w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-left text-stone-300 hover:text-stone-100 hover:bg-stone-700/50 transition-colors"
             >
-              <span className="text-stone-500">{opt.icon}</span>
+              <span className="opacity-70">{opt.icon}</span>
               {t(opt.labelKey)}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="flex justify-end px-4 py-3 border-t border-stone-700/40">
+      <div className="flex justify-end px-4 py-3 border-t" style={{ borderColor: 'var(--border-soft)' }}>
         <Button onClick={cancel} variant="secondary">
           {t('importDestination.cancel')}
         </Button>

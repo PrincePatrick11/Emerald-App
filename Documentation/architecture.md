@@ -44,6 +44,8 @@ src/
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, routineStore, customPropertyStore, undoStore,
 │                     trashStore, vaultStore, importStore
+├── hooks/            useCategoryEditor (shared add/edit/delete-with-confirm category logic,
+│                                      used by TasksView, WikiView, OperationsView)
 ├── lib/              db.ts, links.ts, tabs.ts, dragState.ts, altarDragState.ts,
 │                     routineDragState.ts, moonPhase.ts, export.ts,
 │                     exportData.ts, emeraldFormat.ts, vaultManager.ts, dbBackup.ts,
@@ -94,6 +96,10 @@ This prevents unnecessary re-renders when unrelated fields change.
 ### Rules of Hooks
 
 All `useState`, `useEffect`, `useRef`, `useMemo`, and `useCallback` calls must appear before any early `return` statement in a component. Hooks placed after a conditional return crash the app with a "rendered fewer hooks than expected" error. Move the hook above the condition and use the condition inside the hook's callback if needed.
+
+### Category CRUD (shared hook)
+
+`useCategoryEditor<C>(store, options)` in `src/hooks/useCategoryEditor.ts` extracts the add/edit/delete-with-confirm state and handlers for a module's category list — this logic was near-duplicated across `TasksView`, `WikiView`, and `OperationsView`. It takes the four category-store actions (`addCategory`, `updateCategory`, `deleteCategory`, `restoreCategory`) generically over any `{ id, name, emoji }`-shaped category type, plus a `defaultEmoji` and an optional `onAdded` callback (used by callers that need to auto-select or auto-save after a category is created). Delete-with-confirm pushes an undo entry via `useUndoStore`. Category creation failures are caught and logged consistently across all three call sites (previously only `TasksView` guarded against a failed `addCategory` call).
 
 ### Auto-Save (stale-closure-safe)
 

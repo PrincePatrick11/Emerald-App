@@ -10,6 +10,7 @@ import { generateId, isImageIcon } from '../../lib/helpers';
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
+import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import RichEditor from '../editor/RichEditor';
 import TagInput from '../editor/TagInput';
 import EntryCustomProperties from '../editor/EntryCustomProperties';
@@ -45,13 +46,6 @@ export default function OperationsView() {
   const [isActive, setIsActive] = useState(true);
   const [endDate, setEndDate] = useState<string>('');
   const [version, setVersion] = useState<string>('');
-  const [addingCategory, setAddingCategory] = useState(false);
-  const [newCatName, setNewCatName] = useState('');
-  const [newCatEmoji, setNewCatEmoji] = useState('⚡');
-  const [editingCatId, setEditingCatId] = useState<string | null>(null);
-  const [editCatName, setEditCatName] = useState('');
-  const [editCatEmoji, setEditCatEmoji] = useState('⚡');
-  const [confirmDeleteCatId, setConfirmDeleteCatId] = useState<string | null>(null);
 
   const pendingRef = useRef({ title, content, category_id: categoryId, tags, is_active: isActive, end_date: endDate || null, version: version || null });
   pendingRef.current = { title, content, category_id: categoryId, tags, is_active: isActive, end_date: endDate || null, version: version || null };
@@ -69,6 +63,26 @@ export default function OperationsView() {
       updateOperation(id, pendingRef.current);
     }, 1500);
   }, [updateOperation]);
+
+  const {
+    addingCategory, setAddingCategory,
+    newCatName, setNewCatName,
+    newCatEmoji, setNewCatEmoji,
+    editingCatId, setEditingCatId,
+    editCatName, setEditCatName,
+    editCatEmoji, setEditCatEmoji,
+    confirmDeleteCatId, setConfirmDeleteCatId,
+    handleAddCategory,
+    startEditCat,
+    handleSaveEditCat,
+    handleDeleteCat,
+  } = useCategoryEditor(
+    { addCategory, updateCategory, deleteCategory, restoreCategory },
+    {
+      defaultEmoji: '⚡',
+      onAdded: (cat) => { setCategoryId(cat.id); triggerAutoSave(); },
+    },
+  );
 
   const prevRef = useRef<{ id: string; isEditing: boolean } | null>(null);
 
@@ -227,34 +241,7 @@ export default function OperationsView() {
     if (!isEditing && operation) setActiveView({ type: 'operations', id: operation.id, mode: 'edit' });
   };
 
-  const handleAddCategory = async () => {
-    if (!newCatName.trim()) return;
-    const cat = await addCategory(newCatName.trim(), newCatEmoji);
-    setCategoryId(cat.id);
-    setNewCatName(''); setNewCatEmoji('⚡'); setAddingCategory(false);
-    triggerAutoSave();
-  };
-
   const getCatById = (id: string) => categories.find((c) => c.id === id);
-
-  const startEditCat = (cat: typeof categories[0]) => {
-    setEditingCatId(cat.id);
-    setEditCatName(cat.name);
-    setEditCatEmoji(cat.emoji);
-  };
-
-  const handleSaveEditCat = async () => {
-    if (!editingCatId || !editCatName.trim()) return;
-    await updateCategory(editingCatId, editCatName.trim(), editCatEmoji);
-    setEditingCatId(null);
-  };
-
-  const handleDeleteCat = async (id: string) => {
-    if (confirmDeleteCatId !== id) { setConfirmDeleteCatId(id); return; }
-    setConfirmDeleteCatId(null);
-    await deleteCategory(id);
-    pushUndo({ id: generateId(), description: t('undo.categoryDeleted'), undo: () => restoreCategory(id) });
-  };
 
   // List view
   if (!operation) {

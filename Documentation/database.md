@@ -165,7 +165,7 @@ Reusable content templates that can be dropped into journal entries.
 
 ### tags
 
-The tags table exists primarily for autocomplete and per-tag colour management. Entries store tag names directly — not IDs.
+The tags table exists primarily for autocomplete and per-tag colour management. Entries store tag names directly — not IDs. `deleteTag`/`restoreTag` in `src/store/tagStore.ts` sweep the `tags` field of Journal entries, Wiki articles, Operations, and Tasks — deleting a tag removes it from all four; restoring re-adds it to whichever of the four had it at deletion time (recorded in `affected_ids`).
 
 | Column | Type | Notes |
 |---|---|---|
@@ -413,7 +413,7 @@ Full vault snapshots are exported and imported via Settings → Backup.
 
 | Mode | Behaviour |
 |---|---|
-| `replace` | Deletes only tables for which the backup contains data (partial-backup-safe), then inserts all rows. |
+| `replace` | Deletes only tables for which the backup contains data (partial-backup-safe), then inserts all rows. The global `tags` table is wiped only when the backup contains Journal, Wiki, Operations, Tasks, *or* Routines data — a Tasks-or-Routines-only backup still clears it, so a Replace import doesn't leave unrelated stale tags behind. |
 | `merge` | Generates an 8-char base36 timestamp prefix (`Date.now().toString(36).slice(-8)`). All entry IDs are prefixed; all cross-references and wiki slugs are remapped. Categories and tags use `INSERT OR IGNORE` by original ID/name. |
 | `add-vault` | Creates a new vault DB → `switchVault()` → runs replace logic on the empty DB. User ends up in the new vault. |
 

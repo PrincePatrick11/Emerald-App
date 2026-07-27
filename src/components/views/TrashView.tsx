@@ -481,10 +481,6 @@ export default function TrashView() {
       onSort={(s) => setTrashPrefs({ sort: s })}
       items={items}
       itemKey={(item) => item.id}
-      renderItem={() => null}
-      isEmpty={false}
-      emptyState={{ message: '' }}
-      hasNoResults={false}
       grouping={{ mode: 'custom', render: renderTrashContent }}
     />
   );

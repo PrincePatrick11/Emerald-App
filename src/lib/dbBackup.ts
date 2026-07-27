@@ -159,6 +159,11 @@ function deletedFilter(includeDeleted: boolean): string {
   return includeDeleted ? '' : 'AND deleted_at IS NULL';
 }
 
+/** Builds a quoted comma-separated id list for use inside a SQL IN(...) clause. */
+function idsInClause(rows: Row[], field: string = 'id'): string {
+  return rows.map((r) => `'${r[field]}'`).join(',');
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Export
 // ─────────────────────────────────────────────────────────────────────────────
@@ -177,7 +182,7 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
       `SELECT * FROM journal_entries WHERE 1=1 ${dateClause} ${deletedClause}`,
       dateParams,
     );
-    const ids = data.journalEntries.map((r) => `'${r.id}'`).join(',');
+    const ids = idsInClause(data.journalEntries);
     if (ids) {
       const props = await db.select<Row[]>(
         `SELECT * FROM custom_properties WHERE entry_type='journal' AND entry_id IN (${ids})`
@@ -202,7 +207,7 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
     data.wikiCategories = await db.select<Row[]>(
       `SELECT * FROM wiki_categories WHERE deleted_at IS NULL`
     );
-    const ids = data.wikiArticles.map((r) => `'${r.id}'`).join(',');
+    const ids = idsInClause(data.wikiArticles);
     if (ids) {
       const props = await db.select<Row[]>(
         `SELECT * FROM custom_properties WHERE entry_type='wiki' AND entry_id IN (${ids})`
@@ -229,7 +234,7 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
     data.operationCategories = await db.select<Row[]>(
       `SELECT * FROM operation_categories WHERE deleted_at IS NULL`
     );
-    const ids = data.operations.map((r) => `'${r.id}'`).join(',');
+    const ids = idsInClause(data.operations);
     if (ids) {
       const props = await db.select<Row[]>(
         `SELECT * FROM custom_properties WHERE entry_type='operation' AND entry_id IN (${ids})`
@@ -266,15 +271,17 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
     // altar_categories has no deleted_at column; export all rows
     data.altarCategories = await db.select<Row[]>(`SELECT * FROM altar_categories`);
     // Only export items and placements that belong to the filtered altars
-    const altarIds = data.altars.map((r) => `'${r.id}'`).join(',');
+    const altarIds = idsInClause(data.altars);
     if (!altarIds) {
       data.altarItems = [];
       data.altarPlacements = [];
     } else {
       // altar_items aren't directly tied to an altar (linked via placements)
       const placedItemIds = altarIds
-        ? (await db.select<Row[]>(`SELECT DISTINCT item_id FROM altar_placements WHERE altar_id IN (${altarIds})`))
-            .map((r) => `'${r.item_id}'`).join(',')
+        ? idsInClause(
+            await db.select<Row[]>(`SELECT DISTINCT item_id FROM altar_placements WHERE altar_id IN (${altarIds})`),
+            'item_id',
+          )
         : '';
       data.altarPlacements = altarIds
         ? await db.select<Row[]>(`SELECT * FROM altar_placements WHERE altar_id IN (${altarIds})`)
@@ -315,7 +322,7 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
       `SELECT * FROM tasks WHERE 1=1 ${dateClause} ${deletedClause}`,
       dateParams,
     );
-    const taskIds = (data.tasks ?? []).map((r) => `'${r.id}'`).join(',');
+    const taskIds = idsInClause(data.tasks ?? []);
     if (taskIds) {
       data.taskLinks = await db.select<Row[]>(
         `SELECT * FROM task_links WHERE task_id IN (${taskIds})`
@@ -428,6 +435,12 @@ function remapRow(row: Row, fields: string[], pathMap: Map<string, string>): Row
 // Insert helpers (used by both replace and merge)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Rows come from a parsed backup file (untrusted JSON) — their keys must never
+ * be concatenated into SQL as-is. We only allow columns that PRAGMA table_info
+ * reports for the real (hardcoded) target table, so a crafted backup can at
+ * worst omit/skip a column, never inject SQL through the column list.
+ */
 async function insertRows(
   db: Awaited<ReturnType<typeof getDb>>,
   table: string,
@@ -435,7 +448,10 @@ async function insertRows(
   orIgnore = false,
 ): Promise<void> {
   if (!rows.length) return;
-  const cols = Object.keys(rows[0]);
+  const tableInfo = await db.select<{ name: string }[]>(`PRAGMA table_info(${table})`);
+  const validColumns = new Set(tableInfo.map((c) => c.name));
+  const cols = Object.keys(rows[0]).filter((c) => validColumns.has(c));
+  if (!cols.length) return;
   const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ');
   const sql = `INSERT ${orIgnore ? 'OR IGNORE ' : ''}INTO ${table} (${cols.join(', ')}) VALUES (${placeholders})`;
   for (const row of rows) {
@@ -530,7 +546,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   const hasRoutines = (d.routines?.length ?? 0) > 0;
   const hasAltars = (d.altars?.length ?? 0) > 0;
   const hasTasks = (d.tasks?.length ?? 0) > 0 || (d.taskCategories?.length ?? 0) > 0;
-  const hasAny = hasJournal || hasWiki || hasOps;
+  const hasAny = hasJournal || hasWiki || hasOps || hasTasks || hasRoutines;
 
   // Links and custom_properties: delete only for present entry types
   if (hasJournal) {

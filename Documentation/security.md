@@ -71,9 +71,13 @@ Several validation rules protect against malformed, oversized, or untrusted data
 
 **Thumbnail size cap.** `AltarView.handleDone` skips the `updateAltar` call for the thumbnail patch when `thumbnailData.length > 524288` (512 KB). This bounds the size of data stored in `altars.thumbnail_data` and prevents oversized blobs from accumulating in the SQLite file.
 
+## Backup Import Column Validation
+
+`.emeralddb` backup files are untrusted input — they can be hand-edited or come from another machine. `insertRows()` in `src/lib/dbBackup.ts` (used by both `replace` and `merge` import modes) builds each `INSERT` statement's column list by intersecting the keys found on a row with `PRAGMA table_info(<table>)` for the real, hardcoded target table, rather than using the row's JSON keys directly. A crafted backup file can therefore at worst contribute an extra key that gets silently dropped (or, if it strips all valid columns, cause that row to be skipped) — it can never inject arbitrary SQL through the column list. Row *values* still go through parameterised placeholders (`$1, $2, …`), as before.
+
 ## HTML Escaping in Exports
 
-All user-provided text that is interpolated into the PDF export HTML template is passed through `htmlEscape()` in `src/lib/export.ts`. This function replaces `&`, `<`, `>`, `"`, and `'` with their corresponding HTML entities. It is applied to:
+All user-provided text that is interpolated into the PDF export HTML template is passed through `htmlEscape()`, exported from `src/lib/export.ts` and reused by `src/lib/altarExport.ts` for the altar PDF export's title. This function replaces `&`, `<`, `>`, `"`, and `'` with their corresponding HTML entities. It is applied to:
 
 - Entry titles (in the `<title>` element, toolbar display, and `<h1>` heading)
 - Chip labels (paradigma, bannung, meditation, linked ops/wiki, category names)

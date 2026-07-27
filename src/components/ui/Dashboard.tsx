@@ -44,7 +44,7 @@ export interface DashboardFilters {
   extraPanelContent?: ReactNode;
 }
 
-export interface DashboardProps<T> {
+interface DashboardBaseProps<T> {
   // Topbar
   title?: string;
   /** Fully replaces the topbar-left slot (icon + title + badge + selection controls). */
@@ -72,16 +72,8 @@ export interface DashboardProps<T> {
   // Content
   items: T[];
   itemKey: (item: T) => string;
-  renderItem: (item: T) => ReactNode;
-  /** True empty state: no items exist at all (independent of search/filters). */
-  isEmpty: boolean;
-  emptyState: DashboardEmptyState;
-  /** Search/filter produced zero results (only checked when `isEmpty` is false). */
-  hasNoResults: boolean;
   noResultsMessage?: string;
   noResultsClassName?: string;
-
-  grouping: DashboardGrouping<T>;
 
   cardsClassName?: string;
   listClassName?: string;
@@ -89,6 +81,32 @@ export interface DashboardProps<T> {
   /** <ContextMenu> stays caller-owned since its trigger is wired inside renderItem. */
   contextMenuSlot?: ReactNode;
 }
+
+/**
+ * `grouping: { mode: 'custom' }` hands 100% of content rendering to the
+ * caller (used by views whose grouping doesn't fit `category`/`timeline`,
+ * e.g. Tasks/Trash) — so it's the only mode where renderItem/isEmpty/
+ * emptyState/hasNoResults don't apply. Every other mode requires them.
+ */
+type DashboardContentProps<T> =
+  | {
+      grouping: Exclude<DashboardGrouping<T>, { mode: 'custom' }>;
+      renderItem: (item: T) => ReactNode;
+      /** True empty state: no items exist at all (independent of search/filters). */
+      isEmpty: boolean;
+      emptyState: DashboardEmptyState;
+      /** Search/filter produced zero results (only checked when `isEmpty` is false). */
+      hasNoResults: boolean;
+    }
+  | {
+      grouping: Extract<DashboardGrouping<T>, { mode: 'custom' }>;
+      renderItem?: undefined;
+      isEmpty?: undefined;
+      emptyState?: undefined;
+      hasNoResults?: undefined;
+    };
+
+export type DashboardProps<T> = DashboardBaseProps<T> & DashboardContentProps<T>;
 
 const DEFAULT_HEADER_CLASSNAME = 'flex items-center justify-between px-8 h-14 border-b border-stone-700/60';
 const DEFAULT_CONTENT_CLASSNAME = 'flex-1 overflow-y-auto px-8 py-6';
@@ -140,30 +158,32 @@ export default function Dashboard<T>({
   contentClassName = DEFAULT_CONTENT_CLASSNAME,
   contextMenuSlot,
 }: DashboardProps<T>) {
-  void items; // kept in the prop contract for callers/future grouping helpers; rendering reads from `grouping`/groups
-
   const renderItems = (subset: T[]) =>
     view === 'cards' ? (
       <div className={cardsClassName}>
-        {subset.map((item) => <Fragment key={itemKey(item)}>{renderItem(item)}</Fragment>)}
+        {subset.map((item) => <Fragment key={itemKey(item)}>{renderItem!(item)}</Fragment>)}
       </div>
     ) : (
       <div className={listClassName}>
-        {subset.map((item) => <Fragment key={itemKey(item)}>{renderItem(item)}</Fragment>)}
+        {subset.map((item) => <Fragment key={itemKey(item)}>{renderItem!(item)}</Fragment>)}
       </div>
     );
 
   const renderContent = () => {
+    // Custom mode owns 100% of its content — checked first so callers don't
+    // need to pass meaningless isEmpty/hasNoResults values to opt out.
+    if (grouping.mode === 'custom') return grouping.render();
+
     if (isEmpty) {
       return (
-        <div className={emptyState.className ?? DEFAULT_EMPTY_WRAPPER_CLASSNAME}>
-          <p className={emptyState.messageClassName ?? DEFAULT_EMPTY_MESSAGE_CLASSNAME}>{emptyState.message}</p>
-          {emptyState.actionLabel && emptyState.onAction && (
+        <div className={emptyState!.className ?? DEFAULT_EMPTY_WRAPPER_CLASSNAME}>
+          <p className={emptyState!.messageClassName ?? DEFAULT_EMPTY_MESSAGE_CLASSNAME}>{emptyState!.message}</p>
+          {emptyState!.actionLabel && emptyState!.onAction && (
             <button
-              onClick={emptyState.onAction}
-              className={emptyState.actionClassName ?? DEFAULT_EMPTY_ACTION_CLASSNAME}
+              onClick={emptyState!.onAction}
+              className={emptyState!.actionClassName ?? DEFAULT_EMPTY_ACTION_CLASSNAME}
             >
-              {emptyState.actionLabel}
+              {emptyState!.actionLabel}
             </button>
           )}
         </div>
@@ -173,8 +193,6 @@ export default function Dashboard<T>({
     if (hasNoResults) {
       return <p className={noResultsClassName}>{noResultsMessage}</p>;
     }
-
-    if (grouping.mode === 'custom') return grouping.render();
 
     if (grouping.mode === 'flat') return renderItems(items);
 
