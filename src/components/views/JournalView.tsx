@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Trash2, PanelRightOpen, Check, X, Plus, Copy, Pencil } from 'lucide-react';
+import { Trash2, PanelRightOpen, Check, X, Copy, Pencil } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import Button from '../ui/Button';
 import { useUIStore } from '../../store/uiStore';
@@ -11,8 +11,7 @@ import { useUndoStore } from '../../store/undoStore';
 import RichEditor from '../editor/RichEditor';
 import TagInput from '../editor/TagInput';
 import EntryCustomProperties from '../editor/EntryCustomProperties';
-import ListToolbar from '../ui/ListToolbar';
-import FilterPanel from '../ui/FilterPanel';
+import Dashboard from '../ui/Dashboard';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { getDb } from '../../lib/db';
@@ -287,126 +286,101 @@ export default function JournalView() {
 
     const go = (e: JournalEntry) => setActiveView({ type: 'journal', id: e.id, mode: 'view' });
 
-    return (
-      <div className="h-full flex flex-col">
-        <div className="flex items-center justify-between px-8 h-14 border-b border-stone-700/60">
-          <h1 className="text-lg font-semibold text-stone-100">{t('journal.title')}</h1>
-          <div className="flex items-center gap-1">
-            <Button onClick={handleNew} variant="primary">
-              <Plus size={13} />{t('journal.newEntry')}
-            </Button>
-            <Button onClick={toggleRightSidebar} variant="ghost" className="ml-1"><PanelRightOpen size={16} /></Button>
+    const renderEntry = (e: JournalEntry) => {
+      const icon = MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓';
+      if (renamingId === e.id) {
+        return view === 'cards' ? (
+          <div className="panel-interactive px-4 py-4 text-left">
+            <div className="text-2xl mb-2">{icon}</div>
+            <input autoFocus value={renameValue} onChange={(ev) => setRenameValue(ev.target.value)}
+              onBlur={commitRename} onKeyDown={(ev) => { if (ev.key === 'Enter') commitRename(); if (ev.key === 'Escape') setRenamingId(null); }}
+              className="text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1" />
+            <div className="text-xs text-parchment-500/70">{format(new Date(e.created_at), 'MMM d, yyyy')}</div>
           </div>
-        </div>
-
-        <ListToolbar
-          view={view} sort={sort} onView={(v) => setJournalPrefs({ view: v })} onSort={(s) => setJournalPrefs({ sort: s })}
-          search={search} onSearch={setSearch}
-          showFilters={showFilters} onToggleFilters={() => setShowFilters((v) => !v)} activeFilterCount={activeFilterCount}
-        />
-        {showFilters && (
-          <FilterPanel
-            chipLabel={t('filters.moonPhase')}
-            chips={phaseChips}
-            selectedChips={filterPhases}
-            onChipToggle={(v) => setFilterPhases((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v])}
-            propNames={allPropNames}
-            propFilters={filterPropSlots}
-            onAddPropFilter={() => setFilterPropSlots((prev) => [...prev, { name: '', value: '' }])}
-            onUpdatePropFilter={(i, pf) => setFilterPropSlots((prev) => prev.map((s, idx) => idx === i ? pf : s))}
-            onRemovePropFilter={(i) => setFilterPropSlots((prev) => prev.filter((_, idx) => idx !== i))}
-            activeFilterCount={activeFilterCount}
-            onClearAll={() => { setFilterPhases([]); setFilterPropSlots([]); }}
-          />
-        )}
-
-        <div className="flex-1 overflow-y-auto px-8 py-6">
-          {entries.length === 0 ? (
-            <div className="text-center py-20">
-              <p className="text-stone-600 text-sm">{t('journal.noEntries')}</p>
-              <button onClick={handleNew} className="mt-4 text-xs text-stone-500 hover:text-stone-300 underline transition-colors">{t('journal.startWriting')}</button>
-            </div>
-          ) : filtered.length === 0 ? (
-            <p className="text-center py-20 text-stone-600 text-sm">{t('search.noResults')}</p>
-          ) : (
-            <div className="space-y-6">
-              {grouped.map(({ label, items }) => (
-                <div key={label || 'all'}>
-                  {label && (
-                    <div className="flex items-center gap-3 mb-3">
-                      <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider whitespace-nowrap">{label}</span>
-                      <div className="flex-1 h-px bg-stone-700/50" />
-                    </div>
-                  )}
-                  {view === 'cards' ? (
-                    <div className="grid grid-cols-3 gap-3">
-                      {items.map((e) => {
-                        const icon = MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓';
-                        if (renamingId === e.id) return (
-                          <div key={e.id} className="panel-interactive px-4 py-4 text-left">
-                            <div className="text-2xl mb-2">{icon}</div>
-                            <input autoFocus value={renameValue} onChange={(ev) => setRenameValue(ev.target.value)}
-                              onBlur={commitRename} onKeyDown={(ev) => { if (ev.key === 'Enter') commitRename(); if (ev.key === 'Escape') setRenamingId(null); }}
-                              className="text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1" />
-                            <div className="text-xs text-parchment-500/70">{format(new Date(e.created_at), 'MMM d, yyyy')}</div>
-                          </div>
-                        );
-                        return (
-                          <button key={e.id} onClick={() => go(e)} onContextMenu={(ev) => openCtxMenu(ev, e.id)} className="panel-interactive px-4 py-4 text-left">
-                            <div className="text-2xl mb-2">{icon}</div>
-                            <div className="text-sm font-medium text-stone-200 truncate mb-1">{e.title}</div>
-                            <div className="text-xs text-parchment-500/70">{format(new Date(e.created_at), 'MMM d, yyyy')}</div>
-                            {e.tags?.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-2">
-                                {e.tags.slice(0, 3).map((tag) => (
-                                  <span key={tag} className="px-1.5 py-0.5 rounded text-xs bg-stone-700/60 text-stone-500">{tag}</span>
-                                ))}
-                              </div>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {items.map((e) => {
-                        const icon = MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓';
-                        if (renamingId === e.id) return (
-                          <div key={e.id} className="panel-interactive w-full flex items-center gap-3 px-4 py-3">
-                            <span className="text-base flex-shrink-0">{icon}</span>
-                            <input autoFocus value={renameValue} onChange={(ev) => setRenameValue(ev.target.value)}
-                              onBlur={commitRename} onKeyDown={(ev) => { if (ev.key === 'Enter') commitRename(); if (ev.key === 'Escape') setRenamingId(null); }}
-                              className="flex-1 bg-transparent text-sm text-stone-300 outline-none selectable" />
-                            <span className="text-xs text-parchment-500/70 flex-shrink-0">{format(new Date(e.created_at), 'MMM d, yyyy')}</span>
-                          </div>
-                        );
-                        return (
-                          <button key={e.id} onClick={() => go(e)} onContextMenu={(ev) => openCtxMenu(ev, e.id)} className="panel-interactive w-full text-left flex items-center gap-3 px-4 py-3 group">
-                            <span className="text-base flex-shrink-0">{icon}</span>
-                            <span className="flex-1 text-sm text-stone-300 truncate">{e.title}</span>
-                            <span className="text-xs text-parchment-500/70 flex-shrink-0">{format(new Date(e.created_at), 'MMM d, yyyy')}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+        ) : (
+          <div className="panel-interactive w-full flex items-center gap-3 px-4 py-3">
+            <span className="text-base flex-shrink-0">{icon}</span>
+            <input autoFocus value={renameValue} onChange={(ev) => setRenameValue(ev.target.value)}
+              onBlur={commitRename} onKeyDown={(ev) => { if (ev.key === 'Enter') commitRename(); if (ev.key === 'Escape') setRenamingId(null); }}
+              className="flex-1 bg-transparent text-sm text-stone-300 outline-none selectable" />
+            <span className="text-xs text-parchment-500/70 flex-shrink-0">{format(new Date(e.created_at), 'MMM d, yyyy')}</span>
+          </div>
+        );
+      }
+      return view === 'cards' ? (
+        <button onClick={() => go(e)} onContextMenu={(ev) => openCtxMenu(ev, e.id)} className="panel-interactive px-4 py-4 text-left">
+          <div className="text-2xl mb-2">{icon}</div>
+          <div className="text-sm font-medium text-stone-200 truncate mb-1">{e.title}</div>
+          <div className="text-xs text-parchment-500/70">{format(new Date(e.created_at), 'MMM d, yyyy')}</div>
+          {e.tags?.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {e.tags.slice(0, 3).map((tag) => (
+                <span key={tag} className="px-1.5 py-0.5 rounded text-xs bg-stone-700/60 text-stone-500">{tag}</span>
               ))}
             </div>
           )}
-        </div>
-      {ctxMenu && (
-        <ContextMenu
-          x={ctxMenu.x} y={ctxMenu.y}
-          onClose={() => setCtxMenu(null)}
-          actions={[
-            { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
-            { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
-            { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },
-          ]}
-        />
-      )}
-      </div>
+        </button>
+      ) : (
+        <button onClick={() => go(e)} onContextMenu={(ev) => openCtxMenu(ev, e.id)} className="panel-interactive w-full text-left flex items-center gap-3 px-4 py-3 group">
+          <span className="text-base flex-shrink-0">{icon}</span>
+          <span className="flex-1 text-sm text-stone-300 truncate">{e.title}</span>
+          <span className="text-xs text-parchment-500/70 flex-shrink-0">{format(new Date(e.created_at), 'MMM d, yyyy')}</span>
+        </button>
+      );
+    };
+
+    return (
+      <Dashboard<JournalEntry>
+        title={t('journal.title')}
+        primaryAction={{ label: t('journal.newEntry'), onClick: handleNew }}
+        onToggleRightSidebar={toggleRightSidebar}
+        view={view}
+        sort={sort}
+        onView={(v) => setJournalPrefs({ view: v })}
+        onSort={(s) => setJournalPrefs({ sort: s })}
+        search={search}
+        onSearch={setSearch}
+        filters={{
+          showFilters,
+          onToggleFilters: () => setShowFilters((v) => !v),
+          activeFilterCount,
+          panelProps: {
+            chipLabel: t('filters.moonPhase'),
+            chips: phaseChips,
+            selectedChips: filterPhases,
+            onChipToggle: (v) => setFilterPhases((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
+            propNames: allPropNames,
+            propFilters: filterPropSlots,
+            onAddPropFilter: () => setFilterPropSlots((prev) => [...prev, { name: '', value: '' }]),
+            onUpdatePropFilter: (i, pf) => setFilterPropSlots((prev) => prev.map((s, idx) => idx === i ? pf : s)),
+            onRemovePropFilter: (i) => setFilterPropSlots((prev) => prev.filter((_, idx) => idx !== i)),
+            onClearAll: () => { setFilterPhases([]); setFilterPropSlots([]); },
+          },
+        }}
+        items={sorted}
+        itemKey={(e) => e.id}
+        renderItem={renderEntry}
+        isEmpty={entries.length === 0}
+        emptyState={{ message: t('journal.noEntries'), actionLabel: t('journal.startWriting'), onAction: handleNew }}
+        hasNoResults={filtered.length === 0}
+        noResultsMessage={t('search.noResults')}
+        grouping={
+          view === 'timeline' || sort === 'category'
+            ? { mode: 'timeline', groups: grouped }
+            : { mode: 'flat' }
+        }
+        contextMenuSlot={ctxMenu && (
+          <ContextMenu
+            x={ctxMenu.x} y={ctxMenu.y}
+            onClose={() => setCtxMenu(null)}
+            actions={[
+              { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
+              { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
+              { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },
+            ]}
+          />
+        )}
+      />
     );
   }
 

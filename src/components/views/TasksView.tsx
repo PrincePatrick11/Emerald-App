@@ -7,8 +7,7 @@ import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { generateId } from '../../lib/helpers';
-import ListToolbar from '../ui/ListToolbar';
-import FilterPanel from '../ui/FilterPanel';
+import Dashboard from '../ui/Dashboard';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import LinkPickerModal from '../editor/LinkPickerModal';
 import EmojiPicker from '../ui/EmojiPicker';
@@ -191,91 +190,8 @@ export default function TasksView() {
     return 'Unknown';
   }, [journalEntries, wikiArticles, operations]);
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-8 h-14 border-b border-stone-700/60">
-        <h1 className="text-lg font-semibold text-stone-100">{t('nav.tasks')}</h1>
-        <div className="flex items-center gap-1">
-          <Button onClick={() => handleCreateTask()} variant="primary">
-            <Plus size={13} />{t('tasks.newTask')}
-          </Button>
-        </div>
-      </div>
-
-      <ListToolbar
-        view={tasksPrefs.view}
-        sort={tasksPrefs.sort}
-        onView={(v) => setTasksPrefs({ view: v })}
-        onSort={(s) => setTasksPrefs({ sort: s })}
-        viewOptions={[{ value: 'list' as const, label: t('listView.list') }]}
-        search={searchQuery}
-        onSearch={setSearchQuery}
-        showFilters={filterOpen}
-        onToggleFilters={() => setFilterOpen((o) => !o)}
-        activeFilterCount={activeFilterCount}
-        extraActions={
-          <button
-            onClick={() => setShowCompleted((o) => !o)}
-            className={`flex items-center justify-center p-1.5 rounded-md transition-colors ${
-              showCompleted
-                ? 'bg-jade-900/50 border border-jade-800/40 text-jade-400'
-                : 'bg-stone-800/70 hover:bg-stone-700/70 text-stone-500 hover:text-stone-300'
-            }`}
-            title={showCompleted ? t('tasks.showCompleted') : t('tasks.hideCompleted')}
-          >
-            <CheckSquare size={13} />
-          </button>
-        }
-      />
-
-      {filterOpen && (
-        <>
-        <FilterPanel
-          chipLabel={t('tasks.filter.category')}
-          chips={categories.map((c) => ({ value: c.id, label: c.name, emoji: c.emoji }))}
-          selectedChips={[...filterCategory]}
-          onChipToggle={(v) => setFilterCategory((prev) => {
-            const next = new Set(prev);
-            if (next.has(v)) next.delete(v); else next.add(v);
-            return next;
-          })}
-          propNames={[]}
-          propFilters={[]}
-          onAddPropFilter={() => {}}
-          onUpdatePropFilter={() => {}}
-          onRemovePropFilter={() => {}}
-          activeFilterCount={activeFilterCount}
-          onClearAll={() => {
-            setFilterCategory(new Set());
-            setFilterPriority(new Set());
-          }}
-        />
-        <div className="px-8 py-2 border-b border-stone-700/40 bg-stone-900/50 flex items-center gap-2">
-          <span className="text-xs font-semibold text-stone-600 uppercase tracking-wider">{t('tasks.filter.priority')}</span>
-          {(['high', 'medium', 'low'] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => setFilterPriority((prev) => {
-                const next = new Set(prev);
-                if (next.has(p)) next.delete(p); else next.add(p);
-                return next;
-              })}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${
-                filterPriority.has(p)
-                  ? 'bg-jade-900/50 border-jade-800/40 text-jade-400'
-                  : 'bg-stone-800/60 border-stone-700/60 text-stone-500 hover:text-stone-300 hover:border-stone-600'
-              }`}
-            >
-              <Flag size={12} />
-              {t('tasks.priority.' + p)}
-            </button>
-          ))}
-        </div>
-        </>
-      )}
-
-      <div className="flex-1 overflow-y-auto px-8 py-6">
+  const renderTasksContent = () => (
+    <>
         {/* Add Category at top */}
         {addingCategory ? (
           <div className="flex items-center gap-2 mb-4 px-2">
@@ -475,16 +391,97 @@ export default function TasksView() {
             <p className="text-stone-600 text-sm">{t('search.noResults')}</p>
           </div>
         )}
-      </div>
+    </>
+  );
 
-      {ctxMenu && (
-        <ContextMenu
-          x={ctxMenu.x}
-          y={ctxMenu.y}
-          onClose={() => setCtxMenu(null)}
-          actions={ctxMenu.actions}
-        />
-      )}
+  return (
+    <>
+      <Dashboard<Task>
+        title={t('nav.tasks')}
+        primaryAction={{ label: t('tasks.newTask'), onClick: () => handleCreateTask() }}
+        view={tasksPrefs.view}
+        sort={tasksPrefs.sort}
+        onView={(v) => setTasksPrefs({ view: v })}
+        onSort={(s) => setTasksPrefs({ sort: s })}
+        viewOptions={[{ value: 'list' as const, label: t('listView.list') }]}
+        search={searchQuery}
+        onSearch={setSearchQuery}
+        toolbarExtraActions={
+          <button
+            onClick={() => setShowCompleted((o) => !o)}
+            className={`flex items-center justify-center p-1.5 rounded-md transition-colors ${
+              showCompleted
+                ? 'bg-jade-900/50 border border-jade-800/40 text-jade-400'
+                : 'bg-stone-800/70 hover:bg-stone-700/70 text-stone-500 hover:text-stone-300'
+            }`}
+            title={showCompleted ? t('tasks.showCompleted') : t('tasks.hideCompleted')}
+          >
+            <CheckSquare size={13} />
+          </button>
+        }
+        filters={{
+          showFilters: filterOpen,
+          onToggleFilters: () => setFilterOpen((o) => !o),
+          activeFilterCount,
+          panelProps: {
+            chipLabel: t('tasks.filter.category'),
+            chips: categories.map((c) => ({ value: c.id, label: c.name, emoji: c.emoji })),
+            selectedChips: [...filterCategory],
+            onChipToggle: (v) => setFilterCategory((prev) => {
+              const next = new Set(prev);
+              if (next.has(v)) next.delete(v); else next.add(v);
+              return next;
+            }),
+            propNames: [],
+            propFilters: [],
+            onAddPropFilter: () => {},
+            onUpdatePropFilter: () => {},
+            onRemovePropFilter: () => {},
+            onClearAll: () => {
+              setFilterCategory(new Set());
+              setFilterPriority(new Set());
+            },
+          },
+          extraPanelContent: (
+            <div className="px-8 py-2 border-b border-stone-700/40 bg-stone-900/50 flex items-center gap-2">
+              <span className="text-xs font-semibold text-stone-600 uppercase tracking-wider">{t('tasks.filter.priority')}</span>
+              {(['high', 'medium', 'low'] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setFilterPriority((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(p)) next.delete(p); else next.add(p);
+                    return next;
+                  })}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                    filterPriority.has(p)
+                      ? 'bg-jade-900/50 border-jade-800/40 text-jade-400'
+                      : 'bg-stone-800/60 border-stone-700/60 text-stone-500 hover:text-stone-300 hover:border-stone-600'
+                  }`}
+                >
+                  <Flag size={12} />
+                  {t('tasks.priority.' + p)}
+                </button>
+              ))}
+            </div>
+          ),
+        }}
+        items={sortedTasks}
+        itemKey={(task) => task.id}
+        renderItem={() => null}
+        isEmpty={false}
+        emptyState={{ message: '' }}
+        hasNoResults={false}
+        grouping={{ mode: 'custom', render: renderTasksContent }}
+        contextMenuSlot={ctxMenu && (
+          <ContextMenu
+            x={ctxMenu.x}
+            y={ctxMenu.y}
+            onClose={() => setCtxMenu(null)}
+            actions={ctxMenu.actions}
+          />
+        )}
+      />
 
       {linkModal && (
         <LinkPickerModal
@@ -492,7 +489,7 @@ export default function TasksView() {
           onClose={() => setLinkModal(null)}
         />
       )}
-    </div>
+    </>
   );
 }
 

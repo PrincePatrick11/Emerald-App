@@ -8,7 +8,7 @@ export interface FilterChip {
   emoji?: string;
 }
 
-interface FilterPanelProps {
+export interface FilterPanelProps {
   chipLabel?: string;
   chips?: FilterChip[];
   selectedChips?: string[];

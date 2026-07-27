@@ -39,7 +39,8 @@ src/
 │   ├── wiki/         WikiList (rendering + category emoji helper)
 │   └── ui/           ListToolbar, FilterPanel, UndoToast, ContextMenu, ImportDestinationModal,
 │                     Modal (shared modal wrapper), EmojiPicker (shared emoji-picker popover),
-│                     Button (shared primary/secondary/ghost/danger button)
+│                     Button (shared primary/secondary/ghost/danger button),
+│                     Dashboard (shared module-overview chrome: topbar/toolbar/filter/grouping)
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, routineStore, customPropertyStore, undoStore,
 │                     trashStore, vaultStore, importStore

@@ -103,6 +103,22 @@ Das Suchfeld bekommt bewusst dieselbe explizite `width`/`minWidth`/`maxWidth` (`
 
 Verbleibende Abweichung: die "Keine Treffer"-Meldung bei leerer Suche (`EmojiPicker.tsx:151`) nutzt rohes `text-stone-500` statt einer Theme-CSS-Variable wie `--text-muted` — der einzige Rest an unthemtem Text innerhalb einer ansonsten komplett auf CSS-Vars umgestellten Komponente.
 
+### Dashboard (Modul-Übersichtsscreens)
+
+Geteilte Komponente: `src/components/ui/Dashboard.tsx` (generisch über `<T>`). Vereinheitlicht nur die äußere Chrome der sechs Modul-Übersichtsscreens (Wiki, Operations, Journal, Altar, Tasks, Trash) — Topbar, `ListToolbar`/`FilterPanel`-Einbindung, sowie Leerzustands-/No-Results-/Gruppierungs-Orchestrierung — analog zum `Modal`/`EmojiPicker`-Prinzip: nur die Chrome ist geteilt, der eigentliche Item-Inhalt bleibt pro Aufrufer lokal (`renderItem`-Prop).
+
+**Topbar**: Standardmäßig `title` + optionale `primaryAction` (Button + Plus-Icon) rechts. Beide Seiten sind per `headerLeft`/`headerRight` vollständig ersetzbar, wenn eine Ansicht keine primäre Aktion, sondern z. B. Bulk-Select-Controls braucht (Trash: Select-all-Link links, Bulk-Delete/Empty-Trash-Buttons rechts). `headerClassName` ist ebenfalls überschreibbar (Trash nutzt `px-6` statt der Default-`px-8`, aus historischen Gründen enger als die übrigen Dashboards).
+
+**Gruppierung** (`grouping`-Prop, vier Modi):
+- `flat` — ungruppierte Liste (Altar).
+- `timeline` — Divider-Gruppen mit `label` + `items`, kein editierbarer Header (Journal: sowohl der Datums-Timeline- als auch der "nach Mondphase gruppiert"-Fall laufen über diesen Modus, da beide dieselbe Divider-Optik brauchen; Altar für seine Datumsgruppen).
+- `category` — wie `timeline`, aber mit `renderGroupHeader`/`renderAddCategory`-Render-Props für editierbare Kategorie-Header inkl. Inline-CRUD (Wiki, Operations — Operations ergänzt zusätzlich einen "Other"-Uncategorized-Bucket als weitere Gruppe).
+- `custom` — Escape-Hatch: Aufrufer liefert eine `render()`-Funktion und ist für den kompletten Inhaltsbereich selbst verantwortlich. Genutzt von Tasks (hierarchische Task/Subtask-Struktur, Kategorie-Collapse-Zustand, Uncategorized-zuerst-Reihenfolge) und Trash (zweistufige Typ→Kategorie-Gruppierung) — beide Strukturen sind nicht generisch abbildbar.
+
+**Filter**: `filters`-Prop ist optional (Views ohne Filterkonzept, z. B. Altar, lassen sie weg). Sie kapselt `showFilters`/`onToggleFilters`/`activeFilterCount` sowie `panelProps` (an `FilterPanel` durchgereicht — dessen `FilterPanelProps`-Interface wurde dafür aus `FilterPanel.tsx` exportiert) und ein optionales `extraPanelContent` für zusätzliche Filterzeilen unterhalb des `FilterPanel` (Tasks' Prioritäts-Chip-Zeile). `toolbarExtraActions` reicht zusätzliche Controls direkt in die `ListToolbar` durch (Tasks' "Show completed"-Toggle).
+
+Diese Vereinheitlichung ist rein strukturell — das visuelle Ergebnis ist unverändert zum vorherigen Zustand jedes Dashboards. Ein separates visuelles Redesign der Dashboards ist als nächster Schritt geplant, aber noch nicht begonnen.
+
 ### Icons (lucide-react)
 
 Keine dokumentierte Größen-Skala. `size`-Props reichen von 10–18px und variieren teils innerhalb derselben Datei zwischen visuell gleichrangigen Elementen, z. B. `SettingsModal.tsx`: Header-Close-Icon `size={16}` (Zeile 179), Sektions-Icons überwiegend `size={13}`/`size={14}` (Zeilen 189, 205, 214, 229, 248, 276, 349, 363, 366) ohne erkennbares Muster, welches Icon welche Größe bekommt. Farbe wird konsistent über die umgebende `text-stone-*`/`text-jade-*`/Theme-Var-Klasse vererbt, nicht per `color`-Prop.

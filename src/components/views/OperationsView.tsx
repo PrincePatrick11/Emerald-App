@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Trash2, PanelRightOpen, Check, X, Plus, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
-import FilterPanel from '../ui/FilterPanel';
+import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import EmojiPicker from '../ui/EmojiPicker';
 import Button from '../ui/Button';
 import { getDb } from '../../lib/db';
@@ -10,7 +10,6 @@ import { generateId, isImageIcon } from '../../lib/helpers';
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
-import ListToolbar from '../ui/ListToolbar';
 import RichEditor from '../editor/RichEditor';
 import TagInput from '../editor/TagInput';
 import EntryCustomProperties from '../editor/EntryCustomProperties';
@@ -456,189 +455,182 @@ export default function OperationsView() {
       );
     };
 
-    return (
-      <div className="h-full flex flex-col">
-        <div className="flex items-center justify-between px-8 h-14 border-b border-stone-700/60">
-          <h1 className="text-lg font-semibold text-stone-100">{t('nav.operations')}</h1>
-          <div className="flex items-center gap-1">
-            <Button onClick={handleNew} variant="primary">
-              <Plus size={13} />{t('operations.new')}
-            </Button>
-            <Button onClick={toggleRightSidebar} variant="ghost" className="ml-1"><PanelRightOpen size={16} /></Button>
-          </div>
-        </div>
+    type Operation = typeof operations[number];
 
-        <ListToolbar
-          view={view} sort={sort} onView={(v) => setOperationsPrefs({ view: v })} onSort={(s) => setOperationsPrefs({ sort: s })}
-          search={search} onSearch={setSearch}
-          showFilters={showFilters} onToggleFilters={() => setShowFilters((v) => !v)} activeFilterCount={activeFilterCount}
-        />
-        {showFilters && (
-          <FilterPanel
-            chipLabel={t('filters.category')}
-            chips={catChips}
-            selectedChips={filterCatIds}
-            onChipToggle={(v) => setFilterCatIds((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v])}
-            statusChips={statusChips}
-            selectedStatus={filterStatus}
-            onStatusToggle={(v) => setFilterStatus((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v])}
-            propNames={allPropNames}
-            propFilters={filterPropSlots}
-            onAddPropFilter={() => setFilterPropSlots((prev) => [...prev, { name: '', value: '' }])}
-            onUpdatePropFilter={(i, pf) => setFilterPropSlots((prev) => prev.map((s, idx) => idx === i ? pf : s))}
-            onRemovePropFilter={(i) => setFilterPropSlots((prev) => prev.filter((_, idx) => idx !== i))}
-            activeFilterCount={activeFilterCount}
-            onClearAll={() => { setFilterCatIds([]); setFilterStatus([]); setFilterPropSlots([]); }}
-          />
-        )}
+    const catGroups: DashboardGroup<Operation>[] = groupedByCat.map(({ cat, ops }) => ({
+      key: cat.id,
+      label: cat.is_builtin ? t(`operations.categories.${cat.id}`) : cat.name,
+      items: ops,
+    }));
+    if (uncategorized.length > 0) {
+      catGroups.push({ key: '__uncategorized__', label: '📄 Other', items: uncategorized });
+    }
 
-        <div className="flex-1 overflow-y-auto px-8 py-6">
-          {operations.length === 0 && categories.length === 0 ? (
-            <div className="text-center py-20">
-              <p className="text-stone-600 text-sm">{t('operations.none')}</p>
-              <button onClick={handleNew} className="mt-4 text-xs text-stone-500 hover:text-stone-300 underline transition-colors">{t('operations.start')}</button>
-            </div>
-          ) : filtered.length === 0 ? (
-            <p className="text-center py-20 text-stone-600 text-sm">{t('search.noResults')}</p>
-          ) : view === 'timeline' ? (
-            <div className="space-y-6">
-              {timelineGroups.map(({ label, items }) => (
-                <div key={label}>
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider whitespace-nowrap">{label}</span>
-                    <div className="flex-1 h-px bg-stone-700/50" />
-                  </div>
-                  <div className="space-y-1.5">{items.map(renderOp)}</div>
-                </div>
-              ))}
-            </div>
-          ) : sort === 'category' ? (
-            <div className="space-y-6">
-              {/* Add category */}
-              {addingCategory ? (
-                <div className="flex items-center gap-2 mb-2">
-                  <EmojiPicker
-                    value={newCatEmoji}
-                    onChange={setNewCatEmoji}
-                    trigger={({ toggle }) => (
-                      <button
-                        onClick={toggle}
-                        className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
-                      >
-                        {newCatEmoji}
-                      </button>
-                    )}
-                  />
-                  <input
-                    autoFocus
-                    value={newCatName}
-                    onChange={(e) => setNewCatName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(); if (e.key === 'Escape') { setAddingCategory(false); } }}
-                    placeholder="Name…"
-                    className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none font-semibold uppercase tracking-wider"
-                  />
-                  <button onClick={handleAddCategory} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
-                  <button onClick={() => setAddingCategory(false)} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
-                </div>
-              ) : (
+    const renderCategoryHeader = (group: DashboardGroup<Operation>) => {
+      if (group.key === '__uncategorized__') {
+        return <p className="text-xs text-stone-600 font-semibold uppercase tracking-wider mb-2">{group.label}</p>;
+      }
+      const cat = catById[group.key!];
+      if (!cat) return null;
+      if (editingCatId === cat.id) {
+        return (
+          <div className="flex items-center gap-2 mb-2">
+            <EmojiPicker
+              value={editCatEmoji}
+              onChange={setEditCatEmoji}
+              trigger={({ toggle }) => (
                 <button
-                  onClick={() => setAddingCategory(true)}
-                  className="flex items-center gap-2 mb-2 w-full text-stone-600 hover:text-stone-400 transition-colors"
+                  onClick={toggle}
+                  className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
                 >
-                  <span className="w-5 flex items-center justify-center flex-shrink-0"><Plus size={18} /></span>
-                  <span className="flex-1 text-left text-xs font-semibold uppercase tracking-wider">{t('operations.addCategory')}</span>
+                  {editCatEmoji}
                 </button>
               )}
-              {groupedByCat.map(({ cat, ops }) => (
-                <div key={cat.id}>
-                  {editingCatId === cat.id ? (
-                    <div className="flex items-center gap-2 mb-2">
-                      <EmojiPicker
-                        value={editCatEmoji}
-                        onChange={setEditCatEmoji}
-                        trigger={({ toggle }) => (
-                          <button
-                            onClick={toggle}
-                            className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
-                          >
-                            {editCatEmoji}
-                          </button>
-                        )}
-                      />
-                      <input
-                        autoFocus
-                        value={editCatName}
-                        onChange={(e) => setEditCatName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditCat(); if (e.key === 'Escape') { setEditingCatId(null); } }}
-                        className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none font-semibold uppercase tracking-wider"
-                      />
-                      <Button onClick={handleSaveEditCat} variant="ghost" className="text-jade-400"><Check size={12} /></Button>
-                      <Button onClick={() => setEditingCatId(null)} variant="ghost"><X size={12} /></Button>
-                      {!(cat.is_builtin as unknown as number) && (
-                        confirmDeleteCatId === cat.id ? (
-                          <>
-                            <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="text-xs px-1">{t('trash.confirmYes')}</Button>
-                            <Button onClick={() => setConfirmDeleteCatId(null)} variant="ghost" className="text-xs">{t('trash.confirmNo')}</Button>
-                          </>
-                        ) : (
-                          <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="p-0.5 ml-1">
-                            <Trash2 size={12} />
-                          </Button>
-                        )
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="w-5 text-center flex-shrink-0 text-base">{cat.emoji}</span>
-                      <p className="text-xs text-stone-600 font-semibold uppercase tracking-wider flex-1">
-                        {cat.is_builtin ? t(`operations.categories.${cat.id}`) : cat.name}
-                      </p>
-                      <button
-                        onClick={() => startEditCat(cat)}
-                        className="text-stone-500 hover:text-stone-300 transition-colors p-0.5"
-                        title={t('editor.edit')}
-                      >
-                        <Pencil size={11} />
-                      </button>
-                    </div>
-                  )}
-                  <div className={view === 'cards' ? 'grid grid-cols-3 gap-3' : 'space-y-1.5'}>
-                    {ops.length === 0 ? (
-                      <p className="text-xs text-stone-700 px-1 py-1">{t('operations.none')}</p>
-                    ) : ops.map(renderOp)}
-                  </div>
-                </div>
-              ))}
-              {uncategorized.length > 0 && (
-                <div>
-                  <p className="text-xs text-stone-600 font-semibold uppercase tracking-wider mb-2">📄 Other</p>
-                  <div className={view === 'cards' ? 'grid grid-cols-3 gap-3' : 'space-y-1.5'}>
-                    {uncategorized.map(renderOp)}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className={view === 'cards' ? 'grid grid-cols-3 gap-3' : 'space-y-1.5'}>
-              {sortedOps.map(renderOp)}
-            </div>
-          )}
+            />
+            <input
+              autoFocus
+              value={editCatName}
+              onChange={(e) => setEditCatName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditCat(); if (e.key === 'Escape') { setEditingCatId(null); } }}
+              className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none font-semibold uppercase tracking-wider"
+            />
+            <Button onClick={handleSaveEditCat} variant="ghost" className="text-jade-400"><Check size={12} /></Button>
+            <Button onClick={() => setEditingCatId(null)} variant="ghost"><X size={12} /></Button>
+            {!(cat.is_builtin as unknown as number) && (
+              confirmDeleteCatId === cat.id ? (
+                <>
+                  <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="text-xs px-1">{t('trash.confirmYes')}</Button>
+                  <Button onClick={() => setConfirmDeleteCatId(null)} variant="ghost" className="text-xs">{t('trash.confirmNo')}</Button>
+                </>
+              ) : (
+                <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="p-0.5 ml-1">
+                  <Trash2 size={12} />
+                </Button>
+              )
+            )}
+          </div>
+        );
+      }
+      return (
+        <div className="flex items-center gap-2 mb-2">
+          <span className="w-5 text-center flex-shrink-0 text-base">{cat.emoji}</span>
+          <p className="text-xs text-stone-600 font-semibold uppercase tracking-wider flex-1">
+            {cat.is_builtin ? t(`operations.categories.${cat.id}`) : cat.name}
+          </p>
+          <button
+            onClick={() => startEditCat(cat)}
+            className="text-stone-500 hover:text-stone-300 transition-colors p-0.5"
+            title={t('editor.edit')}
+          >
+            <Pencil size={11} />
+          </button>
         </div>
-      {ctxMenu && (
-        <ContextMenu
-          x={ctxMenu.x} y={ctxMenu.y}
-          onClose={() => setCtxMenu(null)}
-          actions={[
-            { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'operations', id: ctxMenu.id, mode: 'view' }) },
-            ...(operations.find((o) => o.id === ctxMenu.id)?.category_id === 'sigils'
-              ? []
-              : [{ label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) }]),
-            { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
-            { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },
-          ]}
-        />
-      )}
-      </div>
+      );
+    };
+
+    const renderAddCategory = () => (
+      addingCategory ? (
+        <div className="flex items-center gap-2 mb-2">
+          <EmojiPicker
+            value={newCatEmoji}
+            onChange={setNewCatEmoji}
+            trigger={({ toggle }) => (
+              <button
+                onClick={toggle}
+                className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
+              >
+                {newCatEmoji}
+              </button>
+            )}
+          />
+          <input
+            autoFocus
+            value={newCatName}
+            onChange={(e) => setNewCatName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(); if (e.key === 'Escape') { setAddingCategory(false); } }}
+            placeholder="Name…"
+            className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none font-semibold uppercase tracking-wider"
+          />
+          <button onClick={handleAddCategory} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
+          <button onClick={() => setAddingCategory(false)} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setAddingCategory(true)}
+          className="flex items-center gap-2 mb-2 w-full text-stone-600 hover:text-stone-400 transition-colors"
+        >
+          <span className="w-5 flex items-center justify-center flex-shrink-0"><Plus size={18} /></span>
+          <span className="flex-1 text-left text-xs font-semibold uppercase tracking-wider">{t('operations.addCategory')}</span>
+        </button>
+      )
+    );
+
+    return (
+      <Dashboard<Operation>
+        title={t('nav.operations')}
+        primaryAction={{ label: t('operations.new'), onClick: handleNew }}
+        onToggleRightSidebar={toggleRightSidebar}
+        view={view}
+        sort={sort}
+        onView={(v) => setOperationsPrefs({ view: v })}
+        onSort={(s) => setOperationsPrefs({ sort: s })}
+        search={search}
+        onSearch={setSearch}
+        filters={{
+          showFilters,
+          onToggleFilters: () => setShowFilters((v) => !v),
+          activeFilterCount,
+          panelProps: {
+            chipLabel: t('filters.category'),
+            chips: catChips,
+            selectedChips: filterCatIds,
+            onChipToggle: (v) => setFilterCatIds((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
+            statusChips,
+            selectedStatus: filterStatus,
+            onStatusToggle: (v) => setFilterStatus((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
+            propNames: allPropNames,
+            propFilters: filterPropSlots,
+            onAddPropFilter: () => setFilterPropSlots((prev) => [...prev, { name: '', value: '' }]),
+            onUpdatePropFilter: (i, pf) => setFilterPropSlots((prev) => prev.map((s, idx) => idx === i ? pf : s)),
+            onRemovePropFilter: (i) => setFilterPropSlots((prev) => prev.filter((_, idx) => idx !== i)),
+            onClearAll: () => { setFilterCatIds([]); setFilterStatus([]); setFilterPropSlots([]); },
+          },
+        }}
+        items={sortedOps}
+        itemKey={(o) => o.id}
+        renderItem={renderOp}
+        isEmpty={operations.length === 0 && categories.length === 0}
+        emptyState={{ message: t('operations.none'), actionLabel: t('operations.start'), onAction: handleNew }}
+        hasNoResults={filtered.length === 0}
+        noResultsMessage={t('search.noResults')}
+        grouping={
+          view === 'timeline'
+            ? { mode: 'timeline', groups: timelineGroups }
+            : sort === 'category'
+              ? {
+                  mode: 'category',
+                  groups: catGroups,
+                  renderGroupHeader: renderCategoryHeader,
+                  renderAddCategory,
+                  renderEmptyGroup: () => <p className="text-xs text-stone-700 px-1 py-1">{t('operations.none')}</p>,
+                }
+              : { mode: 'flat' }
+        }
+        contextMenuSlot={ctxMenu && (
+          <ContextMenu
+            x={ctxMenu.x} y={ctxMenu.y}
+            onClose={() => setCtxMenu(null)}
+            actions={[
+              { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'operations', id: ctxMenu.id, mode: 'view' }) },
+              ...(operations.find((o) => o.id === ctxMenu.id)?.category_id === 'sigils'
+                ? []
+                : [{ label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) }]),
+              { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
+              { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },
+            ]}
+          />
+        )}
+      />
     );
   }
 
