@@ -11,6 +11,18 @@ function slugify(title: string): string {
     .replace(/^-|-$/g, '') || generateId();
 }
 
+/** slug has a UNIQUE constraint — two articles can share a title (e.g. importing
+ *  a duplicate or re-importing the same file), so a plain slugify() can collide
+ *  with an existing row and fail the UPDATE. Appends -2, -3, ... until free. */
+function uniqueSlugify(title: string, articles: WikiArticle[], excludeId: string): string {
+  const base = slugify(title);
+  const taken = new Set(articles.filter((a) => a.id !== excludeId).map((a) => a.slug));
+  if (!taken.has(base)) return base;
+  let i = 2;
+  while (taken.has(`${base}-${i}`)) i++;
+  return `${base}-${i}`;
+}
+
 interface WikiState {
   articles: WikiArticle[];
   wikiCategories: WikiCategoryDef[];
@@ -116,7 +128,9 @@ export const useWikiStore = create<WikiState>((set, get) => ({
       ...article,
       ...patch,
       updated_at: now,
-      slug: patch.title && patch.title !== article.title ? slugify(patch.title) : article.slug,
+      slug: patch.title && patch.title !== article.title
+        ? uniqueSlugify(patch.title, get().articles, id)
+        : article.slug,
     };
 
     await db.execute(

@@ -131,19 +131,23 @@ export default function AppShell() {
     }).catch(() => {/* desktop-only, ignore in browser preview */});
   }, [i18n.language, t]);
 
-  // Enable "Export to Markdown" only while a journal / wiki entry is
-  // actually open. "Export as PDF" and "Export as Emerald" are shared
+  // Enable "Export to Markdown" only while a journal / wiki / operation entry
+  // is actually open. "Export as PDF" and "Export as Emerald" are shared
   // between those entry types and an Altar's reading view (not while
   // editing it — matches where the Save Image UI used to live): for an open
   // Altar, PDF exports the rendered altar image instead of entry content.
   // "Export as Image" is altar-only.
-  // Operations entries are excluded here for now — export isn't wired up
-  // for that module yet, so the menu items stay disabled to avoid a
-  // broken action being visible.
+  // Sigil operations are excluded — that category has its own dedicated
+  // view (OperationSigilView) and export isn't wired up for it yet, so its
+  // menu items stay disabled to avoid a broken action being visible.
   useEffect(() => {
+    const isSigilOperation =
+      activeView.type === 'operations' && !!activeView.id &&
+      useOperationStore.getState().operations.find((o) => o.id === activeView.id)?.category_id === 'sigils';
     const isEntryView =
       (activeView.type === 'journal' ||
-       activeView.type === 'wiki') &&
+       activeView.type === 'wiki' ||
+       (activeView.type === 'operations' && !isSigilOperation)) &&
       !!activeView.id;
     const isAltarReadingView =
       activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit';

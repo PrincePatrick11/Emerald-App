@@ -7,6 +7,7 @@
     "core:default",
     "dialog:allow-save",
     "dialog:allow-open",
+    "dialog:allow-message",
     "opener:default",
     "sql:allow-load",
     "sql:allow-execute",
