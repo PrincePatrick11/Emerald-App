@@ -19,9 +19,8 @@ use std::time::Duration;
 use tokio::sync::oneshot;
 
 use objc2::rc::Retained;
-use objc2::runtime::AnyObject;
 use objc2::{msg_send};
-use objc2_foundation::{MainThreadMarker, NSData, NSString};
+use objc2_foundation::{MainThreadMarker, NSData, NSError, NSString};
 use objc2_web_kit::{WKPDFConfiguration, WKWebView};
 
 use tauri::AppHandle;
@@ -116,18 +115,18 @@ pub async fn export_pdf(
             // We're on the main thread, so we can grab a MainThreadMarker.
             let mtm = MainThreadMarker::new()
                 .expect("with_webview should always run on the main thread");
-            let pdf_config = WKPDFConfiguration::new(mtm);
+            let pdf_config = unsafe { WKPDFConfiguration::new(mtm) };
 
             // The Arc is cloned into the closure so we can still report
             // synchronously if `createPDFWithConfiguration:` itself fails
             // before the completion handler would ever fire.
             let pdf_tx_for_handler = pdf_tx.clone();
 
-            let handler = block2::ConcreteBlock::new(
-                move |data: Option<Retained<NSData>>, error: *mut AnyObject| {
+            // block2 0.6: ConcreteBlock → RcBlock; closure args must be raw
+            // Objective-C pointer types so that IntoBlock is satisfied.
+            let handler = block2::RcBlock::new(
+                move |data: *mut NSData, error: *mut NSError| {
                     let result = (|| -> Result<(), String> {
-                        // `error` is a `*mut NSError` (id-style). When
-                        // non-null, surface its localizedDescription.
                         if !error.is_null() {
                             let desc: Option<Retained<NSString>> = unsafe {
                                 msg_send![&*error, localizedDescription]
@@ -138,35 +137,21 @@ pub async fn export_pdf(
                                 .unwrap_or_else(|| "unknown error".to_string());
                             return Err(format!("createPDF failed: {msg}"));
                         }
-                        let data = data
-                            .ok_or_else(|| "createPDF returned no data and no error".to_string())?;
-
-                        // Write the PDF to the user-chosen path. NSData's
-                        // `writeToFile:atomically:` handles the parent
-                        // directory and atomic-replace semantics — we
-                        // don't need a separate mkdir.
-                        let path_ns = NSString::from_str(&path_for_handler);
-                        let mut write_error: *mut AnyObject = std::ptr::null_mut();
-                        let ok: bool = unsafe {
-                            msg_send![
-                                &*data,
-                                writeToFile: &*path_ns,
-                                atomically: true,
-                                error: &mut write_error
-                            ]
-                        };
-                        if !ok {
-                            let desc: Option<Retained<NSString>> = if !write_error.is_null() {
-                                unsafe { msg_send![&*write_error, localizedDescription] }
-                            } else {
-                                None
-                            };
-                            let msg = desc
-                                .as_ref()
-                                .map(|s| s.to_string())
-                                .unwrap_or_else(|| "unknown error".to_string());
-                            return Err(format!("write PDF: {msg}"));
+                        if data.is_null() {
+                            return Err("createPDF returned no data and no error".to_string());
                         }
+                        // Extract bytes from NSData via msg_send! and write
+                        // with Rust's fs::write. Avoids the NSData
+                        // writeToFile: API (whose selector with an `error:`
+                        // parameter doesn't exist — the correct selectors are
+                        // `writeToFile:atomically:` or `writeToFile:options:error:`).
+                        let bytes = unsafe {
+                            let ptr: *const u8 = msg_send![&*data, bytes];
+                            let len: usize = msg_send![&*data, length];
+                            std::slice::from_raw_parts(ptr, len)
+                        };
+                        std::fs::write(&path_for_handler, bytes)
+                            .map_err(|e| format!("write PDF: {e}"))?;
                         Ok(())
                     })();
 
@@ -176,7 +161,6 @@ pub async fn export_pdf(
                     }
                 },
             );
-            let handler = handler.copy();
             unsafe {
                 let _: () = msg_send![
                     wkv,

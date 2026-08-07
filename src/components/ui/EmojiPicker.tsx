@@ -107,14 +107,24 @@ export default function EmojiPicker({
   // Sized on the grid itself (not the padded/bordered popover box) so the column math is exact —
   // computing this against the outer box's border-box width previously rounded 5 columns down to 4.
   const colsWidth = (n: number) => `calc(${cell} * ${n} + ${gap} * ${n - 1})`;
-  // Applied to both the search input and the grid below so they always match exactly — a
-  // percentage width (e.g. `w-full`) on the input would instead resolve against whatever the
-  // surrounding layout happens to give the popover's auto-sized box, which isn't always the
-  // grid's own width (e.g. inside a plain block wrapper instead of a shrink-wrapped flex item).
+  // Space reserved on the right for the macOS overlay scrollbar. The scroll container (and the
+  // search input) remain at colsWidth(COLUMNS); the grid is narrowed by this amount so the
+  // overlay scrollbar appears in the gap between the grid's right edge and the container's right
+  // edge instead of on top of the last emoji column.
+  const SCROLLBAR_GUTTER = '0.5rem';
+  // Applied to the search input — sets the popover width via flex-col's stretch behaviour.
   const sizeStyle = {
     width: colsWidth(COLUMNS),
     minWidth: colsWidth(MIN_COLUMNS),
     maxWidth: 'calc(100vw - 3rem)',
+  };
+  // Grid is slightly narrower so the scrollbar has room to the right without overlapping emojis.
+  // repeat(COLUMNS, minmax(0, 1fr)) forces exactly COLUMNS equal columns at any container width.
+  const gridStyle = {
+    width: `calc(${colsWidth(COLUMNS)} - ${SCROLLBAR_GUTTER})`,
+    minWidth: `calc(${colsWidth(MIN_COLUMNS)} - ${SCROLLBAR_GUTTER})`,
+    maxWidth: `calc(100vw - 3rem - ${SCROLLBAR_GUTTER})`,
+    gridTemplateColumns: `repeat(${COLUMNS}, minmax(0, 1fr))`,
   };
 
   const trimmedQuery = query.trim().toLowerCase();
@@ -139,13 +149,15 @@ export default function EmojiPicker({
             className="emoji-picker-search box-border rounded px-2 py-1 text-xs outline-none"
             style={sizeStyle}
           />
-          {/* Scroll clipping lives on this wrapper, not the sized grid below — an auto-width
-              scroll container grows to fit a scrollbar alongside its content instead of
-              shrinking the content, so the scrollbar can't eat into the column math. */}
-          <div className="max-h-56 overflow-y-auto">
+          {/* overflow-x-hidden prevents a horizontal scrollbar on macOS when
+              space-taking (non-overlay) scrollbars are in use. The grid is
+              intentionally narrower than the container (gridStyle vs sizeStyle)
+              so the overlay scrollbar has room at the right without covering the
+              last emoji column. */}
+          <div className="max-h-56 overflow-y-auto overflow-x-hidden">
             <div
               className="grid gap-1"
-              style={{ ...sizeStyle, gridTemplateColumns: `repeat(auto-fill, minmax(${cell}, 1fr))` }}
+              style={gridStyle}
             >
               {isSearchLoading ? null : displayedEmojis.length === 0 ? (
                 <p className="col-span-full py-2 text-center text-xs text-stone-500">{t('common.noEmojiResults')}</p>
