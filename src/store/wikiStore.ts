@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type Database from '@tauri-apps/plugin-sql';
 import { getDb } from '../lib/db';
 import { syncLinks } from '../lib/links';
 import { generateId, nowIso } from '../lib/helpers';
@@ -9,6 +10,24 @@ function slugify(title: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '') || generateId();
+}
+
+/** slug has a UNIQUE constraint that applies to every row, including
+ *  soft-deleted ones — so collisions must be checked against the DB, not just
+ *  the in-memory (non-deleted) article list, or a title matching a
+ *  soft-deleted article's slug would still fail the UPDATE. Appends
+ *  -2, -3, ... until free. */
+async function uniqueSlugify(db: Database, title: string, excludeId: string): Promise<string> {
+  const base = slugify(title);
+  const rows = await db.select<{ slug: string }[]>(
+    'SELECT slug FROM wiki_articles WHERE id != $1 AND (slug = $2 OR slug LIKE $3)',
+    [excludeId, base, `${base}-%`]
+  );
+  const taken = new Set(rows.map((r) => r.slug));
+  if (!taken.has(base)) return base;
+  let i = 2;
+  while (taken.has(`${base}-${i}`)) i++;
+  return `${base}-${i}`;
 }
 
 interface WikiState {
@@ -112,11 +131,14 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     const now = nowIso();
     const article = get().articles.find((a) => a.id === id);
     if (!article) return;
+    const slug = patch.title && patch.title !== article.title
+      ? await uniqueSlugify(db, patch.title, id)
+      : article.slug;
     const merged = {
       ...article,
       ...patch,
       updated_at: now,
-      slug: patch.title && patch.title !== article.title ? slugify(patch.title) : article.slug,
+      slug,
     };
 
     await db.execute(

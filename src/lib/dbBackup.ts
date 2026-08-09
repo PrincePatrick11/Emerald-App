@@ -21,6 +21,7 @@ import { useOperationStore } from '../store/operationStore';
 import { useTagStore } from '../store/tagStore';
 import { useRoutineStore } from '../store/routineStore';
 import { useAltarStore } from '../store/altarStore';
+import { useTaskStore } from '../store/taskStore';
 import { useUIStore } from '../store/uiStore';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,6 +34,7 @@ export interface BackupOptions {
   includeOperations: boolean;
   includeRoutines: boolean;
   includeAltars: boolean;
+  includeTasks: boolean;
   includeTags: boolean;
   dateFrom: string;       // ISO date string, '' = no lower bound
   dateTo: string;         // ISO date string, '' = no upper bound
@@ -55,6 +57,8 @@ export interface BackupPreview {
   opsCount: number;
   routinesCount: number;
   altarsCount: number;
+  taskCount: number;
+  taskCategoriesCount: number;
   wikiCategories: BackupCategoryEntry[];
   opCategories: BackupCategoryEntry[];
 }
@@ -66,6 +70,7 @@ export interface ImportTypeFilters {
   includeOperations: boolean;
   includeRoutines: boolean;
   includeAltars: boolean;
+  includeTasks: boolean;
   includeTags: boolean;
 }
 
@@ -97,8 +102,12 @@ interface BackupFile {
     customProperties?: Row[];
     routines?: Row[];
     altars?: Row[];
+    altarCategories?: Row[];
     altarItems?: Row[];
     altarPlacements?: Row[];
+    tasks?: Row[];
+    taskCategories?: Row[];
+    taskLinks?: Row[];
     links?: Row[];
   };
   images: Record<string, string>;  // absolute file path → data-URL
@@ -150,6 +159,11 @@ function deletedFilter(includeDeleted: boolean): string {
   return includeDeleted ? '' : 'AND deleted_at IS NULL';
 }
 
+/** Builds a quoted comma-separated id list for use inside a SQL IN(...) clause. */
+function idsInClause(rows: Row[], field: string = 'id'): string {
+  return rows.map((r) => `'${r[field]}'`).join(',');
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Export
 // ─────────────────────────────────────────────────────────────────────────────
@@ -168,7 +182,7 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
       `SELECT * FROM journal_entries WHERE 1=1 ${dateClause} ${deletedClause}`,
       dateParams,
     );
-    const ids = data.journalEntries.map((r) => `'${r.id}'`).join(',');
+    const ids = idsInClause(data.journalEntries);
     if (ids) {
       const props = await db.select<Row[]>(
         `SELECT * FROM custom_properties WHERE entry_type='journal' AND entry_id IN (${ids})`
@@ -193,7 +207,7 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
     data.wikiCategories = await db.select<Row[]>(
       `SELECT * FROM wiki_categories WHERE deleted_at IS NULL`
     );
-    const ids = data.wikiArticles.map((r) => `'${r.id}'`).join(',');
+    const ids = idsInClause(data.wikiArticles);
     if (ids) {
       const props = await db.select<Row[]>(
         `SELECT * FROM custom_properties WHERE entry_type='wiki' AND entry_id IN (${ids})`
@@ -220,7 +234,7 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
     data.operationCategories = await db.select<Row[]>(
       `SELECT * FROM operation_categories WHERE deleted_at IS NULL`
     );
-    const ids = data.operations.map((r) => `'${r.id}'`).join(',');
+    const ids = idsInClause(data.operations);
     if (ids) {
       const props = await db.select<Row[]>(
         `SELECT * FROM custom_properties WHERE entry_type='operation' AND entry_id IN (${ids})`
@@ -254,16 +268,20 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
       `SELECT * FROM altars WHERE 1=1 ${dateClause}`,
       dateParams,
     );
+    // altar_categories has no deleted_at column; export all rows
+    data.altarCategories = await db.select<Row[]>(`SELECT * FROM altar_categories`);
     // Only export items and placements that belong to the filtered altars
-    const altarIds = data.altars.map((r) => `'${r.id}'`).join(',');
+    const altarIds = idsInClause(data.altars);
     if (!altarIds) {
       data.altarItems = [];
       data.altarPlacements = [];
     } else {
       // altar_items aren't directly tied to an altar (linked via placements)
       const placedItemIds = altarIds
-        ? (await db.select<Row[]>(`SELECT DISTINCT item_id FROM altar_placements WHERE altar_id IN (${altarIds})`))
-            .map((r) => `'${r.item_id}'`).join(',')
+        ? idsInClause(
+            await db.select<Row[]>(`SELECT DISTINCT item_id FROM altar_placements WHERE altar_id IN (${altarIds})`),
+            'item_id',
+          )
         : '';
       data.altarPlacements = altarIds
         ? await db.select<Row[]>(`SELECT * FROM altar_placements WHERE altar_id IN (${altarIds})`)
@@ -276,6 +294,12 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
       if (r.background_image_data && !r.background_image_data.startsWith('data:') && !r.background_image_data.startsWith('http')) {
         allImagePaths.add(r.background_image_data as string);
       }
+      if (r.thumbnail_data && !r.thumbnail_data.startsWith('data:') && !r.thumbnail_data.startsWith('http')) {
+        allImagePaths.add(r.thumbnail_data as string);
+      }
+      if (r.icon_data && !r.icon_data.startsWith('data:') && !r.icon_data.startsWith('http')) {
+        allImagePaths.add(r.icon_data as string);
+      }
     }
     for (const r of data.altarItems) {
       if (r.image_data && !r.image_data.startsWith('data:') && !r.image_data.startsWith('http')) {
@@ -287,6 +311,25 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
   // ── Tags ─────────────────────────────────────────────────────────────────
   if (options.includeTags) {
     data.tags = await db.select<Row[]>(`SELECT * FROM tags WHERE deleted_at IS NULL`);
+  }
+
+  // ── Tasks ────────────────────────────────────────────────────────────────
+  if (options.includeTasks) {
+    data.taskCategories = await db.select<Row[]>(
+      `SELECT * FROM task_categories WHERE deleted_at IS NULL`
+    );
+    data.tasks = await db.select<Row[]>(
+      `SELECT * FROM tasks WHERE 1=1 ${dateClause} ${deletedClause}`,
+      dateParams,
+    );
+    const taskIds = idsInClause(data.tasks ?? []);
+    if (taskIds) {
+      data.taskLinks = await db.select<Row[]>(
+        `SELECT * FROM task_links WHERE task_id IN (${taskIds})`
+      );
+    } else {
+      data.taskLinks = [];
+    }
   }
 
   // ── Embed images ─────────────────────────────────────────────────────────
@@ -345,6 +388,8 @@ export async function openBackupFile(): Promise<{ path: string; backup: BackupFi
     opsCount: backup.data.operations?.length ?? 0,
     routinesCount: backup.data.routines?.length ?? 0,
     altarsCount: backup.data.altars?.length ?? 0,
+    taskCount: backup.data.tasks?.length ?? 0,
+    taskCategoriesCount: backup.data.taskCategories?.length ?? 0,
     wikiCategories: (backup.data.wikiCategories ?? []).filter((c) => usedWikiCatIds.has(c.id as string)) as BackupCategoryEntry[],
     opCategories: (backup.data.operationCategories ?? []).filter((c) => usedOpCatIds.has(c.id as string)) as BackupCategoryEntry[],
   };
@@ -390,6 +435,12 @@ function remapRow(row: Row, fields: string[], pathMap: Map<string, string>): Row
 // Insert helpers (used by both replace and merge)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Rows come from a parsed backup file (untrusted JSON) — their keys must never
+ * be concatenated into SQL as-is. We only allow columns that PRAGMA table_info
+ * reports for the real (hardcoded) target table, so a crafted backup can at
+ * worst omit/skip a column, never inject SQL through the column list.
+ */
 async function insertRows(
   db: Awaited<ReturnType<typeof getDb>>,
   table: string,
@@ -397,7 +448,10 @@ async function insertRows(
   orIgnore = false,
 ): Promise<void> {
   if (!rows.length) return;
-  const cols = Object.keys(rows[0]);
+  const tableInfo = await db.select<{ name: string }[]>(`PRAGMA table_info(${table})`);
+  const validColumns = new Set(tableInfo.map((c) => c.name));
+  const cols = Object.keys(rows[0]).filter((c) => validColumns.has(c));
+  if (!cols.length) return;
   const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ');
   const sql = `INSERT ${orIgnore ? 'OR IGNORE ' : ''}INTO ${table} (${cols.join(', ')}) VALUES (${placeholders})`;
   for (const row of rows) {
@@ -416,6 +470,7 @@ function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFi
     ...(f.includeOperations ? (d.operations ?? []).map((r) => r.id as string) : []),
     ...(f.includeRoutines   ? (d.routines    ?? []).map((r) => r.id as string) : []),
     ...(f.includeAltars     ? (d.altars      ?? []).map((r) => r.id as string) : []),
+    ...(f.includeTasks      ? (d.tasks       ?? []).map((r) => r.id as string) : []),
   ]);
   return {
     ...d,
@@ -426,8 +481,12 @@ function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFi
     operationCategories:f.includeOperations ? d.operationCategories : [],
     routines:           f.includeRoutines   ? d.routines          : [],
     altars:             f.includeAltars     ? d.altars            : [],
+    altarCategories:    f.includeAltars     ? d.altarCategories   : [],
     altarItems:         f.includeAltars     ? d.altarItems        : [],
     altarPlacements:    f.includeAltars     ? d.altarPlacements   : [],
+    tasks:              f.includeTasks      ? d.tasks             : [],
+    taskCategories:     f.includeTasks      ? d.taskCategories    : [],
+    taskLinks:          f.includeTasks      ? d.taskLinks         : [],
     tags:               f.includeTags       ? d.tags              : [],
     customProperties: (d.customProperties ?? []).filter((r) => keptContentIds.has(r.entry_id as string)),
     links:            (d.links ?? []).filter((r) => keptContentIds.has(r.source_id as string)),
@@ -450,6 +509,7 @@ function applyCategoryFilters(d: BackupFile['data'], filters: ImportCategoryFilt
     ...(d.journalEntries ?? []).map((r) => r.id as string),
     ...(d.routines ?? []).map((r) => r.id as string),
     ...(d.altars ?? []).map((r) => r.id as string),
+    ...(d.tasks ?? []).map((r) => r.id as string),
   ]);
 
   return {
@@ -469,7 +529,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   const IMAGE_FIELDS_JOURNAL = ['content'];
   const IMAGE_FIELDS_WIKI = ['content', 'icon', 'cover_image'];
   const IMAGE_FIELDS_OP = ['content', 'icon', 'cover_image', 'drawing_data', 'thumbnail_data'];
-  const IMAGE_FIELDS_ALTAR = ['background_image_data'];
+  const IMAGE_FIELDS_ALTAR = ['background_image_data', 'thumbnail_data', 'icon_data'];
   const IMAGE_FIELDS_ITEM = ['image_data'];
 
   const journalEntries = (d.journalEntries ?? []).map((r) => remapRow(r, IMAGE_FIELDS_JOURNAL, pathMap));
@@ -485,7 +545,8 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   const hasOps = (d.operations?.length ?? 0) > 0;
   const hasRoutines = (d.routines?.length ?? 0) > 0;
   const hasAltars = (d.altars?.length ?? 0) > 0;
-  const hasAny = hasJournal || hasWiki || hasOps;
+  const hasTasks = (d.tasks?.length ?? 0) > 0 || (d.taskCategories?.length ?? 0) > 0;
+  const hasAny = hasJournal || hasWiki || hasOps || hasTasks || hasRoutines;
 
   // Links and custom_properties: delete only for present entry types
   if (hasJournal) {
@@ -504,6 +565,12 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
     await db.execute('DELETE FROM altar_placements');
     await db.execute('DELETE FROM altar_items');
     await db.execute('DELETE FROM altars');
+    await db.execute('DELETE FROM altar_categories');
+  }
+  if (hasTasks) {
+    await db.execute('DELETE FROM task_links');
+    await db.execute('DELETE FROM tasks');
+    await db.execute('DELETE FROM task_categories');
   }
   if (hasRoutines) await db.execute('DELETE FROM routines');
   if (hasOps) {
@@ -526,8 +593,12 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   await insertRows(db, 'operations', operations);
   if (d.routines) await insertRows(db, 'routines', d.routines);
   await insertRows(db, 'altars', altars);
+  if (d.altarCategories) await insertRows(db, 'altar_categories', d.altarCategories, true);
   await insertRows(db, 'altar_items', altarItems);
   if (d.altarPlacements) await insertRows(db, 'altar_placements', d.altarPlacements);
+  if (d.taskCategories) await insertRows(db, 'task_categories', d.taskCategories, true);
+  await insertRows(db, 'tasks', d.tasks ?? []);
+  if (d.taskLinks) await insertRows(db, 'task_links', d.taskLinks);
   if (d.customProperties) await insertRows(db, 'custom_properties', d.customProperties);
   if (d.links) await insertRows(db, 'links', d.links, true);
 }
@@ -552,6 +623,7 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     ...(d.routines ?? []).map((r: Row) => r.id as string),
     ...(d.altars ?? []).map((r: Row) => r.id as string),
     ...(d.altarItems ?? []).map((r: Row) => r.id as string),
+    ...(d.tasks ?? []).map((r: Row) => r.id as string),
   ]);
 
   function remapId(id: unknown): unknown {
@@ -610,6 +682,15 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     altar_id: remapId(r.altar_id),
     item_id: remapId(r.item_id),
   }));
+  const tasks = (d.tasks ?? []).map((r: Row) =>
+    remapEntry(r, [], ['parent_task_id'], [])
+  );
+  const taskLinks = (d.taskLinks ?? []).map((r: Row) => ({
+    ...r,
+    id: pid(r.id as string),
+    task_id: remapId(r.task_id),
+    target_id: remapId(r.target_id),
+  }));
   const customProperties = (d.customProperties ?? []).map((r: Row) => ({
     ...r,
     id: pid(r.id as string),
@@ -624,6 +705,8 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   // Categories and tags: INSERT OR IGNORE (no prefix — shared by name/fixed ID)
   if (d.wikiCategories) await insertRows(db, 'wiki_categories', d.wikiCategories, true);
   if (d.operationCategories) await insertRows(db, 'operation_categories', d.operationCategories, true);
+  if (d.altarCategories) await insertRows(db, 'altar_categories', d.altarCategories, true);
+  if (d.taskCategories) await insertRows(db, 'task_categories', d.taskCategories, true);
   if (d.tags) await insertRows(db, 'tags', d.tags, true);
 
   // Content: plain INSERT with prefixed IDs (no conflicts possible)
@@ -634,6 +717,8 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   await insertRows(db, 'altars', altars);
   await insertRows(db, 'altar_items', altarItems);
   await insertRows(db, 'altar_placements', altarPlacements);
+  await insertRows(db, 'tasks', tasks);
+  await insertRows(db, 'task_links', taskLinks, true);
   await insertRows(db, 'custom_properties', customProperties);
   await insertRows(db, 'links', links, true);
 }
@@ -644,7 +729,7 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
 
 const ALL_TYPES_INCLUDED: ImportTypeFilters = {
   includeJournal: true, includeWiki: true, includeOperations: true,
-  includeRoutines: true, includeAltars: true, includeTags: true,
+  includeRoutines: true, includeAltars: true, includeTasks: true, includeTags: true,
 };
 
 export async function importDatabase(
@@ -714,6 +799,7 @@ export async function importDatabase(
     useWikiStore.getState().fetchArticles(),
     useRoutineStore.getState().fetchRoutines(),
     useAltarStore.getState().fetchAltars(),
+    useTaskStore.getState().fetchAll(),
   ]);
 }
 

@@ -79,10 +79,6 @@ html[data-theme='emerald-noctis'] {
   --search-bg: rgba(34, 28, 24, 0.9);
   --search-border: rgba(109, 91, 75, 0.5);
   --search-inset: inset 0 1px 0 rgba(255, 241, 223, 0.06);
-  --settings-overlay: rgba(9, 7, 6, 0.7);
-  --settings-card-bg: rgba(30, 25, 21, 0.98);
-  --settings-card-border: rgba(112, 95, 79, 0.5);
-  --settings-card-shadow: 0 26px 72px rgba(0, 0, 0, 0.5);
   --list-toolbar-bg: rgba(31, 25, 21, 0.9);
   --list-toolbar-border: rgba(109, 91, 75, 0.46);
 }

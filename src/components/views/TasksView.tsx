@@ -7,21 +7,17 @@ import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { generateId } from '../../lib/helpers';
-import ListToolbar from '../ui/ListToolbar';
-import FilterPanel from '../ui/FilterPanel';
+import { useCategoryEditor } from '../../hooks/useCategoryEditor';
+import Dashboard from '../ui/Dashboard';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
+import LinkPickerModal from '../editor/LinkPickerModal';
+import EmojiPicker from '../ui/EmojiPicker';
+import Button from '../ui/Button';
 import {
   Plus, ChevronDown, ChevronRight, Flag, Trash2,
   CheckSquare, Square, X, Check, Link2, Pencil,
 } from 'lucide-react';
-import type { Task, TaskPriority, TaskCategory } from '../../types';
-
-const TASK_EMOJIS = [
-  '📋','💼','🔯','✍️','🌙','☀️','🌟','✨','🔮','🌀',
-  '⚗️','🗡️','⏰','🕯️','🔑','🪄','🧿','🌊','🔥','💀',
-  '🌺','🐍','🧹','🌿','📝','🌈','⭐','🪬','☯️','🔱',
-  '🌑','🎯','💡','🔔','🛡️','⚔️','🏺','🧪','📖','🎵',
-];
+import type { Task, TaskPriority } from '../../types';
 
 const TASK_PRIORITY_COLORS: Record<string, string> = {
   high: 'text-red-400',
@@ -46,10 +42,23 @@ export default function TasksView() {
     updateCategory, deleteCategory, restoreCategory,
   } = useTaskStore();
 
-  const pushUndo = useUndoStore((s) => s.push);
   const journalEntries = useJournalStore((s) => s.entries);
   const wikiArticles = useWikiStore((s) => s.articles);
   const operations = useOperationStore((s) => s.operations);
+
+  const {
+    addingCategory, setAddingCategory,
+    newCatName, setNewCatName,
+    newCatEmoji, setNewCatEmoji,
+    editingCatId, setEditingCatId,
+    editCatName, setEditCatName,
+    editCatEmoji, setEditCatEmoji,
+    confirmDeleteCatId, setConfirmDeleteCatId,
+    handleAddCategory,
+    startEditCat,
+    handleSaveEditCat,
+    handleDeleteCat,
+  } = useCategoryEditor({ addCategory, updateCategory, deleteCategory, restoreCategory }, { defaultEmoji: '📋' });
 
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number; actions: ContextMenuAction[] } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -60,16 +69,7 @@ export default function TasksView() {
   const [filterCategory, setFilterCategory] = useState<Set<string>>(new Set());
   const [filterPriority, setFilterPriority] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
-  const [addingCategory, setAddingCategory] = useState(false);
-  const [newCatName, setNewCatName] = useState('');
-  const [newCatEmoji, setNewCatEmoji] = useState('📋');
-  const [showCatEmojiPicker, setShowCatEmojiPicker] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
-  const [editingCatId, setEditingCatId] = useState<string | null>(null);
-  const [editCatName, setEditCatName] = useState('');
-  const [editCatEmoji, setEditCatEmoji] = useState('📋');
-  const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
-  const [confirmDeleteCatId, setConfirmDeleteCatId] = useState<string | null>(null);
   const [linkModal, setLinkModal] = useState<{ taskId: string } | null>(null);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -132,41 +132,6 @@ export default function TasksView() {
     setEditingId(null);
   };
 
-  const handleAddCategory = async () => {
-    if (!newCatName.trim()) return;
-    try {
-      await addCategory(newCatName.trim(), newCatEmoji);
-    } catch (err) {
-      console.error('[TasksView] handleAddCategory failed:', err);
-      return;
-    }
-    setNewCatName('');
-    setNewCatEmoji('📋');
-    setAddingCategory(false);
-    setShowCatEmojiPicker(false);
-  };
-
-  const startEditCat = (cat: TaskCategory) => {
-    setEditingCatId(cat.id);
-    setEditCatName(cat.name);
-    setEditCatEmoji(cat.emoji);
-    setShowEditEmojiPicker(false);
-  };
-
-  const handleSaveEditCat = async () => {
-    if (!editingCatId || !editCatName.trim()) return;
-    await updateCategory(editingCatId, editCatName.trim(), editCatEmoji);
-    setEditingCatId(null);
-    setShowEditEmojiPicker(false);
-  };
-
-  const handleDeleteCat = async (id: string) => {
-    if (confirmDeleteCatId !== id) { setConfirmDeleteCatId(id); return; }
-    setConfirmDeleteCatId(null);
-    await deleteCategory(id);
-    pushUndo({ id: generateId(), description: t('undo.categoryDeleted'), undo: () => restoreCategory(id) });
-  };
-
   const toggleExpand = useCallback((id: string) => {
     setExpandedTasks((prev) => {
       const next = new Set(prev);
@@ -200,122 +165,33 @@ export default function TasksView() {
     return 'Unknown';
   }, [journalEntries, wikiArticles, operations]);
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-8 h-14 border-b border-stone-700/60">
-        <h1 className="text-lg font-semibold text-stone-100">{t('nav.tasks')}</h1>
-        <div className="flex items-center gap-1">
-          <button onClick={() => handleCreateTask()} className="btn-primary">
-            <Plus size={13} />{t('tasks.newTask')}
-          </button>
-        </div>
-      </div>
-
-      <ListToolbar
-        view={tasksPrefs.view}
-        sort={tasksPrefs.sort}
-        onView={(v) => setTasksPrefs({ view: v })}
-        onSort={(s) => setTasksPrefs({ sort: s })}
-        viewOptions={[{ value: 'list' as const, label: t('listView.list') }]}
-        search={searchQuery}
-        onSearch={setSearchQuery}
-        showFilters={filterOpen}
-        onToggleFilters={() => setFilterOpen((o) => !o)}
-        activeFilterCount={activeFilterCount}
-        extraActions={
-          <button
-            onClick={() => setShowCompleted((o) => !o)}
-            className={`flex items-center justify-center p-1.5 rounded-md transition-colors ${
-              showCompleted
-                ? 'bg-jade-900/50 border border-jade-800/40 text-jade-400'
-                : 'bg-stone-800/70 hover:bg-stone-700/70 text-stone-500 hover:text-stone-300'
-            }`}
-            title={showCompleted ? t('tasks.showCompleted') : t('tasks.hideCompleted')}
-          >
-            <CheckSquare size={13} />
-          </button>
-        }
-      />
-
-      {filterOpen && (
-        <>
-        <FilterPanel
-          chipLabel={t('tasks.filter.category')}
-          chips={categories.map((c) => ({ value: c.id, label: c.name, emoji: c.emoji }))}
-          selectedChips={[...filterCategory]}
-          onChipToggle={(v) => setFilterCategory((prev) => {
-            const next = new Set(prev);
-            if (next.has(v)) next.delete(v); else next.add(v);
-            return next;
-          })}
-          propNames={[]}
-          propFilters={[]}
-          onAddPropFilter={() => {}}
-          onUpdatePropFilter={() => {}}
-          onRemovePropFilter={() => {}}
-          activeFilterCount={activeFilterCount}
-          onClearAll={() => {
-            setFilterCategory(new Set());
-            setFilterPriority(new Set());
-          }}
-        />
-        <div className="px-8 py-2 border-b border-stone-700/40 bg-stone-900/50 flex items-center gap-2">
-          <span className="text-xs font-semibold text-stone-600 uppercase tracking-wider">{t('tasks.filter.priority')}</span>
-          {(['high', 'medium', 'low'] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => setFilterPriority((prev) => {
-                const next = new Set(prev);
-                if (next.has(p)) next.delete(p); else next.add(p);
-                return next;
-              })}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${
-                filterPriority.has(p)
-                  ? 'bg-jade-900/50 border-jade-800/40 text-jade-400'
-                  : 'bg-stone-800/60 border-stone-700/60 text-stone-500 hover:text-stone-300 hover:border-stone-600'
-              }`}
-            >
-              <Flag size={12} />
-              {t('tasks.priority.' + p)}
-            </button>
-          ))}
-        </div>
-        </>
-      )}
-
-      <div className="flex-1 overflow-y-auto px-8 py-6">
+  const renderTasksContent = () => (
+    <>
         {/* Add Category at top */}
         {addingCategory ? (
-          <div className="relative flex items-center gap-2 mb-4 px-2">
-            <button
-              onClick={() => setShowCatEmojiPicker(!showCatEmojiPicker)}
-              className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
-            >
-              {newCatEmoji}
-            </button>
-            {showCatEmojiPicker && (
-              <div className="absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 w-52">
-                <div className="flex flex-wrap gap-1">
-                  {TASK_EMOJIS.map((e) => (
-                    <button key={e}
-                      onClick={() => { setNewCatEmoji(e); setShowCatEmojiPicker(false); }}
-                      className={`text-base p-1 rounded hover:bg-stone-700 transition-colors ${newCatEmoji === e ? 'bg-stone-700' : ''}`}
-                    >{e}</button>
-                  ))}
-                </div>
-              </div>
-            )}
+          <div className="flex items-center gap-2 mb-4 px-2">
+            <EmojiPicker
+              value={newCatEmoji}
+              onChange={setNewCatEmoji}
+              trigger={({ toggle }) => (
+                <button
+                  onClick={toggle}
+                  className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
+                >
+                  {newCatEmoji}
+                </button>
+              )}
+            />
             <input
               autoFocus
               value={newCatName}
               onChange={(e) => setNewCatName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(); if (e.key === 'Escape') { setAddingCategory(false); setShowCatEmojiPicker(false); } }}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(); if (e.key === 'Escape') { setAddingCategory(false); } }}
               placeholder="Name…"
               className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none"
             />
             <button onClick={handleAddCategory} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
-            <button onClick={() => { setAddingCategory(false); setShowCatEmojiPicker(false); }} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
+            <button onClick={() => setAddingCategory(false)} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
           </div>
         ) : (
           <button
@@ -368,45 +244,38 @@ export default function TasksView() {
               return (
                 <div key={cat.id} className="mb-6 space-y-1.5">
                   {editingCatId === cat.id ? (
-                    <div className="relative flex items-center gap-2 mb-2">
-                      <button
-                        onClick={() => setShowEditEmojiPicker(!showEditEmojiPicker)}
-                        className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
-                      >
-                        {editCatEmoji}
-                      </button>
-                      {showEditEmojiPicker && (
-                        <div className="absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 w-52">
-                          <div className="flex flex-wrap gap-1">
-                            {TASK_EMOJIS.map((e) => (
-                              <button key={e}
-                                onClick={() => { setEditCatEmoji(e); setShowEditEmojiPicker(false); }}
-                                className={`text-base p-1 rounded hover:bg-stone-700 transition-colors ${editCatEmoji === e ? 'bg-stone-700' : ''}`}
-                               >{e}</button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                    <div className="flex items-center gap-2 mb-2">
+                      <EmojiPicker
+                        value={editCatEmoji}
+                        onChange={setEditCatEmoji}
+                        trigger={({ toggle }) => (
+                          <button
+                            onClick={toggle}
+                            className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
+                          >
+                            {editCatEmoji}
+                          </button>
+                        )}
+                      />
                       <input
                         autoFocus
                         value={editCatName}
                         onChange={(e) => setEditCatName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditCat(); if (e.key === 'Escape') { setEditingCatId(null); setShowEditEmojiPicker(false); } }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditCat(); if (e.key === 'Escape') { setEditingCatId(null); } }}
                         className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none"
                       />
-                      <button onClick={handleSaveEditCat} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
-                      <button onClick={() => { setEditingCatId(null); setShowEditEmojiPicker(false); }} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
+                      <Button onClick={handleSaveEditCat} variant="ghost" className="text-jade-400"><Check size={12} /></Button>
+                      <Button onClick={() => setEditingCatId(null)} variant="ghost"><X size={12} /></Button>
                       {confirmDeleteCatId === cat.id ? (
                           <>
-                            <button onClick={() => handleDeleteCat(cat.id)} className="text-xs text-red-400 hover:text-red-300 px-1">{t('trash.confirmYes')}</button>
-                            <button onClick={() => setConfirmDeleteCatId(null)} className="text-xs text-stone-500 hover:text-stone-300">{t('trash.confirmNo')}</button>
+                            <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="text-xs px-1">{t('trash.confirmYes')}</Button>
+                            <Button onClick={() => setConfirmDeleteCatId(null)} variant="ghost" className="text-xs">{t('trash.confirmNo')}</Button>
                           </>
                         ) : (
-                          <button onClick={() => handleDeleteCat(cat.id)} className="text-stone-500 hover:text-red-400 transition-colors p-0.5 ml-1">
+                          <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="p-0.5 ml-1">
                             <Trash2 size={12} />
-                          </button>
-                        )
-                      }
+                          </Button>
+                        )}
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 mb-2">
@@ -419,13 +288,14 @@ export default function TasksView() {
                       <span className="w-5 text-center flex-shrink-0 text-base">{cat.emoji}</span>
                       <p className="text-xs text-stone-600 font-semibold uppercase tracking-wider flex-1">{cat.name}</p>
                       <span className="text-xs text-stone-500">({catTasks.length})</span>
-                      <button
+                      <Button
                         onClick={() => handleCreateTask(cat.id)}
-                        className="ml-auto btn-ghost p-1"
+                        variant="ghost"
+                        className="ml-auto p-1"
                         title={t('tasks.newTask')}
                       >
                         <Plus size={14} />
-                      </button>
+                      </Button>
                       <button
                         onClick={() => startEditCat(cat)}
                         className="text-stone-500 hover:text-stone-300 transition-colors p-0.5"
@@ -496,29 +366,101 @@ export default function TasksView() {
             <p className="text-stone-600 text-sm">{t('search.noResults')}</p>
           </div>
         )}
-      </div>
+    </>
+  );
 
-      {ctxMenu && (
-        <ContextMenu
-          x={ctxMenu.x}
-          y={ctxMenu.y}
-          onClose={() => setCtxMenu(null)}
-          actions={ctxMenu.actions}
-        />
-      )}
+  return (
+    <>
+      <Dashboard<Task>
+        title={t('nav.tasks')}
+        primaryAction={{ label: t('tasks.newTask'), onClick: () => handleCreateTask() }}
+        view={tasksPrefs.view}
+        sort={tasksPrefs.sort}
+        onView={(v) => setTasksPrefs({ view: v })}
+        onSort={(s) => setTasksPrefs({ sort: s })}
+        viewOptions={[{ value: 'list' as const, label: t('listView.list') }]}
+        search={searchQuery}
+        onSearch={setSearchQuery}
+        toolbarExtraActions={
+          <button
+            onClick={() => setShowCompleted((o) => !o)}
+            className={`flex items-center justify-center p-1.5 rounded-md transition-colors ${
+              showCompleted
+                ? 'bg-jade-900/50 border border-jade-800/40 text-jade-400'
+                : 'bg-stone-800/70 hover:bg-stone-700/70 text-stone-500 hover:text-stone-300'
+            }`}
+            title={showCompleted ? t('tasks.showCompleted') : t('tasks.hideCompleted')}
+          >
+            <CheckSquare size={13} />
+          </button>
+        }
+        filters={{
+          showFilters: filterOpen,
+          onToggleFilters: () => setFilterOpen((o) => !o),
+          activeFilterCount,
+          panelProps: {
+            chipLabel: t('tasks.filter.category'),
+            chips: categories.map((c) => ({ value: c.id, label: c.name, emoji: c.emoji })),
+            selectedChips: [...filterCategory],
+            onChipToggle: (v) => setFilterCategory((prev) => {
+              const next = new Set(prev);
+              if (next.has(v)) next.delete(v); else next.add(v);
+              return next;
+            }),
+            propNames: [],
+            propFilters: [],
+            onAddPropFilter: () => {},
+            onUpdatePropFilter: () => {},
+            onRemovePropFilter: () => {},
+            onClearAll: () => {
+              setFilterCategory(new Set());
+              setFilterPriority(new Set());
+            },
+          },
+          extraPanelContent: (
+            <div className="px-8 py-2 border-b border-stone-700/40 bg-stone-900/50 flex items-center gap-2">
+              <span className="text-xs font-semibold text-stone-600 uppercase tracking-wider">{t('tasks.filter.priority')}</span>
+              {(['high', 'medium', 'low'] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setFilterPriority((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(p)) next.delete(p); else next.add(p);
+                    return next;
+                  })}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                    filterPriority.has(p)
+                      ? 'bg-jade-900/50 border-jade-800/40 text-jade-400'
+                      : 'bg-stone-800/60 border-stone-700/60 text-stone-500 hover:text-stone-300 hover:border-stone-600'
+                  }`}
+                >
+                  <Flag size={12} />
+                  {t('tasks.priority.' + p)}
+                </button>
+              ))}
+            </div>
+          ),
+        }}
+        items={sortedTasks}
+        itemKey={(task) => task.id}
+        grouping={{ mode: 'custom', render: renderTasksContent }}
+        contextMenuSlot={ctxMenu && (
+          <ContextMenu
+            x={ctxMenu.x}
+            y={ctxMenu.y}
+            onClose={() => setCtxMenu(null)}
+            actions={ctxMenu.actions}
+          />
+        )}
+      />
 
       {linkModal && (
-        <LinkModal
-          taskId={linkModal.taskId}
+        <LinkPickerModal
+          onSelect={(item) => { addLink(linkModal.taskId, item.id, item.entryType); }}
           onClose={() => setLinkModal(null)}
-          addLink={addLink}
-          journalEntries={journalEntries}
-          wikiArticles={wikiArticles}
-          operations={operations}
-          t={t}
         />
       )}
-    </div>
+    </>
   );
 }
 
@@ -819,92 +761,3 @@ const TaskRow = memo(function TaskRow({
   );
 });
 
-interface LinkModalProps {
-  taskId: string;
-  onClose: () => void;
-  addLink: (taskId: string, targetId: string, targetType: 'journal' | 'wiki' | 'operation') => Promise<void>;
-  journalEntries: any[];
-  wikiArticles: any[];
-  operations: any[];
-  t: (key: string) => string;
-}
-
-function LinkModal({ taskId, onClose, addLink, journalEntries, wikiArticles, operations, t }: LinkModalProps) {
-  const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'journal' | 'wiki' | 'operation'>('journal');
-
-  const filtered = (() => {
-    const q = search.toLowerCase();
-    if (activeTab === 'journal') {
-      return journalEntries.filter((e) => e.title.toLowerCase().includes(q));
-    }
-    if (activeTab === 'wiki') {
-      return wikiArticles.filter((a) => a.title.toLowerCase().includes(q));
-    }
-    return operations.filter((o) => o.title.toLowerCase().includes(q));
-  })();
-
-  const handleLink = async (targetId: string) => {
-    await addLink(taskId, targetId, activeTab);
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        className="tasks-link-modal bg-stone-900 border border-stone-700 rounded-lg shadow-xl w-96 max-h-[80vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-stone-700/40">
-          <h3 className="text-sm font-semibold text-stone-200">{t('tasks.linkEntry')}</h3>
-          <button onClick={onClose} className="btn-ghost p-1">
-            <X size={14} />
-          </button>
-        </div>
-
-        <div className="flex border-b border-stone-700/40">
-          {(['journal', 'wiki', 'operation'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
-                activeTab === tab
-                  ? 'tasks-link-tab-active text-jade-400 border-b-2 border-jade-400'
-                  : 'tasks-link-tab-idle text-stone-400 hover:text-stone-200'
-              }`}
-            >
-              {tab === 'journal' ? t('nav.journal') : tab === 'wiki' ? t('nav.wiki') : t('nav.operations')}
-            </button>
-          ))}
-        </div>
-
-        <div className="px-4 py-2">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('search.placeholder')}
-            className="w-full bg-stone-800 border border-stone-600 rounded px-2 py-1.5 text-sm text-stone-200 outline-none focus:border-jade-500"
-            autoFocus
-          />
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-2 pb-2">
-          {filtered.length === 0 ? (
-            <p className="text-xs text-stone-500 px-2 py-4 text-center">{t('search.noResults')}</p>
-          ) : (
-            filtered.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => handleLink(item.id)}
-                className="tasks-link-row w-full text-left px-3 py-2 text-sm text-stone-300 hover:bg-stone-700/50 rounded transition-colors"
-              >
-                {item.title}
-              </button>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}

@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
-import { Check, Maximize2, Minimize2, PanelRightOpen, Pencil, Plus, X } from 'lucide-react';
+import { Check, Maximize2, Minimize2, PanelRightOpen, Pencil, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAltarStore } from '../../store/altarStore';
 import { useUIStore } from '../../store/uiStore';
 import { getAltarBackgroundStyle, DEFAULT_ALTAR_RESOLUTION, parseResolution, isRatioFormat } from '../../lib/altarConstants';
 import type { AltarRecord } from '../../types';
-import ListToolbar from '../ui/ListToolbar';
+import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import ContextMenu from '../ui/ContextMenu';
+import Button from '../ui/Button';
 import { AltarCanvas, captureCurrentAltar } from '../altar/AltarCanvas';
 import { AltarLibraryStrip } from '../altar/AltarLibraryStrip';
 import { AltarCard, AltarListRow, buildAltarContextMenuActions } from '../altar/AltarCard';
@@ -236,91 +237,57 @@ export default function AltarView() {
 
     const filteredCount = filtered.length;
 
-    return (
-      <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between px-8 h-14 border-b border-stone-700/60">
-          <h1 className="text-lg font-semibold text-stone-100">{t('nav.altar')}</h1>
-          <div className="flex items-center gap-1">
-            <button onClick={handleNew} className="btn-primary">
-              <Plus size={13} />{t('altar.newAltar')}
-            </button>
-            <button onClick={toggleRightSidebar} className="btn-ghost ml-1">
-              <PanelRightOpen size={16} />
-            </button>
-          </div>
-        </div>
-
-        <ListToolbar
-          view={altarPrefs.view}
-          sort={altarPrefs.sort}
-          onView={(next) => setAltarPrefs({ view: next })}
-          onSort={(next) => setAltarPrefs({ sort: next === 'category' ? 'date_desc' : next })}
-          search={search}
-          onSearch={setSearch}
+    const renderAltarItem = (altar: AltarRecord) =>
+      altarPrefs.view === 'cards' ? (
+        <AltarCard
+          altar={altar}
+          previewItems={previewPlacements[altar.id] ?? []}
+          isRenaming={renamingId === altar.id}
+          renameValue={renameValue}
+          onChangeRename={setRenameValue}
+          onCommitRename={commitRename}
+          onCancelRename={() => setRenamingId(null)}
+          onOpen={() => openAltar(altar)}
+          onContextMenu={(event) => { event.preventDefault(); setCtxMenu({ id: altar.id, x: event.clientX, y: event.clientY }); }}
         />
+      ) : (
+        <AltarListRow
+          altar={altar}
+          previewItems={previewPlacements[altar.id] ?? []}
+          isRenaming={renamingId === altar.id}
+          renameValue={renameValue}
+          onChangeRename={setRenameValue}
+          onCommitRename={commitRename}
+          onCancelRename={() => setRenamingId(null)}
+          onOpen={() => openAltar(altar)}
+          onContextMenu={(event) => { event.preventDefault(); setCtxMenu({ id: altar.id, x: event.clientX, y: event.clientY }); }}
+        />
+      );
 
-        <div className="flex-1 overflow-y-auto px-8 py-6">
-          {altars.length === 0 ? (
-            <div className="text-center py-20">
-              <p className="text-stone-600 text-sm">{t('altar.none')}</p>
-              <button onClick={handleNew} className="mt-4 text-xs text-stone-500 hover:text-stone-300 underline transition-colors">
-                {t('altar.start')}
-              </button>
-            </div>
-          ) : filteredCount === 0 ? (
-            <p className="text-center py-20 text-stone-600 text-sm">{t('search.noResults')}</p>
-          ) : (
-            <div className="space-y-6">
-              {grouped.map(([label, items]) => (
-                <div key={label || 'all'}>
-                  {label && (
-                    <div className="flex items-center gap-3 mb-3">
-                      <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider whitespace-nowrap">{label}</span>
-                      <div className="flex-1 h-px bg-stone-700/50" />
-                    </div>
-                  )}
-                  {altarPrefs.view === 'cards' ? (
-                    <div className="grid grid-cols-3 gap-3">
-                      {items.map((altar) => (
-                        <AltarCard
-                          key={altar.id}
-                          altar={altar}
-                          previewItems={previewPlacements[altar.id] ?? []}
-                          isRenaming={renamingId === altar.id}
-                          renameValue={renameValue}
-                          onChangeRename={setRenameValue}
-                          onCommitRename={commitRename}
-                          onCancelRename={() => setRenamingId(null)}
-                          onOpen={() => openAltar(altar)}
-                          onContextMenu={(event) => { event.preventDefault(); setCtxMenu({ id: altar.id, x: event.clientX, y: event.clientY }); }}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {items.map((altar) => (
-                        <AltarListRow
-                          key={altar.id}
-                          altar={altar}
-                          previewItems={previewPlacements[altar.id] ?? []}
-                          isRenaming={renamingId === altar.id}
-                          renameValue={renameValue}
-                          onChangeRename={setRenameValue}
-                          onCommitRename={commitRename}
-                          onCancelRename={() => setRenamingId(null)}
-                          onOpen={() => openAltar(altar)}
-                          onContextMenu={(event) => { event.preventDefault(); setCtxMenu({ id: altar.id, x: event.clientX, y: event.clientY }); }}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {ctxMenu && (
+    return (
+      <Dashboard<AltarRecord>
+        title={t('nav.altar')}
+        primaryAction={{ label: t('altar.newAltar'), onClick: handleNew }}
+        onToggleRightSidebar={toggleRightSidebar}
+        view={altarPrefs.view}
+        sort={altarPrefs.sort}
+        onView={(next) => setAltarPrefs({ view: next })}
+        onSort={(next) => setAltarPrefs({ sort: next === 'category' ? 'date_desc' : next })}
+        search={search}
+        onSearch={setSearch}
+        items={sorted}
+        itemKey={(altar) => altar.id}
+        renderItem={renderAltarItem}
+        isEmpty={altars.length === 0}
+        emptyState={{ message: t('altar.none'), actionLabel: t('altar.start'), onAction: handleNew }}
+        hasNoResults={filteredCount === 0}
+        noResultsMessage={t('search.noResults')}
+        grouping={
+          altarPrefs.view === 'timeline'
+            ? { mode: 'timeline', groups: grouped.map(([label, items]): DashboardGroup<AltarRecord> => ({ label, items })) }
+            : { mode: 'flat' }
+        }
+        contextMenuSlot={ctxMenu && (
           <ContextMenu
             x={ctxMenu.x}
             y={ctxMenu.y}
@@ -334,7 +301,7 @@ export default function AltarView() {
             })}
           />
         )}
-      </div>
+      />
     );
   }
 
@@ -350,38 +317,38 @@ export default function AltarView() {
         <div className="flex items-center gap-1">
           {isEditing ? (
             <>
-              <button onClick={handleDone} className="flex items-center gap-1.5 rounded-md border border-jade-800/40 bg-jade-900/40 px-3 py-1.5 text-xs font-medium text-jade-400 transition-colors hover:bg-jade-900/60">
+              <Button onClick={handleDone} variant="primary">
                 <Check size={13} />{t('editor.done')}
-              </button>
-              <button onClick={handleCancel} className="btn-ghost">
+              </Button>
+              <Button onClick={handleCancel} variant="ghost">
                 <X size={15} />
-              </button>
+              </Button>
             </>
           ) : (
             <>
               {altarWindowFullscreen ? (
-                <button
+                <Button
                   onClick={() => setAltarWindowFullscreen(false)}
-                  className="btn-ghost"
+                  variant="ghost"
                   title={t('altar.exitWindowFullscreen')}
                 >
                   <Minimize2 size={15} />
-                </button>
+                </Button>
               ) : !rightSidebarOpen && (
-                <button
+                <Button
                   onClick={() => setAltarWindowFullscreen(true)}
-                  className="btn-ghost"
+                  variant="ghost"
                   title={t('altar.windowFullscreen')}
                 >
                   <Maximize2 size={15} />
-                </button>
+                </Button>
               )}
-              <button onClick={enterEditMode} className="btn-ghost" title={t('editor.edit')}>
+              <Button onClick={enterEditMode} variant="ghost" title={t('editor.edit')}>
                 <Pencil size={15} />
-              </button>
-              <button onClick={toggleRightSidebar} className="btn-ghost">
+              </Button>
+              <Button onClick={toggleRightSidebar} variant="ghost">
                 <PanelRightOpen size={16} />
-              </button>
+              </Button>
             </>
           )}
         </div>

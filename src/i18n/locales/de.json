@@ -7,7 +7,9 @@
     "no": "Nein",
     "delete": "Löschen",
     "deleteConfirm": "Löschen?",
-    "unsupportedImageFormat": "Format nicht unterstützt. Erlaubt: PNG, JPEG, GIF, WebP, SVG"
+    "unsupportedImageFormat": "Format nicht unterstützt. Erlaubt: PNG, JPEG, GIF, WebP, SVG",
+    "searchEmoji": "Emoji suchen…",
+    "noEmojiResults": "Keine Treffer"
   },
   "listView": {
     "view": "Ansicht",
@@ -97,6 +99,10 @@
     "dragHint": "Auf den Altar ziehen zum Platzieren",
     "readOnlyHint": "Wechsle in den Bearbeitungsmodus, um den Altar zu verändern.",
     "uploadImage": "Bild hochladen",
+    "favicon": "Favicon",
+    "changeImage": "Bild ändern",
+    "removeFavicon": "Favicon entfernen",
+    "addImage": "Bild hinzufügen",
     "background": "Hintergrund",
     "changeBackground": "Hintergrund ändern",
     "uploadBackground": "Hintergrund hochladen",
@@ -126,6 +132,10 @@
     "rotationSnap": "Rotationswinkel einrasten",
     "rotationSnapAngle": "Winkelschritt (°)",
     "snapScaleToGrid": "Skalierung am Raster einrasten",
+    "gridToggleGrid": "Raster",
+    "gridToggleSnap": "Einrasten",
+    "gridToggleRotate": "Drehen",
+    "gridToggleScale": "Skalieren",
     "canvasOptions": "Leinwandoptionen",
     "resolution": "Auflösung",
     "ratio": "Seitenverhältnis",
@@ -151,11 +161,6 @@
     "summaryActive": "Aktiv",
     "summaryInactive": "Inaktiv",
     "summaryEditToChange": "Wechsle in den Bearbeitungsmodus, um diese Einstellungen zu ändern.",
-    "saveImageFormat": "Format",
-    "saveImage": "Bild speichern …",
-    "saveImageSaving": "Wird gespeichert …",
-    "saveImageDone": "Gespeichert",
-    "saveImageError": "Fehler beim Speichern",
     "inspector": "Inspektor",
     "inspectorX": "X",
     "inspectorY": "Y",
@@ -407,6 +412,7 @@
     "includeOperations": "Operationen",
     "includeRoutines": "Routinen",
     "includeAltars": "Altäre",
+    "includeTasks": "Aufgaben",
     "includeTags": "Tags",
     "importInclude": "Einschließen",
     "importCategories": "Zu importierende Kategorien",
@@ -481,6 +487,10 @@
     "exportPdf": "Als PDF exportieren…",
     "exportMarkdown": "Als Markdown exportieren…",
     "exportEmerald": "Als Emerald exportieren…",
+    "exportAltarImage": "Als Bild exportieren",
+    "exportAltarJpeg": "JPEG…",
+    "exportAltarPng": "PNG…",
+    "exportAltarWebp": "WebP…",
     "importMarkdown": "Aus Markdown…",
     "importEmerald": "Aus Emerald…"
   },
@@ -492,6 +502,11 @@
     "tabWiki": "Wiki",
     "tabOperations": "Operationen",
     "noResults": "Keine Einträge gefunden"
+  },
+  "importDestination": {
+    "title": "Ziel wählen",
+    "description": "„{{title}}“ enthält keine Angabe, wohin importiert werden soll. Wohin soll der Eintrag importiert werden?",
+    "cancel": "Abbrechen"
   },
   "tasks": {
     "title": "Aufgaben",

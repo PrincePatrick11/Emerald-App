@@ -8,6 +8,7 @@ import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import ContextMenu from '../ui/ContextMenu';
+import Button from '../ui/Button';
 import { getMoonPhase, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId } from '../../lib/helpers';
 import { format } from 'date-fns';
@@ -236,15 +237,14 @@ export default function HomeView() {
                 {MOON_PHASE_SYMBOLS[moonPhase]}{' '}{t(`moonPhase.${moonPhase}`)}
               </p>
             </div>
-            <button
+            <Button
               onClick={handleNewEntry}
-              className="flex items-center gap-2 px-4 py-2 bg-jade-900/40 hover:bg-jade-900/60
-                         text-jade-400 text-sm font-medium rounded-lg border border-jade-800/40
-                         transition-colors duration-150 flex-shrink-0"
+              variant="primary"
+              className="px-4 py-2 text-sm flex-shrink-0"
             >
               <Plus size={15} />
               {t('journal.newEntry')}
-            </button>
+            </Button>
           </div>
         </div>
 

@@ -9,14 +9,23 @@ import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { useTagStore } from '../store/tagStore';
 import { useCustomPropertyStore } from '../store/customPropertyStore';
+import { useAltarStore } from '../store/altarStore';
+import { useImportStore } from '../store/importStore';
+import { getDb } from './db';
+import { generateId } from './helpers';
+import {
+  DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY,
+  DEFAULT_OVERLAY_COLOR, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE,
+} from './altarConstants';
 import { MOON_PHASE_SYMBOLS } from './moonPhase';
+import { noAltarOpenMessage } from './altarExport';
 import type { CustomPropertyType } from '../types';
 
 // ── File format ──────────────────────────────────────────────────────────────
 
 interface EmeraldFile {
   version: '1';
-  type: 'journal' | 'wiki' | 'operations';
+  type: 'journal' | 'wiki' | 'operations' | 'altar';
   title: string;
   createdAt: string;
   content: string;
@@ -58,6 +67,46 @@ interface EmeraldMeta {
     showInEntry: boolean;
     sortOrder: number;
   }>;
+  // altar — background_image_data is a local file path, so it's routed
+  // through `images` like content images. icon_data, thumbnail_data, and item
+  // images are already data: URLs (or a plain emoji, for icon) in the DB, so
+  // they're embedded directly rather than treated as paths.
+  altarBackgroundPreset?: string;
+  altarBackgroundImagePath?: string;
+  altarBackgroundOverlay?: number;
+  altarBackgroundOverlayColor?: string;
+  altarThumbnailData?: string;
+  altarIconData?: string;
+  altarGridEnabled?: boolean;
+  altarGridSize?: number;
+  altarGridOpacity?: number;
+  altarGridColor?: string;
+  altarSnapToGrid?: boolean;
+  altarRotationSnapEnabled?: boolean;
+  altarRotationSnapAngle?: number;
+  altarSnapScaleToGrid?: boolean;
+  altarResolution?: string;
+  altarCategories?: Array<{ name: string; emoji: string }>;
+  altarItems?: Array<{
+    id: string;
+    name: string;
+    emoji: string;
+    category: string;
+    note: string;
+    imageData?: string;
+  }>;
+  altarPlacements?: Array<{
+    itemId: string;
+    x: number;
+    y: number;
+    z_index: number;
+    width: number;
+    height: number;
+    rotation: number;
+    opacity: number;
+    locked: boolean;
+    hidden: boolean;
+  }>;
 }
 
 function safeFilename(title: string): string {
@@ -74,6 +123,9 @@ function exportFilename(title: string, date: string, ext: string): string {
 
 export async function exportAsEmerald(): Promise<void> {
   const view = useUIStore.getState().activeView;
+  if (view.type === 'altar') {
+    return exportAltarAsEmerald();
+  }
   if (!view.id) {
     await message('Please open a journal entry, wiki article, or operation first.', { title: 'Export', kind: 'info' });
     return;
@@ -180,6 +232,75 @@ export async function exportAsEmerald(): Promise<void> {
   await invoke('write_file', { path: savePath, content: JSON.stringify(file, null, 2) });
 }
 
+async function exportAltarAsEmerald(): Promise<void> {
+  const { altars, activeAltarId, items, placements, categories } = useAltarStore.getState();
+  const altar = altars.find(a => a.id === activeAltarId);
+  if (!altar) {
+    await noAltarOpenMessage();
+    return;
+  }
+
+  // Only background_image_data is a local file path — read it via Rust like
+  // content images. icon_data, thumbnail_data, and item images are already
+  // data: URLs (or a plain emoji for icon_data) straight from the DB.
+  const images: Record<string, string> = {};
+  const bgPath = altar.background_image_data;
+  if (bgPath && !bgPath.startsWith('data:') && !bgPath.startsWith('http')) {
+    try {
+      images[bgPath] = await invoke<string>('read_image_as_base64', { path: bgPath });
+    } catch { /* skip missing file */ }
+  }
+
+  const placedItemIds = new Set(placements.map(p => p.item_id));
+  const altarItems = items.filter(i => placedItemIds.has(i.id));
+  const usedCategoryNames = new Set(altarItems.map(i => i.category));
+  const usedCategories = categories.filter(c => usedCategoryNames.has(c.name));
+
+  const meta: EmeraldMeta = {
+    altarBackgroundPreset: altar.background_preset,
+    altarBackgroundImagePath: altar.background_image_data ?? undefined,
+    altarBackgroundOverlay: altar.background_overlay,
+    altarBackgroundOverlayColor: altar.background_overlay_color,
+    altarThumbnailData: altar.thumbnail_data ?? undefined,
+    altarIconData: altar.icon_data ?? undefined,
+    altarGridEnabled: altar.grid_enabled,
+    altarGridSize: altar.grid_size,
+    altarGridOpacity: altar.grid_opacity,
+    altarGridColor: altar.grid_color,
+    altarSnapToGrid: altar.snap_to_grid,
+    altarRotationSnapEnabled: altar.rotation_snap_enabled,
+    altarRotationSnapAngle: altar.rotation_snap_angle,
+    altarSnapScaleToGrid: altar.snap_scale_to_grid,
+    altarResolution: altar.resolution,
+    altarCategories: usedCategories.map(c => ({ name: c.name, emoji: c.emoji })),
+    altarItems: altarItems.map(i => ({
+      id: i.id, name: i.name, emoji: i.emoji, category: i.category, note: i.note,
+      imageData: i.image_data ?? undefined,
+    })),
+    altarPlacements: placements.map(p => ({
+      itemId: p.item_id, x: p.x, y: p.y, z_index: p.z_index, width: p.width, height: p.height,
+      rotation: p.rotation, opacity: p.opacity, locked: p.locked, hidden: p.hidden,
+    })),
+  };
+
+  const file: EmeraldFile = {
+    version: '1',
+    type: 'altar',
+    title: altar.title || 'Untitled Altar',
+    createdAt: altar.created_at,
+    content: altar.intention || '',
+    images,
+    meta,
+  };
+
+  const savePath = await save({
+    defaultPath: exportFilename(file.title, file.createdAt, 'emerald'),
+    filters: [{ name: 'Emerald', extensions: ['emerald'] }],
+  });
+  if (!savePath) return;
+  await invoke('write_file', { path: savePath, content: JSON.stringify(file, null, 2) });
+}
+
 // ── Import helpers ───────────────────────────────────────────────────────────
 
 /** Ensures each tag name exists in the tags table, then returns the names unchanged.
@@ -256,6 +377,20 @@ export async function importFromEmerald(): Promise<void> {
 
   if (file.version !== '1') {
     await message('Unsupported Emerald file version.', { title: 'Import', kind: 'error' });
+    return;
+  }
+
+  if (file.type === 'altar') {
+    let newAltarId: string;
+    try {
+      newAltarId = await importAltarEntry(file);
+    } catch (e) {
+      await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
+      return;
+    }
+    await useAltarStore.getState().fetchAltars();
+    useUIStore.getState().setActiveView({ type: 'altar', id: newAltarId });
+    await message('Altar imported successfully!', { title: 'Import', kind: 'info' });
     return;
   }
 
@@ -394,6 +529,140 @@ async function importOperationEntry(file: EmeraldFile, content: string, tagNames
   return op.id;
 }
 
+// ── Import altar from Emerald ────────────────────────────────────────────────
+
+/**
+ * Reuses a matching existing altar item or creates a new one.
+ * Matches by name + category + image, comparing the image by its actual
+ * data: URL content (altar item images are stored inline, never as a local
+ * file path — see the note on EmeraldMeta above). The item's id is
+ * deliberately not treated as a match on its own — it only proves the two
+ * items were assigned the same UUID, not that they're the same artwork, and a
+ * file imported from an unrelated vault has no guarantee its ids mean
+ * anything here.
+ */
+async function resolveOrCreateItem(
+  itemMeta: NonNullable<EmeraldMeta['altarItems']>[number],
+): Promise<{ id: string; created: boolean }> {
+  const { items, addItem } = useAltarStore.getState();
+
+  const existingMatch = items.find(i =>
+    i.name === itemMeta.name &&
+    i.category === itemMeta.category &&
+    (i.image_data ?? null) === (itemMeta.imageData ?? null),
+  );
+  if (existingMatch) return { id: existingMatch.id, created: false };
+
+  const created = await addItem(itemMeta.name, itemMeta.emoji, itemMeta.category, itemMeta.note, itemMeta.imageData);
+  return { id: created.id, created: true };
+}
+
+/** Creates the category if no local category has this name yet (case-insensitive). */
+async function ensureAltarCategory(name: string, emoji: string): Promise<void> {
+  const { categories, addCategory } = useAltarStore.getState();
+  if (categories.some(c => c.name.toLowerCase() === name.toLowerCase())) return;
+  try { await addCategory(name, emoji); } catch { /* created concurrently, or name conflict — keep going */ }
+}
+
+async function remapAltarImagePath(path: string | undefined, images: Record<string, string>): Promise<string | null> {
+  if (!path) return null;
+  const dataUrl = images[path];
+  if (!dataUrl) return path;
+  try {
+    return await invoke<string>('save_image', { dataUrl });
+  } catch {
+    return null;
+  }
+}
+
+async function importAltarEntry(file: EmeraldFile): Promise<string> {
+  const { createAltar, updateAltar, updateAltarGrid, updateAltarResolution, deleteAltar, deleteItem } = useAltarStore.getState();
+  const altar = await createAltar();
+  // Only items actually *created* (not reused) get rolled back on failure —
+  // altar_items is a shared library, so a partial import must not leave
+  // undetectable debris in it the way it briefly leaves the (fully deleted)
+  // altar behind. See the catch block below.
+  const createdItemIds: string[] = [];
+
+  try {
+    const images = file.images ?? {};
+    const meta = file.meta;
+
+    const backgroundImageData = await remapAltarImagePath(meta.altarBackgroundImagePath, images);
+
+    await updateAltar(altar.id, {
+      title: file.title || 'Untitled Altar',
+      intention: file.content || '',
+      background_preset: meta.altarBackgroundPreset || DEFAULT_ALTAR_BACKGROUND,
+      background_image_data: backgroundImageData,
+      background_overlay: meta.altarBackgroundOverlay ?? DEFAULT_BACKGROUND_OVERLAY,
+      background_overlay_color: meta.altarBackgroundOverlayColor ?? DEFAULT_OVERLAY_COLOR,
+      thumbnail_data: meta.altarThumbnailData ?? null,
+      icon_data: meta.altarIconData ?? null,
+    });
+
+    await updateAltarGrid(altar.id, {
+      grid_enabled: meta.altarGridEnabled ?? false,
+      grid_size: meta.altarGridSize ?? DEFAULT_GRID_SIZE,
+      grid_opacity: meta.altarGridOpacity ?? DEFAULT_GRID_OPACITY,
+      grid_color: meta.altarGridColor ?? DEFAULT_GRID_COLOR,
+      snap_to_grid: meta.altarSnapToGrid ?? false,
+      rotation_snap_enabled: meta.altarRotationSnapEnabled ?? false,
+      rotation_snap_angle: meta.altarRotationSnapAngle ?? 15,
+      snap_scale_to_grid: meta.altarSnapScaleToGrid ?? false,
+    });
+
+    await updateAltarResolution(altar.id, meta.altarResolution || DEFAULT_ALTAR_RESOLUTION);
+
+    for (const cat of meta.altarCategories ?? []) {
+      await ensureAltarCategory(cat.name, cat.emoji);
+    }
+
+    const idMap = new Map<string, string>();
+    for (const itemMeta of meta.altarItems ?? []) {
+      const { id, created } = await resolveOrCreateItem(itemMeta);
+      idMap.set(itemMeta.id, id);
+      if (created) createdItemIds.push(id);
+    }
+
+    // Insert placements directly via SQL (like duplicateAltar does) rather than
+    // through placeItem()/updatePlacement() — those read the store's
+    // activeAltarId, which AltarView's view-sync effect can reassign out from
+    // under a bulk import as soon as createAltar() changes it, silently
+    // dropping every placement onto the wrong altar (or nowhere).
+    const db = await getDb();
+    for (const placementMeta of meta.altarPlacements ?? []) {
+      const realItemId = idMap.get(placementMeta.itemId);
+      if (!realItemId) continue;
+      await db.execute(
+        'INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
+        [
+          generateId(),
+          altar.id,
+          realItemId,
+          placementMeta.x,
+          placementMeta.y,
+          placementMeta.z_index,
+          placementMeta.width,
+          placementMeta.height,
+          placementMeta.rotation,
+          placementMeta.opacity,
+          placementMeta.locked ? 1 : 0,
+          placementMeta.hidden ? 1 : 0,
+        ],
+      );
+    }
+
+    return altar.id;
+  } catch (e) {
+    await deleteAltar(altar.id).catch(() => {});
+    for (const itemId of createdItemIds) {
+      await deleteItem(itemId).catch(() => {});
+    }
+    throw e;
+  }
+}
+
 // ── Import from Markdown ─────────────────────────────────────────────────────
 
 /** Strips a leading emoji + whitespace from a metadata value like "🌀 Paradigm Name". */
@@ -471,7 +740,22 @@ export async function importFromMarkdown(): Promise<void> {
 
   const bodyMd = lines.slice(bodyStart).join('\n').trim();
   const html   = await marked.parse(bodyMd) as string;
-  const type   = (frontMeta['type'] ?? 'journal') as EmeraldFile['type'];
+
+  // Markdown import only supports journal/wiki/operations as a destination
+  // (unlike .emerald files, which also carry 'altar'). A missing or
+  // unrecognised `type` frontmatter key is ambiguous, so ask the user
+  // instead of silently defaulting to journal.
+  const rawType = frontMeta['type'];
+  const validTypes = ['journal', 'wiki', 'operations'];
+  let type: EmeraldFile['type'];
+  if (rawType && validTypes.includes(rawType)) {
+    type = rawType as EmeraldFile['type'];
+  } else {
+    const chosen = await useImportStore.getState().askDestination(title);
+    if (!chosen) return;
+    type = chosen;
+  }
+
   const tagNames = await ensureTagNames(
     (frontMeta['tags'] ?? '').split(',').map(t => t.trim()).filter(Boolean),
   );

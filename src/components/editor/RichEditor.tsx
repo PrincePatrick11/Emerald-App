@@ -18,6 +18,8 @@ async function persistImage(dataUrl: string): Promise<string> {
   return invoke<string>('save_image', { dataUrl });
 }
 import EditorToolbar from './EditorToolbar';
+import Button from '../ui/Button';
+import Modal from '../ui/Modal';
 import LinkPickerModal from './LinkPickerModal';
 import { createInternalLinkExtension } from './InternalLinkExtension';
 import { ExternalDropExtension } from './ExternalDropExtension';
@@ -494,13 +496,14 @@ export default function RichEditor({
               >
                 <Pencil size={11} />
               </button>
-              <button
+              <Button
                 onClick={handleLinkRemove}
-                className="p-1 text-stone-500 hover:text-red-400"
+                variant="danger"
+                className="p-1"
                 title="Link entfernen"
               >
                 <Trash2 size={11} />
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -527,30 +530,20 @@ export default function RichEditor({
 
       {/* Drag-drop format error modal */}
       {dragFormatError && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setDragFormatError(false)}>
-          <div className="bg-stone-900 border border-stone-700 rounded-xl shadow-2xl w-72 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 py-3 border-b border-stone-700/60">
-              <div className="flex items-center gap-2 text-red-400">
-                <AlertCircle size={14} />
-                <span className="text-sm font-medium">{t('common.unsupportedImageFormat')}</span>
-              </div>
-              <button onClick={() => setDragFormatError(false)} className="text-stone-500 hover:text-stone-300 transition-colors">
-                <X size={14} />
-              </button>
-            </div>
-            <div className="px-4 py-3">
-              <p className="text-xs text-stone-400">PNG, JPEG, GIF, WebP, SVG</p>
-            </div>
-            <div className="px-4 pb-4">
-              <button
-                onClick={() => setDragFormatError(false)}
-                className="w-full rounded-md border border-stone-700/60 bg-stone-800/60 py-1.5 text-xs font-medium text-stone-300 hover:bg-stone-700/60 transition-colors"
-              >
-                OK
-              </button>
-            </div>
+        <Modal
+          title={t('common.unsupportedImageFormat')}
+          onClose={() => setDragFormatError(false)}
+          widthClassName="w-72"
+          bodyClassName="px-4 py-3"
+        >
+          <div className="flex items-center gap-2 text-red-400 mb-2">
+            <AlertCircle size={14} />
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>PNG, JPEG, GIF, WebP, SVG</p>
           </div>
-        </div>
+          <Button onClick={() => setDragFormatError(false)} variant="secondary" className="w-full">
+            OK
+          </Button>
+        </Modal>
       )}
 
       {/* Floating ghost following cursor during drag */}

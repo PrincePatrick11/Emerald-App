@@ -14,7 +14,7 @@ Emerald uses a single SQLite file, `emerald.db`, located in the OS application d
 4. After each successful migration, writes a row into `schema_version` with the version, name, and ISO timestamp.
 5. Calls the separate `runPeriodicCleanup(db)` function, which auto-purges trashed rows older than 30 days across all soft-delete-aware tables. This is **not** a migration — it is idempotent and time-dependent, so it runs on every vault open.
 
-The current schema version is **29**. New schema changes must be added as a new entry in the `MIGRATIONS` array with a strictly higher version number and a unique `name`.
+The current schema version is **31**. New schema changes must be added as a new entry in the `MIGRATIONS` array with a strictly higher version number and a unique `name`.
 
 **Upgrades from older versions.** Vaults that predate the `schema_version` table will see all migrations run on first open. `ALTER TABLE … ADD COLUMN` against an already-present column raises a "duplicate column" error; this is detected by `isAlreadyAppliedError` (matches `duplicate column name`, `already exists`, or a pre-existing table) and the migration is marked applied anyway. The data migrations themselves are idempotent and re-run safely: `entry_number` is only backfilled where `NULL`, the UUID → fixed-string category ID rewrite is a no-op once the fixed IDs exist, and the `custom_properties.type = 'checkbox' → 'toggle'` rename is a single `UPDATE` that is a no-op once the migration has run.
 
@@ -165,7 +165,7 @@ Reusable content templates that can be dropped into journal entries.
 
 ### tags
 
-The tags table exists primarily for autocomplete and per-tag colour management. Entries store tag names directly — not IDs.
+The tags table exists primarily for autocomplete and per-tag colour management. Entries store tag names directly — not IDs. `deleteTag`/`restoreTag` in `src/store/tagStore.ts` sweep the `tags` field of Journal entries, Wiki articles, Operations, and Tasks — deleting a tag removes it from all four; restoring re-adds it to whichever of the four had it at deletion time (recorded in `affected_ids`).
 
 | Column | Type | Notes |
 |---|---|---|
@@ -214,7 +214,7 @@ Primary key: `(source_id, target_id)`. Index: `idx_links_target` on `(target_id)
 | thumbnail_data | TEXT | JPEG thumbnail of the altar stored as a `data:image/jpeg;base64,…` string; `NULL` until the first save completes. Maximum stored length is 512 KB. Set to `NULL` automatically by `updateAltarResolution` when the canvas ratio is changed. Added in migration v26 (`altar_thumbnail`). |
 | icon_data | TEXT | Favicon for the altar. Either a single emoji character (e.g. `'🔮'`) or a base64 data-URL image (e.g. `'data:image/png;base64,…'`). `NULL` = no favicon set; the tab falls back to the flame icon. Added in migration v29 (`altar_icon_data`). |
 
-Grid columns were added in migration v18 (`altar_grid_options_per_altar`). Rotation snap and scale-to-grid columns were added in migration v19 (`altar_rotation_snap_and_scale_to_grid`). The `resolution` column was added in migration v21 (`altar_resolution`). Default values in the migrations must stay in sync with the constants `DEFAULT_GRID_SIZE`, `DEFAULT_GRID_OPACITY`, `DEFAULT_GRID_COLOR`, `DEFAULT_ALTAR_RESOLUTION`, and `DEFAULT_BACKGROUND_OVERLAY` in `src/lib/altarConstants.ts`. Grid writes go exclusively through `altarStore.updateAltarGrid(id, patch)`. Resolution writes go exclusively through `altarStore.updateAltarResolution(id, resolution)`, which validates the format with a regex, clamps both dimensions via `parseResolution`, and updates `updated_at`. The `altar_categories` table was introduced in migration v22 and its default rows were capitalized and emoji-corrected in migration v23. Migration v24 is not used (reserved/skipped). The `background_overlay` column was added in migration v25 (`altar_background_overlay`). The `thumbnail_data` column was added in migration v26 (`altar_thumbnail`). Thumbnail writes go through `altarStore.updateAltar(id, { thumbnail_data })` after the canvas renderer resolves; the value must start with `data:image/` and must not exceed 512 KB before being passed to that action. Resolution changes clear the column via `updateAltarResolution`. The `background_overlay_color` column was added in migration v27 (`altar_background_overlay_color`); valid values are `'dark'` and `'light'`. All altar writes that include overlay settings go through `altarStore.updateAltar(id, patch)`, which now includes `background_overlay_color` in the `UPDATE` statement. The constant `DEFAULT_OVERLAY_COLOR` (`'dark'`) in `src/lib/altarConstants.ts` is the fallback used by `normalizeAltar`, `createAltar`, and `duplicateAltar`. Migration v28 (`altar_categories_sort_order`) added `sort_order INTEGER NOT NULL DEFAULT 0` to `altar_categories` and backfilled existing rows; see the `altar_categories` table section for details. Migration v29 (`altar_icon_data`) added `icon_data TEXT DEFAULT NULL` to `altars`; valid values are either a single emoji character or a `data:image/…` base64 string. Icon writes go through `altarStore.updateAltar(id, { icon_data })`. The `AltarTabIcon` component in `TabBar.tsx` reads this field and distinguishes between emoji (no leading `/` or `data:` prefix) and image values for rendering.
+Grid columns were added in migration v18 (`altar_grid_options_per_altar`). Rotation snap and scale-to-grid columns were added in migration v19 (`altar_rotation_snap_and_scale_to_grid`). The `resolution` column was added in migration v21 (`altar_resolution`). Default values in the migrations must stay in sync with the constants `DEFAULT_GRID_SIZE`, `DEFAULT_GRID_OPACITY`, `DEFAULT_GRID_COLOR`, `DEFAULT_ALTAR_RESOLUTION`, and `DEFAULT_BACKGROUND_OVERLAY` in `src/lib/altarConstants.ts`. Grid writes go exclusively through `altarStore.updateAltarGrid(id, patch)`. Resolution writes go exclusively through `altarStore.updateAltarResolution(id, resolution)`, which validates the format with a regex, clamps both dimensions via `parseResolution`, and updates `updated_at`. The `altar_categories` table was introduced in migration v22 and its default rows were capitalized and emoji-corrected in migration v23. Migration v24 is not used (reserved/skipped). The `background_overlay` column was added in migration v25 (`altar_background_overlay`). The `thumbnail_data` column was added in migration v26 (`altar_thumbnail`). Thumbnail writes go through `altarStore.updateAltar(id, { thumbnail_data })` after the canvas renderer resolves; the value must start with `data:image/` and must not exceed 512 KB before being passed to that action. Resolution changes clear the column via `updateAltarResolution`. The `background_overlay_color` column was added in migration v27 (`altar_background_overlay_color`); valid values are `'dark'` and `'light'`. All altar writes that include overlay settings go through `altarStore.updateAltar(id, patch)`, which now includes `background_overlay_color` in the `UPDATE` statement. The constant `DEFAULT_OVERLAY_COLOR` (`'dark'`) in `src/lib/altarConstants.ts` is the fallback used by `normalizeAltar`, `createAltar`, and `duplicateAltar`. Migration v28 (`altar_categories_sort_order`) added `sort_order INTEGER NOT NULL DEFAULT 0` to `altar_categories` and backfilled existing rows; see the `altar_categories` table section for details. Migration v29 (`altar_icon_data`) added `icon_data TEXT DEFAULT NULL` to `altars`; valid values are either a single emoji character or a `data:image/…` base64 string. Icon writes go through `altarStore.updateAltar(id, { icon_data })`. The `AltarTabIcon` component in `TabBar.tsx` reads this field and distinguishes between emoji (no leading `/` or `data:` prefix) and image values for rendering. Migrations v30 (`altar_placements_column_guard`) and v31 (`altar_placements_column_guard_v2`) are both guard/repair migrations, not feature additions: they re-add any of the `scale` / `z_index` / `width` / `height` / `rotation` / `opacity` / `locked` / `hidden` / `altar_id` columns that are missing on `altar_placements` for databases where an earlier migration (v3/v4) was recorded as applied without actually having created all of those columns. v30 checks via `PRAGMA table_info`; v31 is a belt-and-suspenders follow-up that instead tries each `ALTER TABLE … ADD COLUMN` individually inside a `try/catch`, in case the PRAGMA-based check itself proves unreliable in some environment.
 
 ### altar_items
 
@@ -399,23 +399,25 @@ Full vault snapshots are exported and imported via Settings → Backup.
     "journalEntries": [], "wikiArticles": [], "wikiCategories": [],
     "operations": [], "operationCategories": [], "tags": [],
     "customProperties": [], "routines": [],
-    "altars": [], "altarItems": [], "altarPlacements": [], "links": []
+    "altars": [], "altarCategories": [], "altarItems": [], "altarPlacements": [],
+    "tasks": [], "taskCategories": [], "taskLinks": [],
+    "links": []
   },
   "images": { "/abs/path/img.png": "data:image/png;base64,..." }
 }
 ```
 
-**Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Routines / Altars / Tags`, `dateFrom`, `dateTo`, `includeDeleted`. Altars and routines are date-filtered on `created_at`. `altar_items` and `altar_placements` are scoped to exported altars.
+**Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Routines / Altars / Tasks / Tags`, `dateFrom`, `dateTo`, `includeDeleted`. Altars, routines, and tasks are date-filtered on `created_at`. `altar_items` and `altar_placements` are scoped to exported altars; `task_links` is scoped to exported task IDs. Soft-deleted rows in `task_categories` and `tasks` are excluded; `altar_categories` has no soft-delete column and is exported in full.
 
 **Import modes:**
 
 | Mode | Behaviour |
 |---|---|
-| `replace` | Deletes only tables for which the backup contains data (partial-backup-safe), then inserts all rows. |
+| `replace` | Deletes only tables for which the backup contains data (partial-backup-safe), then inserts all rows. The global `tags` table is wiped only when the backup contains Journal, Wiki, Operations, Tasks, *or* Routines data — a Tasks-or-Routines-only backup still clears it, so a Replace import doesn't leave unrelated stale tags behind. |
 | `merge` | Generates an 8-char base36 timestamp prefix (`Date.now().toString(36).slice(-8)`). All entry IDs are prefixed; all cross-references and wiki slugs are remapped. Categories and tags use `INSERT OR IGNORE` by original ID/name. |
 | `add-vault` | Creates a new vault DB → `switchVault()` → runs replace logic on the empty DB. User ends up in the new vault. |
 
-Images are restored via `save_image` (SHA-256 dedup — identical images are written to disk only once).
+Images are restored via `save_image` (SHA-256 dedup — identical images are written to disk only once). The path-remap covers all image-bearing columns: journal `content`; wiki `content` / `icon` / `cover_image`; operation `content` / `icon` / `cover_image` / `drawing_data` / `thumbnail_data`; altar `background_image_data` / `thumbnail_data` / `icon_data`; altar library item `image_data`. Absolute paths from the backup are rewritten to point at the local image directory.
 
 ## Rules for Future Schema Changes
 

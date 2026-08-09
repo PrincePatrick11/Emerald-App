@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { useUndoStore } from '../../store/undoStore';
+import Button from './Button';
 
 export default function UndoToast() {
   const { t } = useTranslation();
@@ -20,12 +21,13 @@ export default function UndoToast() {
   return (
     <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 px-4 py-3 bg-stone-800 border border-stone-700/60 rounded-xl shadow-xl animate-slide-in">
       <span className="text-sm text-stone-300 max-w-xs truncate">{activeToast.description}</span>
-      <button
+      <Button
         onClick={executeUndo}
-        className="flex-shrink-0 px-3 py-1.5 bg-jade-900/40 hover:bg-jade-900/60 text-jade-400 text-xs font-medium rounded-md border border-jade-800/40 transition-colors"
+        variant="primary"
+        className="flex-shrink-0"
       >
         {t('undo.action')}
-      </button>
+      </Button>
       <button onClick={dismissToast} className="flex-shrink-0 text-stone-600 hover:text-stone-400 transition-colors">
         <X size={14} />
       </button>

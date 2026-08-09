@@ -1,5 +1,6 @@
 import { Plus, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import Button from './Button';
 
 export interface FilterChip {
   value: string;
@@ -7,7 +8,7 @@ export interface FilterChip {
   emoji?: string;
 }
 
-interface FilterPanelProps {
+export interface FilterPanelProps {
   chipLabel?: string;
   chips?: FilterChip[];
   selectedChips?: string[];
@@ -139,12 +140,13 @@ export default function FilterPanel({
 
       {/* Clear all */}
       {activeFilterCount > 0 && (
-        <button
+        <Button
           onClick={onClearAll}
-          className="text-xs text-stone-600 hover:text-red-400 transition-colors self-end ml-auto"
+          variant="danger"
+          className="text-xs self-end ml-auto"
         >
           {t('filters.clearAll')}
-        </button>
+        </Button>
       )}
     </div>
   );

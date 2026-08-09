@@ -103,7 +103,7 @@ Locked placements are click-through on the canvas (pointer events disabled), so 
 
 **Selecting elements.** Clicking a row in the placed-elements sidebar highlights the corresponding element on the canvas with a jade border in both view and edit mode. Clicking the same row again deselects it (the inspector closes). Clicking an empty area of the canvas or the sidebar also deselects.
 
-**Favicon.** Each altar can have a custom favicon displayed in its tab in the tab bar and as the first row in the view-mode summary panel. To set one, open the altar in edit mode and expand the collapsible "Favicon" section at the top of the sidebar. You can pick from a grid of 30 spiritual emojis or upload an image (stored directly as base64). When a favicon is set, the tab shows it instead of the default flame icon; when none is set, the flame icon is used as a fallback.
+**Favicon.** Each altar can have a custom favicon displayed in its tab in the tab bar and as the first row in the view-mode summary panel. To set one, open the altar in edit mode and expand the collapsible "Favicon" section at the top of the sidebar. You can pick an emoji from the shared emoji picker (a curated default grid, searchable by name/keyword across the full standard emoji set) or upload an image (stored directly as base64). When a favicon is set, the tab shows it instead of the default flame icon; when none is set, the flame icon is used as a fallback.
 
 **Sidebar in view mode.** When viewing an altar outside edit mode, the right sidebar shows a compact **summary panel** instead of the full editor. It displays:
 
@@ -115,9 +115,9 @@ Locked placements are click-through on the canvas (pointer events disabled), so 
 - **Grid** — active/inactive status and grid size.
 - **Elements** — count of placed items.
 
-A **Save Image…** button above the summary grid exports the current altar at full native resolution via the native OS save dialog. Three format buttons — **JPEG**, **PNG**, and **WebP** — sit directly below the save button in the same card block. The active format is highlighted with a jade ring. JPEG uses quality 0.97, WebP uses 0.92, PNG is lossless. The suggested filename and the OS save dialog filter adapt to the selected format (e.g. `AltarTitle_YYYY-MM-DD.png`). The button shows in-progress, success, and error feedback states inline.
-
 A note at the bottom reminds you to switch to edit mode to change these settings. The header fullscreen button is hidden when the sidebar is open, since the sidebar already provides one.
+
+Exporting the altar as an image (JPEG / PNG / WebP) is done from the native application menu, not the sidebar — see [Export and Import](#export-and-import) below. The export renders the current altar at full native resolution via the native OS save dialog. JPEG uses quality 0.97, WebP uses 0.92, PNG is lossless. The suggested filename and the OS save dialog filter adapt to the selected format (e.g. `AltarTitle_YYYY-MM-DD.png`).
 
 **Sidebar in edit mode.** The full editor panel — Canvas Options, Change Background, Overlay Options, Grid Options, and Placed Elements — is visible only when the altar is in edit mode. Each section is collapsible with a chevron toggle. The open/closed state of all six sections (Background, Overlay, Grid, Favicon, Canvas Options, Placements) is saved per altar in `localStorage` and restored when you switch back to that altar. Sections default to open the first time an altar is opened.
 
@@ -131,11 +131,11 @@ The grid is rendered as an SVG overlay directly in the canvas, with lines placed
 - *Snap rotation angle* — when enabled, dragging the rotation handle snaps to a configurable angle step (1–180°, default 15°). When disabled, rotation is free; holding Shift still snaps to 15° steps.
 - *Scale to grid* — when enabled, resizing a placement snaps to the nearest whole number of grid cells on both axes, so items always align to the grid as a box.
 
-The grid is also visible in exported images and captured thumbnails — the same grid settings (`grid_enabled`, `grid_size`, `grid_color`, `grid_opacity`) are applied by the Canvas 2D renderer that produces thumbnails and the "Save Image" export.
+The grid is also visible in exported images and captured thumbnails — the same grid settings (`grid_enabled`, `grid_size`, `grid_color`, `grid_opacity`) are applied by the Canvas 2D renderer that produces thumbnails and the altar image export (Export → Export as Image).
 
 **Multiple altars.** You can create several named altars and switch between them. Each altar has its own title, intention text, background, and set of placements.
 
-**Backgrounds.** Four built-in colour presets (Midnight, Ember, Forest, Moon) plus 16 photographic image presets, and the option to upload a custom background image.
+**Backgrounds.** A **Gradient** background type — pick one of 7 preset swatch colours or any custom colour via a colour wheel, opened from a small modal — plus 16 photographic image presets, and the option to upload a custom background image. The four original named presets (Midnight, Ember, Forest, Moon) are no longer offered as a picker in the sidebar; they are kept only so altars saved before the gradient picker was introduced keep rendering their original colour.
 
 The image presets are organised thematically — Forest & Nature, Mountains, Caves & Grottos, Magic & Portals, Temples & Halls — and displayed as a 4-column thumbnail grid below the colour presets in the sidebar. Thumbnails (160×90 px) are served from `public/backgrounds/thumbs/`; the full-resolution image is only loaded by the canvas when that preset is active. Each preset has a localised display name in all four supported languages.
 
@@ -235,9 +235,21 @@ Tags and categories also support soft-delete and restoration.
 
 All export and import actions are in the native application menu.
 
+> **Sigil-category Operations export is temporarily disabled.** Export (Markdown, PDF, Emerald) works for Journal and Wiki entries, for altars, and for Operations in any category *except* Sigils. Opening a Sigil (an Operations entry in the `sigils` category) leaves all three "Export as …" menu items greyed out — export for that category isn't wired up correctly yet, so the items are disabled rather than left to produce a broken result. This is a temporary state, not a permanent design decision; the menu items will re-enable for Sigils once that export path is implemented. Import (Markdown and Emerald) is unaffected and still supports Operations, including Sigils, as a destination.
+
 ### PDF Export
 
-Opens a preview window showing the entry with its metadata formatted as a print document. A "Save as PDF" button triggers the system print dialog where you can choose a file destination. Images in the entry are embedded as base64 before the preview is generated. Internal link chips are rendered as styled spans.
+Prompts a native save dialog for the destination and writes the PDF directly to disk — there is no preview window and no system print dialog. The PDF is rendered by the app's own webview (WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux), so emoji render as proper colored glyphs (Segoe UI Emoji / Apple Color Emoji / Noto Color Emoji) without any frontend rasterisation. The suggested filename is `<Title>_YYYY-MM-DD.pdf`; the user picks the actual location in the OS save dialog. Images in the entry are embedded as base64 before the PDF is generated; internal link chips are rendered as styled spans inside the content.
+
+The **Export → Export as PDF…** menu item is available while a Journal / Wiki / non-Sigil Operations entry is open, or while an Altar is open in **reading view** (not while editing it) — it is disabled on the home view, the tag manager, the trash, and (for now, see note above) while a Sigil-category Operations entry is open. For Journal/Wiki/Operations it exports the entry text as described above; for an open Altar it instead exports the rendered altar image as a single-page PDF (see Altar PDF Export below).
+
+### Altar PDF Export
+
+When an Altar is open in reading view, **Export → Export as PDF…** renders the altar the same way the image export does (full native resolution) and embeds that image as a single page in a PDF instead of exporting text content. The PDF page size is derived from the altar's own pixel aspect ratio rather than a fixed portrait page: the long edge is 11", and the short edge follows the aspect ratio, so a portrait altar (e.g. 9:16) produces a portrait page and a landscape altar (e.g. 16:9) produces a landscape page. On Windows this custom page size is applied natively in the print pipeline; on macOS and Linux the export still succeeds but currently uses the platform's default page size (not yet verified on real hardware). There is no separate "Export Altar as PDF" menu item — the existing Export as PDF item is reused and switches behavior based on what's currently open. A confirmation dialog shows the saved file path once the PDF is written, matching Journal/Wiki/Operations PDF export.
+
+### Altar Image Export
+
+A nested **Export as Image** submenu (Export → Export as Image → JPEG… / PNG… / WebP…) renders the currently open altar at full native resolution and prompts a native save dialog for the destination. This submenu is enabled only while an Altar is open in **reading view** — it is disabled while editing an altar, while any non-altar content is open, and when no altar is open. A confirmation dialog shows the saved file path once the image is written.
 
 ### Markdown Export
 
@@ -245,29 +257,51 @@ Saves a `.md` file with a frontmatter block followed by the entry body. Frontmat
 
 ### Emerald Format
 
-The Emerald format (`.emerald` file extension) is a JSON file that captures the full entry including all metadata and embedded images. It is designed for lossless transfer between Emerald installations.
+The Emerald format (`.emerald` file extension) is a JSON file that captures the full entry — or, for altars, the full altar — including all metadata and embedded images. It is designed for lossless transfer between Emerald installations.
+
+The single **Export → Export as Emerald…** menu item is shared between Journal/Wiki/Operations entries and altars: it is enabled whenever a Journal / Wiki / non-Sigil Operations entry is open, or an Altar is open in reading view, and exports whichever is currently active. (Sigil-category Operations entries are temporarily excluded — see the note at the top of this section.)
 
 The file structure:
 
 ```json
 {
   "version": "1",
-  "type": "journal | wiki | operations",
+  "type": "journal | wiki | operations | altar",
   "title": "…",
   "createdAt": "ISO 8601",
-  "content": "HTML string",
+  "content": "HTML string (intention text for altars)",
   "images": { "/absolute/path/to/image.png": "data:image/png;base64,…" },
   "meta": { … }
 }
 ```
 
-On import, image data-URLs are re-saved into the local image directory (with SHA-256 deduplication), HTML is sanitised with DOMPurify, and linked entries are resolved by ID first and then by title as a fallback. Tags are synced into the local tags table. Custom properties are recreated in the same order.
+For `journal` / `wiki` / `operations`, on import image data-URLs are re-saved into the local image directory (with SHA-256 deduplication), HTML is sanitised with DOMPurify, and linked entries are resolved by ID first and then by title as a fallback. Tags are synced into the local tags table. Custom properties are recreated in the same order.
+
+For `altar`, `meta` carries the background preset/image/overlay, grid and snapping settings, resolution, the categories used by the placed items (name + emoji), and the full list of placed items (each with name, emoji, category, note, optional image, and placement geometry — position, size, rotation, opacity, z-index, locked/hidden). Only the background image is a local file path in the database, so it alone is round-tripped through `images` like content images; the icon, thumbnail, and every item image are already inline `data:` URLs in the database and are embedded directly.
+
+On import a new altar is created and populated:
+- Any exported category not already present locally (matched case-insensitively by name) is created first, so items land in the right category instead of "Uncategorized".
+- Altar items are matched against the existing library by name + category + image content (compared as the literal `data:` URL, not a resolved file), reusing an existing item where possible and creating a new one otherwise — the item's id is not used for matching, since it proves nothing about content when importing from an unrelated vault. This means re-importing the same file repeatedly, or importing into a different vault that already has the same items, does not pile up duplicate library items, while items that merely share a name/category but have different artwork are correctly kept separate.
+- If the import fails partway through, the newly created altar and any newly created (not reused) library items are rolled back, so a failed import doesn't leave orphaned items behind in the shared item library.
+
+Import for all types goes through the same **Import → From Emerald…** menu item — the target type is read from the file itself, so no separate altar import entry point is needed.
 
 ### Import from Markdown
 
 Parses a Markdown file exported by Emerald (or following the same structure). The `# Title` line becomes the entry title. Key-value lines before the `---` separator are parsed as metadata. Unrecognised metadata keys become custom text properties. The body below `---` is parsed from Markdown to HTML using `marked`.
 
 Note: this path is parser-based (Markdown -> HTML) and is not identical to Emerald JSON import sanitisation. Metadata rendered into PDF export is escaped before interpolation.
+
+**Destination confirmation.** The frontmatter's `type` key determines where the entry is imported. If `type` is present and is one of `journal`, `wiki`, or `operations`, the import proceeds directly into that module. If `type` is missing or set to anything else (Altar is not a valid Markdown-import destination), a modal appears showing the detected title and asking you to choose Journal, Wiki, or Operations; cancelling the modal aborts the import entirely — no entry is created. This only applies to Markdown import: `.emerald` files always carry a definite `type`, so importing from that format never prompts.
+
+### Vault Backup (`.emeralddb`)
+
+The full vault can be backed up and restored as a single self-contained JSON file (`.emeralddb`), separate from per-entry Emerald-format exports. The Backup section in **Settings** exposes two flows:
+
+- **Export.** A "What to include" checkbox list lets you pick which modules go into the backup: Journal, Wiki, Operations, Routines, Altars, Tasks, and Tags. Optional `dateFrom` / `dateTo` fields restrict the export to entries created in that window (Altars, Routines, and Tasks are date-filtered; soft-deleted tasks and task categories are excluded). Embedded image files referenced from any exported entry are inlined as data-URLs.
+- **Import.** Before importing, the modal shows a preview line summarising the counts per type (e.g. `12 J, 5 W, 3 O, 2 R, 1 A, 4 T`). The same checkbox list is then used to choose which types to actually apply; categories can also be filtered. Three import modes are available: **Replace** (overwrite selected tables in the current vault), **Merge** (imported entries are prefixed with a timestamp so existing IDs never collide), and **Add Vault** (import into a brand new vault and switch to it).
+
+For the on-disk JSON structure and per-mode semantics, see [DB Backup / Restore (`.emeralddb`) in `database.md`](database.md#db-backup--restore-emeralddb).
 
 ## Image Upload Validation
 

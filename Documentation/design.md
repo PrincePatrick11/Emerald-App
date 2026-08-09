@@ -1,6 +1,6 @@
 # Design
 
-Bestandsaufnahme des aktuellen visuellen Design-Systems von Emerald: Farb-/Typografie-Tokens, tatsächlich verwendete Spacing-/Radius-/Shadow-Werte und die gewachsenen Komponenten-Patterns (Buttons, Panels, Modals, Icons). Dies ist eine reine Ist-Zustand-Dokumentation ohne Priorisierung oder Lösungsvorschläge — sie dient als Referenzgrundlage für einen späteren, separaten Redesign-Durchgang.
+Bestandsaufnahme des aktuellen visuellen Design-Systems von Emerald: Farb-/Typografie-Tokens, tatsächlich verwendete Spacing-/Radius-/Shadow-Werte und die gewachsenen Komponenten-Patterns (Buttons, Panels, Modals, Emoji-Picker, Icons). Dies ist eine reine Ist-Zustand-Dokumentation ohne Priorisierung oder Lösungsvorschläge — sie dient als Referenzgrundlage für einen späteren, separaten Redesign-Durchgang.
 
 Für die *Architektur* des Theming-Systems (CSS-Custom-Property-Tiers, Normalisierungs-Flow, Tailwind-Bridge-Konzept) siehe bereits [`architecture.md`](architecture.md#theming-system) — hier werden stattdessen die konkreten Werte und die Komponenten-Ebene dokumentiert, die dort fehlen.
 
@@ -54,9 +54,9 @@ Damit existieren für die "Primärfarbe" faktisch drei unabhängig gepflegte Wer
 `tailwind.config.js` definiert keine eigene `spacing`, `borderRadius` oder `boxShadow` Skala — jede Stelle im Code wählt einen Tailwind-Default-Wert frei. Beobachtete tatsächliche Verteilung:
 
 **Border-Radius**, für optisch vergleichbare "Container"-Elemente:
-- `rounded-md`: Dropdown-Trigger (`ListToolbar.tsx`), kleine Tab-Buttons (`AltarLibraryStrip.tsx:172`), Undo-Button in `UndoToast.tsx:25`
-- `rounded-lg`: Context-Menu (`ContextMenu.tsx:49`), die meisten Buttons (`.btn-primary`, `.btn-secondary`, `index.css:106,111`), Settings-Reihen
-- `rounded-xl`: `.panel`/`.panel-interactive` (`index.css:96,125`), alle drei Modal-Cards (Settings, LinkPicker, Altar-Item), aber auch der Undo-Toast (`UndoToast.tsx:21`)
+- `rounded-md`: Dropdown-Trigger (`ListToolbar.tsx`), kleine Tab-Buttons (`AltarLibraryStrip.tsx:172`), `.btn-danger` (`index.css`)
+- `rounded-lg`: Context-Menu (`ContextMenu.tsx:49`), `.btn-primary`/`.btn-secondary` (`index.css`, jetzt auch der Undo-Button in `UndoToast.tsx` über `<Button variant="primary">`), Settings-Reihen
+- `rounded-xl`: `.panel`/`.panel-interactive` (`index.css:96,125`), alle drei Modal-Cards (Settings, LinkPicker, Altar-Item), aber auch der Undo-Toast selbst (`UndoToast.tsx`)
 - `rounded-full`: Filter-Chips (`FilterPanel.tsx`)
 
 Es gibt keine erkennbare Regel, wann `md`/`lg`/`xl` verwendet wird — z. B. ist `ContextMenu` (`rounded-lg`) und `UndoToast` (`rounded-xl`) beides ein kleines, schwebendes Overlay-Element mit ähnlicher Funktion, aber unterschiedlichem Radius.
@@ -69,13 +69,11 @@ Es gibt keine erkennbare Regel, wann `md`/`lg`/`xl` verwendet wird — z. B. ist
 
 ### Buttons
 
-Kein geteiltes `<Button>`-Component. Drei CSS-Utility-Klassen existieren in `index.css` (`.btn-primary`, `.btn-secondary`, `.btn-ghost`), werden aber nicht durchgängig verwendet:
+Geteilte Komponente: `src/components/ui/Button.tsx`. Ein dünner Wrapper mit vier Varianten (`primary` / `secondary` / `ghost` / `danger`), die auf die bestehenden CSS-Klassen `.btn-primary`, `.btn-secondary`, `.btn-ghost` sowie die neue `.btn-danger`-Klasse (`index.css`, basierend auf den bereits themed `--danger-*`-CSS-Variablen — es waren keine Theme-Datei-Änderungen nötig) abbilden. `type` ist standardmäßig `'button'`; `className` wird an die Varianten-Klasse angehängt statt sie zu ersetzen, sodass Aufrufer weiterhin Layout/Spacing pro Stelle mitgeben können. Eine gemeinsame `:disabled`-Regel (`opacity-50 cursor-not-allowed pointer-events-none`) gilt für alle vier Varianten.
 
-- `HomeView.tsx:239-243` ("Neuer Eintrag"-Button) dupliziert die `.btn-primary`-Optik komplett inline (`bg-jade-900/40 hover:bg-jade-900/60 text-jade-400 text-sm font-medium rounded-lg border border-jade-800/40`) statt die Klasse `.btn-primary` zu nutzen.
-- `SettingsModal.tsx:447` nutzt eine eigene Klasse `.settings-cta-btn` gemischt mit rohen Tailwind-Utilities (`bg-jade-500/20 border-jade-500/40`), ein drittes visuelles Muster für einen inhaltlich ähnlichen "primären" Button.
-- `UndoToast.tsx:25` repliziert wiederum eine eigene Variante (`bg-jade-900/40 ... rounded-md`, mit `rounded-md` statt dem sonst für Primary-Buttons üblichen `rounded-lg`).
+Über Journal, Wiki, Operations, Tasks, Altar, Trash, Settings sowie die geteilten `Modal`/`FilterPanel`/`RichEditor`-Komponenten sind 109 vormals rohe `<button>`-Elemente auf `<Button>` migriert. Dabei wurden fünf verschiedene Ad-hoc-Rot-Behandlungen für "löschen" (`text-red-400`, `text-red-600`, `text-stone-500 hover:text-red-400`, bordered `bg-red-950/30`-Pills u. a., verstreut über Trash/Operations/Wiki/Tasks/Altar/Settings) auf `<Button variant="danger">` konsolidiert, und drei vormals inline-duplizierte "primary"-Button-Rezepte (`HomeView`s "New Entry", `UndoToast`s Action-Button, Settings' Export/Import-Buttons) nutzen jetzt `<Button variant="primary">`. Die dadurch toten CSS-Klassen `.trash-empty-btn`, `.trash-bulk-delete-btn` und `.settings-cta-btn` wurden entfernt.
 
-Aktive/inaktive Zustände (z. B. Tab-artige Buttons in `AltarLibraryStrip.tsx:172,174,219`, `SettingsModal.tsx:199-201,261`) werden jeweils lokal per Ternary im `className`-Template neu implementiert statt über eine gemeinsame Komponente/Klasse.
+Aktive/inaktive Zustände (z. B. Tab-artige Buttons in `AltarLibraryStrip.tsx:172,174,219`, `SettingsModal.tsx:199-201,261`) werden weiterhin jeweils lokal per Ternary im `className`-Template implementiert — das ist bewusst außerhalb des `Button`-Scopes, da diese Buttons einen `active`-Toggle-State abbilden, den die vier Basis-Varianten nicht kennen. Ebenfalls bewusst nicht migriert: `AltarCanvas.tsx`s Rotations-/Resize-Drag-Handles (dynamisch dimensioniert, keine semantischen Buttons), `EditorToolbar.tsx`s `ToolbarBtn` (hat ebenfalls einen `active`-Toggle-State), sowie `ContextMenu.tsx`-Menüeinträge und andere volle-Breite Menü-/Chip-/Tab-/Nav-Item-Patterns (`LinkedOpsInput`, `LinkedWikiInput`, `BacklinksPanel`, `SuggestionList`, `TagInput`, die WikiPanel-/OperationsPanel-Untertabs, die `TabBar`-Tableiste, `AltarReadingSummary`s Fullscreen-Toggle) — das sind strukturell andere Komponententypen (Listenzeilen, Chips, Toggles), keine generischen Aktions-Buttons.
 
 ### Panels / Cards
 
@@ -83,15 +81,47 @@ Aktive/inaktive Zustände (z. B. Tab-artige Buttons in `AltarLibraryStrip.tsx:17
 
 ### Modals / Dialogs
 
-Kein geteilter Modal-Wrapper — drei unabhängige Implementierungen:
+Geteilter Modal-Wrapper: `src/components/ui/Modal.tsx`. Ein Overlay (`bg-black/50 backdrop-blur-sm`), eine `.modal-card` (`index.css`, theme-var-basiert: `background-color: var(--bg-surface-2)`, `border-color: var(--border-soft)`, `shadow-2xl`, `rounded-xl`) mit Header (Titel + Close-X), `createPortal` nach `document.body`, und Escape-to-close sind damit für alle Modals einheitlich. Genutzt von `SettingsModal`, `LinkPickerModal`, `ImportDestinationModal`, `AltarLibraryStrip` (`ItemModal` und `CategoryModal`), dem Gradient-Hintergrund-Picker in `AltarSidebarPanel`, und `RichEditor`s "nicht unterstütztes Bildformat"-Fehlerdialog beim Drag-Drop (vorher ein roher `fixed inset-0`-Overlay mit hartcodierten `stone-900`/`stone-700`-Farben, die im Emerald-Parchment-Theme nicht themten).
 
-| | Overlay | Backdrop-Blur | Card | Portal |
-|---|---|---|---|---|
-| `SettingsModal.tsx:166,171` | `bg-black/60` | nein | `rounded-xl shadow-2xl w-[520px]` | `createPortal` |
-| `LinkPickerModal.tsx:107,110` | `bg-black/50` | `backdrop-blur-sm` | `rounded-xl shadow-2xl w-[560px]` | nein |
-| `AltarLibraryStrip.tsx:195-196` | `bg-black/55` | nein | `rounded-xl` (kein `shadow-*`) | nein |
+`ImportDestinationModal`s Options-Zeilen nutzen jetzt die geteilte `context-menu-item-default`-Klasse aus `ContextMenu.tsx` statt roher `stone-800`/`stone-700`-Utility-Klassen, und Footer-Border/-Beschreibungstext nutzen `var(--border-soft)`/`var(--text-muted)` statt roher `stone-*`-Farben — damit themt auch dieses Modal jetzt vollständig in Emerald Parchment.
 
-Overlay-Opacity (50/55/60), Blur-Einsatz und Portal-Nutzung unterscheiden sich in allen drei Fällen.
+`.modal-card` selbst hat kein `overflow-hidden` in der Basisklasse, da einzelne Modals einen Popover-Inhalt haben, der die Card-Grenzen verlassen muss (z. B. der Altar-Kategorie-Emoji-Picker). `overflow-hidden` wird stattdessen pro Modal per `className`-Prop opt-in gesetzt (`LinkPickerModal`, `ImportDestinationModal`, der Altar-Gradient-Picker).
+
+Verbleibende Abweichung: `LinkPickerModal`s interne Elemente (Suchfeld, Tab-Textfarben) nutzen weiterhin rohe Tailwind-`stone-*`-Utility-Klassen statt Theme-CSS-Variablen — nur der äußere Wrapper (Overlay/Card/Header/Portal) wurde vereinheitlicht, nicht der komplette Innenaufbau jedes Modals.
+
+### Emoji-Picker
+
+Geteilte Komponente: `src/components/ui/EmojiPicker.tsx`. Kapselt Open/Close-State, Klick-außerhalb- und Escape-to-close (vorher bei keiner der Einzelimplementierungen vorhanden) sowie eine themed Popover-Chrome (`.emoji-picker-popover`, `.emoji-picker-item-idle`/`-active` in `index.css`, beide auf `--menu-bg`/`--menu-border`/`--menu-item-hover-bg` basierend). Der Trigger-Button bleibt pro Aufrufer frei gestaltbar (Render-Prop `trigger`), da sich die Trigger-Optik je nach Kontext stark unterscheidet (z. B. großer Bild/Emoji-Button mit Label in `AltarLibraryStrip`s `ItemModal` vs. reiner Emoji-Glyph ohne Hintergrund in den Kategorie-Zeilen von Operations/Tasks/Wiki) — analog zu `Modal.tsx`, das ebenfalls nur die äußere Chrome vereinheitlicht und den Inhalt frei lässt.
+
+Genutzt von `AltarLibraryStrip` (`ItemModal` und `CategoryModal`), `AltarSidebarPanel` (Altar-Favicon/-Emoji in den Altar-Properties), `RoutinesPanel` (Add- und Edit-Formular), `OperationsView`, `TasksView` und `WikiView` (jeweils Add- und Edit-Kategorie) — 11 vormals unabhängige Implementierungen mit rohen `bg-stone-800`/`border-stone-700`-Popovern (die im Emerald-Parchment-Theme falsch bzw. gar nicht themten) sind damit auf eine gemeinsame, theme-korrekte Implementierung reduziert. Einzige Vorlage, die bereits korrekt themte, war `WikiView`s `.wiki-emoji-popover`; deren CSS-Klassen wurden zu den jetzt generischen `.emoji-picker-*`-Klassen verallgemeinert.
+
+Vorher hatte jede Aufrufer-Stelle eine eigene, unterschiedlich kuratierte Emoji-Liste (`ROUTINE_EMOJIS`, `OPERATION_EMOJIS`, `TASK_EMOJIS`, `WIKI_EMOJIS`, `ALTAR_CAT_EMOJIS`, `ALTAR_ICON_EMOJIS`, `CATEGORY_EMOJIS`/`FALLBACK_CATEGORY_EMOJIS` inkl. der kategoriebasierten Mini-Vorschläge im Altar-Item-Picker). Alle wurden entfernt zugunsten einer einzigen `DEFAULT_EMOJI_PICKER_EMOJIS`-Konstante in `EmojiPicker.tsx`, die als Default für den optionalen `emojis`-Prop dient — damit steht in jedem Picker dieselbe Auswahl zur Verfügung.
+
+Das Popover-Grid ist auf **max. 5, min. 3 Spalten** ausgelegt (`COLUMNS`/`MIN_COLUMNS` in `EmojiPicker.tsx`): `width`/`minWidth`/`maxWidth` werden direkt am Grid-Element in Zellen-Einheiten berechnet (`cell * n + gap * (n-1)`), nicht am gepolsterten Popover-Rahmen — eine erste Version rechnete das gegen die Border-Box der äußeren, gepolsterten Box, wodurch für 5 Spalten zu wenig Platz übrig blieb und `auto-fill` auf 4 abrundete. `grid-template-columns: repeat(COLUMNS, minmax(0, 1fr))` erzwingt seitdem die konfigurierte Spaltenzahl exakt, statt sie wie zuvor über `auto-fill` aus der verfügbaren Breite abzuleiten — das bleibt auch bei der unten beschriebenen, absichtlich reduzierten Grid-Breite stabil bei 5 Spalten. Bei zu wenig Viewport-Breite (`maxWidth: calc(100vw - 3rem)`) schrumpft das Raster bis auf 3 Spalten (harte Untergrenze über `minWidth`, kann bei extrem schmalem Fenster leicht über den Viewport hinausragen).
+
+Scroll-Clipping sitzt auf einem eigenen Wrapper um das Grid herum (`max-h-56 overflow-y-auto overflow-x-hidden`), nicht direkt auf dem Grid. Da die globale Scrollbar-Regel (`::-webkit-scrollbar` in `index.css`, 6 px) plattformübergreifend einen klassischen, platzraubenden statt einen überlagernden Scrollbalken erzeugt, lief ein gleich breites Grid auf macOS über den Wrapper hinaus und erzeugte einen sichtbaren horizontalen Scrollbalken; `overflow-x-hidden` unterdrückt dieses Artefakt. Damit der vertikale Scrollbalken dabei nicht stattdessen die letzte Emoji-Spalte überlappt, ist das Grid über ein eigenes `gridStyle`-Objekt (getrennt von `sizeStyle`, das weiterhin Suchfeld- und Popover-Breite bestimmt) um eine feste `SCROLLBAR_GUTTER` (`0.5rem`) schmaler als der Scroll-Wrapper — der Scrollbalken hat dadurch Platz in der Lücke rechts vom Grid.
+
+**Suche**: Ein fixes Suchfeld (`.emoji-picker-search`, themed wie `.wiki-cat-input`) sitzt oben im Popover und scrollt nicht mit. Leer zeigt der Picker weiterhin `DEFAULT_EMOJI_PICKER_EMOJIS`; sobald getippt wird, durchsucht er stattdessen ein vollständiges, lokalisiertes Emoji-Set aus `src/lib/emojiSearchData/{en,de,es,fr}.json` (je `[emoji, suchtext]`-Paare, aus `emojibase-data@17` generiert — Skins/reine Flaggen-Bausteine ausgeschlossen, ca. 1900 Einträge/Sprache), nicht nur die kuratierte Kurzliste. Das passende Locale-File wird anhand von `i18n.language` gewählt (Fallback `en`) und per dynamischem `import()` erst beim ersten Öffnen eines Pickers nachgeladen (Vite code-splittet das automatisch in einen eigenen Chunk pro Sprache, ~100–150 KB, mit Modul-Level-Cache gegen Mehrfach-Laden). Treffer sind auf 150 begrenzt (`MAX_SEARCH_RESULTS`), ein leeres Ergebnis zeigt `common.noEmojiResults` statt eines leeren Rasters.
+
+Das Suchfeld bekommt bewusst dieselbe explizite `width`/`minWidth`/`maxWidth` (`sizeStyle`-Objekt) wie das Grid statt einer prozentualen `w-full`-Breite: `AltarSidebarPanel`s Favicon-Picker sitzt (anders als die übrigen 10 Aufrufer, die alle in einer Flex-Zeile stecken) in einem normalen Block-`<div>`, dessen Wrapper dadurch auf 100 % Elternbreite aufgeht statt sich auf die Trigger-Größe zu schrumpfen — eine `w-full`-Suchleiste hätte sich dort gegen diese (deutlich breitere) Wrapper-Breite aufgeblasen und rechts neben dem schmaleren, fix breiten Grid sichtbaren Leerraum hinterlassen. Mit identischer expliziter Breite für Input und Grid kann das unabhängig vom umgebenden Layout des jeweiligen Aufrufers nicht mehr auseinanderlaufen.
+
+Verbleibende Abweichung: die "Keine Treffer"-Meldung bei leerer Suche (`EmojiPicker.tsx:151`) nutzt rohes `text-stone-500` statt einer Theme-CSS-Variable wie `--text-muted` — der einzige Rest an unthemtem Text innerhalb einer ansonsten komplett auf CSS-Vars umgestellten Komponente.
+
+### Dashboard (Modul-Übersichtsscreens)
+
+Geteilte Komponente: `src/components/ui/Dashboard.tsx` (generisch über `<T>`). Vereinheitlicht nur die äußere Chrome der sechs Modul-Übersichtsscreens (Wiki, Operations, Journal, Altar, Tasks, Trash) — Topbar, `ListToolbar`/`FilterPanel`-Einbindung, sowie Leerzustands-/No-Results-/Gruppierungs-Orchestrierung — analog zum `Modal`/`EmojiPicker`-Prinzip: nur die Chrome ist geteilt, der eigentliche Item-Inhalt bleibt pro Aufrufer lokal (`renderItem`-Prop).
+
+**Topbar**: Standardmäßig `title` + optionale `primaryAction` (Button + Plus-Icon) rechts. Beide Seiten sind per `headerLeft`/`headerRight` vollständig ersetzbar, wenn eine Ansicht keine primäre Aktion, sondern z. B. Bulk-Select-Controls braucht (Trash: Select-all-Link links, Bulk-Delete/Empty-Trash-Buttons rechts). `headerClassName` ist ebenfalls überschreibbar (Trash nutzt `px-6` statt der Default-`px-8`, aus historischen Gründen enger als die übrigen Dashboards).
+
+**Gruppierung** (`grouping`-Prop, vier Modi):
+- `flat` — ungruppierte Liste (Altar).
+- `timeline` — Divider-Gruppen mit `label` + `items`, kein editierbarer Header (Journal: sowohl der Datums-Timeline- als auch der "nach Mondphase gruppiert"-Fall laufen über diesen Modus, da beide dieselbe Divider-Optik brauchen; Altar für seine Datumsgruppen).
+- `category` — wie `timeline`, aber mit `renderGroupHeader`/`renderAddCategory`-Render-Props für editierbare Kategorie-Header inkl. Inline-CRUD (Wiki, Operations — Operations ergänzt zusätzlich einen "Other"-Uncategorized-Bucket als weitere Gruppe).
+- `custom` — Escape-Hatch: Aufrufer liefert eine `render()`-Funktion und ist für den kompletten Inhaltsbereich selbst verantwortlich. Genutzt von Tasks (hierarchische Task/Subtask-Struktur, Kategorie-Collapse-Zustand, Uncategorized-zuerst-Reihenfolge) und Trash (zweistufige Typ→Kategorie-Gruppierung) — beide Strukturen sind nicht generisch abbildbar. `DashboardProps<T>` ist als discriminated Union über `grouping.mode` typisiert: `renderItem`/`isEmpty`/`emptyState`/`hasNoResults` sind nur bei `flat`/`timeline`/`category` erforderlich und bei `custom` typseitig ausgeschlossen (`grouping.mode === 'custom'` wird in `renderContent()` als erste Prüfung behandelt) — Tasks und Trash müssen dadurch keine bedeutungslosen Dummy-Props (`renderItem={() => null}`, `isEmpty={false}` usw.) mehr an `Dashboard` übergeben, nur um in den `custom`-Modus zu wechseln.
+
+**Filter**: `filters`-Prop ist optional (Views ohne Filterkonzept, z. B. Altar, lassen sie weg). Sie kapselt `showFilters`/`onToggleFilters`/`activeFilterCount` sowie `panelProps` (an `FilterPanel` durchgereicht — dessen `FilterPanelProps`-Interface wurde dafür aus `FilterPanel.tsx` exportiert) und ein optionales `extraPanelContent` für zusätzliche Filterzeilen unterhalb des `FilterPanel` (Tasks' Prioritäts-Chip-Zeile). `toolbarExtraActions` reicht zusätzliche Controls direkt in die `ListToolbar` durch (Tasks' "Show completed"-Toggle).
+
+Diese Vereinheitlichung ist rein strukturell — das visuelle Ergebnis ist unverändert zum vorherigen Zustand jedes Dashboards. Ein separates visuelles Redesign der Dashboards ist als nächster Schritt geplant, aber noch nicht begonnen.
 
 ### Icons (lucide-react)
 
@@ -103,8 +133,9 @@ Sachliche Zusammenfassung der oben belegten Abweichungen, ohne Priorisierung:
 
 1. **Primärfarbe an drei Stellen unabhängig gepflegt**: `jade`-Tailwind-Skala, `--accent`-CSS-Vars pro Theme, und Bridge-Overrides in `index.css` (z. B. `index.css:900-906`, `1343-1348`) — alle drei können bei einer Farbänderung auseinanderlaufen.
 2. **`parchment`-Tailwind-Skala ungenutzt**: Definiert in `tailwind.config.js:29-41`, aber das Parchment-Theme verwendet eigene CSS-Var-Werte, die nicht auf diese Skala mappen.
-3. **Kein geteiltes Button-Component**: `.btn-primary`/`.btn-secondary`/`.btn-ghost` existieren, werden aber an mehreren Stellen (`HomeView.tsx:239-243`, `SettingsModal.tsx:447`, `UndoToast.tsx:25`) durch eigene, leicht abweichende Inline-Varianten ersetzt.
-4. **Drei unabhängige Modal-Implementierungen** mit unterschiedlicher Overlay-Opacity, Backdrop-Blur und Portal-Nutzung (siehe Tabelle oben).
-5. **Border-Radius ohne erkennbare Regel** zwischen `rounded-md`/`lg`/`xl` für konzeptionell ähnliche Container (z. B. `ContextMenu` vs. `UndoToast`).
-6. **Icon-Größen rein ad-hoc** (10–18px), keine Skala, teils uneinheitlich innerhalb derselben Datei.
-7. **`JetBrains Mono` totes Config**: in `tailwind.config.js:46` deklariert, aber nirgends per Font-Link geladen.
+3. **Border-Radius ohne erkennbare Regel** zwischen `rounded-md`/`lg`/`xl` für konzeptionell ähnliche Container (z. B. `ContextMenu` vs. `UndoToast`).
+4. **Icon-Größen rein ad-hoc** (10–18px), keine Skala, teils uneinheitlich innerhalb derselben Datei.
+5. **`JetBrains Mono` totes Config**: in `tailwind.config.js:46` deklariert, aber nirgends per Font-Link geladen.
+
+(Ehemaliger Punkt "drei unabhängige Modal-Implementierungen" ist behoben — siehe [Modals / Dialogs](#modals--dialogs) oben.)
+(Ehemaliger Punkt "kein geteiltes Button-Component" ist behoben — siehe [Buttons](#buttons) oben.)

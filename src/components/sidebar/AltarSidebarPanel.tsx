@@ -21,13 +21,13 @@ import {
   ratioFromResolution,
 } from '../../lib/altarConstants';
 import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
+import Button from '../ui/Button';
 import { useUIStore } from '../../store/uiStore';
 import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
 import { PlacedElementRow, PlacedElementInspector } from './PlacedElementRow';
 import AltarReadingSummary from './AltarReadingSummary';
-
-
-const ALTAR_ICON_EMOJIS = ['🕯️','🔮','🌙','⭐','✨','🌺','🌸','🌼','🌿','🪷','🫧','🌊','🔥','🌑','🌕','☀️','⚡','🌈','🦋','🕊️','🌹','🍀','🪄','💫','🌌','🏔️','🫀','🐉','🦅','🌻'];
+import Modal from '../ui/Modal';
+import EmojiPicker from '../ui/EmojiPicker';
 
 export default function AltarSidebarPanel() {
   const { t } = useTranslation();
@@ -56,7 +56,6 @@ export default function AltarSidebarPanel() {
   const gridOpacityPercent = Math.round((activeAltar?.grid_opacity ?? 0) * 100);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
-  const [showIconPicker, setShowIconPicker] = useState(false);
 const noticeTimerRef = useRef<number | null>(null);
   const [backgroundNotice, setBackgroundNotice] = useState<string | null>(null);
   const [backgroundOpen, setBackgroundOpen] = useState(true);
@@ -268,44 +267,37 @@ const [gridOpen, setGridOpen] = useState(true);
                 className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
               >
                 {faviconOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                Favicon
+                {t('altar.favicon')}
               </button>
               {faviconOpen && (
                 <div className="mt-2 mb-4">
-                  {activeAltar.icon_data ? (
-                    <div className="flex items-center gap-2">
-                      {activeAltar.icon_data.startsWith('data:image/') && !activeAltar.icon_data.startsWith('data:image/svg+xml')
-                        ? <img src={activeAltar.icon_data} alt="" className="w-10 h-10 object-cover rounded-lg border border-stone-700/40 flex-shrink-0" />
-                        : <span className="text-4xl leading-none w-10 h-10 flex items-center justify-center flex-shrink-0">{activeAltar.icon_data}</span>}
-                      <div className="flex flex-col gap-0.5">
-                        <button onClick={() => iconInputRef.current?.click()} className="text-xs text-stone-500 hover:text-stone-300 transition-colors text-left">Bild ändern</button>
-                        <button onClick={() => setShowIconPicker((v) => !v)} className="text-xs text-stone-500 hover:text-stone-300 transition-colors text-left">Emoji wählen</button>
-                        <button onClick={() => updateAltar(activeAltar.id, { icon_data: null })} className="text-xs text-stone-500 hover:text-red-400 transition-colors text-left">Favicon entfernen</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <button onClick={() => iconInputRef.current?.click()} className="flex items-center gap-1.5 text-xs text-stone-600 hover:text-stone-400 transition-colors">
-                        <ImagePlus size={13} /> Bild hinzufügen
-                      </button>
-                      <button onClick={() => setShowIconPicker((v) => !v)} className="flex items-center gap-1.5 text-xs text-stone-600 hover:text-stone-400 transition-colors">
-                        ✨ Emoji wählen
-                      </button>
-                    </div>
-                  )}
-                  {showIconPicker && (
-                    <div className="mt-2 bg-stone-800/60 border border-stone-700/40 rounded-lg p-2">
-                      <div className="flex flex-wrap gap-1">
-                        {ALTAR_ICON_EMOJIS.map((e) => (
-                          <button
-                            key={e}
-                            onClick={() => { updateAltar(activeAltar.id, { icon_data: e }); setShowIconPicker(false); }}
-                            className={`text-lg p-1 rounded hover:bg-stone-700 transition-colors ${activeAltar.icon_data === e ? 'bg-stone-700' : ''}`}
-                          >{e}</button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <EmojiPicker
+                    value={activeAltar.icon_data ?? ''}
+                    onChange={(emoji) => updateAltar(activeAltar.id, { icon_data: emoji })}
+                    trigger={({ toggle }) => (
+                      activeAltar.icon_data ? (
+                        <div className="flex items-center gap-2">
+                          {activeAltar.icon_data.startsWith('data:image/') && !activeAltar.icon_data.startsWith('data:image/svg+xml')
+                            ? <img src={activeAltar.icon_data} alt="" className="w-10 h-10 object-cover rounded-lg border border-stone-700/40 flex-shrink-0" />
+                            : <span className="text-4xl leading-none w-10 h-10 flex items-center justify-center flex-shrink-0">{activeAltar.icon_data}</span>}
+                          <div className="flex flex-col gap-0.5">
+                            <button onClick={() => iconInputRef.current?.click()} className="text-xs text-stone-500 hover:text-stone-300 transition-colors text-left">{t('altar.changeImage')}</button>
+                            <button onClick={toggle} className="text-xs text-stone-500 hover:text-stone-300 transition-colors text-left">{t('altar.chooseEmoji')}</button>
+                            <Button onClick={() => updateAltar(activeAltar.id, { icon_data: null })} variant="danger" className="text-xs text-left">{t('altar.removeFavicon')}</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => iconInputRef.current?.click()} className="flex items-center gap-1.5 text-xs text-stone-600 hover:text-stone-400 transition-colors">
+                            <ImagePlus size={13} /> {t('altar.addImage')}
+                          </button>
+                          <button onClick={toggle} className="flex items-center gap-1.5 text-xs text-stone-600 hover:text-stone-400 transition-colors">
+                            ✨ {t('altar.chooseEmoji')}
+                          </button>
+                        </div>
+                      )
+                    )}
+                  />
                 </div>
               )}
               <button
@@ -431,12 +423,13 @@ const [gridOpen, setGridOpen] = useState(true);
                         >
                           <Pencil size={9} />{t('altar.change')}
                         </button>
-                        <button
+                        <Button
                           onClick={removeGradient}
-                          className="flex flex-1 items-center justify-center gap-1 rounded border border-red-700/60 bg-red-950/30 py-1 text-[10px] uppercase tracking-wide text-red-200 hover:border-red-500 transition-colors"
+                          variant="danger"
+                          className="flex flex-1 items-center justify-center gap-1 rounded border py-1 text-[10px] uppercase tracking-wide bg-[var(--danger-bg)] border-[var(--danger-border)] hover:border-[var(--danger-hover-border)]"
                         >
                           <Trash2 size={9} />{t('altar.remove')}
-                        </button>
+                        </Button>
                         </div>
                       </div>
                     ) : (
@@ -457,13 +450,23 @@ const [gridOpen, setGridOpen] = useState(true);
                       const maxW = 240;
                       const previewW = w >= h ? maxW : Math.round(128 * w / h);
                       const previewH = w >= h ? Math.round(maxW * h / w) : 128;
+                      const revertAndClose = () => {
+                        updateAltar(activeAltar.id, { background_preset: gradientOriginalPreset || DEFAULT_ALTAR_BACKGROUND, background_image_data: null }).catch(console.error);
+                        if (isGradientPreset(gradientOriginalPreset) || ALTAR_BACKGROUND_PRESETS.includes(gradientOriginalPreset as (typeof ALTAR_BACKGROUND_PRESETS)[number])) {
+                          setGradientColorMap((prev) => ({ ...prev, [activeAltar.id]: gradientOriginalColor }));
+                        } else {
+                          setGradientColorMap((prev) => { const next = { ...prev }; delete next[activeAltar.id]; return next; });
+                        }
+                        setGradientModalOpen(false);
+                      };
                       return (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                          <div className="bg-stone-900 border border-stone-700 rounded-xl shadow-2xl w-72 overflow-hidden">
-                            <div className="px-4 py-3 border-b border-stone-700/60">
-                              <span className="text-sm font-medium text-stone-300">{t('altar.backgrounds.gradient')}</span>
-                            </div>
-                            <div className="p-4 space-y-3">
+                        <Modal
+                          title={t('altar.backgrounds.gradient')}
+                          onClose={revertAndClose}
+                          widthClassName="w-72"
+                          bodyClassName="p-4 space-y-3"
+                          className="overflow-hidden"
+                        >
                               <div className="flex justify-center">
                                 <div
                                   className="rounded-lg overflow-hidden border border-stone-700/50"
@@ -507,21 +510,10 @@ const [gridOpen, setGridOpen] = useState(true);
                                 </button>
                               </div>
                               <div className="flex items-center justify-end gap-1">
-                                <button onClick={() => {
-                                  // Revert: restore original preset and colorMap entry
-                                  updateAltar(activeAltar.id, { background_preset: gradientOriginalPreset || DEFAULT_ALTAR_BACKGROUND, background_image_data: null }).catch(console.error);
-                                  if (isGradientPreset(gradientOriginalPreset) || ALTAR_BACKGROUND_PRESETS.includes(gradientOriginalPreset as (typeof ALTAR_BACKGROUND_PRESETS)[number])) {
-                                    setGradientColorMap((prev) => ({ ...prev, [activeAltar.id]: gradientOriginalColor }));
-                                  } else {
-                                    setGradientColorMap((prev) => { const next = { ...prev }; delete next[activeAltar.id]; return next; });
-                                  }
-                                  setGradientModalOpen(false);
-                                }} className="btn-ghost"><X size={13} /></button>
-                                <button onClick={() => { applyGradient(displayColor); setGradientModalOpen(false); }} className="btn-ghost text-jade-400"><Check size={13} /></button>
+                                <Button onClick={revertAndClose} variant="ghost"><X size={13} /></Button>
+                                <Button onClick={() => { applyGradient(displayColor); setGradientModalOpen(false); }} variant="ghost" className="text-jade-400"><Check size={13} /></Button>
                               </div>
-                            </div>
-                          </div>
-                        </div>
+                        </Modal>
                       );
                     })()}
                   </>
@@ -560,12 +552,13 @@ const [gridOpen, setGridOpen] = useState(true);
                   >
                     <Pencil size={9} />{t('altar.change')}
                   </button>
-                  <button
+                  <Button
                     onClick={removeCustomBackground}
-                    className="flex flex-1 items-center justify-center gap-1 rounded border border-red-700/60 bg-red-950/30 py-1 text-[10px] uppercase tracking-wide text-red-200 hover:border-red-500 transition-colors"
+                    variant="danger"
+                    className="flex flex-1 items-center justify-center gap-1 rounded border py-1 text-[10px] uppercase tracking-wide bg-[var(--danger-bg)] border-[var(--danger-border)] hover:border-[var(--danger-hover-border)]"
                   >
                     <Trash2 size={9} />{t('altar.remove')}
-                  </button>
+                  </Button>
                   </div>
                 </div>
               ) : (
@@ -685,10 +678,10 @@ const [gridOpen, setGridOpen] = useState(true);
               {gridOpen && <>
               <div className="mt-2 grid grid-cols-4 gap-1">
                 {([
-                  { key: 'grid_enabled' as const, icon: Grid3x3, label: 'Grid', title: t('altar.gridOverlay'), toggle: () => updateAltarGrid(activeAltar.id, { grid_enabled: !activeAltar.grid_enabled }), active: activeAltar.grid_enabled },
-                  { key: 'snap_to_grid' as const, icon: Magnet, label: 'Snap', title: t('altar.snapToGrid'), toggle: () => updateAltarGrid(activeAltar.id, { snap_to_grid: !activeAltar.snap_to_grid }), active: activeAltar.snap_to_grid },
-                  { key: 'rotation_snap_enabled' as const, icon: RotateCw, label: 'Rotate', title: t('altar.rotationSnap'), toggle: () => updateAltarGrid(activeAltar.id, { rotation_snap_enabled: !activeAltar.rotation_snap_enabled }), active: activeAltar.rotation_snap_enabled },
-                  { key: 'snap_scale_to_grid' as const, icon: Scaling, label: 'Scale', title: t('altar.snapScaleToGrid'), toggle: () => updateAltarGrid(activeAltar.id, { snap_scale_to_grid: !activeAltar.snap_scale_to_grid }), active: activeAltar.snap_scale_to_grid },
+                  { key: 'grid_enabled' as const, icon: Grid3x3, label: t('altar.gridToggleGrid'), title: t('altar.gridOverlay'), toggle: () => updateAltarGrid(activeAltar.id, { grid_enabled: !activeAltar.grid_enabled }), active: activeAltar.grid_enabled },
+                  { key: 'snap_to_grid' as const, icon: Magnet, label: t('altar.gridToggleSnap'), title: t('altar.snapToGrid'), toggle: () => updateAltarGrid(activeAltar.id, { snap_to_grid: !activeAltar.snap_to_grid }), active: activeAltar.snap_to_grid },
+                  { key: 'rotation_snap_enabled' as const, icon: RotateCw, label: t('altar.gridToggleRotate'), title: t('altar.rotationSnap'), toggle: () => updateAltarGrid(activeAltar.id, { rotation_snap_enabled: !activeAltar.rotation_snap_enabled }), active: activeAltar.rotation_snap_enabled },
+                  { key: 'snap_scale_to_grid' as const, icon: Scaling, label: t('altar.gridToggleScale'), title: t('altar.snapScaleToGrid'), toggle: () => updateAltarGrid(activeAltar.id, { snap_scale_to_grid: !activeAltar.snap_scale_to_grid }), active: activeAltar.snap_scale_to_grid },
                 ] as const).map(({ key, icon: Icon, label, title, toggle, active }) => (
                   <button
                     key={key}

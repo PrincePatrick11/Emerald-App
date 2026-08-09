@@ -7,7 +7,9 @@
     "no": "No",
     "delete": "Delete",
     "deleteConfirm": "Delete?",
-    "unsupportedImageFormat": "Unsupported format. Allowed: PNG, JPEG, GIF, WebP, SVG"
+    "unsupportedImageFormat": "Unsupported format. Allowed: PNG, JPEG, GIF, WebP, SVG",
+    "searchEmoji": "Search emoji…",
+    "noEmojiResults": "No matches"
   },
   "listView": {
     "view": "View",
@@ -97,6 +99,10 @@
     "dragHint": "Drag onto the altar to place",
     "readOnlyHint": "Switch to edit mode to change the altar.",
     "uploadImage": "Upload image",
+    "favicon": "Favicon",
+    "changeImage": "Change image",
+    "removeFavicon": "Remove favicon",
+    "addImage": "Add Icon",
     "background": "Background",
     "changeBackground": "Change Background",
     "uploadBackground": "Upload background",
@@ -126,6 +132,10 @@
     "rotationSnap": "Snap rotation angle",
     "rotationSnapAngle": "Angle step (°)",
     "snapScaleToGrid": "Scale to grid",
+    "gridToggleGrid": "Grid",
+    "gridToggleSnap": "Snap",
+    "gridToggleRotate": "Rotate",
+    "gridToggleScale": "Scale",
     "canvasOptions": "Canvas options",
     "resolution": "Resolution",
     "ratio": "Ratio",
@@ -151,11 +161,6 @@
     "summaryActive": "Active",
     "summaryInactive": "Inactive",
     "summaryEditToChange": "Switch to edit mode to change these settings.",
-    "saveImageFormat": "Format",
-    "saveImage": "Save Image …",
-    "saveImageSaving": "Saving …",
-    "saveImageDone": "Saved",
-    "saveImageError": "Save failed",
     "inspector": "Inspector",
     "inspectorX": "X",
     "inspectorY": "Y",
@@ -407,6 +412,7 @@
     "includeOperations": "Operations",
     "includeRoutines": "Routines",
     "includeAltars": "Altars",
+    "includeTasks": "Tasks",
     "includeTags": "Tags",
     "importInclude": "Include",
     "importCategories": "Categories to import",
@@ -481,6 +487,10 @@
     "exportPdf": "Export as PDF…",
     "exportMarkdown": "Export as Markdown…",
     "exportEmerald": "Export as Emerald…",
+    "exportAltarImage": "Export as Image",
+    "exportAltarJpeg": "JPEG…",
+    "exportAltarPng": "PNG…",
+    "exportAltarWebp": "WebP…",
     "importMarkdown": "From Markdown…",
     "importEmerald": "From Emerald…"
   },
@@ -492,6 +502,11 @@
     "tabWiki": "Wiki",
     "tabOperations": "Operations",
     "noResults": "No entries found"
+  },
+  "importDestination": {
+    "title": "Choose destination",
+    "description": "\"{{title}}\" doesn't specify where to import it. Where should it go?",
+    "cancel": "Cancel"
   },
   "tasks": {
     "title": "Tasks",

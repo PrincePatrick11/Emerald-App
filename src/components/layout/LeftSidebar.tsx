@@ -17,6 +17,7 @@ import {
   CheckSquare,
 } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
+import Button from '../ui/Button';
 import { useUndoStore } from '../../store/undoStore';
 import { useState } from 'react';
 import { useUIStore } from '../../store/uiStore';
@@ -152,13 +153,13 @@ export default function LeftSidebar() {
             <BookOpen size={14} />
             {t('nav.journal')}
           </button>
-          <button
+          <Button
             onClick={handleNewJournalEntry}
-            className="btn-ghost"
+            variant="ghost"
             title={t('journal.newEntry')}
           >
             <Plus size={14} />
-          </button>
+          </Button>
         </div>
         <button
           onClick={() => setActiveView({ type: 'tasks' })}

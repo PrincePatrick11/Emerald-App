@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Lock, Unlock, Trash2, Copy, GripVertical } from 'lucide-react';
 import type { AltarPlacement } from '../../types';
 import { AltarItemVisual } from '../altar/AltarItemVisual';
+import Button from '../ui/Button';
 
 export const PlacedElementRow = memo(function PlacedElementRow({
   placement,
@@ -97,13 +98,14 @@ export const PlacedElementRow = memo(function PlacedElementRow({
             >
               {placement.hidden ? <EyeOff size={11} /> : <Eye size={11} />}
             </button>
-            <button
+            <Button
               onClick={onRemove}
-              className={`ml-3 transition-colors ${isSelected ? 'hover:text-red-400' : 'text-stone-500 hover:text-red-400'}`}
+              variant="danger"
+              className="ml-3"
               title={t('altar.removeElement')}
             >
               <Trash2 size={11} />
-            </button>
+            </Button>
           </span>
         )}
       </div>

@@ -37,23 +37,36 @@ src/
 │   │                 CustomPropertiesSection, LinkedOpsInput, LinkedWikiInput,
 │   │                 PlacedElementRow
 │   ├── wiki/         WikiList (rendering + category emoji helper)
-│   └── ui/           ListToolbar, FilterPanel, UndoToast, ContextMenu
+│   └── ui/           ListToolbar, FilterPanel, UndoToast, ContextMenu, ImportDestinationModal,
+│                     Modal (shared modal wrapper), EmojiPicker (shared emoji-picker popover),
+│                     Button (shared primary/secondary/ghost/danger button),
+│                     Dashboard (shared module-overview chrome: topbar/toolbar/filter/grouping)
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, routineStore, customPropertyStore, undoStore,
-│                     trashStore, vaultStore
+│                     trashStore, vaultStore, importStore
+├── hooks/            useCategoryEditor (shared add/edit/delete-with-confirm category logic,
+│                                      used by TasksView, WikiView, OperationsView)
 ├── lib/              db.ts, links.ts, tabs.ts, dragState.ts, altarDragState.ts,
 │                     routineDragState.ts, moonPhase.ts, export.ts,
 │                     exportData.ts, emeraldFormat.ts, vaultManager.ts, dbBackup.ts,
 │                     helpers.ts (incl. isImageIcon, safeParseArray, generateId,
 │                                      hexToRgb, isValidHexColor, readFileAsDataUrl,
 │                                      ACCEPTED_IMAGE_MIME, isAcceptedImageFile),
-│                     altarConstants.ts, styleClasses.ts
+│                     altarConstants.ts, altarExport.ts, styleClasses.ts,
+│                     emojiSearchData/{en,de,es,fr}.json (localised emoji search datasets,
+│                                      generated from emojibase-data, lazy-loaded per locale)
 ├── themes/           emerald-noctis.css, emerald-parchment.css, theme.ts
 ├── i18n/             react-i18next setup + locales/en.json de.json es.json fr.json
 └── types/index.ts    Shared TypeScript interfaces
 
 src-tauri/
-└── src/lib.rs        All Rust commands and application setup
+└── src/
+    ├── lib.rs           Tauri commands, native menu, mouse nav monitor, application setup
+    └── pdf_export/      Native-webview PDF export (one file per platform, #[cfg(target_os)] dispatch)
+        ├── mod.rs           #[cfg(target_os = "…")] re-export of the platform `export_pdf`
+        ├── windows.rs       WebView2 + ICoreWebView2_7::PrintToPdf
+        ├── macos.rs         WKWebView createPDFWithConfiguration
+        └── linux.rs         WebKitGTK WebKitPrintOperation (PrintOperationAction::Export)
 ```
 
 ## Key Architectural Patterns
@@ -83,6 +96,10 @@ This prevents unnecessary re-renders when unrelated fields change.
 ### Rules of Hooks
 
 All `useState`, `useEffect`, `useRef`, `useMemo`, and `useCallback` calls must appear before any early `return` statement in a component. Hooks placed after a conditional return crash the app with a "rendered fewer hooks than expected" error. Move the hook above the condition and use the condition inside the hook's callback if needed.
+
+### Category CRUD (shared hook)
+
+`useCategoryEditor<C>(store, options)` in `src/hooks/useCategoryEditor.ts` extracts the add/edit/delete-with-confirm state and handlers for a module's category list — this logic was near-duplicated across `TasksView`, `WikiView`, and `OperationsView`. It takes the four category-store actions (`addCategory`, `updateCategory`, `deleteCategory`, `restoreCategory`) generically over any `{ id, name, emoji }`-shaped category type, plus a `defaultEmoji` and an optional `onAdded` callback (used by callers that need to auto-select or auto-save after a category is created). Delete-with-confirm pushes an undo entry via `useUndoStore`. Category creation failures are caught and logged consistently across all three call sites (previously only `TasksView` guarded against a failed `addCategory` call).
 
 ### Auto-Save (stale-closure-safe)
 
@@ -259,13 +276,13 @@ Two modules centralise reusable Tailwind class strings to avoid duplication acro
 Altar rendering and editing were split into focused components:
 
 - **`src/components/altar/AltarItemVisual.tsx`** — shared visual renderer for altar items (emoji/image and candle animation treatment).
-- **`src/components/altar/AltarCanvas.tsx`** — canvas scene rendering, placement transforms, drag/drop interactions, lock handling, and grid overlay drawing. The internal `_renderAltar(altar, backgroundSrc, placements, nativeW, nativeH, outW)` function owns the off-screen canvas draw pipeline and is shared by two exported helpers: `captureCurrentAltar(): Promise<string | null>` renders at 640 px wide with adaptive JPEG/WebP quality (0.85 → 0.65 → 0.45) capped at 512 KB — used for dashboard thumbnails, safe to call after unmount; `exportCurrentAltarImage(format?: 'jpeg' | 'png' | 'webp'): Promise<string | null>` renders at the full native resolution with no size limit — used by the "Save Image" button in the view-mode sidebar. The `format` parameter (default `'jpeg'`) controls the output encoding: JPEG at quality 0.97, WebP at quality 0.92, PNG lossless. `captureCurrentAltar` reads altar state from `useAltarStore.getState()` synchronously and is safe to call from a `useEffect` cleanup. The `captureRef` prop mechanism that previously threaded a capture callback through the component tree was removed in favour of these module-level exports. `_renderAltar` draws the grid after the overlay pass (step 3) using the same `resolveResolutionPixels` + `grid_size` → `numCols`/`numRows` arithmetic as the live SVG grid, so captured images and thumbnails are pixel-consistent with the on-screen grid.
+- **`src/components/altar/AltarCanvas.tsx`** — canvas scene rendering, placement transforms, drag/drop interactions, lock handling, and grid overlay drawing. The internal `_renderAltar(altar, backgroundSrc, placements, nativeW, nativeH, outW)` function owns the off-screen canvas draw pipeline and is shared by two exported helpers: `captureCurrentAltar(): Promise<string | null>` renders at 640 px wide with adaptive JPEG/WebP quality (0.85 → 0.65 → 0.45) capped at 512 KB — used for dashboard thumbnails, safe to call after unmount; `exportCurrentAltarImage(format?: 'jpeg' | 'png' | 'webp'): Promise<string | null>` renders at the full native resolution with no size limit — used by `saveAltarImage()` in `src/lib/altarExport.ts`, which backs the native menu's Export → Export as Image items. The `format` parameter (default `'jpeg'`) controls the output encoding: JPEG at quality 0.97, WebP at quality 0.92, PNG lossless. `captureCurrentAltar` reads altar state from `useAltarStore.getState()` synchronously and is safe to call from a `useEffect` cleanup. The `captureRef` prop mechanism that previously threaded a capture callback through the component tree was removed in favour of these module-level exports. `_renderAltar` draws the grid after the overlay pass (step 3) using the same `resolveResolutionPixels` + `grid_size` → `numCols`/`numRows` arithmetic as the live SVG grid, so captured images and thumbnails are pixel-consistent with the on-screen grid.
 - **`src/components/altar/AltarLibraryStrip.tsx`** — docked library strip under canvas (edit mode), compact tiles, and modal CRUD for altar items. The add/edit item dialog is implemented as an `ItemModal` sub-component and the add/edit/delete category dialog as a `CategoryModal` sub-component; each manages its own form state independently. `CategoryModal.save()` wraps the store call in try/catch; a `nameError` state displays the rejection message (e.g. "Category already exists") inline under the name input and clears automatically when the user resumes typing. The strip itself holds only strip-level state (selected tab, library height, drag/reorder state, scroll fade state). `LIBRARY_DEFAULT_HEIGHT` and `UNCATEGORIZED_TAB` are module-scope constants. Category tab drag-to-reorder uses Pointer Events (not HTML5 drag API) for Tauri/WKWebView compatibility. The FLIP animation (`applyFlipAndUpdate`) snapshots tab positions before the state update, applies inverse `translateX` transforms after the DOM updates via `flushSync`, then removes them in a `requestAnimationFrame` tick with a `transition: transform 150ms ease` so tabs visually slide to their new positions. `dragCatIdRef`, `tabRefs`, `liveOrderRef`, and `lastHoverIdRef` coordinate drag state without stale closures; the `pointerup` handler reads the final order from `liveOrderRef` and calls `useAltarStore.getState().reorderCategories(finalOrder)`. The category scroll container hides its scrollbar (`scrollbar-none`) and shows left/right gradient fade overlays (`transition-opacity duration-150`) when content overflows in that direction; `checkCatScroll()` is called on `onScroll` and via `useEffect` after `displayCategories` changes. The `+ Category` button is placed outside the scroll container so it remains visible at all scroll positions.
 - **`src/components/altar/AltarCard.tsx`** — `AltarCard`, `AltarListRow`, and `buildAltarContextMenuActions` — a plain function (not a component) that returns the action list for the altar dashboard context menu. `AltarCard` and `AltarListRow` render the saved thumbnail (`thumbnail_data`) when it is present and starts with `data:image/`; otherwise they fall back to `AltarCardPreview`. The thumbnail area is capped at `max-h-44` in card view. `resolveResolutionPixels` is used (not `parseResolution`) to derive aspect ratio values from the stored resolution string.
 - **`src/components/altar/AltarCardPreview.tsx`** — preview scene used by the dashboard cards and list rows (background + placed items, both compact and full-size variants).
 - **`src/components/altar/AltarRenameField.tsx`** — inline rename input used by the dashboard cards and list rows.
 - **`src/components/sidebar/PlacedElementRow.tsx`** — `PlacedElementRow` and `PlacedElementInspector` for the sidebar's placed-elements list and its inline inspector. `PlacedElementRow` manages its own right-click context-menu state (position + portal render via `createPortal`). The delete button is in the row (Trash icon, rightmost). `PlacedElementInspector` shows a compact 4-column input grid (X, Y, Rot, Scale) plus a custom jade opacity slider (track/fill/thumb with a transparent range overlay). Inspector fields, labels, and unit symbols (`%`, `°`) use stone colour tokens; jade is used only for the selected row highlight (border and background) and the slider fill/thumb. Z-order buttons are not in the inspector — layer order is set by dragging rows in `AltarSidebarPanel`. A `focusedFieldRef` (`useRef<string | null>`) tracks which input is currently focused; the `useEffect` that syncs placement values from the store into draft state depends on all relevant placement fields (`x`, `y`, `width`, `height`, `rotation`, `opacity`, `id`) and skips updating the focused field so canvas drag-resize does not overwrite mid-edit input.
-- **`src/components/sidebar/AltarReadingSummary.tsx`** — read-only sidebar panel shown in altar view mode. Displays a "Enter Fullscreen" button at the top, then a compact summary grid: aspect ratio, background (with swatch preview), overlay (percentage + color), grid (active/inactive + size), and placed element count. Resolves background info (preset name, gradient color, or custom image preview) via `useMemo` and the same constants used by the full editor. Also contains the Save Image block: a save button grouped with a three-button format picker (JPEG / PNG / WebP) in the same card; the selected format is stored in local state (`imageFormat`) and passed to `exportCurrentAltarImage(imageFormat)`; the OS save dialog filter and suggested filename extension are derived from the same value.
+- **`src/components/sidebar/AltarReadingSummary.tsx`** — read-only sidebar panel shown in altar view mode. Displays a "Enter Fullscreen" button at the top, then a compact summary grid: aspect ratio, background (with swatch preview), overlay (percentage + color), grid (active/inactive + size), and placed element count. Resolves background info (preset name, gradient color, or custom image preview) via `useMemo` and the same constants used by the full editor. It no longer contains an image-export control — that moved to the native Export menu (see `src/lib/altarExport.ts` and [Menu enablement gating](#menu-enablement-gating)).
 
 Supporting hooks:
 
@@ -342,8 +359,7 @@ All Rust commands are registered in `src-tauri/src/lib.rs` and invoked from Type
 | `write_file(path, content)` | Write UTF-8 text to a user-selected path. Permitted extensions: `.md`, `.emerald`, `.emeralddb`, `.json`, `.txt`. Path must resolve within allowed storage roots. |
 | `read_file(path)` | Read a file and return its UTF-8 content. Same extension allowlist and root confinement as `write_file`. |
 | `ensure_app_storage_dirs()` | Create app data and app config directories if they don't exist. Called before frontend writes vault metadata or opens SQLite. |
-| `open_pdf_export(html)` | Store the HTML in a static `Mutex<String>`, open a new `pdf-export` window that serves it over a custom `export-html://` URI scheme. |
-| `trigger_print()` | Call `window.print()` on the `pdf-export` window. Invoked by a button in the print window HTML. |
+| `export_pdf(html, path, page_size?)` | Render the supplied HTML to a PDF at `path` by driving the app's own webview. The frontend first prompts the user for a save location via the `dialog` plugin and passes the chosen path here. `page_size`, an optional `(width_in, height_in)` tuple in inches, overrides the default Letter/Portrait page with a custom size — used only by the Altar PDF export (see below); Journal/Wiki/Operations export calls it without `page_size` and gets the old default behavior. Per-platform implementations live in `src-tauri/src/pdf_export/{windows,macos,linux}.rs`, all behind the same `pub async fn export_pdf` signature; `mod.rs` does the `#[cfg(target_os = "…")]` re-export so `lib.rs` calls `pdf_export::export_pdf` without knowing which platform it's on. |
 | `update_menu_labels(...)` | Update native menu item labels for i18n (edit, view, export, import submenus and their items). |
 
 Tauri menu events (not `invoke`) are emitted by the native menu and received in `AppShell` via `listen()`:
@@ -358,3 +374,82 @@ Tauri menu events (not `invoke`) are emitted by the native menu and received in 
 | `reset-sidebar-widths` | View > Reset View |
 | `navigate-back` | Mouse back button (macOS NSEvent monitor) |
 | `navigate-forward` | Mouse forward button (macOS NSEvent monitor) |
+
+## PDF Export
+
+Emerald renders PDFs by driving the app's own embedded webview rather than bundling a separate HTML-to-PDF engine. The implementation is split across one module file per platform, dispatched at compile time by `#[cfg(target_os = "…")]` in `src-tauri/src/pdf_export/mod.rs`, so `lib.rs` only has to call `pdf_export::export_pdf(&app, html, path, page_size).await` regardless of the host OS.
+
+The same command backs two distinct export flows, distinguished by what's currently open (see [Menu enablement gating](#menu-enablement-gating) below): Journal/Wiki/Operations entries export their text content at the default Letter/Portrait page size; an open Altar (reading view) instead exports its rendered image at a page size matching the altar's own aspect ratio, via the optional `page_size` parameter.
+
+### Flow — Journal / Wiki / Operations (entry text)
+
+```
+frontend export.ts:exportAsPDF
+    ↓  build full HTML (DOMPurify, transformInternalLinks, embedImages)
+frontend save() dialog → user picks destination path
+    ↓  invoke('export_pdf', { html, path })   // no page_size → default Letter/Portrait
+src-tauri/src/lib.rs:export_pdf
+    ↓  pdf_export::export_pdf(&app, html, path, None).await
+src-tauri/src/pdf_export/{windows,macos,linux}.rs
+    ↓  write HTML to a unique temp file (file:// URL)
+    ↓  build a hidden WebviewWindow pointing at that file
+    ↓  wait for PageLoadEvent::Finished via tokio::sync::oneshot
+    ↓  with_webview(...) → call platform's native PDF API
+    ↓  close the hidden window + remove the temp file
+    ↓  return Result<(), String> → frontend toasts success/failure
+```
+
+### Flow — Altar (rendered image)
+
+```
+frontend altarExport.ts:saveAltarPDF
+    ↓  exportCurrentAltarImage('png')  // same capture path as "Export as Image"
+    ↓  pdfPageSizeForResolution(resolution) → [widthIn, heightIn]
+    ↓  build minimal HTML: single <img> filling the page (object-fit: cover, 2% overscan
+    ↓    to hide a rounding-induced hairline gap at some aspect ratios)
+frontend save() dialog → user picks destination path
+    ↓  invoke('export_pdf', { html, path, pageSize: [widthIn, heightIn] })
+src-tauri/src/lib.rs:export_pdf
+    ↓  pdf_export::export_pdf(&app, html, path, Some((widthIn, heightIn))).await
+    ↓  (same hidden-webview flow as above; Windows applies page_size as a
+    ↓   custom print media size, macOS/Linux currently ignore it — see below)
+```
+
+All three platforms share the same shape — hidden webview, oneshot-coordinated page-load wait, `with_webview` to reach the platform webview, native PDF API call, hidden window + temp file cleanup in a `Drop`-style guard. The differences are entirely in step 4 (the platform webview API) and in how (or whether) `page_size` is honored.
+
+### Per-platform implementations
+
+- **Windows (`src-tauri/src/pdf_export/windows.rs`)** — implemented and tested end-to-end. Builds a hidden `WebviewWindow` with `WebviewWindowBuilder`, waits for `PageLoadEvent::Finished` via a `oneshot` signalled from `on_page_load`, then calls `with_webview` to reach the WebView2 controller. Casts the core to `ICoreWebView2_7` and invokes `PrintToPdf(PCWSTR, settings, ICoreWebView2PrintToPdfCompletedHandler)`. When `page_size` is `Some`, it is applied as a custom media size before printing: `ICoreWebView2_2::Environment` → `ICoreWebView2Environment6::CreatePrintSettings` builds an `ICoreWebView2PrintSettings`, cast to `ICoreWebView2PrintSettings2` to call `SetMediaSize(COREWEBVIEW2_PRINT_MEDIA_SIZE_CUSTOM)`, then `SetPageWidth`/`SetPageHeight` (inches) and all four margins set to 0. If building the custom settings fails for any reason, the export falls back to `PrintToPdf`'s default Letter/Portrait settings rather than aborting. The COM completion handler runs on a worker thread; the Rust side bridges it back to async with a second `oneshot` wrapped in `Arc<Mutex<Option<_>>>` so the handler can move it out. Two timeouts cap the operation: 30 s for the page-load wait and 120 s for `PrintToPdf` itself.
+- **macOS (`src-tauri/src/pdf_export/macos.rs`)** — implemented and verified on real hardware. Same shape. Reaches the `WKWebView` pointer via `with_webview` and calls `createPDFWithConfiguration:completionHandler:`. The completion handler runs on a background queue and is bridged back to async with a `block2::RcBlock` + `oneshot`; the closure parameters are raw Objective-C pointer types (`*mut NSData`, `*mut NSError`) as required by the `IntoBlock` trait in block2 0.6. `WKPDFConfiguration::new` is called inside an `unsafe` block (required by `objc2-web-kit` 0.3). `MainThreadMarker` is acquired inside the `with_webview` closure because that closure dispatches us to the AppKit main thread. PDF bytes are extracted from the `NSData` result via `msg_send![data, bytes]` / `msg_send![data, length]` and written to disk with Rust's `std::fs::write` (the `NSData` selector `writeToFile:atomically:error:` does not exist; use `writeToFile:atomically:` or `writeToFile:options:error:` if switching back to the ObjC API). `page_size` is accepted but currently unused (`_page_size`) — honoring it would need `WKPDFConfiguration.rect` sized in points; left for a future change.
+- **Linux (`src-tauri/src/pdf_export/linux.rs`)** — implemented, but **not yet verified on real hardware**. Same shape. Uses `WebKitPrintOperation` configured with `PrintOperationOutputFormat::Pdf` and `output_uri = "file://<path>"`, then calls `print(PrintOperationAction::Export)`. The synchronous Rust binding blocks inside `with_webview` until the operation finishes writing the PDF; a post-check `stat`s the output file and returns an error if it landed as a zero-byte PDF (the WebKit print API can succeed while producing an empty file). Supported distro matrix: Ubuntu 22.04 LTS and 24.04 LTS. `page_size` is accepted but currently unused (`_page_size`) — honoring it would need a custom `GtkPaperSize`; left for a future change, same verification caveat as above.
+
+### Frontend responsibilities
+
+Because the hidden webview inherits the app CSP (`script-src 'self'`, see `tauri.conf.json`), the frontend does everything that the old print-window approach did with inline JavaScript before it hands the HTML to Rust:
+
+- `transformInternalLinks(html)` in `src/lib/export.ts` walks every `<span data-type="internalLink">` and bakes the chip (icon `<img>`/`<span>` + label `<span>`) into the DOM. This replaces the `TRANSFORM_LINKS_JS` inline `<script>` that the old print window ran, and is required because the new webview's CSP blocks inline scripts.
+- `embedImages(html)` resolves every file-backed `src="…"` to a base64 data-URL via the `read_image_as_base64` IPC command before export. The hidden webview runs on a `file://` URL and would otherwise not have access to images stored outside the document directory.
+- `resolveInternalLinkIcons(html)` fills in missing `data-icon` attributes from the live store state at export time, so chips saved without an icon still render correctly.
+- DOMPurify sanitisation runs in TypeScript before the HTML is passed to the backend, with the TipTap internal-link attributes explicitly allowlisted so chips survive the pass intact.
+
+### Menu enablement gating
+
+The three "Export as …" menu items (`export-pdf`, `export-markdown`, `export-emerald`) share one submenu but are not all gated identically: Markdown is entry-only, while PDF and Emerald are also available for altars. There is no separate "Export Altar as PDF" menu item — `export-pdf` is reused and its handler branches on what's currently open. The gating is done in two places:
+
+- **Rust (`src-tauri/src/lib.rs`)** — the menu items are constructed with `enabled: false` in the `setup` block, so they start greyed out. The `set_export_menu_enabled(app, entry_enabled, pdf_enabled, emerald_enabled)` Tauri command walks the `export-submenu` and sets `export-markdown` from `entry_enabled`, `export-pdf` from `pdf_enabled`, and `export-emerald` from `emerald_enabled`, all independently.
+- **Frontend (`src/components/layout/AppShell.tsx`)** — a single `useEffect` keyed on `activeView.type`, `activeView.id`, and `activeView.mode` calls `invoke('set_export_menu_enabled', { entryEnabled, pdfEnabled, emeraldEnabled })` with `entryEnabled = (activeView.type ∈ {journal, wiki}) && !!activeView.id`, and both `pdfEnabled` and `emeraldEnabled` set to `entryEnabled || (activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit')`. The same effect also calls `set_altar_export_menu_enabled` (see below), since all three depend on the same view-state inputs. The `export-pdf` listener itself re-reads `useUIStore.getState().activeView` at click time: if it resolves to an Altar reading view, it calls `saveAltarPDF()` (`src/lib/altarExport.ts`) instead of the usual `exportAsPDF(data)` path.
+
+  **Sigil-category Operations are temporarily excluded from `entryEnabled`.** `isEntryView` computes `isSigilOperation` (an open Operations entry whose `category_id === 'sigils'`) and requires `activeView.type === 'operations' && !isSigilOperation`, so all three "Export as …" items are disabled specifically while a Sigil is open — Sigils have their own dedicated view (`OperationSigilView`) and export isn't wired up for that category yet. Non-Sigil Operations (e.g. Servitors, custom categories) are unaffected and export normally. This is a stopgap, not a permanent restriction: remove the `!isSigilOperation` condition once Sigil export is implemented and verified. Journal, Wiki, non-Sigil Operations, and the Altar reading-view export path are all unaffected.
+
+There is still only one `export-emerald` menu item — it is not duplicated per content type; `exportAsEmerald()` in `src/lib/emeraldFormat.ts` branches internally on `activeView.type` to export either the open entry or the open altar. The same one-menu-item-branches-internally pattern now also applies to `export-pdf`.
+
+**Altar "Export as Image" submenu.** A nested `Submenu` (id `export-altar-image`, containing `MenuItem`s `export-altar-jpeg` / `export-altar-png` / `export-altar-webp`) sits inside `export-submenu`, separated from the entry-export items by a `PredefinedMenuItem::separator`. It follows the same two-place gating pattern, but with a different condition — it is only meaningful while an Altar is open in **reading view** (not edit mode):
+
+- **Rust** — `set_altar_export_menu_enabled(app, enabled)` walks `export-submenu` to find the `export-altar-image` submenu, toggles the submenu itself (`enabled: false` at construction) plus its three child `MenuItem`s in one call.
+- **Frontend** — a separate `useEffect` keyed on `activeView.type`, `activeView.id`, and `activeView.mode` calls `invoke('set_altar_export_menu_enabled', { enabled })` with `enabled = activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit'`.
+- Clicking a leaf item emits `export-altar-jpeg` / `export-altar-png` / `export-altar-webp`, which `AppShell.tsx` listens for and forwards to `saveAltarImage(format)` (`src/lib/altarExport.ts`) — the same `exportCurrentAltarImage()` capture path formerly wired to the in-sidebar "Save Image" button.
+- `update_menu_labels` was extended with `export_altar_image` / `export_altar_jpeg` / `export_altar_png` / `export_altar_webp` params and traverses into the nested submenu to relabel it and its children on language change.
+
+### Bridging imperative menu-event code to a React modal
+
+`import-markdown` is a Tauri menu event, so its handler (`importFromMarkdown()` in `src/lib/emeraldFormat.ts`) runs as plain imperative code with no component tree to render a confirmation dialog into. When the parsed file's frontmatter has no usable `type`, the import needs the user to pick a destination before it can continue — `src/store/importStore.ts` bridges this gap with a promise-based Zustand store: `askDestination(title)` sets `pending = { title, resolve }` and returns a `Promise<ImportDestinationType | null>` that does not resolve until the store's `choose(type)` or `cancel()` action is called. `ImportDestinationModal` (mounted globally in `AppShell`, alongside `UndoToast`) subscribes to `pending` and renders only when it's non-null; clicking an option calls `choose`, clicking outside/Escape/Cancel calls `cancel` (resolves `null`). `importFromMarkdown()` awaits the promise and treats `null` as a full import abort (`return` before any DB write). This pattern — an imperative caller `await`s a store method, a mounted-once modal component resolves it — is the template for any future case where non-component code needs a blocking user decision.

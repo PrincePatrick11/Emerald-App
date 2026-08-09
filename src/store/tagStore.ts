@@ -3,6 +3,7 @@ import { getDb } from '../lib/db';
 import { useJournalStore } from './journalStore';
 import { useWikiStore } from './wikiStore';
 import { useOperationStore } from './operationStore';
+import { useTaskStore } from './taskStore';
 import { generateId, nowIso } from '../lib/helpers';
 import type { Tag } from '../types';
 
@@ -15,7 +16,7 @@ function randomColor() {
   return TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)];
 }
 
-interface AffectedEntry { id: string; type: 'journal' | 'wiki' | 'operation' }
+interface AffectedEntry { id: string; type: 'journal' | 'wiki' | 'operation' | 'task' }
 
 interface TagState {
   tags: Tag[];
@@ -77,6 +78,7 @@ export const useTagStore = create<TagState>((set, get) => ({
     const { entries, updateEntry } = useJournalStore.getState();
     const { articles, updateArticle } = useWikiStore.getState();
     const { operations, updateOperation } = useOperationStore.getState();
+    const { tasks, updateTask } = useTaskStore.getState();
     const affected: AffectedEntry[] = [];
 
     for (const entry of entries) {
@@ -95,6 +97,12 @@ export const useTagStore = create<TagState>((set, get) => ({
       if (op.tags?.includes(name)) {
         affected.push({ id: op.id, type: 'operation' });
         await updateOperation(op.id, { tags: op.tags.filter((t) => t !== name) });
+      }
+    }
+    for (const task of tasks) {
+      if (task.tags?.includes(name)) {
+        affected.push({ id: task.id, type: 'task' });
+        await updateTask(task.id, { tags: task.tags.filter((t) => t !== name) });
       }
     }
 
@@ -124,6 +132,7 @@ export const useTagStore = create<TagState>((set, get) => ({
     const { entries, updateEntry } = useJournalStore.getState();
     const { articles, updateArticle } = useWikiStore.getState();
     const { operations, updateOperation } = useOperationStore.getState();
+    const { tasks, updateTask } = useTaskStore.getState();
     for (const { id: eid, type } of affected) {
       if (type === 'journal') {
         const entry = entries.find((e) => e.id === eid);
@@ -139,6 +148,11 @@ export const useTagStore = create<TagState>((set, get) => ({
         const op = operations.find((o) => o.id === eid);
         if (op && !op.tags?.includes(name)) {
           await updateOperation(eid, { tags: [...(op.tags ?? []), name] });
+        }
+      } else if (type === 'task') {
+        const task = tasks.find((t) => t.id === eid);
+        if (task && !task.tags?.includes(name)) {
+          await updateTask(eid, { tags: [...(task.tags ?? []), name] });
         }
       }
     }

@@ -7,7 +7,9 @@
     "no": "Non",
     "delete": "Supprimer",
     "deleteConfirm": "Supprimer ?",
-    "unsupportedImageFormat": "Format non supporté. Autorisé : PNG, JPEG, GIF, WebP, SVG"
+    "unsupportedImageFormat": "Format non supporté. Autorisé : PNG, JPEG, GIF, WebP, SVG",
+    "searchEmoji": "Rechercher un emoji…",
+    "noEmojiResults": "Aucun résultat"
   },
   "listView": {
     "view": "Vue",
@@ -97,6 +99,10 @@
     "dragHint": "Glisser sur l'autel pour placer",
     "readOnlyHint": "Passez en mode édition pour modifier l'autel.",
     "uploadImage": "Télécharger une image",
+    "favicon": "Favicon",
+    "changeImage": "Changer l'image",
+    "removeFavicon": "Supprimer le favicon",
+    "addImage": "Ajouter une image",
     "background": "Arrière-plan",
     "changeBackground": "Changer l'arrière-plan",
     "uploadBackground": "Télécharger un arrière-plan",
@@ -126,6 +132,10 @@
     "rotationSnap": "Aligner l'angle de rotation",
     "rotationSnapAngle": "Pas d'angle (°)",
     "snapScaleToGrid": "Mettre à l'échelle de la grille",
+    "gridToggleGrid": "Grille",
+    "gridToggleSnap": "Aligner",
+    "gridToggleRotate": "Rotation",
+    "gridToggleScale": "Échelle",
     "canvasOptions": "Options de la toile",
     "resolution": "Résolution",
     "ratio": "Format",
@@ -151,11 +161,6 @@
     "summaryActive": "Actif",
     "summaryInactive": "Inactif",
     "summaryEditToChange": "Passez en mode édition pour modifier ces paramètres.",
-    "saveImageFormat": "Format",
-    "saveImage": "Enregistrer l'image …",
-    "saveImageSaving": "Enregistrement …",
-    "saveImageDone": "Enregistré",
-    "saveImageError": "Échec de l'enregistrement",
     "inspector": "Inspecteur",
     "inspectorX": "X",
     "inspectorY": "Y",
@@ -415,6 +420,7 @@
     "includeOperations": "Opérations",
     "includeRoutines": "Routines",
     "includeAltars": "Autels",
+    "includeTasks": "Tâches",
     "includeTags": "Tags",
     "importInclude": "Inclure",
     "importCategories": "Catégories à importer",
@@ -481,6 +487,10 @@
     "exportPdf": "Exporter en PDF…",
     "exportMarkdown": "Exporter en Markdown…",
     "exportEmerald": "Exporter en Emerald…",
+    "exportAltarImage": "Exporter en image",
+    "exportAltarJpeg": "JPEG…",
+    "exportAltarPng": "PNG…",
+    "exportAltarWebp": "WebP…",
     "importMarkdown": "Depuis Markdown…",
     "importEmerald": "Depuis Emerald…"
   },
@@ -492,6 +502,11 @@
     "tabWiki": "Wiki",
     "tabOperations": "Opérations",
     "noResults": "Aucune entrée trouvée"
+  },
+  "importDestination": {
+    "title": "Choisir la destination",
+    "description": "« {{title}} » ne précise pas où l'importer. Où doit-il être importé ?",
+    "cancel": "Annuler"
   },
   "tasks": {
     "title": "Tâches",

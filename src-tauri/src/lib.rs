@@ -1,13 +1,18 @@
 use base64::{engine::general_purpose, Engine as _};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 
-// ── PDF export state ──────────────────────────────────────────────────────────
-
-static EXPORT_HTML: Mutex<String> = Mutex::new(String::new());
+/// Native-webview PDF export. Each platform owns its own implementation
+/// in `pdf_export/{windows,macos,linux}.rs`, all behind the same
+/// `pub async fn export_pdf` signature; `mod.rs` does the
+/// per-`#[cfg(target_os)]` re-export.
+///
+/// See `tmp/pdf-export-native-webview.md` for the design history (the
+/// plan that replaced the old bundled `wkhtmltopdf.exe` subprocess with
+/// driving the app's own webview).
+mod pdf_export;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -264,36 +269,25 @@ fn ensure_app_storage_dirs(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Triggers the system print dialog on the pdf-export window.
+/// Renders the given HTML to a PDF file at `path` by driving the
+/// platform's own webview. See `pdf_export::{windows,macos,linux}.rs`
+/// for the per-platform implementation; `pdf_export::mod.rs` does the
+/// `#[cfg(target_os = "…")]` re-export so this is a one-liner.
+///
+/// The frontend first prompts the user for a save location via the
+/// `dialog` plugin and passes the chosen path here. The pre-migration
+/// implementation bundled a `wkhtmltopdf.exe` subprocess (~42 MB, LGPL,
+/// 2015-era Qt WebKit, no working macOS build); it was replaced because
+/// the app's own WebView2 / WKWebView / WebKitGTK does the same job
+/// with smaller install, modern CSS, and native color emoji.
+///
+/// `page_size`, when present, is `(width_in, height_in)` in inches and
+/// overrides the default Letter/Portrait page with a custom size —
+/// used by the Altar PDF export so the page matches the altar's own
+/// aspect ratio instead of leaving it letterboxed on a portrait page.
 #[tauri::command]
-fn trigger_print(app: tauri::AppHandle) -> Result<(), String> {
-    if let Some(w) = app.get_webview_window("pdf-export") {
-        w.print().map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-/// Opens a new window that renders the given HTML and immediately triggers
-/// the system print dialog — on macOS the user can "Save as PDF" there.
-#[tauri::command]
-fn open_pdf_export(app: tauri::AppHandle, html: String) -> Result<(), String> {
-    *EXPORT_HTML.lock().map_err(|e| e.to_string())? = html;
-
-    // Close any leftover export window
-    if let Some(w) = app.get_webview_window("pdf-export") {
-        w.close().ok();
-    }
-
-    let url = url::Url::parse("export-html://localhost/")
-        .map_err(|e| e.to_string())?;
-
-    tauri::WebviewWindowBuilder::new(&app, "pdf-export", tauri::WebviewUrl::CustomProtocol(url))
-        .title("Export as PDF")
-        .inner_size(816.0, 1100.0)
-        .build()
-        .map_err(|e| e.to_string())?;
-
-    Ok(())
+async fn export_pdf(app: tauri::AppHandle, html: String, path: String, page_size: Option<(f64, f64)>) -> Result<(), String> {
+    pdf_export::export_pdf(&app, html, path, page_size).await
 }
 
 /// Deletes image files in the images dir that are not in `used_paths`
@@ -401,6 +395,63 @@ fn install_mouse_nav_monitor(app_handle: tauri::AppHandle) {
     }
 }
 
+/// Toggles the enabled state of the "Export to …" menu items. `entry_enabled`
+/// covers Markdown (journal / wiki / operations only); `pdf_enabled` covers
+/// PDF, which is also available while an Altar's reading view is open (it
+/// exports the rendered altar image instead of entry content in that case);
+/// `emerald_enabled` covers the shared Emerald export, also available for an
+/// open Altar. Called by the frontend on every view change.
+#[tauri::command]
+fn set_export_menu_enabled(app: tauri::AppHandle, entry_enabled: bool, pdf_enabled: bool, emerald_enabled: bool) {
+    use tauri::menu::MenuItemKind;
+    let Some(menu) = app.menu() else { return };
+
+    for kind in menu.items().unwrap_or_default() {
+        if let MenuItemKind::Submenu(sub) = &kind {
+            if sub.id().0.as_str() != "export-submenu" { continue; }
+            for child in sub.items().unwrap_or_default() {
+                if let MenuItemKind::MenuItem(item) = &child {
+                    match item.id().0.as_str() {
+                        "export-pdf" => { item.set_enabled(pdf_enabled).ok(); }
+                        "export-markdown" => { item.set_enabled(entry_enabled).ok(); }
+                        "export-emerald" => { item.set_enabled(emerald_enabled).ok(); }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Toggles the enabled state of the "Export as Image" submenu (and its
+/// JPEG/PNG/WebP children). Called by the frontend whenever the active
+/// view changes, so it's only clickable while an Altar's reading view is open.
+#[tauri::command]
+fn set_altar_export_menu_enabled(app: tauri::AppHandle, enabled: bool) {
+    use tauri::menu::MenuItemKind;
+    let Some(menu) = app.menu() else { return };
+
+    for kind in menu.items().unwrap_or_default() {
+        if let MenuItemKind::Submenu(sub) = &kind {
+            if sub.id().0.as_str() != "export-submenu" { continue; }
+            for child in sub.items().unwrap_or_default() {
+                if let MenuItemKind::Submenu(image_sub) = &child {
+                    if image_sub.id().0.as_str() != "export-altar-image" { continue; }
+                    image_sub.set_enabled(enabled).ok();
+                    for leaf in image_sub.items().unwrap_or_default() {
+                        if let MenuItemKind::MenuItem(item) = &leaf {
+                            let leaf_id = item.id().0.as_str();
+                            if matches!(leaf_id, "export-altar-jpeg" | "export-altar-png" | "export-altar-webp") {
+                                item.set_enabled(enabled).ok();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[tauri::command]
 fn update_menu_labels(
     app: tauri::AppHandle,
@@ -412,6 +463,10 @@ fn update_menu_labels(
     export_pdf: String,
     export_markdown: String,
     export_emerald: String,
+    export_altar_image: String,
+    export_altar_jpeg: String,
+    export_altar_png: String,
+    export_altar_webp: String,
     import_markdown: String,
     import_emerald: String,
 ) {
@@ -448,6 +503,23 @@ fn update_menu_labels(
                     if let Some(text) = new_child_text {
                         item.set_text(text).ok();
                     }
+                } else if let MenuItemKind::Submenu(image_sub) = &child {
+                    if image_sub.id().0.as_str() != "export-altar-image" { continue; }
+                    image_sub.set_text(export_altar_image.as_str()).ok();
+                    for leaf in image_sub.items().unwrap_or_default() {
+                        if let MenuItemKind::MenuItem(item) = &leaf {
+                            let leaf_id = item.id().0.as_str().to_owned();
+                            let new_leaf_text = match leaf_id.as_str() {
+                                "export-altar-jpeg" => Some(export_altar_jpeg.as_str()),
+                                "export-altar-png"  => Some(export_altar_png.as_str()),
+                                "export-altar-webp" => Some(export_altar_webp.as_str()),
+                                _ => None,
+                            };
+                            if let Some(text) = new_leaf_text {
+                                item.set_text(text).ok();
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -456,14 +528,6 @@ fn update_menu_labels(
 
 pub fn run() {
     tauri::Builder::default()
-        .register_uri_scheme_protocol("export-html", |_app, _request| {
-            let html = EXPORT_HTML.lock().unwrap().clone();
-            tauri::http::Response::builder()
-                .status(200)
-                .header("content-type", "text/html; charset=utf-8")
-                .body(html.into_bytes())
-                .unwrap()
-        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_sql::Builder::new().build())
@@ -476,8 +540,9 @@ pub fn run() {
             write_file,
             read_file,
             ensure_app_storage_dirs,
-            open_pdf_export,
-            trigger_print,
+            export_pdf,
+            set_export_menu_enabled,
+            set_altar_export_menu_enabled,
             update_menu_labels,
         ])
         .setup(|app| {
@@ -514,33 +579,72 @@ pub fn run() {
                 None::<&str>,
             )?;
             let view_submenu = Submenu::with_id_and_items(app, "view-submenu", "View", true, &[&reset_item])?;
+            // Export items start disabled — the frontend enables them once a
+            // journal / wiki / operations entry is actually open (PDF is also
+            // enabled while an Altar's reading view is open).
             let export_pdf_item = MenuItem::with_id(
                 app,
                 "export-pdf",
                 "Export as PDF…",
-                true,
+                false,
                 None::<&str>,
             )?;
             let export_md_item = MenuItem::with_id(
                 app,
                 "export-markdown",
                 "Export as Markdown…",
-                true,
+                false,
                 None::<&str>,
             )?;
             let export_emerald_item = MenuItem::with_id(
                 app,
                 "export-emerald",
                 "Export as Emerald…",
-                true,
+                false,
                 None::<&str>,
+            )?;
+            // Altar image export — starts disabled, the frontend enables it
+            // only while an Altar's reading view is open.
+            let export_altar_jpeg_item = MenuItem::with_id(
+                app,
+                "export-altar-jpeg",
+                "JPEG…",
+                false,
+                None::<&str>,
+            )?;
+            let export_altar_png_item = MenuItem::with_id(
+                app,
+                "export-altar-png",
+                "PNG…",
+                false,
+                None::<&str>,
+            )?;
+            let export_altar_webp_item = MenuItem::with_id(
+                app,
+                "export-altar-webp",
+                "WebP…",
+                false,
+                None::<&str>,
+            )?;
+            let export_altar_image_submenu = Submenu::with_id_and_items(
+                app,
+                "export-altar-image",
+                "Export as Image",
+                false,
+                &[&export_altar_jpeg_item, &export_altar_png_item, &export_altar_webp_item],
             )?;
             let export_submenu = Submenu::with_id_and_items(
                 app,
                 "export-submenu",
                 "Export",
                 true,
-                &[&export_pdf_item, &export_md_item, &export_emerald_item],
+                &[
+                    &export_pdf_item,
+                    &export_md_item,
+                    &export_emerald_item,
+                    &PredefinedMenuItem::separator(app)?,
+                    &export_altar_image_submenu,
+                ],
             )?;
             let import_md_item = MenuItem::with_id(
                 app,
@@ -572,6 +676,9 @@ pub fn run() {
                     "export-pdf"           => { app.emit("export-pdf", ()).ok(); }
                     "export-markdown"      => { app.emit("export-markdown", ()).ok(); }
                     "export-emerald"       => { app.emit("export-emerald", ()).ok(); }
+                    "export-altar-jpeg"    => { app.emit("export-altar-jpeg", ()).ok(); }
+                    "export-altar-png"     => { app.emit("export-altar-png", ()).ok(); }
+                    "export-altar-webp"    => { app.emit("export-altar-webp", ()).ok(); }
                     "import-markdown"      => { app.emit("import-markdown", ()).ok(); }
                     "import-emerald"       => { app.emit("import-emerald", ()).ok(); }
                     _ => {}

@@ -7,7 +7,8 @@ import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { formatDistanceToNow, differenceInDays, format } from 'date-fns';
-import ListToolbar from '../ui/ListToolbar';
+import Dashboard from '../ui/Dashboard';
+import Button from '../ui/Button';
 import type { TrashedItem } from '../../types';
 import type { SortMode } from '../../store/uiStore';
 
@@ -102,18 +103,20 @@ function ItemRow({ item, confirmingId, setConfirmingId, restore, handlePermanent
         {confirming ? (
           <>
             <span className="text-xs text-stone-400">{t('trash.sure')}</span>
-            <button
+            <Button
               onClick={() => handlePermanentDelete(item)}
-              className="text-xs text-red-400 hover:text-red-300 px-2.5 py-1.5 rounded hover:bg-red-400/10 transition-colors"
+              variant="danger"
+              className="text-xs px-2.5 py-1.5"
             >
               {t('trash.confirmYes')}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setConfirmingId(null)}
-              className="text-xs text-stone-500 hover:text-stone-300 px-2 py-1.5 rounded"
+              variant="ghost"
+              className="text-xs px-2 py-1.5"
             >
               {t('trash.confirmNo')}
-            </button>
+            </Button>
           </>
         ) : (
           <>
@@ -124,12 +127,13 @@ function ItemRow({ item, confirmingId, setConfirmingId, restore, handlePermanent
               <RotateCcw size={12} />
               {t('trash.restore')}
             </button>
-            <button
+            <Button
               onClick={() => handlePermanentDelete(item)}
-              className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 px-2.5 py-1.5 rounded hover:bg-red-400/10 transition-colors"
+              variant="danger"
+              className="flex items-center gap-1.5 px-2.5 py-1.5"
             >
               <Trash2 size={12} />
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -167,21 +171,21 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, handlePermanen
         {confirming ? (
           <>
             <span className="text-xs text-stone-400">{t('trash.sure')}</span>
-            <button onClick={() => handlePermanentDelete(item)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-400/10 transition-colors">
+            <Button onClick={() => handlePermanentDelete(item)} variant="danger" className="text-xs px-2 py-1">
               {t('trash.confirmYes')}
-            </button>
-            <button onClick={() => setConfirmingId(null)} className="text-xs text-stone-500 hover:text-stone-300 px-2 py-1 rounded">
+            </Button>
+            <Button onClick={() => setConfirmingId(null)} variant="ghost" className="text-xs px-2 py-1">
               {t('trash.confirmNo')}
-            </button>
+            </Button>
           </>
         ) : (
           <>
             <button onClick={() => restore(item)} className="trash-restore-btn flex items-center gap-1 text-xs text-jade-400 hover:text-jade-300 px-2 py-1 rounded hover:bg-jade-400/10 transition-colors">
               <RotateCcw size={11} />{t('trash.restore')}
             </button>
-            <button onClick={() => handlePermanentDelete(item)} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-400/10 transition-colors">
+            <Button onClick={() => handlePermanentDelete(item)} variant="danger" className="flex items-center gap-1 px-2 py-1">
               <Trash2 size={11} />
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -375,98 +379,109 @@ export default function TrashView() {
   const hasSelection = selectedIds.size > 0;
   const allSelected = items.length > 0 && selectedIds.size === items.length;
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 h-14 border-b border-stone-700/60">
-        <div className="flex items-center gap-3">
-          <Trash2 size={18} className="text-stone-500" />
-          <h1 className="text-lg font-semibold text-stone-200">{t('trash.title')}</h1>
-          {items.length > 0 && (
-            <span className="text-xs text-stone-500 bg-stone-700/50 px-2 py-0.5 rounded-full">
-              {items.length}
-            </span>
-          )}
-          {items.length > 0 && (
-            <button
-              onClick={allSelected ? deselectAll : selectAll}
-              className="text-xs text-stone-500 hover:text-stone-300 transition-colors"
-            >
-              {allSelected ? t('trash.deselectAll') : t('trash.selectAll')}
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {hasSelection && (
-            <>
-              {confirmingBulkDelete && (
-                <span className="text-xs text-stone-400">{t('trash.sure')}</span>
-              )}
-              <button
-                onClick={handleBulkDelete}
-                className="trash-bulk-delete-btn flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-md hover:bg-red-400/10"
-              >
-                <Trash2 size={12} />
-                {confirmingBulkDelete
-                  ? t('trash.confirmYes')
-                  : t('trash.deleteSelected', { count: selectedIds.size })}
-              </button>
-              {confirmingBulkDelete && (
-                <button onClick={() => setConfirmingBulkDelete(false)} className="text-xs text-stone-500 hover:text-stone-300 px-2 py-1.5 rounded-md">
-                  {t('trash.confirmNo')}
-                </button>
-              )}
-              <div className="w-px h-4 bg-stone-700" />
-            </>
-          )}
-          {items.length > 0 && !hasSelection && (
-            <div className="flex items-center gap-2">
-              {confirmingEmpty && (
-                <span className="text-xs text-stone-400">{t('trash.confirmEmpty')}</span>
-              )}
-              <button
-                onClick={handleEmptyTrash}
-                className="trash-empty-btn text-xs text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-md hover:bg-red-400/10"
-              >
-                {confirmingEmpty ? t('trash.confirmYes') : t('trash.emptyTrash')}
-              </button>
-              {confirmingEmpty && (
-                <button onClick={() => setConfirmingEmpty(false)} className="text-xs text-stone-500 hover:text-stone-300 px-2 py-1.5 rounded-md">
-                  {t('trash.confirmNo')}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <ListToolbar
-        view={trashPrefs.view}
-        sort={trashPrefs.sort}
-        onView={(v) => setTrashPrefs({ view: v })}
-        onSort={(s) => setTrashPrefs({ sort: s })}
-      />
-
-      <div className="flex-1 overflow-y-auto p-6">
-        {loading && <p className="text-sm text-stone-600">{t('trash.loading')}</p>}
-
-        {!loading && items.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
-            <Trash2 size={40} className="text-stone-700" />
-            <p className="text-stone-600 text-sm">{t('trash.empty')}</p>
-          </div>
-        )}
-
-        {!loading && items.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-xs text-stone-600 mb-3">{t('trash.retentionNote')}</p>
-            {trashPrefs.sort === 'category' && trashPrefs.view !== 'timeline' && renderGrouped(trashPrefs.view)}
-            {trashPrefs.sort !== 'category' && trashPrefs.view === 'list'     && <div className="space-y-1">{sorted.map((item) => <ItemRow key={item.id} item={item} {...itemProps} />)}</div>}
-            {trashPrefs.sort !== 'category' && trashPrefs.view === 'cards'    && <div className="grid grid-cols-3 gap-3">{sorted.map((item) => <ItemCard key={item.id} item={item} {...itemProps} />)}</div>}
-            {trashPrefs.view === 'timeline' && renderTimeline()}
-          </div>
-        )}
-      </div>
+  const headerLeft = (
+    <div className="flex items-center gap-3">
+      <Trash2 size={18} className="text-stone-500" />
+      <h1 className="text-lg font-semibold text-stone-200">{t('trash.title')}</h1>
+      {items.length > 0 && (
+        <span className="text-xs text-stone-500 bg-stone-700/50 px-2 py-0.5 rounded-full">
+          {items.length}
+        </span>
+      )}
+      {items.length > 0 && (
+        <button
+          onClick={allSelected ? deselectAll : selectAll}
+          className="text-xs text-stone-500 hover:text-stone-300 transition-colors"
+        >
+          {allSelected ? t('trash.deselectAll') : t('trash.selectAll')}
+        </button>
+      )}
     </div>
+  );
+
+  const headerRight = (
+    <div className="flex items-center gap-2">
+      {hasSelection && (
+        <>
+          {confirmingBulkDelete && (
+            <span className="text-xs text-stone-400">{t('trash.sure')}</span>
+          )}
+          <Button
+            onClick={handleBulkDelete}
+            variant="danger"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--danger-bg)] border border-[var(--danger-border)] hover:border-[var(--danger-hover-border)]"
+          >
+            <Trash2 size={12} />
+            {confirmingBulkDelete
+              ? t('trash.confirmYes')
+              : t('trash.deleteSelected', { count: selectedIds.size })}
+          </Button>
+          {confirmingBulkDelete && (
+            <Button onClick={() => setConfirmingBulkDelete(false)} variant="ghost" className="text-xs px-2 py-1.5 rounded-md">
+              {t('trash.confirmNo')}
+            </Button>
+          )}
+          <div className="w-px h-4 bg-stone-700" />
+        </>
+      )}
+      {items.length > 0 && !hasSelection && (
+        <div className="flex items-center gap-2">
+          {confirmingEmpty && (
+            <span className="text-xs text-stone-400">{t('trash.confirmEmpty')}</span>
+          )}
+          <Button
+            onClick={handleEmptyTrash}
+            variant="danger"
+            className="text-xs px-3 py-1.5 rounded-md bg-[var(--danger-bg)] border border-[var(--danger-border)] hover:border-[var(--danger-hover-border)]"
+          >
+            {confirmingEmpty ? t('trash.confirmYes') : t('trash.emptyTrash')}
+          </Button>
+          {confirmingEmpty && (
+            <Button onClick={() => setConfirmingEmpty(false)} variant="ghost" className="text-xs px-2 py-1.5 rounded-md">
+              {t('trash.confirmNo')}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderTrashContent = () => (
+    <>
+      {loading && <p className="text-sm text-stone-600">{t('trash.loading')}</p>}
+
+      {!loading && items.length === 0 && (
+        <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+          <Trash2 size={40} className="text-stone-700" />
+          <p className="text-stone-600 text-sm">{t('trash.empty')}</p>
+        </div>
+      )}
+
+      {!loading && items.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs text-stone-600 mb-3">{t('trash.retentionNote')}</p>
+          {trashPrefs.sort === 'category' && trashPrefs.view !== 'timeline' && renderGrouped(trashPrefs.view)}
+          {trashPrefs.sort !== 'category' && trashPrefs.view === 'list'     && <div className="space-y-1">{sorted.map((item) => <ItemRow key={item.id} item={item} {...itemProps} />)}</div>}
+          {trashPrefs.sort !== 'category' && trashPrefs.view === 'cards'    && <div className="grid grid-cols-3 gap-3">{sorted.map((item) => <ItemCard key={item.id} item={item} {...itemProps} />)}</div>}
+          {trashPrefs.view === 'timeline' && renderTimeline()}
+        </div>
+      )}
+    </>
+  );
+
+  return (
+    <Dashboard<TrashedItem>
+      headerLeft={headerLeft}
+      headerRight={headerRight}
+      headerClassName="flex items-center justify-between px-6 h-14 border-b border-stone-700/60"
+      contentClassName="flex-1 overflow-y-auto p-6"
+      view={trashPrefs.view}
+      sort={trashPrefs.sort}
+      onView={(v) => setTrashPrefs({ view: v })}
+      onSort={(s) => setTrashPrefs({ sort: s })}
+      items={items}
+      itemKey={(item) => item.id}
+      grouping={{ mode: 'custom', render: renderTrashContent }}
+    />
   );
 }

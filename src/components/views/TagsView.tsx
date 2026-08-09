@@ -9,6 +9,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useUndoStore } from '../../store/undoStore';
 import { generateId } from '../../lib/helpers';
 import ContextMenu from '../ui/ContextMenu';
+import Button from '../ui/Button';
 
 const TAG_COLORS = [
   '#00e699', '#8347ff', '#3b82f6', '#f43f5e',
@@ -149,12 +150,12 @@ export default function TagsView() {
                     }}
                     className="flex-1 bg-stone-700/50 text-xs text-stone-200 px-2 py-1 rounded outline-none selectable"
                   />
-                  <button onClick={() => saveEdit(tag.id)} className="btn-ghost text-jade-400">
+                  <Button onClick={() => saveEdit(tag.id)} variant="ghost" className="text-jade-400">
                     <Check size={12} />
-                  </button>
-                  <button onClick={() => setEditingId(null)} className="btn-ghost">
+                  </Button>
+                  <Button onClick={() => setEditingId(null)} variant="ghost">
                     <X size={12} />
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <button

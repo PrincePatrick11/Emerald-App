@@ -2,27 +2,22 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Trash2, PanelRightOpen, Check, X, Plus, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
-import ListToolbar from '../ui/ListToolbar';
-import FilterPanel from '../ui/FilterPanel';
+import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
+import EmojiPicker from '../ui/EmojiPicker';
+import Button from '../ui/Button';
 import { getDb } from '../../lib/db';
 import { generateId, isImageIcon } from '../../lib/helpers';
 
 import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useUndoStore } from '../../store/undoStore';
+import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import RichEditor from '../editor/RichEditor';
 import TagInput from '../editor/TagInput';
 import EntryCustomProperties from '../editor/EntryCustomProperties';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import { format } from 'date-fns';
 import type { WikiCategory } from '../../types';
-
-const WIKI_EMOJIS = [
-  '⚡','🔯','👁️','🌙','☀️','🌟','✨','🔮','🌀','⚗️',
-  '🗡️','📜','🕯️','🔑','🪄','🧿','🌊','🔥','💀','🌺',
-  '🐍','🦅','🌿','💎','🌈','⭐','🪬','☯️','🔱','🌑',
-  '📖','📄','🌸','🦋','🐉','🏺','🌺','💫','🌀','🎭',
-];
 
 
 export default function WikiView() {
@@ -54,17 +49,6 @@ export default function WikiView() {
   const [icon, setIcon] = useState<string | null>(null);
   const [loadedArticleId, setLoadedArticleId] = useState<string | null>(null);
 
-  // Category management state
-  const [editingCatId, setEditingCatId] = useState<string | null>(null);
-  const [editCatName, setEditCatName] = useState('');
-  const [editCatEmoji, setEditCatEmoji] = useState('📄');
-  const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
-  const [confirmDeleteCatId, setConfirmDeleteCatId] = useState<string | null>(null);
-  const [addingWikiCat, setAddingWikiCat] = useState(false);
-  const [newWikiCatName, setNewWikiCatName] = useState('');
-  const [newWikiCatEmoji, setNewWikiCatEmoji] = useState('📄');
-  const [showWikiCatEmojiPicker, setShowWikiCatEmojiPicker] = useState(false);
-
   // Always-fresh refs
   const pendingRef = useRef({ title, content, category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined });
   pendingRef.current = { title, content, category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined };
@@ -83,6 +67,26 @@ export default function WikiView() {
       updateArticle(id, pendingRef.current);
     }, 1500);
   }, [updateArticle]);
+
+  const {
+    addingCategory: addingWikiCat, setAddingCategory: setAddingWikiCat,
+    newCatName: newWikiCatName, setNewCatName: setNewWikiCatName,
+    newCatEmoji: newWikiCatEmoji, setNewCatEmoji: setNewWikiCatEmoji,
+    editingCatId, setEditingCatId,
+    editCatName, setEditCatName,
+    editCatEmoji, setEditCatEmoji,
+    confirmDeleteCatId, setConfirmDeleteCatId,
+    handleAddCategory: handleAddWikiCat,
+    startEditCat,
+    handleSaveEditCat,
+    handleDeleteCat,
+  } = useCategoryEditor(
+    { addCategory: addWikiCategory, updateCategory: updateWikiCategory, deleteCategory: deleteWikiCategory, restoreCategory: restoreWikiCategory },
+    {
+      defaultEmoji: '📄',
+      onAdded: (cat) => { setCategory(cat.id); triggerAutoSave(); },
+    },
+  );
 
   const prevRef = useRef<{ id: string; isEditing: boolean } | null>(null);
 
@@ -235,35 +239,6 @@ export default function WikiView() {
     if (!isEditing && article) setActiveView({ type: 'wiki', id: article.id, mode: 'edit' });
   };
 
-  const startEditCat = (cat: typeof wikiCategories[0]) => {
-    setEditingCatId(cat.id);
-    setEditCatName(cat.name);
-    setEditCatEmoji(cat.emoji);
-    setShowEditEmojiPicker(false);
-  };
-
-  const handleSaveEditCat = async () => {
-    if (!editingCatId || !editCatName.trim()) return;
-    await updateWikiCategory(editingCatId, editCatName.trim(), editCatEmoji);
-    setEditingCatId(null);
-    setShowEditEmojiPicker(false);
-  };
-
-  const handleDeleteCat = async (id: string) => {
-    if (confirmDeleteCatId !== id) { setConfirmDeleteCatId(id); return; }
-    setConfirmDeleteCatId(null);
-    await deleteWikiCategory(id);
-    pushUndo({ id: generateId(), description: t('undo.categoryDeleted'), undo: () => restoreWikiCategory(id) });
-  };
-
-  const handleAddWikiCat = async () => {
-    if (!newWikiCatName.trim()) return;
-    const cat = await addWikiCategory(newWikiCatName.trim(), newWikiCatEmoji);
-    setCategory(cat.id);
-    setNewWikiCatName(''); setNewWikiCatEmoji('📄'); setAddingWikiCat(false); setShowWikiCatEmojiPicker(false);
-    triggerAutoSave();
-  };
-
   if (!article) {
     const { view, sort } = wikiPrefs;
     const catById = Object.fromEntries(wikiCategories.map((c) => [c.id, c]));
@@ -383,191 +358,173 @@ export default function WikiView() {
       );
     };
 
-    return (
-      <div className="h-full flex flex-col">
-        <div className="flex items-center justify-between px-8 h-14 border-b border-stone-700/60">
-          <h1 className="text-lg font-semibold text-stone-100">{t('wiki.title')}</h1>
-          <div className="flex items-center gap-1">
-            <button onClick={handleNew} className="btn-primary">
-              <Plus size={13} />{t('wiki.newArticle')}
-            </button>
-            <button onClick={toggleRightSidebar} className="btn-ghost ml-1"><PanelRightOpen size={16} /></button>
-          </div>
-        </div>
+    type Article = typeof articles[number];
 
-        <ListToolbar
-          view={view} sort={sort} onView={(v) => setWikiPrefs({ view: v })} onSort={(s) => setWikiPrefs({ sort: s })}
-          search={search} onSearch={setSearch}
-          showFilters={showFilters} onToggleFilters={() => setShowFilters((v) => !v)} activeFilterCount={activeFilterCount}
-        />
-        {showFilters && (
-          <FilterPanel
-            chipLabel={t('filters.category')}
-            chips={catChips}
-            selectedChips={filterCatIds}
-            onChipToggle={(v) => setFilterCatIds((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v])}
-            propNames={allPropNames}
-            propFilters={filterPropSlots}
-            onAddPropFilter={() => setFilterPropSlots((prev) => [...prev, { name: '', value: '' }])}
-            onUpdatePropFilter={(i, pf) => setFilterPropSlots((prev) => prev.map((s, idx) => idx === i ? pf : s))}
-            onRemovePropFilter={(i) => setFilterPropSlots((prev) => prev.filter((_, idx) => idx !== i))}
-            activeFilterCount={activeFilterCount}
-            onClearAll={() => { setFilterCatIds([]); setFilterPropSlots([]); }}
-          />
-        )}
+    const catGroups: DashboardGroup<Article>[] = groupedByCat.map(({ cat, arts }) => ({
+      key: cat.id,
+      label: cat.is_builtin ? t(`wiki.categories.${cat.id}`) : cat.name,
+      items: arts,
+    }));
 
-        <div className="flex-1 overflow-y-auto px-8 py-6">
-          {articles.length === 0 && wikiCategories.length === 0 ? (
-            <div className="text-center py-20">
-              <p className="text-stone-600 text-sm">{t('wiki.noArticles')}</p>
-              <button onClick={handleNew} className="mt-4 text-xs text-stone-500 hover:text-stone-300 underline transition-colors">{t('wiki.startDocumenting')}</button>
-            </div>
-          ) : filtered.length === 0 ? (
-            <p className="text-center py-20 text-stone-600 text-sm">{t('search.noResults')}</p>
-          ) : view === 'timeline' ? (
-            <div className="space-y-6">
-              {timelineGroups.map(({ label, items }) => (
-                <div key={label}>
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider whitespace-nowrap">{label}</span>
-                    <div className="flex-1 h-px bg-stone-700/50" />
-                  </div>
-                  <div className="space-y-1.5">{items.map(renderArticle)}</div>
-                </div>
-              ))}
-            </div>
-          ) : sort === 'category' ? (
-            <div className="space-y-6">
-              {/* Add category */}
-              {addingWikiCat ? (
-                <div className="relative flex items-center gap-2 mb-2">
-                  <button
-                    onClick={() => setShowWikiCatEmojiPicker(!showWikiCatEmojiPicker)}
-                    className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
-                  >
-                    {newWikiCatEmoji}
-                  </button>
-                  {showWikiCatEmojiPicker && (
-                    <div className="wiki-emoji-popover absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 w-52">
-                      <div className="flex flex-wrap gap-1">
-                        {WIKI_EMOJIS.map((e) => (
-                          <button key={e}
-                            onClick={() => { setNewWikiCatEmoji(e); setShowWikiCatEmojiPicker(false); }}
-                            className={`text-base p-1 rounded transition-colors ${newWikiCatEmoji === e ? 'wiki-emoji-active' : 'wiki-emoji-idle'}`}
-                          >{e}</button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <input
-                    autoFocus
-                    value={newWikiCatName}
-                    onChange={(e) => setNewWikiCatName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddWikiCat(); if (e.key === 'Escape') { setAddingWikiCat(false); setShowWikiCatEmojiPicker(false); } }}
-                    placeholder="Name…"
-                    className="wiki-cat-input flex-1 rounded px-2 py-0.5 text-xs outline-none font-semibold uppercase tracking-wider"
-                  />
-                  <button onClick={handleAddWikiCat} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
-                  <button onClick={() => { setAddingWikiCat(false); setShowWikiCatEmojiPicker(false); }} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
-                </div>
-              ) : (
+    const timelineDashboardGroups: DashboardGroup<Article>[] = timelineGroups.map(({ label, items }) => ({ label, items }));
+
+    const renderCategoryHeader = (group: DashboardGroup<Article>) => {
+      const cat = catById[group.key!];
+      if (!cat) return null;
+      if (editingCatId === cat.id) {
+        return (
+          <div className="flex items-center gap-2 mb-2">
+            <EmojiPicker
+              value={editCatEmoji}
+              onChange={setEditCatEmoji}
+              trigger={({ toggle }) => (
                 <button
-                  onClick={() => setAddingWikiCat(true)}
-                  className="flex items-center gap-2 mb-2 w-full text-stone-600 hover:text-stone-400 transition-colors"
+                  onClick={toggle}
+                  className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
                 >
-                  <span className="w-5 flex items-center justify-center flex-shrink-0"><Plus size={18} /></span>
-                  <span className="flex-1 text-left text-xs font-semibold uppercase tracking-wider">{t('wiki.addCategory')}</span>
+                  {editCatEmoji}
                 </button>
               )}
-              {groupedByCat.map(({ cat, arts }) => (
-                <div key={cat.id}>
-                  {editingCatId === cat.id ? (
-                    <div className="relative flex items-center gap-2 mb-2">
-                      <button
-                        onClick={() => setShowEditEmojiPicker(!showEditEmojiPicker)}
-                        className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
-                      >
-                        {editCatEmoji}
-                      </button>
-                      {showEditEmojiPicker && (
-                        <div className="wiki-emoji-popover absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 w-52">
-                          <div className="flex flex-wrap gap-1">
-                            {WIKI_EMOJIS.map((e) => (
-                              <button key={e}
-                                onClick={() => { setEditCatEmoji(e); setShowEditEmojiPicker(false); }}
-                                className={`text-base p-1 rounded transition-colors ${editCatEmoji === e ? 'wiki-emoji-active' : 'wiki-emoji-idle'}`}
-                               >{e}</button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      <input
-                        autoFocus
-                        value={editCatName}
-                        onChange={(e) => setEditCatName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditCat(); if (e.key === 'Escape') { setEditingCatId(null); setShowEditEmojiPicker(false); } }}
-                        className="wiki-cat-input flex-1 rounded px-2 py-0.5 text-xs outline-none font-semibold uppercase tracking-wider"
-                      />
-                      <button onClick={handleSaveEditCat} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
-                      <button onClick={() => { setEditingCatId(null); setShowEditEmojiPicker(false); }} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
-                      {!cat.is_builtin && (
-                        confirmDeleteCatId === cat.id ? (
-                          <>
-                            <button onClick={() => handleDeleteCat(cat.id)} className="text-xs text-red-400 hover:text-red-300 px-1">{t('trash.confirmYes')}</button>
-                            <button onClick={() => setConfirmDeleteCatId(null)} className="text-xs text-stone-500 hover:text-stone-300">{t('trash.confirmNo')}</button>
-                          </>
-                        ) : (
-                          <button onClick={() => handleDeleteCat(cat.id)} className="text-stone-500 hover:text-red-400 transition-colors p-0.5 ml-1">
-                            <Trash2 size={12} />
-                          </button>
-                        )
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="w-5 text-center flex-shrink-0 text-base">{cat.emoji}</span>
-                      <p className="text-xs text-stone-600 font-semibold uppercase tracking-wider flex-1">
-                        {cat.is_builtin ? t(`wiki.categories.${cat.id}`) : cat.name}
-                      </p>
-                      <button
-                        onClick={() => startEditCat(cat)}
-                        className="text-stone-500 hover:text-stone-300 transition-colors p-0.5"
-                        title={t('editor.edit')}
-                      >
-                        <Pencil size={11} />
-                      </button>
-                    </div>
-                  )}
-                  <div className={view === 'cards' ? 'grid grid-cols-3 gap-3' : 'space-y-1.5'}>
-                    {arts.length === 0 ? (
-                      <p className="text-xs text-stone-700 px-1 py-1">{t('wiki.noArticles')}</p>
-                    ) : arts.map(renderArticle)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            /* Flat list (sort=date or sort=alpha) */
-            view === 'cards' ? (
-              <div className="grid grid-cols-3 gap-3">{sortedArticles.map(renderArticle)}</div>
-            ) : (
-              <div className="space-y-1.5">{sortedArticles.map(renderArticle)}</div>
-            )
-          )}
+            />
+            <input
+              autoFocus
+              value={editCatName}
+              onChange={(e) => setEditCatName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditCat(); if (e.key === 'Escape') { setEditingCatId(null); } }}
+              className="wiki-cat-input flex-1 rounded px-2 py-0.5 text-xs outline-none font-semibold uppercase tracking-wider"
+            />
+            <button onClick={handleSaveEditCat} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
+            <button onClick={() => setEditingCatId(null)} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
+            {!cat.is_builtin && (
+              confirmDeleteCatId === cat.id ? (
+                <>
+                  <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="text-xs px-1">{t('trash.confirmYes')}</Button>
+                  <Button onClick={() => setConfirmDeleteCatId(null)} variant="ghost" className="text-xs">{t('trash.confirmNo')}</Button>
+                </>
+              ) : (
+                <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="p-0.5 ml-1">
+                  <Trash2 size={12} />
+                </Button>
+              )
+            )}
+          </div>
+        );
+      }
+      return (
+        <div className="flex items-center gap-2 mb-2">
+          <span className="w-5 text-center flex-shrink-0 text-base">{cat.emoji}</span>
+          <p className="text-xs text-stone-600 font-semibold uppercase tracking-wider flex-1">
+            {cat.is_builtin ? t(`wiki.categories.${cat.id}`) : cat.name}
+          </p>
+          <button
+            onClick={() => startEditCat(cat)}
+            className="text-stone-500 hover:text-stone-300 transition-colors p-0.5"
+            title={t('editor.edit')}
+          >
+            <Pencil size={11} />
+          </button>
         </div>
-      {ctxMenu && (
-        <ContextMenu
-          x={ctxMenu.x} y={ctxMenu.y}
-          onClose={() => setCtxMenu(null)}
-          actions={[
-            { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'wiki', id: ctxMenu.id, mode: 'view' }) },
-            { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
-            { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
-            { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },
-          ]}
-        />
-      )}
-      </div>
+      );
+    };
+
+    const renderAddCategory = () => (
+      addingWikiCat ? (
+        <div className="flex items-center gap-2 mb-2">
+          <EmojiPicker
+            value={newWikiCatEmoji}
+            onChange={setNewWikiCatEmoji}
+            trigger={({ toggle }) => (
+              <button
+                onClick={toggle}
+                className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
+              >
+                {newWikiCatEmoji}
+              </button>
+            )}
+          />
+          <input
+            autoFocus
+            value={newWikiCatName}
+            onChange={(e) => setNewWikiCatName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAddWikiCat(); if (e.key === 'Escape') { setAddingWikiCat(false); } }}
+            placeholder="Name…"
+            className="wiki-cat-input flex-1 rounded px-2 py-0.5 text-xs outline-none font-semibold uppercase tracking-wider"
+          />
+          <button onClick={handleAddWikiCat} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
+          <button onClick={() => setAddingWikiCat(false)} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setAddingWikiCat(true)}
+          className="flex items-center gap-2 mb-2 w-full text-stone-600 hover:text-stone-400 transition-colors"
+        >
+          <span className="w-5 flex items-center justify-center flex-shrink-0"><Plus size={18} /></span>
+          <span className="flex-1 text-left text-xs font-semibold uppercase tracking-wider">{t('wiki.addCategory')}</span>
+        </button>
+      )
+    );
+
+    return (
+      <Dashboard<Article>
+        title={t('wiki.title')}
+        primaryAction={{ label: t('wiki.newArticle'), onClick: handleNew }}
+        onToggleRightSidebar={toggleRightSidebar}
+        view={view}
+        sort={sort}
+        onView={(v) => setWikiPrefs({ view: v })}
+        onSort={(s) => setWikiPrefs({ sort: s })}
+        search={search}
+        onSearch={setSearch}
+        filters={{
+          showFilters,
+          onToggleFilters: () => setShowFilters((v) => !v),
+          activeFilterCount,
+          panelProps: {
+            chipLabel: t('filters.category'),
+            chips: catChips,
+            selectedChips: filterCatIds,
+            onChipToggle: (v) => setFilterCatIds((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
+            propNames: allPropNames,
+            propFilters: filterPropSlots,
+            onAddPropFilter: () => setFilterPropSlots((prev) => [...prev, { name: '', value: '' }]),
+            onUpdatePropFilter: (i, pf) => setFilterPropSlots((prev) => prev.map((s, idx) => idx === i ? pf : s)),
+            onRemovePropFilter: (i) => setFilterPropSlots((prev) => prev.filter((_, idx) => idx !== i)),
+            onClearAll: () => { setFilterCatIds([]); setFilterPropSlots([]); },
+          },
+        }}
+        items={sortedArticles}
+        itemKey={(a) => a.id}
+        renderItem={renderArticle}
+        isEmpty={articles.length === 0 && wikiCategories.length === 0}
+        emptyState={{ message: t('wiki.noArticles'), actionLabel: t('wiki.startDocumenting'), onAction: handleNew }}
+        hasNoResults={filtered.length === 0}
+        noResultsMessage={t('search.noResults')}
+        grouping={
+          view === 'timeline'
+            ? { mode: 'timeline', groups: timelineDashboardGroups }
+            : sort === 'category'
+              ? {
+                  mode: 'category',
+                  groups: catGroups,
+                  renderGroupHeader: renderCategoryHeader,
+                  renderAddCategory,
+                  renderEmptyGroup: () => <p className="text-xs text-stone-700 px-1 py-1">{t('wiki.noArticles')}</p>,
+                }
+              : { mode: 'flat' }
+        }
+        contextMenuSlot={ctxMenu && (
+          <ContextMenu
+            x={ctxMenu.x} y={ctxMenu.y}
+            onClose={() => setCtxMenu(null)}
+            actions={[
+              { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'wiki', id: ctxMenu.id, mode: 'view' }) },
+              { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
+              { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
+              { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },
+            ]}
+          />
+        )}
+      />
     );
   }
 
@@ -591,35 +548,28 @@ export default function WikiView() {
           <span>{format(new Date(article.updated_at), 'MMM d, yyyy')}</span>
           {isEditing && <span className="text-stone-700 italic ml-1">{t('editor.editing')}</span>}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           {isEditing ? (
             <>
-              <button
-                onClick={handleDone}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-jade-900/40 hover:bg-jade-900/60
-                           text-jade-400 text-xs font-medium rounded-md border border-jade-800/40 transition-colors"
-              >
+              <Button onClick={handleDone} variant="primary">
                 <Check size={13} />
                 {t('editor.done')}
-              </button>
-              <button
-                onClick={handleDelete}
-                className="btn-ghost text-red-600 hover:text-red-400"
-              >
+              </Button>
+              <Button onClick={handleDelete} variant="danger">
                 <Trash2 size={15} />
-              </button>
-              <button onClick={handleCancel} className="btn-ghost">
+              </Button>
+              <Button onClick={handleCancel} variant="ghost">
                 <X size={15} />
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button onClick={enterEditMode} className="btn-ghost" title={t('editor.edit')}>
+              <Button onClick={enterEditMode} variant="ghost" title={t('editor.edit')}>
                 <Pencil size={15} />
-              </button>
-              <button onClick={toggleRightSidebar} className="btn-ghost">
+              </Button>
+              <Button onClick={toggleRightSidebar} variant="ghost">
                 <PanelRightOpen size={15} />
-              </button>
+              </Button>
             </>
           )}
         </div>
