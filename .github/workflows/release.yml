@@ -9,7 +9,31 @@ permissions:
   contents: write
 
 jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract changelog section for this version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="## [$VERSION]" '
+            $0 ~ /^## \[/ {
+              if (started) exit
+              if (index($0, ver) == 1) started = 1
+            }
+            started { print }
+          ' CHANGELOG.md > release-notes.md
+          echo "--- extracted release notes ---"
+          cat release-notes.md
+
+      - name: Create or update release with notes
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+
   build-macos-intel:
+    needs: prepare-release
     runs-on: macos-13
     env:
       MACOSX_DEPLOYMENT_TARGET: "10.15"
@@ -66,6 +90,7 @@ jobs:
           files: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
 
   build-macos-apple-silicon:
+    needs: prepare-release
     runs-on: macos-14
     env:
       MACOSX_DEPLOYMENT_TARGET: "11.0"
@@ -122,6 +147,7 @@ jobs:
           files: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
 
   build-windows:
+    needs: prepare-release
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -149,6 +175,7 @@ jobs:
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
 
   build-ubuntu:
+    needs: prepare-release
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
