@@ -13,6 +13,7 @@ Tauri 2 uses a capability file to declare which permissions each window receives
     "core:default",
     "dialog:allow-save",
     "dialog:allow-open",
+    "dialog:allow-message",
     "opener:default",
     "sql:allow-load",
     "sql:allow-execute",
@@ -23,6 +24,8 @@ Tauri 2 uses a capability file to declare which permissions each window receives
 ```
 
 SQLite permissions must be declared explicitly. `sql:default` alone grants read-only access; write access requires `sql:allow-execute` in addition to `sql:allow-select`. Omitting any of these permissions causes silent failures at runtime.
+
+`dialog:allow-message` backs the native success/error confirmation popups shown by `@tauri-apps/plugin-dialog`'s `message()` — used throughout export/import (`src/lib/export.ts`, `src/lib/emeraldFormat.ts`, `src/lib/altarExport.ts`) to report a saved file path or a failure.
 
 PDF export runs in a hidden window built and torn down by the per-platform `export_pdf` command, so it operates entirely under the main process's existing capability set — no extra capability entry is required.
 

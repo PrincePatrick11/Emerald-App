@@ -135,7 +135,7 @@ The grid is also visible in exported images and captured thumbnails — the same
 
 **Multiple altars.** You can create several named altars and switch between them. Each altar has its own title, intention text, background, and set of placements.
 
-**Backgrounds.** Four built-in colour presets (Midnight, Ember, Forest, Moon) plus 16 photographic image presets, and the option to upload a custom background image.
+**Backgrounds.** A **Gradient** background type — pick one of 7 preset swatch colours or any custom colour via a colour wheel, opened from a small modal — plus 16 photographic image presets, and the option to upload a custom background image. The four original named presets (Midnight, Ember, Forest, Moon) are no longer offered as a picker in the sidebar; they are kept only so altars saved before the gradient picker was introduced keep rendering their original colour.
 
 The image presets are organised thematically — Forest & Nature, Mountains, Caves & Grottos, Magic & Portals, Temples & Halls — and displayed as a 4-column thumbnail grid below the colour presets in the sidebar. Thumbnails (160×90 px) are served from `public/backgrounds/thumbs/`; the full-resolution image is only loaded by the canvas when that preset is active. Each preset has a localised display name in all four supported languages.
 
@@ -235,13 +235,13 @@ Tags and categories also support soft-delete and restoration.
 
 All export and import actions are in the native application menu.
 
-> **Operations export is temporarily disabled.** Export (Markdown, PDF, Emerald) currently only works for Journal and Wiki entries and for altars. Opening an Operations entry leaves all three "Export as …" menu items greyed out — export for that module isn't wired up correctly yet, so the items are disabled rather than left to produce a broken result. This is a temporary state, not a permanent design decision; the menu items will re-enable for Operations once that export path is implemented. Import (Markdown and Emerald) is unaffected and still supports Operations as a destination.
+> **Sigil-category Operations export is temporarily disabled.** Export (Markdown, PDF, Emerald) works for Journal and Wiki entries, for altars, and for Operations in any category *except* Sigils. Opening a Sigil (an Operations entry in the `sigils` category) leaves all three "Export as …" menu items greyed out — export for that category isn't wired up correctly yet, so the items are disabled rather than left to produce a broken result. This is a temporary state, not a permanent design decision; the menu items will re-enable for Sigils once that export path is implemented. Import (Markdown and Emerald) is unaffected and still supports Operations, including Sigils, as a destination.
 
 ### PDF Export
 
 Prompts a native save dialog for the destination and writes the PDF directly to disk — there is no preview window and no system print dialog. The PDF is rendered by the app's own webview (WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux), so emoji render as proper colored glyphs (Segoe UI Emoji / Apple Color Emoji / Noto Color Emoji) without any frontend rasterisation. The suggested filename is `<Title>_YYYY-MM-DD.pdf`; the user picks the actual location in the OS save dialog. Images in the entry are embedded as base64 before the PDF is generated; internal link chips are rendered as styled spans inside the content.
 
-The **Export → Export as PDF…** menu item is available while a Journal / Wiki entry is open, or while an Altar is open in **reading view** (not while editing it) — it is disabled on the home view, the tag manager, the trash, and (for now, see note above) while an Operations entry is open. For Journal/Wiki it exports the entry text as described above; for an open Altar it instead exports the rendered altar image as a single-page PDF (see Altar PDF Export below).
+The **Export → Export as PDF…** menu item is available while a Journal / Wiki / non-Sigil Operations entry is open, or while an Altar is open in **reading view** (not while editing it) — it is disabled on the home view, the tag manager, the trash, and (for now, see note above) while a Sigil-category Operations entry is open. For Journal/Wiki/Operations it exports the entry text as described above; for an open Altar it instead exports the rendered altar image as a single-page PDF (see Altar PDF Export below).
 
 ### Altar PDF Export
 
@@ -259,7 +259,7 @@ Saves a `.md` file with a frontmatter block followed by the entry body. Frontmat
 
 The Emerald format (`.emerald` file extension) is a JSON file that captures the full entry — or, for altars, the full altar — including all metadata and embedded images. It is designed for lossless transfer between Emerald installations.
 
-The single **Export → Export as Emerald…** menu item is shared between Journal/Wiki entries and altars: it is enabled whenever a Journal / Wiki entry is open, or an Altar is open in reading view, and exports whichever of the two is currently active. (Operations is temporarily excluded — see the note at the top of this section.)
+The single **Export → Export as Emerald…** menu item is shared between Journal/Wiki/Operations entries and altars: it is enabled whenever a Journal / Wiki / non-Sigil Operations entry is open, or an Altar is open in reading view, and exports whichever is currently active. (Sigil-category Operations entries are temporarily excluded — see the note at the top of this section.)
 
 The file structure:
 
