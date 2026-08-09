@@ -290,59 +290,6 @@ async fn export_pdf(app: tauri::AppHandle, html: String, path: String, page_size
     pdf_export::export_pdf(&app, html, path, page_size).await
 }
 
-/// Deletes image files in the images dir that are not in `used_paths`
-/// AND are older than `min_age_secs` (default 300 s = 5 min).
-/// The age guard prevents deleting files that were just saved but whose
-/// owning entry hasn't been persisted yet.
-#[tauri::command]
-fn cleanup_unused_images(
-    app: tauri::AppHandle,
-    used_paths: Vec<String>,
-    min_age_secs: Option<u64>,
-) -> Result<u32, String> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("images");
-
-    if !dir.exists() {
-        return Ok(0);
-    }
-
-    let used: std::collections::HashSet<String> = used_paths.into_iter().collect();
-    let min_age = std::time::Duration::from_secs(min_age_secs.unwrap_or(300));
-    let mut deleted = 0u32;
-
-    for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
-        }
-        let path_str = path.to_string_lossy().into_owned();
-        if used.contains(&path_str) {
-            continue;
-        }
-        // Only delete files older than min_age to avoid races with unsaved entries
-        let old_enough = path
-            .metadata()
-            .ok()
-            .and_then(|m| m.modified().ok())
-            .and_then(|t| t.elapsed().ok())
-            .map(|age| age >= min_age)
-            .unwrap_or(false);
-
-        if old_enough {
-            if std::fs::remove_file(&path).is_ok() {
-                deleted += 1;
-            }
-        }
-    }
-
-    Ok(deleted)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 // ── macOS mouse back/forward button support ───────────────────────────────────
 
@@ -535,7 +482,6 @@ pub fn run() {
             save_image,
             copy_image_file,
             read_image_as_base64,
-            cleanup_unused_images,
             export_image,
             write_file,
             read_file,

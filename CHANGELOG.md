@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+- The startup image-cleanup routine (`cleanup_unused_images`) has been removed entirely. It deleted files in the images directory that weren't referenced by the currently loaded content — but that directory is shared across all vaults, while the "referenced" set was built only from the currently active vault's data. With multiple vaults in use, opening a different vault meant its images weren't in that set, so they'd be deleted as false "unused" positives after the 5-minute age guard elapsed. There is currently no automatic deletion of image files; this will need a proper per-vault-aware replacement before cleanup is reintroduced. (`src/components/layout/AppShell.tsx`, `src-tauri/src/lib.rs`)
+
 ## [0.1.3.5] - 2026-08-09
 
 ### Known Issues

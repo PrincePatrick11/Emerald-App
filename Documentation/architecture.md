@@ -181,7 +181,7 @@ Images are content-addressed and stored outside SQLite:
 - **Insert path**: when an image is added (toolbar button, paste, Finder drop), the Rust `save_image` command decodes the base64 data-URL, computes SHA-256, and writes the file only if it does not already exist. The absolute file path is stored in the HTML `src` attribute.
 - **Display path**: `ResizableImageExtension.tsx` detects that a `src` value is a file path (not `data:` or `http`), calls `read_image_as_base64` via IPC, and caches the returned data-URL in a module-level `Map`.
 - **Deduplication**: because the filename is the SHA-256 of the raw bytes, uploading the same image twice produces one file.
-- **Cleanup**: `AppShell` calls `cleanup_unused_images` after all stores load. It collects every `src="..."` path from all content fields — including altar `background_image_data` paths — and passes that set to Rust, which deletes any files in the images directory that are not in the set and are older than 5 minutes. The age guard prevents deleting files belonging to unsaved new entries.
+- **Cleanup**: none. There is no automatic deletion of files in the images directory — a prior "delete unreferenced images on startup" routine (`cleanup_unused_images`) was removed because the images directory is shared across all vaults while the used-paths set was built from only the currently active vault's loaded content, causing images belonging to other vaults to be deleted as false "unused" positives.
 
 ## Theming System
 
@@ -354,7 +354,6 @@ All Rust commands are registered in `src-tauri/src/lib.rs` and invoked from Type
 | `save_image(data_url)` | Decode base64 data-URL, write `{sha256}.{ext}`, skip if exists. Returns absolute path. |
 | `copy_image_file(source)` | Read a file from an arbitrary path, write to images dir with SHA-256 name. Accepts png/jpg/gif/webp/svg only. Rejects symlinks, canonicalizes the source path, and verifies it falls within allowed storage roots (home, documents, downloads, desktop, app data, app config). |
 | `read_image_as_base64(path)` | Read a file from the images dir and return it as a base64 data-URL. Path must be within the images directory (checked via `canonicalize`). |
-| `cleanup_unused_images(used_paths, min_age_secs?)` | Delete unreferenced files older than N seconds (default 300). Returns count deleted. |
 | `export_image(path, data_url)` | Decode a base64 data-URL and write the binary image bytes to a user-chosen path. Permitted extensions: `.png`, `.jpg`, `.jpeg`, `.webp`. Same symlink rejection, allowed-roots confinement, and `canonicalize`-before-write checks as `write_file`. |
 | `write_file(path, content)` | Write UTF-8 text to a user-selected path. Permitted extensions: `.md`, `.emerald`, `.emeralddb`, `.json`, `.txt`. Path must resolve within allowed storage roots. |
 | `read_file(path)` | Read a file and return its UTF-8 content. Same extension allowlist and root confinement as `write_file`. |
