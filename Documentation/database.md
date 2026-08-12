@@ -361,7 +361,6 @@ Handled natively in `src-tauri/src/lib.rs`. Images are SHA-256-deduplicated — 
 | `save_image(data_url)` | Decodes base64, writes `{appDataDir}/images/{sha256}.{ext}`, skips if already exists |
 | `copy_image_file(source)` | Copies an existing file into storage with the same dedupe logic |
 | `read_image_as_base64(path)` | Reads a stored file and returns a data-URL for rendering |
-| `cleanup_unused_images(used_paths, min_age_secs?)` | Deletes unreferenced files older than N seconds (default 300 s) |
 
 ## Multi-Vault System
 

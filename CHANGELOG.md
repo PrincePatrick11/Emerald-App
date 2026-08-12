@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.3.6] - 2026-08-12
+
+### Known Issues
+- **Sigil-category Operations export is temporarily disabled** (Markdown / PDF / Emerald). The menu items are greyed out rather than left to fail. Non-Sigil Operations, Journal, Wiki, and Altar export are unaffected.
+
+### Fixed
+- The startup image-cleanup routine (`cleanup_unused_images`) has been removed entirely. It deleted files in the images directory that weren't referenced by the currently loaded content — but that directory is shared across all vaults, while the "referenced" set was built only from the currently active vault's data. With multiple vaults in use, opening a different vault meant its images weren't in that set, so they'd be deleted as false "unused" positives after the 5-minute age guard elapsed. There is currently no automatic deletion of image files; this will need a proper per-vault-aware replacement before cleanup is reintroduced. (`src/components/layout/AppShell.tsx`, `src-tauri/src/lib.rs`)
+- Linux PDF export (WebKitGTK) is now implemented and verified end-to-end on real hardware, matching Windows and macOS. The previous code was written without a Linux machine to test on and had never actually run: it imported `PrintSettings`/`PrintOperationAction`/`PrintOperationOutputFormat` from the wrong crate (they belong to `gtk`, not `webkit2gtk`, and `gtk::PrintSettings` only exposes a generic string-keyed `set()`, not the typed setters the code assumed); it treated `PrintOperation::print()` as synchronous when it's actually asynchronous, completing via the `finished`/`failed` signals; and it never selected a printer, which made WebKit's printer resolution fail with "Printer not found" on machines without a real CUPS printer configured — export now resolves GTK's virtual "Print to File" printer at runtime instead of relying on a system default. (`src-tauri/src/pdf_export/linux.rs`)
+
 ## [0.1.3.5] - 2026-08-09
 
 ### Known Issues

@@ -9,49 +9,11 @@ import { useOperationStore } from '../../store/operationStore';
 import { useAltarStore } from '../../store/altarStore';
 import { useRoutineStore } from '../../store/routineStore';
 import { useVaultStore } from '../../store/vaultStore';
-// useJournalStore/useWikiStore/useOperationStore used for image cleanup below
 import { invoke } from '@tauri-apps/api/core';
 import { exportAsPDF, exportAsMarkdown, noEntryMessage, exportErrorMessage } from '../../lib/export';
 import { collectExportData } from '../../lib/exportData';
 import { exportAsEmerald, importFromEmerald, importFromMarkdown } from '../../lib/emeraldFormat';
 import { saveAltarImage, saveAltarPDF } from '../../lib/altarExport';
-
-const LOCAL_PATH_RE = /src="([^"]+)"/g;
-
-async function runImageCleanup() {
-  try {
-    const { entries } = useJournalStore.getState();
-    const { articles } = useWikiStore.getState();
-    const { operations } = useOperationStore.getState();
-    const { altars } = useAltarStore.getState();
-
-    const usedPaths = new Set<string>();
-    for (const altar of altars) {
-      if (altar.background_image_data && !altar.background_image_data.startsWith('data:')) {
-        usedPaths.add(altar.background_image_data);
-      }
-    }
-    for (const item of [...entries, ...articles, ...operations]) {
-      const content: string = (item as { content?: string }).content ?? '';
-      if (!content) continue;
-      LOCAL_PATH_RE.lastIndex = 0;
-      let m;
-      while ((m = LOCAL_PATH_RE.exec(content)) !== null) {
-        const src = m[1];
-        if (src && !src.startsWith('data:') && !src.startsWith('http') && !src.startsWith('blob:')) {
-          usedPaths.add(src);
-        }
-      }
-    }
-
-    const deleted = await invoke<number>('cleanup_unused_images', {
-      usedPaths: [...usedPaths],
-    });
-    if (deleted > 0) console.log(`[images] cleaned up ${deleted} unused file(s)`);
-  } catch (e) {
-    console.warn('[images] cleanup failed:', e);
-  }
-}
 import LeftSidebar from './LeftSidebar';
 import RightSidebar from './RightSidebar';
 import MainArea from './MainArea';
@@ -107,7 +69,6 @@ export default function AppShell() {
     // Load vault metadata first so getDb() knows which DB file to open
     loadVaults().then(() =>
       Promise.all([fetchEntries(), fetchArticles(), fetchTags(), fetchAll(), fetchRoutines(), fetchAltars()])
-        .then(runImageCleanup)
     );
   }, []);
 
