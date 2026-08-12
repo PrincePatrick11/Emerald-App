@@ -6,17 +6,89 @@
 //! via a oneshot, then use `with_webview` to grab the `WebView` and run a
 //! `PrintOperation` configured for PDF output to the user-chosen path.
 //!
-//! ⚠️  Untested in this session — written blind, because we have no
-//! Linux box available. The Windows path is tested; this one needs a
-//! real Linux (Ubuntu 22.04 LTS or 24.04 LTS per the plan's supported
-//! matrix) to verify the webkit2gtk version expectations and the
-//! headless-print API surface.
+//! Print settings (`output-file-format`, `output-uri`) come from
+//! `gtk::PrintSettings`, not `webkit2gtk` — the WebKit crate only owns
+//! `PrintOperation`/`PrintOperationExt`, whose `print()` takes no
+//! action argument and always renders to `output-uri` without a
+//! dialog.
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::oneshot;
 
-use webkit2gtk::{PrintOperation, PrintOperationAction, PrintOperationOutputFormat, PrintSettings, WebViewExt};
+use gtk::PrintSettings;
+use webkit2gtk::{PrintOperation, PrintOperationExt};
+
+/// `GtkPrinter` / `gtk_enumerate_printers` aren't covered by the `gtk`
+/// crate's bindings (the "unix print" header is excluded from its gir
+/// scan), so we call libgtk-3 directly. It's already linked in via the
+/// `gtk`/`webkit2gtk` crates, so this needs no extra build config.
+mod printer_ffi {
+    use std::os::raw::{c_char, c_int, c_void};
+
+    #[repr(C)]
+    pub struct GtkPrinter {
+        _private: [u8; 0],
+    }
+
+    extern "C" {
+        pub fn gtk_enumerate_printers(
+            func: unsafe extern "C" fn(*mut GtkPrinter, *mut c_void) -> c_int,
+            data: *mut c_void,
+            destroy: Option<unsafe extern "C" fn(*mut c_void)>,
+            wait: c_int,
+        );
+        pub fn gtk_printer_get_name(printer: *mut GtkPrinter) -> *const c_char;
+        pub fn gtk_printer_is_virtual(printer: *mut GtkPrinter) -> c_int;
+        pub fn gtk_printer_accepts_pdf(printer: *mut GtkPrinter) -> c_int;
+    }
+}
+
+/// Find the name of GTK's built-in "Print to File" virtual printer.
+/// Its display name is locale-translated (e.g. "In Datei drucken" on a
+/// German system), so it can't be hardcoded — we have to enumerate.
+/// `webkit_print_operation_print()` always routes through GTK's normal
+/// printer resolution (it's not a plain filesystem write), and fails
+/// with "Printer not found" unless `GtkPrintSettings`' `printer` key
+/// names a printer that actually exists, so we resolve and set it
+/// ourselves rather than relying on a default that this virtual
+/// printer never claims to be (`gtk_printer_is_default` is false for
+/// it, even when it's the only printer registered).
+fn find_pdf_printer_name() -> Option<String> {
+    unsafe extern "C" fn on_printer(
+        printer: *mut printer_ffi::GtkPrinter,
+        data: *mut std::ffi::c_void,
+    ) -> std::os::raw::c_int {
+        let out = unsafe { &mut *(data as *mut Option<String>) };
+        let is_match = unsafe {
+            printer_ffi::gtk_printer_is_virtual(printer) != 0
+                && printer_ffi::gtk_printer_accepts_pdf(printer) != 0
+        };
+        if is_match {
+            let name_ptr = unsafe { printer_ffi::gtk_printer_get_name(printer) };
+            if !name_ptr.is_null() {
+                *out = Some(
+                    unsafe { std::ffi::CStr::from_ptr(name_ptr) }
+                        .to_string_lossy()
+                        .into_owned(),
+                );
+            }
+            return 1; // TRUE: stop enumerating, we found it.
+        }
+        0 // FALSE: keep enumerating.
+    }
+
+    let mut result: Option<String> = None;
+    unsafe {
+        printer_ffi::gtk_enumerate_printers(
+            on_printer,
+            &mut result as *mut Option<String> as *mut std::ffi::c_void,
+            None,
+            1, // wait: block until enumeration finishes (this runs on the GTK main thread).
+        );
+    }
+    result
+}
 
 use tauri::AppHandle;
 use tauri::webview::{PageLoadEvent, WebviewWindowBuilder};
@@ -92,9 +164,11 @@ pub async fn export_pdf(
         // 3. Run a PrintOperation configured for PDF output. The
         //    `with_webview` closure runs on the main thread (the GTK
         //    main thread, where webkit2gtk requires all calls to land).
-        //    `PrintOperation::print(PrintOperationAction::Export)` is
-        //    synchronous in the Rust binding — it blocks until the
-        //    operation finishes writing the PDF.
+        //    `PrintOperation::print` is NOT synchronous — it kicks off
+        //    the job and returns immediately; completion is reported
+        //    later via the `finished`/`failed` signals, still on the
+        //    main thread. `run_print` wires those signals to `pdf_tx`
+        //    instead of sending a result itself.
         let (pdf_tx, pdf_rx) = oneshot::channel::<Result<(), String>>();
         let pdf_tx = Arc::new(Mutex::new(Some(pdf_tx)));
         let path_for_thread = path.clone();
@@ -104,19 +178,18 @@ pub async fn export_pdf(
             // `inner()` returns a `webkit2gtk::WebView` (already cloned,
             // refcounted).
             let wv: webkit2gtk::WebView = webview.inner();
-            let result = run_print(&wv, &path_for_thread);
-            let tx = pdf_tx.lock().unwrap().take();
-            if let Some(tx) = tx {
-                let _ = tx.send(result);
+            if let Err(e) = run_print(&wv, &path_for_thread, pdf_tx.clone()) {
+                let tx = pdf_tx.lock().unwrap().take();
+                if let Some(tx) = tx {
+                    let _ = tx.send(Err(e));
+                }
             }
         })
         .map_err(|e| format!("with_webview: {e}"))?;
 
-        // 4. Wait for the result. The synchronous `print` call inside
-        //    `with_webview` already finished by the time we get here, so
-        //    the oneshot should fire immediately; the timeout is just
-        //    a safety net in case a future webkit2gtk makes the call
-        //    async via callback.
+        // 4. Wait for the `finished`/`failed` signal, relayed through
+        //    `pdf_tx` by `run_print`. `PRINT_TIMEOUT` guards against a
+        //    print job that never reports back.
         tokio::time::timeout(PRINT_TIMEOUT, pdf_rx)
             .await
             .map_err(|_| format!(
@@ -151,27 +224,60 @@ pub async fn export_pdf(
     Ok(())
 }
 
-/// Configure and run the print operation for PDF export. Runs on the
-/// GTK main thread (we're inside `with_webview`).
-fn run_print(webview: &webkit2gtk::WebView, path: &str) -> Result<(), String> {
+/// Configure and start the print operation for PDF export. Runs on the
+/// GTK main thread (we're inside `with_webview`). Does not block on the
+/// print job itself — `print()` starts an async operation, so this
+/// connects the `finished`/`failed` signals to relay the eventual
+/// result through `pdf_tx` (shared with the caller's oneshot receiver).
+fn run_print(
+    webview: &webkit2gtk::WebView,
+    path: &str,
+    pdf_tx: Arc<Mutex<Option<oneshot::Sender<Result<(), String>>>>>,
+) -> Result<(), String> {
+    let printer_name = find_pdf_printer_name().ok_or_else(|| {
+        "no virtual PDF printer found (GTK's \"Print to File\" backend is missing or disabled)"
+            .to_string()
+    })?;
+
     let print_op = PrintOperation::new(webview);
 
     let settings = PrintSettings::new();
-    settings.set_output_format(PrintOperationOutputFormat::Pdf);
-    // GTK expects a file:// URI in the output_uri. The path is the
+    // Without an explicit printer, WebKit's printer resolution comes up
+    // empty on a machine with no real (CUPS) printers configured — see
+    // `find_pdf_printer_name` for why this can't be hardcoded.
+    settings.set_printer(&printer_name);
+    // `gtk::PrintSettings` has no typed setters for these — only the
+    // generic string-keyed `set`. Keys match `Gtk::PrintSettings` (see
+    // `GTK_PRINT_SETTINGS_OUTPUT_FILE_FORMAT` / `_OUTPUT_URI` in gtk-sys).
+    settings.set("output-file-format", Some("pdf"));
+    // GTK expects a file:// URI in the output-uri. The path is the
     // user-chosen absolute path on disk.
     let file_uri = format!("file://{path}");
-    settings.set_output_uri(Some(&file_uri));
+    settings.set("output-uri", Some(&file_uri));
 
     print_op.set_print_settings(&settings);
 
-    // `PrintOperationAction::Export` = render to the file at
-    // `output_uri` without showing any dialog. The synchronous Rust
-    // binding blocks until the operation finishes; WebKit internally
-    // runs the print on a worker thread but our side waits.
-    print_op
-        .print(PrintOperationAction::Export)
-        .map_err(|e| format!("WebKitPrintOperation: {e}"))?;
+    // WebKit keeps its own reference to the operation while it's
+    // running (same convention as `GtkPrintOperation`), so it's safe
+    // that no Rust-side owner outlives this function — the object
+    // stays alive until one of these signals fires.
+    let tx_finished = pdf_tx.clone();
+    print_op.connect_finished(move |_op| {
+        if let Some(tx) = tx_finished.lock().unwrap().take() {
+            let _ = tx.send(Ok(()));
+        }
+    });
+    print_op.connect_failed(move |_op, error| {
+        if let Some(tx) = pdf_tx.lock().unwrap().take() {
+            let _ = tx.send(Err(format!("WebKitPrintOperation: {error}")));
+        }
+    });
+
+    // `WebKitPrintOperation::print` (unlike `Gtk::PrintOperation::run`)
+    // takes no action argument and returns nothing — it always renders
+    // to the configured `output-uri` without showing a dialog, and
+    // reports completion asynchronously via the signals above.
+    print_op.print();
 
     Ok(())
 }
