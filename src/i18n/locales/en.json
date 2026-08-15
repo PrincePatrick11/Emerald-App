@@ -52,6 +52,12 @@
     "newEntry": "New Entry",
     "newArticle": "New Article"
   },
+  "sidebar": {
+    "collapseList": "Collapse list",
+    "expandList": "Expand list",
+    "back": "Back",
+    "forward": "Forward"
+  },
   "operations": {
     "title": "Operations",
     "new": "New Operation",

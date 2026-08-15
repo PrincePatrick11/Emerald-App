@@ -7,6 +7,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useTagStore } from '../../store/tagStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useAltarStore } from '../../store/altarStore';
+import { useTaskStore } from '../../store/taskStore';
 import { useRoutineStore } from '../../store/routineStore';
 import { useVaultStore } from '../../store/vaultStore';
 import { invoke } from '@tauri-apps/api/core';
@@ -14,16 +15,18 @@ import { exportAsPDF, exportAsMarkdown, noEntryMessage, exportErrorMessage } fro
 import { collectExportData } from '../../lib/exportData';
 import { exportAsEmerald, importFromEmerald, importFromMarkdown } from '../../lib/emeraldFormat';
 import { saveAltarImage, saveAltarPDF } from '../../lib/altarExport';
-import LeftSidebar from './LeftSidebar';
+import LeftSidebarRail from './LeftSidebarRail';
+import LeftSidebarEntryList from './LeftSidebarEntryList';
 import RightSidebar from './RightSidebar';
 import MainArea from './MainArea';
 import TabBar from './TabBar';
 import UndoToast from '../ui/UndoToast';
 import ImportDestinationModal from '../ui/ImportDestinationModal';
 
-const LEFT_MIN = 180;
+const RAIL_WIDTH = 56;
+const ENTRY_LIST_MIN = 180;
+const ENTRY_LIST_DEFAULT = 220;
 const RIGHT_MIN = 180;
-const LEFT_DEFAULT = 220;
 const RIGHT_DEFAULT = 300;
 
 function loadSavedWidth(key: string, min: number, fallback: number): number {
@@ -37,10 +40,12 @@ export default function AppShell() {
   const fetchArticles = useWikiStore((s) => s.fetchArticles);
   const fetchTags = useTagStore((s) => s.fetchTags);
   const fetchAll = useOperationStore((s) => s.fetchAll);
+  const fetchAllTasks = useTaskStore((s) => s.fetchAll);
   const fetchRoutines = useRoutineStore((s) => s.fetchRoutines);
   const fetchAltars = useAltarStore((s) => s.fetchAltars);
   const loadVaults = useVaultStore((s) => s.loadVaults);
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
+  const leftListOpen = useUIStore((s) => s.leftListOpen);
   const activeView = useUIStore((s) => s.activeView);
   const altarWindowFullscreen = useUIStore((s) => s.altarWindowFullscreen);
   const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
@@ -48,16 +53,16 @@ export default function AppShell() {
   const navigateForward = useUIStore((s) => s.navigateForward);
   const isAltarWindowFullscreen = activeView.type === 'altar' && activeView.mode !== 'edit' && altarWindowFullscreen;
 
-  const [leftWidth, setLeftWidth] = useState(() =>
-    loadSavedWidth('sidebar-left-width', LEFT_MIN, LEFT_DEFAULT)
+  const [entryListWidth, setEntryListWidth] = useState(() =>
+    loadSavedWidth('entry-list-width', ENTRY_LIST_MIN, ENTRY_LIST_DEFAULT)
   );
   const [rightWidth, setRightWidth] = useState(() =>
     loadSavedWidth('sidebar-right-width', RIGHT_MIN, RIGHT_DEFAULT)
   );
 
-  const leftWidthRef = useRef(leftWidth);
+  const entryListWidthRef = useRef(entryListWidth);
   const rightWidthRef = useRef(rightWidth);
-  useEffect(() => { leftWidthRef.current = leftWidth; }, [leftWidth]);
+  useEffect(() => { entryListWidthRef.current = entryListWidth; }, [entryListWidth]);
   useEffect(() => { rightWidthRef.current = rightWidth; }, [rightWidth]);
 
   const draggingLeft = useRef(false);
@@ -68,7 +73,7 @@ export default function AppShell() {
   useEffect(() => {
     // Load vault metadata first so getDb() knows which DB file to open
     loadVaults().then(() =>
-      Promise.all([fetchEntries(), fetchArticles(), fetchTags(), fetchAll(), fetchRoutines(), fetchAltars()])
+      Promise.all([fetchEntries(), fetchArticles(), fetchTags(), fetchAll(), fetchAllTasks(), fetchRoutines(), fetchAltars()])
     );
   }, []);
 
@@ -132,9 +137,9 @@ export default function AppShell() {
 
   useEffect(() => {
     const unlisten = listen('reset-sidebar-widths', () => {
-      setLeftWidth(LEFT_DEFAULT);
+      setEntryListWidth(ENTRY_LIST_DEFAULT);
       setRightWidth(RIGHT_DEFAULT);
-      localStorage.removeItem('sidebar-left-width');
+      localStorage.removeItem('entry-list-width');
       localStorage.removeItem('sidebar-right-width');
       setAltarWindowFullscreen(false);
     });
@@ -199,7 +204,7 @@ export default function AppShell() {
   const onLeftPointerDown = (e: React.PointerEvent) => {
     draggingLeft.current = true;
     startX.current = e.clientX;
-    startWidth.current = leftWidth;
+    startWidth.current = entryListWidth;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
 
@@ -213,7 +218,7 @@ export default function AppShell() {
   const onPointerMove = (e: React.PointerEvent) => {
     if (draggingLeft.current) {
       const delta = e.clientX - startX.current;
-      setLeftWidth(Math.max(LEFT_MIN, startWidth.current + delta));
+      setEntryListWidth(Math.max(ENTRY_LIST_MIN, startWidth.current + delta));
     }
     if (draggingRight.current) {
       const delta = startX.current - e.clientX;
@@ -223,7 +228,7 @@ export default function AppShell() {
 
   const onPointerUp = () => {
     if (draggingLeft.current) {
-      localStorage.setItem('sidebar-left-width', String(leftWidthRef.current));
+      localStorage.setItem('entry-list-width', String(entryListWidthRef.current));
     }
     if (draggingRight.current) {
       localStorage.setItem('sidebar-right-width', String(rightWidthRef.current));
@@ -247,13 +252,18 @@ export default function AppShell() {
       {!isAltarWindowFullscreen && (
         <aside
           className="app-sidebar app-sidebar-left flex-shrink-0 border-r border-stone-700/60 relative"
-          style={{ width: leftWidth }}
+          style={{ width: RAIL_WIDTH + (leftListOpen ? entryListWidth : 0) }}
         >
-          <LeftSidebar />
-          <div
-            onPointerDown={onLeftPointerDown}
-            className="absolute top-0 right-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"
-          />
+          <div className="flex h-full">
+            <LeftSidebarRail />
+            {leftListOpen && <LeftSidebarEntryList />}
+          </div>
+          {leftListOpen && (
+            <div
+              onPointerDown={onLeftPointerDown}
+              className="absolute top-0 right-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"
+            />
+          )}
         </aside>
       )}
 

@@ -67,6 +67,10 @@ html[data-editor-font='lora'] { --font-editor: var(--font-lora); }
 html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather); }
 
 @layer components {
+  .left-sidebar-rail {
+    background: var(--shell-bg);
+  }
+
   .sidebar-item {
     @apply flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors duration-150;
     color: var(--text-muted);
@@ -633,7 +637,8 @@ html[data-theme='emerald-noctis'] .app-sidebar-right {
 }
 
 html[data-theme='emerald-noctis'] .sidebar-header,
-html[data-theme='emerald-noctis'] .sidebar-search {
+html[data-theme='emerald-noctis'] .sidebar-search,
+html[data-theme='emerald-noctis'] .rail-divider {
   border-color: rgba(110, 93, 76, 0.44);
 }
 
@@ -877,7 +882,8 @@ html[data-theme='emerald-noctis'] .panel-interactive:hover .home-item-title {
 }
 
 html[data-theme='emerald-noctis'] .right-sidebar-tab-active,
-html[data-theme='emerald-noctis'] .app-sidebar-right .bg-stone-700.text-stone-200 {
+html[data-theme='emerald-noctis'] .app-sidebar-right .bg-stone-700.text-stone-200,
+html[data-theme='emerald-noctis'] .app-sidebar-left .bg-stone-700.text-stone-200 {
   background: rgba(0, 138, 87, 0.24);
   color: #b8ffe2;
   border: 1px solid rgba(0, 196, 127, 0.34);
@@ -988,7 +994,8 @@ html[data-theme='emerald-parchment'] .app-sidebar-right {
 }
 
 html[data-theme='emerald-parchment'] .sidebar-header,
-html[data-theme='emerald-parchment'] .sidebar-search {
+html[data-theme='emerald-parchment'] .sidebar-search,
+html[data-theme='emerald-parchment'] .rail-divider {
   border-color: rgba(145, 108, 70, 0.32);
 }
 
@@ -1336,7 +1343,8 @@ html[data-theme='emerald-parchment'] .right-sidebar-tab-idle:hover {
   background: rgba(136, 97, 57, 0.12);
 }
 
-html[data-theme='emerald-parchment'] .app-sidebar-right .bg-stone-700.text-stone-200 {
+html[data-theme='emerald-parchment'] .app-sidebar-right .bg-stone-700.text-stone-200,
+html[data-theme='emerald-parchment'] .app-sidebar-left .bg-stone-700.text-stone-200 {
   background: #d8efe3;
   color: #0b5a3a;
   border: 1px solid rgba(0, 138, 87, 0.34);

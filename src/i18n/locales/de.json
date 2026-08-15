@@ -52,6 +52,12 @@
     "newEntry": "Neuer Eintrag",
     "newArticle": "Neuer Artikel"
   },
+  "sidebar": {
+    "collapseList": "Liste einklappen",
+    "expandList": "Liste ausklappen",
+    "back": "Zurück",
+    "forward": "Vor"
+  },
   "operations": {
     "title": "Operationen",
     "new": "Neue Operation",

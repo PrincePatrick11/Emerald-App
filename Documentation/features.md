@@ -154,11 +154,10 @@ The overlay is applied on top of all background types — colour presets, gradie
 
 ## Navigation
 
-**Left sidebar structure.** The left sidebar is divided into three fixed zones:
+**Left sidebar structure.** The left sidebar has two parts side by side:
 
-1. A non-scrollable nav block at the top containing links to Journal, Tasks, Operations, Wiki, and Altar.
-2. A scrollable list of journal entries below the nav block.
-3. An icon-only row at the bottom containing Settings (left), Tags (centre), and Trash (right-aligned). These three items show only icons (no labels); hover titles are provided via `title` attributes.
+1. A narrow icon **rail** — app logo/home, back/forward navigation-history buttons, a search shortcut, a toggle to collapse/expand the entry list next to it, the five module icons (Journal/Tasks/Operations/Wiki/Altar), and Tags/Trash/Settings at the bottom. Clicking a module icon switches the main view; it does not highlight, since it's independent of whichever list tab is open.
+2. A resizable, collapsible **entry list** panel next to the rail, with five tabs (Journal/Tasks/Operations/Wiki/Altar) that switch which module's items are listed. Each tab has its own search field, a "+" button to quick-create a new item, inline rename (double-click or via the context menu), and a right-click context menu (Duplicate/Rename/Delete where applicable — Altar only offers Rename, since it has no duplicate action; Tasks offers Rename/Delete and shows a completion checkbox on each row instead of an icon). Journal, Operations, and Wiki rows can also be dragged into the editor to insert an internal link. The panel can be collapsed entirely via the toggle in the rail, and its width is remembered independently of the main window.
 
 **Breadcrumb back links.** When an entry is open in JournalView, WikiView, or OperationsView, the topbar shows a clickable breadcrumb that navigates back to the corresponding list view (e.g. clicking "Journal" returns to the journal entry list without closing the tab).
 

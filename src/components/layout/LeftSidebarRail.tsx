@@ -1,0 +1,120 @@
+import { useTranslation } from 'react-i18next';
+import {
+  BookOpen,
+  Library,
+  Tag,
+  Trash2,
+  Flame,
+  Search,
+  Wand2,
+  ArrowLeft,
+  ArrowRight,
+  Settings,
+  CheckSquare,
+} from 'lucide-react';
+import { useState } from 'react';
+import { useUIStore } from '../../store/uiStore';
+import SettingsModal from './SettingsModal';
+import RailButton from '../ui/RailButton';
+
+function PanelToggleIcon({ active, size = 16 }: { active: boolean; size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <path d="M9 3v18" />
+      {active && <path d="M4.5 4.5l15 15" />}
+    </svg>
+  );
+}
+
+export default function LeftSidebarRail() {
+  const { t } = useTranslation();
+  const {
+    setActiveView, navigateBack, navigateForward, historyIndex, history,
+    leftListOpen, toggleLeftList,
+  } = useUIStore();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  return (
+    <div className="left-sidebar-rail rail-divider flex flex-col items-center h-full w-14 flex-shrink-0 border-r">
+      {/* App Logo */}
+      <div className="sidebar-header w-full flex flex-col items-center gap-1.5 py-2.5 border-b border-stone-700/60">
+        <button
+          onClick={() => setActiveView({ type: 'home' })}
+          title={t('app.name')}
+          className="hover:opacity-80 transition-opacity"
+        >
+          <img src="/emerald-icon.png" alt="Emerald" className="w-7 h-7 rounded-lg object-cover" />
+        </button>
+        <div className="flex items-center gap-0.5">
+          <RailButton onClick={navigateBack} disabled={historyIndex <= 0} title={t('sidebar.back')}>
+            <ArrowLeft size={14} />
+          </RailButton>
+          <RailButton onClick={navigateForward} disabled={historyIndex >= history.length - 1} title={t('sidebar.forward')}>
+            <ArrowRight size={14} />
+          </RailButton>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="rail-divider w-full flex justify-center py-2 border-b">
+        <RailButton onClick={() => { if (!leftListOpen) toggleLeftList(); }} title={t('search.placeholder')}>
+          <Search size={18} />
+        </RailButton>
+      </div>
+
+      {/* Entry-list panel toggle — independent of the nav links below */}
+      <div className="rail-divider w-full flex justify-center py-2 border-b">
+        <RailButton onClick={toggleLeftList} title={leftListOpen ? t('sidebar.collapseList') : t('sidebar.expandList')}>
+          <PanelToggleIcon active={leftListOpen} size={18} />
+        </RailButton>
+      </div>
+
+      {/* Main nav icons — navigate only, never touch the entry-list panel */}
+      <div className="rail-divider w-full flex flex-col items-center gap-0.5 py-2 border-b">
+        <RailButton onClick={() => setActiveView({ type: 'journal' })} title={t('nav.journal')}>
+          <BookOpen size={18} />
+        </RailButton>
+        <RailButton onClick={() => setActiveView({ type: 'tasks' })} title={t('nav.tasks')}>
+          <CheckSquare size={18} />
+        </RailButton>
+        <RailButton onClick={() => setActiveView({ type: 'operations' })} title={t('nav.operations')}>
+          <Wand2 size={18} />
+        </RailButton>
+        <RailButton onClick={() => setActiveView({ type: 'wiki' })} title={t('nav.wiki')}>
+          <Library size={18} />
+        </RailButton>
+        <RailButton onClick={() => setActiveView({ type: 'altar' })} title={t('nav.altar')}>
+          <Flame size={18} />
+        </RailButton>
+      </div>
+
+      {/* Bottom nav — always visible: Tags/Trash grouped, Settings set apart below a divider */}
+      <div className="sidebar-bottom-bar w-full flex-1 flex flex-col items-center justify-end py-2">
+        <div className="flex flex-col items-center gap-0.5">
+          <RailButton onClick={() => setActiveView({ type: 'tags' })} title={t('nav.tags')}>
+            <Tag size={18} />
+          </RailButton>
+          <RailButton onClick={() => setActiveView({ type: 'trash' })} title={t('nav.trash')}>
+            <Trash2 size={18} />
+          </RailButton>
+        </div>
+        <div className="rail-divider w-8 border-t my-1.5" />
+        <RailButton onClick={() => setSettingsOpen(true)} title={t('nav.settings')}>
+          <Settings size={18} />
+        </RailButton>
+      </div>
+
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+    </div>
+  );
+}

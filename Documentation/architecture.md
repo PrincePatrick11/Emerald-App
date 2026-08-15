@@ -26,7 +26,8 @@ Emerald is a desktop app built on Tauri v2 (Rust backend) and React 19 (TypeScri
 ```
 src/
 ├── components/
-│   ├── layout/       AppShell, LeftSidebar, RightSidebar, MainArea, SettingsModal, TabBar
+│   ├── layout/       AppShell, LeftSidebarRail, LeftSidebarEntryList, RightSidebar, MainArea,
+│   │                 SettingsModal, TabBar
 │   ├── editor/       RichEditor, InternalLinkExtension, EntryCustomProperties,
 │   │                 TagInput, ResizableImageExtension, ExternalDropExtension,
 │   │                 EditorToolbar, LinkPickerModal, SuggestionList
@@ -40,7 +41,10 @@ src/
 │   └── ui/           ListToolbar, FilterPanel, UndoToast, ContextMenu, ImportDestinationModal,
 │                     Modal (shared modal wrapper), EmojiPicker (shared emoji-picker popover),
 │                     Button (shared primary/secondary/ghost/danger button),
-│                     Dashboard (shared module-overview chrome: topbar/toolbar/filter/grouping)
+│                     Dashboard (shared module-overview chrome: topbar/toolbar/filter/grouping),
+│                     RailButton (icon-button for the sidebar rail), TabIconButton (active/idle
+│                     tab toggle), EntryListTab (generic searchable/renameable/draggable list,
+│                     shared by all five sidebar entry-list tabs)
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, routineStore, customPropertyStore, undoStore,
 │                     trashStore, vaultStore, importStore
@@ -156,6 +160,15 @@ This means users can keep several entries open while still using back/forward na
 ### Navigation History
 
 `uiStore` maintains a `history` array and `historyIndex`. `setActiveView` pushes a new entry only when the type or id changes — switching between read and edit mode for the same entry is not recorded as a new step. Mouse back/forward buttons are handled by a macOS NSEvent local monitor in `lib.rs` that emits `navigate-back` and `navigate-forward` Tauri events; `AppShell` listens for these and calls `uiStore.navigateBack()` / `navigateForward()`.
+
+### Left Sidebar (Rail + Entry List)
+
+The left sidebar is two independent components rendered side by side inside `AppShell`'s `app-sidebar-left` container:
+
+- **`LeftSidebarRail`** (`src/components/layout/LeftSidebarRail.tsx`) — a fixed-width (56px, `RAIL_WIDTH` in `AppShell.tsx`) icon column: app logo/home, back/forward navigation-history buttons, a search-icon shortcut that opens the entry list, the list collapse/expand toggle, the five module navigation icons (Journal/Tasks/Operations/Wiki/Altar), and Tags/Trash/Settings at the bottom. The module icons only call `setActiveView(...)` — they carry no active/selected styling and are intentionally decoupled from `leftListTab` below, since navigating the main view and browsing a different module's entry list are independent actions.
+- **`LeftSidebarEntryList`** (`src/components/layout/LeftSidebarEntryList.tsx`) — the adjoining panel, shown only while `uiStore.leftListOpen` is true. Its five tabs (`TabIconButton`) write to `uiStore.leftListTab`; the active tab determines which per-module list (`JournalList`, `TasksList`, `OperationsList`, `WikiList`, `AltarList`) renders below. All five are thin wrappers around the shared `EntryListTab<T>` component (`src/components/ui/EntryListTab.tsx`), which owns search filtering, inline rename, the "+" quick-create flow, drag-start wiring, and the right-click `ContextMenu` — callers only supply accessor functions (`getId`/`getTitle`/`getIcon`/`getDateStr`) and the action list. Tasks is the one caller that needs a materially different row (an independent checkbox toggle) and opts out via the `renderRow` render-prop instead of the accessor props.
+
+`AppShell` owns the width/resize logic: the rail is fixed at `RAIL_WIDTH`, and only the entry-list panel's width (`entry-list-width` in `localStorage`, `ENTRY_LIST_MIN`/`ENTRY_LIST_DEFAULT` = 180/220) is user-resizable via the same drag-handle pattern used for the right sidebar. The outer `<aside>` width is computed as `RAIL_WIDTH + (leftListOpen ? entryListWidth : 0)`, and the resize handle only renders while the list is open.
 
 ## Data Flow
 

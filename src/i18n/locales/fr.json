@@ -52,6 +52,12 @@
     "newEntry": "Nouvelle entrée",
     "newArticle": "Nouvel article"
   },
+  "sidebar": {
+    "collapseList": "Réduire la liste",
+    "expandList": "Développer la liste",
+    "back": "Précédent",
+    "forward": "Suivant"
+  },
   "operations": {
     "title": "Opérations",
     "new": "Nouvelle opération",

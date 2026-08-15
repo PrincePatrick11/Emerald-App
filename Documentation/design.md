@@ -123,6 +123,17 @@ Geteilte Komponente: `src/components/ui/Dashboard.tsx` (generisch über `<T>`). 
 
 Diese Vereinheitlichung ist rein strukturell — das visuelle Ergebnis ist unverändert zum vorherigen Zustand jedes Dashboards. Ein separates visuelles Redesign der Dashboards ist als nächster Schritt geplant, aber noch nicht begonnen.
 
+### Left Sidebar: Rail + Entry-List
+
+Die linke Sidebar besteht aus zwei nebeneinander liegenden Komponenten: `LeftSidebarRail.tsx` (feste 56px-Icon-Leiste) und `LeftSidebarEntryList.tsx` (daneben liegendes, größenverstellbares Panel). Zwei neue geteilte Button-Komponenten kapseln die jeweiligen Zustände:
+
+- `RailButton.tsx` — dünner Wrapper um die bestehende `.btn-ghost`-Klasse, für alle Icon-Buttons der Rail (Verlauf, Suche, Listen-Toggle, Modul-Icons, Tags/Trash/Settings).
+- `TabIconButton.tsx` — Active/Idle-Toggle für die fünf Tab-Icons im Entry-List-Panel. Nutzt dafür die bereits bestehenden `.right-sidebar-tab-active`/`.right-sidebar-tab-idle`-CSS-Klassen (ursprünglich für die rechte Sidebar benannt) statt eigener Klassen — funktional identisch, aber der Klassenname passt jetzt nicht mehr zur tatsächlichen Verwendung auf beiden Seiten der App.
+
+Neue CSS-Klassen in `index.css`: `.left-sidebar-rail` (eigener Hintergrund `--shell-bg`, hebt die Rail farblich vom Entry-List-Panel ab, das weiterhin `--sidebar-bg` nutzt) und `.rail-divider` (themafähige Trennlinien innerhalb der Rail, mit denselben Border-Farbwerten wie `.sidebar-header`/`.sidebar-search` in beiden Themes).
+
+Die Listenzeilen selbst (Suche, Leerzustand, Inline-Rename, Drag-Start, Kontextmenü) sind in `EntryListTab.tsx` zentralisiert — analog zu `Dashboard.tsx`, das nur die äußere Chrome vereinheitlicht: Journal/Operations/Wiki/Altar reichen Accessor-Funktionen (`getIcon`/`getTitle`/`getDateStr`) durch, Tasks steigt über die `renderRow`-Render-Prop aus (eigene Checkbox-Zeile statt Icon-Zeile).
+
 ### Icons (lucide-react)
 
 Keine dokumentierte Größen-Skala. `size`-Props reichen von 10–18px und variieren teils innerhalb derselben Datei zwischen visuell gleichrangigen Elementen, z. B. `SettingsModal.tsx`: Header-Close-Icon `size={16}` (Zeile 179), Sektions-Icons überwiegend `size={13}`/`size={14}` (Zeilen 189, 205, 214, 229, 248, 276, 349, 363, 366) ohne erkennbares Muster, welches Icon welche Größe bekommt. Farbe wird konsistent über die umgebende `text-stone-*`/`text-jade-*`/Theme-Var-Klasse vererbt, nicht per `color`-Prop.

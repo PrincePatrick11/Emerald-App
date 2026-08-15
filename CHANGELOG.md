@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- The left sidebar's entry list can now browse Tasks, Operations, Wiki, and Altar items directly, not just Journal entries. Five tabs (Journal / Tasks / Operations / Wiki / Altar) at the top of the list switch between them; each tab has its own search, quick-create ("+"), inline rename, right-click context menu (Duplicate/Rename/Delete where applicable), and — for Journal, Operations, and Wiki — drag-and-drop linking into the editor.
+
+### Changed
+- The left sidebar is now split into two parts: a fixed-width icon rail (logo, back/forward navigation history, search, a list collapse/expand toggle, the five module icons, and Tags/Trash/Settings at the bottom) and the entry-list panel described above, which sits next to it and can be collapsed or expanded independently. Clicking a module icon in the rail (Journal/Tasks/Operations/Wiki/Altar) switches the main view only — it no longer highlights, since it's independent of whichever tab the entry-list panel has selected.
+- The sidebar's drag-resizable width now applies to the entry-list panel only; the icon rail is a fixed 56px. The saved width moved to a new `entry-list-width` localStorage key, replacing `sidebar-left-width`.
+
 ## [0.1.3.6] - 2026-08-12
 
 ### Known Issues

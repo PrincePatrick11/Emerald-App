@@ -24,6 +24,8 @@ interface UIState {
   rightSidebarTab: 'op-properties' | 'backlinks' | 'wiki' | 'operations' | 'routines';
   operationsSubTab: string | null;
   wikiSubTab: string | null;
+  leftListOpen: boolean;
+  leftListTab: 'journal' | 'tasks' | 'operations' | 'wiki' | 'altar';
   searchQuery: string;
   journalPrefs: ListPrefs;
   wikiPrefs: ListPrefs;
@@ -52,6 +54,8 @@ interface UIState {
   setRightSidebarTab: (tab: 'op-properties' | 'backlinks' | 'wiki' | 'operations' | 'routines') => void;
   setOperationsSubTab: (id: string | null) => void;
   setWikiSubTab: (category: string | null) => void;
+  toggleLeftList: () => void;
+  setLeftListTab: (tab: 'journal' | 'tasks' | 'operations' | 'wiki' | 'altar') => void;
   setSearchQuery: (q: string) => void;
   setJournalPrefs: (p: Partial<ListPrefs>) => void;
   setWikiPrefs: (p: Partial<ListPrefs>) => void;
@@ -132,6 +136,8 @@ export const useUIStore = create<UIState>((set) => ({
   rightSidebarTab: 'op-properties',
   operationsSubTab: null,
   wikiSubTab: null,
+  leftListOpen: true,
+  leftListTab: 'journal',
   searchQuery: '',
   theme: loadSavedTheme(),
   uiFontId: loadSavedUIFontId(),
@@ -247,6 +253,8 @@ export const useUIStore = create<UIState>((set) => ({
   setRightSidebarTab: (tab) => set({ rightSidebarTab: tab }),
   setOperationsSubTab: (id) => set({ operationsSubTab: id }),
   setWikiSubTab: (category) => set({ wikiSubTab: category }),
+  toggleLeftList: () => set((s) => ({ leftListOpen: !s.leftListOpen })),
+  setLeftListTab: (tab) => set({ leftListTab: tab }),
   setSearchQuery: (q) => set({ searchQuery: q }),
   setJournalPrefs: (p) => set((s) => ({ journalPrefs: { ...s.journalPrefs, ...p } })),
   setWikiPrefs: (p) => set((s) => ({ wikiPrefs: { ...s.wikiPrefs, ...p } })),
