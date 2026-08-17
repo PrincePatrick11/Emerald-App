@@ -12,6 +12,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The left sidebar is now split into two parts: a fixed-width icon rail (logo, back/forward navigation history, search, a list collapse/expand toggle, the five module icons, and Tags/Trash/Settings at the bottom) and the entry-list panel described above, which sits next to it and can be collapsed or expanded independently. Clicking a module icon in the rail (Journal/Tasks/Operations/Wiki/Altar) switches the main view only — it no longer highlights, since it's independent of whichever tab the entry-list panel has selected.
 - The sidebar's drag-resizable width now applies to the entry-list panel only; the icon rail is a fixed 56px. The saved width moved to a new `entry-list-width` localStorage key, replacing `sidebar-left-width`.
 
+### Fixed
+- The left entry-list panel's tab icons (Journal/Tasks/Operations/Wiki/Altar) now show the same themed active/hover highlight as the right sidebar's tabs. Both sides share the same CSS classes, but the per-theme color rules for the hover state only matched the right sidebar's container, so the left tabs fell back to unstyled colors on hover in both themes. (`src/index.css`)
+
 ## [0.1.3.6] - 2026-08-12
 
 ### Known Issues

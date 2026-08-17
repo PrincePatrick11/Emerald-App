@@ -900,6 +900,7 @@ html[data-theme='emerald-noctis'] .altar-category-chip {
 
 html[data-theme='emerald-noctis'] .right-sidebar-tab-idle:hover,
 html[data-theme='emerald-noctis'] .app-sidebar-right .text-stone-500.hover\:text-stone-300:hover,
+html[data-theme='emerald-noctis'] .app-sidebar-left .text-stone-500.hover\:text-stone-300:hover,
 html[data-theme='emerald-noctis'] .task-action-btn:hover,
 html[data-theme='emerald-noctis'] .custom-prop-type-btn:hover,
 html[data-theme='emerald-noctis'] .altar-category-chip:hover,
@@ -1338,8 +1339,10 @@ html[data-theme='emerald-parchment'] .right-sidebar-tab-idle {
   color: #7f6448;
 }
 
-html[data-theme='emerald-parchment'] .right-sidebar-tab-idle:hover {
-  color: #352516;
+html[data-theme='emerald-parchment'] .right-sidebar-tab-idle:hover,
+html[data-theme='emerald-parchment'] .app-sidebar-right .text-stone-500.hover\:text-stone-300:hover,
+html[data-theme='emerald-parchment'] .app-sidebar-left .text-stone-500.hover\:text-stone-300:hover {
+  color: #2f2114;
   background: rgba(136, 97, 57, 0.12);
 }
 
@@ -1348,11 +1351,6 @@ html[data-theme='emerald-parchment'] .app-sidebar-left .bg-stone-700.text-stone-
   background: #d8efe3;
   color: #0b5a3a;
   border: 1px solid rgba(0, 138, 87, 0.34);
-}
-
-html[data-theme='emerald-parchment'] .app-sidebar-right .text-stone-500.hover\:text-stone-300:hover {
-  color: #2f2114;
-  background: rgba(136, 97, 57, 0.12);
 }
 
 html[data-theme='emerald-parchment'] .btn-primary,
