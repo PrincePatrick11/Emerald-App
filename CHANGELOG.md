@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [Unreleased] (targeting v0.2.0)
 
 ### Added
 - The left sidebar's entry list can now browse Tasks, Operations, Wiki, and Altar items directly, not just Journal entries. Five tabs (Journal / Tasks / Operations / Wiki / Altar) at the top of the list switch between them; each tab has its own search, quick-create ("+"), inline rename, right-click context menu (Duplicate/Rename/Delete where applicable), and — for Journal, Operations, and Wiki — drag-and-drop linking into the editor.
