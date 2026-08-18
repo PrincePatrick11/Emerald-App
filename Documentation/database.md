@@ -18,7 +18,21 @@ The current schema version is **32**. New schema changes must be added as a new 
 
 **Upgrades from older versions.** Vaults that predate the `schema_version` table will see all migrations run on first open. `ALTER TABLE … ADD COLUMN` against an already-present column raises a "duplicate column" error; this is detected by `isAlreadyAppliedError` (matches `duplicate column name`, `already exists`, or a pre-existing table) and the migration is marked applied anyway. The data migrations themselves are idempotent and re-run safely: `entry_number` is only backfilled where `NULL`, and the UUID → fixed-string category ID rewrite is a no-op once the fixed IDs exist.
 
-**Version 11 is intentionally missing.** It used to create the `custom_properties` table for the Custom Properties feature, which was removed in 0.2.0. Deleting the migration outright — rather than leaving an empty no-op entry — is safe because `runMigrations` only cares that each entry's version is above the last *applied* version, not that the sequence is gapless. Vaults that already recorded version 11 in `schema_version` are unaffected; fresh vaults simply jump from 10 to 12 and never create the table. Version 32 (`drop_custom_properties`) then drops the table and its index from vaults that do still have it, which deletes any rows they hold. That data is not preserved anywhere — it is not part of backups taken with 0.2.0 — so the drop is deliberate and irreversible.
+**Removing a feature does not mean editing its old migrations.** Custom Properties were removed in 0.2.0, but migration 1 still creates the `custom_properties` table and migration 11 (`custom_properties_meta_and_type_rename`) still alters it — both untouched, because they are history that existing vaults already applied. The removal is expressed as a *new* migration, version 32 (`drop_custom_properties`), which drops the table and its index at the end of the run.
+
+This keeps every upgrade path working with one rule instead of several special cases:
+
+| Vault state | What happens |
+|---|---|
+| Fresh | 1 creates the table, 11 alters it, 32 drops it — net effect: no table |
+| Any older version | Remaining migrations run as before, 32 drops the table and its rows |
+| Pre-`schema_version` | All migrations replay; the `IF NOT EXISTS` / `isAlreadyAppliedError` machinery absorbs the overlap, then 32 drops the table |
+
+On a fresh vault, migration 11's first statement (`ADD COLUMN meta`) hits a column that migration 1's `CREATE TABLE` already defines. That raises "duplicate column name", `isAlreadyAppliedError` absorbs it, the rest of that migration's body is skipped and it is marked applied — the same path any migration takes once its columns have moved into the initial schema. Nothing is lost, since the table is dropped moments later.
+
+Version 32 deletes any custom-property rows an existing vault still holds. That data is not preserved anywhere — it is not part of backups taken with 0.2.0 either — so the drop is deliberate and irreversible.
+
+Note that **version 24 is genuinely missing**, and predates all of this: no entry with that number has existed in the array for some time. `runMigrations` tolerates it, since it only requires each entry's version to be above the last *applied* version rather than a gapless sequence.
 
 ## Tables
 

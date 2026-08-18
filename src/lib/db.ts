@@ -262,6 +262,23 @@ const MIGRATIONS: Migration[] = [
           sort_order INTEGER NOT NULL DEFAULT 0
         )
       `);
+      // Custom Properties were removed in 0.2.0, but this migration is history and must
+      // stay byte-for-byte what older vaults already applied. Migration 32 drops the
+      // table again at the end of the run, so fresh vaults never end up with it.
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS custom_properties (
+          id TEXT PRIMARY KEY,
+          entry_id TEXT NOT NULL,
+          entry_type TEXT NOT NULL,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL DEFAULT 'text',
+          value TEXT,
+          meta TEXT,
+          sort_order INTEGER NOT NULL DEFAULT 0
+        )
+      `);
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_custom_props_entry ON custom_properties(entry_id, entry_type)');
+
       await db.execute(`
         CREATE TABLE IF NOT EXISTS routines (
           id TEXT PRIMARY KEY,
@@ -459,10 +476,22 @@ const MIGRATIONS: Migration[] = [
       await db.execute('ALTER TABLE operations ADD COLUMN cover_image TEXT');
     },
   },
-  // Version 11 is intentionally absent, not a mistake. It created the `custom_properties`
-  // table for the Custom Properties feature, removed in 0.2.0. Fresh databases skip
-  // straight from 10 to 12 and never create it; databases that already ran v11 have it
-  // dropped by migration 32 at the end of this array.
+  {
+    // Belongs to the removed Custom Properties feature, but left intact for the same
+    // reason as the CREATE in migration 1: this is history older vaults already ran.
+    // `meta` is already part of that CREATE, so on a fresh vault the first ALTER raises
+    // "duplicate column name"; isAlreadyAppliedError absorbs it and the rest of this body
+    // is skipped, which is the established path for columns that later moved into the
+    // initial schema. Nothing is lost either way — migration 32 drops the table.
+    version: 11,
+    name: 'custom_properties_meta_and_type_rename',
+    up: async (db) => {
+      await db.execute('ALTER TABLE custom_properties ADD COLUMN meta TEXT');
+      await db.execute('ALTER TABLE custom_properties ADD COLUMN show_in_entry INTEGER NOT NULL DEFAULT 0');
+      // Rename old 'checkbox' type to 'toggle' (checkbox is now a separate simple type)
+      await db.execute("UPDATE custom_properties SET type='toggle' WHERE type='checkbox'");
+    },
+  },
   {
     version: 12,
     name: 'wiki_categories_builtin_seed',
