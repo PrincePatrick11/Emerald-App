@@ -407,11 +407,6 @@ export default function TasksView() {
               if (next.has(v)) next.delete(v); else next.add(v);
               return next;
             }),
-            propNames: [],
-            propFilters: [],
-            onAddPropFilter: () => {},
-            onUpdatePropFilter: () => {},
-            onRemovePropFilter: () => {},
             onClearAll: () => {
               setFilterCategory(new Set());
               setFilterPriority(new Set());

@@ -1,17 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Check,
   Eraser,
   Image as ImageIcon,
-  PanelRightOpen,
-  Pencil,
   PenTool,
   Redo2,
   RotateCcw,
-  Trash2,
   Undo2,
-  X,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import Button from '../ui/Button';
@@ -185,7 +180,7 @@ function DrawingCanvas({
 export default function OperationSigilView({ operation }: { operation: Operation }) {
   const { t } = useTranslation();
   const setActiveView = useUIStore((s) => s.setActiveView);
-  const toggleRightSidebar = useUIStore((s) => s.toggleRightSidebar);
+  const setEditActions = useUIStore((s) => s.setEditActions);
   const updateOperation = useOperationStore((s) => s.updateOperation);
   const deleteOperation = useOperationStore((s) => s.deleteOperation);
   const restoreOperation = useOperationStore((s) => s.restoreOperation);
@@ -349,6 +344,19 @@ export default function OperationSigilView({ operation }: { operation: Operation
     setActiveView({ type: 'operations' });
   };
 
+  const editHandlersRef = useRef({ onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
+  editHandlersRef.current = { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete };
+
+  useEffect(() => {
+    if (!isEditing) return;
+    setEditActions({
+      onSave: () => editHandlersRef.current.onSave(),
+      onCancel: () => editHandlersRef.current.onCancel(),
+      onDelete: () => editHandlersRef.current.onDelete(),
+    });
+    return () => setEditActions(null);
+  }, [isEditing]);
+
   const enterEditMode = () => {
     if (isEditing || operation.is_loaded) return;
     setActiveView({ type: 'operations', id: operation.id, mode: 'edit' });
@@ -457,39 +465,16 @@ export default function OperationSigilView({ operation }: { operation: Operation
           {isEditing && <span className="ml-1 italic text-stone-700">{t('editor.editing')}</span>}
         </div>
         <div className="flex items-center gap-2">
-          {isEditing ? (
-            <>
-              <Button onClick={handleDone} variant="primary">
-                <Check size={13} />
-                {t('editor.done')}
+          {isEditing ? null : (
+            operation.is_loaded && (
+              <Button
+                onClick={sigilVisible ? handleHideSigil : handleShowSigil}
+                variant="ghost"
+                className="text-xs"
+              >
+                {sigilVisible ? t('creation.hideSigil') : t('creation.showSigil')}
               </Button>
-              <Button onClick={handleDelete} variant="danger" title={t('editor.delete')}>
-                <Trash2 size={15} />
-              </Button>
-              <Button onClick={handleCancel} variant="ghost">
-                <X size={15} />
-              </Button>
-            </>
-          ) : (
-            <>
-              {!operation.is_loaded && (
-                <Button onClick={enterEditMode} variant="ghost" title={t('editor.edit')}>
-                  <Pencil size={15} />
-                </Button>
-              )}
-              {operation.is_loaded && (
-                <Button
-                  onClick={sigilVisible ? handleHideSigil : handleShowSigil}
-                  variant="ghost"
-                  className="text-xs"
-                >
-                  {sigilVisible ? t('creation.hideSigil') : t('creation.showSigil')}
-                </Button>
-              )}
-              <Button onClick={toggleRightSidebar} variant="ghost">
-                <PanelRightOpen size={15} />
-              </Button>
-            </>
+            )
           )}
         </div>
       </div>

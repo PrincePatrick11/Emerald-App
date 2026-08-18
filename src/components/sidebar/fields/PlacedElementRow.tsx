@@ -2,9 +2,9 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Lock, Unlock, Trash2, Copy, GripVertical } from 'lucide-react';
-import type { AltarPlacement } from '../../types';
-import { AltarItemVisual } from '../altar/AltarItemVisual';
-import Button from '../ui/Button';
+import type { AltarPlacement } from '../../../types';
+import { AltarItemVisual } from '../../altar/AltarItemVisual';
+import Button from '../../ui/Button';
 
 export const PlacedElementRow = memo(function PlacedElementRow({
   placement,

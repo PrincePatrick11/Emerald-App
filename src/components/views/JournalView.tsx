@@ -1,8 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Trash2, PanelRightOpen, Check, X, Copy, Pencil } from 'lucide-react';
+import { Trash2, Copy, Pencil } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
-import Button from '../ui/Button';
 import { useUIStore } from '../../store/uiStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
@@ -10,11 +9,9 @@ import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
 import RichEditor from '../editor/RichEditor';
 import TagInput from '../editor/TagInput';
-import EntryCustomProperties from '../editor/EntryCustomProperties';
 import Dashboard from '../ui/Dashboard';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
-import { getDb } from '../../lib/db';
 import { generateId } from '../../lib/helpers';
 import { format } from 'date-fns';
 import type { JournalEntry, MoonPhase } from '../../types';
@@ -26,7 +23,7 @@ const MOON_PHASE_ORDER: MoonPhase[] = [
 
 export default function JournalView() {
   const { t } = useTranslation();
-  const { activeView, setActiveView, toggleRightSidebar, journalPrefs, setJournalPrefs } = useUIStore();
+  const { activeView, setActiveView, setEditActions, journalPrefs, setJournalPrefs } = useUIStore();
   const { entries, createEntry, updateEntry, deleteEntry, restoreEntry, getEntry } =
     useJournalStore();
   const pushUndo = useUndoStore((s) => s.push);
@@ -43,9 +40,6 @@ export default function JournalView() {
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterPhases, setFilterPhases] = useState<string[]>([]);
-  const [filterPropSlots, setFilterPropSlots] = useState<{ name: string; value: string }[]>([]);
-  const [allPropRows, setAllPropRows] = useState<{ entry_id: string; name: string; value: string | null }[]>([]);
-  const [allPropNames, setAllPropNames] = useState<string[]>([]);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -133,25 +127,6 @@ export default function JournalView() {
     return () => document.removeEventListener('routine-drop', handler);
   }, [isEditing, entry?.id, triggerAutoSave, updateEntry]);
 
-  // Load all custom-property data for list-view filtering
-  useEffect(() => {
-    (async () => {
-      const db = await getDb();
-      const [nameRows, valueRows] = await Promise.all([
-        db.select<{ name: string }[]>(
-          'SELECT DISTINCT name FROM custom_properties WHERE entry_type = $1 ORDER BY name ASC',
-          ['journal']
-        ),
-        db.select<{ entry_id: string; name: string; value: string | null }[]>(
-          'SELECT entry_id, name, value FROM custom_properties WHERE entry_type = $1',
-          ['journal']
-        ),
-      ]);
-      setAllPropNames(nameRows.map((r) => r.name));
-      setAllPropRows(valueRows);
-    })();
-  }, [entries.length]);
-
   const handleNew = async () => {
     const e = await createEntry();
     setActiveView({ type: 'journal', id: e.id, mode: 'edit' });
@@ -224,6 +199,19 @@ export default function JournalView() {
     triggerAutoSave();
   }, [triggerAutoSave]);
 
+  const editHandlersRef = useRef({ onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
+  editHandlersRef.current = { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete };
+
+  useEffect(() => {
+    if (!isEditing) return;
+    setEditActions({
+      onSave: () => editHandlersRef.current.onSave(),
+      onCancel: () => editHandlersRef.current.onCancel(),
+      onDelete: () => editHandlersRef.current.onDelete(),
+    });
+    return () => setEditActions(null);
+  }, [isEditing]);
+
   const enterEditMode = () => {
     if (!isEditing && entry) setActiveView({ type: 'journal', id: entry.id, mode: 'edit' });
   };
@@ -243,22 +231,13 @@ export default function JournalView() {
       ? searchFiltered
       : searchFiltered.filter((e) => e.moon_phase != null && filterPhases.includes(e.moon_phase));
 
-    const filtered = filterPropSlots.some((s) => s.name && s.value)
-      ? phaseFiltered.filter((e) =>
-          filterPropSlots.filter((s) => s.name && s.value).every(({ name, value }) =>
-            allPropRows.some(
-              (r) => r.entry_id === e.id && r.name === name &&
-                     (r.value ?? '').toLowerCase().includes(value.toLowerCase())
-            )
-          )
-        )
-      : phaseFiltered;
+    const filtered = phaseFiltered;
 
     const phaseChips = MOON_PHASE_ORDER
       .filter((p) => entries.some((e) => e.moon_phase === p))
       .map((p) => ({ value: p, label: t(`moonPhase.${p}`), emoji: MOON_PHASE_SYMBOLS[p] }));
 
-    const activeFilterCount = (filterPhases.length > 0 ? 1 : 0) + filterPropSlots.filter((s) => s.name && s.value).length;
+    const activeFilterCount = filterPhases.length > 0 ? 1 : 0;
 
     const sorted = [...filtered].sort((a, b) => {
       if (sort === 'alpha_asc') return a.title.localeCompare(b.title);
@@ -333,7 +312,6 @@ export default function JournalView() {
       <Dashboard<JournalEntry>
         title={t('journal.title')}
         primaryAction={{ label: t('journal.newEntry'), onClick: handleNew }}
-        onToggleRightSidebar={toggleRightSidebar}
         view={view}
         sort={sort}
         onView={(v) => setJournalPrefs({ view: v })}
@@ -349,12 +327,7 @@ export default function JournalView() {
             chips: phaseChips,
             selectedChips: filterPhases,
             onChipToggle: (v) => setFilterPhases((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
-            propNames: allPropNames,
-            propFilters: filterPropSlots,
-            onAddPropFilter: () => setFilterPropSlots((prev) => [...prev, { name: '', value: '' }]),
-            onUpdatePropFilter: (i, pf) => setFilterPropSlots((prev) => prev.map((s, idx) => idx === i ? pf : s)),
-            onRemovePropFilter: (i) => setFilterPropSlots((prev) => prev.filter((_, idx) => idx !== i)),
-            onClearAll: () => { setFilterPhases([]); setFilterPropSlots([]); },
+            onClearAll: () => setFilterPhases([]),
           },
         }}
         items={sorted}
@@ -396,31 +369,6 @@ export default function JournalView() {
           <span>{format(new Date(entry.created_at), 'MMMM d, yyyy')}</span>
           {entry.moon_phase && <span>· {t(`moonPhase.${entry.moon_phase}`)}</span>}
           {isEditing && <span className="text-stone-700 italic ml-1">{t('editor.editing')}</span>}
-        </div>
-        <div className="flex items-center gap-2">
-          {isEditing ? (
-            <>
-              <Button onClick={handleDone} variant="primary">
-                <Check size={13} />
-                {t('editor.done')}
-              </Button>
-              <Button onClick={handleDelete} variant="danger" title={t('editor.delete')}>
-                <Trash2 size={15} />
-              </Button>
-              <Button onClick={handleCancel} variant="ghost">
-                <X size={15} />
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button onClick={enterEditMode} variant="ghost" title={t('editor.edit')}>
-                <Pencil size={15} />
-              </Button>
-              <Button onClick={toggleRightSidebar} variant="ghost">
-                <PanelRightOpen size={15} />
-              </Button>
-            </>
-          )}
         </div>
       </div>
 
@@ -552,9 +500,6 @@ export default function JournalView() {
           readOnly={true}
         />
       </div>
-
-      {/* Custom properties marked "show in entry" */}
-      <EntryCustomProperties entryId={entry.id} entryType="journal" isEditing={false} />
 
       {/* Editor — double-click enters edit mode */}
       <div className="flex-1 overflow-hidden px-8 pb-8" onDoubleClick={enterEditMode}>

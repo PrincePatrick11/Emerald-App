@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
-import { useOperationStore } from '../../store/operationStore';
+import { useOperationStore } from '../../../store/operationStore';
 
 export default function LinkedOpsInput({
   ids, onChange, inputCls,

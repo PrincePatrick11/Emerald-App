@@ -598,18 +598,6 @@ html[data-theme='emerald-parchment'] .border-stone-600 { border-color: var(--bor
   border-color: rgba(74, 222, 128, 0.3);
 }
 
-.custom-prop-menu {
-  background-color: var(--menu-bg);
-  border-color: var(--menu-border);
-  box-shadow: var(--menu-shadow);
-}
-
-.custom-prop-menu-item:hover,
-.custom-prop-menu-item-active {
-  background-color: var(--menu-item-hover-bg);
-  color: var(--menu-item-hover-text);
-}
-
 html[data-theme='emerald-noctis'] .app-shell {
   background: var(--shell-bg);
 }
@@ -893,7 +881,6 @@ html[data-theme='emerald-noctis'] .right-sidebar-tab-idle,
 html[data-theme='emerald-noctis'] .task-action-btn,
 html[data-theme='emerald-noctis'] .linked-entry-menu-item,
 html[data-theme='emerald-noctis'] .context-menu-item-default,
-html[data-theme='emerald-noctis'] .custom-prop-menu-item,
 html[data-theme='emerald-noctis'] .altar-category-chip {
   color: #b49d87;
 }
@@ -902,7 +889,6 @@ html[data-theme='emerald-noctis'] .right-sidebar-tab-idle:hover,
 html[data-theme='emerald-noctis'] .app-sidebar-right .text-stone-500.hover\:text-stone-300:hover,
 html[data-theme='emerald-noctis'] .app-sidebar-left .text-stone-500.hover\:text-stone-300:hover,
 html[data-theme='emerald-noctis'] .task-action-btn:hover,
-html[data-theme='emerald-noctis'] .custom-prop-type-btn:hover,
 html[data-theme='emerald-noctis'] .altar-category-chip:hover,
 html[data-theme='emerald-noctis'] .editor-toolbar-btn-idle:hover {
   color: #eadfce;
@@ -941,9 +927,6 @@ html[data-theme='emerald-noctis'] .tasks-category-trigger,
 html[data-theme='emerald-noctis'] .sigil-tool-toggle,
 html[data-theme='emerald-noctis'] .sigil-brush-controls,
 html[data-theme='emerald-noctis'] .op-prop-select,
-html[data-theme='emerald-noctis'] .custom-prop-input,
-html[data-theme='emerald-noctis'] .custom-prop-edit-panel,
-html[data-theme='emerald-noctis'] .custom-prop-type-btn,
 html[data-theme='emerald-noctis'] .altar-symbol-trigger,
 html[data-theme='emerald-noctis'] .altar-upload-item-btn,
 html[data-theme='emerald-noctis'] .altar-item-name-input {
@@ -953,7 +936,6 @@ html[data-theme='emerald-noctis'] .altar-item-name-input {
 }
 
 html[data-theme='emerald-noctis'] .op-prop-select:hover,
-html[data-theme='emerald-noctis'] .custom-prop-type-btn:hover,
 html[data-theme='emerald-noctis'] .altar-symbol-trigger:hover,
 html[data-theme='emerald-noctis'] .altar-upload-item-btn:hover {
   border-color: rgba(142, 121, 101, 0.56);
@@ -964,9 +946,7 @@ html[data-theme='emerald-noctis'] .op-prop-select:focus {
   box-shadow: 0 0 0 2px rgba(0, 196, 127, 0.18);
 }
 
-html[data-theme='emerald-noctis'] .context-menu-item-default:hover,
-html[data-theme='emerald-noctis'] .custom-prop-menu-item:hover,
-html[data-theme='emerald-noctis'] .custom-prop-menu-item-active {
+html[data-theme='emerald-noctis'] .context-menu-item-default:hover {
   background: rgba(0, 122, 77, 0.2);
   color: #b8ffe2;
 }
@@ -1635,43 +1615,6 @@ html[data-theme='emerald-parchment'] .context-menu-item-danger:hover {
   color: #8f2f26;
 }
 
-html[data-theme='emerald-parchment'] .custom-prop-input {
-  background: #f3e6cf;
-  border-color: rgba(145, 108, 70, 0.34);
-  color: #3a2918;
-}
-
-html[data-theme='emerald-parchment'] .custom-prop-input::placeholder {
-  color: #94795c;
-}
-
-html[data-theme='emerald-parchment'] .custom-prop-edit-panel {
-  background: #efe1cb;
-  border-color: rgba(145, 108, 70, 0.34);
-}
-
-html[data-theme='emerald-parchment'] .custom-prop-type-btn {
-  background: #eadbc4;
-  border-color: rgba(145, 108, 70, 0.34);
-  color: #6d553d;
-}
-
-html[data-theme='emerald-parchment'] .custom-prop-type-btn:hover {
-  background: #efdfc8;
-  color: #2f2114;
-  border-color: rgba(131, 96, 62, 0.46);
-}
-
-html[data-theme='emerald-parchment'] .custom-prop-menu-item {
-  color: #5b432d;
-}
-
-html[data-theme='emerald-parchment'] .custom-prop-menu-item:hover,
-html[data-theme='emerald-parchment'] .custom-prop-menu-item-active {
-  background: rgba(18, 145, 92, 0.12);
-  color: #0b6e48;
-}
-
 html[data-theme='emerald-parchment'] .altar-bg-preset-label {
   background: #5f574f;
   border-color: rgba(222, 202, 173, 0.42);
@@ -1830,6 +1773,38 @@ html[data-theme='emerald-parchment'] .hover\:border-jade-500\/70:hover {
 
 html[data-theme='emerald-parchment'] .text-jade-200 {
   color: #ecfff7;
+}
+
+/* Sidebar action bar — amber "edit" tone, warmed up so it reads on the light parchment ground */
+html[data-theme='emerald-parchment'] .bg-amber-900\/30 {
+  background: #c07a1e;
+  border-color: rgba(168, 105, 24, 0.6);
+  color: #fff6e6;
+}
+
+html[data-theme='emerald-parchment'] .hover\:bg-amber-900\/50:hover {
+  background: #a5661a;
+}
+
+html[data-theme='emerald-parchment'] .border-amber-700\/60 {
+  border-color: rgba(168, 105, 24, 0.6);
+}
+
+html[data-theme='emerald-parchment'] .hover\:border-amber-500\/70:hover {
+  border-color: rgba(168, 105, 24, 0.8);
+}
+
+/* Two Parchment idle overrides sit at (0,2,1) and so outrank Tailwind's unprefixed
+   hover: variants at (0,2,0): .bg-red-950/30 swallows Delete's hover fill, and
+   .text-stone-400 (line 406) swallows Cancel's hover text. The bg/border hovers that
+   do have a themed rule of their own are fine — those land at (0,3,1) and win.
+   Scoped to .sidebar-action-btn to keep other users of those utilities untouched. */
+html[data-theme='emerald-parchment'] .sidebar-action-btn.bg-red-950\/30:hover {
+  background-color: rgba(220, 76, 63, 0.18);
+}
+
+html[data-theme='emerald-parchment'] .sidebar-action-btn.text-stone-400:hover {
+  color: var(--text-secondary);
 }
 
 html[data-theme='emerald-parchment'] .ring-jade-500\/60 {

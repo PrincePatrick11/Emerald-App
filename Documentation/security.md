@@ -85,7 +85,6 @@ All user-provided text that is interpolated into the PDF export HTML template is
 - Entry titles (in the `<title>` element, toolbar display, and `<h1>` heading)
 - Chip labels (paradigma, bannung, meditation, linked ops/wiki, category names)
 - Tag names
-- Custom property names and values
 - Version strings
 - Icon emoji characters (when not a data-URL image)
 

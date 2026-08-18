@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Library, BookOpen, Wand2 } from 'lucide-react';
-import { useUIStore } from '../../store/uiStore';
-import { fetchBacklinks, type BacklinkEntry } from '../../lib/links';
+import { useUIStore } from '../../../store/uiStore';
+import { fetchBacklinks, type BacklinkEntry } from '../../../lib/links';
 
 export default function BacklinksPanel({ currentId }: { currentId?: string }) {
   const { t } = useTranslation();

@@ -1,85 +1,114 @@
-import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Library, Link2, Wand2, SlidersHorizontal, Repeat2 } from 'lucide-react';
+import { Pencil, Check, X, Trash2, Maximize2, Minimize2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
-import { useWikiStore } from '../../store/wikiStore';
-import OpPropertiesPanel from '../sidebar/OpPropertiesPanel';
-import RoutinesPanel from '../sidebar/RoutinesPanel';
-import WikiPanel from '../sidebar/WikiPanel';
-import BacklinksPanel from '../sidebar/BacklinksPanel';
-import OperationsPanel from '../sidebar/OperationsPanel';
-import AltarSidebarPanel from '../sidebar/AltarSidebarPanel';
-import Button from '../ui/Button';
+import { useOperationStore } from '../../store/operationStore';
+import type { ActiveView } from '../../types';
+import JournalPropertiesPanel from '../sidebar/panels/JournalPropertiesPanel';
+import WikiPropertiesPanel from '../sidebar/panels/WikiPropertiesPanel';
+import OperationPropertiesPanel from '../sidebar/panels/OperationPropertiesPanel';
+import AltarSidebarPanel from '../sidebar/panels/AltarSidebarPanel';
+import SidebarActionButton from '../sidebar/fields/SidebarActionButton';
 
+/* Mirrors the entry-list tab bar in LeftSidebarEntryList so both sidebars put their
+   bottom border on the same line. Keep the two in sync. */
+const ACTION_BAR_CLASSES = 'flex items-center gap-0.5 px-3 h-14 border-b border-stone-700/60 flex-shrink-0';
+
+function PropertiesContent({ activeView }: { activeView: ActiveView }) {
+  const { t } = useTranslation();
+  switch (activeView.type) {
+    case 'journal':
+      return <JournalPropertiesPanel />;
+    case 'wiki':
+      return <WikiPropertiesPanel />;
+    case 'operations':
+      return <OperationPropertiesPanel />;
+    case 'altar':
+      return <AltarSidebarPanel />;
+    default:
+      return <p className="text-xs text-stone-600 px-2 py-3">{t('properties.noEntry')}</p>;
+  }
+}
+
+function RightSidebarActionBar() {
+  const { t } = useTranslation();
+  const activeView = useUIStore((s) => s.activeView);
+  const setActiveView = useUIStore((s) => s.setActiveView);
+  const editActions = useUIStore((s) => s.editActions);
+  const altarWindowFullscreen = useUIStore((s) => s.altarWindowFullscreen);
+  const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
+  const operations = useOperationStore((s) => s.operations);
+
+  if (!activeView.id) return null;
+  const isEditing = activeView.mode === 'edit';
+
+  if (isEditing) {
+    if (!editActions) return null;
+    return (
+      <div className={ACTION_BAR_CLASSES}>
+        <SidebarActionButton
+          icon={<Check size={14} />}
+          label={t('editor.done')}
+          tone="jade"
+          onClick={editActions.onSave}
+        />
+        {editActions.onDelete && (
+          <SidebarActionButton
+            icon={<Trash2 size={14} />}
+            label={t('editor.delete')}
+            tone="danger"
+            compact
+            onClick={editActions.onDelete}
+          />
+        )}
+        <SidebarActionButton
+          icon={<X size={14} />}
+          label={t('editor.cancel')}
+          tone="neutral"
+          compact
+          onClick={editActions.onCancel}
+        />
+      </div>
+    );
+  }
+
+  // A loaded sigil operation can't be edited (matches OperationSigilView's enterEditMode guard).
+  const op = activeView.type === 'operations'
+    ? operations.find((o) => o.id === activeView.id)
+    : undefined;
+  if (op?.category_id === 'sigils' && op.is_loaded) return null;
+
+  const isAltar = activeView.type === 'altar';
+
+  return (
+    <div className={ACTION_BAR_CLASSES}>
+      <SidebarActionButton
+        icon={<Pencil size={14} />}
+        label={t('editor.edit')}
+        tone="amber"
+        onClick={() => setActiveView({ ...activeView, mode: 'edit' })}
+      />
+      {isAltar && (
+        <SidebarActionButton
+          icon={altarWindowFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          label={altarWindowFullscreen ? t('altar.exitWindowFullscreen') : t('altar.windowFullscreen')}
+          tone="jade"
+          active={altarWindowFullscreen}
+          compact
+          onClick={() => setAltarWindowFullscreen(!altarWindowFullscreen)}
+        />
+      )}
+    </div>
+  );
+}
 
 export default function RightSidebar() {
-  const { t } = useTranslation();
-  const { toggleRightSidebar, rightSidebarTab, setRightSidebarTab, activeView, wikiSubTab } =
-    useUIStore();
-  const articles = useWikiStore((s) => s.articles);
-  const setActiveView = useUIStore((s) => s.setActiveView);
-  const sidebarTabs: Array<{
-    id: 'op-properties' | 'backlinks' | 'wiki' | 'operations' | 'routines';
-    icon: ReactNode;
-    label: string;
-  }> = [
-    { id: 'op-properties', icon: <SlidersHorizontal size={14} />, label: t('operations.properties') },
-    { id: 'routines', icon: <Repeat2 size={14} />, label: t('routines.title') },
-    { id: 'wiki', icon: <Library size={14} />, label: t('nav.wiki') },
-    { id: 'operations', icon: <Wand2 size={14} />, label: t('nav.operations') },
-    { id: 'backlinks', icon: <Link2 size={14} />, label: t('backlinks.title') },
-  ];
+  const activeView = useUIStore((s) => s.activeView);
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header — icon-only tabs + close button */}
-      <div className="flex items-center justify-between px-3 h-14 border-b border-stone-700/60">
-        <div className="flex items-center gap-0.5">
-          {sidebarTabs.map(({ id, icon, label }) => (
-            <button
-              key={id}
-              onClick={() => setRightSidebarTab(id)}
-              title={label}
-                className={`p-2 rounded-md transition-colors ${
-                  rightSidebarTab === id
-                    ? 'right-sidebar-tab-active bg-stone-700 text-stone-200'
-                    : 'right-sidebar-tab-idle text-stone-500 hover:text-stone-300'
-                }`}
-              >
-              {icon}
-            </button>
-          ))}
-        </div>
-        <Button onClick={toggleRightSidebar} variant="ghost">
-          <X size={15} />
-        </Button>
-      </div>
-
-      {/* Content */}
+      <RightSidebarActionBar />
       <div className="flex-1 overflow-y-auto p-3">
-        {/* Tab title */}
-        <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 px-2 pb-3">
-          {rightSidebarTab === 'op-properties' && t('operations.properties')}
-          {rightSidebarTab === 'backlinks' && t('backlinks.title')}
-          {rightSidebarTab === 'wiki' && t('nav.wiki')}
-          {rightSidebarTab === 'operations' && t('nav.operations')}
-          {rightSidebarTab === 'routines' && t('routines.title')}
-        </p>
-        {rightSidebarTab === 'op-properties' && (
-          activeView.type === 'altar' ? <AltarSidebarPanel /> : <OpPropertiesPanel />
-        )}
-        {rightSidebarTab === 'routines' && (
-          <RoutinesPanel />
-        )}
-        {rightSidebarTab === 'wiki' && (
-          <WikiPanel articles={articles} onNavigate={setActiveView} wikiSubTab={wikiSubTab} />
-        )}
-        {rightSidebarTab === 'backlinks' && (
-          <BacklinksPanel currentId={activeView.id} />
-        )}
-        {rightSidebarTab === 'operations' && (
-          <OperationsPanel onNavigate={setActiveView} />
-        )}
+        <PropertiesContent activeView={activeView} />
       </div>
     </div>
   );

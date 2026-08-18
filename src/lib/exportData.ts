@@ -2,10 +2,9 @@ import { useJournalStore } from '../store/journalStore';
 import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { useUIStore } from '../store/uiStore';
-import { useCustomPropertyStore } from '../store/customPropertyStore';
 import { getCategoryEmoji } from '../components/wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from './moonPhase';
-import type { CustomProperty, WikiCategoryDef } from '../types';
+import type { WikiCategoryDef } from '../types';
 
 export interface ChipData {
   id?: string;            // entry ID (for import resolution)
@@ -38,7 +37,6 @@ export interface ExportData {
   version?: string | null;
   // common
   tagNames?: string[];
-  customProps?: Pick<CustomProperty, 'name' | 'value' | 'type' | 'meta'>[];
 }
 
 function wikiIcon(article: { icon?: string; category: string }, cats: WikiCategoryDef[]): string {
@@ -64,9 +62,6 @@ export async function collectExportData(): Promise<ExportData | null> {
   if (view.type === 'journal') {
     const entry = entries.find(e => e.id === view.id);
     if (!entry) return null;
-
-    await useCustomPropertyStore.getState().fetchProperties(entry.id, 'journal');
-    const customProps = useCustomPropertyStore.getState().properties.filter(p => p.show_in_entry);
 
     const paradigmaArt   = entry.paradigm_id            ? articles.find(a => a.id === entry.paradigm_id)            : undefined;
     const bannungArt     = entry.bannung_type_wiki_id    ? articles.find(a => a.id === entry.bannung_type_wiki_id)    : undefined;
@@ -120,7 +115,6 @@ export async function collectExportData(): Promise<ExportData | null> {
       linkedOps,
       linkedWiki,
       tagNames: (entry.tags ?? []) as string[],
-      customProps,
     };
   }
 
@@ -128,9 +122,6 @@ export async function collectExportData(): Promise<ExportData | null> {
   if (view.type === 'wiki') {
     const article = articles.find(a => a.id === view.id);
     if (!article) return null;
-
-    await useCustomPropertyStore.getState().fetchProperties(article.id, 'wiki');
-    const customProps = useCustomPropertyStore.getState().properties.filter(p => p.show_in_entry);
 
     const cat = wikiCategories.find(c => c.id === article.category);
 
@@ -143,7 +134,6 @@ export async function collectExportData(): Promise<ExportData | null> {
       wikiCategory: { label: cat?.name ?? article.category, icon: cat?.emoji ?? getCategoryEmoji(article.category) },
       entryIcon: article.icon || undefined,
       tagNames: (article.tags ?? []) as string[],
-      customProps,
     };
   }
 
@@ -151,9 +141,6 @@ export async function collectExportData(): Promise<ExportData | null> {
   if (view.type === 'operations') {
     const op = operations.find(o => o.id === view.id);
     if (!op) return null;
-
-    await useCustomPropertyStore.getState().fetchProperties(op.id, 'operation');
-    const customProps = useCustomPropertyStore.getState().properties.filter(p => p.show_in_entry);
 
     const cat = opCats.find(c => c.id === op.category_id);
 
@@ -169,7 +156,6 @@ export async function collectExportData(): Promise<ExportData | null> {
       endDate: op.end_date,
       version: op.version,
       tagNames: (op.tags ?? []) as string[],
-      customProps,
     };
   }
 

@@ -1,11 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Trash2, PanelRightOpen, Check, X, Plus, Pencil, Copy, PanelTopOpen } from 'lucide-react';
+import { Trash2, Check, X, Plus, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import EmojiPicker from '../ui/EmojiPicker';
 import Button from '../ui/Button';
-import { getDb } from '../../lib/db';
 import { generateId, isImageIcon } from '../../lib/helpers';
 
 import { useUIStore } from '../../store/uiStore';
@@ -14,7 +13,6 @@ import { useUndoStore } from '../../store/undoStore';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import RichEditor from '../editor/RichEditor';
 import TagInput from '../editor/TagInput';
-import EntryCustomProperties from '../editor/EntryCustomProperties';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import { format } from 'date-fns';
 import type { WikiCategory } from '../../types';
@@ -22,7 +20,7 @@ import type { WikiCategory } from '../../types';
 
 export default function WikiView() {
   const { t } = useTranslation();
-  const { activeView, setActiveView, openViewInNewTab, toggleRightSidebar, wikiPrefs, setWikiPrefs } = useUIStore();
+  const { activeView, setActiveView, setEditActions, openViewInNewTab, wikiPrefs, setWikiPrefs } = useUIStore();
   const {
     articles, wikiCategories, createArticle, updateArticle, deleteArticle, restoreArticle, getArticle,
     addWikiCategory, updateWikiCategory, deleteWikiCategory, restoreWikiCategory,
@@ -38,9 +36,6 @@ export default function WikiView() {
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
-  const [filterPropSlots, setFilterPropSlots] = useState<{ name: string; value: string }[]>([]);
-  const [allPropRows, setAllPropRows] = useState<{ entry_id: string; name: string; value: string | null }[]>([]);
-  const [allPropNames, setAllPropNames] = useState<string[]>([]);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [category, setCategory] = useState<WikiCategory>('other');
@@ -146,24 +141,6 @@ export default function WikiView() {
     return () => document.removeEventListener('routine-drop', handler);
   }, [isEditing, article?.id, triggerAutoSave]);
 
-  useEffect(() => {
-    (async () => {
-      const db = await getDb();
-      const [nameRows, valueRows] = await Promise.all([
-        db.select<{ name: string }[]>(
-          'SELECT DISTINCT name FROM custom_properties WHERE entry_type = $1 ORDER BY name ASC',
-          ['wiki']
-        ),
-        db.select<{ entry_id: string; name: string; value: string | null }[]>(
-          'SELECT entry_id, name, value FROM custom_properties WHERE entry_type = $1',
-          ['wiki']
-        ),
-      ]);
-      setAllPropNames(nameRows.map((r) => r.name));
-      setAllPropRows(valueRows);
-    })();
-  }, [articles.length]);
-
   const handleDone = async () => {
     if (!article) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
@@ -197,6 +174,19 @@ export default function WikiView() {
     setContent(html);
     triggerAutoSave();
   }, [triggerAutoSave]);
+
+  const editHandlersRef = useRef({ onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
+  editHandlersRef.current = { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete };
+
+  useEffect(() => {
+    if (!isEditing) return;
+    setEditActions({
+      onSave: () => editHandlersRef.current.onSave(),
+      onCancel: () => editHandlersRef.current.onCancel(),
+      onDelete: () => editHandlersRef.current.onDelete(),
+    });
+    return () => setEditActions(null);
+  }, [isEditing]);
 
   const handleNew = async () => {
     const a = await createArticle();
@@ -254,22 +244,13 @@ export default function WikiView() {
       ? searchFiltered
       : searchFiltered.filter((a) => filterCatIds.includes(a.category));
 
-    const filtered = filterPropSlots.some((s) => s.name && s.value)
-      ? catFiltered.filter((a) =>
-          filterPropSlots.filter((s) => s.name && s.value).every(({ name, value }) =>
-            allPropRows.some(
-              (r) => r.entry_id === a.id && r.name === name &&
-                     (r.value ?? '').toLowerCase().includes(value.toLowerCase())
-            )
-          )
-        )
-      : catFiltered;
+    const filtered = catFiltered;
 
     const catChips = wikiCategories
       .filter((c) => articles.some((a) => a.category === c.id))
       .map((c) => ({ value: c.id, label: c.is_builtin ? t(`wiki.categories.${c.id}`) : c.name, emoji: c.emoji }));
 
-    const activeFilterCount = (filterCatIds.length > 0 ? 1 : 0) + filterPropSlots.filter((s) => s.name && s.value).length;
+    const activeFilterCount = filterCatIds.length > 0 ? 1 : 0;
 
     const sortedArticles = [...filtered].sort((a, b) => {
       if (sort === 'alpha_asc') return a.title.localeCompare(b.title);
@@ -468,7 +449,6 @@ export default function WikiView() {
       <Dashboard<Article>
         title={t('wiki.title')}
         primaryAction={{ label: t('wiki.newArticle'), onClick: handleNew }}
-        onToggleRightSidebar={toggleRightSidebar}
         view={view}
         sort={sort}
         onView={(v) => setWikiPrefs({ view: v })}
@@ -484,12 +464,7 @@ export default function WikiView() {
             chips: catChips,
             selectedChips: filterCatIds,
             onChipToggle: (v) => setFilterCatIds((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
-            propNames: allPropNames,
-            propFilters: filterPropSlots,
-            onAddPropFilter: () => setFilterPropSlots((prev) => [...prev, { name: '', value: '' }]),
-            onUpdatePropFilter: (i, pf) => setFilterPropSlots((prev) => prev.map((s, idx) => idx === i ? pf : s)),
-            onRemovePropFilter: (i) => setFilterPropSlots((prev) => prev.filter((_, idx) => idx !== i)),
-            onClearAll: () => { setFilterCatIds([]); setFilterPropSlots([]); },
+            onClearAll: () => setFilterCatIds([]),
           },
         }}
         items={sortedArticles}
@@ -548,31 +523,6 @@ export default function WikiView() {
           <span>{format(new Date(article.updated_at), 'MMM d, yyyy')}</span>
           {isEditing && <span className="text-stone-700 italic ml-1">{t('editor.editing')}</span>}
         </div>
-        <div className="flex items-center gap-2">
-          {isEditing ? (
-            <>
-              <Button onClick={handleDone} variant="primary">
-                <Check size={13} />
-                {t('editor.done')}
-              </Button>
-              <Button onClick={handleDelete} variant="danger">
-                <Trash2 size={15} />
-              </Button>
-              <Button onClick={handleCancel} variant="ghost">
-                <X size={15} />
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button onClick={enterEditMode} variant="ghost" title={t('editor.edit')}>
-                <Pencil size={15} />
-              </Button>
-              <Button onClick={toggleRightSidebar} variant="ghost">
-                <PanelRightOpen size={15} />
-              </Button>
-            </>
-          )}
-        </div>
       </div>
 
 
@@ -608,9 +558,6 @@ export default function WikiView() {
         )}
       </div>
 
-
-      {/* Custom properties marked "show in entry" */}
-      <EntryCustomProperties entryId={article.id} entryType="wiki" isEditing={false} />
 
       {/* Tags */}
       <div className="px-8 pb-3 flex-shrink-0" onDoubleClick={enterEditMode}>

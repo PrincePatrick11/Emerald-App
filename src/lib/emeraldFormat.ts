@@ -8,7 +8,6 @@ import { useJournalStore } from '../store/journalStore';
 import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { useTagStore } from '../store/tagStore';
-import { useCustomPropertyStore } from '../store/customPropertyStore';
 import { useAltarStore } from '../store/altarStore';
 import { useImportStore } from '../store/importStore';
 import { getDb } from './db';
@@ -19,7 +18,6 @@ import {
 } from './altarConstants';
 import { MOON_PHASE_SYMBOLS } from './moonPhase';
 import { noAltarOpenMessage } from './altarExport';
-import type { CustomPropertyType } from '../types';
 
 // ── File format ──────────────────────────────────────────────────────────────
 
@@ -59,14 +57,6 @@ interface EmeraldMeta {
   icon?: string;
   // common
   tags?: string[];
-  customProps?: Array<{
-    name: string;
-    type: string;
-    value: string | null;
-    meta: string | null;
-    showInEntry: boolean;
-    sortOrder: number;
-  }>;
   // altar — background_image_data is a local file path, so it's routed
   // through `images` like content images. icon_data, thumbnail_data, and item
   // images are already data: URLs (or a plain emoji, for icon) in the DB, so
@@ -169,7 +159,6 @@ export async function exportAsEmerald(): Promise<void> {
       meta.linkedWiki = linkedWikiIds.map(id => ({ id, title: articles.find(a => a.id === id)?.title ?? '' }));
 
     meta.tags = (entry.tags ?? []) as string[];
-    await useCustomPropertyStore.getState().fetchProperties(entry.id, 'journal');
 
   } else if (view.type === 'wiki') {
     const article = articles.find(a => a.id === view.id);
@@ -184,7 +173,6 @@ export async function exportAsEmerald(): Promise<void> {
     meta.wikiCategoryName = cat?.name ?? article.category;
     meta.icon             = article.icon ?? undefined;
     meta.tags             = (article.tags ?? []) as string[];
-    await useCustomPropertyStore.getState().fetchProperties(article.id, 'wiki');
 
   } else if (view.type === 'operations') {
     const op = operations.find(o => o.id === view.id);
@@ -201,13 +189,7 @@ export async function exportAsEmerald(): Promise<void> {
     meta.version   = op.version;
     meta.icon      = op.icon ?? undefined;
     meta.tags      = (op.tags ?? []) as string[];
-    await useCustomPropertyStore.getState().fetchProperties(op.id, 'operation');
   }
-
-  meta.customProps = useCustomPropertyStore.getState().properties.map(p => ({
-    name: p.name, type: p.type, value: p.value, meta: p.meta,
-    showInEntry: p.show_in_entry, sortOrder: p.sort_order,
-  }));
 
   // Embed all local images from content as base64
   const images: Record<string, string> = {};
@@ -323,25 +305,6 @@ async function remapImages(content: string, images: Record<string, string>): Pro
     } catch { /* skip */ }
   }
   return result;
-}
-
-async function importCustomProps(
-  entryId: string,
-  entryType: string,
-  props: EmeraldMeta['customProps'],
-): Promise<void> {
-  if (!props?.length) return;
-  // Reset store state for this entry so sort_order starts at 0
-  await useCustomPropertyStore.getState().fetchProperties(entryId, entryType);
-  const store = useCustomPropertyStore.getState();
-  for (const p of props) {
-    const prop = await store.addProperty(
-      entryId, entryType, p.name, p.type as CustomPropertyType, p.meta, p.showInEntry,
-    );
-    if (p.value !== null) {
-      await useCustomPropertyStore.getState().updateProperty(prop.id, { value: p.value });
-    }
-  }
 }
 
 /** Re-reads the relevant store from DB so the UI reflects the imported data. */
@@ -466,7 +429,6 @@ async function importJournalEntry(file: EmeraldFile, content: string, tagNames: 
     linked_operation_ids: linkedOpIds,
     linked_wiki_ids: linkedWikiIds,
   });
-  await importCustomProps(entry.id, 'journal', file.meta.customProps);
   return entry.id;
 }
 
@@ -496,7 +458,6 @@ async function importWikiArticle(file: EmeraldFile, content: string, tagNames: s
     tags: tagNames,
     icon: file.meta.icon ?? undefined,
   });
-  await importCustomProps(article.id, 'wiki', file.meta.customProps);
   return article.id;
 }
 
@@ -525,7 +486,6 @@ async function importOperationEntry(file: EmeraldFile, content: string, tagNames
     version: file.meta.version ?? null,
     icon: file.meta.icon ?? undefined,
   });
-  await importCustomProps(op.id, 'operation', file.meta.customProps);
   return op.id;
 }
 
@@ -693,14 +653,6 @@ function parseLinkedItems(raw: string): Array<{ id: string | null; title: string
   }).filter(item => item.title);
 }
 
-/** Known Emerald-exported frontmatter keys. Everything else → custom property. */
-const KNOWN_MD_KEYS = new Set([
-  'type', 'moon', 'paradigma', 'bannung', 'meditation', 'operations',
-  'wiki', 'category', 'status', 'end date', 'version', 'tags',
-]);
-
-type MdCustomProp = { name: string; type: CustomPropertyType; value: string; meta: null; showInEntry: boolean; sortOrder: number };
-
 export async function importFromMarkdown(): Promise<void> {
   const result = await openDialog({
     filters: [{ name: 'Markdown', extensions: ['md'] }],
@@ -760,26 +712,14 @@ export async function importFromMarkdown(): Promise<void> {
     (frontMeta['tags'] ?? '').split(',').map(t => t.trim()).filter(Boolean),
   );
 
-  // All unrecognised keys → custom properties (text type)
-  const customProps: MdCustomProp[] = Object.entries(frontMeta)
-    .filter(([k]) => !KNOWN_MD_KEYS.has(k))
-    .map(([name, value]) => ({
-      name: name.charAt(0).toUpperCase() + name.slice(1),
-      type: 'text' as CustomPropertyType,
-      value,
-      meta: null,
-      showInEntry: true,
-      sortOrder: 0,
-    }));
-
   let newId: string;
   try {
     if (type === 'journal') {
-      newId = await importJournalFromMarkdown(title, html, tagNames, frontMeta, customProps);
+      newId = await importJournalFromMarkdown(title, html, tagNames, frontMeta);
     } else if (type === 'wiki') {
-      newId = await importWikiFromMarkdown(title, html, tagNames, frontMeta, customProps);
+      newId = await importWikiFromMarkdown(title, html, tagNames, frontMeta);
     } else {
-      newId = await importOperationFromMarkdown(title, html, tagNames, frontMeta, customProps);
+      newId = await importOperationFromMarkdown(title, html, tagNames, frontMeta);
     }
   } catch (e) {
     await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
@@ -793,7 +733,7 @@ export async function importFromMarkdown(): Promise<void> {
 
 async function importJournalFromMarkdown(
   title: string, html: string, tagNames: string[],
-  meta: Record<string, string>, customProps: MdCustomProp[],
+  meta: Record<string, string>,
 ): Promise<string> {
   const { createEntry, updateEntry } = useJournalStore.getState();
   const { articles }   = useWikiStore.getState();
@@ -848,13 +788,12 @@ async function importJournalFromMarkdown(
     linked_operation_ids: linkedOpIds,
     linked_wiki_ids: linkedWikiIds,
   });
-  await importCustomProps(entry.id, 'journal', customProps);
   return entry.id;
 }
 
 async function importWikiFromMarkdown(
   title: string, html: string, tagNames: string[],
-  meta: Record<string, string>, customProps: MdCustomProp[],
+  meta: Record<string, string>,
 ): Promise<string> {
   const { createArticle, updateArticle, wikiCategories } = useWikiStore.getState();
 
@@ -867,13 +806,12 @@ async function importWikiFromMarkdown(
 
   const article = await createArticle(categoryId);
   await updateArticle(article.id, { title, content: html, category: categoryId, tags: tagNames });
-  await importCustomProps(article.id, 'wiki', customProps);
   return article.id;
 }
 
 async function importOperationFromMarkdown(
   title: string, html: string, tagNames: string[],
-  meta: Record<string, string>, customProps: MdCustomProp[],
+  meta: Record<string, string>,
 ): Promise<string> {
   const { createOperation, updateOperation, categories: opCats, addCategory } = useOperationStore.getState();
 
@@ -898,6 +836,5 @@ async function importOperationFromMarkdown(
     end_date: meta['end date'] ?? null,
     version: meta['version'] ?? null,
   });
-  await importCustomProps(op.id, 'operation', customProps);
   return op.id;
 }

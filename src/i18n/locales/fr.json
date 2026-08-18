@@ -33,9 +33,6 @@
     "operationDeleted": "Opération supprimée",
     "creationDeleted": "Création supprimée",
     "taskDeleted": "Tâche supprimée",
-    "propertyAdded": "Propriété ajoutée",
-    "propertyUpdated": "Propriété mise à jour",
-    "propertyDeleted": "Propriété supprimée",
     "categoryDeleted": "Catégorie supprimée",
     "tagDeleted": "Étiquette supprimée"
   },
@@ -55,6 +52,8 @@
   "sidebar": {
     "collapseList": "Réduire la liste",
     "expandList": "Développer la liste",
+    "collapseProperties": "Réduire les propriétés",
+    "expandProperties": "Développer les propriétés",
     "back": "Précédent",
     "forward": "Suivant"
   },
@@ -71,7 +70,6 @@
     "categoryName": "Nom de catégorie…",
     "categoryEmoji": "Emoji…",
     "deleteCategory": "Supprimer la catégorie",
-    "properties": "Propriétés",
     "active": "Active",
     "inactive": "Inactive",
     "endDate": "Date de fin",
@@ -116,7 +114,6 @@
     "customColor": "Couleur personnalisée",
     "windowFullscreen": "Vue focus",
     "exitWindowFullscreen": "Quitter la vue focus",
-    "enterFullscreen": "Plein écran",
     "change": "Changer",
     "remove": "Supprimer",
     "removeCustomBackground": "Supprimer l'arriere-plan personnalise",
@@ -309,7 +306,6 @@
     "addCategory": "Ajouter une catégorie"
   },
   "editor": {
-    "save": "Enregistrer",
     "done": "Terminé",
     "cancel": "Annuler",
     "delete": "Supprimer",
@@ -353,13 +349,6 @@
     "noEntry": "Ouvrez une entrée pour voir ses propriétés.",
     "category": "Catégorie",
     "tags": "Étiquettes",
-    "custom": "Propriétés personnalisées",
-    "addProperty": "Ajouter une propriété",
-    "namePlaceholder": "Nom de la propriété…",
-    "add": "Ajouter",
-    "showInEntry": "Afficher dans l'entrée",
-    "trueLabelPlaceholder": "Libellé activé…",
-    "falseLabelPlaceholder": "Libellé désactivé…",
     "paradigma": "Paradigme",
     "bannung": "Bannissement",
     "meditation": "Méditation",
@@ -372,25 +361,14 @@
     "coverImage": "Image de couverture",
     "addCoverImage": "Ajouter une image de couverture",
     "change": "Modifier",
-    "remove": "Supprimer",
-    "types": {
-      "text": "Texte",
-      "number": "Nombre",
-      "date": "Date",
-      "toggle": "Bascule",
-      "checkbox": "Case à cocher"
-    }
+    "remove": "Supprimer"
   },
   "filters": {
     "toggle": "Filtres",
     "clearAll": "Tout effacer",
     "category": "Catégorie",
     "moonPhase": "Phase lunaire",
-    "status": "Statut",
-    "properties": "Propriétés",
-    "addFilter": "Ajouter un filtre de propriété",
-    "selectProperty": "Propriété…",
-    "valuePlaceholder": "Valeur…"
+    "status": "Statut"
   },
   "home": {
     "viewAll": "Voir tout",

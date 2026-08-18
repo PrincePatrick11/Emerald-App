@@ -33,9 +33,6 @@
     "operationDeleted": "Operation gelöscht",
     "creationDeleted": "Kreation gelöscht",
     "taskDeleted": "Aufgabe gelöscht",
-    "propertyAdded": "Eigenschaft hinzugefügt",
-    "propertyUpdated": "Eigenschaft aktualisiert",
-    "propertyDeleted": "Eigenschaft gelöscht",
     "categoryDeleted": "Kategorie gelöscht",
     "tagDeleted": "Tag gelöscht"
   },
@@ -55,6 +52,8 @@
   "sidebar": {
     "collapseList": "Liste einklappen",
     "expandList": "Liste ausklappen",
+    "collapseProperties": "Eigenschaften einklappen",
+    "expandProperties": "Eigenschaften ausklappen",
     "back": "Zurück",
     "forward": "Vor"
   },
@@ -71,7 +70,6 @@
     "categoryName": "Kategoriename…",
     "categoryEmoji": "Emoji…",
     "deleteCategory": "Kategorie löschen",
-    "properties": "Eigenschaften",
     "active": "Aktiv",
     "inactive": "Inaktiv",
     "endDate": "Enddatum",
@@ -116,7 +114,6 @@
     "customColor": "Benutzerdefinierte Farbe",
     "windowFullscreen": "Fokusansicht",
     "exitWindowFullscreen": "Fokusansicht beenden",
-    "enterFullscreen": "Vollbild aktivieren",
     "change": "Aendern",
     "remove": "Entfernen",
     "removeCustomBackground": "Benutzerdefinierten Hintergrund entfernen",
@@ -309,7 +306,6 @@
     "addCategory": "Kategorie hinzufügen"
   },
   "editor": {
-    "save": "Speichern",
     "done": "Fertig",
     "cancel": "Abbrechen",
     "delete": "Löschen",
@@ -353,13 +349,6 @@
     "noEntry": "Öffne einen Eintrag, um seine Eigenschaften zu sehen.",
     "category": "Kategorie",
     "tags": "Tags",
-    "custom": "Eigene Eigenschaften",
-    "addProperty": "Eigenschaft hinzufügen",
-    "namePlaceholder": "Name der Eigenschaft…",
-    "add": "Hinzufügen",
-    "showInEntry": "Im Eintrag anzeigen",
-    "trueLabelPlaceholder": "An-Bezeichnung…",
-    "falseLabelPlaceholder": "Aus-Bezeichnung…",
     "paradigma": "Paradigma",
     "bannung": "Bannung",
     "meditation": "Meditation",
@@ -372,25 +361,14 @@
     "coverImage": "Titelbild",
     "addCoverImage": "Titelbild hinzufügen",
     "change": "Ändern",
-    "remove": "Entfernen",
-    "types": {
-      "text": "Text",
-      "number": "Zahl",
-      "date": "Datum",
-      "toggle": "Schalter",
-      "checkbox": "Checkbox"
-    }
+    "remove": "Entfernen"
   },
   "filters": {
     "toggle": "Filter",
     "clearAll": "Alle löschen",
     "category": "Kategorie",
     "moonPhase": "Mondphase",
-    "status": "Status",
-    "properties": "Eigenschaften",
-    "addFilter": "Eigenschaftsfilter hinzufügen",
-    "selectProperty": "Eigenschaft…",
-    "valuePlaceholder": "Wert…"
+    "status": "Status"
   },
   "settings": {
     "language": "Sprache",

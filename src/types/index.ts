@@ -112,20 +112,6 @@ export interface Routine {
   updated_at: string;
 }
 
-export type CustomPropertyType = 'text' | 'number' | 'date' | 'toggle' | 'checkbox';
-
-export interface CustomProperty {
-  id: string;
-  entry_id: string;
-  entry_type: 'journal' | 'wiki' | 'operation';
-  name: string;
-  type: CustomPropertyType;
-  value: string | null;
-  meta: string | null;  // JSON: type-specific config (e.g. {trueLabel, falseLabel} for checkbox)
-  show_in_entry: boolean;
-  sort_order: number;
-}
-
 
 export type MoonPhase =
   | 'new'

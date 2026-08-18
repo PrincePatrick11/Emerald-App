@@ -169,25 +169,6 @@ function chip(data: ChipData, extra = ''): string {
   return `<span class="chip${extra ? ' ' + extra : ''}">${iconHtml}<span class="chip-label">${htmlEscape(data.label)}</span></span>`;
 }
 
-function formatCustomPropValue(prop: { type: string; value: string | null; meta: string | null }): string {
-  if (prop.value === null || prop.value === '') return '—';
-  if (prop.type === 'checkbox' || prop.type === 'toggle') {
-    let trueLabel = 'Yes', falseLabel = 'No';
-    if (prop.meta) {
-      try {
-        const m = JSON.parse(prop.meta);
-        trueLabel  = m.trueLabel  ?? trueLabel;
-        falseLabel = m.falseLabel ?? falseLabel;
-      } catch { /* ignore */ }
-    }
-    return prop.value === 'true' ? trueLabel : falseLabel;
-  }
-  if (prop.type === 'date') {
-    try { return format(new Date(prop.value), 'MMM d, yyyy'); } catch { return prop.value; }
-  }
-  return prop.value;
-}
-
 // Top bar: exactly like the main view — 🌕 January 15, 2026 · Full Moon
 function buildTopBar(data: ExportData): string {
   const dateStr = format(new Date(data.createdAt), 'MMMM d, yyyy');
@@ -254,14 +235,6 @@ function buildMetaHtml(data: ExportData): string {
     const tags = data.tagNames.map(t => `<span class="tag">${htmlEscape(t)}</span>`).join('');
     parts.push(`<div class="meta-row">${tags}</div>`);
   }
-  // Custom props
-  if (data.customProps?.length) {
-    const badges = data.customProps.map(p =>
-      `<span class="prop-badge"><span class="prop-name">${htmlEscape(p.name)}</span><span class="prop-val">${htmlEscape(formatCustomPropValue(p))}</span></span>`
-    ).join('');
-    parts.push(`<div class="meta-row">${badges}</div>`);
-  }
-
   return parts.length ? `<div class="meta-section">${parts.join('\n')}</div>` : '';
 }
 
@@ -334,13 +307,6 @@ const PRINT_CSS = `
     display: inline-block; font-family: system-ui,sans-serif; font-size: 0.78em;
     background: #e8e8e8; border-radius: 12px; padding: 2px 10px; color: #444;
   }
-  .prop-badge {
-    display: inline-flex; align-items: center;
-    font-family: system-ui,sans-serif; font-size: 0.78em;
-    border: 1px solid #ddd; border-radius: 6px; overflow: hidden;
-  }
-  .prop-name { background: #f2f2f2; padding: 2px 7px; color: #666; border-right: 1px solid #ddd; }
-  .prop-val  { padding: 2px 7px; color: #333; }
   /* Content */
   .entry-content h1, .entry-content h2, .entry-content h3 { margin-top: 1.3em; margin-bottom: 0.4em; }
   .entry-content p  { margin-bottom: 0.8em; }
@@ -495,9 +461,6 @@ export async function exportAsMarkdown(data: ExportData): Promise<void> {
   if (data.endDate)             lines.push(`End Date: ${format(new Date(data.endDate), 'MMM d, yyyy')}`);
   if (data.version)             lines.push(`Version: ${data.version}`);
   if (data.tagNames?.length)    lines.push(`Tags: ${data.tagNames.join(', ')}`);
-  if (data.customProps?.length) {
-    for (const p of data.customProps) lines.push(`${p.name}: ${formatCustomPropValue(p)}`);
-  }
   lines.push('', '---', '');
   lines.push(td.turndown(stripped), '');
 

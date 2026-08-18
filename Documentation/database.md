@@ -14,9 +14,11 @@ Emerald uses a single SQLite file, `emerald.db`, located in the OS application d
 4. After each successful migration, writes a row into `schema_version` with the version, name, and ISO timestamp.
 5. Calls the separate `runPeriodicCleanup(db)` function, which auto-purges trashed rows older than 30 days across all soft-delete-aware tables. This is **not** a migration — it is idempotent and time-dependent, so it runs on every vault open.
 
-The current schema version is **31**. New schema changes must be added as a new entry in the `MIGRATIONS` array with a strictly higher version number and a unique `name`.
+The current schema version is **32**. New schema changes must be added as a new entry in the `MIGRATIONS` array with a strictly higher version number and a unique `name`.
 
-**Upgrades from older versions.** Vaults that predate the `schema_version` table will see all migrations run on first open. `ALTER TABLE … ADD COLUMN` against an already-present column raises a "duplicate column" error; this is detected by `isAlreadyAppliedError` (matches `duplicate column name`, `already exists`, or a pre-existing table) and the migration is marked applied anyway. The data migrations themselves are idempotent and re-run safely: `entry_number` is only backfilled where `NULL`, the UUID → fixed-string category ID rewrite is a no-op once the fixed IDs exist, and the `custom_properties.type = 'checkbox' → 'toggle'` rename is a single `UPDATE` that is a no-op once the migration has run.
+**Upgrades from older versions.** Vaults that predate the `schema_version` table will see all migrations run on first open. `ALTER TABLE … ADD COLUMN` against an already-present column raises a "duplicate column" error; this is detected by `isAlreadyAppliedError` (matches `duplicate column name`, `already exists`, or a pre-existing table) and the migration is marked applied anyway. The data migrations themselves are idempotent and re-run safely: `entry_number` is only backfilled where `NULL`, and the UUID → fixed-string category ID rewrite is a no-op once the fixed IDs exist.
+
+**Version 11 is intentionally missing.** It used to create the `custom_properties` table for the Custom Properties feature, which was removed in 0.2.0. Deleting the migration outright — rather than leaving an empty no-op entry — is safe because `runMigrations` only cares that each entry's version is above the last *applied* version, not that the sequence is gapless. Vaults that already recorded version 11 in `schema_version` are unaffected; fresh vaults simply jump from 10 to 12 and never create the table. Version 32 (`drop_custom_properties`) then drops the table and its index from vaults that do still have it, which deletes any rows they hold. That data is not preserved anywhere — it is not part of backups taken with 0.2.0 — so the drop is deliberate and irreversible.
 
 ## Tables
 
@@ -126,26 +128,6 @@ Two built-in categories are seeded with fixed string IDs. Custom categories use 
 | deleted_at | TEXT | |
 
 A startup migration replaces any UUID-based built-in IDs left over from older versions with the canonical string IDs, and updates all `operations.category_id` references accordingly.
-
-### custom_properties
-
-User-defined properties attached to individual journal entries, wiki articles, or operations.
-
-| Column | Type | Notes |
-|---|---|---|
-| id | TEXT PK | UUID |
-| entry_id | TEXT | FK to the owning row in its table |
-| entry_type | TEXT | `'journal'`, `'wiki'`, or `'operation'` |
-| name | TEXT | Display label |
-| type | TEXT | `'text'`, `'number'`, `'date'`, `'toggle'`, `'checkbox'` |
-| value | TEXT | Stored as string; NULL if unset |
-| meta | TEXT | JSON; type-specific config (e.g. `{"trueLabel":"Yes","falseLabel":"No"}` for toggle) |
-| show_in_entry | INTEGER | Boolean 0/1; shows as a badge in the read view when true |
-| sort_order | INTEGER | |
-
-Index: `idx_custom_props_entry` on `(entry_id, entry_type)`.
-
-Note: the `checkbox` type was renamed to `toggle` in a data migration. The migration updates any existing rows.
 
 ### routines
 
@@ -397,7 +379,7 @@ Full vault snapshots are exported and imported via Settings → Backup.
   "data": {
     "journalEntries": [], "wikiArticles": [], "wikiCategories": [],
     "operations": [], "operationCategories": [], "tags": [],
-    "customProperties": [], "routines": [],
+    "routines": [],
     "altars": [], "altarCategories": [], "altarItems": [], "altarPlacements": [],
     "tasks": [], "taskCategories": [], "taskLinks": [],
     "links": []

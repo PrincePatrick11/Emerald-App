@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Check, Pencil, Trash2, Copy } from 'lucide-react';
-import { useRoutineStore } from '../../store/routineStore';
-import { useUndoStore } from '../../store/undoStore';
-import { setRoutineDragItem } from '../../lib/routineDragState';
-import { generateId } from '../../lib/helpers';
-import TagInput from '../editor/TagInput';
-import LinkedOpsInput from './LinkedOpsInput';
-import LinkedWikiInput from './LinkedWikiInput';
-import ContextMenu from '../ui/ContextMenu';
-import EmojiPicker from '../ui/EmojiPicker';
-import Button from '../ui/Button';
+import { useRoutineStore } from '../../../store/routineStore';
+import { useUndoStore } from '../../../store/undoStore';
+import { setRoutineDragItem } from '../../../lib/routineDragState';
+import { generateId } from '../../../lib/helpers';
+import TagInput from '../../editor/TagInput';
+import LinkedOpsInput from '../fields/LinkedOpsInput';
+import LinkedWikiInput from '../fields/LinkedWikiInput';
+import ContextMenu from '../../ui/ContextMenu';
+import EmojiPicker from '../../ui/EmojiPicker';
+import Button from '../../ui/Button';
 
 export default function RoutinesPanel() {
   const { t } = useTranslation();
@@ -173,10 +173,10 @@ function RoutineRow({
   isRenaming, renameValue, onRenameChange, onRenameCommit, onRenameCancel,
   inputCls, textareaCls,
 }: {
-  routine: import('../../types').Routine;
+  routine: import('../../../types').Routine;
   expanded: boolean;
   onToggle: () => void;
-  onUpdate: (id: string, patch: Partial<Pick<import('../../types').Routine, 'name' | 'emoji' | 'content' | 'tags' | 'operation_ids' | 'wiki_ids'>>) => Promise<void>;
+  onUpdate: (id: string, patch: Partial<Pick<import('../../../types').Routine, 'name' | 'emoji' | 'content' | 'tags' | 'operation_ids' | 'wiki_ids'>>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onContextMenu: (e: React.MouseEvent, id: string) => void;
   isRenaming: boolean;

@@ -17,7 +17,7 @@ import { useUIStore } from '../../store/uiStore';
 import SettingsModal from './SettingsModal';
 import RailButton from '../ui/RailButton';
 
-function PanelToggleIcon({ active, size = 16 }: { active: boolean; size?: number }) {
+function PanelToggleIcon({ active, mirrored, size = 16 }: { active: boolean; mirrored?: boolean; size?: number }) {
   return (
     <svg
       width={size}
@@ -30,7 +30,7 @@ function PanelToggleIcon({ active, size = 16 }: { active: boolean; size?: number
       strokeLinejoin="round"
     >
       <rect width="18" height="18" x="3" y="3" rx="2" />
-      <path d="M9 3v18" />
+      <path d={mirrored ? 'M15 3v18' : 'M9 3v18'} />
       {active && <path d="M4.5 4.5l15 15" />}
     </svg>
   );
@@ -40,7 +40,7 @@ export default function LeftSidebarRail() {
   const { t } = useTranslation();
   const {
     setActiveView, navigateBack, navigateForward, historyIndex, history,
-    leftListOpen, toggleLeftList,
+    leftListOpen, toggleLeftList, rightSidebarOpen, toggleRightSidebar,
   } = useUIStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -72,10 +72,13 @@ export default function LeftSidebarRail() {
         </RailButton>
       </div>
 
-      {/* Entry-list panel toggle — independent of the nav links below */}
-      <div className="rail-divider w-full flex justify-center py-2 border-b">
+      {/* Sidebar panel toggles — independent of the nav links below */}
+      <div className="rail-divider w-full flex flex-col items-center gap-0.5 py-2 border-b">
         <RailButton onClick={toggleLeftList} title={leftListOpen ? t('sidebar.collapseList') : t('sidebar.expandList')}>
           <PanelToggleIcon active={leftListOpen} size={18} />
+        </RailButton>
+        <RailButton onClick={toggleRightSidebar} title={rightSidebarOpen ? t('sidebar.collapseProperties') : t('sidebar.expandProperties')}>
+          <PanelToggleIcon active={rightSidebarOpen} mirrored size={18} />
         </RailButton>
       </div>
 

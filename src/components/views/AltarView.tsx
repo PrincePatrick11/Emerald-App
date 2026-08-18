@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
-import { Check, Maximize2, Minimize2, PanelRightOpen, Pencil, X } from 'lucide-react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAltarStore } from '../../store/altarStore';
 import { useUIStore } from '../../store/uiStore';
@@ -33,7 +33,7 @@ export default function AltarView() {
   );
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
-  const toggleRightSidebar = useUIStore((s) => s.toggleRightSidebar);
+  const setEditActions = useUIStore((s) => s.setEditActions);
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const altarPrefs = useUIStore((s) => s.altarPrefs);
   const setAltarPrefs = useUIStore((s) => s.setAltarPrefs);
@@ -159,6 +159,11 @@ export default function AltarView() {
     }
   };
 
+  const handleDeleteActive = () => {
+    if (!activeAltar) return;
+    handleDelete(activeAltar.id);
+  };
+
   const handleDuplicate = async (id: string) => {
     const altar = await duplicateAltar(id);
     if (!altar) return;
@@ -205,6 +210,19 @@ export default function AltarView() {
       thumbnailSavingRef.current = false;
     }
   };
+
+  const editHandlersRef = useRef({ onSave: handleDone, onCancel: handleCancel, onDelete: handleDeleteActive });
+  editHandlersRef.current = { onSave: handleDone, onCancel: handleCancel, onDelete: handleDeleteActive };
+
+  useEffect(() => {
+    if (!isEditing) return;
+    setEditActions({
+      onSave: () => editHandlersRef.current.onSave(),
+      onCancel: () => editHandlersRef.current.onCancel(),
+      onDelete: () => editHandlersRef.current.onDelete(),
+    });
+    return () => setEditActions(null);
+  }, [isEditing]);
 
   const backgroundSrc = useBackgroundPreview(activeAltar?.background_image_data ?? null);
 
@@ -268,7 +286,6 @@ export default function AltarView() {
       <Dashboard<AltarRecord>
         title={t('nav.altar')}
         primaryAction={{ label: t('altar.newAltar'), onClick: handleNew }}
-        onToggleRightSidebar={toggleRightSidebar}
         view={altarPrefs.view}
         sort={altarPrefs.sort}
         onView={(next) => setAltarPrefs({ view: next })}
@@ -315,16 +332,7 @@ export default function AltarView() {
           <span>{format(new Date(activeAltar.updated_at), 'MMM d, yyyy')}</span>
         </div>
         <div className="flex items-center gap-1">
-          {isEditing ? (
-            <>
-              <Button onClick={handleDone} variant="primary">
-                <Check size={13} />{t('editor.done')}
-              </Button>
-              <Button onClick={handleCancel} variant="ghost">
-                <X size={15} />
-              </Button>
-            </>
-          ) : (
+          {isEditing ? null : (
             <>
               {altarWindowFullscreen ? (
                 <Button
@@ -343,12 +351,6 @@ export default function AltarView() {
                   <Maximize2 size={15} />
                 </Button>
               )}
-              <Button onClick={enterEditMode} variant="ghost" title={t('editor.edit')}>
-                <Pencil size={15} />
-              </Button>
-              <Button onClick={toggleRightSidebar} variant="ghost">
-                <PanelRightOpen size={16} />
-              </Button>
             </>
           )}
         </div>

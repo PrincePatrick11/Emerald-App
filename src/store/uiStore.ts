@@ -14,6 +14,12 @@ export interface HomeSectionPrefs { sort: HomeSort; view: HomeView; count: numbe
 export type ThemeId = 'emerald-noctis' | 'emerald-parchment';
 export type FontId = 'inter' | 'source-sans-3' | 'nunito' | 'ibm-plex-sans' | 'alegreya' | 'cormorant-garamond' | 'lora' | 'merriweather';
 
+export interface EditActions {
+  onSave: () => void;
+  onCancel: () => void;
+  onDelete?: () => void;
+}
+
 interface UIState {
   activeView: ActiveView;
   tabs: OpenTab[];
@@ -21,7 +27,7 @@ interface UIState {
   history: ActiveView[];
   historyIndex: number;
   rightSidebarOpen: boolean;
-  rightSidebarTab: 'op-properties' | 'backlinks' | 'wiki' | 'operations' | 'routines';
+  editActions: EditActions | null;
   operationsSubTab: string | null;
   wikiSubTab: string | null;
   leftListOpen: boolean;
@@ -51,7 +57,7 @@ interface UIState {
   navigateBack: () => void;
   navigateForward: () => void;
   toggleRightSidebar: () => void;
-  setRightSidebarTab: (tab: 'op-properties' | 'backlinks' | 'wiki' | 'operations' | 'routines') => void;
+  setEditActions: (actions: EditActions | null) => void;
   setOperationsSubTab: (id: string | null) => void;
   setWikiSubTab: (category: string | null) => void;
   toggleLeftList: () => void;
@@ -133,7 +139,7 @@ export const useUIStore = create<UIState>((set) => ({
   history: [{ type: 'home' }],
   historyIndex: 0,
   rightSidebarOpen: true,
-  rightSidebarTab: 'op-properties',
+  editActions: null,
   operationsSubTab: null,
   wikiSubTab: null,
   leftListOpen: true,
@@ -154,7 +160,9 @@ export const useUIStore = create<UIState>((set) => ({
   homeWikiPrefs:    { sort: 'alpha_asc', view: 'cards', count: 6 },
 
   setActiveView: (view) => set((s) => {
-    const usesEditorSidebar = view.type === 'journal' || view.type === 'wiki' || view.type === 'operations';
+    // Save/Cancel/Delete live only in the right sidebar, so edit mode must not start with it closed.
+    const usesEditorSidebar = view.type === 'journal' || view.type === 'wiki'
+      || view.type === 'operations' || view.type === 'altar';
     const openSidebar = view.mode === 'edit' && usesEditorSidebar && !s.rightSidebarOpen
       ? { rightSidebarOpen: true }
       : {};
@@ -250,7 +258,7 @@ export const useUIStore = create<UIState>((set) => ({
     return { historyIndex, activeView, tabs };
   }),
   toggleRightSidebar: () => set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),
-  setRightSidebarTab: (tab) => set({ rightSidebarTab: tab }),
+  setEditActions: (actions) => set({ editActions: actions }),
   setOperationsSubTab: (id) => set({ operationsSubTab: id }),
   setWikiSubTab: (category) => set({ wikiSubTab: category }),
   toggleLeftList: () => set((s) => ({ leftListOpen: !s.leftListOpen })),

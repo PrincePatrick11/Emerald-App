@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
-import { Check, ChevronDown, ChevronRight, Grid3x3, Image as ImageIcon, ImagePlus, Magnet, Pencil, RotateCw, Scaling, Trash2, X } from 'lucide-react';
-import { useAltarStore } from '../../store/altarStore';
+import { Check, ChevronDown, ChevronRight, Grid3x3, Image as ImageIcon, Magnet, Pencil, RotateCw, Scaling, Trash2, X } from 'lucide-react';
+import { useAltarStore } from '../../../store/altarStore';
 import {
   ALTAR_RATIOS,
   ALTAR_BACKGROUND_PRESETS,
@@ -19,15 +19,15 @@ import {
   parseResolution,
   isRatioFormat,
   ratioFromResolution,
-} from '../../lib/altarConstants';
-import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
-import Button from '../ui/Button';
-import { useUIStore } from '../../store/uiStore';
-import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
-import { PlacedElementRow, PlacedElementInspector } from './PlacedElementRow';
-import AltarReadingSummary from './AltarReadingSummary';
-import Modal from '../ui/Modal';
-import EmojiPicker from '../ui/EmojiPicker';
+} from '../../../lib/altarConstants';
+import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../../lib/helpers';
+import Button from '../../ui/Button';
+import { useUIStore } from '../../../store/uiStore';
+import { useBackgroundPreview } from '../../altar/useAltarBackgroundPreview';
+import { PlacedElementRow, PlacedElementInspector } from '../fields/PlacedElementRow';
+import AltarReadingSummary from '../fields/AltarReadingSummary';
+import Favicon from '../fields/Favicon';
+import Modal from '../../ui/Modal';
 
 export default function AltarSidebarPanel() {
   const { t } = useTranslation();
@@ -55,7 +55,6 @@ export default function AltarSidebarPanel() {
   const activeAltar = useAltarStore((s) => s.altars.find((a) => a.id === s.activeAltarId) ?? null);
   const gridOpacityPercent = Math.round((activeAltar?.grid_opacity ?? 0) * 100);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
-  const iconInputRef = useRef<HTMLInputElement>(null);
 const noticeTimerRef = useRef<number | null>(null);
   const [backgroundNotice, setBackgroundNotice] = useState<string | null>(null);
   const [backgroundOpen, setBackgroundOpen] = useState(true);
@@ -205,16 +204,6 @@ const [gridOpen, setGridOpen] = useState(true);
       });
   };
 
-  const handleIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !activeAltar) return;
-    if (!isAcceptedImageFile(file) || file.type === 'image/svg+xml') { e.target.value = ''; return; }
-    const reader = new FileReader();
-    reader.onloadend = () => updateAltar(activeAltar.id, { icon_data: reader.result as string });
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
-
   const activateCustomBackground = () => {
     if (!activeAltar) return;
     const savedPath = customBackgroundMap[activeAltar.id];
@@ -251,14 +240,6 @@ const [gridOpen, setGridOpen] = useState(true);
           e.target.value = '';
         }}
       />
-      <input
-        ref={iconInputRef}
-        type="file"
-        accept={ACCEPTED_IMAGE_MIME}
-        className="hidden"
-        onChange={handleIconUpload}
-      />
-
       {activeAltar && isEditing && (
         <div className="px-3 pb-5">
           <>
@@ -271,32 +252,10 @@ const [gridOpen, setGridOpen] = useState(true);
               </button>
               {faviconOpen && (
                 <div className="mt-2 mb-4">
-                  <EmojiPicker
-                    value={activeAltar.icon_data ?? ''}
-                    onChange={(emoji) => updateAltar(activeAltar.id, { icon_data: emoji })}
-                    trigger={({ toggle }) => (
-                      activeAltar.icon_data ? (
-                        <div className="flex items-center gap-2">
-                          {activeAltar.icon_data.startsWith('data:image/') && !activeAltar.icon_data.startsWith('data:image/svg+xml')
-                            ? <img src={activeAltar.icon_data} alt="" className="w-10 h-10 object-cover rounded-lg border border-stone-700/40 flex-shrink-0" />
-                            : <span className="text-4xl leading-none w-10 h-10 flex items-center justify-center flex-shrink-0">{activeAltar.icon_data}</span>}
-                          <div className="flex flex-col gap-0.5">
-                            <button onClick={() => iconInputRef.current?.click()} className="text-xs text-stone-500 hover:text-stone-300 transition-colors text-left">{t('altar.changeImage')}</button>
-                            <button onClick={toggle} className="text-xs text-stone-500 hover:text-stone-300 transition-colors text-left">{t('altar.chooseEmoji')}</button>
-                            <Button onClick={() => updateAltar(activeAltar.id, { icon_data: null })} variant="danger" className="text-xs text-left">{t('altar.removeFavicon')}</Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-3">
-                          <button onClick={() => iconInputRef.current?.click()} className="flex items-center gap-1.5 text-xs text-stone-600 hover:text-stone-400 transition-colors">
-                            <ImagePlus size={13} /> {t('altar.addImage')}
-                          </button>
-                          <button onClick={toggle} className="flex items-center gap-1.5 text-xs text-stone-600 hover:text-stone-400 transition-colors">
-                            ✨ {t('altar.chooseEmoji')}
-                          </button>
-                        </div>
-                      )
-                    )}
+                  <Favicon
+                    value={activeAltar.icon_data}
+                    onChange={(icon_data) => updateAltar(activeAltar.id, { icon_data })}
+                    onRemove={() => updateAltar(activeAltar.id, { icon_data: null })}
                   />
                 </div>
               )}

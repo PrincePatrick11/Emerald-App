@@ -28,15 +28,18 @@ src/
 ├── components/
 │   ├── layout/       AppShell, LeftSidebarRail, LeftSidebarEntryList, RightSidebar, MainArea,
 │   │                 SettingsModal, TabBar
-│   ├── editor/       RichEditor, InternalLinkExtension, EntryCustomProperties,
+│   ├── editor/       RichEditor, InternalLinkExtension,
 │   │                 TagInput, ResizableImageExtension, ExternalDropExtension,
 │   │                 EditorToolbar, LinkPickerModal, SuggestionList
 │   ├── views/        HomeView, JournalView, WikiView, TagsView, AltarView,
 │   │                 OperationsView, OperationSigilView, TrashView, TasksView
-│   ├── sidebar/      OpPropertiesPanel, RoutinesPanel, WikiPanel, OperationsPanel,
-│   │                 BacklinksPanel, AltarSidebarPanel, AltarReadingSummary,
-│   │                 CustomPropertiesSection, LinkedOpsInput, LinkedWikiInput,
-│   │                 PlacedElementRow
+│   ├── sidebar/
+│   │   ├── panels/   JournalPropertiesPanel, WikiPropertiesPanel, OperationPropertiesPanel,
+│   │   │             AltarSidebarPanel, RoutinesPanel (currently unrendered), BacklinksPanel
+│   │   │             (currently unrendered)
+│   │   └── fields/   PropertiesReadView / PropertiesEditView (read vs. edit layout shell),
+│   │                 PropertySummaryRow, SidebarActionButton, Favicon, Banner,
+│   │                 AltarReadingSummary, LinkedOpsInput, LinkedWikiInput, PlacedElementRow
 │   ├── wiki/         WikiList (rendering + category emoji helper)
 │   └── ui/           ListToolbar, FilterPanel, UndoToast, ContextMenu, ImportDestinationModal,
 │                     Modal (shared modal wrapper), EmojiPicker (shared emoji-picker popover),
@@ -46,7 +49,7 @@ src/
 │                     tab toggle), EntryListTab (generic searchable/renameable/draggable list,
 │                     shared by all five sidebar entry-list tabs)
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
-│                     altarStore, routineStore, customPropertyStore, undoStore,
+│                     altarStore, routineStore, undoStore,
 │                     trashStore, vaultStore, importStore
 ├── hooks/            useCategoryEditor (shared add/edit/delete-with-confirm category logic,
 │                                      used by TasksView, WikiView, OperationsView)
@@ -81,7 +84,32 @@ src-tauri/
 
 ### Edit Mode Architecture
 
-The main content area renders only the title and body. All metadata — tags, category, custom properties, icon, cover image — is edited exclusively in the right sidebar. The sidebar writes directly to the relevant store; the main area subscribes to the same store fields and updates accordingly. There is no "is editing" guard that blocks sidebar saves.
+The main content area renders only the title and body. All metadata — tags, category, icon, cover image — is edited exclusively in the right sidebar's Properties panel. The sidebar writes directly to the relevant store; the main area subscribes to the same store fields and updates accordingly.
+
+Unlike earlier versions, the Properties panel itself is now gated by the entry's edit state (`activeView.mode === 'edit'`): each panel renders a read-only summary (`PropertiesReadView` + `PropertySummaryRow`) while viewing, and swaps to editable form fields (`PropertiesEditView`) only once the entry is opened for editing. Entering/leaving edit mode is triggered from the sidebar's own action bar, not from the main content area.
+
+### Right Sidebar Action Bar
+
+`RightSidebar.tsx` renders a `RightSidebarActionBar` pinned above the scrollable Properties content, replacing what used to be separate Edit/Save/Cancel/Delete buttons duplicated in every entry view's header. The bar reads `uiStore.editActions` (set via `setEditActions({ onSave, onCancel, onDelete? })`) to know what to call — in edit mode it shows Done/Delete/Cancel; in view mode it shows Edit (plus a Fullscreen toggle for Altar); a loaded Sigil operation shows nothing, matching `OperationSigilView`'s existing edit-mode guard.
+
+Each of the five entry views registers its handlers the same way:
+
+```ts
+const editHandlersRef = useRef({ onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
+editHandlersRef.current = { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete };
+
+useEffect(() => {
+  if (!isEditing) return;
+  setEditActions({
+    onSave: () => editHandlersRef.current.onSave(),
+    onCancel: () => editHandlersRef.current.onCancel(),
+    onDelete: () => editHandlersRef.current.onDelete(),
+  });
+  return () => setEditActions(null);
+}, [isEditing]);
+```
+
+The ref exists for the same stale-closure reason as the auto-save pattern below: `setEditActions` only needs to run when `isEditing` flips, not on every keystroke, but the handlers it registers must still see the latest `title`/`content`/etc. at call time. An earlier version of this effect had no dependency array and called `setEditActions` unconditionally on every render, which combined with a whole-store `useUIStore()` subscription in the same component to produce an infinite render loop (each `setEditActions` call re-rendered the subscriber, which re-ran the effect, which called `setEditActions` again) and a blank screen on startup. Keep the effect scoped to `[isEditing]` and keep sidebar-consuming components on per-field selectors (see Store Selectors above) to avoid reintroducing it.
 
 ### Store Selectors
 
@@ -165,7 +193,7 @@ This means users can keep several entries open while still using back/forward na
 
 The left sidebar is two independent components rendered side by side inside `AppShell`'s `app-sidebar-left` container:
 
-- **`LeftSidebarRail`** (`src/components/layout/LeftSidebarRail.tsx`) — a fixed-width (56px, `RAIL_WIDTH` in `AppShell.tsx`) icon column: app logo/home, back/forward navigation-history buttons, a search-icon shortcut that opens the entry list, the list collapse/expand toggle, the five module navigation icons (Journal/Tasks/Operations/Wiki/Altar), and Tags/Trash/Settings at the bottom. The module icons only call `setActiveView(...)` — they carry no active/selected styling and are intentionally decoupled from `leftListTab` below, since navigating the main view and browsing a different module's entry list are independent actions.
+- **`LeftSidebarRail`** (`src/components/layout/LeftSidebarRail.tsx`) — a fixed-width (56px, `RAIL_WIDTH` in `AppShell.tsx`) icon column: app logo/home, back/forward navigation-history buttons, a search-icon shortcut that opens the entry list, the entry-list collapse/expand toggle, the right-sidebar collapse/expand toggle (added alongside it, sharing the `PanelToggleIcon` component via a `mirrored` variant so the two icons read as left/right mirrors), the five module navigation icons (Journal/Tasks/Operations/Wiki/Altar), and Tags/Trash/Settings at the bottom. The module icons only call `setActiveView(...)` — they carry no active/selected styling and are intentionally decoupled from `leftListTab` below, since navigating the main view and browsing a different module's entry list are independent actions.
 - **`LeftSidebarEntryList`** (`src/components/layout/LeftSidebarEntryList.tsx`) — the adjoining panel, shown only while `uiStore.leftListOpen` is true. Its five tabs (`TabIconButton`) write to `uiStore.leftListTab`; the active tab determines which per-module list (`JournalList`, `TasksList`, `OperationsList`, `WikiList`, `AltarList`) renders below. All five are thin wrappers around the shared `EntryListTab<T>` component (`src/components/ui/EntryListTab.tsx`), which owns search filtering, inline rename, the "+" quick-create flow, drag-start wiring, and the right-click `ContextMenu` — callers only supply accessor functions (`getId`/`getTitle`/`getIcon`/`getDateStr`) and the action list. Tasks is the one caller that needs a materially different row (an independent checkbox toggle) and opts out via the `renderRow` render-prop instead of the accessor props.
 
 `AppShell` owns the width/resize logic: the rail is fixed at `RAIL_WIDTH`, and only the entry-list panel's width (`entry-list-width` in `localStorage`, `ENTRY_LIST_MIN`/`ENTRY_LIST_DEFAULT` = 180/220) is user-resizable via the same drag-handle pattern used for the right sidebar. The outer `<aside>` width is computed as `RAIL_WIDTH + (leftListOpen ? entryListWidth : 0)`, and the resize handle only renders while the list is open.
@@ -281,7 +309,7 @@ The Parchment bridge is organised into feature-scoped comment blocks at the end 
 
 Two modules centralise reusable Tailwind class strings to avoid duplication across components:
 
-- **`src/lib/styleClasses.ts`** — Input and select class strings for custom properties and operation properties (`CUSTOM_PROP_INPUT_CLASSES`, `CUSTOM_PROP_SMALL_INPUT_CLASSES`, `OP_PROP_SELECT_CLASSES`).
+- **`src/lib/styleClasses.ts`** — Shared select class string for operation properties (`OP_PROP_SELECT_CLASSES`). The former `CUSTOM_PROP_INPUT_CLASSES`/`CUSTOM_PROP_SMALL_INPUT_CLASSES` were removed along with Custom Properties.
 - **`src/lib/altarConstants.ts`** — Altar background presets (`ALTAR_BACKGROUND_PRESETS`, `ALTAR_BACKGROUND_STYLES`), photographic image presets (`ALTAR_IMAGE_PRESETS` — a readonly tuple of 16 preset names; `AltarImagePresetName` type), the default background (`DEFAULT_ALTAR_BACKGROUND`), canonical grid defaults (`DEFAULT_GRID_SIZE`, `DEFAULT_GRID_OPACITY`, `DEFAULT_GRID_COLOR`), the background overlay defaults (`DEFAULT_BACKGROUND_OVERLAY` = `0.2`; `DEFAULT_OVERLAY_COLOR` = `'dark'`), and the resolution system: `DEFAULT_ALTAR_RESOLUTION` (`'1920x1080'`), `BASE_RESOLUTION_WIDTH` (1920), `MAX_ALTAR_RESOLUTION_W` (7680), `MAX_ALTAR_RESOLUTION_H` (4320), `ALTAR_RATIOS`, `ALTAR_SIZE_KEYS`, `ALTAR_RESOLUTION_MAP`, `sizeAndRatioFromResolution`, `parseResolution`, `resolveResolutionPixels`, `isRatioFormat`, and `ratioFromResolution`. `resolveResolutionPixels(res)` is the preferred helper when the input may be either a ratio string or a pixel string: ratio inputs are mapped to their `ALTAR_RESOLUTION_MAP.lg` canonical pixel size first, then passed through `parseResolution`; pixel inputs go straight to `parseResolution`. All dashboard-facing code (`AltarCard`, `AltarCardPreview`, `AltarCanvas` thumbnail renderer) must use `resolveResolutionPixels` rather than calling `parseResolution` directly on `altar.resolution`. Also exports `getAltarBackgroundStyle(altar, imageSrc)` — the **single source of truth** for constructing the altar CSS background object; it accepts the altar record (to read `background_overlay` and `background_overlay_color`) and prepends a `buildOverlayGradient(opacity, color)` layer when the overlay value is greater than 0. The overlay layer is applied to **all** background types: custom images, image presets, gradient-color presets, and legacy colour presets. For custom image-backed backgrounds it enforces a `data:image/` prefix on `backgroundSrc` before interpolating into CSS; for image presets it constructs a `url("/backgrounds/{name}.webp")` CSS background; for gradient presets it prepends the overlay to the `generateGradientStyle(hex)` result; for colour presets it prepends the overlay to the value from `ALTAR_BACKGROUND_STYLES`. Unknown preset values fall back to `DEFAULT_ALTAR_BACKGROUND`. All components that need a background style must call this function rather than constructing the CSS inline. Gradient-colour preset helpers: `GRADIENT_PRESET_COLORS` (readonly tuple of 7 dark hex values used as colour-gradient presets), `LEGACY_GRADIENT_COLORS` (maps each preset name to its base hex value), `isGradientPreset(preset)` (returns true when the preset string matches one of the gradient preset names), `getGradientColor(preset)` (returns the hex string for a gradient preset or `null` for unknown inputs), and `generateGradientStyle(hex)` (builds the radial-gradient CSS string from a hex colour). These are used internally by `getAltarBackgroundStyle` and by `AltarSidebarPanel` to render the gradient swatch buttons. Category emoji helpers: `CATEGORY_EMOJIS` (a `Record<string, string[]>` of emoji suggestions keyed by default category name), `FALLBACK_CATEGORY_EMOJIS` (fallback array used when no entry matches a custom category name), and `ALTAR_CAT_EMOJIS` (flat palette array for the category emoji picker). `ALTAR_CATEGORIES` and `ALTAR_CATEGORY_EMOJI` have been removed — the authoritative category list is now stored in the `altar_categories` database table and loaded via `altarStore.fetchCategories()`. The SQL migration defaults for altar grid, resolution, and overlay columns must stay in sync with the constants in this file. `parseResolution` validates the input string against `/^\d+x\d+$/` and clamps both dimensions before returning `{ w, h }`. `isRatioFormat` tests whether a string is a ratio (e.g. `"16:9"`). `ratioFromResolution` returns the matching `AltarRatio` for either format.
 
 ## Altar UI Composition
@@ -294,8 +322,8 @@ Altar rendering and editing were split into focused components:
 - **`src/components/altar/AltarCard.tsx`** — `AltarCard`, `AltarListRow`, and `buildAltarContextMenuActions` — a plain function (not a component) that returns the action list for the altar dashboard context menu. `AltarCard` and `AltarListRow` render the saved thumbnail (`thumbnail_data`) when it is present and starts with `data:image/`; otherwise they fall back to `AltarCardPreview`. The thumbnail area is capped at `max-h-44` in card view. `resolveResolutionPixels` is used (not `parseResolution`) to derive aspect ratio values from the stored resolution string.
 - **`src/components/altar/AltarCardPreview.tsx`** — preview scene used by the dashboard cards and list rows (background + placed items, both compact and full-size variants).
 - **`src/components/altar/AltarRenameField.tsx`** — inline rename input used by the dashboard cards and list rows.
-- **`src/components/sidebar/PlacedElementRow.tsx`** — `PlacedElementRow` and `PlacedElementInspector` for the sidebar's placed-elements list and its inline inspector. `PlacedElementRow` manages its own right-click context-menu state (position + portal render via `createPortal`). The delete button is in the row (Trash icon, rightmost). `PlacedElementInspector` shows a compact 4-column input grid (X, Y, Rot, Scale) plus a custom jade opacity slider (track/fill/thumb with a transparent range overlay). Inspector fields, labels, and unit symbols (`%`, `°`) use stone colour tokens; jade is used only for the selected row highlight (border and background) and the slider fill/thumb. Z-order buttons are not in the inspector — layer order is set by dragging rows in `AltarSidebarPanel`. A `focusedFieldRef` (`useRef<string | null>`) tracks which input is currently focused; the `useEffect` that syncs placement values from the store into draft state depends on all relevant placement fields (`x`, `y`, `width`, `height`, `rotation`, `opacity`, `id`) and skips updating the focused field so canvas drag-resize does not overwrite mid-edit input.
-- **`src/components/sidebar/AltarReadingSummary.tsx`** — read-only sidebar panel shown in altar view mode. Displays a "Enter Fullscreen" button at the top, then a compact summary grid: aspect ratio, background (with swatch preview), overlay (percentage + color), grid (active/inactive + size), and placed element count. Resolves background info (preset name, gradient color, or custom image preview) via `useMemo` and the same constants used by the full editor. It no longer contains an image-export control — that moved to the native Export menu (see `src/lib/altarExport.ts` and [Menu enablement gating](#menu-enablement-gating)).
+- **`src/components/sidebar/fields/PlacedElementRow.tsx`** — `PlacedElementRow` and `PlacedElementInspector` for the sidebar's placed-elements list and its inline inspector. `PlacedElementRow` manages its own right-click context-menu state (position + portal render via `createPortal`). The delete button is in the row (Trash icon, rightmost). `PlacedElementInspector` shows a compact 4-column input grid (X, Y, Rot, Scale) plus a custom jade opacity slider (track/fill/thumb with a transparent range overlay). Inspector fields, labels, and unit symbols (`%`, `°`) use stone colour tokens; jade is used only for the selected row highlight (border and background) and the slider fill/thumb. Z-order buttons are not in the inspector — layer order is set by dragging rows in `AltarSidebarPanel`. A `focusedFieldRef` (`useRef<string | null>`) tracks which input is currently focused; the `useEffect` that syncs placement values from the store into draft state depends on all relevant placement fields (`x`, `y`, `width`, `height`, `rotation`, `opacity`, `id`) and skips updating the focused field so canvas drag-resize does not overwrite mid-edit input.
+- **`src/components/sidebar/fields/AltarReadingSummary.tsx`** — read-only sidebar panel shown in altar view mode. Displays a "Enter Fullscreen" button at the top, then a compact summary grid: aspect ratio, background (with swatch preview), overlay (percentage + color), grid (active/inactive + size), and placed element count. Resolves background info (preset name, gradient color, or custom image preview) via `useMemo` and the same constants used by the full editor. It no longer contains an image-export control — that moved to the native Export menu (see `src/lib/altarExport.ts` and [Menu enablement gating](#menu-enablement-gating)).
 
 Supporting hooks:
 

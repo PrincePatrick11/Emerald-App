@@ -33,9 +33,6 @@
     "operationDeleted": "Operation deleted",
     "creationDeleted": "Creation deleted",
     "taskDeleted": "Task deleted",
-    "propertyAdded": "Property added",
-    "propertyUpdated": "Property updated",
-    "propertyDeleted": "Property deleted",
     "categoryDeleted": "Category deleted",
     "tagDeleted": "Tag deleted"
   },
@@ -55,6 +52,8 @@
   "sidebar": {
     "collapseList": "Collapse list",
     "expandList": "Expand list",
+    "collapseProperties": "Collapse properties",
+    "expandProperties": "Expand properties",
     "back": "Back",
     "forward": "Forward"
   },
@@ -71,7 +70,6 @@
     "categoryName": "Category name…",
     "categoryEmoji": "Emoji…",
     "deleteCategory": "Delete category",
-    "properties": "Properties",
     "active": "Active",
     "inactive": "Inactive",
     "endDate": "End Date",
@@ -116,7 +114,6 @@
     "customColor": "Custom color",
     "windowFullscreen": "Focus view",
     "exitWindowFullscreen": "Exit focus view",
-    "enterFullscreen": "Enter Fullscreen",
     "change": "Change",
     "remove": "Remove",
     "removeCustomBackground": "Remove custom background",
@@ -309,7 +306,6 @@
     "addCategory": "Add category"
   },
   "editor": {
-    "save": "Save",
     "done": "Done",
     "cancel": "Cancel",
     "delete": "Delete",
@@ -353,13 +349,6 @@
     "noEntry": "Open an entry to see its properties.",
     "category": "Category",
     "tags": "Tags",
-    "custom": "Custom Properties",
-    "addProperty": "Add Property",
-    "namePlaceholder": "Property name…",
-    "add": "Add",
-    "showInEntry": "Show in entry",
-    "trueLabelPlaceholder": "On label…",
-    "falseLabelPlaceholder": "Off label…",
     "paradigma": "Paradigm",
     "bannung": "Banishing",
     "meditation": "Meditation",
@@ -372,25 +361,14 @@
     "coverImage": "Cover Image",
     "addCoverImage": "Add Cover Image",
     "change": "Change",
-    "remove": "Remove",
-    "types": {
-      "text": "Text",
-      "number": "Number",
-      "date": "Date",
-      "toggle": "Toggle",
-      "checkbox": "Checkbox"
-    }
+    "remove": "Remove"
   },
   "filters": {
     "toggle": "Filters",
     "clearAll": "Clear all",
     "category": "Category",
     "moonPhase": "Moon Phase",
-    "status": "Status",
-    "properties": "Properties",
-    "addFilter": "Add property filter",
-    "selectProperty": "Property…",
-    "valuePlaceholder": "Value…"
+    "status": "Status"
   },
   "settings": {
     "language": "Language",

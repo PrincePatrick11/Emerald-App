@@ -16,9 +16,7 @@ The journal is the primary day-to-day writing space. Each entry has a title and 
 
 **Tags.** Free-form labels shared across the app. Tag names are stored directly on entries (not as IDs). The Tags view lets you see all entries carrying a particular tag.
 
-**Custom Properties.** You can attach any number of named properties to an entry. Supported types: text, number, date, toggle (boolean with configurable on/off labels), checkbox. Enabling "Show in entry" displays the property as a read-only badge in the entry's read view.
-
-**List views.** The journal list supports three layouts (List, Cards, Timeline) and four sort orders (newest first, oldest first, A→Z, Z→A). A filter panel lets you filter by moon phase and by custom property values. Search filters by title.
+**List views.** The journal list supports three layouts (List, Cards, Timeline) and four sort orders (newest first, oldest first, A→Z, Z→A). A filter panel lets you filter by moon phase. Search filters by title.
 
 **Context menu.** Right-click any entry in the list or sidebar to Duplicate, Rename, or Delete it.
 
@@ -32,7 +30,7 @@ The wiki stores reference articles about anything relevant to your practice: rit
 
 **Cover Images.** A banner image displayed at the top of the article in read mode. Stored as a file in the app's image directory.
 
-**Backlinks.** The right sidebar shows every journal entry, wiki article, or operation that links to the current article via an internal link chip.
+**Backlinks.** `fetchBacklinks` and the `BacklinksPanel` component that lists every journal entry, wiki article, or operation linking to the current article still exist, but the panel is not currently surfaced anywhere in the UI — it was removed from the right sidebar along with the old tab bar and has not yet been reintroduced elsewhere.
 
 **Special categories.** `paradigm`, `bannung`, and `meditation` articles are used as the target for the matching journal entry properties. These categories are not shown as generic filter chips in the wiki list.
 
@@ -105,17 +103,16 @@ Locked placements are click-through on the canvas (pointer events disabled), so 
 
 **Favicon.** Each altar can have a custom favicon displayed in its tab in the tab bar and as the first row in the view-mode summary panel. To set one, open the altar in edit mode and expand the collapsible "Favicon" section at the top of the sidebar. You can pick an emoji from the shared emoji picker (a curated default grid, searchable by name/keyword across the full standard emoji set) or upload an image (stored directly as base64). When a favicon is set, the tab shows it instead of the default flame icon; when none is set, the flame icon is used as a fallback.
 
-**Sidebar in view mode.** When viewing an altar outside edit mode, the right sidebar shows a compact **summary panel** instead of the full editor. It displays:
+**Sidebar in view mode.** When viewing an altar outside edit mode, the right sidebar's action bar shows Edit and a Fullscreen toggle, and the Properties area below it shows a compact **summary panel** instead of the full editor. It displays:
 
 - **Favicon** — shown as the first row when a favicon is set (emoji or image thumbnail).
-- **Enter Fullscreen** — a dedicated fullscreen toggle at the top, so the view is accessible without reaching for the header button.
 - **Ratio** — the current aspect ratio (e.g. `16:9`).
 - **Background** — the active background name with a small swatch preview (image, gradient, or preset).
 - **Overlay** — opacity percentage and color (dark/light).
 - **Grid** — active/inactive status and grid size.
 - **Elements** — count of placed items.
 
-A note at the bottom reminds you to switch to edit mode to change these settings. The header fullscreen button is hidden when the sidebar is open, since the sidebar already provides one.
+A note at the bottom reminds you to switch to edit mode to change these settings. The header fullscreen button (in the altar's own topbar) only appears when the sidebar is closed, since the sidebar's action bar already provides one while it's open.
 
 Exporting the altar as an image (JPEG / PNG / WebP) is done from the native application menu, not the sidebar — see [Export and Import](#export-and-import) below. The export renders the current altar at full native resolution via the native OS save dialog. JPEG uses quality 0.97, WebP uses 0.92, PNG is lossless. The suggested filename and the OS save dialog filter adapt to the selected format (e.g. `AltarTitle_YYYY-MM-DD.png`).
 
@@ -156,10 +153,12 @@ The overlay is applied on top of all background types — colour presets, gradie
 
 **Left sidebar structure.** The left sidebar has two parts side by side:
 
-1. A narrow icon **rail** — app logo/home, back/forward navigation-history buttons, a search shortcut, a toggle to collapse/expand the entry list next to it, the five module icons (Journal/Tasks/Operations/Wiki/Altar), and Tags/Trash/Settings at the bottom. Clicking a module icon switches the main view; it does not highlight, since it's independent of whichever list tab is open.
+1. A narrow icon **rail** — app logo/home, back/forward navigation-history buttons, a search shortcut, a toggle to collapse/expand the entry list next to it, a second toggle to collapse/expand the right sidebar (so both sidebars are controlled from the same rail), the five module icons (Journal/Tasks/Operations/Wiki/Altar), and Tags/Trash/Settings at the bottom. Clicking a module icon switches the main view; it does not highlight, since it's independent of whichever list tab is open.
 2. A resizable, collapsible **entry list** panel next to the rail, with five tabs (Journal/Tasks/Operations/Wiki/Altar) that switch which module's items are listed. Each tab has its own search field, a "+" button to quick-create a new item, inline rename (double-click or via the context menu), and a right-click context menu (Duplicate/Rename/Delete where applicable — Altar only offers Rename, since it has no duplicate action; Tasks offers Rename/Delete and shows a completion checkbox on each row instead of an icon). Journal, Operations, and Wiki rows can also be dragged into the editor to insert an internal link. The panel can be collapsed entirely via the toggle in the rail, and its width is remembered independently of the main window.
 
 **Breadcrumb back links.** When an entry is open in JournalView, WikiView, or OperationsView, the topbar shows a clickable breadcrumb that navigates back to the corresponding list view (e.g. clicking "Journal" returns to the journal entry list without closing the tab).
+
+**Right sidebar action bar.** Entering/leaving edit mode, saving, cancelling, and deleting an open Journal entry, Wiki article, Operation, or Altar all happen from a single action bar pinned above the Properties panel in the right sidebar — not from buttons in the entry's own header. In view mode it shows an Edit button (plus a Fullscreen toggle for Altar); once you're editing, it shows Done, Delete (where applicable), and Cancel. A loaded Sigil operation shows no actions there, since loaded sigils can't be edited.
 
 **Internal link chips.** Links inserted with `[[` are rendered as styled chips in both edit mode and view mode. There is no raw `[[Label(id)]]` text representation in edit mode.
 
@@ -191,7 +190,7 @@ Routines are reusable content blocks that you can drop into any journal entry.
 
 Each routine has a name, an emoji, plain-text content (Markdown is supported), and optional lists of operations and wiki articles to link.
 
-Dropping a routine into an open entry appends its content as formatted paragraphs and merges its tags, linked operations, and linked wiki articles into the current entry. The drop is triggered from the Routines panel in the right sidebar.
+Dropping a routine into an open entry appends its content as formatted paragraphs and merges its tags, linked operations, and linked wiki articles into the current entry. The drag-and-drop mechanism (`routine-drop` event, handled by JournalView/WikiView/OperationsView) is intact, but its source — a `RoutinesPanel` in the right sidebar — was removed along with the old sidebar tab bar and is not currently rendered anywhere, so there is presently no UI path to start the drag.
 
 ## Tasks
 
@@ -252,7 +251,7 @@ A nested **Export as Image** submenu (Export → Export as Image → JPEG… / P
 
 ### Markdown Export
 
-Saves a `.md` file with a frontmatter block followed by the entry body. Frontmatter includes date, moon phase, paradigm, banishing, meditation, linked operations, linked wiki articles, category, status, end date, version, tags, and custom properties. Images are stripped (not included). Internal link chips become `[[Title]]` wiki-link syntax. Linked operations and wiki articles include their UUID: `Operations: Title [uuid]`.
+Saves a `.md` file with a frontmatter block followed by the entry body. Frontmatter includes date, moon phase, paradigm, banishing, meditation, linked operations, linked wiki articles, category, status, end date, version, and tags. Images are stripped (not included). Internal link chips become `[[Title]]` wiki-link syntax. Linked operations and wiki articles include their UUID: `Operations: Title [uuid]`.
 
 ### Emerald Format
 
@@ -274,7 +273,7 @@ The file structure:
 }
 ```
 
-For `journal` / `wiki` / `operations`, on import image data-URLs are re-saved into the local image directory (with SHA-256 deduplication), HTML is sanitised with DOMPurify, and linked entries are resolved by ID first and then by title as a fallback. Tags are synced into the local tags table. Custom properties are recreated in the same order.
+For `journal` / `wiki` / `operations`, on import image data-URLs are re-saved into the local image directory (with SHA-256 deduplication), HTML is sanitised with DOMPurify, and linked entries are resolved by ID first and then by title as a fallback. Tags are synced into the local tags table.
 
 For `altar`, `meta` carries the background preset/image/overlay, grid and snapping settings, resolution, the categories used by the placed items (name + emoji), and the full list of placed items (each with name, emoji, category, note, optional image, and placement geometry — position, size, rotation, opacity, z-index, locked/hidden). Only the background image is a local file path in the database, so it alone is round-tripped through `images` like content images; the icon, thumbnail, and every item image are already inline `data:` URLs in the database and are embedded directly.
 
@@ -287,7 +286,7 @@ Import for all types goes through the same **Import → From Emerald…** menu i
 
 ### Import from Markdown
 
-Parses a Markdown file exported by Emerald (or following the same structure). The `# Title` line becomes the entry title. Key-value lines before the `---` separator are parsed as metadata. Unrecognised metadata keys become custom text properties. The body below `---` is parsed from Markdown to HTML using `marked`.
+Parses a Markdown file exported by Emerald (or following the same structure). The `# Title` line becomes the entry title. Key-value lines before the `---` separator are parsed as metadata; unrecognised keys are ignored. The body below `---` is parsed from Markdown to HTML using `marked`.
 
 Note: this path is parser-based (Markdown -> HTML) and is not identical to Emerald JSON import sanitisation. Metadata rendered into PDF export is escaped before interpolation.
 
@@ -308,7 +307,7 @@ All image upload inputs across the app accept only these MIME types: **PNG**, **
 
 - Altar background and icon uploads (`AltarSidebarPanel`)
 - Altar library item images (`AltarLibraryStrip`)
-- Operation and wiki article icons and cover images (`OpPropertiesPanel`)
+- Operation and wiki article icons and cover images (`Favicon`/`Banner`, used by `OperationPropertiesPanel`/`WikiPropertiesPanel`)
 - Editor image insert via the toolbar (`EditorToolbar`)
 - Paste events in the rich-text editor (`RichEditor`)
 - Finder drag-and-drop into the rich-text editor (`RichEditor`)

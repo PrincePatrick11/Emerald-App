@@ -1,11 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Trash2, PanelRightOpen, Check, X, Plus, Pencil, Copy, PanelTopOpen } from 'lucide-react';
+import { Trash2, Check, X, Plus, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import EmojiPicker from '../ui/EmojiPicker';
 import Button from '../ui/Button';
-import { getDb } from '../../lib/db';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
@@ -13,14 +12,13 @@ import { useUndoStore } from '../../store/undoStore';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import RichEditor from '../editor/RichEditor';
 import TagInput from '../editor/TagInput';
-import EntryCustomProperties from '../editor/EntryCustomProperties';
 import { format } from 'date-fns';
 import OperationSigilView from './OperationSigilView';
 
 
 export default function OperationsView() {
   const { t } = useTranslation();
-  const { activeView, setActiveView, openViewInNewTab, toggleRightSidebar, operationsPrefs, setOperationsPrefs } = useUIStore();
+  const { activeView, setActiveView, setEditActions, openViewInNewTab, operationsPrefs, setOperationsPrefs } = useUIStore();
   const { operations, categories, createOperation, updateOperation, deleteOperation, restoreOperation, getOperation, addCategory, updateCategory, deleteCategory, restoreCategory } = useOperationStore();
   const pushUndo = useUndoStore((s) => s.push);
 
@@ -35,9 +33,6 @@ export default function OperationsView() {
   const [showFilters, setShowFilters] = useState(false);
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
-  const [filterPropSlots, setFilterPropSlots] = useState<{ name: string; value: string }[]>([]);
-  const [allPropRows, setAllPropRows] = useState<{ entry_id: string; name: string; value: string | null }[]>([]);
-  const [allPropNames, setAllPropNames] = useState<string[]>([]);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -144,24 +139,6 @@ export default function OperationsView() {
     return () => document.removeEventListener('routine-drop', handler);
   }, [isEditing, operation?.id, triggerAutoSave]);
 
-  useEffect(() => {
-    (async () => {
-      const db = await getDb();
-      const [nameRows, valueRows] = await Promise.all([
-        db.select<{ name: string }[]>(
-          'SELECT DISTINCT name FROM custom_properties WHERE entry_type = $1 ORDER BY name ASC',
-          ['operation']
-        ),
-        db.select<{ entry_id: string; name: string; value: string | null }[]>(
-          'SELECT entry_id, name, value FROM custom_properties WHERE entry_type = $1',
-          ['operation']
-        ),
-      ]);
-      setAllPropNames(nameRows.map((r) => r.name));
-      setAllPropRows(valueRows);
-    })();
-  }, [operations.length]);
-
   const handleNew = async () => {
     const defaultCat = categories[0];
     if (!defaultCat) return;
@@ -237,6 +214,20 @@ export default function OperationsView() {
     triggerAutoSave();
   }, [triggerAutoSave]);
 
+  const editHandlersRef = useRef({ onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
+  editHandlersRef.current = { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete };
+
+  // Sigil operations delegate rendering (and editActions registration) to OperationSigilView.
+  useEffect(() => {
+    if (!isEditing || isSigilOperation) return;
+    setEditActions({
+      onSave: () => editHandlersRef.current.onSave(),
+      onCancel: () => editHandlersRef.current.onCancel(),
+      onDelete: () => editHandlersRef.current.onDelete(),
+    });
+    return () => setEditActions(null);
+  }, [isEditing, isSigilOperation]);
+
   const enterEditMode = () => {
     if (!isEditing && operation) setActiveView({ type: 'operations', id: operation.id, mode: 'edit' });
   };
@@ -266,16 +257,7 @@ export default function OperationsView() {
           return filterStatus.includes(active ? 'active' : 'inactive');
         });
 
-    const filtered = filterPropSlots.some((s) => s.name && s.value)
-      ? statusFiltered.filter((o) =>
-          filterPropSlots.filter((s) => s.name && s.value).every(({ name, value }) =>
-            allPropRows.some(
-              (r) => r.entry_id === o.id && r.name === name &&
-                     (r.value ?? '').toLowerCase().includes(value.toLowerCase())
-            )
-          )
-        )
-      : statusFiltered;
+    const filtered = statusFiltered;
 
     const opCatName = (c: typeof categories[0]) => c.is_builtin ? t(`operations.categories.${c.id}`) : c.name;
 
@@ -290,8 +272,7 @@ export default function OperationsView() {
 
     const activeFilterCount =
       (filterCatIds.length > 0 ? 1 : 0) +
-      (filterStatus.length > 0 ? 1 : 0) +
-      filterPropSlots.filter((s) => s.name && s.value).length;
+      (filterStatus.length > 0 ? 1 : 0);
 
     const sortedOps = [...filtered].sort((a, b) => {
       if (sort === 'alpha_asc') return a.title.localeCompare(b.title);
@@ -556,7 +537,6 @@ export default function OperationsView() {
       <Dashboard<Operation>
         title={t('nav.operations')}
         primaryAction={{ label: t('operations.new'), onClick: handleNew }}
-        onToggleRightSidebar={toggleRightSidebar}
         view={view}
         sort={sort}
         onView={(v) => setOperationsPrefs({ view: v })}
@@ -575,12 +555,7 @@ export default function OperationsView() {
             statusChips,
             selectedStatus: filterStatus,
             onStatusToggle: (v) => setFilterStatus((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
-            propNames: allPropNames,
-            propFilters: filterPropSlots,
-            onAddPropFilter: () => setFilterPropSlots((prev) => [...prev, { name: '', value: '' }]),
-            onUpdatePropFilter: (i, pf) => setFilterPropSlots((prev) => prev.map((s, idx) => idx === i ? pf : s)),
-            onRemovePropFilter: (i) => setFilterPropSlots((prev) => prev.filter((_, idx) => idx !== i)),
-            onClearAll: () => { setFilterCatIds([]); setFilterStatus([]); setFilterPropSlots([]); },
+            onClearAll: () => { setFilterCatIds([]); setFilterStatus([]); },
           },
         }}
         items={sortedOps}
@@ -645,28 +620,6 @@ export default function OperationsView() {
           <span>{format(new Date(operation.updated_at), 'MMM d, yyyy')}</span>
           {isEditing && <span className="text-stone-700 italic ml-1">{t('editor.editing')}</span>}
         </div>
-        <div className="flex items-center gap-2">
-          {isEditing ? (
-            <>
-              <Button onClick={handleDone} variant="primary">
-                <Check size={13} />{t('editor.done')}
-              </Button>
-              <Button onClick={handleDelete} variant="danger">
-                <Trash2 size={15} />
-              </Button>
-              <Button onClick={handleCancel} variant="ghost"><X size={15} /></Button>
-            </>
-          ) : (
-            <>
-              <Button onClick={enterEditMode} variant="ghost" title={t('editor.edit')}>
-                <Pencil size={15} />
-              </Button>
-              <Button onClick={toggleRightSidebar} variant="ghost">
-                <PanelRightOpen size={15} />
-              </Button>
-            </>
-          )}
-        </div>
       </div>
 
       {/* Title */}
@@ -722,9 +675,6 @@ export default function OperationsView() {
           </span>
         )}
       </div>
-
-      {/* Custom properties marked "show in entry" */}
-      <EntryCustomProperties entryId={operation.id} entryType="operation" isEditing={false} />
 
       {/* Tags */}
       <div className="px-8 pb-3 flex-shrink-0" onDoubleClick={enterEditMode}>

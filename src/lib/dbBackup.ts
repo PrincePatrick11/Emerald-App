@@ -99,7 +99,6 @@ interface BackupFile {
     operations?: Row[];
     operationCategories?: Row[];
     tags?: Row[];
-    customProperties?: Row[];
     routines?: Row[];
     altars?: Row[];
     altarCategories?: Row[];
@@ -184,10 +183,6 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
     );
     const ids = idsInClause(data.journalEntries);
     if (ids) {
-      const props = await db.select<Row[]>(
-        `SELECT * FROM custom_properties WHERE entry_type='journal' AND entry_id IN (${ids})`
-      );
-      data.customProperties = [...(data.customProperties ?? []), ...props];
       const lnks = await db.select<Row[]>(
         `SELECT * FROM links WHERE source_type='journal' AND source_id IN (${ids})`
       );
@@ -209,10 +204,6 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
     );
     const ids = idsInClause(data.wikiArticles);
     if (ids) {
-      const props = await db.select<Row[]>(
-        `SELECT * FROM custom_properties WHERE entry_type='wiki' AND entry_id IN (${ids})`
-      );
-      data.customProperties = [...(data.customProperties ?? []), ...props];
       const lnks = await db.select<Row[]>(
         `SELECT * FROM links WHERE source_type='wiki' AND source_id IN (${ids})`
       );
@@ -236,10 +227,6 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
     );
     const ids = idsInClause(data.operations);
     if (ids) {
-      const props = await db.select<Row[]>(
-        `SELECT * FROM custom_properties WHERE entry_type='operation' AND entry_id IN (${ids})`
-      );
-      data.customProperties = [...(data.customProperties ?? []), ...props];
       const lnks = await db.select<Row[]>(
         `SELECT * FROM links WHERE source_type='operation' AND source_id IN (${ids})`
       );
@@ -488,7 +475,6 @@ function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFi
     taskCategories:     f.includeTasks      ? d.taskCategories    : [],
     taskLinks:          f.includeTasks      ? d.taskLinks         : [],
     tags:               f.includeTags       ? d.tags              : [],
-    customProperties: (d.customProperties ?? []).filter((r) => keptContentIds.has(r.entry_id as string)),
     links:            (d.links ?? []).filter((r) => keptContentIds.has(r.source_id as string)),
   };
 }
@@ -516,7 +502,6 @@ function applyCategoryFilters(d: BackupFile['data'], filters: ImportCategoryFilt
     ...d,
     wikiArticles: filteredWiki,
     operations: filteredOps,
-    customProperties: (d.customProperties ?? []).filter((r) => keptIds.has(r.entry_id as string)),
     links: (d.links ?? []).filter((r) => keptIds.has(r.source_id as string)),
   };
 }
@@ -548,18 +533,15 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   const hasTasks = (d.tasks?.length ?? 0) > 0 || (d.taskCategories?.length ?? 0) > 0;
   const hasAny = hasJournal || hasWiki || hasOps || hasTasks || hasRoutines;
 
-  // Links and custom_properties: delete only for present entry types
+  // Links: delete only for present entry types
   if (hasJournal) {
     await db.execute(`DELETE FROM links WHERE source_type='journal'`);
-    await db.execute(`DELETE FROM custom_properties WHERE entry_type='journal'`);
   }
   if (hasWiki) {
     await db.execute(`DELETE FROM links WHERE source_type='wiki'`);
-    await db.execute(`DELETE FROM custom_properties WHERE entry_type='wiki'`);
   }
   if (hasOps) {
     await db.execute(`DELETE FROM links WHERE source_type='operation'`);
-    await db.execute(`DELETE FROM custom_properties WHERE entry_type='operation'`);
   }
   if (hasAltars) {
     await db.execute('DELETE FROM altar_placements');
@@ -599,7 +581,6 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   if (d.taskCategories) await insertRows(db, 'task_categories', d.taskCategories, true);
   await insertRows(db, 'tasks', d.tasks ?? []);
   if (d.taskLinks) await insertRows(db, 'task_links', d.taskLinks);
-  if (d.customProperties) await insertRows(db, 'custom_properties', d.customProperties);
   if (d.links) await insertRows(db, 'links', d.links, true);
 }
 
@@ -691,11 +672,6 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     task_id: remapId(r.task_id),
     target_id: remapId(r.target_id),
   }));
-  const customProperties = (d.customProperties ?? []).map((r: Row) => ({
-    ...r,
-    id: pid(r.id as string),
-    entry_id: remapId(r.entry_id),
-  }));
   const links = (d.links ?? []).map((r: Row) => ({
     ...r,
     source_id: remapId(r.source_id),
@@ -719,7 +695,6 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   await insertRows(db, 'altar_placements', altarPlacements);
   await insertRows(db, 'tasks', tasks);
   await insertRows(db, 'task_links', taskLinks, true);
-  await insertRows(db, 'custom_properties', customProperties);
   await insertRows(db, 'links', links, true);
 }
 

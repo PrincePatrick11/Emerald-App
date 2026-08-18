@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
-import { useWikiStore } from '../../store/wikiStore';
-import { getCategoryEmoji } from '../wiki/WikiList';
+import { useWikiStore } from '../../../store/wikiStore';
+import { getCategoryEmoji } from '../../wiki/WikiList';
 
 export default function LinkedWikiInput({
   ids, onChange, inputCls,

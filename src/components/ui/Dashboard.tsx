@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode } from 'react';
-import { PanelRightOpen, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import Button from './Button';
 import ListToolbar from './ListToolbar';
 import FilterPanel, { type FilterPanelProps } from './FilterPanel';
@@ -53,7 +53,6 @@ interface DashboardBaseProps<T> {
   primaryAction?: { label: string; onClick: () => void };
   /** Fully replaces the topbar-right slot (Trash's bulk-select controls). */
   headerRight?: ReactNode;
-  onToggleRightSidebar?: () => void;
   headerClassName?: string;
 
   // ListToolbar passthrough
@@ -133,7 +132,6 @@ export default function Dashboard<T>({
   titleClassName = DEFAULT_TITLE_CLASSNAME,
   primaryAction,
   headerRight,
-  onToggleRightSidebar,
   headerClassName = DEFAULT_HEADER_CLASSNAME,
   view,
   sort,
@@ -234,11 +232,6 @@ export default function Dashboard<T>({
             {primaryAction && (
               <Button onClick={primaryAction.onClick} variant="primary">
                 <Plus size={13} />{primaryAction.label}
-              </Button>
-            )}
-            {onToggleRightSidebar && (
-              <Button onClick={onToggleRightSidebar} variant="ghost" className="ml-1">
-                <PanelRightOpen size={16} />
               </Button>
             )}
           </div>
