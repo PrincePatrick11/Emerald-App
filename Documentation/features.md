@@ -151,7 +151,7 @@ The overlay is applied on top of all background types — colour presets, gradie
 
 ## Navigation
 
-**Window title bar.** The app draws its own title bar across the top of the window: the Emerald logo (click to go Home), the application menu, back/forward navigation through the view history, a centred search field, and — on Windows and Linux — the minimise / maximise / close buttons. macOS keeps its native window buttons and its native menu bar instead, so its title bar shows only the logo, navigation and search. The search field currently opens the left entry list; a cross-module search is not implemented yet. It is hidden below 1024px window width so it cannot collide with the menu.
+**Window title bar.** The app draws its own title bar across the top of the window: the Emerald logo (click to go Home), the application menu, back/forward navigation through the view history, a search field, and — on Windows and Linux — the minimise / maximise / close buttons. macOS keeps its native window buttons and its native menu bar instead, so its title bar shows only the logo, navigation and search. The search field currently opens the left entry list; a cross-module search is not implemented yet. The search field fills whatever space is left between the menu and the window controls and is always visible; if the window gets narrow enough to squeeze it too far, the four menus (Edit/View/Export/Import) fold into a single menu button instead, so the search field never has to hide. The app's minimum window width is 720px.
 
 **Left sidebar structure.** The left sidebar has two parts side by side:
 

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { Menu } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
 import { useOperationStore } from '../../../store/operationStore';
@@ -16,8 +17,12 @@ import MenuDropdown, { type MenuNode } from './MenuDropdown';
  *
  * The structure mirrors the native menu exactly, down to which items are
  * disabled — both sides read that from `computeMenuEnabledState`.
+ *
+ * `compact` folds all four into a single button holding them as submenus.
+ * `TitleBar` decides when, from the room actually left over — the bar never
+ * shrinks to make space for the search field, only to stop it disappearing.
  */
-export default function TitleBarMenuBar() {
+export default function TitleBarMenuBar({ compact }: { compact: boolean }) {
   const { t } = useTranslation();
   const activeView = useUIStore((s) => s.activeView);
   const operations = useOperationStore((s) => s.operations);
@@ -93,6 +98,17 @@ export default function TitleBarMenuBar() {
     },
   ];
 
+  // Collapsed, the same four menus become submenus of one button, so every
+  // item stays reachable and `menuActions` still has a single definition.
+  const bar: Array<{ id: string; label: ReactNode; title?: string; nodes: MenuNode[] }> = compact
+    ? [{
+        id: 'all',
+        label: <Menu size={15} />,
+        title: t('titlebar.menu'),
+        nodes: menus.map((menu) => ({ kind: 'submenu', label: menu.label, children: menu.nodes })),
+      }]
+    : menus;
+
   /** Left/Right walk the bar, opening as they go once a menu is already open. */
   const onBarKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
@@ -103,12 +119,12 @@ export default function TitleBarMenuBar() {
     const step = e.key === 'ArrowRight' ? 1 : -1;
     const next = (current + step + triggers.length) % triggers.length;
     triggers[next].focus();
-    if (openMenu !== null) setOpenMenu(menus[next].id);
+    if (openMenu !== null) setOpenMenu(bar[next].id);
   };
 
   return (
     <div ref={barRef} onKeyDown={onBarKeyDown} className="flex items-center h-full flex-shrink-0" role="menubar">
-      {menus.map((menu) => (
+      {bar.map((menu) => (
         <div key={menu.id} className="relative h-full flex items-center">
           <button
             type="button"
@@ -117,6 +133,8 @@ export default function TitleBarMenuBar() {
             aria-expanded={openMenu === menu.id}
             data-open={openMenu === menu.id || undefined}
             className="titlebar-menu-trigger"
+            title={menu.title}
+            aria-label={menu.title}
             // Cancelling mousedown keeps the editor's selection alive, so the
             // Edit menu's Cut and Copy still have something to act on.
             onMouseDown={(e) => e.preventDefault()}

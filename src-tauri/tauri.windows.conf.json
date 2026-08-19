@@ -6,7 +6,7 @@
         "title": "Emerald",
         "width": 1280,
         "height": 800,
-        "minWidth": 900,
+        "minWidth": 720,
         "minHeight": 600,
         "decorations": false,
         "shadow": true

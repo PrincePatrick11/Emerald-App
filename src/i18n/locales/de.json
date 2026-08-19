@@ -487,7 +487,8 @@
     "close": "Schließen",
     "back": "Zurück",
     "forward": "Vor",
-    "search": "Suchen"
+    "search": "Suchen",
+    "menu": "Menü"
   },
   "linkPicker": {
     "title": "Link einfügen",

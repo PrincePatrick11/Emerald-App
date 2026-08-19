@@ -8,7 +8,7 @@ interface PropertiesReadViewProps {
 
 export default function PropertiesReadView({ sectionTitle, footnote, children }: PropertiesReadViewProps) {
   return (
-    <div className="flex flex-col gap-1.5 px-3 pb-5">
+    <div className="flex flex-col gap-1.5 pb-5">
       {sectionTitle && <PropertySummarySectionTitle label={sectionTitle} />}
       <div className="flex flex-col gap-1.5">{children}</div>
       {footnote && (

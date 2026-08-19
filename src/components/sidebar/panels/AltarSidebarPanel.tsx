@@ -241,7 +241,7 @@ const [gridOpen, setGridOpen] = useState(true);
         }}
       />
       {activeAltar && isEditing && (
-        <div className="px-3 pb-5">
+        <div className="pb-5">
           <>
               <button
                 onClick={() => setFaviconOpen((v) => !v)}
@@ -744,7 +744,7 @@ const [gridOpen, setGridOpen] = useState(true);
       )}
 
       {activeAltar && isEditing && (
-        <div className="px-3 pb-4 border-t border-stone-700/60">
+        <div className="pb-4 border-t border-stone-700/60">
           <button
             onClick={() => setPlacementsOpen((v) => !v)}
             className="pt-4 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"

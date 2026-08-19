@@ -26,9 +26,11 @@ export default function TitleBarSearchButton() {
       onClick={() => { if (!leftListOpen) toggleLeftList(); }}
       title={t('search.placeholder')}
       aria-label={t('titlebar.search')}
-      // Hidden below `lg` so it cannot collide with the menu bar at the 900px
-      // minimum window width.
-      className="titlebar-search sidebar-search-inner hidden lg:flex items-center gap-2 rounded-md px-2.5 h-7 w-[clamp(12rem,28vw,26rem)] min-w-0 bg-stone-700/40"
+      // Fills the space the menu bar and the window controls leave over, up
+      // to a width where it still reads as a field rather than a banner, and
+      // gives that space back as the window narrows. No lower bound: the menu
+      // has the prior claim on the room, so the field is what yields.
+      className="titlebar-search sidebar-search-inner flex w-full max-w-[26rem] items-center gap-2 rounded-md px-2.5 h-7 min-w-0 bg-stone-700/40"
     >
       <Search size={14} className="flex-shrink-0" />
       <span className="truncate text-xs">{t('search.placeholder')}</span>

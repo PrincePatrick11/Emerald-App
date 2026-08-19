@@ -107,6 +107,10 @@ export default function RightSidebar() {
   return (
     <div className="flex flex-col h-full">
       <RightSidebarActionBar />
+      {/* The horizontal inset lives here and nowhere else. It matches the
+          action bar's `px-3`, so the summary rows below line up with the
+          Edit button above them; a panel adding its own `px-*` would break
+          that alignment again. */}
       <div className="flex-1 overflow-y-auto p-3">
         <PropertiesContent activeView={activeView} />
       </div>
