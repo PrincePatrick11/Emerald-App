@@ -440,7 +440,6 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 // ── macOS mouse back/forward button support ───────────────────────────────────
 
 #[cfg(target_os = "macos")]
@@ -623,6 +622,7 @@ fn update_menu_labels(
     }
 }
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
