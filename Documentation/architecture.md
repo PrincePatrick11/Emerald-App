@@ -28,6 +28,8 @@ src/
 ├── components/
 │   ├── layout/       AppShell, LeftSidebarRail, LeftSidebarEntryList, RightSidebar, MainArea,
 │   │                 SettingsModal, TabBar
+│   │   └── titlebar/ TitleBar (custom window chrome), WindowControls, TitleBarMenuBar,
+│   │                 MenuDropdown, TitleBarSearchButton, useIsMaximized, editCommands
 │   ├── editor/       RichEditor, InternalLinkExtension,
 │   │                 TagInput, ResizableImageExtension, ExternalDropExtension,
 │   │                 EditorToolbar, LinkPickerModal, SuggestionList
@@ -54,7 +56,8 @@ src/
 ├── hooks/            useCategoryEditor (shared add/edit/delete-with-confirm category logic,
 │                                      used by TasksView, WikiView, OperationsView)
 ├── lib/              db.ts, links.ts, tabs.ts, dragState.ts, altarDragState.ts,
-│                     routineDragState.ts, moonPhase.ts, export.ts,
+│                     routineDragState.ts, moonPhase.ts, export.ts, menuActions.ts,
+│                     platform.ts,
 │                     exportData.ts, emeraldFormat.ts, vaultManager.ts, dbBackup.ts,
 │                     helpers.ts (incl. isImageIcon, safeParseArray, generateId,
 │                                      hexToRgb, isValidHexColor, readFileAsDataUrl,
@@ -400,9 +403,11 @@ All Rust commands are registered in `src-tauri/src/lib.rs` and invoked from Type
 | `read_file(path)` | Read a file and return its UTF-8 content. Same extension allowlist and root confinement as `write_file`. |
 | `ensure_app_storage_dirs()` | Create app data and app config directories if they don't exist. Called before frontend writes vault metadata or opens SQLite. |
 | `export_pdf(html, path, page_size?)` | Render the supplied HTML to a PDF at `path` by driving the app's own webview. The frontend first prompts the user for a save location via the `dialog` plugin and passes the chosen path here. `page_size`, an optional `(width_in, height_in)` tuple in inches, overrides the default Letter/Portrait page with a custom size — used only by the Altar PDF export (see below); Journal/Wiki/Operations export calls it without `page_size` and gets the old default behavior. Per-platform implementations live in `src-tauri/src/pdf_export/{windows,macos,linux}.rs`, all behind the same `pub async fn export_pdf` signature; `mod.rs` does the `#[cfg(target_os = "…")]` re-export so `lib.rs` calls `pdf_export::export_pdf` without knowing which platform it's on. |
-| `update_menu_labels(...)` | Update native menu item labels for i18n (edit, view, export, import submenus and their items). |
+| `update_menu_labels(...)` | Update native menu item labels for i18n (edit, view, export, import submenus and their items). macOS only in effect — see [Window Chrome](#window-chrome). |
+| `set_export_menu_enabled(entry, pdf, emerald)` | Enable/disable the native "Export as …" items for the current view. Driven by `computeMenuEnabledState`; macOS only in effect. |
+| `set_altar_export_menu_enabled(enabled)` | Enable/disable the native "Export as Image" submenu. macOS only in effect. |
 
-Tauri menu events (not `invoke`) are emitted by the native menu and received in `AppShell` via `listen()`:
+Tauri menu events (not `invoke`) are emitted by the native menu and received in `AppShell` via `listen()`. On Windows and Linux there is no native menu (see [Window Chrome](#window-chrome) below) — the HTML menu bar calls the same actions directly through `src/lib/menuActions.ts`, so both platforms run one implementation:
 
 | Event ID | Trigger |
 |---|---|
@@ -411,9 +416,42 @@ Tauri menu events (not `invoke`) are emitted by the native menu and received in 
 | `export-emerald` | Export > Export as Emerald… |
 | `import-markdown` | Import > From Markdown… |
 | `import-emerald` | Import > From Emerald… |
+| `export-altar-jpeg` / `-png` / `-webp` | Export > Export as Image > JPEG… / PNG… / WebP… |
 | `reset-sidebar-widths` | View > Reset View |
 | `navigate-back` | Mouse back button (macOS NSEvent monitor) |
 | `navigate-forward` | Mouse forward button (macOS NSEvent monitor) |
+
+Only `reset-sidebar-widths` is still emitted from the frontend as well — the HTML menu bar re-emits it so `AppShell`'s existing listener handles it identically on both platforms. The other eight are called directly through `runMenuAction`.
+
+## Window Chrome
+
+The window's title bar is drawn by the app, not the OS — a slim 40px bar holding the Emerald logo, the application menu, back/forward navigation, a centred search affordance, and the window buttons (`src/components/layout/titlebar/`). It sits above the three-column shell in `AppShell`.
+
+**The split is per platform, and deliberately not uniform.** `src/lib/platform.ts` decides at module-eval time (a synchronous user-agent check, so the first paint is already correct) and `main.tsx` mirrors the result onto `html[data-platform]` for CSS:
+
+| | Windows / Linux | macOS |
+|---|---|---|
+| Window config | `decorations: false` | `decorations: true` + `titleBarStyle: "Overlay"` + `hiddenTitle` |
+| Min / max / close | `WindowControls` (46x40, Fluent geometry) | Native traffic lights, positioned by `trafficLightPosition` |
+| Application menu | `TitleBarMenuBar` (HTML) | Native, in the system menu bar |
+| Title bar left inset | none | 5rem, reserved for the traffic lights |
+
+Per-platform window settings live in `src-tauri/tauri.{windows,linux,macos}.conf.json`, which Tauri merges over `tauri.conf.json`. The merge is RFC 7396, which **replaces arrays wholesale**, so each file repeats the complete window object rather than only its deltas. `tauri.dev.conf.json` merges last (it is passed via `--config`) and must never gain an `app.windows` key, or it would wipe the platform settings.
+
+Dragging the window uses `data-tauri-drag-region`. Tauri reads the attribute off the element directly under the cursor and does **not** walk up the tree, so every non-interactive wrapper in `TitleBar` carries it and no interactive control does. Double-clicking a drag region maximises; Tauri handles that natively via `internal-toggle-maximize`.
+
+Beyond `core:default`, the window controls need four permissions in `src-tauri/capabilities/default.json`: `allow-start-dragging`, `allow-minimize`, `allow-toggle-maximize` and `allow-close`. `allow-is-maximized` and `allow-internal-toggle-maximize` are already in the default set.
+
+### Why the native menu is macOS-only
+
+`install_native_menu` in `src-tauri/src/lib.rs` is gated to macOS. On Windows and Linux, `set_menu` attaches an in-window menu bar (an HMENU / a GTK menubar) regardless of `decorations`, which would sit alongside the app's own menu bar. The three menu commands (`update_menu_labels`, `set_export_menu_enabled`, `set_altar_export_menu_enabled`) all bail out when `app.menu()` returns `None`, so they become no-ops on those platforms without any frontend branching.
+
+Both menus resolve to the same code. `src/lib/menuActions.ts` owns the action implementations (`runMenuAction`) and the rules for which export items are available (`computeMenuEnabledState`); the native macOS menu reaches them by emitting the event ids listed above, which `AppShell` forwards, while the HTML menu bar calls them directly. `View > Reset View` is the one exception: it manipulates `AppShell`'s local sidebar widths, so the HTML menu re-emits `reset-sidebar-widths` rather than calling a function, and `AppShell`'s existing listener answers it on both platforms.
+
+### Known limitations
+
+- **Windows 11 Snap Layouts.** With `decorations: false` the hover flyout on the maximise button is gone; restoring it needs `WM_NCHITTEST` returning `HTMAXBUTTON` from Rust. `Win+Arrow` and drag-to-edge snapping still work.
+- **Paste in the HTML Edit menu** goes through `navigator.clipboard.read()` replayed as a synthetic `ClipboardEvent` (`editCommands.ts`), because `document.execCommand('paste')` is blocked in WebView2 and WKWebView. `Ctrl+V` always works natively regardless.
 
 ## PDF Export
 

@@ -3,7 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { useTranslation } from 'react-i18next';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
-import { useUIStore } from '../../store/uiStore';
+import { isAltarFullscreen, useUIStore } from '../../store/uiStore';
 import { useTagStore } from '../../store/tagStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useAltarStore } from '../../store/altarStore';
@@ -11,10 +11,8 @@ import { useTaskStore } from '../../store/taskStore';
 import { useRoutineStore } from '../../store/routineStore';
 import { useVaultStore } from '../../store/vaultStore';
 import { invoke } from '@tauri-apps/api/core';
-import { exportAsPDF, exportAsMarkdown, noEntryMessage, exportErrorMessage } from '../../lib/export';
-import { collectExportData } from '../../lib/exportData';
-import { exportAsEmerald, importFromEmerald, importFromMarkdown } from '../../lib/emeraldFormat';
-import { saveAltarImage, saveAltarPDF } from '../../lib/altarExport';
+import { computeMenuEnabledState, runMenuAction, SELF_CONTAINED_MENU_ACTIONS } from '../../lib/menuActions';
+import TitleBar from './titlebar/TitleBar';
 import LeftSidebarRail from './LeftSidebarRail';
 import LeftSidebarEntryList from './LeftSidebarEntryList';
 import RightSidebar from './RightSidebar';
@@ -47,11 +45,10 @@ export default function AppShell() {
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const leftListOpen = useUIStore((s) => s.leftListOpen);
   const activeView = useUIStore((s) => s.activeView);
-  const altarWindowFullscreen = useUIStore((s) => s.altarWindowFullscreen);
   const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
   const navigateBack = useUIStore((s) => s.navigateBack);
   const navigateForward = useUIStore((s) => s.navigateForward);
-  const isAltarWindowFullscreen = activeView.type === 'altar' && activeView.mode !== 'edit' && altarWindowFullscreen;
+  const isAltarWindowFullscreen = useUIStore(isAltarFullscreen);
 
   const [entryListWidth, setEntryListWidth] = useState(() =>
     loadSavedWidth('entry-list-width', ENTRY_LIST_MIN, ENTRY_LIST_DEFAULT)
@@ -97,32 +94,18 @@ export default function AppShell() {
     }).catch(() => {/* desktop-only, ignore in browser preview */});
   }, [i18n.language, t]);
 
-  // Enable "Export to Markdown" only while a journal / wiki / operation entry
-  // is actually open. "Export as PDF" and "Export as Emerald" are shared
-  // between those entry types and an Altar's reading view (not while
-  // editing it — matches where the Save Image UI used to live): for an open
-  // Altar, PDF exports the rendered altar image instead of entry content.
-  // "Export as Image" is altar-only.
-  // Sigil operations are excluded — that category has its own dedicated
-  // view (OperationSigilView) and export isn't wired up for it yet, so its
-  // menu items stay disabled to avoid a broken action being visible.
+  // Keeps the native macOS menu's enabled states in sync with the current
+  // view. The rules live in `computeMenuEnabledState` so the HTML menu bar
+  // greys out exactly the same items. No-ops on Windows/Linux, where no
+  // native menu is installed and the Rust commands bail out early.
   useEffect(() => {
-    const isSigilOperation =
-      activeView.type === 'operations' && !!activeView.id &&
-      useOperationStore.getState().operations.find((o) => o.id === activeView.id)?.category_id === 'sigils';
-    const isEntryView =
-      (activeView.type === 'journal' ||
-       activeView.type === 'wiki' ||
-       (activeView.type === 'operations' && !isSigilOperation)) &&
-      !!activeView.id;
-    const isAltarReadingView =
-      activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit';
+    const enabled = computeMenuEnabledState(activeView, useOperationStore.getState().operations);
     invoke('set_export_menu_enabled', {
-      entryEnabled: isEntryView,
-      pdfEnabled: isEntryView || isAltarReadingView,
-      emeraldEnabled: isEntryView || isAltarReadingView,
+      entryEnabled: enabled.entryEnabled,
+      pdfEnabled: enabled.pdfEnabled,
+      emeraldEnabled: enabled.emeraldEnabled,
     }).catch(() => {/* desktop-only, ignore in browser preview */});
-    invoke('set_altar_export_menu_enabled', { enabled: isAltarReadingView })
+    invoke('set_altar_export_menu_enabled', { enabled: enabled.altarImageEnabled })
       .catch(() => {/* desktop-only, ignore in browser preview */});
   }, [activeView.type, activeView.id, activeView.mode]);
 
@@ -146,59 +129,13 @@ export default function AppShell() {
     return () => { unlisten.then(fn => fn()); };
   }, [setAltarWindowFullscreen]);
 
+  // The native macOS menu emits these; the HTML menu bar on Windows/Linux
+  // calls `runMenuAction` directly. Both go through the same implementation.
   useEffect(() => {
-    const unlistenPdf = listen('export-pdf', async () => {
-      const view = useUIStore.getState().activeView;
-      const isAltarReadingView = view.type === 'altar' && !!view.id && view.mode !== 'edit';
-      if (isAltarReadingView) {
-        saveAltarPDF().catch(err => exportErrorMessage(err, 'PDF export'));
-        return;
-      }
-      const data = await collectExportData();
-      if (!data) { noEntryMessage(); return; }
-      exportAsPDF(data).catch(err => exportErrorMessage(err, 'PDF export'));
-    });
-
-    const unlistenMd = listen('export-markdown', async () => {
-      const data = await collectExportData();
-      if (!data) { noEntryMessage(); return; }
-      exportAsMarkdown(data).catch(err => exportErrorMessage(err, 'Markdown export'));
-    });
-
-    const unlistenEmerald = listen('export-emerald', () => {
-      exportAsEmerald().catch(err => exportErrorMessage(err, 'Emerald export'));
-    });
-
-    const unlistenAltarJpeg = listen('export-altar-jpeg', () => {
-      saveAltarImage('jpeg').catch(err => exportErrorMessage(err, 'Image export'));
-    });
-
-    const unlistenAltarPng = listen('export-altar-png', () => {
-      saveAltarImage('png').catch(err => exportErrorMessage(err, 'Image export'));
-    });
-
-    const unlistenAltarWebp = listen('export-altar-webp', () => {
-      saveAltarImage('webp').catch(err => exportErrorMessage(err, 'Image export'));
-    });
-
-    const unlistenImportEmerald = listen('import-emerald', () => {
-      importFromEmerald().catch(err => exportErrorMessage(err, 'Emerald import'));
-    });
-
-    const unlistenImportMd = listen('import-markdown', () => {
-      importFromMarkdown().catch(err => exportErrorMessage(err, 'Markdown import'));
-    });
-
-    return () => {
-      unlistenPdf.then(fn => fn());
-      unlistenMd.then(fn => fn());
-      unlistenEmerald.then(fn => fn());
-      unlistenAltarJpeg.then(fn => fn());
-      unlistenAltarPng.then(fn => fn());
-      unlistenAltarWebp.then(fn => fn());
-      unlistenImportEmerald.then(fn => fn());
-      unlistenImportMd.then(fn => fn());
-    };
+    const unlisteners = SELF_CONTAINED_MENU_ACTIONS.map((id) =>
+      listen(id, () => { void runMenuAction(id); })
+    );
+    return () => { unlisteners.forEach((p) => p.then((fn) => fn())); };
   }, []);
 
   const onLeftPointerDown = (e: React.PointerEvent) => {
@@ -238,57 +175,65 @@ export default function AppShell() {
   };
 
   return (
-    <div
-      className="app-shell flex h-screen w-screen overflow-hidden bg-stone-900 relative"
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-    >
-      {/* Jade accent — magical topline */}
+    <div className="app-shell flex flex-col h-screen w-screen overflow-hidden bg-stone-900 relative">
+      {/* Jade accent — magical topline. pointer-events-none so it never
+          intercepts a window drag on the title bar underneath it. */}
       <div
         className="absolute top-0 left-0 right-0 h-px pointer-events-none z-50"
         style={{ background: 'linear-gradient(to right, transparent, rgba(0,166,102,0.45) 30%, rgba(0,230,153,0.3) 50%, rgba(0,166,102,0.45) 70%, transparent)' }}
       />
 
-      {!isAltarWindowFullscreen && (
-        <aside
-          className="app-sidebar app-sidebar-left flex-shrink-0 border-r border-stone-700/60 relative"
-          style={{ width: RAIL_WIDTH + (leftListOpen ? entryListWidth : 0) }}
-        >
-          <div className="flex h-full">
-            <LeftSidebarRail />
-            {leftListOpen && <LeftSidebarEntryList />}
+      <TitleBar />
+
+      {/* The sidebar resize handles live in here, so the pointer handlers that
+          drive them do too. */}
+      <div
+        className="flex flex-1 min-h-0 overflow-hidden relative"
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+      >
+        {!isAltarWindowFullscreen && (
+          <aside
+            className="app-sidebar app-sidebar-left flex-shrink-0 border-r border-stone-700/60 relative"
+            style={{ width: RAIL_WIDTH + (leftListOpen ? entryListWidth : 0) }}
+          >
+            <div className="flex h-full">
+              <LeftSidebarRail />
+              {leftListOpen && <LeftSidebarEntryList />}
+            </div>
+            {leftListOpen && (
+              <div
+                onPointerDown={onLeftPointerDown}
+                className="absolute top-0 right-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"
+              />
+            )}
+          </aside>
+        )}
+
+        {/* Main Content */}
+        <main className="app-main flex-1 min-w-0 overflow-hidden flex flex-col">
+          {!isAltarWindowFullscreen && <TabBar />}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <MainArea />
           </div>
-          {leftListOpen && (
+        </main>
+
+        {/* Right Sidebar */}
+        {rightSidebarOpen && !isAltarWindowFullscreen && (
+          <aside
+            className="app-sidebar app-sidebar-right flex-shrink-0 border-l border-stone-700/60 animate-slide-in relative"
+            style={{ width: rightWidth }}
+          >
+            {/* Resize handle */}
             <div
-              onPointerDown={onLeftPointerDown}
-              className="absolute top-0 right-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"
+              onPointerDown={onRightPointerDown}
+              className="absolute top-0 left-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"
             />
-          )}
-        </aside>
-      )}
+            <RightSidebar />
+          </aside>
+        )}
+      </div>
 
-      {/* Main Content */}
-      <main className="app-main flex-1 min-w-0 overflow-hidden flex flex-col">
-        {!isAltarWindowFullscreen && <TabBar />}
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <MainArea />
-        </div>
-      </main>
-
-      {/* Right Sidebar */}
-      {rightSidebarOpen && !isAltarWindowFullscreen && (
-        <aside
-          className="app-sidebar app-sidebar-right flex-shrink-0 border-l border-stone-700/60 animate-slide-in relative"
-          style={{ width: rightWidth }}
-        >
-          {/* Resize handle */}
-          <div
-            onPointerDown={onRightPointerDown}
-            className="absolute top-0 left-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"
-          />
-          <RightSidebar />
-        </aside>
-      )}
       <UndoToast />
       <ImportDestinationModal />
     </div>

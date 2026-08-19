@@ -114,7 +114,7 @@ Locked placements are click-through on the canvas (pointer events disabled), so 
 
 A note at the bottom reminds you to switch to edit mode to change these settings. The header fullscreen button (in the altar's own topbar) only appears when the sidebar is closed, since the sidebar's action bar already provides one while it's open.
 
-Exporting the altar as an image (JPEG / PNG / WebP) is done from the native application menu, not the sidebar — see [Export and Import](#export-and-import) below. The export renders the current altar at full native resolution via the native OS save dialog. JPEG uses quality 0.97, WebP uses 0.92, PNG is lossless. The suggested filename and the OS save dialog filter adapt to the selected format (e.g. `AltarTitle_YYYY-MM-DD.png`).
+Exporting the altar as an image (JPEG / PNG / WebP) is done from the application menu, not the sidebar — see [Export and Import](#export-and-import) below. The export renders the current altar at full native resolution via the native OS save dialog. JPEG uses quality 0.97, WebP uses 0.92, PNG is lossless. The suggested filename and the OS save dialog filter adapt to the selected format (e.g. `AltarTitle_YYYY-MM-DD.png`).
 
 **Sidebar in edit mode.** The full editor panel — Canvas Options, Change Background, Overlay Options, Grid Options, and Placed Elements — is visible only when the altar is in edit mode. Each section is collapsible with a chevron toggle. The open/closed state of all six sections (Background, Overlay, Grid, Favicon, Canvas Options, Placements) is saved per altar in `localStorage` and restored when you switch back to that altar. Sections default to open the first time an altar is opened.
 
@@ -151,9 +151,11 @@ The overlay is applied on top of all background types — colour presets, gradie
 
 ## Navigation
 
+**Window title bar.** The app draws its own title bar across the top of the window: the Emerald logo (click to go Home), the application menu, back/forward navigation through the view history, a centred search field, and — on Windows and Linux — the minimise / maximise / close buttons. macOS keeps its native window buttons and its native menu bar instead, so its title bar shows only the logo, navigation and search. The search field currently opens the left entry list; a cross-module search is not implemented yet. It is hidden below 1024px window width so it cannot collide with the menu.
+
 **Left sidebar structure.** The left sidebar has two parts side by side:
 
-1. A narrow icon **rail** — app logo/home, back/forward navigation-history buttons, a search shortcut, a toggle to collapse/expand the entry list next to it, a second toggle to collapse/expand the right sidebar (so both sidebars are controlled from the same rail), the five module icons (Journal/Tasks/Operations/Wiki/Altar), and Tags/Trash/Settings at the bottom. Clicking a module icon switches the main view; it does not highlight, since it's independent of whichever list tab is open.
+1. A narrow icon **rail** — a toggle to collapse/expand the entry list next to it, a second toggle to collapse/expand the right sidebar (so both sidebars are controlled from the same rail), the five module icons (Journal/Tasks/Operations/Wiki/Altar), and Tags/Trash/Settings at the bottom. Clicking a module icon switches the main view; it does not highlight, since it's independent of whichever list tab is open.
 2. A resizable, collapsible **entry list** panel next to the rail, with five tabs (Journal/Tasks/Operations/Wiki/Altar) that switch which module's items are listed. Each tab has its own search field, a "+" button to quick-create a new item, inline rename (double-click or via the context menu), and a right-click context menu (Duplicate/Rename/Delete where applicable — Altar only offers Rename, since it has no duplicate action; Tasks offers Rename/Delete and shows a completion checkbox on each row instead of an icon). Journal, Operations, and Wiki rows can also be dragged into the editor to insert an internal link. The panel can be collapsed entirely via the toggle in the rail, and its width is remembered independently of the main window.
 
 **Breadcrumb back links.** When an entry is open in JournalView, WikiView, or OperationsView, the topbar shows a clickable breadcrumb that navigates back to the corresponding list view (e.g. clicking "Journal" returns to the journal entry list without closing the tab).
@@ -231,7 +233,7 @@ Tags and categories also support soft-delete and restoration.
 
 ## Export and Import
 
-All export and import actions are in the native application menu.
+All export and import actions are in the application menu. Where that menu lives depends on the platform: on macOS it is the native menu in the system menu bar at the top of the screen; on Windows and Linux it is rendered in the app's own title bar. Both offer the same items with the same enabled/disabled rules. The menu bar stays available in the altar's distraction-free full-window mode, since that is where image export is most often wanted.
 
 > **Sigil-category Operations export is temporarily disabled.** Export (Markdown, PDF, Emerald) works for Journal and Wiki entries, for altars, and for Operations in any category *except* Sigils. Opening a Sigil (an Operations entry in the `sigils` category) leaves all three "Export as …" menu items greyed out — export for that category isn't wired up correctly yet, so the items are disabled rather than left to produce a broken result. This is a temporary state, not a permanent design decision; the menu items will re-enable for Sigils once that export path is implemented. Import (Markdown and Emerald) is unaffected and still supports Operations, including Sigils, as a destination.
 

@@ -66,6 +66,7 @@ html[data-theme='emerald-noctis'] {
   --panel-hover-bg: rgba(45, 37, 32, 0.9);
   --panel-hover-border: rgba(119, 101, 85, 0.58);
   --panel-hover-shadow: 0 14px 30px rgba(0, 0, 0, 0.4);
+  --titlebar-bg: rgba(24, 20, 16, 0.94);
   --tabbar-bg: rgba(28, 23, 19, 0.86);
   --tab-active-bg: #1a1510;
   --tab-active-text: #f6efe8;

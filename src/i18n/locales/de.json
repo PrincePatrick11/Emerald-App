@@ -53,9 +53,7 @@
     "collapseList": "Liste einklappen",
     "expandList": "Liste ausklappen",
     "collapseProperties": "Eigenschaften einklappen",
-    "expandProperties": "Eigenschaften ausklappen",
-    "back": "Zurück",
-    "forward": "Vor"
+    "expandProperties": "Eigenschaften ausklappen"
   },
   "operations": {
     "title": "Operationen",
@@ -324,7 +322,7 @@
     "waning_crescent": "Abnehmende Sichel"
   },
   "search": {
-    "placeholder": "Suchen...",
+    "placeholder": "Suchen…",
     "noResults": "Keine Ergebnisse gefunden.",
     "noResultsShort": "Keine Ergebnisse",
     "operations": "Operationen suchen…",
@@ -463,6 +461,10 @@
     "deleteSelected": "Ausgewählte löschen ({{count}})"
   },
   "menu": {
+    "cut": "Ausschneiden",
+    "copy": "Kopieren",
+    "paste": "Einfügen",
+    "selectAll": "Alles auswählen",
     "edit": "Bearbeiten",
     "view": "Ansicht",
     "export": "Exportieren",
@@ -477,6 +479,15 @@
     "exportAltarWebp": "WebP…",
     "importMarkdown": "Aus Markdown…",
     "importEmerald": "Aus Emerald…"
+  },
+  "titlebar": {
+    "minimize": "Minimieren",
+    "maximize": "Maximieren",
+    "restore": "Wiederherstellen",
+    "close": "Schließen",
+    "back": "Zurück",
+    "forward": "Vor",
+    "search": "Suchen"
   },
   "linkPicker": {
     "title": "Link einfügen",

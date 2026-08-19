@@ -7,6 +7,7 @@ import "./themes/emerald-parchment.css";
 import "./index.css";
 import "tippy.js/dist/tippy.css";
 import { applyTheme, normalizeThemeId } from "./themes/theme";
+import { platformName } from "./lib/platform";
 
 // Load Google Fonts asynchronously so they never block the initial render.
 // The render-blocking <link rel="stylesheet"> was moved here from index.html.
@@ -19,6 +20,11 @@ document.head.appendChild(_fontLink);
 
 // Apply theme before first render to avoid flash
 applyTheme(normalizeThemeId(localStorage.getItem('theme-id') ?? localStorage.getItem('theme')));
+
+// Expose the platform to CSS (html[data-platform='macos'] reserves room for
+// the native traffic lights in the title bar). Set before first render for
+// the same reason as the theme above.
+document.documentElement.dataset.platform = platformName;
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

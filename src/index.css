@@ -67,6 +67,108 @@ html[data-editor-font='lora'] { --font-editor: var(--font-lora); }
 html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather); }
 
 @layer components {
+  /* ── Window title bar ──────────────────────────────────────────────────
+     Windows and Linux run the window undecorated and draw the whole bar
+     here; macOS keeps its native traffic lights overlaid on the webview and
+     only needs room reserved for them. */
+
+  .titlebar {
+    background: var(--titlebar-bg);
+    border-bottom: 1px solid transparent;
+  }
+
+  /* Traffic lights sit at x:14 and span ~52px (see tauri.macos.conf.json).
+     The inset goes on the first column, not the container: padding on the
+     grid itself would shrink its content box and shift the centre track,
+     which is the one thing the 1fr/auto/1fr layout exists to prevent. */
+  html[data-platform='macos'] .titlebar > :first-child {
+    padding-left: 5rem;
+  }
+
+  .titlebar-menu-trigger {
+    @apply h-7 px-2.5 rounded-md text-xs whitespace-nowrap transition-colors duration-150;
+    color: var(--text-secondary);
+  }
+
+  .titlebar-menu-trigger:hover {
+    background: var(--interactive-hover);
+    color: var(--text-primary);
+  }
+
+  .titlebar-menu-trigger[data-open] {
+    background: var(--interactive-active);
+    color: var(--text-primary);
+  }
+
+  .titlebar-search {
+    color: var(--text-muted);
+    transition: color 150ms, border-color 150ms;
+  }
+
+  .titlebar-search:hover {
+    color: var(--text-primary);
+  }
+
+  /* 46x40 with square corners is the Windows Fluent geometry — matching it is
+     what makes these read as real window controls rather than app buttons. */
+  .window-control {
+    @apply flex items-center justify-center w-[46px] h-full flex-shrink-0 transition-colors duration-150;
+    color: var(--text-muted);
+  }
+
+  .window-control:hover {
+    background: var(--interactive-hover);
+    color: var(--text-primary);
+  }
+
+  .window-control:active {
+    background: var(--interactive-active);
+  }
+
+  /* Fluent's close-button red, deliberately hardcoded: it is the same in both
+     themes, so a token would only add a value to keep in sync twice. */
+  .window-control-close:hover {
+    background: #c42b1c;
+    color: #ffffff;
+  }
+
+  .window-control-close:active {
+    background: #b2231a;
+    color: #ffffff;
+  }
+
+  /* ── Menu-bar dropdowns ────────────────────────────────────────────────
+     Shares the context menu's themed surface tokens. */
+
+  .menu-surface {
+    @apply rounded-lg border;
+    background: var(--menu-bg);
+    border-color: var(--menu-border);
+    box-shadow: var(--menu-shadow);
+  }
+
+  .menu-item {
+    @apply w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left transition-colors duration-150;
+    color: var(--text-secondary);
+  }
+
+  .menu-item:hover:not(:disabled) {
+    background: var(--menu-item-hover-bg);
+    color: var(--menu-item-hover-text);
+  }
+
+  /* Dimmed rather than recoloured: the per-theme `.menu-item` colour rules
+     outrank this one on specificity, so a `color` here would not survive. */
+  .menu-item:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .menu-separator {
+    @apply my-1 h-px;
+    background: var(--menu-border);
+  }
+
   .left-sidebar-rail {
     background: var(--shell-bg);
   }
@@ -624,10 +726,22 @@ html[data-theme='emerald-noctis'] .app-sidebar-right {
   box-shadow: -12px 0 30px rgba(0, 0, 0, 0.28);
 }
 
-html[data-theme='emerald-noctis'] .sidebar-header,
+html[data-theme='emerald-noctis'] .titlebar,
 html[data-theme='emerald-noctis'] .sidebar-search,
 html[data-theme='emerald-noctis'] .rail-divider {
   border-color: rgba(110, 93, 76, 0.44);
+}
+
+html[data-theme='emerald-noctis'] .titlebar-search:hover {
+  border-color: var(--border-strong);
+}
+
+html[data-theme='emerald-noctis'] .window-control:focus-visible,
+html[data-theme='emerald-noctis'] .titlebar-menu-trigger:focus-visible,
+html[data-theme='emerald-noctis'] .titlebar-search:focus-visible,
+html[data-theme='emerald-noctis'] .menu-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 html[data-theme='emerald-noctis'] .sidebar-search-inner {
@@ -880,6 +994,7 @@ html[data-theme='emerald-noctis'] .app-sidebar-left .bg-stone-700.text-stone-200
 html[data-theme='emerald-noctis'] .right-sidebar-tab-idle,
 html[data-theme='emerald-noctis'] .task-action-btn,
 html[data-theme='emerald-noctis'] .linked-entry-menu-item,
+html[data-theme='emerald-noctis'] .menu-item,
 html[data-theme='emerald-noctis'] .context-menu-item-default,
 html[data-theme='emerald-noctis'] .altar-category-chip {
   color: #b49d87;
@@ -946,6 +1061,7 @@ html[data-theme='emerald-noctis'] .op-prop-select:focus {
   box-shadow: 0 0 0 2px rgba(0, 196, 127, 0.18);
 }
 
+html[data-theme='emerald-noctis'] .menu-item:hover:not(:disabled),
 html[data-theme='emerald-noctis'] .context-menu-item-default:hover {
   background: rgba(0, 122, 77, 0.2);
   color: #b8ffe2;
@@ -974,10 +1090,22 @@ html[data-theme='emerald-parchment'] .app-sidebar-right {
   box-shadow: -10px 0 30px rgba(112, 77, 40, 0.07);
 }
 
-html[data-theme='emerald-parchment'] .sidebar-header,
+html[data-theme='emerald-parchment'] .titlebar,
 html[data-theme='emerald-parchment'] .sidebar-search,
 html[data-theme='emerald-parchment'] .rail-divider {
   border-color: rgba(145, 108, 70, 0.32);
+}
+
+html[data-theme='emerald-parchment'] .titlebar-search:hover {
+  border-color: var(--border-strong);
+}
+
+html[data-theme='emerald-parchment'] .window-control:focus-visible,
+html[data-theme='emerald-parchment'] .titlebar-menu-trigger:focus-visible,
+html[data-theme='emerald-parchment'] .titlebar-search:focus-visible,
+html[data-theme='emerald-parchment'] .menu-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 html[data-theme='emerald-parchment'] .sidebar-search-inner {
@@ -1597,10 +1725,12 @@ html[data-theme='emerald-parchment'] .linked-entry-menu-item {
   color: #5b432d;
 }
 
+html[data-theme='emerald-parchment'] .menu-item,
 html[data-theme='emerald-parchment'] .context-menu-item-default {
   color: #5b432d;
 }
 
+html[data-theme='emerald-parchment'] .menu-item:hover:not(:disabled),
 html[data-theme='emerald-parchment'] .context-menu-item-default:hover {
   background: rgba(18, 145, 92, 0.12);
   color: #0b6e48;

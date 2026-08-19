@@ -53,9 +53,7 @@
     "collapseList": "Contraer lista",
     "expandList": "Expandir lista",
     "collapseProperties": "Contraer propiedades",
-    "expandProperties": "Expandir propiedades",
-    "back": "Atrás",
-    "forward": "Adelante"
+    "expandProperties": "Expandir propiedades"
   },
   "operations": {
     "title": "Operaciones",
@@ -324,7 +322,7 @@
     "waning_crescent": "Cuarto menguante"
   },
   "search": {
-    "placeholder": "Buscar...",
+    "placeholder": "Buscar…",
     "noResults": "No se encontraron resultados.",
     "noResultsShort": "Sin resultados",
     "operations": "Buscar operaciones…",
@@ -463,7 +461,11 @@
     "deleteSelected": "Eliminar seleccionados ({{count}})"
   },
   "menu": {
-    "edit": "Editar",
+    "cut": "Cortar",
+    "copy": "Copiar",
+    "paste": "Pegar",
+    "selectAll": "Seleccionar todo",
+    "edit": "Edición",
     "view": "Vista",
     "export": "Exportar",
     "import": "Importar",
@@ -477,6 +479,15 @@
     "exportAltarWebp": "WebP…",
     "importMarkdown": "Desde Markdown…",
     "importEmerald": "Desde Emerald…"
+  },
+  "titlebar": {
+    "minimize": "Minimizar",
+    "maximize": "Maximizar",
+    "restore": "Restaurar",
+    "close": "Cerrar",
+    "back": "Atrás",
+    "forward": "Adelante",
+    "search": "Buscar"
   },
   "linkPicker": {
     "title": "Insertar enlace",

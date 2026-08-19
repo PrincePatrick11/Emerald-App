@@ -65,6 +65,7 @@ html[data-theme='emerald-parchment'] {
   --panel-hover-bg: #f9f1e3;
   --panel-hover-border: rgba(131, 96, 62, 0.48);
   --panel-hover-shadow: 0 10px 24px rgba(114, 79, 43, 0.11);
+  --titlebar-bg: #ecdec7;
   --tabbar-bg: rgba(240, 225, 201, 0.9);
   --tab-active-bg: #f5ecdc;
   --tab-active-text: #2f2114;

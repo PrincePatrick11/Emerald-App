@@ -53,9 +53,7 @@
     "collapseList": "Réduire la liste",
     "expandList": "Développer la liste",
     "collapseProperties": "Réduire les propriétés",
-    "expandProperties": "Développer les propriétés",
-    "back": "Précédent",
-    "forward": "Suivant"
+    "expandProperties": "Développer les propriétés"
   },
   "operations": {
     "title": "Opérations",
@@ -324,7 +322,7 @@
     "waning_crescent": "Croissant décroissant"
   },
   "search": {
-    "placeholder": "Rechercher...",
+    "placeholder": "Rechercher…",
     "noResults": "Aucun résultat trouvé.",
     "noResultsShort": "Aucun résultat",
     "operations": "Rechercher des opérations…",
@@ -463,7 +461,11 @@
     "deleteSelected": "Supprimer la sélection ({{count}})"
   },
   "menu": {
-    "edit": "Éditer",
+    "cut": "Couper",
+    "copy": "Copier",
+    "paste": "Coller",
+    "selectAll": "Tout sélectionner",
+    "edit": "Édition",
     "view": "Affichage",
     "export": "Exporter",
     "import": "Importer",
@@ -477,6 +479,15 @@
     "exportAltarWebp": "WebP…",
     "importMarkdown": "Depuis Markdown…",
     "importEmerald": "Depuis Emerald…"
+  },
+  "titlebar": {
+    "minimize": "Réduire",
+    "maximize": "Agrandir",
+    "restore": "Restaurer",
+    "close": "Fermer",
+    "back": "Retour",
+    "forward": "Suivant",
+    "search": "Rechercher"
   },
   "linkPicker": {
     "title": "Insérer un lien",

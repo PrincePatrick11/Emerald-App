@@ -120,6 +120,14 @@ function saveTabs(tabs: OpenTab[], activeTabId: string | null) {
   else localStorage.removeItem('active-tab-id');
 }
 
+/**
+ * The Altar's distraction-free mode, which hides the sidebars and the tab bar.
+ * Shared by `AppShell` and `TitleBar` so the two cannot drift apart.
+ */
+export function isAltarFullscreen(s: Pick<UIState, 'activeView' | 'altarWindowFullscreen'>): boolean {
+  return s.activeView.type === 'altar' && s.activeView.mode !== 'edit' && s.altarWindowFullscreen;
+}
+
 function withNavigationState(s: UIState, view: ActiveView) {
   const current = s.history[s.historyIndex];
   const isNewPage = !current || current.type !== view.type || current.id !== view.id;

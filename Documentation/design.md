@@ -127,12 +127,40 @@ Diese Vereinheitlichung ist rein strukturell — das visuelle Ergebnis ist unver
 
 Die linke Sidebar besteht aus zwei nebeneinander liegenden Komponenten: `LeftSidebarRail.tsx` (feste 56px-Icon-Leiste) und `LeftSidebarEntryList.tsx` (daneben liegendes, größenverstellbares Panel). Zwei neue geteilte Button-Komponenten kapseln die jeweiligen Zustände:
 
-- `RailButton.tsx` — dünner Wrapper um die bestehende `.btn-ghost`-Klasse, für alle Icon-Buttons der Rail (Verlauf, Suche, Listen-Toggle, Modul-Icons, Tags/Trash/Settings).
+- `RailButton.tsx` — dünner Wrapper um die bestehende `.btn-ghost`-Klasse, für alle Icon-Buttons der Rail (Listen-Toggle, Modul-Icons, Tags/Trash/Settings) sowie für die Verlaufs-Buttons in der Titelleiste.
 - `TabIconButton.tsx` — Active/Idle-Toggle für die fünf Tab-Icons im Entry-List-Panel. Nutzt dafür die bereits bestehenden `.right-sidebar-tab-active`/`.right-sidebar-tab-idle`-CSS-Klassen (ursprünglich für die rechte Sidebar benannt) statt eigener Klassen — funktional identisch, aber der Klassenname passt jetzt nicht mehr zur tatsächlichen Verwendung auf beiden Seiten der App. Die themafähigen Farbregeln für diese Klassen in `index.css` waren zunächst per `.app-sidebar-right`-Präfix auf die rechte Sidebar gescoped; die Hover-Regel für inaktive Tabs (`.text-stone-500.hover\:text-stone-300:hover`) ist in beiden Themes jetzt zusätzlich auf `.app-sidebar-left` gescoped, sodass linke und rechte Tab-Icons denselben Hover-Farbwert treffen, statt dass die linke Seite auf ungestyltes Tailwind-Grau zurückfällt.
 
-Neue CSS-Klassen in `index.css`: `.left-sidebar-rail` (eigener Hintergrund `--shell-bg`, hebt die Rail farblich vom Entry-List-Panel ab, das weiterhin `--sidebar-bg` nutzt) und `.rail-divider` (themafähige Trennlinien innerhalb der Rail, mit denselben Border-Farbwerten wie `.sidebar-header`/`.sidebar-search` in beiden Themes).
+Neue CSS-Klassen in `index.css`: `.left-sidebar-rail` (eigener Hintergrund `--shell-bg`, hebt die Rail farblich vom Entry-List-Panel ab, das weiterhin `--sidebar-bg` nutzt) und `.rail-divider` (themafähige Trennlinien innerhalb der Rail, mit denselben Border-Farbwerten wie `.titlebar`/`.sidebar-search` in beiden Themes).
+
+Der frühere Rail-Kopf — Emerald-Logo, Zurück/Vorwärts und der Such-Button — ist entfallen; diese drei sitzen jetzt in der Titelleiste (siehe unten). Die Rail beginnt dadurch direkt mit den Panel-Togglern. Die zugehörige `.sidebar-header`-Klasse wurde ersatzlos entfernt; `.titlebar` steht an ihrer Stelle in den beiden gruppierten Hairline-Regeln, sodass Titelleiste und Rail-Trennlinien weiterhin denselben Farbwert teilen.
 
 Die Listenzeilen selbst (Suche, Leerzustand, Inline-Rename, Drag-Start, Kontextmenü) sind in `EntryListTab.tsx` zentralisiert — analog zu `Dashboard.tsx`, das nur die äußere Chrome vereinheitlicht: Journal/Operations/Wiki/Altar reichen Accessor-Funktionen (`getIcon`/`getTitle`/`getDateStr`) durch, Tasks steigt über die `renderRow`-Render-Prop aus (eigene Checkbox-Zeile statt Icon-Zeile).
+
+### Titelleiste
+
+`src/components/layout/titlebar/TitleBar.tsx`, **40px hoch** (`h-10`). Bewusst nicht die sonst übliche `h-14`-Kopfhöhe: die Titelleiste ist Fenster-Chrome, keine Inhalts-Kopfzeile, und 56px wirken dafür schwer. 40px trifft stattdessen die `TabBar` (ebenfalls `h-10`), sodass beide horizontalen Leisten denselben Rhythmus haben. Weil die Titelleiste *über* der dreispaltigen Shell sitzt, bleibt die bewusst gleiche Höhe von `LeftSidebarEntryList`s Tab-Leiste und `RightSidebarActionBar` (beide `h-14`) unangetastet.
+
+Layout ist ein Grid mit `minmax(0,1fr) auto minmax(0,1fr)` statt Flexbox: dadurch sitzt das Suchfeld exakt in der Fenstermitte statt mittig im Restplatz — es verschiebt sich also nicht, wenn die Menüleiste je nach Sprache breiter oder schmaler wird. Unterhalb von `lg` wird es ausgeblendet, damit es bei der Mindestfensterbreite von 900px nicht mit der Menüleiste kollidiert.
+
+**Genau ein neues Token**: `--titlebar-bg` (Noctis `rgba(24, 20, 16, 0.94)`, Parchment `#ecdec7`) — bewusst etwas dunkler bzw. wärmer als `--tabbar-bg`, damit sich die beiden Leisten nicht optisch zu einer verschmelzen. Alles andere wird wiederverwendet: `--interactive-hover`/`--interactive-active` (Hover der Menü-Trigger und Fenster-Buttons), `--text-secondary`/`--text-muted`/`--text-subtle` (Beschriftungen und Glyphen), `--menu-*` (Dropdown-Flächen), sowie `--search-bg`/`--search-border`/`--search-inset` über die von `EntryListTab` geerbte `.sidebar-search-inner`-Klasse.
+
+Bewusst hartkodiert statt tokenisiert: das Fluent-Rot des Schließen-Buttons (`#c42b1c`, aktiv `#b2231a`) — es ist in beiden Themes identisch, ein Token wäre also nur ein zweiter Ort, an dem derselbe Wert gepflegt werden müsste.
+
+Eine Einschränkung zur Such-Pille: sie trägt wie ihr Vorbild in `EntryListTab` zusätzlich `bg-stone-700/40`, und in Emerald Parchment gewinnt der Theme-Override für diese Utility-Klasse (`index.css`) gegen die `.sidebar-search-inner`-Regel. Dort kommt also nicht `--search-bg` zum Zug, sondern der Override-Wert. Beide Suchfelder sehen dadurch weiterhin gleich aus — die Klasse wurde bewusst mitgenommen —, aber die Aussage „läuft über `--search-bg`" gilt in Parchment nur für Noctis-artige Fälle. Das sauber aufzulösen hieße, `bg-stone-700/40` an beiden Stellen gemeinsam zu entfernen.
+
+Die Höhe der Pille (`h-7`, 28px) weicht bewusst von der Eintragslisten-Suche (~34px) ab: in einer 40px hohen Leiste würde ein 34px-Feld die Leiste fast ausfüllen.
+
+**Suchfeld**: ein `<button>` in Suchfeld-Optik, kein `<input>`. Es gibt noch keine modulübergreifende Suche; ein Textfeld, in das man tippen kann und in dem nichts passiert, wäre schlechter als ein Control, das sichtbar eine Sache tut. Der Klick öffnet die linke Eintragsliste — dieselbe Wirkung, die der frühere Lupen-Button in der Rail hatte. Optisch teilt es sich `.sidebar-search-inner` mit dem echten Suchfeld der Eintragsliste, färbt seine Beschriftung aber über `.titlebar-search` mit `--text-subtle` (dem Placeholder-Ton), statt `.sidebar-search-input` mitzunehmen — deren Farbe ist der Eingabetext, nicht der Platzhalter.
+
+**Fenster-Buttons** (`WindowControls.tsx`, nur Windows/Linux): 46×40px, eckig, ohne Abstand, bündig in der Fensterecke — die Windows-Fluent-Geometrie. Die Glyphen sind Inline-SVG auf einem 10×10-Raster mit 1px-Strich statt lucide-Icons, weil lucide kein korrektes "Wiederherstellen"-Symbol hat (zwei versetzte Quadrate, das hintere angeschnitten).
+
+**Menü-Dropdowns** (`MenuDropdown.tsx`, nur Windows/Linux): eigene Komponente statt einer Erweiterung von `ContextMenu.tsx`. Letzteres positioniert sich an einer Cursor-Koordinate, hat einen Timing-Kniff, um den öffnenden Rechtsklick zu überleben, und kennt weder deaktivierte Einträge noch Untermenüs — beides bräuchte die Menüleiste.
+
+Damit existieren zwei Dropdown-Implementierungen mit je eigenen Flächen-Klassen: `.menu-surface`/`.menu-item`/`.menu-separator` für die Menüleiste, `.context-menu*` für das Kontextmenü. Farblich sind sie zusammengeführt — `.menu-item` hängt in beiden Themes in denselben Selektorgruppen wie `.context-menu-item-default`, teilt also Ruhe- und Jade-Hover-Farbe — und die Zeilenhöhe (`py-2`) stimmt überein. Die Strukturklassen selbst sind aber weiterhin doppelt: `ContextMenu` nutzt noch rohes `border-stone-700/60` und `shadow-2xl` statt `--menu-border`/`--menu-shadow`. Das zusammenzuführen wäre der nächste Schritt und würde `ContextMenu` auf `.menu-surface`/`.menu-item` plus seine `danger`-Variante reduzieren.
+
+Deaktivierte Einträge werden über `opacity: 0.45` gedämpft, nicht über eine eigene Farbe: die Theme-Regeln für `.menu-item` sind spezifischer als `.menu-item:disabled`, eine Farbangabe dort würde also nicht durchkommen.
+
+**Tastaturbedienung**: Die Leiste trägt `role="menubar"`, deshalb muss sie den zugehörigen Vertrag auch einhalten — Links/Rechts wechseln zwischen den Menüs, Runter öffnet und springt in das Panel, Hoch/Runter laufen darin, Rechts/Links öffnen und schließen das Untermenü, Escape schließt. Nur ein per Tastatur geöffnetes Menü zieht den Fokus ins Panel; per Maus geöffnet bleibt der Fokus stehen, sonst verlöre der Editor seine Selektion und Ausschneiden/Kopieren hätten nichts mehr, worauf sie wirken.
 
 ### Right Sidebar Action Bar
 

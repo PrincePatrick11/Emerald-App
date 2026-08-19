@@ -5,10 +5,7 @@ import {
   Tag,
   Trash2,
   Flame,
-  Search,
   Wand2,
-  ArrowLeft,
-  ArrowRight,
   Settings,
   CheckSquare,
 } from 'lucide-react';
@@ -39,39 +36,12 @@ function PanelToggleIcon({ active, mirrored, size = 16 }: { active: boolean; mir
 export default function LeftSidebarRail() {
   const { t } = useTranslation();
   const {
-    setActiveView, navigateBack, navigateForward, historyIndex, history,
-    leftListOpen, toggleLeftList, rightSidebarOpen, toggleRightSidebar,
+    setActiveView, leftListOpen, toggleLeftList, rightSidebarOpen, toggleRightSidebar,
   } = useUIStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <div className="left-sidebar-rail rail-divider flex flex-col items-center h-full w-14 flex-shrink-0 border-r">
-      {/* App Logo */}
-      <div className="sidebar-header w-full flex flex-col items-center gap-1.5 py-2.5 border-b border-stone-700/60">
-        <button
-          onClick={() => setActiveView({ type: 'home' })}
-          title={t('app.name')}
-          className="hover:opacity-80 transition-opacity"
-        >
-          <img src="/emerald-icon.png" alt="Emerald" className="w-7 h-7 rounded-lg object-cover" />
-        </button>
-        <div className="flex items-center gap-0.5">
-          <RailButton onClick={navigateBack} disabled={historyIndex <= 0} title={t('sidebar.back')}>
-            <ArrowLeft size={14} />
-          </RailButton>
-          <RailButton onClick={navigateForward} disabled={historyIndex >= history.length - 1} title={t('sidebar.forward')}>
-            <ArrowRight size={14} />
-          </RailButton>
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="rail-divider w-full flex justify-center py-2 border-b">
-        <RailButton onClick={() => { if (!leftListOpen) toggleLeftList(); }} title={t('search.placeholder')}>
-          <Search size={18} />
-        </RailButton>
-      </div>
-
       {/* Sidebar panel toggles — independent of the nav links below */}
       <div className="rail-divider w-full flex flex-col items-center gap-0.5 py-2 border-b">
         <RailButton onClick={toggleLeftList} title={leftListOpen ? t('sidebar.collapseList') : t('sidebar.expandList')}>

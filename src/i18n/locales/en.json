@@ -53,9 +53,7 @@
     "collapseList": "Collapse list",
     "expandList": "Expand list",
     "collapseProperties": "Collapse properties",
-    "expandProperties": "Expand properties",
-    "back": "Back",
-    "forward": "Forward"
+    "expandProperties": "Expand properties"
   },
   "operations": {
     "title": "Operations",
@@ -324,7 +322,7 @@
     "waning_crescent": "Waning Crescent"
   },
   "search": {
-    "placeholder": "Search...",
+    "placeholder": "Search…",
     "noResults": "No results found.",
     "noResultsShort": "No results",
     "operations": "Search operations…",
@@ -463,6 +461,10 @@
     "deleteSelected": "Delete selected ({{count}})"
   },
   "menu": {
+    "cut": "Cut",
+    "copy": "Copy",
+    "paste": "Paste",
+    "selectAll": "Select All",
     "edit": "Edit",
     "view": "View",
     "export": "Export",
@@ -477,6 +479,15 @@
     "exportAltarWebp": "WebP…",
     "importMarkdown": "From Markdown…",
     "importEmerald": "From Emerald…"
+  },
+  "titlebar": {
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "close": "Close",
+    "back": "Back",
+    "forward": "Forward",
+    "search": "Search"
   },
   "linkPicker": {
     "title": "Insert link",

@@ -1,7 +1,12 @@
 use base64::{engine::general_purpose, Engine as _};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
-use tauri::{Emitter, Manager};
+use tauri::Manager;
+// Every `emit` call site (the native menu's events and the mouse-navigation
+// monitor) is macOS-only, so the trait is too.
+#[cfg(target_os = "macos")]
+use tauri::Emitter;
+#[cfg(target_os = "macos")]
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 
 /// Native-webview PDF export. Each platform owns its own implementation
@@ -290,6 +295,151 @@ async fn export_pdf(app: tauri::AppHandle, html: String, path: String, page_size
     pdf_export::export_pdf(&app, html, path, page_size).await
 }
 
+/// Builds and installs the native application menu.
+///
+/// macOS only: there the menu lives in the system menu bar at the top of the
+/// screen, where it belongs. On Windows and Linux `set_menu` would attach an
+/// in-window menu bar (HMENU / GTK menubar) that would collide with the
+/// app's own menu bar in `TitleBar` — those platforms render the same items
+/// in HTML instead (`src/components/layout/titlebar/TitleBarMenuBar.tsx`),
+/// firing the identical events listed below.
+///
+/// `set_export_menu_enabled`, `set_altar_export_menu_enabled` and
+/// `update_menu_labels` all bail out on `app.menu()` returning `None`, so
+/// they become no-ops on the platforms that never get here.
+#[cfg(target_os = "macos")]
+fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
+    let app_submenu = Submenu::with_items(app, "Emerald", true, &[
+        &PredefinedMenuItem::about(app, None, None)?,
+        &PredefinedMenuItem::separator(app)?,
+        &PredefinedMenuItem::hide(app, None)?,
+        &PredefinedMenuItem::hide_others(app, None)?,
+        &PredefinedMenuItem::separator(app)?,
+        &PredefinedMenuItem::quit(app, None)?,
+    ])?;
+    let edit_submenu = Submenu::with_id_and_items(app, "edit-submenu", "Edit", true, &[
+        &PredefinedMenuItem::cut(app, None)?,
+        &PredefinedMenuItem::copy(app, None)?,
+        &PredefinedMenuItem::paste(app, None)?,
+        &PredefinedMenuItem::separator(app)?,
+        &PredefinedMenuItem::select_all(app, None)?,
+    ])?;
+    let reset_item = MenuItem::with_id(
+        app,
+        "reset-sidebar-widths",
+        "Reset View",
+        true,
+        None::<&str>,
+    )?;
+    let view_submenu = Submenu::with_id_and_items(app, "view-submenu", "View", true, &[&reset_item])?;
+    // Export items start disabled — the frontend enables them once a
+    // journal / wiki / operations entry is actually open (PDF is also
+    // enabled while an Altar's reading view is open).
+    let export_pdf_item = MenuItem::with_id(
+        app,
+        "export-pdf",
+        "Export as PDF…",
+        false,
+        None::<&str>,
+    )?;
+    let export_md_item = MenuItem::with_id(
+        app,
+        "export-markdown",
+        "Export as Markdown…",
+        false,
+        None::<&str>,
+    )?;
+    let export_emerald_item = MenuItem::with_id(
+        app,
+        "export-emerald",
+        "Export as Emerald…",
+        false,
+        None::<&str>,
+    )?;
+    // Altar image export — starts disabled, the frontend enables it
+    // only while an Altar's reading view is open.
+    let export_altar_jpeg_item = MenuItem::with_id(
+        app,
+        "export-altar-jpeg",
+        "JPEG…",
+        false,
+        None::<&str>,
+    )?;
+    let export_altar_png_item = MenuItem::with_id(
+        app,
+        "export-altar-png",
+        "PNG…",
+        false,
+        None::<&str>,
+    )?;
+    let export_altar_webp_item = MenuItem::with_id(
+        app,
+        "export-altar-webp",
+        "WebP…",
+        false,
+        None::<&str>,
+    )?;
+    let export_altar_image_submenu = Submenu::with_id_and_items(
+        app,
+        "export-altar-image",
+        "Export as Image",
+        false,
+        &[&export_altar_jpeg_item, &export_altar_png_item, &export_altar_webp_item],
+    )?;
+    let export_submenu = Submenu::with_id_and_items(
+        app,
+        "export-submenu",
+        "Export",
+        true,
+        &[
+            &export_pdf_item,
+            &export_md_item,
+            &export_emerald_item,
+            &PredefinedMenuItem::separator(app)?,
+            &export_altar_image_submenu,
+        ],
+    )?;
+    let import_md_item = MenuItem::with_id(
+        app,
+        "import-markdown",
+        "From Markdown…",
+        true,
+        None::<&str>,
+    )?;
+    let import_emerald_item = MenuItem::with_id(
+        app,
+        "import-emerald",
+        "From Emerald…",
+        true,
+        None::<&str>,
+    )?;
+    let import_submenu = Submenu::with_id_and_items(
+        app,
+        "import-submenu",
+        "Import",
+        true,
+        &[&import_md_item, &import_emerald_item],
+    )?;
+    let menu = Menu::with_items(app, &[&app_submenu, &edit_submenu, &view_submenu, &export_submenu, &import_submenu])?;
+    app.set_menu(menu)?;
+
+    app.on_menu_event(|app, event| {
+        match event.id().as_ref() {
+            "reset-sidebar-widths" => { app.emit("reset-sidebar-widths", ()).ok(); }
+            "export-pdf"           => { app.emit("export-pdf", ()).ok(); }
+            "export-markdown"      => { app.emit("export-markdown", ()).ok(); }
+            "export-emerald"       => { app.emit("export-emerald", ()).ok(); }
+            "export-altar-jpeg"    => { app.emit("export-altar-jpeg", ()).ok(); }
+            "export-altar-png"     => { app.emit("export-altar-png", ()).ok(); }
+            "export-altar-webp"    => { app.emit("export-altar-webp", ()).ok(); }
+            "import-markdown"      => { app.emit("import-markdown", ()).ok(); }
+            "import-emerald"       => { app.emit("import-emerald", ()).ok(); }
+            _ => {}
+        }
+    });
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 // ── macOS mouse back/forward button support ───────────────────────────────────
 
@@ -491,145 +641,14 @@ pub fn run() {
             set_altar_export_menu_enabled,
             update_menu_labels,
         ])
-        .setup(|app| {
+        .setup(|_app| {
+            // Both of these are macOS-only; `_app` keeps the parameter from
+            // reading as unused on the platforms where the block is empty.
             #[cfg(target_os = "macos")]
-            install_mouse_nav_monitor(app.handle().clone());
-
-            #[cfg(target_os = "macos")]
-            let app_submenu = Submenu::with_items(app, "Emerald", true, &[
-                &PredefinedMenuItem::about(app, None, None)?,
-                &PredefinedMenuItem::separator(app)?,
-                &PredefinedMenuItem::hide(app, None)?,
-                &PredefinedMenuItem::hide_others(app, None)?,
-                &PredefinedMenuItem::separator(app)?,
-                &PredefinedMenuItem::quit(app, None)?,
-            ])?;
-            #[cfg(not(target_os = "macos"))]
-            let app_submenu = Submenu::with_items(app, "Emerald", true, &[
-                &PredefinedMenuItem::about(app, None, None)?,
-                &PredefinedMenuItem::separator(app)?,
-                &PredefinedMenuItem::quit(app, None)?,
-            ])?;
-            let edit_submenu = Submenu::with_id_and_items(app, "edit-submenu", "Edit", true, &[
-                &PredefinedMenuItem::cut(app, None)?,
-                &PredefinedMenuItem::copy(app, None)?,
-                &PredefinedMenuItem::paste(app, None)?,
-                &PredefinedMenuItem::separator(app)?,
-                &PredefinedMenuItem::select_all(app, None)?,
-            ])?;
-            let reset_item = MenuItem::with_id(
-                app,
-                "reset-sidebar-widths",
-                "Reset View",
-                true,
-                None::<&str>,
-            )?;
-            let view_submenu = Submenu::with_id_and_items(app, "view-submenu", "View", true, &[&reset_item])?;
-            // Export items start disabled — the frontend enables them once a
-            // journal / wiki / operations entry is actually open (PDF is also
-            // enabled while an Altar's reading view is open).
-            let export_pdf_item = MenuItem::with_id(
-                app,
-                "export-pdf",
-                "Export as PDF…",
-                false,
-                None::<&str>,
-            )?;
-            let export_md_item = MenuItem::with_id(
-                app,
-                "export-markdown",
-                "Export as Markdown…",
-                false,
-                None::<&str>,
-            )?;
-            let export_emerald_item = MenuItem::with_id(
-                app,
-                "export-emerald",
-                "Export as Emerald…",
-                false,
-                None::<&str>,
-            )?;
-            // Altar image export — starts disabled, the frontend enables it
-            // only while an Altar's reading view is open.
-            let export_altar_jpeg_item = MenuItem::with_id(
-                app,
-                "export-altar-jpeg",
-                "JPEG…",
-                false,
-                None::<&str>,
-            )?;
-            let export_altar_png_item = MenuItem::with_id(
-                app,
-                "export-altar-png",
-                "PNG…",
-                false,
-                None::<&str>,
-            )?;
-            let export_altar_webp_item = MenuItem::with_id(
-                app,
-                "export-altar-webp",
-                "WebP…",
-                false,
-                None::<&str>,
-            )?;
-            let export_altar_image_submenu = Submenu::with_id_and_items(
-                app,
-                "export-altar-image",
-                "Export as Image",
-                false,
-                &[&export_altar_jpeg_item, &export_altar_png_item, &export_altar_webp_item],
-            )?;
-            let export_submenu = Submenu::with_id_and_items(
-                app,
-                "export-submenu",
-                "Export",
-                true,
-                &[
-                    &export_pdf_item,
-                    &export_md_item,
-                    &export_emerald_item,
-                    &PredefinedMenuItem::separator(app)?,
-                    &export_altar_image_submenu,
-                ],
-            )?;
-            let import_md_item = MenuItem::with_id(
-                app,
-                "import-markdown",
-                "From Markdown…",
-                true,
-                None::<&str>,
-            )?;
-            let import_emerald_item = MenuItem::with_id(
-                app,
-                "import-emerald",
-                "From Emerald…",
-                true,
-                None::<&str>,
-            )?;
-            let import_submenu = Submenu::with_id_and_items(
-                app,
-                "import-submenu",
-                "Import",
-                true,
-                &[&import_md_item, &import_emerald_item],
-            )?;
-            let menu = Menu::with_items(app, &[&app_submenu, &edit_submenu, &view_submenu, &export_submenu, &import_submenu])?;
-            app.set_menu(menu)?;
-
-            app.on_menu_event(|app, event| {
-                match event.id().as_ref() {
-                    "reset-sidebar-widths" => { app.emit("reset-sidebar-widths", ()).ok(); }
-                    "export-pdf"           => { app.emit("export-pdf", ()).ok(); }
-                    "export-markdown"      => { app.emit("export-markdown", ()).ok(); }
-                    "export-emerald"       => { app.emit("export-emerald", ()).ok(); }
-                    "export-altar-jpeg"    => { app.emit("export-altar-jpeg", ()).ok(); }
-                    "export-altar-png"     => { app.emit("export-altar-png", ()).ok(); }
-                    "export-altar-webp"    => { app.emit("export-altar-webp", ()).ok(); }
-                    "import-markdown"      => { app.emit("import-markdown", ()).ok(); }
-                    "import-emerald"       => { app.emit("import-emerald", ()).ok(); }
-                    _ => {}
-                }
-            });
+            {
+                install_mouse_nav_monitor(_app.handle().clone());
+                install_native_menu(_app)?;
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
