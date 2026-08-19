@@ -427,7 +427,7 @@ Only `reset-sidebar-widths` is still emitted from the frontend as well — the H
 
 The window's title bar is drawn by the app, not the OS — a slim 40px bar holding the Emerald logo, the application menu, back/forward navigation, a centred search affordance, and the window buttons (`src/components/layout/titlebar/`). It sits above the three-column shell in `AppShell`.
 
-**The split is per platform, and deliberately not uniform.** `src/lib/platform.ts` decides at module-eval time (a synchronous user-agent check, so the first paint is already correct) and `main.tsx` mirrors the result onto `html[data-platform]` for CSS:
+**The split is per platform, and deliberately not uniform.** `src/lib/platform.ts` decides at module-eval time (a synchronous user-agent check, so the first paint is already correct) and `main.tsx` mirrors the result onto `html[data-platform]` for CSS. `usesCustomWindowControls` additionally requires `isTauri` (`'__TAURI_INTERNALS__' in window`): opened as a plain page in a browser the window APIs do not exist, and `getCurrentWindow()` would throw during render rather than fail softly like the rest of the desktop-only calls:
 
 | | Windows / Linux | macOS |
 |---|---|---|
@@ -437,6 +437,8 @@ The window's title bar is drawn by the app, not the OS — a slim 40px bar holdi
 | Title bar left inset | none | 5rem, reserved for the traffic lights |
 
 Per-platform window settings live in `src-tauri/tauri.{windows,linux,macos}.conf.json`, which Tauri merges over `tauri.conf.json`. The merge is RFC 7396, which **replaces arrays wholesale**, so each file repeats the complete window object rather than only its deltas. `tauri.dev.conf.json` merges last (it is passed via `--config`) and must never gain an `app.windows` key, or it would wipe the platform settings.
+
+In the Altar's distraction-free full-window mode the title bar stays, minus the navigation and the search — on Windows and Linux it holds the only way to close or move the window, *and* the only route to the altar's image export, which is usually why that mode was entered. The predicate for that mode is `isAltarFullscreen` in `uiStore`, shared by `AppShell` (which hides the sidebars and tab bar) and `TitleBar`, so the two cannot drift apart.
 
 Dragging the window uses `data-tauri-drag-region`. Tauri reads the attribute off the element directly under the cursor and does **not** walk up the tree, so every non-interactive wrapper in `TitleBar` carries it and no interactive control does. Double-clicking a drag region maximises; Tauri handles that natively via `internal-toggle-maximize`.
 
@@ -451,7 +453,7 @@ Both menus resolve to the same code. `src/lib/menuActions.ts` owns the action im
 ### Known limitations
 
 - **Windows 11 Snap Layouts.** With `decorations: false` the hover flyout on the maximise button is gone; restoring it needs `WM_NCHITTEST` returning `HTMAXBUTTON` from Rust. `Win+Arrow` and drag-to-edge snapping still work.
-- **Paste in the HTML Edit menu** goes through `navigator.clipboard.read()` replayed as a synthetic `ClipboardEvent` (`editCommands.ts`), because `document.execCommand('paste')` is blocked in WebView2 and WKWebView. `Ctrl+V` always works natively regardless.
+- **Paste in the HTML Edit menu** goes through `navigator.clipboard.read()` replayed as a synthetic `ClipboardEvent` (`editCommands.ts`), because `document.execCommand('paste')` is blocked in WebView2 and WKWebView. Going through a real event rather than `insertText` lets ProseMirror apply its own paste handling and keep `text/html` formatting; images are carried as `File` entries on the `DataTransfer` so `RichEditor`'s `handlePaste` still finds them via `getAsFile()`. `Ctrl+V` always works natively regardless.
 
 ## PDF Export
 
