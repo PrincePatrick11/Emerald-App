@@ -24,12 +24,12 @@ export default function WikiPropertiesPanel() {
   }
 
   const inputCls = OP_PROP_SELECT_CLASSES;
-  const category = wikiCategories.find((c) => c.id === article.category);
+  const category = wikiCategories.find((c) => c.id === article.category_id);
 
   if (!isEditing) {
     return (
       <PropertiesReadView>
-        <PropertySummaryRow label={t('properties.category')} value={category ? `${category.emoji} ${category.name}` : article.category} />
+        <PropertySummaryRow label={t('properties.category')} value={category ? `${category.emoji} ${category.name}` : article.category_id} />
         <Favicon value={article.icon} readOnly label={t('properties.icon')} />
         <Banner value={article.cover_image} readOnly />
         <div>
@@ -45,8 +45,8 @@ export default function WikiPropertiesPanel() {
       <div>
         <p className="label-xs mb-2">{t('properties.category')}</p>
         <select
-          value={article.category}
-          onChange={(e) => updateArticle(article.id, { category: e.target.value })}
+          value={article.category_id}
+          onChange={(e) => updateArticle(article.id, { category_id: e.target.value })}
           className={inputCls + ' cursor-pointer'}
         >
           {wikiCategories.map((c) => (

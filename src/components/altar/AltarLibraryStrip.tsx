@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
 import { Check, ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
+import { FALLBACK_CATEGORY } from '../../lib/schema';
 import { setAltarDragItem } from '../../lib/altarDragState';
 import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
 import type { AltarCategory, AltarItem } from '../../types';
@@ -35,14 +36,14 @@ function ItemModal({
   );
   const [editName, setEditName] = useState(item?.name ?? '');
   const [editEmoji, setEditEmoji] = useState(item?.emoji ?? '');
-  const [editCategory, setEditCategory] = useState(item?.category ?? defaultCategory);
+  const [editCategory, setEditCategory] = useState(item?.category_id ?? defaultCategory);
   const [editImageData, setEditImageData] = useState<string | null>(item?.image_data ?? null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  const getCategoryEmoji = (catName: string) => categories.find((c) => c.name === catName)?.emoji ?? '✨';
+  const getCategoryEmoji = (catId: string) => categories.find((c) => c.id === catId)?.emoji ?? '✨';
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -75,7 +76,7 @@ function ItemModal({
       await updateItem(item.id, {
         name: editName.trim(),
         emoji: editEmoji || fallbackEmoji,
-        category: editCategory,
+        category_id: editCategory,
         image_data: editImageData ?? undefined,
       });
     } else {
@@ -120,7 +121,7 @@ function ItemModal({
         <input ref={nameInputRef} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t('altar.itemName')} className="w-full bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" />
         <div className="flex flex-wrap gap-1">
           {categories.map((cat) => (
-            <button key={cat.id} onClick={() => { setEditCategory(cat.name); setEditEmoji(''); }} className={`text-xs px-2 py-1 rounded-md transition-colors ${editCategory === cat.name ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{cat.emoji} {cat.name}</button>
+            <button key={cat.id} onClick={() => { setEditCategory(cat.id); setEditEmoji(''); }} className={`text-xs px-2 py-1 rounded-md transition-colors ${editCategory === cat.id ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{cat.emoji} {cat.name}</button>
           ))}
         </div>
         {item && confirmDelete ? (
@@ -157,7 +158,7 @@ function CategoryModal({
 }: {
   category: AltarCategory | null;
   onClose: () => void;
-  onTabChange: (tabName: string) => void;
+  onTabChange: (tabId: string) => void;
 }) {
   const { t } = useTranslation();
   const { addCategory, updateCategory, deleteCategory } = useAltarStore(
@@ -168,6 +169,11 @@ function CategoryModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [nameError, setNameError] = useState('');
 
+  // Die Default-Kategorie ist das Ziel, auf das die Objekte anderer Kategorien
+  // beim Löschen umgehängt werden. Sie selbst zu löschen lehnt der Store ab —
+  // also den Knopf gar nicht erst anbieten, statt still nichts zu tun.
+  const isFallback = category?.id === FALLBACK_CATEGORY.altar_items;
+
   const save = async () => {
     if (!catName.trim()) return;
     setNameError('');
@@ -177,7 +183,7 @@ function CategoryModal({
         await updateCategory(category.id, catName.trim(), emoji);
       } else {
         const cat = await addCategory(catName.trim(), emoji);
-        onTabChange(cat.name);
+        onTabChange(cat.id);
       }
     } catch (e) {
       setNameError(e instanceof Error ? e.message : String(e));
@@ -190,7 +196,8 @@ function CategoryModal({
     if (!category) return;
     if (!confirmDelete) { setConfirmDelete(true); return; }
     await deleteCategory(category.id);
-    onTabChange(UNCATEGORIZED_TAB);
+    // Die Items der Kategorie wandern nach 'other', nicht ins Kategorielose.
+    onTabChange('all');
     onClose();
   };
 
@@ -213,7 +220,7 @@ function CategoryModal({
           <input value={catName} onChange={(e) => { setCatName(e.target.value); setNameError(''); }} placeholder={t('altar.categoryName') ?? 'Category name'} className="flex-1 bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" onKeyDown={(e) => { if (e.key === 'Enter') save(); }} autoFocus />
         </div>
         {nameError && <p className="text-xs text-red-400">{nameError}</p>}
-        {category && confirmDelete ? (
+        {category && !isFallback && confirmDelete ? (
           <div className="flex items-center justify-between rounded-lg border border-red-700/40 bg-red-950/20 px-3 py-2">
             <span className="text-xs text-red-300">{t('common.deleteConfirm')}</span>
             <span className="flex items-center gap-2">
@@ -223,7 +230,7 @@ function CategoryModal({
           </div>
         ) : (
           <div className="flex items-center justify-between">
-            {category ? (
+            {category && !isFallback ? (
               <Button onClick={doDelete} variant="danger" className="flex items-center gap-1 text-xs">
                 <Trash2 size={11} /> {t('common.delete')}
               </Button>
@@ -271,7 +278,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
   const [editingCat, setEditingCat] = useState<AltarCategory | null>(null);
 
-  const hasUncategorized = items.some((i) => !categories.find((c) => c.name === i.category));
+  const hasUncategorized = items.some((i) => !categories.find((c) => c.id === i.category_id));
 
   useEffect(() => {
     if (activeCategoryTab === UNCATEGORIZED_TAB && !hasUncategorized) {
@@ -425,14 +432,15 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
 
   useEffect(() => { checkCatScroll(); }, [displayCategories, checkCatScroll]);
 
-  const defaultCategory = categories[0]?.name ?? '';
+  const defaultCategory = categories[0]?.id ?? '';
 
-  const selectedCatName = categories.find((c) => c.id === activeCategoryTab)?.name;
+  // Die Tab-IDs sind Kategorie-IDs, und item.category_id haelt seit v33
+  // ebenfalls die ID — der Umweg über den Namen entfällt damit.
   const filteredItems = activeCategoryTab === 'all'
     ? items
     : activeCategoryTab === UNCATEGORIZED_TAB
-      ? items.filter((i) => !categories.find((c) => c.name === i.category))
-      : items.filter((item) => item.category === selectedCatName);
+      ? items.filter((i) => !categories.find((c) => c.id === i.category_id))
+      : items.filter((item) => item.category_id === activeCategoryTab);
 
   return (
     <div
@@ -489,7 +497,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
               <div className="mb-1 w-full h-12 flex items-center justify-center overflow-hidden rounded-sm bg-stone-950/35">
                 {item.image_data?.startsWith('data:image/')
                   ? <img src={item.image_data} alt="" className="h-full w-full object-contain" draggable={false} />
-                  : <span className={`leading-none select-none ${item.category === 'candle' ? 'candle-flame' : ''}`} style={{ fontSize: 34 }}>{item.emoji}</span>}
+                  : <span className={`leading-none select-none ${item.category_id === 'candle' ? 'candle-flame' : ''}`} style={{ fontSize: 34 }}>{item.emoji}</span>}
               </div>
               <div className="mt-auto flex items-center gap-1">
                 <span className="flex-1 truncate text-[10px] text-stone-300">{item.name}</span>

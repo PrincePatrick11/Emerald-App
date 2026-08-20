@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { getDb } from '../lib/db';
 import { generateId, nowIso } from '../lib/helpers';
+import { fromRow, type DbRow } from '../lib/row';
 import type { Routine } from '../types';
 
 interface RoutineState {
@@ -17,14 +18,8 @@ export const useRoutineStore = create<RoutineState>((set, get) => ({
 
   fetchRoutines: async () => {
     const db = await getDb();
-    const rows = await db.select<Routine[]>('SELECT * FROM routines ORDER BY created_at DESC');
-    const routines = rows.map((r) => ({
-      ...r,
-      tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : r.tags,
-      operation_ids: typeof r.operation_ids === 'string' ? JSON.parse(r.operation_ids) : (r.operation_ids ?? []),
-      wiki_ids: typeof r.wiki_ids === 'string' ? JSON.parse(r.wiki_ids) : (r.wiki_ids ?? []),
-    }));
-    set({ routines });
+    const rows = await db.select<DbRow[]>('SELECT * FROM routines ORDER BY created_at DESC');
+    set({ routines: rows.map(fromRow.routine) });
   },
 
   createRoutine: async (name, emoji, content, tags, operation_ids, wiki_ids) => {

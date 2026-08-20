@@ -87,8 +87,55 @@ export interface ImportCategoryFilters {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = Record<string, any>;
 
+/**
+ * '1' = vor der Schema-Vereinheitlichung (`wiki_articles.category`,
+ * `altar_items.category` mit dem Kategorie-*Namen*), '2' = danach.
+ */
+const BACKUP_VERSION = '2' as const;
+
+/**
+ * Hebt eine Sicherung im alten Format auf das aktuelle.
+ *
+ * Ohne diesen Schritt wuerde `insertRows` die unbekannt gewordene Spalte
+ * `category` still verwerfen — jeder Artikel aus einer älteren Sicherung
+ * landete kommentarlos in der Default-Kategorie. Der Filter dort schuetzt vor
+ * präparierten Dateien und kann nicht zwischen bösartig und veraltet
+ * unterscheiden; also wird hier übersetzt, bevor er greift.
+ */
+export function migrateBackupPayload(backup: BackupFile): void {
+  if (backup.version === BACKUP_VERSION) return;
+
+  for (const row of backup.data.wikiArticles ?? []) {
+    if (row.category_id === undefined && row.category !== undefined) {
+      row.category_id = row.category;
+    }
+    delete row.category;
+  }
+
+  // altar_items hielt früher den Kategorie-*Namen*. Erst gegen die Kategorien
+  // aus derselben Sicherung aufloesen, sonst auf 'other'.
+  const byName = new Map<string, string>(
+    (backup.data.altarCategories ?? []).map((c) => [String(c.name), String(c.id)])
+  );
+  const byId = new Set((backup.data.altarCategories ?? []).map((c) => String(c.id)));
+  for (const row of backup.data.altarItems ?? []) {
+    if (row.category_id === undefined) {
+      const raw = row.category === undefined ? '' : String(row.category);
+      row.category_id = byId.has(raw) ? raw : (byName.get(raw) ?? 'other');
+    }
+    delete row.category;
+  }
+
+  for (const row of backup.data.journalEntries ?? []) {
+    row.linked_operation_ids = row.linked_operation_ids ?? '[]';
+    row.linked_wiki_ids = row.linked_wiki_ids ?? '[]';
+  }
+
+  backup.version = BACKUP_VERSION;
+}
+
 interface BackupFile {
-  version: '1';
+  version: '1' | '2';
   type: 'backup';
   exportedAt: string;
   filters: BackupOptions;
@@ -158,9 +205,38 @@ function deletedFilter(includeDeleted: boolean): string {
   return includeDeleted ? '' : 'AND deleted_at IS NULL';
 }
 
-/** Builds a quoted comma-separated id list for use inside a SQL IN(...) clause. */
-function idsInClause(rows: Row[], field: string = 'id'): string {
-  return rows.map((r) => `'${r[field]}'`).join(',');
+/**
+ * Höchstzahl gebundener Werte pro Abfrage. SQLite verträgt weit mehr, aber ein
+ * fester Schnitt macht die Abfrage unabhängig von der Größe des Vaults.
+ */
+const IN_CHUNK = 400;
+
+/**
+ * Führt eine Abfrage mit einer `IN (...)`-Liste aus, ohne die Werte in den
+ * SQL-String zu schreiben.
+ *
+ * Der Vorgänger baute die Liste per String-Konkatenation. Die IDs darin sind
+ * nicht zwingend von der App vergeben: Ein Backup-Import übernimmt sie wörtlich
+ * aus der Datei, und beim nächsten Export landeten sie ungebunden in
+ * `db.select`. sqlx zerlegt SQL an `;` und führt jede Anweisung aus
+ * (`sqlx-sqlite/src/statement/virtual.rs`), womit eine präparierte
+ * `.emeralddb` beliebiges SQL ausführen konnte — eine Injection zweiter
+ * Ordnung, ausgelöst erst durch eine spätere, harmlos aussehende Aktion.
+ */
+async function selectWhereIn(
+  db: Awaited<ReturnType<typeof getDb>>,
+  buildSql: (placeholders: string) => string,
+  rows: Row[],
+  field: string = 'id',
+): Promise<Row[]> {
+  const ids = rows.map((r) => String(r[field]));
+  const out: Row[] = [];
+  for (let i = 0; i < ids.length; i += IN_CHUNK) {
+    const chunk = ids.slice(i, i + IN_CHUNK);
+    const placeholders = chunk.map((_, n) => `$${n + 1}`).join(',');
+    out.push(...(await db.select<Row[]>(buildSql(placeholders), chunk)));
+  }
+  return out;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -181,13 +257,12 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
       `SELECT * FROM journal_entries WHERE 1=1 ${dateClause} ${deletedClause}`,
       dateParams,
     );
-    const ids = idsInClause(data.journalEntries);
-    if (ids) {
-      const lnks = await db.select<Row[]>(
-        `SELECT * FROM links WHERE source_type='journal' AND source_id IN (${ids})`
-      );
-      data.links = [...(data.links ?? []), ...lnks];
-    }
+    const lnks = await selectWhereIn(
+      db,
+      (ph) => `SELECT * FROM links WHERE source_type='journal' AND source_id IN (${ph})`,
+      data.journalEntries,
+    );
+    if (lnks.length) data.links = [...(data.links ?? []), ...lnks];
     for (const r of data.journalEntries) {
       if (r.content) extractImagePaths(r.content as string).forEach((p) => allImagePaths.add(p));
     }
@@ -200,15 +275,16 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
       dateParams,
     );
     data.wikiCategories = await db.select<Row[]>(
-      `SELECT * FROM wiki_categories WHERE deleted_at IS NULL`
+      // Auch soft-geloeschte Kategorien: ihre Artikel werden mitexportiert und
+      // brauchen ihr Gegenstueck, sonst scheitert der Import am Foreign Key.
+      `SELECT * FROM wiki_categories`
     );
-    const ids = idsInClause(data.wikiArticles);
-    if (ids) {
-      const lnks = await db.select<Row[]>(
-        `SELECT * FROM links WHERE source_type='wiki' AND source_id IN (${ids})`
-      );
-      data.links = [...(data.links ?? []), ...lnks];
-    }
+    const lnks = await selectWhereIn(
+      db,
+      (ph) => `SELECT * FROM links WHERE source_type='wiki' AND source_id IN (${ph})`,
+      data.wikiArticles,
+    );
+    if (lnks.length) data.links = [...(data.links ?? []), ...lnks];
     for (const r of data.wikiArticles) {
       if (r.content) extractImagePaths(r.content as string).forEach((p) => allImagePaths.add(p));
       if (r.icon && !r.icon.startsWith('data:') && !r.icon.startsWith('http')) allImagePaths.add(r.icon as string);
@@ -223,15 +299,14 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
       dateParams,
     );
     data.operationCategories = await db.select<Row[]>(
-      `SELECT * FROM operation_categories WHERE deleted_at IS NULL`
+      `SELECT * FROM operation_categories`
     );
-    const ids = idsInClause(data.operations);
-    if (ids) {
-      const lnks = await db.select<Row[]>(
-        `SELECT * FROM links WHERE source_type='operation' AND source_id IN (${ids})`
-      );
-      data.links = [...(data.links ?? []), ...lnks];
-    }
+    const lnks = await selectWhereIn(
+      db,
+      (ph) => `SELECT * FROM links WHERE source_type='operation' AND source_id IN (${ph})`,
+      data.operations,
+    );
+    if (lnks.length) data.links = [...(data.links ?? []), ...lnks];
     for (const r of data.operations) {
       if (r.content) extractImagePaths(r.content as string).forEach((p) => allImagePaths.add(p));
       if (r.icon && !r.icon.startsWith('data:') && !r.icon.startsWith('http')) allImagePaths.add(r.icon as string);
@@ -258,24 +333,27 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
     // altar_categories has no deleted_at column; export all rows
     data.altarCategories = await db.select<Row[]>(`SELECT * FROM altar_categories`);
     // Only export items and placements that belong to the filtered altars
-    const altarIds = idsInClause(data.altars);
-    if (!altarIds) {
+    if (!data.altars.length) {
       data.altarItems = [];
       data.altarPlacements = [];
     } else {
+      data.altarPlacements = await selectWhereIn(
+        db,
+        (ph) => `SELECT * FROM altar_placements WHERE altar_id IN (${ph})`,
+        data.altars,
+      );
       // altar_items aren't directly tied to an altar (linked via placements)
-      const placedItemIds = altarIds
-        ? idsInClause(
-            await db.select<Row[]>(`SELECT DISTINCT item_id FROM altar_placements WHERE altar_id IN (${altarIds})`),
-            'item_id',
-          )
-        : '';
-      data.altarPlacements = altarIds
-        ? await db.select<Row[]>(`SELECT * FROM altar_placements WHERE altar_id IN (${altarIds})`)
-        : [];
-      data.altarItems = placedItemIds
-        ? await db.select<Row[]>(`SELECT * FROM altar_items WHERE id IN (${placedItemIds})`)
-        : [];
+      const placedItems = await selectWhereIn(
+        db,
+        (ph) => `SELECT DISTINCT item_id FROM altar_placements WHERE altar_id IN (${ph})`,
+        data.altars,
+      );
+      data.altarItems = await selectWhereIn(
+        db,
+        (ph) => `SELECT * FROM altar_items WHERE id IN (${ph})`,
+        placedItems,
+        'item_id',
+      );
     }
     for (const r of data.altars) {
       if (r.background_image_data && !r.background_image_data.startsWith('data:') && !r.background_image_data.startsWith('http')) {
@@ -303,20 +381,17 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
   // ── Tasks ────────────────────────────────────────────────────────────────
   if (options.includeTasks) {
     data.taskCategories = await db.select<Row[]>(
-      `SELECT * FROM task_categories WHERE deleted_at IS NULL`
+      `SELECT * FROM task_categories`
     );
     data.tasks = await db.select<Row[]>(
       `SELECT * FROM tasks WHERE 1=1 ${dateClause} ${deletedClause}`,
       dateParams,
     );
-    const taskIds = idsInClause(data.tasks ?? []);
-    if (taskIds) {
-      data.taskLinks = await db.select<Row[]>(
-        `SELECT * FROM task_links WHERE task_id IN (${taskIds})`
-      );
-    } else {
-      data.taskLinks = [];
-    }
+    data.taskLinks = await selectWhereIn(
+      db,
+      (ph) => `SELECT * FROM task_links WHERE task_id IN (${ph})`,
+      data.tasks ?? [],
+    );
   }
 
   // ── Embed images ─────────────────────────────────────────────────────────
@@ -331,7 +406,7 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
   }
 
   const backup: BackupFile = {
-    version: '1',
+    version: BACKUP_VERSION,
     type: 'backup',
     exportedAt: new Date().toISOString(),
     filters: options,
@@ -363,9 +438,10 @@ export async function openBackupFile(): Promise<{ path: string; backup: BackupFi
   const raw = await invoke<string>('read_file', { path: filePath });
   const backup = JSON.parse(raw) as BackupFile;
   if (backup.type !== 'backup') throw new Error('Not an Emerald backup file');
+  migrateBackupPayload(backup);
 
   // Only show categories that are actually used by entries in this backup
-  const usedWikiCatIds = new Set((backup.data.wikiArticles ?? []).map((r) => r.category as string));
+  const usedWikiCatIds = new Set((backup.data.wikiArticles ?? []).map((r) => r.category_id as string));
   const usedOpCatIds = new Set((backup.data.operations ?? []).map((r) => r.category_id as string));
 
   const preview: BackupPreview = {
@@ -446,6 +522,31 @@ async function insertRows(
   }
 }
 
+/**
+ * `tasks.parent_task_id` zeigt auf dieselbe Tabelle. Steht ein Kind in der
+ * Sicherung vor seinem Elternteil, schlägt der Foreign Key beim INSERT fehl.
+ * Deshalb erst ohne Elternbezug einfügen und ihn danach nachtragen — dann
+ * existieren garantiert alle Zeilen.
+ */
+async function insertTasks(
+  db: Awaited<ReturnType<typeof getDb>>,
+  rows: Row[],
+): Promise<void> {
+  if (!rows.length) return;
+  const parents = rows
+    .filter((r) => r.parent_task_id)
+    .map((r) => [String(r.id), String(r.parent_task_id)] as const);
+
+  await insertRows(db, 'tasks', rows.map((r) => ({ ...r, parent_task_id: null })));
+
+  for (const [id, parentId] of parents) {
+    await db.execute(
+      'UPDATE tasks SET parent_task_id=$1 WHERE id=$2 AND EXISTS (SELECT 1 FROM tasks WHERE id=$1)',
+      [parentId, id],
+    );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Replace import
 // ─────────────────────────────────────────────────────────────────────────────
@@ -483,7 +584,7 @@ function applyCategoryFilters(d: BackupFile['data'], filters: ImportCategoryFilt
   if (!filters.excludedWikiCategoryIds.size && !filters.excludedOpCategoryIds.size) return d;
 
   const filteredWiki = filters.excludedWikiCategoryIds.size
-    ? (d.wikiArticles ?? []).filter((r) => !filters.excludedWikiCategoryIds.has(r.category as string))
+    ? (d.wikiArticles ?? []).filter((r) => !filters.excludedWikiCategoryIds.has(r.category_id as string))
     : d.wikiArticles;
   const filteredOps = filters.excludedOpCategoryIds.size
     ? (d.operations ?? []).filter((r) => !filters.excludedOpCategoryIds.has(r.category_id as string))
@@ -506,9 +607,70 @@ function applyCategoryFilters(d: BackupFile['data'], filters: ImportCategoryFilt
   };
 }
 
+/**
+ * Prüft, ob jede Kategorie-Referenz der Nutzlast auflösbar ist — entweder aus
+ * der Sicherung selbst oder aus dem Bestand des Ziel-Vaults.
+ *
+ * Muss **vor** dem ersten DELETE laufen. `doReplace` leert den Vault, bevor es
+ * einfügt, und eine Transaktion steht hier nicht zur Verfügung (siehe
+ * `normalizeSchema.ts`). Ohne diese Vorprüfung würde eine Sicherung mit einer
+ * unauflösbaren Kategorie erst beim INSERT am Foreign Key scheitern — mit
+ * bereits geleertem Vault und ohne Weg zurück.
+ */
+async function assertPayloadReferencesResolve(
+  db: Awaited<ReturnType<typeof getDb>>,
+  d: BackupFile['data'],
+  options: { keepsExistingRows?: boolean } = {},
+): Promise<void> {
+  // `survivesReplace` sagt, ob doReplace die Kategorien dieser Tabelle stehen
+  // lässt. Bei wiki und operations werden nur die selbst angelegten gelöscht
+  // (`WHERE is_builtin=0`), die eingebauten bleiben und duerfen deshalb als
+  // Ziel zaehlen. task_categories und altar_categories werden komplett geleert
+  // — was dort heute im Vault steht, ist nach dem DELETE weg.
+  const checks = [
+    ['wikiArticles', 'wikiCategories', 'wiki_categories', 'Wiki-Artikel', 'is_builtin=1'],
+    ['operations', 'operationCategories', 'operation_categories', 'Operationen', 'is_builtin=1'],
+    ['tasks', 'taskCategories', 'task_categories', 'Aufgaben', null],
+    ['altarItems', 'altarCategories', 'altar_categories', 'Altar-Objekte', null],
+  ] as const;
+
+  for (const [rowsKey, catsKey, table, label, survivesReplace] of checks) {
+    const rows = d[rowsKey] ?? [];
+    if (!rows.length) continue;
+
+    const known = new Set((d[catsKey] ?? []).map((c) => String(c.id)));
+    if (options.keepsExistingRows) {
+      for (const row of await db.select<Row[]>(`SELECT id FROM ${table}`)) {
+        known.add(String(row.id));
+      }
+    } else if (survivesReplace) {
+      for (const row of await db.select<Row[]>(
+        `SELECT id FROM ${table} WHERE ${survivesReplace}`
+      )) {
+        known.add(String(row.id));
+      }
+    }
+
+    const missing = new Set<string>();
+    for (const row of rows) {
+      const id = row.category_id == null ? '' : String(row.category_id);
+      if (!known.has(id)) missing.add(id || '(leer)');
+    }
+    if (missing.size) {
+      throw new Error(
+        `Die Sicherung verweist bei ${label} auf Kategorien, die weder in der ` +
+          `Datei noch in diesem Vault existieren: ${[...missing].join(', ')}. ` +
+          'Der Import wurde abgebrochen, bevor etwas geändert wurde.'
+      );
+    }
+  }
+}
+
 async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile, filters: ImportCategoryFilters): Promise<void> {
   const pathMap = await restoreImages(backup);
   const d = applyCategoryFilters(backup.data, filters);
+
+  await assertPayloadReferencesResolve(db, d);
 
   // Remap image paths
   const IMAGE_FIELDS_JOURNAL = ['content'];
@@ -579,7 +741,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   await insertRows(db, 'altar_items', altarItems);
   if (d.altarPlacements) await insertRows(db, 'altar_placements', d.altarPlacements);
   if (d.taskCategories) await insertRows(db, 'task_categories', d.taskCategories, true);
-  await insertRows(db, 'tasks', d.tasks ?? []);
+  await insertTasks(db, d.tasks ?? []);
   if (d.taskLinks) await insertRows(db, 'task_links', d.taskLinks);
   if (d.links) await insertRows(db, 'links', d.links, true);
 }
@@ -591,6 +753,12 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
 async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile, filters: ImportCategoryFilters): Promise<void> {
   const pathMap = await restoreImages(backup);
   const d = applyCategoryFilters(backup.data, filters);
+
+  // Merge loescht zwar nichts, bricht aber mitten im Einfuegen ab, wenn eine
+  // Kategorie fehlt — und lässt dann halb importierte Daten zurück. Hier
+  // zählt der Bestand des Vaults vollstaendig als Quelle, weil er erhalten
+  // bleibt.
+  await assertPayloadReferencesResolve(db, d, { keepsExistingRows: true });
 
   // Prefix = base36 encoding of current timestamp (8 chars, unique per merge)
   const prefix = Date.now().toString(36).slice(-8);
@@ -624,9 +792,36 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     }
   }
 
-  function remapEntry(row: Row, imagePaths: string[], idFields: string[], jsonIdFields: string[]): Row {
+  /**
+   * Seit v33 steht `entry_number` wirklich in der Datenbank, statt beim Lesen
+   * aus der ROWID erzeugt zu werden. Beim Merge muessen die Nummern deshalb
+   * hinter den Bestand geschoben werden — sonst zeigen zwei Eintraege dieselbe
+   * `#n`.
+   */
+  async function entryNumberOffset(table: string): Promise<number> {
+    const rows = await db.select<{ n: number }[]>(
+      `SELECT COALESCE(MAX(entry_number), 0) AS n FROM ${table}`
+    );
+    return rows[0]?.n ?? 0;
+  }
+  const offsets = {
+    journal_entries: await entryNumberOffset('journal_entries'),
+    wiki_articles: await entryNumberOffset('wiki_articles'),
+    operations: await entryNumberOffset('operations'),
+  };
+
+  function remapEntry(
+    row: Row,
+    imagePaths: string[],
+    idFields: string[],
+    jsonIdFields: string[],
+    entryNumberTable?: keyof typeof offsets,
+  ): Row {
     const out = remapRow(row, imagePaths, pathMap);
     out.id = pid(out.id as string);
+    if (entryNumberTable && out.entry_number != null) {
+      out.entry_number = Number(out.entry_number) + offsets[entryNumberTable];
+    }
     for (const f of idFields) {
       if (out[f] != null) out[f] = remapId(out[f]);
     }
@@ -637,16 +832,16 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   }
 
   const journalEntries = (d.journalEntries ?? []).map((r: Row) =>
-    remapEntry(r, ['content'], ['paradigm_id', 'bannung_type_wiki_id', 'meditation_type_wiki_id'], ['linked_operation_ids', 'linked_wiki_ids'])
+    remapEntry(r, ['content'], ['paradigm_id', 'bannung_type_wiki_id', 'meditation_type_wiki_id'], ['linked_operation_ids', 'linked_wiki_ids'], 'journal_entries')
   );
   const wikiArticles = (d.wikiArticles ?? []).map((r: Row) => {
-    const row = remapEntry(r, ['content', 'icon', 'cover_image'], [], []);
+    const row = remapEntry(r, ['content', 'icon', 'cover_image'], [], [], 'wiki_articles');
     // slug has a UNIQUE constraint — prefix it to avoid collisions on merge
     if (typeof row.slug === 'string') row.slug = `${prefix}-${row.slug}`;
     return row;
   });
   const operations = (d.operations ?? []).map((r: Row) =>
-    remapEntry(r, ['content', 'icon', 'cover_image', 'drawing_data', 'thumbnail_data'], ['charging_technique_wiki_id'], [])
+    remapEntry(r, ['content', 'icon', 'cover_image', 'drawing_data', 'thumbnail_data'], ['charging_technique_wiki_id'], [], 'operations')
   );
   const routines = (d.routines ?? []).map((r: Row) =>
     remapEntry(r, [], [], ['operation_ids', 'wiki_ids'])
@@ -693,7 +888,7 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   await insertRows(db, 'altars', altars);
   await insertRows(db, 'altar_items', altarItems);
   await insertRows(db, 'altar_placements', altarPlacements);
-  await insertRows(db, 'tasks', tasks);
+  await insertTasks(db, tasks);
   await insertRows(db, 'task_links', taskLinks, true);
   await insertRows(db, 'links', links, true);
 }

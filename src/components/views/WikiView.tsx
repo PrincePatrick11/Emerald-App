@@ -45,8 +45,8 @@ export default function WikiView() {
   const [loadedArticleId, setLoadedArticleId] = useState<string | null>(null);
 
   // Always-fresh refs
-  const pendingRef = useRef({ title, content, category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined });
-  pendingRef.current = { title, content, category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined };
+  const pendingRef = useRef({ title, content, category_id: category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined });
+  pendingRef.current = { title, content, category_id: category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined };
   const isEditingRef = useRef(false);
   isEditingRef.current = isEditing;
   const articleIdRef = useRef<string | undefined>(undefined);
@@ -106,7 +106,7 @@ export default function WikiView() {
     if (article) {
       setTitle(article.title);
       setContent(article.content);
-      setCategory(article.category);
+      setCategory(article.category_id);
       setTags(article.tags ?? []);
       setCoverImage(article.cover_image ?? null);
       setIcon(article.icon ?? null);
@@ -120,11 +120,11 @@ export default function WikiView() {
   useEffect(() => {
     if (article) {
       setTags(article.tags ?? []);
-      setCategory(article.category);
+      setCategory(article.category_id);
       setCoverImage(article.cover_image ?? null);
       setIcon(article.icon ?? null);
     }
-  }, [article?.tags, article?.category, article?.cover_image, article?.icon]);
+  }, [article?.tags, article?.category_id, article?.cover_image, article?.icon]);
 
   // Apply tags from a dropped routine
   useEffect(() => {
@@ -144,7 +144,7 @@ export default function WikiView() {
   const handleDone = async () => {
     if (!article) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    await updateArticle(article.id, { title, content, category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined });
+    await updateArticle(article.id, { title, content, category_id: category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined });
     setActiveView({ type: 'wiki', id: article.id, mode: 'view' });
   };
 
@@ -153,7 +153,7 @@ export default function WikiView() {
     if (article) {
       setTitle(article.title);
       setContent(article.content);
-      setCategory(article.category);
+      setCategory(article.category_id);
       setTags(article.tags ?? []);
       setCoverImage(article.cover_image ?? null);
       setIcon(article.icon ?? null);
@@ -198,9 +198,9 @@ export default function WikiView() {
   const handleDuplicate = async (id: string) => {
     const src = articles.find((a) => a.id === id);
     if (!src) return;
-    const newArt = await createArticle(src.category);
+    const newArt = await createArticle(src.category_id);
     await updateArticle(newArt.id, {
-      title: src.title + ' (Copy)', content: src.content, category: src.category,
+      title: src.title + ' (Copy)', content: src.content, category_id: src.category_id,
       tags: src.tags, icon: src.icon ?? undefined, cover_image: src.cover_image ?? undefined,
     });
     setActiveView({ type: 'wiki', id: newArt.id, mode: 'view' });
@@ -242,12 +242,12 @@ export default function WikiView() {
 
     const catFiltered = filterCatIds.length === 0
       ? searchFiltered
-      : searchFiltered.filter((a) => filterCatIds.includes(a.category));
+      : searchFiltered.filter((a) => filterCatIds.includes(a.category_id));
 
     const filtered = catFiltered;
 
     const catChips = wikiCategories
-      .filter((c) => articles.some((a) => a.category === c.id))
+      .filter((c) => articles.some((a) => a.category_id === c.id))
       .map((c) => ({ value: c.id, label: c.is_builtin ? t(`wiki.categories.${c.id}`) : c.name, emoji: c.emoji }));
 
     const activeFilterCount = filterCatIds.length > 0 ? 1 : 0;
@@ -255,14 +255,14 @@ export default function WikiView() {
     const sortedArticles = [...filtered].sort((a, b) => {
       if (sort === 'alpha_asc') return a.title.localeCompare(b.title);
       if (sort === 'alpha_desc') return b.title.localeCompare(a.title);
-      if (sort === 'category') return (a.category ?? '').localeCompare(b.category ?? '');
+      if (sort === 'category') return (a.category_id ?? '').localeCompare(b.category_id ?? '');
       if (sort === 'date_asc') return a.created_at.localeCompare(b.created_at);
       return b.created_at.localeCompare(a.created_at); // date_desc
     });
 
     const groupedByCat = wikiCategories.map((cat) => ({
       cat,
-      arts: sortedArticles.filter((a) => a.category === cat.id),
+      arts: sortedArticles.filter((a) => a.category_id === cat.id),
     }));
 
     // For timeline (by month)
@@ -277,9 +277,9 @@ export default function WikiView() {
     })();
 
     const renderArticle = (a: typeof articles[0]) => {
-      const cat = catById[a.category];
+      const cat = catById[a.category_id];
       const iconEl = isImageIcon(a.icon) ? <img src={a.icon!} alt="" className="w-5 h-5 object-cover rounded inline" /> : (cat?.emoji ?? '📄');
-      const catLabel = cat ? (cat.is_builtin ? t(`wiki.categories.${cat.id}`) : cat.name) : a.category;
+      const catLabel = cat ? (cat.is_builtin ? t(`wiki.categories.${cat.id}`) : cat.name) : a.category_id;
       const dateStr = `${catLabel} · ${format(new Date(a.updated_at), 'MMM d, yyyy')}`;
       if (renamingId === a.id) return (
         <div key={a.id} className={view === 'cards' ? 'panel-interactive px-4 py-4 text-left' : 'panel-interactive w-full flex items-center gap-3 px-4 py-3'}>
@@ -503,7 +503,7 @@ export default function WikiView() {
     );
   }
 
-  const currentCat = wikiCategories.find((c) => c.id === (isEditing ? category : article.category));
+  const currentCat = wikiCategories.find((c) => c.id === (isEditing ? category : article.category_id));
 
   return (
     <div className="h-full flex flex-col">
@@ -516,9 +516,9 @@ export default function WikiView() {
           </button>
           {isImageIcon(article.icon)
             ? <img src={article.icon!} alt="" className="w-5 h-5 object-cover rounded" />
-            : <span>{currentCat?.emoji ?? getCategoryEmoji(article.category)}</span>
+            : <span>{currentCat?.emoji ?? getCategoryEmoji(article.category_id)}</span>
           }
-          <span className="capitalize">{currentCat?.name ?? article.category}</span>
+          <span className="capitalize">{currentCat?.name ?? article.category_id}</span>
           <span>·</span>
           <span>{format(new Date(article.updated_at), 'MMM d, yyyy')}</span>
           {isEditing && <span className="text-stone-700 italic ml-1">{t('editor.editing')}</span>}

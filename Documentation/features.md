@@ -24,7 +24,7 @@ The journal is the primary day-to-day writing space. Each entry has a title and 
 
 The wiki stores reference articles about anything relevant to your practice: rituals, deities, herbs, symbols, concepts, spells, tools, and more.
 
-**Categories.** Each article belongs to one category. Twelve built-in categories cover the most common types. You can add custom categories from the list view. Category sort groups articles by category with inline category management.
+**Categories.** Each article belongs to one category. Twelve built-in categories cover the most common types. You can add custom categories from the list view. Category sort groups articles by category with inline category management. Deleting a custom category moves its articles to the built-in **Other** category rather than losing the association; built-in categories, including Other, cannot be deleted.
 
 **Icons.** Articles can have a custom icon: either an emoji character or an image. Image icons render only when the icon value is a local-safe source (`/` path), a `data:image/...` URL, or a `blob:` URL. Remote `http://` and `https://` icon URLs are not rendered as images.
 
@@ -38,7 +38,7 @@ The wiki stores reference articles about anything relevant to your practice: rit
 
 Operations track magical workings: rituals in progress, ongoing practices, servitors, and sigils.
 
-**Categories.** Two built-in categories (Sigils and Servitors) and any number of custom categories you define. Categories have a name and an emoji.
+**Categories.** Three built-in categories (Sigils, Servitors and Other) and any number of custom categories you define. Categories have a name and an emoji. Deleting a custom category moves its operations to the built-in **Other** category rather than losing the association; built-in categories, including Other, cannot be deleted.
 
 **Active / Inactive.** Each operation can be marked active or inactive. The status badge in the operation's read view is clickable and saves immediately. The filter panel lets you filter the list to active or inactive operations.
 
@@ -79,7 +79,7 @@ Dashboard cards and list rows show a **thumbnail preview** of each altar. The th
 - Hover a category tab in the library strip to reveal a pencil icon that opens the inline rename/delete editor.
 - Drag a category tab left or right to change its position in the tab row. Tabs animate smoothly into their new slots and the order is saved immediately to the database.
 - Click the "+ Category" button — always visible to the right of the scrollable tab row — to add a new category; choose a name and pick an emoji from the palette.
-- Deleting a category does not reassign its items. Items whose category no longer matches any existing category become visible under an **Uncategorized** tab that appears automatically in the library strip. The tab disappears once no uncategorized items remain.
+- Deleting a category moves its items to the built-in **Other** category rather than leaving them unassigned. The default categories (Other among them) cannot themselves be deleted, since deleting one would leave its own items with nowhere to go. An **Uncategorized** tab can still appear in the library strip as a fallback for items whose category doesn't resolve to any existing one, but it is no longer how deleting a category behaves.
 - Renaming a category updates all items already assigned to it.
 - When there are more categories than can fit on screen, the tab row scrolls horizontally. The scrollbar is hidden; gradient fade overlays on the left and right edges indicate that more tabs are available in that direction.
 
@@ -198,7 +198,7 @@ Dropping a routine into an open entry appends its content as formatted paragraph
 
 The Tasks module provides a hierarchical task manager with categories, priorities, and cross-references to Journal entries, Wiki articles, and Operations.
 
-**Categories.** A default "Allgemein" category is seeded on first launch. You can create, rename, and delete custom categories from the list view via the pencil button on each category header. Deleting a category moves its tasks to an uncategorized section — they are not lost. Categories show an emoji icon, a name, and a task count badge.
+**Categories.** A default "Allgemein" category is seeded on first launch and cannot be deleted. You can create, rename, and delete custom categories from the list view via the pencil button on each category header. Deleting a category moves its tasks to "Allgemein" — they are not lost. Categories show an emoji icon, a name, and a task count badge.
 
 **Subtasks.** Every task can have nested subtasks to any depth. Subtasks are indented under their parent and can be expanded or collapsed. Marking a parent task as completed recursively marks all subtasks as completed (and vice versa). Deleting a parent task also deletes all its descendants.
 

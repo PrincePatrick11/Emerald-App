@@ -290,7 +290,7 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
   };
 
   const handleDuplicate = async (article: (typeof articles)[number]) => {
-    const newArt = await createArticle(article.category);
+    const newArt = await createArticle(article.category_id);
     await updateArticle(newArt.id, {
       title: article.title + ' (Copy)', content: article.content,
       tags: article.tags, icon: article.icon ?? undefined, cover_image: article.cover_image ?? undefined,
@@ -311,20 +311,20 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
     getId: (a) => a.id,
     getTitle: (a) => a.title,
     getDateStr: (a) => {
-      const cat = catById[a.category];
-      const catLabel = cat ? (cat.is_builtin ? t(`wiki.categories.${cat.id}`) : cat.name) : a.category;
+      const cat = catById[a.category_id];
+      const catLabel = cat ? (cat.is_builtin ? t(`wiki.categories.${cat.id}`) : cat.name) : a.category_id;
       return `${catLabel} · ${format(new Date(a.updated_at), 'MMM d, yyyy')}`;
     },
     getIcon: (a) => {
-      const cat = catById[a.category];
+      const cat = catById[a.category_id];
       return isImageIcon(a.icon)
         ? <img src={a.icon} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
-        : <span className="text-base leading-none flex-shrink-0">{cat?.emoji ?? getCategoryEmoji(a.category)}</span>;
+        : <span className="text-base leading-none flex-shrink-0">{cat?.emoji ?? getCategoryEmoji(a.category_id)}</span>;
     },
     isActive: (a) => activeView.id === a.id,
     onOpen: (a) => setActiveView({ type: 'wiki', id: a.id, mode: 'view' }),
     onOpenNewTab: (a) => openViewInNewTab({ type: 'wiki', id: a.id, mode: 'view' }),
-    onDragStart: (a) => setDragItem({ id: a.id, entryType: 'wiki', label: a.title, category: a.category }),
+    onDragStart: (a) => setDragItem({ id: a.id, entryType: 'wiki', label: a.title, category: a.category_id }),
     onRename: (a, title) => updateArticle(a.id, { title }),
     contextMenuActions: (a, startRename) => [
       { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'wiki', id: a.id, mode: 'view' }) },

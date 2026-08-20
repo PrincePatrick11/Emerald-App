@@ -87,8 +87,8 @@ function resolveInternalLinkIcons(html: string): string {
         if (article.icon?.startsWith('data:')) {
           icon = article.icon;
         } else {
-          const cat = wikiCategories.find(c => c.id === article.category);
-          icon = cat?.emoji ?? getCategoryEmoji(article.category);
+          const cat = wikiCategories.find(c => c.id === article.category_id);
+          icon = cat?.emoji ?? getCategoryEmoji(article.category_id);
         }
       }
     } else if (entryType === 'operation') {

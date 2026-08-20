@@ -8,7 +8,7 @@ export const AltarItemVisual = memo(function AltarItemVisual({
   size = 24,
   candleAnimate = false,
 }: {
-  item: { emoji: string; image_data?: string; category?: string };
+  item: { emoji: string; image_data?: string };
   size?: number;
   candleAnimate?: boolean;
 }) {

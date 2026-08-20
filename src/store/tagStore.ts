@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getDb } from '../lib/db';
+import { fromRow, jsonArray, type DbRow } from '../lib/row';
 import { useJournalStore } from './journalStore';
 import { useWikiStore } from './wikiStore';
 import { useOperationStore } from './operationStore';
@@ -35,10 +36,10 @@ export const useTagStore = create<TagState>((set, get) => ({
 
   fetchTags: async () => {
     const db = await getDb();
-    const rows = await db.select<Tag[]>(
+    const rows = await db.select<DbRow[]>(
       'SELECT * FROM tags WHERE deleted_at IS NULL ORDER BY name ASC'
     );
-    set({ tags: rows });
+    set({ tags: rows.map(fromRow.tag) });
   },
 
   // Returns existing tag or creates a new one
@@ -122,8 +123,7 @@ export const useTagStore = create<TagState>((set, get) => ({
     );
     if (!rows[0]) return;
     const { name, color, affected_ids } = rows[0];
-    let affected: AffectedEntry[] = [];
-    try { affected = JSON.parse(affected_ids); } catch { affected = []; }
+    const affected = jsonArray<AffectedEntry>(affected_ids);
 
     // Un-delete the tag
     await db.execute('UPDATE tags SET deleted_at=NULL, affected_ids=$1 WHERE id=$2', ['[]', id]);

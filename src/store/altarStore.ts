@@ -2,7 +2,9 @@ import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import { getDb } from '../lib/db';
 import { ALTAR_RATIOS, DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY, DEFAULT_OVERLAY_COLOR, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE, isRatioFormat, parseResolution } from '../lib/altarConstants';
-import { boolToInt, generateId, isValidHexColor, nowIso } from '../lib/helpers';
+import { generateId, isValidHexColor, nowIso } from '../lib/helpers';
+import { bool, fromRow, toInt, type DbRow } from '../lib/row';
+import { FALLBACK_CATEGORY, reassignCategoryContent } from '../lib/schema';
 import type { AltarCategory, AltarItem, AltarItemCategory, AltarPlacement, AltarRecord } from '../types';
 
 const DEFAULT_PLACEMENT_SIZE = 40;
@@ -28,48 +30,41 @@ function filterEachPreview(
 async function insertAltarRow(altar: AltarRecord): Promise<void> {
   const db = await getDb();
   await db.execute(
-    'INSERT INTO altars (id, title, intention, background_preset, background_image_data, background_overlay, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid, resolution, thumbnail_data, icon_data) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)',
-    [altar.id, altar.title, altar.intention, altar.background_preset, altar.background_image_data, altar.background_overlay, altar.created_at, altar.updated_at, boolToInt(altar.grid_enabled), altar.grid_size, altar.grid_opacity, altar.grid_color, boolToInt(altar.snap_to_grid), boolToInt(altar.rotation_snap_enabled), altar.rotation_snap_angle, boolToInt(altar.snap_scale_to_grid), altar.resolution, altar.thumbnail_data ?? null, altar.icon_data ?? null],
+    'INSERT INTO altars (id, title, intention, background_preset, background_image_data, background_overlay, background_overlay_color, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid, resolution, thumbnail_data, icon_data) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)',
+    [altar.id, altar.title, altar.intention, altar.background_preset, altar.background_image_data, altar.background_overlay, altar.background_overlay_color, altar.created_at, altar.updated_at, toInt(altar.grid_enabled), altar.grid_size, altar.grid_opacity, altar.grid_color, toInt(altar.snap_to_grid), toInt(altar.rotation_snap_enabled), altar.rotation_snap_angle, toInt(altar.snap_scale_to_grid), altar.resolution, altar.thumbnail_data ?? null, altar.icon_data ?? null],
   );
 }
 
 async function fetchPlacementsForAltar(altarId: string, items: AltarItem[]): Promise<AltarPlacement[]> {
   const db = await getDb();
-  const rows = await db.select<{
-    id: string;
-    altar_id: string;
-    item_id: string;
-    x: number;
-    y: number;
-    scale: number | null;
-    z_index: number | null;
-    width: number | null;
-    height: number | null;
-    rotation: number | null;
-    opacity: number | null;
-    locked: number | null;
-    hidden: number | null;
-  }[]>('SELECT * FROM altar_placements WHERE altar_id=$1', [altarId]);
+  const rows = await db.select<DbRow[]>(
+    'SELECT * FROM altar_placements WHERE altar_id=$1',
+    [altarId]
+  );
 
+  // name, emoji, category_id und image_data sind keine Spalten von
+  // altar_placements — sie stammen aus dem zugehörigen altar_items-Eintrag.
+  // Die Spalte `scale`, aus der frühere Versionen eine Ersatzgröße abgeleitet
+  // haben, ist mit Migration v33 entfallen: width und height sind seitdem
+  // NOT NULL und tragen ihren eigenen Default.
   return rows.map((r) => {
     const item = items.find((i) => i.id === r.item_id);
-    const legacySize = Math.max(4, Math.min(24, (r.scale ?? 1) * 8));
     return {
-      id: r.id,
-      altar_id: r.altar_id,
-      item_id: r.item_id,
+      id: String(r.id),
+      altar_id: String(r.altar_id),
+      item_id: String(r.item_id),
       name: item?.name ?? '?',
       emoji: item?.emoji ?? '✨',
-      category: item?.category ?? 'other',
-      x: r.x,
-      y: r.y,
-      z_index: r.z_index ?? 0,
-      width: r.width ?? legacySize,
-      height: r.height ?? legacySize,
-      rotation: r.rotation ?? 0,
-      opacity: r.opacity ?? 1,
-      locked: Boolean(r.locked ?? 0),
-      hidden: Boolean(r.hidden ?? 0),
+      category_id: item?.category_id ?? 'other',
+      x: Number(r.x),
+      y: Number(r.y),
+      z_index: Number(r.z_index),
+      width: Number(r.width),
+      height: Number(r.height),
+      rotation: Number(r.rotation),
+      opacity: Number(r.opacity),
+      locked: bool(r.locked),
+      hidden: bool(r.hidden),
       image_data: item?.image_data,
     };
   });
@@ -121,7 +116,7 @@ interface AltarState {
   fetchCategories: () => Promise<void>;
   addCategory: (name: string, emoji: string) => Promise<AltarCategory>;
   updateCategory: (id: string, name: string, emoji: string) => Promise<void>;
-  deleteCategory: (id: string) => Promise<void>;
+  deleteCategory: (id: string) => Promise<boolean>;
   reorderCategories: (ids: string[]) => Promise<void>;
   setActiveAltar: (id: string) => Promise<void>;
   clearActiveAltar: () => void;
@@ -133,7 +128,7 @@ interface AltarState {
   bumpAltarUpdatedAt: (id: string) => Promise<void>;
   deleteAltar: (id: string) => Promise<void>;
 
-  addItem: (name: string, emoji: string, category: AltarItemCategory, note?: string, imageData?: string) => Promise<AltarItem>;
+  addItem: (name: string, emoji: string, categoryId: AltarItemCategory, note?: string, imageData?: string) => Promise<AltarItem>;
   updateItem: (id: string, patch: Partial<Omit<AltarItem, 'id'>>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   placeItem: (item: AltarItem, x: number, y: number) => Promise<void>;
@@ -164,17 +159,17 @@ export const useAltarStore = create<AltarState>((set, get) => ({
 
   fetchCategories: async () => {
     const db = await getDb();
-    const rows = await db.select<AltarCategory[]>('SELECT id, name, emoji FROM altar_categories ORDER BY sort_order ASC, created_at ASC, name ASC');
-    set({ categories: rows });
+    const rows = await db.select<DbRow[]>('SELECT * FROM altar_categories ORDER BY sort_order ASC, created_at ASC, name ASC');
+    set({ categories: rows.map(fromRow.altarCategory) });
   },
 
   addCategory: async (name, emoji) => {
     const db = await getDb();
     const existing = get().categories.find((c) => c.name.toLowerCase() === name.toLowerCase());
     if (existing) throw new Error(`Category "${name}" already exists`);
-    const cat: AltarCategory = { id: generateId(), name, emoji };
     const maxRow = await db.select<{ m: number }[]>('SELECT COALESCE(MAX(sort_order), -1) as m FROM altar_categories');
     const sortOrder = (maxRow[0]?.m ?? -1) + 1;
+    const cat: AltarCategory = { id: generateId(), name, emoji, sort_order: sortOrder };
     await db.execute(
       'INSERT INTO altar_categories (id, name, emoji, created_at, sort_order) VALUES ($1,$2,$3,$4,$5)',
       [cat.id, cat.name, cat.emoji, nowIso(), sortOrder]
@@ -205,35 +200,36 @@ export const useAltarStore = create<AltarState>((set, get) => ({
 
   updateCategory: async (id, name, emoji) => {
     const db = await getDb();
-    const old = get().categories.find((c) => c.id === id);
     const conflict = get().categories.find((c) => c.id !== id && c.name.toLowerCase() === name.toLowerCase());
     if (conflict) throw new Error(`Category "${name}" already exists`);
     await db.execute('UPDATE altar_categories SET name=$1, emoji=$2 WHERE id=$3', [name, emoji, id]);
-    if (old && old.name !== name) {
-      // Update all items that referenced the old category name
-      await db.execute('UPDATE altar_items SET category=$1 WHERE category=$2', [name, old.name]);
-      set((s) => ({
-        items: s.items.map((i) => i.category === old.name ? { ...i, category: name } : i),
-        placements: s.placements.map((p) => p.category === old.name ? { ...p, category: name } : p),
-        previewPlacements: mapEachPreview(s.previewPlacements, (p) => p.category === old.name ? { ...p, category: name } : p),
-      }));
-    }
+    // Früher musste ein Umbenennen über altar_items kaskadieren, weil dort der
+    // Kategorie-*Name* stand. Seit v33 steht dort die ID, die sich nicht ändert.
     set((s) => ({ categories: s.categories.map((c) => c.id === id ? { ...c, name, emoji } : c) }));
   },
 
   deleteCategory: async (id) => {
     const db = await getDb();
     const cat = get().categories.find((c) => c.id === id);
-    if (!cat) return;
+    if (!cat) return false;
+    // Ziel des Umhängens — siehe taskStore.deleteCategory.
+    if (id === FALLBACK_CATEGORY.altar_items) return false;
+    await reassignCategoryContent(db, 'altar_items', id);
     await db.execute('DELETE FROM altar_categories WHERE id=$1', [id]);
-    set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }));
+    set((s) => ({
+      categories: s.categories.filter((c) => c.id !== id),
+      items: s.items.map((i) => (i.category_id === id ? { ...i, category_id: 'other' } : i)),
+    }));
+    return true;
   },
 
   fetchAltars: async () => {
     await get().fetchCategories();
     const db = await getDb();
-    const items = await db.select<AltarItem[]>('SELECT * FROM altar_items ORDER BY name ASC');
-    const altars = (await db.select<AltarRecord[]>('SELECT * FROM altars ORDER BY updated_at DESC, created_at DESC')).map(normalizeAltar);
+    const itemRows = await db.select<DbRow[]>('SELECT * FROM altar_items ORDER BY name ASC');
+    const items = itemRows.map(fromRow.altarItem);
+    const altarRows = await db.select<DbRow[]>('SELECT * FROM altars ORDER BY updated_at DESC, created_at DESC');
+    const altars = altarRows.map(fromRow.altar).map(normalizeAltar);
     for (const altar of altars) {
       if (!altar.background_image_data?.startsWith('data:')) continue;
       try {
@@ -412,7 +408,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     };
     await db.execute(
       'UPDATE altars SET grid_enabled=$1, grid_size=$2, grid_opacity=$3, grid_color=$4, snap_to_grid=$5, rotation_snap_enabled=$6, rotation_snap_angle=$7, snap_scale_to_grid=$8, updated_at=$9 WHERE id=$10',
-      [boolToInt(next.grid_enabled), next.grid_size, next.grid_opacity, next.grid_color, boolToInt(next.snap_to_grid), boolToInt(next.rotation_snap_enabled), next.rotation_snap_angle, boolToInt(next.snap_scale_to_grid), next.updated_at, id]
+      [toInt(next.grid_enabled), next.grid_size, next.grid_opacity, next.grid_color, toInt(next.snap_to_grid), toInt(next.rotation_snap_enabled), next.rotation_snap_angle, toInt(next.snap_scale_to_grid), next.updated_at, id]
     );
     set((s) => ({
       altars: s.altars.map((entry) => (entry.id === id ? next : entry)).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
@@ -470,12 +466,12 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     });
   },
 
-  addItem: async (name, emoji, category, note = '', imageData) => {
+  addItem: async (name, emoji, categoryId, note = '', imageData) => {
     const db = await getDb();
-    const item: AltarItem = { id: generateId(), name, emoji, category, note, image_data: imageData };
+    const item: AltarItem = { id: generateId(), name, emoji, category_id: categoryId, note, image_data: imageData };
     await db.execute(
-      'INSERT INTO altar_items (id, name, emoji, category, note, image_data, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-      [item.id, item.name, item.emoji, item.category, item.note, item.image_data ?? null, nowIso()]
+      'INSERT INTO altar_items (id, name, emoji, category_id, note, image_data, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+      [item.id, item.name, item.emoji, item.category_id, item.note, item.image_data ?? null, nowIso()]
     );
     set((s) => ({ items: [...s.items, item].sort((a, b) => a.name.localeCompare(b.name)) }));
     return item;
@@ -487,13 +483,13 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     if (!item) return;
     const updated = { ...item, ...patch };
     await db.execute(
-      'UPDATE altar_items SET name=$1, emoji=$2, category=$3, note=$4, image_data=$5 WHERE id=$6',
-      [updated.name, updated.emoji, updated.category, updated.note, updated.image_data ?? null, id]
+      'UPDATE altar_items SET name=$1, emoji=$2, category_id=$3, note=$4, image_data=$5 WHERE id=$6',
+      [updated.name, updated.emoji, updated.category_id, updated.note, updated.image_data ?? null, id]
     );
     set((s) => ({
       items: s.items.map((i) => (i.id === id ? updated : i)).sort((a, b) => a.name.localeCompare(b.name)),
-      placements: s.placements.map((p) => (p.item_id === id ? { ...p, name: updated.name, emoji: updated.emoji, category: updated.category, image_data: updated.image_data } : p)),
-      previewPlacements: mapEachPreview(s.previewPlacements, (p) => p.item_id === id ? { ...p, name: updated.name, emoji: updated.emoji, category: updated.category, image_data: updated.image_data } : p),
+      placements: s.placements.map((p) => (p.item_id === id ? { ...p, name: updated.name, emoji: updated.emoji, category_id: updated.category_id, image_data: updated.image_data } : p)),
+      previewPlacements: mapEachPreview(s.previewPlacements, (p) => p.item_id === id ? { ...p, name: updated.name, emoji: updated.emoji, category_id: updated.category_id, image_data: updated.image_data } : p),
     }));
   },
 
@@ -525,7 +521,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       item_id: item.id,
       name: item.name,
       emoji: item.emoji,
-      category: item.category,
+      category_id: item.category_id,
       x,
       y,
       z_index: nextZ,
@@ -585,7 +581,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const next = { ...current, ...safePatch };
     await db.execute(
       'UPDATE altar_placements SET x=$1, y=$2, z_index=$3, width=$4, height=$5, rotation=$6, opacity=$7, locked=$8, hidden=$9 WHERE id=$10',
-      [next.x, next.y, next.z_index, next.width, next.height, next.rotation, next.opacity, next.locked ? 1 : 0, next.hidden ? 1 : 0, id]
+      [next.x, next.y, next.z_index, next.width, next.height, next.rotation, next.opacity, toInt(next.locked), toInt(next.hidden), id]
     );
     set((s) => ({
       placements: s.placements.map((p) => (p.id === id ? { ...p, ...safePatch } : p)),
@@ -697,7 +693,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       item_id: source.item_id,
       name: source.name,
       emoji: source.emoji,
-      category: source.category,
+      category_id: source.category_id,
       x: newX,
       y: newY,
       z_index: nextZ,

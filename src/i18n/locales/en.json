@@ -79,7 +79,8 @@
     "noOperation": "Open an operation to see its properties.",
     "categories": {
       "sigils": "Sigils",
-      "servitors": "Servitors"
+      "servitors": "Servitors",
+      "other": "Other"
     }
   },
   "altar": {

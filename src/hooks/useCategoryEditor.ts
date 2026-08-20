@@ -12,7 +12,8 @@ interface CategoryLike {
 interface CategoryEditorStore<C extends CategoryLike> {
   addCategory: (name: string, emoji: string) => Promise<C>;
   updateCategory: (id: string, name: string, emoji: string) => Promise<void>;
-  deleteCategory: (id: string) => Promise<void>;
+  /** `false`, wenn die Kategorie nicht gelöscht werden darf. */
+  deleteCategory: (id: string) => Promise<boolean | void>;
   restoreCategory: (id: string) => Promise<void>;
 }
 
@@ -71,7 +72,10 @@ export function useCategoryEditor<C extends CategoryLike>(
       return;
     }
     setConfirmDeleteCatId(null);
-    await store.deleteCategory(id);
+    // Eingebaute und Default-Kategorien lehnt der Store ab. Ohne diese Prüfung
+    // meldete die Oberfläche „Kategorie gelöscht" samt Rückgängig-Knopf für
+    // etwas, das nie passiert ist.
+    if ((await store.deleteCategory(id)) === false) return;
     pushUndo({
       id: generateId(),
       description: t('undo.categoryDeleted'),

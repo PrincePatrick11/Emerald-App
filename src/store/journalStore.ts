@@ -1,8 +1,10 @@
 import { create } from 'zustand';
-import { getDb } from '../lib/db';
+import type Database from '@tauri-apps/plugin-sql';
+import { getDb, nextEntryNumber } from '../lib/db';
 import { getMoonPhase } from '../lib/moonPhase';
 import { syncLinks } from '../lib/links';
-import { generateId, nowIso, safeParseArray } from '../lib/helpers';
+import { generateId, nowIso } from '../lib/helpers';
+import { fromRow, toInt, type DbRow } from '../lib/row';
 import type { JournalEntry } from '../types';
 
 interface JournalState {
@@ -18,6 +20,18 @@ interface JournalState {
   getEntry: (id: string) => JournalEntry | undefined;
 }
 
+/**
+ * Die Liste der sichtbaren Eintraege. Fetch und Restore haben diese Abfrage
+ * früher jeweils mit eigener Mapping-Logik dupliziert — mit unterschiedlichem
+ * Verhalten bei kaputtem JSON.
+ */
+async function selectAllEntries(db: Database): Promise<JournalEntry[]> {
+  const rows = await db.select<DbRow[]>(
+    'SELECT * FROM journal_entries WHERE deleted_at IS NULL ORDER BY created_at DESC'
+  );
+  return rows.map(fromRow.journalEntry);
+}
+
 export const useJournalStore = create<JournalState>((set, get) => ({
   entries: [],
   loading: false,
@@ -26,21 +40,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     set({ loading: true });
     try {
       const db = await getDb();
-      const rows = await db.select<JournalEntry[]>(
-        'SELECT *, ROWID as entry_number FROM journal_entries WHERE deleted_at IS NULL ORDER BY created_at DESC'
-      );
-      const entries = rows.map((r) => ({
-        ...r,
-        tags: safeParseArray<string>(r.tags),
-        linked_operation_ids: safeParseArray<string>(r.linked_operation_ids),
-        linked_wiki_ids: safeParseArray<string>(r.linked_wiki_ids),
-        is_bannung: (r.is_bannung as unknown as number) !== 0,
-        bannung_type_wiki_id: r.bannung_type_wiki_id ?? null,
-        is_meditation: (r.is_meditation as unknown as number) !== 0,
-        meditation_duration: r.meditation_duration ?? null,
-        meditation_type_wiki_id: r.meditation_type_wiki_id ?? null,
-      }));
-      set({ entries });
+      set({ entries: await selectAllEntries(db) });
     } finally {
       set({ loading: false });
     }
@@ -50,7 +50,9 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     const db = await getDb();
     const now = nowIso();
     const moonPhase = getMoonPhase();
+    const entryNumber = await nextEntryNumber(db, 'journal_entries');
     const entry: JournalEntry = {
+      entry_number: entryNumber,
       id: generateId(),
       title: 'Untitled Entry',
       content: '',
@@ -70,8 +72,8 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       deleted_at: null,
     };
     await db.execute(
-      `INSERT INTO journal_entries (id, title, content, created_at, updated_at, tags, moon_phase, mood)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      `INSERT INTO journal_entries (id, title, content, created_at, updated_at, tags, moon_phase, mood, entry_number)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         entry.id,
         entry.title,
@@ -81,6 +83,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
         JSON.stringify(entry.tags),
         entry.moon_phase,
         entry.mood,
+        entryNumber,
       ]
     );
     set((s) => ({ entries: [entry, ...s.entries] }));
@@ -110,9 +113,9 @@ export const useJournalStore = create<JournalState>((set, get) => ({
         merged.paradigm_id ?? null,
         JSON.stringify(merged.linked_operation_ids ?? []),
         JSON.stringify(merged.linked_wiki_ids ?? []),
-        merged.is_bannung ? 1 : 0,
+        toInt(merged.is_bannung),
         merged.bannung_type_wiki_id ?? null,
-        merged.is_meditation ? 1 : 0,
+        toInt(merged.is_meditation),
         merged.meditation_duration ?? null,
         merged.meditation_type_wiki_id ?? null,
         id,
@@ -149,22 +152,8 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       'UPDATE journal_entries SET deleted_at=NULL WHERE id=$1',
       [id]
     );
-    // Re-fetch so the entry appears in the list again
-    const rows = await db.select<JournalEntry[]>(
-      'SELECT *, ROWID as entry_number FROM journal_entries WHERE deleted_at IS NULL ORDER BY created_at DESC'
-    );
-    const entries = rows.map((r) => ({
-      ...r,
-      tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : r.tags,
-      linked_operation_ids: typeof r.linked_operation_ids === 'string' ? JSON.parse(r.linked_operation_ids) : (r.linked_operation_ids ?? []),
-      linked_wiki_ids: typeof r.linked_wiki_ids === 'string' ? JSON.parse(r.linked_wiki_ids) : (r.linked_wiki_ids ?? []),
-      is_bannung: (r.is_bannung as unknown as number) !== 0,
-      bannung_type_wiki_id: r.bannung_type_wiki_id ?? null,
-      is_meditation: (r.is_meditation as unknown as number) !== 0,
-      meditation_duration: r.meditation_duration ?? null,
-      meditation_type_wiki_id: r.meditation_type_wiki_id ?? null,
-    }));
-    set({ entries });
+    // Neu laden, damit der Eintrag wieder in der Liste auftaucht
+    set({ entries: await selectAllEntries(db) });
   },
 
   permanentlyDeleteEntry: async (id) => {

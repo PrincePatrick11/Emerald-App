@@ -26,7 +26,7 @@ export default function OperationPropertiesPanel() {
   const sigilOperation = op?.category_id === 'sigils' ? op : null;
 
   const sigilChargingArticles = useMemo(
-    () => articles.filter((a) => a.category === 'sigil_charging' && !a.deleted_at),
+    () => articles.filter((a) => a.category_id === 'sigil_charging' && !a.deleted_at),
     [articles]
   );
 

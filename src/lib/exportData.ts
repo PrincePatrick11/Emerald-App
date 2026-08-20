@@ -39,10 +39,10 @@ export interface ExportData {
   tagNames?: string[];
 }
 
-function wikiIcon(article: { icon?: string; category: string }, cats: WikiCategoryDef[]): string {
+function wikiIcon(article: { icon?: string; category_id: string }, cats: WikiCategoryDef[]): string {
   if (article.icon?.startsWith('data:')) return article.icon;
-  const cat = cats.find(c => c.id === article.category);
-  return cat?.emoji ?? getCategoryEmoji(article.category);
+  const cat = cats.find(c => c.id === article.category_id);
+  return cat?.emoji ?? getCategoryEmoji(article.category_id);
 }
 
 function moonLabel(phase: string): string {
@@ -77,10 +77,10 @@ export async function collectExportData(): Promise<ExportData | null> {
 
     const linkedWiki = (entry.linked_wiki_ids ?? [])
       .map(id => articles.find(a => a.id === id)).filter(Boolean)
-      .filter(a => a!.category !== 'paradigm')
+      .filter(a => a!.category_id !== 'paradigm')
       .map(a => {
-        const cat = wikiCategories.find(c => c.id === a!.category);
-        const fallback = cat?.emoji ?? getCategoryEmoji(a!.category);
+        const cat = wikiCategories.find(c => c.id === a!.category_id);
+        const fallback = cat?.emoji ?? getCategoryEmoji(a!.category_id);
         return { id: a!.id, label: a!.title, icon: wikiIcon(a!, wikiCategories), fallbackIcon: fallback };
       });
 
@@ -97,8 +97,8 @@ export async function collectExportData(): Promise<ExportData | null> {
       createdAt: entry.created_at,
       moonPhase,
       paradigma: paradigmaArt ? (() => {
-        const cat = wikiCategories.find(c => c.id === paradigmaArt.category);
-        const fallback = cat?.emoji ?? getCategoryEmoji(paradigmaArt.category);
+        const cat = wikiCategories.find(c => c.id === paradigmaArt.category_id);
+        const fallback = cat?.emoji ?? getCategoryEmoji(paradigmaArt.category_id);
         return { label: paradigmaArt.title, icon: wikiIcon(paradigmaArt, wikiCategories), fallbackIcon: fallback };
       })() : undefined,
       bannung: entry.is_bannung ? {
@@ -123,7 +123,7 @@ export async function collectExportData(): Promise<ExportData | null> {
     const article = articles.find(a => a.id === view.id);
     if (!article) return null;
 
-    const cat = wikiCategories.find(c => c.id === article.category);
+    const cat = wikiCategories.find(c => c.id === article.category_id);
 
     return {
       type: 'wiki',
@@ -131,7 +131,7 @@ export async function collectExportData(): Promise<ExportData | null> {
       entryNumber: article.entry_number,
       content: article.content,
       createdAt: article.created_at,
-      wikiCategory: { label: cat?.name ?? article.category, icon: cat?.emoji ?? getCategoryEmoji(article.category) },
+      wikiCategory: { label: cat?.name ?? article.category_id, icon: cat?.emoji ?? getCategoryEmoji(article.category_id) },
       entryIcon: article.icon || undefined,
       tagNames: (article.tags ?? []) as string[],
     };

@@ -29,18 +29,18 @@ export default function LinkedWikiInput({
 
   const filtered = useMemo(() =>
     articles
-      .filter((a) => !ids.includes(a.id) && !a.deleted_at && a.category !== 'paradigm' &&
+      .filter((a) => !ids.includes(a.id) && !a.deleted_at && a.category_id !== 'paradigm' &&
         a.title.toLowerCase().includes(query.toLowerCase()))
       .slice(0, 8),
     [articles, ids, query]);
 
   const selectedArticles = useMemo(() =>
-    ids.map((id) => articles.find((a) => a.id === id)).filter((a) => a && a.category !== 'paradigm') as typeof articles,
+    ids.map((id) => articles.find((a) => a.id === id)).filter((a) => a && a.category_id !== 'paradigm') as typeof articles,
     [ids, articles]);
 
   const articleIcon = (article: typeof articles[number]) => {
-    const cat = wikiCategories.find((c) => c.id === article.category);
-    return cat?.emoji ?? getCategoryEmoji(article.category);
+    const cat = wikiCategories.find((c) => c.id === article.category_id);
+    return cat?.emoji ?? getCategoryEmoji(article.category_id);
   };
 
   return (

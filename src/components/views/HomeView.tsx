@@ -178,7 +178,7 @@ export default function HomeView() {
     } else if (target.kind === 'wiki') {
       const src = articles.find((a) => a.id === target.id);
       if (!src) return;
-      const na = await createArticle(src.category as never);
+      const na = await createArticle(src.category_id as never);
       await updateArticle(na.id, { title: src.title + ' (Copy)', content: src.content, tags: src.tags });
       setActiveView({ type: 'wiki', id: na.id, mode: 'view' });
     } else if (target.kind === 'operation') {
@@ -407,9 +407,9 @@ export default function HomeView() {
           ) : homeWikiPrefs.view === 'list' ? (
             <div className="space-y-2">
               {wikiItems.map((article) => {
-                const cat = wikiCategories.find((c) => c.id === article.category);
-                const icon = cat?.emoji ?? getCategoryEmoji(article.category);
-                const catLabel = cat ? (cat.is_builtin ? t(`wiki.categories.${cat.id}`) : cat.name) : article.category;
+                const cat = wikiCategories.find((c) => c.id === article.category_id);
+                const icon = cat?.emoji ?? getCategoryEmoji(article.category_id);
+                const catLabel = cat ? (cat.is_builtin ? t(`wiki.categories.${cat.id}`) : cat.name) : article.category_id;
                 return (
                   <button
                     key={article.id}
@@ -438,9 +438,9 @@ export default function HomeView() {
           ) : (
             <div className="grid grid-cols-2 gap-2">
               {wikiItems.map((article) => {
-                const cat = wikiCategories.find((c) => c.id === article.category);
-                const icon = cat?.emoji ?? getCategoryEmoji(article.category);
-                const catLabel = cat ? (cat.is_builtin ? t(`wiki.categories.${cat.id}`) : cat.name) : article.category;
+                const cat = wikiCategories.find((c) => c.id === article.category_id);
+                const icon = cat?.emoji ?? getCategoryEmoji(article.category_id);
+                const catLabel = cat ? (cat.is_builtin ? t(`wiki.categories.${cat.id}`) : cat.name) : article.category_id;
                 return (
                   <button
                     key={article.id}

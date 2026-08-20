@@ -1,6 +1,8 @@
 import Database from '@tauri-apps/plugin-sql';
 import { invoke } from '@tauri-apps/api/core';
 import { getActiveDbName } from './vaultManager';
+import { BASELINE_VERSION, TABLE_DDL, createSchema, ddlIfNotExists, seedBuiltins } from './schema';
+import { normalizeSchema } from './normalizeSchema';
 
 // Per-vault DB cache: SQLite identifier → Database instance
 const _dbCache = new Map<string, Database>();
@@ -37,30 +39,71 @@ export async function getDb(): Promise<Database> {
 type Migration = {
   version: number;
   name: string;
+  /**
+   * Eingefrorene Historie: v1–v32, so wie bestehende Datenbanken sie gelaufen
+   * sind. Nur bei diesen werden „already applied"-Fehler geschluckt (siehe
+   * isAlreadyAppliedError). Neue Migrationen ab v33 tragen das Flag nicht und
+   * schlagen laut fehl, wenn etwas schiefgeht.
+   */
+  legacy?: true;
   up: (db: Database) => Promise<void>;
 };
 
 /**
  * Whether an error from a migration's `up` indicates the schema change was
- * already applied by an older version of the app. Such errors are non-fatal:
- * we just mark the migration as applied and move on.
+ * already applied by an older version of the app.
+ *
+ * Gilt ausschließlich für `legacy`-Migrationen. Das Schlucken ist bequem, aber
+ * gefährlich: Es bricht die *gesamte* restliche Migration ab und stempelt sie
+ * trotzdem als angewendet. Genau daran ist v4 gescheitert — v1 legt `altars`
+ * bereits mit `background_preset` an, v4 fängt mit einem ALTER für dieselbe
+ * Spalte an, und alles danach (u. a. `altar_placements.altar_id` und das
+ * Default-Altar-Seeding) wurde nie ausgeführt. Die Notfall-Migrationen v30 und
+ * v31 existieren deshalb. Für neue Migrationen darf das nie wieder gelten.
  */
 function isAlreadyAppliedError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   return /duplicate column name|already exists|table .* already exists/i.test(msg);
 }
 
-async function runMigrations(db: Database): Promise<void> {
+/**
+ * Ist das eine unberührte Datei? Dann bekommt sie das Baseline-Schema statt 33
+ * Migrationsschritten. `schema_version` allein reicht als Kriterium nicht: Eine
+ * Datenbank aus der Zeit vor dem Migrationssystem hätte Tabellen, aber keine
+ * Versionstabelle — sie muss die Kette laufen.
+ */
+async function isEmptyDatabase(db: Database): Promise<boolean> {
+  const rows = await db.select<{ n: number }[]>(
+    "SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+  );
+  return (rows[0]?.n ?? 0) === 0;
+}
+
+export async function runMigrations(db: Database): Promise<void> {
   // Use DELETE journal mode — simpler than WAL, survives unclean shutdowns
   await db.execute('PRAGMA journal_mode = DELETE');
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS schema_version (
-      version INTEGER PRIMARY KEY,
-      name TEXT NOT NULL,
-      applied_at TEXT NOT NULL
-    )
-  `);
+  const latest = MIGRATIONS[MIGRATIONS.length - 1].version;
+  if (latest !== BASELINE_VERSION) {
+    throw new Error(
+      `[db] schema.ts steht auf BASELINE_VERSION ${BASELINE_VERSION}, die letzte Migration ist v${latest}. ` +
+        'Beide müssen zusammenpassen, sonst bekommen frische und migrierte Vaults unterschiedliche Schemata.'
+    );
+  }
+
+  // Frische Datei: Baseline direkt anlegen und die Kette überspringen.
+  if (await isEmptyDatabase(db)) {
+    await createSchema(db);
+    await seedBuiltins(db);
+    const now = new Date().toISOString();
+    await db.execute(
+      'INSERT INTO schema_version (version, name, applied_at) VALUES ($1, $2, $3)',
+      [BASELINE_VERSION, 'baseline', now]
+    );
+    return;
+  }
+
+  await db.execute(ddlIfNotExists(TABLE_DDL.schema_version));
 
   const versionRows = await db.select<{ version: number | null }[]>(
     'SELECT COALESCE(MAX(version), 0) AS version FROM schema_version'
@@ -72,7 +115,7 @@ async function runMigrations(db: Database): Promise<void> {
     try {
       await migration.up(db);
     } catch (err) {
-      if (!isAlreadyAppliedError(err)) throw err;
+      if (!migration.legacy || !isAlreadyAppliedError(err)) throw err;
       console.warn(
         `[db] Migration v${migration.version} (${migration.name}) had pre-existing schema, marking applied`
       );
@@ -85,22 +128,53 @@ async function runMigrations(db: Database): Promise<void> {
 }
 
 /**
- * Maintenance work that runs on every vault open. Intentionally separate from
- * the migration system — these are idempotent, time-dependent, and not part
- * of the schema's historical record.
+ * Tabellen, aus denen der 30-Tage-Purge endgültig löscht. Läuft bei jedem
+ * Öffnen eines Vaults, bewusst getrennt vom Migrationssystem — idempotent,
+ * zeitabhängig und kein Teil der Schema-Historie.
+ *
+ * Kategorietabellen stehen bewusst **nicht** hier. Eine Kategorie nach 30 Tagen
+ * hart zu löschen, während Artikel, Operationen oder Tasks noch darauf zeigen,
+ * hinterließ ins Leere zeigende `category_id`-Werte — still und unbemerkt. Seit
+ * v33 verhindert ein Foreign Key mit ON DELETE RESTRICT das ohnehin. Kategorien
+ * werden nur noch über den Papierkorb entfernt, und dort werden ihre Inhalte
+ * vorher auf die Default-Kategorie umgehängt (siehe `reassignCategoryContent`).
+ *
+ * Table names interpolated into SQL — must stay a hardcoded literal list.
  */
-// Table names interpolated into SQL — must stay a hardcoded literal list.
 const CLEANUP_TABLES = [
   'journal_entries',
   'wiki_articles',
   'tags',
   'operations',
-  'creations',
-  'wiki_categories',
-  'operation_categories',
   'tasks',
-  'task_categories',
 ] as const;
+
+/**
+ * Die nächste laufende Nummer für `journal_entries`, `wiki_articles` oder
+ * `operations`.
+ *
+ * Früher wurde `entry_number` gar nicht geschrieben — die Stores holten sich
+ * beim Lesen `SELECT *, ROWID as entry_number` und überschrieben damit die
+ * Spalte, die Migration v9 einmal befuellt hatte. Das ging so lange gut, bis
+ * ein Replace-Import die ROWIDs neu vergab und sich alle angezeigten Nummern
+ * verschoben. Jetzt wird die Nummer beim Anlegen vergeben und bleibt.
+ *
+ * Table name interpolated into SQL — nur mit literalen Namen aufrufen.
+ */
+export async function nextEntryNumber(
+  db: Database,
+  table: 'journal_entries' | 'wiki_articles' | 'operations'
+): Promise<number> {
+  const rows = await db.select<{ n: number }[]>(
+    `SELECT COALESCE(MAX(entry_number), 0) + 1 AS n FROM ${table}`
+  );
+  return rows[0]?.n ?? 1;
+}
+
+/** Alle IDs, auf die eine polymorphe Verknüpfung zeigen darf. */
+const CONTENT_IDS = `(SELECT id FROM journal_entries
+                      UNION ALL SELECT id FROM wiki_articles
+                      UNION ALL SELECT id FROM operations)`;
 
 async function runPeriodicCleanup(db: Database): Promise<void> {
   // Auto-purge trash items older than 30 days
@@ -111,11 +185,35 @@ async function runPeriodicCleanup(db: Database): Promise<void> {
       [cutoff]
     );
   }
+
+  await sweepDanglingLinks(db);
 }
 
-const MIGRATIONS: Migration[] = [
+/**
+ * Entfernt Verknüpfungen, deren Ziel nicht mehr existiert.
+ *
+ * `links` und `task_links.target_id` sind polymorph — das `*_type`-Feld
+ * entscheidet, welche Tabelle gemeint ist — und können deshalb keinen Foreign
+ * Key tragen. Es räumt hier also nichts von selbst auf, und jedes endgültige
+ * Löschen von Inhalten hinterlässt Waisen, wenn es nicht ausdrücklich passiert.
+ *
+ * Wird sowohl vom 30-Tage-Purge als auch vom Leeren des Papierkorbs benutzt,
+ * damit beide Wege dasselbe Ergebnis liefern.
+ */
+export async function sweepDanglingLinks(db: Database): Promise<void> {
+  const contentIds = `${CONTENT_IDS}`;
+  await db.execute(
+    `DELETE FROM links
+      WHERE source_id NOT IN ${contentIds}
+         OR target_id NOT IN ${contentIds}`
+  );
+  await db.execute(`DELETE FROM task_links WHERE target_id NOT IN ${contentIds}`);
+}
+
+export const MIGRATIONS: Migration[] = [
   {
     version: 1,
+    legacy: true,
     name: 'initial_schema',
     up: async (db) => {
       await db.execute(`
@@ -333,6 +431,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 2,
+    legacy: true,
     name: 'soft_delete_journal_wiki',
     up: async (db) => {
       await db.execute('ALTER TABLE journal_entries ADD COLUMN deleted_at TEXT');
@@ -341,6 +440,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 3,
+    legacy: true,
     name: 'altar_item_image_and_placement_columns',
     up: async (db) => {
       await db.execute('ALTER TABLE altar_items ADD COLUMN image_data TEXT');
@@ -356,6 +456,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 4,
+    legacy: true,
     name: 'altar_background_and_default_altar',
     up: async (db) => {
       await db.execute('ALTER TABLE altars ADD COLUMN background_preset TEXT NOT NULL DEFAULT \'midnight\'');
@@ -382,6 +483,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 5,
+    legacy: true,
     name: 'tags_soft_delete_and_affected_ids',
     up: async (db) => {
       await db.execute('ALTER TABLE tags ADD COLUMN deleted_at TEXT');
@@ -390,6 +492,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 6,
+    legacy: true,
     name: 'wiki_article_cover_and_icon',
     up: async (db) => {
       await db.execute('ALTER TABLE wiki_articles ADD COLUMN cover_image TEXT');
@@ -398,6 +501,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 7,
+    legacy: true,
     name: 'seed_builtin_op_categories',
     up: async (db) => {
       const catCount = await db.select<{ n: number }[]>(
@@ -417,6 +521,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 8,
+    legacy: true,
     name: 'op_categories_rewrite_to_fixed_ids',
     up: async (db) => {
       for (const [fixedId, sortOrder] of [['sigils', 0], ['servitors', 1]] as const) {
@@ -441,6 +546,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 9,
+    legacy: true,
     name: 'entry_number_and_creations_columns',
     up: async (db) => {
       // entry_number for disambiguation of same-name entries. Seeded from
@@ -467,6 +573,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 10,
+    legacy: true,
     name: 'operation_extra_columns',
     up: async (db) => {
       await db.execute('ALTER TABLE operations ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1');
@@ -484,6 +591,7 @@ const MIGRATIONS: Migration[] = [
     // is skipped, which is the established path for columns that later moved into the
     // initial schema. Nothing is lost either way — migration 32 drops the table.
     version: 11,
+    legacy: true,
     name: 'custom_properties_meta_and_type_rename',
     up: async (db) => {
       await db.execute('ALTER TABLE custom_properties ADD COLUMN meta TEXT');
@@ -494,6 +602,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 12,
+    legacy: true,
     name: 'wiki_categories_builtin_seed',
     up: async (db) => {
       const wikiCatCount = await db.select<{ n: number }[]>(
@@ -551,6 +660,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 13,
+    legacy: true,
     name: 'routines_linked_ids',
     up: async (db) => {
       await db.execute("ALTER TABLE routines ADD COLUMN operation_ids TEXT NOT NULL DEFAULT '[]'");
@@ -559,6 +669,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 14,
+    legacy: true,
     name: 'journal_entries_paradigm_and_links',
     up: async (db) => {
       await db.execute('ALTER TABLE journal_entries ADD COLUMN paradigm_id TEXT');
@@ -568,6 +679,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 15,
+    legacy: true,
     name: 'journal_entries_bannung_and_meditation',
     up: async (db) => {
       await db.execute('ALTER TABLE journal_entries ADD COLUMN is_bannung INTEGER NOT NULL DEFAULT 0');
@@ -579,6 +691,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 16,
+    legacy: true,
     name: 'categories_soft_delete',
     up: async (db) => {
       await db.execute('ALTER TABLE wiki_categories ADD COLUMN deleted_at TEXT');
@@ -587,6 +700,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 17,
+    legacy: true,
     name: 'seed_task_default_category',
     up: async (db) => {
       await db.execute(
@@ -597,6 +711,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 18,
+    legacy: true,
     name: 'altar_grid_options_per_altar',
     up: async (db) => {
       // Keep numeric defaults in sync with DEFAULT_GRID_* in altarConstants.ts
@@ -609,6 +724,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 19,
+    legacy: true,
     name: 'altar_rotation_snap_and_scale_to_grid',
     up: async (db) => {
       await db.execute("ALTER TABLE altars ADD COLUMN rotation_snap_enabled INTEGER NOT NULL DEFAULT 0");
@@ -620,6 +736,7 @@ const MIGRATIONS: Migration[] = [
     // aspect_ratio column is unused — ratio is always derived from resolution via parseResolution.
     // Kept for backwards compatibility with existing DBs; do not read or write this column.
     version: 20,
+    legacy: true,
     name: 'altar_aspect_ratio',
     up: async (db) => {
       await db.execute("ALTER TABLE altars ADD COLUMN aspect_ratio TEXT NOT NULL DEFAULT '16:9'");
@@ -627,6 +744,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 21,
+    legacy: true,
     name: 'altar_resolution',
     up: async (db) => {
       await db.execute("ALTER TABLE altars ADD COLUMN resolution TEXT NOT NULL DEFAULT '1920x1080'");
@@ -634,6 +752,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 22,
+    legacy: true,
     name: 'altar_categories_table',
     up: async (db) => {
       await db.execute(`
@@ -667,6 +786,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 23,
+    legacy: true,
     name: 'altar_categories_capitalize_and_fix_emojis',
     up: async (db) => {
       // Capitalize default category names and sync altar_items.category to match
@@ -697,6 +817,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 25,
+    legacy: true,
     name: 'altar_background_overlay',
     up: async (db) => {
       await db.execute('ALTER TABLE altars ADD COLUMN background_overlay REAL NOT NULL DEFAULT 0.2');
@@ -704,6 +825,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 26,
+    legacy: true,
     name: 'altar_thumbnail_data',
     up: async (db) => {
       await db.execute('ALTER TABLE altars ADD COLUMN thumbnail_data TEXT');
@@ -711,6 +833,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 27,
+    legacy: true,
     name: 'altar_background_overlay_color',
     up: async (db) => {
       await db.execute("ALTER TABLE altars ADD COLUMN background_overlay_color TEXT NOT NULL DEFAULT 'dark'");
@@ -718,6 +841,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 28,
+    legacy: true,
     name: 'altar_categories_sort_order',
     up: async (db) => {
       await db.execute('ALTER TABLE altar_categories ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
@@ -729,6 +853,7 @@ const MIGRATIONS: Migration[] = [
   },
   {
     version: 29,
+    legacy: true,
     name: 'altar_icon_data',
     up: async (db) => {
       await db.execute('ALTER TABLE altars ADD COLUMN icon_data TEXT DEFAULT NULL');
@@ -739,6 +864,7 @@ const MIGRATIONS: Migration[] = [
     // Needed for DBs where v3 was recorded as applied but run against older code
     // that didn't include all of these columns yet.
     version: 30,
+    legacy: true,
     name: 'altar_placements_column_guard',
     up: async (db) => {
       const cols = await db.select<{ name: string }[]>('PRAGMA table_info(altar_placements)');
@@ -759,6 +885,7 @@ const MIGRATIONS: Migration[] = [
     // PRAGMA so it is immune to any result-format quirks in plugin-sql.
     // Runs unconditionally on DBs that had v30 applied but columns still missing.
     version: 31,
+    legacy: true,
     name: 'altar_placements_column_guard_v2',
     up: async (db) => {
       const tryAdd = async (sql: string) => {
@@ -781,10 +908,42 @@ const MIGRATIONS: Migration[] = [
     // or written it since 0.2.0. Dropping it deletes any rows an older database still
     // holds — deliberate, and irreversible.
     version: 32,
+    legacy: true,
     name: 'drop_custom_properties',
     up: async (db) => {
       await db.execute('DROP INDEX IF EXISTS idx_custom_props_entry');
       await db.execute('DROP TABLE IF EXISTS custom_properties');
+    },
+  },
+  {
+    // Erste Migration ohne `legacy`-Flag: Fehler werden nicht mehr geschluckt.
+    //
+    // Bringt bestehende Datenbanken auf das Schema aus `schema.ts` — dasselbe
+    // DDL, das frische Vaults über den Baseline-Pfad bekommen. Ab hier sind die
+    // beiden Wege wieder deckungsgleich, und `scripts/schema-check.mjs` prueft
+    // genau das.
+    //
+    // Der Ablauf steht in `normalizeSchema.ts`; er ist zu umfangreich, um hier
+    // noch lesbar zu sein.
+    version: 33,
+    name: 'normalize_schema',
+    up: normalizeSchema,
+  },
+  {
+    // Eine eingebaute „Other"-Kategorie für Operationen. Bis hierher gab es nur
+    // `sigils` und `servitors`, weshalb Operationen einer gelöschten Kategorie
+    // bei den Sigillen landeten — inhaltlich falsch, denn eine Operation wird
+    // nicht dadurch zum Sigill, dass ihre Kategorie verschwindet.
+    //
+    // v33 legt sie auf Vaults an, die den Rebuild noch vor sich haben; dieser
+    // Schritt holt sie für alle nach, die ihn schon hinter sich haben.
+    version: 34,
+    name: 'operation_other_category',
+    up: async (db) => {
+      await db.execute(
+        `INSERT OR IGNORE INTO operation_categories (id, name, emoji, sort_order, is_builtin)
+         VALUES ('other', 'Other', '📦', 2, 1)`
+      );
     },
   },
 ];

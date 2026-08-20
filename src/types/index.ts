@@ -26,7 +26,7 @@ export interface WikiArticle {
   title: string;
   slug: string;
   content: string; // TipTap JSON serialized
-  category: WikiCategory;
+  category_id: WikiCategory;
   created_at: string;
   updated_at: string;
   tags: string[];
@@ -80,7 +80,7 @@ export interface Operation {
 export interface TrashedItem {
   id: string;
   title: string;
-  type: 'journal' | 'wiki' | 'tag' | 'operation' | 'creation' | 'wiki_category' | 'operation_category' | 'task' | 'task_category';
+  type: 'journal' | 'wiki' | 'tag' | 'operation' | 'wiki_category' | 'operation_category' | 'task' | 'task_category';
   deleted_at: string;
   category?: string;
 }
@@ -129,6 +129,7 @@ export interface AltarCategory {
   id: string;
   name: string;
   emoji: string;
+  sort_order: number;
 }
 
 export interface AltarRecord {
@@ -158,7 +159,7 @@ export interface AltarItem {
   id: string;
   name: string;
   emoji: string;
-  category: AltarItemCategory;
+  category_id: AltarItemCategory;
   note: string;
   image_data?: string;
 }
@@ -167,9 +168,11 @@ export interface AltarPlacement {
   id: string;
   altar_id?: string;
   item_id: string;
+  // name, emoji, category_id und image_data stammen aus altar_items und werden
+  // beim Laden hinzugejoint — sie sind keine Spalten von altar_placements.
   name: string;
   emoji: string;
-  category: string;
+  category_id: string;
   x: number;
   y: number;
   z_index: number;
@@ -210,7 +213,6 @@ export interface Task {
   updated_at: string;
   tags: string[];
   deleted_at: string | null;
-  entry_number?: number;
 }
 
 export interface ActiveView {

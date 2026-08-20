@@ -11,6 +11,8 @@ import { useTagStore } from '../store/tagStore';
 import { useAltarStore } from '../store/altarStore';
 import { useImportStore } from '../store/importStore';
 import { getDb } from './db';
+import { BUILTIN_WIKI_CATEGORIES } from './schema';
+import { toInt } from './row';
 import { generateId } from './helpers';
 import {
   DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY,
@@ -81,6 +83,12 @@ interface EmeraldMeta {
     id: string;
     name: string;
     emoji: string;
+    /**
+     * Kategorie-*Name*, nicht die ID. Eine `.emerald`-Datei wandert zwischen
+     * Vaults, und dieselbe selbst angelegte Kategorie hat dort verschiedene
+     * IDs. Der Import gleicht deshalb über den Namen ab und löst ihn lokal
+     * auf. In der Datenbank steht seit v33 die ID.
+     */
     category: string;
     note: string;
     imageData?: string;
@@ -168,9 +176,9 @@ export async function exportAsEmerald(): Promise<void> {
     content   = article.content || '';
     createdAt = article.created_at;
 
-    const cat = wikiCategories.find(c => c.id === article.category);
-    meta.wikiCategoryId   = article.category;
-    meta.wikiCategoryName = cat?.name ?? article.category;
+    const cat = wikiCategories.find(c => c.id === article.category_id);
+    meta.wikiCategoryId   = article.category_id;
+    meta.wikiCategoryName = cat?.name ?? article.category_id;
     meta.icon             = article.icon ?? undefined;
     meta.tags             = (article.tags ?? []) as string[];
 
@@ -235,8 +243,9 @@ async function exportAltarAsEmerald(): Promise<void> {
 
   const placedItemIds = new Set(placements.map(p => p.item_id));
   const altarItems = items.filter(i => placedItemIds.has(i.id));
-  const usedCategoryNames = new Set(altarItems.map(i => i.category));
-  const usedCategories = categories.filter(c => usedCategoryNames.has(c.name));
+  const usedCategoryIds = new Set(altarItems.map(i => i.category_id));
+  const usedCategories = categories.filter(c => usedCategoryIds.has(c.id));
+  const categoryNameById = new Map(categories.map(c => [c.id, c.name]));
 
   const meta: EmeraldMeta = {
     altarBackgroundPreset: altar.background_preset,
@@ -256,7 +265,8 @@ async function exportAltarAsEmerald(): Promise<void> {
     altarResolution: altar.resolution,
     altarCategories: usedCategories.map(c => ({ name: c.name, emoji: c.emoji })),
     altarItems: altarItems.map(i => ({
-      id: i.id, name: i.name, emoji: i.emoji, category: i.category, note: i.note,
+      id: i.id, name: i.name, emoji: i.emoji,
+      category: categoryNameById.get(i.category_id) ?? 'Other', note: i.note,
       imageData: i.image_data ?? undefined,
     })),
     altarPlacements: placements.map(p => ({
@@ -390,7 +400,7 @@ async function importJournalEntry(file: EmeraldFile, content: string, tagNames: 
   const { operations } = useOperationStore.getState();
 
   const paradigmId = file.meta.paradigmaTitle
-    ? (articles.find(a => a.title === file.meta.paradigmaTitle && a.category === 'paradigm')?.id ?? null)
+    ? (articles.find(a => a.title === file.meta.paradigmaTitle && a.category_id === 'paradigm')?.id ?? null)
     : null;
   const bannungId = file.meta.bannungTitle
     ? (articles.find(a => a.title === file.meta.bannungTitle)?.id ?? null)
@@ -432,9 +442,10 @@ async function importJournalEntry(file: EmeraldFile, content: string, tagNames: 
   return entry.id;
 }
 
-const BUILTIN_WIKI_CATEGORY_IDS = [
-  'paradigm','bannung','meditation','ritual','deity','herb','symbol','tool','concept','spell','other',
-];
+// Aus schema.ts abgeleitet statt handgepflegt: Die frühere Kopie hing seit
+// Migration v12 hinterher — 'sigil_charging' fehlte, weshalb ein Artikel dieser
+// Kategorie beim Import still in 'other' landete.
+const BUILTIN_WIKI_CATEGORY_IDS = BUILTIN_WIKI_CATEGORIES.map(([id]) => id);
 
 async function importWikiArticle(file: EmeraldFile, content: string, tagNames: string[]): Promise<string> {
   const { createArticle, updateArticle, wikiCategories } = useWikiStore.getState();
@@ -454,7 +465,7 @@ async function importWikiArticle(file: EmeraldFile, content: string, tagNames: s
   await updateArticle(article.id, {
     title: file.title,
     content,
-    category: categoryId,
+    category_id: categoryId,
     tags: tagNames,
     icon: file.meta.icon ?? undefined,
   });
@@ -505,16 +516,30 @@ async function resolveOrCreateItem(
   itemMeta: NonNullable<EmeraldMeta['altarItems']>[number],
 ): Promise<{ id: string; created: boolean }> {
   const { items, addItem } = useAltarStore.getState();
+  const categoryId = localAltarCategoryId(itemMeta.category);
 
   const existingMatch = items.find(i =>
     i.name === itemMeta.name &&
-    i.category === itemMeta.category &&
+    i.category_id === categoryId &&
     (i.image_data ?? null) === (itemMeta.imageData ?? null),
   );
   if (existingMatch) return { id: existingMatch.id, created: false };
 
-  const created = await addItem(itemMeta.name, itemMeta.emoji, itemMeta.category, itemMeta.note, itemMeta.imageData);
+  const created = await addItem(itemMeta.name, itemMeta.emoji, categoryId, itemMeta.note, itemMeta.imageData);
   return { id: created.id, created: true };
+}
+
+/**
+ * Der Kategorie-Name aus der Datei, übersetzt in die ID dieses Vaults.
+ * `ensureAltarCategory` hat den Namen zuvor angelegt, falls er fehlte; bleibt
+ * er unauffindbar, fängt 'other' den Fall ab — ohne gültige ID wuerde der
+ * Foreign Key das Item ablehnen.
+ */
+function localAltarCategoryId(name: string): string {
+  const { categories } = useAltarStore.getState();
+  const match = categories.find(c => c.name.toLowerCase() === name.toLowerCase())
+    ?? categories.find(c => c.id === name);
+  return match?.id ?? 'other';
 }
 
 /** Creates the category if no local category has this name yet (case-insensitive). */
@@ -607,8 +632,8 @@ async function importAltarEntry(file: EmeraldFile): Promise<string> {
           placementMeta.height,
           placementMeta.rotation,
           placementMeta.opacity,
-          placementMeta.locked ? 1 : 0,
-          placementMeta.hidden ? 1 : 0,
+          toInt(placementMeta.locked),
+          toInt(placementMeta.hidden),
         ],
       );
     }
@@ -743,7 +768,7 @@ async function importJournalFromMarkdown(
 
   const paradigmaName = meta['paradigma'] ? stripIconPrefix(meta['paradigma']) : null;
   const paradigmId = paradigmaName
-    ? (articles.find(a => a.title === paradigmaName && a.category === 'paradigm')?.id ?? null)
+    ? (articles.find(a => a.title === paradigmaName && a.category_id === 'paradigm')?.id ?? null)
     : null;
 
   const bannungName = meta['bannung'] ? stripIconPrefix(meta['bannung']) : null;
@@ -805,7 +830,7 @@ async function importWikiFromMarkdown(
   }
 
   const article = await createArticle(categoryId);
-  await updateArticle(article.id, { title, content: html, category: categoryId, tags: tagNames });
+  await updateArticle(article.id, { title, content: html, category_id: categoryId, tags: tagNames });
   return article.id;
 }
 

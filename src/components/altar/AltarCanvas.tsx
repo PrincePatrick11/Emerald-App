@@ -629,7 +629,7 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rot
       onWheel={handleWheel}
     >
       <div style={{ opacity: placement.opacity ?? 1 }}>
-        <AltarItemVisual item={placement} size={Math.max(displayWidth, displayHeight)} candleAnimate={placement.category === 'candle'} />
+        <AltarItemVisual item={placement} size={Math.max(displayWidth, displayHeight)} candleAnimate={placement.category_id === 'candle'} />
       </div>
       {(selected || (editable && hovered)) && <span className="absolute inset-0 rounded border border-jade-500/50 pointer-events-none" />}
       {editable && isRotating && (

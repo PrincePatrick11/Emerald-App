@@ -50,8 +50,8 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
         id: a.id,
         entryType: 'wiki' as const,
         label: a.title,
-        category: a.category,
-        icon: a.icon || (wikiCategories.find((c) => c.id === a.category)?.emoji ?? getCategoryEmoji(a.category as any)),
+        category: a.category_id,
+        icon: a.icon || (wikiCategories.find((c) => c.id === a.category_id)?.emoji ?? getCategoryEmoji(a.category_id as any)),
         entry_number: a.entry_number,
       })),
     ...operations

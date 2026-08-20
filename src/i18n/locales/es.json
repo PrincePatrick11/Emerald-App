@@ -79,7 +79,8 @@
     "noOperation": "Abre una operación para ver sus propiedades.",
     "categories": {
       "sigils": "Sigilos",
-      "servitors": "Servidores"
+      "servitors": "Servidores",
+      "other": "Otro"
     }
   },
   "altar": {

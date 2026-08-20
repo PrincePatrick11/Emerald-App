@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { Trash2, RotateCcw, BookOpen, Library, Tag, Wand2, FolderOpen, CheckSquare, Square, PenTool, ListTodo } from 'lucide-react';
+import { Trash2, RotateCcw, BookOpen, Library, Tag, Wand2, FolderOpen, CheckSquare, Square, ListTodo } from 'lucide-react';
 import { useTrashStore } from '../../store/trashStore';
 import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
@@ -16,7 +16,6 @@ function typeIcon(type: TrashedItem['type']) {
   if (type === 'journal') return <BookOpen size={14} className="text-stone-500 flex-shrink-0" />;
   if (type === 'wiki') return <Library size={14} className="text-stone-500 flex-shrink-0" />;
   if (type === 'operation') return <Wand2 size={14} className="text-stone-500 flex-shrink-0" />;
-  if (type === 'creation') return <PenTool size={14} className="text-stone-500 flex-shrink-0" />;
   if (type === 'wiki_category' || type === 'operation_category' || type === 'task_category')
     return <FolderOpen size={14} className="text-stone-500 flex-shrink-0" />;
   if (type === 'task') return <ListTodo size={14} className="text-stone-500 flex-shrink-0" />;
@@ -265,7 +264,6 @@ export default function TrashView() {
     const journal    = sorted.filter((i) => i.type === 'journal');
     const wiki       = sorted.filter((i) => i.type === 'wiki');
     const operations = sorted.filter((i) => i.type === 'operation');
-    const creations  = sorted.filter((i) => i.type === 'creation');
     const tags       = sorted.filter((i) => i.type === 'tag');
     const tasks      = sorted.filter((i) => i.type === 'task');
     const cats       = sorted.filter((i) => i.type === 'wiki_category' || i.type === 'operation_category' || i.type === 'task_category');
@@ -324,12 +322,6 @@ export default function TrashView() {
                 </div>
               );
             })}
-          </>
-        )}
-        {creations.length > 0 && (
-          <>
-            <SectionHeader label={t('nav.creation')} count={creations.length} />
-            {renderItems(creations)}
           </>
         )}
         {tasks.length > 0 && (

@@ -24,9 +24,9 @@ export default function JournalPropertiesPanel() {
 
   const entry = activeView.id ? entries.find((e) => e.id === activeView.id) : null;
 
-  const paradigmArticles = useMemo(() => articles.filter((a) => a.category === 'paradigm'), [articles]);
-  const bannungArticles = useMemo(() => articles.filter((a) => a.category === 'bannung' && !a.deleted_at), [articles]);
-  const meditationArticles = useMemo(() => articles.filter((a) => a.category === 'meditation' && !a.deleted_at), [articles]);
+  const paradigmArticles = useMemo(() => articles.filter((a) => a.category_id === 'paradigm'), [articles]);
+  const bannungArticles = useMemo(() => articles.filter((a) => a.category_id === 'bannung' && !a.deleted_at), [articles]);
+  const meditationArticles = useMemo(() => articles.filter((a) => a.category_id === 'meditation' && !a.deleted_at), [articles]);
 
   if (!entry) {
     return <p className="text-xs text-stone-600 px-2 py-3">{t('properties.noEntry')}</p>;

@@ -1,32 +1,11 @@
 import { create } from 'zustand';
-import { getDb } from '../lib/db';
+import type Database from '@tauri-apps/plugin-sql';
+import { getDb, nextEntryNumber } from '../lib/db';
+import { reassignCategoryContent } from '../lib/schema';
 import { syncLinks } from '../lib/links';
-import { generateId, nowIso, safeParseArray } from '../lib/helpers';
+import { generateId, nowIso } from '../lib/helpers';
+import { fromRow, toInt, type DbRow } from '../lib/row';
 import type { Operation, OperationCategory } from '../types';
-
-function normalizeOperation(row: Operation): Operation {
-  return {
-    ...row,
-    tags: safeParseArray<string>(row.tags),
-    is_active: (row.is_active as unknown as number) !== 0,
-    is_loaded: (row.is_loaded as unknown as number) !== 0,
-    letter_bank: safeParseArray<string>(row.letter_bank),
-    implemented_letters: safeParseArray<string>(row.implemented_letters),
-    show_intention_in_properties: row.show_intention_in_properties == null
-      ? true
-      : (row.show_intention_in_properties as unknown as number) !== 0,
-    show_letter_bank_in_properties: row.show_letter_bank_in_properties == null
-      ? true
-      : (row.show_letter_bank_in_properties as unknown as number) !== 0,
-    show_sigil: row.show_sigil == null ? true : (row.show_sigil as unknown as number) !== 0,
-    description: row.description ?? '',
-    target_reveal_date: row.target_reveal_date ?? null,
-    charging_technique_wiki_id: row.charging_technique_wiki_id ?? null,
-    intention_text: row.intention_text ?? '',
-    drawing_data: row.drawing_data ?? null,
-    thumbnail_data: row.thumbnail_data ?? null,
-  };
-}
 
 interface OperationState {
   categories: OperationCategory[];
@@ -41,9 +20,16 @@ interface OperationState {
   getOperation: (id: string) => Operation | undefined;
   addCategory: (name: string, emoji: string) => Promise<OperationCategory>;
   updateCategory: (id: string, name: string, emoji: string) => Promise<void>;
-  deleteCategory: (id: string) => Promise<void>;
+  deleteCategory: (id: string) => Promise<boolean>;
   restoreCategory: (id: string) => Promise<void>;
   permanentlyDeleteCategory: (id: string) => Promise<void>;
+}
+
+async function selectAllOperations(db: Database): Promise<Operation[]> {
+  const rows = await db.select<DbRow[]>(
+    'SELECT * FROM operations WHERE deleted_at IS NULL ORDER BY updated_at DESC'
+  );
+  return rows.map(fromRow.operation);
 }
 
 export const useOperationStore = create<OperationState>((set, get) => ({
@@ -52,20 +38,23 @@ export const useOperationStore = create<OperationState>((set, get) => ({
 
   fetchAll: async () => {
     const db = await getDb();
-    const categories = await db.select<OperationCategory[]>(
+    // is_builtin kam hier früher ohne Umwandlung durch und lag als 0/1 im
+    // State, obwohl als boolean deklariert — deshalb musste deleteCategory den
+    // Wert an der Verzweigung zu number zurückcasten.
+    const categoryRows = await db.select<DbRow[]>(
       'SELECT * FROM operation_categories WHERE deleted_at IS NULL ORDER BY sort_order ASC, name ASC'
     );
-    const rows = await db.select<Operation[]>(
-      'SELECT *, ROWID as entry_number FROM operations WHERE deleted_at IS NULL ORDER BY updated_at DESC'
-    );
-    const operations = rows.map(normalizeOperation);
-    set({ categories, operations });
+    set({
+      categories: categoryRows.map(fromRow.category),
+      operations: await selectAllOperations(db),
+    });
   },
 
   createOperation: async (categoryId) => {
     const db = await getDb();
     const now = nowIso();
     const op: Operation = {
+      entry_number: await nextEntryNumber(db, 'operations'),
       id: generateId(), title: 'Untitled Operation', content: '',
       category_id: categoryId, created_at: now, updated_at: now, tags: [], deleted_at: null,
       is_active: true, end_date: null, version: null,
@@ -87,13 +76,13 @@ export const useOperationStore = create<OperationState>((set, get) => ({
         id, title, content, category_id, created_at, updated_at, tags, is_active, description,
         target_reveal_date, charging_technique_wiki_id, is_loaded, intention_text, letter_bank,
         implemented_letters, show_intention_in_properties, show_letter_bank_in_properties,
-        show_sigil, drawing_data, thumbnail_data
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
+        show_sigil, drawing_data, thumbnail_data, entry_number
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
       [
         op.id, op.title, op.content, op.category_id, op.created_at, op.updated_at, JSON.stringify(op.tags), 1,
         op.description, op.target_reveal_date, op.charging_technique_wiki_id, 0, op.intention_text,
         JSON.stringify(op.letter_bank), JSON.stringify(op.implemented_letters),
-        1, 1, 1, op.drawing_data, op.thumbnail_data,
+        1, 1, 1, op.drawing_data, op.thumbnail_data, op.entry_number ?? null,
       ]
     );
     set((s) => ({ operations: [op, ...s.operations] }));
@@ -116,14 +105,14 @@ export const useOperationStore = create<OperationState>((set, get) => ({
        WHERE id=$23`,
       [
         merged.title, merged.content, merged.category_id, merged.updated_at, JSON.stringify(merged.tags),
-        merged.is_active ? 1 : 0, merged.end_date ?? null, merged.version ?? null,
+        toInt(merged.is_active, true), merged.end_date ?? null, merged.version ?? null,
         merged.icon ?? null, merged.cover_image ?? null, merged.description ?? '',
         merged.target_reveal_date ?? null, merged.charging_technique_wiki_id ?? null,
-        merged.is_loaded ? 1 : 0, merged.intention_text ?? '',
+        toInt(merged.is_loaded), merged.intention_text ?? '',
         JSON.stringify(merged.letter_bank ?? []), JSON.stringify(merged.implemented_letters ?? []),
-        merged.show_intention_in_properties === false ? 0 : 1,
-        merged.show_letter_bank_in_properties === false ? 0 : 1,
-        merged.show_sigil === false ? 0 : 1,
+        toInt(merged.show_intention_in_properties, true),
+        toInt(merged.show_letter_bank_in_properties, true),
+        toInt(merged.show_sigil, true),
         merged.drawing_data ?? null, merged.thumbnail_data ?? null, id,
       ]
     );
@@ -142,11 +131,7 @@ export const useOperationStore = create<OperationState>((set, get) => ({
   restoreOperation: async (id) => {
     const db = await getDb();
     await db.execute('UPDATE operations SET deleted_at=NULL WHERE id=$1', [id]);
-    const rows = await db.select<Operation[]>(
-      'SELECT *, ROWID as entry_number FROM operations WHERE deleted_at IS NULL ORDER BY updated_at DESC'
-    );
-    const operations = rows.map(normalizeOperation);
-    set({ operations });
+    set({ operations: await selectAllOperations(db) });
   },
 
   permanentlyDeleteOperation: async (id) => {
@@ -178,22 +163,25 @@ export const useOperationStore = create<OperationState>((set, get) => ({
   deleteCategory: async (id) => {
     const db = await getDb();
     const cat = get().categories.find((c) => c.id === id);
-    if (!cat || (cat.is_builtin as unknown as number)) return;
+    if (!cat || cat.is_builtin) return false;
     await db.execute('UPDATE operation_categories SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
     set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }));
+    return true;
   },
 
   restoreCategory: async (id) => {
     const db = await getDb();
     await db.execute('UPDATE operation_categories SET deleted_at=NULL WHERE id=$1', [id]);
-    const rows = await db.select<OperationCategory[]>('SELECT * FROM operation_categories WHERE id=$1', [id]);
+    const rows = await db.select<DbRow[]>('SELECT * FROM operation_categories WHERE id=$1', [id]);
     if (rows[0]) {
-      set((s) => ({ categories: [...s.categories, rows[0]].sort((a, b) => a.sort_order - b.sort_order) }));
+      const cat = fromRow.category(rows[0]);
+      set((s) => ({ categories: [...s.categories, cat].sort((a, b) => a.sort_order - b.sort_order) }));
     }
   },
 
   permanentlyDeleteCategory: async (id) => {
     const db = await getDb();
+    await reassignCategoryContent(db, 'operations', id);
     await db.execute('DELETE FROM operation_categories WHERE id=$1', [id]);
   },
 }));

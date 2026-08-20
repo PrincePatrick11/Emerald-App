@@ -408,7 +408,7 @@ export default function JournalView() {
         return (
           <div className="px-8 pb-2 flex-shrink-0 flex flex-wrap gap-1.5">
             {paradigm && (() => {
-              const icon = paradigm.icon || (wikiCategories.find((c) => c.id === paradigm.category)?.emoji ?? getCategoryEmoji(paradigm.category));
+              const icon = paradigm.icon || (wikiCategories.find((c) => c.id === paradigm.category_id)?.emoji ?? getCategoryEmoji(paradigm.category_id));
               return (
                 <button onClick={() => setActiveView({ type: 'wiki', id: paradigm.id, mode: 'view' })} className={chipCls}>
                   {renderIcon(icon)}<span>{paradigm.title}</span>
@@ -417,7 +417,7 @@ export default function JournalView() {
             })()}
             {entry.is_bannung && (() => {
               const icon = bannungArticle
-                ? (bannungArticle.icon || (wikiCategories.find((c) => c.id === bannungArticle.category)?.emoji ?? getCategoryEmoji(bannungArticle.category)))
+                ? (bannungArticle.icon || (wikiCategories.find((c) => c.id === bannungArticle.category_id)?.emoji ?? getCategoryEmoji(bannungArticle.category_id)))
                 : '🚫';
               const label = bannungArticle ? bannungArticle.title : 'Bannung';
               return bannungArticle
@@ -426,7 +426,7 @@ export default function JournalView() {
             })()}
             {entry.is_meditation && (() => {
               const icon = meditationArticle
-                ? (meditationArticle.icon || (wikiCategories.find((c) => c.id === meditationArticle.category)?.emoji ?? getCategoryEmoji(meditationArticle.category)))
+                ? (meditationArticle.icon || (wikiCategories.find((c) => c.id === meditationArticle.category_id)?.emoji ?? getCategoryEmoji(meditationArticle.category_id)))
                 : '🧘';
               const label = meditationArticle ? meditationArticle.title : 'Meditation';
               return (
@@ -475,9 +475,9 @@ export default function JournalView() {
         <div className="px-8 pb-2 flex-shrink-0 flex flex-wrap gap-1.5">
           {(entry.linked_wiki_ids ?? []).map((wikiId) => {
             const article = getWikiArticle(wikiId);
-            if (!article || article.category === 'paradigm') return null;
-            const cat = wikiCategories.find((c) => c.id === article.category);
-            const icon = cat?.emoji ?? getCategoryEmoji(article.category);
+            if (!article || article.category_id === 'paradigm') return null;
+            const cat = wikiCategories.find((c) => c.id === article.category_id);
+            const icon = cat?.emoji ?? getCategoryEmoji(article.category_id);
             return (
               <button
                 key={wikiId}

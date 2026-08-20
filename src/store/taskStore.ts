@@ -1,19 +1,10 @@
 import { create } from 'zustand';
+import type Database from '@tauri-apps/plugin-sql';
 import { getDb } from '../lib/db';
-import { generateId, nowIso, safeParseArray } from '../lib/helpers';
+import { FALLBACK_CATEGORY, reassignCategoryContent } from '../lib/schema';
+import { generateId, nowIso } from '../lib/helpers';
+import { fromRow, toInt, type DbRow } from '../lib/row';
 import type { Task, TaskCategory, TaskLink } from '../types';
-
-function normalizeTask(row: Task): Task {
-  return {
-    ...row,
-    completed: (row.completed as unknown as number) !== 0,
-    tags: safeParseArray<string>(row.tags),
-    description: row.description ?? '',
-    due_date: row.due_date ?? null,
-    completed_at: row.completed_at ?? null,
-    parent_task_id: row.parent_task_id ?? null,
-  };
-}
 
 function collectDescendantIds(tasks: Task[], parentId: string): string[] {
   const ids: string[] = [];
@@ -48,7 +39,7 @@ interface TaskState {
 
   addCategory: (name: string, emoji: string) => Promise<TaskCategory>;
   updateCategory: (id: string, name: string, emoji: string) => Promise<void>;
-  deleteCategory: (id: string) => Promise<void>;
+  deleteCategory: (id: string) => Promise<boolean>;
   restoreCategory: (id: string) => Promise<void>;
   permanentlyDeleteCategory: (id: string) => Promise<void>;
   getCategory: (id: string) => TaskCategory | undefined;
@@ -59,6 +50,13 @@ interface TaskState {
   getLinksForTarget: (targetId: string) => TaskLink[];
 }
 
+async function selectAllTasks(db: Database): Promise<Task[]> {
+  const rows = await db.select<DbRow[]>(
+    'SELECT * FROM tasks WHERE deleted_at IS NULL ORDER BY sort_order ASC, created_at DESC'
+  );
+  return rows.map(fromRow.task);
+}
+
 export const useTaskStore = create<TaskState>((set, get) => ({
   categories: [],
   tasks: [],
@@ -66,15 +64,15 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   fetchAll: async () => {
     const db = await getDb();
-    const categories = await db.select<TaskCategory[]>(
+    const categoryRows = await db.select<DbRow[]>(
       'SELECT * FROM task_categories WHERE deleted_at IS NULL ORDER BY sort_order ASC, name ASC'
     );
-    const taskRows = await db.select<Task[]>(
-      'SELECT * FROM tasks WHERE deleted_at IS NULL ORDER BY sort_order ASC, created_at DESC'
-    );
-    const tasks = taskRows.map(normalizeTask);
-    const links = await db.select<TaskLink[]>('SELECT * FROM task_links');
-    set({ categories, tasks, links });
+    const linkRows = await db.select<DbRow[]>('SELECT * FROM task_links');
+    set({
+      categories: categoryRows.map(fromRow.taskCategory),
+      tasks: await selectAllTasks(db),
+      links: linkRows.map(fromRow.taskLink),
+    });
   },
 
   createTask: async (categoryId: string, parentTaskId: string | null = null) => {
@@ -115,7 +113,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
        WHERE id=$12`,
       [
         merged.title, merged.description, merged.category_id, merged.priority,
-        merged.due_date ?? null, merged.completed ? 1 : 0,
+        merged.due_date ?? null, toInt(merged.completed),
         merged.completed_at ?? null, merged.parent_task_id ?? null,
         merged.sort_order, merged.updated_at, JSON.stringify(merged.tags), id,
       ]
@@ -137,7 +135,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     for (const tid of idsToUpdate) {
       await db.execute(
         'UPDATE tasks SET completed=$1, completed_at=$2, updated_at=$3 WHERE id=$4',
-        [newCompleted ? 1 : 0, newCompletedAt, now, tid]
+        [toInt(newCompleted), newCompletedAt, now, tid]
       );
     }
 
@@ -171,8 +169,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   restoreTask: async (id: string) => {
     const db = await getDb();
     await db.execute('UPDATE tasks SET deleted_at=NULL WHERE id=$1', [id]);
-    const rows = await db.select<Task[]>('SELECT * FROM tasks WHERE deleted_at IS NULL ORDER BY sort_order ASC, created_at DESC');
-    set((s) => ({ ...s, tasks: rows.map(normalizeTask) }));
+    const tasks = await selectAllTasks(db);
+    set((s) => ({ ...s, tasks }));
   },
 
   permanentlyDeleteTask: async (id: string) => {
@@ -217,26 +215,37 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   deleteCategory: async (id: string) => {
     const db = await getDb();
     const cat = get().categories.find((c) => c.id === id);
-    if (!cat) return;
+    if (!cat) return false;
+    // Die Default-Kategorie ist das Ziel, auf das alles andere umgehängt wird.
+    // Sie selbst zu löschen ließe ihre Aufgaben ohne gültige Kategorie
+    // zurück und blockierte danach jedes Leeren des Papierkorbs.
+    if (id === FALLBACK_CATEGORY.tasks) return false;
     await db.execute('UPDATE task_categories SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
-    await db.execute('UPDATE tasks SET category_id=$1 WHERE category_id=$2', ['', id]);
+    // Vorher stand hier category_id='' — eine Kategorie, die es nicht gibt.
+    // Der Foreign Key lässt das nicht mehr zu, und die Aufgaben waren damit
+    // ohnehin keiner Kategorie mehr zugeordnet.
+    await reassignCategoryContent(db, 'tasks', id);
+    const fallback = FALLBACK_CATEGORY.tasks;
     set((s) => ({
       categories: s.categories.filter((c) => c.id !== id),
-      tasks: s.tasks.map((t) => t.category_id === id ? { ...t, category_id: '' } : t),
+      tasks: s.tasks.map((t) => t.category_id === id ? { ...t, category_id: fallback } : t),
     }));
+    return true;
   },
 
   restoreCategory: async (id: string) => {
     const db = await getDb();
     await db.execute('UPDATE task_categories SET deleted_at=NULL WHERE id=$1', [id]);
-    const rows = await db.select<TaskCategory[]>('SELECT * FROM task_categories WHERE id=$1', [id]);
+    const rows = await db.select<DbRow[]>('SELECT * FROM task_categories WHERE id=$1', [id]);
     if (rows.length > 0) {
-      set((s) => ({ categories: [...s.categories, rows[0]] }));
+      set((s) => ({ categories: [...s.categories, fromRow.taskCategory(rows[0])] }));
     }
   },
 
   permanentlyDeleteCategory: async (id: string) => {
+    if (id === FALLBACK_CATEGORY.tasks) return;
     const db = await getDb();
+    await reassignCategoryContent(db, 'tasks', id);
     await db.execute('DELETE FROM task_categories WHERE id=$1', [id]);
     set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }));
   },

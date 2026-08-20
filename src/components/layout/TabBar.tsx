@@ -83,8 +83,8 @@ export default function TabBar() {
     }
     if (view.type === 'wiki' && view.id) {
       const article = getArticle(view.id);
-      const categoryIcon = wikiCategories.find((category) => category.id === article?.category)?.emoji
-        ?? getCategoryEmoji(article?.category as any);
+      const categoryIcon = wikiCategories.find((category) => category.id === article?.category_id)?.emoji
+        ?? getCategoryEmoji(article?.category_id as any);
       return renderIconValue(article?.icon, <span className="text-sm leading-none">{categoryIcon}</span>);
     }
     if (view.type === 'operations' && view.id) {

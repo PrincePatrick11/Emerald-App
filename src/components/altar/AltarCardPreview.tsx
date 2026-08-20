@@ -40,7 +40,7 @@ export const AltarCardPreview = memo(function AltarCardPreview({
               height: size,
             }}
           >
-            <AltarItemVisual item={placement} size={size} candleAnimate={placement.category === 'candle'} />
+            <AltarItemVisual item={placement} size={size} candleAnimate={placement.category_id === 'candle'} />
           </div>
         );
       })}

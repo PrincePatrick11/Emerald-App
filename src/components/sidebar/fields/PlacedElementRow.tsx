@@ -73,7 +73,7 @@ export const PlacedElementRow = memo(function PlacedElementRow({
             <GripVertical size={12} />
           </span>
         )}
-        <AltarItemVisual item={placement} size={16} candleAnimate={placement.category === 'candle'} />
+        <AltarItemVisual item={placement} size={16} candleAnimate={placement.category_id === 'candle'} />
         <span className="flex-1 truncate text-[11px] font-medium">{placement.name}</span>
         {isEditing && (
           <span className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
