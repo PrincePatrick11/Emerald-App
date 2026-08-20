@@ -155,8 +155,8 @@ The overlay is applied on top of all background types — colour presets, gradie
 
 **Left sidebar structure.** The left sidebar has two parts side by side:
 
-1. A narrow icon **rail** — a toggle to collapse/expand the entry list next to it, a second toggle to collapse/expand the right sidebar (so both sidebars are controlled from the same rail), the five module icons (Journal/Tasks/Operations/Wiki/Altar), and Tags/Trash/Settings at the bottom. Clicking a module icon switches the main view; it does not highlight, since it's independent of whichever list tab is open.
-2. A resizable, collapsible **entry list** panel next to the rail, with five tabs (Journal/Tasks/Operations/Wiki/Altar) that switch which module's items are listed. Each tab has its own search field, a "+" button to quick-create a new item, inline rename (double-click or via the context menu), and a right-click context menu (Duplicate/Rename/Delete where applicable — Altar only offers Rename, since it has no duplicate action; Tasks offers Rename/Delete and shows a completion checkbox on each row instead of an icon). Journal, Operations, and Wiki rows can also be dragged into the editor to insert an internal link. The panel can be collapsed entirely via the toggle in the rail, and its width is remembered independently of the main window.
+1. A narrow icon **rail** — a toggle to collapse/expand the entry list next to it, a second toggle to collapse/expand the right sidebar (so both sidebars are controlled from the same rail), the five module icons (Journal/Tasks/Operations/Wiki/Altar), and — at the bottom — Tags and Trash grouped together, then Vault and Settings below a divider. Clicking a module icon switches the main view; it does not highlight, since it's independent of whichever list tab is open. The Vault button opens vault management — see [Vaults](#vaults) below.
+2. A resizable, collapsible **entry list** panel next to the rail, with six tabs (**All** / Journal/Tasks/Operations/Wiki/Altar) that switch which items are listed. The All tab lists every module's items together in one list, sorted by last-updated. Each tab has its own search field, a "+" button to quick-create a new item, inline rename (double-click or via the context menu), and a right-click context menu (Duplicate/Rename/Delete where applicable — Altar only offers Rename, since it has no duplicate action; Tasks offers Rename/Delete and shows a completion checkbox on each row instead of an icon, except in the All tab, where a Task row shows a static checkbox icon instead). Journal, Operations, and Wiki rows can also be dragged into the editor to insert an internal link — in the All tab this still only applies to those three; Tasks and Altar rows there don't show a grab cursor. The panel can be collapsed entirely via the toggle in the rail, and its width is remembered independently of the main window.
 
 **Breadcrumb back links.** When an entry is open in JournalView, WikiView, or OperationsView, the topbar shows a clickable breadcrumb that navigates back to the corresponding list view (e.g. clicking "Journal" returns to the journal entry list without closing the tab).
 
@@ -230,6 +230,16 @@ From the Trash view you can:
 - Empty the entire trash at once (requires confirmation).
 
 Tags and categories also support soft-delete and restoration.
+
+## Vaults
+
+Emerald supports multiple vaults, each backed by its own separate SQLite database — see [Multi-Vault System in `database.md`](database.md#multi-vault-system) for the on-disk representation. Vault management lives in its own modal, opened via the Vault icon in the left rail (directly above Settings):
+
+- Each vault is shown as a card with its name and database filename. Clicking a card switches to that vault; the currently active vault's card is disabled and carries an "active" label instead.
+- **Rename** and **Delete** are inline states on the same card — Delete asks for confirmation first. The active vault can't be deleted, and the last remaining vault can't be deleted either.
+- A dashed **Add Vault** row at the bottom creates a new, empty vault directly from this modal. A newly created vault is not switched to automatically; its database file is created the first time you actually switch to it.
+
+This is separate from importing a vault from a `.emeralddb` backup file (Settings → Backup → Import → Add Vault mode), which also creates a new vault but populates it from the backup's contents — see [Vault Backup](#vault-backup-emeralddb) below.
 
 ## Export and Import
 

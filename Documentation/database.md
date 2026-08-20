@@ -377,6 +377,7 @@ Vault metadata is stored outside SQLite in `{appDataDir}/vaults.json`:
 - `resetDbCache()` in `db.ts` must be called before switching vaults; clears the per-vault `Map<identifier, Database>` cache.
 - `runMigrations()` is idempotent — called on every `getDb()` cache miss, safe on both existing and empty DBs.
 - All tables in all vaults share the same schema.
+- `newVaultRecord(name)` in `vaultManager.ts` is the single place that builds a new vault's record (`crypto.randomUUID()` for `id`, `dbName: emerald-<id>.db`, `createdAt`). It's used both by `vaultStore.createVault()` (the Vault management modal's "Add Vault" row — see [Vaults in `features.md`](features.md#vaults)) and by `.emeralddb` add-vault import. Neither path creates the vault's `.db` file up front; it's created the first time the app actually switches to that vault, relying on `runMigrations()`'s idempotency above. `addVault`/`updateVaultName`/`removeVault`/`setActiveVaultId` all read-modify-write `vaults.json` by copying (`{ ...data, vaults: [...] }`) rather than mutating the cached object in place before the write lands.
 
 ## DB Backup / Restore (`.emeralddb`)
 
