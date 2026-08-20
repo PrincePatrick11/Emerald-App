@@ -13,7 +13,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { getDb } from './db';
-import { getActiveDbName, addVault, invalidateVaultCache, type Vault } from './vaultManager';
+import { getActiveDbName, addVault, invalidateVaultCache, newVaultRecord } from './vaultManager';
 import { useVaultStore } from '../store/vaultStore';
 import { useJournalStore } from '../store/journalStore';
 import { useWikiStore } from '../store/wikiStore';
@@ -727,14 +727,8 @@ export async function importDatabase(
 
   if (mode === 'add-vault') {
     // 1. Create a new vault record
-    const vaultId = crypto.randomUUID();
-    const dbName = `emerald-${vaultId}.db`;
-    const newVault: Vault = {
-      id: vaultId,
-      name: newVaultName ?? 'Imported Vault',
-      dbName,
-      createdAt: new Date().toISOString(),
-    };
+    const newVault = newVaultRecord(newVaultName ?? 'Imported Vault');
+    const vaultId = newVault.id;
 
     // 2. Register vault (writes to vaults.json)
     await addVault(newVault);

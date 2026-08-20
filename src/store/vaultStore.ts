@@ -4,6 +4,7 @@ import {
   loadVaultsFile,
   setActiveVaultId,
   addVault as addVaultToFile,
+  newVaultRecord,
   updateVaultName,
   removeVault as removeVaultFromFile,
 } from '../lib/vaultManager';
@@ -15,6 +16,8 @@ import { useTagStore } from './tagStore';
 import { useRoutineStore } from './routineStore';
 import { useAltarStore } from './altarStore';
 import { useUIStore } from './uiStore';
+import { useTaskStore } from './taskStore';
+import { useUndoStore } from './undoStore';
 
 interface VaultStore {
   vaults: Vault[];
@@ -24,6 +27,7 @@ interface VaultStore {
   loadVaults: () => Promise<void>;
   switchVault: (id: string) => Promise<void>;
   addVault: (vault: Vault) => Promise<void>;
+  createVault: (name: string) => Promise<Vault>;
   renameVault: (id: string, name: string) => Promise<void>;
   removeVault: (id: string) => Promise<void>;
 }
@@ -39,6 +43,7 @@ async function reloadAllStores(): Promise<void> {
     useWikiStore.getState().fetchArticles(),
     useRoutineStore.getState().fetchRoutines(),
     useAltarStore.getState().fetchAltars(),
+    useTaskStore.getState().fetchAll(),
   ]);
 }
 
@@ -68,6 +73,9 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     // Navigate to home first to avoid stale open-entry state
     useUIStore.getState().setActiveView({ type: 'home' });
 
+    // Undo entries reference rows of the old vault by id — drop them
+    useUndoStore.getState().clear();
+
     // Reload all data stores from the new DB
     await reloadAllStores();
   },
@@ -75,6 +83,12 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   addVault: async (vault: Vault) => {
     await addVaultToFile(vault);
     set((s) => ({ vaults: [...s.vaults, vault] }));
+  },
+
+  createVault: async (name: string) => {
+    const vault = newVaultRecord(name);
+    await get().addVault(vault);
+    return vault;
   },
 
   renameVault: async (id: string, name: string) => {

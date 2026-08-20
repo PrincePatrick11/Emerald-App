@@ -8,10 +8,12 @@ import {
   Wand2,
   Settings,
   CheckSquare,
+  Vault,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useUIStore } from '../../store/uiStore';
 import SettingsModal from './SettingsModal';
+import VaultModal from './VaultModal';
 import RailButton from '../ui/RailButton';
 
 function PanelToggleIcon({ active, mirrored, size = 16 }: { active: boolean; mirrored?: boolean; size?: number }) {
@@ -39,6 +41,7 @@ export default function LeftSidebarRail() {
     setActiveView, leftListOpen, toggleLeftList, rightSidebarOpen, toggleRightSidebar,
   } = useUIStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [vaultOpen, setVaultOpen] = useState(false);
 
   return (
     <div className="left-sidebar-rail rail-divider flex flex-col items-center h-full w-14 flex-shrink-0 border-r">
@@ -71,7 +74,7 @@ export default function LeftSidebarRail() {
         </RailButton>
       </div>
 
-      {/* Bottom nav — always visible: Tags/Trash grouped, Settings set apart below a divider */}
+      {/* Bottom nav — always visible: Tags/Trash grouped, Vault/Settings set apart below a divider */}
       <div className="sidebar-bottom-bar w-full flex-1 flex flex-col items-center justify-end py-2">
         <div className="flex flex-col items-center gap-0.5">
           <RailButton onClick={() => setActiveView({ type: 'tags' })} title={t('nav.tags')}>
@@ -82,11 +85,17 @@ export default function LeftSidebarRail() {
           </RailButton>
         </div>
         <div className="rail-divider w-8 border-t my-1.5" />
-        <RailButton onClick={() => setSettingsOpen(true)} title={t('nav.settings')}>
-          <Settings size={18} />
-        </RailButton>
+        <div className="flex flex-col items-center gap-0.5">
+          <RailButton onClick={() => setVaultOpen(true)} title={t('nav.vaults')}>
+            <Vault size={18} />
+          </RailButton>
+          <RailButton onClick={() => setSettingsOpen(true)} title={t('nav.settings')}>
+            <Settings size={18} />
+          </RailButton>
+        </div>
       </div>
 
+      {vaultOpen && <VaultModal onClose={() => setVaultOpen(false)} />}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   );

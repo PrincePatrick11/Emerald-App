@@ -3,7 +3,6 @@ import { Globe, Info, Database, Upload, Download, Check, AlertTriangle, ChevronD
 import { useTranslation } from 'react-i18next';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import { useVaultStore } from '../../store/vaultStore';
 import { useUIStore } from '../../store/uiStore';
 import { FONT_OPTIONS, THEME_OPTIONS } from '../../themes/theme';
 import packageJson from '../../../package.json';
@@ -47,17 +46,6 @@ export default function SettingsModal({ onClose }: Props) {
   const setUIFontId = useUIStore((s) => s.setUIFontId);
   const setEditorFontId = useUIStore((s) => s.setEditorFontId);
 
-  // ── Vault state ────────────────────────────────────────────────────────────
-  const vaults = useVaultStore((s) => s.vaults);
-  const activeVaultId = useVaultStore((s) => s.activeVaultId);
-  const switchVault = useVaultStore((s) => s.switchVault);
-  const renameVault = useVaultStore((s) => s.renameVault);
-  const removeVault = useVaultStore((s) => s.removeVault);
-
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
-  const [switchingId, setSwitchingId] = useState<string | null>(null);
-
   // ── Backup panel state ─────────────────────────────────────────────────────
   const [panel, setPanel] = useState<'none' | 'export' | 'import'>('none');
 
@@ -84,27 +72,6 @@ export default function SettingsModal({ onClose }: Props) {
     'emerald-noctis': Moon,
     'emerald-parchment': Sun,
   } as const;
-
-  // ── Vault handlers ─────────────────────────────────────────────────────────
-  async function handleSwitchVault(id: string) {
-    setSwitchingId(id);
-    try {
-      await switchVault(id);
-    } finally {
-      setSwitchingId(null);
-    }
-  }
-
-  function startRename(id: string, currentName: string) {
-    setRenamingId(id);
-    setRenameValue(currentName);
-  }
-
-  async function commitRename(id: string) {
-    const name = renameValue.trim();
-    if (name) await renameVault(id, name);
-    setRenamingId(null);
-  }
 
   // ── Export handler ─────────────────────────────────────────────────────────
   async function handleExport() {
@@ -255,80 +222,6 @@ export default function SettingsModal({ onClose }: Props) {
                   {label}
                 </button>
               ))}
-            </div>
-          </section>
-
-          {/* ── Vaults ───────────────────────────────────────────────────── */}
-          <section>
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">
-              <Database size={13} />
-              {t('settings.vaults')}
-            </div>
-            <div className="space-y-1.5">
-              {vaults.map((v) => {
-                const isActive = v.id === activeVaultId;
-                const isSwitching = switchingId === v.id;
-                const isRenaming = renamingId === v.id;
-                return (
-                  <div
-                    key={v.id}
-                    className={`settings-vault-row flex items-center gap-2 rounded-lg px-3 py-2 border transition-colors ${
-                      isActive
-                        ? 'settings-vault-row-active bg-jade-500/10 border-jade-500/30'
-                        : 'settings-vault-row-idle bg-stone-800/40 border-stone-700/40'
-                    }`}
-                  >
-                    {isRenaming ? (
-                      <input
-                        autoFocus
-                        value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitRename(v.id);
-                          if (e.key === 'Escape') setRenamingId(null);
-                        }}
-                        onBlur={() => commitRename(v.id)}
-                        className="flex-1 bg-stone-800 border border-stone-700/60 rounded px-2 py-1 text-sm text-stone-200 outline-none focus:border-jade-500/60"
-                      />
-                    ) : (
-                      <span className={`settings-vault-name flex-1 text-sm truncate ${isActive ? 'text-jade-300' : 'text-stone-300'}`}>
-                        {v.name}
-                      </span>
-                    )}
-                    {isActive && (
-                      <span className="settings-vault-active text-xs text-jade-500 shrink-0">{t('settings.vaultActive')}</span>
-                    )}
-                    {!isRenaming && (
-                      <button
-                        onClick={() => startRename(v.id, v.name)}
-                        className="settings-vault-action text-xs text-stone-500 hover:text-stone-300 transition-colors shrink-0"
-                      >
-                        {t('settings.vaultRename')}
-                      </button>
-                    )}
-                    {!isActive && !isSwitching && !isRenaming && (
-                      <button
-                        onClick={() => handleSwitchVault(v.id)}
-                        className="text-xs text-stone-400 hover:text-jade-400 transition-colors shrink-0"
-                      >
-                        {t('settings.vaultSwitch')}
-                      </button>
-                    )}
-                    {isSwitching && (
-                      <span className="text-xs text-stone-500 shrink-0">{t('settings.vaultSwitching')}</span>
-                    )}
-                    {!isActive && vaults.length > 1 && !isRenaming && (
-                      <Button
-                        onClick={() => removeVault(v.id)}
-                        variant="danger"
-                        className="text-xs shrink-0"
-                      >
-                        {t('settings.vaultDelete')}
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
             </div>
           </section>
 
@@ -571,7 +464,7 @@ export default function SettingsModal({ onClose }: Props) {
                             type="text"
                             value={newVaultName}
                             onChange={(e) => setNewVaultName(e.target.value)}
-                            placeholder={t('settings.vaultNamePlaceholder')}
+                            placeholder={t('vault.namePlaceholder')}
                             className="w-full bg-stone-800 border border-stone-700/60 rounded px-2 py-1 text-xs text-stone-300 outline-none focus:border-jade-500/60"
                           />
                         </div>

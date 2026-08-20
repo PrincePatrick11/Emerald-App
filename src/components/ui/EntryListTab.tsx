@@ -25,6 +25,8 @@ export interface EntryListTabProps<T> {
   onOpen?: (item: T) => void;
   onOpenNewTab?: (item: T) => void;
   onDragStart?: (item: T) => void;
+  /** Per-item drag gate — lets a mixed list keep the grab cursor off rows that cannot be dragged. */
+  canDrag?: (item: T) => boolean;
   onRename: (item: T, newTitle: string) => void | Promise<void>;
   contextMenuActions: (item: T, startRename: () => void) => ContextMenuAction[];
   emptyMessage: string;
@@ -36,7 +38,7 @@ export interface EntryListTabProps<T> {
 }
 
 export default function EntryListTab<T>({
-  items, getId, getTitle, getDateStr, getIcon, isActive, onOpen, onOpenNewTab, onDragStart,
+  items, getId, getTitle, getDateStr, getIcon, isActive, onOpen, onOpenNewTab, onDragStart, canDrag,
   onRename, contextMenuActions, emptyMessage, onCreate, createTitle, renderRow,
 }: EntryListTabProps<T>) {
   const { t } = useTranslation();
@@ -123,6 +125,7 @@ export default function EntryListTab<T>({
               const dateStr = getDateStr?.(item);
               const icon = getIcon?.(item);
               const active = isActive?.(item) ?? false;
+              const dragHandler = onDragStart && (canDrag?.(item) ?? true) ? onDragStart : undefined;
 
               if (renamingId === id) {
                 return (
@@ -146,10 +149,10 @@ export default function EntryListTab<T>({
               return (
                 <button
                   key={id}
-                  onPointerDown={onDragStart ? (e) => {
+                  onPointerDown={dragHandler ? (e) => {
                     if (e.button !== 0) return;
                     e.preventDefault();
-                    onDragStart(item);
+                    dragHandler(item);
                   } : undefined}
                   onClick={onOpen ? () => onOpen(item) : undefined}
                   onAuxClick={onOpenNewTab ? (e) => {
@@ -159,12 +162,12 @@ export default function EntryListTab<T>({
                     }
                   } : undefined}
                   onContextMenu={(e) => openCtxMenu(e, id)}
-                  className={`sidebar-item w-full text-left ${onDragStart ? 'cursor-grab active:cursor-grabbing' : ''} ${active ? 'active' : ''}`}
+                  className={`sidebar-item w-full text-left ${dragHandler ? 'cursor-grab active:cursor-grabbing' : ''} ${active ? 'active' : ''}`}
                 >
                   {icon}
                   <div className="flex-1 min-w-0">
                     <div className="truncate">{title}</div>
-                    {dateStr && <div className="text-xs text-stone-600 mt-0.5">{dateStr}</div>}
+                    {dateStr && <div className="text-xs text-stone-600 mt-0.5 truncate">{dateStr}</div>}
                   </div>
                 </button>
               );

@@ -265,6 +265,74 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     border-color: var(--border-strong);
   }
 
+  /* Vault picker cards. Deliberately NOT built on .panel/.panel-interactive:
+     those carry per-theme overrides (html[data-theme=…] .panel, specificity
+     0-2-1) that outrank any single-class modifier layered on top, so the
+     accent tint below would never render. Same tokens, own selectors. */
+  .vault-card {
+    @apply flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-all duration-150;
+    background-color: var(--bg-surface-1);
+    border-color: var(--border-soft);
+  }
+
+  .vault-card-idle {
+    @apply cursor-pointer;
+  }
+
+  .vault-card-idle:hover {
+    background-color: var(--bg-surface-2);
+    border-color: var(--border-strong);
+  }
+
+  .vault-card-active {
+    background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+
+  .vault-badge {
+    @apply flex items-center justify-center w-9 h-9 rounded-lg shrink-0;
+    background-color: var(--interactive-active);
+    color: var(--text-muted);
+  }
+
+  .vault-card-active .vault-badge {
+    background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+    color: var(--accent);
+  }
+
+  .vault-name {
+    @apply text-sm truncate;
+    color: var(--text-secondary);
+  }
+
+  .vault-card-active .vault-name,
+  .vault-card-idle:hover .vault-name {
+    color: var(--text-primary);
+  }
+
+  .vault-meta {
+    @apply text-xs;
+    color: var(--text-subtle);
+  }
+
+  .vault-active-label {
+    @apply text-xs shrink-0;
+    color: var(--accent);
+  }
+
+  /* Dashed "add" row — the dashed edge is the affordance, so not a .vault-card. */
+  .vault-create {
+    @apply w-full flex items-center gap-2.5 rounded-xl border border-dashed px-3 py-2.5 text-sm cursor-pointer transition-colors duration-150;
+    border-color: var(--border-soft);
+    color: var(--text-muted);
+  }
+
+  .vault-create:hover {
+    background-color: var(--interactive-hover);
+    border-color: var(--accent);
+    color: var(--text-primary);
+  }
+
   /* Consistent small section label (JOURNAL, PROPERTIES, etc.) */
   .label-xs {
     @apply text-xs font-semibold uppercase tracking-wider text-stone-500;
@@ -357,7 +425,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     box-shadow: 0 0 0 2px var(--focus-ring);
   }
 
-  .wiki-cat-input {
+  .input-field {
     background-color: color-mix(in srgb, var(--bg-surface-1) 80%, transparent);
     border: 1px solid var(--border-soft);
     color: var(--text-secondary);
@@ -374,6 +442,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   .panel-interactive:hover .home-item-title {
     color: var(--text-primary);
   }
+}
+
+/* Unlayered on purpose: in Parchment a base-layer rule paints border-color on
+   every element, and an unlayered declaration beats a layered one regardless of
+   specificity — inside @layer components the accent edge below never rendered. */
+.vault-card.vault-card-active {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 /* TipTap Editor Styles */
@@ -871,8 +946,7 @@ html[data-theme='emerald-noctis'] textarea::placeholder {
   color: #9c8872;
 }
 
-html[data-theme='emerald-noctis'] .settings-choice-btn-idle,
-html[data-theme='emerald-noctis'] .settings-vault-row-idle {
+html[data-theme='emerald-noctis'] .settings-choice-btn-idle {
   background: rgba(46, 38, 32, 0.82);
   border-color: rgba(113, 94, 77, 0.48);
   color: #c9b5a1;
@@ -884,8 +958,7 @@ html[data-theme='emerald-noctis'] .settings-choice-btn-idle:hover {
   color: #f2e7da;
 }
 
-html[data-theme='emerald-noctis'] .settings-choice-btn-active,
-html[data-theme='emerald-noctis'] .settings-vault-row-active {
+html[data-theme='emerald-noctis'] .settings-choice-btn-active {
   background: rgba(0, 138, 87, 0.28);
   border-color: rgba(0, 196, 127, 0.44);
   color: #d9ffef;
@@ -1290,31 +1363,6 @@ html[data-theme='emerald-parchment'] .settings-choice-btn-active {
   color: #075e3d;
 }
 
-html[data-theme='emerald-parchment'] .settings-vault-row-active {
-  background: #1f9567;
-  border-color: #177d56;
-}
-
-html[data-theme='emerald-parchment'] .settings-vault-row-active .settings-vault-name,
-html[data-theme='emerald-parchment'] .settings-vault-row-active .settings-vault-active,
-html[data-theme='emerald-parchment'] .settings-vault-row-active .settings-vault-action {
-  color: #eafff7;
-}
-
-html[data-theme='emerald-parchment'] .settings-vault-row-active .settings-vault-action {
-  opacity: 0.92;
-}
-
-html[data-theme='emerald-parchment'] .settings-vault-row-active .settings-vault-action:hover {
-  color: #ffffff;
-  opacity: 1;
-}
-
-html[data-theme='emerald-parchment'] .settings-vault-row-idle {
-  background: #f3e6cf;
-  border-color: rgba(145, 108, 70, 0.3);
-}
-
 html[data-theme='emerald-parchment'] .home-item-title {
   color: #3b2a19;
 }
@@ -1554,7 +1602,7 @@ html[data-theme='emerald-parchment'] .emoji-picker-item-active {
   background-color: rgba(140, 99, 58, 0.14);
 }
 
-html[data-theme='emerald-parchment'] .wiki-cat-input {
+html[data-theme='emerald-parchment'] .input-field {
   background: rgba(252, 244, 229, 0.95);
   border-color: rgba(145, 108, 70, 0.38);
   color: #342416;

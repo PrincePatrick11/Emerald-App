@@ -37,6 +37,7 @@
     "tagDeleted": "Étiquette supprimée"
   },
   "nav": {
+    "all": "Tout",
     "journal": "Journal",
     "wiki": "Wiki",
     "altar": "Autel",
@@ -46,6 +47,7 @@
     "operations": "Opérations",
     "tasks": "Tâches",
     "settings": "Paramètres",
+    "vaults": "Vaults",
     "newEntry": "Nouvelle entrée",
     "newArticle": "Nouvel article"
   },
@@ -53,7 +55,8 @@
     "collapseList": "Réduire la liste",
     "expandList": "Développer la liste",
     "collapseProperties": "Réduire les propriétés",
-    "expandProperties": "Développer les propriétés"
+    "expandProperties": "Développer les propriétés",
+    "allEmpty": "Aucune entrée pour le moment"
   },
   "operations": {
     "title": "Opérations",
@@ -376,6 +379,22 @@
     "newest": "Récents",
     "oldest": "Anciens"
   },
+  "vault": {
+    "title": "Vaults",
+    "hint": "Chaque vault possède sa propre base de données.",
+    "active": "actif",
+    "switch": "Basculer",
+    "switching": "Basculement…",
+    "rename": "Renommer",
+    "delete": "Supprimer",
+    "namePlaceholder": "Nom du vault…",
+    "add": "Ajouter un vault",
+    "create": "Créer",
+    "cancel": "Annuler",
+    "deleteHint": "Le fichier de base de données reste sur le disque.",
+    "switchFailed": "Impossible de changer de vault.",
+    "saveFailed": "Impossible d'enregistrer la modification."
+  },
   "settings": {
     "language": "Langue",
     "about": "À propos",
@@ -383,13 +402,6 @@
     "version": "Version",
     "description": "Description",
     "descriptionValue": "Une application bureau pour documenter la pratique magique",
-    "vaults": "Vaults",
-    "vaultActive": "actif",
-    "vaultSwitch": "Basculer",
-    "vaultSwitching": "Basculement…",
-    "vaultRename": "Renommer",
-    "vaultDelete": "Supprimer",
-    "vaultNamePlaceholder": "Nom du vault…",
     "backup": "Sauvegarde",
     "exportDb": "Exporter la base de données",
     "exportBtn": "Exporter en .emeralddb",

@@ -76,27 +76,36 @@ export async function getActiveVaultId(): Promise<string> {
 
 export async function setActiveVaultId(id: string): Promise<void> {
   const data = await loadVaultsFile();
-  data.activeVaultId = id;
-  await saveVaultsFile(data);
+  await saveVaultsFile({ ...data, activeVaultId: id });
+}
+
+/** Build the record for a brand new vault — each one gets its own SQLite file. */
+export function newVaultRecord(name: string): Vault {
+  const id = crypto.randomUUID();
+  return {
+    id,
+    name,
+    dbName: `emerald-${id}.db`,
+    createdAt: new Date().toISOString(),
+  };
 }
 
 export async function addVault(vault: Vault): Promise<void> {
   const data = await loadVaultsFile();
-  data.vaults.push(vault);
-  await saveVaultsFile(data);
+  await saveVaultsFile({ ...data, vaults: [...data.vaults, vault] });
 }
 
 export async function updateVaultName(id: string, name: string): Promise<void> {
   const data = await loadVaultsFile();
-  const v = data.vaults.find((v) => v.id === id);
-  if (v) v.name = name;
-  await saveVaultsFile(data);
+  await saveVaultsFile({
+    ...data,
+    vaults: data.vaults.map((v) => (v.id === id ? { ...v, name } : v)),
+  });
 }
 
 export async function removeVault(id: string): Promise<void> {
   const data = await loadVaultsFile();
-  data.vaults = data.vaults.filter((v) => v.id !== id);
-  await saveVaultsFile(data);
+  await saveVaultsFile({ ...data, vaults: data.vaults.filter((v) => v.id !== id) });
 }
 
 /** Invalidate in-memory cache (e.g. after an external write). */

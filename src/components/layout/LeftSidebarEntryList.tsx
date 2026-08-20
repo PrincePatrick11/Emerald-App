@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
-import { BookOpen, Wand2, Library, Flame, CheckSquare, Square, Copy, Pencil, Trash2, PanelTopOpen } from 'lucide-react';
+import { BookOpen, Wand2, Library, Flame, CheckSquare, Square, Copy, Pencil, Trash2, PanelTopOpen, LayoutList } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useOperationStore } from '../../store/operationStore';
@@ -13,15 +13,17 @@ import { setDragItem } from '../../lib/dragState';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
-import type { MoonPhase } from '../../types';
+import type { AltarRecord, JournalEntry, MoonPhase, Operation, Task, WikiArticle } from '../../types';
 import TabIconButton from '../ui/TabIconButton';
-import EntryListTab from '../ui/EntryListTab';
+import EntryListTab, { type EntryListTabProps } from '../ui/EntryListTab';
+import type { ContextMenuAction } from '../ui/ContextMenu';
 
 export default function LeftSidebarEntryList() {
   const { t } = useTranslation();
   const { leftListTab, setLeftListTab } = useUIStore();
 
-  const tabs: Array<{ id: 'journal' | 'tasks' | 'operations' | 'wiki' | 'altar'; icon: ReactNode; label: string }> = [
+  const tabs: Array<{ id: 'all' | 'journal' | 'tasks' | 'operations' | 'wiki' | 'altar'; icon: ReactNode; label: string }> = [
+    { id: 'all', icon: <LayoutList size={14} />, label: t('nav.all') },
     { id: 'journal', icon: <BookOpen size={14} />, label: t('nav.journal') },
     { id: 'tasks', icon: <CheckSquare size={14} />, label: t('nav.tasks') },
     { id: 'operations', icon: <Wand2 size={14} />, label: t('nav.operations') },
@@ -39,6 +41,7 @@ export default function LeftSidebarEntryList() {
         ))}
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
+        {leftListTab === 'all' && <AllList />}
         {leftListTab === 'journal' && <JournalList />}
         {leftListTab === 'tasks' && <TasksList />}
         {leftListTab === 'operations' && <OperationsList />}
@@ -49,7 +52,94 @@ export default function LeftSidebarEntryList() {
   );
 }
 
-function JournalList() {
+// ── All ──────────────────────────────────────────────────────────────────────
+// One flat, type-erased row per entry, so the combined list reuses each tab's
+// real handlers (duplicate, delete-with-undo, rename) instead of copying them.
+// EntryListTab<T> is single-typed, so the erasure has to happen somewhere; the
+// closures below are that seam. Four config fields cannot survive it and are
+// dropped on purpose: renderRow (only Tasks has one — in "All" its rows fall
+// back to the plain icon/title layout), plus onCreate, createTitle and
+// emptyMessage, which "All" answers for itself.
+
+type EntryKind = 'journal' | 'task' | 'operation' | 'wiki' | 'altar';
+
+interface AllRow {
+  id: string;
+  title: string;
+  sortDate: string;
+  icon: ReactNode;
+  dateStr: string;
+  active: boolean;
+  open: () => void;
+  /** Absent for Tasks, which have no standalone view to open in a tab. */
+  openNewTab?: () => void;
+  /** Absent for Tasks and Altars, which are not drag sources. */
+  dragStart?: () => void;
+  rename: (title: string) => void | Promise<void>;
+  actions: (startRename: () => void) => ContextMenuAction[];
+}
+
+function toAllRows<T>(
+  kind: EntryKind,
+  kindLabel: string,
+  cfg: EntryListTabProps<T>,
+  getSortDate: (item: T) => string,
+): AllRow[] {
+  const { onOpen, onOpenNewTab, onDragStart } = cfg;
+  return cfg.items.map((item) => ({
+    id: `${kind}:${cfg.getId(item)}`,
+    title: cfg.getTitle(item),
+    sortDate: getSortDate(item),
+    icon: cfg.getIcon?.(item),
+    // Reuse the tab's own subtitle so an entry never shows one date here and
+    // another there; the kind label is what "All" adds on top.
+    dateStr: [kindLabel, cfg.getDateStr?.(item)].filter(Boolean).join(' · '),
+    active: cfg.isActive?.(item) ?? false,
+    open: () => onOpen?.(item),
+    openNewTab: onOpenNewTab && (() => onOpenNewTab(item)),
+    dragStart: onDragStart && (() => onDragStart(item)),
+    rename: (title: string) => cfg.onRename(item, title),
+    actions: (startRename: () => void) => cfg.contextMenuActions(item, startRename),
+  }));
+}
+
+function AllList() {
+  const { t } = useTranslation();
+  const journal = useJournalConfig();
+  const tasks = useTasksConfig();
+  const operations = useOperationsConfig();
+  const wiki = useWikiConfig();
+  const altar = useAltarConfig();
+
+  const rows = [
+    ...toAllRows('journal', t('nav.journal'), journal, (e) => e.updated_at),
+    ...toAllRows('task', t('nav.tasks'), tasks, (task) => task.updated_at),
+    ...toAllRows('operation', t('nav.operations'), operations, (op) => op.updated_at),
+    ...toAllRows('wiki', t('nav.wiki'), wiki, (a) => a.updated_at),
+    ...toAllRows('altar', t('nav.altar'), altar, (a) => a.updated_at),
+  ].sort((a, b) => b.sortDate.localeCompare(a.sortDate));
+
+  return (
+    <EntryListTab
+      items={rows}
+      getId={(r) => r.id}
+      getTitle={(r) => r.title}
+      getDateStr={(r) => r.dateStr}
+      getIcon={(r) => r.icon}
+      isActive={(r) => r.active}
+      onOpen={(r) => r.open()}
+      onOpenNewTab={(r) => r.openNewTab?.()}
+      onDragStart={(r) => r.dragStart?.()}
+      canDrag={(r) => Boolean(r.dragStart)}
+      onRename={(r, title) => r.rename(title)}
+      contextMenuActions={(r, startRename) => r.actions(startRename)}
+      emptyMessage={t('sidebar.allEmpty')}
+    />
+  );
+}
+
+// ── Journal ──────────────────────────────────────────────────────────────────
+function useJournalConfig(): EntryListTabProps<JournalEntry> {
   const { t } = useTranslation();
   const { activeView, setActiveView, openViewInNewTab } = useUIStore();
   const { entries, createEntry, updateEntry, deleteEntry, restoreEntry } = useJournalStore();
@@ -85,32 +175,35 @@ function JournalList() {
     if (activeView.id === entry.id) setActiveView({ type: 'journal' });
   };
 
-  return (
-    <EntryListTab
-      items={entries}
-      getId={(e) => e.id}
-      getTitle={(e) => e.title}
-      getDateStr={(e) => format(new Date(e.created_at), 'MMM d, yyyy')}
-      getIcon={(e) => <span className="text-base leading-none flex-shrink-0">{MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓'}</span>}
-      isActive={(e) => activeView.id === e.id}
-      onOpen={(e) => setActiveView({ type: 'journal', id: e.id, mode: 'view' })}
-      onOpenNewTab={(e) => openViewInNewTab({ type: 'journal', id: e.id, mode: 'view' })}
-      onDragStart={(e) => setDragItem({ id: e.id, entryType: 'journal', label: e.title })}
-      onRename={(e, title) => updateEntry(e.id, { title })}
-      contextMenuActions={(e, startRename) => [
-        { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'journal', id: e.id, mode: 'view' }) },
-        { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(e) },
-        { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
-        { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(e), danger: true },
-      ]}
-      emptyMessage={t('journal.noEntries')}
-      onCreate={handleNewJournalEntry}
-      createTitle={t('journal.newEntry')}
-    />
-  );
+  return {
+    items: entries,
+    getId: (e) => e.id,
+    getTitle: (e) => e.title,
+    getDateStr: (e) => format(new Date(e.created_at), 'MMM d, yyyy'),
+    getIcon: (e) => <span className="text-base leading-none flex-shrink-0">{MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓'}</span>,
+    isActive: (e) => activeView.id === e.id,
+    onOpen: (e) => setActiveView({ type: 'journal', id: e.id, mode: 'view' }),
+    onOpenNewTab: (e) => openViewInNewTab({ type: 'journal', id: e.id, mode: 'view' }),
+    onDragStart: (e) => setDragItem({ id: e.id, entryType: 'journal', label: e.title }),
+    onRename: (e, title) => updateEntry(e.id, { title }),
+    contextMenuActions: (e, startRename) => [
+      { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'journal', id: e.id, mode: 'view' }) },
+      { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(e) },
+      { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
+      { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(e), danger: true },
+    ],
+    emptyMessage: t('journal.noEntries'),
+    onCreate: handleNewJournalEntry,
+    createTitle: t('journal.newEntry'),
+  };
 }
 
-function OperationsList() {
+function JournalList() {
+  return <EntryListTab {...useJournalConfig()} />;
+}
+
+// ── Operations ───────────────────────────────────────────────────────────────
+function useOperationsConfig(): EntryListTabProps<Operation> {
   const { t } = useTranslation();
   const { activeView, setActiveView, openViewInNewTab } = useUIStore();
   const { categories, operations, createOperation, updateOperation, deleteOperation, restoreOperation } = useOperationStore();
@@ -144,42 +237,45 @@ function OperationsList() {
 
   const sorted = operations.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 
-  return (
-    <EntryListTab
-      items={sorted}
-      getId={(op) => op.id}
-      getTitle={(op) => op.title}
-      getDateStr={(op) => {
-        const cat = catById[op.category_id];
-        const catDisplayName = cat ? opCatName(cat) : '';
-        return `${catDisplayName}${catDisplayName ? ' · ' : ''}${format(new Date(op.updated_at), 'MMM d, yyyy')}`;
-      }}
-      getIcon={(op) => {
-        const cat = catById[op.category_id];
-        const iconValue = op.icon || cat?.emoji || '⚡';
-        return isImageIcon(iconValue)
-          ? <img src={iconValue} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
-          : <span className="text-base leading-none flex-shrink-0">{iconValue}</span>;
-      }}
-      isActive={(op) => activeView.id === op.id}
-      onOpen={(op) => setActiveView({ type: 'operations', id: op.id, mode: 'view' })}
-      onOpenNewTab={(op) => openViewInNewTab({ type: 'operations', id: op.id, mode: 'view' })}
-      onDragStart={(op) => setDragItem({ id: op.id, entryType: 'operation', label: op.title, category: catById[op.category_id]?.emoji })}
-      onRename={(op, title) => updateOperation(op.id, { title })}
-      contextMenuActions={(op, startRename) => [
-        { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'operations', id: op.id, mode: 'view' }) },
-        { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(op) },
-        { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
-        { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(op), danger: true },
-      ]}
-      emptyMessage={t('operations.none')}
-      onCreate={handleNewOperation}
-      createTitle={t('operations.new')}
-    />
-  );
+  return {
+    items: sorted,
+    getId: (op) => op.id,
+    getTitle: (op) => op.title,
+    getDateStr: (op) => {
+      const cat = catById[op.category_id];
+      const catDisplayName = cat ? opCatName(cat) : '';
+      return `${catDisplayName}${catDisplayName ? ' · ' : ''}${format(new Date(op.updated_at), 'MMM d, yyyy')}`;
+    },
+    getIcon: (op) => {
+      const cat = catById[op.category_id];
+      const iconValue = op.icon || cat?.emoji || '⚡';
+      return isImageIcon(iconValue)
+        ? <img src={iconValue} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
+        : <span className="text-base leading-none flex-shrink-0">{iconValue}</span>;
+    },
+    isActive: (op) => activeView.id === op.id,
+    onOpen: (op) => setActiveView({ type: 'operations', id: op.id, mode: 'view' }),
+    onOpenNewTab: (op) => openViewInNewTab({ type: 'operations', id: op.id, mode: 'view' }),
+    onDragStart: (op) => setDragItem({ id: op.id, entryType: 'operation', label: op.title, category: catById[op.category_id]?.emoji }),
+    onRename: (op, title) => updateOperation(op.id, { title }),
+    contextMenuActions: (op, startRename) => [
+      { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'operations', id: op.id, mode: 'view' }) },
+      { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(op) },
+      { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
+      { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(op), danger: true },
+    ],
+    emptyMessage: t('operations.none'),
+    onCreate: handleNewOperation,
+    createTitle: t('operations.new'),
+  };
 }
 
-function WikiList() {
+function OperationsList() {
+  return <EntryListTab {...useOperationsConfig()} />;
+}
+
+// ── Wiki ─────────────────────────────────────────────────────────────────────
+function useWikiConfig(): EntryListTabProps<WikiArticle> {
   const { t } = useTranslation();
   const { activeView, setActiveView, openViewInNewTab } = useUIStore();
   const { articles, wikiCategories, createArticle, updateArticle, deleteArticle, restoreArticle } = useWikiStore();
@@ -210,41 +306,44 @@ function WikiList() {
 
   const sorted = articles.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 
-  return (
-    <EntryListTab
-      items={sorted}
-      getId={(a) => a.id}
-      getTitle={(a) => a.title}
-      getDateStr={(a) => {
-        const cat = catById[a.category];
-        const catLabel = cat ? (cat.is_builtin ? t(`wiki.categories.${cat.id}`) : cat.name) : a.category;
-        return `${catLabel} · ${format(new Date(a.updated_at), 'MMM d, yyyy')}`;
-      }}
-      getIcon={(a) => {
-        const cat = catById[a.category];
-        return isImageIcon(a.icon)
-          ? <img src={a.icon} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
-          : <span className="text-base leading-none flex-shrink-0">{cat?.emoji ?? getCategoryEmoji(a.category)}</span>;
-      }}
-      isActive={(a) => activeView.id === a.id}
-      onOpen={(a) => setActiveView({ type: 'wiki', id: a.id, mode: 'view' })}
-      onOpenNewTab={(a) => openViewInNewTab({ type: 'wiki', id: a.id, mode: 'view' })}
-      onDragStart={(a) => setDragItem({ id: a.id, entryType: 'wiki', label: a.title, category: a.category })}
-      onRename={(a, title) => updateArticle(a.id, { title })}
-      contextMenuActions={(a, startRename) => [
-        { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'wiki', id: a.id, mode: 'view' }) },
-        { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(a) },
-        { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
-        { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(a), danger: true },
-      ]}
-      emptyMessage={t('wiki.noArticles')}
-      onCreate={handleNewArticle}
-      createTitle={t('wiki.newArticle')}
-    />
-  );
+  return {
+    items: sorted,
+    getId: (a) => a.id,
+    getTitle: (a) => a.title,
+    getDateStr: (a) => {
+      const cat = catById[a.category];
+      const catLabel = cat ? (cat.is_builtin ? t(`wiki.categories.${cat.id}`) : cat.name) : a.category;
+      return `${catLabel} · ${format(new Date(a.updated_at), 'MMM d, yyyy')}`;
+    },
+    getIcon: (a) => {
+      const cat = catById[a.category];
+      return isImageIcon(a.icon)
+        ? <img src={a.icon} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
+        : <span className="text-base leading-none flex-shrink-0">{cat?.emoji ?? getCategoryEmoji(a.category)}</span>;
+    },
+    isActive: (a) => activeView.id === a.id,
+    onOpen: (a) => setActiveView({ type: 'wiki', id: a.id, mode: 'view' }),
+    onOpenNewTab: (a) => openViewInNewTab({ type: 'wiki', id: a.id, mode: 'view' }),
+    onDragStart: (a) => setDragItem({ id: a.id, entryType: 'wiki', label: a.title, category: a.category }),
+    onRename: (a, title) => updateArticle(a.id, { title }),
+    contextMenuActions: (a, startRename) => [
+      { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'wiki', id: a.id, mode: 'view' }) },
+      { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(a) },
+      { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
+      { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(a), danger: true },
+    ],
+    emptyMessage: t('wiki.noArticles'),
+    onCreate: handleNewArticle,
+    createTitle: t('wiki.newArticle'),
+  };
 }
 
-function AltarList() {
+function WikiList() {
+  return <EntryListTab {...useWikiConfig()} />;
+}
+
+// ── Altar ────────────────────────────────────────────────────────────────────
+function useAltarConfig(): EntryListTabProps<AltarRecord> {
   const { t } = useTranslation();
   const { activeView, setActiveView, openViewInNewTab } = useUIStore();
   const { altars, createAltar, updateAltar } = useAltarStore();
@@ -256,31 +355,34 @@ function AltarList() {
 
   const sorted = altars.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 
-  return (
-    <EntryListTab
-      items={sorted}
-      getId={(a) => a.id}
-      getTitle={(a) => a.title}
-      getDateStr={(a) => format(new Date(a.updated_at), 'MMM d, yyyy')}
-      getIcon={(a) => isImageIcon(a.icon_data)
-        ? <img src={a.icon_data!} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
-        : <Flame size={16} className="flex-shrink-0 text-stone-600" />}
-      isActive={(a) => activeView.id === a.id}
-      onOpen={(a) => setActiveView({ type: 'altar', id: a.id, mode: 'view' })}
-      onOpenNewTab={(a) => openViewInNewTab({ type: 'altar', id: a.id, mode: 'view' })}
-      onRename={(a, title) => updateAltar(a.id, { title })}
-      contextMenuActions={(a, startRename) => [
-        { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'altar', id: a.id, mode: 'view' }) },
-        { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
-      ]}
-      emptyMessage={t('altar.none')}
-      onCreate={handleNewAltar}
-      createTitle={t('altar.newAltar')}
-    />
-  );
+  return {
+    items: sorted,
+    getId: (a) => a.id,
+    getTitle: (a) => a.title,
+    getDateStr: (a) => format(new Date(a.updated_at), 'MMM d, yyyy'),
+    getIcon: (a) => (isImageIcon(a.icon_data)
+      ? <img src={a.icon_data!} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
+      : <Flame size={16} className="flex-shrink-0 text-stone-600" />),
+    isActive: (a) => activeView.id === a.id,
+    onOpen: (a) => setActiveView({ type: 'altar', id: a.id, mode: 'view' }),
+    onOpenNewTab: (a) => openViewInNewTab({ type: 'altar', id: a.id, mode: 'view' }),
+    onRename: (a, title) => updateAltar(a.id, { title }),
+    contextMenuActions: (a, startRename) => [
+      { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'altar', id: a.id, mode: 'view' }) },
+      { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
+    ],
+    emptyMessage: t('altar.none'),
+    onCreate: handleNewAltar,
+    createTitle: t('altar.newAltar'),
+  };
 }
 
-function TasksList() {
+function AltarList() {
+  return <EntryListTab {...useAltarConfig()} />;
+}
+
+// ── Tasks ────────────────────────────────────────────────────────────────────
+function useTasksConfig(): EntryListTabProps<Task> {
   const { t } = useTranslation();
   const { setActiveView } = useUIStore();
   const { categories, tasks, createTask, updateTask, deleteTask, restoreTask } = useTaskStore();
@@ -299,63 +401,75 @@ function TasksList() {
     pushUndo({ id: generateId(), description: t('undo.taskDeleted'), undo: () => restoreTask(task.id) });
   };
 
+  const dateStrFor = (task: (typeof tasks)[number]) => {
+    const cat = catById[task.category_id];
+    return `${cat?.name ?? ''}${cat?.name && task.due_date ? ' · ' : ''}${task.due_date ? format(new Date(task.due_date), 'MMM d, yyyy') : ''}`;
+  };
+
   const sorted = tasks.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 
   // The checkbox needs to be clickable independently of the title, so the row
   // content is custom — search bar, empty-state, "+" and the context menu
-  // popup itself still come from EntryListTab.
-  return (
-    <EntryListTab
-      items={sorted}
-      getId={(task) => task.id}
-      getTitle={(task) => task.title}
-      onRename={(task, title) => updateTask(task.id, { title })}
-      contextMenuActions={(task, startRename) => [
-        { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
-        { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(task), danger: true },
-      ]}
-      emptyMessage={t('tasks.empty')}
-      onCreate={handleNewTask}
-      createTitle={t('tasks.newTask')}
-      renderRow={({ item: task, isRenaming, renameValue, setRenameValue, commitRename, cancelRename, openCtxMenu }) => {
-        const cat = catById[task.category_id];
-        const dateStr = `${cat?.name ?? ''}${cat?.name && task.due_date ? ' · ' : ''}${task.due_date ? format(new Date(task.due_date), 'MMM d, yyyy') : ''}`;
+  // popup itself still come from EntryListTab. getIcon/getDateStr/onOpen go
+  // unused behind renderRow here, but let the "All" tab render tasks plainly.
+  return {
+    items: sorted,
+    getId: (task) => task.id,
+    getTitle: (task) => task.title,
+    getDateStr: dateStrFor,
+    getIcon: (task) => (task.completed
+      ? <CheckSquare size={16} className="flex-shrink-0 text-stone-600" />
+      : <Square size={16} className="flex-shrink-0 text-stone-600" />),
+    onOpen: () => setActiveView({ type: 'tasks' }),
+    onRename: (task, title) => updateTask(task.id, { title }),
+    contextMenuActions: (task, startRename) => [
+      { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
+      { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(task), danger: true },
+    ],
+    emptyMessage: t('tasks.empty'),
+    onCreate: handleNewTask,
+    createTitle: t('tasks.newTask'),
+    renderRow: ({ item: task, isRenaming, renameValue, setRenameValue, commitRename, cancelRename, openCtxMenu }) => {
+      const dateStr = dateStrFor(task);
 
-        if (isRenaming) {
-          return (
-            <div className="sidebar-item">
-              <CheckSquare size={16} className="flex-shrink-0 text-stone-600" />
-              <div className="flex-1 min-w-0">
-                <input
-                  autoFocus
-                  value={renameValue}
-                  onChange={(e) => setRenameValue(e.target.value)}
-                  onBlur={commitRename}
-                  onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') cancelRename(); }}
-                  className="w-full bg-transparent text-sm text-stone-300 outline-none selectable truncate"
-                />
-                {dateStr && <div className="text-xs text-stone-600 mt-0.5">{dateStr}</div>}
-              </div>
-            </div>
-          );
-        }
-
+      if (isRenaming) {
         return (
-          <div onContextMenu={openCtxMenu} className="sidebar-item w-full text-left">
-            <button
-              onClick={(e) => { e.stopPropagation(); updateTask(task.id, { completed: !task.completed }); }}
-              className="flex-shrink-0 text-stone-500 hover:text-stone-300"
-              title={task.completed ? t('tasks.markActive') : t('tasks.markCompleted')}
-            >
-              {task.completed ? <CheckSquare size={16} /> : <Square size={16} />}
-            </button>
-            <button onClick={() => setActiveView({ type: 'tasks' })} className="flex-1 min-w-0 text-left">
-              <div className={`truncate ${task.completed ? 'line-through text-stone-500' : ''}`}>{task.title}</div>
+          <div className="sidebar-item">
+            <CheckSquare size={16} className="flex-shrink-0 text-stone-600" />
+            <div className="flex-1 min-w-0">
+              <input
+                autoFocus
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') cancelRename(); }}
+                className="w-full bg-transparent text-sm text-stone-300 outline-none selectable truncate"
+              />
               {dateStr && <div className="text-xs text-stone-600 mt-0.5">{dateStr}</div>}
-            </button>
+            </div>
           </div>
         );
-      }}
-    />
-  );
+      }
+
+      return (
+        <div onContextMenu={openCtxMenu} className="sidebar-item w-full text-left">
+          <button
+            onClick={(e) => { e.stopPropagation(); updateTask(task.id, { completed: !task.completed }); }}
+            className="flex-shrink-0 text-stone-500 hover:text-stone-300"
+            title={task.completed ? t('tasks.markActive') : t('tasks.markCompleted')}
+          >
+            {task.completed ? <CheckSquare size={16} /> : <Square size={16} />}
+          </button>
+          <button onClick={() => setActiveView({ type: 'tasks' })} className="flex-1 min-w-0 text-left">
+            <div className={`truncate ${task.completed ? 'line-through text-stone-500' : ''}`}>{task.title}</div>
+            {dateStr && <div className="text-xs text-stone-600 mt-0.5">{dateStr}</div>}
+          </button>
+        </div>
+      );
+    },
+  };
+}
+
+function TasksList() {
+  return <EntryListTab {...useTasksConfig()} />;
 }

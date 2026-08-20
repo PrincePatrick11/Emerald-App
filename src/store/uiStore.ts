@@ -31,7 +31,7 @@ interface UIState {
   operationsSubTab: string | null;
   wikiSubTab: string | null;
   leftListOpen: boolean;
-  leftListTab: 'journal' | 'tasks' | 'operations' | 'wiki' | 'altar';
+  leftListTab: 'all' | 'journal' | 'tasks' | 'operations' | 'wiki' | 'altar';
   searchQuery: string;
   journalPrefs: ListPrefs;
   wikiPrefs: ListPrefs;
@@ -61,7 +61,7 @@ interface UIState {
   setOperationsSubTab: (id: string | null) => void;
   setWikiSubTab: (category: string | null) => void;
   toggleLeftList: () => void;
-  setLeftListTab: (tab: 'journal' | 'tasks' | 'operations' | 'wiki' | 'altar') => void;
+  setLeftListTab: (tab: 'all' | 'journal' | 'tasks' | 'operations' | 'wiki' | 'altar') => void;
   setSearchQuery: (q: string) => void;
   setJournalPrefs: (p: Partial<ListPrefs>) => void;
   setWikiPrefs: (p: Partial<ListPrefs>) => void;

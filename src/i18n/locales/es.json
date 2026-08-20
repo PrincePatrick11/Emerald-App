@@ -37,6 +37,7 @@
     "tagDeleted": "Etiqueta eliminada"
   },
   "nav": {
+    "all": "Todo",
     "journal": "Diario",
     "wiki": "Wiki",
     "altar": "Altar",
@@ -46,6 +47,7 @@
     "operations": "Operaciones",
     "tasks": "Tareas",
     "settings": "Ajustes",
+    "vaults": "Vaults",
     "newEntry": "Nueva entrada",
     "newArticle": "Nuevo artículo"
   },
@@ -53,7 +55,8 @@
     "collapseList": "Contraer lista",
     "expandList": "Expandir lista",
     "collapseProperties": "Contraer propiedades",
-    "expandProperties": "Expandir propiedades"
+    "expandProperties": "Expandir propiedades",
+    "allEmpty": "Aún no hay entradas"
   },
   "operations": {
     "title": "Operaciones",
@@ -376,6 +379,22 @@
     "newest": "Recientes",
     "oldest": "Antiguos"
   },
+  "vault": {
+    "title": "Vaults",
+    "hint": "Cada vault tiene su propia base de datos.",
+    "active": "activo",
+    "switch": "Cambiar",
+    "switching": "Cambiando…",
+    "rename": "Renombrar",
+    "delete": "Eliminar",
+    "namePlaceholder": "Nombre del vault…",
+    "add": "Añadir vault",
+    "create": "Crear",
+    "cancel": "Cancelar",
+    "deleteHint": "El archivo de base de datos permanece en el disco.",
+    "switchFailed": "No se pudo cambiar de vault.",
+    "saveFailed": "No se pudo guardar el cambio."
+  },
   "settings": {
     "language": "Idioma",
     "about": "Acerca de",
@@ -383,13 +402,6 @@
     "version": "Versión",
     "description": "Descripción",
     "descriptionValue": "Una app de escritorio para documentar la práctica mágica",
-    "vaults": "Vaults",
-    "vaultActive": "activo",
-    "vaultSwitch": "Cambiar",
-    "vaultSwitching": "Cambiando…",
-    "vaultRename": "Renombrar",
-    "vaultDelete": "Eliminar",
-    "vaultNamePlaceholder": "Nombre del vault…",
     "backup": "Copia de seguridad",
     "exportDb": "Exportar base de datos",
     "exportBtn": "Exportar como .emeralddb",

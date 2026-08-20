@@ -372,7 +372,7 @@ export default function WikiView() {
               value={editCatName}
               onChange={(e) => setEditCatName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditCat(); if (e.key === 'Escape') { setEditingCatId(null); } }}
-              className="wiki-cat-input flex-1 rounded px-2 py-0.5 text-xs outline-none font-semibold uppercase tracking-wider"
+              className="input-field flex-1 rounded px-2 py-0.5 text-xs outline-none font-semibold uppercase tracking-wider"
             />
             <button onClick={handleSaveEditCat} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
             <button onClick={() => setEditingCatId(null)} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
@@ -429,7 +429,7 @@ export default function WikiView() {
             onChange={(e) => setNewWikiCatName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleAddWikiCat(); if (e.key === 'Escape') { setAddingWikiCat(false); } }}
             placeholder="Name…"
-            className="wiki-cat-input flex-1 rounded px-2 py-0.5 text-xs outline-none font-semibold uppercase tracking-wider"
+            className="input-field flex-1 rounded px-2 py-0.5 text-xs outline-none font-semibold uppercase tracking-wider"
           />
           <button onClick={handleAddWikiCat} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
           <button onClick={() => setAddingWikiCat(false)} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>

@@ -37,6 +37,7 @@
     "tagDeleted": "Tag deleted"
   },
   "nav": {
+    "all": "All",
     "journal": "Journal",
     "wiki": "Wiki",
     "altar": "Altar",
@@ -46,6 +47,7 @@
     "operations": "Operations",
     "tasks": "Tasks",
     "settings": "Settings",
+    "vaults": "Vaults",
     "newEntry": "New Entry",
     "newArticle": "New Article"
   },
@@ -53,7 +55,8 @@
     "collapseList": "Collapse list",
     "expandList": "Expand list",
     "collapseProperties": "Collapse properties",
-    "expandProperties": "Expand properties"
+    "expandProperties": "Expand properties",
+    "allEmpty": "No entries yet"
   },
   "operations": {
     "title": "Operations",
@@ -368,6 +371,22 @@
     "moonPhase": "Moon Phase",
     "status": "Status"
   },
+  "vault": {
+    "title": "Vaults",
+    "hint": "Each vault has its own database.",
+    "active": "active",
+    "switch": "Switch",
+    "switching": "Switching…",
+    "rename": "Rename",
+    "delete": "Delete",
+    "namePlaceholder": "Vault name…",
+    "add": "Add Vault",
+    "create": "Create",
+    "cancel": "Cancel",
+    "deleteHint": "The database file stays on disk.",
+    "switchFailed": "Could not switch vault.",
+    "saveFailed": "Could not save the change."
+  },
   "settings": {
     "language": "Language",
     "about": "About",
@@ -375,13 +394,6 @@
     "version": "Version",
     "description": "Description",
     "descriptionValue": "A desktop app for documenting magical practice",
-    "vaults": "Vaults",
-    "vaultActive": "active",
-    "vaultSwitch": "Switch",
-    "vaultSwitching": "Switching…",
-    "vaultRename": "Rename",
-    "vaultDelete": "Delete",
-    "vaultNamePlaceholder": "Vault name…",
     "backup": "Backup",
     "exportDb": "Export Database",
     "exportBtn": "Export as .emeralddb",

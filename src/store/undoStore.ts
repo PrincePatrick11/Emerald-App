@@ -13,6 +13,7 @@ interface UndoState {
   push: (action: UndoAction) => void;
   executeUndo: () => Promise<void>;
   dismissToast: () => void;
+  clear: () => void;
 }
 
 export const useUndoStore = create<UndoState>((set, get) => ({
@@ -38,5 +39,11 @@ export const useUndoStore = create<UndoState>((set, get) => ({
 
   dismissToast: () => {
     set({ toastVisible: false });
+  },
+
+  /** Drop every queued undo — their closures restore rows by id against whatever
+      DB is active, so they are meaningless once the vault changes. */
+  clear: () => {
+    set({ stack: [], activeToast: null, toastVisible: false });
   },
 }));
