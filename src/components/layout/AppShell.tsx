@@ -13,8 +13,8 @@ import { hasActiveVault, useVaultStore } from '../../store/vaultStore';
 import { invoke } from '@tauri-apps/api/core';
 import { computeMenuEnabledState, runMenuAction, SELF_CONTAINED_MENU_ACTIONS } from '../../lib/menuActions';
 import TitleBar from './titlebar/TitleBar';
-import LeftSidebarRail from './LeftSidebarRail';
-import LeftSidebarEntryList from './LeftSidebarEntryList';
+import LeftSidebarRail, { RAIL_WIDTH } from './LeftSidebarRail';
+import LeftSidebarEntryList, { ENTRY_LIST_TABS_WIDTH } from './LeftSidebarEntryList';
 import RightSidebar from './RightSidebar';
 import MainArea from './MainArea';
 import TabBar from './TabBar';
@@ -22,15 +22,45 @@ import VaultModal from './VaultModal';
 import UndoToast from '../ui/UndoToast';
 import ImportDestinationModal from '../ui/ImportDestinationModal';
 
-const RAIL_WIDTH = 56;
 const ENTRY_LIST_MIN = 180;
-const ENTRY_LIST_DEFAULT = 220;
+/** Genau so breit, dass die sechs Tabs der Eintragsliste nebeneinander passen. */
+const ENTRY_LIST_DEFAULT = ENTRY_LIST_TABS_WIDTH;
 const RIGHT_MIN = 180;
-const RIGHT_DEFAULT = 300;
+/** So breit wie die linke Seite im Ganzen — Rail plus Eintragsliste. */
+const RIGHT_DEFAULT = RAIL_WIDTH + ENTRY_LIST_DEFAULT;
+
+/* Die Breiten-Transition der Seitenleisten. Eine Klasse in `index.css`, kein
+   `style={{ transition: … }}` aus SIDEBAR_ANIM_MS heraus: ein Inline-Style
+   schlaegt jede Regel im Stylesheet, also auch die `prefers-reduced-motion`-
+   Abbestellung. SIDEBAR_ANIM_MS muss deshalb von Hand zur Dauer dort passen —
+   es steuert nur, wie lange der Inhalt noch gemountet bleibt. */
+const SIDEBAR_ANIM_CLASS = 'app-sidebar-animated';
+const SIDEBAR_ANIM_MS = 200;
+
+const ENTRY_LIST_WIDTH_KEY = 'entry-list-width';
+const RIGHT_WIDTH_KEY = 'sidebar-right-width';
 
 /** Vault setup has nowhere to close to. `Modal` requires the prop but never
  *  calls it while `dismissible={false}` — there is no X, no Escape, no backdrop. */
 const NEVER_CLOSE = () => {};
+
+/**
+ * Haelt den Inhalt einer Seitenleiste ueber die Ausblend-Animation hinweg
+ * gemountet und raeumt ihn erst danach ab. Dauerhaft gemountet lassen waere
+ * einfacher, kostet aber: `AllList` ruft alle fuenf Config-Hooks der Module,
+ * `AltarSidebarPanel` bringt eigene Effekte und Drag-Listener mit — beides
+ * soll unsichtbar nicht mitlaufen. Timeout statt `transitionend`, damit auch
+ * abgeraeumt wird, wenn die Transition (Reduced Motion) gar nicht laeuft.
+ */
+function useDeferredUnmount(open: boolean): boolean {
+  const [mounted, setMounted] = useState(open);
+  useEffect(() => {
+    if (open) { setMounted(true); return; }
+    const tid = setTimeout(() => setMounted(false), SIDEBAR_ANIM_MS);
+    return () => clearTimeout(tid);
+  }, [open]);
+  return mounted;
+}
 
 function loadSavedWidth(key: string, min: number, fallback: number): number {
   const saved = localStorage.getItem(key);
@@ -59,11 +89,16 @@ export default function AppShell() {
   const isAltarWindowFullscreen = useUIStore(isAltarFullscreen);
 
   const [entryListWidth, setEntryListWidth] = useState(() =>
-    loadSavedWidth('entry-list-width', ENTRY_LIST_MIN, ENTRY_LIST_DEFAULT)
+    loadSavedWidth(ENTRY_LIST_WIDTH_KEY, ENTRY_LIST_MIN, ENTRY_LIST_DEFAULT)
   );
   const [rightWidth, setRightWidth] = useState(() =>
-    loadSavedWidth('sidebar-right-width', RIGHT_MIN, RIGHT_DEFAULT)
+    loadSavedWidth(RIGHT_WIDTH_KEY, RIGHT_MIN, RIGHT_DEFAULT)
   );
+  // State, nicht Ref: das Abschalten der Transition muss neu rendern.
+  const [resizing, setResizing] = useState(false);
+
+  const leftListMounted = useDeferredUnmount(leftListOpen);
+  const rightSidebarMounted = useDeferredUnmount(rightSidebarOpen);
 
   const entryListWidthRef = useRef(entryListWidth);
   const rightWidthRef = useRef(rightWidth);
@@ -96,6 +131,8 @@ export default function AppShell() {
       export:          t('menu.export'),
       import:          t('menu.import'),
       resetView:       t('menu.resetView'),
+      entryList:       t('menu.entryList'),
+      properties:      t('menu.properties'),
       exportPdf:       t('menu.exportPdf'),
       exportMarkdown:  t('menu.exportMarkdown'),
       exportEmerald:   t('menu.exportEmerald'),
@@ -123,6 +160,13 @@ export default function AppShell() {
       .catch(() => {/* desktop-only, ignore in browser preview */});
   }, [activeView.type, activeView.id, activeView.mode]);
 
+  // Same idea for the View menu's two check items — the rail's own toggle
+  // buttons change this state without the menu ever being opened.
+  useEffect(() => {
+    invoke('set_view_menu_checked', { leftList: leftListOpen, rightSidebar: rightSidebarOpen })
+      .catch(() => {/* desktop-only, ignore in browser preview */});
+  }, [leftListOpen, rightSidebarOpen]);
+
   useEffect(() => {
     const unlistenBack = listen('navigate-back', () => navigateBack());
     const unlistenFwd  = listen('navigate-forward', () => navigateForward());
@@ -136,8 +180,8 @@ export default function AppShell() {
     const unlisten = listen('reset-sidebar-widths', () => {
       setEntryListWidth(ENTRY_LIST_DEFAULT);
       setRightWidth(RIGHT_DEFAULT);
-      localStorage.removeItem('entry-list-width');
-      localStorage.removeItem('sidebar-right-width');
+      localStorage.removeItem(ENTRY_LIST_WIDTH_KEY);
+      localStorage.removeItem(RIGHT_WIDTH_KEY);
       setAltarWindowFullscreen(false);
     });
     return () => { unlisten.then(fn => fn()); };
@@ -154,6 +198,7 @@ export default function AppShell() {
 
   const onLeftPointerDown = (e: React.PointerEvent) => {
     draggingLeft.current = true;
+    setResizing(true);
     startX.current = e.clientX;
     startWidth.current = entryListWidth;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -161,6 +206,7 @@ export default function AppShell() {
 
   const onRightPointerDown = (e: React.PointerEvent) => {
     draggingRight.current = true;
+    setResizing(true);
     startX.current = e.clientX;
     startWidth.current = rightWidth;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -179,13 +225,14 @@ export default function AppShell() {
 
   const onPointerUp = () => {
     if (draggingLeft.current) {
-      localStorage.setItem('entry-list-width', String(entryListWidthRef.current));
+      localStorage.setItem(ENTRY_LIST_WIDTH_KEY, String(entryListWidthRef.current));
     }
     if (draggingRight.current) {
-      localStorage.setItem('sidebar-right-width', String(rightWidthRef.current));
+      localStorage.setItem(RIGHT_WIDTH_KEY, String(rightWidthRef.current));
     }
     draggingLeft.current = false;
     draggingRight.current = false;
+    setResizing(false);
   };
 
   // Jade accent — magical topline. pointer-events-none so it never intercepts
@@ -231,6 +278,15 @@ export default function AppShell() {
 
       {/* The sidebar resize handles live in here, so the pointer handlers that
           drive them do too. */}
+      {/* Beide Leisten animieren ihre Breite und klippen ihren Inhalt, statt ihn
+          mitschrumpfen zu lassen: der innere Container behaelt seine
+          Pixelbreite, das <aside> schneidet sie ab. Sonst quetscht sich der
+          Inhalt waehrend der Animation zusammen — und die Tab-Leiste der
+          Eintragsliste braeche mitten im Uebergang um. Waehrend eines
+          Resize-Drags laeuft keine Transition. Solange der geschlossene Inhalt
+          noch gemountet ist, halten `inert` und `aria-hidden` ihn zusammen aus
+          Fokus *und* Vorlesereihenfolge heraus; `inert` allein waere auf
+          aelteren WebKit-Versionen wirkungslos. */}
       <div
         className="flex flex-1 min-h-0 overflow-hidden relative"
         onPointerMove={onPointerMove}
@@ -238,12 +294,23 @@ export default function AppShell() {
       >
         {!isAltarWindowFullscreen && (
           <aside
-            className="app-sidebar app-sidebar-left flex-shrink-0 border-r border-stone-700/60 relative"
+            // Die Trennlinie darf hier am <aside> bleiben: die Rail klappt nie
+            // weg, die linke Leiste wird also nie schmaler als 56px.
+            className={`app-sidebar app-sidebar-left flex-shrink-0 border-r border-stone-700/60 relative overflow-hidden${
+              resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`
+            }`}
             style={{ width: RAIL_WIDTH + (leftListOpen ? entryListWidth : 0) }}
           >
-            <div className="flex h-full">
+            <div className="flex h-full" style={{ width: RAIL_WIDTH + entryListWidth }}>
               <LeftSidebarRail />
-              {leftListOpen && <LeftSidebarEntryList />}
+              <div
+                className="flex-shrink-0 h-full flex"
+                style={{ width: entryListWidth }}
+                inert={!leftListOpen}
+                aria-hidden={!leftListOpen}
+              >
+                {leftListMounted && <LeftSidebarEntryList />}
+              </div>
             </div>
             {leftListOpen && (
               <div
@@ -262,18 +329,34 @@ export default function AppShell() {
           </div>
         </main>
 
-        {/* Right Sidebar */}
-        {rightSidebarOpen && !isAltarWindowFullscreen && (
+        {/* Right Sidebar — Inhalt am rechten Rand verankert, damit er sich beim
+            Aufklappen von dort hereinschiebt statt links aufzuklappen. */}
+        {!isAltarWindowFullscreen && (
           <aside
-            className="app-sidebar app-sidebar-right flex-shrink-0 border-l border-stone-700/60 animate-slide-in relative"
-            style={{ width: rightWidth }}
+            className={`app-sidebar app-sidebar-right flex-shrink-0 relative overflow-hidden${
+              resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`
+            }`}
+            style={{ width: rightSidebarOpen ? rightWidth : 0 }}
           >
-            {/* Resize handle */}
+            {/* Resize handle — bei geschlossener Leiste saesse er sonst als
+                Streifen am Rand des Hauptbereichs. */}
+            {rightSidebarOpen && (
+              <div
+                onPointerDown={onRightPointerDown}
+                className="absolute top-0 left-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"
+              />
+            )}
+            {/* Die Trennlinie sitzt am Inhalt, nicht am <aside>: dort waere sie
+                bei Breite 0 als 1px-Strich am Fensterrand stehengeblieben. So
+                faehrt sie mit dem Inhalt hinaus und wird mit ihm geklippt. */}
             <div
-              onPointerDown={onRightPointerDown}
-              className="absolute top-0 left-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"
-            />
-            <RightSidebar />
+              className="absolute top-0 right-0 h-full border-l border-stone-700/60"
+              style={{ width: rightWidth }}
+              inert={!rightSidebarOpen}
+              aria-hidden={!rightSidebarOpen}
+            >
+              {rightSidebarMounted && <RightSidebar />}
+            </div>
           </aside>
         )}
       </div>

@@ -18,24 +18,50 @@ import TabIconButton from '../ui/TabIconButton';
 import EntryListTab, { type EntryListTabProps } from '../ui/EntryListTab';
 import type { ContextMenuAction } from '../ui/ContextMenu';
 
+/** Die Tabs ohne ihre Beschriftungen, die `t()` brauchen und deshalb in der
+ *  Komponente bleiben. Auf Modulebene, damit `ENTRY_LIST_TABS_WIDTH` unten
+ *  ihre Anzahl zaehlen kann, statt sie danebenzuschreiben. */
+const TABS: Array<{ id: 'all' | 'journal' | 'tasks' | 'operations' | 'wiki' | 'altar'; icon: ReactNode }> = [
+  { id: 'all', icon: <LayoutList size={14} /> },
+  { id: 'journal', icon: <BookOpen size={14} /> },
+  { id: 'tasks', icon: <CheckSquare size={14} /> },
+  { id: 'operations', icon: <Wand2 size={14} /> },
+  { id: 'wiki', icon: <Library size={14} /> },
+  { id: 'altar', icon: <Flame size={14} /> },
+];
+
+/* Die Geometrie der Tab-Leiste, in Zahlen statt nur in Utility-Klassen: die
+   Standardbreite der Eintragsliste ist genau die Breite, die ihre Tabs
+   brauchen (`AppShell`s ENTRY_LIST_DEFAULT). Die Werte spiegeln die Klassen
+   der Leiste unten — `px-3` (12), `TabIconButton`s `p-2` + 14px-Icon + 1px
+   Rahmen (32), `gap-0.5` (2). Wer eine davon aendert, muss hier mit.
+
+   Die Zahlen gelten fuer 16px Grundschrift — die Utilities darunter rechnen
+   in rem. Auf WebKitGTK, das seine Grundschrift aus der GTK-Textskalierung
+   zieht, kann die Leiste deshalb schon bei Standardbreite umbrechen. Schlimm
+   ist das nicht: der Umbruch ist der behandelte Fall, nicht der Fehlerfall.
+   Falsch laufen kann hier nur die Standardbreite selbst. */
+const TAB_SIZE = 32;
+const TAB_GAP = 2;
+const TAB_STRIP_PADDING_X = 12;
+export const ENTRY_LIST_TABS_WIDTH =
+  TAB_STRIP_PADDING_X * 2 + TABS.length * TAB_SIZE + (TABS.length - 1) * TAB_GAP;
+
 export default function LeftSidebarEntryList() {
   const { t } = useTranslation();
   const { leftListTab, setLeftListTab } = useUIStore();
 
-  const tabs: Array<{ id: 'all' | 'journal' | 'tasks' | 'operations' | 'wiki' | 'altar'; icon: ReactNode; label: string }> = [
-    { id: 'all', icon: <LayoutList size={14} />, label: t('nav.all') },
-    { id: 'journal', icon: <BookOpen size={14} />, label: t('nav.journal') },
-    { id: 'tasks', icon: <CheckSquare size={14} />, label: t('nav.tasks') },
-    { id: 'operations', icon: <Wand2 size={14} />, label: t('nav.operations') },
-    { id: 'wiki', icon: <Library size={14} />, label: t('nav.wiki') },
-    { id: 'altar', icon: <Flame size={14} />, label: t('nav.altar') },
-  ];
 
   return (
     <div className="flex flex-col h-full flex-1 min-w-0">
-      <div className="flex items-center gap-0.5 px-3 h-14 border-b border-stone-700/60 flex-shrink-0">
-        {tabs.map(({ id, icon, label }) => (
-          <TabIconButton key={id} active={leftListTab === id} onClick={() => setLeftListTab(id)} title={label}>
+      {/* `flex-wrap` + `min-h-14` statt `h-14`: bei voller Breite unveraendert
+          (eine 32px-Reihe, mit `py-2` = 48px unter der Mindesthoehe, weiterhin
+          zentriert), darunter rutschen die ueberzaehligen Tabs in eine zweite
+          Reihe statt stumm ueber den Rand zu laufen. Flexbox entscheidet das
+          selbst — keine Schwelle, kein ResizeObserver, kein Oszillieren. */}
+      <div className="flex flex-wrap items-center gap-0.5 px-3 py-2 min-h-14 border-b border-stone-700/60 flex-shrink-0">
+        {TABS.map(({ id, icon }) => (
+          <TabIconButton key={id} active={leftListTab === id} onClick={() => setLeftListTab(id)} title={t(`nav.${id}`)}>
             {icon}
           </TabIconButton>
         ))}

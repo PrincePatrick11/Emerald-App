@@ -6,7 +6,7 @@ use tauri::Manager;
 #[cfg(target_os = "macos")]
 use tauri::Emitter;
 #[cfg(target_os = "macos")]
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 
 /// Native-webview PDF export. Each platform owns its own implementation
 /// in `pdf_export/{windows,macos,linux}.rs`, all behind the same
@@ -268,7 +268,37 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
         true,
         None::<&str>,
     )?;
-    let view_submenu = Submenu::with_id_and_items(app, "view-submenu", "View", true, &[&reset_item])?;
+    // Check items rather than plain ones: the sidebars are a visible-or-not
+    // state, and a tick reads better than a label that flips between
+    // "Show …" and "Hide …". `set_view_menu_checked` keeps them in sync with
+    // the store, which the rail's own toggles can change just as well.
+    //
+    // Both start ticked because `uiStore`'s `leftListOpen` / `rightSidebarOpen`
+    // both default to true. That is a second copy of a frontend default, and
+    // what keeps it honest is `AppShell`'s mount-time `set_view_menu_checked`,
+    // which corrects it on the first render regardless.
+    let toggle_left_item = CheckMenuItem::with_id(
+        app,
+        "toggle-left-list",
+        "Entry List",
+        true,
+        true,
+        None::<&str>,
+    )?;
+    let toggle_right_item = CheckMenuItem::with_id(
+        app,
+        "toggle-right-sidebar",
+        "Properties",
+        true,
+        true,
+        None::<&str>,
+    )?;
+    let view_submenu = Submenu::with_id_and_items(app, "view-submenu", "View", true, &[
+        &toggle_left_item,
+        &toggle_right_item,
+        &PredefinedMenuItem::separator(app)?,
+        &reset_item,
+    ])?;
     // Export items start disabled — the frontend enables them once a
     // journal / wiki / operations entry is actually open (PDF is also
     // enabled while an Altar's reading view is open).
@@ -363,6 +393,8 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
     app.on_menu_event(|app, event| {
         match event.id().as_ref() {
             "reset-sidebar-widths" => { app.emit("reset-sidebar-widths", ()).ok(); }
+            "toggle-left-list"     => { app.emit("toggle-left-list", ()).ok(); }
+            "toggle-right-sidebar" => { app.emit("toggle-right-sidebar", ()).ok(); }
             "export-pdf"           => { app.emit("export-pdf", ()).ok(); }
             "export-markdown"      => { app.emit("export-markdown", ()).ok(); }
             "export-emerald"       => { app.emit("export-emerald", ()).ok(); }
@@ -456,6 +488,30 @@ fn set_export_menu_enabled(app: tauri::AppHandle, entry_enabled: bool, pdf_enabl
     }
 }
 
+/// Mirrors the frontend's sidebar visibility onto the View menu's two check
+/// items. Called on every change, because the rail's own toggle buttons can
+/// flip the same state without the menu ever being opened.
+#[tauri::command]
+fn set_view_menu_checked(app: tauri::AppHandle, left_list: bool, right_sidebar: bool) {
+    use tauri::menu::MenuItemKind;
+    let Some(menu) = app.menu() else { return };
+
+    for kind in menu.items().unwrap_or_default() {
+        if let MenuItemKind::Submenu(sub) = &kind {
+            if sub.id().0.as_str() != "view-submenu" { continue; }
+            for child in sub.items().unwrap_or_default() {
+                if let MenuItemKind::Check(item) = &child {
+                    match item.id().0.as_str() {
+                        "toggle-left-list" => { item.set_checked(left_list).ok(); }
+                        "toggle-right-sidebar" => { item.set_checked(right_sidebar).ok(); }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Toggles the enabled state of the "Export as Image" submenu (and its
 /// JPEG/PNG/WebP children). Called by the frontend whenever the active
 /// view changes, so it's only clickable while an Altar's reading view is open.
@@ -493,6 +549,8 @@ fn update_menu_labels(
     export: String,
     import: String,
     reset_view: String,
+    entry_list: String,
+    properties: String,
     export_pdf: String,
     export_markdown: String,
     export_emerald: String,
@@ -522,7 +580,19 @@ fn update_menu_labels(
             }
             // Update items inside this submenu
             for child in sub.items().unwrap_or_default() {
-                if let MenuItemKind::MenuItem(item) = &child {
+                // The View menu's two toggles are `Check` items, not plain
+                // ones — without their own arm they would keep the English
+                // labels they were built with.
+                if let MenuItemKind::Check(item) = &child {
+                    let new_check_text = match item.id().0.as_str() {
+                        "toggle-left-list" => Some(entry_list.as_str()),
+                        "toggle-right-sidebar" => Some(properties.as_str()),
+                        _ => None,
+                    };
+                    if let Some(text) = new_check_text {
+                        item.set_text(text).ok();
+                    }
+                } else if let MenuItemKind::MenuItem(item) = &child {
                     let child_id = item.id().0.as_str().to_owned();
                     let new_child_text = match child_id.as_str() {
                         "reset-sidebar-widths" => Some(reset_view.as_str()),
@@ -591,6 +661,7 @@ pub fn run() {
             export_pdf,
             set_export_menu_enabled,
             set_altar_export_menu_enabled,
+            set_view_menu_checked,
             update_menu_labels,
         ])
         .setup(|_app| {

@@ -40,6 +40,7 @@
     "tagDeleted": "Tag deleted"
   },
   "nav": {
+    "home": "Home",
     "all": "All",
     "journal": "Journal",
     "wiki": "Wiki",
@@ -55,8 +56,8 @@
     "newArticle": "New Article"
   },
   "sidebar": {
-    "collapseList": "Collapse list",
-    "expandList": "Expand list",
+    "collapseList": "Collapse entry list",
+    "expandList": "Expand entry list",
     "collapseProperties": "Collapse properties",
     "expandProperties": "Expand properties",
     "allEmpty": "No entries yet"
@@ -513,6 +514,8 @@
     "view": "View",
     "export": "Export",
     "import": "Import",
+    "entryList": "Entry List",
+    "properties": "Properties",
     "resetView": "Reset View",
     "exportPdf": "Export as PDF…",
     "exportMarkdown": "Export as Markdown…",

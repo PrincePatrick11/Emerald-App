@@ -25,6 +25,8 @@ import MenuDropdown, { type MenuNode } from './MenuDropdown';
 export default function TitleBarMenuBar({ compact }: { compact: boolean }) {
   const { t } = useTranslation();
   const activeView = useUIStore((s) => s.activeView);
+  const leftListOpen = useUIStore((s) => s.leftListOpen);
+  const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const operations = useOperationStore((s) => s.operations);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   // Only a keyboard-opened menu pulls focus into its panel. Opening by mouse
@@ -65,6 +67,9 @@ export default function TitleBarMenuBar({ compact }: { compact: boolean }) {
       id: 'view',
       label: t('menu.view'),
       nodes: [
+        { kind: 'item', label: t('menu.entryList'), checked: leftListOpen, onSelect: () => dispatchMenuAction('toggle-left-list') },
+        { kind: 'item', label: t('menu.properties'), checked: rightSidebarOpen, onSelect: () => dispatchMenuAction('toggle-right-sidebar') },
+        { kind: 'separator' },
         { kind: 'item', label: t('menu.resetView'), onSelect: () => dispatchMenuAction('reset-sidebar-widths') },
       ],
     },

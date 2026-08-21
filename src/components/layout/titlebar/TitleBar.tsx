@@ -38,7 +38,6 @@ const SEARCH_GUTTER_PX = 32;
  */
 export default function TitleBar() {
   const { t, i18n } = useTranslation();
-  const setActiveView = useUIStore((s) => s.setActiveView);
   const navigateBack = useUIStore((s) => s.navigateBack);
   const navigateForward = useUIStore((s) => s.navigateForward);
   const history = useUIStore((s) => s.history);
@@ -101,14 +100,21 @@ export default function TitleBar() {
       className="titlebar relative flex-shrink-0 flex items-center h-10 select-none"
     >
       <div ref={leftRef} data-tauri-drag-region className="flex items-center gap-1 h-full flex-shrink-0 pl-2">
-        <button
-          type="button"
-          onClick={() => setActiveView({ type: 'home' })}
+        {/* Reines Logo, kein Control: der Weg zum Dashboard sitzt jetzt in der
+            Rail, und `data-tauri-drag-region` gibt die Fensterecke ans Ziehen
+            zurueck, statt sie an einen Klick zu binden. */}
+        <img
+          data-tauri-drag-region
+          // Ein <img> ist von Haus aus eine Drag-Quelle. Tauris drag.js laesst
+          // auf macOS den zweiten Druck eines Doppelklicks (`e.detail === 2`)
+          // ohne `preventDefault()` durch — ohne das hier startete WKWebView
+          // dort ein natives Bild-Drag statt das Fenster zu maximieren.
+          draggable={false}
+          src="/emerald-icon.png"
+          alt="Emerald"
           title={t('app.name')}
-          className="flex-shrink-0 hover:opacity-80 transition-opacity"
-        >
-          <img src="/emerald-icon.png" alt="Emerald" className="w-5 h-5 rounded-md object-cover" />
-        </button>
+          className="flex-shrink-0 w-5 h-5 rounded-md object-cover [-webkit-user-drag:none]"
+        />
 
         {/* Not gated on `minimal`: on Windows and Linux this is the only
             route to the altar's image export, and distraction-free mode is

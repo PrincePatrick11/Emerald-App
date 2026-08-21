@@ -1,10 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { Check, ChevronRight } from 'lucide-react';
 
 export type MenuNode =
-  | { kind: 'item'; label: string; disabled?: boolean; onSelect: () => void }
+  /** `checked` macht den Eintrag zu einem Haekchen-Eintrag: gesetzt (auch auf
+   *  `false`) reserviert er den fuehrenden Slot, undefined laesst ihn weg. */
+  | { kind: 'item'; label: string; disabled?: boolean; checked?: boolean; onSelect: () => void }
   | { kind: 'separator' }
   | { kind: 'submenu'; label: string; disabled?: boolean; children: MenuNode[] };
+
+/** Breite des fuehrenden Haekchen-Slots. Sobald ein Eintrag eines Panels
+ *  ankreuzbar ist, bekommen ihn alle — sonst stuenden die Labels desselben
+ *  Panels auf zwei verschiedenen Kanten. */
+const CHECK_SLOT_CLASSES = 'w-3.5 flex-shrink-0';
 
 interface Props {
   nodes: MenuNode[];
@@ -26,6 +33,7 @@ interface Props {
 export default function MenuDropdown({ nodes, positionClass, onClose, autoFocus }: Props) {
   const [openSubmenu, setOpenSubmenu] = useState<number | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const hasChecks = nodes.some((node) => node.kind === 'item' && node.checked !== undefined);
 
   useEffect(() => {
     if (!autoFocus) return;
@@ -79,6 +87,7 @@ export default function MenuDropdown({ nodes, positionClass, onClose, autoFocus 
                   if (e.key === 'ArrowLeft') { e.preventDefault(); setOpenSubmenu(null); }
                 }}
               >
+                {hasChecks && <span className={CHECK_SLOT_CLASSES} />}
                 <span className="flex-1 text-left">{node.label}</span>
                 <ChevronRight size={12} className="flex-shrink-0 opacity-70" />
               </button>
@@ -101,7 +110,11 @@ export default function MenuDropdown({ nodes, positionClass, onClose, autoFocus 
           <button
             key={i}
             type="button"
-            role="menuitem"
+            // Ein ankreuzbarer Eintrag ist eine andere Rolle als ein
+            // ausloesender — ohne das bleibt das Haekchen rein optisch und ein
+            // Screenreader erfaehrt nichts vom Zustand.
+            role={node.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+            aria-checked={node.checked}
             className="menu-item"
             disabled={node.disabled}
             // Cancelling mousedown keeps the editor's selection alive, so Cut
@@ -109,6 +122,9 @@ export default function MenuDropdown({ nodes, positionClass, onClose, autoFocus 
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => { onClose(); node.onSelect(); }}
           >
+            {hasChecks && (
+              <span className={CHECK_SLOT_CLASSES}>{node.checked && <Check size={12} />}</span>
+            )}
             <span className="flex-1 text-left">{node.label}</span>
           </button>
         );

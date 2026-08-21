@@ -18,6 +18,8 @@ import type { ActiveView, Operation } from '../types';
  */
 export type MenuActionId =
   | 'reset-sidebar-widths'
+  | 'toggle-left-list'
+  | 'toggle-right-sidebar'
   | 'export-pdf'
   | 'export-markdown'
   | 'export-emerald'
@@ -38,6 +40,8 @@ export type SelfContainedMenuActionId = Exclude<MenuActionId, 'reset-sidebar-wid
 // listing it here is a compile error, not a menu item that silently stops
 // working on macOS.
 const SELF_CONTAINED: Record<SelfContainedMenuActionId, true> = {
+  'toggle-left-list': true,
+  'toggle-right-sidebar': true,
   'export-pdf': true,
   'export-markdown': true,
   'export-emerald': true,
@@ -52,6 +56,21 @@ export const SELF_CONTAINED_MENU_ACTIONS = Object.keys(SELF_CONTAINED) as SelfCo
 
 /** Runs a menu action. Errors surface as native dialogs, matching the previous behaviour. */
 export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void> {
+  // Diese beiden brauchen keinen Vault und stehen deshalb vor der Sperre
+  // unten. Sie muessen es sogar: muda, Tauris Menue-Crate, kippt das Haekchen
+  // eines nativen Check-Eintrags selbst, bevor es das Event schickt — ein
+  // frueher Rueckkehren liesse auf macOS ein Haekchen ohne Zustand dahinter
+  // stehen, das der auf genau diesen Zustand gekeyte Sync-Effekt in
+  // `AppShell` nie korrigieren wuerde.
+  switch (id) {
+    case 'toggle-left-list':
+      useUIStore.getState().toggleLeftList();
+      return;
+    case 'toggle-right-sidebar':
+      useUIStore.getState().toggleRightSidebar();
+      return;
+  }
+
   // Waehrend der Vault-Einrichtung gibt es keine Datenbank, aber die Menuleiste
   // steht — sie sitzt in der Titelleiste, und die bleibt sichtbar, damit sich
   // das Fenster bedienen laesst. Ohne diese Sperre liefe „Exportieren" in einen

@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import {
   BookOpen,
+  Home,
   Library,
   Tag,
   Trash2,
@@ -15,6 +16,12 @@ import { useVaultStore } from '../../store/vaultStore';
 import SettingsModal from './SettingsModal';
 import VaultModal, { VaultGlyph } from './VaultModal';
 import RailButton from '../ui/RailButton';
+
+/** Breite der Rail. `AppShell` rechnet damit die Breite des <aside> und
+ *  die Standardbreite der rechten Seitenleiste aus, deshalb steht sie als
+ *  Zahl hier statt als `w-14`-Klasse unten: zwei Wahrheiten haetten eine
+ *  geklippte Rail *und* eine falsche Breite rechts ergeben. */
+export const RAIL_WIDTH = 56;
 
 function PanelToggleIcon({ active, mirrored, size = 16 }: { active: boolean; mirrored?: boolean; size?: number }) {
   return (
@@ -47,7 +54,10 @@ export default function LeftSidebarRail() {
   const activeVaultIcon = useVaultStore((s) => s.vaults.find((v) => v.id === s.activeVaultId)?.icon);
 
   return (
-    <div className="left-sidebar-rail rail-divider flex flex-col items-center h-full w-14 flex-shrink-0 border-r">
+    <div
+      className="left-sidebar-rail rail-divider flex flex-col items-center h-full flex-shrink-0 border-r"
+      style={{ width: RAIL_WIDTH }}
+    >
       {/* Sidebar panel toggles — independent of the nav links below */}
       <div className="rail-divider w-full flex flex-col items-center gap-0.5 py-2 border-b">
         <RailButton onClick={toggleLeftList} title={leftListOpen ? t('sidebar.collapseList') : t('sidebar.expandList')}>
@@ -60,6 +70,13 @@ export default function LeftSidebarRail() {
 
       {/* Main nav icons — navigate only, never touch the entry-list panel */}
       <div className="rail-divider w-full flex flex-col items-center gap-0.5 py-2 border-b">
+        {/* Der Weg zum Dashboard. Er hing vorher am Emerald-Logo in der
+            Titelleiste, das niemand als Navigationsziel liest.
+            Achtung bei MCP-Selektoren: lucide exportiert `Home` als Alias von
+            `House`, das SVG traegt also `.lucide-house`, nicht `.lucide-home`. */}
+        <RailButton onClick={() => setActiveView({ type: 'home' })} title={t('nav.home')}>
+          <Home size={18} />
+        </RailButton>
         <RailButton onClick={() => setActiveView({ type: 'journal' })} title={t('nav.journal')}>
           <BookOpen size={18} />
         </RailButton>

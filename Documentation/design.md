@@ -55,7 +55,7 @@ Damit existieren für die "Primärfarbe" faktisch drei unabhängig gepflegte Wer
 
 **Border-Radius**, für optisch vergleichbare "Container"-Elemente:
 - `rounded-md`: Dropdown-Trigger (`ListToolbar.tsx`), kleine Tab-Buttons (`AltarLibraryStrip.tsx:172`), `.btn-danger` (`index.css`)
-- `rounded-lg`: Context-Menu (`ContextMenu.tsx:49`), `.btn-primary`/`.btn-secondary` (`index.css`, jetzt auch der Undo-Button in `UndoToast.tsx` über `<Button variant="primary">`), Settings-Reihen
+- `rounded-lg`: Context-Menu (`ContextMenu.tsx`), `.btn-primary`/`.btn-secondary` (`index.css`, jetzt auch der Undo-Button in `UndoToast.tsx` über `<Button variant="primary">`), Settings-Reihen
 - `rounded-xl`: `.panel`/`.panel-interactive` (`index.css:96,125`), alle drei Modal-Cards (Settings, LinkPicker, Altar-Item), aber auch der Undo-Toast selbst (`UndoToast.tsx`)
 - `rounded-full`: Filter-Chips (`FilterPanel.tsx`)
 
@@ -143,11 +143,19 @@ Diese Vereinheitlichung ist rein strukturell — das visuelle Ergebnis ist unver
 Die linke Sidebar besteht aus zwei nebeneinander liegenden Komponenten: `LeftSidebarRail.tsx` (feste 56px-Icon-Leiste) und `LeftSidebarEntryList.tsx` (daneben liegendes, größenverstellbares Panel). Zwei neue geteilte Button-Komponenten kapseln die jeweiligen Zustände:
 
 - `RailButton.tsx` — dünner Wrapper um die bestehende `.btn-ghost`-Klasse, für alle Icon-Buttons der Rail (Listen-Toggle, Modul-Icons, Tags/Trash/Vault/Settings) sowie für die Verlaufs-Buttons in der Titelleiste.
-- `TabIconButton.tsx` — Active/Idle-Toggle für die sechs Tab-Icons im Entry-List-Panel (All + fünf Module). Nutzt dafür die bereits bestehenden `.right-sidebar-tab-active`/`.right-sidebar-tab-idle`-CSS-Klassen (ursprünglich für die rechte Sidebar benannt) statt eigener Klassen — funktional identisch, aber der Klassenname passt jetzt nicht mehr zur tatsächlichen Verwendung auf beiden Seiten der App. Die themafähigen Farbregeln für diese Klassen in `index.css` waren zunächst per `.app-sidebar-right`-Präfix auf die rechte Sidebar gescoped; die Hover-Regel für inaktive Tabs (`.text-stone-500.hover\:text-stone-300:hover`) ist in beiden Themes jetzt zusätzlich auf `.app-sidebar-left` gescoped, sodass linke und rechte Tab-Icons denselben Hover-Farbwert treffen, statt dass die linke Seite auf ungestyltes Tailwind-Grau zurückfällt.
+- `TabIconButton.tsx` — Active/Idle-Toggle für die sechs Tab-Icons im Entry-List-Panel (All + fünf Module). Trägt im Grundzustand `border border-transparent`, weil die Theme-Regeln dem aktiven Tab einen 1px-Rahmen geben: ohne den Platzhalter ist der aktive Tab 32px breit und die inaktiven 30, die Reihe ruckt bei jedem Tabwechsel um 2px, und die sechs Tabs passen nicht mehr in die aus ihnen abgeleitete Standardbreite der Eintragsliste. Nutzt ansonsten die bereits bestehenden `.right-sidebar-tab-active`/`.right-sidebar-tab-idle`-CSS-Klassen (ursprünglich für die rechte Sidebar benannt) statt eigener Klassen — funktional identisch, aber der Klassenname passt jetzt nicht mehr zur tatsächlichen Verwendung auf beiden Seiten der App. Die themafähigen Farbregeln für diese Klassen in `index.css` waren zunächst per `.app-sidebar-right`-Präfix auf die rechte Sidebar gescoped; die Hover-Regel für inaktive Tabs (`.text-stone-500.hover\:text-stone-300:hover`) ist in beiden Themes jetzt zusätzlich auf `.app-sidebar-left` gescoped, sodass linke und rechte Tab-Icons denselben Hover-Farbwert treffen, statt dass die linke Seite auf ungestyltes Tailwind-Grau zurückfällt.
 
 Neue CSS-Klassen in `index.css`: `.left-sidebar-rail` (eigener Hintergrund `--shell-bg`, hebt die Rail farblich vom Entry-List-Panel ab, das weiterhin `--sidebar-bg` nutzt) und `.rail-divider` (themafähige Trennlinien innerhalb der Rail, mit denselben Border-Farbwerten wie `.titlebar`/`.sidebar-search` in beiden Themes).
 
 Der frühere Rail-Kopf — Emerald-Logo, Zurück/Vorwärts und der Such-Button — ist entfallen; diese drei sitzen jetzt in der Titelleiste (siehe unten). Die Rail beginnt dadurch direkt mit den Panel-Togglern. Die zugehörige `.sidebar-header`-Klasse wurde ersatzlos entfernt; `.titlebar` steht an ihrer Stelle in den beiden gruppierten Hairline-Regeln, sodass Titelleiste und Rail-Trennlinien weiterhin denselben Farbwert teilen.
+
+`RAIL_WIDTH` wird von `LeftSidebarRail` exportiert und von `AppShell` konsumiert, statt als `w-14` ein zweites Mal dazustehen: seit die Standardbreite der rechten Seitenleiste sich daraus ableitet, ergäbe eine Abweichung eine geklippte Rail *und* eine falsche Breite rechts.
+
+Über Journal steht seit dem Umbau ein **Home-Button** (lucide `Home`, `size={18}` wie seine Nachbarn) als Einstieg ins Dashboard. Er ersetzt den Klick auf das Emerald-Logo in der Titelleiste, das dafür wieder ein reines Bild ist: ein Logo in der Fensterecke liest niemand als Navigationsziel, und als Control nahm es der Ecke das Ziehen weg.
+
+Die **Tab-Leiste des Entry-List-Panels** ist `flex-wrap` mit `min-h-14` statt `h-14`. Bei voller Breite ändert das optisch nichts; wird das Panel schmaler gezogen als seine sechs Tabs breit sind (226px, siehe `ENTRY_LIST_TABS_WIDTH`), bricht sie in eine zweite Reihe um, statt stumm über den Rand zu laufen. Der Preis steht unter [Beobachtete Inkonsistenzen](#beobachtete-inkonsistenzen): im umgebrochenen Zustand liegen die unteren Trennlinien der beiden Seitenleisten nicht mehr auf einer Höhe.
+
+Das **Ein- und Ausblenden beider Seitenleisten ist animiert** (200ms Breiten-Transition). Der Inhalt behält dabei seine Pixelbreite und wird vom `<aside>` geklippt, statt mitzuschrumpfen — sonst quetschte er sich sichtbar zusammen und die Tab-Leiste bräche mitten im Übergang um. Während eines Resize-Drags nimmt `AppShell` die Klasse `.app-sidebar-animated` weg, sonst hinkt die Kante dem Zeiger hinterher. Die Transition steht als Klasse in `index.css`, nicht als Inline-Style aus `SIDEBAR_ANIM_MS` heraus — ein Inline-Style schlüge jede Regel im Stylesheet und damit auch die `prefers-reduced-motion`-Abbestellung, die direkt darunter steht (gleiche Spezifität, gewinnt über die Reihenfolge). Das ist die erste Reduced-Motion-Regel der Datei.
 
 Die Listenzeilen selbst (Suche, Leerzustand, Inline-Rename, Drag-Start, Kontextmenü) sind in `EntryListTab.tsx` zentralisiert — analog zu `Dashboard.tsx`, das nur die äußere Chrome vereinheitlicht: Journal/Operations/Wiki/Altar reichen Accessor-Funktionen (`getIcon`/`getTitle`/`getDateStr`) durch, Tasks steigt über die `renderRow`-Render-Prop aus (eigene Checkbox-Zeile statt Icon-Zeile).
 
@@ -170,6 +178,8 @@ Die Höhe der Pille (`h-7`, 28px) weicht bewusst von der Eintragslisten-Suche (~
 **Fenster-Buttons** (`WindowControls.tsx`, nur Windows/Linux): 46×40px, eckig, ohne Abstand, bündig in der Fensterecke — die Windows-Fluent-Geometrie. Die Glyphen sind Inline-SVG auf einem 10×10-Raster mit 1px-Strich statt lucide-Icons, weil lucide kein korrektes "Wiederherstellen"-Symbol hat (zwei versetzte Quadrate, das hintere angeschnitten).
 
 **Menü-Dropdowns** (`MenuDropdown.tsx`, nur Windows/Linux): eigene Komponente statt einer Erweiterung von `ContextMenu.tsx`. Letzteres positioniert sich an einer Cursor-Koordinate, hat einen Timing-Kniff, um den öffnenden Rechtsklick zu überleben, und kennt weder deaktivierte Einträge noch Untermenüs — beides bräuchte die Menüleiste.
+
+`MenuDropdown` kennt inzwischen ankreuzbare Einträge (`checked` am `MenuNode`, `role="menuitemcheckbox"` plus `aria-checked`), genutzt von den beiden Seitenleisten-Togglen im Ansicht-Menü. Sobald *ein* Eintrag eines Panels ankreuzbar ist, bekommen alle den führenden 14px-Slot — sonst stünden die Labels desselben Panels auf zwei Kanten.
 
 Damit existieren zwei Dropdown-Implementierungen mit je eigenen Flächen-Klassen: `.menu-surface`/`.menu-item`/`.menu-separator` für die Menüleiste, `.context-menu*` für das Kontextmenü. Farblich sind sie zusammengeführt — `.menu-item` hängt in beiden Themes in denselben Selektorgruppen wie `.context-menu-item-default`, teilt also Ruhe- und Jade-Hover-Farbe — und die Zeilenhöhe (`py-2`) stimmt überein. Die Strukturklassen selbst sind aber weiterhin doppelt: `ContextMenu` nutzt noch rohes `border-stone-700/60` und `shadow-2xl` statt `--menu-border`/`--menu-shadow`. Das zusammenzuführen wäre der nächste Schritt und würde `ContextMenu` auf `.menu-surface`/`.menu-item` plus seine `danger`-Variante reduzieren.
 
@@ -202,6 +212,14 @@ Der Inhalt der Leiste hängt vom `activeView.mode` ab: im Edit-Modus Done (prim�
 
 Keine dokumentierte Größen-Skala. `size`-Props reichen von 10–18px und variieren teils innerhalb derselben Datei zwischen visuell gleichrangigen Elementen, z. B. `SettingsModal.tsx`: Header-Close-Icon `size={16}` (Zeile 179), Sektions-Icons überwiegend `size={13}`/`size={14}` (Zeilen 189, 205, 214, 229, 248, 276, 349, 363, 366) ohne erkennbares Muster, welches Icon welche Größe bekommt. Farbe wird konsistent über die umgebende `text-stone-*`/`text-jade-*`/Theme-Var-Klasse vererbt, nicht per `color`-Prop.
 
+### Kontextmenü
+
+`src/components/ui/ContextMenu.tsx` hängt per `createPortal` an `document.body` — aus demselben Grund wie `EmojiPicker` und `Modal`. Inline gerendert galt sein `z-[9999]` nur innerhalb der Sidebar: `.app-sidebar` und `.app-main` tragen in beiden Themes `position: relative; z-index: 1` (`index.css`) und sind damit gleichrangige Stacking-Contexts, gegen die der später gemalte Hauptbereich immer gewinnt. Eine höhere Zahl half nicht; das Menü lag unter dem Inhalt und wirkte abgeschnitten.
+
+Die Positionierung klemmt seitdem zusätzlich, statt nur zu kippen: ein Menü, das höher ist als der Klick-Y-Offset, bekam vorher ein negatives `top` und wurde oben abgeschnitten.
+
+`PlacedElementRow` hatte ein eigenes, handgebautes Portal-Menü mit rohen `stone-*`-Farben und ohne jede Kantenlogik; es nutzt jetzt dieselbe Komponente. Damit gibt es in der App genau eine Kontextmenü-Implementierung.
+
 ## Beobachtete Inkonsistenzen
 
 Sachliche Zusammenfassung der oben belegten Abweichungen, ohne Priorisierung:
@@ -214,7 +232,9 @@ Sachliche Zusammenfassung der oben belegten Abweichungen, ohne Priorisierung:
 6. **`SidebarActionButton` als fünfte Button-Implementierung**: bewusst am `Button`-Wrapper vorbei, mit eigener Tonwert-Tabelle und einem wiederbelebten `bg-red-950/30`-Danger-Rezept. Begründung und Konsequenz unter [Right Sidebar Action Bar](#right-sidebar-action-bar).
 7. **`amber` als zweiter Akzentton neben `jade`**: aus Tailwinds Default-Palette, ohne Entsprechung in den Theme-CSS-Variablen oder der `parchment`-Skala — verschärft Punkt 1 und 2.
 8. **Aktionen nur über eine einklappbare Fläche erreichbar**: Edit/Done/Delete/Cancel leben ausschließlich in der rechten Sidebar. Wer sie mitten im Edit-Modus zuklappt, hat keinen sichtbaren Weg zurück; ein Tastatur-Fallback existiert nicht. Beim *Wechsel* in den Edit-Modus wird die Leiste automatisch aufgeklappt (`usesEditorSidebar` in `uiStore.ts`), das deckt den Einstieg ab, nicht das nachträgliche Zuklappen.
-9. **Kein sichtbarer Fokus-Ring in Emerald Noctis**: `button:focus-visible` ist in `index.css` nur für `emerald-parchment` definiert. Betrifft die ganze App, fällt aber bei der Action Bar am stärksten auf, seit sie die einzige Heimat der Entry-Aktionen ist.
+9. **Tab-Leiste und Action Bar liegen nicht immer auf einer Höhe**: `LeftSidebarEntryList`s Tab-Leiste ist `min-h-14` und bricht unterhalb von 226px Panelbreite in eine zweite Reihe um; `RightSidebarActionBar` bleibt bei `h-14`. Die in [Right Sidebar Action Bar](#right-sidebar-action-bar) beschriebene Deckungsgleichheit der beiden unteren Trennlinien gilt dann nicht. Bewusst so: die rechte Leiste mitwachsen zu lassen hieße, sie aus einem Grund zu vergrößern, der mit ihrem eigenen Inhalt nichts zu tun hat.
+10. **Kein sichtbarer Fokus-Ring in Emerald Noctis**: `button:focus-visible` ist in `index.css` nur für `emerald-parchment` definiert. Betrifft die ganze App, fällt aber bei der Action Bar am stärksten auf, seit sie die einzige Heimat der Entry-Aktionen ist.
 
+(Ehemaliger Punkt "Aktionen nur über eine einklappbare Fläche erreichbar" ist damit nicht behoben, aber teilweise entschärft: die beiden Seitenleisten lassen sich jetzt auch über das Ansicht-Menü wieder aufklappen, nicht mehr nur über die Rail.)
 (Ehemaliger Punkt "drei unabhängige Modal-Implementierungen" ist behoben — siehe [Modals / Dialogs](#modals--dialogs) oben.)
 (Ehemaliger Punkt "kein geteiltes Button-Component" ist behoben — siehe [Buttons](#buttons) oben.)

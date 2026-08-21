@@ -10,7 +10,11 @@ import AltarSidebarPanel from '../sidebar/panels/AltarSidebarPanel';
 import SidebarActionButton from '../sidebar/fields/SidebarActionButton';
 
 /* Mirrors the entry-list tab bar in LeftSidebarEntryList so both sidebars put their
-   bottom border on the same line. Keep the two in sync. */
+   bottom border on the same line. Keep the two in sync — with one known
+   exception: that bar is `min-h-14` and wraps into a second row once the entry
+   list is dragged narrower than its six tabs, and the two borders then sit at
+   different heights. Matching that here would mean growing this bar for a
+   reason that has nothing to do with its own contents, so it stays 56px. */
 const ACTION_BAR_CLASSES = 'flex items-center gap-0.5 px-3 h-14 border-b border-stone-700/60 flex-shrink-0';
 
 function PropertiesContent({ activeView }: { activeView: ActiveView }) {

@@ -5,7 +5,6 @@
 @layer base {
   :root {
     --sidebar-left-width: 240px;
-    --sidebar-right-width: 300px;
     --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
     --font-editor: 'Lora', Georgia, serif;
   }
@@ -171,6 +170,23 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
   .left-sidebar-rail {
     background: var(--shell-bg);
+  }
+
+  /* Das Ein-/Ausblenden der Seitenleisten (`AppShell`). Die Dauer haengt mit
+     SIDEBAR_ANIM_MS dort zusammen, das den Inhalt so lange gemountet laesst.
+     Waehrend eines Resize-Drags nimmt `AppShell` die Klasse weg. */
+  .app-sidebar-animated {
+    transition: width 200ms ease-out;
+  }
+
+  /* Steht danach und ist gleich spezifisch, gewinnt also ueber die
+     Reihenfolge. Der verzoegerte Unmount haengt an einem Timeout statt an
+     `transitionend` und laeuft deshalb auch hier. WebKitGTK vor 2.38 meldet
+     immer `no-preference` — dort laesst sich die Animation nicht abbestellen. */
+  @media (prefers-reduced-motion: reduce) {
+    .app-sidebar-animated {
+      transition: none;
+    }
   }
 
   .sidebar-item {

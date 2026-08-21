@@ -40,6 +40,7 @@
     "tagDeleted": "Étiquette supprimée"
   },
   "nav": {
+    "home": "Accueil",
     "all": "Tout",
     "journal": "Journal",
     "wiki": "Wiki",
@@ -55,8 +56,8 @@
     "newArticle": "Nouvel article"
   },
   "sidebar": {
-    "collapseList": "Réduire la liste",
-    "expandList": "Développer la liste",
+    "collapseList": "Réduire la liste des entrées",
+    "expandList": "Développer la liste des entrées",
     "collapseProperties": "Réduire les propriétés",
     "expandProperties": "Développer les propriétés",
     "allEmpty": "Aucune entrée pour le moment"
@@ -513,6 +514,8 @@
     "view": "Affichage",
     "export": "Exporter",
     "import": "Importer",
+    "entryList": "Liste des entrées",
+    "properties": "Propriétés",
     "resetView": "Réinitialiser la vue",
     "exportPdf": "Exporter en PDF…",
     "exportMarkdown": "Exporter en Markdown…",

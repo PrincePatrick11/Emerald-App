@@ -1,10 +1,10 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Lock, Unlock, Trash2, Copy, GripVertical } from 'lucide-react';
 import type { AltarPlacement } from '../../../types';
 import { AltarItemVisual } from '../../altar/AltarItemVisual';
 import Button from '../../ui/Button';
+import ContextMenu from '../../ui/ContextMenu';
 
 export const PlacedElementRow = memo(function PlacedElementRow({
   placement,
@@ -31,18 +31,6 @@ export const PlacedElementRow = memo(function PlacedElementRow({
 }) {
   const { t } = useTranslation();
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!contextMenu) return;
-    const close = () => setContextMenu(null);
-    window.addEventListener('click', close);
-    window.addEventListener('contextmenu', close);
-    return () => {
-      window.removeEventListener('click', close);
-      window.removeEventListener('contextmenu', close);
-    };
-  }, [contextMenu]);
 
   const handleContextMenu = (e: React.MouseEvent) => {
     if (!isEditing) return;
@@ -109,28 +97,16 @@ export const PlacedElementRow = memo(function PlacedElementRow({
           </span>
         )}
       </div>
-      {contextMenu && createPortal(
-        <div
-          ref={menuRef}
-          style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x, zIndex: 9999 }}
-          className="min-w-[140px] rounded-lg border border-stone-700 bg-stone-900 py-1 shadow-xl"
-          onClick={(e) => e.stopPropagation()}
-          onContextMenu={(e) => e.preventDefault()}
-        >
-          <button
-            onClick={() => { onDuplicate(); setContextMenu(null); }}
-            className="w-full px-3 py-1.5 text-left text-xs text-stone-300 hover:bg-stone-800"
-          >
-            {t('altar.duplicateElement')}
-          </button>
-          <button
-            onClick={() => { onRemove(); setContextMenu(null); }}
-            className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:bg-stone-800"
-          >
-            {t('altar.removeElement')}
-          </button>
-        </div>,
-        document.body
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          actions={[
+            { label: t('altar.duplicateElement'), icon: <Copy size={12} />, onClick: onDuplicate },
+            { label: t('altar.removeElement'), icon: <Trash2 size={12} />, onClick: onRemove, danger: true },
+          ]}
+        />
       )}
     </>
   );
