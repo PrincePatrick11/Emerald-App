@@ -9,7 +9,10 @@
     "deleteConfirm": "Supprimer ?",
     "unsupportedImageFormat": "Format non supporté. Autorisé : PNG, JPEG, GIF, WebP, SVG",
     "searchEmoji": "Rechercher un emoji…",
-    "noEmojiResults": "Aucun résultat"
+    "noEmojiResults": "Aucun résultat",
+    "bytes": "o",
+    "kilobytes": "Ko",
+    "megabytes": "Mo"
   },
   "listView": {
     "view": "Vue",
@@ -382,7 +385,7 @@
   },
   "vault": {
     "title": "Vaults",
-    "hint": "Chaque vault possède sa propre base de données.",
+    "hint": "Un vault est un dossier avec sa propre base de données et ses propres images.",
     "active": "actif",
     "switch": "Basculer",
     "switching": "Basculement…",
@@ -392,9 +395,21 @@
     "add": "Ajouter un vault",
     "create": "Créer",
     "cancel": "Annuler",
-    "deleteHint": "Le fichier de base de données reste sur le disque.",
+    "deleteHint": "Le vault disparaît de la liste.",
     "switchFailed": "Impossible de changer de vault.",
-    "saveFailed": "Impossible d'enregistrer la modification."
+    "saveFailed": "Impossible d'enregistrer la modification.",
+    "open": "Ouvrir un vault",
+    "chooseFolder": "Choisir un dossier…",
+    "relocate": "Localiser à nouveau…",
+    "missing": "Dossier introuvable",
+    "accessDenied": "Pas d’accès au dossier",
+    "folderHasVault": "Ce dossier contient déjà un vault.",
+    "folderHasNoVault": "Ce dossier ne contient aucun vault.",
+    "alreadyOpen": "Ce vault est déjà dans la liste.",
+    "deleteFiles": "Supprimer aussi les fichiers :",
+    "deleteFilesWarning": "La base de données et ses images seront supprimées définitivement.",
+    "folderNotEmpty": "Le dossier n’est pas vide. Un nouveau vault demande un dossier vide.",
+    "deleteFilesLeftover": "Le dossier contenait d’autres fichiers et n’a pas été supprimé."
   },
   "settings": {
     "language": "Langue",
@@ -442,7 +457,16 @@
     "uiFont": "Police de l'interface",
     "editorFont": "Police du corps de l'éditeur",
     "themeDark": "Sombre",
-    "themeLight": "Clair"
+    "themeLight": "Clair",
+    "cleanupImages": "Images inutilisées",
+    "cleanupScan": "Rechercher",
+    "cleanupScanning": "Recherche…",
+    "cleanupNone": "Rien à supprimer",
+    "cleanupFound": "{{count}} image, {{size}}",
+    "cleanupFound_other": "{{count}} images, {{size}}",
+    "cleanupDelete": "Supprimer",
+    "cleanupDone": "{{size}} libérés",
+    "storage": "Stockage"
   },
   "contextMenu": {
     "openInNewTab": "Ouvrir dans un nouvel onglet",

@@ -1,6 +1,6 @@
 # Database
 
-Emerald uses a single SQLite file per vault, `emerald.db` by default, located in the OS application data directory. On macOS this is `~/Library/Application Support/com.emerald.magical-journal/` for the production build and a separate directory for the dev build (`com.emerald.magical-journal.dev`).
+Emerald uses a single SQLite file per vault, always named `emerald.db`, inside that vault's own directory. Where that directory sits is the user's choice — see [Multi-Vault System](#multi-vault-system). Vaults the user did not place themselves live under `{appDataDir}/vaults/{id}/`; on macOS that is `~/Library/Application Support/com.emerald.magical-journal/vaults/…` for the production build and a separate directory for the dev build (`com.emerald.magical-journal.dev`).
 
 ## Where the schema lives
 
@@ -27,7 +27,7 @@ The emptiness check looks at `sqlite_master`, not at `schema_version`: a databas
 
 Afterwards `runPeriodicCleanup(db)` purges trashed rows older than 30 days. It is **not** a migration — idempotent, time-dependent, and run on every vault open.
 
-The current version is **34**, and `BASELINE_VERSION` in `schema.ts` must equal the highest entry in `MIGRATIONS`. `runMigrations` throws at startup if the two disagree, so a new migration cannot be added without updating the baseline.
+The current version is **35**, and `BASELINE_VERSION` in `schema.ts` must equal the highest entry in `MIGRATIONS`. `runMigrations` throws at startup if the two disagree, so a new migration cannot be added without updating the baseline.
 
 Note that **version 24 is genuinely missing** — no entry with that number has existed for some time. The runner tolerates gaps; it only requires each version to be above the last applied one.
 
@@ -220,7 +220,7 @@ Both `linked_*_ids` columns were nullable until v33, unlike every other JSON arr
 | content | TEXT | HTML produced by TipTap |
 | category_id | TEXT | **FK → wiki_categories.id**, RESTRICT, default `'other'` |
 | entry_number | INTEGER | |
-| cover_image / icon | TEXT | file path or emoji |
+| cover_image / icon | TEXT | data-URL, or emoji for icon — see the Base64 note under [Key Conventions](#key-conventions) |
 | tags | TEXT | JSON array of tag names |
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active |
@@ -237,7 +237,7 @@ Both `linked_*_ids` columns were nullable until v33, unlike every other JSON arr
 | category_id | TEXT | **FK → operation_categories.id**, RESTRICT |
 | entry_number | INTEGER | |
 | description | TEXT | |
-| icon / cover_image | TEXT | |
+| icon / cover_image | TEXT | data-URL, or emoji for icon — see the Base64 note under [Key Conventions](#key-conventions) |
 | version | TEXT | free-text version label |
 | is_active | INTEGER | boolean, NOT NULL DEFAULT 1 |
 | end_date / target_reveal_date | TEXT | date-only `YYYY-MM-DD` from `<input type="date">` |
@@ -264,7 +264,7 @@ The shared library of objects that can be placed on altars.
 | emoji | TEXT | NOT NULL DEFAULT `'✨'` |
 | category_id | TEXT | **FK → altar_categories.id**, RESTRICT, default `'other'` |
 | note | TEXT | |
-| image_data | TEXT | file path |
+| image_data | TEXT | data-URL, not a path — see the Base64 note under [Key Conventions](#key-conventions) |
 | created_at | TEXT | ISO 8601 |
 
 Until v33 this column was called `category` and held the category **name** — the only name-based reference in the schema. That is why migration v23 had to cascade a rename across two tables. It now holds the id, and renaming a category touches nothing else.
@@ -339,7 +339,7 @@ The `deleted_at` indexes matter because `runPeriodicCleanup` runs a range scan a
 
 **Timestamps.** ISO 8601 text produced by `nowIso()`, sorted and compared lexicographically. `due_date`, `end_date`, and `target_reveal_date` are the exception: they come from `<input type="date">` and are date-only `YYYY-MM-DD`.
 
-**Base64 in SQLite.** The rule below is to keep image data in files. `altars.thumbnail_data`, `altars.icon_data`, and `operations.drawing_data` / `thumbnail_data` predate it and still hold data-URLs. Do not add more.
+**Base64 in SQLite.** The rule below is to keep image data in files. Nine columns predate it and still hold data-URLs — the `legacy` group of `IMAGE_FIELDS` in `schema.ts`: `wiki_articles.icon` / `cover_image`, `operations.icon` / `cover_image` / `drawing_data` / `thumbnail_data`, `altars.thumbnail_data` / `icon_data`, and `altar_items.image_data` (the last of which this file described as a file path until the code was checked). `Favicon.tsx` and `Banner.tsx` read the uploaded file with `FileReader.readAsDataURL`, and `AltarLibraryStrip.tsx` does the same with `readFileAsDataUrl`; none of the three go through `save_image`. Every consumer tests the value with `startsWith('data:image/')`. Do not add more.
 
 ## Sigil Workflow
 
@@ -355,34 +355,40 @@ The standalone Creation module that preceded this is gone. Its `creations` table
 
 ## Image Storage
 
-Handled natively in `src-tauri/src/lib.rs`. Images are SHA-256-deduplicated — identical images are stored only once regardless of how many entries reference them. The UI may hold a data-URL for display, but persistence always uses file paths.
+Handled natively in `src-tauri/src/images.rs`. Images live in `{vaultDir}/images/` and are named after the SHA-256 of their own bytes, so the same image is stored once per vault however many entries reference it.
+
+**The database stores the bare filename** — `{sha256}.{ext}`, no directory and no drive letter. Rendering goes through the `emerald-img` URI scheme rather than through IPC; the details are in [`architecture.md`](architecture.md#image-storage-system).
 
 | Command | Behaviour |
 |---|---|
-| `save_image(data_url)` | Decodes base64, writes `{appDataDir}/images/{sha256}.{ext}`, skips if already present |
-| `copy_image_file(source)` | Copies an existing file into storage with the same dedupe logic |
-| `read_image_as_base64(path)` | Reads a stored file and returns a data-URL for rendering |
+| `save_image(data_url, vault_id)` | Decodes base64, writes into the vault's `images/`, skips if present. Returns the filename |
+| `copy_image_file(source, vault_id)` | Copies an existing file in, same dedupe. Returns the filename |
+| `read_image_as_base64(filename, vault_id)` | Returns a data-URL — only for the PDF export and the backup writer |
+| `adopt_legacy_images` / `list_image_files` / `delete_image_files` | Migration v35 and the *Unused images* cleanup |
 
 ## Multi-Vault System
 
-Vault metadata is stored outside SQLite in `{appDataDir}/vaults.json`:
+A vault is a **directory** the user picks, holding `emerald.db` and an `images/` folder. Metadata is stored outside SQLite in `{appDataDir}/vaults.json`:
 
 ```json
 {
+  "version": 2,
   "vaults": [
-    { "id": "default", "name": "Emerald", "dbName": "emerald.db", "createdAt": "..." },
-    { "id": "uuid",    "name": "My Vault", "dbName": "emerald-uuid.db", "createdAt": "..." }
+    { "id": "default", "name": "Emerald",  "path": ".../vaults/default", "createdAt": "..." },
+    { "id": "uuid",    "name": "My Vault", "path": "D:/Vaults/My Vault", "createdAt": "..." }
   ],
   "activeVaultId": "default"
 }
 ```
 
-- `id='default'` / `dbName='emerald.db'` is bootstrapped on first run for backward compatibility.
-- `getActiveDbName()` in `vaultManager.ts` is called by `getDb()` to resolve the correct DB file.
+- Records from before this layout carry `dbName` instead of `path`. `loadVaultsFile()` lifts each one through `migrate_vault_layout`, which moves the flat `.db` into `{appDataDir}/vaults/{id}/`. That happens before any database is opened, so it cannot be a schema migration; the image half is [v35](#rules-for-future-schema-changes) and runs afterwards.
+- `id='default'` is bootstrapped on first run for backward compatibility.
+- `getActiveDbFile()` in `vaultManager.ts` is called by `getDb()` to build `sqlite:{vaultDir}/emerald.db`.
+- Every write to `vaults.json` calls `register_vaults`, mirroring `id → path` into Rust. Storage commands resolve a vault *id* against that registry and never accept a path — see [`architecture.md`](architecture.md#vault-layout) and [`security.md`](security.md).
 - `resetDbCache()` in `db.ts` must be called before switching vaults; it clears the per-vault `Map<identifier, Database>` cache.
 - `runMigrations()` is idempotent — called on every `getDb()` cache miss, safe on both existing and empty DBs. A newly created vault's `.db` file is only written the first time the app switches to it, which is why `newVaultRecord(name)` does not create it up front.
 - All vaults share the same schema.
-- `newVaultRecord(name)` in `vaultManager.ts` is the single place that builds a new vault's record (`crypto.randomUUID()` for `id`, `dbName: emerald-<id>.db`, `createdAt`). It is used by `vaultStore.createVault()` (the Vault management modal's "Add Vault" row — see [Vaults in `features.md`](features.md#vaults)) and by `.emeralddb` add-vault import. `addVault`/`updateVaultName`/`removeVault`/`setActiveVaultId` all read-modify-write `vaults.json` by copying rather than mutating the cached object before the write lands.
+- `newVaultRecord(name, path?)` in `vaultManager.ts` is the single place that builds a new vault's record (`crypto.randomUUID()` for `id`, the chosen directory or `default_vault_dir(id)` for `path`, `createdAt`). It is used by the vault modal (both the "Add Vault" and "Open vault" rows call `addVault(await newVaultRecord(...))`)md`](features.md#vaults)) and by `.emeralddb` add-vault import. `addVault`/`updateVaultName`/`removeVault`/`setActiveVaultId` all read-modify-write `vaults.json` by copying rather than mutating the cached object before the write lands.
 
 ## DB Backup / Restore (`.emeralddb`)
 
@@ -404,11 +410,11 @@ Full vault snapshots are exported and imported via Settings → Backup.
     "tasks": [], "taskCategories": [], "taskLinks": [],
     "links": []
   },
-  "images": { "/abs/path/img.png": "data:image/png;base64,..." }
+  "images": { "3f2a….png": "data:image/png;base64,..." }
 }
 ```
 
-`version` is `"2"` since the schema was unified. `migrateBackupPayload` lifts a `"1"` file on load: `wiki_articles.category` becomes `category_id`, `altar_items.category` is resolved from a category name to an id against the backup's own categories, and null `linked_*_ids` become `'[]'`. Without that step `insertRows` would silently drop the columns it no longer recognises — its `PRAGMA table_info` filter guards against crafted files and cannot tell malicious apart from merely old — and every article from an older backup would land in the default category.
+`version` is `"3"` since image references became filenames. `migrateBackupPayload` only has a v1 lift to apply; a v2 file needs no row changes, because `restoreImages` maps whatever keys the file carries — absolute paths in v1/v2, filenames in v3 — onto the filenames of the images it just wrote, and `remapPaths` substitutes those throughout. `migrateBackupPayload` lifts a `"1"` file on load: `wiki_articles.category` becomes `category_id`, `altar_items.category` is resolved from a category name to an id against the backup's own categories, and null `linked_*_ids` become `'[]'`. Without that step `insertRows` would silently drop the columns it no longer recognises — its `PRAGMA table_info` filter guards against crafted files and cannot tell malicious apart from merely old — and every article from an older backup would land in the default category.
 
 **Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Routines / Altars / Tasks / Tags`, `dateFrom`, `dateTo`, `includeDeleted`. Altars, routines, and tasks are date-filtered on `created_at`. `altar_items` and `altar_placements` are scoped to exported altars; `task_links` to exported task IDs.
 
@@ -428,7 +434,15 @@ Rows are inserted parents-first, following the order in `TABLES`; foreign keys a
 
 ID lists for `IN (...)` clauses are bound as parameters, never concatenated into the SQL string. The IDs are not necessarily app-generated — an import takes them verbatim from the file — and sqlx splits a statement on `;` and executes each part, so concatenating them let a crafted backup run arbitrary SQL during a later, unrelated export.
 
-Images are restored via `save_image`. The path remap covers journal `content`; wiki `content` / `icon` / `cover_image`; operation `content` / `icon` / `cover_image` / `drawing_data` / `thumbnail_data`; altar `background_image_data` / `thumbnail_data` / `icon_data`; and altar item `image_data`.
+Images are restored via `save_image`, which returns the filename they were given in the importing vault. The remap covers journal `content`; wiki `content` / `icon` / `cover_image`; operation `content` / `icon` / `cover_image` / `drawing_data` / `thumbnail_data`; altar `background_image_data` / `thumbnail_data` / `icon_data`; and altar item `image_data`. `IMAGE_FIELDS` in `schema.ts` is the corresponding inventory on the app side, shared by migration v35 and `collectUsedImageFilenames`. It groups the columns by how they must be treated:
+
+| Group | Meaning | v35 rewrites | Cleanup scans |
+|---|---|---|---|
+| `html` | the reference sits in a `src` attribute | yes | yes |
+| `plain` | the column *is* the reference | yes | yes |
+| `legacy` | the column holds a data-URL | no | yes |
+
+The `legacy` group is why the list has to be complete rather than only naming the rewritable columns: `collectUsedImageFilenames` decides which file the cleanup action may delete, so a column missing from it would be a reference nobody sees. Rewriting them would break their renderers — `Favicon` and `Banner` write `icon` / `cover_image` with `FileReader` and test them with `isImageIcon`, which only accepts `data:` / `blob:` / `/`.
 
 ## Rules for Future Schema Changes
 
@@ -437,6 +451,6 @@ Images are restored via `save_image`. The path remap covers journal `content`; w
 - Prefer additive changes. A rename or a type change means another full rebuild in the style of `normalizeSchema.ts`.
 - New boolean fields: `INTEGER NOT NULL DEFAULT 0` (or `1` where the safe default is true). New array fields: `TEXT NOT NULL DEFAULT '[]'`.
 - New references: name them `<thing>_id`, store the id and never the name, declare the foreign key, and index the column.
-- New image-backed fields: reuse the file pipeline (`save_image` / `copy_image_file`). Do not store base64 in SQLite.
+- New image-backed fields: reuse the file pipeline through `src/lib/images.ts` (`saveImage` / `copyImageFile`), store the returned **filename**, and add the column to the `plain` (or `html`) group of `IMAGE_FIELDS` in `schema.ts` so migration and cleanup both see it. Do not store base64 in SQLite, and do not store a path.
 - Never use the retired `try { ALTER TABLE … ADD COLUMN … } catch {}` pattern, and never rely on the `legacy` error-swallowing — new migrations must fail loudly.
 - If a change alters the shape of exported rows, bump `BACKUP_VERSION` in `dbBackup.ts` and extend `migrateBackupPayload` so older files still import.

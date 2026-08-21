@@ -34,8 +34,7 @@
  * öffnen.
  */
 import type Database from '@tauri-apps/plugin-sql';
-import { appDataDir } from '@tauri-apps/api/path';
-import { getActiveDbName } from './vaultManager';
+import { getActiveDbFile } from './vaultManager';
 import { TABLES, TABLE_DDL, INDEX_DDL, FALLBACK_CATEGORY } from './schema';
 
 /** `schema_version` überlebt den Rebuild — dort steht, was gerade läuft. */
@@ -93,10 +92,9 @@ async function rollbackPartialRebuild(db: Database): Promise<void> {
  * ohne Rückfahrkarte zu starten wäre die schlechtere Wahl.
  */
 async function backupDatabaseFile(db: Database): Promise<string> {
-  const dbName = await getActiveDbName();
-  const dir = await appDataDir();
-  const sep = dir.endsWith('/') || dir.endsWith('\\') ? '' : '/';
-  const target = `${dir}${sep}${dbName}.pre-v33.bak`;
+  // Die Sicherung liegt neben der Datenbank, im Vault-Ordner: wer den Ordner
+  // kopiert, nimmt sie mit.
+  const target = `${await getActiveDbFile()}.pre-v33.bak`;
   try {
     await db.execute(`VACUUM INTO '${target.replace(/'/g, "''")}'`);
   } catch (err) {

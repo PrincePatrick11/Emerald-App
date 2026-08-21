@@ -10,7 +10,7 @@ import { getCategoryEmoji } from '../wiki/WikiList';
 import ContextMenu from '../ui/ContextMenu';
 import Button from '../ui/Button';
 import { getMoonPhase, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
-import { generateId } from '../../lib/helpers';
+import { generateId, isImageIcon } from '../../lib/helpers';
 import { format } from 'date-fns';
 import type { MoonPhase } from '../../types';
 import type { HomeSort, HomeView, HomeSectionPrefs } from '../../store/uiStore';
@@ -19,11 +19,6 @@ type CtxTarget =
   | { kind: 'journal'; id: string }
   | { kind: 'wiki'; id: string }
   | { kind: 'operation'; id: string };
-
-function isImageIcon(icon: string | null | undefined) {
-  if (!icon) return false;
-  return icon.startsWith('data:image/') || icon.startsWith('blob:') || icon.startsWith('/');
-}
 
 // ── Dropdown (same style as ListToolbar) ──────────────────────────────────────
 

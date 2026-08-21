@@ -8,6 +8,7 @@ import { useAltarStore } from '../../store/altarStore';
 import { FALLBACK_CATEGORY } from '../../lib/schema';
 import { setAltarDragItem } from '../../lib/altarDragState';
 import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
+import { imageSrc } from '../../lib/images';
 import type { AltarCategory, AltarItem } from '../../types';
 import Modal from '../ui/Modal';
 import EmojiPicker from '../ui/EmojiPicker';
@@ -107,8 +108,8 @@ function ItemModal({
             wrapperClassName="relative flex-1"
             trigger={({ toggle }) => (
               <button onClick={toggle} className="w-full flex items-center gap-2 bg-stone-800/60 rounded-lg px-3 py-2 text-sm hover:bg-stone-700/60 transition-colors">
-                {editImageData?.startsWith('data:image/')
-                  ? <img src={editImageData} alt="" className="w-6 h-6 object-contain rounded" />
+                {imageSrc(editImageData)
+                  ? <img src={imageSrc(editImageData)} alt="" className="w-6 h-6 object-contain rounded" />
                   : <span className="text-xl">{editEmoji || getCategoryEmoji(editCategory)}</span>}
                 <span className="text-xs text-stone-500">{t('altar.chooseEmoji')}</span>
               </button>
@@ -495,8 +496,8 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
           {filteredItems.map((item) => (
             <div key={item.id} onPointerDown={(e) => { if (!editable) return; e.preventDefault(); setAltarDragItem(item); }} className={`group w-[70px] h-[85px] rounded-md border border-stone-700/60 bg-stone-900/40 px-1.5 py-2 flex flex-col ${editable ? 'cursor-grab active:cursor-grabbing' : 'cursor-default opacity-90'}`}>
               <div className="mb-1 w-full h-12 flex items-center justify-center overflow-hidden rounded-sm bg-stone-950/35">
-                {item.image_data?.startsWith('data:image/')
-                  ? <img src={item.image_data} alt="" className="h-full w-full object-contain" draggable={false} />
+                {imageSrc(item.image_data)
+                  ? <img src={imageSrc(item.image_data)} alt="" className="h-full w-full object-contain" draggable={false} />
                   : <span className={`leading-none select-none ${item.category_id === 'candle' ? 'candle-flame' : ''}`} style={{ fontSize: 34 }}>{item.emoji}</span>}
               </div>
               <div className="mt-auto flex items-center gap-1">

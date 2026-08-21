@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { imageRefsInHtml, readImageAsBase64, rewriteImageRefs } from './images';
 import { save, message } from '@tauri-apps/plugin-dialog';
 import TurndownService from 'turndown';
 import { format } from 'date-fns';
@@ -25,36 +26,24 @@ function sanitizeDataImageUrl(value: string | null | undefined): string | null {
   return /^data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+$/.test(trimmed) ? trimmed : null;
 }
 
-const FILE_SRC_RE = /src="([^"]+)"/g;
 
 async function embedImages(html: string): Promise<string> {
-  const paths: string[] = [];
-  FILE_SRC_RE.lastIndex = 0;
-  let m;
-  while ((m = FILE_SRC_RE.exec(html)) !== null) {
-    const src = m[1];
-    if (!src.startsWith('data:') && !src.startsWith('http') && !src.startsWith('blob:')) {
-      paths.push(src);
-    }
-  }
-  if (paths.length === 0) return html;
+  const refs = [...new Set(imageRefsInHtml(html))];
+  if (refs.length === 0) return html;
 
-  const resolved = await Promise.all(
-    paths.map(async (path) => {
+  const resolved = new Map<string, string>();
+  await Promise.all(
+    refs.map(async (ref) => {
       try {
-        const dataUrl = await invoke<string>('read_image_as_base64', { path });
-        return { path, dataUrl };
+        resolved.set(ref, await readImageAsBase64(ref));
       } catch {
-        return { path, dataUrl: '' };
+        // Datei fehlt — leeres src statt eines toten Verweises im Export.
+        resolved.set(ref, '');
       }
     })
   );
 
-  let result = html;
-  for (const { path, dataUrl } of resolved) {
-    result = result.split(`src="${path}"`).join(dataUrl ? `src="${dataUrl}"` : 'src=""');
-  }
-  return result;
+  return rewriteImageRefs(html, (ref) => resolved.get(ref) ?? null);
 }
 
 function stripImages(html: string): string {

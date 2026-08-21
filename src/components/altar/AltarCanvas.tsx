@@ -20,7 +20,7 @@ import type { AltarImagePresetName } from '../../lib/altarConstants';
 import { hexToRgb } from '../../lib/helpers';
 import type { AltarItem, AltarPlacement, AltarRecord } from '../../types';
 import { AltarItemVisual } from './AltarItemVisual';
-import { getCachedBackgroundPreview } from './useAltarBackgroundPreview';
+import { canvasImageSrc } from '../../lib/images';
 
 const BASE_SIZE = 40;
 
@@ -51,6 +51,15 @@ function _radialGrad(
   ctx.fillRect(0, 0, w, h);
 }
 
+/**
+ * Alles, was hier gezeichnet wird, landet in `exportCurrentAltarImage` und wird
+ * mit `toBlob()` wieder ausgelesen. Das geht nur, solange keine fremde Quelle
+ * auf der Flaeche liegt — deshalb kommen die Quellen aus `canvasImageSrc()`,
+ * das gespeicherte Bilder als Data-URL liefert statt ueber `emerald-img`.
+ *
+ * Kein `crossOrigin` also: es gaebe hier nichts mehr, worauf es sich beziehen
+ * koennte, und same-origin holt es nur ein zweites Mal in den Cache.
+ */
 function _loadImg(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -88,7 +97,7 @@ async function _renderAltar(
   // 1. Background
   const preset = altar.background_preset;
   try {
-    if (backgroundSrc?.startsWith('data:image/')) {
+    if (backgroundSrc) {
       await _drawCover(ctx, backgroundSrc, outW, outH);
     } else if (ALTAR_IMAGE_PRESETS.includes(preset as AltarImagePresetName)) {
       await _drawCover(ctx, `/backgrounds/${preset}.webp`, outW, outH);
@@ -160,9 +169,10 @@ async function _renderAltar(
     if (rot !== 0) ctx.rotate(rot);
     ctx.globalAlpha = p.opacity ?? 1;
 
-    if (p.image_data?.startsWith('data:image/')) {
+    const itemSrc = await canvasImageSrc(p.image_data);
+    if (itemSrc) {
       try {
-        const img = await _loadImg(p.image_data);
+        const img = await _loadImg(itemSrc);
         const ia = img.naturalWidth / img.naturalHeight;
         const da = drawW / drawH;
         const [rw, rh] = ia > da ? [drawW, drawW / ia] : [drawH * ia, drawH];
@@ -231,7 +241,7 @@ export async function exportCurrentAltarImage(format: 'jpeg' | 'png' | 'webp' = 
     const altar = altars.find((a) => a.id === activeAltarId) ?? null;
     if (!altar) return null;
     const { w: nativeW, h: nativeH } = resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
-    const backgroundSrc = getCachedBackgroundPreview(altar.background_image_data);
+    const backgroundSrc = (await canvasImageSrc(altar.background_image_data)) || null;
     const canvas = await _renderAltar(altar, backgroundSrc, placements, nativeW, nativeH, nativeW);
     if (!canvas) return null;
     const mime = format === 'png' ? 'image/png' : format === 'webp' ? 'image/webp' : 'image/jpeg';
@@ -258,7 +268,7 @@ export async function captureCurrentAltar(): Promise<string | null> {
     const altar = altars.find((a) => a.id === activeAltarId) ?? null;
     if (!altar) return null;
     const { w: nativeW, h: nativeH } = resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
-    const backgroundSrc = getCachedBackgroundPreview(altar.background_image_data);
+    const backgroundSrc = (await canvasImageSrc(altar.background_image_data)) || null;
     return renderAltarThumbnail(altar, backgroundSrc, placements, nativeW, nativeH);
   } catch (err) {
     console.error('[captureCurrentAltar]', err);

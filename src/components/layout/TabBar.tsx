@@ -10,7 +10,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
 import type { ActiveView, MoonPhase } from '../../types';
 import { getCategoryEmoji } from '../wiki/WikiList';
-import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
+import { imageSrc } from '../../lib/images';
 
 function getFallbackTitle(view: ActiveView) {
   switch (view.type) {
@@ -44,14 +44,11 @@ function renderIconValue(icon: string | null | undefined, fallback: ReactNode) {
 }
 
 function AltarTabIcon({ iconData }: { iconData: string | null | undefined }) {
-  const preview = useBackgroundPreview(iconData ?? null);
   if (!iconData) return <Flame size={13} />;
-  // emoji: no slash, no data: prefix
-  if (!iconData.startsWith('/') && !iconData.startsWith('data:')) {
-    return <span className="text-sm leading-none">{iconData}</span>;
-  }
-  const src = iconData.startsWith('data:') ? iconData : preview;
-  return src ? <img src={src} alt="" className="h-4 w-4 rounded object-cover" /> : <Flame size={13} />;
+  // `/`-Pfade sind Presets aus public/ und gehen an imageSrc vorbei.
+  const src = iconData.startsWith('/') ? iconData : imageSrc(iconData);
+  if (src) return <img src={src} alt="" className="h-4 w-4 rounded object-cover" />;
+  return <span className="text-sm leading-none">{iconData}</span>;
 }
 
 export default function TabBar() {

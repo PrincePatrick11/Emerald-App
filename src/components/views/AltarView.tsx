@@ -13,7 +13,7 @@ import Button from '../ui/Button';
 import { AltarCanvas, captureCurrentAltar } from '../altar/AltarCanvas';
 import { AltarLibraryStrip } from '../altar/AltarLibraryStrip';
 import { AltarCard, AltarListRow, buildAltarContextMenuActions } from '../altar/AltarCard';
-import { useBackgroundPreview } from '../altar/useAltarBackgroundPreview';
+import { imageSrc } from '../../lib/images';
 
 export default function AltarView() {
   const { t } = useTranslation();
@@ -224,7 +224,7 @@ export default function AltarView() {
     return () => setEditActions(null);
   }, [isEditing]);
 
-  const backgroundSrc = useBackgroundPreview(activeAltar?.background_image_data ?? null);
+  const backgroundSrc = imageSrc(activeAltar?.background_image_data);
 
   if (!activeAltar) {
     const filtered = search

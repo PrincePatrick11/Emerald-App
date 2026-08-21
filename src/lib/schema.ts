@@ -20,7 +20,7 @@ import type Database from '@tauri-apps/plugin-sql';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 34;
+export const BASELINE_VERSION = 35;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
@@ -565,4 +565,123 @@ export async function checkIntegrity(db: Database): Promise<Orphan[]> {
   }
 
   return orphans;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bildreferenzen
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Das vollstaendige Inventar der Spalten, in denen ein Bild referenziert sein
+ * kann. Drei Sorten, weil sie unterschiedlich behandelt werden muessen:
+ *
+ * - `html` — der Verweis steckt in einem `src`-Attribut. Wird umgeschrieben.
+ * - `plain` — die Spalte *ist* der Verweis. Wird umgeschrieben.
+ * - `legacy` — die Spalte haelt heute eine Data-URL. Wird **gelesen**, aber nie
+ *   umgeschrieben.
+ *
+ * Die `legacy`-Gruppe ist der Grund, warum diese Liste vollstaendig sein muss
+ * und nicht nur die umschreibbaren Spalten nennt. `collectUsedImageFilenames`
+ * entscheidet, welche Datei die Aufraeum-Aktion loeschen darf; eine Spalte, die
+ * hier fehlt, waere eine Referenz, die niemand sieht. Data-URLs stoeren dabei
+ * nicht — sie enthalten keine 64 Hex-Zeichen mit Bildendung und fallen von
+ * selbst durch.
+ *
+ * Umgeschrieben werden sie trotzdem nicht, und das ist Absicht:
+ * `wiki_articles`/`operations` `icon` und `cover_image` werden von `Favicon`
+ * und `Banner` per `FileReader` als Data-URL geschrieben, und ihre Renderer
+ * pruefen mit `isImageIcon` auf `data:` / `blob:` / `/`. Ein Dateiname wuerde
+ * dort als Text durchfallen. Dasselbe gilt fuer `altars.thumbnail_data` /
+ * `icon_data`, `operations.drawing_data` / `thumbnail_data` und
+ * `altar_items.image_data` (siehe die Base64-Notiz in `database.md`).
+ *
+ * Migration v35 und `collectUsedImageFilenames` lesen dieselbe Liste. Liefe
+ * jede fuer sich, wuerde die Bereinigung frueher oder spaeter ein Bild
+ * loeschen, das die Migration noch kennt.
+ */
+export const IMAGE_FIELDS: {
+  table: string;
+  html: string[];
+  plain: string[];
+  legacy: string[];
+}[] = [
+  { table: 'journal_entries', html: ['content'], plain: [], legacy: [] },
+  { table: 'wiki_articles', html: ['content'], plain: [], legacy: ['icon', 'cover_image'] },
+  {
+    table: 'operations',
+    html: ['content'],
+    plain: [],
+    legacy: ['icon', 'cover_image', 'drawing_data', 'thumbnail_data'],
+  },
+  { table: 'altars', html: [], plain: ['background_image_data'], legacy: ['thumbnail_data', 'icon_data'] },
+  { table: 'altar_items', html: [], plain: [], legacy: ['image_data'] },
+];
+
+/**
+ * Spiegelt `is_valid_image_name` in `src-tauri/src/images.rs`: ein gespeichertes
+ * Bild heisst nach dem SHA-256 seines eigenen Inhalts.
+ *
+ * Das Format ist eine Eigenschaft der Spalten, nicht der Oberflaeche — deshalb
+ * steht es hier und nicht in `images.ts`, das es nur re-exportiert. `db.ts`
+ * kann es so in Migration v35 benutzen, ohne die Tauri-Module zu ziehen, die
+ * `scripts/schema-check.mjs` gar nicht hat.
+ */
+const STORED_IMAGE_RE = /^[0-9a-f]{64}\.(?:png|jpe?g|gif|webp|svg)$/;
+
+/** Dieselbe Form, ungeankert — zum Aufsammeln aus HTML. */
+const IMAGE_NAME_RE = /[0-9a-f]{64}\.(?:png|jpe?g|gif|webp|svg)/g;
+
+/**
+ * Der gespeicherte Dateiname einer Referenz, oder null.
+ *
+ * Nimmt auch einen vollen Pfad: v35 schreibt jeden absoluten Pfad um, den sie
+ * findet, aber eine `.emerald`-Datei aus einer aelteren Version traegt weiter
+ * welche.
+ */
+export function storedImageName(ref: string | null | undefined): string | null {
+  if (!ref) return null;
+  const base = ref.split(/[\\/]/).pop() ?? '';
+  return STORED_IMAGE_RE.test(base) ? base : null;
+}
+
+/**
+ * Alle Spalten einer Tabelle, die einen Bildverweis halten koennen.
+ *
+ * Fuer alles, was nicht zwischen den drei Gruppen unterscheiden muss — der
+ * Backup-Export und beide Import-Modi wollen schlicht "jede Spalte, in der ein
+ * Bild stecken kann".
+ */
+export function imageColumns(table: string): string[] {
+  const entry = IMAGE_FIELDS.find((f) => f.table === table);
+  return entry ? [...entry.html, ...entry.plain, ...entry.legacy] : [];
+}
+
+/**
+ * Alle Bild-Dateinamen, die dieser Vault tatsaechlich referenziert.
+ *
+ * Diagnose- und Aufraeumcode, kein Produktivpfad: die Funktion scannt ganze
+ * Tabellen. Sie steht neben `checkIntegrity`, weil sie dieselbe Rolle hat —
+ * etwas pruefen, das keine Fremdschluesselbeziehung abdecken kann.
+ */
+export async function collectUsedImageFilenames(db: Database): Promise<Set<string>> {
+  const used = new Set<string>();
+
+  for (const { table, html, plain, legacy } of IMAGE_FIELDS) {
+    const columns = [...html, ...plain, ...legacy];
+    const rows = await db.select<Record<string, string | null>[]>(
+      `SELECT ${columns.join(', ')} FROM ${table}`
+    );
+    for (const row of rows) {
+      for (const column of columns) {
+        const value = row[column];
+        if (!value) continue;
+        // Ein Data-URL enthaelt keine 64 Hex-Zeichen mit Bildendung und
+        // faellt von selbst durch — deshalb duerfen die `legacy`-Spalten hier
+        // ohne Sonderbehandlung mitlaufen.
+        for (const match of value.matchAll(IMAGE_NAME_RE)) used.add(match[0]);
+      }
+    }
+  }
+
+  return used;
 }

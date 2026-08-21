@@ -9,7 +9,10 @@
     "deleteConfirm": "Delete?",
     "unsupportedImageFormat": "Unsupported format. Allowed: PNG, JPEG, GIF, WebP, SVG",
     "searchEmoji": "Search emoji…",
-    "noEmojiResults": "No matches"
+    "noEmojiResults": "No matches",
+    "bytes": "B",
+    "kilobytes": "KB",
+    "megabytes": "MB"
   },
   "listView": {
     "view": "View",
@@ -374,7 +377,7 @@
   },
   "vault": {
     "title": "Vaults",
-    "hint": "Each vault has its own database.",
+    "hint": "A vault is a folder with its own database and its own images.",
     "active": "active",
     "switch": "Switch",
     "switching": "Switching…",
@@ -384,9 +387,21 @@
     "add": "Add Vault",
     "create": "Create",
     "cancel": "Cancel",
-    "deleteHint": "The database file stays on disk.",
+    "deleteHint": "The vault disappears from the list.",
     "switchFailed": "Could not switch vault.",
-    "saveFailed": "Could not save the change."
+    "saveFailed": "Could not save the change.",
+    "open": "Open Vault",
+    "chooseFolder": "Choose folder…",
+    "relocate": "Locate again…",
+    "missing": "Folder not found",
+    "accessDenied": "No access to the folder",
+    "folderHasVault": "This folder already holds a vault.",
+    "folderHasNoVault": "This folder holds no vault.",
+    "alreadyOpen": "This vault is already in the list.",
+    "deleteFiles": "Delete the files as well:",
+    "deleteFilesWarning": "This will permanently delete the database and its images.",
+    "folderNotEmpty": "The folder is not empty. A new vault needs an empty folder.",
+    "deleteFilesLeftover": "The folder held other files and was not removed."
   },
   "settings": {
     "language": "Language",
@@ -434,7 +449,16 @@
     "uiFont": "UI font",
     "editorFont": "Editor body font",
     "themeDark": "Dark",
-    "themeLight": "Light"
+    "themeLight": "Light",
+    "cleanupImages": "Unused images",
+    "cleanupScan": "Scan",
+    "cleanupScanning": "Scanning…",
+    "cleanupNone": "Nothing to remove",
+    "cleanupFound": "{{count}} image, {{size}}",
+    "cleanupFound_other": "{{count}} images, {{size}}",
+    "cleanupDelete": "Remove",
+    "cleanupDone": "{{size}} freed",
+    "storage": "Storage"
   },
   "home": {
     "viewAll": "View all",

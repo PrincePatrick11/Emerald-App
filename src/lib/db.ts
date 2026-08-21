@@ -1,29 +1,44 @@
 import Database from '@tauri-apps/plugin-sql';
 import { invoke } from '@tauri-apps/api/core';
-import { getActiveDbName } from './vaultManager';
-import { BASELINE_VERSION, TABLE_DDL, createSchema, ddlIfNotExists, seedBuiltins } from './schema';
+import { getActiveDbConnectionString, getActiveVaultId } from './vaultManager';
+import { BASELINE_VERSION, IMAGE_FIELDS, TABLE_DDL, createSchema, ddlIfNotExists, seedBuiltins, storedImageName } from './schema';
 import { normalizeSchema } from './normalizeSchema';
+import { adoptLegacyImages, rewriteImageRefs } from './images';
 
 // Per-vault DB cache: SQLite identifier → Database instance
 const _dbCache = new Map<string, Database>();
 // Serialises the first-load for each vault to avoid duplicate runMigrations calls
 const _initPromises = new Map<string, Promise<Database>>();
 
-/** Drop all cached connections. Call before switching vaults. */
-export function resetDbCache(): void {
+/**
+ * Close and drop all cached connections. Call before switching vaults.
+ *
+ * Dropping the JavaScript reference is not enough: the connection pool lives in
+ * `tauri-plugin-sql`, and an open pool keeps the file locked. On Windows that
+ * means the vault's folder cannot be moved, relocated, or deleted for the rest
+ * of the session — which is exactly what the vault modal's "delete files"
+ * checkbox tries to do.
+ */
+export async function resetDbCache(): Promise<void> {
+  const open = [..._dbCache.values()];
   _dbCache.clear();
   _initPromises.clear();
+  await Promise.all(
+    open.map((db) => db.close().catch((err) => console.warn('[db] close failed', err)))
+  );
 }
 
 export async function getDb(): Promise<Database> {
-  const dbName = await getActiveDbName();
-  const identifier = `sqlite:${dbName}`;
+  const vaultId = await getActiveVaultId();
+  const identifier = await getActiveDbConnectionString();
 
   if (_dbCache.has(identifier)) return _dbCache.get(identifier)!;
   if (_initPromises.has(identifier)) return _initPromises.get(identifier)!;
 
   const promise = (async () => {
-    await invoke('ensure_app_storage_dirs');
+    // SQLite does not create a directory for its own file, so the vault folder
+    // has to exist before the load.
+    await invoke('ensure_vault_dirs', { vaultId });
     const db = await Database.load(identifier);
     await runMigrations(db);
     await runPeriodicCleanup(db);
@@ -944,6 +959,91 @@ export const MIGRATIONS: Migration[] = [
         `INSERT OR IGNORE INTO operation_categories (id, name, emoji, sort_order, is_builtin)
          VALUES ('other', 'Other', '📦', 2, 1)`
       );
+    },
+  },
+  {
+    // Bilder gehoeren ab hier dem Vault. Sie liegen in `{vaultDir}/images/`, und
+    // referenziert wird nur noch der Dateiname.
+    //
+    // Vorher stand in `content` der absolute Pfad in eine Ablage, die sich alle
+    // Vaults geteilt haben. Das hat drei Dinge gleichzeitig kaputtgemacht: die
+    // Datenbank war an einen Rechner und einen Benutzer gebunden, ein Bild war
+    // aus jedem Vault sichtbar, und Aufraeumen war unmoeglich — `cleanup_unused_images`
+    // musste entfernt werden, weil es Bilder fremder Vaults als unbenutzt
+    // geloescht hat.
+    //
+    // Der Umzug der Datenbankdatei selbst ist *keine* Migration: sie zieht um,
+    // bevor sie geoeffnet wird. Das macht `migrate_vault_layout`, angestossen
+    // aus `vaultManager.loadVaultsFile()`.
+    version: 35,
+    name: 'vault_scoped_images',
+    up: async (db) => {
+      const adopt = new Set<string>();
+      const updates: { sql: string; params: unknown[] }[] = [];
+
+      // Bewusst ohne die `legacy`-Spalten aus IMAGE_FIELDS: die halten
+      // Data-URLs, und ihre Renderer koennen mit einem Dateinamen nichts
+      // anfangen. Gelesen werden sie trotzdem — von
+      // `collectUsedImageFilenames`, damit die Aufraeum-Aktion nichts loescht,
+      // worauf sie noch zeigen.
+      for (const { table, html, plain } of IMAGE_FIELDS) {
+        const columns = [...html, ...plain];
+        if (columns.length === 0) continue;
+        const rows = await db.select<Record<string, string | null>[]>(
+          `SELECT id, ${columns.join(', ')} FROM ${table}`
+        );
+
+        for (const row of rows) {
+          const next: Record<string, string> = {};
+
+          for (const column of html) {
+            const value = row[column];
+            if (!value) continue;
+            const rewritten = rewriteImageRefs(value, (ref) => {
+              const name = storedImageName(ref);
+              if (!name || name === ref) return null;
+              adopt.add(name);
+              return name;
+            });
+            if (rewritten !== value) next[column] = rewritten;
+          }
+
+          for (const column of plain) {
+            const value = row[column];
+            if (!value) continue;
+            const name = storedImageName(value);
+            if (!name || name === value) continue;
+            adopt.add(name);
+            next[column] = name;
+          }
+
+          const changed = Object.keys(next);
+          if (!changed.length) continue;
+          updates.push({
+            sql: `UPDATE ${table} SET ${changed.map((c, i) => `${c}=$${i + 1}`).join(', ')} WHERE id=$${changed.length + 1}`,
+            params: [...changed.map((c) => next[c]), row.id],
+          });
+        }
+      }
+
+      // Erst kopieren, dann umschreiben. Schlaegt das Kopieren fehl, wird
+      // trotzdem umgeschrieben: der Protokoll-Handler faellt auf die alte
+      // gemeinsame Ablage zurueck, das Bild bleibt also sichtbar. Andersherum
+      // — umschreiben ohne Kopie und ohne Fallback — waere es weg.
+      // `adoptLegacyImages` schreibt in den *aktiven* Vault. Das passt, weil
+      // `runMigrations` ausschliesslich aus `getDb()` laeuft und das immer den
+      // aktiven Vault oeffnet — aber die Annahme steht nicht in der Signatur.
+      if (adopt.size > 0) {
+        try {
+          await adoptLegacyImages([...adopt]);
+        } catch (err) {
+          console.warn('[db] v35: Uebernahme aus der alten Bildablage fehlgeschlagen', err);
+        }
+      }
+
+      for (const { sql, params } of updates) {
+        await db.execute(sql, params);
+      }
     },
   },
 ];

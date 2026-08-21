@@ -4,8 +4,8 @@ import {
   loadVaultsFile,
   setActiveVaultId,
   addVault as addVaultToFile,
-  newVaultRecord,
   updateVaultName,
+  relocateVault as relocateVaultInFile,
   removeVault as removeVaultFromFile,
 } from '../lib/vaultManager';
 import { resetDbCache, getDb } from '../lib/db';
@@ -27,9 +27,9 @@ interface VaultStore {
   loadVaults: () => Promise<void>;
   switchVault: (id: string) => Promise<void>;
   addVault: (vault: Vault) => Promise<void>;
-  createVault: (name: string) => Promise<Vault>;
   renameVault: (id: string, name: string) => Promise<void>;
-  removeVault: (id: string) => Promise<void>;
+  relocateVault: (id: string, path: string) => Promise<void>;
+  removeVault: (id: string, deleteFiles?: boolean) => Promise<void>;
 }
 
 async function reloadAllStores(): Promise<void> {
@@ -58,17 +58,27 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   },
 
   switchVault: async (id: string) => {
-    if (id === get().activeVaultId) return;
+    const previous = get().activeVaultId;
+    if (id === previous) return;
 
     // Persist new active vault
     await setActiveVaultId(id);
     set({ activeVaultId: id });
 
     // Drop cached DB connection so next getDb() loads the new vault
-    resetDbCache();
+    await resetDbCache();
 
-    // Initialize schema for the new vault (runMigrations is idempotent)
-    await getDb();
+    // Initialize schema for the new vault (runMigrations is idempotent).
+    // A vault whose folder is gone fails here — and must not stay the active
+    // one, or the next start comes up on a vault that cannot be opened.
+    try {
+      await getDb();
+    } catch (err) {
+      await setActiveVaultId(previous);
+      set({ activeVaultId: previous });
+      await resetDbCache();
+      throw err;
+    }
 
     // Navigate to home first to avoid stale open-entry state
     useUIStore.getState().setActiveView({ type: 'home' });
@@ -85,12 +95,6 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     set((s) => ({ vaults: [...s.vaults, vault] }));
   },
 
-  createVault: async (name: string) => {
-    const vault = newVaultRecord(name);
-    await get().addVault(vault);
-    return vault;
-  },
-
   renameVault: async (id: string, name: string) => {
     await updateVaultName(id, name);
     set((s) => ({
@@ -98,10 +102,15 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     }));
   },
 
-  removeVault: async (id: string) => {
+  relocateVault: async (id: string, path: string) => {
+    await relocateVaultInFile(id, path);
+    set((s) => ({ vaults: s.vaults.map((v) => (v.id === id ? { ...v, path } : v)) }));
+  },
+
+  removeVault: async (id: string, deleteFiles = false) => {
     const { vaults, activeVaultId } = get();
     if (id === activeVaultId || vaults.length <= 1) return;
-    await removeVaultFromFile(id);
+    await removeVaultFromFile(id, deleteFiles);
     set((s) => ({ vaults: s.vaults.filter((v) => v.id !== id) }));
   },
 }));

@@ -11,7 +11,7 @@ import {
   getGradientColor,
   isGradientPreset,
 } from '../../../lib/altarConstants';
-import { useBackgroundPreview } from '../../altar/useAltarBackgroundPreview';
+import { imageSrc } from '../../../lib/images';
 import { PropertySummaryRow } from './PropertySummaryRow';
 import PropertiesReadView from './PropertiesReadView';
 import { FaviconGlyph } from './Favicon';
@@ -37,7 +37,7 @@ export default function AltarReadingSummary() {
   const activeAltar = useAltarStore((s) => s.altars.find((a) => a.id === s.activeAltarId) ?? null);
   const placements = useAltarStore((s) => s.placements);
 
-  const customBackgroundPreview = useBackgroundPreview(activeAltar?.background_image_data ?? null);
+  const customBackgroundPreview = imageSrc(activeAltar?.background_image_data);
 
   const backgroundInfo = useMemo(() => {
     if (!activeAltar) return null;

@@ -147,19 +147,22 @@ function buildOverlayGradient(opacity: number, color: string = DEFAULT_OVERLAY_C
 
 /**
  * Returns a CSS `background` value for an altar canvas or card preview.
- * Only `data:image/` URIs are accepted as image sources — anything else falls
- * back to the altar's preset so that no arbitrary content is interpolated into
- * the CSS string.
+ * `backgroundSrc` must come from `imageSrc()`. That yields an empty string for
+ * anything it does not recognise, and otherwise a stored image's
+ * `emerald-img://` URL or an inline `data:` / `blob:` / `http` source passed
+ * through unchanged — so only those four shapes reach the CSS `url()`.
  */
 export function getAltarBackgroundStyle(
   altar: Pick<AltarRecord, 'background_preset' | 'background_overlay' | 'background_overlay_color'> | null,
-  imageSrc: string | null | undefined,
+  backgroundSrc: string | null | undefined,
 ): string {
   if (!altar) return ALTAR_BACKGROUND_STYLES[DEFAULT_ALTAR_BACKGROUND];
   const overlay = altar.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY;
   const overlayLayer = overlay > 0 ? `${buildOverlayGradient(overlay, altar.background_overlay_color)}, ` : '';
-  if (imageSrc?.startsWith('data:image/')) {
-    return `${overlayLayer}url("${imageSrc}") center / cover no-repeat`;
+  // A custom background resolves to an `emerald-img://` URL, a legacy one to a
+  // data-URL. Either way, having a source at all is what makes it custom.
+  if (backgroundSrc) {
+    return `${overlayLayer}url("${backgroundSrc}") center / cover no-repeat`;
   }
   if (ALTAR_IMAGE_PRESETS.includes(altar.background_preset as AltarImagePresetName)) {
     return `${overlayLayer}url("/backgrounds/${altar.background_preset}.webp") center / cover no-repeat`;

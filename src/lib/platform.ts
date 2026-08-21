@@ -6,7 +6,15 @@
  * the first paint. Every async alternative would render one frame with the
  * wrong layout first.
  */
-const ua = navigator.userAgent;
+/**
+ * Die `typeof`-Wachen hier und an `isTauri` sind kein Zierrat:
+ * `scripts/schema-check.mjs` buendelt `db.ts` fuer node, und ueber `images.ts`
+ * haengt dieses Modul mit drin. Ein ungeschuetzter Zugriff auf `navigator` oder
+ * `window` beim Laden sprengt den Harness beim Import, bevor irgendeine
+ * Pruefung laeuft. Ausserhalb eines Browsers ist die Antwort schlicht "nichts
+ * davon".
+ */
+const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
 
 export const isMacOS = /Mac OS X|Macintosh/.test(ua);
 export const isWindows = /Windows/.test(ua);
@@ -16,7 +24,7 @@ export type PlatformName = 'macos' | 'windows' | 'linux';
 export const platformName: PlatformName = isMacOS ? 'macos' : isWindows ? 'windows' : 'linux';
 
 /** False when the app is opened in a plain browser, where no window APIs exist. */
-export const isTauri = '__TAURI_INTERNALS__' in window;
+export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 /**
  * Windows and Linux run the window undecorated, so the title bar draws its own

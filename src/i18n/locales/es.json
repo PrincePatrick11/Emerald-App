@@ -9,7 +9,10 @@
     "deleteConfirm": "¿Eliminar?",
     "unsupportedImageFormat": "Formato no compatible. Permitido: PNG, JPEG, GIF, WebP, SVG",
     "searchEmoji": "Buscar emoji…",
-    "noEmojiResults": "Sin resultados"
+    "noEmojiResults": "Sin resultados",
+    "bytes": "B",
+    "kilobytes": "KB",
+    "megabytes": "MB"
   },
   "listView": {
     "view": "Vista",
@@ -382,7 +385,7 @@
   },
   "vault": {
     "title": "Vaults",
-    "hint": "Cada vault tiene su propia base de datos.",
+    "hint": "Un vault es una carpeta con su propia base de datos y sus propias imágenes.",
     "active": "activo",
     "switch": "Cambiar",
     "switching": "Cambiando…",
@@ -392,9 +395,21 @@
     "add": "Añadir vault",
     "create": "Crear",
     "cancel": "Cancelar",
-    "deleteHint": "El archivo de base de datos permanece en el disco.",
+    "deleteHint": "El vault desaparece de la lista.",
     "switchFailed": "No se pudo cambiar de vault.",
-    "saveFailed": "No se pudo guardar el cambio."
+    "saveFailed": "No se pudo guardar el cambio.",
+    "open": "Abrir vault",
+    "chooseFolder": "Elegir carpeta…",
+    "relocate": "Volver a ubicar…",
+    "missing": "Carpeta no encontrada",
+    "accessDenied": "Sin acceso a la carpeta",
+    "folderHasVault": "Esta carpeta ya contiene un vault.",
+    "folderHasNoVault": "Esta carpeta no contiene ningún vault.",
+    "alreadyOpen": "Este vault ya está en la lista.",
+    "deleteFiles": "Eliminar también los archivos:",
+    "deleteFilesWarning": "La base de datos y sus imágenes se eliminarán permanentemente.",
+    "folderNotEmpty": "La carpeta no está vacía. Un vault nuevo necesita una carpeta vacía.",
+    "deleteFilesLeftover": "La carpeta contenía otros archivos y no se eliminó."
   },
   "settings": {
     "language": "Idioma",
@@ -442,7 +457,16 @@
     "uiFont": "Fuente de la interfaz",
     "editorFont": "Fuente del cuerpo del editor",
     "themeDark": "Oscuro",
-    "themeLight": "Claro"
+    "themeLight": "Claro",
+    "cleanupImages": "Imágenes sin usar",
+    "cleanupScan": "Buscar",
+    "cleanupScanning": "Buscando…",
+    "cleanupNone": "Nada que eliminar",
+    "cleanupFound": "{{count}} imagen, {{size}}",
+    "cleanupFound_other": "{{count}} imágenes, {{size}}",
+    "cleanupDelete": "Eliminar",
+    "cleanupDone": "{{size}} liberados",
+    "storage": "Almacenamiento"
   },
   "contextMenu": {
     "openInNewTab": "Abrir en nueva pestaña",

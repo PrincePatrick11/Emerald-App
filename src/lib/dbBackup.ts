@@ -13,7 +13,9 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { getDb } from './db';
-import { getActiveDbName, addVault, invalidateVaultCache, newVaultRecord } from './vaultManager';
+import { getActiveDbFile, addVault, invalidateVaultCache, newVaultRecord } from './vaultManager';
+import { imageRefsInHtml, isStoredImage, readImageAsBase64, saveImage } from './images';
+import { IMAGE_FIELDS, imageColumns } from './schema';
 import { useVaultStore } from '../store/vaultStore';
 import { useJournalStore } from '../store/journalStore';
 import { useWikiStore } from '../store/wikiStore';
@@ -89,9 +91,10 @@ type Row = Record<string, any>;
 
 /**
  * '1' = vor der Schema-Vereinheitlichung (`wiki_articles.category`,
- * `altar_items.category` mit dem Kategorie-*Namen*), '2' = danach.
+ * `altar_items.category` mit dem Kategorie-*Namen*), '2' = danach, '3' = seit
+ * Bilder als Dateiname statt als absoluter Pfad referenziert werden.
  */
-const BACKUP_VERSION = '2' as const;
+const BACKUP_VERSION = '3' as const;
 
 /**
  * Hebt eine Sicherung im alten Format auf das aktuelle.
@@ -103,7 +106,20 @@ const BACKUP_VERSION = '2' as const;
  * unterscheiden; also wird hier übersetzt, bevor er greift.
  */
 export function migrateBackupPayload(backup: BackupFile): void {
-  if (backup.version === BACKUP_VERSION) return;
+  // Eine Version, die diese App noch nicht kennt, wird zurückgewiesen statt
+  // umgestempelt — sonst liefe eine Datei aus einer neueren Version durch den
+  // Import, als wäre sie verstanden worden. `.emerald` hält es ebenso.
+  if (backup.version > BACKUP_VERSION) {
+    throw new Error(`Unsupported backup version: ${backup.version}`);
+  }
+
+  // v2 → v3 braucht keinen Schritt: geaendert hat sich nur, dass Bilder als
+  // Dateiname statt als absoluter Pfad referenziert werden, und `restoreImages`
+  // uebersetzt die Schluessel der Datei so oder so.
+  if (backup.version !== '1') {
+    backup.version = BACKUP_VERSION;
+    return;
+  }
 
   for (const row of backup.data.wikiArticles ?? []) {
     if (row.category_id === undefined && row.category !== undefined) {
@@ -135,7 +151,7 @@ export function migrateBackupPayload(backup: BackupFile): void {
 }
 
 interface BackupFile {
-  version: '1' | '2';
+  version: '1' | '2' | '3';
   type: 'backup';
   exportedAt: string;
   filters: BackupOptions;
@@ -156,26 +172,34 @@ interface BackupFile {
     taskLinks?: Row[];
     links?: Row[];
   };
-  images: Record<string, string>;  // absolute file path → data-URL
+  images: Record<string, string>;  // gespeicherter Dateiname → data-URL (in v1/v2: absoluter Pfad)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const LOCAL_PATH_RE = /src="([^"]+)"/g;
-
-function extractImagePaths(html: string): string[] {
-  const paths: string[] = [];
-  LOCAL_PATH_RE.lastIndex = 0;
-  let m;
-  while ((m = LOCAL_PATH_RE.exec(html)) !== null) {
-    const src = m[1];
-    if (src && !src.startsWith('data:') && !src.startsWith('http') && !src.startsWith('blob:')) {
-      paths.push(src);
+/**
+ * Traegt jeden Bildverweis der Zeilen in `into` ein.
+ *
+ * Die Spaltenliste kommt aus `IMAGE_FIELDS`, damit sie dieselbe ist, die
+ * Migration v35 und die Aufraeum-Aktion benutzen. Vorher stand sie hier
+ * dreimal von Hand — und `doReplace` und `doMerge` waren fuer `altars` bereits
+ * auseinandergelaufen.
+ */
+function collectImageRefs(table: string, rows: Row[] | undefined, into: Set<string>): void {
+  const fields = IMAGE_FIELDS.find((f) => f.table === table);
+  if (!fields || !rows) return;
+  for (const row of rows) {
+    for (const column of fields.html) {
+      const value = row[column];
+      if (typeof value === 'string') imageRefsInHtml(value).forEach((ref) => into.add(ref));
+    }
+    for (const column of [...fields.plain, ...fields.legacy]) {
+      const value = row[column];
+      if (isStoredImage(value as string)) into.add(value as string);
     }
   }
-  return paths;
 }
 
 /**
@@ -263,9 +287,7 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
       data.journalEntries,
     );
     if (lnks.length) data.links = [...(data.links ?? []), ...lnks];
-    for (const r of data.journalEntries) {
-      if (r.content) extractImagePaths(r.content as string).forEach((p) => allImagePaths.add(p));
-    }
+    collectImageRefs('journal_entries', data.journalEntries, allImagePaths);
   }
 
   // ── Wiki ─────────────────────────────────────────────────────────────────
@@ -285,11 +307,7 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
       data.wikiArticles,
     );
     if (lnks.length) data.links = [...(data.links ?? []), ...lnks];
-    for (const r of data.wikiArticles) {
-      if (r.content) extractImagePaths(r.content as string).forEach((p) => allImagePaths.add(p));
-      if (r.icon && !r.icon.startsWith('data:') && !r.icon.startsWith('http')) allImagePaths.add(r.icon as string);
-      if (r.cover_image && !r.cover_image.startsWith('data:') && !r.cover_image.startsWith('http')) allImagePaths.add(r.cover_image as string);
-    }
+    collectImageRefs('wiki_articles', data.wikiArticles, allImagePaths);
   }
 
   // ── Operations ───────────────────────────────────────────────────────────
@@ -307,13 +325,7 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
       data.operations,
     );
     if (lnks.length) data.links = [...(data.links ?? []), ...lnks];
-    for (const r of data.operations) {
-      if (r.content) extractImagePaths(r.content as string).forEach((p) => allImagePaths.add(p));
-      if (r.icon && !r.icon.startsWith('data:') && !r.icon.startsWith('http')) allImagePaths.add(r.icon as string);
-      if (r.cover_image && !r.cover_image.startsWith('data:') && !r.cover_image.startsWith('http')) allImagePaths.add(r.cover_image as string);
-      if (r.drawing_data && !r.drawing_data.startsWith('data:')) allImagePaths.add(r.drawing_data as string);
-      if (r.thumbnail_data && !r.thumbnail_data.startsWith('data:')) allImagePaths.add(r.thumbnail_data as string);
-    }
+    collectImageRefs('operations', data.operations, allImagePaths);
   }
 
   // ── Routines ─────────────────────────────────────────────────────────────
@@ -355,22 +367,8 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
         'item_id',
       );
     }
-    for (const r of data.altars) {
-      if (r.background_image_data && !r.background_image_data.startsWith('data:') && !r.background_image_data.startsWith('http')) {
-        allImagePaths.add(r.background_image_data as string);
-      }
-      if (r.thumbnail_data && !r.thumbnail_data.startsWith('data:') && !r.thumbnail_data.startsWith('http')) {
-        allImagePaths.add(r.thumbnail_data as string);
-      }
-      if (r.icon_data && !r.icon_data.startsWith('data:') && !r.icon_data.startsWith('http')) {
-        allImagePaths.add(r.icon_data as string);
-      }
-    }
-    for (const r of data.altarItems) {
-      if (r.image_data && !r.image_data.startsWith('data:') && !r.image_data.startsWith('http')) {
-        allImagePaths.add(r.image_data as string);
-      }
-    }
+    collectImageRefs('altars', data.altars, allImagePaths);
+    collectImageRefs('altar_items', data.altarItems, allImagePaths);
   }
 
   // ── Tags ─────────────────────────────────────────────────────────────────
@@ -398,8 +396,7 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
   const images: Record<string, string> = {};
   for (const path of allImagePaths) {
     try {
-      const dataUrl = await invoke<string>('read_image_as_base64', { path });
-      images[path] = dataUrl;
+      images[path] = await readImageAsBase64(path);
     } catch {
       // Image file missing — skip silently
     }
@@ -468,8 +465,7 @@ async function restoreImages(backup: BackupFile): Promise<Map<string, string>> {
   const pathMap = new Map<string, string>();
   for (const [oldPath, dataUrl] of Object.entries(backup.images)) {
     try {
-      const newPath = await invoke<string>('save_image', { dataUrl });
-      pathMap.set(oldPath, newPath);
+      pathMap.set(oldPath, await saveImage(dataUrl));
     } catch {
       // skip
     }
@@ -672,12 +668,12 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
 
   await assertPayloadReferencesResolve(db, d);
 
-  // Remap image paths
-  const IMAGE_FIELDS_JOURNAL = ['content'];
-  const IMAGE_FIELDS_WIKI = ['content', 'icon', 'cover_image'];
-  const IMAGE_FIELDS_OP = ['content', 'icon', 'cover_image', 'drawing_data', 'thumbnail_data'];
-  const IMAGE_FIELDS_ALTAR = ['background_image_data', 'thumbnail_data', 'icon_data'];
-  const IMAGE_FIELDS_ITEM = ['image_data'];
+  // Remap image paths — Spalten aus `IMAGE_FIELDS`, nicht von Hand gepflegt.
+  const IMAGE_FIELDS_JOURNAL = imageColumns('journal_entries');
+  const IMAGE_FIELDS_WIKI = imageColumns('wiki_articles');
+  const IMAGE_FIELDS_OP = imageColumns('operations');
+  const IMAGE_FIELDS_ALTAR = imageColumns('altars');
+  const IMAGE_FIELDS_ITEM = imageColumns('altar_items');
 
   const journalEntries = (d.journalEntries ?? []).map((r) => remapRow(r, IMAGE_FIELDS_JOURNAL, pathMap));
   const wikiArticles = (d.wikiArticles ?? []).map((r) => remapRow(r, IMAGE_FIELDS_WIKI, pathMap));
@@ -847,7 +843,11 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     remapEntry(r, [], [], ['operation_ids', 'wiki_ids'])
   );
   const altars = (d.altars ?? []).map((r: Row) =>
-    remapEntry(r, ['background_image_data'], [], [])
+    // Dieselben drei Spalten wie in doReplace. Solange thumbnail_data und
+    // icon_data Data-URLs halten, ist der Unterschied folgenlos — aber der
+    // Export sammelt beide ein, sobald sie einen Dateinamen tragen, und dann
+    // wäre merge die Variante, die ihn nicht mitzieht.
+    remapEntry(r, ['background_image_data', 'thumbnail_data', 'icon_data'], [], [])
   );
   const altarItems = (d.altarItems ?? []).map((r: Row) =>
     remapEntry(r, ['image_data'], [], [])
@@ -922,7 +922,7 @@ export async function importDatabase(
 
   if (mode === 'add-vault') {
     // 1. Create a new vault record
-    const newVault = newVaultRecord(newVaultName ?? 'Imported Vault');
+    const newVault = await newVaultRecord(newVaultName ?? 'Imported Vault');
     const vaultId = newVault.id;
 
     // 2. Register vault (writes to vaults.json)
@@ -946,8 +946,7 @@ export async function importDatabase(
   }
 
   // Reload all store data from the (now modified) active vault
-  const dbName = await getActiveDbName();
-  console.log(`[backup] import complete (${mode}) into ${dbName}`);
+  console.log(`[backup] import complete (${mode}) into ${await getActiveDbFile()}`);
 
   if (mode === 'replace') {
     useUIStore.getState().setActiveView({ type: 'home' });

@@ -9,14 +9,11 @@ import TaskItem from '@tiptap/extension-task-item';
 import { ResizableImage } from './ResizableImageExtension';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
-import { invoke } from '@tauri-apps/api/core';
+import { saveImage, copyImageFile } from '../../lib/images';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ExternalLink, Pencil, Trash2, Check, X, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-async function persistImage(dataUrl: string): Promise<string> {
-  return invoke<string>('save_image', { dataUrl });
-}
 import EditorToolbar from './EditorToolbar';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
@@ -174,7 +171,7 @@ export default function RichEditor({
         const reader = new FileReader();
         reader.onload = async () => {
           try {
-            const src = await persistImage(reader.result as string);
+            const src = await saveImage(reader.result as string);
             const nodeType = view.state.schema.nodes['image'];
             if (!nodeType) return;
             view.dispatch(view.state.tr.replaceSelectionWith(nodeType.create({ src })));
@@ -362,7 +359,7 @@ export default function RichEditor({
 
           for (const path of imagePaths) {
             try {
-              const src = await invoke<string>('copy_image_file', { source: path });
+              const src = await copyImageFile(path);
               ed.chain().focus().insertContent({ type: 'image', attrs: { src } }).run();
             } catch (e) {
               console.error('[DnD] failed:', path, e);
@@ -439,7 +436,7 @@ export default function RichEditor({
           editor={editor}
           onInsertImage={async (dataUrl) => {
             try {
-              const src = await persistImage(dataUrl);
+              const src = await saveImage(dataUrl);
               editor.chain().focus().insertContent({ type: 'image', attrs: { src } }).run();
             } catch (e) {
               console.error('Failed to save image:', e);

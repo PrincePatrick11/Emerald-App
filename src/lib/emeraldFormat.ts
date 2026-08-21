@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { imageRefsInHtml, isStoredImage, readImageAsBase64, rewriteImageRefs, saveImage } from './images';
 import { open as openDialog, save, message } from '@tauri-apps/plugin-dialog';
 import { format } from 'date-fns';
 import { marked } from 'marked';
@@ -59,7 +60,7 @@ interface EmeraldMeta {
   icon?: string;
   // common
   tags?: string[];
-  // altar — background_image_data is a local file path, so it's routed
+  // altar — background_image_data is a stored image filename, so it's routed
   // through `images` like content images. icon_data, thumbnail_data, and item
   // images are already data: URLs (or a plain emoji, for icon) in the DB, so
   // they're embedded directly rather than treated as paths.
@@ -201,15 +202,10 @@ export async function exportAsEmerald(): Promise<void> {
 
   // Embed all local images from content as base64
   const images: Record<string, string> = {};
-  const re = /src="([^"]+)"/g;
-  let m;
-  while ((m = re.exec(content)) !== null) {
-    const src = m[1];
-    if (!src.startsWith('data:') && !src.startsWith('http') && !src.startsWith('blob:')) {
-      try {
-        images[src] = await invoke<string>('read_image_as_base64', { path: src });
-      } catch { /* skip missing files */ }
-    }
+  for (const ref of new Set(imageRefsInHtml(content))) {
+    try {
+      images[ref] = await readImageAsBase64(ref);
+    } catch { /* skip missing files */ }
   }
 
   const file: EmeraldFile = { version: '1', type, title, createdAt, content, images, meta };
@@ -230,14 +226,14 @@ async function exportAltarAsEmerald(): Promise<void> {
     return;
   }
 
-  // Only background_image_data is a local file path — read it via Rust like
+  // Only background_image_data is a stored image filename — read it via Rust like
   // content images. icon_data, thumbnail_data, and item images are already
   // data: URLs (or a plain emoji for icon_data) straight from the DB.
   const images: Record<string, string> = {};
   const bgPath = altar.background_image_data;
-  if (bgPath && !bgPath.startsWith('data:') && !bgPath.startsWith('http')) {
+  if (isStoredImage(bgPath)) {
     try {
-      images[bgPath] = await invoke<string>('read_image_as_base64', { path: bgPath });
+      images[bgPath!] = await readImageAsBase64(bgPath!);
     } catch { /* skip missing file */ }
   }
 
@@ -306,15 +302,14 @@ async function ensureTagNames(names: string[]): Promise<string[]> {
 
 /** Re-saves images into local storage and returns content with updated paths. */
 async function remapImages(content: string, images: Record<string, string>): Promise<string> {
-  let result = content;
-  for (const [oldPath, dataUrl] of Object.entries(images)) {
+  const map = new Map<string, string>();
+  for (const [oldRef, dataUrl] of Object.entries(images)) {
     if (!dataUrl) continue;
     try {
-      const newPath = await invoke<string>('save_image', { dataUrl });
-      result = result.split(`src="${oldPath}"`).join(`src="${newPath}"`);
+      map.set(oldRef, await saveImage(dataUrl));
     } catch { /* skip */ }
   }
-  return result;
+  return rewriteImageRefs(content, (ref) => map.get(ref) ?? null);
 }
 
 /** Re-reads the relevant store from DB so the UI reflects the imported data. */
@@ -554,7 +549,7 @@ async function remapAltarImagePath(path: string | undefined, images: Record<stri
   const dataUrl = images[path];
   if (!dataUrl) return path;
   try {
-    return await invoke<string>('save_image', { dataUrl });
+    return await saveImage(dataUrl);
   } catch {
     return null;
   }

@@ -41,3 +41,15 @@ export function hexToRgb(hex: string): { r: number; g: number; b: number } {
     b: parseInt(normalized.slice(4, 6), 16),
   };
 }
+
+/**
+ * Dateigroesse fuer die Anzeige — eine Nachkommastelle ab MB.
+ *
+ * Die Einheiten kommen von aussen statt fest im Code zu stehen: Franzoesisch
+ * rechnet in Oktett und schreibt `o` / `Ko` / `Mo`, nicht `B` / `KB` / `MB`.
+ */
+export function formatBytes(bytes: number, units: [string, string, string]): string {
+  if (bytes < 1024) return `${bytes} ${units[0]}`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} ${units[1]}`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} ${units[2]}`;
+}

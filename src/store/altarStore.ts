@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { invoke } from '@tauri-apps/api/core';
+import { saveImage } from '../lib/images';
 import { getDb } from '../lib/db';
 import { ALTAR_RATIOS, DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY, DEFAULT_OVERLAY_COLOR, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE, isRatioFormat, parseResolution } from '../lib/altarConstants';
 import { generateId, isValidHexColor, nowIso } from '../lib/helpers';
@@ -233,9 +233,9 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     for (const altar of altars) {
       if (!altar.background_image_data?.startsWith('data:')) continue;
       try {
-        const savedPath = await invoke<string>('save_image', { dataUrl: altar.background_image_data });
-        altar.background_image_data = savedPath;
-        await db.execute('UPDATE altars SET background_image_data=$1, updated_at=$2 WHERE id=$3', [savedPath, altar.updated_at, altar.id]);
+        const filename = await saveImage(altar.background_image_data);
+        altar.background_image_data = filename;
+        await db.execute('UPDATE altars SET background_image_data=$1, updated_at=$2 WHERE id=$3', [filename, altar.updated_at, altar.id]);
       } catch (error) {
         console.error('Failed to migrate altar background image:', altar.id, error);
       }

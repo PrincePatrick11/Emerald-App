@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
 import { Check, ChevronDown, ChevronRight, Grid3x3, Image as ImageIcon, Magnet, Pencil, RotateCw, Scaling, Trash2, X } from 'lucide-react';
@@ -23,7 +22,7 @@ import {
 import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../../lib/helpers';
 import Button from '../../ui/Button';
 import { useUIStore } from '../../../store/uiStore';
-import { useBackgroundPreview } from '../../altar/useAltarBackgroundPreview';
+import { imageSrc, saveImage } from '../../../lib/images';
 import { PlacedElementRow, PlacedElementInspector } from '../fields/PlacedElementRow';
 import AltarReadingSummary from '../fields/AltarReadingSummary';
 import Favicon from '../fields/Favicon';
@@ -104,7 +103,7 @@ const [gridOpen, setGridOpen] = useState(true);
   const [customBackgroundMap, setCustomBackgroundMap] = useState<Record<string, string>>({});
   const [gradientColorMap, setGradientColorMap] = useState<Record<string, string>>({});
   const customBackgroundSource = activeAltar?.background_image_data || (activeAltar ? customBackgroundMap[activeAltar.id] : null);
-  const customBackgroundPreview = useBackgroundPreview(customBackgroundSource);
+  const customBackgroundPreview = imageSrc(customBackgroundSource);
   const sortedPlacements = useMemo(
     () => [...placements].sort((a, b) => b.z_index - a.z_index),
     [placements],
@@ -162,7 +161,7 @@ const [gridOpen, setGridOpen] = useState(true);
   }, [sortedPlacements, updatePlacement]);
 
   const hasCustomBackground = !!(activeAltar && (activeAltar.background_image_data || customBackgroundMap[activeAltar.id]));
-  const safeBackgroundUrl = customBackgroundPreview?.startsWith('data:image/')
+  const backgroundUrl = customBackgroundPreview
     ? `url("${customBackgroundPreview}")`
     : null;
 
@@ -192,10 +191,10 @@ const [gridOpen, setGridOpen] = useState(true);
       return;
     }
     readFileAsDataUrl(file)
-      .then((data) => invoke<string>('save_image', { dataUrl: data }))
-      .then((savedPath) => {
-        setCustomBackgroundMap((current) => ({ ...current, [activeAltar.id]: savedPath }));
-        return updateAltar(activeAltar.id, { background_preset: 'custom', background_image_data: savedPath });
+      .then((data) => saveImage(data))
+      .then((filename) => {
+        setCustomBackgroundMap((current) => ({ ...current, [activeAltar.id]: filename }));
+        return updateAltar(activeAltar.id, { background_preset: 'custom', background_image_data: filename });
       })
       .then(() => showBackgroundNotice(t('altar.backgroundUpdated')))
       .catch((error) => {
@@ -496,7 +495,7 @@ const [gridOpen, setGridOpen] = useState(true);
                   >
                     <div
                       className="h-full w-full bg-gradient-to-br from-stone-800/80 via-stone-900/70 to-stone-950/80"
-                      style={safeBackgroundUrl ? { backgroundImage: safeBackgroundUrl, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+                      style={backgroundUrl ? { backgroundImage: backgroundUrl, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
                     />
                     {activeAltar.background_image_data && (
                       <span className="absolute right-0.5 top-0.5 rounded-full border border-jade-600/60 bg-jade-900/70 p-0.5 text-jade-200">
@@ -543,8 +542,8 @@ const [gridOpen, setGridOpen] = useState(true);
                   className="h-14 w-full"
                   style={(() => {
                     const p = activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND;
-                    if (activeAltar.background_image_data && safeBackgroundUrl)
-                      return { backgroundImage: safeBackgroundUrl, backgroundSize: 'cover', backgroundPosition: 'center' };
+                    if (activeAltar.background_image_data && backgroundUrl)
+                      return { backgroundImage: backgroundUrl, backgroundSize: 'cover', backgroundPosition: 'center' };
                     if (ALTAR_IMAGE_PRESETS.includes(p as (typeof ALTAR_IMAGE_PRESETS)[number]))
                       return { backgroundImage: `url("/backgrounds/thumbs/${p}.webp")`, backgroundSize: 'cover', backgroundPosition: 'center' };
                     if (isGradientPreset(p))

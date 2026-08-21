@@ -235,6 +235,12 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     border-color: var(--border-strong);
   }
 
+  /* Danger text — a warning or a broken state that is not a button.
+     Same token as .btn-danger, so the two cannot drift apart across themes. */
+  .text-danger {
+    color: var(--danger-text);
+  }
+
   /* Danger action button — destructive actions (delete, remove, empty trash) */
   .btn-danger {
     @apply rounded-md transition-colors duration-150 cursor-pointer;

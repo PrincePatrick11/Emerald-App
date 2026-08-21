@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { imageSrc } from '../../lib/images';
 
 // memo prevents re-renders when item reference changes but values are the same,
 // which happens on every drag frame for non-dragged items due to the placements
@@ -12,10 +13,11 @@ export const AltarItemVisual = memo(function AltarItemVisual({
   size?: number;
   candleAnimate?: boolean;
 }) {
-  if (item.image_data?.startsWith('data:image/')) {
+  const src = imageSrc(item.image_data);
+  if (src) {
     return (
       <img
-        src={item.image_data}
+        src={src}
         alt=""
         style={{ width: size, height: size }}
         className="object-contain rounded"

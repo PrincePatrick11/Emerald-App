@@ -28,7 +28,7 @@ The wiki stores reference articles about anything relevant to your practice: rit
 
 **Icons.** Articles can have a custom icon: either an emoji character or an image. Image icons render only when the icon value is a local-safe source (`/` path), a `data:image/...` URL, or a `blob:` URL. Remote `http://` and `https://` icon URLs are not rendered as images.
 
-**Cover Images.** A banner image displayed at the top of the article in read mode. Stored as a file in the app's image directory.
+**Cover Images.** A banner image displayed at the top of the article in read mode. Stored as an inline data-URL directly on the entry row, not as a file in the vault's image folder.
 
 **Backlinks.** `fetchBacklinks` and the `BacklinksPanel` component that lists every journal entry, wiki article, or operation linking to the current article still exist, but the panel is not currently surfaced anywhere in the UI — it was removed from the right sidebar along with the old tab bar and has not yet been reintroduced elsewhere.
 
@@ -233,13 +233,19 @@ Tags and categories also support soft-delete and restoration.
 
 ## Vaults
 
-Emerald supports multiple vaults, each backed by its own separate SQLite database — see [Multi-Vault System in `database.md`](database.md#multi-vault-system) for the on-disk representation. Vault management lives in its own modal, opened via the Vault icon in the left rail (directly above Settings):
+A vault is a **folder** you choose, holding its own database and its own images — see [Multi-Vault System in `database.md`](database.md#multi-vault-system) for the on-disk representation. Because nothing inside it refers to a location, a vault folder can be copied to another machine and opened there.
 
-- Each vault is shown as a card with its name and database filename. Clicking a card switches to that vault; the currently active vault's card is disabled and carries an "active" label instead.
-- **Rename** and **Delete** are inline states on the same card — Delete asks for confirmation first. The active vault can't be deleted, and the last remaining vault can't be deleted either.
-- A dashed **Add Vault** row at the bottom creates a new, empty vault directly from this modal. A newly created vault is not switched to automatically; its database file is created the first time you actually switch to it.
+Vault management lives in its own modal, opened via the Vault icon in the left rail (directly above Settings):
 
-This is separate from importing a vault from a `.emeralddb` backup file (Settings → Backup → Import → Add Vault mode), which also creates a new vault but populates it from the backup's contents — see [Vault Backup](#vault-backup-emeralddb) below.
+- Each vault is shown as a card with its name and its folder. Clicking a card switches to that vault; the currently active vault's card is disabled and carries an "active" label instead.
+- **Add Vault** creates a new, empty one. Give it a name and, if you want, pick a folder — without one it lands in Emerald's own application directory. The folder has to be empty: sharing it with unrelated files would make deleting them ambiguous later.
+- **Open vault** adds a vault that already exists on disk: pick its folder, and it joins the list under the folder's own name. This is how you take a vault over from another machine, or re-add one you removed from the list.
+- **Rename** and **Delete** are inline states on the same card. Delete asks for confirmation, and offers a **"Delete the files as well"** checkbox — off by default, showing the folder it would erase. It removes the vault\'s own files rather than the folder wholesale: if anything else is in there, the folder stays and Emerald says so. The active vault can't be deleted, and neither can the last remaining one.
+- A vault whose folder has moved or is on a disconnected drive is marked **Folder not found** and cannot be switched to. A folder button next to it locates it again. Emerald deliberately does not recreate a missing folder — SQLite would put a fresh, empty database in it, and the vault would come back looking empty rather than telling you something is wrong.
+- A vault Emerald is not *allowed* to read is marked **No access** instead, and gets no relocate button — the folder is exactly where you left it. On macOS this is what `~/Documents`, `~/Desktop` and iCloud folders look like until you grant access in System Settings › Privacy & Security.
+- A vault folder inside iCloud Drive, Dropbox or OneDrive works, but SQLite on a synchronised folder can be damaged if the sync client touches the file mid-write.
+
+New vaults are not switched to automatically. This is separate from importing a vault from a `.emeralddb` backup file (Settings → Backup → Import → Add Vault mode), which also creates a new vault but populates it from the backup's contents — see [Vault Backup](#vault-backup-emeralddb) below.
 
 ## Export and Import
 
@@ -312,6 +318,14 @@ The full vault can be backed up and restored as a single self-contained JSON fil
 - **Import.** Before importing, the modal shows a preview line summarising the counts per type (e.g. `12 J, 5 W, 3 O, 2 R, 1 A, 4 T`). The same checkbox list is then used to choose which types to actually apply; categories can also be filtered. Three import modes are available: **Replace** (overwrite selected tables in the current vault), **Merge** (imported entries are prefixed with a timestamp so existing IDs never collide), and **Add Vault** (import into a brand new vault and switch to it).
 
 For the on-disk JSON structure and per-mode semantics, see [DB Backup / Restore (`.emeralddb`) in `database.md`](database.md#db-backup--restore-emeralddb).
+
+## Image Storage and Cleanup
+
+Images are written into the active vault's own `images/` folder, named after a hash of their content, so the same picture added twice is stored once. Entries reference them by that filename alone, which is what makes a vault folder portable.
+
+Nothing deletes an image automatically. **Settings → Storage → Unused images** scans on demand: *Scan* reports how many images nothing points at any more and how much space they take, and *Remove* deletes exactly those. It is a manual action on purpose — an image you have just inserted but not yet saved would otherwise look unused.
+
+Images added before vaults became folders live in a shared pool and keep rendering from there. The cleanup never proposes deleting from that pool, since a vault you have not opened since the update may still be reading from it.
 
 ## Image Upload Validation
 

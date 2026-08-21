@@ -29,11 +29,41 @@ SQLite permissions must be declared explicitly. `sql:default` alone grants read-
 
 PDF export runs in a hidden window built and torn down by the per-platform `export_pdf` command, so it operates entirely under the main process's existing capability set — no extra capability entry is required.
 
+## Vault Directories as a Trust Boundary
+
+A vault is a directory the user picks, and it may sit outside every fixed user root — another drive, an external disk.
+
+**`resolve_allowed_roots` deliberately does not include those directories.** The registry behind them is filled by `register_vaults`, an ordinary command the frontend calls; a frontend that could add its own roots would be handing itself the very boundary that exists to contain it. The "the user picked it in a folder dialog" guarantee lives in TypeScript and cannot be verified from Rust, so it is not treated as one.
+
+Vault storage does not need those roots. **No storage command accepts a path.** They take a vault *id* and resolve it through `vault_dir()` against the registry; an unknown or malformed id is an error, and ids are validated against `[A-Za-z0-9-]{1,64}` before they can become a path segment. A path arriving over IPC, or read out of stored HTML content, never becomes a destination.
+
+What that costs is one thing: `write_file` / `read_file` / `export_image` / `copy_image_file` stay confined to the fixed user directories, so a backup file or a Markdown export cannot be written into — or read out of — a vault folder that lives outside them. Opening, using and deleting such a vault works in full.
+
+`delete_vault_files` removes the vault's own artefacts **by name** — `emerald.db`, its journal, and the files in `images/` whose names pass `is_valid_image_name` — and then takes the two directories with plain `remove_dir`, which fails while anything else is still inside. It is not `remove_dir_all`, and the earlier "the folder contains an `emerald.db`" check was never a real guard: the app puts that database into whatever folder the user chose, so a vault created straight in Documents would have taken Documents with it. A folder holding anything foreign now survives and reports `VAULT_DIR_NOT_EMPTY`. The other half of that fix is in the UI, which refuses to create a new vault in a folder that is not empty.
+
+`ensure_vault_dirs` deliberately does **not** create the vault directory — the rule lives in `images_dir()`, so it holds for every command that touches vault storage. SQLite would put a fresh, empty database into a recreated folder, so a vault on an unplugged drive would silently come back as an empty vault. Creating is `create_vault_dirs`, called once when a vault enters the list.
+
+`probe_vault_dir` is a deliberate exception: it takes a raw path and is not confined to any root. It has to be, because it answers "what is in the folder the user just picked?" before that folder is registered anywhere. It returns four booleans — exists, access denied, holds a database, is empty — and reads no content, so it is an existence oracle for arbitrary paths and nothing more.
+
+## The `emerald-img` URI Scheme
+
+Images are served to the webview over a custom scheme instead of through IPC. The request path is `/{vaultId}/{filename}`, and both segments are attacker-reachable in principle: the filename comes out of stored HTML content, which may have arrived in an imported backup.
+
+- **The filename is validated before any path is built**: exactly 64 lowercase hex digits, a dot, and one of `png` / `jpg` / `jpeg` / `gif` / `webp` / `svg`. Nothing else is even resolved. Rejecting everything outside that alphabet also means percent-encoded traversal never has to be decoded and handled — it simply fails the check.
+- **The vault id is resolved through the registry**, so the directory is one the user authorised. An unknown id yields 404.
+- **Reads happen off the main thread** (`register_asynchronous_uri_scheme_protocol`), so a large file cannot stall the UI.
+- **`Access-Control-Allow-Origin: *`** is sent deliberately. The altar draws these images onto a canvas and reads it back with `toBlob()` for the image export; without the header the canvas is tainted and the export silently produces nothing. The images come from the app's own storage, so allowing the read grants the page nothing it could not already request.
+
 ## Path Confinement
 
-Three Rust commands enforce path restrictions:
+**`read_image_as_base64`** takes a vault id and a filename, not a path. The filename passes the same strict check as the URI scheme, and the file is looked up in that vault's `images/` folder, falling back to the pre-per-vault shared pool. There is no way to name a file outside those two directories.
 
-**`read_image_as_base64`** resolves the requested path and the images directory to their canonical forms using `std::fs::canonicalize`, then checks that the canonical path starts with the canonical images directory. Any path that escapes the images directory (including symlink traversal) returns an `"access denied: path outside images directory"` error.
+**One guard per direction.** `guarded_write_target()` and `guarded_read_path()` in `lib.rs` hold the path rules; `write_file`, `export_image`, `read_file` and `copy_image_file` call them rather than repeating the sequence. That is not only deduplication — the two halves of this boundary had already drifted, with `read_file` accepting a symlink that the image reader rejected. It no longer does.
+
+Two things the write guard gets right that the four hand-written copies did not:
+
+- **Dangling symlinks.** The old check hung off `target.exists()`, which follows the link and returns `false` for a broken one — so the symlink rejection was skipped entirely and `fs::write` created the file at the link's target, outside the allowed roots. The guard now calls `symlink_metadata` unconditionally and refuses any symlink, resolvable or not.
+- **Directories created before the check.** `create_dir_all(parent)` used to run first, so a denied write still left directories behind outside the boundary. The deepest already-existing ancestor is now canonicalized and checked before anything is created.
 
 **`write_file` and `read_file`** enforce two layers of confinement:
 
@@ -50,7 +80,9 @@ Three Rust commands enforce path restrictions:
 
 1. **Extension allowlist.** Only `png`, `jpg`, `jpeg`, `gif`, `webp`, and `svg` are permitted. Any other extension returns an `"unsupported file type"` error.
 2. **Symlink rejection.** The source path is checked with `symlink_metadata`; if it resolves to a symlink, the command returns `"access denied: symlink targets are not allowed"`.
-3. **Root directory confinement.** The source path is canonicalized and verified against the allowed storage roots (home, documents, downloads, desktop, app data, app config). If the resolved path escapes these roots, the command returns `"access denied: path outside allowed directories"`.
+3. **Root directory confinement.** The source path is canonicalized and verified through the same shared `guarded_read_path` that `read_file` uses — the fixed roots only (home, documents, downloads, desktop, app data, app config), deliberately *not* the registered vault directories, for the same reason `resolve_allowed_roots` leaves them out (see [Vault Directories as a Trust Boundary](#vault-directories-as-a-trust-boundary) above). If the resolved path escapes these roots, the command returns `"access denied: path outside allowed directories"`.
+
+The *destination* is not a path at all — it is the active vault's `images/` folder, resolved from the vault id.
 
 ## Frontend Input Validation
 
@@ -106,7 +138,7 @@ All HTML that enters the app from outside is sanitised with DOMPurify before bei
 
 ## Content Security Policy
 
-The main window has CSP enabled through Tauri's default configuration. The export HTML for PDF export is written to a unique file in the OS temp directory and loaded by a hidden webview over a `file://` URL — it never fetches external resources and is removed from disk as soon as the export finishes. Because the hidden webview inherits the same CSP as the main window (`script-src 'self'` — see `tauri.conf.json`), inline scripts in the export HTML are blocked; the frontend therefore pre-renders the internal-link chip transformation in TypeScript (`transformInternalLinks` in `src/lib/export.ts`) before handing the HTML to the backend.
+The main window has CSP enabled through Tauri's default configuration. `img-src` additionally allows `emerald-img:` and `http://emerald-img.localhost` — the same scheme in the two forms the platforms serve it as (WebView2 maps custom schemes onto `http`, the other engines do not). The export HTML for PDF export is written to a unique file in the OS temp directory and loaded by a hidden webview over a `file://` URL — it never fetches external resources and is removed from disk as soon as the export finishes. Because the hidden webview inherits the same CSP as the main window (`script-src 'self'` — see `tauri.conf.json`), inline scripts in the export HTML are blocked; the frontend therefore pre-renders the internal-link chip transformation in TypeScript (`transformInternalLinks` in `src/lib/export.ts`) before handing the HTML to the backend.
 
 ## File Dialog Safety
 

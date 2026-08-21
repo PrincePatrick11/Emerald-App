@@ -2,7 +2,7 @@ import { memo } from 'react';
 import type { AltarPlacement, AltarRecord } from '../../types';
 import { getAltarBackgroundStyle, resolveResolutionPixels } from '../../lib/altarConstants';
 import { AltarItemVisual } from './AltarItemVisual';
-import { useBackgroundPreview } from './useAltarBackgroundPreview';
+import { imageSrc } from '../../lib/images';
 
 export const AltarCardPreview = memo(function AltarCardPreview({
   altar,
@@ -13,7 +13,7 @@ export const AltarCardPreview = memo(function AltarCardPreview({
   previewItems: AltarPlacement[];
   compact?: boolean;
 }) {
-  const previewSrc = useBackgroundPreview(altar.background_image_data);
+  const previewSrc = imageSrc(altar.background_image_data);
   const background = getAltarBackgroundStyle(altar, previewSrc);
   const { w, h } = resolveResolutionPixels(altar.resolution ?? '1920x1080');
 

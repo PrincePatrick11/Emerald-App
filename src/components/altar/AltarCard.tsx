@@ -6,6 +6,7 @@ import type { AltarPlacement, AltarRecord } from '../../types';
 import { resolveResolutionPixels } from '../../lib/altarConstants';
 import { AltarCardPreview } from './AltarCardPreview';
 import { AltarRenameField } from './AltarRenameField';
+import { imageSrc } from '../../lib/images';
 
 type AltarCardVariant = 'cards' | 'list';
 
@@ -51,8 +52,8 @@ export const AltarCard = memo(function AltarCard({
   return (
     <button onClick={onOpen} onContextMenu={onContextMenu} className={`${baseClass} px-4 py-4`}>
       <div className="mb-3">
-        {altar.thumbnail_data?.startsWith('data:image/')
-          ? <img src={altar.thumbnail_data} alt="" draggable={false}
+        {imageSrc(altar.thumbnail_data)
+          ? <img src={imageSrc(altar.thumbnail_data)} alt="" draggable={false}
               className="max-h-44 w-auto max-w-full mx-auto block rounded-lg border border-stone-700/40" />
           : <div className="max-h-44 overflow-hidden rounded-lg"><AltarCardPreview altar={altar} previewItems={previewItems} /></div>}
       </div>
@@ -96,8 +97,8 @@ export const AltarListRow = memo(function AltarListRow({
   return (
     <button onClick={onOpen} onContextMenu={onContextMenu} className={`${baseClass} w-full flex items-center gap-3 px-4 py-3`}>
       <span className="flex-shrink-0">
-        {altar.thumbnail_data?.startsWith('data:image/')
-        ? <img src={altar.thumbnail_data} alt="" draggable={false}
+        {imageSrc(altar.thumbnail_data)
+        ? <img src={imageSrc(altar.thumbnail_data)} alt="" draggable={false}
             className="h-8 rounded object-cover border border-stone-700/40"
             style={{ aspectRatio: `${resW}/${resH}` }} />
         : <AltarCardPreview altar={altar} previewItems={previewItems} compact />}

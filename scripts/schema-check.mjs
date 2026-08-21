@@ -13,7 +13,7 @@
  */
 import { build } from 'esbuild';
 import { DatabaseSync } from 'node:sqlite';
-import { mkdtempSync, mkdirSync, rmSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, readdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -72,6 +72,11 @@ const STUBS = {
     export async function invoke(cmd) {
       // vaultManager liest vaults.json und legt es beim ersten Fehlschlag an.
       if (cmd === 'read_file') throw new Error('ENOENT (Harness)');
+      // Ein Vault ist ein Verzeichnis; im Harness ist das schlicht das
+      // Arbeitsverzeichnis, damit die Sicherung aus v33 dort landet.
+      if (cmd === 'migrate_vault_layout' || cmd === 'default_vault_dir') {
+        return process.env.EMERALD_HARNESS_DIR;
+      }
       return undefined;
     }`,
   '@tauri-apps/api/path': `
@@ -96,7 +101,8 @@ const entry = join(workDir, 'entry.ts');
 writeFileSync(
   entry,
   `export { runMigrations, MIGRATIONS } from '${process.cwd().replace(/\\/g, '/')}/src/lib/db';
-   export { TABLES, TABLE_DDL, ddlIfNotExists, checkIntegrity, reassignCategoryContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/schema';`
+   export { TABLES, TABLE_DDL, ddlIfNotExists, checkIntegrity, reassignCategoryContent, collectUsedImageFilenames } from '${process.cwd().replace(/\\/g, '/')}/src/lib/schema';
+   export { invalidateVaultCache } from '${process.cwd().replace(/\\/g, '/')}/src/lib/vaultManager';`
 );
 
 const bundlePath = join(workDir, 'bundle.mjs');
@@ -114,6 +120,7 @@ process.env.EMERALD_HARNESS_DIR = workDir;
 const {
   runMigrations, MIGRATIONS, TABLES, TABLE_DDL,
   ddlIfNotExists, checkIntegrity, reassignCategoryContent,
+  collectUsedImageFilenames, invalidateVaultCache,
 } = await import(pathToFileURL(bundlePath).href);
 
 /* ------------------------------------------------------------------ *
@@ -166,12 +173,18 @@ async function readSchema(db) {
  * ------------------------------------------------------------------ */
 
 function freshDb(name) {
-  // In der App hat jeder Vault ein eigenes appDataDir; im Harness liefert der
-  // gestubbte vaultManager immer 'emerald.db', also trennen wir hier — sonst
-  // kollidieren die Snapshots, die v33 unter einem festen Namen ablegt.
+  // Jeder Durchlauf bekommt sein eigenes Verzeichnis, sonst kollidieren die
+  // Snapshots, die v33 unter einem festen Namen ablegt.
+  //
+  // `invalidateVaultCache()` ist dafuer noetig, seit `vaultManager` den
+  // Vault-Pfad zwischenspeichert: ohne den Reset behaelt der erste Durchlauf
+  // sein Verzeichnis fuer alle weiteren, und die Trennung hier waere wirkungslos
+  // — sichtbar daran, dass v33 „Sicherung eines frueheren Versuchs liegt
+  // bereits unter …" meldet, obwohl es eine frische Datei ist.
   const dir = join(workDir, name.replace(/\.db$/, ''));
   mkdirSync(dir, { recursive: true });
   process.env.EMERALD_HARNESS_DIR = dir;
+  invalidateVaultCache();
   return new HarnessDb(join(dir, name));
 }
 
@@ -216,6 +229,30 @@ async function buildViaChain(name, seed) {
 const now = new Date().toISOString();
 
 /** Bildet genau die Zustände ab, die v33 reparieren muss. */
+/** Ein gueltiger Bildname: 64 Hex-Zeichen plus Endung. */
+const LEGACY_IMAGE = `${'a1b2c3d4e5f60718'.repeat(4)}.png`;
+
+/**
+ * Bildverweise, wie sie vor v35 in der Datenbank standen: ein absoluter Pfad
+ * im HTML einer Journal-Zeile, einer direkt in einer Altar-Spalte, und daneben
+ * je eine Data-URL, die v35 nicht anfassen darf.
+ *
+ * Eigene Datenbank statt seedLegacyData, weil ein hier eingefuegter Altar die
+ * Pruefung „v33 legt genau einen Default-Altar an" aushebeln wuerde.
+ */
+async function seedImageRefs(db) {
+  await db.execute(
+    `INSERT INTO journal_entries (id,title,content,created_at,updated_at,tags)
+     VALUES ('j1','Eintrag',$2,$1,$1,'[]')`,
+    [now, `<p>x</p><img src="C:\\Users\\x\\Roaming\\app\\images\\${LEGACY_IMAGE}"><img src="data:image/png;base64,AAAA">`]
+  );
+  await db.execute(
+    `INSERT INTO altars (id,title,intention,background_preset,background_image_data,icon_data,created_at,updated_at)
+     VALUES ('a1','Altar','','custom',$2,'data:image/png;base64,BBBB',$1,$1)`,
+    [now, `/home/x/.local/share/app/images/${LEGACY_IMAGE}`]
+  );
+}
+
 async function seedLegacyData(db) {
   await db.execute(
     `INSERT INTO journal_entries (id,title,content,created_at,updated_at,tags,linked_wiki_ids)
@@ -554,6 +591,105 @@ if (backups.length) {
     (await db.select('PRAGMA foreign_key_check')).length === 0
   );
   db.close();
+}
+
+console.log('\n8. Migration v35: Bildverweise\n');
+
+{
+  const v35 = await buildViaChain('v35.db', seedImageRefs);
+  const [entry] = await v35.select("SELECT content FROM journal_entries WHERE id='j1'");
+  const [altar] = await v35.select("SELECT background_image_data, icon_data FROM altars WHERE id='a1'");
+
+  check(
+    'absoluter Pfad im HTML wurde auf den Dateinamen reduziert',
+    entry.content.includes(`src="${LEGACY_IMAGE}"`) && !entry.content.includes('AppData'),
+    entry.content
+  );
+  check(
+    'die Data-URL daneben blieb unangetastet',
+    entry.content.includes('src="data:image/png;base64,AAAA"'),
+    entry.content
+  );
+  check(
+    'absoluter Pfad in einer plain-Spalte wurde reduziert',
+    altar.background_image_data === LEGACY_IMAGE,
+    altar.background_image_data
+  );
+  check(
+    'eine legacy-Spalte wurde NICHT umgeschrieben',
+    altar.icon_data === 'data:image/png;base64,BBBB',
+    altar.icon_data
+  );
+
+  // Das ist die Eigenschaft, an der die Aufraeum-Aktion haengt: was die
+  // Migration kennt, muss auch das Used-Set kennen, sonst loescht die
+  // Bereinigung eine noch referenzierte Datei.
+  const used = await collectUsedImageFilenames(v35);
+  check(
+    'collectUsedImageFilenames findet den Verweis wieder',
+    used.has(LEGACY_IMAGE),
+    [...used].join(', ')
+  );
+  v35.close();
+}
+
+/* ------------------------------------------------------------------ *
+ * Konstanten, die es zweimal gibt — einmal in TypeScript, einmal in Rust
+ * ------------------------------------------------------------------ */
+
+console.log('\n9. Gespiegelte Konstanten\n');
+
+{
+  const read = (rel) => readFileSync(join(process.cwd(), rel), 'utf8');
+  const imagesRs = read('src-tauri/src/images.rs');
+  const imagesTs = read('src/lib/images.ts');
+  const schemaTs = read('src/lib/schema.ts');
+  const vaultRs = read('src-tauri/src/vault.rs');
+  const vaultManagerTs = read('src/lib/vaultManager.ts');
+  const tauriConf = read('src-tauri/tauri.conf.json');
+
+  // Bewusst wortwoertliche Vergleiche statt geparster Werte: wer eine dieser
+  // Konstanten aendert, soll hier scheitern und gezwungen sein, die andere
+  // Seite mitzuziehen. Ein Kommentar "Mirrors X in Y" leistet das nicht.
+
+  // Der Dateiname eines gespeicherten Bildes ist die Grenze zwischen dem
+  // URI-Schema und dem Dateisystem. Laufen die Pruefungen auseinander,
+  // akzeptiert eine Seite etwas, das die andere ablehnt.
+  check(
+    'Bild-Endungen: images.rs kennt dieselben sechs wie schema.ts',
+    imagesRs.includes('["png", "jpg", "jpeg", "gif", "webp", "svg"]') &&
+      schemaTs.includes('(?:png|jpe?g|gif|webp|svg)')
+  );
+  check(
+    'Hash-Laenge im Dateinamen ist beidseitig 64',
+    imagesRs.includes('stem.len() == 64') && schemaTs.includes('[0-9a-f]{64}')
+  );
+
+  // Der Datenbankname baut auf der einen Seite den Connection-String, auf der
+  // anderen den Guard in delete_vault_files.
+  check(
+    'DB_FILE stimmt in vault.rs und vaultManager.ts ueberein',
+    vaultRs.includes('pub const DB_FILE: &str = "emerald.db"') &&
+      vaultManagerTs.includes("const DB_FILE = 'emerald.db'")
+  );
+  check(
+    'Der Bildordner heisst images (Rust ist die einzige Quelle)',
+    vaultRs.includes('pub const IMAGES_SUBDIR: &str = "images"')
+  );
+
+  // Das Schema steht an drei Stellen: Handler, URL-Bau und CSP. Fehlt eine der
+  // beiden URL-Formen in der CSP, bricht genau eine Plattform — und zwar erst
+  // im Build fuer sie.
+  check(
+    'emerald-img: Handler und URL-Bau nennen dasselbe Schema',
+    imagesRs.includes('"emerald-img"') &&
+      imagesTs.includes('emerald-img://localhost/') &&
+      imagesTs.includes('http://emerald-img.localhost/')
+  );
+  check(
+    'img-src erlaubt beide URL-Formen des Schemas',
+    tauriConf.includes('emerald-img:') && tauriConf.includes('http://emerald-img.localhost')
+  );
 }
 
 /* ------------------------------------------------------------------ */

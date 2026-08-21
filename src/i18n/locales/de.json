@@ -9,7 +9,10 @@
     "deleteConfirm": "Löschen?",
     "unsupportedImageFormat": "Format nicht unterstützt. Erlaubt: PNG, JPEG, GIF, WebP, SVG",
     "searchEmoji": "Emoji suchen…",
-    "noEmojiResults": "Keine Treffer"
+    "noEmojiResults": "Keine Treffer",
+    "bytes": "B",
+    "kilobytes": "KB",
+    "megabytes": "MB"
   },
   "listView": {
     "view": "Ansicht",
@@ -374,7 +377,7 @@
   },
   "vault": {
     "title": "Vaults",
-    "hint": "Jeder Vault hat seine eigene Datenbank.",
+    "hint": "Ein Vault ist ein Ordner mit eigener Datenbank und eigener Bildablage.",
     "active": "aktiv",
     "switch": "Wechseln",
     "switching": "Wechsle…",
@@ -384,9 +387,21 @@
     "add": "Vault hinzufügen",
     "create": "Erstellen",
     "cancel": "Abbrechen",
-    "deleteHint": "Die Datenbankdatei bleibt erhalten.",
+    "deleteHint": "Der Vault verschwindet aus der Liste.",
     "switchFailed": "Vault konnte nicht gewechselt werden.",
-    "saveFailed": "Änderung konnte nicht gespeichert werden."
+    "saveFailed": "Änderung konnte nicht gespeichert werden.",
+    "open": "Vault öffnen",
+    "chooseFolder": "Ordner wählen…",
+    "relocate": "Neu verorten…",
+    "missing": "Ordner nicht gefunden",
+    "accessDenied": "Kein Zugriff auf den Ordner",
+    "folderHasVault": "In diesem Ordner liegt bereits ein Vault.",
+    "folderHasNoVault": "In diesem Ordner liegt kein Vault.",
+    "alreadyOpen": "Dieser Vault ist bereits in der Liste.",
+    "deleteFiles": "Auch die Dateien löschen:",
+    "deleteFilesWarning": "Datenbank und Bilder werden dauerhaft gelöscht.",
+    "folderNotEmpty": "Der Ordner ist nicht leer. Ein neuer Vault braucht einen leeren Ordner.",
+    "deleteFilesLeftover": "Im Ordner lagen weitere Dateien — er wurde nicht entfernt."
   },
   "settings": {
     "language": "Sprache",
@@ -434,7 +449,16 @@
     "uiFont": "UI-Schriftart",
     "editorFont": "Editor-Textschrift",
     "themeDark": "Dunkel",
-    "themeLight": "Hell"
+    "themeLight": "Hell",
+    "cleanupImages": "Nicht verwendete Bilder",
+    "cleanupScan": "Suchen",
+    "cleanupScanning": "Suche…",
+    "cleanupNone": "Nichts zu entfernen",
+    "cleanupFound": "{{count}} Bild, {{size}}",
+    "cleanupFound_other": "{{count}} Bilder, {{size}}",
+    "cleanupDelete": "Entfernen",
+    "cleanupDone": "{{size}} freigegeben",
+    "storage": "Speicher"
   },
   "home": {
     "viewAll": "Alle anzeigen",
