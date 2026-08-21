@@ -55,7 +55,8 @@ export default function OperationsView() {
     const id = opIdRef.current;
     autoSaveTimer.current = setTimeout(() => {
       if (!isEditingRef.current || !id) return;
-      updateOperation(id, pendingRef.current);
+      // Siehe JournalView: `getDb()` lehnt ab, waehrend ein Vault geloescht wird.
+      void updateOperation(id, pendingRef.current).catch(() => {});
     }, 1500);
   }, [updateOperation]);
 

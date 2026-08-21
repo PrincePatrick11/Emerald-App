@@ -64,7 +64,10 @@ export default function JournalView() {
     const id = entryIdRef.current;
     autoSaveTimer.current = setTimeout(() => {
       if (!isEditingRef.current || !id) return;
-      updateEntry(id, pendingRef.current);
+      // Fire-and-forget: waehrend `withDbClosed` laeuft (Vault-Dateien werden
+      // geloescht) lehnt `getDb()` ab, und die Aenderung gehoert ohnehin zu dem
+      // Vault, der gerade verschwindet.
+      void updateEntry(id, pendingRef.current).catch(() => {});
     }, 1500);
   }, [updateEntry]);
 

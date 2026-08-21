@@ -72,9 +72,14 @@ const STUBS = {
     export async function invoke(cmd) {
       // vaultManager liest vaults.json und legt es beim ersten Fehlschlag an.
       if (cmd === 'read_file') throw new Error('ENOENT (Harness)');
+      // Ohne vaults.json entscheidet dieses Command, ob ein Erststart vorliegt
+      // (leere Vault-Liste) oder eine Altinstallation adoptiert wird. Der
+      // Harness braucht den zweiten Fall: eine leere Liste hiesse kein aktiver
+      // Vault, und v33 sichert die Datenbankdatei ueber getActiveDbFile().
+      if (cmd === 'legacy_default_db_exists') return true;
       // Ein Vault ist ein Verzeichnis; im Harness ist das schlicht das
       // Arbeitsverzeichnis, damit die Sicherung aus v33 dort landet.
-      if (cmd === 'migrate_vault_layout' || cmd === 'default_vault_dir') {
+      if (cmd === 'migrate_vault_layout' || cmd === 'default_vault_dir' || cmd === 'new_vault_base_dir') {
         return process.env.EMERALD_HARNESS_DIR;
       }
       return undefined;

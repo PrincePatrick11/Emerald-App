@@ -20,6 +20,14 @@ const _initPromises = new Map<string, Promise<Database>>();
  * checkbox tries to do.
  */
 export async function resetDbCache(): Promise<void> {
+  // Erst die laufenden Ladevorgaenge abwarten, dann leeren. Ein `getDb()`
+  // traegt seine Verbindung erst *nach* `Database.load` in den Cache ein — wer
+  // nur leert, uebersieht genau die: sie landet danach in der frisch geleerten
+  // Map, wird nie geschlossen, und auf Windows bleibt die Datei bis zum
+  // Neustart gesperrt.
+  const pending = [..._initPromises.values()];
+  if (pending.length) await Promise.all(pending.map((p) => p.catch(() => null)));
+
   const open = [..._dbCache.values()];
   _dbCache.clear();
   _initPromises.clear();
@@ -28,7 +36,33 @@ export async function resetDbCache(): Promise<void> {
   );
 }
 
+/** Set while {@link withDbClosed} runs; `getDb()` refuses to open anything. */
+let _blocked = false;
+
+/**
+ * Runs `fn` with every connection closed and no new one allowed.
+ *
+ * Das Löschen der Dateien eines Vaults braucht die Datenbank entsperrt.
+ * `resetDbCache()` allein reicht dafür nicht: die Editoren halten entprellte
+ * Speicher-Timer, und einer, der in genau diesem Moment feuert, öffnet über
+ * `getDb()` wieder die Datei, die gerade verschwinden soll.
+ *
+ * `getDb()` wirft solange `DB_CLOSED`. Die Speicher-Timer sind fire-and-forget
+ * und fangen das ab — die verlorene Änderung gehört zu dem Vault, der gerade
+ * gelöscht wird.
+ */
+export async function withDbClosed<T>(fn: () => Promise<T>): Promise<T> {
+  _blocked = true;
+  try {
+    await resetDbCache();
+    return await fn();
+  } finally {
+    _blocked = false;
+  }
+}
+
 export async function getDb(): Promise<Database> {
+  if (_blocked) throw new Error('DB_CLOSED');
   const vaultId = await getActiveVaultId();
   const identifier = await getActiveDbConnectionString();
 

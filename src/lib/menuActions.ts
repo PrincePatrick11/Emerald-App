@@ -4,6 +4,7 @@ import { collectExportData } from './exportData';
 import { exportAsEmerald, importFromEmerald, importFromMarkdown } from './emeraldFormat';
 import { saveAltarImage, saveAltarPDF } from './altarExport';
 import { useUIStore } from '../store/uiStore';
+import { hasActiveVault, useVaultStore } from '../store/vaultStore';
 import type { ActiveView, Operation } from '../types';
 
 /**
@@ -51,6 +52,14 @@ export const SELF_CONTAINED_MENU_ACTIONS = Object.keys(SELF_CONTAINED) as SelfCo
 
 /** Runs a menu action. Errors surface as native dialogs, matching the previous behaviour. */
 export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void> {
+  // Waehrend der Vault-Einrichtung gibt es keine Datenbank, aber die Menuleiste
+  // steht — sie sitzt in der Titelleiste, und die bleibt sichtbar, damit sich
+  // das Fenster bedienen laesst. Ohne diese Sperre liefe „Exportieren" in einen
+  // rohen NO_ACTIVE_VAULT-Dialog, und „Markdown importieren" wartete auf ein
+  // Ziel-Modal, das im Setup gar nicht gemountet ist: das Versprechen loeste
+  // sich nie auf und poppte auf, sobald der erste Vault fertig war.
+  if (!hasActiveVault(useVaultStore.getState())) return;
+
   switch (id) {
     case 'export-pdf': {
       const view = useUIStore.getState().activeView;

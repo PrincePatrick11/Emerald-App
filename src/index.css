@@ -301,6 +301,14 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-muted);
   }
 
+  /* Das Badge war rein dekorativ, solange es in der Zeilen-Schaltflaeche sass
+     und deren Hover erbte. Als eigener Trigger fuer den Emoji-Picker steht es
+     zwischen lauter .btn-ghost-Buttons und braucht dieselbe Rueckmeldung. */
+  .vault-badge-interactive:hover {
+    background-color: var(--interactive-hover);
+    color: var(--text-primary);
+  }
+
   .vault-card-active .vault-badge {
     background-color: color-mix(in srgb, var(--accent) 22%, transparent);
     color: var(--accent);

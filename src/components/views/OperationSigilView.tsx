@@ -244,7 +244,8 @@ export default function OperationSigilView({ operation }: { operation: Operation
     autoSaveTimer.current = setTimeout(() => {
       if (!isEditingRef.current) return;
       const id = operationIdRef.current;
-      if (id) updateOperation(id, pendingRef.current);
+      // Siehe JournalView: `getDb()` lehnt ab, waehrend ein Vault geloescht wird.
+      if (id) void updateOperation(id, pendingRef.current).catch(() => {});
     }, 1000);
   }, [updateOperation]);
 

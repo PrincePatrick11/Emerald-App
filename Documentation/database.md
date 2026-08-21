@@ -1,6 +1,6 @@
 # Database
 
-Emerald uses a single SQLite file per vault, always named `emerald.db`, inside that vault's own directory. Where that directory sits is the user's choice — see [Multi-Vault System](#multi-vault-system). Vaults the user did not place themselves live under `{appDataDir}/vaults/{id}/`; on macOS that is `~/Library/Application Support/com.emerald.magical-journal/vaults/…` for the production build and a separate directory for the dev build (`com.emerald.magical-journal.dev`).
+Emerald uses a single SQLite file per vault, always named `emerald.db`, inside that vault's own directory. Where that directory sits is the user's choice — see [Multi-Vault System](#multi-vault-system). A vault created without picking a folder defaults to `{documentDir}/Emerald/{name}`. Vaults migrated from a pre-multi-vault installation, or created by `.emeralddb` add-vault import, instead live under `{appDataDir}/vaults/{id}/`; on macOS that is `~/Library/Application Support/com.emerald.magical-journal/vaults/…` for the production build and a separate directory for the dev build (`com.emerald.magical-journal.dev`).
 
 ## Where the schema lives
 
@@ -374,21 +374,24 @@ A vault is a **directory** the user picks, holding `emerald.db` and an `images/`
 {
   "version": 2,
   "vaults": [
-    { "id": "default", "name": "Emerald",  "path": ".../vaults/default", "createdAt": "..." },
-    { "id": "uuid",    "name": "My Vault", "path": "D:/Vaults/My Vault", "createdAt": "..." }
+    { "id": "uuid-1", "name": "My Vault",  "path": "D:/Vaults/My Vault", "createdAt": "...", "icon": "🌿" },
+    { "id": "uuid-2", "name": "Work",      "path": "C:/Users/.../Documents/Emerald/Work", "createdAt": "..." }
   ],
-  "activeVaultId": "default"
+  "activeVaultId": "uuid-1"
 }
 ```
 
+`icon` (a user-chosen emoji) is optional and its absence is what shows the generic vault glyph. `version` is not bumped for it — nothing reads that field, and records are copied through whole (`vaults.push(entry)`, `{ ...v, ...patch }`), so it round-trips through an older build untouched.
+
+- A genuinely first-ever launch starts with an **empty** `vaults` array and `activeVaultId: ""` — there is no guaranteed `default` record. `readVaultsFile()` only invents one (`id: 'default', name: 'Emerald'`) when `vaults.json` is missing *and* the Rust command `legacy_default_db_exists` finds a database from before multi-vault support; a file that already exists with an empty list (a user who removed every vault) is left alone. `AppShell` shows a non-dismissible vault modal instead of mounting the rest of the shell whenever the active id doesn't match any vault in the list.
 - Records from before this layout carry `dbName` instead of `path`. `loadVaultsFile()` lifts each one through `migrate_vault_layout`, which moves the flat `.db` into `{appDataDir}/vaults/{id}/`. That happens before any database is opened, so it cannot be a schema migration; the image half is [v35](#rules-for-future-schema-changes) and runs afterwards.
-- `id='default'` is bootstrapped on first run for backward compatibility.
-- `getActiveDbFile()` in `vaultManager.ts` is called by `getDb()` to build `sqlite:{vaultDir}/emerald.db`.
+- A vault created through the UI defaults to `{documentDir}/Emerald/{name}` (`new_vault_base_dir`, sanitized through `vaultFolderName()`), not the app's own directory — that one (`default_vault_dir` / `default_dir_for`, `{appDataDir}/vaults/{id}`) stays reserved for the migration above and for `.emeralddb` add-vault import, where a uuid-named folder is what keeps two same-named imports from colliding.
+- `getActiveDbFile()` in `vaultManager.ts` is called by `getDb()` to build `sqlite:{vaultDir}/emerald.db`. It throws `NO_ACTIVE_VAULT` instead of falling back to `vaults[0]` when `activeVaultId` doesn't resolve — a silent fallback would open a different vault under the wrong id.
 - Every write to `vaults.json` calls `register_vaults`, mirroring `id → path` into Rust. Storage commands resolve a vault *id* against that registry and never accept a path — see [`architecture.md`](architecture.md#vault-layout) and [`security.md`](security.md).
-- `resetDbCache()` in `db.ts` must be called before switching vaults; it clears the per-vault `Map<identifier, Database>` cache.
+- `resetDbCache()` in `db.ts` must be called before switching vaults; it clears the per-vault `Map<identifier, Database>` cache. It also awaits any load still in flight first: `getDb()` only registers a connection in the cache once `Database.load` resolves, so a reset racing a load could otherwise clear the cache before that connection landed in it — the connection would then leak into the map unclosed, keeping the file locked on Windows. `withDbClosed(fn)` runs `fn` with every connection closed and blocks `getDb()` for its duration (throwing `DB_CLOSED`); vault deletion uses it so a debounced autosave elsewhere in the app can't reopen the very file being removed.
 - `runMigrations()` is idempotent — called on every `getDb()` cache miss, safe on both existing and empty DBs. A newly created vault's `.db` file is only written the first time the app switches to it, which is why `newVaultRecord(name)` does not create it up front.
 - All vaults share the same schema.
-- `newVaultRecord(name, path?)` in `vaultManager.ts` is the single place that builds a new vault's record (`crypto.randomUUID()` for `id`, the chosen directory or `default_vault_dir(id)` for `path`, `createdAt`). It is used by the vault modal (both the "Add Vault" and "Open vault" rows call `addVault(await newVaultRecord(...))`)md`](features.md#vaults)) and by `.emeralddb` add-vault import. `addVault`/`updateVaultName`/`removeVault`/`setActiveVaultId` all read-modify-write `vaults.json` by copying rather than mutating the cached object before the write lands.
+- `newVaultRecord(name, opts?)` in `vaultManager.ts` is the single place that builds a new vault's record (`crypto.randomUUID()` for `id`, `opts.path` or `default_vault_dir(id)` for `path`, `opts.icon`, `createdAt`). It is used by the vault modal (the "Add Vault" and "Open vault" rows both call `addVault(await newVaultRecord(...))`, see [`features.md`](features.md#vaults)) and by `.emeralddb` add-vault import. `addVault`/`updateVault`/`removeVault`/`setActiveVaultId` all read-modify-write `vaults.json` by copying rather than mutating the cached object before the write lands; `updateVault(id, patch)` (replacing the old name-only `updateVaultName`) applies `patch` through the shared `applyVaultPatch()`, where `icon: null` deletes the key rather than storing it as `null`. `removeVault(id, deleteFiles, nextActiveId?)` folds handing off the active role into the same write that removes the record, so `vaults.json` is never briefly left naming an active vault that isn't in its own list.
 
 ## DB Backup / Restore (`.emeralddb`)
 

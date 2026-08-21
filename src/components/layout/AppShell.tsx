@@ -9,7 +9,7 @@ import { useOperationStore } from '../../store/operationStore';
 import { useAltarStore } from '../../store/altarStore';
 import { useTaskStore } from '../../store/taskStore';
 import { useRoutineStore } from '../../store/routineStore';
-import { useVaultStore } from '../../store/vaultStore';
+import { hasActiveVault, useVaultStore } from '../../store/vaultStore';
 import { invoke } from '@tauri-apps/api/core';
 import { computeMenuEnabledState, runMenuAction, SELF_CONTAINED_MENU_ACTIONS } from '../../lib/menuActions';
 import TitleBar from './titlebar/TitleBar';
@@ -18,6 +18,7 @@ import LeftSidebarEntryList from './LeftSidebarEntryList';
 import RightSidebar from './RightSidebar';
 import MainArea from './MainArea';
 import TabBar from './TabBar';
+import VaultModal from './VaultModal';
 import UndoToast from '../ui/UndoToast';
 import ImportDestinationModal from '../ui/ImportDestinationModal';
 
@@ -26,6 +27,10 @@ const ENTRY_LIST_MIN = 180;
 const ENTRY_LIST_DEFAULT = 220;
 const RIGHT_MIN = 180;
 const RIGHT_DEFAULT = 300;
+
+/** Vault setup has nowhere to close to. `Modal` requires the prop but never
+ *  calls it while `dismissible={false}` — there is no X, no Escape, no backdrop. */
+const NEVER_CLOSE = () => {};
 
 function loadSavedWidth(key: string, min: number, fallback: number): number {
   const saved = localStorage.getItem(key);
@@ -42,6 +47,9 @@ export default function AppShell() {
   const fetchRoutines = useRoutineStore((s) => s.fetchRoutines);
   const fetchAltars = useAltarStore((s) => s.fetchAltars);
   const loadVaults = useVaultStore((s) => s.loadVaults);
+  const vaultsLoaded = useVaultStore((s) => s.loaded);
+  const vaults = useVaultStore((s) => s.vaults);
+  const activeVaultId = useVaultStore((s) => s.activeVaultId);
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const leftListOpen = useUIStore((s) => s.leftListOpen);
   const activeView = useUIStore((s) => s.activeView);
@@ -67,11 +75,17 @@ export default function AppShell() {
   const startX = useRef(0);
   const startWidth = useRef(0);
 
+  const needsVault = !hasActiveVault({ vaults, activeVaultId });
+
   useEffect(() => {
     // Load vault metadata first so getDb() knows which DB file to open
-    loadVaults().then(() =>
-      Promise.all([fetchEntries(), fetchArticles(), fetchTags(), fetchAll(), fetchAllTasks(), fetchRoutines(), fetchAltars()])
-    );
+    loadVaults().then(() => {
+      // Erststart: es gibt noch keine Datenbank, aus der sich etwas laden
+      // liesse. Der erste Vault wird ueber `switchVault` aktiviert, und das
+      // endet in `reloadAllStores()` — dieser Effekt laeuft dafuer nicht erneut.
+      if (!hasActiveVault(useVaultStore.getState())) return;
+      return Promise.all([fetchEntries(), fetchArticles(), fetchTags(), fetchAll(), fetchAllTasks(), fetchRoutines(), fetchAltars()]);
+    });
   }, []);
 
   // Sync menu bar labels with the current language
@@ -174,14 +188,44 @@ export default function AppShell() {
     draggingRight.current = false;
   };
 
+  // Jade accent — magical topline. pointer-events-none so it never intercepts
+  // a window drag on the title bar underneath it.
+  const topline = (
+    <div
+      className="absolute top-0 left-0 right-0 h-px pointer-events-none z-50"
+      style={{ background: 'linear-gradient(to right, transparent, rgba(0,166,102,0.45) 30%, rgba(0,230,153,0.3) 50%, rgba(0,166,102,0.45) 70%, transparent)' }}
+    />
+  );
+
+  // Fensterrahmen und Titelleiste — alles, was auch ohne offenen Vault steht.
+  const chrome = (children: React.ReactNode) => (
+    <div className="app-shell flex flex-col h-screen w-screen overflow-hidden bg-stone-900 relative">
+      {topline}
+      <TitleBar />
+      {children}
+    </div>
+  );
+
+  // Solange kein Vault offen ist, bleibt der Shell-Inhalt ungemountet: jedes
+  // `getDb()` aus Sidebar, Tableiste oder Hauptbereich liefe in den
+  // NO_ACTIVE_VAULT-Fehler aus `getActiveVaultPath()`.
+  //
+  // Zwei getrennte Ausgaenge, damit sichtbar bleibt, warum: waehrend `loaded`
+  // noch falsch ist, steht nur noch nicht fest, ob ein Vault da ist — dann darf
+  // das Setup-Modal nicht schon aufblitzen.
+  if (!vaultsLoaded) return chrome(<main className="app-main flex-1 min-h-0" />);
+  if (needsVault) {
+    return chrome(
+      <>
+        <main className="app-main flex-1 min-h-0" />
+        <VaultModal dismissible={false} onClose={NEVER_CLOSE} />
+      </>
+    );
+  }
+
   return (
     <div className="app-shell flex flex-col h-screen w-screen overflow-hidden bg-stone-900 relative">
-      {/* Jade accent — magical topline. pointer-events-none so it never
-          intercepts a window drag on the title bar underneath it. */}
-      <div
-        className="absolute top-0 left-0 right-0 h-px pointer-events-none z-50"
-        style={{ background: 'linear-gradient(to right, transparent, rgba(0,166,102,0.45) 30%, rgba(0,230,153,0.3) 50%, rgba(0,166,102,0.45) 70%, transparent)' }}
-      />
+      {topline}
 
       <TitleBar />
 

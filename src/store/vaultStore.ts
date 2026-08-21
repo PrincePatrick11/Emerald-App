@@ -4,11 +4,13 @@ import {
   loadVaultsFile,
   setActiveVaultId,
   addVault as addVaultToFile,
-  updateVaultName,
+  updateVault as updateVaultInFile,
+  applyVaultPatch,
+  type VaultPatch,
   relocateVault as relocateVaultInFile,
   removeVault as removeVaultFromFile,
 } from '../lib/vaultManager';
-import { resetDbCache, getDb } from '../lib/db';
+import { resetDbCache, getDb, withDbClosed } from '../lib/db';
 import { useJournalStore } from './journalStore';
 import { useWikiStore } from './wikiStore';
 import { useOperationStore } from './operationStore';
@@ -27,7 +29,7 @@ interface VaultStore {
   loadVaults: () => Promise<void>;
   switchVault: (id: string) => Promise<void>;
   addVault: (vault: Vault) => Promise<void>;
-  renameVault: (id: string, name: string) => Promise<void>;
+  updateVault: (id: string, patch: VaultPatch) => Promise<void>;
   relocateVault: (id: string, path: string) => Promise<void>;
   removeVault: (id: string, deleteFiles?: boolean) => Promise<void>;
 }
@@ -47,9 +49,41 @@ async function reloadAllStores(): Promise<void> {
   ]);
 }
 
+/**
+ * Whether a vault is open.
+ *
+ * Membership, not list length: `switchVault` rolls `activeVaultId` back to `''`
+ * when a vault cannot be opened, and then the list is not empty but nothing is
+ * active either. Both mean "no database" and both belong in vault setup.
+ */
+export function hasActiveVault(state: Pick<VaultStore, 'vaults' | 'activeVaultId'>): boolean {
+  return state.vaults.some((v) => v.id === state.activeVaultId);
+}
+
+/**
+ * Opens the active vault's database and refills every store.
+ *
+ * The caller has already made it the active one; where to go when it cannot be
+ * opened is the caller's decision — switching goes back, deleting cannot.
+ */
+async function openActiveVault(): Promise<void> {
+  // Drop cached connections so getDb() loads the vault that is active now.
+  await resetDbCache();
+  // runMigrations is idempotent, so this is also what initialises a fresh vault.
+  await getDb();
+  // Navigate to home first to avoid stale open-entry state
+  useUIStore.getState().setActiveView({ type: 'home' });
+  // Undo entries reference rows of the old vault by id — drop them
+  useUndoStore.getState().clear();
+  await reloadAllStores();
+}
+
 export const useVaultStore = create<VaultStore>((set, get) => ({
   vaults: [],
-  activeVaultId: 'default',
+  // Leer, nicht 'default': bis `loadVaults()` durch ist — und waehrend des
+  // Erststarts ueberhaupt — gibt es keinen aktiven Vault, und das darf sich
+  // nicht als eine Id tarnen, die die Registry vielleicht gar nicht kennt.
+  activeVaultId: '',
   loaded: false,
 
   loadVaults: async () => {
@@ -65,29 +99,16 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     await setActiveVaultId(id);
     set({ activeVaultId: id });
 
-    // Drop cached DB connection so next getDb() loads the new vault
-    await resetDbCache();
-
-    // Initialize schema for the new vault (runMigrations is idempotent).
     // A vault whose folder is gone fails here — and must not stay the active
     // one, or the next start comes up on a vault that cannot be opened.
     try {
-      await getDb();
+      await openActiveVault();
     } catch (err) {
       await setActiveVaultId(previous);
       set({ activeVaultId: previous });
       await resetDbCache();
       throw err;
     }
-
-    // Navigate to home first to avoid stale open-entry state
-    useUIStore.getState().setActiveView({ type: 'home' });
-
-    // Undo entries reference rows of the old vault by id — drop them
-    useUndoStore.getState().clear();
-
-    // Reload all data stores from the new DB
-    await reloadAllStores();
   },
 
   addVault: async (vault: Vault) => {
@@ -95,10 +116,10 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     set((s) => ({ vaults: [...s.vaults, vault] }));
   },
 
-  renameVault: async (id: string, name: string) => {
-    await updateVaultName(id, name);
+  updateVault: async (id: string, patch: VaultPatch) => {
+    await updateVaultInFile(id, patch);
     set((s) => ({
-      vaults: s.vaults.map((v) => (v.id === id ? { ...v, name } : v)),
+      vaults: s.vaults.map((v) => (v.id === id ? applyVaultPatch(v, patch) : v)),
     }));
   },
 
@@ -108,9 +129,54 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   },
 
   removeVault: async (id: string, deleteFiles = false) => {
-    const { vaults, activeVaultId } = get();
-    if (id === activeVaultId || vaults.length <= 1) return;
-    await removeVaultFromFile(id, deleteFiles);
-    set((s) => ({ vaults: s.vaults.filter((v) => v.id !== id) }));
+    if (!get().vaults.some((v) => v.id === id)) return;
+    const wasActive = id === get().activeVaultId;
+
+    // Der Aktivwechsel gehoert in denselben Schreibvorgang wie das Entfernen:
+    // dazwischen stuende in `vaults.json` sonst ein aktiver Vault, der nicht
+    // mehr in seiner eigenen Liste ist — der Zustand, den
+    // `getActiveVaultPath()` mit NO_ACTIVE_VAULT beantwortet. Der Nachfolger
+    // steht noch nicht fest, also erst einmal an niemanden.
+    const removeFromFile = () =>
+      removeVaultFromFile(id, deleteFiles, wasActive ? '' : undefined);
+
+    // Die Datei muss entsperrt sein — und es bleiben, bis sie weg ist. Sonst
+    // oeffnet ein entprellter Speicher-Timer aus einem Editor genau die Datei
+    // wieder, die gerade verschwinden soll. Nur der aktive Vault hat ueberhaupt
+    // eine offene Verbindung; bei jedem anderen waere das Schliessen bloss eine
+    // abgebrochene Abfrage im laufenden Betrieb.
+    if (deleteFiles && wasActive) await withDbClosed(removeFromFile);
+    else await removeFromFile();
+
+    // Position und Restliste beide frisch: zwischen dem Eintritt und hier
+    // liegen mehrere awaits, in denen ein `addVault` die Liste verlaengert
+    // haben kann. Eine vorher gemerkte Position zeigte danach auf den falschen
+    // Nachbarn.
+    const list = get().vaults;
+    const index = list.findIndex((v) => v.id === id);
+    const remaining = list.filter((v) => v.id !== id);
+    if (!wasActive) {
+      set({ vaults: remaining });
+      return;
+    }
+
+    // Der Nachbar rueckt nach — dieselbe Erwartung wie beim Schliessen eines
+    // Tabs. Ohne Nachbarn faellt die App in die Vault-Einrichtung.
+    const successor = remaining[Math.min(Math.max(index, 0), remaining.length - 1)];
+    if (!successor) {
+      set({ vaults: remaining, activeVaultId: '' });
+      return;
+    }
+
+    await setActiveVaultId(successor.id);
+    // Ein einziges `set`: gaebe es dazwischen einen Render, in dem
+    // `activeVaultId` ins Leere zeigt, raeumte `AppShell` den Shell-Inhalt ab —
+    // samt des Modals, in dem gerade geloescht wird.
+    set({ vaults: remaining, activeVaultId: successor.id });
+    // Scheitert das Oeffnen, bleibt der Nachfolger trotzdem der aktive: er steht
+    // in der Liste, das Vault-Modal bleibt stehen und zeigt den Fehler, und von
+    // dort aus laesst er sich neu verorten oder ein anderer waehlen. Auf ''
+    // zurueckzufallen hiesse, den Nutzer wortlos in die Einrichtung zu werfen.
+    await openActiveVault();
   },
 }));

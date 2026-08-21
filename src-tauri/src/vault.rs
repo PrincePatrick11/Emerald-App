@@ -7,9 +7,13 @@
 //!
 //! Commands never take a destination path. A path arriving over IPC, or read
 //! out of stored HTML content, is not evidence that the user authorised it —
-//! only a registered vault id is. `resolve_allowed_roots` in `lib.rs` extends
-//! the same trust to the registered directories, which is what lets a vault
-//! live outside the usual home/documents roots.
+//! only a registered vault id is. That is what lets a vault live outside the
+//! usual home/documents roots: storage here resolves an id, never a path.
+//!
+//! `resolve_allowed_roots` in `lib.rs` deliberately does *not* extend the same
+//! trust to the registered directories — it is the boundary for reading and
+//! writing *documents*, and the registry is filled by an ordinary frontend
+//! command. The two never meet.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -18,8 +22,10 @@ use tauri::Manager;
 
 pub const DB_FILE: &str = "emerald.db";
 pub const IMAGES_SUBDIR: &str = "images";
-/// Vaults with no user-chosen location live under `{appDataDir}/vaults/`.
+/// Where a vault migrated from the pre-0.2.1 layout lives: `{appDataDir}/vaults/`.
 pub const VAULTS_SUBDIR: &str = "vaults";
+/// The folder new vaults are offered in, inside the user's documents directory.
+pub const VAULT_HOME_DIR: &str = "Emerald";
 
 /// `vault id → absolute directory`, mirrored from `vaults.json`.
 #[derive(Default)]
@@ -200,6 +206,57 @@ pub fn default_vault_dir(app: tauri::AppHandle, vault_id: String) -> Result<Stri
         .into_owned())
 }
 
+/// The folder new vaults are offered in: `{documentDir}/Emerald`.
+///
+/// Deliberately not [`default_dir_for`]. That one is the *migration* target and
+/// has to keep pointing at `{appDataDir}/vaults/{id}` for every installation
+/// with the move still ahead of it — moving it would strand their database.
+///
+/// Falls back to that same app directory where the platform exposes no
+/// documents folder, so there is always somewhere to offer.
+#[tauri::command]
+pub fn new_vault_base_dir(app: tauri::AppHandle) -> Result<String, String> {
+    let base = match app.path().document_dir() {
+        Ok(documents) => documents.join(VAULT_HOME_DIR),
+        Err(_) => app
+            .path()
+            .app_data_dir()
+            .map_err(|e| e.to_string())?
+            .join(VAULTS_SUBDIR),
+    };
+    Ok(base.to_string_lossy().into_owned())
+}
+
+/// Whether this installation already holds a database from before `vaults.json`
+/// existed, or from a first run that was cut short after the layout migration.
+///
+/// Answers one question for the frontend: is a missing `vaults.json` a genuine
+/// first start, or an installation whose journal is sitting right there? Getting
+/// that wrong the wrong way puts a user with data on disk through onboarding.
+///
+/// Deliberately `is_file()` and not [`probe_vault_dir`]: that one lists the
+/// directory, and a refused listing reports `has_db: false` — indistinguishable
+/// from "there is nothing here". Statting a single file needs no listing.
+///
+/// The two legacy locations are not the same directory on every platform — see
+/// [`migrate_vault_layout`] — so both are searched. Only `emerald.db` matters:
+/// the flat `emerald-{uuid}.db` files of other legacy vaults were only ever
+/// addressable through `vaults.json`, so without it they are unreachable anyway.
+#[tauri::command]
+pub fn legacy_default_db_exists(app: tauri::AppHandle) -> Result<bool, String> {
+    let legacy = [
+        app.path().app_config_dir().ok(),
+        app.path().app_data_dir().ok(),
+    ]
+    .into_iter()
+    .flatten()
+    .map(|dir| dir.join(DB_FILE));
+
+    let adopted = default_dir_for(&app, "default")?.join(DB_FILE);
+
+    Ok(legacy.chain(std::iter::once(adopted)).any(|db| db.is_file()))
+}
+
 /// Reports what a directory chosen in the folder dialog contains, so the UI
 /// can tell "create a vault here" from "open the one already here".
 #[tauri::command]
@@ -308,6 +365,45 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<(),
         return Err("not a vault directory: no database found".to_string());
     }
 
+    // Erst zaehlen, dann loeschen. `remove_dir` weiter unten ist die Sperre
+    // gegen fremde Dateien, aber es laeuft zuletzt — ohne diesen Vorlauf waeren
+    // Datenbank und Bilder bereits weg, wenn es scheitert. Der Vault bliebe
+    // dabei in `vaults.json` stehen (der Aufrufer schreibt die Datei erst nach
+    // einem erfolgreichen Lauf), sein Ordner existierte noch, und das naechste
+    // `getDb()` legte darin eine frische, leere Datenbank an. Aus einem
+    // `desktop.ini` oder `.DS_Store` — in `~/Documents` die Regel, nicht die
+    // Ausnahme — wuerde so ein stiller Totalverlust.
+    let foreign = |entry: &std::fs::DirEntry, allowed: &dyn Fn(&str) -> bool| {
+        !allowed(&entry.file_name().to_string_lossy())
+    };
+    let journal = format!("{DB_FILE}-journal");
+    let owned_at_top =
+        |name: &str| name == DB_FILE || name == journal || name == IMAGES_SUBDIR;
+
+    for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
+        if foreign(&entry, &owned_at_top) {
+            return Err(DIR_NOT_EMPTY.to_string());
+        }
+    }
+    let images = dir.join(IMAGES_SUBDIR);
+    if images.is_dir() {
+        for entry in std::fs::read_dir(&images).map_err(|e| e.to_string())?.flatten() {
+            if foreign(&entry, &crate::images::is_valid_image_name) {
+                return Err(DIR_NOT_EMPTY.to_string());
+            }
+        }
+    }
+
+    // Ab hier gehoert alles im Ordner diesem Vault. Die Datenbank zuerst: sie
+    // ist das einzige Stueck, das noch gesperrt sein kann, und ein Fehlschlag
+    // laesst dann wenigstens die Bilder stehen.
+    for name in [DB_FILE, &journal] {
+        let file = dir.join(name);
+        if file.is_file() {
+            std::fs::remove_file(&file).map_err(|e| format!("remove {}: {e}", file.display()))?;
+        }
+    }
+
     let images = dir.join(IMAGES_SUBDIR);
     if images.is_dir() {
         for entry in std::fs::read_dir(&images).map_err(|e| e.to_string())?.flatten() {
@@ -317,13 +413,6 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<(),
             }
         }
         std::fs::remove_dir(&images).map_err(|_| DIR_NOT_EMPTY.to_string())?;
-    }
-
-    for name in [DB_FILE, &format!("{DB_FILE}-journal")] {
-        let file = dir.join(name);
-        if file.is_file() {
-            std::fs::remove_file(&file).map_err(|e| format!("remove {}: {e}", file.display()))?;
-        }
     }
 
     std::fs::remove_dir(&dir).map_err(|_| DIR_NOT_EMPTY.to_string())

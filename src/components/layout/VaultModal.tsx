@@ -1,15 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { open as openFolderDialog } from '@tauri-apps/plugin-dialog';
-import { AlertTriangle, Check, FolderOpen, Loader2, Pencil, Plus, Trash2, Vault, X } from 'lucide-react';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import { AlertTriangle, Check, FolderOpen, Loader2, Pencil, Plus, RotateCcw, Trash2, Vault, X } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import { useVaultStore } from '../../store/vaultStore';
-import { newVaultRecord, probeVaultDir, type Vault as VaultRecord } from '../../lib/vaultManager';
-import { isWindows } from '../../lib/platform';
+import EmojiPicker from '../ui/EmojiPicker';
+import { hasActiveVault, useVaultStore } from '../../store/vaultStore';
+import {
+  DB_FILE,
+  folderName,
+  joinPath,
+  newVaultBaseDir,
+  newVaultRecord,
+  parentDir,
+  probeVaultDir,
+  splitPath,
+  vaultFolderName,
+  type Vault as VaultRecord,
+} from '../../lib/vaultManager';
 
 interface Props {
   onClose: () => void;
+  /** `false` while no vault exists: there is no app behind this modal to
+   *  return to. Nothing else changes — the setup state is this same modal with
+   *  an empty list. See the gate in `AppShell`. */
+  dismissible?: boolean;
 }
 
 const INPUT_CLASS = 'input-field flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-sm outline-none';
@@ -17,59 +32,113 @@ const CHECKBOX_CLASS =
   'mt-0.5 w-4 h-4 shrink-0 rounded border flex items-center justify-center transition-colors ' +
   'peer-focus-visible:ring-2 peer-focus-visible:ring-jade-500/35';
 
-/** The one open editor, if any — rename, delete confirmation and the create row
+/** The one open editor, if any — edit, delete confirmation and the create row
     are mutually exclusive, so they share a single state. */
 type Editor =
   | { kind: 'none' }
-  | { kind: 'rename'; id: string; value: string }
+  | { kind: 'edit'; id: string; name: string; icon?: string }
   | { kind: 'confirmDelete'; id: string; deleteFiles: boolean }
-  | { kind: 'create'; value: string; path: string | null };
+  | {
+      kind: 'create';
+      name: string;
+      icon?: string;
+      /** `{Dokumente}/Emerald`, einmal beim Oeffnen der Zeile aufgeloest. */
+      baseDir: string | null;
+      /** Selbst gewaehlt — schlaegt `baseDir` dann aus dem Rennen. */
+      customPath: string | null;
+    };
 
-/**
- * The folder's own name, as the default vault name when opening one.
- *
- * Splits on the platform's separator only: on POSIX a backslash is an ordinary
- * character in a folder name, and treating it as one would truncate the
- * suggested name.
- */
-function folderName(path: string): string {
-  const parts = isWindows ? path.split(/[\\/]/) : path.split('/');
-  return parts.filter(Boolean).pop() ?? path;
+/** Where the vault being created will land. */
+function createTarget(baseDir: string | null, customPath: string | null, name: string): string | null {
+  if (customPath) return customPath;
+  if (!baseDir) return null;
+  // Ohne Namen noch kein Ordner — der angehaengte Trenner zeigt, dass dort
+  // gleich einer hinkommt. Committen laesst sich in dem Zustand ohnehin nichts.
+  return name.trim() ? joinPath(baseDir, vaultFolderName(name)) : joinPath(baseDir, '');
+}
+
+/** A vault's own emoji, or the generic glyph while it has none. */
+export function VaultGlyph({ icon, size }: { icon?: string; size: number }) {
+  return icon
+    ? <span className="leading-none" style={{ fontSize: size }}>{icon}</span>
+    : <Vault size={size} />;
 }
 
 // ── rows ─────────────────────────────────────────────────────────────────────
 
-function RenameRow({
-  value, onChange, onCommit, onCancel,
+/** The badge doubles as the icon picker; the reset appears once one is set. */
+function IconField({ icon, onChange }: { icon?: string; onChange: (icon?: string) => void }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <EmojiPicker
+        value={icon ?? ''}
+        onChange={onChange}
+        trigger={({ toggle }) => (
+          <button type="button" className="vault-badge vault-badge-interactive" title={t('vault.icon')} onClick={toggle}>
+            <VaultGlyph icon={icon} size={16} />
+          </button>
+        )}
+      />
+      {icon && (
+        <Button variant="ghost" title={t('vault.resetIcon')} onClick={() => onChange(undefined)}>
+          <RotateCcw size={14} />
+        </Button>
+      )}
+    </>
+  );
+}
+
+/**
+ * Name and icon in one editor, committed together by the check button.
+ *
+ * Deliberately no commit on blur: the emoji picker's trigger and its search
+ * field both take the focus away from this input, so a blur commit would close
+ * the row mid-click and take the picker with it.
+ */
+function EditRow({
+  name, icon, onChangeName, onChangeIcon, onCommit, onCancel,
 }: {
-  value: string;
-  onChange: (value: string) => void;
+  name: string;
+  icon?: string;
+  onChangeName: (name: string) => void;
+  onChangeIcon: (icon?: string) => void;
   onCommit: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="vault-card">
-      <div className="vault-badge"><Vault size={16} /></div>
+      <IconField icon={icon} onChange={onChangeIcon} />
       <input
         autoFocus
         className={INPUT_CLASS}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={name}
+        onChange={(e) => onChangeName(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') onCommit();
           if (e.key === 'Escape') onCancel();
         }}
-        onBlur={onCommit}
       />
+      <Button variant="ghost" title={t('vault.save')} disabled={!name.trim()} onClick={onCommit}>
+        <Check size={14} />
+      </Button>
+      <Button variant="ghost" title={t('vault.cancel')} onClick={onCancel}>
+        <X size={14} />
+      </Button>
     </div>
   );
 }
 
 function DeleteConfirmRow({
-  vault, deleteFiles, onToggleFiles, onConfirm, onCancel,
+  vault, deleteFiles, hintKey, busy, onToggleFiles, onConfirm, onCancel,
 }: {
   vault: VaultRecord;
   deleteFiles: boolean;
+  /** Was danach passiert — bei der aktiven und der letzten Vault ist das mehr
+   *  als „verschwindet aus der Liste". */
+  hintKey: 'vault.deleteHint' | 'vault.deleteActiveHint' | 'vault.deleteLastHint';
+  busy: boolean;
   onToggleFiles: (next: boolean) => void;
   onConfirm: () => void;
   onCancel: () => void;
@@ -81,10 +150,10 @@ function DeleteConfirmRow({
         <div className="vault-badge"><Trash2 size={16} /></div>
         <div className="flex-1 min-w-0">
           <div className="vault-name">{vault.name}</div>
-          <div className="vault-meta">{t('vault.deleteHint')}</div>
+          <div className="vault-meta">{t(hintKey)}</div>
         </div>
-        <Button onClick={onConfirm} variant="danger" className="text-xs px-1">
-          {t('trash.confirmYes')}
+        <Button onClick={onConfirm} variant="danger" className="text-xs px-1" disabled={busy}>
+          {busy ? <Loader2 size={12} className="animate-spin" /> : t('trash.confirmYes')}
         </Button>
         <Button onClick={onCancel} variant="ghost" className="text-xs">
           {t('trash.confirmNo')}
@@ -121,7 +190,7 @@ function DeleteConfirmRow({
 }
 
 function VaultRow({
-  vault, isActive, unreachable, isSwitching, busy, onSwitch, onRename, onRelocate, onDelete,
+  vault, isActive, unreachable, isSwitching, busy, onSwitch, onEdit, onRelocate, onDelete,
 }: {
   vault: VaultRecord;
   isActive: boolean;
@@ -129,9 +198,9 @@ function VaultRow({
   isSwitching: boolean;
   busy: boolean;
   onSwitch: () => void;
-  onRename: () => void;
+  onEdit: () => void;
   onRelocate: () => void;
-  onDelete: (() => void) | null;
+  onDelete: () => void;
 }) {
   const { t } = useTranslation();
   const isUnreachable = unreachable !== null;
@@ -144,12 +213,14 @@ function VaultRow({
         title={isActive || isUnreachable ? undefined : t('vault.switch')}
         className="flex items-center gap-3 flex-1 min-w-0 text-left"
       >
+        {/* Status schlaegt Identitaet: waehrend eines Wechsels und bei einem
+            unerreichbaren Ordner zaehlt, was los ist, nicht welcher Vault. */}
         <div className="vault-badge">
           {isSwitching
             ? <Loader2 size={16} className="animate-spin" />
             : isUnreachable
               ? <AlertTriangle size={16} className="text-danger" />
-              : <Vault size={16} />}
+              : <VaultGlyph icon={vault.icon} size={16} />}
         </div>
         <div className="flex-1 min-w-0">
           <div className="vault-name">{vault.name}</div>
@@ -170,83 +241,104 @@ function VaultRow({
           <FolderOpen size={14} />
         </Button>
       )}
-      <Button variant="ghost" title={t('vault.rename')} onClick={onRename}>
+      <Button variant="ghost" title={t('vault.edit')} onClick={onEdit}>
         <Pencil size={14} />
       </Button>
-      {onDelete && (
-        <Button variant="danger" className="p-1.5" title={t('vault.delete')} onClick={onDelete}>
-          <Trash2 size={14} />
-        </Button>
-      )}
+      <Button variant="danger" className="p-1.5" title={t('vault.delete')} onClick={onDelete}>
+        <Trash2 size={14} />
+      </Button>
     </div>
   );
 }
 
 function CreateRow({
-  value, path, onChange, onPickFolder, onCommit, onCancel,
+  name, icon, baseDir, customPath, onChangeName, onChangeIcon, onPickFolder, onResetFolder,
+  onCommit, onCancel,
 }: {
-  value: string;
-  path: string | null;
-  onChange: (value: string) => void;
+  name: string;
+  icon?: string;
+  baseDir: string | null;
+  customPath: string | null;
+  onChangeName: (name: string) => void;
+  onChangeIcon: (icon?: string) => void;
   onPickFolder: () => void;
+  onResetFolder: () => void;
   onCommit: () => void;
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
+  // Die Zeile zeigt den Ordner, in dem der Vault tatsaechlich landet — nicht
+  // bloss die Aufforderung, einen zu waehlen.
+  const target = createTarget(baseDir, customPath, name);
+  const { parent: targetParent, leaf: targetLeaf } = splitPath(target ?? '');
   return (
     <div className="vault-card flex-col items-stretch gap-2">
       <div className="flex items-center gap-3">
-        <div className="vault-badge"><Vault size={16} /></div>
+        <IconField icon={icon} onChange={onChangeIcon} />
         <input
           autoFocus
           className={INPUT_CLASS}
           placeholder={t('vault.namePlaceholder')}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          value={name}
+          onChange={(e) => onChangeName(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') onCommit();
             if (e.key === 'Escape') onCancel();
           }}
         />
-        <Button variant="ghost" title={t('vault.create')} disabled={!value.trim()} onClick={onCommit}>
+        <Button variant="ghost" title={t('vault.create')} disabled={!name.trim()} onClick={onCommit}>
           <Check size={14} />
         </Button>
         <Button variant="ghost" title={t('vault.cancel')} onClick={onCancel}>
           <X size={14} />
         </Button>
       </div>
-      <button
-        type="button"
-        className="flex items-center gap-2 text-xs text-left min-w-0"
-        style={{ color: 'var(--text-muted)' }}
-        onClick={onPickFolder}
-      >
-        <FolderOpen size={13} className="shrink-0" />
-        <span className="truncate">{path ?? t('vault.chooseFolder')}</span>
-      </button>
+      <div className="flex items-center gap-2 min-w-0">
+        <Button variant="secondary" className="shrink-0" onClick={onPickFolder}>
+          <FolderOpen size={14} />
+          {t('vault.chooseFolder')}
+        </Button>
+        {/* Der Ordner des Vaults bleibt lesbar, abgeschnitten wird nur der Weg
+            dorthin — genau andersherum als bei einem `truncate` ueber das
+            Ganze, das ausgerechnet den Namen wegkuerzt. */}
+        <span className="flex items-baseline text-xs min-w-0" title={target ?? undefined}>
+          <span className="truncate min-w-0" style={{ color: 'var(--text-subtle)' }}>
+            {targetParent}
+          </span>
+          <span className="shrink-0" style={{ color: 'var(--text-muted)' }}>
+            {targetLeaf}
+          </span>
+        </span>
+        {customPath && (
+          <Button variant="ghost" className="shrink-0" title={t('vault.defaultFolder')} onClick={onResetFolder}>
+            <RotateCcw size={14} />
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
 
 // ── modal ────────────────────────────────────────────────────────────────────
 
-export default function VaultModal({ onClose }: Props) {
+export default function VaultModal({ onClose, dismissible = true }: Props) {
   const { t } = useTranslation();
-
   const vaults = useVaultStore((s) => s.vaults);
   const activeVaultId = useVaultStore((s) => s.activeVaultId);
   const switchVault = useVaultStore((s) => s.switchVault);
   const addVault = useVaultStore((s) => s.addVault);
-  const renameVault = useVaultStore((s) => s.renameVault);
+  const updateVault = useVaultStore((s) => s.updateVault);
   const relocateVault = useVaultStore((s) => s.relocateVault);
   const removeVault = useVaultStore((s) => s.removeVault);
 
   const [editor, setEditor] = useState<Editor>({ kind: 'none' });
   const [switchingId, setSwitchingId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   // 'missing' = Ordner nicht auffindbar, 'denied' = da, aber kein Zugriff.
   // Der Unterschied ist der zwischen "such woanders" und "erlaub den Zugriff".
   const [unreachable, setUnreachable] = useState<Map<string, 'missing' | 'denied'>>(new Map());
   const [error, setError] = useState('');
+
 
   // Which vaults are still where vaults.json says they are. A folder on an
   // unplugged drive, or one that was renamed, has to be visible as such rather
@@ -271,6 +363,13 @@ export default function VaultModal({ onClose }: Props) {
 
   const closeEditor = () => setEditor({ kind: 'none' });
 
+  /** Resolves the default location before the row opens, so it shows a real
+   *  path from the first frame instead of a placeholder. */
+  const openCreateRow = useCallback(async () => {
+    const baseDir = await newVaultBaseDir().catch(() => null);
+    setEditor({ kind: 'create', name: '', baseDir, customPath: null });
+  }, []);
+
   /**
    * Every action here has the same shape: clear the previous message, do the
    * thing, and show one shared message if it throws. Without the clearing step
@@ -287,10 +386,61 @@ export default function VaultModal({ onClose }: Props) {
   }
 
   async function pickFolder(): Promise<string | null> {
-    const picked = await openFolderDialog({ directory: true, multiple: false });
+    const picked = await openDialog({ directory: true, multiple: false });
     if (typeof picked !== 'string') return null;
     setError('');
     return picked;
+  }
+
+  /**
+   * Picks the vault's database rather than its folder.
+   *
+   * A directory dialog lists no files, so nothing in it shows whether the
+   * folder holds a vault at all — the answer only arrived after confirming.
+   * Filtered on `.db`, the database is visible while choosing; the folder is
+   * its parent.
+   */
+  async function pickVaultDir(): Promise<string | null> {
+    const picked = await openDialog({
+      multiple: false,
+      title: t('vault.openDbFile'),
+      filters: [{ name: 'Emerald Vault', extensions: ['db'] }],
+    });
+    if (!picked) return null;
+    const file = typeof picked === 'string' ? picked : picked[0];
+    // Der Filter laesst jede `.db` durch. Waere hier irgendeine erlaubt, wuerde
+    // aus `~/Documents/fremd.db` der Ordner `~/Documents` zum Vault-Verzeichnis
+    // — samt `images/` darin und samt „Dateien loeschen" darauf.
+    if (splitPath(file).leaf !== DB_FILE) {
+      setError(t('vault.folderHasNoVault'));
+      return null;
+    }
+    return parentDir(file);
+  }
+
+  /** Shared gate for opening and relocating: the folder has to be reachable
+   *  and actually hold a vault. Returns `false` once the reason is displayed. */
+  async function requireVaultDir(path: string): Promise<boolean> {
+    const probe = await probeVaultDir(path);
+    // `denied` zuerst: ein verweigerter Probe meldet has_db=false und ginge
+    // sonst als "kein Vault in diesem Ordner" durch.
+    if (probe.denied) {
+      setError(t('vault.accessDenied'));
+      return false;
+    }
+    if (!probe.has_db) {
+      setError(t('vault.folderHasNoVault'));
+      return false;
+    }
+    return true;
+  }
+
+  /** Adds a vault to the list, and during first-run setup activates it — that
+   *  is what fills the empty stores and lets the app shell take over. */
+  async function adoptVault(record: VaultRecord) {
+    const hadActive = hasActiveVault({ vaults, activeVaultId });
+    await addVault(record);
+    if (!hadActive) await switchVault(record.id);
   }
 
   async function handleSwitch(id: string) {
@@ -308,38 +458,44 @@ export default function VaultModal({ onClose }: Props) {
     }
   }
 
-  // Closes synchronously so a click that opens another editor is not undone by
-  // this one resuming after its await; the guard absorbs Enter-then-blur.
-  async function commitRename(id: string, value: string) {
-    if (editor.kind !== 'rename' || editor.id !== id) return;
+  async function commitEdit(id: string, name: string, icon?: string) {
+    if (editor.kind !== 'edit' || editor.id !== id) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
     closeEditor();
-    const name = value.trim();
-    if (!name) return;
-    await run('rename', () => renameVault(id, name));
+    await run('edit', () => updateVault(id, { name: trimmed, icon: icon ?? null }));
   }
 
-  async function commitCreate(value: string, path: string | null) {
-    const name = value.trim();
+  async function commitCreate(pending: Extract<Editor, { kind: 'create' }>) {
+    const name = pending.name.trim();
     if (!name) return;
+    const target = createTarget(pending.baseDir, pending.customPath, name);
     await run('create', async () => {
       // Erst pruefen, dann den Editor schliessen: sonst sind Name und Ordner
       // weg, sobald der Ordner nicht taugt.
-      if (path) {
-        const probe = await probeVaultDir(path);
+      if (target) {
+        const probe = await probeVaultDir(target);
+        // `denied` zuerst: ein verweigerter Probe meldet is_empty=false und
+        // ginge sonst als "Ordner nicht leer" durch.
+        if (probe.denied) {
+          setError(t('vault.accessDenied'));
+          return;
+        }
         if (probe.has_db) {
           setError(t('vault.folderHasVault'));
           return;
         }
         // Ein neuer Vault gehoert in einen leeren Ordner. Sonst vermischen sich
         // seine Dateien mit fremden, und "Dateien loeschen" muesste spaeter
-        // entscheiden, was davon ihm gehoert.
-        if (!probe.is_empty) {
+        // entscheiden, was davon ihm gehoert. Ein Ordner, den es noch gar nicht
+        // gibt, ist der Normalfall — `create_vault_dirs` legt ihn an.
+        if (probe.exists && !probe.is_empty) {
           setError(t('vault.folderNotEmpty'));
           return;
         }
       }
       closeEditor();
-      await addVault(await newVaultRecord(name, path ?? undefined));
+      await adoptVault(await newVaultRecord(name, { path: target ?? undefined, icon: pending.icon }));
     });
   }
 
@@ -347,27 +503,27 @@ export default function VaultModal({ onClose }: Props) {
       over from another machine. */
   async function handleOpenExisting() {
     closeEditor();
-    const path = await pickFolder();
+    const path = await pickVaultDir();
     if (!path) return;
     await run('open', async () => {
-      if (!(await probeVaultDir(path)).has_db) {
-        setError(t('vault.folderHasNoVault'));
-        return;
-      }
+      if (!(await requireVaultDir(path))) return;
       if (vaults.some((v) => v.path === path)) {
         setError(t('vault.alreadyOpen'));
         return;
       }
-      await addVault(await newVaultRecord(folderName(path), path));
+      await adoptVault(await newVaultRecord(folderName(path), { path }));
     });
   }
 
   async function handleRelocate(id: string) {
-    const path = await pickFolder();
+    const path = await pickVaultDir();
     if (!path) return;
     await run('relocate', async () => {
-      if (!(await probeVaultDir(path)).has_db) {
-        setError(t('vault.folderHasNoVault'));
+      if (!(await requireVaultDir(path))) return;
+      // Zwei Vaults auf einem Ordner waeren zwei Ids auf einer Datenbank —
+      // und „Dateien loeschen" beim einen risse dem anderen den Boden weg.
+      if (vaults.some((v) => v.id !== id && v.path === path)) {
+        setError(t('vault.alreadyOpen'));
         return;
       }
       // Kein manuelles Aufraeumen von `missing` — die geaenderte Vault-Liste
@@ -377,16 +533,24 @@ export default function VaultModal({ onClose }: Props) {
   }
 
   async function handleRemove(id: string, deleteFiles: boolean) {
-    closeEditor();
+    // Ein zweiter Klick waehrend des ersten wuerde seinen Nachfolger aus einem
+    // Zustand berechnen, den es nicht mehr gibt — und `delete_vault_files`
+    // faende die Id nicht mehr in der Registry.
+    if (removingId) return;
+    setRemovingId(id);
     setError('');
     try {
       await removeVault(id, deleteFiles);
+      closeEditor();
     } catch (e) {
       console.error('[vault] remove failed', e);
       // `delete_vault_files` raeumt nur die eigenen Dateien weg und laesst den
       // Ordner stehen, sobald noch etwas anderes darin liegt.
       const leftover = String((e as Error)?.message ?? e).includes('VAULT_DIR_NOT_EMPTY');
       setError(t(leftover ? 'vault.deleteFilesLeftover' : 'vault.saveFailed'));
+      closeEditor();
+    } finally {
+      setRemovingId(null);
     }
   }
 
@@ -394,21 +558,26 @@ export default function VaultModal({ onClose }: Props) {
     <Modal
       title={t('vault.title')}
       onClose={onClose}
+      dismissible={dismissible}
       widthClassName="w-[480px]"
       maxHeightClassName="max-h-[80vh]"
       bodyClassName="flex-1 overflow-y-auto px-5 py-4"
     >
-      <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>{t('vault.hint')}</p>
+      <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+        {t('vault.hint')}
+      </p>
 
       <div className="space-y-2">
         {vaults.map((v) => {
-          if (editor.kind === 'rename' && editor.id === v.id) {
+          if (editor.kind === 'edit' && editor.id === v.id) {
             return (
-              <RenameRow
+              <EditRow
                 key={v.id}
-                value={editor.value}
-                onChange={(value) => setEditor({ kind: 'rename', id: v.id, value })}
-                onCommit={() => commitRename(v.id, editor.value)}
+                name={editor.name}
+                icon={editor.icon}
+                onChangeName={(name) => setEditor({ ...editor, name })}
+                onChangeIcon={(icon) => setEditor({ ...editor, icon })}
+                onCommit={() => commitEdit(v.id, editor.name, editor.icon)}
                 onCancel={closeEditor}
               />
             );
@@ -420,6 +589,14 @@ export default function VaultModal({ onClose }: Props) {
                 key={v.id}
                 vault={v}
                 deleteFiles={editor.deleteFiles}
+                busy={removingId === v.id}
+                hintKey={
+                  vaults.length === 1
+                    ? 'vault.deleteLastHint'
+                    : v.id === activeVaultId
+                      ? 'vault.deleteActiveHint'
+                      : 'vault.deleteHint'
+                }
                 onToggleFiles={(deleteFiles) => setEditor({ kind: 'confirmDelete', id: v.id, deleteFiles })}
                 onConfirm={() => handleRemove(v.id, editor.deleteFiles)}
                 onCancel={closeEditor}
@@ -437,36 +614,32 @@ export default function VaultModal({ onClose }: Props) {
               isSwitching={switchingId === v.id}
               busy={switchingId !== null}
               onSwitch={() => handleSwitch(v.id)}
-              onRename={() => setEditor({ kind: 'rename', id: v.id, value: v.name })}
+              onEdit={() => setEditor({ kind: 'edit', id: v.id, name: v.name, icon: v.icon })}
               onRelocate={() => handleRelocate(v.id)}
-              onDelete={
-                !isActive && vaults.length > 1
-                  ? () => setEditor({ kind: 'confirmDelete', id: v.id, deleteFiles: false })
-                  : null
-              }
+              onDelete={() => setEditor({ kind: 'confirmDelete', id: v.id, deleteFiles: false })}
             />
           );
         })}
 
         {editor.kind === 'create' ? (
           <CreateRow
-            value={editor.value}
-            path={editor.path}
-            onChange={(value) => setEditor({ kind: 'create', value, path: editor.path })}
+            name={editor.name}
+            icon={editor.icon}
+            baseDir={editor.baseDir}
+            customPath={editor.customPath}
+            onChangeName={(name) => setEditor({ ...editor, name })}
+            onChangeIcon={(icon) => setEditor({ ...editor, icon })}
             onPickFolder={async () => {
-              const path = await pickFolder();
-              if (path) setEditor({ kind: 'create', value: editor.value, path });
+              const customPath = await pickFolder();
+              if (customPath) setEditor({ ...editor, customPath });
             }}
-            onCommit={() => commitCreate(editor.value, editor.path)}
+            onResetFolder={() => setEditor({ ...editor, customPath: null })}
+            onCommit={() => commitCreate(editor)}
             onCancel={closeEditor}
           />
         ) : (
           <div className="flex gap-2">
-            <button
-              type="button"
-              className="vault-create flex-1"
-              onClick={() => setEditor({ kind: 'create', value: '', path: null })}
-            >
+            <button type="button" className="vault-create flex-1" onClick={openCreateRow}>
               <Plus size={16} className="shrink-0" />
               {t('vault.add')}
             </button>

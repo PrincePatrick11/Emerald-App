@@ -8,12 +8,12 @@ import {
   Wand2,
   Settings,
   CheckSquare,
-  Vault,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useUIStore } from '../../store/uiStore';
+import { useVaultStore } from '../../store/vaultStore';
 import SettingsModal from './SettingsModal';
-import VaultModal from './VaultModal';
+import VaultModal, { VaultGlyph } from './VaultModal';
 import RailButton from '../ui/RailButton';
 
 function PanelToggleIcon({ active, mirrored, size = 16 }: { active: boolean; mirrored?: boolean; size?: number }) {
@@ -42,6 +42,9 @@ export default function LeftSidebarRail() {
   } = useUIStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [vaultOpen, setVaultOpen] = useState(false);
+  // Selector auf ein Primitiv, nicht auf den Vault-Datensatz: `find` liefert
+  // sonst bei jedem Store-Update ein Objekt, das zustand als geaendert liest.
+  const activeVaultIcon = useVaultStore((s) => s.vaults.find((v) => v.id === s.activeVaultId)?.icon);
 
   return (
     <div className="left-sidebar-rail rail-divider flex flex-col items-center h-full w-14 flex-shrink-0 border-r">
@@ -87,7 +90,10 @@ export default function LeftSidebarRail() {
         <div className="rail-divider w-8 border-t my-1.5" />
         <div className="flex flex-col items-center gap-0.5">
           <RailButton onClick={() => setVaultOpen(true)} title={t('nav.vaults')}>
-            <Vault size={18} />
+            {/* 17px nur fuers Emoji: es traegt keine Strichstaerke und wirkt
+                neben den lucide-Icons sonst zu gross. Das Ersatz-Glyph ist
+                selbst ein lucide-Icon und bleibt bei den 18 seiner Nachbarn. */}
+            <VaultGlyph icon={activeVaultIcon} size={activeVaultIcon ? 17 : 18} />
           </RailButton>
           <RailButton onClick={() => setSettingsOpen(true)} title={t('nav.settings')}>
             <Settings size={18} />

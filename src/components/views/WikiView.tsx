@@ -59,7 +59,8 @@ export default function WikiView() {
     const id = articleIdRef.current;
     autoSaveTimer.current = setTimeout(() => {
       if (!isEditingRef.current || !id) return;
-      updateArticle(id, pendingRef.current);
+      // Siehe JournalView: `getDb()` lehnt ab, waehrend ein Vault geloescht wird.
+      void updateArticle(id, pendingRef.current).catch(() => {});
     }, 1500);
   }, [updateArticle]);
 
