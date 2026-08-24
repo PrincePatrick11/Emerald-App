@@ -40,12 +40,13 @@ src/
 │   │   │             AltarSidebarPanel, RoutinesPanel (currently unrendered), BacklinksPanel
 │   │   │             (currently unrendered)
 │   │   └── fields/   PropertiesReadView / PropertiesEditView (read vs. edit layout shell),
-│   │                 PropertySummaryRow, SidebarActionButton, Favicon, Banner,
+│   │                 PropertySummaryRow, Favicon, Banner,
 │   │                 AltarReadingSummary, LinkedOpsInput, LinkedWikiInput, PlacedElementRow
 │   ├── wiki/         WikiList (rendering + category emoji helper)
 │   └── ui/           ListToolbar, FilterPanel, UndoToast, ContextMenu, ImportDestinationModal,
 │                     Modal (shared modal wrapper), EmojiPicker (shared emoji-picker popover),
-│                     Button (shared primary/secondary/ghost/danger button),
+│                     Button (shared button — primary/secondary/ghost/danger variants, plus a
+│                     separate tone-coded jade/amber/danger/neutral row-action mode),
 │                     Dashboard (shared module-overview chrome: topbar/toolbar/filter/grouping),
 │                     RailButton (icon-button for the sidebar rail), TabIconButton (active/idle
 │                     tab toggle), EntryListTab (generic searchable/renameable/draggable list,

@@ -235,19 +235,9 @@ export default function AppShell() {
     setResizing(false);
   };
 
-  // Jade accent — magical topline. pointer-events-none so it never intercepts
-  // a window drag on the title bar underneath it.
-  const topline = (
-    <div
-      className="absolute top-0 left-0 right-0 h-px pointer-events-none z-50"
-      style={{ background: 'linear-gradient(to right, transparent, rgba(0,166,102,0.45) 30%, rgba(0,230,153,0.3) 50%, rgba(0,166,102,0.45) 70%, transparent)' }}
-    />
-  );
-
   // Fensterrahmen und Titelleiste — alles, was auch ohne offenen Vault steht.
   const chrome = (children: React.ReactNode) => (
     <div className="app-shell flex flex-col h-screen w-screen overflow-hidden bg-stone-900 relative">
-      {topline}
       <TitleBar />
       {children}
     </div>
@@ -272,8 +262,6 @@ export default function AppShell() {
 
   return (
     <div className="app-shell flex flex-col h-screen w-screen overflow-hidden bg-stone-900 relative">
-      {topline}
-
       <TitleBar />
 
       {/* The sidebar resize handles live in here, so the pointer handlers that

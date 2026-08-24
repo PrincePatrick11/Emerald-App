@@ -120,12 +120,21 @@ function EditRow({
           if (e.key === 'Escape') onCancel();
         }}
       />
-      <Button variant="ghost" title={t('vault.save')} disabled={!name.trim()} onClick={onCommit}>
-        <Check size={14} />
-      </Button>
-      <Button variant="ghost" title={t('vault.cancel')} onClick={onCancel}>
-        <X size={14} />
-      </Button>
+      <div className="flex items-center gap-0.5">
+        <Button
+          tone="jade"
+          compact
+          title={t('vault.save')}
+          aria-label={t('vault.save')}
+          disabled={!name.trim()}
+          onClick={onCommit}
+        >
+          <Check size={14} />
+        </Button>
+        <Button tone="neutral" compact title={t('vault.cancel')} aria-label={t('vault.cancel')} onClick={onCancel}>
+          <X size={14} />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -234,17 +243,19 @@ function VaultRow({
         </div>
       </button>
 
-      {unreachable === 'missing' && (
-        <Button variant="ghost" title={t('vault.relocate')} onClick={onRelocate}>
-          <FolderOpen size={14} />
+      <div className="flex items-center gap-0.5">
+        {unreachable === 'missing' && (
+          <Button variant="ghost" title={t('vault.relocate')} onClick={onRelocate}>
+            <FolderOpen size={14} />
+          </Button>
+        )}
+        <Button tone="amber" compact title={t('vault.edit')} aria-label={t('vault.edit')} onClick={onEdit}>
+          <Pencil size={14} />
         </Button>
-      )}
-      <Button variant="ghost" title={t('vault.edit')} onClick={onEdit}>
-        <Pencil size={14} />
-      </Button>
-      <Button variant="danger" className="p-1.5" title={t('vault.delete')} onClick={onDelete}>
-        <Trash2 size={14} />
-      </Button>
+        <Button tone="danger" compact title={t('vault.delete')} aria-label={t('vault.delete')} onClick={onDelete}>
+          <Trash2 size={14} />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -284,12 +295,21 @@ function CreateRow({
             if (e.key === 'Escape') onCancel();
           }}
         />
-        <Button variant="ghost" title={t('vault.create')} disabled={!name.trim()} onClick={onCommit}>
-          <Check size={14} />
-        </Button>
-        <Button variant="ghost" title={t('vault.cancel')} onClick={onCancel}>
-          <X size={14} />
-        </Button>
+        <div className="flex items-center gap-0.5">
+          <Button
+            tone="jade"
+            compact
+            title={t('vault.create')}
+            aria-label={t('vault.create')}
+            disabled={!name.trim()}
+            onClick={onCommit}
+          >
+            <Check size={14} />
+          </Button>
+          <Button tone="neutral" compact title={t('vault.cancel')} aria-label={t('vault.cancel')} onClick={onCancel}>
+            <X size={14} />
+          </Button>
+        </div>
       </div>
       <div className="flex items-center gap-2 min-w-0">
         <Button variant="secondary" className="shrink-0" onClick={onPickFolder}>

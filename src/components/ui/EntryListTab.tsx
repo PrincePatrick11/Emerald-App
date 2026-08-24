@@ -84,12 +84,14 @@ export default function EntryListTab<T>({
         </div>
         {onCreate && (
           <Button
-            variant="ghost"
+            tone="neutral"
+            compact
             onClick={async () => {
               const created = await onCreate();
               if (created) startRename(created);
             }}
             title={createTitle}
+            aria-label={createTitle}
             className="flex-shrink-0"
           >
             <Plus size={14} />

@@ -7,7 +7,7 @@ import JournalPropertiesPanel from '../sidebar/panels/JournalPropertiesPanel';
 import WikiPropertiesPanel from '../sidebar/panels/WikiPropertiesPanel';
 import OperationPropertiesPanel from '../sidebar/panels/OperationPropertiesPanel';
 import AltarSidebarPanel from '../sidebar/panels/AltarSidebarPanel';
-import SidebarActionButton from '../sidebar/fields/SidebarActionButton';
+import Button from '../ui/Button';
 
 /* Mirrors the entry-list tab bar in LeftSidebarEntryList so both sidebars put their
    bottom border on the same line. Keep the two in sync — with one known
@@ -49,28 +49,30 @@ function RightSidebarActionBar() {
     if (!editActions) return null;
     return (
       <div className={ACTION_BAR_CLASSES}>
-        <SidebarActionButton
-          icon={<Check size={14} />}
-          label={t('editor.done')}
-          tone="jade"
-          onClick={editActions.onSave}
-        />
+        <Button tone="jade" fill title={t('editor.done')} aria-label={t('editor.done')} onClick={editActions.onSave}>
+          <Check size={14} />
+          <span className="truncate">{t('editor.done')}</span>
+        </Button>
         {editActions.onDelete && (
-          <SidebarActionButton
-            icon={<Trash2 size={14} />}
-            label={t('editor.delete')}
+          <Button
             tone="danger"
             compact
+            title={t('editor.delete')}
+            aria-label={t('editor.delete')}
             onClick={editActions.onDelete}
-          />
+          >
+            <Trash2 size={14} />
+          </Button>
         )}
-        <SidebarActionButton
-          icon={<X size={14} />}
-          label={t('editor.cancel')}
+        <Button
           tone="neutral"
           compact
+          title={t('editor.cancel')}
+          aria-label={t('editor.cancel')}
           onClick={editActions.onCancel}
-        />
+        >
+          <X size={14} />
+        </Button>
       </div>
     );
   }
@@ -85,21 +87,27 @@ function RightSidebarActionBar() {
 
   return (
     <div className={ACTION_BAR_CLASSES}>
-      <SidebarActionButton
-        icon={<Pencil size={14} />}
-        label={t('editor.edit')}
+      <Button
         tone="amber"
+        fill
+        title={t('editor.edit')}
+        aria-label={t('editor.edit')}
         onClick={() => setActiveView({ ...activeView, mode: 'edit' })}
-      />
+      >
+        <Pencil size={14} />
+        <span className="truncate">{t('editor.edit')}</span>
+      </Button>
       {isAltar && (
-        <SidebarActionButton
-          icon={altarWindowFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-          label={altarWindowFullscreen ? t('altar.exitWindowFullscreen') : t('altar.windowFullscreen')}
+        <Button
           tone="jade"
           active={altarWindowFullscreen}
           compact
+          title={altarWindowFullscreen ? t('altar.exitWindowFullscreen') : t('altar.windowFullscreen')}
+          aria-label={altarWindowFullscreen ? t('altar.exitWindowFullscreen') : t('altar.windowFullscreen')}
           onClick={() => setAltarWindowFullscreen(!altarWindowFullscreen)}
-        />
+        >
+          {altarWindowFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        </Button>
       )}
     </div>
   );
