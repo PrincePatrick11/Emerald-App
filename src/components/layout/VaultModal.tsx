@@ -234,8 +234,6 @@ function VaultRow({
         </div>
       </button>
 
-      {isActive && <span className="vault-active-label">{t('vault.active')}</span>}
-
       {unreachable === 'missing' && (
         <Button variant="ghost" title={t('vault.relocate')} onClick={onRelocate}>
           <FolderOpen size={14} />
@@ -639,14 +637,14 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
           />
         ) : (
           <div className="flex gap-2">
-            <button type="button" className="vault-create flex-1" onClick={openCreateRow}>
+            <Button variant="primary" className="flex-1 justify-center" onClick={openCreateRow}>
               <Plus size={16} className="shrink-0" />
               {t('vault.add')}
-            </button>
-            <button type="button" className="vault-create flex-1" onClick={handleOpenExisting}>
+            </Button>
+            <Button variant="secondary" className="flex-1 justify-center" onClick={handleOpenExisting}>
               <FolderOpen size={16} className="shrink-0" />
               {t('vault.open')}
-            </button>
+            </Button>
           </div>
         )}
       </div>

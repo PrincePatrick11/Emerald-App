@@ -379,7 +379,6 @@
   "vault": {
     "title": "Vaults",
     "hint": "A vault is a folder with its own database and its own images.",
-    "active": "active",
     "switch": "Switch",
     "switching": "Switching…",
     "edit": "Edit",
@@ -388,7 +387,7 @@
     "resetIcon": "Use default icon",
     "delete": "Delete",
     "namePlaceholder": "Vault name…",
-    "add": "Add Vault",
+    "add": "New Vault",
     "create": "Create",
     "cancel": "Cancel",
     "deleteHint": "The vault disappears from the list.",

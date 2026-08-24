@@ -92,7 +92,7 @@ The translation files follow this top-level structure (from `en.json`):
 | `tags` | Tags view strings |
 | `properties` | Right sidebar Properties panel strings |
 | `filters` | Filter panel strings |
-| `vault` | `VaultModal` strings: `title`, `hint`, `active`, `switch`, `switching`, `rename`, `delete`, `namePlaceholder`, `add`, `create`, `cancel`, `deleteHint`, `switchFailed`, `saveFailed`. Moved out of `settings.vault*` when vault management moved into its own modal |
+| `vault` | `VaultModal` strings: `title`, `hint`, `switch`, `switching`, `rename`, `delete`, `namePlaceholder`, `add`, `create`, `cancel`, `deleteHint`, `switchFailed`, `saveFailed`. Moved out of `settings.vault*` when vault management moved into its own modal |
 | `settings` | Settings modal strings |
 | `home` | Home view strings |
 | `contextMenu` | Context menu action labels, including `openInNewTab` |

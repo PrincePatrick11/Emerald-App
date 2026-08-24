@@ -379,7 +379,6 @@
   "vault": {
     "title": "Vaults",
     "hint": "Ein Vault ist ein Ordner mit eigener Datenbank und eigener Bildablage.",
-    "active": "aktiv",
     "switch": "Wechseln",
     "switching": "Wechsle…",
     "edit": "Bearbeiten",
@@ -388,7 +387,7 @@
     "resetIcon": "Standard-Symbol",
     "delete": "Löschen",
     "namePlaceholder": "Vault-Name…",
-    "add": "Vault hinzufügen",
+    "add": "Neuer Vault",
     "create": "Erstellen",
     "cancel": "Abbrechen",
     "deleteHint": "Der Vault verschwindet aus der Liste.",

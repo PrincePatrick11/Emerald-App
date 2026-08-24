@@ -387,7 +387,6 @@
   "vault": {
     "title": "Vaults",
     "hint": "Un vault est un dossier avec sa propre base de données et ses propres images.",
-    "active": "actif",
     "switch": "Basculer",
     "switching": "Basculement…",
     "edit": "Modifier",
@@ -396,7 +395,7 @@
     "resetIcon": "Icône par défaut",
     "delete": "Supprimer",
     "namePlaceholder": "Nom du vault…",
-    "add": "Ajouter un vault",
+    "add": "Nouveau vault",
     "create": "Créer",
     "cancel": "Annuler",
     "deleteHint": "Le vault disparaît de la liste.",

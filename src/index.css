@@ -345,24 +345,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-subtle);
   }
 
-  .vault-active-label {
-    @apply text-xs shrink-0;
-    color: var(--accent);
-  }
-
-  /* Dashed "add" row — the dashed edge is the affordance, so not a .vault-card. */
-  .vault-create {
-    @apply w-full flex items-center gap-2.5 rounded-xl border border-dashed px-3 py-2.5 text-sm cursor-pointer transition-colors duration-150;
-    border-color: var(--border-soft);
-    color: var(--text-muted);
-  }
-
-  .vault-create:hover {
-    background-color: var(--interactive-hover);
-    border-color: var(--accent);
-    color: var(--text-primary);
-  }
-
   /* Consistent small section label (JOURNAL, PROPERTIES, etc.) */
   .label-xs {
     @apply text-xs font-semibold uppercase tracking-wider text-stone-500;
