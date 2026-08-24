@@ -183,6 +183,8 @@ Tab reordering is implemented in `src/components/layout/TabBar.tsx` with Framer 
 
 An overflowing tab bar scrolls horizontally on a vertical mouse-wheel gesture. `TabBar` holds a `ref` on the `Reorder.Group` element (it renders a `<ul>`) and, in a `useEffect`, attaches a native `wheel` listener with `{ passive: false }` — React's synthetic `onWheel` is passive, so `preventDefault()` there would not stop the page from also scrolling. The handler only acts when `scrollWidth > clientWidth` (tabs actually overflow) and `|deltaY| > |deltaX|` (so horizontal trackpad scrolling isn't also redirected into `scrollLeft`), then adds `deltaY` onto `el.scrollLeft`.
 
+Closing a tab with a middle-click needs a second handler, not just `onAuxClick`: Chromium enters its native autoscroll/pan mode on a middle-click's `mousedown`, before `auxclick` ever fires, which felt like the close was fighting the pointer. Each tab's select button also calls `event.preventDefault()` on `onMouseDown` when `event.button === 1`, suppressing that native mode so the click purely closes the tab.
+
 When `setActiveView()` is called while a tab is active, the current tab's view is updated. Opening content in a new tab creates a new tab with its own `ActiveView`. Selecting a tab restores that tab's view into the main area.
 
 Tabs and navigation history are related but separate:

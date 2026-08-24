@@ -159,6 +159,7 @@ export default function TabBar() {
               >
                 <button
                   onClick={() => selectTab(tab.id)}
+                  onMouseDown={(event) => { if (event.button === 1) event.preventDefault(); }}
                   onAuxClick={(event) => { if (event.button === 1) closeTab(tab.id); }}
                   className="flex min-w-0 flex-1 items-center gap-2 text-left"
                   title={title}
