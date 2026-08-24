@@ -11,6 +11,7 @@ import {
   removeVault as removeVaultFromFile,
 } from '../lib/vaultManager';
 import { resetDbCache, getDb, withDbClosed } from '../lib/db';
+import { clearSearchTextCache } from '../lib/searchText';
 import { useJournalStore } from './journalStore';
 import { useWikiStore } from './wikiStore';
 import { useOperationStore } from './operationStore';
@@ -35,6 +36,10 @@ interface VaultStore {
 }
 
 async function reloadAllStores(): Promise<void> {
+  // Die globale Suche haelt den Klartext jedes Eintrags unter dessen id fest.
+  // Die ids des eben geschlossenen Vaults werden nie wieder erfragt, also
+  // waere ihr Text ein Leck, das mit jedem Wechsel weiterwaechst.
+  clearSearchTextCache();
   await useTagStore.getState().fetchTags();
   await Promise.all([
     useWikiStore.getState().fetchCategories(),

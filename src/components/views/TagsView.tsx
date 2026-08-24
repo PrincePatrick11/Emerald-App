@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tag, BookOpen, Library, Check, X, Search, Wand2, Pencil, Trash2 } from 'lucide-react';
 import { useTagStore } from '../../store/tagStore';
@@ -38,17 +38,45 @@ export default function TagsView() {
     fetchTags();
   }, []);
 
+  /**
+   * Der Tiefenlink aus der globalen Suche.
+   *
+   * Ein Tag-Treffer navigiert nach `{ type: 'tags', id }`. `selectedTag` hält
+   * den Tag-*Namen* — das ist, wonach die Einträge filtern —, der Treffer aber
+   * die id, also wird hier übersetzt. Die Tag-Suche dieser Ansicht wird dabei
+   * geleert, sonst zeigte die Liste den ausgewählten Tag womöglich gar nicht.
+   *
+   * Wie in `TasksView` hängt der Effekt am `activeView`-Objekt statt an der id
+   * darin: `setActiveView` legt pro Navigation ein frisches an, sodass derselbe
+   * Treffer auch zweimal hintereinander wirkt, und `handledView` sorgt dafür,
+   * dass eine spätere Tag-Änderung die Auswahl des Nutzers nicht zurückwirft.
+   */
+  const activeView = useUIStore((s) => s.activeView);
+  const handledView = useRef<typeof activeView | null>(null);
+  const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
+
   useEffect(() => {
-    if (!colorPickerId) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      // Don't close if clicking inside a color picker
-      if (target.closest('[data-color-picker]')) return;
-      setColorPickerId(null);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [colorPickerId]);
+    if (activeView.type !== 'tags' || !activeView.id) return;
+    if (handledView.current === activeView) return;
+    const tag = tags.find((candidate) => candidate.id === activeView.id);
+    if (!tag) return;
+    handledView.current = activeView;
+    setSelectedTag(tag.name);
+    setTagSearch('');
+    setPendingScrollId(tag.id);
+  }, [activeView, tags]);
+
+  // Eigener Effekt, weil die Zeile erst nach der geleerten Tag-Suche steht.
+  useEffect(() => {
+    if (!pendingScrollId) return;
+    const frame = requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLElement>(`[data-tag-id="${CSS.escape(pendingScrollId)}"]`)
+        ?.scrollIntoView({ block: 'nearest' });
+      setPendingScrollId(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pendingScrollId]);
 
   // Count entries per tag
   const countMap: Record<string, number> = {};
@@ -159,6 +187,7 @@ export default function TagsView() {
                 </div>
               ) : (
                 <button
+                  data-tag-id={tag.id}
                   className={`sidebar-item w-full ${selectedTag === tag.name ? 'active' : ''}`}
                   onClick={() => { setSelectedTag(tag.name); setColorPickerId(null); }}
                   onDoubleClick={() => startEdit(tag)}

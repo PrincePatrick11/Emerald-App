@@ -15,6 +15,7 @@ import { save, open } from '@tauri-apps/plugin-dialog';
 import { getDb } from './db';
 import { getActiveDbFile, addVault, invalidateVaultCache, newVaultRecord } from './vaultManager';
 import { imageRefsInHtml, isStoredImage, readImageAsBase64, saveImage } from './images';
+import { clearSearchTextCache } from './searchText';
 import { IMAGE_FIELDS, imageColumns } from './schema';
 import { useVaultStore } from '../store/vaultStore';
 import { useJournalStore } from '../store/journalStore';
@@ -951,6 +952,12 @@ export async function importDatabase(
   if (mode === 'replace') {
     useUIStore.getState().setActiveView({ type: 'home' });
   }
+
+  // Die globale Suche merkt sich den Klartext eines Eintrags unter (id,
+  // updated_at). Beide Haelften stehen so in der Sicherungsdatei: eine Datei,
+  // die ein Paar wiederverwendet und nur den Inhalt aendert, erbte sonst den
+  // alten Text — der neue waere bis zum Neustart unauffindbar.
+  clearSearchTextCache();
 
   await useTagStore.getState().fetchTags();
   await Promise.all([

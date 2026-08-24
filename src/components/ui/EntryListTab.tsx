@@ -7,6 +7,9 @@ import Button from './Button';
 
 export interface RenderRowArgs<T> {
   item: T;
+  /** Das Ergebnis von `isActive` — damit eine eigene Zeile die Auswahl
+   *  markieren kann, ohne dieselbe Bedingung ein zweites Mal zu formulieren. */
+  isActive: boolean;
   isRenaming: boolean;
   renameValue: string;
   setRenameValue: (v: string) => void;
@@ -33,7 +36,7 @@ export interface EntryListTabProps<T> {
   /** Return the created item to immediately drop it into rename mode (e.g. Tasks, which has no separate edit view). */
   onCreate?: () => void | T | Promise<void | T>;
   createTitle?: string;
-  /** Fully custom row content (both normal and renaming state). Overrides getIcon/onOpen/onOpenNewTab/onDragStart/isActive for rendering — search, empty-state, and the context menu popup stay centrally handled. */
+  /** Fully custom row content (both normal and renaming state). Overrides getIcon/onOpen/onOpenNewTab/onDragStart for rendering — search, empty-state, and the context menu popup stay centrally handled. `isActive` is not overridden but handed to the row, which decides how to show it. */
   renderRow?: (args: RenderRowArgs<T>) => ReactNode;
 }
 
@@ -112,6 +115,7 @@ export default function EntryListTab<T>({
                   <div key={id}>
                     {renderRow({
                       item,
+                      isActive: isActive?.(item) ?? false,
                       isRenaming: renamingId === id,
                       renameValue,
                       setRenameValue,

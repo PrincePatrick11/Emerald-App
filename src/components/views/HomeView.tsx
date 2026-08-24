@@ -11,6 +11,7 @@ import ContextMenu from '../ui/ContextMenu';
 import Button from '../ui/Button';
 import { getMoonPhase, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId, isImageIcon } from '../../lib/helpers';
+import { viewTypeForEntryType } from '../../lib/tabs';
 import { format } from 'date-fns';
 import type { MoonPhase } from '../../types';
 import type { HomeSort, HomeView, HomeSectionPrefs } from '../../store/uiStore';
@@ -186,9 +187,7 @@ export default function HomeView() {
   };
 
   const handleRename = (target: CtxTarget) => {
-    if (target.kind === 'journal')    setActiveView({ type: 'journal',    id: target.id, mode: 'edit' });
-    if (target.kind === 'wiki')       setActiveView({ type: 'wiki',        id: target.id, mode: 'edit' });
-    if (target.kind === 'operation')  setActiveView({ type: 'operations',  id: target.id, mode: 'edit' });
+    setActiveView({ type: viewTypeForEntryType(target.kind), id: target.id, mode: 'edit' });
   };
 
   const handleDelete = async (target: CtxTarget) => {

@@ -24,6 +24,8 @@ import type { SuggestionItem } from './SuggestionList';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { getDragItem, setDragItem, subscribeDrag } from '../../lib/dragState';
+import { viewTypeForEntryType } from '../../lib/tabs';
+import type { ContentType } from '../../types';
 import { getRoutineDragItem, setRoutineDragItem, subscribeRoutineDrag, type RoutineDragItem } from '../../lib/routineDragState';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
@@ -375,7 +377,6 @@ export default function RichEditor({
 
   // Navigate to internal link via CustomEvent (fired by InternalLinkNodeView).
   // Only active in read mode — edit mode ignores clicks so the cursor can be placed.
-  // 'operation' maps to view type 'operations' (plural) to match uiStore's naming.
   useEffect(() => {
     if (editable) return;
     const handler = (e: Event) => {
@@ -386,7 +387,7 @@ export default function RichEditor({
       // Accept standard UUIDs and merge-prefixed IDs (8-char base36 prefix prepended during merge import)
       const UUID_RE = /^([0-9a-z]{8}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!VALID_TYPES.includes(entryType as any) || !UUID_RE.test(id)) return;
-      setActiveView({ type: entryType === 'operation' ? 'operations' : entryType as any, id, mode: 'view' });
+      setActiveView({ type: viewTypeForEntryType(entryType as ContentType), id, mode: 'view' });
     };
     document.addEventListener('internal-link-navigate', handler);
     return () => document.removeEventListener('internal-link-navigate', handler);

@@ -2,10 +2,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { isAltarFullscreen, useUIStore } from '../../../store/uiStore';
+import { hasActiveVault, useVaultStore } from '../../../store/vaultStore';
 import { usesCustomWindowControls, usesHtmlMenuBar } from '../../../lib/platform';
 import RailButton from '../../ui/RailButton';
 import TitleBarMenuBar from './TitleBarMenuBar';
-import TitleBarSearchButton from './TitleBarSearchButton';
+import TitleBarSearch from './TitleBarSearch';
 import WindowControls from './WindowControls';
 
 /**
@@ -47,6 +48,14 @@ export default function TitleBar() {
   // title bar stays — on Windows and Linux it holds the only way to close,
   // minimise or move the window — but drops the navigation and the search.
   const minimal = useUIStore(isAltarFullscreen);
+
+  // Ohne offenen Vault gibt es nichts zu durchsuchen — und mehr als das: die
+  // Stores behalten ihre Inhalte, wenn der letzte Vault geloescht wird
+  // (`vaultStore.removeVault`, Zweig ohne Nachfolger). Sidebar und Hauptbereich
+  // sind dann ungemountet, die Titelleiste bleibt stehen. Ein Suchfeld hier
+  // waere die einzige Stelle, an der ein Nutzer den eben geloeschten Vault noch
+  // lesen koennte — auch nachdem er "Dateien loeschen" angehakt hat.
+  const vaultOpen = useVaultStore(hasActiveVault);
 
   const headerRef = useRef<HTMLElement>(null);
   const leftRef = useRef<HTMLDivElement>(null);
@@ -146,7 +155,7 @@ export default function TitleBar() {
           The wrapper renders even when empty; it is what holds the window
           controls at the right edge. */}
       <div data-tauri-drag-region className="flex justify-center px-4 flex-1 min-w-0">
-        {!minimal && <TitleBarSearchButton />}
+        {!minimal && vaultOpen && <TitleBarSearch />}
       </div>
 
       <div ref={rightRef} data-tauri-drag-region className="flex items-center justify-end h-full flex-shrink-0">

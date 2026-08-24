@@ -29,7 +29,8 @@ src/
 │   ├── layout/       AppShell, LeftSidebarRail, LeftSidebarEntryList, RightSidebar, MainArea,
 │   │                 SettingsModal, TabBar
 │   │   └── titlebar/ TitleBar (custom window chrome), WindowControls, TitleBarMenuBar,
-│   │                 MenuDropdown, TitleBarSearchButton, useIsMaximized, editCommands
+│   │                 MenuDropdown, TitleBarSearch (global search field), TitleBarSearchResults
+│   │                 (results dropdown), useIsMaximized, editCommands
 │   ├── editor/       RichEditor, InternalLinkExtension,
 │   │                 TagInput, ResizableImageExtension, ExternalDropExtension,
 │   │                 EditorToolbar, LinkPickerModal, SuggestionList
@@ -55,9 +56,11 @@ src/
 │                     altarStore, routineStore, undoStore,
 │                     trashStore, vaultStore, importStore
 ├── hooks/            useCategoryEditor (shared add/edit/delete-with-confirm category logic,
-│                                      used by TasksView, WikiView, OperationsView)
+│                                      used by TasksView, WikiView, OperationsView),
+│                     useGlobalSearch (assembles the search corpus from the stores and runs it
+│                                      against the query; backs the title bar's search field)
 ├── lib/              db.ts, schema.ts, normalizeSchema.ts, row.ts,
-│                     links.ts, tabs.ts, dragState.ts, altarDragState.ts,
+│                     links.ts, tabs.ts, globalSearch.ts, searchText.ts, dragState.ts, altarDragState.ts,
 │                     routineDragState.ts, moonPhase.ts, export.ts, menuActions.ts,
 │                     platform.ts,
 │                     exportData.ts, emeraldFormat.ts, vaultManager.ts, dbBackup.ts,
@@ -154,6 +157,18 @@ After every save, `syncLinks(sourceId, sourceType, htmlContent)` in `src/lib/lin
 
 Backlinks are fetched on demand by `fetchBacklinks(targetId)`, which joins the `links` table with each content table to return entry titles and types.
 
+### Global Search
+
+The title bar's search field searches every module by title, tag, and body text. It is a pure in-memory filter, not a database query: `useGlobalSearch` (`src/hooks/useGlobalSearch.ts`) assembles a `SearchCorpus` from the Zustand stores `AppShell` already loads at startup, and `searchCorpus()` (`src/lib/globalSearch.ts`) scores and sorts it. There is no FTS5 table and no migration — the stores are already the single source of truth (see [Data Flow](#data-flow) above), and duplicating them into a second searchable copy would only be a second place to keep in sync.
+
+`globalSearch.ts` is deliberately free of JSX: it decides *what* matched and with what score, not how a hit looks or which icon it gets — that's `TitleBarSearchResults.tsx`'s job. Matching runs per record through `matchRecord()`: a title match wins outright (prefix beats substring), then a tag match, then — only once the query is at least two characters — a full-text match against a thunk that is only invoked when the cheaper checks fail. For Journal/Wiki/Operations that thunk parses the entry's stored HTML into plain text via `plainTextFor()` (`src/lib/searchText.ts`), cached per `(id, updated_at)` so a keystroke doesn't re-parse the whole vault; the cache is cleared on vault switch (`vaultStore.ts`) and on a `.emeralddb` import (`dbBackup.ts`), since both can leave stale ids or reused id/timestamp pairs behind.
+
+`searchText.ts`'s `htmlToText()` uses `DOMParser` rather than assigning to `innerHTML` on a detached `<div>` — the parsed document is inert, so an `<img onerror>` that arrived through an import never executes when the search re-parses it (see [Security → Search Text Extraction](security.md#search-text-extraction)). `foldTypography()` reverses TipTap's `Typography` extension (curly quotes, en/em dashes) back to keyboard characters, one character for one character, so a search for `don't` finds an entry stored with a curly apostrophe; the query and the result-row highlighting run through the same folding via the shared `comparable()` helper, so the two never disagree about what matched.
+
+Results are capped at 50 (`MAX_RESULTS`); the uncapped total is kept so the dropdown can report how many were left out. Routines are not part of the corpus — `RoutinesPanel` is currently unrendered (see [Module Map](#module-map)), so there is no view a routine result could open.
+
+`viewForSearchHit()` maps a hit to an `ActiveView`. Tasks and tags have no page of their own — a task hit opens the Tasks view addressed by the task's id, and `TasksView`/`TagsView` each run an effect keyed on the `activeView` *object* itself (not the id inside it, which stays the same if the same result is opened twice) that clears search/filters/collapsed state and scrolls the matching row into view. A `handledView` ref stops a later store mutation from re-triggering that scroll-and-clear and from overwriting filters the user has since changed themselves.
+
 ### Drag and Drop
 
 Tauri's WKWebView does not pass HTML5 drag events to JavaScript. All drag-and-drop uses Pointer Events:
@@ -170,7 +185,7 @@ Emerald uses browser-like tabs to keep multiple pieces of content open at the sa
 - `activeTabId` stores which tab is currently selected.
 - Each tab contains an `ActiveView`, so a tab can represent a journal entry, wiki article, operation, sigil, altar, or a top-level view.
 
-Tab IDs and helper functions live in `src/lib/tabs.ts`.
+Tab IDs and helper functions live in `src/lib/tabs.ts`. It also exports `viewTypeForEntryType()`, the one place that translates the data model's `operation` (singular — what `links.target_type`, the drag payload, and the internal-link mark all carry) into `ActiveView`'s `operations` (plural, named after the module rather than the record). The mapping used to be copied at each call site; `RichEditor.tsx`, `BacklinksPanel.tsx`, `HomeView.tsx`, and `globalSearch.ts` (see [Global Search](#global-search) below) now call the shared function instead.
 
 Tabs are persisted in `localStorage` using:
 

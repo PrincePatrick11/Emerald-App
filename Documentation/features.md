@@ -151,7 +151,7 @@ The overlay is applied on top of all background types — colour presets, gradie
 
 ## Navigation
 
-**Window title bar.** The app draws its own title bar across the top of the window: the Emerald logo, the application menu, back/forward navigation through the view history, a search field, and — on Windows and Linux — the minimise / maximise / close buttons. The logo is decoration, not a button: clicking it used to be the only way to the dashboard, which now has its own Home button at the top of the left rail. macOS keeps its native window buttons and its native menu bar instead, so its title bar shows only the logo, navigation and search. The search field currently opens the left entry list; a cross-module search is not implemented yet. The search field fills whatever space is left between the menu and the window controls and is always visible; if the window gets narrow enough to squeeze it too far, the four menus (Edit/View/Export/Import) fold into a single menu button instead, so the search field never has to hide. The app's minimum window width is 720px.
+**Window title bar.** The app draws its own title bar across the top of the window: the Emerald logo, the application menu, back/forward navigation through the view history, a search field, and — on Windows and Linux — the minimise / maximise / close buttons. The logo is decoration, not a button: clicking it used to be the only way to the dashboard, which now has its own Home button at the top of the left rail. macOS keeps its native window buttons and its native menu bar instead, so its title bar shows only the logo, navigation and search. The search field searches everything in the vault — see [Search](#search) below. It fills whatever space is left between the menu and the window controls and is always visible; if the window gets narrow enough to squeeze it too far, the four menus (Edit/View/Export/Import) fold into a single menu button instead, so the search field never has to hide. The app's minimum window width is 720px.
 
 **Left sidebar structure.** The left sidebar has two parts side by side:
 
@@ -163,6 +163,16 @@ The overlay is applied on top of all background types — colour presets, gradie
 **Right sidebar action bar.** Entering/leaving edit mode, saving, cancelling, and deleting an open Journal entry, Wiki article, Operation, or Altar all happen from a single action bar pinned above the Properties panel in the right sidebar — not from buttons in the entry's own header. In view mode it shows an Edit button (plus a Fullscreen toggle for Altar); once you're editing, it shows Done, Delete (where applicable), and Cancel. A loaded Sigil operation shows no actions there, since loaded sigils can't be edited.
 
 **Internal link chips.** Links inserted with `[[` are rendered as styled chips in both edit mode and view mode. There is no raw `[[Label(id)]]` text representation in edit mode.
+
+## Search
+
+The search field in the title bar searches everything in the current vault, not just the left entry list. Type into it and a dropdown appears below showing matches from Journal, Wiki, Operations, Tasks, Altars, altar library items, tags, and categories, ranked so a title match appears above a tag match, which appears above a match found in an entry's body text; ties go to whichever item was updated more recently. Body-text matches only start showing once you've typed at least two characters, so a single letter doesn't return most of the vault.
+
+Each result shows which module it's from and, for Journal/Wiki/Operations, its entry number (e.g. `#12`). A body-text match shows a short snippet of the surrounding text with the matched word highlighted. Up to 50 results are shown at once; if there are more, a line at the bottom says how many were left out.
+
+You can use the mouse or the keyboard: Up/Down moves a highlight through the list without leaving the search field, Enter opens the highlighted result, Ctrl/Cmd+Enter opens it in a new tab, and Escape clears the field and closes the dropdown in one press. Opening a Journal entry, Wiki article, Operation, or Altar takes you straight to it. Tasks and tags don't have a page of their own, so opening one of those instead takes you to the Tasks list or the Tags list, scrolls the matching row into view and marks it. The mark stays as long as that row is the one you navigated to — it doesn't fade after a moment. Opening a task also clears any search, filter or collapsed category in the Tasks view that would otherwise have hidden the row, and expands its parent tasks if it is a subtask.
+
+There is currently no keyboard shortcut to jump to the search field. Routines are not included in search results, since there is no place in the app to open one right now (see [Routines](#routines)).
 
 ## Tabs & Workspace
 

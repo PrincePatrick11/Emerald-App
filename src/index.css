@@ -168,6 +168,79 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     background: var(--menu-border);
   }
 
+  /* Die globale Suche unter der Titelleiste. Sie liegt auf `.menu-surface` und
+     borgt sich die Hover-Tokens der Menues daneben, statt die Farben des
+     LinkPickers zu kopieren: das Dropdown ist ein Titelleisten-Popup und soll
+     wie die Menues aussehen, zwischen denen es aufklappt — nicht wie ein
+     Modal, das an einer anderen Stelle der App aufgeht. */
+  .search-result-row {
+    @apply w-full flex items-start gap-2.5 px-3 py-2 text-left transition-colors duration-150;
+    color: var(--text-secondary);
+  }
+
+  /* Tastatur- und Mausauswahl sind derselbe Zustand: die Liste fuehrt genau
+     eine Markierung, und die Maus setzt sie beim Ueberfahren um. Ein eigener
+     :hover daneben liesse zwei Zeilen gleichzeitig ausgewaehlt aussehen. */
+  .search-result-row[aria-selected='true'] {
+    background: var(--menu-item-hover-bg);
+    color: var(--menu-item-hover-text);
+  }
+
+  .search-result-title {
+    @apply text-xs truncate;
+    color: var(--text-primary);
+  }
+
+  .search-result-snippet {
+    @apply text-xs truncate;
+    color: var(--text-subtle);
+  }
+
+  .search-result-badge {
+    @apply text-xs flex-shrink-0 flex items-center gap-1;
+    color: var(--text-subtle);
+  }
+
+  .search-result-meta {
+    @apply text-xs px-3 py-2;
+    color: var(--text-subtle);
+  }
+
+  /* Die Fundstelle im Titel oder im Textausschnitt. Dieselbe Akzentmischung
+     wie `.vault-card-active .vault-badge` — die Stelle wird eingefaerbt, nicht
+     umrahmt, damit eine Trefferliste nicht zum Flickenteppich wird. */
+  /* Die erste Deklaration ist kein Stilmittel, sondern der Rueckfall: faellt
+     `color-mix` aus (WebKit vor 16.2, WebKitGTK vor 2.40), bliebe hier sonst
+     das gelbe UA-Standardgelb des <mark> stehen — unter accentfarbener Schrift
+     in einem dunklen Theme. */
+  .search-match {
+    background-color: rgba(0, 176, 118, 0.22);
+    background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+    color: var(--accent);
+    border-radius: 2px;
+  }
+
+  /* Die Aufgabenzeile, auf die ein Treffer der globalen Suche gerade zeigt.
+     Sie haengt am aktiven View wie `.sidebar-item.active`, nicht an einem
+     Timer — die Markierung steht, solange der Tiefenlink steht.
+
+     Ein Ring statt einer Flaeche, und zwar ueber `outline`: die Zeile ist ein
+     `.panel-interactive`, und dessen `background`, `border-color` und
+     `box-shadow` werden pro Theme mit hoeherer Spezifitaet ueberschrieben
+     (`html[data-theme=…] .panel-interactive`) — dieselbe Falle, die bei den
+     Vault-Karten oben dokumentiert ist. `outline` setzt dort niemand, die
+     Regel braucht deshalb keinen Theme-Zwilling und keinen Wettlauf um
+     Spezifitaet. `outline-offset` zieht den Ring nach innen, damit die Zeile
+     im Fluss nicht springt. */
+  .task-row-target {
+    /* Wie oben ein Rueckfall, hier aber noetiger: `outline` ist eine
+       Kurzschreibweise, ein nicht verstandenes `color-mix` darin verwirft die
+       ganze Deklaration — der Ring waere ersatzlos und lautlos weg. */
+    outline: 1px solid rgba(0, 176, 118, 0.55);
+    outline: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    outline-offset: -1px;
+  }
+
   .left-sidebar-rail {
     background: var(--shell-bg);
   }
@@ -825,7 +898,9 @@ html[data-theme='emerald-noctis'] .titlebar-search:hover {
 
 html[data-theme='emerald-noctis'] .window-control:focus-visible,
 html[data-theme='emerald-noctis'] .titlebar-menu-trigger:focus-visible,
-html[data-theme='emerald-noctis'] .titlebar-search:focus-visible,
+/* Die Such-Pille ist selbst nicht mehr fokussierbar — der Ring gehoert
+   jetzt an das <input> darin, gezeichnet wird er weiterhin am Feld. */
+html[data-theme='emerald-noctis'] .titlebar-search:focus-within,
 html[data-theme='emerald-noctis'] .menu-item:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
@@ -1187,7 +1262,9 @@ html[data-theme='emerald-parchment'] .titlebar-search:hover {
 
 html[data-theme='emerald-parchment'] .window-control:focus-visible,
 html[data-theme='emerald-parchment'] .titlebar-menu-trigger:focus-visible,
-html[data-theme='emerald-parchment'] .titlebar-search:focus-visible,
+/* Die Such-Pille ist selbst nicht mehr fokussierbar — der Ring gehoert
+   jetzt an das <input> darin, gezeichnet wird er weiterhin am Feld. */
+html[data-theme='emerald-parchment'] .titlebar-search:focus-within,
 html[data-theme='emerald-parchment'] .menu-item:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);

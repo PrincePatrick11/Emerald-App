@@ -3,7 +3,7 @@ export type ContentType = 'journal' | 'wiki' | 'operation';
 export interface JournalEntry {
   id: string;
   title: string;
-  content: string; // TipTap JSON serialized
+  content: string; // HTML, wie TipTaps getHTML() es liefert
   created_at: string;
   updated_at: string;
   tags: string[];
@@ -25,7 +25,7 @@ export interface WikiArticle {
   id: string;
   title: string;
   slug: string;
-  content: string; // TipTap JSON serialized
+  content: string; // HTML, wie TipTaps getHTML() es liefert
   category_id: WikiCategory;
   created_at: string;
   updated_at: string;
@@ -51,7 +51,7 @@ export interface WikiCategoryDef extends CategoryBase {}
 export interface Operation {
   id: string;
   title: string;
-  content: string;
+  content: string; // HTML, wie TipTaps getHTML() es liefert
   category_id: string;
   created_at: string;
   updated_at: string;

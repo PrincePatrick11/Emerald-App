@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Library, BookOpen, Wand2 } from 'lucide-react';
 import { useUIStore } from '../../../store/uiStore';
 import { fetchBacklinks, type BacklinkEntry } from '../../../lib/links';
+import { viewTypeForEntryType } from '../../../lib/tabs';
 
 export default function BacklinksPanel({ currentId }: { currentId?: string }) {
   const { t } = useTranslation();
@@ -44,7 +45,7 @@ export default function BacklinksPanel({ currentId }: { currentId?: string }) {
         <button
           key={link.id}
           onClick={() =>
-            setActiveView({ type: link.type === 'operation' ? 'operations' : link.type, id: link.id, mode: 'view' })
+            setActiveView({ type: viewTypeForEntryType(link.type), id: link.id, mode: 'view' })
           }
           className="sidebar-item w-full text-left"
         >

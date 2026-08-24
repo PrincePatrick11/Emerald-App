@@ -140,6 +140,10 @@ All HTML that enters the app from outside is sanitised with DOMPurify before bei
 
 **Routine drops.** Routine content is passed through `marked.parse` before insertion into the editor. `marked` produces sanitised HTML by default, but any content from the editor is further controlled by TipTap's schema, which only allows known node types.
 
+## Search Text Extraction
+
+The title bar's global search needs plain text to match against, not the HTML stored for Journal, Wiki, and Operations content — content that can arrive through an import. `htmlToText()` (`src/lib/searchText.ts`) parses it with `DOMParser` rather than assigning it to `innerHTML` on a detached `<div>`: the document `DOMParser` produces is inert, so an `<img onerror>` or similar payload that made it into stored content through an import never executes when the search re-parses it. `script`, `style`, and `noscript` elements are stripped before `textContent` is read — TipTap itself never emits them, but imported content can carry both.
+
 ## Content Security Policy
 
 The main window has CSP enabled through Tauri's default configuration. `img-src` additionally allows `emerald-img:` and `http://emerald-img.localhost` — the same scheme in the two forms the platforms serve it as (WebView2 maps custom schemes onto `http`, the other engines do not). The export HTML for PDF export is written to a unique file in the OS temp directory and loaded by a hidden webview over a `file://` URL — it never fetches external resources and is removed from disk as soon as the export finishes. Because the hidden webview inherits the same CSP as the main window (`script-src 'self'` — see `tauri.conf.json`), inline scripts in the export HTML are blocked; the frontend therefore pre-renders the internal-link chip transformation in TypeScript (`transformInternalLinks` in `src/lib/export.ts`) before handing the HTML to the backend.

@@ -411,15 +411,19 @@ function AltarList() {
 // ── Tasks ────────────────────────────────────────────────────────────────────
 function useTasksConfig(): EntryListTabProps<Task> {
   const { t } = useTranslation();
-  const { setActiveView } = useUIStore();
+  const { activeView, setActiveView } = useUIStore();
   const { categories, tasks, createTask, updateTask, deleteTask, restoreTask } = useTaskStore();
   const pushUndo = useUndoStore((s) => s.push);
 
   const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
 
+  /** Aufgaben haben keine eigene Seite; die id waehlt die Zeile in `TasksView`
+   *  aus, die sich daraufhin sichtbar macht und markiert. */
+  const openTask = (id: string) => setActiveView({ type: 'tasks', id });
+
   const handleNewTask = async () => {
     const task = await createTask(FALLBACK_CATEGORY.tasks);
-    setActiveView({ type: 'tasks' });
+    openTask(task.id);
     return task;
   };
 
@@ -439,6 +443,8 @@ function useTasksConfig(): EntryListTabProps<Task> {
   // content is custom — search bar, empty-state, "+" and the context menu
   // popup itself still come from EntryListTab. getIcon/getDateStr/onOpen go
   // unused behind renderRow here, but let the "All" tab render tasks plainly.
+  // `isActive` is the exception: EntryListTab hands it to the row, so both tabs
+  // mark the selected task from the same predicate.
   return {
     items: sorted,
     getId: (task) => task.id,
@@ -447,7 +453,8 @@ function useTasksConfig(): EntryListTabProps<Task> {
     getIcon: (task) => (task.completed
       ? <CheckSquare size={16} className="flex-shrink-0 text-stone-600" />
       : <Square size={16} className="flex-shrink-0 text-stone-600" />),
-    onOpen: () => setActiveView({ type: 'tasks' }),
+    isActive: (task) => activeView.id === task.id,
+    onOpen: (task) => openTask(task.id),
     onRename: (task, title) => updateTask(task.id, { title }),
     contextMenuActions: (task, startRename) => [
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
@@ -456,12 +463,12 @@ function useTasksConfig(): EntryListTabProps<Task> {
     emptyMessage: t('tasks.empty'),
     onCreate: handleNewTask,
     createTitle: t('tasks.newTask'),
-    renderRow: ({ item: task, isRenaming, renameValue, setRenameValue, commitRename, cancelRename, openCtxMenu }) => {
+    renderRow: ({ item: task, isActive, isRenaming, renameValue, setRenameValue, commitRename, cancelRename, openCtxMenu }) => {
       const dateStr = dateStrFor(task);
 
       if (isRenaming) {
         return (
-          <div className="sidebar-item">
+          <div className={`sidebar-item ${isActive ? 'active' : ''}`}>
             <CheckSquare size={16} className="flex-shrink-0 text-stone-600" />
             <div className="flex-1 min-w-0">
               <input
@@ -479,7 +486,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
       }
 
       return (
-        <div onContextMenu={openCtxMenu} className="sidebar-item w-full text-left">
+        <div onContextMenu={openCtxMenu} className={`sidebar-item w-full text-left ${isActive ? 'active' : ''}`}>
           <button
             onClick={(e) => { e.stopPropagation(); updateTask(task.id, { completed: !task.completed }); }}
             className="flex-shrink-0 text-stone-500 hover:text-stone-300"
@@ -487,7 +494,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
           >
             {task.completed ? <CheckSquare size={16} /> : <Square size={16} />}
           </button>
-          <button onClick={() => setActiveView({ type: 'tasks' })} className="flex-1 min-w-0 text-left">
+          <button onClick={() => openTask(task.id)} className="flex-1 min-w-0 text-left">
             <div className={`truncate ${task.completed ? 'line-through text-stone-500' : ''}`}>{task.title}</div>
             {dateStr && <div className="text-xs text-stone-600 mt-0.5">{dateStr}</div>}
           </button>

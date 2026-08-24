@@ -334,7 +334,14 @@
     "noResults": "Aucun résultat trouvé.",
     "noResultsShort": "Aucun résultat",
     "operations": "Rechercher des opérations…",
-    "wikiArticles": "Rechercher des articles wiki…"
+    "wikiArticles": "Rechercher des articles wiki…",
+    "globalPlaceholder": "Tout rechercher…",
+    "hint": "Titres, étiquettes et contenus de tous les modules.",
+    "clear": "Effacer la recherche",
+    "altarItems": "Objet d'autel",
+    "categories": "Catégorie",
+    "more": "{{count}} autre résultat",
+    "more_other": "{{count}} autres résultats"
   },
   "routines": {
     "title": "Routines",

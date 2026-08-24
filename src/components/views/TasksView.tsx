@@ -151,6 +151,72 @@ export default function TasksView() {
     });
   }, []);
 
+  /**
+   * Der Tiefenlink aus der globalen Suche.
+   *
+   * Ein Aufgaben-Treffer navigiert nach `{ type: 'tasks', id }`. Aufgaben haben
+   * keine eigene Detailseite, die Ansicht holt die Zeile also stattdessen in den
+   * Blick — und räumt vorher weg, was sie verdecken könnte: die Suche dieser
+   * Ansicht, die Filter, ein zugeklapptes Kategoriefach, eingeklappte
+   * Elternzeilen und der ausgeblendete Erledigt-Zustand. Ohne das zeigte der
+   * Treffer auf eine Zeile, die gar nicht gerendert wird.
+   *
+   * Ausgelöst wird das vom `activeView`-*Objekt*, nicht von der id darin:
+   * `setActiveView` legt bei jeder Navigation ein frisches an, die id dagegen
+   * ist ein String und bliebe gleich, wenn man denselben Treffer zweimal
+   * anklickt. `handledView` merkt sich, welches Objekt schon dran war — damit
+   * darf `tasks` in den Abhängigkeiten stehen, ohne dass eine Mutation dem
+   * Nutzer seine Filter unter den Händen wegräumt, und ein Tiefenlink, der
+   * einen noch leeren Store vorfindet, greift beim nächsten Lauf.
+   */
+  const activeView = useUIStore((s) => s.activeView);
+  const handledView = useRef<typeof activeView | null>(null);
+  const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeView.type !== 'tasks' || !activeView.id) return;
+    if (handledView.current === activeView) return;
+    const target = tasks.find((task) => task.id === activeView.id);
+    if (!target) return;
+    handledView.current = activeView;
+
+    setSearchQuery('');
+    setFilterCategory(new Set());
+    setFilterPriority(new Set());
+    if (target.completed) setShowCompleted(true);
+    setCollapsedCategories((prev) => {
+      const next = new Set(prev);
+      next.delete(target.category_id);
+      next.delete('__uncategorized__');
+      return next;
+    });
+
+    // Eine Unteraufgabe ist nur sichtbar, wenn jede Zeile über ihr offen ist.
+    const ancestors: string[] = [];
+    for (let parentId = target.parent_task_id; parentId; ) {
+      ancestors.push(parentId);
+      parentId = tasks.find((task) => task.id === parentId)?.parent_task_id ?? null;
+    }
+    if (ancestors.length) setExpandedTasks((prev) => new Set([...prev, ...ancestors]));
+
+    setPendingScrollId(target.id);
+  }, [activeView, tasks]);
+
+  // Gescrollt wird genau einmal pro Tiefenlink. Das hängt ausdrücklich an
+  // `pendingScrollId` und nicht an den aufgeräumten Zuständen: die als
+  // Abhängigkeiten zu führen hieße, den Nutzer jedes Mal zurückzuwerfen, wenn
+  // er später selbst eine Kategorie auf- oder zuklappt.
+  useEffect(() => {
+    if (!pendingScrollId) return;
+    const frame = requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLElement>(`[data-task-id="${CSS.escape(pendingScrollId)}"]`)
+        ?.scrollIntoView({ block: 'center' });
+      setPendingScrollId(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pendingScrollId]);
+
   const activeFilterCount = filterCategory.size + filterPriority.size;
 
   const resolveTaskLinkTitle = useCallback((targetType: string, targetId: string) => {
@@ -479,6 +545,10 @@ const TaskRow = memo(function TaskRow({
   task, editingId, editValue, setEditValue, setEditingId,
   handleSaveEdit, toggleExpand, expandedTasks, setCtxMenu, setLinkModal, resolveTaskLinkTitle, t,
 }: TaskRowProps) {
+  // Wie `.sidebar-item.active` anderswo: die Markierung haengt am aktiven
+  // View, nicht an einem Timer. Sie steht, solange der Tiefenlink auf diese
+  // Zeile zeigt, und verschwindet, sobald anderswohin navigiert wird.
+  const isTarget = useUIStore((s) => s.activeView.type === 'tasks' && s.activeView.id === task.id);
   const updateTask = useTaskStore((s) => s.updateTask);
   const getCategory = useTaskStore((s) => s.getCategory);
   const categories = useTaskStore((s) => s.categories);
@@ -555,7 +625,8 @@ const TaskRow = memo(function TaskRow({
   return (
     <div>
       <div
-        className={`panel-interactive flex items-center gap-3 px-4 py-2 group ${task.completed ? 'opacity-50' : ''}`}
+        data-task-id={task.id}
+        className={`panel-interactive flex items-center gap-3 px-4 py-2 group ${task.completed ? 'opacity-50' : ''} ${isTarget ? 'task-row-target' : ''}`}
         onContextMenu={(e) => {
           e.preventDefault();
           const actions: ContextMenuAction[] = [

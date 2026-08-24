@@ -334,7 +334,14 @@
     "noResults": "Keine Ergebnisse gefunden.",
     "noResultsShort": "Keine Ergebnisse",
     "operations": "Operationen suchen…",
-    "wikiArticles": "Wiki-Artikel suchen…"
+    "wikiArticles": "Wiki-Artikel suchen…",
+    "globalPlaceholder": "Alles durchsuchen…",
+    "hint": "Titel, Tags und Inhalte aller Module.",
+    "clear": "Suche leeren",
+    "altarItems": "Altar-Objekt",
+    "categories": "Kategorie",
+    "more": "{{count}} weiterer Treffer",
+    "more_other": "{{count}} weitere Treffer"
   },
   "routines": {
     "title": "Routinen",
