@@ -1,6 +1,6 @@
 import { BookOpen, Flame, Home, Library, MoreHorizontal, Plus, Tag, Trash2, Wand2, X, CheckSquare } from 'lucide-react';
 import { LazyMotion, Reorder, domAnimation } from 'framer-motion';
-import { type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { useAltarStore } from '../../store/altarStore';
 import { useJournalStore } from '../../store/journalStore';
@@ -60,6 +60,20 @@ export default function TabBar() {
   const operationCategories = useOperationStore((s) => s.categories);
   const wikiCategories = useWikiStore((s) => s.wikiCategories);
   const altars = useAltarStore((s) => s.altars);
+  const scrollRef = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handleWheel = (event: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth) return;
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      event.preventDefault();
+      el.scrollLeft += event.deltaY;
+    };
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [tabs.length]);
 
   if (tabs.length === 0) return null;
 
@@ -121,6 +135,7 @@ export default function TabBar() {
     <div className="tabbar relative h-10 flex items-end overflow-hidden px-2 pt-2">
       <LazyMotion features={domAnimation}>
         <Reorder.Group
+          ref={scrollRef}
           axis="x"
           values={tabs.map((tab) => tab.id)}
           onReorder={setTabsOrder}

@@ -176,6 +176,7 @@ You can:
 - Switch between tabs without navigating away from your current workspace.
 - Close tabs individually.
 - Drag tabs left/right to reorder them.
+- Scroll the mouse wheel over the tab bar to scroll it horizontally once there are more open tabs than fit.
 - Open entries, wiki articles, and operations in a new tab with middle-click.
 - Close a tab with middle-click on the tab itself.
 - Create a new empty tab from the tab bar.

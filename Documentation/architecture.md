@@ -180,6 +180,8 @@ This keeps the user's workspace available after restarting the app without addin
 
 Tab reordering is implemented in `src/components/layout/TabBar.tsx` with Framer Motion (`LazyMotion`, `Reorder.Group`, `Reorder.Item`). `Reorder.Group` emits the reordered tab ID list via `onReorder`, and `uiStore.setTabsOrder(ids)` validates the payload (length and uniqueness) before rebuilding the tab array and saving it through `saveTabs(...)`. Because `saveTabs` writes the full `tabs` array to `open-tabs`, tab order persists across restarts.
 
+An overflowing tab bar scrolls horizontally on a vertical mouse-wheel gesture. `TabBar` holds a `ref` on the `Reorder.Group` element (it renders a `<ul>`) and, in a `useEffect`, attaches a native `wheel` listener with `{ passive: false }` — React's synthetic `onWheel` is passive, so `preventDefault()` there would not stop the page from also scrolling. The handler only acts when `scrollWidth > clientWidth` (tabs actually overflow) and `|deltaY| > |deltaX|` (so horizontal trackpad scrolling isn't also redirected into `scrollLeft`), then adds `deltaY` onto `el.scrollLeft`.
+
 When `setActiveView()` is called while a tab is active, the current tab's view is updated. Opening content in a new tab creates a new tab with its own `ActiveView`. Selecting a tab restores that tab's view into the main area.
 
 Tabs and navigation history are related but separate:
