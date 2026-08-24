@@ -8,6 +8,7 @@ import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { generateId } from '../../lib/helpers';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
+import { FALLBACK_CATEGORY } from '../../lib/schema';
 import Dashboard from '../ui/Dashboard';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import LinkPickerModal from '../editor/LinkPickerModal';
@@ -119,7 +120,7 @@ export default function TasksView() {
     : categories;
 
   const handleCreateTask = async (categoryId?: string) => {
-    const cat = categoryId ?? '';
+    const cat = categoryId ?? FALLBACK_CATEGORY.tasks;
     const task = await createTask(cat);
     setEditingId(task.id);
     setEditValue(task.title);

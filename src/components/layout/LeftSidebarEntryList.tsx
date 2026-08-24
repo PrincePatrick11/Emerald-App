@@ -10,6 +10,7 @@ import { useTaskStore } from '../../store/taskStore';
 import { useAltarStore } from '../../store/altarStore';
 import { useUndoStore } from '../../store/undoStore';
 import { setDragItem } from '../../lib/dragState';
+import { FALLBACK_CATEGORY } from '../../lib/schema';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
@@ -417,7 +418,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
   const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
 
   const handleNewTask = async () => {
-    const task = await createTask('');
+    const task = await createTask(FALLBACK_CATEGORY.tasks);
     setActiveView({ type: 'tasks' });
     return task;
   };

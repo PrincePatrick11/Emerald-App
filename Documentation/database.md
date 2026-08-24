@@ -291,6 +291,8 @@ Tasks have no `entry_number`; migration v9 only added that column to journal ent
 
 The self-reference makes insert order matter: a child inserted before its parent violates the foreign key. `insertTasks` in `dbBackup.ts` inserts with `parent_task_id` NULL and fills it in afterwards.
 
+Unlike `wiki_articles`, `operations`, and `altar_items`, `tasks.category_id` has **no SQL-level default** — the column is `NOT NULL` with nothing to fall back on. Every call site that creates a task without letting the user pick a category must pass `FALLBACK_CATEGORY.tasks` (`'general'`) explicitly; passing `''` matches no row in `task_categories` and the insert fails the foreign key silently from the caller's point of view (no task is created, no visible error).
+
 ### altar_placements
 
 One placed object on one altar.
