@@ -456,7 +456,7 @@ export default function TasksView() {
                 ? 'bg-jade-900/50 border border-jade-800/40 text-jade-400'
                 : 'bg-stone-800/70 hover:bg-stone-700/70 text-stone-500 hover:text-stone-300'
             }`}
-            title={showCompleted ? t('tasks.showCompleted') : t('tasks.hideCompleted')}
+            title={showCompleted ? t('tasks.hideCompleted') : t('tasks.showCompleted')}
           >
             <CheckSquare size={13} />
           </button>
