@@ -87,7 +87,7 @@ The translation files follow this top-level structure (from `en.json`):
 | `wiki` | Wiki UI strings, including `categories.*` for all built-in wiki category IDs |
 | `editor` | Shared editor button labels (Done, Cancel, Edit, Delete) |
 | `moonPhase` | Display names for all eight moon phase keys |
-| `search` | Search bar placeholders and no-results messages, including the title bar's global search: `globalPlaceholder` (input placeholder), `hint` (shown before anything is typed), `clear` (accessible name for the clear button), `altarItems` / `categories` (module labels for the two result kinds with no entry in `nav.*`), `more` / `more_other` (footer count of results past the 50-result cap). The dropdown's other module labels reuse the existing `nav.*` keys rather than duplicating them |
+| `search` | Search bar placeholders and no-results messages, including the title bar's global search: `globalPlaceholder` (input placeholder), `hint` (shown before anything is typed), `clear` (accessible name for the clear button), `altarItems` / `categories` (module labels for the two result kinds with no entry in `nav.*`), `showMore` / `showMore_other` (label of the "show more results" button, phrased as an action since clicking it — or pressing Arrow Down on the last visible result — reveals the next page rather than just stating a count). The dropdown's other module labels, including the module shown on a category result (`Category · Wiki`), reuse the existing `nav.*` keys rather than duplicating them |
 | `routines` | Routines panel strings |
 | `tags` | Tags view strings |
 | `properties` | Right sidebar Properties panel strings |

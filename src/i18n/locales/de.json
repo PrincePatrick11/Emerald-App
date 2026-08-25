@@ -340,8 +340,8 @@
     "clear": "Suche leeren",
     "altarItems": "Altar-Objekt",
     "categories": "Kategorie",
-    "more": "{{count}} weiterer Treffer",
-    "more_other": "{{count}} weitere Treffer"
+    "showMore": "{{count}} weiteres Ergebnis anzeigen",
+    "showMore_other": "{{count}} weitere Ergebnisse anzeigen"
   },
   "routines": {
     "title": "Routinen",

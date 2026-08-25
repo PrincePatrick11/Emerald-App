@@ -340,8 +340,8 @@
     "clear": "Effacer la recherche",
     "altarItems": "Objet d'autel",
     "categories": "Catégorie",
-    "more": "{{count}} autre résultat",
-    "more_other": "{{count}} autres résultats"
+    "showMore": "Afficher {{count}} autre résultat",
+    "showMore_other": "Afficher {{count}} autres résultats"
   },
   "routines": {
     "title": "Routines",

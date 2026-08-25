@@ -26,6 +26,11 @@ import TitleBarSearchResults from './TitleBarSearchResults';
 const LISTBOX_ID = 'titlebar-search-results';
 const optionId = (index: number) => `${LISTBOX_ID}-option-${index}`;
 
+/** Wie viele Zeilen die Liste zeigt, bevor sie den Rest anbietet — und um
+ *  wie viele sie danach waechst. Eine reine Ansichtsgroesse: gesucht wird
+ *  ohnehin im ganzen Bestand, `lib/globalSearch` kennt die Zahl nicht. */
+const PAGE_SIZE = 50;
+
 export default function TitleBarSearch() {
   const { t } = useTranslation();
   const setActiveView = useUIStore((s) => s.setActiveView);
@@ -34,19 +39,41 @@ export default function TitleBarSearch() {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [limit, setLimit] = useState(PAGE_SIZE);
   const fieldRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { results, query: effectiveQuery, pending } = useGlobalSearch(query);
-  const { hits } = results;
+  const { results, query: effectiveQuery, pending } = useGlobalSearch(query, limit);
+  const { hits, total } = results;
+  const hasMore = total > hits.length;
 
-  // Eine neue Trefferliste fängt oben an. An der Anfrage aufgehängt und nicht
-  // an `hits`: das Array ist bei jeder Store-Mutation ein neues, und ein
-  // Autosave mitten in der Pfeiltastenauswahl würde die Markierung sonst
-  // zurück auf die erste Zeile werfen.
-  useEffect(() => { setActiveIndex(0); }, [effectiveQuery]);
+  const showMore = () => setLimit((current) => current + PAGE_SIZE);
 
-  const close = () => { setOpen(false); setActiveIndex(0); };
+  /**
+   * Die Auswahl wird beim *Lesen* geklemmt, nicht per Effekt nachgezogen.
+   *
+   * `hits` ist immer der Anfang derselben sortierten Liste, `activeIndex` zeigt
+   * also normalerweise ins Ziel. Schrumpft der Bestand aber zwischen zwei
+   * Rendern — Autosave, geloeschter Eintrag, Vault-Wechsel —, laege der Index
+   * dahinter, und das faellt still aus: keine Zeile markiert, nichts zu
+   * scrollen, und das naechste ArrowDown landet irgendwo. Ein Effekt an `hits`
+   * waere das falsche Mittel, siehe unten.
+   */
+  const selectedIndex = hits.length ? Math.min(activeIndex, hits.length - 1) : 0;
+
+  // Beide Wege hierher brauchen ihn, und keiner sieht den anderen: der Effekt
+  // greift beim Tippen einer neuen Anfrage, ohne dass geschlossen wird;
+  // `close()` greift beim Klick daneben, wobei der Begriff stehen bleibt und
+  // der Effekt deshalb nicht feuert.
+  const resetPaging = () => { setActiveIndex(0); setLimit(PAGE_SIZE); };
+
+  // Eine neue Trefferliste fängt oben an, und zwar wieder auf Seite eins. An
+  // der Anfrage aufgehängt und nicht an `hits`: das Array ist bei jeder
+  // Store-Mutation ein neues, und ein Autosave mitten in der
+  // Pfeiltastenauswahl würde die Markierung sonst zurück nach oben werfen.
+  useEffect(() => { resetPaging(); }, [effectiveQuery]);
+
+  const close = () => { setOpen(false); resetPaging(); };
 
   const openHit = (hit: SearchHit, inNewTab: boolean) => {
     const view = viewForSearchHit(hit);
@@ -70,15 +97,28 @@ export default function TitleBarSearch() {
     }
     if (!open || hits.length === 0) return;
 
+    // Erst die Ausnahme: am Listenende geht es weiter, statt umzulaufen,
+    // solange noch etwas zurueckgehalten wird. Sonst waere die Fusszeile das
+    // einzige Element des Dropdowns, das sich nur mit der Maus bedienen laesst
+    // — der Fokus bleibt im Feld, ihre Stelle in der Tab-Reihenfolge erreicht
+    // also niemand. `hits.length` ist die erste neu freigegebene Zeile, weil
+    // die laengere Liste mit der kuerzeren beginnt.
+    if (e.key === 'ArrowDown' && hasMore && selectedIndex === hits.length - 1) {
+      e.preventDefault();
+      showMore();
+      setActiveIndex(hits.length);
+      return;
+    }
+    // Dann die Regel.
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       const step = e.key === 'ArrowDown' ? 1 : -1;
-      setActiveIndex((current) => (current + step + hits.length) % hits.length);
+      setActiveIndex((selectedIndex + step + hits.length) % hits.length);
       return;
     }
     if (e.key === 'Enter') {
       e.preventDefault();
-      const hit = hits[activeIndex];
+      const hit = hits[selectedIndex];
       if (hit) openHit(hit, e.ctrlKey || e.metaKey);
     }
   };
@@ -111,7 +151,7 @@ export default function TitleBarSearch() {
           aria-controls={open ? LISTBOX_ID : undefined}
           // Der Fokus verlaesst das Feld nie; ohne diesen Zeiger bewegen die
           // Pfeiltasten eine Auswahl, von der nur sehende Nutzer erfahren.
-          aria-activedescendant={open && hits[activeIndex] ? optionId(activeIndex) : undefined}
+          aria-activedescendant={open && hits[selectedIndex] ? optionId(selectedIndex) : undefined}
           className="sidebar-search-input flex-1 min-w-0 bg-transparent text-xs outline-none"
         />
         {query && (
@@ -132,10 +172,11 @@ export default function TitleBarSearch() {
           results={results}
           pending={pending}
           query={effectiveQuery}
-          activeIndex={activeIndex}
+          activeIndex={selectedIndex}
           listboxId={LISTBOX_ID}
           onActiveIndexChange={setActiveIndex}
           onSelect={openHit}
+          onShowMore={showMore}
           onClose={close}
         />
       )}

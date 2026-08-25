@@ -206,6 +206,23 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-subtle);
   }
 
+  /* Die Fusszeile, die den Rest der Treffer herausgibt. Sie sitzt angeheftet
+     unter der scrollenden Liste, also braucht sie die Trennlinie, die der
+     Scrollrand nicht hergibt — sonst laeuft die halb abgeschnittene letzte
+     Zeile optisch in sie hinein. Kein `.search-result-row`: sie ist keine
+     Zeile der Liste, traegt keine Auswahl und wird von den Pfeiltasten nie
+     markiert. */
+  .search-result-more {
+    @apply w-full text-xs text-left px-3 py-2 transition-colors duration-150;
+    color: var(--text-subtle);
+    border-top: 1px solid var(--menu-border);
+  }
+
+  .search-result-more:hover {
+    background: var(--menu-item-hover-bg);
+    color: var(--menu-item-hover-text);
+  }
+
   /* Die Fundstelle im Titel oder im Textausschnitt. Dieselbe Akzentmischung
      wie `.vault-card-active .vault-badge` — die Stelle wird eingefaerbt, nicht
      umrahmt, damit eine Trefferliste nicht zum Flickenteppich wird. */

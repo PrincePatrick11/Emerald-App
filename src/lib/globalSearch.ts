@@ -31,7 +31,15 @@ export interface SearchSnippet {
 }
 
 export interface SearchHit {
-  /** `${kind}:${id}` — ids are unique per table, not across them. */
+  /**
+   * Stable identity of a hit, unique across the whole result list.
+   *
+   * `kind` and `id` together are not enough: the four category tables ship the
+   * same built-in ids — `other` exists in Wiki, Operations *and* Altar,
+   * `herb`/`deity`/`symbol`/`tool` in Wiki and Altar. Two of those are
+   * different things that open different modules, so the module is part of
+   * what tells them apart.
+   */
   key: string;
   kind: SearchKind;
   id: string;
@@ -68,7 +76,7 @@ export interface SearchCorpus {
 }
 
 export interface SearchResults {
-  /** Capped at `MAX_RESULTS`. */
+  /** What the view shows — the head of the sorted list. */
   hits: SearchHit[];
   /** Uncapped, so the list can say how much it is not showing. */
   total: number;
@@ -79,9 +87,6 @@ export interface SearchResults {
  * for the second one. Titles and tags are short enough to stay useful at one.
  */
 const MIN_CONTENT_QUERY = 2;
-
-/** More rows than this stop being a result list and start being the vault. */
-const MAX_RESULTS = 50;
 
 const SNIPPET_LEAD = 40;
 const SNIPPET_TRAIL = 80;
@@ -159,9 +164,16 @@ function matchRecord(
 
 const notDeleted = <T extends { deleted_at?: string | null }>(item: T) => !item.deleted_at;
 
-export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchResults {
+/**
+ * Scores the whole corpus and returns every hit, best first.
+ *
+ * Nothing is cut here. How many of them a view shows is the view's business,
+ * and keeping the cut out of this function is what lets it show more without
+ * searching again.
+ */
+export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[] {
   const q = comparable(rawQuery.trim());
-  if (!q) return { hits: [], total: 0 };
+  if (!q) return [];
 
   const hits: SearchHit[] = [];
 
@@ -174,7 +186,7 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchResu
   ) => {
     if (!match) return;
     hits.push({
-      key: `${kind}:${id}`,
+      key: `${kind}:${extra.module ?? ''}:${id}`,
       kind,
       id,
       title,
@@ -246,7 +258,7 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchResu
     || b.updatedAt.localeCompare(a.updatedAt)
     || a.title.localeCompare(b.title));
 
-  return { hits: hits.slice(0, MAX_RESULTS), total: hits.length };
+  return hits;
 }
 
 /**

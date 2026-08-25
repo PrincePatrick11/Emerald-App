@@ -79,11 +79,22 @@ export interface GlobalSearchState {
  * because React keeps the old result on screen while the new one is computed,
  * and there is no interval to tune — the delay is however long the search
  * actually takes, which on a small vault is no delay at all.
+ *
+ * The search and the cut are two memos on purpose. `limit` only feeds the
+ * second one, so showing another page re-slices the list that is already
+ * there instead of scoring the corpus again — which is the whole point of
+ * paging in a search that runs on every keystroke.
  */
-export function useGlobalSearch(query: string): GlobalSearchState {
+export function useGlobalSearch(query: string, limit: number): GlobalSearchState {
   const corpus = useSearchCorpus();
   const deferredQuery = useDeferredValue(query);
   const effectiveQuery = deferredQuery.trim();
-  const results = useMemo(() => searchCorpus(corpus, effectiveQuery), [corpus, effectiveQuery]);
+
+  const all = useMemo(() => searchCorpus(corpus, effectiveQuery), [corpus, effectiveQuery]);
+  const results = useMemo(
+    () => ({ hits: all.slice(0, limit), total: all.length }),
+    [all, limit],
+  );
+
   return { results, query: effectiveQuery, pending: deferredQuery !== query };
 }

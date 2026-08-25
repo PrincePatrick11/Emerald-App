@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefO
 import { createPortal } from 'react-dom';
 import { BookOpen, CheckSquare, Flame, Folder, Library, Sparkles, Tag, Wand2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { comparable, type SearchHit, type SearchKind, type SearchResults } from '../../../lib/globalSearch';
+import { comparable, type CategoryModule, type SearchHit, type SearchKind, type SearchResults } from '../../../lib/globalSearch';
 
 /** Abstand des Panels zur Fensterkante und zum Suchfeld darüber. */
 const VIEWPORT_MARGIN = 8;
@@ -42,6 +42,17 @@ const KIND_LABEL_KEYS: Record<SearchKind, string> = {
   category: 'search.categories',
 };
 
+/** Kategorien tragen zusaetzlich ihr Modul. Die vier Kategorie-Tabellen teilen
+ *  sich Built-in-Ids, also stehen `Herb` aus dem Wiki und `Herb` vom Altar
+ *  gleichzeitig in der Liste — ohne das Modul waeren die beiden Zeilen nicht
+ *  zu unterscheiden, obwohl sie woandershin fuehren. Wieder `nav.*`. */
+const MODULE_LABEL_KEYS: Record<CategoryModule, string> = {
+  wiki: 'nav.wiki',
+  operations: 'nav.operations',
+  tasks: 'nav.tasks',
+  altar: 'nav.altar',
+};
+
 /**
  * Hebt die Fundstelle im Titel hervor.
  *
@@ -78,6 +89,7 @@ interface Props {
   listboxId: string;
   onActiveIndexChange: (index: number) => void;
   onSelect: (hit: SearchHit, inNewTab: boolean) => void;
+  onShowMore: () => void;
   onClose: () => void;
 }
 
@@ -91,7 +103,8 @@ interface Props {
  * gemalten Hauptbereich — eine hoehere `z-index`-Zahl ändert daran nichts.
  */
 export default function TitleBarSearchResults({
-  anchorRef, results, pending, query, activeIndex, listboxId, onActiveIndexChange, onSelect, onClose,
+  anchorRef, results, pending, query, activeIndex, listboxId, onActiveIndexChange, onSelect,
+  onShowMore, onClose,
 }: Props) {
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -206,6 +219,13 @@ export default function TitleBarSearchResults({
               <span className="search-result-badge mt-0.5">
                 {t(KIND_LABEL_KEYS[hit.kind])}
                 {hit.entryNumber != null && <span>#{hit.entryNumber}</span>}
+                {/* Schliessen sich aus: eine Kategorie hat keine Eintragsnummer. */}
+                {hit.module && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>{t(MODULE_LABEL_KEYS[hit.module])}</span>
+                  </>
+                )}
               </span>
             </button>
           ))}
@@ -213,9 +233,20 @@ export default function TitleBarSearchResults({
       )}
 
       {/* Was die Kappung verschweigt, sagt die Liste selbst — eine stumm
-          abgeschnittene Trefferliste liest sich wie eine vollstaendige. */}
+          abgeschnittene Trefferliste liest sich wie eine vollstaendige. Und
+          weil das Zurueckgehaltene ohnehin schon gesucht ist, sagt die Zeile
+          es nicht nur, sie gibt es auch heraus. Mit der Tastatur laeuft man
+          dafuer einfach weiter nach unten. `onMouseDown` aus demselben Grund
+          wie bei den Zeilen darueber. */}
       {total > hits.length && (
-        <p className="search-result-meta flex-shrink-0">{t('search.more', { count: total - hits.length })}</p>
+        <button
+          type="button"
+          className="search-result-more flex-shrink-0"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onShowMore}
+        >
+          {t('search.showMore', { count: total - hits.length })}
+        </button>
       )}
     </div>,
     document.body,
