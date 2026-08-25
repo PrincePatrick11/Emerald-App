@@ -81,7 +81,8 @@ release on GitHub.
    `## [<version>]` out of `CHANGELOG.md` and hands it to the release as the
    body. Note that it does not fail on an empty result — if the section is still
    headed `## [Unreleased]`, the release is created with no notes and no
-   complaint. Cutting that section is the `release` agent's job.
+   complaint. Cutting `## [Unreleased]` into a versioned section is a manual
+   step before tagging.
 
 `concurrency` is set without `cancel-in-progress`: pushing the same tag twice
 makes the second run wait rather than race the first for the same asset names.
@@ -123,8 +124,9 @@ Windows builds are unsigned; SmartScreen warns on first run.
 
 ## Cutting a release
 
-1. `/release` — the agent syncs the version across the three files and cuts
-   `## [Unreleased]` into a versioned section.
+1. Set the version in `package.json`, `src-tauri/tauri.conf.json` and
+   `src-tauri/Cargo.toml` — character-identical in all three — and rename
+   `## [Unreleased]` in `CHANGELOG.md` to `## [<version>] - <date>`.
 2. Run `manual-desktop-builds.yml` from the branch and confirm all three
    platforms produce bundles.
 3. Commit, push, then tag and push the tag. `prepare-release` re-checks the
@@ -136,5 +138,5 @@ Windows builds are unsigned; SmartScreen warns on first run.
 - The changelog extraction cannot fail — an empty section yields an empty
   release body silently.
 - Nothing runs clippy, and warnings do not fail a build.
-- There are no automated tests to run; `qacheck` drives the running app by hand
-  over the `emerald-devtools` MCP instead.
+- There are no automated tests. CI proves the code compiles, nothing more —
+  behaviour is only ever verified by running the app by hand.
