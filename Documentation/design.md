@@ -1,27 +1,215 @@
 # Design
 
-Bestandsaufnahme des aktuellen visuellen Design-Systems von Emerald: Farb-/Typografie-Tokens, tatsächlich verwendete Spacing-/Radius-/Shadow-Werte und die gewachsenen Komponenten-Patterns (Buttons, Panels, Modals, Emoji-Picker, Icons). Dies ist eine reine Ist-Zustand-Dokumentation ohne Priorisierung oder Lösungsvorschläge — sie dient als Referenzgrundlage für einen späteren, separaten Redesign-Durchgang.
+**This file is a specification, not an inventory.** [Binding Rules](#binding-rules)
+applies to new and touched code. [Open Points](#open-points) lists where today's code
+still contradicts those rules — the code still wins there, but the direction is settled.
+The [Appendix](#appendix-inventory-and-traps) records the actual values and the traps of
+the theming system.
 
-Für die *Architektur* des Theming-Systems (CSS-Custom-Property-Tiers, Normalisierungs-Flow, Tailwind-Bridge-Konzept) siehe bereits [`architecture.md`](architecture.md#theming-system) — hier werden stattdessen die konkreten Werte und die Komponenten-Ebene dokumentiert, die dort fehlen.
+Deviations are allowed. They need a comment at the deviating place in the code, not an
+addition to this file.
 
-## Farben
+For the *components* (which shared building blocks exist, when to use them) see
+[`components.md`](components.md). For the *architecture* of the theming system
+(CSS custom property tiers, normalisation flow, Tailwind bridge) see
+[`architecture.md`](architecture.md#theming-system).
 
-### Tailwind-Tokens (`tailwind.config.js`)
+---
 
-| Skala | 50 | 300 | 500 | 600 | 800 | 950 |
-|---|---|---|---|---|---|---|
-| `jade` | `#edfff7` | `#70ffca` | `#00e699` (primary bright) | `#00c47f` (buttons/links) | `#007a4d` (borders) | `#002e1d` (darkest) |
-| `parchment` | `#fdf8f0` | `#ecc685` | `#d98c34` | `#c97229` | `#874824` | `#3b1d0f` |
-| `stone` | Tailwind-Default-Skala, nur `950: #0f0e0c` ist überschrieben | | | | | |
+## Binding Rules
 
-`jade` ist die durchgängig genutzte Akzentfarbe (Buttons, Links, aktive Zustände). `parchment` ist als Tailwind-Skala vorhanden, wird aber im tatsächlichen "Emerald Parchment"-Theme kaum als Utility-Klasse verwendet — das Theme läuft stattdessen über eigene CSS-Variablen (siehe unten), deren Werte nicht auf die `parchment`-Skala mappen.
+### Colour
 
-### CSS-Custom-Properties pro Theme (`src/themes/emerald-noctis.css`, `emerald-parchment.css`)
+**Exactly one source: the theme CSS variables.** `--accent`, `--text-*`, `--border-*`,
+`--bg-*`, `--panel-*`, `--menu-*`, `--search-*`. They are fully defined in both themes
+(82 properties each) and are the only thing guaranteed to look right in both.
 
-Beide Dateien definieren dieselben ~55 Properties. Kernwerte im Vergleich:
+**Raw Tailwind colour utilities are a deviation.** `stone-*`, `jade-*`, `red-*` and
+`amber-*` in a component only theme in Emerald Parchment for as long as someone maintains
+a bridge override for them in `index.css`. Setting such a class silently takes on the
+obligation to keep it in step across both themes — that is the mechanism the primary
+colour's triple maintenance grew out of.
 
-| Property | Emerald Noctis (dunkel) | Emerald Parchment (hell) |
-|---|---|---|
+**Exactly one accent: jade.** `amber` is confined to the single documented case — the
+`tone="amber"` mode for the edit action in row action bars — and is not extended. A third
+accent tone needs a theme token in both files first.
+
+**Red means destructive, nothing else.** Via `Button variant="danger"` or `tone="danger"`,
+not via a per-site red treatment of its own.
+
+### Typography
+
+- **UI**: `font-sans` — Inter by default, switchable in settings.
+- **Editor**: `font-serif` — Lora by default, configured separately.
+- Applied through `data-ui-font`/`data-editor-font` on `<html>`, never through a direct
+  `font-family` in a component.
+- Eight selectable Google Fonts, loaded through a single `<link>` in `index.html`.
+  A ninth font means `theme.ts` **and** the link — both or neither.
+- `font-mono` is currently unusable, see [Open Points](#open-points).
+
+### Border Radius
+
+Four steps, each with a responsibility. Not chosen by feel:
+
+| Step | For |
+| --- | --- |
+| `rounded-md` | small controls: inputs, chips, icon buttons, list rows, tiles |
+| `rounded-lg` | buttons and **floating surfaces**: menu, popover, toast, dropdown |
+| `rounded-xl` | surfaces that carry content: `.panel`, `.panel-interactive`, `.modal-card` |
+| `rounded-full` | genuinely round elements only: dots, avatars, filter pills |
+
+`rounded-sm` stays reserved for decorative miniature surfaces below ~16px (colour swatch,
+resize handle, image thumbnail) — `rounded-md` would be visibly too round there. It is not
+a general step.
+
+The rule settles the case this used to snag on: `ContextMenu` and `UndoToast` are both
+small floating overlays and therefore belong on the same step (`lg`). What decides is
+**what an element is**, not how large it is.
+
+### Icon Sizes
+
+Four steps for UI icons (lucide-react `size` prop):
+
+| px | Level |
+| --- | --- |
+| `18` | rail and title bar — navigation level |
+| `16` | modal headers, primary actions |
+| `14` | default: lists, buttons, panels |
+| `12` | dense meta rows, chips, badges |
+
+Nothing is interpolated in between — 13 and 11 are not steps. Large icons in empty states
+and illustrations (32–40px) are decorative and exempt from the scale.
+
+Colour is inherited from the surrounding text colour, not set through a `color` prop on
+the icon.
+
+### Heights and Spacing
+
+**Two bar heights, no third:**
+
+- `h-10` (40px) — window chrome: title bar, tab bar.
+- `h-14` (56px) — content bars: entry list tabs, `RightSidebarActionBar`, dashboard topbar.
+
+The split is deliberate: the title bar is window chrome, not a content header, and 56px
+feels heavy for that. Because it sits *above* the three-column shell, this does not
+collide with the 56px to its left and right below — the two sidebars must place their
+bottom divider at the same height.
+
+**Horizontal padding has exactly one source per column.** The column's outer container
+sets it; the panels inside add no `px-*` of their own. In the right sidebar that is the
+scrolling properties container (`p-3` in `RightSidebar.tsx`, with a comment in place) — if
+a panel adds its own padding again, the summary rows end up visibly indented differently
+from the button in the action bar above them.
+
+There is no enforced spacing scale. Observed practice: `px-8` for toolbar strips in the
+main area, `px-3`/`p-3` in the sidebars, `px-4 py-3` through `px-5 py-4` in modal headers
+and bodies.
+
+### States
+
+**Focus must be visible in both themes.** A new focusable element without a
+`:focus-visible` rule in *both* theme blocks is unfinished. `--focus-ring` exists for
+exactly this.
+
+**Disabled runs through the shared `:disabled` rule**
+(`opacity-50 cursor-not-allowed pointer-events-none`), not through a colour of its own.
+Where theme rules are more specific than `:disabled` — `.menu-item`, for instance — the
+element is dimmed via `opacity`, because a colour declaration there would not get through.
+
+**Active/inactive toggles use `Button`'s `tone` mode**, not a ternary in the `className`
+template. The four base variants (`primary`/`secondary`/`ghost`/`danger`) have no active
+state; `tone` does. Documented exceptions: `EditorToolbar`'s `ToolbarBtn` and
+`AltarCanvas`'s drag handles — neither is a generic action button.
+
+**Animations respect `prefers-reduced-motion`** and live as a class in the stylesheet,
+never as an inline style: an inline style beats every rule in the stylesheet and with it
+the opt-out.
+
+---
+
+## Open Points
+
+Where the code contradicts the rules above today. No prioritisation — each point names the
+rule, the violation, and what resolving it would cost.
+
+**1. The primary colour is maintained independently in three places.**
+The `jade` Tailwind scale (`tailwind.config.js`), the per-theme `--accent` variables, and
+the bridge overrides in `index.css` that set yet another set of hex values for
+`.btn-primary` and friends (`html[data-theme='emerald-noctis'] .btn-primary` from line
+1190, Parchment from 1618). Noctis's `--accent: #00c47f` happens to be exactly `jade-600`;
+Parchment's `#008a57` sits between no two steps of the scale.
+*Cost: move the bridge overrides onto `var(--accent*)` and check that the layer ordering
+still holds.*
+
+**2. 1039 raw colour utilities across 49 `.tsx` files.** The largest single item, and the
+reason point 1 exists at all. *Cost: not doable in one pass — sensible only file by file
+or module by module, each verified in both themes.*
+
+**3. `amber` is a second accent tone with no theme equivalent.** It comes from Tailwind's
+default palette, not from an `--accent-*` variable and not from the `parchment` scale.
+Emerald Parchment needs its own overrides on the underlying utility classes for it
+(`.bg-amber-900\/30` and others).
+*Cost: one token pair in both theme files, then switch `TONE_CLASSES` over.*
+
+**4. The `parchment` Tailwind scale carries eleven steps for a single shade.**
+It is used 19 times, without exception as `text-parchment-500/70` for date text in list
+rows. The Parchment *theme* does not use it at all — that runs on its own CSS variables,
+whose values do not map onto this scale. The name suggests a connection that does not
+exist.
+*Cost: move the 19 sites onto `--text-muted` or similar, then delete the scale.*
+
+**5. Icon sizes sit off the scale in roughly a third of cases.** Around 100 occurrences at
+13, 11, 15, 10, 9, 8 and 7px, in places inconsistent within a single file — `SettingsModal.tsx`
+mixes 13 and 14 for section icons with no discernible pattern.
+*Cost: mechanical but widely scattered; best done per file when it is touched anyway.*
+
+**6. `UndoToast` carries `rounded-xl`** and is therefore the only known violation of the
+radius rule — a floating overlay on the surface step. *Cost: one line.*
+
+**7. `JetBrains Mono` is dead config.** Declared as `font-mono` in `tailwind.config.js:46`
+but never loaded via a `<link>`. Every site using `font-mono` falls back to the system
+monospace. *Cost: either load it or strike it from the config — the decision is open
+because it is unclear whether `font-mono` is needed at all.*
+
+**8. Emerald Noctis lacks the generic focus rule.** Parchment has
+`html[data-theme='emerald-parchment'] button:focus-visible` (`index.css:1426`); Noctis has
+`:focus-visible` only for individual classes (`.window-control`, `.titlebar-menu-trigger`,
+`.menu-item`, `.link-picker-row`). Every button outside that list looks unfocused in
+Noctis. It shows most on the `RightSidebarActionBar`, since that became the only home of
+the entry actions. *Cost: one rule, mirrored from Parchment.*
+
+**9. The entry actions live exclusively in a collapsible surface.**
+Edit/Done/Delete/Cancel exist only in the right sidebar. Collapsing it mid-edit leaves no
+visible way back; there is no keyboard fallback. *Switching* into edit mode expands it
+automatically (`usesEditorSidebar` in `uiStore.ts`) — that covers entry, not later
+collapsing. Mitigated, not fixed: both sidebars can also be reopened from the View menu.
+*Cost: keyboard shortcuts for Edit/Done/Cancel, or a second home for the actions.*
+
+**10. Tab strip and action bar do not always line up.** `LeftSidebarEntryList`'s tab strip
+is `min-h-14` and wraps onto a second row below 226px panel width, while
+`RightSidebarActionBar` stays `h-14`. **Deliberate:** growing the right bar too would mean
+enlarging it for a reason that has nothing to do with its own content. The point is
+recorded here so the deviation is not reported as a bug.
+
+---
+
+## Appendix: Inventory and Traps
+
+### Colour Values
+
+**Tailwind scales** (`tailwind.config.js`):
+
+| Scale | 300 | 500 | 600 | 800 | 950 |
+| --- | --- | --- | --- | --- | --- |
+| `jade` | `#70ffca` | `#00e699` (primary bright) | `#00c47f` (buttons/links) | `#007a4d` (borders) | `#002e1d` |
+| `parchment` | `#ecc685` | `#d98c34` | `#c97229` | `#874824` | `#3b1d0f` |
+| `stone` | Tailwind default, only `950: #0f0e0c` overridden | | | | |
+
+**Theme variables** (`src/themes/emerald-noctis.css`, `emerald-parchment.css`). Both files
+define the same 82 properties. Core values:
+
+| Property | Emerald Noctis (dark) | Emerald Parchment (light) |
+| --- | --- | --- |
 | `--bg-app` | `#15110d` | `#f7efdf` |
 | `--text-primary` | `#f5f5f4` | `#2c2014` |
 | `--accent` | `#00c47f` | `#008a57` |
@@ -30,221 +218,187 @@ Beide Dateien definieren dieselben ~55 Properties. Kernwerte im Vergleich:
 | `--danger-text` | `#f87171` | `#b63f32` |
 | `--panel-bg` | `rgba(38, 32, 27, 0.78)` | `#f7eddb` |
 | `--menu-shadow` | `0 14px 36px rgba(0,0,0,0.35)` | `0 18px 36px rgba(96,63,30,0.2)` |
-
-Beobachtung: Noctis' `--accent: #00c47f` entspricht exakt `jade-600`. Parchments `--accent: #008a57` liegt zwischen keinen zwei `jade`-Stufen und taucht auch sonst nirgends in der Tailwind-Palette auf — die beiden Farbsysteme (Tailwind-Skala vs. Theme-CSS-Vars) sind an dieser Stelle unabhängig voneinander gepflegt.
-
-Zusätzlich überschreibt `src/index.css` (die in `architecture.md` beschriebene "Tailwind bridge") pro Theme nochmals eigene Hex-Werte für Klassen wie `.btn-primary`, `.btn-secondary`, `.panel-interactive`, unabhängig von den obigen CSS-Vars, z. B.:
-
-- `html[data-theme='emerald-noctis'] .btn-primary` → `background: rgba(0,138,87,0.3)`, `border-color: rgba(0,196,127,0.44)`, `color: #dcfff0` (index.css:900-906)
-- `html[data-theme='emerald-parchment'] .btn-primary` → `background: #159165`, `border-color: #127651`, `color: #ecfff7` (index.css:1343-1348)
-
-Damit existieren für die "Primärfarbe" faktisch drei unabhängig gepflegte Werte-Sets: die `jade`-Tailwind-Skala, die `--accent`-CSS-Vars, und die Bridge-Overrides in `index.css`.
-
-## Typografie
-
-- UI-Schrift-Stack: `Inter, system-ui, sans-serif` (Tailwind `font-sans`)
-- Editor-Schrift-Stack: `Lora, Georgia, serif` (Tailwind `font-serif`)
-- Mono-Stack: `JetBrains Mono, monospace` (Tailwind `font-mono`) — deklariert in `tailwind.config.js:46`, aber `JetBrains Mono` wird nirgends per `<link>` geladen (weder in `index.html` noch sonstwo); Code-Stellen mit `font-mono` fallen faktisch auf die System-Monospace-Schrift zurück.
-- 8 wählbare Google Fonts (UI/Editor getrennt einstellbar), geladen über einen einzelnen `<link>` in `index.html`: Alegreya, Cormorant Garamond, IBM Plex Sans, Inter, Lora, Merriweather, Nunito, Source Sans 3 (`src/themes/theme.ts:13-22`).
-- Defaults: UI = Inter, Editor = Lora (`DEFAULT_UI_FONT_ID`, `DEFAULT_EDITOR_FONT_ID`, `theme.ts:10-11`).
-- Anwendung technisch über `data-ui-font`/`data-editor-font`-Attribute auf `<html>`, siehe `architecture.md#font-system` für den vollen Flow.
-
-## Spacing, Radius, Shadows
-
-`tailwind.config.js` definiert keine eigene `spacing`, `borderRadius` oder `boxShadow` Skala — jede Stelle im Code wählt einen Tailwind-Default-Wert frei. Beobachtete tatsächliche Verteilung:
-
-**Border-Radius**, für optisch vergleichbare "Container"-Elemente:
-- `rounded-md`: Dropdown-Trigger (`ListToolbar.tsx`), kleine Tab-Buttons (`AltarLibraryStrip.tsx:172`), `.btn-danger` (`index.css`)
-- `rounded-lg`: Context-Menu (`ContextMenu.tsx`), `.btn-primary`/`.btn-secondary` (`index.css`, jetzt auch der Undo-Button in `UndoToast.tsx` über `<Button variant="primary">`), Settings-Reihen
-- `rounded-xl`: `.panel`/`.panel-interactive` (`index.css:96,125`), alle drei Modal-Cards (Settings, LinkPicker, Altar-Item), aber auch der Undo-Toast selbst (`UndoToast.tsx`)
-- `rounded-full`: Filter-Chips (`FilterPanel.tsx`)
-
-Es gibt keine erkennbare Regel, wann `md`/`lg`/`xl` verwendet wird — z. B. ist `ContextMenu` (`rounded-lg`) und `UndoToast` (`rounded-xl`) beides ein kleines, schwebendes Overlay-Element mit ähnlicher Funktion, aber unterschiedlichem Radius.
-
-**Shadows**: `shadow-2xl` (ContextMenu, alle Modal-Cards außer Altar-Item-Modal), `shadow-xl` (UndoToast), kein Shadow (Altar-Item-Modal-Card, `AltarLibraryStrip.tsx:196`) — Modals verlassen sich teils auf `shadow-2xl`-Klasse, teils auf die `--panel-shadow`/`--menu-shadow` CSS-Vars, teils auf gar nichts.
-
-**Padding/Spacing**: Toolbar-artige Leisten (`ListToolbar`, `FilterPanel`) nutzen häufig `px-8 py-2`/`px-8 py-3`; Modal-Header/-Bodies nutzen `px-4 py-3`/`px-5 py-4`/`p-4`. Keine dokumentierte oder erzwungene Spacing-Skala.
-
-## Komponenten-Patterns
-
-### Buttons
-
-Geteilte Komponente: `src/components/ui/Button.tsx`. Ein dünner Wrapper mit vier Varianten (`primary` / `secondary` / `ghost` / `danger`), die auf die bestehenden CSS-Klassen `.btn-primary`, `.btn-secondary`, `.btn-ghost` sowie die neue `.btn-danger`-Klasse (`index.css`, basierend auf den bereits themed `--danger-*`-CSS-Variablen — es waren keine Theme-Datei-Änderungen nötig) abbilden. `type` ist standardmäßig `'button'`; `className` wird an die Varianten-Klasse angehängt statt sie zu ersetzen, sodass Aufrufer weiterhin Layout/Spacing pro Stelle mitgeben können. Eine gemeinsame `:disabled`-Regel (`opacity-50 cursor-not-allowed pointer-events-none`) gilt für alle vier Varianten.
-
-Über Journal, Wiki, Operations, Tasks, Altar, Trash, Settings sowie die geteilten `Modal`/`FilterPanel`/`RichEditor`-Komponenten sind 109 vormals rohe `<button>`-Elemente auf `<Button>` migriert. Dabei wurden fünf verschiedene Ad-hoc-Rot-Behandlungen für "löschen" (`text-red-400`, `text-red-600`, `text-stone-500 hover:text-red-400`, bordered `bg-red-950/30`-Pills u. a., verstreut über Trash/Operations/Wiki/Tasks/Altar/Settings) auf `<Button variant="danger">` konsolidiert, und drei vormals inline-duplizierte "primary"-Button-Rezepte (`HomeView`s "New Entry", `UndoToast`s Action-Button, Settings' Export/Import-Buttons) nutzen jetzt `<Button variant="primary">`. Die dadurch toten CSS-Klassen `.trash-empty-btn`, `.trash-bulk-delete-btn` und `.settings-cta-btn` wurden entfernt.
-
-Aktive/inaktive Zustände (z. B. Tab-artige Buttons in `AltarLibraryStrip.tsx:172,174,219`, `SettingsModal.tsx:199-201,261`) werden weiterhin jeweils lokal per Ternary im `className`-Template implementiert — das ist bewusst außerhalb des `Button`-Scopes, da diese Buttons einen `active`-Toggle-State abbilden, den die vier Basis-*Varianten* (`primary`/`secondary`/`ghost`/`danger`) nicht kennen. Ebenfalls bewusst nicht migriert: `AltarCanvas.tsx`s Rotations-/Resize-Drag-Handles (dynamisch dimensioniert, keine semantischen Buttons), `EditorToolbar.tsx`s `ToolbarBtn` (hat ebenfalls einen `active`-Toggle-State), sowie `ContextMenu.tsx`-Menüeinträge und andere volle-Breite Menü-/Chip-/Tab-/Nav-Item-Patterns (`LinkedOpsInput`, `LinkedWikiInput`, `BacklinksPanel`, `SuggestionList`, `TagInput`, die frühere WikiPanel-/OperationsPanel-Browse-Tabs) — das sind strukturell andere Komponententypen (Listenzeilen, Chips, Toggles), keine generischen Aktions-Buttons. `AltarReadingSummary`s eigener Fullscreen-Toggle wurde inzwischen ganz entfernt, siehe [Right Sidebar Action Bar](#right-sidebar-action-bar) unten.
-
-**Zweiter Rendering-Pfad: `tone`.** Neben den vier `variant`-Werten trägt `Button` einen komplett separaten, getönten Modus für Zeilen-Aktionen (Edit/Save/Delete/Cancel u. ä.): die Props `tone` (`'jade' | 'amber' | 'danger' | 'neutral'`), `compact` (30px reines Icon-Quadrat, sonst füllt die Aktion die verbleibende Breite mit Icon + Label), `active` (gedrückter/aktiver Zustand — aktuell nur für `jade` definiert) und `fill` (`flex-1`, damit die Aktion statt sich am Inhalt zu orientieren die ganze Zeile füllt). Ist `tone` gesetzt, übernimmt es das Rendering vollständig und `variant` wird ignoriert; die beiden Systeme sind bewusst getrennte Pfade in derselben Komponente, keine Varianten voneinander — `tone` kennt insbesondere den `active`-Toggle-State, den die vier Basis-Varianten oben nicht abbilden. Alle vier Töne teilen dasselbe "gedämpfte Fläche + passende Border, heller bei Hover"-Rezept, das ursprünglich am Altar-Fullscreen-Button entstand:
-
-- `jade` — primäre/positive Aktion (z. B. Done, Fullscreen-Toggle im aktiven Zustand)
-- `amber` — Edit
-- `danger` — Delete
-- `neutral` — Cancel
-
-`tone` entstand für `RightSidebarActionBar` und lebte zunächst als eigene Komponente (`SidebarActionButton`), wurde inzwischen aber in `Button` zusammengeführt — die App hat damit wieder eine einzige Button-Implementierung für dieses Pattern statt zwei. Genutzt in: `RightSidebarActionBar` (Edit/Done/Delete/Cancel, Altar-Fullscreen-Toggle — Details unten), `VaultModal` (Edit/Delete auf jeder Vault-Zeile, Save/Cancel beim Umbenennen, Save/Cancel beim Anlegen), `EntryListTab`s "+"-Button (`tone="neutral" compact`) und `SettingsModal`s Storage-Aufräum-Zeile (`tone="amber"` für Scan, `tone="danger"` für Löschen). Emerald Parchment hat für die `amber`-Töne eigene Overrides in `index.css` auf den zugrunde liegenden Tailwind-Utility-Klassen (`.bg-amber-900\/30`, `.hover\:bg-amber-900\/50`, `.border-amber-700\/60`, `.hover\:border-amber-500\/70`); die anderen drei Töne erben ihre Idle-Optik aus bereits bestehenden Parchment-Overrides. `amber` ist damit die erste Farbe außerhalb der dokumentierten Einzel-Akzent-Regel (jade) — sie stammt aus Tailwinds Default-Palette, nicht aus der `parchment`-Skala in `tailwind.config.js` und nicht aus einer `--accent-*`-CSS-Variablen, hat also keine Theme-Datei-Entsprechung und existiert nur als Utility-Klassen plus Parchment-Bridge in `index.css`.
-
-### Panels / Cards
-
-`.panel` / `.panel-interactive` (`index.css:95-99,124-131`, plus Theme-Overrides `index.css:633-637,1009-1013`) sind das konsistenteste wiederverwendete Pattern — in `HomeView.tsx` durchgängig für Journal-/Operations-/Wiki-Karten genutzt. Abweichung: Der Altar-Item-Modal-Card-Container (`AltarLibraryStrip.tsx:196`, `rounded-xl border border-stone-700/80 bg-stone-900 p-4`) reimplementiert dieselbe Optik roh statt `.panel` zu verwenden.
-
-Der Vault-Picker in `VaultModal.tsx` (`.vault-card`/`.vault-card-idle`/`.vault-card-active`/`.vault-badge` in `index.css`) ist eine zweite, bewusste Abweichung — nicht aus Nachlässigkeit, sondern weil `.panel`/`.panel-interactive` hier nachweislich nicht funktioniert hätten:
-
-1. **Theme-Overrides schlagen Modifier-Klassen.** `html[data-theme=…] .panel` hat Spezifität 0-2-1; eine einklassige Modifier-Regel wie `.panel.vault-card-active` (0-2-0, oder 0-1-0 für eine einzelne neue Klasse) verliert dagegen unabhängig von der Deklarationsreihenfolge. Der Akzent-Tint der aktiven Vault-Karte wäre in beiden Themes unsichtbar geblieben.
-2. **Unlayered schlägt layered, unabhängig von Spezifität.** In Emerald Parchment setzt eine `@layer base`-Regel `border-color` auf praktisch jedem Element. Deklarationen aus `@layer components` (wo `.panel` lebt) verlieren gegen unlayered Regeln selbst bei höherer Spezifität. Aus diesem Grund steht die Akzent-Rahmenfarbe der aktiven Vault-Karte absichtlich außerhalb jedes `@layer`-Blocks in `index.css` (mit Kommentar an Ort und Stelle), statt in `@layer components` neben den übrigen `.vault-*`-Klassen.
-
-Beide Punkte sind in beiden Themes per berechneten Stilen verifiziert. Das ist keine Vault-spezifische Einzelheit, sondern eine generelle Falle des Theming-Systems: jede neue "aktiv"-Variante auf einer bestehenden `.panel`-Karte braucht entweder eine eigene, unlayered Regel oder muss auf `.panel` ganz verzichten.
-
-### Modals / Dialogs
-
-Geteilter Modal-Wrapper: `src/components/ui/Modal.tsx`. Ein Overlay (`bg-black/50 backdrop-blur-sm`), eine `.modal-card` (`index.css`, theme-var-basiert: `background-color: var(--bg-surface-2)`, `border-color: var(--border-soft)`, `shadow-2xl`, `rounded-xl`) mit Header (Titel + Close-X), `createPortal` nach `document.body`, und Escape-to-close sind damit für alle Modals einheitlich. Genutzt von `SettingsModal`, `LinkPickerModal`, `ImportDestinationModal`, `AltarLibraryStrip` (`ItemModal` und `CategoryModal`), dem Gradient-Hintergrund-Picker in `AltarSidebarPanel`, und `RichEditor`s "nicht unterstütztes Bildformat"-Fehlerdialog beim Drag-Drop (vorher ein roher `fixed inset-0`-Overlay mit hartcodierten `stone-900`/`stone-700`-Farben, die im Emerald-Parchment-Theme nicht themten).
-
-`ImportDestinationModal`s Options-Zeilen nutzen jetzt die geteilte `context-menu-item-default`-Klasse aus `ContextMenu.tsx` statt roher `stone-800`/`stone-700`-Utility-Klassen, und Footer-Border/-Beschreibungstext nutzen `var(--border-soft)`/`var(--text-muted)` statt roher `stone-*`-Farben — damit themt auch dieses Modal jetzt vollständig in Emerald Parchment.
-
-`.modal-card` selbst hat kein `overflow-hidden` in der Basisklasse, da einzelne Modals einen Popover-Inhalt haben, der die Card-Grenzen verlassen muss (z. B. der Altar-Kategorie-Emoji-Picker). `overflow-hidden` wird stattdessen pro Modal per `className`-Prop opt-in gesetzt (`LinkPickerModal`, `ImportDestinationModal`, der Altar-Gradient-Picker).
-
-Verbleibende Abweichung: `LinkPickerModal`s interne Elemente (Suchfeld, Tab-Textfarben) nutzen weiterhin rohe Tailwind-`stone-*`-Utility-Klassen statt Theme-CSS-Variablen — nur der äußere Wrapper (Overlay/Card/Header/Portal) wurde vereinheitlicht, nicht der komplette Innenaufbau jedes Modals.
-
-`Modal` hat ein optionales `dismissible`-Prop (Default `true`). Auf `false` entfernt es alle drei Schließwege gleichzeitig — Close-X, Escape, Backdrop-Klick — statt jeden einzeln abschalten zu müssen. Genutzt vom Vault-Modal während der Erst-Einrichtung, wenn noch kein Vault existiert: es gibt dann nichts, wohin ein Schließen führen könnte.
-
-Ein nicht schließbares Modal lässt außerdem die Titelleiste frei: das Backdrop ist `fixed inset-x-0 bottom-0` und beginnt bei `top-10` statt `top-0`, sobald `usesCustomWindowControls` gilt (Windows und Linux, wo das Fenster ohne Systemdekoration läuft und die Titelleiste selbst Ziehen, Minimieren und Schließen übernimmt). Ohne das läge das Backdrop über der eigenen Titelleiste, und ohne X, Escape oder Backdrop-Klick bliebe nur noch Alt+F4. Ein schließbares Modal behält das volle Overlay — dort ist der Ausweg das Modal selbst.
-
-### Emoji-Picker
-
-Geteilte Komponente: `src/components/ui/EmojiPicker.tsx`. Kapselt Open/Close-State, Klick-außerhalb- und Escape-to-close (vorher bei keiner der Einzelimplementierungen vorhanden) sowie eine themed Popover-Chrome (`.emoji-picker-popover`, `.emoji-picker-item-idle`/`-active` in `index.css`, beide auf `--menu-bg`/`--menu-border`/`--menu-item-hover-bg` basierend). Der Trigger-Button bleibt pro Aufrufer frei gestaltbar (Render-Prop `trigger`), da sich die Trigger-Optik je nach Kontext stark unterscheidet (z. B. großer Bild/Emoji-Button mit Label in `AltarLibraryStrip`s `ItemModal` vs. reiner Emoji-Glyph ohne Hintergrund in den Kategorie-Zeilen von Operations/Tasks/Wiki) — analog zu `Modal.tsx`, das ebenfalls nur die äußere Chrome vereinheitlicht und den Inhalt frei lässt.
-
-Genutzt von `AltarLibraryStrip` (`ItemModal` und `CategoryModal`), `AltarSidebarPanel` (Altar-Favicon/-Emoji in den Altar-Properties), `RoutinesPanel` (Add- und Edit-Formular), `OperationsView`, `TasksView` und `WikiView` (jeweils Add- und Edit-Kategorie) — 11 vormals unabhängige Implementierungen mit rohen `bg-stone-800`/`border-stone-700`-Popovern (die im Emerald-Parchment-Theme falsch bzw. gar nicht themten) sind damit auf eine gemeinsame, theme-korrekte Implementierung reduziert. Einzige Vorlage, die bereits korrekt themte, war `WikiView`s `.wiki-emoji-popover`; deren CSS-Klassen wurden zu den jetzt generischen `.emoji-picker-*`-Klassen verallgemeinert.
-
-Vorher hatte jede Aufrufer-Stelle eine eigene, unterschiedlich kuratierte Emoji-Liste (`ROUTINE_EMOJIS`, `OPERATION_EMOJIS`, `TASK_EMOJIS`, `WIKI_EMOJIS`, `ALTAR_CAT_EMOJIS`, `ALTAR_ICON_EMOJIS`, `CATEGORY_EMOJIS`/`FALLBACK_CATEGORY_EMOJIS` inkl. der kategoriebasierten Mini-Vorschläge im Altar-Item-Picker). Alle wurden entfernt zugunsten einer einzigen `DEFAULT_EMOJI_PICKER_EMOJIS`-Konstante in `EmojiPicker.tsx`, die als Default für den optionalen `emojis`-Prop dient — damit steht in jedem Picker dieselbe Auswahl zur Verfügung.
-
-Das Popover-Grid ist auf **max. 5, min. 3 Spalten** ausgelegt (`COLUMNS`/`MIN_COLUMNS` in `EmojiPicker.tsx`): `width`/`minWidth`/`maxWidth` werden direkt am Grid-Element in Zellen-Einheiten berechnet (`cell * n + gap * (n-1)`), nicht am gepolsterten Popover-Rahmen — eine erste Version rechnete das gegen die Border-Box der äußeren, gepolsterten Box, wodurch für 5 Spalten zu wenig Platz übrig blieb und `auto-fill` auf 4 abrundete. `grid-template-columns: repeat(COLUMNS, minmax(0, 1fr))` erzwingt seitdem die konfigurierte Spaltenzahl exakt, statt sie wie zuvor über `auto-fill` aus der verfügbaren Breite abzuleiten — das bleibt auch bei der unten beschriebenen, absichtlich reduzierten Grid-Breite stabil bei 5 Spalten. Bei zu wenig Viewport-Breite (`maxWidth: calc(100vw - 3rem)`) schrumpft das Raster bis auf 3 Spalten (harte Untergrenze über `minWidth`, kann bei extrem schmalem Fenster leicht über den Viewport hinausragen).
-
-Scroll-Clipping sitzt auf einem eigenen Wrapper um das Grid herum (`max-h-56 overflow-y-auto overflow-x-hidden`), nicht direkt auf dem Grid. Da die globale Scrollbar-Regel (`::-webkit-scrollbar` in `index.css`, 6 px) plattformübergreifend einen klassischen, platzraubenden statt einen überlagernden Scrollbalken erzeugt, lief ein gleich breites Grid auf macOS über den Wrapper hinaus und erzeugte einen sichtbaren horizontalen Scrollbalken; `overflow-x-hidden` unterdrückt dieses Artefakt. Damit der vertikale Scrollbalken dabei nicht stattdessen die letzte Emoji-Spalte überlappt, ist das Grid über ein eigenes `gridStyle`-Objekt (getrennt von `sizeStyle`, das weiterhin Suchfeld- und Popover-Breite bestimmt) um eine feste `SCROLLBAR_GUTTER` (`0.5rem`) schmaler als der Scroll-Wrapper — der Scrollbalken hat dadurch Platz in der Lücke rechts vom Grid.
-
-**Suche**: Ein fixes Suchfeld (`.emoji-picker-search`, themed wie `.input-field`, vormals `.wiki-cat-input` — inzwischen auf allgemeine kleine Text-Inputs verallgemeinert und auch vom Vault-Rename-/Vault-Create-Feld in `VaultModal.tsx` genutzt) sitzt oben im Popover und scrollt nicht mit. Leer zeigt der Picker weiterhin `DEFAULT_EMOJI_PICKER_EMOJIS`; sobald getippt wird, durchsucht er stattdessen ein vollständiges, lokalisiertes Emoji-Set aus `src/lib/emojiSearchData/{en,de,es,fr}.json` (je `[emoji, suchtext]`-Paare, aus `emojibase-data@17` generiert — Skins/reine Flaggen-Bausteine ausgeschlossen, ca. 1900 Einträge/Sprache), nicht nur die kuratierte Kurzliste. Das passende Locale-File wird anhand von `i18n.language` gewählt (Fallback `en`) und per dynamischem `import()` erst beim ersten Öffnen eines Pickers nachgeladen (Vite code-splittet das automatisch in einen eigenen Chunk pro Sprache, ~100–150 KB, mit Modul-Level-Cache gegen Mehrfach-Laden). Treffer sind auf 150 begrenzt (`MAX_SEARCH_RESULTS`), ein leeres Ergebnis zeigt `common.noEmojiResults` statt eines leeren Rasters.
-
-Das Suchfeld bekommt bewusst dieselbe explizite `width`/`minWidth`/`maxWidth` (`sizeStyle`-Objekt) wie das Grid statt einer prozentualen `w-full`-Breite: `AltarSidebarPanel`s Favicon-Picker sitzt (anders als die übrigen 10 Aufrufer, die alle in einer Flex-Zeile stecken) in einem normalen Block-`<div>`, dessen Wrapper dadurch auf 100 % Elternbreite aufgeht statt sich auf die Trigger-Größe zu schrumpfen — eine `w-full`-Suchleiste hätte sich dort gegen diese (deutlich breitere) Wrapper-Breite aufgeblasen und rechts neben dem schmaleren, fix breiten Grid sichtbaren Leerraum hinterlassen. Mit identischer expliziter Breite für Input und Grid kann das unabhängig vom umgebenden Layout des jeweiligen Aufrufers nicht mehr auseinanderlaufen.
-
-Verbleibende Abweichung: die "Keine Treffer"-Meldung bei leerer Suche (`EmojiPicker.tsx:151`) nutzt rohes `text-stone-500` statt einer Theme-CSS-Variable wie `--text-muted` — der einzige Rest an unthemtem Text innerhalb einer ansonsten komplett auf CSS-Vars umgestellten Komponente.
-
-Das Popover selbst hängt inzwischen per `createPortal` an `document.body` statt `absolute top-full` im Trigger-Wrapper zu liegen, und positioniert sich mit `position: fixed` in Viewport-Koordinaten (neu berechnet bei `resize` und bei `scroll` mit `capture: true`, damit auch scrollende Vorfahren erfasst werden). Grund: der nächstgelegene Vorfahre mit `overflow` schnitt das Popover sonst ab — im Vault-Modal etwa der scrollende Modal-Body, in dem es nichts zu scrollen gab, wodurch das Popover dort praktisch unsichtbar war. Klappt nach oben, wenn unten zu wenig Platz ist, und rückt seitlich vom Fensterrand ab. `wrapperClassName` braucht dafür kein `relative` mehr. Der Klick-außerhalb-Handler prüft jetzt Trigger **und** Popover (`ref`/`popoverRef`), da das Popover als Portal-Kind kein DOM-Nachfahre des Triggers mehr ist. Die Popover-Ebene ist `z-[9999]` — dieselbe Stufe, die `ContextMenu` und `MenuDropdown` für Overlays über einem Modal (`z-50`) nutzen.
-
-Escape wird in der **Capture-Phase** abgefangen, mit `stopPropagation()`. Grund: `Modal` registriert seinen eigenen Escape-Handler ebenfalls auf dem Dokument, aber in der Bubble-Phase, und ist beim Mount des Pickers immer schon da — ohne das Abfangen gewänne bei einem Escape im offenen Picker immer das Modal, und Escape schlösse das ganze Modal samt laufender Bearbeitung statt nur des Pickers. Das gilt an jeder Aufrufstelle, `AltarLibraryStrip` eingeschlossen.
-
-### Dashboard (Modul-Übersichtsscreens)
-
-Geteilte Komponente: `src/components/ui/Dashboard.tsx` (generisch über `<T>`). Vereinheitlicht nur die äußere Chrome der sechs Modul-Übersichtsscreens (Wiki, Operations, Journal, Altar, Tasks, Trash) — Topbar, `ListToolbar`/`FilterPanel`-Einbindung, sowie Leerzustands-/No-Results-/Gruppierungs-Orchestrierung — analog zum `Modal`/`EmojiPicker`-Prinzip: nur die Chrome ist geteilt, der eigentliche Item-Inhalt bleibt pro Aufrufer lokal (`renderItem`-Prop).
-
-**Topbar**: Standardmäßig `title` + optionale `primaryAction` (Button + Plus-Icon) rechts. Beide Seiten sind per `headerLeft`/`headerRight` vollständig ersetzbar, wenn eine Ansicht keine primäre Aktion, sondern z. B. Bulk-Select-Controls braucht (Trash: Select-all-Link links, Bulk-Delete/Empty-Trash-Buttons rechts). `headerClassName` ist ebenfalls überschreibbar (Trash nutzt `px-6` statt der Default-`px-8`, aus historischen Gründen enger als die übrigen Dashboards).
-
-**Gruppierung** (`grouping`-Prop, vier Modi):
-- `flat` — ungruppierte Liste (Altar).
-- `timeline` — Divider-Gruppen mit `label` + `items`, kein editierbarer Header (Journal: sowohl der Datums-Timeline- als auch der "nach Mondphase gruppiert"-Fall laufen über diesen Modus, da beide dieselbe Divider-Optik brauchen; Altar für seine Datumsgruppen).
-- `category` — wie `timeline`, aber mit `renderGroupHeader`/`renderAddCategory`-Render-Props für editierbare Kategorie-Header inkl. Inline-CRUD (Wiki, Operations — Operations ergänzt zusätzlich einen "Other"-Uncategorized-Bucket als weitere Gruppe).
-- `custom` — Escape-Hatch: Aufrufer liefert eine `render()`-Funktion und ist für den kompletten Inhaltsbereich selbst verantwortlich. Genutzt von Tasks (hierarchische Task/Subtask-Struktur, Kategorie-Collapse-Zustand, Uncategorized-zuerst-Reihenfolge) und Trash (zweistufige Typ→Kategorie-Gruppierung) — beide Strukturen sind nicht generisch abbildbar. `DashboardProps<T>` ist als discriminated Union über `grouping.mode` typisiert: `renderItem`/`isEmpty`/`emptyState`/`hasNoResults` sind nur bei `flat`/`timeline`/`category` erforderlich und bei `custom` typseitig ausgeschlossen (`grouping.mode === 'custom'` wird in `renderContent()` als erste Prüfung behandelt) — Tasks und Trash müssen dadurch keine bedeutungslosen Dummy-Props (`renderItem={() => null}`, `isEmpty={false}` usw.) mehr an `Dashboard` übergeben, nur um in den `custom`-Modus zu wechseln.
-
-**Filter**: `filters`-Prop ist optional (Views ohne Filterkonzept, z. B. Altar, lassen sie weg). Sie kapselt `showFilters`/`onToggleFilters`/`activeFilterCount` sowie `panelProps` (an `FilterPanel` durchgereicht — dessen `FilterPanelProps`-Interface wurde dafür aus `FilterPanel.tsx` exportiert) und ein optionales `extraPanelContent` für zusätzliche Filterzeilen unterhalb des `FilterPanel` (Tasks' Prioritäts-Chip-Zeile). `toolbarExtraActions` reicht zusätzliche Controls direkt in die `ListToolbar` durch (Tasks' "Show completed"-Toggle).
-
-Diese Vereinheitlichung ist rein strukturell — das visuelle Ergebnis ist unverändert zum vorherigen Zustand jedes Dashboards. Ein separates visuelles Redesign der Dashboards ist als nächster Schritt geplant, aber noch nicht begonnen.
-
-### Left Sidebar: Rail + Entry-List
-
-Die linke Sidebar besteht aus zwei nebeneinander liegenden Komponenten: `LeftSidebarRail.tsx` (feste 56px-Icon-Leiste) und `LeftSidebarEntryList.tsx` (daneben liegendes, größenverstellbares Panel). Zwei neue geteilte Button-Komponenten kapseln die jeweiligen Zustände:
-
-- `RailButton.tsx` — dünner Wrapper um die bestehende `.btn-ghost`-Klasse, für alle Icon-Buttons der Rail (Listen-Toggle, Modul-Icons, Tags/Trash/Vault/Settings) sowie für die Verlaufs-Buttons in der Titelleiste.
-- `TabIconButton.tsx` — Active/Idle-Toggle für die sechs Tab-Icons im Entry-List-Panel (All + fünf Module). Trägt im Grundzustand `border border-transparent`, weil die Theme-Regeln dem aktiven Tab einen 1px-Rahmen geben: ohne den Platzhalter ist der aktive Tab 32px breit und die inaktiven 30, die Reihe ruckt bei jedem Tabwechsel um 2px, und die sechs Tabs passen nicht mehr in die aus ihnen abgeleitete Standardbreite der Eintragsliste. Nutzt ansonsten die bereits bestehenden `.right-sidebar-tab-active`/`.right-sidebar-tab-idle`-CSS-Klassen (ursprünglich für die rechte Sidebar benannt) statt eigener Klassen — funktional identisch, aber der Klassenname passt jetzt nicht mehr zur tatsächlichen Verwendung auf beiden Seiten der App. Die themafähigen Farbregeln für diese Klassen in `index.css` waren zunächst per `.app-sidebar-right`-Präfix auf die rechte Sidebar gescoped; die Hover-Regel für inaktive Tabs (`.text-stone-500.hover\:text-stone-300:hover`) ist in beiden Themes jetzt zusätzlich auf `.app-sidebar-left` gescoped, sodass linke und rechte Tab-Icons denselben Hover-Farbwert treffen, statt dass die linke Seite auf ungestyltes Tailwind-Grau zurückfällt.
-
-Neue CSS-Klassen in `index.css`: `.left-sidebar-rail` (eigener Hintergrund `--shell-bg`, hebt die Rail farblich vom Entry-List-Panel ab, das weiterhin `--sidebar-bg` nutzt) und `.rail-divider` (themafähige Trennlinien innerhalb der Rail, mit denselben Border-Farbwerten wie `.titlebar`/`.sidebar-search` in beiden Themes).
-
-Der frühere Rail-Kopf — Emerald-Logo, Zurück/Vorwärts und der Such-Button — ist entfallen; diese drei sitzen jetzt in der Titelleiste (siehe unten). Die Rail beginnt dadurch direkt mit den Panel-Togglern. Die zugehörige `.sidebar-header`-Klasse wurde ersatzlos entfernt; `.titlebar` steht an ihrer Stelle in den beiden gruppierten Hairline-Regeln, sodass Titelleiste und Rail-Trennlinien weiterhin denselben Farbwert teilen.
-
-`RAIL_WIDTH` wird von `LeftSidebarRail` exportiert und von `AppShell` konsumiert, statt als `w-14` ein zweites Mal dazustehen: seit die Standardbreite der rechten Seitenleiste sich daraus ableitet, ergäbe eine Abweichung eine geklippte Rail *und* eine falsche Breite rechts.
-
-Über Journal steht seit dem Umbau ein **Home-Button** (lucide `Home`, `size={18}` wie seine Nachbarn) als Einstieg ins Dashboard. Er ersetzt den Klick auf das Emerald-Logo in der Titelleiste, das dafür wieder ein reines Bild ist: ein Logo in der Fensterecke liest niemand als Navigationsziel, und als Control nahm es der Ecke das Ziehen weg.
-
-Die **Tab-Leiste des Entry-List-Panels** ist `flex-wrap` mit `min-h-14` statt `h-14`. Bei voller Breite ändert das optisch nichts; wird das Panel schmaler gezogen als seine sechs Tabs breit sind (226px, siehe `ENTRY_LIST_TABS_WIDTH`), bricht sie in eine zweite Reihe um, statt stumm über den Rand zu laufen. Der Preis steht unter [Beobachtete Inkonsistenzen](#beobachtete-inkonsistenzen): im umgebrochenen Zustand liegen die unteren Trennlinien der beiden Seitenleisten nicht mehr auf einer Höhe.
-
-Das **Ein- und Ausblenden beider Seitenleisten ist animiert** (200ms Breiten-Transition). Der Inhalt behält dabei seine Pixelbreite und wird vom `<aside>` geklippt, statt mitzuschrumpfen — sonst quetschte er sich sichtbar zusammen und die Tab-Leiste bräche mitten im Übergang um. Während eines Resize-Drags nimmt `AppShell` die Klasse `.app-sidebar-animated` weg, sonst hinkt die Kante dem Zeiger hinterher. Die Transition steht als Klasse in `index.css`, nicht als Inline-Style aus `SIDEBAR_ANIM_MS` heraus — ein Inline-Style schlüge jede Regel im Stylesheet und damit auch die `prefers-reduced-motion`-Abbestellung, die direkt darunter steht (gleiche Spezifität, gewinnt über die Reihenfolge). Das ist die erste Reduced-Motion-Regel der Datei.
-
-Die Listenzeilen selbst (Suche, Leerzustand, Inline-Rename, Drag-Start, Kontextmenü) sind in `EntryListTab.tsx` zentralisiert — analog zu `Dashboard.tsx`, das nur die äußere Chrome vereinheitlicht: Journal/Operations/Wiki/Altar reichen Accessor-Funktionen (`getIcon`/`getTitle`/`getDateStr`) durch, Tasks steigt über die `renderRow`-Render-Prop aus (eigene Checkbox-Zeile statt Icon-Zeile).
-
-### Titelleiste
-
-`src/components/layout/titlebar/TitleBar.tsx`, **40px hoch** (`h-10`). Bewusst nicht die sonst übliche `h-14`-Kopfhöhe: die Titelleiste ist Fenster-Chrome, keine Inhalts-Kopfzeile, und 56px wirken dafür schwer. 40px trifft stattdessen die `TabBar` (ebenfalls `h-10`), sodass beide horizontalen Leisten denselben Rhythmus haben. Weil die Titelleiste *über* der dreispaltigen Shell sitzt, bleibt die bewusst gleiche Höhe von `LeftSidebarEntryList`s Tab-Leiste und `RightSidebarActionBar` (beide `h-14`) unangetastet.
-
-Layout ist Flexbox, kein zentrierendes Grid mehr: die linke Spalte (Logo, Menüleiste, Zurück/Vor) und die rechte (Fensterknöpfe) sind `flex-shrink-0`, die mittlere Spalte mit dem Suchfeld ist `flex-1 min-w-0` — die einzige Spalte, die nachgibt, wenn das Fenster schmaler wird. Das Suchfeld ist dadurch immer sichtbar (`w-full max-w-[26rem]`) und nicht mehr auf der Fenstermitte zentriert, sondern füllt den Restplatz zwischen Menü und Fensterknöpfen. Unterschreitet dieser Restplatz 192px (`SEARCH_MIN_PX` in `TitleBar.tsx`), falten sich die vier Menüs (Bearbeiten/Ansicht/Export/Import) stattdessen in einen einzelnen Button mit Menu-Icon (`titlebar.menu`), der sie als Submenüs führt — die Menüleiste selbst schrumpft nie, nur das Suchfeld gibt zuerst nach. Der Umschaltpunkt ist keine feste Fensterbreite, sondern wird per `ResizeObserver` aus der tatsächlich gerenderten Breite der Menüleiste berechnet: sie ist auf Deutsch 315px breit gegen 203px auf Englisch, eine Konstante würde also eine der beiden Sprachen falsch bedienen. Die ausgeklappte Breite wird in einem Ref gemerkt und im eingeklappten Zustand weiterverwendet, sonst würden beide Zustände oszillieren; ein Sprachwechsel verwirft den Cache und klappt zuerst wieder aus. Im Altar-Fokusmodus (`isAltarFullscreen`) klappt die Leiste nie ein, weil dort kein Suchfeld zu schützen ist. Die Fenster-Mindestbreite wurde parallel von 900px auf 720px gesenkt (`minHeight` bleibt 600), da die Titelleiste jetzt bei wenig Platz nachgibt statt zu überlaufen.
-
-**Genau ein neues Token**: `--titlebar-bg` (Noctis `rgba(24, 20, 16, 0.94)`, Parchment `#ecdec7`) — bewusst etwas dunkler bzw. wärmer als `--tabbar-bg`, damit sich die beiden Leisten nicht optisch zu einer verschmelzen. Alles andere wird wiederverwendet: `--interactive-hover`/`--interactive-active` (Hover der Menü-Trigger und Fenster-Buttons), `--text-secondary`/`--text-muted`/`--text-subtle` (Beschriftungen und Glyphen), `--menu-*` (Dropdown-Flächen), sowie `--search-bg`/`--search-border`/`--search-inset` über die von `EntryListTab` geerbte `.sidebar-search-inner`-Klasse.
-
-Bewusst hartkodiert statt tokenisiert: das Fluent-Rot des Schließen-Buttons (`#c42b1c`, aktiv `#b2231a`) — es ist in beiden Themes identisch, ein Token wäre also nur ein zweiter Ort, an dem derselbe Wert gepflegt werden müsste.
-
-Eine Einschränkung zur Such-Pille: sie trägt wie ihr Vorbild in `EntryListTab` zusätzlich `bg-stone-700/40`, und in Emerald Parchment gewinnt der Theme-Override für diese Utility-Klasse (`index.css`) gegen die `.sidebar-search-inner`-Regel. Dort kommt also nicht `--search-bg` zum Zug, sondern der Override-Wert. Beide Suchfelder sehen dadurch weiterhin gleich aus — die Klasse wurde bewusst mitgenommen —, aber die Aussage „läuft über `--search-bg`" gilt in Parchment nur für Noctis-artige Fälle. Das sauber aufzulösen hieße, `bg-stone-700/40` an beiden Stellen gemeinsam zu entfernen.
-
-Die Höhe der Pille (`h-7`, 28px) weicht bewusst von der Eintragslisten-Suche (~34px) ab: in einer 40px hohen Leiste würde ein 34px-Feld die Leiste fast ausfüllen.
-
-**Suchfeld**: ein echtes `<input>` (`TitleBarSearch.tsx`, vormals `TitleBarSearchButton.tsx`) statt eines Buttons in Suchfeld-Optik — die App hat jetzt eine modulübergreifende Suche (`src/lib/globalSearch.ts`), siehe [Features → Search](features.md#search) für das Nutzerverhalten. Feld und Trefferliste (`TitleBarSearchResults.tsx`, siehe [Suchergebnis-Dropdown](#suchergebnis-dropdown) unten) bilden zusammen ein Combobox-Muster: `role="combobox"`, `aria-expanded`, `aria-controls`, `aria-activedescendant`; der Fokus bleibt im Feld, die Pfeiltasten bewegen nur die Markierung in der Liste daneben. Optisch teilt sich das Feld weiterhin `.sidebar-search-inner` mit der Eintragslisten-Suche, färbt seine Beschriftung aber über `.titlebar-search` mit `--text-subtle`. Weil die Pille selbst kein fokussierbares Element mehr ist — das `<input>` darin ist es —, steht `:focus-within` jetzt an der Stelle, an der zuvor `:focus-visible` auf der Pille selbst saß.
-
-### Suchergebnis-Dropdown
-
-`TitleBarSearchResults.tsx` — die Trefferliste unter dem Titelleisten-Suchfeld. Liegt wie `ContextMenu`/`EmojiPicker`/`Modal` per `createPortal` auf `document.body` mit `position: fixed` (`z-[9999]`), aus demselben Grund: `.app-sidebar` und `.app-main` sind gleichrangige Stacking-Contexts, gegen die ein inline in der Titelleiste gerendertes Panel verlieren würde. Nutzt `.menu-surface` — dieselbe Fläche wie die Titelleisten-Menüs — statt der `link-picker-*`-Klassen: es soll wie die Menüs aussehen, zwischen denen es aufklappt, nicht wie ein Modal an anderer Stelle der App. Neue Klassen in `index.css`: `.search-result-row/-title/-snippet/-badge/-meta` und `.search-match` (Fundstellen-Hervorhebung, farblich wie `.vault-card-active .vault-badge` — eingefärbt statt umrahmt, damit die Liste kein Flickenteppich wird). Tastatur- und Mausauswahl sind ein einziger Zustand (`aria-selected`), kein separates `:hover` daneben, sonst könnten zwei Zeilen gleichzeitig markiert aussehen. Ein Kategorie-Treffer zeigt in seinem Badge zusätzlich sein Modul (`Kategorie · Wiki`) — die vier Kategorie-Tabellen teilen sich Built-in-Ids (`other`, `herb`, `deity`, …), ohne das Modul wären zwei gleichnamige Zeilen nicht auseinanderzuhalten.
-
-Die Fußzeile, die auf zurückgehaltene Treffer hinweist, ist kein `<p>` mehr, sondern ein `<button>` mit eigener Klasse `.search-result-more` — ein Klick blättert die nächsten 50 Treffer nach (`onShowMore`, beliebig oft wiederholbar), statt die Kappung nur zu benennen. Sie bekommt `border-top: 1px solid var(--menu-border)`, weil sie am unteren Rand der scrollenden Liste angeheftet ist und die Trennlinie sonst fehlt, die der Scrollrand normalerweise liefert — ohne sie liefe die halb abgeschnittene letzte Zeile optisch in die Fußzeile hinein. Bewusst keine `.search-result-row`: sie trägt keine Auswahl und wird von den Pfeiltasten nie markiert.
-
-Der Außenklick-Listener sitzt in der **Capture-Phase**: Tauris `drag.js` hängt seinen eigenen `mousedown`-Listener an `document`, noch vor allem, was die App selbst registriert, und ruft auf jedem `data-tauri-drag-region`-Element `stopImmediatePropagation()` — genau das ist der Zwischenraum links und rechts vom Suchfeld. In der Bubble-Phase hätte ein Klick dorthin stattdessen das Fenster gezogen und die Trefferliste offen stehen lassen.
-
-Die Panelbreite hat eine Mindestbreite `MIN_PANEL_REM = 24` statt einer px-Konstante, weil WebKitGTK seine Wurzelschrift aus der GTK-Textskalierung zieht; eine feste px-Zahl bräche bei größerer Systemschrift auf weniger als zehn Zeichen zusammen.
-
-Die Zeile, auf die ein Aufgaben-Treffer zeigt (`TasksView.tsx`), bekommt die neue Klasse `.task-row-target` — ein `outline` statt `background`/`border`/`box-shadow`, weil `html[data-theme=…] .panel-interactive` alle drei mit höherer Spezifität überschreibt (dieselbe Falle wie bei den Vault-Karten, siehe [Panels / Cards](#panels--cards) oben). Beide neuen `color-mix`-Stellen (`.search-match`, `.task-row-target`) haben eine `rgba()`-Zeile als Rückfall davor, für WebKit vor 16.2 / WebKitGTK vor 2.40.
-
-**Fenster-Buttons** (`WindowControls.tsx`, nur Windows/Linux): 46×40px, eckig, ohne Abstand, bündig in der Fensterecke — die Windows-Fluent-Geometrie. Die Glyphen sind Inline-SVG auf einem 10×10-Raster mit 1px-Strich statt lucide-Icons, weil lucide kein korrektes "Wiederherstellen"-Symbol hat (zwei versetzte Quadrate, das hintere angeschnitten).
-
-**Menü-Dropdowns** (`MenuDropdown.tsx`, nur Windows/Linux): eigene Komponente statt einer Erweiterung von `ContextMenu.tsx`. Letzteres positioniert sich an einer Cursor-Koordinate, hat einen Timing-Kniff, um den öffnenden Rechtsklick zu überleben, und kennt weder deaktivierte Einträge noch Untermenüs — beides bräuchte die Menüleiste.
-
-`MenuDropdown` kennt inzwischen ankreuzbare Einträge (`checked` am `MenuNode`, `role="menuitemcheckbox"` plus `aria-checked`), genutzt von den beiden Seitenleisten-Togglen im Ansicht-Menü. Sobald *ein* Eintrag eines Panels ankreuzbar ist, bekommen alle den führenden 14px-Slot — sonst stünden die Labels desselben Panels auf zwei Kanten.
-
-Damit existieren zwei Dropdown-Implementierungen mit je eigenen Flächen-Klassen: `.menu-surface`/`.menu-item`/`.menu-separator` für die Menüleiste, `.context-menu*` für das Kontextmenü. Farblich sind sie zusammengeführt — `.menu-item` hängt in beiden Themes in denselben Selektorgruppen wie `.context-menu-item-default`, teilt also Ruhe- und Jade-Hover-Farbe — und die Zeilenhöhe (`py-2`) stimmt überein. Die Strukturklassen selbst sind aber weiterhin doppelt: `ContextMenu` nutzt noch rohes `border-stone-700/60` und `shadow-2xl` statt `--menu-border`/`--menu-shadow`. Das zusammenzuführen wäre der nächste Schritt und würde `ContextMenu` auf `.menu-surface`/`.menu-item` plus seine `danger`-Variante reduzieren.
-
-Deaktivierte Einträge werden über `opacity: 0.45` gedämpft, nicht über eine eigene Farbe: die Theme-Regeln für `.menu-item` sind spezifischer als `.menu-item:disabled`, eine Farbangabe dort würde also nicht durchkommen.
-
-**Tastaturbedienung**: Die Leiste trägt `role="menubar"`, deshalb muss sie den zugehörigen Vertrag auch einhalten — Links/Rechts wechseln zwischen den Menüs, Runter öffnet und springt in das Panel, Hoch/Runter laufen darin, Rechts/Links öffnen und schließen das Untermenü, Escape schließt. Nur ein per Tastatur geöffnetes Menü zieht den Fokus ins Panel; per Maus geöffnet bleibt der Fokus stehen, sonst verlöre der Editor seine Selektion und Ausschneiden/Kopieren hätten nichts mehr, worauf sie wirken.
-
-### Right Sidebar Action Bar
-
-`RightSidebarActionBar` (in `RightSidebar.tsx`) ersetzt die früheren, pro Entry-View dupliziert implementierten Edit-/Save-/Cancel-/Delete-Buttons in den Content-Headern durch eine einzelne, über der scrollbaren Properties-Fläche fixierte Leiste (`px-3 h-14 border-b`, bewusst identisch zur Tab-Leiste in `LeftSidebarEntryList`, damit beide Sidebars ihre untere Trennlinie auf derselben Höhe haben — siehe Kommentar `ACTION_BAR_CLASSES` in `RightSidebar.tsx`).
-
-**Horizontales Padding hat genau eine Quelle.** Der scrollbare Properties-Container darunter (`<div className="flex-1 overflow-y-auto p-3">` in `RightSidebar.tsx`) trägt das einzige horizontale Padding der rechten Sidebar, mit Kommentar im Code dazu. `PropertiesReadView`, `PropertiesEditView` und die beiden bedingten Blöcke in `AltarSidebarPanel` legen kein eigenes `px-*` mehr darüber — vorher taten sie das (`px-3` bzw. `px-1`), wodurch die Summary-Zeilen 24px eingerückt waren gegen 12px beim Edit-Button in der Actionbar darüber, sichtbar unterschiedliche Breiten. Ein Panel, das wieder eigenes horizontales Padding ergänzt, bricht diese Deckungsgleichheit erneut.
-
-Die Buttons selbst sind `Button` in seinem getönten `tone`-Modus (`jade`/`amber`/`danger`/`neutral`, `compact` für die 30px-Icon-Quadrate) — siehe [Buttons](#buttons) oben für die volle Beschreibung inklusive der Parchment-Hover-Fixes und der `amber`-Akzentton-Herkunft. Dieser Modus entstand ursprünglich für diese Leiste (zunächst als eigene `SidebarActionButton`-Komponente, seither in `Button` konsolidiert), wird inzwischen aber auch anderswo genutzt (`VaultModal`, `SettingsModal`, `EntryListTab`).
-
-Der Inhalt der Leiste hängt vom `activeView.mode` ab: im Edit-Modus Done (primär) + Delete (falls vorhanden) + Cancel; im View-Modus nur Edit (primär), bei Altar zusätzlich ein Fullscreen-Toggle. Bei einer geladenen Sigil-Operation zeigt die Leiste nichts an, da geladene Sigile nicht editierbar sind (`OperationSigilView`s bestehende Regel). Altar hat dadurch erstmals eine Delete-Aktion in der Sidebar bekommen, die vorher fehlte.
-
-### Icons (lucide-react)
-
-Keine dokumentierte Größen-Skala. `size`-Props reichen von 10–18px und variieren teils innerhalb derselben Datei zwischen visuell gleichrangigen Elementen, z. B. `SettingsModal.tsx`: Header-Close-Icon `size={16}` (Zeile 179), Sektions-Icons überwiegend `size={13}`/`size={14}` (Zeilen 189, 205, 214, 229, 248, 276, 349, 363, 366) ohne erkennbares Muster, welches Icon welche Größe bekommt. Farbe wird konsistent über die umgebende `text-stone-*`/`text-jade-*`/Theme-Var-Klasse vererbt, nicht per `color`-Prop.
-
-### Kontextmenü
-
-`src/components/ui/ContextMenu.tsx` hängt per `createPortal` an `document.body` — aus demselben Grund wie `EmojiPicker` und `Modal`. Inline gerendert galt sein `z-[9999]` nur innerhalb der Sidebar: `.app-sidebar` und `.app-main` tragen in beiden Themes `position: relative; z-index: 1` (`index.css`) und sind damit gleichrangige Stacking-Contexts, gegen die der später gemalte Hauptbereich immer gewinnt. Eine höhere Zahl half nicht; das Menü lag unter dem Inhalt und wirkte abgeschnitten.
-
-Die Positionierung klemmt seitdem zusätzlich, statt nur zu kippen: ein Menü, das höher ist als der Klick-Y-Offset, bekam vorher ein negatives `top` und wurde oben abgeschnitten.
-
-`PlacedElementRow` hatte ein eigenes, handgebautes Portal-Menü mit rohen `stone-*`-Farben und ohne jede Kantenlogik; es nutzt jetzt dieselbe Komponente. Damit gibt es in der App genau eine Kontextmenü-Implementierung.
-
-## Beobachtete Inkonsistenzen
-
-Sachliche Zusammenfassung der oben belegten Abweichungen, ohne Priorisierung:
-
-1. **Primärfarbe an drei Stellen unabhängig gepflegt**: `jade`-Tailwind-Skala, `--accent`-CSS-Vars pro Theme, und Bridge-Overrides in `index.css` (z. B. `index.css:900-906`, `1343-1348`) — alle drei können bei einer Farbänderung auseinanderlaufen.
-2. **`parchment`-Tailwind-Skala ungenutzt**: Definiert in `tailwind.config.js:29-41`, aber das Parchment-Theme verwendet eigene CSS-Var-Werte, die nicht auf diese Skala mappen.
-3. **Border-Radius ohne erkennbare Regel** zwischen `rounded-md`/`lg`/`xl` für konzeptionell ähnliche Container (z. B. `ContextMenu` vs. `UndoToast`).
-4. **Icon-Größen rein ad-hoc** (10–18px), keine Skala, teils uneinheitlich innerhalb derselben Datei.
-5. **`JetBrains Mono` totes Config**: in `tailwind.config.js:46` deklariert, aber nirgends per Font-Link geladen.
-6. **`amber` als zweiter Akzentton neben `jade`**: aus Tailwinds Default-Palette, ohne Entsprechung in den Theme-CSS-Variablen oder der `parchment`-Skala — verschärft Punkt 1 und 2.
-7. **Aktionen nur über eine einklappbare Fläche erreichbar**: Edit/Done/Delete/Cancel leben ausschließlich in der rechten Sidebar. Wer sie mitten im Edit-Modus zuklappt, hat keinen sichtbaren Weg zurück; ein Tastatur-Fallback existiert nicht. Beim *Wechsel* in den Edit-Modus wird die Leiste automatisch aufgeklappt (`usesEditorSidebar` in `uiStore.ts`), das deckt den Einstieg ab, nicht das nachträgliche Zuklappen.
-8. **Tab-Leiste und Action Bar liegen nicht immer auf einer Höhe**: `LeftSidebarEntryList`s Tab-Leiste ist `min-h-14` und bricht unterhalb von 226px Panelbreite in eine zweite Reihe um; `RightSidebarActionBar` bleibt bei `h-14`. Die in [Right Sidebar Action Bar](#right-sidebar-action-bar) beschriebene Deckungsgleichheit der beiden unteren Trennlinien gilt dann nicht. Bewusst so: die rechte Leiste mitwachsen zu lassen hieße, sie aus einem Grund zu vergrößern, der mit ihrem eigenen Inhalt nichts zu tun hat.
-9. **Kein sichtbarer Fokus-Ring in Emerald Noctis**: `button:focus-visible` ist in `index.css` nur für `emerald-parchment` definiert. Betrifft die ganze App, fällt aber bei der Action Bar am stärksten auf, seit sie die einzige Heimat der Entry-Aktionen ist.
-
-(Ehemaliger Punkt "Aktionen nur über eine einklappbare Fläche erreichbar" ist damit nicht behoben, aber teilweise entschärft: die beiden Seitenleisten lassen sich jetzt auch über das Ansicht-Menü wieder aufklappen, nicht mehr nur über die Rail.)
-(Ehemaliger Punkt "drei unabhängige Modal-Implementierungen" ist behoben — siehe [Modals / Dialogs](#modals--dialogs) oben.)
-(Ehemaliger Punkt "kein geteiltes Button-Component" ist behoben — siehe [Buttons](#buttons) oben.)
-(Ehemaliger Punkt "`SidebarActionButton` als fünfte Button-Implementierung" ist behoben — der Ton-Modus wurde in `Button` zurückgeführt, siehe [Buttons](#buttons) oben.)
+| `--titlebar-bg` | `rgba(24, 20, 16, 0.94)` | `#ecdec7` |
+| `--tabbar-bg` | `rgba(28, 23, 19, 0.86)` | `rgba(240, 225, 201, 0.9)` |
+
+`--titlebar-bg` is deliberately a little darker (respectively warmer) than `--tabbar-bg`,
+so the two strips do not visually merge into one.
+
+Deliberately **not** tokenised: the Fluent red of the close button (`#c42b1c`, active
+`#b2231a`). It is identical in both themes — a token would only be a second place to
+maintain the same value.
+
+### Specificity Traps
+
+Two traps of the theming system, both verified through computed styles in both themes.
+They hit **every** new state variant on an existing class, not just the places where they
+were discovered.
+
+**1. Theme overrides beat modifier classes.** `html[data-theme=…] .panel` has specificity
+0-2-1. A single-class modifier rule such as `.panel.vault-card-active` (0-2-0) loses
+against it regardless of declaration order.
+
+**2. Unlayered beats layered, regardless of specificity.** In Emerald Parchment a
+`@layer base` rule sets `border-color` on virtually every element. Declarations from
+`@layer components` — where `.panel` and most semantic classes live — lose against
+unlayered rules even at higher specificity.
+
+Consequence: a new "active" variant on a `.panel` card needs either its own **unlayered**
+rule or must forgo `.panel` entirely. Both ways out are present in the code:
+
+- `.vault-card*` forgoes `.panel` and rebuilds the look; the accent border colour of the
+  active card deliberately sits outside any `@layer` block (`index.css:552`, with a
+  comment in place) rather than with the other `.vault-*` classes in `@layer components`
+  (from `index.css:384`).
+- `.task-row-target` (`index.css:252`) marks the row a search hit points at using
+  `outline` rather than `background`/`border`/`box-shadow` — all three would be
+  overridden by `html[data-theme=…] .panel-interactive`.
+
+Both `color-mix()` sites (`.search-match`, `.task-row-target`) carry an `rgba()` line as a
+fallback ahead of them, for WebKit before 16.2 / WebKitGTK before 2.40.
+
+### Overlays and Portals
+
+**Everything floating hangs off `document.body` via `createPortal`** and positions itself
+with `position: fixed` in viewport coordinates: `Modal`, `ContextMenu`, `EmojiPicker`,
+`MenuDropdown`, `TitleBarSearchResults`.
+
+The reason is the same for all of them: `.app-sidebar` and `.app-main` carry
+`position: relative; z-index: 1` in both themes and are therefore **sibling stacking
+contexts**. An overlay rendered inline in the sidebar loses against the later-painted main
+area no matter how high its `z-index` number is. On top of that, the nearest ancestor with
+`overflow` clips the popover — in the vault modal, for instance, the scrolling modal body.
+
+The overlay layer is uniformly `z-[9999]`, one step above modals (`z-50`).
+
+Two things follow that are easy to forget:
+
+- **The outside-click handler must check trigger *and* popover** — as a portal child the
+  popover is no longer a DOM descendant of the trigger.
+- **Recalculate on `resize` and on `scroll` with `capture: true`**, so scrolling ancestors
+  are caught too. Popovers flip upwards when there is too little room below, and shift
+  away from the window edge. `ContextMenu` additionally clamps rather than only flipping:
+  a menu taller than the click's Y offset used to get a negative `top`.
+
+### Keyboard
+
+**Escape is caught in the capture phase inside `EmojiPicker`, with `stopPropagation()`.**
+`Modal` registers its own Escape handler on the document as well, but in the bubble phase,
+and it is always already mounted when the picker mounts. Without the interception, an
+Escape inside an open picker would always be won by the modal — closing the whole dialog
+along with the edit in progress instead of just the picker.
+
+**The outside-click listener of the search results list also sits in the capture phase.**
+Tauri's `drag.js` attaches its own `mousedown` listener to `document` ahead of anything the
+app registers, and calls `stopImmediatePropagation()` on every `data-tauri-drag-region`
+element — which is exactly the gap to the left and right of the search field. In the bubble
+phase a click there would have dragged the window and left the list standing open.
+
+**The menu bar carries `role="menubar"` and honours the contract that comes with it:**
+Left/Right move between menus, Down opens and enters, Up/Down move within, Right/Left open
+and close submenus, Escape closes. Only a menu opened by keyboard pulls focus into the
+panel — opened by mouse the focus stays put, otherwise the editor would lose its selection
+and Cut/Copy would have nothing left to act on.
+
+**Search field and results list form a combobox pattern** (`role="combobox"`,
+`aria-expanded`, `aria-controls`, `aria-activedescendant`): focus stays in the field, the
+arrow keys only move the highlight in the list beside it. Keyboard and mouse selection are
+a single state (`aria-selected`), with no separate `:hover` alongside — otherwise two rows
+could look selected at once.
+
+### Shell Layout
+
+**Title bar** (`TitleBar.tsx`, `h-10`). Flexbox, not a centring grid: the left column
+(logo, menu bar, back/forward) and the right one (window buttons) are `flex-shrink-0`, the
+middle one with the search field is `flex-1 min-w-0` — the only one that gives way.
+
+Once the remaining space drops below 192px (`SEARCH_MIN_PX`), the four menus fold into a
+single button with a menu icon. The switch point is **not a fixed window width** but is
+computed via `ResizeObserver` from the menu bar's actually rendered width: it is 315px wide
+in German against 203px in English, so a constant would serve one of the two languages
+wrong. The expanded width is remembered in a ref and reused while collapsed, otherwise the
+two states oscillate; a language change discards the cache. In altar focus mode the bar
+never collapses — there is no search field to protect there. The window's minimum width is
+720px.
+
+The search pill is `h-7` (28px), not the ~34px of the entry list search: in a 40px bar a
+34px field would nearly fill the bar.
+
+**Window buttons** (`WindowControls.tsx`, Windows and Linux only): 46×40px, square, no
+gap, flush into the window corner — the Windows Fluent geometry. The glyphs are inline SVG
+on a 10×10 grid with a 1px stroke rather than lucide icons, because lucide has no correct
+"restore" symbol (two offset squares, the rear one clipped).
+
+**Left sidebar**: `LeftSidebarRail.tsx` (fixed 56px icon strip, its own `--shell-bg`
+background, setting it apart from the entry list panel on `--sidebar-bg`) plus
+`LeftSidebarEntryList.tsx` beside it. `RAIL_WIDTH` is exported by the rail and consumed by
+`AppShell` instead of appearing a second time as `w-14` — the right sidebar's default width
+derives from it, so a mismatch would produce a clipped rail *and* a wrong width on the
+right.
+
+`TabIconButton` carries `border border-transparent` in its base state, because the theme
+rules give the active tab a 1px border: without the placeholder the active tab is 32px wide
+and the inactive ones 30, the row jumps by 2px on every tab change, and the six tabs no
+longer fit the entry list's default width derived from them.
+
+**Showing and hiding either sidebar is animated** (200ms width transition). The content
+keeps its pixel width and is clipped by the `<aside>` rather than shrinking along — otherwise
+it would visibly squeeze together and the tab strip would wrap mid-transition. During a
+resize drag `AppShell` removes the `.app-sidebar-animated` class, otherwise the edge lags
+behind the pointer. The transition lives as a class in `index.css` (line 268), not as an
+inline style: an inline style would beat the `prefers-reduced-motion` opt-out directly
+below it (line 276), which wins on order at equal specificity.
+
+**A non-dismissible modal leaves the title bar clear.** The backdrop is
+`fixed inset-x-0 bottom-0` and starts at `top-10` instead of `top-0` as soon as
+`usesCustomWindowControls` applies (Windows and Linux). Without that the backdrop would lie
+over the app's own title bar, and with no X, Escape or backdrop click the only way out
+would be Alt+F4. A dismissible modal keeps the full overlay — there the way out is the
+modal itself.
+
+### Emoji Picker Geometry
+
+The measurements sit in unusual places, each for a concrete reason:
+
+- **Width on the grid, not the frame.** `width`/`minWidth`/`maxWidth` are computed on the
+  grid element in cell units (`cell * n + gap * (n-1)`), not on the padded border box
+  outside — otherwise there was too little room left for 5 columns.
+  `grid-template-columns: repeat(COLUMNS, minmax(0, 1fr))` forces the column count exactly
+  instead of deriving it from available width via `auto-fill`. Max 5, min 3 columns; on too
+  narrow a viewport (`maxWidth: calc(100vw - 3rem)`) the grid shrinks to the hard lower
+  bound.
+- **Scroll clipping on a wrapper of its own**, not on the grid
+  (`max-h-56 overflow-y-auto overflow-x-hidden`). The global scrollbar rule produces a
+  classic, space-consuming rather than an overlaying bar on every platform; an equally wide
+  grid overflowed the wrapper on macOS. `overflow-x-hidden` suppresses the artefact, and the
+  grid is a fixed `SCROLLBAR_GUTTER` (`0.5rem`) narrower than the wrapper via its own
+  `gridStyle` object, so the vertical bar does not overlap the last column.
+- **The search field gets the same explicit width as the grid**, no `w-full`:
+  `AltarSidebarPanel`'s favicon picker is the one caller sitting in a block `<div>`, whose
+  wrapper expands to 100% of the parent width — a `w-full` search bar would have inflated
+  itself against that much wider wrapper there.
+- **The emoji search set is loaded lazily.** `src/lib/emojiSearchData/{en,de,es,fr}.json`,
+  around 1900 entries each, via dynamic `import()` on first open; Vite code-splits this
+  automatically per language (~100–150 KB) and a module-level cache prevents repeat loads.
+  Matches are capped at 150.
+
+### Platform Quirks
+
+- **`MIN_PANEL_REM = 24` instead of a px constant** for the minimum width of the search
+  results list: WebKitGTK derives its root font size from the GTK text scaling, so a fixed
+  px number would collapse to fewer than ten characters at a larger system font.
+- **`.modal-card` has no `overflow-hidden` in its base class**, because individual modals
+  have popover content that must leave the card bounds (the altar category emoji picker,
+  for one). It is opted into per modal via `className`.
+- **Platform-dependent looks branch in CSS through `html[data-platform]`**, never through a
+  `navigator.userAgent` check in a component. Where the attribute comes from is covered in
+  [`components.md`](components.md).
+
+### Known Fault Line: `bg-stone-700/40` on the Search Fields
+
+Both search pills (title bar and entry list) carry a raw `bg-stone-700/40` on top of the
+`.sidebar-search-inner` class. In Emerald Parchment the theme override for that utility
+class beats the class rule — so `--search-bg` does not apply there, the override value
+does. Both fields still look the same, but the claim "runs on `--search-bg`" does not hold
+in Parchment. Resolving it cleanly would mean removing `bg-stone-700/40` from both places
+**together**.

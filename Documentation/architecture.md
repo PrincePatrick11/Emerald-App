@@ -23,6 +23,8 @@ Emerald is a desktop app built on Tauri v2 (Rust backend) and React 19 (TypeScri
 
 ## Module Map
 
+This is the structural map — where things live. What the shared building blocks do and when to use them is in [`components.md`](components.md).
+
 ```
 src/
 ├── components/
@@ -44,14 +46,10 @@ src/
 │   │                 PropertySummaryRow, Favicon, Banner,
 │   │                 AltarReadingSummary, LinkedOpsInput, LinkedWikiInput, PlacedElementRow
 │   ├── wiki/         WikiList (rendering + category emoji helper)
-│   └── ui/           ListToolbar, FilterPanel, UndoToast, ContextMenu, ImportDestinationModal,
-│                     Modal (shared modal wrapper), EmojiPicker (shared emoji-picker popover),
-│                     Button (shared button — primary/secondary/ghost/danger variants, plus a
-│                     separate tone-coded jade/amber/danger/neutral row-action mode),
-│                     Dashboard (shared module-overview chrome: topbar/toolbar/filter/grouping),
-│                     RailButton (icon-button for the sidebar rail), TabIconButton (active/idle
-│                     tab toggle), EntryListTab (generic searchable/renameable/draggable list,
-│                     shared by all five sidebar entry-list tabs)
+│   └── ui/           Button, Modal, ContextMenu, EmojiPicker, Dashboard, EntryListTab,
+│                     ListToolbar, FilterPanel, RailButton, TabIconButton, UndoToast,
+│                     ImportDestinationModal — the shared component layer; what each one
+│                     encapsulates and where it can be extended is in components.md
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, routineStore, undoStore,
 │                     trashStore, vaultStore, importStore
@@ -384,7 +382,7 @@ The Parchment bridge is organised into feature-scoped comment blocks at the end 
 
 ### Shared style constants
 
-Two modules centralise reusable Tailwind class strings to avoid duplication across components:
+Two modules centralise reusable Tailwind class strings to avoid duplication across components. `styleClasses.ts` is the established home for a repeated Tailwind chain — extend it rather than copying the chain again (see [`components.md`](components.md)):
 
 - **`src/lib/styleClasses.ts`** — Shared select class string for operation properties (`OP_PROP_SELECT_CLASSES`). The former `CUSTOM_PROP_INPUT_CLASSES`/`CUSTOM_PROP_SMALL_INPUT_CLASSES` were removed along with Custom Properties.
 - **`src/lib/altarConstants.ts`** — Altar background presets (`ALTAR_BACKGROUND_PRESETS`, `ALTAR_BACKGROUND_STYLES`), photographic image presets (`ALTAR_IMAGE_PRESETS` — a readonly tuple of 16 preset names; `AltarImagePresetName` type), the default background (`DEFAULT_ALTAR_BACKGROUND`), canonical grid defaults (`DEFAULT_GRID_SIZE`, `DEFAULT_GRID_OPACITY`, `DEFAULT_GRID_COLOR`), the background overlay defaults (`DEFAULT_BACKGROUND_OVERLAY` = `0.2`; `DEFAULT_OVERLAY_COLOR` = `'dark'`), and the resolution system: `DEFAULT_ALTAR_RESOLUTION` (`'1920x1080'`), `BASE_RESOLUTION_WIDTH` (1920), `MAX_ALTAR_RESOLUTION_W` (7680), `MAX_ALTAR_RESOLUTION_H` (4320), `ALTAR_RATIOS`, `ALTAR_SIZE_KEYS`, `ALTAR_RESOLUTION_MAP`, `sizeAndRatioFromResolution`, `parseResolution`, `resolveResolutionPixels`, `isRatioFormat`, and `ratioFromResolution`. `resolveResolutionPixels(res)` is the preferred helper when the input may be either a ratio string or a pixel string: ratio inputs are mapped to their `ALTAR_RESOLUTION_MAP.lg` canonical pixel size first, then passed through `parseResolution`; pixel inputs go straight to `parseResolution`. All dashboard-facing code (`AltarCard`, `AltarCardPreview`, `AltarCanvas` thumbnail renderer) must use `resolveResolutionPixels` rather than calling `parseResolution` directly on `altar.resolution`. Also exports `getAltarBackgroundStyle(altar, imageSrc)` — the **single source of truth** for constructing the altar CSS background object; it accepts the altar record (to read `background_overlay` and `background_overlay_color`) and prepends a `buildOverlayGradient(opacity, color)` layer when the overlay value is greater than 0. The overlay layer is applied to **all** background types: custom images, image presets, gradient-color presets, and legacy colour presets. For custom image-backed backgrounds it interpolates `backgroundSrc` into CSS whenever it is non-empty — that value has to come from `imageSrc()`, which is what narrows it to a stored image or an inline source; for image presets it constructs a `url("/backgrounds/{name}.webp")` CSS background; for gradient presets it prepends the overlay to the `generateGradientStyle(hex)` result; for colour presets it prepends the overlay to the value from `ALTAR_BACKGROUND_STYLES`. Unknown preset values fall back to `DEFAULT_ALTAR_BACKGROUND`. All components that need a background style must call this function rather than constructing the CSS inline. Gradient-colour preset helpers: `GRADIENT_PRESET_COLORS` (readonly tuple of 7 dark hex values used as colour-gradient presets), `LEGACY_GRADIENT_COLORS` (maps each preset name to its base hex value), `isGradientPreset(preset)` (returns true when the preset string matches one of the gradient preset names), `getGradientColor(preset)` (returns the hex string for a gradient preset or `null` for unknown inputs), and `generateGradientStyle(hex)` (builds the radial-gradient CSS string from a hex colour). These are used internally by `getAltarBackgroundStyle` and by `AltarSidebarPanel` to render the gradient swatch buttons. Category emoji helpers: `CATEGORY_EMOJIS` (a `Record<string, string[]>` of emoji suggestions keyed by default category name), `FALLBACK_CATEGORY_EMOJIS` (fallback array used when no entry matches a custom category name), and `ALTAR_CAT_EMOJIS` (flat palette array for the category emoji picker). `ALTAR_CATEGORIES` and `ALTAR_CATEGORY_EMOJI` have been removed — the authoritative category list is now stored in the `altar_categories` database table and loaded via `altarStore.fetchCategories()`. The SQL migration defaults for altar grid, resolution, and overlay columns must stay in sync with the constants in this file. `parseResolution` validates the input string against `/^\d+x\d+$/` and clamps both dimensions before returning `{ w, h }`. `isRatioFormat` tests whether a string is a ratio (e.g. `"16:9"`). `ratioFromResolution` returns the matching `AltarRatio` for either format.
