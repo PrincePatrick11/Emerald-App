@@ -6,6 +6,7 @@ import { syncLinks } from '../lib/links';
 import { generateId, nowIso } from '../lib/helpers';
 import { fromRow, toInt, type DbRow } from '../lib/row';
 import type { Operation, OperationCategory } from '../types';
+import i18n from '../i18n';
 
 interface OperationState {
   categories: OperationCategory[];
@@ -13,6 +14,7 @@ interface OperationState {
 
   fetchAll: () => Promise<void>;
   createOperation: (categoryId: string) => Promise<Operation>;
+  duplicateOperation: (id: string) => Promise<Operation | undefined>;
   updateOperation: (id: string, patch: Partial<Operation>) => Promise<void>;
   deleteOperation: (id: string) => Promise<void>;
   restoreOperation: (id: string) => Promise<void>;
@@ -114,6 +116,36 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     );
     set((s) => ({ operations: [op, ...s.operations] }));
     return op;
+  },
+
+  /**
+   * Kopiert alle Inhaltsfelder — auch die Sigil-Felder samt Zeichnung, die
+   * dafuer zuerst nachgeladen wird. Die drei Aufrufer zaehlten die Felder
+   * frueher jeweils selbst auf, mit drei verschiedenen (und allesamt
+   * unvollstaendigen) Listen; Sigil-Zeichnungen gingen dabei immer verloren.
+   */
+  duplicateOperation: async (id) => {
+    await get().ensureDrawingLoaded(id);
+    const src = get().operations.find((o) => o.id === id);
+    if (!src) return undefined;
+    const copy = await get().createOperation(src.category_id);
+    const {
+      id: _id,
+      created_at: _created,
+      updated_at: _updated,
+      deleted_at: _deleted,
+      entry_number: _number,
+      ...fields
+    } = src;
+    // is_loaded wird bewusst NICHT uebernommen: eine "geladene" Sigil-
+    // Operation ist gesperrt und ihr Sigil versiegelt — eine Kopie, die man
+    // nie bearbeiten kann, waere sinnlos. target_reveal_date bleibt erhalten.
+    await get().updateOperation(copy.id, {
+      ...fields,
+      title: src.title + i18n.t('common.copySuffix'),
+      is_loaded: false,
+    });
+    return get().operations.find((o) => o.id === copy.id) ?? copy;
   },
 
   updateOperation: async (id, patch) => {

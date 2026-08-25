@@ -88,53 +88,76 @@ fn locate(app: &tauri::AppHandle, vault_id: &str, filename: &str) -> Result<Path
 
 // ── commands ─────────────────────────────────────────────────────────────────
 
+/// Serialisiert Schreiben und Loeschen in der Bildablage. Solange die
+/// Commands synchron auf dem Main-Thread liefen, war diese Serialisierung
+/// implizit; seit sie auf dem Blocking-Pool laufen, koennte sonst der
+/// Storage-Cleanup eine Datei loeschen, deren Hash ein gleichzeitiges
+/// save_image gerade als "existiert schon" uebersprungen hat.
+static IMAGE_WRITE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn image_write_guard() -> std::sync::MutexGuard<'static, ()> {
+    IMAGE_WRITE_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 /// Stores a base64 data-URL and returns the filename it was given.
 /// SHA-256 of the raw bytes is the name, so identical images share one file.
 #[tauri::command]
-pub fn save_image(
+pub async fn save_image(
     app: tauri::AppHandle,
     data_url: String,
     vault_id: String,
 ) -> Result<String, String> {
-    let (mime_part, b64) = data_url
-        .strip_prefix("data:")
-        .and_then(|s| s.split_once(','))
-        .ok_or("Invalid data URL")?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let (mime_part, b64) = data_url
+            .strip_prefix("data:")
+            .and_then(|s| s.split_once(','))
+            .ok_or("Invalid data URL")?;
 
-    let ext = ext_for_mime(mime_part.split(';').next().unwrap_or(""));
-    let bytes = general_purpose::STANDARD
-        .decode(b64)
-        .map_err(|e| e.to_string())?;
+        let ext = ext_for_mime(mime_part.split(';').next().unwrap_or(""));
+        let bytes = general_purpose::STANDARD
+            .decode(b64)
+            .map_err(|e| e.to_string())?;
 
-    let filename = format!("{}.{}", sha256_hex(&bytes), ext);
-    let path = vault::images_dir(&app, &vault_id)?.join(&filename);
-    if !path.exists() {
-        std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
-    }
-    Ok(filename)
+        let filename = format!("{}.{}", sha256_hex(&bytes), ext);
+        let path = vault::images_dir(&app, &vault_id)?.join(&filename);
+        let _guard = image_write_guard();
+        if !path.exists() {
+            std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+        }
+        Ok(filename)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Copies a file from an arbitrary location into the vault and returns the
 /// filename it was given. Same deduplication as `save_image`.
 #[tauri::command]
-pub fn copy_image_file(
+pub async fn copy_image_file(
     app: tauri::AppHandle,
     source: String,
     vault_id: String,
 ) -> Result<String, String> {
-    let ext = crate::ext_for_path(&source);
-    if !IMAGE_EXTS.contains(&ext.as_str()) {
-        return Err("unsupported file type".to_string());
-    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let ext = crate::ext_for_path(&source);
+        if !IMAGE_EXTS.contains(&ext.as_str()) {
+            return Err("unsupported file type".to_string());
+        }
 
-    let canonical_source = crate::guarded_read_path(&app, &source)?;
-    let bytes = std::fs::read(&canonical_source).map_err(|e| format!("read {source}: {e}"))?;
-    let filename = format!("{}.{}", sha256_hex(&bytes), ext);
-    let path = vault::images_dir(&app, &vault_id)?.join(&filename);
-    if !path.exists() {
-        std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
-    }
-    Ok(filename)
+        let canonical_source = crate::guarded_read_path(&app, &source)?;
+        let bytes = std::fs::read(&canonical_source).map_err(|e| format!("read {source}: {e}"))?;
+        let filename = format!("{}.{}", sha256_hex(&bytes), ext);
+        let path = vault::images_dir(&app, &vault_id)?.join(&filename);
+        let _guard = image_write_guard();
+        if !path.exists() {
+            std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+        }
+        Ok(filename)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Reads a stored image and returns it as a base64 data-URL.
@@ -143,52 +166,61 @@ pub fn copy_image_file(
 /// export renders in a `file://` webview, and the backup writer has to embed
 /// the bytes in JSON.
 #[tauri::command]
-pub fn read_image_as_base64(
+pub async fn read_image_as_base64(
     app: tauri::AppHandle,
     filename: String,
     vault_id: String,
 ) -> Result<String, String> {
-    let path = locate(&app, &vault_id, &filename)?;
-    let bytes = std::fs::read(&path).map_err(|e| format!("read: {e}"))?;
-    let ext = crate::ext_for_path(&filename);
-    Ok(format!(
-        "data:{};base64,{}",
-        mime_for_ext(&ext),
-        general_purpose::STANDARD.encode(&bytes)
-    ))
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = locate(&app, &vault_id, &filename)?;
+        let bytes = std::fs::read(&path).map_err(|e| format!("read: {e}"))?;
+        let ext = crate::ext_for_path(&filename);
+        Ok(format!(
+            "data:{};base64,{}",
+            mime_for_ext(&ext),
+            general_purpose::STANDARD.encode(&bytes)
+        ))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Copies images out of the pre-per-vault shared pool into a vault's own folder.
 /// Migration v35 calls this with the names it found in that vault's content.
 /// Returns how many files were copied.
 #[tauri::command]
-pub fn adopt_legacy_images(
+pub async fn adopt_legacy_images(
     app: tauri::AppHandle,
     vault_id: String,
     filenames: Vec<String>,
 ) -> Result<u32, String> {
-    let target_dir = vault::images_dir(&app, &vault_id)?;
-    let legacy_dir = vault::legacy_images_dir(&app)?;
-    let mut copied = 0;
+    tauri::async_runtime::spawn_blocking(move || {
+        let target_dir = vault::images_dir(&app, &vault_id)?;
+        let legacy_dir = vault::legacy_images_dir(&app)?;
+        let _guard = image_write_guard();
+        let mut copied = 0;
 
-    for name in filenames {
-        if !is_valid_image_name(&name) {
-            continue;
+        for name in filenames {
+            if !is_valid_image_name(&name) {
+                continue;
+            }
+            let target = target_dir.join(&name);
+            if target.exists() {
+                continue;
+            }
+            let source = legacy_dir.join(&name);
+            if !source.is_file() {
+                continue;
+            }
+            if std::fs::copy(&source, &target).is_ok() {
+                copied += 1;
+            }
         }
-        let target = target_dir.join(&name);
-        if target.exists() {
-            continue;
-        }
-        let source = legacy_dir.join(&name);
-        if !source.is_file() {
-            continue;
-        }
-        if std::fs::copy(&source, &target).is_ok() {
-            copied += 1;
-        }
-    }
 
-    Ok(copied)
+        Ok(copied)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[derive(serde::Serialize)]
@@ -201,47 +233,56 @@ pub struct StoredImage {
 /// deliberately not listed: it is still readable by vaults that have not been
 /// opened since the migration, so nothing here may propose deleting from it.
 #[tauri::command]
-pub fn list_image_files(
+pub async fn list_image_files(
     app: tauri::AppHandle,
     vault_id: String,
 ) -> Result<Vec<StoredImage>, String> {
-    let dir = vault::images_dir(&app, &vault_id)?;
-    let mut out = Vec::new();
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = vault::images_dir(&app, &vault_id)?;
+        let mut out = Vec::new();
 
-    for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if !is_valid_image_name(&name) {
-            continue;
+        for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !is_valid_image_name(&name) {
+                continue;
+            }
+            let bytes = entry.metadata().map(|m| m.len()).unwrap_or(0);
+            out.push(StoredImage { name, bytes });
         }
-        let bytes = entry.metadata().map(|m| m.len()).unwrap_or(0);
-        out.push(StoredImage { name, bytes });
-    }
 
-    Ok(out)
+        Ok(out)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Deletes the named images from a vault's own folder. Returns bytes freed.
 #[tauri::command]
-pub fn delete_image_files(
+pub async fn delete_image_files(
     app: tauri::AppHandle,
     vault_id: String,
     filenames: Vec<String>,
 ) -> Result<u64, String> {
-    let dir = vault::images_dir(&app, &vault_id)?;
-    let mut freed = 0u64;
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = vault::images_dir(&app, &vault_id)?;
+        let _guard = image_write_guard();
+        let mut freed = 0u64;
 
-    for name in filenames {
-        if !is_valid_image_name(&name) {
-            continue;
+        for name in filenames {
+            if !is_valid_image_name(&name) {
+                continue;
+            }
+            let path = dir.join(&name);
+            let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+            if std::fs::remove_file(&path).is_ok() {
+                freed += size;
+            }
         }
-        let path = dir.join(&name);
-        let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-        if std::fs::remove_file(&path).is_ok() {
-            freed += size;
-        }
-    }
 
-    Ok(freed)
+        Ok(freed)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 // ── emerald-img:// ───────────────────────────────────────────────────────────
@@ -297,7 +338,12 @@ pub fn register(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wr
         "emerald-img",
         |ctx: UriSchemeContext<'_, tauri::Wry>, request, responder| {
             let app = ctx.app_handle().clone();
-            std::thread::spawn(move || {
+            // spawn_blocking statt thread::spawn: der Blocking-Pool
+            // wiederverwendet seine Threads ueber Bursts hinweg, statt fuer
+            // jedes Bild einen frischen OS-Thread zu starten und wieder
+            // abzubauen. (Sein Limit liegt bei 512 — ein Deckel ist er bei
+            // realen Eintragsgroessen nicht, der Gewinn ist die Wiederverwendung.)
+            tauri::async_runtime::spawn_blocking(move || {
                 responder.respond(serve(&app, &request));
             });
         },

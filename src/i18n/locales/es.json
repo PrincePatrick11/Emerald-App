@@ -12,7 +12,8 @@
     "noEmojiResults": "Sin resultados",
     "bytes": "B",
     "kilobytes": "KB",
-    "megabytes": "MB"
+    "megabytes": "MB",
+    "copySuffix": " (Copia)"
   },
   "listView": {
     "view": "Vista",

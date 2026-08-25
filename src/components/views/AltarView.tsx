@@ -66,7 +66,7 @@ export default function AltarView() {
       if (!altarId) return;
       captureCurrentAltar()
         .then((thumbnailData) => {
-          if (thumbnailData !== null && thumbnailData.length <= 524288)
+          if (thumbnailData !== null)
             useAltarStore.getState().updateAltar(altarId, { thumbnail_data: thumbnailData });
         })
         .catch(console.error);
@@ -184,7 +184,7 @@ export default function AltarView() {
     try {
       await updateAltar(altarId, { title: title.trim() || t('altar.untitled') });
       const thumbnailData = await capturePromise;
-      if (thumbnailData !== null && thumbnailData.length <= 524288)
+      if (thumbnailData !== null)
         await updateAltar(altarId, { thumbnail_data: thumbnailData });
     } catch (err) {
       console.error('[handleDone]', err);
@@ -202,7 +202,7 @@ export default function AltarView() {
     setActiveView({ type: 'altar', id: altarId, mode: 'view' });
     try {
       const thumbnailData = await capturePromise;
-      if (thumbnailData !== null && thumbnailData.length <= 524288)
+      if (thumbnailData !== null)
         await updateAltar(altarId, { thumbnail_data: thumbnailData });
     } catch (err) {
       console.error('[handleCancel]', err);

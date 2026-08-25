@@ -26,6 +26,7 @@ import { useRoutineStore } from '../store/routineStore';
 import { useAltarStore } from '../store/altarStore';
 import { useTaskStore } from '../store/taskStore';
 import { useUIStore } from '../store/uiStore';
+import { resumeEditorSaves, suspendEditorSaves } from './editorLock';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public types
@@ -915,6 +916,15 @@ export async function importDatabase(
     excludedOpCategoryIds: new Set(),
   };
 
+  // replace behaelt die Original-IDs und add-vault wechselt den Vault: ein
+  // offener Editor, den die Navigation dabei unmountet, wuerde seinen
+  // VOR-Import-Stand ueber die frisch importierten Zeilen speichern. Fuer die
+  // Dauer des Imports sind die automatischen Editor-Saves deshalb gesperrt;
+  // merge vergibt neue IDs und braucht das nicht.
+  const suspendSaves = mode !== 'merge';
+  if (suspendSaves) suspendEditorSaves();
+  try {
+
   // Apply type-level filtering first, then subcategory filtering
   const filteredBackup: BackupFile = {
     ...backup,
@@ -971,6 +981,9 @@ export async function importDatabase(
     useAltarStore.getState().fetchAltars(),
     useTaskStore.getState().fetchAll(),
   ]);
+  } finally {
+    if (suspendSaves) resumeEditorSaves();
+  }
 }
 
 // Re-export BackupFile type for use in UI

@@ -14,6 +14,8 @@ import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
 import { generateId } from '../../lib/helpers';
+import { editorSavesSuspended } from '../../lib/editorLock';
+import { canvasToCappedThumbnail } from '../../lib/thumbnail';
 import type { Operation } from '../../types';
 
 type DrawMode = 'draw' | 'erase';
@@ -21,13 +23,19 @@ type DrawMode = 'draw' | 'erase';
 const SIGIL_COLORS = ['#f8fafc', '#00e699', '#f59e0b', '#ef4444', '#60a5fa', '#a78bfa', '#111827'];
 
 /**
- * Verkleinert die 1200px-Zeichnung auf einen echten Listen-Thumbnail.
- * thumbnail_data war frueher eine 1:1-Kopie von drawing_data — damit lud die
- * Listen-Query die volle Zeichnung doch wieder mit, obwohl sie drawing_data
- * gerade deshalb weglaesst. Bei einem Fehler faellt sie auf das Original
- * zurueck; besser ein grosser Thumbnail als gar keiner.
+ * Verkleinert die 1200px-Zeichnung auf einen echten Listen-Thumbnail — auf
+ * demselben Weg wie die Altar-Karten (lib/thumbnail.ts: 640px Breite, WebP-
+ * Qualitaetsleiter, 512-KB-Deckel), nur mit PNG statt JPEG als Fallback,
+ * weil die Zeichnung auf transparentem Grund liegt. thumbnail_data war
+ * frueher eine 1:1-Kopie von drawing_data — damit lud die Listen-Query die
+ * volle Zeichnung doch wieder mit, obwohl sie drawing_data gerade deshalb
+ * weglaesst. Bei einem Fehler faellt sie auf das Original zurueck; besser
+ * ein grosser Thumbnail als gar keiner.
  */
-const SIGIL_THUMBNAIL_MAX = 300;
+// Schmaler als die 640px der Altar-Karten: thumbnail_data steht in der
+// Listen-Query des operationStore und wird fuer JEDE Operation geladen —
+// fuer die kleinen Listenkacheln reichen 320px Strichzeichnung locker.
+const SIGIL_THUMBNAIL_W = 320;
 
 async function sigilThumbnail(dataUrl: string | null): Promise<string | null> {
   if (!dataUrl) return null;
@@ -38,15 +46,16 @@ async function sigilThumbnail(dataUrl: string | null): Promise<string | null> {
       img.onerror = () => reject(new Error('thumbnail decode failed'));
       img.src = dataUrl;
     });
-    const scale = SIGIL_THUMBNAIL_MAX / Math.max(img.width, img.height);
-    if (scale >= 1) return dataUrl;
+    const scale = Math.min(1, SIGIL_THUMBNAIL_W / img.width);
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.round(img.width * scale));
     canvas.height = Math.max(1, Math.round(img.height * scale));
     const ctx = canvas.getContext('2d');
     if (!ctx) return dataUrl;
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/png');
+    // Cap-Ueberschreitung liefert bewusst KEINEN Thumbnail statt des vollen
+    // Originals — das waere exakt die 1:1-Kopie, die diese Funktion abloest.
+    return canvasToCappedThumbnail(canvas, 'png');
   } catch {
     return dataUrl;
   }
@@ -150,7 +159,14 @@ function DrawingCanvas({
     const point = getPoint(event);
     isDrawingRef.current = true;
     lastPointRef.current = point;
-    canvas.setPointerCapture(event.pointerId);
+    // Wirft NotFoundError fuer Pointer-IDs ohne echte OS-Pointer-Session
+    // (synthetische Events, exotische Eingabegeraete). Zeichnen funktioniert
+    // auch ohne Capture — nur das Nachziehen ausserhalb des Canvas leidet.
+    try {
+      canvas.setPointerCapture(event.pointerId);
+    } catch {
+      /* siehe oben */
+    }
     ctx.beginPath();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -269,6 +285,12 @@ export default function OperationSigilView({ operation }: { operation: Operation
   isEditingRef.current = isEditing;
   const operationIdRef = useRef<string | undefined>(undefined);
   operationIdRef.current = operation.id;
+  // Erst wenn der Load-Effekt den lokalen State aus der Operation gefuellt
+  // UND der Re-Render committed hat, darf der Unmount-Save unten feuern —
+  // sonst schriebe ein StrictMode-Doppelmount im Edit-Modus leere Felder.
+  const [hydratedId, setHydratedId] = useState<string | null>(null);
+  const hydratedRef = useRef<string | null>(null);
+  hydratedRef.current = hydratedId;
 
   // Der Thumbnail wird erst beim Speichern aus der Zeichnung verkleinert,
   // nicht bei jedem Render — pendingRef traegt bis dahin das Original.
@@ -300,6 +322,7 @@ export default function OperationSigilView({ operation }: { operation: Operation
     setDrawingHistory(nextDrawing ? [null, nextDrawing] : [null]);
     setHistoryIndex(nextDrawing ? 1 : 0);
     setLoadCountdown(null);
+    setHydratedId(operation.id);
   }, [operation.id]);
 
   // Sync text/letter fields when the store updates from outside (e.g. sidebar edits in view mode).
@@ -321,11 +344,19 @@ export default function OperationSigilView({ operation }: { operation: Operation
     operation.implemented_letters,
   ]);
 
+  // Speichern beim Unmount — die anderen Editor-Views bekommen das vom
+  // useEntryEditor-Hook; hier ist der Pending-Zustand Canvas-Daten statt
+  // HTML, deshalb die eigene Variante mit demselben Sperr- und
+  // Hydration-Schutz.
   useEffect(() => {
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+      const id = operationIdRef.current;
+      if (isEditingRef.current && id && hydratedRef.current === id && !editorSavesSuspended()) {
+        void buildSavePatch().then((patch) => updateOperation(id, patch)).catch(() => {});
+      }
     };
-  }, []);
+  }, [updateOperation, buildSavePatch]);
 
   const isAutoHiddenSigil = useMemo(() => (
     operation.is_loaded

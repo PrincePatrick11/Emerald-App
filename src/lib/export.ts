@@ -8,6 +8,7 @@ import type { ExportData, ChipData } from './exportData';
 import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { getCategoryEmoji } from '../components/wiki/WikiList';
+import i18n from '../i18n';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -371,7 +372,7 @@ export async function exportAsPDF(data: ExportData): Promise<void> {
 
   const escapedTitle = htmlEscape(data.title);
   const fullHtml = `<!DOCTYPE html>
-<html lang="de">
+<html lang="${i18n.language}">
 <head>
   <meta charset="utf-8">
   <title>${escapedTitle}</title>

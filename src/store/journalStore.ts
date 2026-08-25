@@ -6,6 +6,7 @@ import { syncLinks } from '../lib/links';
 import { generateId, nowIso } from '../lib/helpers';
 import { fromRow, toInt, type DbRow } from '../lib/row';
 import type { JournalEntry } from '../types';
+import i18n from '../i18n';
 
 interface JournalState {
   entries: JournalEntry[];
@@ -109,7 +110,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       entry_number: _number,
       ...fields
     } = src;
-    await get().updateEntry(copy.id, { ...fields, title: src.title + ' (Copy)' });
+    await get().updateEntry(copy.id, { ...fields, title: src.title + i18n.t('common.copySuffix') });
     return get().entries.find((e) => e.id === copy.id) ?? copy;
   },
 

@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import "./i18n";
+import { changeAppLanguage, savedAppLanguage } from "./i18n";
 import "./themes/emerald-noctis.css";
 import "./themes/emerald-parchment.css";
 import "./index.css";
@@ -26,8 +26,21 @@ applyTheme(normalizeThemeId(localStorage.getItem('theme-id') ?? localStorage.get
 // the same reason as the theme above.
 document.documentElement.dataset.platform = platformName;
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+// Die gespeicherte Sprache VOR dem ersten Render aktivieren — wie das Theme
+// oben, damit die App nicht kurz auf Englisch aufblitzt und dann umspringt.
+// Englisch ist im Bundle; alles andere laedt einen lokalen Chunk nach, das
+// sind einstellige Millisekunden. Schlaegt es fehl, startet die App englisch.
+const savedLanguage = savedAppLanguage();
+const languageReady =
+  savedLanguage === "en" ? Promise.resolve() : changeAppLanguage(savedLanguage).catch(() => {});
+// Sicherheitsnetz: settelt der Locale-Chunk wider Erwarten nie, rendert die
+// App nach 2s trotzdem (dann englisch) statt ein leeres Fenster zu zeigen.
+const languageDeadline = new Promise<void>((resolve) => setTimeout(resolve, 2000));
+
+void Promise.race([languageReady, languageDeadline]).then(() => {
+  ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  );
+});

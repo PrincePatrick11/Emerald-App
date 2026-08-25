@@ -6,6 +6,7 @@ import { generateId, isValidHexColor, nowIso } from '../lib/helpers';
 import { bool, fromRow, toInt, type DbRow } from '../lib/row';
 import { FALLBACK_CATEGORY, reassignCategoryContent } from '../lib/schema';
 import type { AltarCategory, AltarItem, AltarItemCategory, AltarPlacement, AltarRecord } from '../types';
+import i18n from '../i18n';
 
 const DEFAULT_PLACEMENT_SIZE = 40;
 
@@ -315,7 +316,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const now = nowIso();
     const copy: AltarRecord = {
       id: newId,
-      title: `${source.title} (Copy)`,
+      title: source.title + i18n.t('common.copySuffix'),
       intention: source.intention,
       background_preset: source.background_preset || DEFAULT_ALTAR_BACKGROUND,
       background_image_data: source.background_image_data ?? null,

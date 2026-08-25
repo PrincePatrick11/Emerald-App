@@ -228,8 +228,8 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { categories, operations, createOperation, updateOperation, deleteOperation, restoreOperation } = useOperationStore(
-    useShallow((s) => ({ categories: s.categories, operations: s.operations, createOperation: s.createOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation }))
+  const { categories, operations, createOperation, duplicateOperation, updateOperation, deleteOperation, restoreOperation } = useOperationStore(
+    useShallow((s) => ({ categories: s.categories, operations: s.operations, createOperation: s.createOperation, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation }))
   );
   const pushUndo = useUndoStore((s) => s.push);
 
@@ -244,13 +244,8 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
   };
 
   const handleDuplicate = async (op: (typeof operations)[number]) => {
-    const newOp = await createOperation(op.category_id);
-    await updateOperation(newOp.id, {
-      title: op.title + ' (Copy)', content: op.content,
-      tags: op.tags, is_active: op.is_active, end_date: op.end_date,
-      version: op.version, icon: op.icon ?? undefined, cover_image: op.cover_image ?? undefined,
-    });
-    setActiveView({ type: 'operations', id: newOp.id, mode: 'view' });
+    const newOp = await duplicateOperation(op.id);
+    if (newOp) setActiveView({ type: 'operations', id: newOp.id, mode: 'view' });
   };
 
   const handleDelete = async (op: (typeof operations)[number]) => {
@@ -304,8 +299,8 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { articles, wikiCategories, createArticle, updateArticle, deleteArticle, restoreArticle } = useWikiStore(
-    useShallow((s) => ({ articles: s.articles, wikiCategories: s.wikiCategories, createArticle: s.createArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle }))
+  const { articles, wikiCategories, createArticle, duplicateArticle, updateArticle, deleteArticle, restoreArticle } = useWikiStore(
+    useShallow((s) => ({ articles: s.articles, wikiCategories: s.wikiCategories, createArticle: s.createArticle, duplicateArticle: s.duplicateArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle }))
   );
   const pushUndo = useUndoStore((s) => s.push);
 
@@ -318,12 +313,8 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
   };
 
   const handleDuplicate = async (article: (typeof articles)[number]) => {
-    const newArt = await createArticle(article.category_id);
-    await updateArticle(newArt.id, {
-      title: article.title + ' (Copy)', content: article.content,
-      tags: article.tags, icon: article.icon ?? undefined, cover_image: article.cover_image ?? undefined,
-    });
-    setActiveView({ type: 'wiki', id: newArt.id, mode: 'view' });
+    const newArt = await duplicateArticle(article.id);
+    if (newArt) setActiveView({ type: 'wiki', id: newArt.id, mode: 'view' });
   };
 
   const handleDelete = async (article: (typeof articles)[number]) => {

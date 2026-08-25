@@ -42,14 +42,21 @@ interface LinkPopupState {
 }
 
 interface RichEditorProps {
-  content: string;
+  /**
+   * Nur der INITIALWERT — der Editor ist danach unkontrolliert. Die Views
+   * mounten ihn per `key` neu, wenn ein anderer Eintrag geladen oder Cancel
+   * gedrueckt wird. Der fruehere Sync-Effekt, der bei jedem Render
+   * `getHTML()` mit dem Prop verglich, war zusammen mit `onUpdate` eine
+   * doppelte Serialisierung des gesamten Dokuments pro Tastendruck.
+   */
+  initialContent: string;
   placeholder?: string;
   onChange: (content: string) => void;
   editable?: boolean;
 }
 
 export default function RichEditor({
-  content,
+  initialContent,
   placeholder = 'Begin writing...',
   onChange,
   editable = true,
@@ -157,7 +164,7 @@ export default function RichEditor({
       ExternalDropExtension,
       ResizableImage,
     ],
-    content: content || '',
+    content: initialContent || '',
     editable,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
@@ -320,14 +327,6 @@ export default function RichEditor({
       document.removeEventListener('pointerup', handlePointerUp);
     };
   }, [wikiDragItem, editor, editable]);
-
-  // Sync content when switching entries (key-based remount handles this,
-  // but keep as fallback for edge cases)
-  useEffect(() => {
-    if (editor && editor.getHTML() !== content) {
-      editor.commands.setContent(content || '', false);
-    }
-  }, [content, editor]);
 
   useEffect(() => {
     editor?.setEditable(editable);

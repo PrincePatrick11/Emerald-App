@@ -12,7 +12,8 @@
     "noEmojiResults": "Aucun résultat",
     "bytes": "o",
     "kilobytes": "Ko",
-    "megabytes": "Mo"
+    "megabytes": "Mo",
+    "copySuffix": " (Copie)"
   },
   "listView": {
     "view": "Vue",

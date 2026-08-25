@@ -11,6 +11,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
+import { useEntryEditor } from '../../hooks/useEntryEditor';
 import RichEditor from '../editor/RichEditor';
 import TagInput from '../editor/TagInput';
 import { format } from 'date-fns';
@@ -22,8 +23,8 @@ export default function OperationsView() {
   const { activeView, setActiveView, setEditActions, openViewInNewTab, operationsPrefs, setOperationsPrefs } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, setEditActions: s.setEditActions, openViewInNewTab: s.openViewInNewTab, operationsPrefs: s.operationsPrefs, setOperationsPrefs: s.setOperationsPrefs }))
   );
-  const { operations, categories, createOperation, updateOperation, deleteOperation, restoreOperation, getOperation, addCategory, updateCategory, deleteCategory, restoreCategory } = useOperationStore(
-    useShallow((s) => ({ operations: s.operations, categories: s.categories, createOperation: s.createOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation, getOperation: s.getOperation, addCategory: s.addCategory, updateCategory: s.updateCategory, deleteCategory: s.deleteCategory, restoreCategory: s.restoreCategory }))
+  const { operations, categories, createOperation, duplicateOperation, updateOperation, deleteOperation, restoreOperation, getOperation, addCategory, updateCategory, deleteCategory, restoreCategory } = useOperationStore(
+    useShallow((s) => ({ operations: s.operations, categories: s.categories, createOperation: s.createOperation, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation, getOperation: s.getOperation, addCategory: s.addCategory, updateCategory: s.updateCategory, deleteCategory: s.deleteCategory, restoreCategory: s.restoreCategory }))
   );
   const pushUndo = useUndoStore((s) => s.push);
 
@@ -49,7 +50,6 @@ export default function OperationsView() {
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [loadedOperationId, setLoadedOperationId] = useState<string | null>(null);
@@ -57,23 +57,17 @@ export default function OperationsView() {
   const [endDate, setEndDate] = useState<string>('');
   const [version, setVersion] = useState<string>('');
 
-  const pendingRef = useRef({ title, content, category_id: categoryId, tags, is_active: isActive, end_date: endDate || null, version: version || null });
-  pendingRef.current = { title, content, category_id: categoryId, tags, is_active: isActive, end_date: endDate || null, version: version || null };
-  const isEditingRef = useRef(false);
-  isEditingRef.current = isEditing;
-  const opIdRef = useRef<string | undefined>(undefined);
-  opIdRef.current = operation?.id;
+  // Content-Mirror im Ref statt State — siehe JournalView.
+  const pendingHtmlRef = useRef('');
+  const [editorEpoch, setEditorEpoch] = useState(0);
 
-  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const triggerAutoSave = useCallback(() => {
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    const id = opIdRef.current;
-    autoSaveTimer.current = setTimeout(() => {
-      if (!isEditingRef.current || !id) return;
-      // Siehe JournalView: `getDb()` lehnt ab, waehrend ein Vault geloescht wird.
-      void updateOperation(id, pendingRef.current).catch(() => {});
-    }, 1500);
-  }, [updateOperation]);
+  const { triggerAutoSave, cancelAutoSave } = useEntryEditor({
+    entityId: operation?.id,
+    isEditing,
+    ready: !!operation && loadedOperationId === operation.id,
+    buildPatch: () => ({ title, content: pendingHtmlRef.current, category_id: categoryId, tags, is_active: isActive, end_date: endDate || null, version: version || null }),
+    update: updateOperation,
+  });
 
   const {
     addingCategory, setAddingCategory,
@@ -95,29 +89,10 @@ export default function OperationsView() {
     },
   );
 
-  const prevRef = useRef<{ id: string; isEditing: boolean } | null>(null);
-
-  useEffect(() => {
-    const prev = prevRef.current;
-    if (prev?.isEditing && prev.id !== operation?.id) {
-      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-      updateOperation(prev.id, pendingRef.current);
-    }
-    prevRef.current = operation ? { id: operation.id, isEditing } : null;
-  }, [operation?.id, isEditing]);
-
-  useEffect(() => {
-    return () => {
-      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-      const prev = prevRef.current;
-      if (prev?.isEditing) updateOperation(prev.id, pendingRef.current);
-    };
-  }, []);
-
   useEffect(() => {
     if (operation) {
       setTitle(operation.title);
-      setContent(operation.content);
+      pendingHtmlRef.current = operation.content;
       setCategoryId(operation.category_id);
       setTags(operation.tags ?? []);
       setIsActive(operation.is_active ?? true);
@@ -139,6 +114,12 @@ export default function OperationsView() {
       setVersion(operation.version ?? '');
     }
   }, [operation?.tags, operation?.category_id, operation?.is_active, operation?.end_date, operation?.version]);
+
+  // Titel ebenso: ein Rename aus der Sidebar bei offenem Edit-Modus wuerde
+  // sonst vom naechsten Autosave zurueckgedreht.
+  useEffect(() => {
+    if (operation) setTitle(operation.title);
+  }, [operation?.title]);
 
   // Apply tags from a dropped routine
   useEffect(() => {
@@ -165,15 +146,8 @@ export default function OperationsView() {
   const openCtxMenu = (e: React.MouseEvent, id: string) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); };
 
   const handleDuplicate = async (id: string) => {
-    const src = operations.find((o) => o.id === id);
-    if (!src) return;
-    const newOp = await createOperation(src.category_id);
-    await updateOperation(newOp.id, {
-      title: src.title + ' (Copy)', content: src.content, category_id: src.category_id,
-      tags: src.tags, is_active: src.is_active, end_date: src.end_date,
-      version: src.version, icon: src.icon ?? undefined, cover_image: src.cover_image ?? undefined,
-    });
-    setActiveView({ type: 'operations', id: newOp.id, mode: 'view' });
+    const newOp = await duplicateOperation(id);
+    if (newOp) setActiveView({ type: 'operations', id: newOp.id, mode: 'view' });
   };
 
   const startRename = (id: string) => {
@@ -197,28 +171,29 @@ export default function OperationsView() {
 
   const handleDone = async () => {
     if (!operation) return;
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    await updateOperation(operation.id, { title, content, category_id: categoryId, tags, is_active: isActive, end_date: endDate || null, version: version || null });
+    cancelAutoSave();
+    await updateOperation(operation.id, { title, content: pendingHtmlRef.current, category_id: categoryId, tags, is_active: isActive, end_date: endDate || null, version: version || null });
     setActiveView({ type: 'operations', id: operation.id, mode: 'view' });
   };
 
   const handleCancel = () => {
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    cancelAutoSave();
     if (operation) {
       setTitle(operation.title);
-      setContent(operation.content);
       setCategoryId(operation.category_id);
       setTags(operation.tags ?? []);
       setIsActive(operation.is_active ?? true);
       setEndDate(operation.end_date ?? '');
       setVersion(operation.version ?? '');
+      pendingHtmlRef.current = operation.content;
+      setEditorEpoch((e) => e + 1);
     }
     setActiveView({ type: 'operations', id: operation!.id, mode: 'view' });
   };
 
   const handleDelete = async () => {
     if (!operation) return;
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    cancelAutoSave();
     const id = operation.id;
     await deleteOperation(id);
     pushUndo({ id: generateId(), description: t('undo.operationDeleted'), undo: () => restoreOperation(id) });
@@ -226,7 +201,7 @@ export default function OperationsView() {
   };
 
   const handleContentChange = useCallback((html: string) => {
-    setContent(html);
+    pendingHtmlRef.current = html;
     triggerAutoSave();
   }, [triggerAutoSave]);
 
@@ -600,9 +575,10 @@ export default function OperationsView() {
             onClose={() => setCtxMenu(null)}
             actions={[
               { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'operations', id: ctxMenu.id, mode: 'view' }) },
-              ...(operations.find((o) => o.id === ctxMenu.id)?.category_id === 'sigils'
-                ? []
-                : [{ label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) }]),
+              // Sigil-Operationen waren hier frueher ausgenommen, weil das
+              // Duplizieren die Zeichnung verlor. duplicateOperation laedt sie
+              // inzwischen nach und entsperrt die Kopie — die Ausnahme ist weg.
+              { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
               { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
               { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },
             ]}
@@ -704,8 +680,8 @@ export default function OperationsView() {
       <div className="flex-1 overflow-hidden px-8 pb-8" onDoubleClick={enterEditMode}>
         {loadedOperationId === operation.id && (
           <RichEditor
-            key={operation.id}
-            content={content}
+            key={`${operation.id}:${editorEpoch}`}
+            initialContent={operation.content}
             placeholder={t('operations.placeholder')}
             onChange={handleContentChange}
             editable={isEditing}

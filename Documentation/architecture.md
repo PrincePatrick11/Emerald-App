@@ -57,6 +57,8 @@ src/
 │                     trashStore, vaultStore, importStore
 ├── hooks/            useCategoryEditor (shared add/edit/delete-with-confirm category logic,
 │                                      used by TasksView, WikiView, OperationsView),
+│                     useEntryEditor (debounced auto-save + save-on-navigate + save-on-unmount,
+│                                      used by JournalView, WikiView, OperationsView),
 │                     useGlobalSearch (assembles the search corpus from the stores and runs it
 │                                      against the query; backs the title bar's search field)
 ├── lib/              db.ts, schema.ts, normalizeSchema.ts, row.ts,
@@ -70,6 +72,8 @@ src/
 │                     images.ts (imageSrc, saveImage, copyImageFile, canvasImageSrc,
 │                                      findUnusedImages — the image pipeline, see Image
 │                                      Storage System below),
+│                     thumbnail.ts (shared thumbnail encoder: WebP quality ladder under the
+│                                      512-KB cap, used by altar cards and sigil lists),
 │                     altarConstants.ts, altarExport.ts, styleClasses.ts,
 │                     emojiSearchData/{en,de,es,fr}.json (localised emoji search datasets,
 │                                      generated from emojibase-data, lazy-loaded per locale)
@@ -154,11 +158,35 @@ All `useState`, `useEffect`, `useRef`, `useMemo`, and `useCallback` calls must a
 
 `useCategoryEditor<C>(store, options)` in `src/hooks/useCategoryEditor.ts` extracts the add/edit/delete-with-confirm state and handlers for a module's category list — this logic was near-duplicated across `TasksView`, `WikiView`, and `OperationsView`. It takes the four category-store actions (`addCategory`, `updateCategory`, `deleteCategory`, `restoreCategory`) generically over any `{ id, name, emoji }`-shaped category type, plus a `defaultEmoji` and an optional `onAdded` callback (used by callers that need to auto-select or auto-save after a category is created). Delete-with-confirm pushes an undo entry via `useUndoStore`. Category creation failures are caught and logged consistently across all three call sites (previously only `TasksView` guarded against a failed `addCategory` call).
 
-### Auto-Save (stale-closure-safe)
+### Auto-Save (the `useEntryEditor` hook)
 
-The editor writes the current title and content into a ref on every render. A debounced timer (1.5 s) reads from the ref when it fires, never from a closure. This means the save always uses the latest content regardless of when the timer was scheduled.
+Debounced auto-save (1.5s), save-on-navigate and save-on-unmount live in
+`src/hooks/useEntryEditor.ts`, used by JournalView, WikiView and
+OperationsView — each of which used to carry its own ~80-line copy of the
+same machinery, with quietly drifting details. The hook takes a
+`buildPatch()` closure and an `update(id, patch)` action; it keeps the
+latest closure in a ref, so the navigate-away save still reads the
+*previous* entry's local state (the views' load effects run after the
+hook's effects — the hook call sits above them in the component body).
 
-`triggerAutoSave()` takes no arguments. Callers must not pass a snapshot of `pendingRef.current` as an argument — doing so would capture stale state at call time and cause the debounced write to overwrite changes made between the call and the timer firing (for example, a sidebar category change made 200 ms after the title change would be lost). All three views that use this pattern (JournalView, WikiView, OperationsView) read `pendingRef.current` and `isEditingRef.current` exclusively inside the timer callback.
+The editor content itself is mirrored into a `pendingHtmlRef` on each
+keystroke rather than into React state: a state update would re-render the
+whole view per keystroke. `RichEditor`'s `content` prop is consequently an
+**initial value only** — the old effect that compared `editor.getHTML()`
+against the prop on every render (a second full-document serialisation per
+keystroke) is gone. Switching entries remounts the editor via its `key`
+(`` `${id}:${editorEpoch}` ``), and Cancel bumps `editorEpoch` to remount
+from the last saved content. `OperationSigilView` keeps its own variant of
+this lifecycle: its pending state is canvas data, not HTML, and its save
+path builds a downscaled thumbnail first.
+
+Two guards protect these save paths: `ready` (the view's `loadedEntryId`
+gate) arms the navigate/unmount saves only after local state is hydrated,
+so a StrictMode double-mount in edit mode cannot write empty fields; and
+`src/lib/editorLock.ts` suspends all automatic editor saves while a
+replace/add-vault backup import runs — without it, the unmount triggered
+by the import's own navigation would write the pre-import content over
+the freshly restored rows.
 
 ### Internal Links
 
@@ -488,6 +516,8 @@ This means the editor font controls the TipTap editor body, entry titles in all 
 ## IPC Command Surface
 
 All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from TypeScript with `invoke()`; over half of them are *defined* in `images.rs` and `vault.rs` and referenced as `images::…` / `vault::…` in the handler list.
+
+**File commands run off the main thread.** `write_file`, `read_file`, `export_image`, `ensure_app_storage_dirs` and all six commands in `images.rs` are `async` and wrap their `std::fs` work in `tauri::async_runtime::spawn_blocking` — a multi-megabyte `.emeralddb` with embedded images used to block the window for the duration of the write. `async fn` alone would not have been enough: without `spawn_blocking`, the blocking call still runs on a runtime worker and can starve the SQL plugin, PDF export and IPC replies on a machine with few cores. The four native-menu commands stay synchronous on purpose — they mutate `NSMenu`, which is main-thread-only on macOS. A static `IMAGE_WRITE_LOCK` mutex in `images.rs` serializes the image folder's writes and deletes, a guarantee that used to be implicit when those commands ran on the main thread one at a time; without it, a storage cleanup could delete a file whose hash a concurrent `save_image` had just judged "already exists" and skipped writing. `resolve_allowed_roots()` caches its result behind a `OnceLock` once every root canonicalizes successfully — it used to re-run six `canonicalize` syscalls on every file command — and falls back to re-resolving on every call if any root fails to canonicalize (a not-yet-existing directory, an unmounted network drive), so a transient failure heals on the next call instead of freezing a wrong answer in for the rest of the session. The `emerald-img` scheme handler likewise moved from one `std::thread::spawn` per image to `spawn_blocking`, reusing the async runtime's blocking pool instead of creating and tearing down an OS thread per request.
 
 | Command | Purpose |
 |---|---|

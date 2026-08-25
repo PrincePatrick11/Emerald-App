@@ -1,10 +1,10 @@
 # Internationalisation
 
-Emerald supports four languages: English (`en`), German (`de`), Spanish (`es`), and French (`fr`). The active language is selected in the Settings modal. It is **not yet persisted** — the app starts in English every launch (known gap).
+Emerald supports four languages: English (`en`), German (`de`), Spanish (`es`), and French (`fr`). The active language is selected in the Settings modal and persisted in `localStorage` (`app-language`); `main.tsx` re-activates it before the first render.
 
 ## Setup
 
-Translations are managed with `react-i18next`. The setup lives in `src/i18n/index.ts`. Only `en` — the startup and fallback language — is imported statically; `de`/`es`/`fr` are loaded on demand as their own chunks, following the same pattern as the emoji search data. **Always switch languages through `changeAppLanguage(lang)`** (exported from `src/i18n/index.ts`), which loads the bundle before calling `i18n.changeLanguage` — a direct `i18n.changeLanguage` call would switch to a not-yet-registered locale and render the English fallback. `SettingsModal` is the one current caller.
+Translations are managed with `react-i18next`. The setup lives in `src/i18n/index.ts`. Only `en` — the startup and fallback language — is imported statically; `de`/`es`/`fr` are loaded on demand as their own chunks, following the same pattern as the emoji search data. **Always switch languages through `changeAppLanguage(lang)`** (exported from `src/i18n/index.ts`), which loads the bundle before calling `i18n.changeLanguage`, persists the choice, and lets the last of two racing switches win — a direct `i18n.changeLanguage` call would switch to a not-yet-registered locale and render the English fallback. `SettingsModal` and the startup path in `main.tsx` are the two callers. Stores without hook access (the duplicate actions' `common.copySuffix`) read translations through the default `i18n` export instead.
 
 Translation files are at:
 

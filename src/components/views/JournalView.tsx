@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Trash2, Copy, Pencil } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import { useUIStore } from '../../store/uiStore';
+import { useEntryEditor } from '../../hooks/useEntryEditor';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
@@ -47,15 +48,10 @@ export default function JournalView() {
   const [showFilters, setShowFilters] = useState(false);
   const [filterPhases, setFilterPhases] = useState<string[]>([]);
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [loadedEntryId, setLoadedEntryId] = useState<string | null>(null);
 
   // Always-fresh refs
-  const pendingRef = useRef({ title, content, tags });
-  pendingRef.current = { title, content, tags };
-  const isEditingRef = useRef(false);
-  isEditingRef.current = isEditing;
   const entryIdRef = useRef<string | undefined>(undefined);
   entryIdRef.current = entry?.id;
   const linkedOpIdsRef = useRef<string[]>(entry?.linked_operation_ids ?? []);
@@ -63,44 +59,26 @@ export default function JournalView() {
   const linkedWikiIdsRef = useRef<string[]>(entry?.linked_wiki_ids ?? []);
   linkedWikiIdsRef.current = entry?.linked_wiki_ids ?? [];
 
-  // Debounced auto-save
-  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const triggerAutoSave = useCallback(() => {
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    const id = entryIdRef.current;
-    autoSaveTimer.current = setTimeout(() => {
-      if (!isEditingRef.current || !id) return;
-      // Fire-and-forget: waehrend `withDbClosed` laeuft (Vault-Dateien werden
-      // geloescht) lehnt `getDb()` ab, und die Aenderung gehoert ohnehin zu dem
-      // Vault, der gerade verschwindet.
-      void updateEntry(id, pendingRef.current).catch(() => {});
-    }, 1500);
-  }, [updateEntry]);
+  // Der Editor-Inhalt wird pro Tastendruck in diesen Ref gespiegelt statt in
+  // State — ein State-Update haette die komplette View pro Anschlag neu
+  // gerendert. Gelesen wird er erst beim Speichern (buildPatch).
+  const pendingHtmlRef = useRef('');
+  // Cancel verwirft die ungespeicherten letzten Sekunden, indem der Editor
+  // ueber den Key frisch vom letzten gespeicherten Stand mountet.
+  const [editorEpoch, setEditorEpoch] = useState(0);
 
-  // Track previous edit state to detect navigation-while-editing
-  const prevRef = useRef<{ id: string; isEditing: boolean } | null>(null);
-
-  useEffect(() => {
-    const prev = prevRef.current;
-    if (prev?.isEditing && prev.id !== entry?.id) {
-      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-      updateEntry(prev.id, pendingRef.current);
-    }
-    prevRef.current = entry ? { id: entry.id, isEditing } : null;
-  }, [entry?.id, isEditing]);
-
-  useEffect(() => {
-    return () => {
-      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-      const prev = prevRef.current;
-      if (prev?.isEditing) updateEntry(prev.id, pendingRef.current);
-    };
-  }, []);
+  const { triggerAutoSave, cancelAutoSave } = useEntryEditor({
+    entityId: entry?.id,
+    isEditing,
+    ready: !!entry && loadedEntryId === entry.id,
+    buildPatch: () => ({ title, content: pendingHtmlRef.current, tags }),
+    update: updateEntry,
+  });
 
   useEffect(() => {
     if (entry) {
       setTitle(entry.title);
-      setContent(entry.content);
+      pendingHtmlRef.current = entry.content;
       setTags(entry.tags ?? []);
       setLoadedEntryId(entry.id);
     } else {
@@ -112,6 +90,12 @@ export default function JournalView() {
   useEffect(() => {
     if (entry) setTags(entry.tags ?? []);
   }, [entry?.tags]);
+
+  // Titel ebenso: ein Rename aus der Sidebar bei offenem Edit-Modus wuerde
+  // sonst vom naechsten Autosave zurueckgedreht.
+  useEffect(() => {
+    if (entry) setTitle(entry.title);
+  }, [entry?.title]);
 
   // Apply tags + operation_ids + wiki_ids from a dropped routine
   useEffect(() => {
@@ -169,24 +153,25 @@ export default function JournalView() {
 
   const handleDone = async () => {
     if (!entry) return;
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    await updateEntry(entry.id, { title, content, tags });
+    cancelAutoSave();
+    await updateEntry(entry.id, { title, content: pendingHtmlRef.current, tags });
     setActiveView({ type: 'journal', id: entry.id, mode: 'view' });
   };
 
   const handleCancel = () => {
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    cancelAutoSave();
     if (entry) {
       setTitle(entry.title);
-      setContent(entry.content);
       setTags(entry.tags ?? []);
+      pendingHtmlRef.current = entry.content;
+      setEditorEpoch((e) => e + 1);
     }
     setActiveView({ type: 'journal', id: entry!.id, mode: 'view' });
   };
 
   const handleDelete = async () => {
     if (!entry) return;
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    cancelAutoSave();
     const id = entry.id;
     await deleteEntry(id);
     pushUndo({ id: generateId(), description: t('undo.entryDeleted'), undo: () => restoreEntry(id) });
@@ -194,7 +179,7 @@ export default function JournalView() {
   };
 
   const handleContentChange = useCallback((html: string) => {
-    setContent(html);
+    pendingHtmlRef.current = html;
     triggerAutoSave();
   }, [triggerAutoSave]);
 
@@ -504,8 +489,8 @@ export default function JournalView() {
       <div className="flex-1 overflow-hidden px-8 pb-8" onDoubleClick={enterEditMode}>
         {loadedEntryId === entry.id && (
           <RichEditor
-            key={entry.id}
-            content={content}
+            key={`${entry.id}:${editorEpoch}`}
+            initialContent={entry.content}
             placeholder={t('journal.placeholder')}
             onChange={handleContentChange}
             editable={isEditing}

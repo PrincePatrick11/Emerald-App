@@ -96,7 +96,9 @@ container in `RightSidebar.tsx`. No panel and no field here adds a `px-*` of its
 | Building block | For |
 | --- | --- |
 | `useCategoryEditor` | category CRUD with confirmation and undo. Generic over the store — used by Tasks, Wiki and Operations. `AltarLibraryStrip` implements its own category CRUD in its `CategoryModal` instead — undocumented deviation, worth folding in when touched |
+| `useEntryEditor` | the editor lifecycle — debounced auto-save, save-on-navigate, save-on-unmount — parameterised over `buildPatch()`/`update()`. Used by JournalView, WikiView and OperationsView, which each held their own drifting copy before |
 | `useGlobalSearch` | assembles the search corpus from the stores and runs the query; backs the title bar's search field |
+| `lib/thumbnail.ts` | `canvasToCappedThumbnail` (WebP quality ladder under the shared `THUMBNAIL_MAX_BYTES` cap, JPEG or PNG fallback) — used by the altar cards and the sigil list thumbnails. `THUMBNAIL_W` (640px) is the altar cards' render width only; `OperationSigilView` scales to its own narrower 320px before calling the shared encoder |
 | `lib/styleClasses.ts` | repeated Tailwind chains. **The established home for them** — extend it rather than bypassing it |
 | `lib/platform.ts` | `isMacOS`, `isWindows`, `platformName`, `isTauri`, `usesCustomWindowControls`, `usesHtmlMenuBar`. The **only** permitted source of platform detection; everything else branches through `html[data-platform]` in CSS, never through scattered `navigator.userAgent` checks |
 | `lib/tabs.ts` | tab IDs, `isContentView`, `viewTypeForEntryType` — the one place translating the data model's `operation` into `ActiveView`'s `operations` |

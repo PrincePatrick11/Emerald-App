@@ -6,6 +6,7 @@ import { syncLinks } from '../lib/links';
 import { generateId, nowIso } from '../lib/helpers';
 import { fromRow, type DbRow } from '../lib/row';
 import type { WikiArticle, WikiCategory, WikiCategoryDef } from '../types';
+import i18n from '../i18n';
 
 function slugify(title: string): string {
   return title
@@ -40,6 +41,7 @@ interface WikiState {
   fetchArticles: () => Promise<void>;
   fetchCategories: () => Promise<void>;
   createArticle: (categoryId?: WikiCategory) => Promise<WikiArticle>;
+  duplicateArticle: (id: string) => Promise<WikiArticle | undefined>;
   updateArticle: (id: string, patch: Partial<WikiArticle>) => Promise<void>;
   deleteArticle: (id: string) => Promise<void>;
   restoreArticle: (id: string) => Promise<void>;
@@ -125,6 +127,28 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     );
     set((s) => ({ articles: [...s.articles, article] }));
     return article;
+  },
+
+  /**
+   * Kopiert alle Inhaltsfelder; Slug und Identitaet bleiben beim neuen
+   * Artikel (updateArticle vergibt fuer den "(Copy)"-Titel selbst einen
+   * eindeutigen Slug). Ersetzt die frueher dreifach kopierten Feldlisten.
+   */
+  duplicateArticle: async (id) => {
+    const src = get().articles.find((a) => a.id === id);
+    if (!src) return undefined;
+    const copy = await get().createArticle(src.category_id);
+    const {
+      id: _id,
+      slug: _slug,
+      created_at: _created,
+      updated_at: _updated,
+      deleted_at: _deleted,
+      entry_number: _number,
+      ...fields
+    } = src;
+    await get().updateArticle(copy.id, { ...fields, title: src.title + i18n.t('common.copySuffix') });
+    return get().articles.find((a) => a.id === copy.id) ?? copy;
   },
 
   updateArticle: async (id, patch) => {

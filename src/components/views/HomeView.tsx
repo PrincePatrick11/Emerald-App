@@ -138,11 +138,11 @@ export default function HomeView() {
   const { entries, createEntry, duplicateEntry, deleteEntry, restoreEntry } = useJournalStore(
     useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
   );
-  const { articles, wikiCategories, createArticle, updateArticle, deleteArticle, restoreArticle } = useWikiStore(
-    useShallow((s) => ({ articles: s.articles, wikiCategories: s.wikiCategories, createArticle: s.createArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle }))
+  const { articles, wikiCategories, duplicateArticle, deleteArticle, restoreArticle } = useWikiStore(
+    useShallow((s) => ({ articles: s.articles, wikiCategories: s.wikiCategories, duplicateArticle: s.duplicateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle }))
   );
-  const { operations, categories, createOperation, updateOperation, deleteOperation, restoreOperation } = useOperationStore(
-    useShallow((s) => ({ operations: s.operations, categories: s.categories, createOperation: s.createOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation }))
+  const { operations, categories, duplicateOperation, deleteOperation, restoreOperation } = useOperationStore(
+    useShallow((s) => ({ operations: s.operations, categories: s.categories, duplicateOperation: s.duplicateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation }))
   );
   const pushUndo = useUndoStore((s) => s.push);
 
@@ -166,17 +166,11 @@ export default function HomeView() {
       const ne = await duplicateEntry(target.id);
       if (ne) setActiveView({ type: 'journal', id: ne.id, mode: 'view' });
     } else if (target.kind === 'wiki') {
-      const src = articles.find((a) => a.id === target.id);
-      if (!src) return;
-      const na = await createArticle(src.category_id as never);
-      await updateArticle(na.id, { title: src.title + ' (Copy)', content: src.content, tags: src.tags });
-      setActiveView({ type: 'wiki', id: na.id, mode: 'view' });
+      const na = await duplicateArticle(target.id);
+      if (na) setActiveView({ type: 'wiki', id: na.id, mode: 'view' });
     } else if (target.kind === 'operation') {
-      const src = operations.find((o) => o.id === target.id);
-      if (!src) return;
-      const no = await createOperation(src.category_id ?? 'other');
-      await updateOperation(no.id, { title: src.title + ' (Copy)', content: src.content, tags: src.tags });
-      setActiveView({ type: 'operations', id: no.id, mode: 'view' });
+      const no = await duplicateOperation(target.id);
+      if (no) setActiveView({ type: 'operations', id: no.id, mode: 'view' });
     }
   };
 

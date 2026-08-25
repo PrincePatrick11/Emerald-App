@@ -49,12 +49,33 @@ pub(crate) fn ext_for_path(path: &str) -> String {
 /// or reading a *document* — a backup file, a Markdown export — inside a vault
 /// folder that sits outside the user directories. That is the intended trade.
 pub(crate) fn resolve_allowed_roots(app: &tauri::AppHandle) -> Result<Vec<PathBuf>, String> {
+    // Cache gegen die sechs canonicalize-Syscalls pro Aufruf (jeder
+    // Datei-Command laeuft hier durch, `copy_image_file` einmal pro Bild).
+    // Gecacht wird NUR ein vollstaendig kanonisiertes Ergebnis: ein Root, bei
+    // dem canonicalize scheiterte (Verzeichnis existiert noch nicht, ein
+    // Windows-Known-Folder liegt auf einem gerade nicht verbundenen
+    // Netzlaufwerk), faellt auf den rohen Pfad zurueck — und der matcht auf
+    // Windows nie gegen kanonisierte Zielpfade mit Verbatim-Praefix.
+    // Eingefroren waere das ein permanentes "access denied" bis zum Neustart;
+    // ungecacht heilt es sich beim naechsten Aufruf.
+    static ALLOWED_ROOTS: std::sync::OnceLock<Vec<PathBuf>> = std::sync::OnceLock::new();
+
+    if let Some(cached) = ALLOWED_ROOTS.get() {
+        return Ok(cached.clone());
+    }
+
     let mut roots: Vec<PathBuf> = Vec::new();
+    let mut all_canonical = true;
 
     let mut push_root = |root: Result<PathBuf, _>| {
         if let Ok(path) = root {
-            let canonical = std::fs::canonicalize(&path).unwrap_or(path);
-            roots.push(canonical);
+            match std::fs::canonicalize(&path) {
+                Ok(canonical) => roots.push(canonical),
+                Err(_) => {
+                    all_canonical = false;
+                    roots.push(path);
+                }
+            }
         }
     };
 
@@ -69,7 +90,11 @@ pub(crate) fn resolve_allowed_roots(app: &tauri::AppHandle) -> Result<Vec<PathBu
         return Err("no allowed storage roots available".to_string());
     }
 
-    Ok(roots)
+    if all_canonical {
+        Ok(ALLOWED_ROOTS.get_or_init(|| roots).clone())
+    } else {
+        Ok(roots)
+    }
 }
 
 pub(crate) fn is_within_allowed_roots(path: &Path, allowed_roots: &[PathBuf]) -> bool {
@@ -150,65 +175,90 @@ pub(crate) fn guarded_read_path(app: &tauri::AppHandle, path: &str) -> Result<Pa
 }
 
 // ── commands ──────────────────────────────────────────────────────────────────
+//
+// Die Datei-Commands sind `async` und wickeln ihre `std::fs`-Arbeit in
+// `spawn_blocking`: eine `.emeralddb` mit eingebetteten Bildern ist
+// zweistellige MB gross und blockierte frueher fuer die Dauer das Fenster.
+// `async` allein genuegt nicht — ohne `spawn_blocking` laege die blockierende
+// Arbeit auf einem Worker der Runtime und koennte auf kleinen Maschinen alle
+// Worker belegen (SQL-Plugin, PDF-Export und IPC-Antworten hungern dann).
+// Die vier Menue-Commands weiter unten bleiben absichtlich synchron: sie
+// mutieren NSMenu, und das ist auf macOS Main-Thread-only.
 
 /// Writes text content to a user-selected file path.
 /// Only .md, .emerald, .emeralddb, .json, and .txt extensions are permitted.
 #[tauri::command]
-fn write_file(app: tauri::AppHandle, path: String, content: String) -> Result<(), String> {
-    let ext = ext_for_path(&path);
-    if !matches!(ext.as_str(), "md" | "emerald" | "emeralddb" | "json" | "txt") {
-        return Err("unsupported file type".to_string());
-    }
+async fn write_file(app: tauri::AppHandle, path: String, content: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let ext = ext_for_path(&path);
+        if !matches!(ext.as_str(), "md" | "emerald" | "emeralddb" | "json" | "txt") {
+            return Err("unsupported file type".to_string());
+        }
 
-    let target = guarded_write_target(&app, &path)?;
-    std::fs::write(target, content.as_bytes()).map_err(|e| e.to_string())
+        let target = guarded_write_target(&app, &path)?;
+        std::fs::write(target, content.as_bytes()).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Exports a base64 data-URL image to a user-chosen path on disk.
 /// Only .png, .jpg, .jpeg, and .webp extensions are permitted.
 /// Path must resolve to within the allowed user directories.
 #[tauri::command]
-fn export_image(app: tauri::AppHandle, path: String, data_url: String) -> Result<(), String> {
-    let ext = ext_for_path(&path);
-    if !matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp") {
-        return Err("unsupported file type".to_string());
-    }
+async fn export_image(app: tauri::AppHandle, path: String, data_url: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let ext = ext_for_path(&path);
+        if !matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp") {
+            return Err("unsupported file type".to_string());
+        }
 
-    let (_mime_part, b64) = data_url
-        .strip_prefix("data:")
-        .and_then(|s| s.split_once(','))
-        .ok_or("Invalid data URL")?;
-    // Rust decodes the payload, so no text encoding or newline handling can
-    // alter the bytes that reach disk.
-    let bytes = general_purpose::STANDARD.decode(b64).map_err(|e| e.to_string())?;
+        let (_mime_part, b64) = data_url
+            .strip_prefix("data:")
+            .and_then(|s| s.split_once(','))
+            .ok_or("Invalid data URL")?;
+        // Rust decodes the payload, so no text encoding or newline handling can
+        // alter the bytes that reach disk.
+        let bytes = general_purpose::STANDARD.decode(b64).map_err(|e| e.to_string())?;
 
-    let target = guarded_write_target(&app, &path)?;
-    std::fs::write(target, &bytes).map_err(|e| e.to_string())
+        let target = guarded_write_target(&app, &path)?;
+        std::fs::write(target, &bytes).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Reads a text file and returns its contents as a UTF-8 string.
 /// Only .md, .emerald, .emeralddb, .json, and .txt extensions are permitted.
 #[tauri::command]
-fn read_file(app: tauri::AppHandle, path: String) -> Result<String, String> {
-    let ext = ext_for_path(&path);
-    if !matches!(ext.as_str(), "md" | "emerald" | "emeralddb" | "json" | "txt") {
-        return Err("unsupported file type".to_string());
-    }
+async fn read_file(app: tauri::AppHandle, path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let ext = ext_for_path(&path);
+        if !matches!(ext.as_str(), "md" | "emerald" | "emeralddb" | "json" | "txt") {
+            return Err("unsupported file type".to_string());
+        }
 
-    std::fs::read_to_string(guarded_read_path(&app, &path)?).map_err(|e| e.to_string())
+        std::fs::read_to_string(guarded_read_path(&app, &path)?).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Ensures platform-specific app storage directories exist before frontend
 /// code writes vault metadata or opens SQLite databases.
 #[tauri::command]
-fn ensure_app_storage_dirs(app: tauri::AppHandle) -> Result<(), String> {
-    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(app_data_dir).map_err(|e| e.to_string())?;
+async fn ensure_app_storage_dirs(app: tauri::AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+        std::fs::create_dir_all(app_data_dir).map_err(|e| e.to_string())?;
 
-    let app_config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(app_config_dir).map_err(|e| e.to_string())?;
+        let app_config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+        std::fs::create_dir_all(app_config_dir).map_err(|e| e.to_string())?;
 
-    Ok(())
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Renders the given HTML to a PDF file at `path` by driving the

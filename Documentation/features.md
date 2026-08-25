@@ -365,7 +365,7 @@ When a rejected file is selected via a file picker, an inline error message appe
 
 Right-click any entry in the left sidebar or in any list view (List, Cards, Timeline layouts) to get a context menu with three core actions — most menus add **Open in new tab** as a fourth:
 
-**Duplicate.** Creates a copy of the entry, appending " (Copy)" to the title, and navigates to it automatically. For journal entries this goes through the store's single `duplicateEntry` action and copies every content field. Wiki and Operations duplicates still enumerate fields per call site and copy less (an operation's sigil drawing, for one, is not copied).
+**Duplicate.** Creates a copy of the entry, appending a localized " (Copy)" suffix (`common.copySuffix`) to the title, and navigates to it automatically. Journal, Wiki, and Operations each go through a single store action (`duplicateEntry` / `duplicateArticle` / `duplicateOperation`) that copies every content field — an operation's sigil drawing is loaded on demand first and comes along too. The one deliberate exception: `is_loaded` is reset, so the copy of a loaded (sealed) sigil is editable rather than instantly locked.
 
 **Rename.** Activates an inline text input directly in the list item. Press Enter or click away to save; press Escape to cancel.
 
@@ -373,7 +373,7 @@ Right-click any entry in the left sidebar or in any list view (List, Cards, Time
 
 ## Language
 
-Settings > Language switches the app language between English, German, Spanish, and French. English is the startup and fallback language; the other three locale bundles are loaded on demand the first time they are selected (`changeAppLanguage` in `src/i18n/index.ts`). The choice is not yet persisted across restarts — the app starts in English every launch.
+Settings > Language switches the app language between English, German, Spanish, and French. English is the default and fallback language; the other three locale bundles are loaded on demand the first time they are selected (`changeAppLanguage` in `src/i18n/index.ts`). The choice is persisted in `localStorage` under `app-language` — like the theme, it is applied before the first render so the app never flashes English on launch.
 
 ## Typography
 

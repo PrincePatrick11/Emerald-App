@@ -11,6 +11,7 @@ import LinkedWikiInput from '../fields/LinkedWikiInput';
 import ContextMenu from '../../ui/ContextMenu';
 import EmojiPicker from '../../ui/EmojiPicker';
 import Button from '../../ui/Button';
+import i18n from '../../../i18n';
 
 export default function RoutinesPanel() {
   const { t } = useTranslation();
@@ -136,7 +137,7 @@ export default function RoutinesPanel() {
               onClick: async () => {
                 const src = routines.find((r) => r.id === ctxMenu.id);
                 if (!src) return;
-                await createRoutine(src.name + ' (Copy)', src.emoji, src.content, src.tags, src.operation_ids ?? [], src.wiki_ids ?? []);
+                await createRoutine(src.name + i18n.t('common.copySuffix'), src.emoji, src.content, src.tags, src.operation_ids ?? [], src.wiki_ids ?? []);
               },
             },
             {

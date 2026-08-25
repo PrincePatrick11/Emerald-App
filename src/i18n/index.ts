@@ -11,6 +11,34 @@ const loaders: Record<string, () => Promise<{ default: typeof en }>> = {
   fr: () => import('./locales/fr.json'),
 };
 
+/**
+ * Die eine Quelle fuer "welche Sprachen gibt es": Settings rendert seine
+ * Buttons daraus, savedAppLanguage validiert dagegen, changeAppLanguage
+ * lehnt Unbekanntes ab. Eine neue Sprache heisst: Eintrag hier, Loader oben,
+ * Locale-Datei — sonst nichts.
+ */
+export const LANGUAGE_OPTIONS = [
+  { code: 'en', label: 'English' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'es', label: 'Español' },
+  { code: 'fr', label: 'Français' },
+] as const;
+
+export type AppLanguage = (typeof LANGUAGE_OPTIONS)[number]['code'];
+
+const SUPPORTED = new Set<string>(LANGUAGE_OPTIONS.map((o) => o.code));
+
+// Gleicher Mechanismus wie 'theme-id' und die Font-Keys: localStorage, damit
+// die Wahl Sessions und Vault-Wechsel uebersteht. Vorher startete die App bei
+// jedem Launch auf Englisch.
+const LANGUAGE_STORAGE_KEY = 'app-language';
+
+/** Die zuletzt gewaehlte Sprache, gegen LANGUAGE_OPTIONS validiert. */
+export function savedAppLanguage(): string {
+  const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+  return stored && SUPPORTED.has(stored) ? stored : 'en';
+}
+
 i18n
   .use(initReactI18next)
   .init({
@@ -36,6 +64,7 @@ i18n
 let switchSeq = 0;
 
 export async function changeAppLanguage(lng: string): Promise<void> {
+  if (!SUPPORTED.has(lng)) return;
   const seq = ++switchSeq;
   if (!i18n.hasResourceBundle(lng, 'translation')) {
     const load = loaders[lng];
@@ -46,6 +75,9 @@ export async function changeAppLanguage(lng: string): Promise<void> {
   }
   if (seq !== switchSeq) return;
   await i18n.changeLanguage(lng);
+  localStorage.setItem(LANGUAGE_STORAGE_KEY, lng);
+  // Fuer Rechtschreibpruefung und Screenreader — index.html startet mit "en".
+  document.documentElement.lang = lng;
 }
 
 export default i18n;

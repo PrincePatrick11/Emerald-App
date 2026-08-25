@@ -21,6 +21,7 @@ import { hexToRgb } from '../../lib/helpers';
 import type { AltarItem, AltarPlacement, AltarRecord } from '../../types';
 import { AltarItemVisual } from './AltarItemVisual';
 import { canvasImageSrc } from '../../lib/images';
+import { THUMBNAIL_W, canvasToCappedThumbnail } from '../../lib/thumbnail';
 
 const BASE_SIZE = 40;
 
@@ -28,8 +29,6 @@ const BASE_SIZE = 40;
 // Altar thumbnail renderer — draws directly to a Canvas 2D context from
 // store data instead of relying on DOM capture (no external library needed).
 // ---------------------------------------------------------------------------
-
-const THUMBNAIL_W = 640;
 
 const PRESET_GRAD: Record<string, { cx: number; cy: number; stops: [string, number][] }> = {
   midnight: { cx: 0.5, cy: 0.30, stops: [['#1a1a2e', 0], ['#0d0d15', 0.6], ['#0a0a0f', 1]] },
@@ -200,38 +199,9 @@ async function renderAltarThumbnail(
 ): Promise<string | null> {
   const canvas = await _renderAltar(altar, backgroundSrc, placements, nativeW, nativeH, THUMBNAIL_W);
   if (!canvas) return null;
-
-  const toDataUrl = (format: string, quality: number): Promise<string | null> =>
-    new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        if (!blob) { resolve(null); return; }
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
-      }, format, quality);
-    });
-
-  // Probe WebP support with one call — if the result isn't actually WebP, the
-  // runtime fell back to PNG (lossless, unaffected by quality) and we skip
-  // straight to JPEG which has reliable quality control.
-  const probe = await toDataUrl('image/webp', 0.85);
-  if (probe !== null) {
-    if (probe.startsWith('data:image/webp')) {
-      if (probe.length <= 524288) return probe;
-      for (const q of [0.65, 0.45]) {
-        const r = await toDataUrl('image/webp', q);
-        if (r !== null && r.length <= 524288) return r;
-      }
-    } else if (probe.length <= 524288) {
-      return probe;
-    }
-  }
-
-  for (const q of [0.85, 0.65, 0.45]) {
-    const r = await toDataUrl('image/jpeg', q);
-    if (r !== null && r.length <= 524288) return r;
-  }
-  return null;
+  // WebP-Leiter mit JPEG-Fallback und 512-KB-Deckel — geteilt mit den
+  // Sigil-Thumbnails in lib/thumbnail.ts.
+  return canvasToCappedThumbnail(canvas, 'jpeg');
 }
 
 /** Renders the active altar at full native resolution for file export. */

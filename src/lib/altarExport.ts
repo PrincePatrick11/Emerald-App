@@ -4,6 +4,7 @@ import { useAltarStore } from '../store/altarStore';
 import { exportCurrentAltarImage } from '../components/altar/AltarCanvas';
 import { DEFAULT_ALTAR_RESOLUTION, resolveResolutionPixels } from './altarConstants';
 import { htmlEscape } from './export';
+import i18n from '../i18n';
 
 // Long edge of the generated PDF page, in inches — same ballpark as a
 // Letter/A4 sheet. The short edge is derived from the altar's own pixel
@@ -78,7 +79,7 @@ export async function saveAltarPDF(): Promise<void> {
 
   const escapedTitle = htmlEscape(activeAltar.title);
   const html = `<!DOCTYPE html>
-<html lang="de">
+<html lang="${i18n.language}">
 <head>
   <meta charset="utf-8">
   <title>${escapedTitle}</title>

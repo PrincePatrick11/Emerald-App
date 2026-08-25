@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Globe, Info, Database, Upload, Download, Check, AlertTriangle, ChevronDown, ChevronUp, Sun, Moon, Type, Brush, HardDrive } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { changeAppLanguage } from '../../i18n';
+import { LANGUAGE_OPTIONS, changeAppLanguage } from '../../i18n';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { useUIStore } from '../../store/uiStore';
@@ -239,12 +239,7 @@ export default function SettingsModal({ onClose }: Props) {
               {t('settings.language')}
             </div>
             <div className="flex gap-2 flex-wrap">
-              {([
-                { code: 'en', label: 'English' },
-                { code: 'de', label: 'Deutsch' },
-                { code: 'es', label: 'Español' },
-                { code: 'fr', label: 'Français' },
-              ] as const).map(({ code, label }) => (
+              {LANGUAGE_OPTIONS.map(({ code, label }) => (
                 <button
                   key={code}
                   onClick={() => changeAppLanguage(code)}

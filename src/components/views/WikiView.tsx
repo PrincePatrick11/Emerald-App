@@ -9,6 +9,7 @@ import Button from '../ui/Button';
 import { generateId, isImageIcon } from '../../lib/helpers';
 
 import { useUIStore } from '../../store/uiStore';
+import { useEntryEditor } from '../../hooks/useEntryEditor';
 import { useWikiStore } from '../../store/wikiStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
@@ -24,8 +25,8 @@ export default function WikiView() {
   const { activeView, setActiveView, setEditActions, openViewInNewTab, wikiPrefs, setWikiPrefs } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, setEditActions: s.setEditActions, openViewInNewTab: s.openViewInNewTab, wikiPrefs: s.wikiPrefs, setWikiPrefs: s.setWikiPrefs }))
   );
-  const { articles, wikiCategories, createArticle, updateArticle, deleteArticle, restoreArticle, getArticle, addWikiCategory, updateWikiCategory, deleteWikiCategory, restoreWikiCategory, } = useWikiStore(
-    useShallow((s) => ({ articles: s.articles, wikiCategories: s.wikiCategories, createArticle: s.createArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle, getArticle: s.getArticle, addWikiCategory: s.addWikiCategory, updateWikiCategory: s.updateWikiCategory, deleteWikiCategory: s.deleteWikiCategory, restoreWikiCategory: s.restoreWikiCategory }))
+  const { articles, wikiCategories, createArticle, duplicateArticle, updateArticle, deleteArticle, restoreArticle, getArticle, addWikiCategory, updateWikiCategory, deleteWikiCategory, restoreWikiCategory, } = useWikiStore(
+    useShallow((s) => ({ articles: s.articles, wikiCategories: s.wikiCategories, createArticle: s.createArticle, duplicateArticle: s.duplicateArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle, getArticle: s.getArticle, addWikiCategory: s.addWikiCategory, updateWikiCategory: s.updateWikiCategory, deleteWikiCategory: s.deleteWikiCategory, restoreWikiCategory: s.restoreWikiCategory }))
   );
   const pushUndo = useUndoStore((s) => s.push);
 
@@ -39,32 +40,23 @@ export default function WikiView() {
   const [showFilters, setShowFilters] = useState(false);
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
   const [category, setCategory] = useState<WikiCategory>('other');
   const [tags, setTags] = useState<string[]>([]);
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [icon, setIcon] = useState<string | null>(null);
   const [loadedArticleId, setLoadedArticleId] = useState<string | null>(null);
 
-  // Always-fresh refs
-  const pendingRef = useRef({ title, content, category_id: category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined });
-  pendingRef.current = { title, content, category_id: category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined };
-  const isEditingRef = useRef(false);
-  isEditingRef.current = isEditing;
-  const articleIdRef = useRef<string | undefined>(undefined);
-  articleIdRef.current = article?.id;
+  // Content-Mirror im Ref statt State — siehe JournalView.
+  const pendingHtmlRef = useRef('');
+  const [editorEpoch, setEditorEpoch] = useState(0);
 
-  // Debounced auto-save
-  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const triggerAutoSave = useCallback(() => {
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    const id = articleIdRef.current;
-    autoSaveTimer.current = setTimeout(() => {
-      if (!isEditingRef.current || !id) return;
-      // Siehe JournalView: `getDb()` lehnt ab, waehrend ein Vault geloescht wird.
-      void updateArticle(id, pendingRef.current).catch(() => {});
-    }, 1500);
-  }, [updateArticle]);
+  const { triggerAutoSave, cancelAutoSave } = useEntryEditor({
+    entityId: article?.id,
+    isEditing,
+    ready: !!article && loadedArticleId === article.id,
+    buildPatch: () => ({ title, content: pendingHtmlRef.current, category_id: category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined }),
+    update: updateArticle,
+  });
 
   const {
     addingCategory: addingWikiCat, setAddingCategory: setAddingWikiCat,
@@ -86,29 +78,10 @@ export default function WikiView() {
     },
   );
 
-  const prevRef = useRef<{ id: string; isEditing: boolean } | null>(null);
-
-  useEffect(() => {
-    const prev = prevRef.current;
-    if (prev?.isEditing && prev.id !== article?.id) {
-      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-      updateArticle(prev.id, pendingRef.current);
-    }
-    prevRef.current = article ? { id: article.id, isEditing } : null;
-  }, [article?.id, isEditing]);
-
-  useEffect(() => {
-    return () => {
-      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-      const prev = prevRef.current;
-      if (prev?.isEditing) updateArticle(prev.id, pendingRef.current);
-    };
-  }, []);
-
   useEffect(() => {
     if (article) {
       setTitle(article.title);
-      setContent(article.content);
+      pendingHtmlRef.current = article.content;
       setCategory(article.category_id);
       setTags(article.tags ?? []);
       setCoverImage(article.cover_image ?? null);
@@ -129,6 +102,12 @@ export default function WikiView() {
     }
   }, [article?.tags, article?.category_id, article?.cover_image, article?.icon]);
 
+  // Titel ebenso: ein Rename aus der Sidebar bei offenem Edit-Modus wuerde
+  // sonst vom naechsten Autosave zurueckgedreht.
+  useEffect(() => {
+    if (article) setTitle(article.title);
+  }, [article?.title]);
+
   // Apply tags from a dropped routine
   useEffect(() => {
     if (!isEditing || !article) return;
@@ -146,27 +125,28 @@ export default function WikiView() {
 
   const handleDone = async () => {
     if (!article) return;
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    await updateArticle(article.id, { title, content, category_id: category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined });
+    cancelAutoSave();
+    await updateArticle(article.id, { title, content: pendingHtmlRef.current, category_id: category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined });
     setActiveView({ type: 'wiki', id: article.id, mode: 'view' });
   };
 
   const handleCancel = () => {
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    cancelAutoSave();
     if (article) {
       setTitle(article.title);
-      setContent(article.content);
       setCategory(article.category_id);
       setTags(article.tags ?? []);
       setCoverImage(article.cover_image ?? null);
       setIcon(article.icon ?? null);
+      pendingHtmlRef.current = article.content;
+      setEditorEpoch((e) => e + 1);
     }
     setActiveView({ type: 'wiki', id: article!.id, mode: 'view' });
   };
 
   const handleDelete = async () => {
     if (!article) return;
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    cancelAutoSave();
     const id = article.id;
     await deleteArticle(id);
     pushUndo({ id: generateId(), description: t('undo.articleDeleted'), undo: () => restoreArticle(id) });
@@ -174,7 +154,7 @@ export default function WikiView() {
   };
 
   const handleContentChange = useCallback((html: string) => {
-    setContent(html);
+    pendingHtmlRef.current = html;
     triggerAutoSave();
   }, [triggerAutoSave]);
 
@@ -199,14 +179,8 @@ export default function WikiView() {
   const openCtxMenu = (e: React.MouseEvent, id: string) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); };
 
   const handleDuplicate = async (id: string) => {
-    const src = articles.find((a) => a.id === id);
-    if (!src) return;
-    const newArt = await createArticle(src.category_id);
-    await updateArticle(newArt.id, {
-      title: src.title + ' (Copy)', content: src.content, category_id: src.category_id,
-      tags: src.tags, icon: src.icon ?? undefined, cover_image: src.cover_image ?? undefined,
-    });
-    setActiveView({ type: 'wiki', id: newArt.id, mode: 'view' });
+    const newArt = await duplicateArticle(id);
+    if (newArt) setActiveView({ type: 'wiki', id: newArt.id, mode: 'view' });
   };
 
   const startRename = (id: string) => {
@@ -575,8 +549,8 @@ export default function WikiView() {
       <div className="flex-1 overflow-hidden px-8 pb-8" onDoubleClick={enterEditMode}>
         {loadedArticleId === article.id && (
           <RichEditor
-            key={article.id}
-            content={content}
+            key={`${article.id}:${editorEpoch}`}
+            initialContent={article.content}
             placeholder={t('wiki.placeholder')}
             onChange={handleContentChange}
             editable={isEditing}
