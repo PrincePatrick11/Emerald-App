@@ -1,6 +1,9 @@
 {
   "name": "emerald",
   "version": "0.2.0",
+  "engines": {
+    "node": ">=22"
+  },
   "description": "A local-first desktop journal for documenting magical practice",
   "author": "Lukas Reuter",
   "license": "GPL-3.0-or-later",

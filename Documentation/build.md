@@ -22,6 +22,11 @@ rather than queueing behind it.
 `npm run check:schema`, then `npm run build`, which is `tsc && vite build` and so
 carries the typecheck.
 
+All workflows pin **Node 22**, and `package.json` records the same floor under
+`engines`. `scripts/schema-check.mjs` imports `node:sqlite`, which does not exist
+in Node 20 — the first CI run failed on exactly that, because the workflows had
+inherited a `node-version: 20` that nothing in the repo justified.
+
 **`rust`** (matrix: `ubuntu-22.04`, `macos-14`, `windows-latest`):
 `cargo check --locked --all-targets`.
 
