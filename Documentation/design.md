@@ -30,9 +30,11 @@ a bridge override for them in `index.css`. Setting such a class silently takes o
 obligation to keep it in step across both themes — that is the mechanism the primary
 colour's triple maintenance grew out of.
 
-**Exactly one accent: jade.** `amber` is confined to the single documented case — the
-`tone="amber"` mode for the edit action in row action bars — and is not extended. A third
-accent tone needs a theme token in both files first.
+**Exactly one accent: jade.** `amber` is meant to be confined to the single documented
+case — the `tone="amber"` mode for the edit action in row action bars — and not extended.
+Two stragglers exist without a deviation comment: a `text-amber-400` warning in
+`SettingsModal` and the lock indicator in `PlacedElementRow` (`text-amber-400
+hover:text-amber-300`). A third accent tone needs a theme token in both files first.
 
 **Red means destructive, nothing else.** Via `Button variant="danger"` or `tone="danger"`,
 not via a per-site red treatment of its own.
@@ -43,8 +45,10 @@ not via a per-site red treatment of its own.
 - **Editor**: `font-serif` — Lora by default, configured separately.
 - Applied through `data-ui-font`/`data-editor-font` on `<html>`, never through a direct
   `font-family` in a component.
-- Eight selectable Google Fonts, loaded through a single `<link>` in `index.html`.
-  A ninth font means `theme.ts` **and** the link — both or neither.
+- Eight selectable Google Fonts. The stylesheet `<link>` is injected at runtime in
+  `src/main.tsx` (moved there from `index.html` so it never blocks the first render;
+  `index.html` keeps only the two `preconnect` hints). A ninth font means `theme.ts`
+  **and** that link in `main.tsx` — both or neither.
 - `font-mono` is currently unusable, see [Open Points](#open-points).
 
 ### Border Radius
@@ -141,7 +145,7 @@ Parchment's `#008a57` sits between no two steps of the scale.
 *Cost: move the bridge overrides onto `var(--accent*)` and check that the layer ordering
 still holds.*
 
-**2. 1039 raw colour utilities across 49 `.tsx` files.** The largest single item, and the
+**2. ~1090 raw colour utilities across 50 `.tsx` files.** The largest single item, and the
 reason point 1 exists at all. *Cost: not doable in one pass — sensible only file by file
 or module by module, each verified in both themes.*
 
@@ -163,8 +167,10 @@ exist.
 mixes 13 and 14 for section icons with no discernible pattern.
 *Cost: mechanical but widely scattered; best done per file when it is touched anyway.*
 
-**6. `UndoToast` carries `rounded-xl`** and is therefore the only known violation of the
-radius rule — a floating overlay on the surface step. *Cost: one line.*
+**6. Radius-rule violations.** `UndoToast` carries `rounded-xl` (a floating overlay on the
+surface step); `.sidebar-item` in `index.css` and `PropertySummaryRow` are list rows on
+`rounded-lg` instead of `rounded-md`, as is the Tags view's search field. *Cost: one line
+each.*
 
 **7. `JetBrains Mono` is dead config.** Declared as `font-mono` in `tailwind.config.js:46`
 but never loaded via a `<link>`. Every site using `font-mono` falls back to the system
@@ -254,14 +260,18 @@ rule or must forgo `.panel` entirely. Both ways out are present in the code:
   `outline` rather than `background`/`border`/`box-shadow` — all three would be
   overridden by `html[data-theme=…] .panel-interactive`.
 
-Both `color-mix()` sites (`.search-match`, `.task-row-target`) carry an `rgba()` line as a
-fallback ahead of them, for WebKit before 16.2 / WebKitGTK before 2.40.
+The two oldest `color-mix()` sites (`.search-match`, `.task-row-target`) carry an `rgba()`
+line as a fallback ahead of them, for WebKit before 16.2 / WebKitGTK before 2.40. The
+newer sites (vault cards, emoji-picker search, `.input-field`, …) do not — they postdate
+the decision to keep supporting those engines and have not been backfilled.
 
 ### Overlays and Portals
 
 **Everything floating hangs off `document.body` via `createPortal`** and positions itself
 with `position: fixed` in viewport coordinates: `Modal`, `ContextMenu`, `EmojiPicker`,
-`MenuDropdown`, `TitleBarSearchResults`.
+`TitleBarSearchResults`, and `AltarCanvas`'s floating controls. `MenuDropdown` is the
+deliberate exception: it renders in place with `absolute` + `z-[9999]`, which works because
+the title bar sits above both stacking contexts described below.
 
 The reason is the same for all of them: `.app-sidebar` and `.app-main` carry
 `position: relative; z-index: 1` in both themes and are therefore **sibling stacking
@@ -396,9 +406,9 @@ The measurements sit in unusual places, each for a concrete reason:
 
 ### Known Fault Line: `bg-stone-700/40` on the Search Fields
 
-Both search pills (title bar and entry list) carry a raw `bg-stone-700/40` on top of the
-`.sidebar-search-inner` class. In Emerald Parchment the theme override for that utility
+Three search pills (title bar, entry list, and the Tags view) carry a raw
+`bg-stone-700/40` on top of their shared class. In Emerald Parchment the theme override for that utility
 class beats the class rule — so `--search-bg` does not apply there, the override value
 does. Both fields still look the same, but the claim "runs on `--search-bg`" does not hold
-in Parchment. Resolving it cleanly would mean removing `bg-stone-700/40` from both places
+in Parchment. Resolving it cleanly would mean removing `bg-stone-700/40` from all three places
 **together**.

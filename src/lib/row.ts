@@ -153,7 +153,10 @@ export const fromRow = {
       show_intention_in_properties: bool(r.show_intention_in_properties, true),
       show_letter_bank_in_properties: bool(r.show_letter_bank_in_properties, true),
       show_sigil: bool(r.show_sigil, true),
-      drawing_data: nullableStr(r.drawing_data),
+      // undefined bleibt undefined: die Listen-Query des operationStore laesst
+      // drawing_data bewusst weg ("noch nicht geladen"); NULL aus der DB heisst
+      // dagegen "hat keine Zeichnung".
+      drawing_data: r.drawing_data === undefined ? undefined : nullableStr(r.drawing_data),
       thumbnail_data: nullableStr(r.thumbnail_data),
     };
   },

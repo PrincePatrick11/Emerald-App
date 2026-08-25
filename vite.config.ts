@@ -28,7 +28,10 @@ export default defineConfig(async () => ({
           if (id.includes("@tiptap") || id.includes("prosemirror")) return "tiptap";
           if (id.includes("@tauri-apps")) return "tauri";
           if (id.includes("i18next")) return "i18n";
-          return "vendor";
+          // Kein "vendor"-Sammelchunk mehr: der zwang turndown, marked und
+          // framer-motion in einen eager geladenen Block, obwohl ihre
+          // Importeure inzwischen dynamisch nachgeladen werden. Ohne Regel
+          // teilt Rollup entlang der import()-Grenzen selbst auf.
         },
       },
     },

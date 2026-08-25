@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type Database from '@tauri-apps/plugin-sql';
 import { getDb, nextEntryNumber } from '../lib/db';
-import { reassignCategoryContent } from '../lib/schema';
+import { FALLBACK_CATEGORY, reassignCategoryContent } from '../lib/schema';
 import { syncLinks } from '../lib/links';
 import { generateId, nowIso } from '../lib/helpers';
 import { fromRow, type DbRow } from '../lib/row';
@@ -246,5 +246,11 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     const db = await getDb();
     await reassignCategoryContent(db, 'wiki_articles', id);
     await db.execute('DELETE FROM wiki_categories WHERE id=$1', [id]);
+    // Auch im Speicher umhaengen — siehe operationStore.permanentlyDeleteCategory.
+    set((s) => ({
+      articles: s.articles.map((a) =>
+        a.category_id === id ? { ...a, category_id: FALLBACK_CATEGORY.wiki_articles } : a
+      ),
+    }));
   },
 }));

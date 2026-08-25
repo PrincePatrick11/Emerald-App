@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Globe, Info, Database, Upload, Download, Check, AlertTriangle, ChevronDown, ChevronUp, Sun, Moon, Type, Brush, HardDrive } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { changeAppLanguage } from '../../i18n';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { useUIStore } from '../../store/uiStore';
@@ -246,7 +247,7 @@ export default function SettingsModal({ onClose }: Props) {
               ] as const).map(({ code, label }) => (
                 <button
                   key={code}
-                  onClick={() => i18n.changeLanguage(code)}
+                  onClick={() => changeAppLanguage(code)}
                   className={`settings-choice-btn px-3 py-1.5 rounded-lg text-sm border transition-all duration-150 focus:outline-none focus:ring-2 ${
                     i18n.language === code
                       ? 'settings-choice-btn-active bg-jade-500/20 border-jade-500/50 text-jade-400 focus:ring-jade-500/35'

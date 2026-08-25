@@ -13,6 +13,7 @@ interface JournalState {
 
   fetchEntries: () => Promise<void>;
   createEntry: () => Promise<JournalEntry>;
+  duplicateEntry: (id: string) => Promise<JournalEntry | undefined>;
   updateEntry: (id: string, patch: Partial<JournalEntry>) => Promise<void>;
   deleteEntry: (id: string) => Promise<void>;
   restoreEntry: (id: string) => Promise<void>;
@@ -88,6 +89,28 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     );
     set((s) => ({ entries: [entry, ...s.entries] }));
     return entry;
+  },
+
+  /**
+   * Kopiert alle Inhaltsfelder des Quelleintrags; nur Identität und Zeitstempel
+   * bleiben beim neuen Eintrag. Die Aufrufer haben die Feldliste früher jeweils
+   * selbst aufgezählt — ein neues Feld fehlte dann still an einzelnen Stellen
+   * (so ist `mood` beim Duplizieren verloren gegangen).
+   */
+  duplicateEntry: async (id) => {
+    const src = get().entries.find((e) => e.id === id);
+    if (!src) return undefined;
+    const copy = await get().createEntry();
+    const {
+      id: _id,
+      created_at: _created,
+      updated_at: _updated,
+      deleted_at: _deleted,
+      entry_number: _number,
+      ...fields
+    } = src;
+    await get().updateEntry(copy.id, { ...fields, title: src.title + ' (Copy)' });
+    return get().entries.find((e) => e.id === copy.id) ?? copy;
   },
 
   updateEntry: async (id, patch) => {

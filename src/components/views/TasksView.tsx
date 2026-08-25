@@ -1,4 +1,5 @@
 import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { useTaskStore } from '../../store/taskStore';
 import { useUIStore } from '../../store/uiStore';
@@ -37,11 +38,9 @@ export default function TasksView() {
   const tasksPrefs = useUIStore((s) => s.tasksPrefs);
   const setTasksPrefs = useUIStore((s) => s.setTasksPrefs);
 
-  const {
-    categories, tasks, fetchAll, createTask, updateTask,
-    getCategory, addCategory, addLink,
-    updateCategory, deleteCategory, restoreCategory,
-  } = useTaskStore();
+  const { categories, tasks, createTask, updateTask, getCategory, addCategory, addLink, updateCategory, deleteCategory, restoreCategory, } = useTaskStore(
+    useShallow((s) => ({ categories: s.categories, tasks: s.tasks, createTask: s.createTask, updateTask: s.updateTask, getCategory: s.getCategory, addCategory: s.addCategory, addLink: s.addLink, updateCategory: s.updateCategory, deleteCategory: s.deleteCategory, restoreCategory: s.restoreCategory }))
+  );
 
   const journalEntries = useJournalStore((s) => s.entries);
   const wikiArticles = useWikiStore((s) => s.articles);
@@ -73,7 +72,8 @@ export default function TasksView() {
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [linkModal, setLinkModal] = useState<{ taskId: string } | null>(null);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  // Kein Refetch beim Mount: AppShell laedt die Tasks beim Start und beim
+  // Vault-Wechsel; danach haelt der Store sich selbst aktuell.
 
   const rootTasks = tasks.filter((task) => task.parent_task_id === null);
 
@@ -254,7 +254,7 @@ export default function TasksView() {
               value={newCatName}
               onChange={(e) => setNewCatName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(); if (e.key === 'Escape') { setAddingCategory(false); } }}
-              placeholder="Name…"
+              placeholder={t('tasks.categoryName')}
               className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none"
             />
             <button onClick={handleAddCategory} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>

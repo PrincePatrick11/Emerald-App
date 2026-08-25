@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { useUndoStore } from '../../store/undoStore';
@@ -6,7 +7,9 @@ import Button from './Button';
 
 export default function UndoToast() {
   const { t } = useTranslation();
-  const { activeToast, toastVisible, executeUndo, dismissToast } = useUndoStore();
+  const { activeToast, toastVisible, executeUndo, dismissToast } = useUndoStore(
+    useShallow((s) => ({ activeToast: s.activeToast, toastVisible: s.toastVisible, executeUndo: s.executeUndo, dismissToast: s.dismissToast }))
+  );
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {

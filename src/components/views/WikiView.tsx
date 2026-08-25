@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Trash2, Check, X, Plus, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
@@ -20,11 +21,12 @@ import type { WikiCategory } from '../../types';
 
 export default function WikiView() {
   const { t } = useTranslation();
-  const { activeView, setActiveView, setEditActions, openViewInNewTab, wikiPrefs, setWikiPrefs } = useUIStore();
-  const {
-    articles, wikiCategories, createArticle, updateArticle, deleteArticle, restoreArticle, getArticle,
-    addWikiCategory, updateWikiCategory, deleteWikiCategory, restoreWikiCategory,
-  } = useWikiStore();
+  const { activeView, setActiveView, setEditActions, openViewInNewTab, wikiPrefs, setWikiPrefs } = useUIStore(
+    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, setEditActions: s.setEditActions, openViewInNewTab: s.openViewInNewTab, wikiPrefs: s.wikiPrefs, setWikiPrefs: s.setWikiPrefs }))
+  );
+  const { articles, wikiCategories, createArticle, updateArticle, deleteArticle, restoreArticle, getArticle, addWikiCategory, updateWikiCategory, deleteWikiCategory, restoreWikiCategory, } = useWikiStore(
+    useShallow((s) => ({ articles: s.articles, wikiCategories: s.wikiCategories, createArticle: s.createArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle, getArticle: s.getArticle, addWikiCategory: s.addWikiCategory, updateWikiCategory: s.updateWikiCategory, deleteWikiCategory: s.deleteWikiCategory, restoreWikiCategory: s.restoreWikiCategory }))
+  );
   const pushUndo = useUndoStore((s) => s.push);
 
   const article = activeView.id ? getArticle(activeView.id) : null;
@@ -429,7 +431,7 @@ export default function WikiView() {
             value={newWikiCatName}
             onChange={(e) => setNewWikiCatName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleAddWikiCat(); if (e.key === 'Escape') { setAddingWikiCat(false); } }}
-            placeholder="Name…"
+            placeholder={t('wiki.categoryName')}
             className="input-field flex-1 rounded px-2 py-0.5 text-xs outline-none font-semibold uppercase tracking-wider"
           />
           <button onClick={handleAddWikiCat} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>

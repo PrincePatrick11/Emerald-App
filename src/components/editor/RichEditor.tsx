@@ -476,10 +476,10 @@ export default function RichEditor({
                 className="bg-stone-900 border border-stone-600 rounded px-2 py-0.5 text-stone-200 w-64 outline-none focus:border-jade-600"
                 placeholder="https://"
               />
-              <button onClick={handleLinkEditConfirm} className="p-1 text-jade-400 hover:text-jade-300" title="Bestätigen">
+              <button onClick={handleLinkEditConfirm} className="p-1 text-jade-400 hover:text-jade-300" title={t('editor.confirm')}>
                 <Check size={12} />
               </button>
-              <button onClick={() => setEditingHref(null)} className="p-1 text-stone-500 hover:text-stone-300" title="Abbrechen">
+              <button onClick={() => setEditingHref(null)} className="p-1 text-stone-500 hover:text-stone-300" title={t('editor.cancel')}>
                 <X size={12} />
               </button>
             </>
@@ -490,7 +490,7 @@ export default function RichEditor({
               <button
                 onClick={() => setEditingHref(linkPopup.href)}
                 className="p-1 text-stone-500 hover:text-stone-300 ml-1"
-                title="Link bearbeiten"
+                title={t('editor.editLink')}
               >
                 <Pencil size={11} />
               </button>
@@ -498,7 +498,7 @@ export default function RichEditor({
                 onClick={handleLinkRemove}
                 variant="danger"
                 className="p-1"
-                title="Link entfernen"
+                title={t('editor.removeLink')}
               >
                 <Trash2 size={11} />
               </Button>

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type Database from '@tauri-apps/plugin-sql';
 import { getDb, nextEntryNumber } from '../lib/db';
-import { reassignCategoryContent } from '../lib/schema';
+import { FALLBACK_CATEGORY, reassignCategoryContent } from '../lib/schema';
 import { syncLinks } from '../lib/links';
 import { generateId, nowIso } from '../lib/helpers';
 import { fromRow, toInt, type DbRow } from '../lib/row';
@@ -18,6 +18,7 @@ interface OperationState {
   restoreOperation: (id: string) => Promise<void>;
   permanentlyDeleteOperation: (id: string) => Promise<void>;
   getOperation: (id: string) => Operation | undefined;
+  ensureDrawingLoaded: (id: string) => Promise<void>;
   addCategory: (name: string, emoji: string) => Promise<OperationCategory>;
   updateCategory: (id: string, name: string, emoji: string) => Promise<void>;
   deleteCategory: (id: string) => Promise<boolean>;
@@ -25,11 +26,36 @@ interface OperationState {
   permanentlyDeleteCategory: (id: string) => Promise<void>;
 }
 
+/**
+ * Alle Spalten AUSSER drawing_data — das sind die vollen Sigil-Zeichnungen als
+ * Base64, mit Abstand die groesste Spalte der Tabelle. Listen und Dashboard
+ * brauchen nur thumbnail_data; die Zeichnung laedt `ensureDrawingLoaded` erst,
+ * wenn der Sigil-Editor sie oeffnet. Im Store heisst `drawing_data: undefined`
+ * daher "noch nicht geladen", `null` "hat keine Zeichnung".
+ */
+const OPERATION_LIST_COLUMNS =
+  'id, title, content, category_id, entry_number, description, icon, cover_image, version, ' +
+  'is_active, end_date, target_reveal_date, charging_technique_wiki_id, is_loaded, ' +
+  'intention_text, letter_bank, implemented_letters, show_intention_in_properties, ' +
+  'show_letter_bank_in_properties, show_sigil, thumbnail_data, tags, created_at, updated_at, deleted_at';
+
 async function selectAllOperations(db: Database): Promise<Operation[]> {
   const rows = await db.select<DbRow[]>(
-    'SELECT * FROM operations WHERE deleted_at IS NULL ORDER BY updated_at DESC'
+    `SELECT ${OPERATION_LIST_COLUMNS} FROM operations WHERE deleted_at IS NULL ORDER BY updated_at DESC`
   );
   return rows.map(fromRow.operation);
+}
+
+/**
+ * Ein Refetch liefert alle Zeichnungen als "nicht geladen" zurueck. Bereits
+ * geladene bleiben erhalten — sonst wuerde ein Import oder Undo-Restore den
+ * offenen Sigil-Editor unmounten und ungespeicherte Striche verwerfen.
+ */
+function preserveLoadedDrawings(prev: Operation[], fresh: Operation[]): Operation[] {
+  const loaded = new Map(
+    prev.filter((o) => o.drawing_data !== undefined).map((o) => [o.id, o.drawing_data])
+  );
+  return fresh.map((o) => (loaded.has(o.id) ? { ...o, drawing_data: loaded.get(o.id) } : o));
 }
 
 export const useOperationStore = create<OperationState>((set, get) => ({
@@ -44,10 +70,11 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     const categoryRows = await db.select<DbRow[]>(
       'SELECT * FROM operation_categories WHERE deleted_at IS NULL ORDER BY sort_order ASC, name ASC'
     );
-    set({
+    const fresh = await selectAllOperations(db);
+    set((s) => ({
       categories: categoryRows.map(fromRow.category),
-      operations: await selectAllOperations(db),
-    });
+      operations: preserveLoadedDrawings(s.operations, fresh),
+    }));
   },
 
   createOperation: async (categoryId) => {
@@ -95,14 +122,23 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     const op = get().operations.find((o) => o.id === id);
     if (!op) return;
     const merged = { ...op, ...patch, updated_at: now };
+    // drawing_data wird nur mitgeschrieben, wenn es geladen ist oder im Patch
+    // steckt — sonst wuerde ein Rename aus der Sidebar den `undefined`-Platz-
+    // halter als NULL persistieren und die Zeichnung loeschen.
+    //
+    // Die $N-Platzhalter MUESSEN in Textreihenfolge aufsteigen: SQLite vergibt
+    // die Bind-Indizes nach dem ersten Auftreten, nicht nach der Ziffer, und
+    // tauri-plugin-sql bindet rein positionell. Ein $23 vor dem $22 wuerde
+    // id und drawing_data vertauschen und das UPDATE traefe keine Zeile.
+    const writeDrawing = merged.drawing_data !== undefined;
     await db.execute(
       `UPDATE operations SET
         title=$1, content=$2, category_id=$3, updated_at=$4, tags=$5, is_active=$6, end_date=$7, version=$8,
         icon=$9, cover_image=$10, description=$11, target_reveal_date=$12, charging_technique_wiki_id=$13,
         is_loaded=$14, intention_text=$15, letter_bank=$16, implemented_letters=$17,
         show_intention_in_properties=$18, show_letter_bank_in_properties=$19, show_sigil=$20,
-        drawing_data=$21, thumbnail_data=$22
-       WHERE id=$23`,
+        thumbnail_data=$21${writeDrawing ? ', drawing_data=$22' : ''}
+       WHERE id=${writeDrawing ? '$23' : '$22'}`,
       [
         merged.title, merged.content, merged.category_id, merged.updated_at, JSON.stringify(merged.tags),
         toInt(merged.is_active, true), merged.end_date ?? null, merged.version ?? null,
@@ -113,10 +149,17 @@ export const useOperationStore = create<OperationState>((set, get) => ({
         toInt(merged.show_intention_in_properties, true),
         toInt(merged.show_letter_bank_in_properties, true),
         toInt(merged.show_sigil, true),
-        merged.drawing_data ?? null, merged.thumbnail_data ?? null, id,
+        merged.thumbnail_data ?? null,
+        ...(writeDrawing ? [merged.drawing_data] : []),
+        id,
       ]
     );
-    set((s) => ({ operations: s.operations.map((o) => (o.id === id ? merged : o)) }));
+    // Aus dem aktuellen State mergen, nicht `merged` einsetzen: zwischen dem
+    // Snapshot oben und diesem set() kann ensureDrawingLoaded gelaufen sein,
+    // und `merged` truege dann noch drawing_data: undefined.
+    set((s) => ({
+      operations: s.operations.map((o) => (o.id === id ? { ...o, ...patch, updated_at: now } : o)),
+    }));
     syncLinks(id, 'operation', merged.content).catch(console.error);
   },
 
@@ -131,7 +174,8 @@ export const useOperationStore = create<OperationState>((set, get) => ({
   restoreOperation: async (id) => {
     const db = await getDb();
     await db.execute('UPDATE operations SET deleted_at=NULL WHERE id=$1', [id]);
-    set({ operations: await selectAllOperations(db) });
+    const fresh = await selectAllOperations(db);
+    set((s) => ({ operations: preserveLoadedDrawings(s.operations, fresh) }));
   },
 
   permanentlyDeleteOperation: async (id) => {
@@ -140,6 +184,19 @@ export const useOperationStore = create<OperationState>((set, get) => ({
   },
 
   getOperation: (id) => get().operations.find((o) => o.id === id),
+
+  ensureDrawingLoaded: async (id) => {
+    const op = get().operations.find((o) => o.id === id);
+    if (!op || op.drawing_data !== undefined) return;
+    const db = await getDb();
+    const rows = await db.select<DbRow[]>('SELECT drawing_data FROM operations WHERE id=$1', [id]);
+    const value = rows[0]?.drawing_data == null ? null : String(rows[0].drawing_data);
+    set((s) => ({
+      operations: s.operations.map((o) =>
+        o.id === id && o.drawing_data === undefined ? { ...o, drawing_data: value } : o
+      ),
+    }));
+  },
 
   addCategory: async (name, emoji) => {
     const db = await getDb();
@@ -183,5 +240,13 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     const db = await getDb();
     await reassignCategoryContent(db, 'operations', id);
     await db.execute('DELETE FROM operation_categories WHERE id=$1', [id]);
+    // Auch im Speicher umhaengen: ein spaeterer updateOperation wuerde die
+    // geloeschte category_id sonst zurueckschreiben und am Foreign Key
+    // scheitern. (Frueher heilte das der Mount-Refetch der View.)
+    set((s) => ({
+      operations: s.operations.map((o) =>
+        o.category_id === id ? { ...o, category_id: FALLBACK_CATEGORY.operations } : o
+      ),
+    }));
   },
 }));

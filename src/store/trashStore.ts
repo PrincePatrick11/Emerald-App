@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { getDb, sweepDanglingLinks } from '../lib/db';
-import { reassignCategoryContent } from '../lib/schema';
+import { FALLBACK_CATEGORY, reassignCategoryContent } from '../lib/schema';
 import { useJournalStore } from './journalStore';
 import { useWikiStore } from './wikiStore';
 import { useTagStore } from './tagStore';
@@ -117,6 +117,11 @@ export const useTrashStore = create<TrashState>((set) => ({
     // sie zeigte, behielt eine category_id ohne Gegenstueck. Seit v33 blockiert
     // ON DELETE RESTRICT das — was den Papierkorb ohne diesen Schritt mit einer
     // Fehlermeldung stehenlassen wuerde.
+    const doomedByContent = {
+      wiki_articles: new Set<string>(),
+      operations: new Set<string>(),
+      tasks: new Set<string>(),
+    };
     for (const [table, content] of [
       ['wiki_categories', 'wiki_articles'],
       ['operation_categories', 'operations'],
@@ -127,8 +132,40 @@ export const useTrashStore = create<TrashState>((set) => ({
       );
       for (const { id } of doomed) {
         await reassignCategoryContent(db, content, id);
+        doomedByContent[content].add(id);
       }
       await db.execute(`DELETE FROM ${table} WHERE deleted_at IS NOT NULL`);
+    }
+
+    // Die Umhängung auch in den In-Memory-Stores nachziehen: dort geladene
+    // Zeilen zeigen sonst weiter auf die geloeschte Kategorie, und der naechste
+    // update* wuerde sie zurueckschreiben und am Foreign Key scheitern.
+    if (doomedByContent.wiki_articles.size > 0) {
+      useWikiStore.setState((s) => ({
+        articles: s.articles.map((a) =>
+          doomedByContent.wiki_articles.has(a.category_id)
+            ? { ...a, category_id: FALLBACK_CATEGORY.wiki_articles }
+            : a
+        ),
+      }));
+    }
+    if (doomedByContent.operations.size > 0) {
+      useOperationStore.setState((s) => ({
+        operations: s.operations.map((o) =>
+          doomedByContent.operations.has(o.category_id)
+            ? { ...o, category_id: FALLBACK_CATEGORY.operations }
+            : o
+        ),
+      }));
+    }
+    if (doomedByContent.tasks.size > 0) {
+      useTaskStore.setState((s) => ({
+        tasks: s.tasks.map((t) =>
+          doomedByContent.tasks.has(t.category_id)
+            ? { ...t, category_id: FALLBACK_CATEGORY.tasks }
+            : t
+        ),
+      }));
     }
 
     // Erst jetzt, wenn alle Inhalte weg sind: Verknüpfungen ins Leere räumen.

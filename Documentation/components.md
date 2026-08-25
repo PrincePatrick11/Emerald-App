@@ -52,7 +52,7 @@ The converse holds too: a shell you end up overriding completely is the wrong sh
 | Building block | For | Extension point |
 | --- | --- | --- |
 | `Button` | **every** action button. Four variants (`primary`/`secondary`/`ghost`/`danger`) plus a separate tinted row-action mode (`tone`: `jade`/`amber`/`danger`/`neutral`) | `className` (appended), `compact`, `fill`, `active` |
-| `Modal` | overlay, card, header with close X, `createPortal`, escape-to-close | `children`; `dismissible={false}` removes all three ways to close at once; `className`/`bodyClassName`/`widthClassName` |
+| `Modal` | overlay, card, header with close X, `createPortal`, escape-to-close | `children`; `dismissible={false}` removes all three ways to close at once; `className`/`bodyClassName`/`widthClassName`/`maxHeightClassName` |
 | `ContextMenu` | right-click menu. Portal, edge logic, closes on click and Escape | `actions: ContextMenuAction[]`, each with `icon` and `danger` |
 | `EmojiPicker` | emoji popover: open/close, portal, search across the full localised emoji set, outside click, Escape in the capture phase | `trigger` render prop, `emojis` (default: `DEFAULT_EMOJI_PICKER_EMOJIS`), `align`, `size` |
 | `Dashboard` | chrome of the six module overview screens: topbar, toolbar, filter, grouping, empty state | `renderItem`, `grouping` (`flat`/`timeline`/`category`/`custom`), `headerLeft`/`headerRight`, `toolbarExtraActions` |
@@ -81,17 +81,21 @@ Parchment for as long as someone remembers to maintain an override for it.
 | `Banner` | cover image picker including upload, with a `readOnly` variant | `label`, `readOnly` |
 | `LinkedWikiInput` / `LinkedOpsInput` | link chips onto wiki respectively operations entries | `inputCls` |
 | `PlacedElementRow` | row of a placed altar element including its row actions | the callbacks (`onToggleLocked`, `onDuplicate`, …) |
+| `PlacedElementInspector` | the inline X/Y/Rot/Scale inspector under a selected placed-element row (same file as `PlacedElementRow`) | — |
+| `PropertySummarySectionTitle` | the small uppercase section title above summary rows (same file as `PropertySummaryRow`) | — |
+| `FaviconGlyph` | just the emoji-or-image glyph of `Favicon`, without the picker (same file) | `icon`, `size` |
 | `AltarReadingSummary` | the altar's summary block in read mode | — |
 
 **Horizontal padding has exactly one source in the right sidebar** — the scrolling
-container in `RightSidebar.tsx`. No panel and no field here adds a `px-*` of its own; see
+container in `RightSidebar.tsx`. No panel and no field here adds a `px-*` of its own
+(the read view's footnote carries a cosmetic `px-1`, which is alignment, not padding); see
 [`design.md`](design.md#heights-and-spacing).
 
 ### `src/hooks/` and `src/lib/` — Shared Logic
 
 | Building block | For |
 | --- | --- |
-| `useCategoryEditor` | category CRUD with confirmation and undo. Generic over the store — used by Tasks, Wiki and Operations |
+| `useCategoryEditor` | category CRUD with confirmation and undo. Generic over the store — used by Tasks, Wiki and Operations. `AltarLibraryStrip` implements its own category CRUD in its `CategoryModal` instead — undocumented deviation, worth folding in when touched |
 | `useGlobalSearch` | assembles the search corpus from the stores and runs the query; backs the title bar's search field |
 | `lib/styleClasses.ts` | repeated Tailwind chains. **The established home for them** — extend it rather than bypassing it |
 | `lib/platform.ts` | `isMacOS`, `isWindows`, `platformName`, `isTauri`, `usesCustomWindowControls`, `usesHtmlMenuBar`. The **only** permitted source of platform detection; everything else branches through `html[data-platform]` in CSS, never through scattered `navigator.userAgent` checks |
@@ -168,6 +172,14 @@ Open, deliberately recorded, and not an excuse for further copies.
 5. **The emoji empty-result message** in `EmojiPicker` uses a raw `text-stone-500` instead
    of `--text-muted`; the one unthemed remainder in an otherwise fully CSS-variable-based
    component.
+6. **`AltarReadingSummary` rebuilds `PropertySummaryRow` raw.** Its local `BackgroundRow`
+   repeats the row's exact class chain (`flex items-center gap-2 px-3 py-2 rounded-lg
+   bg-stone-900/45 border border-stone-700/60`) instead of using the component.
+7. **Two hand-written buttons in `AltarSidebarPanel`** carry the full `Button
+   tone="neutral"` class chain as raw Tailwind, in a file that imports and uses `Button`
+   a few lines above.
+8. **A third dropdown row class** exists besides `.menu-item`/`.context-menu-item-*`:
+   `linked-entry-menu-item` in `LinkedOpsInput`/`LinkedWikiInput`, with its own raw chain.
 
 Whoever touches one of these places anyway clears it up along the way. New entries in this
 list need a reason why resolving it was not possible right away.

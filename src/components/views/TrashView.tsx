@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Trash2, RotateCcw, BookOpen, Library, Tag, Wand2, FolderOpen, CheckSquare, Square, ListTodo } from 'lucide-react';
@@ -182,7 +183,7 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, handlePermanen
             <button onClick={() => restore(item)} className="trash-restore-btn flex items-center gap-1 text-xs text-jade-400 hover:text-jade-300 px-2 py-1 rounded hover:bg-jade-400/10 transition-colors">
               <RotateCcw size={11} />{t('trash.restore')}
             </button>
-            <Button onClick={() => handlePermanentDelete(item)} variant="danger" className="flex items-center gap-1 px-2 py-1">
+            <Button onClick={() => handlePermanentDelete(item)} variant="danger" className="flex items-center gap-1 px-2 py-1" title={t('trash.deletePermanently')}>
               <Trash2 size={11} />
             </Button>
           </>
@@ -194,8 +195,12 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, handlePermanen
 
 export default function TrashView() {
   const { t } = useTranslation();
-  const { items, loading, fetchTrashed, restore, permanentlyDelete, emptyTrash } = useTrashStore();
-  const { trashPrefs, setTrashPrefs } = useUIStore();
+  const { items, loading, fetchTrashed, restore, permanentlyDelete, emptyTrash } = useTrashStore(
+    useShallow((s) => ({ items: s.items, loading: s.loading, fetchTrashed: s.fetchTrashed, restore: s.restore, permanentlyDelete: s.permanentlyDelete, emptyTrash: s.emptyTrash }))
+  );
+  const { trashPrefs, setTrashPrefs } = useUIStore(
+    useShallow((s) => ({ trashPrefs: s.trashPrefs, setTrashPrefs: s.setTrashPrefs }))
+  );
   const wikiCategories = useWikiStore((s) => s.wikiCategories);
   const opCategories = useOperationStore((s) => s.categories);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);

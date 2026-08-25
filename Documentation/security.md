@@ -11,6 +11,10 @@ Tauri 2 uses a capability file to declare which permissions each window receives
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
     "dialog:allow-save",
     "dialog:allow-open",
     "dialog:allow-message",
@@ -23,11 +27,35 @@ Tauri 2 uses a capability file to declare which permissions each window receives
 }
 ```
 
+The four `core:window:allow-*` permissions exist for the custom title bar: on Windows and Linux the window runs undecorated and the HTML window buttons (`WindowControls.tsx`) drive minimize/maximize/close over IPC, and the bar itself starts window dragging. They widen what a compromised frontend could do only marginally (annoyance-level window manipulation, no data access).
+
 SQLite permissions must be declared explicitly. `sql:default` alone grants read-only access; write access requires `sql:allow-execute` in addition to `sql:allow-select`. Omitting any of these permissions causes silent failures at runtime.
 
 `dialog:allow-message` backs the native success/error confirmation popups shown by `@tauri-apps/plugin-dialog`'s `message()` — used throughout export/import (`src/lib/export.ts`, `src/lib/emeraldFormat.ts`, `src/lib/altarExport.ts`) to report a saved file path or a failure.
 
 PDF export runs in a hidden window built and torn down by the per-platform `export_pdf` command, so it operates entirely under the main process's existing capability set — no extra capability entry is required.
+
+## Command Surface
+
+`src-tauri/src/lib.rs` registers **24 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
+
+| Command | Defined in | Notes |
+|---|---|---|
+| `write_file`, `read_file`, `export_image` | `lib.rs` | path-taking; confined by `guarded_write_target` / `guarded_read_path` (see [Path Confinement](#path-confinement)) |
+| `export_pdf` | `pdf_export/` | hidden-window PDF render, per-platform |
+| `ensure_app_storage_dirs` | `lib.rs` | creates the app's own fixed storage dirs; takes no path |
+| `save_image` | `images.rs` | accepts a data-URL, decodes it in Rust, writes into the active vault's `images/` under a generated hex name; extension derived from the MIME type with `png` fallback. No backend size cap — the frontend's upload limits are the only bound |
+| `copy_image_file`, `read_image_as_base64` | `images.rs` | see [Path Confinement](#path-confinement) |
+| `list_image_files`, `adopt_legacy_images` | `images.rs` | enumerate / migrate files inside the vault's `images/` only |
+| `delete_image_files` | `images.rs` | **a delete primitive** — takes a list of filenames, each validated with `is_valid_image_name`, resolved only against the vault's `images/` dir. Used by Settings → Storage cleanup and bounded by that validation |
+| `register_vaults`, `ensure_vault_dirs`, `create_vault_dirs`, `probe_vault_dir`, `delete_vault_files` | `vault.rs` | see [Vault Directories as a Trust Boundary](#vault-directories-as-a-trust-boundary) |
+| `default_vault_dir`, `new_vault_base_dir`, `legacy_default_db_exists` | `vault.rs` | pure path/existence oracles for the vault modal; return strings, take no path |
+| `migrate_vault_layout` | `vault.rs` | one-time move of a pre-multi-vault `.db` into the vault layout; the legacy name is validated with `is_valid_legacy_db_name` |
+| `update_menu_labels`, `set_export_menu_enabled`, `set_altar_export_menu_enabled`, `set_view_menu_checked` | `lib.rs` | native-menu state sync; no-ops on Windows/Linux where no native menu is installed |
+
+## External Links
+
+The capability includes `opener:default`, and the editor opens external links through it: clicking a link in read mode calls `openUrl(href)` (`RichEditor.tsx`) with an `href` taken from stored content — content that can arrive via an imported backup. There is no scheme allowlist at the call site; the `opener` plugin's default configuration is the only filter before the URL reaches the system browser. The link's full URL is shown in the link popup before it can be clicked, which is the practical mitigation for look-alike links.
 
 ## Vault Directories as a Trust Boundary
 
@@ -39,7 +67,7 @@ Vault storage does not need those roots. **No storage command accepts a path.** 
 
 What that costs is one thing: `write_file` / `read_file` / `export_image` / `copy_image_file` stay confined to the fixed user directories, so a backup file or a Markdown export cannot be written into — or read out of — a vault folder that lives outside them. Opening, using and deleting such a vault works in full.
 
-`delete_vault_files` validates before it deletes anything: it walks the folder's top level and `images/` first and aborts with `VAULT_DIR_NOT_EMPTY` the moment it meets a name it doesn't own — anything other than `emerald.db`, its journal, and files in `images/` whose names pass `is_valid_image_name`. Only once the whole tree checks out does it remove the vault's own artefacts **by name**, database first, then the images, then the two now-empty directories with plain `remove_dir`. It is not `remove_dir_all` anywhere in that path. Checking first rather than relying on `remove_dir` failing at the end matters: the database and images are gone by the time a trailing `remove_dir` fails, so a single unrecognised file used to mean losing both before the check ever caught it. The earlier "the folder contains an `emerald.db`" check was never a real guard either: the app puts that database into whatever folder the user chose, so a vault created straight in Documents would have taken Documents with it. The other half of that fix is in the UI, which refuses to create a new vault in a folder that is not empty.
+`delete_vault_files` validates before it deletes anything: it walks the folder's top level and `images/` first and aborts with `VAULT_DIR_NOT_EMPTY` the moment it meets a name it doesn't own — anything other than `emerald.db`, its journal, and files in `images/` whose names pass `is_valid_image_name`. Only once the whole tree checks out does it remove the vault's own artefacts **by name**, database first, then the images, then the two now-empty directories with plain `remove_dir`. It is not `remove_dir_all` anywhere in that path. Checking first rather than relying on `remove_dir` failing at the end matters: the database and images are gone by the time a trailing `remove_dir` fails, so a single unrecognised file used to mean losing both before the check ever caught it. The "the folder contains an `emerald.db`" check still runs first (`vault.rs` refuses with `not a vault directory: no database found`), but as a fast pre-check, not as the guard: the app puts that database into whatever folder the user chose, so a vault created straight in Documents would have taken Documents with it if the walk did not also verify every name it is about to delete. The other half of that fix is in the UI, which refuses to create a new vault in a folder that is not empty.
 
 `ensure_vault_dirs` deliberately does **not** create the vault directory — the rule lives in `images_dir()`, so it holds for every command that touches vault storage. SQLite would put a fresh, empty database into a recreated folder, so a vault on an unplugged drive would silently come back as an empty vault. Creating is `create_vault_dirs`, called once when a vault enters the list.
 
@@ -56,7 +84,7 @@ Images are served to the webview over a custom scheme instead of through IPC. Th
 - **The filename is validated before any path is built**: exactly 64 lowercase hex digits, a dot, and one of `png` / `jpg` / `jpeg` / `gif` / `webp` / `svg`. Nothing else is even resolved. Rejecting everything outside that alphabet also means percent-encoded traversal never has to be decoded and handled — it simply fails the check.
 - **The vault id is resolved through the registry**, so the directory is one the user authorised. An unknown id yields 404.
 - **Reads happen off the main thread** (`register_asynchronous_uri_scheme_protocol`), so a large file cannot stall the UI.
-- **`Access-Control-Allow-Origin: *`** is sent deliberately. The altar draws these images onto a canvas and reads it back with `toBlob()` for the image export; without the header the canvas is tainted and the export silently produces nothing. The images come from the app's own storage, so allowing the read grants the page nothing it could not already request.
+- **`Access-Control-Allow-Origin: *`** is belt and braces, not a load-bearing requirement any more. The altar export used to depend on it (canvas `toBlob()` on a tainted canvas silently produces nothing), but it now loads its images as data-URLs precisely so it does not have to rely on a custom scheme being CORS-enabled — wry never registers the scheme as such on every platform. The header stays because the images come from the app's own storage, so allowing the read grants the page nothing it could not already request.
 
 ## Path Confinement
 
@@ -108,7 +136,7 @@ Several validation rules protect against malformed, oversized, or untrusted data
 
 **`getGradientColor` validation.** `getGradientColor` in `altarConstants.ts` now validates the extracted hex colour against `/^#[0-9a-fA-F]{6}$/` and returns `null` for values that do not match. Call sites (`getAltarBackgroundStyle`, `renderAltarThumbnail`) treat a `null` return as an invalid preset and fall back to the default background. This prevents malformed `gradient:` preset strings from reaching canvas colour parsing or CSS interpolation.
 
-**Thumbnail size cap.** `AltarView.handleDone` skips the `updateAltar` call for the thumbnail patch when `thumbnailData.length > 524288` (512 KB). This bounds the size of data stored in `altars.thumbnail_data` and prevents oversized blobs from accumulating in the SQLite file.
+**Thumbnail size cap.** The 512 KB limit (`524288`) is enforced at every capture site in `AltarView` (three of them) and in `AltarCanvas`, where `renderAltarThumbnail` downscales in a loop until the data-URL fits under the cap. Changing the limit means changing it everywhere — it is a repeated literal, not a shared constant. This bounds the size of data stored in `altars.thumbnail_data` and prevents oversized blobs from accumulating in the SQLite file.
 
 ## Backup Import Column Validation
 
@@ -146,7 +174,7 @@ The title bar's global search needs plain text to match against, not the HTML st
 
 ## Content Security Policy
 
-The main window has CSP enabled through Tauri's default configuration. `img-src` additionally allows `emerald-img:` and `http://emerald-img.localhost` — the same scheme in the two forms the platforms serve it as (WebView2 maps custom schemes onto `http`, the other engines do not). The export HTML for PDF export is written to a unique file in the OS temp directory and loaded by a hidden webview over a `file://` URL — it never fetches external resources and is removed from disk as soon as the export finishes. Because the hidden webview inherits the same CSP as the main window (`script-src 'self'` — see `tauri.conf.json`), inline scripts in the export HTML are blocked; the frontend therefore pre-renders the internal-link chip transformation in TypeScript (`transformInternalLinks` in `src/lib/export.ts`) before handing the HTML to the backend.
+The main window has an **explicit, hand-written CSP** in `tauri.conf.json` (`app.security.csp`), not Tauri's default. `script-src` is `'self'`. `img-src` additionally allows `emerald-img:` and `http://emerald-img.localhost` — the same scheme in the two forms the platforms serve it as (WebView2 maps custom schemes onto `http`, the other engines do not). Three remote origins are allowed for typography: `style-src`/`connect-src` include `https://fonts.googleapis.com` and `connect-src`/`font-src` include `https://fonts.gstatic.com`. That is the app's one network dependency: `src/main.tsx` injects the Google Fonts stylesheet link at runtime (with `preconnect` hints in `index.html`), and the app falls back to system font stacks when offline — nothing else may leave the machine. The export HTML for PDF export is written to a unique file in the OS temp directory and loaded by a hidden webview over a `file://` URL — it never fetches external resources and is removed from disk as soon as the export finishes. Because the hidden webview inherits the same CSP as the main window (`script-src 'self'` — see `tauri.conf.json`), inline scripts in the export HTML are blocked; the frontend therefore pre-renders the internal-link chip transformation in TypeScript (`transformInternalLinks` in `src/lib/export.ts`) before handing the HTML to the backend.
 
 ## File Dialog Safety
 

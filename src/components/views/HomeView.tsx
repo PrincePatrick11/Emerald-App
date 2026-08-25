@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
+import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { BookOpen, Library, Plus, Wand2, ChevronDown, Copy, Pencil, Trash2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
@@ -131,15 +132,18 @@ function applyCount<T>(items: T[], count: number): T[] {
 
 export default function HomeView() {
   const { t } = useTranslation();
-  const {
-    setActiveView,
-    homeJournalPrefs, setHomeJournalPrefs,
-    homeOpsPrefs,     setHomeOpsPrefs,
-    homeWikiPrefs,    setHomeWikiPrefs,
-  } = useUIStore();
-  const { entries, createEntry, updateEntry, deleteEntry, restoreEntry } = useJournalStore();
-  const { articles, wikiCategories, createArticle, updateArticle, deleteArticle, restoreArticle } = useWikiStore();
-  const { operations, categories, createOperation, updateOperation, deleteOperation, restoreOperation } = useOperationStore();
+  const { setActiveView, homeJournalPrefs, setHomeJournalPrefs, homeOpsPrefs, setHomeOpsPrefs, homeWikiPrefs, setHomeWikiPrefs, } = useUIStore(
+    useShallow((s) => ({ setActiveView: s.setActiveView, homeJournalPrefs: s.homeJournalPrefs, setHomeJournalPrefs: s.setHomeJournalPrefs, homeOpsPrefs: s.homeOpsPrefs, setHomeOpsPrefs: s.setHomeOpsPrefs, homeWikiPrefs: s.homeWikiPrefs, setHomeWikiPrefs: s.setHomeWikiPrefs }))
+  );
+  const { entries, createEntry, duplicateEntry, deleteEntry, restoreEntry } = useJournalStore(
+    useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
+  );
+  const { articles, wikiCategories, createArticle, updateArticle, deleteArticle, restoreArticle } = useWikiStore(
+    useShallow((s) => ({ articles: s.articles, wikiCategories: s.wikiCategories, createArticle: s.createArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle }))
+  );
+  const { operations, categories, createOperation, updateOperation, deleteOperation, restoreOperation } = useOperationStore(
+    useShallow((s) => ({ operations: s.operations, categories: s.categories, createOperation: s.createOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation }))
+  );
   const pushUndo = useUndoStore((s) => s.push);
 
   const [ctxMenu, setCtxMenu] = useState<{ target: CtxTarget; x: number; y: number } | null>(null);
@@ -159,18 +163,8 @@ export default function HomeView() {
 
   const handleDuplicate = async (target: CtxTarget) => {
     if (target.kind === 'journal') {
-      const src = entries.find((e) => e.id === target.id);
-      if (!src) return;
-      const ne = await createEntry();
-      await updateEntry(ne.id, {
-        title: src.title + ' (Copy)', content: src.content, tags: src.tags,
-        moon_phase: src.moon_phase, paradigm_id: src.paradigm_id,
-        is_bannung: src.is_bannung, bannung_type_wiki_id: src.bannung_type_wiki_id,
-        is_meditation: src.is_meditation, meditation_type_wiki_id: src.meditation_type_wiki_id,
-        meditation_duration: src.meditation_duration,
-        linked_operation_ids: src.linked_operation_ids, linked_wiki_ids: src.linked_wiki_ids,
-      });
-      setActiveView({ type: 'journal', id: ne.id, mode: 'view' });
+      const ne = await duplicateEntry(target.id);
+      if (ne) setActiveView({ type: 'journal', id: ne.id, mode: 'view' });
     } else if (target.kind === 'wiki') {
       const src = articles.find((a) => a.id === target.id);
       if (!src) return;

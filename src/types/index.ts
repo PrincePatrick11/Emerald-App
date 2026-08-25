@@ -73,6 +73,8 @@ export interface Operation {
   show_intention_in_properties?: boolean;
   show_letter_bank_in_properties?: boolean;
   show_sigil?: boolean;
+  /** Tri-State: `undefined` = von der Listen-Query nicht geladen (siehe
+   *  operationStore.ensureDrawingLoaded), `null` = hat keine Zeichnung. */
   drawing_data?: string | null;
   thumbnail_data?: string | null;
 }

@@ -247,7 +247,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const db = await getDb();
     await reassignCategoryContent(db, 'tasks', id);
     await db.execute('DELETE FROM task_categories WHERE id=$1', [id]);
-    set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }));
+    // deleteCategory haengt beim Soft-Delete bereits um; das hier faengt den
+    // Fall ab, dass eine Task-Zeile im Store doch noch auf die Kategorie zeigt.
+    set((s) => ({
+      categories: s.categories.filter((c) => c.id !== id),
+      tasks: s.tasks.map((t) => (t.category_id === id ? { ...t, category_id: FALLBACK_CATEGORY.tasks } : t)),
+    }));
   },
 
   getCategory: (id: string) => get().categories.find((c) => c.id === id),

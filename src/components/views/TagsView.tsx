@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Tag, BookOpen, Library, Check, X, Search, Wand2, Pencil, Trash2 } from 'lucide-react';
 import { useTagStore } from '../../store/tagStore';
@@ -19,11 +20,15 @@ const TAG_COLORS = [
 
 export default function TagsView() {
   const { t } = useTranslation();
-  const { tags, fetchTags, updateTag, deleteTag, restoreTag } = useTagStore();
+  const { tags, fetchTags, updateTag, deleteTag, restoreTag } = useTagStore(
+    useShallow((s) => ({ tags: s.tags, fetchTags: s.fetchTags, updateTag: s.updateTag, deleteTag: s.deleteTag, restoreTag: s.restoreTag }))
+  );
   const pushUndo = useUndoStore((s) => s.push);
   const entries = useJournalStore((s) => s.entries);
   const articles = useWikiStore((s) => s.articles);
-  const { operations, categories: opCategories } = useOperationStore();
+  const { operations, categories: opCategories } = useOperationStore(
+    useShallow((s) => ({ operations: s.operations, categories: s.categories }))
+  );
   const setActiveView = useUIStore((s) => s.setActiveView);
 
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
@@ -205,9 +210,9 @@ export default function TagsView() {
                   <span className="flex-1 truncate text-xs text-left">{tag.name}</span>
                   {confirmDeleteName === tag.name ? (
                     <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      <span className="text-xs text-stone-400">Sure?</span>
-                      <span onClick={() => handleDelete(tag)} className="text-xs text-red-400 hover:text-red-300 cursor-pointer px-1">Yes</span>
-                      <span onClick={() => setConfirmDeleteName(null)} className="text-xs text-stone-500 hover:text-stone-300 cursor-pointer">No</span>
+                      <span className="text-xs text-stone-400">{t('trash.sure')}</span>
+                      <span onClick={() => handleDelete(tag)} className="text-xs text-red-400 hover:text-red-300 cursor-pointer px-1">{t('trash.confirmYes')}</span>
+                      <span onClick={() => setConfirmDeleteName(null)} className="text-xs text-stone-500 hover:text-stone-300 cursor-pointer">{t('trash.confirmNo')}</span>
                     </span>
                   ) : (
                     <>

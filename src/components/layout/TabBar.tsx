@@ -1,4 +1,7 @@
 import { BookOpen, Flame, Home, Library, MoreHorizontal, Plus, Tag, Trash2, Wand2, X, CheckSquare } from 'lucide-react';
+import { useShallow } from 'zustand/shallow';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { LazyMotion, Reorder, domAnimation } from 'framer-motion';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
@@ -12,26 +15,26 @@ import type { ActiveView, MoonPhase } from '../../types';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import { imageSrc } from '../../lib/images';
 
-function getFallbackTitle(view: ActiveView) {
+function getFallbackTitle(view: ActiveView, t: TFunction) {
   switch (view.type) {
     case 'home':
-      return 'Home';
+      return t('nav.home');
     case 'journal':
-      return view.id ? 'Untitled journal entry' : 'Journal';
+      return view.id ? t('journal.untitled') : t('nav.journal');
     case 'wiki':
-      return view.id ? 'Untitled wiki article' : 'Wiki';
+      return view.id ? t('wiki.untitled') : t('nav.wiki');
     case 'operations':
-      return view.id ? 'Untitled operation' : 'Operations';
+      return view.id ? t('operations.untitled') : t('nav.operations');
     case 'altar':
-      return view.id ? 'Untitled altar' : 'Altar';
+      return view.id ? t('altar.untitled') : t('nav.altar');
     case 'tasks':
-      return view.id ? 'Untitled task' : 'Tasks';
+      return view.id ? t('tasks.untitled') : t('nav.tasks');
     case 'tags':
-      return 'Tags';
+      return t('nav.tags');
     case 'trash':
-      return 'Trash';
+      return t('nav.trash');
     default:
-      return 'Untitled';
+      return '';
   }
 }
 
@@ -52,7 +55,10 @@ function AltarTabIcon({ iconData }: { iconData: string | null | undefined }) {
 }
 
 export default function TabBar() {
-  const { tabs, activeTabId, selectTab, closeTab, addTab, setTabsOrder } = useUIStore();
+  const { t } = useTranslation();
+  const { tabs, activeTabId, selectTab, closeTab, addTab, setTabsOrder } = useUIStore(
+    useShallow((s) => ({ tabs: s.tabs, activeTabId: s.activeTabId, selectTab: s.selectTab, closeTab: s.closeTab, addTab: s.addTab, setTabsOrder: s.setTabsOrder }))
+  );
   const getEntry = useJournalStore((s) => s.getEntry);
   const getArticle = useWikiStore((s) => s.getArticle);
   const getOperation = useOperationStore((s) => s.getOperation);
@@ -78,13 +84,13 @@ export default function TabBar() {
   if (tabs.length === 0) return null;
 
   const getTitle = (view: ActiveView) => {
-    if (!view.id) return getFallbackTitle(view);
-    if (view.type === 'journal') return getEntry(view.id)?.title || getFallbackTitle(view);
-    if (view.type === 'wiki') return getArticle(view.id)?.title || getFallbackTitle(view);
-    if (view.type === 'operations') return getOperation(view.id)?.title || getFallbackTitle(view);
-    if (view.type === 'altar') return altars.find((altar) => altar.id === view.id)?.title || getFallbackTitle(view);
-    if (view.type === 'tasks') return getTask(view.id)?.title || getFallbackTitle(view);
-    return getFallbackTitle(view);
+    if (!view.id) return getFallbackTitle(view, t);
+    if (view.type === 'journal') return getEntry(view.id)?.title || getFallbackTitle(view, t);
+    if (view.type === 'wiki') return getArticle(view.id)?.title || getFallbackTitle(view, t);
+    if (view.type === 'operations') return getOperation(view.id)?.title || getFallbackTitle(view, t);
+    if (view.type === 'altar') return altars.find((altar) => altar.id === view.id)?.title || getFallbackTitle(view, t);
+    if (view.type === 'tasks') return getTask(view.id)?.title || getFallbackTitle(view, t);
+    return getFallbackTitle(view, t);
   };
 
   const getIcon = (view: ActiveView) => {
@@ -166,12 +172,12 @@ export default function TabBar() {
                 >
                   <span className="flex-shrink-0 text-stone-500">{getIcon(tab.view)}</span>
                   <span className="truncate">{title}</span>
-                  {tab.view.mode === 'edit' && <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-jade-500" title="Editing" />}
+                  {tab.view.mode === 'edit' && <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-jade-500" title={t('tabBar.editing')} />}
                 </button>
                 <button
                   onClick={() => closeTab(tab.id)}
                   className="-mr-1 rounded p-0.5 text-stone-600 opacity-0 transition-colors hover:bg-stone-700 hover:text-stone-200 group-hover:opacity-100"
-                  title="Close tab"
+                  title={t('tabBar.closeTab')}
                 >
                   <X size={13} />
                 </button>
@@ -183,7 +189,7 @@ export default function TabBar() {
       <button
         onClick={() => addTab()}
         className="tab-add mb-px ml-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-t-lg border border-stone-800/60 bg-stone-900/70 text-stone-500 transition-colors hover:bg-stone-800/60 hover:text-stone-200"
-        title="New tab"
+        title={t('tabBar.newTab')}
       >
         <Plus size={15} />
       </button>

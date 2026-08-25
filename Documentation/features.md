@@ -1,5 +1,9 @@
 # Features
 
+## Home Dashboard
+
+The Home view (the rail's top button, also the default view of a fresh tab) is a dashboard over three sections — Journal, Operations, and Wiki. Each section has its own toolbar with a view-mode dropdown (list or cards), a sort dropdown, and an item-count dropdown; all three are persisted per section in the UI store (`homeJournalPrefs` / `homeOpsPrefs` / `homeWikiPrefs`). The header shows today's date together with the current **moon phase**. Rows and cards carry the same right-click context menus as the module lists (Duplicate/Rename/Delete), and clicking an item opens it in its module.
+
 ## Journal
 
 The journal is the primary day-to-day writing space. Each entry has a title and a rich-text body edited with TipTap.
@@ -16,9 +20,9 @@ The journal is the primary day-to-day writing space. Each entry has a title and 
 
 **Tags.** Free-form labels shared across the app. Tag names are stored directly on entries (not as IDs). The Tags view lets you see all entries carrying a particular tag.
 
-**List views.** The journal list supports three layouts (List, Cards, Timeline) and four sort orders (newest first, oldest first, A→Z, Z→A). A filter panel lets you filter by moon phase. Search filters by title.
+**List views.** The journal list supports three layouts (List, Cards, Timeline) and five sort orders (newest first, oldest first, A→Z, Z→A, and Category — which for the journal groups by **moon phase**). A filter panel lets you filter by moon phase. Search filters by title *or* tag name.
 
-**Context menu.** Right-click any entry in the list or sidebar to Duplicate, Rename, or Delete it. The menu always draws above everything else and stays inside the window — near an edge it flips back towards the cursor rather than being cut off.
+**Context menu.** Right-click any entry in the list or sidebar to Duplicate, Rename, or Delete it — most menus also offer *Open in new tab* (the journal's own list view is the one without it). The menu always draws above everything else and stays inside the window — near an edge it flips back towards the cursor rather than being cut off.
 
 ## Wiki
 
@@ -156,7 +160,7 @@ The overlay is applied on top of all background types — colour presets, gradie
 **Left sidebar structure.** The left sidebar has two parts side by side:
 
 1. A narrow icon **rail** — a toggle to collapse/expand the entry list next to it, a second toggle to collapse/expand the right sidebar (so both sidebars are controlled from the same rail; both toggles animate the sidebar's width in and out rather than snapping it), then six navigation icons — Home (opens the dashboard) above Journal/Tasks/Operations/Wiki/Altar — and, at the bottom, Tags and Trash grouped together, then Vault and Settings below a divider. Clicking a navigation icon switches the main view; only Home overwrites the active tab rather than opening a new one, since it has no content of its own to keep open. The other icons do not highlight, since they're independent of whichever list tab is open. The Vault button opens vault management — see [Vaults](#vaults) below. Both sidebar toggles are mirrored in the *View* menu as **Entry List** and **Properties**, each showing a checkmark for its current state so either route stays in sync with the other.
-2. A resizable, collapsible **entry list** panel next to the rail, with six tabs (**All** / Journal/Tasks/Operations/Wiki/Altar) that switch which items are listed. The All tab lists every module's items together in one list, sorted by last-updated. Each tab has its own search field, a "+" button to quick-create a new item, inline rename (double-click or via the context menu), and a right-click context menu (Duplicate/Rename/Delete where applicable — Altar only offers Rename, since it has no duplicate action; Tasks offers Rename/Delete and shows a completion checkbox on each row instead of an icon, except in the All tab, where a Task row shows a static checkbox icon instead). Journal, Operations, and Wiki rows can also be dragged into the editor to insert an internal link — in the All tab this still only applies to those three; Tasks and Altar rows there don't show a grab cursor. The panel can be collapsed entirely via the toggle in the rail, and its width is remembered independently of the main window.
+2. A resizable, collapsible **entry list** panel next to the rail, with six tabs (**All** / Journal/Tasks/Operations/Wiki/Altar) that switch which items are listed. The All tab lists every module's items together in one list, sorted by last-updated. Each tab has its own search field, a "+" button to quick-create a new item, inline rename (double-click or via the context menu), and a right-click context menu (Open in new tab/Duplicate/Rename/Delete where applicable — Altar offers Open in new tab and Rename here; duplicating an altar lives in the Altar dashboard's card context menu instead. Tasks offers Rename/Delete and shows a completion checkbox on each row instead of an icon, except in the All tab, where a Task row shows a static checkbox icon instead). Journal, Operations, and Wiki rows can also be dragged into the editor to insert an internal link — in the All tab this still only applies to those three; Tasks and Altar rows there don't show a grab cursor. The panel can be collapsed entirely via the toggle in the rail, and its width is remembered independently of the main window.
 
 **Breadcrumb back links.** When an entry is open in JournalView, WikiView, or OperationsView, the topbar shows a clickable breadcrumb that navigates back to the corresponding list view (e.g. clicking "Journal" returns to the journal entry list without closing the tab).
 
@@ -166,7 +170,7 @@ The overlay is applied on top of all background types — colour presets, gradie
 
 ## Search
 
-The search field in the title bar searches everything in the current vault, not just the left entry list. Type into it and a dropdown appears below showing matches from Journal, Wiki, Operations, Tasks, Altars, altar library items, tags, and categories, ranked so a title match appears above a tag match, which appears above a match found in an entry's body text; ties go to whichever item was updated more recently. Body-text matches only start showing once you've typed at least two characters, so a single letter doesn't return most of the vault.
+The search field in the title bar searches everything in the current vault, not just the left entry list. Type into it and a dropdown appears below showing matches from Journal, Wiki, Operations, Tasks, Altars, altar library items, tags, and categories, ranked so a title match appears above a tag match (for wiki articles the slug counts like a tag), which appears above a match found in an entry's body text; ties go to whichever item was updated more recently. Body-text matches only start showing once you've typed at least two characters, so a single letter doesn't return most of the vault.
 
 Each result shows which module it's from and, for Journal/Wiki/Operations, its entry number (e.g. `#12`). A category result shows its module too (e.g. "Category · Wiki"), since Wiki, Operations, Tasks, and Altar can each have a built-in category of the same name and would otherwise look identical. A body-text match shows a short snippet of the surrounding text with the matched word highlighted.
 
@@ -235,6 +239,8 @@ The Tasks module provides a hierarchical task manager with categories, prioritie
 
 Deleting a journal entry, wiki article, or operation moves it to the Trash rather than removing it permanently. Trashed items are retained for 30 days and then automatically purged at startup.
 
+**Altars are the exception: deleting an altar is a hard delete.** There is no trash row and no undo toast for it — the delete button in the altar action bar and the dashboard card's context menu both remove the altar (and, via `ON DELETE CASCADE`, its placements) immediately. The inline two-step confirmation is the only safety net.
+
 From the Trash view you can:
 
 - **Restore** an item to return it to its original section.
@@ -276,7 +282,7 @@ The **Export → Export as PDF…** menu item is available while a Journal / Wik
 
 ### Altar PDF Export
 
-When an Altar is open in reading view, **Export → Export as PDF…** renders the altar the same way the image export does (full native resolution) and embeds that image as a single page in a PDF instead of exporting text content. The PDF page size is derived from the altar's own pixel aspect ratio rather than a fixed portrait page: the long edge is 11", and the short edge follows the aspect ratio, so a portrait altar (e.g. 9:16) produces a portrait page and a landscape altar (e.g. 16:9) produces a landscape page. On Windows this custom page size is applied natively in the print pipeline; on macOS and Linux the export itself is implemented and hardware-verified, but the custom-page-size logic isn't — both currently ignore the altar's aspect ratio and fall back to the platform's default page size. There is no separate "Export Altar as PDF" menu item — the existing Export as PDF item is reused and switches behavior based on what's currently open. A confirmation dialog shows the saved file path once the PDF is written, matching Journal/Wiki/Operations PDF export.
+When an Altar is open in reading view, **Export → Export as PDF…** renders the altar the same way the image export does (full native resolution) and embeds that image as a single page in a PDF instead of exporting text content. The PDF page size is derived from the altar's own pixel aspect ratio rather than a fixed portrait page: the long edge is 11", and the short edge follows the aspect ratio, so a portrait altar (e.g. 9:16) produces a portrait page and a landscape altar (e.g. 16:9) produces a landscape page. On Windows this custom page size is applied natively in the print pipeline; on macOS and Linux the export is implemented but **untested on real hardware** (the code comments in `src-tauri/src/pdf_export/` say so explicitly), and the custom-page-size logic is not implemented there either — both currently ignore the altar's aspect ratio and fall back to the platform's default page size. There is no separate "Export Altar as PDF" menu item — the existing Export as PDF item is reused and switches behavior based on what's currently open. A confirmation dialog shows the saved file path once the PDF is written, matching Journal/Wiki/Operations PDF export.
 
 ### Altar Image Export
 
@@ -329,7 +335,7 @@ Note: this path is parser-based (Markdown -> HTML) and is not identical to Emera
 
 The full vault can be backed up and restored as a single self-contained JSON file (`.emeralddb`), separate from per-entry Emerald-format exports. The Backup section in **Settings** exposes two flows:
 
-- **Export.** A "What to include" checkbox list lets you pick which modules go into the backup: Journal, Wiki, Operations, Routines, Altars, Tasks, and Tags. Optional `dateFrom` / `dateTo` fields restrict the export to entries created in that window (Altars, Routines, and Tasks are date-filtered; soft-deleted tasks and task categories are excluded). Embedded image files referenced from any exported entry are inlined as data-URLs.
+- **Export.** A "What to include" checkbox list lets you pick which modules go into the backup: Journal, Wiki, Operations, Routines, Altars, Tasks, and Tags. Optional `dateFrom` / `dateTo` fields restrict the export to entries created in that window (all content types are date-filtered; tags and categories are not). Soft-deleted rows are excluded by default; an **Include deleted** checkbox exports them too — except tags, which are always exported without their trashed rows. Embedded image files referenced from any exported entry are inlined as data-URLs.
 - **Import.** Before importing, the modal shows a preview line summarising the counts per type (e.g. `12 J, 5 W, 3 O, 2 R, 1 A, 4 T`). The same checkbox list is then used to choose which types to actually apply; categories can also be filtered. Three import modes are available: **Replace** (overwrite selected tables in the current vault), **Merge** (imported entries are prefixed with a timestamp so existing IDs never collide), and **Add Vault** (import into a brand new vault and switch to it).
 
 For the on-disk JSON structure and per-mode semantics, see [DB Backup / Restore (`.emeralddb`) in `database.md`](database.md#db-backup--restore-emeralddb).
@@ -357,13 +363,17 @@ When a rejected file is selected via a file picker, an inline error message appe
 
 ## Context Menus
 
-Right-click any entry in the left sidebar or in any list view (List, Cards, Timeline layouts) to get a context menu with three actions:
+Right-click any entry in the left sidebar or in any list view (List, Cards, Timeline layouts) to get a context menu with three core actions — most menus add **Open in new tab** as a fourth:
 
-**Duplicate.** Creates a copy of the entry with all fields, appending " (Copy)" to the title. Navigates to the new entry automatically.
+**Duplicate.** Creates a copy of the entry, appending " (Copy)" to the title, and navigates to it automatically. For journal entries this goes through the store's single `duplicateEntry` action and copies every content field. Wiki and Operations duplicates still enumerate fields per call site and copy less (an operation's sigil drawing, for one, is not copied).
 
 **Rename.** Activates an inline text input directly in the list item. Press Enter or click away to save; press Escape to cancel.
 
 **Delete.** Soft-deletes the entry and shows a 5-second undo toast in the bottom-right corner. If the deleted entry is currently open, the view navigates away.
+
+## Language
+
+Settings > Language switches the app language between English, German, Spanish, and French. English is the startup and fallback language; the other three locale bundles are loaded on demand the first time they are selected (`changeAppLanguage` in `src/i18n/index.ts`). The choice is not yet persisted across restarts — the app starts in English every launch.
 
 ## Typography
 

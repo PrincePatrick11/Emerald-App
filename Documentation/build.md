@@ -18,9 +18,11 @@ Two jobs, on every push to every branch and on every pull request.
 `cancel-in-progress` is on, so a quick follow-up push supersedes the previous run
 rather than queueing behind it.
 
-**`frontend`** (Ubuntu, once — the frontend build is platform-independent):
-`npm run check:schema`, then `npm run build`, which is `tsc && vite build` and so
-carries the typecheck.
+**`frontend`** (`ubuntu-latest`, once — the frontend build is platform-independent,
+so the glibc argument below does not apply to it):
+`npm run check:schema` (needs `esbuild`, declared in `devDependencies`), then
+`npm run build`, which is `tsc && vite build --configLoader runner` and so carries
+the typecheck.
 
 All workflows pin **Node 22**, and `package.json` records the same floor under
 `engines`. `scripts/schema-check.mjs` imports `node:sqlite`, which does not exist
@@ -28,7 +30,7 @@ in Node 20 — the first CI run failed on exactly that, because the workflows ha
 inherited a `node-version: 20` that nothing in the repo justified.
 
 **`rust`** (matrix: `ubuntu-22.04`, `macos-14`, `windows-latest`):
-`cargo check --locked --all-targets`.
+`cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets`.
 
 The matrix is the entire point of the file. `src-tauri/src/pdf_export/` holds
 three implementations — `windows.rs`, `macos.rs`, `linux.rs` — separated by
@@ -55,13 +57,17 @@ dependency tree before `Swatinem/rust-cache` has anything to restore.
 
 ## Manual builds — the dress rehearsal
 
-`manual-desktop-builds.yml` runs the same steps as the release, but from a branch
-instead of a tag, and uploads the results as workflow artifacts rather than
-publishing anything. Start it from the Actions tab with per-platform checkboxes
-(`build_macos`, `build_windows`, `build_linux`, all default on).
+`manual-desktop-builds.yml` runs the same build steps as the release, but from a
+branch instead of a tag, and uploads the results as workflow artifacts rather
+than publishing anything. Start it from the Actions tab with per-platform
+checkboxes (`build_macos`, `build_windows`, `build_linux`, all default on).
+Its `concurrency` group does not cancel in-progress runs — two manual builds
+queue rather than killing each other.
 
-This is what closes CI's gap: run it before tagging and the bundling, linking and
-signing steps have actually been exercised.
+This is what closes most of CI's gap: run it before tagging and the bundling and
+linking steps have actually been exercised. Apple code signing is deliberately
+left out here — that step exists only in `release.yml` and is first exercised by
+the tag build itself.
 
 ## Release — what a tag sets off
 
@@ -112,6 +118,27 @@ truth that will drift.
 Linux builds on 22.04 LTS on purpose — glibc compatibility is downward, so a
 binary built there runs on 24.04, but not the other way round.
 
+## Per-platform Tauri configs
+
+`tauri.conf.json` is not the whole story: at build time Tauri merges a
+platform-specific file over it, and the window chrome depends on exactly that.
+
+| File | Carries |
+| --- | --- |
+| `tauri.windows.conf.json` | `decorations: false`, `shadow: true` — the undecorated window behind the custom title bar |
+| `tauri.linux.conf.json` | `decorations: false` |
+| `tauri.macos.conf.json` | `titleBarStyle: "Overlay"`, `hiddenTitle: true`, `trafficLightPosition` — native traffic lights stay |
+| `tauri.dev.conf.json` | dev identifier `com.emerald.magical-journal.dev` and `productName: "Emerald Dev"`; selected by `npm run tauri:dev` |
+
+**These files replace arrays and objects wholesale rather than merging them.**
+Each platform file therefore repeats the complete window object, and
+`tauri.dev.conf.json` must never gain an `app.windows` key, or the platform
+settings vanish for dev builds.
+
+`bundle.targets` in `tauri.conf.json` is `"all"`, so macOS and Windows build more
+bundle formats than the release uploads (the workflow filters to `.dmg` and
+`.exe`/`.msi`); only Linux narrows the build itself with `--bundles deb,appimage`.
+
 ## Signing
 
 macOS signing and notarisation are wired up but optional. The step reads
@@ -137,6 +164,8 @@ Windows builds are unsigned; SmartScreen warns on first run.
 - CI proves compilation, not bundling. Only a manual or release build does that.
 - The changelog extraction cannot fail — an empty section yields an empty
   release body silently.
-- Nothing runs clippy, and warnings do not fail a build.
+- Nothing runs clippy, and warnings do not fail a build. (`src-tauri/Cargo.toml`
+  declares an empty `cargo-clippy` feature so that a manual clippy run compiles;
+  CI does not use it.)
 - There are no automated tests. CI proves the code compiles, nothing more —
   behaviour is only ever verified by running the app by hand.

@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import { useShallow } from 'zustand/shallow';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { useTagStore } from '../../store/tagStore';
 
@@ -9,7 +11,10 @@ interface TagInputProps {
 }
 
 export default function TagInput({ tags, onChange, readOnly = false }: TagInputProps) {
-  const { tags: allTags, ensureTag, getByName } = useTagStore();
+  const { t } = useTranslation();
+  const { tags: allTags, ensureTag, getByName } = useTagStore(
+    useShallow((s) => ({ tags: s.tags, ensureTag: s.ensureTag, getByName: s.getByName }))
+  );
   const [input, setInput] = useState('');
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -109,7 +114,7 @@ export default function TagInput({ tags, onChange, readOnly = false }: TagInputP
         onChange={(e) => { setInput(e.target.value); setOpen(true); }}
         onKeyDown={handleKeyDown}
         onFocus={() => setOpen(true)}
-        placeholder={tags.length === 0 ? 'Add tags…' : ''}
+        placeholder={tags.length === 0 ? t('editor.addTags') : ''}
         className="bg-transparent text-xs text-stone-400 placeholder-stone-700 outline-none min-w-[80px] flex-1 selectable"
       />
 

@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/shallow';
 import {
   BookOpen,
   Home,
@@ -10,11 +11,16 @@ import {
   Settings,
   CheckSquare,
 } from 'lucide-react';
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { useUIStore } from '../../store/uiStore';
 import { useVaultStore } from '../../store/vaultStore';
-import SettingsModal from './SettingsModal';
 import VaultModal, { VaultGlyph } from './VaultModal';
+
+// SettingsModal zieht die komplette Backup-/Restore-Maschinerie (dbBackup)
+// hinter sich her — als eigener Chunk erst beim ersten Oeffnen.
+// VaultModal bleibt eager: VaultGlyph wird fuer den Rail-Button gebraucht,
+// und AppShell rendert es beim Erststart ohnehin.
+const SettingsModal = lazy(() => import('./SettingsModal'));
 import RailButton from '../ui/RailButton';
 
 /** Breite der Rail. `AppShell` rechnet damit die Breite des <aside> und
@@ -44,9 +50,9 @@ function PanelToggleIcon({ active, mirrored, size = 16 }: { active: boolean; mir
 
 export default function LeftSidebarRail() {
   const { t } = useTranslation();
-  const {
-    setActiveView, leftListOpen, toggleLeftList, rightSidebarOpen, toggleRightSidebar,
-  } = useUIStore();
+  const { setActiveView, leftListOpen, toggleLeftList, rightSidebarOpen, toggleRightSidebar, } = useUIStore(
+    useShallow((s) => ({ setActiveView: s.setActiveView, leftListOpen: s.leftListOpen, toggleLeftList: s.toggleLeftList, rightSidebarOpen: s.rightSidebarOpen, toggleRightSidebar: s.toggleRightSidebar }))
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [vaultOpen, setVaultOpen] = useState(false);
   // Selector auf ein Primitiv, nicht auf den Vault-Datensatz: `find` liefert
@@ -119,7 +125,11 @@ export default function LeftSidebarRail() {
       </div>
 
       {vaultOpen && <VaultModal onClose={() => setVaultOpen(false)} />}
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && (
+        <Suspense fallback={null}>
+          <SettingsModal onClose={() => setSettingsOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }

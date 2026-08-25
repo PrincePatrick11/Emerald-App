@@ -1,10 +1,10 @@
 # Internationalisation
 
-Emerald supports four languages: English (`en`), German (`de`), Spanish (`es`), and French (`fr`). The active language is selected in the Settings modal and persisted across sessions.
+Emerald supports four languages: English (`en`), German (`de`), Spanish (`es`), and French (`fr`). The active language is selected in the Settings modal. It is **not yet persisted** — the app starts in English every launch (known gap).
 
 ## Setup
 
-Translations are managed with `react-i18next`. The setup lives in `src/i18n/index.ts`, which imports all four locale files and registers them. `SettingsModal` calls `i18n.changeLanguage(lang)` when the user changes the setting.
+Translations are managed with `react-i18next`. The setup lives in `src/i18n/index.ts`. Only `en` — the startup and fallback language — is imported statically; `de`/`es`/`fr` are loaded on demand as their own chunks, following the same pattern as the emoji search data. **Always switch languages through `changeAppLanguage(lang)`** (exported from `src/i18n/index.ts`), which loads the bundle before calling `i18n.changeLanguage` — a direct `i18n.changeLanguage` call would switch to a not-yet-registered locale and render the English fallback. `SettingsModal` is the one current caller.
 
 Translation files are at:
 
@@ -83,21 +83,21 @@ The translation files follow this top-level structure (from `en.json`):
 | `altar` | All altar UI strings, including `element` (add-item button label), `category` (category field label), `addCategory` (new-category button), `categoryName` (category name input placeholder), `uncategorized` (label for the pseudo-tab that collects items whose category no longer exists), `backgroundOverlay` (opacity slider label inside the Overlay Options box), `overlayOptions` (collapsible section header, formerly "Background Overlay"), `overlay.dark` / `overlay.light` (labels for the overlay color toggle buttons), reading summary labels (`summary`, `summaryRatio`, `summaryBackground`, `summaryOverlay`, `summaryGrid`, `summaryElements`, `summaryActive`, `summaryInactive`, `summaryEditToChange`), background presets under `altar.backgrounds.*` — four colour-gradient preset keys (`midnight`, `ember`, `forest`, `moon`) plus 16 image preset keys (e.g. `bamboo_grove_bench`, `mountain_altar_summit`, `dark_grotto_shrine`, `light_gate_magic`, `marble_temple_arch`, …), inspector labels (`inspectorX`, `inspectorY`, `inspectorScale`, `inspectorRotation`, `inspectorOpacity` — unit annotations are rendered in the UI, not in the key values), grid controls (`rotationSnap`, `rotationSnapAngle`, `snapScaleToGrid`, `gridToggleGrid` / `gridToggleSnap` / `gridToggleRotate` / `gridToggleScale` — the short labels under the four grid-toggle buttons, distinct from the longer `title` tooltips `gridOverlay` / `snapToGrid` / `rotationSnap` / `snapScaleToGrid` on the same buttons), favicon section strings (`favicon` section header, `changeImage`, `removeFavicon`, `addImage`, reusing `chooseEmoji` for both the with-favicon and no-favicon states rather than duplicating it), canvas options controls (`canvasOptions`, `ratio`), lock/show/hide actions, `background` (view-mode section header), `duplicateElement` (duplicate button tooltip and context menu label), and `removeElement` (remove button tooltip and context menu label — replaces the previously hardcoded "Remove" string in `PlacedElementRow`) |
 | `tasks` | Tasks module UI strings |
 | `journal` | Journal UI strings |
-| `creation` | Sigil editor strings (shown for sigil operations) |
 | `wiki` | Wiki UI strings, including `categories.*` for all built-in wiki category IDs |
-| `editor` | Shared editor button labels (Done, Cancel, Edit, Delete) |
+| `editor` | Shared editor button labels (Done, Cancel, Confirm, Edit, Delete), the link-popup actions (`editLink`, `removeLink`), and `editor.toolbar.*` — every tooltip of the formatting toolbar |
 | `moonPhase` | Display names for all eight moon phase keys |
 | `search` | Search bar placeholders and no-results messages, including the title bar's global search: `globalPlaceholder` (input placeholder), `hint` (shown before anything is typed), `clear` (accessible name for the clear button), `altarItems` / `categories` (module labels for the two result kinds with no entry in `nav.*`), `showMore` / `showMore_other` (label of the "show more results" button, phrased as an action since clicking it — or pressing Arrow Down on the last visible result — reveals the next page rather than just stating a count). The dropdown's other module labels, including the module shown on a category result (`Category · Wiki`), reuse the existing `nav.*` keys rather than duplicating them |
 | `routines` | Routines panel strings |
 | `tags` | Tags view strings |
 | `properties` | Right sidebar Properties panel strings |
 | `filters` | Filter panel strings |
-| `vault` | `VaultModal` strings: `title`, `hint`, `switch`, `switching`, `rename`, `delete`, `namePlaceholder`, `add`, `create`, `cancel`, `deleteHint`, `switchFailed`, `saveFailed`. Moved out of `settings.vault*` when vault management moved into its own modal |
+| `vault` | The full `VaultModal` string set — list/switch (`title`, `hint`, `switch`, `switching`, `alreadyOpen`), edit (`edit`, `save`, `icon`, `resetIcon`, `namePlaceholder`), create (`add`, `create`, `chooseFolder`, `defaultFolder`, `folderNotEmpty`), open/relocate (`open`, `openDbFile`, `relocate`, `missing`, `accessDenied`, `folderHasVault`, `folderHasNoVault`), and delete (`delete`, `deleteHint`, `deleteFiles`, `deleteFilesWarning`, `deleteFilesLeftover`, `deleteActiveHint`, `deleteLastHint`), plus `cancel`, `switchFailed`, `saveFailed`. Moved out of `settings.vault*` when vault management moved into its own modal |
 | `settings` | Settings modal strings |
 | `home` | Home view strings |
 | `contextMenu` | Context menu action labels, including `openInNewTab` |
 | `backlinks` | Backlinks panel strings |
-| `trash` | Trash view strings |
+| `trash` | Trash view strings; its `sure`/`confirmYes`/`confirmNo` triple is the shared inline delete confirmation, reused by Tags and the altar library |
+| `tabBar` | Tab strip strings (`editing`, `closeTab`, `newTab`); the tab titles themselves fall back to `nav.*` and the modules' `untitled` keys |
 | `linkPicker` | Internal link picker modal (title, search placeholder, tab labels, no-results message) |
 | `importDestination` | Markdown-import destination-picker modal (`title`, `description` — interpolates `{{title}}`, `cancel`); reuses `linkPicker.tabJournal` / `tabWiki` / `tabOperations` for the option labels rather than duplicating them |
 | `menu` | Application menu item labels (Edit, View, Export, Import submenus and their items), including the nested `exportAltarImage` submenu (`exportAltarJpeg`, `exportAltarPng`, `exportAltarWebp`) and the View menu's two check items, `entryList` / `properties` (toggle the left entry list / right Properties sidebar; named after what each sidebar holds, not after the rail button that also toggles it). Used by both menus: the native macOS menu, whose labels are pushed into Rust via `update_menu_labels`, and the HTML menu bar on Windows/Linux, which reads them through `useTranslation` like any other component. `cut` / `copy` / `paste` / `selectAll` exist only for the HTML menu — on macOS those items are `PredefinedMenuItem`s and the OS supplies its own localised labels |

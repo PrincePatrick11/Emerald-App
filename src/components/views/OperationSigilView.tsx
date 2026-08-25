@@ -20,6 +20,38 @@ type DrawMode = 'draw' | 'erase';
 
 const SIGIL_COLORS = ['#f8fafc', '#00e699', '#f59e0b', '#ef4444', '#60a5fa', '#a78bfa', '#111827'];
 
+/**
+ * Verkleinert die 1200px-Zeichnung auf einen echten Listen-Thumbnail.
+ * thumbnail_data war frueher eine 1:1-Kopie von drawing_data — damit lud die
+ * Listen-Query die volle Zeichnung doch wieder mit, obwohl sie drawing_data
+ * gerade deshalb weglaesst. Bei einem Fehler faellt sie auf das Original
+ * zurueck; besser ein grosser Thumbnail als gar keiner.
+ */
+const SIGIL_THUMBNAIL_MAX = 300;
+
+async function sigilThumbnail(dataUrl: string | null): Promise<string | null> {
+  if (!dataUrl) return null;
+  try {
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('thumbnail decode failed'));
+      img.src = dataUrl;
+    });
+    const scale = SIGIL_THUMBNAIL_MAX / Math.max(img.width, img.height);
+    if (scale >= 1) return dataUrl;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(img.width * scale));
+    canvas.height = Math.max(1, Math.round(img.height * scale));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return dataUrl;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/png');
+  } catch {
+    return dataUrl;
+  }
+}
+
 function extractUniqueLetters(input: string): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -238,6 +270,13 @@ export default function OperationSigilView({ operation }: { operation: Operation
   const operationIdRef = useRef<string | undefined>(undefined);
   operationIdRef.current = operation.id;
 
+  // Der Thumbnail wird erst beim Speichern aus der Zeichnung verkleinert,
+  // nicht bei jedem Render — pendingRef traegt bis dahin das Original.
+  const buildSavePatch = useCallback(async () => ({
+    ...pendingRef.current,
+    thumbnail_data: await sigilThumbnail(pendingRef.current.drawing_data),
+  }), []);
+
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const triggerAutoSave = useCallback(() => {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
@@ -245,9 +284,9 @@ export default function OperationSigilView({ operation }: { operation: Operation
       if (!isEditingRef.current) return;
       const id = operationIdRef.current;
       // Siehe JournalView: `getDb()` lehnt ab, waehrend ein Vault geloescht wird.
-      if (id) void updateOperation(id, pendingRef.current).catch(() => {});
+      if (id) void buildSavePatch().then((patch) => updateOperation(id, patch)).catch(() => {});
     }, 1000);
-  }, [updateOperation]);
+  }, [updateOperation, buildSavePatch]);
 
   useEffect(() => {
     setTitle(operation.title);
@@ -318,7 +357,7 @@ export default function OperationSigilView({ operation }: { operation: Operation
 
   const handleDone = async () => {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    await updateOperation(operation.id, pendingRef.current);
+    await updateOperation(operation.id, await buildSavePatch());
     setActiveView({ type: 'operations', id: operation.id, mode: 'view' });
   };
 

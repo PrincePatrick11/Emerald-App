@@ -20,9 +20,8 @@ export default function AltarView() {
   const altars = useAltarStore((s) => s.altars);
   const activeAltarId = useAltarStore((s) => s.activeAltarId);
   const previewPlacements = useAltarStore((s) => s.previewPlacements);
-  const { fetchAltars, createAltar, duplicateAltar, setActiveAltar, clearActiveAltar, updateAltar, deleteAltar } = useAltarStore(
+  const { createAltar, duplicateAltar, setActiveAltar, clearActiveAltar, updateAltar, deleteAltar } = useAltarStore(
     useShallow((s) => ({
-      fetchAltars: s.fetchAltars,
       createAltar: s.createAltar,
       duplicateAltar: s.duplicateAltar,
       setActiveAltar: s.setActiveAltar,
@@ -53,7 +52,8 @@ export default function AltarView() {
   // isEditing cleanup effect doesn't fire a redundant second capture.
   const thumbnailSavingRef = useRef(false);
 
-  useEffect(() => { fetchAltars(); }, [fetchAltars]);
+  // Kein Refetch beim Mount: AppShell laedt die Altaere beim Start und beim
+  // Vault-Wechsel; danach haelt der Store sich selbst aktuell.
 
   // Must be placed BEFORE the activeView.id effect so that when both run in the same
   // commit (e.g. back-button press), getState() is called before clearActiveAltar().

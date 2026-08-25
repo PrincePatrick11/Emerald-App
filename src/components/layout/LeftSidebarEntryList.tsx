@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import { BookOpen, Wand2, Library, Flame, CheckSquare, Square, Copy, Pencil, Trash2, PanelTopOpen, LayoutList } from 'lucide-react';
@@ -50,7 +51,9 @@ export const ENTRY_LIST_TABS_WIDTH =
 
 export default function LeftSidebarEntryList() {
   const { t } = useTranslation();
-  const { leftListTab, setLeftListTab } = useUIStore();
+  const { leftListTab, setLeftListTab } = useUIStore(
+    useShallow((s) => ({ leftListTab: s.leftListTab, setLeftListTab: s.setLeftListTab }))
+  );
 
 
   return (
@@ -168,8 +171,12 @@ function AllList() {
 // ── Journal ──────────────────────────────────────────────────────────────────
 function useJournalConfig(): EntryListTabProps<JournalEntry> {
   const { t } = useTranslation();
-  const { activeView, setActiveView, openViewInNewTab } = useUIStore();
-  const { entries, createEntry, updateEntry, deleteEntry, restoreEntry } = useJournalStore();
+  const { activeView, setActiveView, openViewInNewTab } = useUIStore(
+    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
+  );
+  const { entries, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useJournalStore(
+    useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
+  );
   const pushUndo = useUndoStore((s) => s.push);
 
   const handleNewJournalEntry = async () => {
@@ -178,22 +185,8 @@ function useJournalConfig(): EntryListTabProps<JournalEntry> {
   };
 
   const handleDuplicate = async (entry: (typeof entries)[number]) => {
-    const newEntry = await createEntry();
-    await updateEntry(newEntry.id, {
-      title: entry.title + ' (Copy)',
-      content: entry.content,
-      tags: entry.tags,
-      moon_phase: entry.moon_phase,
-      paradigm_id: entry.paradigm_id,
-      is_bannung: entry.is_bannung,
-      bannung_type_wiki_id: entry.bannung_type_wiki_id,
-      is_meditation: entry.is_meditation,
-      meditation_type_wiki_id: entry.meditation_type_wiki_id,
-      meditation_duration: entry.meditation_duration,
-      linked_operation_ids: entry.linked_operation_ids,
-      linked_wiki_ids: entry.linked_wiki_ids,
-    });
-    setActiveView({ type: 'journal', id: newEntry.id, mode: 'view' });
+    const newEntry = await duplicateEntry(entry.id);
+    if (newEntry) setActiveView({ type: 'journal', id: newEntry.id, mode: 'view' });
   };
 
   const handleDelete = async (entry: (typeof entries)[number]) => {
@@ -232,8 +225,12 @@ function JournalList() {
 // ── Operations ───────────────────────────────────────────────────────────────
 function useOperationsConfig(): EntryListTabProps<Operation> {
   const { t } = useTranslation();
-  const { activeView, setActiveView, openViewInNewTab } = useUIStore();
-  const { categories, operations, createOperation, updateOperation, deleteOperation, restoreOperation } = useOperationStore();
+  const { activeView, setActiveView, openViewInNewTab } = useUIStore(
+    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
+  );
+  const { categories, operations, createOperation, updateOperation, deleteOperation, restoreOperation } = useOperationStore(
+    useShallow((s) => ({ categories: s.categories, operations: s.operations, createOperation: s.createOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation }))
+  );
   const pushUndo = useUndoStore((s) => s.push);
 
   const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
@@ -304,8 +301,12 @@ function OperationsList() {
 // ── Wiki ─────────────────────────────────────────────────────────────────────
 function useWikiConfig(): EntryListTabProps<WikiArticle> {
   const { t } = useTranslation();
-  const { activeView, setActiveView, openViewInNewTab } = useUIStore();
-  const { articles, wikiCategories, createArticle, updateArticle, deleteArticle, restoreArticle } = useWikiStore();
+  const { activeView, setActiveView, openViewInNewTab } = useUIStore(
+    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
+  );
+  const { articles, wikiCategories, createArticle, updateArticle, deleteArticle, restoreArticle } = useWikiStore(
+    useShallow((s) => ({ articles: s.articles, wikiCategories: s.wikiCategories, createArticle: s.createArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle }))
+  );
   const pushUndo = useUndoStore((s) => s.push);
 
   const catById = Object.fromEntries(wikiCategories.map((c) => [c.id, c]));
@@ -372,8 +373,12 @@ function WikiList() {
 // ── Altar ────────────────────────────────────────────────────────────────────
 function useAltarConfig(): EntryListTabProps<AltarRecord> {
   const { t } = useTranslation();
-  const { activeView, setActiveView, openViewInNewTab } = useUIStore();
-  const { altars, createAltar, updateAltar } = useAltarStore();
+  const { activeView, setActiveView, openViewInNewTab } = useUIStore(
+    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
+  );
+  const { altars, createAltar, updateAltar } = useAltarStore(
+    useShallow((s) => ({ altars: s.altars, createAltar: s.createAltar, updateAltar: s.updateAltar }))
+  );
 
   const handleNewAltar = async () => {
     const altar = await createAltar();
@@ -411,8 +416,12 @@ function AltarList() {
 // ── Tasks ────────────────────────────────────────────────────────────────────
 function useTasksConfig(): EntryListTabProps<Task> {
   const { t } = useTranslation();
-  const { activeView, setActiveView } = useUIStore();
-  const { categories, tasks, createTask, updateTask, deleteTask, restoreTask } = useTaskStore();
+  const { activeView, setActiveView } = useUIStore(
+    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView }))
+  );
+  const { categories, tasks, createTask, updateTask, deleteTask, restoreTask } = useTaskStore(
+    useShallow((s) => ({ categories: s.categories, tasks: s.tasks, createTask: s.createTask, updateTask: s.updateTask, deleteTask: s.deleteTask, restoreTask: s.restoreTask }))
+  );
   const pushUndo = useUndoStore((s) => s.push);
 
   const catById = Object.fromEntries(categories.map((c) => [c.id, c]));

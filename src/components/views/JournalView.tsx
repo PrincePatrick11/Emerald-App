@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Trash2, Copy, Pencil } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
@@ -23,13 +24,18 @@ const MOON_PHASE_ORDER: MoonPhase[] = [
 
 export default function JournalView() {
   const { t } = useTranslation();
-  const { activeView, setActiveView, setEditActions, journalPrefs, setJournalPrefs } = useUIStore();
-  const { entries, createEntry, updateEntry, deleteEntry, restoreEntry, getEntry } =
-    useJournalStore();
+  const { activeView, setActiveView, setEditActions, journalPrefs, setJournalPrefs } = useUIStore(
+    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, setEditActions: s.setEditActions, journalPrefs: s.journalPrefs, setJournalPrefs: s.setJournalPrefs }))
+  );
+  const { entries, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useJournalStore(
+    useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
+  );
   const pushUndo = useUndoStore((s) => s.push);
   const getWikiArticle = useWikiStore((s) => s.getArticle);
   const wikiCategories = useWikiStore((s) => s.wikiCategories);
-  const { operations, categories: opCategories } = useOperationStore();
+  const { operations, categories: opCategories } = useOperationStore(
+    useShallow((s) => ({ operations: s.operations, categories: s.categories }))
+  );
 
   const entry = activeView.id ? getEntry(activeView.id) : null;
   const isEditing = activeView.mode === 'edit';
@@ -138,18 +144,8 @@ export default function JournalView() {
   const openCtxMenu = (e: React.MouseEvent, id: string) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); };
 
   const handleDuplicate = async (id: string) => {
-    const src = entries.find((e) => e.id === id);
-    if (!src) return;
-    const newEntry = await createEntry();
-    await updateEntry(newEntry.id, {
-      title: src.title + ' (Copy)', content: src.content, tags: src.tags,
-      moon_phase: src.moon_phase, paradigm_id: src.paradigm_id,
-      is_bannung: src.is_bannung, bannung_type_wiki_id: src.bannung_type_wiki_id,
-      is_meditation: src.is_meditation, meditation_type_wiki_id: src.meditation_type_wiki_id,
-      meditation_duration: src.meditation_duration,
-      linked_operation_ids: src.linked_operation_ids, linked_wiki_ids: src.linked_wiki_ids,
-    });
-    setActiveView({ type: 'journal', id: newEntry.id, mode: 'view' });
+    const newEntry = await duplicateEntry(id);
+    if (newEntry) setActiveView({ type: 'journal', id: newEntry.id, mode: 'view' });
   };
 
   const startRename = (id: string) => {

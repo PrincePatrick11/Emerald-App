@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Trash2, Check, X, Plus, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
@@ -18,13 +19,27 @@ import OperationSigilView from './OperationSigilView';
 
 export default function OperationsView() {
   const { t } = useTranslation();
-  const { activeView, setActiveView, setEditActions, openViewInNewTab, operationsPrefs, setOperationsPrefs } = useUIStore();
-  const { operations, categories, createOperation, updateOperation, deleteOperation, restoreOperation, getOperation, addCategory, updateCategory, deleteCategory, restoreCategory } = useOperationStore();
+  const { activeView, setActiveView, setEditActions, openViewInNewTab, operationsPrefs, setOperationsPrefs } = useUIStore(
+    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, setEditActions: s.setEditActions, openViewInNewTab: s.openViewInNewTab, operationsPrefs: s.operationsPrefs, setOperationsPrefs: s.setOperationsPrefs }))
+  );
+  const { operations, categories, createOperation, updateOperation, deleteOperation, restoreOperation, getOperation, addCategory, updateCategory, deleteCategory, restoreCategory } = useOperationStore(
+    useShallow((s) => ({ operations: s.operations, categories: s.categories, createOperation: s.createOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation, getOperation: s.getOperation, addCategory: s.addCategory, updateCategory: s.updateCategory, deleteCategory: s.deleteCategory, restoreCategory: s.restoreCategory }))
+  );
   const pushUndo = useUndoStore((s) => s.push);
 
   const operation = activeView.id ? getOperation(activeView.id) : null;
   const isEditing = activeView.mode === 'edit';
   const isSigilOperation = operation?.category_id === 'sigils';
+
+  // Die Listen-Query laesst drawing_data weg; der Sigil-Editor braucht es.
+  // needsDrawing statt nur der id in den Deps: ein Refetch (Import, Restore)
+  // setzt drawing_data auf undefined zurueck, ohne dass die id wechselt —
+  // der Effekt muss dann erneut nachladen, sonst bleibt das Gate unten leer.
+  const ensureDrawingLoaded = useOperationStore((s) => s.ensureDrawingLoaded);
+  const needsDrawing = isSigilOperation && operation?.drawing_data === undefined;
+  useEffect(() => {
+    if (needsDrawing && operation) void ensureDrawingLoaded(operation.id);
+  }, [needsDrawing, operation?.id, ensureDrawingLoaded]);
 
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -517,7 +532,7 @@ export default function OperationsView() {
             value={newCatName}
             onChange={(e) => setNewCatName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(); if (e.key === 'Escape') { setAddingCategory(false); } }}
-            placeholder="Name…"
+            placeholder={t('operations.categoryName')}
             className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none font-semibold uppercase tracking-wider"
           />
           <button onClick={handleAddCategory} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
@@ -598,6 +613,9 @@ export default function OperationsView() {
   }
 
   if (isSigilOperation) {
+    // Kurz leer rendern, bis ensureDrawingLoaded die Zeichnung nachgeladen hat —
+    // sonst initialisiert der Canvas seine Historie mit "keine Zeichnung".
+    if (operation.drawing_data === undefined) return null;
     return <OperationSigilView operation={operation} />;
   }
 

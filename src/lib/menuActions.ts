@@ -1,8 +1,4 @@
 import { emit } from '@tauri-apps/api/event';
-import { exportAsPDF, exportAsMarkdown, noEntryMessage, exportErrorMessage } from './export';
-import { collectExportData } from './exportData';
-import { exportAsEmerald, importFromEmerald, importFromMarkdown } from './emeraldFormat';
-import { saveAltarImage, saveAltarPDF } from './altarExport';
 import { useUIStore } from '../store/uiStore';
 import { hasActiveVault, useVaultStore } from '../store/vaultStore';
 import type { ActiveView, Operation } from '../types';
@@ -79,43 +75,59 @@ export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void
   // sich nie auf und poppte auf, sobald der erste Vault fertig war.
   if (!hasActiveVault(useVaultStore.getState())) return;
 
+  // Die Export-/Import-Module (samt turndown und marked) werden erst beim
+  // ersten Menueaufruf geladen — sie hingen sonst ueber AppShell am Startpfad.
   switch (id) {
     case 'export-pdf': {
+      const { exportAsPDF, noEntryMessage, exportErrorMessage } = await import('./export');
       const view = useUIStore.getState().activeView;
       const isAltarReadingView = view.type === 'altar' && !!view.id && view.mode !== 'edit';
       if (isAltarReadingView) {
+        const { saveAltarPDF } = await import('./altarExport');
         saveAltarPDF().catch((err) => exportErrorMessage(err, 'PDF export'));
         return;
       }
+      const { collectExportData } = await import('./exportData');
       const data = await collectExportData();
       if (!data) { noEntryMessage(); return; }
       exportAsPDF(data).catch((err) => exportErrorMessage(err, 'PDF export'));
       return;
     }
     case 'export-markdown': {
+      const { exportAsMarkdown, noEntryMessage, exportErrorMessage } = await import('./export');
+      const { collectExportData } = await import('./exportData');
       const data = await collectExportData();
       if (!data) { noEntryMessage(); return; }
       exportAsMarkdown(data).catch((err) => exportErrorMessage(err, 'Markdown export'));
       return;
     }
-    case 'export-emerald':
+    case 'export-emerald': {
+      const { exportErrorMessage } = await import('./export');
+      const { exportAsEmerald } = await import('./emeraldFormat');
       exportAsEmerald().catch((err) => exportErrorMessage(err, 'Emerald export'));
       return;
+    }
     case 'export-altar-jpeg':
-      saveAltarImage('jpeg').catch((err) => exportErrorMessage(err, 'Image export'));
-      return;
     case 'export-altar-png':
-      saveAltarImage('png').catch((err) => exportErrorMessage(err, 'Image export'));
+    case 'export-altar-webp': {
+      const { exportErrorMessage } = await import('./export');
+      const { saveAltarImage } = await import('./altarExport');
+      const format = id.slice('export-altar-'.length) as 'jpeg' | 'png' | 'webp';
+      saveAltarImage(format).catch((err) => exportErrorMessage(err, 'Image export'));
       return;
-    case 'export-altar-webp':
-      saveAltarImage('webp').catch((err) => exportErrorMessage(err, 'Image export'));
-      return;
-    case 'import-markdown':
+    }
+    case 'import-markdown': {
+      const { exportErrorMessage } = await import('./export');
+      const { importFromMarkdown } = await import('./emeraldFormat');
       importFromMarkdown().catch((err) => exportErrorMessage(err, 'Markdown import'));
       return;
-    case 'import-emerald':
+    }
+    case 'import-emerald': {
+      const { exportErrorMessage } = await import('./export');
+      const { importFromEmerald } = await import('./emeraldFormat');
       importFromEmerald().catch((err) => exportErrorMessage(err, 'Emerald import'));
       return;
+    }
     default: {
       // Compile error if a SelfContainedMenuActionId is left unhandled.
       const unhandled: never = id;

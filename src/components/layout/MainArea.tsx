@@ -1,17 +1,19 @@
+import { Suspense, lazy } from 'react';
 import { useUIStore } from '../../store/uiStore';
-import HomeView from '../views/HomeView';
-import JournalView from '../views/JournalView';
-import WikiView from '../views/WikiView';
-import TagsView from '../views/TagsView';
-import TrashView from '../views/TrashView';
-import AltarView from '../views/AltarView';
-import OperationsView from '../views/OperationsView';
-import TasksView from '../views/TasksView';
 
-export default function MainArea() {
-  const activeView = useUIStore((s) => s.activeView);
+// Jede View als eigener Chunk: TipTap haengt an Journal/Wiki/Operations und
+// wuerde sonst bei jedem Start mitgeladen, auch wenn nur Home offen ist.
+const HomeView = lazy(() => import('../views/HomeView'));
+const JournalView = lazy(() => import('../views/JournalView'));
+const WikiView = lazy(() => import('../views/WikiView'));
+const TagsView = lazy(() => import('../views/TagsView'));
+const TrashView = lazy(() => import('../views/TrashView'));
+const AltarView = lazy(() => import('../views/AltarView'));
+const OperationsView = lazy(() => import('../views/OperationsView'));
+const TasksView = lazy(() => import('../views/TasksView'));
 
-  switch (activeView.type) {
+function viewFor(type: string) {
+  switch (type) {
     case 'journal':
       return <JournalView />;
     case 'wiki':
@@ -29,4 +31,12 @@ export default function MainArea() {
     default:
       return <HomeView />;
   }
+}
+
+export default function MainArea() {
+  const activeView = useUIStore((s) => s.activeView);
+
+  // Fallback null: die Chunks sind lokal und laden in einstelligen
+  // Millisekunden — ein Spinner wuerde nur flackern.
+  return <Suspense fallback={null}>{viewFor(activeView.type)}</Suspense>;
 }

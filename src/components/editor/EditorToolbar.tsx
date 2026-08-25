@@ -85,35 +85,35 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
         <ToolbarBtn
           onClick={() => editor.chain().focus().toggleBold().run()}
           active={editor.isActive('bold')}
-          title="Bold"
+          title={t('editor.toolbar.bold')}
         >
           <Bold size={14} />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => editor.chain().focus().toggleItalic().run()}
           active={editor.isActive('italic')}
-          title="Italic"
+          title={t('editor.toolbar.italic')}
         >
           <Italic size={14} />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => editor.chain().focus().toggleStrike().run()}
           active={editor.isActive('strike')}
-          title="Strikethrough"
+          title={t('editor.toolbar.strikethrough')}
         >
           <Strikethrough size={14} />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => editor.chain().focus().toggleHighlight().run()}
           active={editor.isActive('highlight')}
-          title="Highlight"
+          title={t('editor.toolbar.highlight')}
         >
           <Highlighter size={14} />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => editor.chain().focus().toggleCode().run()}
           active={editor.isActive('code')}
-          title="Inline code"
+          title={t('editor.toolbar.inlineCode')}
         >
           <Code size={14} />
         </ToolbarBtn>
@@ -127,7 +127,7 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
             editor.chain().focus().toggleHeading({ level: 1 }).run()
           }
           active={editor.isActive('heading', { level: 1 })}
-          title="Heading 1"
+          title={t('editor.toolbar.heading1')}
         >
           <Heading1 size={14} />
         </ToolbarBtn>
@@ -136,7 +136,7 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
             editor.chain().focus().toggleHeading({ level: 2 }).run()
           }
           active={editor.isActive('heading', { level: 2 })}
-          title="Heading 2"
+          title={t('editor.toolbar.heading2')}
         >
           <Heading2 size={14} />
         </ToolbarBtn>
@@ -145,14 +145,14 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
             editor.chain().focus().toggleHeading({ level: 3 }).run()
           }
           active={editor.isActive('heading', { level: 3 })}
-          title="Heading 3"
+          title={t('editor.toolbar.heading3')}
         >
           <Heading3 size={14} />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
           active={editor.isActive('blockquote')}
-          title="Blockquote"
+          title={t('editor.toolbar.blockquote')}
         >
           <Quote size={14} />
         </ToolbarBtn>
@@ -164,21 +164,21 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
         <ToolbarBtn
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           active={editor.isActive('bulletList')}
-          title="Bullet list"
+          title={t('editor.toolbar.bulletList')}
         >
           <List size={14} />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           active={editor.isActive('orderedList')}
-          title="Numbered list"
+          title={t('editor.toolbar.numberedList')}
         >
           <ListOrdered size={14} />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => editor.chain().focus().toggleTaskList().run()}
           active={editor.isActive('taskList')}
-          title="Task list"
+          title={t('editor.toolbar.taskList')}
         >
           <CheckSquare size={14} />
         </ToolbarBtn>
@@ -187,10 +187,10 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
       <ToolbarDivider />
 
       <ToolbarGroup>
-        <ToolbarBtn onClick={handleLinkButtonClick} active={editor.isActive('link')} title="Link einfügen">
+        <ToolbarBtn onClick={handleLinkButtonClick} active={editor.isActive('link')} title={t('editor.toolbar.insertLink')}>
           <Link size={14} />
         </ToolbarBtn>
-        <ToolbarBtn onClick={() => fileInputRef.current?.click()} active={false} title="Bild einfügen">
+        <ToolbarBtn onClick={() => fileInputRef.current?.click()} active={false} title={t('editor.toolbar.insertImage')}>
           <ImagePlus size={14} />
         </ToolbarBtn>
       </ToolbarGroup>
@@ -209,10 +209,10 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
             placeholder="https://..."
             className="bg-stone-900 border border-stone-600 rounded px-2 py-0.5 text-xs text-stone-200 w-52 outline-none focus:border-jade-600"
           />
-          <button onClick={confirmExternalLink} className="p-1 text-jade-400 hover:text-jade-300" title="Link einfügen">
+          <button onClick={confirmExternalLink} className="p-1 text-jade-400 hover:text-jade-300" title={t('editor.toolbar.insertLink')}>
             <Check size={12} />
           </button>
-          <button onClick={cancelLink} className="p-1 text-stone-500 hover:text-stone-300" title="Abbrechen">
+          <button onClick={cancelLink} className="p-1 text-stone-500 hover:text-stone-300" title={t('editor.cancel')}>
             <X size={12} />
           </button>
         </div>
@@ -232,7 +232,7 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
         <ToolbarBtn
           onClick={() => editor.chain().focus().undo().run()}
           active={false}
-          title="Undo"
+          title={t('editor.toolbar.undo')}
           disabled={!editor.can().undo()}
         >
           <Undo size={14} />
@@ -240,7 +240,7 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
         <ToolbarBtn
           onClick={() => editor.chain().focus().redo().run()}
           active={false}
-          title="Redo"
+          title={t('editor.toolbar.redo')}
           disabled={!editor.can().redo()}
         >
           <Redo size={14} />

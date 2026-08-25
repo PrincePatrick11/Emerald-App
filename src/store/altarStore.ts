@@ -35,20 +35,15 @@ async function insertAltarRow(altar: AltarRecord): Promise<void> {
   );
 }
 
-async function fetchPlacementsForAltar(altarId: string, items: AltarItem[]): Promise<AltarPlacement[]> {
-  const db = await getDb();
-  const rows = await db.select<DbRow[]>(
-    'SELECT * FROM altar_placements WHERE altar_id=$1',
-    [altarId]
-  );
-
-  // name, emoji, category_id und image_data sind keine Spalten von
-  // altar_placements — sie stammen aus dem zugehörigen altar_items-Eintrag.
-  // Die Spalte `scale`, aus der frühere Versionen eine Ersatzgröße abgeleitet
-  // haben, ist mit Migration v33 entfallen: width und height sind seitdem
-  // NOT NULL und tragen ihren eigenen Default.
+// name, emoji, category_id und image_data sind keine Spalten von
+// altar_placements — sie stammen aus dem zugehörigen altar_items-Eintrag.
+// Die Spalte `scale`, aus der frühere Versionen eine Ersatzgröße abgeleitet
+// haben, ist mit Migration v33 entfallen: width und height sind seitdem
+// NOT NULL und tragen ihren eigenen Default.
+function mapPlacementRows(rows: DbRow[], items: AltarItem[]): AltarPlacement[] {
+  const itemsById = new Map(items.map((i) => [i.id, i]));
   return rows.map((r) => {
-    const item = items.find((i) => i.id === r.item_id);
+    const item = itemsById.get(String(r.item_id));
     return {
       id: String(r.id),
       altar_id: String(r.altar_id),
@@ -68,6 +63,15 @@ async function fetchPlacementsForAltar(altarId: string, items: AltarItem[]): Pro
       image_data: item?.image_data,
     };
   });
+}
+
+async function fetchPlacementsForAltar(altarId: string, items: AltarItem[]): Promise<AltarPlacement[]> {
+  const db = await getDb();
+  const rows = await db.select<DbRow[]>(
+    'SELECT * FROM altar_placements WHERE altar_id=$1',
+    [altarId]
+  );
+  return mapPlacementRows(rows, items);
 }
 
 function normalizeAltar(altar: AltarRecord): AltarRecord {
@@ -242,15 +246,17 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     }
     const activeAltarId = get().activeAltarId ?? null;
     const activeAltar = altars.find((altar) => altar.id === activeAltarId) ?? null;
-    const placements = activeAltar ? await fetchPlacementsForAltar(activeAltar.id, items) : [];
-    const previewResults = await Promise.allSettled(
-      altars.map(async (altar) => [altar.id, await fetchPlacementsForAltar(altar.id, items)] as const)
+    // Eine Query fuer alle Altaere statt einer pro Altar — das lief frueher als
+    // N+1 bei jedem App-Start und jedem Mount der AltarView.
+    const placementRows = await db.select<DbRow[]>('SELECT * FROM altar_placements');
+    const allPlacements = mapPlacementRows(placementRows, items);
+    const previewPlacements: Record<string, AltarPlacement[]> = Object.fromEntries(
+      altars.map((altar) => [altar.id, [] as AltarPlacement[]])
     );
-    const previewPlacements = Object.fromEntries(
-      previewResults
-        .filter((r): r is PromiseFulfilledResult<readonly [string, AltarPlacement[]]> => r.status === 'fulfilled')
-        .map((r) => r.value)
-    );
+    for (const placement of allPlacements) {
+      if (placement.altar_id) previewPlacements[placement.altar_id]?.push(placement);
+    }
+    const placements = activeAltar ? previewPlacements[activeAltar.id] ?? [] : [];
     set({
       items,
       altars,

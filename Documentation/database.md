@@ -11,7 +11,7 @@ Two consumers share those strings, and that sharing is the point of the file:
 - the **baseline path** in `runMigrations`, which fresh vaults take;
 - **migration v33** `normalize_schema`, which rebuilds the tables of existing vaults.
 
-Because both execute the same DDL, they cannot drift apart. `npm run check:schema` proves it: it builds one vault each way and compares `sqlite_master` and `PRAGMA table_info` table by table. Without that coupling and that check, the two paths quietly diverge after a few releases and nobody notices until a user hits an error.
+Because both execute the same DDL, they cannot drift apart. `npm run check:schema` proves it: it builds one vault each way and compares `sqlite_master`, `PRAGMA table_info`, `PRAGMA foreign_key_list`, and every index, table by table. The script covers more than the schema comparison — it also exercises resume-after-crash, migration v35's image-reference rewrite, and the constants that are mirrored between `images.rs` / `schema.ts` / `vault.rs` / `vaultManager.ts` / `tauri.conf.json` (image extensions, vault file names, scheme name). It needs `esbuild`, which is declared in `devDependencies`. Without that coupling and that check, the two paths quietly diverge after a few releases and nobody notices until a user hits an error.
 
 ## Migration Model
 
@@ -38,6 +38,8 @@ Migrations v1–v32 carry `legacy: true`. Only for those does the runner swallow
 That leniency is convenient and was actively harmful. It aborts the **entire remaining body** of a migration and still records it as done. Migration v4 is the case in point: v1 already creates `altars` with `background_preset`, and v4 opens with an `ALTER TABLE` for that same column. On every database, that throws, gets swallowed, and everything after it — `altar_placements.altar_id` and the default-altar seeding — never runs. The emergency migrations v30 and v31 exist to patch one symptom of this; they add the missing placement columns back but cannot restore the seeding.
 
 v33 repairs the rest: placements without a valid altar are given one, and if the vault has no altar at all, the default altar v4 intended to create is finally created, which makes those placements visible again.
+
+Before v33's rebuild touches anything, `normalizeSchema.ts` writes a full file backup of the database via `VACUUM INTO` to `{vaultDir}/emerald.db.pre-v33.bak`. The name is fixed, the file is never cleaned up, and on image-heavy vaults it can be sizeable — but it is the escape hatch if the one migration that rewrites every table goes wrong. (Opening a vault additionally takes a `VACUUM INTO` backup right before the normalization runs, see the changelog for 0.2.0.)
 
 The historical migrations themselves are left untouched. Rewriting history is riskier than repairing its outcome, and existing vaults have already run them exactly as written.
 
@@ -71,11 +73,11 @@ Eight relations are declared, with deliberately chosen delete behaviour rather t
 
 ### What foreign keys cannot cover
 
-`links.source_id` / `links.target_id` and `task_links.target_id` are **polymorphic** — the accompanying `*_type` column decides whether the target is a journal entry, a wiki article, or an operation. SQL has no polymorphic foreign key. The same applies to the JSON-array references (`routines.operation_ids`, `journal_entries.linked_wiki_ids`, every `tags` column) and to the loose optional ID columns `paradigm_id`, `bannung_type_wiki_id`, `meditation_type_wiki_id`, `charging_technique_wiki_id`.
+`links.source_id` / `links.target_id` and `task_links.target_id` are **polymorphic** — the accompanying `*_type` column decides whether the target is a journal entry, a wiki article, or an operation. SQL has no polymorphic foreign key. The same applies to the JSON-array references (`routines.operation_ids`, `journal_entries.linked_wiki_ids`) and to the loose optional ID columns `paradigm_id`, `bannung_type_wiki_id`, `meditation_type_wiki_id`, `charging_technique_wiki_id`. (The `tags` columns are also unconstrained JSON arrays, but they hold tag *names*, not IDs — there is nothing to orphan-check them against.)
 
 These are exactly the places where orphans accumulate, and they are unguarded. Two things stand in for the missing constraints:
 
-`checkIntegrity(db)` in `schema.ts` reports orphans across all of them — the polymorphic link tables, the loose ID columns, and the JSON arrays (which it parses in JavaScript, since SQL cannot). It is a diagnostic: it scans whole tables and is not called on the production path.
+`checkIntegrity(db)` in `schema.ts` reports orphans across the ID-bearing JSON arrays (`journal_entries.linked_operation_ids` / `linked_wiki_ids`, `routines.operation_ids` / `wiki_ids`), which it parses in JavaScript, since SQL cannot. It is a diagnostic: it scans whole tables and is not called on the production path.
 
 `sweepDanglingLinks(db)` in `db.ts` deletes link rows whose endpoint no longer exists. Both the 30-day purge and emptying the trash call it, so the two paths cannot drift; before, only the trash cleaned up, and only for journal and wiki entries.
 
@@ -108,7 +110,7 @@ Migration bookkeeping. The only table v33 does not rebuild, since it records the
 | id | TEXT PK | UUID |
 | name | TEXT UNIQUE | the value entries actually reference |
 | color | TEXT | hex, default `'#8347ff'` |
-| affected_ids | TEXT | JSON array; snapshot for restoring a deleted tag |
+| affected_ids | TEXT | NOT NULL DEFAULT `'[]'`; JSON array; snapshot for restoring a deleted tag |
 | deleted_at | TEXT | NULL = active |
 
 ### links
@@ -129,7 +131,7 @@ Internal `[[wiki-style]]` references between entries. `source_id` and `target_id
 | id | TEXT PK | UUID |
 | name | TEXT | |
 | emoji | TEXT | default `'📋'` |
-| content | TEXT | plain text; newlines become paragraphs on drop |
+| content | TEXT | NOT NULL DEFAULT `''`; plain text; newlines become paragraphs on drop |
 | tags | TEXT | JSON array, NOT NULL DEFAULT `'[]'` |
 | operation_ids | TEXT | JSON array, NOT NULL DEFAULT `'[]'` |
 | wiki_ids | TEXT | JSON array, NOT NULL DEFAULT `'[]'` |
@@ -168,9 +170,9 @@ No soft delete — deleting an altar category is immediate, and its items move t
 |---|---|---|
 | id | TEXT PK | UUID |
 | title | TEXT | default `'Untitled Altar'` |
-| intention | TEXT | |
+| intention | TEXT | NOT NULL DEFAULT `''` |
 | background_preset | TEXT | default `'midnight'` |
-| background_image_data | TEXT | despite the name, holds a **file path**, not base64 |
+| background_image_data | TEXT | despite the name, holds the **bare filename** of a stored image, not base64 (migration v35 reduced old paths/data URLs to filenames) |
 | background_overlay | REAL | NOT NULL DEFAULT 0.2 |
 | background_overlay_color | TEXT | NOT NULL DEFAULT `'dark'` |
 | grid_enabled | INTEGER | boolean 0/1 |
@@ -180,7 +182,7 @@ No soft delete — deleting an altar category is immediate, and its items move t
 | rotation_snap_enabled | INTEGER | boolean 0/1 |
 | rotation_snap_angle | REAL | default 15 |
 | snap_scale_to_grid | INTEGER | boolean 0/1 |
-| resolution | TEXT | e.g. `'1920x1080'`; the aspect ratio is derived from it |
+| resolution | TEXT | NOT NULL DEFAULT `'1920x1080'`; the aspect ratio is derived from it |
 | thumbnail_data / icon_data | TEXT | data-URLs — see the note under Key Conventions |
 | created_at / updated_at | TEXT | ISO 8601 |
 
@@ -192,7 +194,7 @@ Numeric grid defaults must stay in sync with `DEFAULT_GRID_*` in `altarConstants
 |---|---|---|
 | id | TEXT PK | UUID |
 | title | TEXT | default `'Untitled Entry'` |
-| content | TEXT | HTML produced by TipTap |
+| content | TEXT | NOT NULL DEFAULT `''`; HTML produced by TipTap |
 | entry_number | INTEGER | stable per row — see Key Conventions |
 | moon_phase | TEXT | one of the eight `MoonPhase` keys, or NULL |
 | mood | TEXT | unused; reserved |
@@ -215,9 +217,9 @@ Both `linked_*_ids` columns were nullable until v33, unlike every other JSON arr
 | Column | Type | Notes |
 |---|---|---|
 | id | TEXT PK | UUID |
-| title | TEXT | |
+| title | TEXT | default `'Untitled Article'` |
 | slug | TEXT UNIQUE | URL-friendly title |
-| content | TEXT | HTML produced by TipTap |
+| content | TEXT | NOT NULL DEFAULT `''`; HTML produced by TipTap |
 | category_id | TEXT | **FK → wiki_categories.id**, RESTRICT, default `'other'` |
 | entry_number | INTEGER | |
 | cover_image / icon | TEXT | data-URL, or emoji for icon — see the Base64 note under [Key Conventions](#key-conventions) |
@@ -233,10 +235,10 @@ Both `linked_*_ids` columns were nullable until v33, unlike every other JSON arr
 |---|---|---|
 | id | TEXT PK | UUID |
 | title | TEXT | default `'Untitled Operation'` |
-| content | TEXT | HTML produced by TipTap |
+| content | TEXT | NOT NULL DEFAULT `''`; HTML produced by TipTap |
 | category_id | TEXT | **FK → operation_categories.id**, RESTRICT |
 | entry_number | INTEGER | |
-| description | TEXT | |
+| description | TEXT | NOT NULL DEFAULT `''` |
 | icon / cover_image | TEXT | data-URL, or emoji for icon — see the Base64 note under [Key Conventions](#key-conventions) |
 | version | TEXT | free-text version label |
 | is_active | INTEGER | boolean, NOT NULL DEFAULT 1 |
@@ -278,7 +280,7 @@ Until v33 this column was called `category` and held the category **name** — t
 | description | TEXT | |
 | category_id | TEXT | **FK → task_categories.id**, RESTRICT |
 | parent_task_id | TEXT | **FK → tasks.id**, SET NULL |
-| priority | TEXT | `'low'` \| `'medium'` \| `'high'` |
+| priority | TEXT | `'low'` \| `'medium'` \| `'high'`, default `'medium'` |
 | due_date | TEXT | date-only `YYYY-MM-DD` |
 | completed | INTEGER | boolean 0/1 |
 | completed_at | TEXT | ISO 8601 |
@@ -291,7 +293,7 @@ Tasks have no `entry_number`; migration v9 only added that column to journal ent
 
 The self-reference makes insert order matter: a child inserted before its parent violates the foreign key. `insertTasks` in `dbBackup.ts` inserts with `parent_task_id` NULL and fills it in afterwards.
 
-Unlike `wiki_articles`, `operations`, and `altar_items`, `tasks.category_id` has **no SQL-level default** — the column is `NOT NULL` with nothing to fall back on. Every call site that creates a task without letting the user pick a category must pass `FALLBACK_CATEGORY.tasks` (`'general'`) explicitly; passing `''` matches no row in `task_categories` and the insert fails the foreign key silently from the caller's point of view (no task is created, no visible error).
+Unlike `wiki_articles` and `altar_items` (both `DEFAULT 'other'`), `tasks.category_id` and `operations.category_id` have **no SQL-level default** — the column is `NOT NULL` with nothing to fall back on. Every call site that creates a task without letting the user pick a category must pass `FALLBACK_CATEGORY.tasks` (`'general'`) explicitly; passing `''` matches no row in `task_categories` and the insert fails the foreign key silently from the caller's point of view (no task is created, no visible error).
 
 ### altar_placements
 
@@ -302,7 +304,7 @@ One placed object on one altar.
 | id | TEXT PK | UUID |
 | altar_id | TEXT | **FK → altars.id**, CASCADE, NOT NULL |
 | item_id | TEXT | **FK → altar_items.id**, CASCADE, NOT NULL |
-| x / y | REAL | percent of canvas, 0–100 |
+| x / y | REAL | NOT NULL DEFAULT 50; percent of canvas, 0–100 |
 | z_index | INTEGER | stacking order |
 | width / height | REAL | NOT NULL DEFAULT 8 |
 | rotation / opacity | REAL | degrees / 0–1 |
@@ -388,12 +390,12 @@ A vault is a **directory** the user picks, holding `emerald.db` and an `images/`
 - A genuinely first-ever launch starts with an **empty** `vaults` array and `activeVaultId: ""` — there is no guaranteed `default` record. `readVaultsFile()` only invents one (`id: 'default', name: 'Emerald'`) when `vaults.json` is missing *and* the Rust command `legacy_default_db_exists` finds a database from before multi-vault support; a file that already exists with an empty list (a user who removed every vault) is left alone. `AppShell` shows a non-dismissible vault modal instead of mounting the rest of the shell whenever the active id doesn't match any vault in the list.
 - Records from before this layout carry `dbName` instead of `path`. `loadVaultsFile()` lifts each one through `migrate_vault_layout`, which moves the flat `.db` into `{appDataDir}/vaults/{id}/`. That happens before any database is opened, so it cannot be a schema migration; the image half is [v35](#rules-for-future-schema-changes) and runs afterwards.
 - A vault created through the UI defaults to `{documentDir}/Emerald/{name}` (`new_vault_base_dir`, sanitized through `vaultFolderName()`), not the app's own directory — that one (`default_vault_dir` / `default_dir_for`, `{appDataDir}/vaults/{id}`) stays reserved for the migration above and for `.emeralddb` add-vault import, where a uuid-named folder is what keeps two same-named imports from colliding.
-- `getActiveDbFile()` in `vaultManager.ts` is called by `getDb()` to build `sqlite:{vaultDir}/emerald.db`. It throws `NO_ACTIVE_VAULT` instead of falling back to `vaults[0]` when `activeVaultId` doesn't resolve — a silent fallback would open a different vault under the wrong id.
+- `getDb()` builds its connection string via `getActiveDbConnectionString()` in `vaultManager.ts`, which percent-encodes the vault path (`?`, `#`, `%` in folder names would otherwise be parsed as URL syntax) around the plain `getActiveDbFile()`. Both throw `NO_ACTIVE_VAULT` instead of falling back to `vaults[0]` when `activeVaultId` doesn't resolve — a silent fallback would open a different vault under the wrong id.
 - Every write to `vaults.json` calls `register_vaults`, mirroring `id → path` into Rust. Storage commands resolve a vault *id* against that registry and never accept a path — see [`architecture.md`](architecture.md#vault-layout) and [`security.md`](security.md).
 - `resetDbCache()` in `db.ts` must be called before switching vaults; it clears the per-vault `Map<identifier, Database>` cache. It also awaits any load still in flight first: `getDb()` only registers a connection in the cache once `Database.load` resolves, so a reset racing a load could otherwise clear the cache before that connection landed in it — the connection would then leak into the map unclosed, keeping the file locked on Windows. `withDbClosed(fn)` runs `fn` with every connection closed and blocks `getDb()` for its duration (throwing `DB_CLOSED`); vault deletion uses it so a debounced autosave elsewhere in the app can't reopen the very file being removed.
 - `runMigrations()` is idempotent — called on every `getDb()` cache miss, safe on both existing and empty DBs. A newly created vault's `.db` file is only written the first time the app switches to it, which is why `newVaultRecord(name)` does not create it up front.
 - All vaults share the same schema.
-- `newVaultRecord(name, opts?)` in `vaultManager.ts` is the single place that builds a new vault's record (`crypto.randomUUID()` for `id`, `opts.path` or `default_vault_dir(id)` for `path`, `opts.icon`, `createdAt`). It is used by the vault modal (the "New Vault" and "Open vault" rows both call `addVault(await newVaultRecord(...))`, see [`features.md`](features.md#vaults)) and by `.emeralddb` add-vault import. `addVault`/`updateVault`/`removeVault`/`setActiveVaultId` all read-modify-write `vaults.json` by copying rather than mutating the cached object before the write lands; `updateVault(id, patch)` (replacing the old name-only `updateVaultName`) applies `patch` through the shared `applyVaultPatch()`, where `icon: null` deletes the key rather than storing it as `null`. `removeVault(id, deleteFiles, nextActiveId?)` folds handing off the active role into the same write that removes the record, so `vaults.json` is never briefly left naming an active vault that isn't in its own list.
+- `newVaultRecord(name, opts?)` in `vaultManager.ts` is the single place that builds a new vault's record (`crypto.randomUUID()` for `id`, `opts.path` or `default_vault_dir(id)` for `path`, `opts.icon`, `createdAt`). It is used by the vault modal (the "New Vault" and "Open vault" rows both call `addVault(await newVaultRecord(...))`, see [`features.md`](features.md#vaults)) and by `.emeralddb` add-vault import. `addVault`/`updateVault`/`removeVault`/`setActiveVaultId`/`relocateVault` all read-modify-write `vaults.json` by copying rather than mutating the cached object before the write lands (`relocateVault(id, path)` repoints a record whose folder was moved on disk); `updateVault(id, patch)` (replacing the old name-only `updateVaultName`) applies `patch` through the shared `applyVaultPatch()`, where `icon: null` deletes the key rather than storing it as `null`. `removeVault(id, deleteFiles, nextActiveId?)` folds handing off the active role into the same write that removes the record, so `vaults.json` is never briefly left naming an active vault that isn't in its own list.
 
 ## DB Backup / Restore (`.emeralddb`)
 
@@ -403,7 +405,7 @@ Full vault snapshots are exported and imported via Settings → Backup.
 
 ```json
 {
-  "version": "2",
+  "version": "3",
   "type": "backup",
   "exportedAt": "2026-04-18T...",
   "filters": { "includeJournal": true, "includeWiki": true, "..." : "..." },
@@ -421,7 +423,7 @@ Full vault snapshots are exported and imported via Settings → Backup.
 
 `version` is `"3"` since image references became filenames. `migrateBackupPayload` only has a v1 lift to apply; a v2 file needs no row changes, because `restoreImages` maps whatever keys the file carries — absolute paths in v1/v2, filenames in v3 — onto the filenames of the images it just wrote, and `remapPaths` substitutes those throughout. `migrateBackupPayload` lifts a `"1"` file on load: `wiki_articles.category` becomes `category_id`, `altar_items.category` is resolved from a category name to an id against the backup's own categories, and null `linked_*_ids` become `'[]'`. Without that step `insertRows` would silently drop the columns it no longer recognises — its `PRAGMA table_info` filter guards against crafted files and cannot tell malicious apart from merely old — and every article from an older backup would land in the default category.
 
-**Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Routines / Altars / Tasks / Tags`, `dateFrom`, `dateTo`, `includeDeleted`. Altars, routines, and tasks are date-filtered on `created_at`. `altar_items` and `altar_placements` are scoped to exported altars; `task_links` to exported task IDs.
+**Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Routines / Altars / Tasks / Tags`, `dateFrom`, `dateTo`, `includeDeleted`. All content tables (journal, wiki, operations, routines, altars, tasks) are date-filtered on `created_at`; tags and the category tables are not. `includeDeleted` applies to the soft-deletable content tables — `tags` are always exported with `deleted_at IS NULL`, regardless of the option. `altar_items` and `altar_placements` are scoped to exported altars; `task_links` to exported task IDs.
 
 **Before anything is written**, `assertPayloadReferencesResolve` checks that every category a payload references exists — in the file itself, or among the rows the import will leave standing. `doReplace` empties the vault before inserting and cannot use a transaction (see the Foreign Keys section), so a payload that fails halfway would leave nothing behind. The check runs for merge too, where a mid-insert failure would leave a half-imported vault.
 
@@ -435,7 +437,7 @@ Categories are exported in full, including soft-deleted ones. Filtering them by 
 | `merge` | Generates an 8-char base36 timestamp prefix. All entry IDs are prefixed; cross-references and wiki slugs are remapped. `entry_number` is offset past the highest existing one, since it is now a stored value rather than a read-time `ROWID` and would otherwise collide. Categories and tags use `INSERT OR IGNORE` by original ID/name. |
 | `add-vault` | Creates a new vault DB → `switchVault()` → runs the replace logic on the empty DB. |
 
-Rows are inserted parents-first, following the order in `TABLES`; foreign keys are active during import and reject anything else.
+Rows are inserted parents-first; foreign keys are active during import and reject anything else. The concrete order is hard-coded per import path (`doReplace` and `doMerge` each have their own) and does *not* follow the order in `TABLES` — e.g. `links` goes last, not third.
 
 ID lists for `IN (...)` clauses are bound as parameters, never concatenated into the SQL string. The IDs are not necessarily app-generated — an import takes them verbatim from the file — and sqlx splits a statement on `;` and executes each part, so concatenating them let a crafted backup run arbitrary SQL during a later, unrelated export.
 
@@ -452,10 +454,12 @@ The `legacy` group is why the list has to be complete rather than only naming th
 ## Rules for Future Schema Changes
 
 - **Change `schema.ts` and add a migration.** Both, always. The DDL there is what fresh vaults get; the migration is what existing vaults get. Bump `BASELINE_VERSION` to match — `runMigrations` refuses to start otherwise.
-- **Run `npm run check:schema`.** It builds a vault each way and compares them column by column, then exercises the rebuild against seeded legacy data. It is the only thing standing between a schema edit and two silently divergent databases.
+- **Run `npm run check:schema`.** It builds a vault each way and compares them column by column (including foreign keys and indexes), then exercises the rebuild against seeded legacy data. It is the only thing standing between a schema edit and two silently divergent databases.
+- **Constants mirrored across languages must change together.** The check's last section compares the image-extension list, vault file names, and the `emerald-img` scheme name across `images.rs`, `schema.ts`, `vault.rs`, `vaultManager.ts`, and `tauri.conf.json`. Changing one side alone fails `check:schema`, not the compiler.
 - Prefer additive changes. A rename or a type change means another full rebuild in the style of `normalizeSchema.ts`.
 - New boolean fields: `INTEGER NOT NULL DEFAULT 0` (or `1` where the safe default is true). New array fields: `TEXT NOT NULL DEFAULT '[]'`.
 - New references: name them `<thing>_id`, store the id and never the name, declare the foreign key, and index the column.
 - New image-backed fields: reuse the file pipeline through `src/lib/images.ts` (`saveImage` / `copyImageFile`), store the returned **filename**, and add the column to the `plain` (or `html`) group of `IMAGE_FIELDS` in `schema.ts` so migration and cleanup both see it. Do not store base64 in SQLite, and do not store a path.
 - Never use the retired `try { ALTER TABLE … ADD COLUMN … } catch {}` pattern, and never rely on the `legacy` error-swallowing — new migrations must fail loudly.
+- **`$N` placeholders must appear in ascending order in the SQL text.** SQLite treats `$N` as a *named* parameter and assigns bind indexes by order of first appearance, not by the digit — `SELECT $21, $23, $22` binds them as 1, 2, 3 (verified against the SQLite C API). `tauri-plugin-sql` binds the values array purely positionally, so a `$23` written before a `$22` silently swaps two values. Every query in this codebase works only because its placeholders ascend; reusing a placeholder (`WHERE id IN ($1, $3)`) is fine, skipping ahead is not.
 - If a change alters the shape of exported rows, bump `BACKUP_VERSION` in `dbBackup.ts` and extend `migrateBackupPayload` so older files still import.

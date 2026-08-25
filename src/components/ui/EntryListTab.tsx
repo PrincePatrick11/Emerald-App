@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Search, Plus } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
@@ -45,7 +46,9 @@ export default function EntryListTab<T>({
   onRename, contextMenuActions, emptyMessage, onCreate, createTitle, renderRow,
 }: EntryListTabProps<T>) {
   const { t } = useTranslation();
-  const { searchQuery, setSearchQuery } = useUIStore();
+  const { searchQuery, setSearchQuery } = useUIStore(
+    useShallow((s) => ({ searchQuery: s.searchQuery, setSearchQuery: s.setSearchQuery }))
+  );
 
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
