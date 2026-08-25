@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+# Schnelle Folge-Pushes sollen den vorigen Lauf ablösen, nicht neben ihm laufen.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Typecheck, Schema, Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check schema
+        run: npm run check:schema
+
+      # `npm run build` ist tsc + vite — der Typecheck steckt darin.
+      - name: Typecheck and build
+        run: npm run build
+
+  rust:
+    # Der eigentliche Zweck dieser Datei: `src-tauri/src/pdf_export/` hat drei
+    # Implementierungen, je eine hinter `cfg(target_os)`. Wer auf Windows
+    # entwickelt, kompiliert `macos.rs` und `linux.rs` nie — Fehler darin fallen
+    # sonst erst beim Release-Build auf, wenn der Tag schon steht.
+    name: cargo check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Ein rotes Linux soll den macOS-Lauf nicht abwürgen; beide Ergebnisse
+      # sind interessant.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-14, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        timeout-minutes: 10
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev
+
+      - run: npm ci
+
+      # `tauri-build` liest `frontendDist: "../dist"` und bricht ab, wenn das
+      # Verzeichnis fehlt — `cargo check` braucht das Frontend also, obwohl es
+      # nichts davon kompiliert.
+      - name: Build frontend
+        run: npm run build
+
+      - name: Check Rust
+        run: cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets

@@ -28,6 +28,15 @@ The dev build uses a separate database and app identity (`com.emerald.magical-jo
 - All hooks (`useState`, `useEffect`, `useMemo`, `useRef`) must appear **before** any early `return` in a component
 - Use Pointer Events for drag & drop (HTML5 DnD is incompatible with Tauri/WKWebView)
 
+## Continuous Integration
+
+Every push and pull request runs `ci.yml`: a frontend job (`npm run check:schema`,
+then the typecheck-carrying `npm run build`) and a `cargo check --locked
+--all-targets` matrix across Linux, macOS, and Windows, since parts of the Rust
+side are platform-gated and only actually compile on their own OS. See
+`Documentation/build.md` for the full pipeline, including what CI does *not*
+cover (bundling, signing, notarisation).
+
 ## Reporting Issues
 
 Please use the [GitHub issue tracker](https://github.com/PrincePatrick11/Emerald-App/issues).

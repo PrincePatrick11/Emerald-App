@@ -27,37 +27,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-macos-intel:
-    if: ${{ inputs.build_macos }}
-    runs-on: macos-15-intel
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-apple-darwin
-
-      - name: Install frontend dependencies
-        run: npm install
-
-      - name: Build macOS Intel bundle
-        run: npm run tauri build -- --target x86_64-apple-darwin
-
-      - name: Upload macOS Intel artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: emerald-macos-intel
-          path: src-tauri/target/x86_64-apple-darwin/release/bundle/
-          if-no-files-found: error
-
   build-macos-apple-silicon:
     if: ${{ inputs.build_macos }}
     runs-on: macos-14
@@ -76,8 +45,13 @@ jobs:
         with:
           targets: aarch64-apple-darwin
 
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
       - name: Install frontend dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build macOS Apple Silicon bundle
         run: npm run tauri build -- --target aarch64-apple-darwin
@@ -107,8 +81,13 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
       - name: Install frontend dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build Windows bundle
         run: npm run tauri build -- --target x86_64-pc-windows-msvc
@@ -138,6 +117,11 @@ jobs:
         with:
           targets: x86_64-unknown-linux-gnu
 
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
       - name: Install Linux dependencies
         timeout-minutes: 10
         run: |
@@ -150,7 +134,7 @@ jobs:
             libssl-dev
 
       - name: Install frontend dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build Ubuntu bundle
         run: npm run tauri build -- --target x86_64-unknown-linux-gnu --bundles deb,appimage

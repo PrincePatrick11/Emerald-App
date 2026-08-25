@@ -83,7 +83,19 @@ Emerald is the private workspace for your magical practice. A journal, personal 
 
 ### Download
 
-Pre-built binaries for macOS, Windows, and Linux are on the [Releases](../../releases) page.
+Pre-built binaries are on the [Releases](../../releases) page.
+
+| Platform | What is built |
+|---|---|
+| macOS | Apple Silicon only, **macOS 13 Ventura or newer** |
+| Windows | x64 — `.exe` (NSIS) and `.msi` |
+| Linux | x64 — `.deb` and `.AppImage`, built on Ubuntu 22.04 |
+
+No Intel macOS build is published. The Ventura floor is a separate matter and
+applies to both architectures: the interface leans on CSS `color-mix()`, which
+needs WebKit 16.2, and below that a number of surfaces lose their accent tint
+silently. Intel Macs are not locked out of the source — `npm run tauri build`
+works there, it is only the release that no longer ships one.
 
 **macOS** — The app is not notarised. Gatekeeper will block it on first launch.
 Right-click the app in Finder → **Open** → confirm. After the first approval it opens normally.
@@ -115,6 +127,7 @@ The dev build uses a separate app identity (`com.emerald.magical-journal.dev`) a
 | [Documentation/database.md](Documentation/database.md) | SQLite schema and conventions |
 | [Documentation/internationalization.md](Documentation/internationalization.md) | Adding and managing translations |
 | [Documentation/security.md](Documentation/security.md) | Capability model and sandboxing |
+| [Documentation/build.md](Documentation/build.md) | CI, build and release pipeline |
 
 ---
 

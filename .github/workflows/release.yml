@@ -8,11 +8,47 @@ on:
 permissions:
   contents: write
 
+# Derselbe Tag zweimal geschoben liesse sonst zwei Laeufe um dieselben
+# Release-Assets rennen. Kein `cancel-in-progress`: einen laufenden Release-Build
+# bricht man nicht ab, der zweite wartet.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   prepare-release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Die Version steht an drei Stellen und muss zeichengleich sein — die UI
+      # zeigt sie aus package.json, der Bundle-Dateiname kommt aus Cargo.toml.
+      # Laeuft vor dem Release-Anlegen: alle Build-Jobs haengen per `needs` hier
+      # dran, ein Fehlschlag kostet also keine einzige Buildminute.
+      - name: Verify the tag matches all three version sites
+        run: |
+          python3 - "$GITHUB_REF_NAME" <<'PY'
+          import json, pathlib, re, sys
+
+          tag = sys.argv[1].removeprefix('v')
+          cargo = pathlib.Path('src-tauri/Cargo.toml').read_text(encoding='utf-8')
+          sites = {
+              'package.json':
+                  json.loads(pathlib.Path('package.json').read_text(encoding='utf-8'))['version'],
+              'src-tauri/tauri.conf.json':
+                  json.loads(pathlib.Path('src-tauri/tauri.conf.json').read_text(encoding='utf-8'))['version'],
+              'src-tauri/Cargo.toml':
+                  re.search(r'^version\s*=\s*"([^"]+)"', cargo, re.M).group(1),
+          }
+
+          bad = [f for f, v in sites.items() if v != tag]
+          for f, v in sites.items():
+              print(f'{"MISMATCH" if f in bad else "ok      "}  {f}: {v}')
+          if bad:
+              print(f'::error::Tag is {tag}, but {", ".join(bad)} disagree.')
+              sys.exit(1)
+          print(f'All three version sites agree with the tag: {tag}')
+          PY
 
       - name: Extract changelog section for this version
         run: |
@@ -32,68 +68,9 @@ jobs:
         with:
           body_path: release-notes.md
 
-  build-macos-intel:
-    needs: prepare-release
-    runs-on: macos-13
-    env:
-      MACOSX_DEPLOYMENT_TARGET: "10.15"
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-apple-darwin
-
-      - name: Set up Apple code signing
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          if [ -z "$APPLE_CERTIFICATE" ]; then
-            echo "No Apple certificate configured, skipping code signing."
-            exit 0
-          fi
-          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
-          security create-keychain -p "ci-keychain" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "ci-keychain" build.keychain
-          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "ci-keychain" build.keychain
-          rm certificate.p12
-          echo "APPLE_SIGNING_IDENTITY=${APPLE_SIGNING_IDENTITY}" >> "$GITHUB_ENV"
-          echo "APPLE_ID=${APPLE_ID}" >> "$GITHUB_ENV"
-          echo "APPLE_PASSWORD=${APPLE_PASSWORD}" >> "$GITHUB_ENV"
-          echo "APPLE_TEAM_ID=${APPLE_TEAM_ID}" >> "$GITHUB_ENV"
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build
-        run: npm run tauri build -- --target x86_64-apple-darwin
-
-      - name: Upload to release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
-
   build-macos-apple-silicon:
     needs: prepare-release
     runs-on: macos-14
-    env:
-      MACOSX_DEPLOYMENT_TARGET: "11.0"
     steps:
       - uses: actions/checkout@v4
 
@@ -136,7 +113,7 @@ jobs:
           workspaces: src-tauri
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build
         run: npm run tauri build -- --target aarch64-apple-darwin
@@ -161,8 +138,12 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build
         run: npm run tauri build -- --target x86_64-pc-windows-msvc
@@ -189,6 +170,10 @@ jobs:
         with:
           targets: x86_64-unknown-linux-gnu
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
       - name: Install Linux dependencies
         timeout-minutes: 10
         run: |
@@ -201,7 +186,7 @@ jobs:
             libssl-dev
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build
         run: npm run tauri build -- --target x86_64-unknown-linux-gnu --bundles deb,appimage
