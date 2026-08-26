@@ -700,6 +700,7 @@ pub fn run() {
             vault::create_vault_dirs,
             vault::default_vault_dir,
             vault::new_vault_base_dir,
+            vault::ensure_backup_dir,
             vault::probe_vault_dir,
             vault::legacy_default_db_exists,
             vault::migrate_vault_layout,

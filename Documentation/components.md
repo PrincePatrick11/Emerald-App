@@ -63,6 +63,8 @@ The converse holds too: a shell you end up overriding completely is the wrong sh
 | `TabIconButton` | active/idle toggle of the tab icons in both sidebars | `active` |
 | `UndoToast` | global undo toast, rendered once in `AppShell`, fed from `undoStore` | none — do not add it per view |
 | `ImportDestinationModal` | destination picker on import, likewise once globally in `AppShell` | none |
+| `FilterChipButton` | the filter-pill toggle (same file as `FilterPanel`) — used by the panel's own chips and the Settings backup include-lists | `active`, `onClick`, `children` |
+| `VaultLocationRow` | choose-folder button plus the folder a new vault will land in, path shown in full on its own wrapping line (lives in `layout/VaultModal.tsx`, like `VaultGlyph`) — used by the vault modal's create row and the Settings add-vault import | `dense` (flatter button for the settings panel) |
 
 `Button` is the building block most likely to be bypassed. A raw `<button>` is only right
 when it is not an action button at all: menu entries, list rows, chips, tabs and nav items

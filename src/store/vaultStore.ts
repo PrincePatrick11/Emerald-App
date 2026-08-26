@@ -32,7 +32,9 @@ interface VaultStore {
   addVault: (vault: Vault) => Promise<void>;
   updateVault: (id: string, patch: VaultPatch) => Promise<void>;
   relocateVault: (id: string, path: string) => Promise<void>;
-  removeVault: (id: string, deleteFiles?: boolean) => Promise<void>;
+  /** Resolves to whether the vault's folder is gone — `false` when it stayed
+   *  because something else still lies in it (see `delete_vault_files`). */
+  removeVault: (id: string, deleteFiles?: boolean) => Promise<boolean>;
 }
 
 async function reloadAllStores(): Promise<void> {
@@ -134,7 +136,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   },
 
   removeVault: async (id: string, deleteFiles = false) => {
-    if (!get().vaults.some((v) => v.id === id)) return;
+    if (!get().vaults.some((v) => v.id === id)) return true;
     const wasActive = id === get().activeVaultId;
 
     // Der Aktivwechsel gehoert in denselben Schreibvorgang wie das Entfernen:
@@ -142,8 +144,10 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     // mehr in seiner eigenen Liste ist — der Zustand, den
     // `getActiveVaultPath()` mit NO_ACTIVE_VAULT beantwortet. Der Nachfolger
     // steht noch nicht fest, also erst einmal an niemanden.
-    const removeFromFile = () =>
-      removeVaultFromFile(id, deleteFiles, wasActive ? '' : undefined);
+    let dirRemoved = true;
+    const removeFromFile = async () => {
+      dirRemoved = await removeVaultFromFile(id, deleteFiles, wasActive ? '' : undefined);
+    };
 
     // Die Datei muss entsperrt sein — und es bleiben, bis sie weg ist. Sonst
     // oeffnet ein entprellter Speicher-Timer aus einem Editor genau die Datei
@@ -162,7 +166,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     const remaining = list.filter((v) => v.id !== id);
     if (!wasActive) {
       set({ vaults: remaining });
-      return;
+      return dirRemoved;
     }
 
     // Der Nachbar rueckt nach — dieselbe Erwartung wie beim Schliessen eines
@@ -170,7 +174,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     const successor = remaining[Math.min(Math.max(index, 0), remaining.length - 1)];
     if (!successor) {
       set({ vaults: remaining, activeVaultId: '' });
-      return;
+      return dirRemoved;
     }
 
     await setActiveVaultId(successor.id);
@@ -183,5 +187,6 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     // dort aus laesst er sich neu verorten oder ein anderer waehlen. Auf ''
     // zurueckzufallen hiesse, den Nutzer wortlos in die Einrichtung zu werfen.
     await openActiveVault();
+    return dirRemoved;
   },
 }));

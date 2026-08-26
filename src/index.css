@@ -502,6 +502,14 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--menu-item-active-text);
   }
 
+  /* Ueber --accent in beiden Themes sichtbar — Noctis hat keine generische
+     button:focus-visible-Regel (design.md, Open Point 8), Parchment schon;
+     hier bekommt die Chip-Klasse selbst eine, damit jede Einbettung sie erbt. */
+  .filter-chip:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+
   .emoji-picker-popover {
     background-color: var(--menu-bg);
     border-color: var(--menu-border);

@@ -1,9 +1,18 @@
 import { useState } from 'react';
-import { Globe, Info, Database, Upload, Download, Check, AlertTriangle, ChevronDown, ChevronUp, Sun, Moon, Type, Brush, HardDrive } from 'lucide-react';
+import { Globe, Info, Database, Upload, Download, Check, AlertTriangle, ChevronDown, ChevronUp, FolderOpen, Sun, Moon, Type, Brush, HardDrive } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { LANGUAGE_OPTIONS, changeAppLanguage } from '../../i18n';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
+import { VaultLocationRow } from './VaultModal';
+import { FilterChipButton } from '../ui/FilterPanel';
+import {
+  NEW_VAULT_TARGET_ERROR_KEY,
+  newVaultBaseDir,
+  newVaultTarget,
+  probeNewVaultTarget,
+} from '../../lib/vaultManager';
 import { useUIStore } from '../../store/uiStore';
 import { deleteImageFiles, findUnusedImages, type UnusedImages } from '../../lib/images';
 import { getDb } from '../../lib/db';
@@ -57,11 +66,19 @@ export default function SettingsModal({ onClose }: Props) {
   const [exportOpts, setExportOpts] = useState<BackupOptions>(DEFAULT_EXPORT_OPTIONS);
   const [exporting, setExporting] = useState(false);
   const [exportDone, setExportDone] = useState(false);
+  const [exportError, setExportError] = useState(false);
 
   // Import
   const [importedFile, setImportedFile] = useState<{ backup: BackupFile; preview: BackupPreview } | null>(null);
-  const [importMode, setImportMode] = useState<ImportMode>('merge');
+  // Add-Vault als Vorauswahl: der einzige Modus, der bestehende Daten sicher
+  // nicht anfasst.
+  const [importMode, setImportMode] = useState<ImportMode>('add-vault');
   const [newVaultName, setNewVaultName] = useState('');
+  // Zielordner des neuen Vaults — dieselbe Mechanik wie im Vault-Modal:
+  // `{Dokumente}/Emerald Vaults` als Basis, ein selbst gewaehlter Ordner
+  // schlaegt sie.
+  const [vaultBaseDir, setVaultBaseDir] = useState<string | null>(null);
+  const [vaultCustomPath, setVaultCustomPath] = useState<string | null>(null);
   const [importTypeFilters, setImportTypeFilters] = useState<ImportTypeFilters>({
     includeJournal: true, includeWiki: true, includeOperations: true,
     includeRoutines: true, includeAltars: true, includeTasks: true, includeTags: true,
@@ -112,9 +129,17 @@ export default function SettingsModal({ onClose }: Props) {
   async function handleExport() {
     setExporting(true);
     setExportDone(false);
+    setExportError(false);
     try {
-      await exportDatabase(exportOpts);
-      setExportDone(true);
+      // Abbruch im Dialog ist kein Erfolg — `exportDatabase` meldet, ob
+      // wirklich geschrieben wurde.
+      setExportDone(await exportDatabase(exportOpts));
+    } catch (e) {
+      // Ohne catch verpuffte ein abgelehnter Schreibzugriff (z. B. Ziel
+      // ausserhalb der erlaubten Wurzeln) als unhandled rejection — der Knopf
+      // sprang zurueck, und nichts sagte warum.
+      console.error('[backup] export failed', e);
+      setExportError(true);
     } finally {
       setExporting(false);
     }
@@ -128,6 +153,12 @@ export default function SettingsModal({ onClose }: Props) {
       if (!result) return;
       setImportedFile({ backup: result.backup, preview: result.preview });
       setNewVaultName(t('settings.importedVault'));
+      setVaultCustomPath(null);
+      // Wie `openCreateRow` im Vault-Modal: einmal aufloesen, damit die Zeile
+      // von Anfang an einen echten Pfad zeigt — und zwar bevor der Import
+      // klickbar wird, sonst laeuft ein schneller Klick in den Rueckfall
+      // `{appDataDir}/vaults/{id}`. Scheitert die Aufloesung, bleibt der.
+      setVaultBaseDir(await newVaultBaseDir().catch(() => null));
       setImportTypeFilters({ includeJournal: true, includeWiki: true, includeOperations: true, includeRoutines: true, includeAltars: true, includeTasks: true, includeTags: true });
     } catch {
       setImportError(t('settings.importErrorInvalid'));
@@ -143,11 +174,27 @@ export default function SettingsModal({ onClose }: Props) {
       excludedWikiCategoryIds: excludedWikiCats,
       excludedOpCategoryIds: excludedOpCats,
     };
+    const vaultName = newVaultName.trim() || t('settings.importedVault');
+    const vaultTarget = importMode === 'add-vault'
+      ? newVaultTarget(vaultBaseDir, vaultCustomPath, vaultName)
+      : null;
     try {
+      // Dieselbe Pruefung wie beim Anlegen eines Vaults — und zwar bevor der
+      // Import irgendetwas anfasst: danach staende der neue Vault schon in der
+      // Liste, waehrend sein Ordner nie entstehen kann.
+      if (vaultTarget) {
+        const problem = await probeNewVaultTarget(vaultTarget);
+        if (problem) {
+          setImportError(t(NEW_VAULT_TARGET_ERROR_KEY[problem]));
+          return;
+        }
+      }
       await importDatabase(
         importedFile.backup,
         importMode,
-        importMode === 'add-vault' ? (newVaultName.trim() || t('settings.importedVault')) : undefined,
+        importMode === 'add-vault'
+          ? { name: vaultName, path: vaultTarget ?? undefined }
+          : undefined,
         categoryFilters,
         importTypeFilters,
       );
@@ -268,6 +315,7 @@ export default function SettingsModal({ onClose }: Props) {
                 onClick={() => {
                   setPanel((p) => (p === 'export' ? 'none' : 'export'));
                   setExportDone(false);
+                  setExportError(false);
                 }}
                 className="flex items-center justify-between w-full px-3 py-2 rounded-lg bg-stone-800/60 border border-stone-700/40 text-sm text-stone-300 hover:border-stone-500 hover:text-stone-200 transition-colors"
               >
@@ -280,10 +328,11 @@ export default function SettingsModal({ onClose }: Props) {
 
               {panel === 'export' && (
                 <div className="mt-2 rounded-lg bg-stone-800/40 border border-stone-700/30 px-3 py-3 space-y-3">
-                  {/* Type checkboxes */}
+                  {/* Type chips — dieselben Pillen wie im Filter-Panel, statt
+                      handgebauter Kaestchen: an/aus liest sich am Chip selbst. */}
                   <div>
                     <p className="text-xs text-stone-500 mb-2">{t('settings.exportInclude')}</p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1.5">
                       {(
                         [
                           ['includeJournal', 'settings.includeJournal'],
@@ -295,21 +344,14 @@ export default function SettingsModal({ onClose }: Props) {
                           ['includeTags', 'settings.includeTags'],
                         ] as [keyof BackupOptions, string][]
                       ).map(([key, labelKey]) => (
-                        <label key={key} className="flex items-center gap-1.5 cursor-pointer group">
-                          <div
-                            onClick={() => toggleExportOpt(key)}
-                            className={`w-4 h-4 rounded border flex items-center justify-center transition-colors cursor-pointer ${
-                              exportOpts[key]
-                                ? 'bg-jade-500/30 border-jade-500/60'
-                                : 'border-stone-600 hover:border-stone-400'
-                            }`}
-                          >
-                            {exportOpts[key] && <Check size={10} className="text-jade-400" />}
-                          </div>
-                          <span className="text-xs text-stone-400 group-hover:text-stone-300 transition-colors">
-                            {t(labelKey)}
-                          </span>
-                        </label>
+                        <FilterChipButton
+                          key={key}
+                          active={!!exportOpts[key]}
+                          onClick={() => toggleExportOpt(key)}
+                        >
+                          {exportOpts[key] && <Check size={12} />}
+                          {t(labelKey)}
+                        </FilterChipButton>
                       ))}
                     </div>
                   </div>
@@ -367,6 +409,11 @@ export default function SettingsModal({ onClose }: Props) {
                         <Check size={12} /> {t('settings.exportDone')}
                       </span>
                     )}
+                    {exportError && (
+                      <span className="text-xs text-red-400 flex items-center gap-1">
+                        <AlertTriangle size={12} /> {t('settings.exportError')}
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
@@ -392,16 +439,16 @@ export default function SettingsModal({ onClose }: Props) {
 
               {panel === 'import' && (
                 <div className="mt-2 rounded-lg bg-stone-800/40 border border-stone-700/30 px-3 py-3 space-y-3">
-                  {/* File picker */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleBrowse}
-                      className="px-3 py-1.5 rounded-lg border border-stone-600 text-xs text-stone-400 hover:border-stone-400 hover:text-stone-300 transition-colors"
-                    >
+                  {/* File picker — die Vorschau auf eigener Zeile: in der
+                      Button-Zeile hatte sie jeden weiteren Nachbarn auf null
+                      Breite gequetscht. */}
+                  <div className="space-y-1.5">
+                    <Button variant="secondary" onClick={handleBrowse}>
+                      <FolderOpen size={14} />
                       {t('settings.importBrowse')}
-                    </button>
+                    </Button>
                     {importedFile && (
-                      <span className="text-xs text-stone-400 truncate">
+                      <p className="text-xs text-stone-400">
                         {t('settings.previewContains')} {[
                           importedFile.preview.journalCount && `${importedFile.preview.journalCount} J`,
                           importedFile.preview.wikiCount && `${importedFile.preview.wikiCount} W`,
@@ -410,20 +457,15 @@ export default function SettingsModal({ onClose }: Props) {
                           importedFile.preview.altarsCount && `${importedFile.preview.altarsCount} A`,
                           importedFile.preview.taskCount && `${importedFile.preview.taskCount} T`,
                         ].filter(Boolean).join(', ')}
-                      </span>
-                    )}
-                    {importError && (
-                      <span className="text-xs text-red-400 flex items-center gap-1">
-                        <AlertTriangle size={12} /> {importError}
-                      </span>
+                      </p>
                     )}
                   </div>
 
-                  {/* Type filters */}
+                  {/* Type filters — dieselben Chips wie beim Export. */}
                   {importedFile && (
                     <div>
                       <p className="text-xs text-stone-500 mb-2">{t('settings.importInclude')}</p>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-1.5">
                         {(
                           [
                             ['includeJournal', 'settings.includeJournal'],
@@ -435,21 +477,14 @@ export default function SettingsModal({ onClose }: Props) {
                             ['includeTags', 'settings.includeTags'],
                           ] as [keyof ImportTypeFilters, string][]
                         ).map(([key, labelKey]) => (
-                          <label key={key} className="flex items-center gap-1.5 cursor-pointer group">
-                            <div
-                              onClick={() => setImportTypeFilters((f) => ({ ...f, [key]: !f[key] }))}
-                              className={`w-4 h-4 rounded border flex items-center justify-center transition-colors cursor-pointer ${
-                                importTypeFilters[key]
-                                  ? 'bg-jade-500/30 border-jade-500/60'
-                                  : 'border-stone-600 hover:border-stone-400'
-                              }`}
-                            >
-                              {importTypeFilters[key] && <Check size={10} className="text-jade-400" />}
-                            </div>
-                            <span className="text-xs text-stone-400 group-hover:text-stone-300 transition-colors">
-                              {t(labelKey)}
-                            </span>
-                          </label>
+                          <FilterChipButton
+                            key={key}
+                            active={importTypeFilters[key]}
+                            onClick={() => setImportTypeFilters((f) => ({ ...f, [key]: !f[key] }))}
+                          >
+                            {importTypeFilters[key] && <Check size={12} />}
+                            {t(labelKey)}
+                          </FilterChipButton>
                         ))}
                       </div>
                     </div>
@@ -458,53 +493,85 @@ export default function SettingsModal({ onClose }: Props) {
                   {/* Import mode radio */}
                   {importedFile && (
                     <>
+                      {/* Modus als Choice-Karten (dieselben Klassen wie die
+                          Theme-Wahl oben) — Add-Vault zuerst: der Modus, der
+                          nichts Bestehendes anfasst, ist Vorauswahl und erster
+                          Griff, Replace steht als destruktivster zuletzt. */}
                       <div className="space-y-1.5">
                         <p className="text-xs text-stone-500">{t('settings.importMode')}</p>
                         {(
                           [
+                            ['add-vault', 'settings.modeAddVault', 'settings.modeAddVaultDesc'],
                             ['merge', 'settings.modeMerge', 'settings.modeMergeDesc'],
                             ['replace', 'settings.modeReplace', 'settings.modeReplaceDesc'],
-                            ['add-vault', 'settings.modeAddVault', 'settings.modeAddVaultDesc'],
                           ] as [ImportMode, string, string][]
                         ).map(([mode, labelKey, descKey]) => (
-                          <label key={mode} className="flex items-start gap-2 cursor-pointer group">
-                            <div
-                              onClick={() => setImportMode(mode)}
-                              className={`mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
-                                importMode === mode
-                                  ? 'border-jade-500/60 bg-jade-500/30'
-                                  : 'border-stone-600 hover:border-stone-400'
-                              }`}
-                            >
-                              {importMode === mode && <div className="w-2 h-2 rounded-full bg-jade-400" />}
-                            </div>
-                            <div>
-                              <span className="text-xs text-stone-300">{t(labelKey)}</span>
-                              <p className="text-xs text-stone-500 mt-0.5">{t(descKey)}</p>
-                            </div>
-                          </label>
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => setImportMode(mode)}
+                            className={`settings-choice-btn block w-full text-left px-3 py-2 rounded-lg border transition-all duration-150 focus:outline-none focus:ring-2 ${
+                              importMode === mode
+                                ? 'settings-choice-btn-active bg-jade-500/20 border-jade-500/50 focus:ring-jade-500/35'
+                                : 'settings-choice-btn-idle border-stone-700/60 hover:border-stone-500 focus:ring-jade-700/25'
+                            }`}
+                          >
+                            {/* Aktiv-Zustand nur ueber die Faerbung — wie bei
+                                der Theme- und Sprachwahl oben, kein Haekchen. */}
+                            <span className={`block text-xs font-medium ${
+                              importMode === mode ? 'text-jade-400' : 'text-stone-300'
+                            }`}>
+                              {t(labelKey)}
+                            </span>
+                            <span className="block text-xs text-stone-500 mt-0.5">{t(descKey)}</span>
+                          </button>
                         ))}
                       </div>
 
-                      {/* New vault name input */}
+                      {/* New vault name + location */}
                       {importMode === 'add-vault' && (
-                        <div>
-                          <label className="text-xs text-stone-500 block mb-1">{t('settings.newVaultName')}</label>
-                          <input
-                            type="text"
-                            value={newVaultName}
-                            onChange={(e) => setNewVaultName(e.target.value)}
-                            placeholder={t('vault.namePlaceholder')}
-                            className="w-full bg-stone-800 border border-stone-700/60 rounded px-2 py-1 text-xs text-stone-300 outline-none focus:border-jade-500/60"
-                          />
+                        <div className="space-y-2">
+                          <div>
+                            <label className="text-xs text-stone-500 block mb-1">{t('settings.newVaultName')}</label>
+                            <input
+                              type="text"
+                              value={newVaultName}
+                              onChange={(e) => setNewVaultName(e.target.value)}
+                              placeholder={t('vault.namePlaceholder')}
+                              className="w-full bg-stone-800 border border-stone-700/60 rounded px-2 py-1 text-xs text-stone-300 outline-none focus:border-jade-500/60"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-stone-500 block mb-1">{t('settings.newVaultLocation')}</label>
+                            <VaultLocationRow
+                              target={newVaultTarget(
+                                vaultBaseDir,
+                                vaultCustomPath,
+                                newVaultName.trim() || t('settings.importedVault'),
+                              )}
+                              customPath={vaultCustomPath}
+                              dense
+                              onPickFolder={async () => {
+                                const picked = await openDialog({ directory: true, multiple: false });
+                                if (typeof picked !== 'string') return;
+                                setVaultCustomPath(picked);
+                                // Wie `pickFolder` im Vault-Modal: die Korrektur
+                                // nimmt die alte Fehlermeldung sofort mit.
+                                setImportError('');
+                              }}
+                              onResetFolder={() => setVaultCustomPath(null)}
+                            />
+                          </div>
                         </div>
                       )}
 
-                      {/* Replace warning */}
+                      {/* Replace warning — die Danger-Tokens, nicht Amber: die
+                          Warnung kuendigt endgueltigen Datenverlust an, und Rot
+                          heisst destruktiv (design.md), in beiden Themes. */}
                       {importMode === 'replace' && (
-                        <div className="flex items-center gap-2 text-xs text-amber-400">
-                          <AlertTriangle size={13} />
-                          {t('settings.modeReplaceWarning')}
+                        <div className="flex items-start gap-2 text-xs rounded-lg border px-3 py-2 text-[var(--danger-text)] bg-[var(--danger-bg)] border-[var(--danger-border)]">
+                          <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                          <span className="min-w-0">{t('settings.modeReplaceWarning')}</span>
                         </div>
                       )}
 
@@ -525,6 +592,18 @@ export default function SettingsModal({ onClose }: Props) {
                         )}
                       </div>
                     </>
+                  )}
+
+                  {/* Am Ende des Panels, nicht in der Datei-Zeile: dort wurde
+                      die Meldung neben Button und Vorschau-Text auf null
+                      Breite gequetscht — gesetzt, aber unsichtbar. Hier steht
+                      sie beim Import-Button, der sie ausloest, und darf
+                      umbrechen. */}
+                  {importError && (
+                    <p className="text-xs text-red-400 flex items-start gap-1.5">
+                      <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                      <span className="min-w-0 break-words">{importError}</span>
+                    </p>
                   )}
                 </div>
               )}

@@ -8,14 +8,15 @@ import EmojiPicker from '../ui/EmojiPicker';
 import { hasActiveVault, useVaultStore } from '../../store/vaultStore';
 import {
   DB_FILE,
+  NEW_VAULT_TARGET_ERROR_KEY,
   folderName,
-  joinPath,
   newVaultBaseDir,
   newVaultRecord,
+  newVaultTarget,
   parentDir,
+  probeNewVaultTarget,
   probeVaultDir,
   splitPath,
-  vaultFolderName,
   type Vault as VaultRecord,
 } from '../../lib/vaultManager';
 
@@ -42,19 +43,53 @@ type Editor =
       kind: 'create';
       name: string;
       icon?: string;
-      /** `{Dokumente}/Emerald`, einmal beim Oeffnen der Zeile aufgeloest. */
+      /** `{Dokumente}/Emerald Vaults`, einmal beim Oeffnen der Zeile aufgeloest. */
       baseDir: string | null;
       /** Selbst gewaehlt — schlaegt `baseDir` dann aus dem Rennen. */
       customPath: string | null;
     };
 
-/** Where the vault being created will land. */
-function createTarget(baseDir: string | null, customPath: string | null, name: string): string | null {
-  if (customPath) return customPath;
-  if (!baseDir) return null;
-  // Ohne Namen noch kein Ordner — der angehaengte Trenner zeigt, dass dort
-  // gleich einer hinkommt. Committen laesst sich in dem Zustand ohnehin nichts.
-  return name.trim() ? joinPath(baseDir, vaultFolderName(name)) : joinPath(baseDir, '');
+/**
+ * Choose-folder button plus the folder the vault will actually land in.
+ * Shared by the create row here and the add-vault backup import in the
+ * settings modal — same choice, same display, same reset.
+ */
+export function VaultLocationRow({
+  target, customPath, dense, onPickFolder, onResetFolder,
+}: {
+  target: string | null;
+  customPath: string | null;
+  /** Flacherer Button (`py-1`) fuer das dichtere Import-Panel der
+   *  Einstellungen, dessen Eingabefelder alle `py-1` haben. */
+  dense?: boolean;
+  onPickFolder: () => void;
+  onResetFolder: () => void;
+}) {
+  const { t } = useTranslation();
+  const { parent: targetParent, leaf: targetLeaf } = splitPath(target ?? '');
+  // Der Pfad steht in voller Laenge auf einer eigenen Zeile — `break-all`,
+  // weil ein Windows-Pfad keine Leerzeichen braucht, an denen `break-words`
+  // umbrechen koennte. Abgeschnitten wird nichts: wohin der Vault kommt,
+  // muss ganz lesbar sein.
+  return (
+    <div className="space-y-1 min-w-0">
+      <div className="flex items-center gap-2">
+        <Button variant="secondary" className={dense ? 'shrink-0 py-1' : 'shrink-0'} onClick={onPickFolder}>
+          <FolderOpen size={14} />
+          {t('vault.chooseFolder')}
+        </Button>
+        {customPath && (
+          <Button variant="ghost" className="shrink-0" title={t('vault.defaultFolder')} onClick={onResetFolder}>
+            <RotateCcw size={14} />
+          </Button>
+        )}
+      </div>
+      <span className="block text-xs break-all">
+        <span style={{ color: 'var(--text-subtle)' }}>{targetParent}</span>
+        <span style={{ color: 'var(--text-muted)' }}>{targetLeaf}</span>
+      </span>
+    </div>
+  );
 }
 
 /** A vault's own emoji, or the generic glyph while it has none. */
@@ -161,10 +196,13 @@ function DeleteConfirmRow({
           <div className="vault-name">{vault.name}</div>
           <div className="vault-meta">{t(hintKey)}</div>
         </div>
-        <Button onClick={onConfirm} variant="danger" className="text-xs px-1" disabled={busy}>
+        {/* Die getoenten Row-Action-Buttons der Button-Komponente — dieselbe
+            30px-Reihe wie Edit/Loeschen auf den Vault-Karten, ohne
+            handgeschriebene Padding-Ketten. */}
+        <Button onClick={onConfirm} tone="danger" className="shrink-0" disabled={busy}>
           {busy ? <Loader2 size={12} className="animate-spin" /> : t('trash.confirmYes')}
         </Button>
-        <Button onClick={onCancel} variant="ghost" className="text-xs">
+        <Button onClick={onCancel} tone="neutral" className="shrink-0">
           {t('trash.confirmNo')}
         </Button>
       </div>
@@ -278,8 +316,7 @@ function CreateRow({
   const { t } = useTranslation();
   // Die Zeile zeigt den Ordner, in dem der Vault tatsaechlich landet — nicht
   // bloss die Aufforderung, einen zu waehlen.
-  const target = createTarget(baseDir, customPath, name);
-  const { parent: targetParent, leaf: targetLeaf } = splitPath(target ?? '');
+  const target = newVaultTarget(baseDir, customPath, name);
   return (
     <div className="vault-card flex-col items-stretch gap-2">
       <div className="flex items-center gap-3">
@@ -311,28 +348,12 @@ function CreateRow({
           </Button>
         </div>
       </div>
-      <div className="flex items-center gap-2 min-w-0">
-        <Button variant="secondary" className="shrink-0" onClick={onPickFolder}>
-          <FolderOpen size={14} />
-          {t('vault.chooseFolder')}
-        </Button>
-        {/* Der Ordner des Vaults bleibt lesbar, abgeschnitten wird nur der Weg
-            dorthin — genau andersherum als bei einem `truncate` ueber das
-            Ganze, das ausgerechnet den Namen wegkuerzt. */}
-        <span className="flex items-baseline text-xs min-w-0" title={target ?? undefined}>
-          <span className="truncate min-w-0" style={{ color: 'var(--text-subtle)' }}>
-            {targetParent}
-          </span>
-          <span className="shrink-0" style={{ color: 'var(--text-muted)' }}>
-            {targetLeaf}
-          </span>
-        </span>
-        {customPath && (
-          <Button variant="ghost" className="shrink-0" title={t('vault.defaultFolder')} onClick={onResetFolder}>
-            <RotateCcw size={14} />
-          </Button>
-        )}
-      </div>
+      <VaultLocationRow
+        target={target}
+        customPath={customPath}
+        onPickFolder={onPickFolder}
+        onResetFolder={onResetFolder}
+      />
     </div>
   );
 }
@@ -487,28 +508,14 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
   async function commitCreate(pending: Extract<Editor, { kind: 'create' }>) {
     const name = pending.name.trim();
     if (!name) return;
-    const target = createTarget(pending.baseDir, pending.customPath, name);
+    const target = newVaultTarget(pending.baseDir, pending.customPath, name);
     await run('create', async () => {
       // Erst pruefen, dann den Editor schliessen: sonst sind Name und Ordner
       // weg, sobald der Ordner nicht taugt.
       if (target) {
-        const probe = await probeVaultDir(target);
-        // `denied` zuerst: ein verweigerter Probe meldet is_empty=false und
-        // ginge sonst als "Ordner nicht leer" durch.
-        if (probe.denied) {
-          setError(t('vault.accessDenied'));
-          return;
-        }
-        if (probe.has_db) {
-          setError(t('vault.folderHasVault'));
-          return;
-        }
-        // Ein neuer Vault gehoert in einen leeren Ordner. Sonst vermischen sich
-        // seine Dateien mit fremden, und "Dateien loeschen" muesste spaeter
-        // entscheiden, was davon ihm gehoert. Ein Ordner, den es noch gar nicht
-        // gibt, ist der Normalfall — `create_vault_dirs` legt ihn an.
-        if (probe.exists && !probe.is_empty) {
-          setError(t('vault.folderNotEmpty'));
+        const problem = await probeNewVaultTarget(target);
+        if (problem) {
+          setError(t(NEW_VAULT_TARGET_ERROR_KEY[problem]));
           return;
         }
       }
@@ -558,14 +565,15 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
     setRemovingId(id);
     setError('');
     try {
-      await removeVault(id, deleteFiles);
+      const dirRemoved = await removeVault(id, deleteFiles);
       closeEditor();
+      // Kein Fehler: `delete_vault_files` raeumt nur die eigenen Dateien weg
+      // und laesst den Ordner stehen, sobald noch etwas anderes darin liegt —
+      // der Hinweis sagt nur, dass er noch da ist.
+      if (deleteFiles && !dirRemoved) setError(t('vault.deleteFilesLeftover'));
     } catch (e) {
       console.error('[vault] remove failed', e);
-      // `delete_vault_files` raeumt nur die eigenen Dateien weg und laesst den
-      // Ordner stehen, sobald noch etwas anderes darin liegt.
-      const leftover = String((e as Error)?.message ?? e).includes('VAULT_DIR_NOT_EMPTY');
-      setError(t(leftover ? 'vault.deleteFilesLeftover' : 'vault.saveFailed'));
+      setError(t('vault.saveFailed'));
       closeEditor();
     } finally {
       setRemovingId(null);

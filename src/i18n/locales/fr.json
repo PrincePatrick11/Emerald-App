@@ -393,7 +393,7 @@
     "deleteFiles": "Supprimer aussi les fichiers :",
     "deleteFilesWarning": "La base de données et ses images seront supprimées définitivement.",
     "folderNotEmpty": "Le dossier n’est pas vide. Un nouveau vault demande un dossier vide.",
-    "deleteFilesLeftover": "Le dossier contenait d’autres fichiers et n’a pas été supprimé."
+    "deleteFilesLeftover": "La base de données et les images ont été supprimées. Le dossier contenait d’autres fichiers et a été conservé."
   },
   "settings": {
     "language": "Langue",
@@ -425,14 +425,16 @@
     "modeMergeDesc": "Ajouter toutes les entrées aux existantes (chaque entrée reçoit un préfixe d'ID unique)",
     "modeReplace": "Remplacer",
     "modeReplaceDesc": "Supprimer toutes les données actuelles et restaurer depuis la sauvegarde",
-    "modeAddVault": "Ajouter comme nouveau Vault",
+    "modeAddVault": "Nouveau vault",
     "modeAddVaultDesc": "Créer un nouveau vault séparé à partir de la sauvegarde",
     "modeReplaceWarning": "Toutes les données actuelles de ce vault seront supprimées définitivement.",
     "newVaultName": "Nom du nouveau vault",
+    "newVaultLocation": "Dossier du nouveau vault",
     "importBtn": "Importer",
     "exporting": "Export en cours…",
     "importing": "Import en cours…",
     "exportDone": "Sauvegarde enregistrée.",
+    "exportError": "L'export a échoué.",
     "importDone": "Import terminé.",
     "importErrorInvalid": "Le fichier n'est pas une sauvegarde Emerald valide.",
     "previewContains": "Contient :",

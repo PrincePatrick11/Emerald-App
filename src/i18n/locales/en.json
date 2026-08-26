@@ -385,7 +385,7 @@
     "deleteFiles": "Delete the files as well:",
     "deleteFilesWarning": "This will permanently delete the database and its images.",
     "folderNotEmpty": "The folder is not empty. A new vault needs an empty folder.",
-    "deleteFilesLeftover": "The folder held other files and was not removed."
+    "deleteFilesLeftover": "The database and images were deleted. The folder held other files and was kept."
   },
   "settings": {
     "language": "Language",
@@ -417,14 +417,16 @@
     "modeMergeDesc": "Add all entries alongside existing ones (each entry gets a unique ID prefix)",
     "modeReplace": "Replace",
     "modeReplaceDesc": "Delete all current data and restore from backup",
-    "modeAddVault": "Add as new Vault",
+    "modeAddVault": "New Vault",
     "modeAddVaultDesc": "Create a new, separate vault from the backup",
     "modeReplaceWarning": "This will permanently delete all current data in this vault.",
     "newVaultName": "New vault name",
+    "newVaultLocation": "New vault folder",
     "importBtn": "Import",
     "exporting": "Exporting…",
     "importing": "Importing…",
     "exportDone": "Backup saved.",
+    "exportError": "Export failed.",
     "importDone": "Import complete.",
     "importErrorInvalid": "File is not a valid Emerald backup.",
     "previewContains": "Contains:",

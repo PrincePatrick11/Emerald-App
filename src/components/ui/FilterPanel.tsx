@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import Button from './Button';
 
@@ -5,6 +6,32 @@ export interface FilterChip {
   value: string;
   label: string;
   emoji?: string;
+}
+
+/**
+ * The one filter-pill look — exported so the class chain is not copied around.
+ * Used by the panel's own chips and by the Settings backup include-lists.
+ */
+export function FilterChipButton({
+  active, onClick, children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`filter-chip flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${
+        active
+          ? 'filter-chip-active bg-jade-900/50 border-jade-800/40 text-jade-400'
+          : 'filter-chip-idle bg-stone-800/60 border-stone-700/60 text-stone-500 hover:text-stone-300 hover:border-stone-600'
+      }`}
+    >
+      {children}
+    </button>
+  );
 }
 
 export interface FilterPanelProps {
@@ -29,17 +56,10 @@ function Chip({
   onToggle: (v: string) => void;
 }) {
   return (
-    <button
-      onClick={() => onToggle(chip.value)}
-      className={`filter-chip flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${
-        active
-          ? 'filter-chip-active bg-jade-900/50 border-jade-800/40 text-jade-400'
-          : 'filter-chip-idle bg-stone-800/60 border-stone-700/60 text-stone-500 hover:text-stone-300 hover:border-stone-600'
-      }`}
-    >
+    <FilterChipButton active={active} onClick={() => onToggle(chip.value)}>
       {chip.emoji && <span className="text-sm leading-none">{chip.emoji}</span>}
       {chip.label}
-    </button>
+    </FilterChipButton>
   );
 }
 

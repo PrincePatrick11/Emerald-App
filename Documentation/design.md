@@ -32,9 +32,11 @@ colour's triple maintenance grew out of.
 
 **Exactly one accent: jade.** `amber` is meant to be confined to the single documented
 case — the `tone="amber"` mode for the edit action in row action bars — and not extended.
-Two stragglers exist without a deviation comment: a `text-amber-400` warning in
-`SettingsModal` and the lock indicator in `PlacedElementRow` (`text-amber-400
-hover:text-amber-300`). A third accent tone needs a theme token in both files first.
+One straggler exists without a deviation comment: the lock indicator in
+`PlacedElementRow` (`text-amber-400 hover:text-amber-300`). The former second one —
+`SettingsModal`'s replace-import warning — now runs on the `--danger-*` tokens, which is
+also its correct meaning (it announces permanent data loss). A third accent tone needs a
+theme token in both files first.
 
 **Red means destructive, nothing else.** Via `Button variant="danger"` or `tone="danger"`,
 not via a per-site red treatment of its own.

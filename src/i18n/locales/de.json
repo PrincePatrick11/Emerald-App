@@ -385,7 +385,7 @@
     "deleteFiles": "Auch die Dateien löschen:",
     "deleteFilesWarning": "Datenbank und Bilder werden dauerhaft gelöscht.",
     "folderNotEmpty": "Der Ordner ist nicht leer. Ein neuer Vault braucht einen leeren Ordner.",
-    "deleteFilesLeftover": "Im Ordner lagen weitere Dateien — er wurde nicht entfernt."
+    "deleteFilesLeftover": "Datenbank und Bilder wurden gelöscht. Der Ordner enthielt weitere Dateien und blieb deshalb bestehen."
   },
   "settings": {
     "language": "Sprache",
@@ -417,14 +417,16 @@
     "modeMergeDesc": "Alle Einträge neben bestehenden hinzufügen (jeder Eintrag erhält einen eindeutigen ID-Präfix)",
     "modeReplace": "Ersetzen",
     "modeReplaceDesc": "Alle aktuellen Daten löschen und aus dem Backup wiederherstellen",
-    "modeAddVault": "Als neuen Vault hinzufügen",
+    "modeAddVault": "Neuer Vault",
     "modeAddVaultDesc": "Einen neuen, separaten Vault aus dem Backup erstellen",
     "modeReplaceWarning": "Alle aktuellen Daten in diesem Vault werden dauerhaft gelöscht.",
     "newVaultName": "Name des neuen Vaults",
+    "newVaultLocation": "Ordner des neuen Vaults",
     "importBtn": "Importieren",
     "exporting": "Exportiere…",
     "importing": "Importiere…",
     "exportDone": "Backup gespeichert.",
+    "exportError": "Export fehlgeschlagen.",
     "importDone": "Import abgeschlossen.",
     "importErrorInvalid": "Datei ist kein gültiges Emerald-Backup.",
     "previewContains": "Enthält:",

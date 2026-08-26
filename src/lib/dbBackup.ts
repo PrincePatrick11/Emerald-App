@@ -13,7 +13,14 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { getDb } from './db';
-import { getActiveDbFile, addVault, invalidateVaultCache, newVaultRecord } from './vaultManager';
+import {
+  addVault,
+  getActiveDbFile,
+  getActiveVaultId,
+  invalidateVaultCache,
+  joinPath,
+  newVaultRecord,
+} from './vaultManager';
 import { imageRefsInHtml, isStoredImage, readImageAsBase64, saveImage } from './images';
 import { clearSearchTextCache } from './searchText';
 import { IMAGE_FIELDS, imageColumns } from './schema';
@@ -269,7 +276,9 @@ async function selectWhereIn(
 // Export
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function exportDatabase(options: BackupOptions): Promise<void> {
+/** Resolves to `false` when the save dialog was cancelled — nichts wurde
+ *  geschrieben, und die Oberflaeche darf dann auch keinen Erfolg melden. */
+export async function exportDatabase(options: BackupOptions): Promise<boolean> {
   const db = await getDb();
   const data: BackupFile['data'] = {};
   const allImagePaths = new Set<string>();
@@ -413,13 +422,25 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
     images,
   };
 
+  // Der Dialog oeffnet im `backup/`-Ordner des aktiven Vaults — bei Bedarf
+  // eben angelegt. Scheitert das (Vault-Ordner gerade nicht erreichbar),
+  // bleibt es beim blossen Dateinamen und der Dialog oeffnet, wo das
+  // Betriebssystem will; der Export selbst haengt nicht daran.
+  const filename = `emerald-backup-${new Date().toISOString().slice(0, 10)}.emeralddb`;
+  // Eine Kette, ein catch: stuende `getActiveVaultId()` als eigenes await im
+  // Argument, entkaeme seine Ablehnung dem `.catch` und risse den Export mit.
+  const backupDir = await getActiveVaultId()
+    .then((vaultId) => invoke<string>('ensure_backup_dir', { vaultId }))
+    .catch(() => null);
+
   const savePath = await save({
-    defaultPath: `emerald-backup-${new Date().toISOString().slice(0, 10)}.emeralddb`,
+    defaultPath: backupDir ? joinPath(backupDir, filename) : filename,
     filters: [{ name: 'Emerald Backup', extensions: ['emeralddb'] }],
   });
-  if (!savePath) return;
+  if (!savePath) return false;
 
   await invoke('write_file', { path: savePath, content: JSON.stringify(backup) });
+  return true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -907,7 +928,10 @@ const ALL_TYPES_INCLUDED: ImportTypeFilters = {
 export async function importDatabase(
   backup: BackupFile,
   mode: ImportMode,
-  newVaultName?: string,
+  /** Nur fuer `add-vault`: Name und — wenn der Nutzer einen gewaehlt hat —
+   *  Zielordner des neuen Vaults. Ohne `path` greift der Rueckfall aus
+   *  `newVaultRecord` (`{appDataDir}/vaults/{id}`). */
+  newVault?: { name: string; path?: string },
   categoryFilters?: ImportCategoryFilters,
   typeFilters?: ImportTypeFilters,
 ): Promise<void> {
@@ -933,11 +957,13 @@ export async function importDatabase(
 
   if (mode === 'add-vault') {
     // 1. Create a new vault record
-    const newVault = await newVaultRecord(newVaultName ?? 'Imported Vault');
-    const vaultId = newVault.id;
+    const vaultRecord = await newVaultRecord(newVault?.name ?? 'Imported Vault', {
+      path: newVault?.path,
+    });
+    const vaultId = vaultRecord.id;
 
     // 2. Register vault (writes to vaults.json)
-    await addVault(newVault);
+    await addVault(vaultRecord);
     invalidateVaultCache();
 
     // 3. Switch to it (resets DB cache + runs migrations on new empty DB)

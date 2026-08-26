@@ -1,7 +1,8 @@
 //! Vault storage layout.
 //!
-//! A vault is a directory the user picked. Inside it live `emerald.db` and an
-//! `images/` folder — nothing else. `vaults.json` in the app data directory
+//! A vault is a directory the user picked. Inside it live `emerald.db`, an
+//! `images/` folder, and a `backup/` folder.
+//! `vaults.json` in the app data directory
 //! maps vault ids to those directories; the frontend owns that file and
 //! mirrors it into [`VaultRegistry`] on every write.
 //!
@@ -25,7 +26,9 @@ pub const IMAGES_SUBDIR: &str = "images";
 /// Where a vault migrated from the pre-0.2.1 layout lives: `{appDataDir}/vaults/`.
 pub const VAULTS_SUBDIR: &str = "vaults";
 /// The folder new vaults are offered in, inside the user's documents directory.
-pub const VAULT_HOME_DIR: &str = "Emerald";
+pub const VAULT_HOME_DIR: &str = "Emerald Vaults";
+/// Where the database export offers to write its `.emeralddb`, inside the vault.
+pub const BACKUP_SUBDIR: &str = "backup";
 
 /// `vault id → absolute directory`, mirrored from `vaults.json`.
 #[derive(Default)]
@@ -182,7 +185,13 @@ pub fn register_vaults(app: tauri::AppHandle, vaults: Vec<VaultEntry>) -> Result
 #[tauri::command]
 pub fn create_vault_dirs(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
     let dir = vault_dir(&app, &vault_id)?;
-    std::fs::create_dir_all(dir.join(IMAGES_SUBDIR)).map_err(|e| e.to_string())
+    std::fs::create_dir_all(dir.join(IMAGES_SUBDIR)).map_err(|e| e.to_string())?;
+    // `backup/` gehoert von Anfang an dazu, nicht erst zum ersten Export — so
+    // ist die Struktur eines Vault-Ordners immer dieselbe. Fuer Vaults
+    // ausserhalb der erlaubten Wurzeln bleibt er folgenlos leer (der Export
+    // bietet ihn dort nicht an, siehe `ensure_backup_dir`), und ein leerer
+    // `backup/` steht dem Loeschen des Ordners nicht im Weg.
+    std::fs::create_dir_all(dir.join(BACKUP_SUBDIR)).map_err(|e| e.to_string())
 }
 
 /// Checks a vault's directory before its database is opened, and makes sure the
@@ -206,7 +215,37 @@ pub fn default_vault_dir(app: tauri::AppHandle, vault_id: String) -> Result<Stri
         .into_owned())
 }
 
-/// The folder new vaults are offered in: `{documentDir}/Emerald`.
+/// The vault's `backup/` folder, created on demand — where the database
+/// export dialog opens by default. Deliberately *inside* the vault: the backup
+/// travels with the data it captures when the folder is copied elsewhere. And
+/// deliberately not part of what [`delete_vault_files`] removes — a backup is
+/// exactly the thing that should outlive the vault it was taken from.
+#[tauri::command]
+pub fn ensure_backup_dir(app: tauri::AppHandle, vault_id: String) -> Result<String, String> {
+    let vault = vault_dir(&app, &vault_id)?;
+    // Wie ueberall hier: einen verschwundenen Vault-Ordner nicht wiederbeleben
+    // (siehe `images_dir`), nur den Unterordner darin anlegen.
+    directory_state(&vault)?;
+
+    // Der Dialog ist nur die halbe Strecke: geschrieben wird die Datei danach
+    // von `write_file`, und das ist auf die festen Wurzeln begrenzt (siehe
+    // `resolve_allowed_roots` — Vault-Verzeichnisse erweitern sie bewusst
+    // nicht). Einem Vault ausserhalb — anderes Laufwerk, Ordner ausserhalb von
+    // `~` — hier ein Ziel anzubieten, hiesse eines anbieten, das der
+    // Schreibbefehl anschliessend verweigert. Der `Err` landet im Frontend im
+    // Fallback (blosser Dateiname), bevor ein toter `backup/`-Ordner entsteht.
+    let allowed = crate::resolve_allowed_roots(&app)?;
+    let canonical = std::fs::canonicalize(&vault).map_err(|e| e.to_string())?;
+    if !crate::is_within_allowed_roots(&canonical, &allowed) {
+        return Err("vault outside allowed storage roots".to_string());
+    }
+
+    let dir = vault.join(BACKUP_SUBDIR);
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.to_string_lossy().into_owned())
+}
+
+/// The folder new vaults are offered in: `{documentDir}/Emerald Vaults`.
 ///
 /// Deliberately not [`default_dir_for`]. That one is the *migration* target and
 /// has to keep pointing at `{appDataDir}/vaults/{id}` for every installation
@@ -341,12 +380,8 @@ pub fn migrate_vault_layout(
     Ok(target_dir.to_string_lossy().into_owned())
 }
 
-/// Marker in the error string, so the UI can tell "there was something else in
-/// that folder" apart from every other failure without parsing prose.
-pub const DIR_NOT_EMPTY: &str = "VAULT_DIR_NOT_EMPTY";
-
-/// Deletes a vault's files. Only ever reached through the vault modal's opt-in
-/// "delete files" checkbox.
+/// Deletes a vault's files — the database, its journal, and its images. Only
+/// ever reached through the vault modal's opt-in "delete files" checkbox.
 ///
 /// Deliberately **not** `remove_dir_all`. A vault directory is one the user
 /// picked, and the app puts `emerald.db` into whatever they picked — so "it
@@ -354,66 +389,56 @@ pub const DIR_NOT_EMPTY: &str = "VAULT_DIR_NOT_EMPTY";
 /// who created a vault straight in their Documents folder would have lost
 /// Documents.
 ///
-/// So only this vault's own artefacts are removed by name, and the two
-/// directories go with plain `remove_dir`, which fails while anything else is
-/// still in them. A folder with a stranger's file in it survives and reports
-/// [`DIR_NOT_EMPTY`] instead of being erased.
+/// So only this vault's own artefacts are removed by name. Whatever else lies
+/// there — the `backup/` folder of the database export, a `desktop.ini`, in
+/// `~/Documents` the rule rather than the exception — stays, and with it the
+/// directory: both directories go with plain `remove_dir`, which fails while
+/// anything is left inside, and that failure is the answer here, not an error.
+/// Returns whether the vault directory itself is gone, so the UI can say "the
+/// folder stayed".
+///
+/// Ein halb geloeschter Vault kann nicht als leerer wiederauferstehen: der
+/// Aufrufer nimmt ihn nach jedem `Ok` aus `vaults.json`, und ein `Err` faellt
+/// nur, solange die Datenbank noch liegt (Loeschen gesperrt/verweigert).
 #[tauri::command]
-pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
+pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<bool, String> {
     let dir = vault_dir(&app, &vault_id)?;
     if !dir.join(DB_FILE).is_file() {
         return Err("not a vault directory: no database found".to_string());
     }
 
-    // Erst zaehlen, dann loeschen. `remove_dir` weiter unten ist die Sperre
-    // gegen fremde Dateien, aber es laeuft zuletzt — ohne diesen Vorlauf waeren
-    // Datenbank und Bilder bereits weg, wenn es scheitert. Der Vault bliebe
-    // dabei in `vaults.json` stehen (der Aufrufer schreibt die Datei erst nach
-    // einem erfolgreichen Lauf), sein Ordner existierte noch, und das naechste
-    // `getDb()` legte darin eine frische, leere Datenbank an. Aus einem
-    // `desktop.ini` oder `.DS_Store` — in `~/Documents` die Regel, nicht die
-    // Ausnahme — wuerde so ein stiller Totalverlust.
-    let foreign = |entry: &std::fs::DirEntry, allowed: &dyn Fn(&str) -> bool| {
-        !allowed(&entry.file_name().to_string_lossy())
-    };
+    // Die Datenbank zuerst: sie ist das einzige Stueck, das noch gesperrt sein
+    // kann, und ein Fehlschlag laesst dann wenigstens die Bilder stehen.
     let journal = format!("{DB_FILE}-journal");
-    let owned_at_top =
-        |name: &str| name == DB_FILE || name == journal || name == IMAGES_SUBDIR;
-
-    for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
-        if foreign(&entry, &owned_at_top) {
-            return Err(DIR_NOT_EMPTY.to_string());
-        }
-    }
-    let images = dir.join(IMAGES_SUBDIR);
-    if images.is_dir() {
-        for entry in std::fs::read_dir(&images).map_err(|e| e.to_string())?.flatten() {
-            if foreign(&entry, &crate::images::is_valid_image_name) {
-                return Err(DIR_NOT_EMPTY.to_string());
-            }
-        }
-    }
-
-    // Ab hier gehoert alles im Ordner diesem Vault. Die Datenbank zuerst: sie
-    // ist das einzige Stueck, das noch gesperrt sein kann, und ein Fehlschlag
-    // laesst dann wenigstens die Bilder stehen.
-    for name in [DB_FILE, &journal] {
+    for name in [DB_FILE, journal.as_str()] {
         let file = dir.join(name);
         if file.is_file() {
             std::fs::remove_file(&file).map_err(|e| format!("remove {}: {e}", file.display()))?;
         }
     }
 
+    // Ab hier kein `?` mehr: die Datenbank ist bereits weg, und der Aufrufer
+    // nimmt den Vault nur nach einem `Ok` aus `vaults.json`. Ein Fehler ab
+    // dieser Stelle liesse den Eintrag stehen, und das naechste `getDb()`
+    // legte in den Ordner eine frische, leere Datenbank — der Zustand, den
+    // die Invariante oben ausschliesst. Was sich nicht loeschen laesst,
+    // bleibt eben liegen, samt Ordner.
     let images = dir.join(IMAGES_SUBDIR);
-    if images.is_dir() {
-        for entry in std::fs::read_dir(&images).map_err(|e| e.to_string())?.flatten() {
+    if let Ok(entries) = std::fs::read_dir(&images) {
+        for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().into_owned();
             if crate::images::is_valid_image_name(&name) {
                 std::fs::remove_file(entry.path()).ok();
             }
         }
-        std::fs::remove_dir(&images).map_err(|_| DIR_NOT_EMPTY.to_string())?;
+        std::fs::remove_dir(&images).ok();
     }
 
-    std::fs::remove_dir(&dir).map_err(|_| DIR_NOT_EMPTY.to_string())
+    // Ein *leerer* `backup/` — seit `create_vault_dirs` ihn mit anlegt, der
+    // Normalfall ohne Export — soll das Entfernen des Ordners nicht
+    // verhindern. `remove_dir` scheitert, sobald ein Backup darin liegt, und
+    // genau dann bleibt beides stehen.
+    std::fs::remove_dir(dir.join(BACKUP_SUBDIR)).ok();
+
+    Ok(std::fs::remove_dir(&dir).is_ok())
 }

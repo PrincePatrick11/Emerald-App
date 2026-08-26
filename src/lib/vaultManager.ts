@@ -355,13 +355,72 @@ export function probeVaultDir(path: string): Promise<VaultProbe> {
   return invoke<VaultProbe>('probe_vault_dir', { path });
 }
 
+/**
+ * Where a vault that is about to be created will land. A self-picked folder
+ * schlaegt den angebotenen Basis-Ordner aus dem Rennen; darunter wird der Name
+ * zum Ordnernamen. Ohne Namen noch kein Ordner — der angehaengte Trenner
+ * zeigt, dass dort gleich einer hinkommt. Committen laesst sich in dem Zustand
+ * ohnehin nichts.
+ */
+export function newVaultTarget(
+  baseDir: string | null,
+  customPath: string | null,
+  name: string,
+): string | null {
+  if (customPath) return customPath;
+  if (!baseDir) return null;
+  return name.trim() ? joinPath(baseDir, vaultFolderName(name)) : joinPath(baseDir, '');
+}
+
+/** Why a folder cannot take a *new* vault — or `null` when it can. */
+export type NewVaultTargetProblem = 'alreadyOpen' | 'denied' | 'hasVault' | 'notEmpty';
+
+/**
+ * The message each problem gets. Lives beside {@link probeNewVaultTarget} so
+ * the vault modal and the backup import cannot drift apart in what they tell
+ * the user about the same folder.
+ */
+export const NEW_VAULT_TARGET_ERROR_KEY: Record<NewVaultTargetProblem, string> = {
+  alreadyOpen: 'vault.alreadyOpen',
+  denied: 'vault.accessDenied',
+  hasVault: 'vault.folderHasVault',
+  notEmpty: 'vault.folderNotEmpty',
+};
+
+/**
+ * Checks a folder a new vault is meant to be created in.
+ *
+ * `denied` zuerst: ein verweigerter Probe meldet `has_db=false` und
+ * `is_empty=false` und ginge sonst als „kein Vault"/„nicht leer" durch. Ein
+ * neuer Vault gehoert in einen leeren Ordner — sonst vermischen sich seine
+ * Dateien mit fremden, und „Dateien loeschen" muesste spaeter entscheiden, was
+ * davon ihm gehoert. Ein Ordner, den es noch gar nicht gibt, ist der
+ * Normalfall; `create_vault_dirs` legt ihn an.
+ *
+ * `alreadyOpen` faengt den Fall, den der Datei-Probe nicht sieht: der Ordner
+ * ist bereits als Vault *registriert*, liegt aber gerade nicht auf der Platte
+ * (geloescht, Laufwerk abgezogen — im Vault-Modal „Ordner nicht gefunden").
+ * Ohne die Pruefung wuerde er hier als leer durchgehen, `create_vault_dirs`
+ * legte ihn neu an, und zwei Vault-Ids teilten sich einen Ordner — worauf
+ * „Dateien loeschen" beim einen dem anderen den Boden wegrisse.
+ */
+export async function probeNewVaultTarget(path: string): Promise<NewVaultTargetProblem | null> {
+  const { vaults } = await loadVaultsFile();
+  if (vaults.some((v) => v.path === path)) return 'alreadyOpen';
+  const probe = await probeVaultDir(path);
+  if (probe.denied) return 'denied';
+  if (probe.has_db) return 'hasVault';
+  if (probe.exists && !probe.is_empty) return 'notEmpty';
+  return null;
+}
+
 /** Where a vault with this id would land without a user-chosen location. */
 export function defaultVaultDir(vaultId: string): Promise<string> {
   return invoke<string>('default_vault_dir', { vaultId });
 }
 
 /**
- * The folder new vaults are offered in — `{documentDir}/Emerald`.
+ * The folder new vaults are offered in — `{documentDir}/Emerald Vaults`.
  *
  * The vault's own folder is that plus {@link vaultFolderName}, so the path can
  * be shown while the name is still being typed.
@@ -373,10 +432,11 @@ export function newVaultBaseDir(): Promise<string> {
 /**
  * Builds the record for a new vault.
  *
- * Without a `path` it falls back to `{appDataDir}/vaults/{id}` — the route the
- * backup import takes, where an id-named folder is what keeps two imports of
- * the same name from landing on top of each other. The vault modal always
- * passes a path, built from the documents folder and the vault's name.
+ * Without a `path` it falls back to `{appDataDir}/vaults/{id}` — the reserve
+ * for the case that the documents folder cannot be resolved: an id-named
+ * folder there can never collide. The vault modal and the backup import
+ * normally pass a path, built from the documents folder and the vault's name
+ * or picked by the user (see {@link newVaultTarget}).
  */
 export async function newVaultRecord(
   name: string,
@@ -472,14 +532,19 @@ export async function relocateVault(id: string, path: string): Promise<void> {
  * list — what `getActiveVaultPath()` answers with `NO_ACTIVE_VAULT`. The
  * successor is chosen afterwards and written separately; that write is
  * harmless, because by then the file is consistent either way.
+ *
+ * Returns whether the vault's *folder* is gone. `delete_vault_files` removes
+ * only the vault's own artefacts and leaves the folder standing as soon as
+ * anything else lies in it — `false` is that case, and the modal tells it.
  */
 export async function removeVault(
   id: string,
   deleteFiles = false,
   nextActiveId?: string,
-): Promise<void> {
+): Promise<boolean> {
+  let dirRemoved = true;
   if (deleteFiles) {
-    await invoke('delete_vault_files', { vaultId: id });
+    dirRemoved = await invoke<boolean>('delete_vault_files', { vaultId: id });
   }
   const data = await loadVaultsFile();
   await saveVaultsFile({
@@ -487,6 +552,7 @@ export async function removeVault(
     vaults: data.vaults.filter((v) => v.id !== id),
     activeVaultId: nextActiveId ?? data.activeVaultId,
   });
+  return dirRemoved;
 }
 
 /** Invalidate in-memory cache (e.g. after an external write). */

@@ -393,7 +393,7 @@
     "deleteFiles": "Eliminar también los archivos:",
     "deleteFilesWarning": "La base de datos y sus imágenes se eliminarán permanentemente.",
     "folderNotEmpty": "La carpeta no está vacía. Un vault nuevo necesita una carpeta vacía.",
-    "deleteFilesLeftover": "La carpeta contenía otros archivos y no se eliminó."
+    "deleteFilesLeftover": "La base de datos y las imágenes se eliminaron. La carpeta contenía otros archivos y se conservó."
   },
   "settings": {
     "language": "Idioma",
@@ -425,14 +425,16 @@
     "modeMergeDesc": "Añadir todas las entradas junto a las existentes (cada entrada obtiene un prefijo de ID único)",
     "modeReplace": "Reemplazar",
     "modeReplaceDesc": "Eliminar todos los datos actuales y restaurar desde la copia de seguridad",
-    "modeAddVault": "Añadir como nuevo Vault",
+    "modeAddVault": "Nuevo vault",
     "modeAddVaultDesc": "Crear un nuevo vault separado a partir de la copia de seguridad",
     "modeReplaceWarning": "Todos los datos actuales de este vault se eliminarán permanentemente.",
     "newVaultName": "Nombre del nuevo vault",
+    "newVaultLocation": "Carpeta del nuevo vault",
     "importBtn": "Importar",
     "exporting": "Exportando…",
     "importing": "Importando…",
     "exportDone": "Copia guardada.",
+    "exportError": "Error al exportar.",
     "importDone": "Importación completada.",
     "importErrorInvalid": "El archivo no es una copia de seguridad válida de Emerald.",
     "previewContains": "Contiene:",
