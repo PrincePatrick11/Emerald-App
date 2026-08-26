@@ -50,7 +50,8 @@ src/
 │   ├── wiki/         WikiList (rendering + category emoji helper)
 │   └── ui/           Button, Modal, ContextMenu, EmojiPicker, Dashboard, EntryListTab,
 │                     ListToolbar, FilterPanel, RailButton, TabIconButton, UndoToast,
-│                     ImportDestinationModal — the shared component layer; what each one
+│                     ImportDestinationModal, Dropdown, CategoryHeaderRow, CategoryAddRow,
+│                     CategorySelect — the shared component layer; what each one
 │                     encapsulates and where it can be extended is in components.md
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, routineStore, undoStore,
@@ -62,9 +63,16 @@ src/
 │                     useGlobalSearch (assembles the search corpus from the stores and runs it
 │                                      against the query; backs the title bar's search field)
 ├── lib/              db.ts, schema.ts, normalizeSchema.ts, row.ts,
-│                     links.ts, tabs.ts, globalSearch.ts, searchText.ts, dragState.ts, altarDragState.ts,
-│                     routineDragState.ts, moonPhase.ts, export.ts, menuActions.ts,
-│                     platform.ts,
+│                     links.ts, tabs.ts, globalSearch.ts, searchText.ts,
+│                     dragChannel.ts (generic set/get/subscribe factory), dragState.ts,
+│                     altarDragState.ts, routineDragState.ts (all three are thin named-export
+│                                      adapters over their own createDragChannel() instance),
+│                     moonPhase.ts, export.ts, menuActions.ts,
+│                     platform.ts, categories.ts (categoryLabel, altarCategoryLabel — builtin
+│                                      vs. custom category display names),
+│                     formatDate.ts (locale-aware date-fns formatting, wired into
+│                                      changeAppLanguage; export.ts/emeraldFormat.ts stay
+│                                      locale-independent on purpose),
 │                     exportData.ts, emeraldFormat.ts, vaultManager.ts, dbBackup.ts,
 │                     helpers.ts (incl. isImageIcon, generateId,
 │                                      hexToRgb, isValidHexColor, readFileAsDataUrl,

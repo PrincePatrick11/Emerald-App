@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
-import { format } from 'date-fns';
+import { formatEntryDate } from '../../lib/formatDate';
+import { categoryLabel } from '../../lib/categories';
 import { BookOpen, Wand2, Library, Flame, CheckSquare, Square, Copy, Pencil, Trash2, PanelTopOpen, LayoutList } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useJournalStore } from '../../store/journalStore';
@@ -199,7 +200,7 @@ function useJournalConfig(): EntryListTabProps<JournalEntry> {
     items: entries,
     getId: (e) => e.id,
     getTitle: (e) => e.title,
-    getDateStr: (e) => format(new Date(e.created_at), 'MMM d, yyyy'),
+    getDateStr: (e) => formatEntryDate(e.created_at),
     getIcon: (e) => <span className="text-base leading-none flex-shrink-0">{MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓'}</span>,
     isActive: (e) => activeView.id === e.id,
     onOpen: (e) => setActiveView({ type: 'journal', id: e.id, mode: 'view' }),
@@ -234,7 +235,7 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
   const pushUndo = useUndoStore((s) => s.push);
 
   const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
-  const opCatName = (c: (typeof categories)[number]) => (c.is_builtin ? t(`operations.categories.${c.id}`) : c.name);
+  const opCatName = (c: (typeof categories)[number]) => categoryLabel(t, 'operations', c);
 
   const handleNewOperation = async () => {
     const categoryId = categories[0]?.id;
@@ -263,7 +264,7 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
     getDateStr: (op) => {
       const cat = catById[op.category_id];
       const catDisplayName = cat ? opCatName(cat) : '';
-      return `${catDisplayName}${catDisplayName ? ' · ' : ''}${format(new Date(op.updated_at), 'MMM d, yyyy')}`;
+      return `${catDisplayName}${catDisplayName ? ' · ' : ''}${formatEntryDate(op.updated_at)}`;
     },
     getIcon: (op) => {
       const cat = catById[op.category_id];
@@ -331,8 +332,8 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
     getTitle: (a) => a.title,
     getDateStr: (a) => {
       const cat = catById[a.category_id];
-      const catLabel = cat ? (cat.is_builtin ? t(`wiki.categories.${cat.id}`) : cat.name) : a.category_id;
-      return `${catLabel} · ${format(new Date(a.updated_at), 'MMM d, yyyy')}`;
+      const catLabel = categoryLabel(t, 'wiki', cat, a.category_id);
+      return `${catLabel} · ${formatEntryDate(a.updated_at)}`;
     },
     getIcon: (a) => {
       const cat = catById[a.category_id];
@@ -382,7 +383,7 @@ function useAltarConfig(): EntryListTabProps<AltarRecord> {
     items: sorted,
     getId: (a) => a.id,
     getTitle: (a) => a.title,
-    getDateStr: (a) => format(new Date(a.updated_at), 'MMM d, yyyy'),
+    getDateStr: (a) => formatEntryDate(a.updated_at),
     getIcon: (a) => (isImageIcon(a.icon_data)
       ? <img src={a.icon_data!} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
       : <Flame size={16} className="flex-shrink-0 text-stone-600" />),
@@ -434,7 +435,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
 
   const dateStrFor = (task: (typeof tasks)[number]) => {
     const cat = catById[task.category_id];
-    return `${cat?.name ?? ''}${cat?.name && task.due_date ? ' · ' : ''}${task.due_date ? format(new Date(task.due_date), 'MMM d, yyyy') : ''}`;
+    return `${cat?.name ?? ''}${cat?.name && task.due_date ? ' · ' : ''}${task.due_date ? formatEntryDate(task.due_date) : ''}`;
   };
 
   const sorted = tasks.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at));

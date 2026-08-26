@@ -5,7 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
 import { Check, ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
-import { BUILTIN_ALTAR_CATEGORIES, FALLBACK_CATEGORY } from '../../lib/schema';
+import { FALLBACK_CATEGORY } from '../../lib/schema';
+import { altarCategoryLabel } from '../../lib/categories';
 import { setAltarDragItem } from '../../lib/altarDragState';
 import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
 import { imageSrc } from '../../lib/images';
@@ -13,16 +14,6 @@ import type { AltarCategory, AltarItem } from '../../types';
 import Modal from '../ui/Modal';
 import EmojiPicker from '../ui/EmojiPicker';
 import Button from '../ui/Button';
-
-// Die eingebauten Kategorien liegen mit englischen Seed-Namen in der DB.
-// Solange der Nutzer eine davon nicht umbenannt hat, zeigen wir die
-// Uebersetzung aus altar.categories.*; ein eigener Name gewinnt immer.
-// (altar_categories hat keine is_builtin-Spalte, deshalb der Namensvergleich.)
-const ALTAR_SEED_NAMES = new Map(BUILTIN_ALTAR_CATEGORIES.map(([id, name]) => [id, name]));
-
-function altarCategoryLabel(cat: AltarCategory, t: (key: string) => string): string {
-  return ALTAR_SEED_NAMES.get(cat.id) === cat.name ? t('altar.categories.' + cat.id) : cat.name;
-}
 
 const LIBRARY_DEFAULT_HEIGHT = 240;
 const UNCATEGORIZED_TAB = '__uncategorized__' as const;
@@ -132,7 +123,7 @@ function ItemModal({
         <input ref={nameInputRef} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t('altar.itemName')} className="w-full bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" />
         <div className="flex flex-wrap gap-1">
           {categories.map((cat) => (
-            <button key={cat.id} onClick={() => { setEditCategory(cat.id); setEditEmoji(''); }} className={`text-xs px-2 py-1 rounded-md transition-colors ${editCategory === cat.id ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{cat.emoji} {altarCategoryLabel(cat, t)}</button>
+            <button key={cat.id} onClick={() => { setEditCategory(cat.id); setEditEmoji(''); }} className={`text-xs px-2 py-1 rounded-md transition-colors ${editCategory === cat.id ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{cat.emoji} {altarCategoryLabel(t, cat)}</button>
           ))}
         </div>
         {item && confirmDelete ? (
@@ -487,7 +478,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
                 onPointerDown={(e) => handleCatPointerDown(e, cat.id)}
                 className={`group relative flex items-center select-none ${dragCatId === cat.id ? 'opacity-40' : 'opacity-100'}`}
               >
-                <button onClick={() => setActiveCategoryTab(cat.id)} className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap cursor-grab ${activeCategoryTab === cat.id ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{cat.emoji} {altarCategoryLabel(cat, t)}</button>
+                <button onClick={() => setActiveCategoryTab(cat.id)} className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap cursor-grab ${activeCategoryTab === cat.id ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{cat.emoji} {altarCategoryLabel(t, cat)}</button>
                 <button onClick={(e) => { e.stopPropagation(); openEditCategoryModal(cat); }} className="absolute -right-1 -top-1 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-stone-700 text-stone-400 hover:text-stone-200 transition-colors" title={t('editor.edit')}><Pencil size={8} /></button>
               </div>
             ))}

@@ -1,7 +1,7 @@
-import { useRef, useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, Library, Plus, Wand2, ChevronDown, Copy, Pencil, Trash2 } from 'lucide-react';
+import { BookOpen, Library, Plus, Wand2, Copy, Pencil, Trash2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
@@ -10,10 +10,12 @@ import { useUndoStore } from '../../store/undoStore';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import ContextMenu from '../ui/ContextMenu';
 import Button from '../ui/Button';
+import Dropdown from '../ui/Dropdown';
 import { getMoonPhase, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { viewTypeForEntryType } from '../../lib/tabs';
-import { format } from 'date-fns';
+import { categoryLabel } from '../../lib/categories';
+import { formatDayHeading, formatEntryDate } from '../../lib/formatDate';
 import type { MoonPhase } from '../../types';
 import type { HomeSort, HomeView, HomeSectionPrefs } from '../../store/uiStore';
 
@@ -21,58 +23,6 @@ type CtxTarget =
   | { kind: 'journal'; id: string }
   | { kind: 'wiki'; id: string }
   | { kind: 'operation'; id: string };
-
-// ── Dropdown (same style as ListToolbar) ──────────────────────────────────────
-
-function Dropdown<T extends string>({
-  label, value, options, onChange,
-}: {
-  label: string;
-  value: T;
-  options: { value: T; label: string }[];
-  onChange: (v: T) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const selected = options.find((o) => o.value === value)?.label ?? value;
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="list-toolbar-chip flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs transition-colors"
-      >
-        <span className="list-toolbar-chip-label mr-0.5">{label}</span>
-        {selected}
-        <ChevronDown size={11} className="list-toolbar-chip-label" />
-      </button>
-      {open && (
-        <div className="list-toolbar-menu absolute top-full left-0 mt-1 z-50 rounded-lg shadow-xl py-1 min-w-[120px]">
-          {options.map((o) => (
-            <button
-              key={o.value}
-              onClick={() => { onChange(o.value); setOpen(false); }}
-              className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
-                value === o.value ? 'list-toolbar-option-active' : 'list-toolbar-option-idle'
-              }`}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── Section toolbar (sort + view + count) ─────────────────────────────────────
 
@@ -213,7 +163,7 @@ export default function HomeView() {
           <div className="flex items-start justify-between mb-1">
             <div>
               <h1 className="text-2xl font-semibold text-stone-100 mb-1">
-                {format(today, 'EEEE, MMMM d')}
+                {formatDayHeading(today)}
               </h1>
               <p className="text-stone-500 text-sm">
                 {MOON_PHASE_SYMBOLS[moonPhase]}{' '}{t(`moonPhase.${moonPhase}`)}
@@ -265,7 +215,7 @@ export default function HomeView() {
                         {entry.title}
                       </div>
                       <div className="home-item-meta text-xs mt-0.5">
-                        {format(new Date(entry.created_at), 'MMM d, yyyy')}
+                        {formatEntryDate(entry.created_at)}
                       </div>
                     </div>
                   </div>
@@ -284,7 +234,7 @@ export default function HomeView() {
                   <div className="text-lg mb-1">{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</div>
                   <div className="home-item-title text-sm font-medium truncate">{entry.title}</div>
                   <div className="home-item-meta text-xs mt-0.5">
-                    {format(new Date(entry.created_at), 'MMM d, yyyy')}
+                    {formatEntryDate(entry.created_at)}
                   </div>
                 </button>
               ))}
@@ -332,7 +282,7 @@ export default function HomeView() {
                           {op.title}
                         </div>
                         <div className="home-item-meta text-xs mt-0.5">
-                          {(cat ? (cat.is_builtin ? t(`operations.categories.${cat.id}`) : cat.name) : '')} · {format(new Date(op.updated_at), 'MMM d, yyyy')}
+                          {categoryLabel(t, 'operations', cat)} · {formatEntryDate(op.updated_at)}
                         </div>
                       </div>
                     </div>
@@ -358,7 +308,7 @@ export default function HomeView() {
                     }
                     <div className="home-item-title text-sm font-medium truncate">{op.title}</div>
                     <div className="home-item-meta text-xs mt-0.5">
-                      {(cat ? (cat.is_builtin ? t(`operations.categories.${cat.id}`) : cat.name) : '')} · {format(new Date(op.updated_at), 'MMM d, yyyy')}
+                      {categoryLabel(t, 'operations', cat)} · {formatEntryDate(op.updated_at)}
                     </div>
                   </button>
                 );
@@ -391,7 +341,7 @@ export default function HomeView() {
               {wikiItems.map((article) => {
                 const cat = wikiCategories.find((c) => c.id === article.category_id);
                 const icon = cat?.emoji ?? getCategoryEmoji(article.category_id);
-                const catLabel = cat ? (cat.is_builtin ? t(`wiki.categories.${cat.id}`) : cat.name) : article.category_id;
+                const catLabel = categoryLabel(t, 'wiki', cat, article.category_id);
                 return (
                   <button
                     key={article.id}
@@ -409,7 +359,7 @@ export default function HomeView() {
                           {article.title}
                         </div>
                         <div className="home-item-meta text-xs capitalize mt-0.5">
-                          {catLabel} · {format(new Date(article.updated_at), 'MMM d, yyyy')}
+                          {catLabel} · {formatEntryDate(article.updated_at)}
                         </div>
                       </div>
                     </div>
@@ -422,7 +372,7 @@ export default function HomeView() {
               {wikiItems.map((article) => {
                 const cat = wikiCategories.find((c) => c.id === article.category_id);
                 const icon = cat?.emoji ?? getCategoryEmoji(article.category_id);
-                const catLabel = cat ? (cat.is_builtin ? t(`wiki.categories.${cat.id}`) : cat.name) : article.category_id;
+                const catLabel = categoryLabel(t, 'wiki', cat, article.category_id);
                 return (
                   <button
                     key={article.id}
@@ -436,7 +386,7 @@ export default function HomeView() {
                     }
                     <div className="home-item-title text-sm font-medium truncate">{article.title}</div>
                     <div className="home-item-meta text-xs capitalize mt-0.5">
-                      {catLabel} · {format(new Date(article.updated_at), 'MMM d, yyyy')}
+                      {catLabel} · {formatEntryDate(article.updated_at)}
                     </div>
                   </button>
                 );

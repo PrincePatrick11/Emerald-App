@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, Search, X, SlidersHorizontal } from 'lucide-react';
+import { Search, X, SlidersHorizontal } from 'lucide-react';
 import type { ViewMode, SortMode } from '../../store/uiStore';
+import Dropdown from './Dropdown';
 
 interface Props {
   view: ViewMode;
@@ -15,58 +15,6 @@ interface Props {
   onToggleFilters?: () => void;
   activeFilterCount?: number;
   extraActions?: React.ReactNode;
-}
-
-function Dropdown<T extends string>({
-  label, value, options, onChange,
-}: {
-  label: string;
-  value: T;
-  options: { value: T; label: string }[];
-  onChange: (v: T) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const selected = options.find((o) => o.value === value)?.label ?? value;
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="list-toolbar-chip flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs transition-colors"
-      >
-        <span className="list-toolbar-chip-label mr-0.5">{label}</span>
-        {selected}
-        <ChevronDown size={11} className="list-toolbar-chip-label" />
-      </button>
-      {open && (
-        <div className="list-toolbar-menu absolute top-full left-0 mt-1 z-50 rounded-lg py-1 min-w-[130px]">
-          {options.map((o) => (
-            <button
-              key={o.value}
-              onClick={() => { onChange(o.value); setOpen(false); }}
-              className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
-                value === o.value
-                  ? 'list-toolbar-option-active'
-                  : 'list-toolbar-option-idle'
-              }`}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 export default function ListToolbar({ view, sort, onView, onSort, viewOptions: viewOptionsProp, search, onSearch, showFilters, onToggleFilters, activeFilterCount = 0, extraActions }: Props) {

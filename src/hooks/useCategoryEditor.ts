@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useUndoStore } from '../store/undoStore';
 import { generateId } from '../lib/helpers';
 
-interface CategoryLike {
+export interface CategoryLike {
   id: string;
   name: string;
   emoji: string;
@@ -97,3 +97,7 @@ export function useCategoryEditor<C extends CategoryLike>(
     handleDeleteCat,
   };
 }
+
+/** Das komplette Editor-Objekt, wie es CategoryHeaderRow/CategoryAddRow entgegennehmen. */
+export type CategoryEditorApi<C extends CategoryLike = CategoryLike> =
+  ReturnType<typeof useCategoryEditor<C>>;

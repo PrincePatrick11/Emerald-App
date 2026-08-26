@@ -7,7 +7,8 @@ import PropertiesReadView from '../fields/PropertiesReadView';
 import { PropertySummaryRow } from '../fields/PropertySummaryRow';
 import Favicon from '../fields/Favicon';
 import Banner from '../fields/Banner';
-import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
+import CategorySelect from '../../ui/CategorySelect';
+import { categoryLabel } from '../../../lib/categories';
 
 export default function WikiPropertiesPanel() {
   const { t } = useTranslation();
@@ -23,13 +24,12 @@ export default function WikiPropertiesPanel() {
     return <p className="text-xs text-stone-600 px-2 py-3">{t('properties.noEntry')}</p>;
   }
 
-  const inputCls = OP_PROP_SELECT_CLASSES;
   const category = wikiCategories.find((c) => c.id === article.category_id);
 
   if (!isEditing) {
     return (
       <PropertiesReadView>
-        <PropertySummaryRow label={t('properties.category')} value={category ? `${category.emoji} ${category.name}` : article.category_id} />
+        <PropertySummaryRow label={t('properties.category')} value={category ? `${category.emoji} ${categoryLabel(t, 'wiki', category)}` : article.category_id} />
         <Favicon value={article.icon} readOnly label={t('properties.icon')} />
         <Banner value={article.cover_image} readOnly />
         <div>
@@ -44,15 +44,13 @@ export default function WikiPropertiesPanel() {
     <PropertiesEditView>
       <div>
         <p className="label-xs mb-2">{t('properties.category')}</p>
-        <select
+        <CategorySelect
+          categories={wikiCategories}
           value={article.category_id}
-          onChange={(e) => updateArticle(article.id, { category_id: e.target.value })}
-          className={inputCls + ' cursor-pointer'}
-        >
-          {wikiCategories.map((c) => (
-            <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>
-          ))}
-        </select>
+          onChange={(category_id) => updateArticle(article.id, { category_id })}
+          getLabel={(c) => categoryLabel(t, 'wiki', c)}
+          variant="field"
+        />
       </div>
 
       <Favicon

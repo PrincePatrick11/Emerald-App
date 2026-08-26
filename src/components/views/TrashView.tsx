@@ -7,7 +7,9 @@ import { useTrashStore } from '../../store/trashStore';
 import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
-import { formatDistanceToNow, differenceInDays, format } from 'date-fns';
+import { differenceInDays } from 'date-fns';
+import { formatMonthGroup, formatTimeDistance } from '../../lib/formatDate';
+import { categoryLabel } from '../../lib/categories';
 import Dashboard from '../ui/Dashboard';
 import Button from '../ui/Button';
 import type { TrashedItem } from '../../types';
@@ -92,7 +94,7 @@ function ItemRow({ item, confirmingId, setConfirmingId, restore, handlePermanent
       <div className="flex-1 min-w-0">
         <div className="text-sm text-stone-300 truncate">{item.title}</div>
         <div className="text-xs text-stone-600 mt-0.5">
-          {t('trash.deletedAgo', { time: formatDistanceToNow(new Date(item.deleted_at)) })}
+          {t('trash.deletedAgo', { time: formatTimeDistance(item.deleted_at) })}
           {' '}&middot;{' '}
           <span className={daysLeft <= 3 ? 'text-red-400' : 'text-stone-600'}>
             {t('trash.daysLeft', { count: Math.max(0, daysLeft) })}
@@ -162,7 +164,7 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, handlePermanen
         </p>
       </div>
       <div className="text-xs text-stone-600">
-        {t('trash.deletedAgo', { time: formatDistanceToNow(new Date(item.deleted_at)) })}
+        {t('trash.deletedAgo', { time: formatTimeDistance(item.deleted_at) })}
       </div>
       <div className={`text-xs font-medium ${daysLeft <= 3 ? 'text-red-400' : 'text-stone-600'}`}>
         {t('trash.daysLeft', { count: Math.max(0, daysLeft) })}
@@ -303,8 +305,9 @@ export default function TrashView() {
           <>
             <SectionHeader label={t('nav.wiki')} count={wiki.length} />
             {[...wikiByCategory.entries()].map(([catKey, catItems]) => {
-              const catDef = wikiCategories.find((c) => c.id === catKey);
-              const label = catDef ? `${catDef.emoji} ${catDef.name}` : catKey;
+              // trashStore joint c.name als category — der Schlüssel ist der Name, nicht die id.
+              const catDef = wikiCategories.find((c) => c.name === catKey);
+              const label = catDef ? `${catDef.emoji} ${categoryLabel(t, 'wiki', catDef)}` : catKey;
               return (
                 <div key={catKey}>
                   {wikiByCategory.size > 1 && <SubSectionHeader label={label} />}
@@ -318,8 +321,8 @@ export default function TrashView() {
           <>
             <SectionHeader label={t('nav.operations')} count={operations.length} />
             {[...opsByCategory.entries()].map(([catName, catItems]) => {
-              const catDef = opCategories.find((c: { name: string; emoji: string }) => c.name === catName);
-              const label = catDef ? `${catDef.emoji} ${catDef.name}` : catName;
+              const catDef = opCategories.find((c) => c.name === catName);
+              const label = catDef ? `${catDef.emoji} ${categoryLabel(t, 'operations', catDef)}` : catName;
               return (
                 <div key={catName}>
                   {opsByCategory.size > 1 && <SubSectionHeader label={label} />}
@@ -355,7 +358,7 @@ export default function TrashView() {
   const renderTimeline = () => {
     const byMonth = new Map<string, TrashedItem[]>();
     for (const item of sorted) {
-      const key = format(new Date(item.deleted_at), 'MMMM yyyy');
+      const key = formatMonthGroup(item.deleted_at);
       if (!byMonth.has(key)) byMonth.set(key, []);
       byMonth.get(key)!.push(item);
     }

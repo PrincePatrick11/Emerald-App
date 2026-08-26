@@ -15,7 +15,7 @@ import Dashboard from '../ui/Dashboard';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId } from '../../lib/helpers';
-import { format } from 'date-fns';
+import { formatEntryDate, formatEntryDateLong, formatMonthGroup } from '../../lib/formatDate';
 import type { JournalEntry, MoonPhase } from '../../types';
 
 const MOON_PHASE_ORDER: MoonPhase[] = [
@@ -237,7 +237,7 @@ export default function JournalView() {
         const map = new Map<string, JournalEntry[]>();
         sorted.forEach((e) => {
           const key = view === 'timeline'
-            ? format(new Date(e.created_at), 'MMMM yyyy')
+            ? formatMonthGroup(e.created_at)
             : t(`moonPhase.${e.moon_phase}`);
           if (!map.has(key)) map.set(key, []);
           map.get(key)!.push(e);
@@ -258,7 +258,7 @@ export default function JournalView() {
             <input autoFocus value={renameValue} onChange={(ev) => setRenameValue(ev.target.value)}
               onBlur={commitRename} onKeyDown={(ev) => { if (ev.key === 'Enter') commitRename(); if (ev.key === 'Escape') setRenamingId(null); }}
               className="text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1" />
-            <div className="text-xs text-parchment-500/70">{format(new Date(e.created_at), 'MMM d, yyyy')}</div>
+            <div className="text-xs text-parchment-500/70">{formatEntryDate(e.created_at)}</div>
           </div>
         ) : (
           <div className="panel-interactive w-full flex items-center gap-3 px-4 py-3">
@@ -266,7 +266,7 @@ export default function JournalView() {
             <input autoFocus value={renameValue} onChange={(ev) => setRenameValue(ev.target.value)}
               onBlur={commitRename} onKeyDown={(ev) => { if (ev.key === 'Enter') commitRename(); if (ev.key === 'Escape') setRenamingId(null); }}
               className="flex-1 bg-transparent text-sm text-stone-300 outline-none selectable" />
-            <span className="text-xs text-parchment-500/70 flex-shrink-0">{format(new Date(e.created_at), 'MMM d, yyyy')}</span>
+            <span className="text-xs text-parchment-500/70 flex-shrink-0">{formatEntryDate(e.created_at)}</span>
           </div>
         );
       }
@@ -274,7 +274,7 @@ export default function JournalView() {
         <button onClick={() => go(e)} onContextMenu={(ev) => openCtxMenu(ev, e.id)} className="panel-interactive px-4 py-4 text-left">
           <div className="text-2xl mb-2">{icon}</div>
           <div className="text-sm font-medium text-stone-200 truncate mb-1">{e.title}</div>
-          <div className="text-xs text-parchment-500/70">{format(new Date(e.created_at), 'MMM d, yyyy')}</div>
+          <div className="text-xs text-parchment-500/70">{formatEntryDate(e.created_at)}</div>
           {e.tags?.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
               {e.tags.slice(0, 3).map((tag) => (
@@ -287,7 +287,7 @@ export default function JournalView() {
         <button onClick={() => go(e)} onContextMenu={(ev) => openCtxMenu(ev, e.id)} className="panel-interactive w-full text-left flex items-center gap-3 px-4 py-3 group">
           <span className="text-base flex-shrink-0">{icon}</span>
           <span className="flex-1 text-sm text-stone-300 truncate">{e.title}</span>
-          <span className="text-xs text-parchment-500/70 flex-shrink-0">{format(new Date(e.created_at), 'MMM d, yyyy')}</span>
+          <span className="text-xs text-parchment-500/70 flex-shrink-0">{formatEntryDate(e.created_at)}</span>
         </button>
       );
     };
@@ -350,7 +350,7 @@ export default function JournalView() {
             {t('nav.journal')}
           </button>
           <span>{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</span>
-          <span>{format(new Date(entry.created_at), 'MMMM d, yyyy')}</span>
+          <span>{formatEntryDateLong(entry.created_at)}</span>
           {entry.moon_phase && <span>· {t(`moonPhase.${entry.moon_phase}`)}</span>}
           {isEditing && <span className="text-stone-700 italic ml-1">{t('editor.editing')}</span>}
         </div>

@@ -13,11 +13,13 @@ import { FALLBACK_CATEGORY } from '../../lib/schema';
 import Dashboard from '../ui/Dashboard';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import LinkPickerModal from '../editor/LinkPickerModal';
-import EmojiPicker from '../ui/EmojiPicker';
 import Button from '../ui/Button';
+import CategoryHeaderRow from '../ui/CategoryHeaderRow';
+import CategoryAddRow from '../ui/CategoryAddRow';
+import CategorySelect from '../ui/CategorySelect';
 import {
   Plus, ChevronDown, ChevronRight, Flag, Trash2,
-  CheckSquare, Square, X, Check, Link2, Pencil,
+  CheckSquare, Square, Link2,
 } from 'lucide-react';
 import type { Task, TaskPriority } from '../../types';
 
@@ -46,19 +48,7 @@ export default function TasksView() {
   const wikiArticles = useWikiStore((s) => s.articles);
   const operations = useOperationStore((s) => s.operations);
 
-  const {
-    addingCategory, setAddingCategory,
-    newCatName, setNewCatName,
-    newCatEmoji, setNewCatEmoji,
-    editingCatId, setEditingCatId,
-    editCatName, setEditCatName,
-    editCatEmoji, setEditCatEmoji,
-    confirmDeleteCatId, setConfirmDeleteCatId,
-    handleAddCategory,
-    startEditCat,
-    handleSaveEditCat,
-    handleDeleteCat,
-  } = useCategoryEditor({ addCategory, updateCategory, deleteCategory, restoreCategory }, { defaultEmoji: '📋' });
+  const catEditor = useCategoryEditor({ addCategory, updateCategory, deleteCategory, restoreCategory }, { defaultEmoji: '📋' });
 
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number; actions: ContextMenuAction[] } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -235,43 +225,16 @@ export default function TasksView() {
   const renderTasksContent = () => (
     <>
         {/* Add Category at top */}
-        {addingCategory ? (
-          <div className="flex items-center gap-2 mb-4 px-2">
-            <EmojiPicker
-              value={newCatEmoji}
-              onChange={setNewCatEmoji}
-              trigger={({ toggle }) => (
-                <button
-                  onClick={toggle}
-                  className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
-                >
-                  {newCatEmoji}
-                </button>
-              )}
-            />
-            <input
-              autoFocus
-              value={newCatName}
-              onChange={(e) => setNewCatName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(); if (e.key === 'Escape') { setAddingCategory(false); } }}
-              placeholder={t('tasks.categoryName')}
-              className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none"
-            />
-            <button onClick={handleAddCategory} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
-            <button onClick={() => setAddingCategory(false)} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setAddingCategory(true)}
-            className="flex items-center gap-2 mb-2 w-full text-stone-600 hover:text-stone-400 transition-colors"
-          >
-            <span className="w-5 flex items-center justify-center flex-shrink-0"><Plus size={18} /></span>
-            <span className="flex-1 text-left text-xs font-semibold uppercase tracking-wider">{t('tasks.newCategory')}</span>
-          </button>
-        )}
+        <CategoryAddRow
+          editor={catEditor}
+          buttonLabel={t('tasks.newCategory')}
+          placeholder={t('tasks.categoryName')}
+        />
 
         {uncategorized.length > 0 && (
           <div className="mb-6 space-y-1.5">
+            {/* Bewusst nicht CategoryHeaderRow: dieser Block hat keinen Editor
+                (kein Umbenennen/Löschen) und damit eine andere Form. */}
             <div className="flex items-center gap-2 mb-2">
               <button
                 onClick={() => toggleCategoryCollapse('__uncategorized__')}
@@ -310,68 +273,31 @@ export default function TasksView() {
               const isEmpty = catTasks.length === 0;
               return (
                 <div key={cat.id} className="mb-6 space-y-1.5">
-                  {editingCatId === cat.id ? (
-                    <div className="flex items-center gap-2 mb-2">
-                      <EmojiPicker
-                        value={editCatEmoji}
-                        onChange={setEditCatEmoji}
-                        trigger={({ toggle }) => (
-                          <button
-                            onClick={toggle}
-                            className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
-                          >
-                            {editCatEmoji}
-                          </button>
-                        )}
-                      />
-                      <input
-                        autoFocus
-                        value={editCatName}
-                        onChange={(e) => setEditCatName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditCat(); if (e.key === 'Escape') { setEditingCatId(null); } }}
-                        className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none"
-                      />
-                      <Button onClick={handleSaveEditCat} variant="ghost" className="text-jade-400"><Check size={12} /></Button>
-                      <Button onClick={() => setEditingCatId(null)} variant="ghost"><X size={12} /></Button>
-                      {confirmDeleteCatId === cat.id ? (
-                          <>
-                            <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="text-xs px-1">{t('trash.confirmYes')}</Button>
-                            <Button onClick={() => setConfirmDeleteCatId(null)} variant="ghost" className="text-xs">{t('trash.confirmNo')}</Button>
-                          </>
-                        ) : (
-                          <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="p-0.5 ml-1">
-                            <Trash2 size={12} />
-                          </Button>
-                        )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 mb-2">
+                  <CategoryHeaderRow
+                    category={cat}
+                    label={cat.name}
+                    editor={catEditor}
+                    canDelete={cat.id !== FALLBACK_CATEGORY.tasks}
+                    leading={
                       <button
                         onClick={() => toggleCategoryCollapse(cat.id)}
                         className="text-stone-500 hover:text-stone-300 flex-shrink-0"
                       >
                         {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                       </button>
-                      <span className="w-5 text-center flex-shrink-0 text-base">{cat.emoji}</span>
-                      <p className="text-xs text-stone-600 font-semibold uppercase tracking-wider flex-1">{cat.name}</p>
-                      <span className="text-xs text-stone-500">({catTasks.length})</span>
+                    }
+                    meta={<span className="text-xs text-stone-500">({catTasks.length})</span>}
+                    actions={
                       <Button
                         onClick={() => handleCreateTask(cat.id)}
                         variant="ghost"
-                        className="ml-auto p-1"
+                        className="p-1"
                         title={t('tasks.newTask')}
                       >
                         <Plus size={14} />
                       </Button>
-                      <button
-                        onClick={() => startEditCat(cat)}
-                        className="text-stone-500 hover:text-stone-300 transition-colors p-0.5"
-                        title={t('editor.edit')}
-                      >
-                        <Pencil size={11} />
-                      </button>
-                    </div>
-                  )}
+                    }
+                  />
                   {!isCollapsed && (
                     isEmpty ? (
                       <p className="text-xs text-stone-700 px-1 py-1">— {t('tasks.emptyCategory')} —</p>
@@ -550,7 +476,6 @@ const TaskRow = memo(function TaskRow({
   // Zeile zeigt, und verschwindet, sobald anderswohin navigiert wird.
   const isTarget = useUIStore((s) => s.activeView.type === 'tasks' && s.activeView.id === task.id);
   const updateTask = useTaskStore((s) => s.updateTask);
-  const getCategory = useTaskStore((s) => s.getCategory);
   const categories = useTaskStore((s) => s.categories);
   const getSubtasks = useTaskStore((s) => s.getSubtasks);
   const deleteTask = useTaskStore((s) => s.deleteTask);
@@ -587,22 +512,17 @@ const TaskRow = memo(function TaskRow({
   })), [taskLinks, resolveTaskLinkTitle]);
 
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
-  const [showCategoryMenu, setShowCategoryMenu] = useState(false);
   const priorityRef = useRef<HTMLDivElement>(null);
-  const categoryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (showPriorityMenu && priorityRef.current && !priorityRef.current.contains(e.target as Node)) {
         setShowPriorityMenu(false);
       }
-      if (showCategoryMenu && categoryRef.current && !categoryRef.current.contains(e.target as Node)) {
-        setShowCategoryMenu(false);
-      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [showPriorityMenu, showCategoryMenu]);
+  }, [showPriorityMenu]);
 
   const handlePriorityChange = async (priority: TaskPriority) => {
     await updateTask(task.id, { priority });
@@ -611,7 +531,6 @@ const TaskRow = memo(function TaskRow({
 
   const handleCategoryChange = async (categoryId: string) => {
     await updateTask(task.id, { category_id: categoryId });
-    setShowCategoryMenu(false);
   };
 
   const priorityLabels: Record<string, string> = {
@@ -619,8 +538,6 @@ const TaskRow = memo(function TaskRow({
     medium: t('tasks.priority.medium'),
     low: t('tasks.priority.low'),
   };
-
-  const currentCategory = getCategory(task.category_id);
 
   return (
     <div>
@@ -729,33 +646,15 @@ const TaskRow = memo(function TaskRow({
             <Plus size={12} />
           </button>
 
-          <div className="relative" ref={categoryRef}>
-            <button
-              onClick={() => setShowCategoryMenu((o) => !o)}
-              className="tasks-category-trigger text-xs text-stone-500 hover:text-stone-300 px-1.5 py-0.5 rounded hover:bg-stone-700/50"
-              title={t('tasks.filter.category')}
-            >
-              {currentCategory ? `${currentCategory.emoji} ${currentCategory.name}` : '—'}
-            </button>
-            {showCategoryMenu && (
-              <div className="tasks-menu absolute right-0 top-full mt-1 z-50 rounded-lg shadow-xl py-1 min-w-[140px]">
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => handleCategoryChange(cat.id)}
-                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors flex items-center gap-2 ${
-                      task.category_id === cat.id
-                        ? 'tasks-menu-item-active text-jade-400'
-                        : 'tasks-menu-item-idle text-stone-400 hover:text-stone-200'
-                    }`}
-                  >
-                    <span>{cat.emoji}</span>
-                    <span>{cat.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <CategorySelect
+            categories={categories}
+            value={task.category_id}
+            onChange={handleCategoryChange}
+            getLabel={(c) => c.name}
+            variant="chip"
+            align="right"
+            title={t('tasks.filter.category')}
+          />
 
           <button
             onClick={() => setLinkModal({ taskId: task.id })}

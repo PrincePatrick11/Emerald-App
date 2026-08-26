@@ -8,12 +8,13 @@ import {
   RotateCcw,
   Undo2,
 } from 'lucide-react';
-import { format } from 'date-fns';
 import Button from '../ui/Button';
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
 import { generateId } from '../../lib/helpers';
+import { categoryLabel } from '../../lib/categories';
+import { formatEntryDate } from '../../lib/formatDate';
 import { editorSavesSuspended } from '../../lib/editorLock';
 import { canvasToCappedThumbnail } from '../../lib/thumbnail';
 import type { Operation } from '../../types';
@@ -530,9 +531,9 @@ export default function OperationSigilView({ operation }: { operation: Operation
             {t('nav.operations')}
           </button>
           {currentCategory?.emoji && <span>{currentCategory.emoji}</span>}
-          <span>{currentCategory?.is_builtin ? t(`operations.categories.${currentCategory.id}`) : currentCategory?.name ?? '—'}</span>
+          <span>{categoryLabel(t, 'operations', currentCategory, '—')}</span>
           <span>·</span>
-          <span>{format(new Date(operation.updated_at), 'MMM d, yyyy')}</span>
+          <span>{formatEntryDate(operation.updated_at)}</span>
           {isEditing && <span className="ml-1 italic text-stone-700">{t('editor.editing')}</span>}
         </div>
         <div className="flex items-center gap-2">
@@ -633,7 +634,7 @@ export default function OperationSigilView({ operation }: { operation: Operation
           <div className="panel p-5">
             {!isEditing && isAutoHiddenSigil && operation.target_reveal_date && (
               <p className="mb-3 text-sm text-stone-500">
-                {t('creation.hiddenUntilDate', { date: operation.target_reveal_date })}
+                {t('creation.hiddenUntilDate', { date: formatEntryDate(operation.target_reveal_date) })}
               </p>
             )}
 

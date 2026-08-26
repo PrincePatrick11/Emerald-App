@@ -1,12 +1,14 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
-import { Trash2, Check, X, Plus, Pencil, Copy, PanelTopOpen } from 'lucide-react';
+import { Trash2, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
-import EmojiPicker from '../ui/EmojiPicker';
-import Button from '../ui/Button';
+import CategoryHeaderRow from '../ui/CategoryHeaderRow';
+import CategoryAddRow from '../ui/CategoryAddRow';
 import { generateId, isImageIcon } from '../../lib/helpers';
+import { categoryLabel } from '../../lib/categories';
+import { formatEntryDate, formatMonthGroup } from '../../lib/formatDate';
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
@@ -14,7 +16,6 @@ import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import { useEntryEditor } from '../../hooks/useEntryEditor';
 import RichEditor from '../editor/RichEditor';
 import TagInput from '../editor/TagInput';
-import { format } from 'date-fns';
 import OperationSigilView from './OperationSigilView';
 
 
@@ -69,19 +70,7 @@ export default function OperationsView() {
     update: updateOperation,
   });
 
-  const {
-    addingCategory, setAddingCategory,
-    newCatName, setNewCatName,
-    newCatEmoji, setNewCatEmoji,
-    editingCatId, setEditingCatId,
-    editCatName, setEditCatName,
-    editCatEmoji, setEditCatEmoji,
-    confirmDeleteCatId, setConfirmDeleteCatId,
-    handleAddCategory,
-    startEditCat,
-    handleSaveEditCat,
-    handleDeleteCat,
-  } = useCategoryEditor(
+  const catEditor = useCategoryEditor(
     { addCategory, updateCategory, deleteCategory, restoreCategory },
     {
       defaultEmoji: '⚡',
@@ -250,7 +239,7 @@ export default function OperationsView() {
 
     const filtered = statusFiltered;
 
-    const opCatName = (c: typeof categories[0]) => c.is_builtin ? t(`operations.categories.${c.id}`) : c.name;
+    const opCatName = (c: typeof categories[0]) => categoryLabel(t, 'operations', c);
 
     const catChips = categories
       .filter((c) => operations.some((o) => o.category_id === c.id))
@@ -286,7 +275,7 @@ export default function OperationsView() {
     const timelineGroups: { label: string; items: typeof operations }[] = (() => {
       const map = new Map<string, typeof operations>();
       sortedOps.forEach((o) => {
-        const key = format(new Date(o.updated_at), 'MMMM yyyy');
+        const key = formatMonthGroup(o.updated_at);
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push(o);
       });
@@ -298,8 +287,8 @@ export default function OperationsView() {
       const iconValue = op.icon || cat?.emoji || '⚡';
       const catDisplayName = cat ? opCatName(cat) : '';
       const isSigil = op.category_id === 'sigils';
-      const dateStr = `${catDisplayName}${catDisplayName ? ' · ' : ''}${format(new Date(op.updated_at), 'MMM d, yyyy')}`;
-      const createdDate = format(new Date(op.created_at), 'MMM d, yyyy');
+      const dateStr = `${catDisplayName}${catDisplayName ? ' · ' : ''}${formatEntryDate(op.updated_at)}`;
+      const createdDate = formatEntryDate(op.created_at);
       const activeDot = <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${op.is_active ? 'bg-jade-400' : 'bg-stone-700'}`} />;
       if (renamingId === op.id) return (
         <div key={op.id} className={view === 'cards' ? 'panel-interactive px-4 py-4 text-left' : 'panel-interactive w-full flex items-center gap-3 px-4 py-3'}>
@@ -370,7 +359,7 @@ export default function OperationsView() {
                 <>
                   <div className="mt-1 flex flex-wrap gap-2 text-xs">
                     {op.target_reveal_date && (
-                      <span className="text-jade-400/80">{t('creation.targetDate')}: {op.target_reveal_date}</span>
+                      <span className="text-jade-400/80">{t('creation.targetDate')}: {formatEntryDate(op.target_reveal_date)}</span>
                     )}
                     <span className="text-parchment-500/70">{createdDate}</span>
                   </div>
@@ -400,7 +389,7 @@ export default function OperationsView() {
               <span className="flex-1 text-sm text-stone-300 truncate">{op.title}</span>
               {isSigil ? (
                 <span className="text-xs text-parchment-500/70 flex-shrink-0">
-                  {op.target_reveal_date ? `${t('creation.targetDate')}: ${op.target_reveal_date}` : createdDate}
+                  {op.target_reveal_date ? `${t('creation.targetDate')}: ${formatEntryDate(op.target_reveal_date)}` : createdDate}
                 </span>
               ) : (
                 <>
@@ -418,7 +407,7 @@ export default function OperationsView() {
 
     const catGroups: DashboardGroup<Operation>[] = groupedByCat.map(({ cat, ops }) => ({
       key: cat.id,
-      label: cat.is_builtin ? t(`operations.categories.${cat.id}`) : cat.name,
+      label: categoryLabel(t, 'operations', cat),
       items: ops,
     }));
     if (uncategorized.length > 0) {
@@ -431,97 +420,22 @@ export default function OperationsView() {
       }
       const cat = catById[group.key!];
       if (!cat) return null;
-      if (editingCatId === cat.id) {
-        return (
-          <div className="flex items-center gap-2 mb-2">
-            <EmojiPicker
-              value={editCatEmoji}
-              onChange={setEditCatEmoji}
-              trigger={({ toggle }) => (
-                <button
-                  onClick={toggle}
-                  className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
-                >
-                  {editCatEmoji}
-                </button>
-              )}
-            />
-            <input
-              autoFocus
-              value={editCatName}
-              onChange={(e) => setEditCatName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditCat(); if (e.key === 'Escape') { setEditingCatId(null); } }}
-              className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none font-semibold uppercase tracking-wider"
-            />
-            <Button onClick={handleSaveEditCat} variant="ghost" className="text-jade-400"><Check size={12} /></Button>
-            <Button onClick={() => setEditingCatId(null)} variant="ghost"><X size={12} /></Button>
-            {!(cat.is_builtin as unknown as number) && (
-              confirmDeleteCatId === cat.id ? (
-                <>
-                  <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="text-xs px-1">{t('trash.confirmYes')}</Button>
-                  <Button onClick={() => setConfirmDeleteCatId(null)} variant="ghost" className="text-xs">{t('trash.confirmNo')}</Button>
-                </>
-              ) : (
-                <Button onClick={() => handleDeleteCat(cat.id)} variant="danger" className="p-0.5 ml-1">
-                  <Trash2 size={12} />
-                </Button>
-              )
-            )}
-          </div>
-        );
-      }
       return (
-        <div className="flex items-center gap-2 mb-2">
-          <span className="w-5 text-center flex-shrink-0 text-base">{cat.emoji}</span>
-          <p className="text-xs text-stone-600 font-semibold uppercase tracking-wider flex-1">
-            {cat.is_builtin ? t(`operations.categories.${cat.id}`) : cat.name}
-          </p>
-          <button
-            onClick={() => startEditCat(cat)}
-            className="text-stone-500 hover:text-stone-300 transition-colors p-0.5"
-            title={t('editor.edit')}
-          >
-            <Pencil size={11} />
-          </button>
-        </div>
+        <CategoryHeaderRow
+          category={cat}
+          label={categoryLabel(t, 'operations', cat)}
+          editor={catEditor}
+          canDelete={!cat.is_builtin}
+        />
       );
     };
 
     const renderAddCategory = () => (
-      addingCategory ? (
-        <div className="flex items-center gap-2 mb-2">
-          <EmojiPicker
-            value={newCatEmoji}
-            onChange={setNewCatEmoji}
-            trigger={({ toggle }) => (
-              <button
-                onClick={toggle}
-                className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
-              >
-                {newCatEmoji}
-              </button>
-            )}
-          />
-          <input
-            autoFocus
-            value={newCatName}
-            onChange={(e) => setNewCatName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(); if (e.key === 'Escape') { setAddingCategory(false); } }}
-            placeholder={t('operations.categoryName')}
-            className="flex-1 bg-stone-800/60 rounded px-2 py-0.5 text-xs text-stone-200 outline-none font-semibold uppercase tracking-wider"
-          />
-          <button onClick={handleAddCategory} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
-          <button onClick={() => setAddingCategory(false)} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
-        </div>
-      ) : (
-        <button
-          onClick={() => setAddingCategory(true)}
-          className="flex items-center gap-2 mb-2 w-full text-stone-600 hover:text-stone-400 transition-colors"
-        >
-          <span className="w-5 flex items-center justify-center flex-shrink-0"><Plus size={18} /></span>
-          <span className="flex-1 text-left text-xs font-semibold uppercase tracking-wider">{t('operations.addCategory')}</span>
-        </button>
-      )
+      <CategoryAddRow
+        editor={catEditor}
+        buttonLabel={t('operations.addCategory')}
+        placeholder={t('operations.categoryName')}
+      />
     );
 
     return (
@@ -610,9 +524,9 @@ export default function OperationsView() {
             ? <img src={operationIcon} alt="" className="w-5 h-5 object-cover rounded" />
             : <span>{operationIcon}</span>
           }
-          <span>{currentCat?.is_builtin ? t(`operations.categories.${currentCat.id}`) : currentCat?.name ?? '—'}</span>
+          <span>{categoryLabel(t, 'operations', currentCat, '—')}</span>
           <span>·</span>
-          <span>{format(new Date(operation.updated_at), 'MMM d, yyyy')}</span>
+          <span>{formatEntryDate(operation.updated_at)}</span>
           {isEditing && <span className="text-stone-700 italic ml-1">{t('editor.editing')}</span>}
         </div>
       </div>
@@ -658,7 +572,7 @@ export default function OperationsView() {
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs bg-stone-800/60 border border-stone-700/40">
             <span className="text-stone-600">{t('operations.endDate')}:</span>
             <span className="text-stone-300">
-              {new Date(operation.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              {formatEntryDate(operation.end_date)}
             </span>
           </span>
         )}

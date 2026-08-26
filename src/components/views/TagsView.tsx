@@ -9,6 +9,7 @@ import { useOperationStore } from '../../store/operationStore';
 import { useUIStore } from '../../store/uiStore';
 import { useUndoStore } from '../../store/undoStore';
 import { generateId } from '../../lib/helpers';
+import { categoryLabel } from '../../lib/categories';
 import ContextMenu from '../ui/ContextMenu';
 import Button from '../ui/Button';
 
@@ -309,7 +310,7 @@ export default function TagsView() {
                   <Wand2 size={14} className="text-stone-500 flex-shrink-0" />
                   <div>
                     <div className="text-sm text-stone-200">{op.title}</div>
-                    <div className="text-xs text-parchment-500/70 mt-0.5">{cat?.emoji} {cat ? (cat.is_builtin ? t(`operations.categories.${cat.id}`) : cat.name) : t('nav.operations')}</div>
+                    <div className="text-xs text-parchment-500/70 mt-0.5">{cat?.emoji} {categoryLabel(t, 'operations', cat, t('nav.operations'))}</div>
                   </div>
                 </button>
               );

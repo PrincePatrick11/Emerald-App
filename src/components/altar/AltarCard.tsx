@@ -1,6 +1,7 @@
 import { memo } from 'react';
-import { format } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 import { Copy, Pencil, Trash2 } from 'lucide-react';
+import { formatEntryDate } from '../../lib/formatDate';
 import type { TFunction } from 'i18next';
 import type { AltarPlacement, AltarRecord } from '../../types';
 import { resolveResolutionPixels } from '../../lib/altarConstants';
@@ -35,6 +36,9 @@ export const AltarCard = memo(function AltarCard({
   onOpen,
   onContextMenu,
 }: CommonProps) {
+  // Abonniert Sprachwechsel für die Datums-Locale — memo ohne t-Prop würde
+  // sonst beim Umschalten das alte Format weiterzeigen.
+  useTranslation();
   if (isRenaming) {
     return (
       <div className={`${baseClass} px-4 py-4`}>
@@ -45,7 +49,7 @@ export const AltarCard = memo(function AltarCard({
           onCancel={onCancelRename}
           className="mb-2 w-full bg-transparent text-sm font-medium text-stone-200 outline-none selectable"
         />
-        <p className="text-xs text-stone-600">{format(new Date(altar.updated_at), 'MMM d, yyyy')}</p>
+        <p className="text-xs text-stone-600">{formatEntryDate(altar.updated_at)}</p>
       </div>
     );
   }
@@ -59,7 +63,7 @@ export const AltarCard = memo(function AltarCard({
       </div>
       <div className="text-sm font-medium text-stone-200 truncate">{altar.title}</div>
       <div className="mt-2 flex flex-wrap gap-2 text-xs">
-        <span className="text-parchment-500/70">{format(new Date(altar.updated_at), 'MMM d, yyyy')}</span>
+        <span className="text-parchment-500/70">{formatEntryDate(altar.updated_at)}</span>
       </div>
       {altar.intention && (
         <p className="mt-2 max-h-8 overflow-hidden text-xs leading-4 text-stone-500">{altar.intention}</p>
@@ -79,6 +83,8 @@ export const AltarListRow = memo(function AltarListRow({
   onOpen,
   onContextMenu,
 }: CommonProps) {
+  // Siehe AltarCard: Subscription für die Datums-Locale.
+  useTranslation();
   if (isRenaming) {
     return (
       <div className={`${baseClass} flex items-center gap-3 px-4 py-3`}>
@@ -89,7 +95,7 @@ export const AltarListRow = memo(function AltarListRow({
           onCancel={onCancelRename}
           className="flex-1 bg-transparent text-sm text-stone-300 outline-none selectable"
         />
-        <span className="text-xs text-parchment-500/70">{format(new Date(altar.updated_at), 'MMM d, yyyy')}</span>
+        <span className="text-xs text-parchment-500/70">{formatEntryDate(altar.updated_at)}</span>
       </div>
     );
   }
@@ -104,7 +110,7 @@ export const AltarListRow = memo(function AltarListRow({
         : <AltarCardPreview altar={altar} previewItems={previewItems} compact />}
       </span>
       <span className="flex-1 text-sm text-stone-300 truncate">{altar.title}</span>
-      <span className="text-xs text-stone-600">{format(new Date(altar.updated_at), 'MMM d, yyyy')}</span>
+      <span className="text-xs text-stone-600">{formatEntryDate(altar.updated_at)}</span>
     </button>
   );
 });

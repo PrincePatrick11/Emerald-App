@@ -7,6 +7,7 @@ import { useTagStore } from '../store/tagStore';
 import { useTaskStore } from '../store/taskStore';
 import { useWikiStore } from '../store/wikiStore';
 import { searchCorpus, type SearchCategory, type SearchCorpus, type SearchResults } from '../lib/globalSearch';
+import { altarCategoryLabel, categoryLabel } from '../lib/categories';
 
 /**
  * The store side of the global search: it assembles the corpus and hands it to
@@ -35,21 +36,22 @@ function useSearchCorpus(): SearchCorpus {
   const categories = useMemo<SearchCategory[]>(() => [
     ...wikiCategories.map((c) => ({
       id: c.id,
-      name: c.is_builtin ? t(`wiki.categories.${c.id}`) : c.name,
+      name: categoryLabel(t, 'wiki', c),
       module: 'wiki' as const,
     })),
     ...operationCategories.map((c) => ({
       id: c.id,
-      name: c.is_builtin ? t(`operations.categories.${c.id}`) : c.name,
+      name: categoryLabel(t, 'operations', c),
       module: 'operations' as const,
     })),
-    // Task and altar categories carry no built-in variant that the locales
-    // rename — both are shown by their stored `name` everywhere else too.
+    // Task categories carry no built-in variant that the locales rename;
+    // altar builtins do (altar.categories.*), aufgelöst per Seed-Namensvergleich
+    // wie in der AltarLibraryStrip — sonst findet die Suche „Kerze" nicht.
     ...taskCategories.filter((c) => !c.deleted_at).map((c) => ({
       id: c.id, name: c.name, module: 'tasks' as const,
     })),
     ...altarCategories.map((c) => ({
-      id: c.id, name: c.name, module: 'altar' as const,
+      id: c.id, name: altarCategoryLabel(t, c), module: 'altar' as const,
     })),
   ], [wikiCategories, operationCategories, taskCategories, altarCategories, t]);
 

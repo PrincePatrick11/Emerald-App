@@ -11,6 +11,9 @@ import { PropertySummaryRow } from '../fields/PropertySummaryRow';
 import Favicon from '../fields/Favicon';
 import Banner from '../fields/Banner';
 import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
+import { categoryLabel } from '../../../lib/categories';
+import { formatEntryDate } from '../../../lib/formatDate';
+import CategorySelect from '../../ui/CategorySelect';
 import Button from '../../ui/Button';
 
 export default function OperationPropertiesPanel() {
@@ -36,7 +39,7 @@ export default function OperationPropertiesPanel() {
 
   const inputCls = OP_PROP_SELECT_CLASSES;
   const category = opCategories.find((c) => c.id === op.category_id);
-  const categoryLabel = category ? `${category.emoji} ${category.is_builtin ? t(`operations.categories.${category.id}`) : category.name}` : op.category_id;
+  const categoryDisplay = category ? `${category.emoji} ${categoryLabel(t, 'operations', category)}` : op.category_id;
 
   if (!isEditing) {
     if (sigilOperation) {
@@ -44,9 +47,9 @@ export default function OperationPropertiesPanel() {
         ? articles.find((a) => a.id === sigilOperation.charging_technique_wiki_id) : undefined;
       return (
         <PropertiesReadView>
-          <PropertySummaryRow label={t('properties.category')} value={categoryLabel} />
+          <PropertySummaryRow label={t('properties.category')} value={categoryDisplay} />
           <PropertySummaryRow label={`⚡ ${t('creation.chargingTechnique')}`} value={chargingArt?.title ?? t('properties.none')} />
-          <PropertySummaryRow label={`📅 ${t('creation.targetDate')}`} value={sigilOperation.target_reveal_date || t('properties.none')} />
+          <PropertySummaryRow label={`📅 ${t('creation.targetDate')}`} value={sigilOperation.target_reveal_date ? formatEntryDate(sigilOperation.target_reveal_date) : t('properties.none')} />
 
           <div>
             <p className="label-xs mb-2">🖼️ {t('creation.types.sigil')}</p>
@@ -89,7 +92,7 @@ export default function OperationPropertiesPanel() {
 
     return (
       <PropertiesReadView>
-        <PropertySummaryRow label={t('properties.category')} value={categoryLabel} />
+        <PropertySummaryRow label={t('properties.category')} value={categoryDisplay} />
         <Favicon value={op.icon} readOnly label={t('properties.icon')} />
         <Banner value={op.cover_image} readOnly />
         <PropertySummaryRow
@@ -97,7 +100,7 @@ export default function OperationPropertiesPanel() {
           value=""
           badge={op.is_active ? { label: t('operations.active'), tone: 'jade' } : { label: t('operations.inactive'), tone: 'muted' }}
         />
-        <PropertySummaryRow label={t('operations.endDate')} value={op.end_date || t('properties.none')} />
+        <PropertySummaryRow label={t('operations.endDate')} value={op.end_date ? formatEntryDate(op.end_date) : t('properties.none')} />
         <PropertySummaryRow label={t('operations.version')} value={op.version || t('properties.none')} />
         <div>
           <p className="label-xs mb-2">{t('properties.tags')}</p>
@@ -111,21 +114,21 @@ export default function OperationPropertiesPanel() {
     <PropertiesEditView>
       <div>
         <p className="label-xs mb-2">{t('properties.category')}</p>
-        <select
+        <CategorySelect
+          categories={opCategories}
           value={op.category_id}
-          onChange={(e) => updateOperation(op.id, { category_id: e.target.value })}
-          className={inputCls + ' cursor-pointer'}
-        >
-          {opCategories.map((c) => (
-            <option key={c.id} value={c.id}>{c.emoji} {c.is_builtin ? t(`operations.categories.${c.id}`) : c.name}</option>
-          ))}
-        </select>
+          onChange={(category_id) => updateOperation(op.id, { category_id })}
+          getLabel={(c) => categoryLabel(t, 'operations', c)}
+          variant="field"
+        />
       </div>
 
       {sigilOperation && (
         <>
           <div>
             <p className="label-xs mb-2">⚡ {t('creation.chargingTechnique')}</p>
+            {/* Bewusst nativ statt CategorySelect: kleine feste Artikel-Liste ohne
+                Builtin/Custom-Unterscheidung — der Themed-Picker gilt nur für Kategorien. */}
             <select
               value={sigilOperation.charging_technique_wiki_id ?? ''}
               onChange={(e) => updateOperation(sigilOperation.id, { charging_technique_wiki_id: e.target.value || null })}

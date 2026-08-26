@@ -1751,10 +1751,6 @@ html[data-theme='emerald-parchment'] .link-picker-tab-idle:hover {
   color: var(--link-picker-tab-idle-hover-text);
 }
 
-html[data-theme='emerald-parchment'] .tasks-menu-item-active.text-jade-400 {
-  color: #075e3d;
-}
-
 html[data-theme='emerald-parchment'] .tasks-menu-item-active.text-red-400 {
   color: #b63f32;
 }

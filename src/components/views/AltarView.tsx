@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
 import { Maximize2, Minimize2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatEntryDate, formatMonthGroup } from '../../lib/formatDate';
 import { useAltarStore } from '../../store/altarStore';
 import { useUIStore } from '../../store/uiStore';
 import { getAltarBackgroundStyle, DEFAULT_ALTAR_RESOLUTION, parseResolution, isRatioFormat } from '../../lib/altarConstants';
@@ -245,7 +245,7 @@ export default function AltarView() {
     const grouped = altarPrefs.view === 'timeline'
       ? Array.from(
           sorted.reduce((map, altar) => {
-            const label = format(new Date(altar.updated_at), 'MMMM yyyy');
+            const label = formatMonthGroup(altar.updated_at);
             if (!map.has(label)) map.set(label, []);
             map.get(label)!.push(altar);
             return map;
@@ -329,7 +329,7 @@ export default function AltarView() {
           <button onClick={() => setActiveView({ type: 'altar' })} className="text-stone-500 transition-colors hover:text-stone-300">
             {t('nav.altar')}
           </button>
-          <span>{format(new Date(activeAltar.updated_at), 'MMM d, yyyy')}</span>
+          <span>{formatEntryDate(activeAltar.updated_at)}</span>
         </div>
         <div className="flex items-center gap-1">
           {isEditing ? null : (

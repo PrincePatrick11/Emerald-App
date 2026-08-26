@@ -1,6 +1,7 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import en from './locales/en.json';
+import { preloadDateLocale, setDateLocale } from '../lib/formatDate';
 
 // Nur Englisch — Start- und Fallback-Sprache — liegt im Start-Bundle. Die
 // anderen drei Locales laden als eigene Chunks erst beim Umschalten nach,
@@ -73,8 +74,15 @@ export async function changeAppLanguage(lng: string): Promise<void> {
       i18n.addResourceBundle(lng, 'translation', bundle, true, true);
     }
   }
+  // Die date-fns-Locale zieht im selben Zug nach — vor changeLanguage, damit
+  // der dadurch ausgelöste Re-Render schon mit der richtigen Locale formatiert.
+  const dateLocale = await preloadDateLocale(lng);
   if (seq !== switchSeq) return;
+  setDateLocale(dateLocale);
   await i18n.changeLanguage(lng);
+  // Zweite Prüfung: hat ein späterer Wechsel überholt, während changeLanguage
+  // lief, dürfen localStorage und <html lang> nicht mehr für den Verlierer schreiben.
+  if (seq !== switchSeq) return;
   localStorage.setItem(LANGUAGE_STORAGE_KEY, lng);
   // Fuer Rechtschreibpruefung und Screenreader — index.html startet mit "en".
   document.documentElement.lang = lng;

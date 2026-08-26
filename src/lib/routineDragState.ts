@@ -1,3 +1,5 @@
+import { createDragChannel } from './dragChannel';
+
 export interface RoutineDragItem {
   id: string;
   name: string;
@@ -8,17 +10,8 @@ export interface RoutineDragItem {
   wiki_ids: string[];
 }
 
-let _item: RoutineDragItem | null = null;
-const _listeners = new Set<(item: RoutineDragItem | null) => void>();
+const channel = createDragChannel<RoutineDragItem>();
 
-export function setRoutineDragItem(item: RoutineDragItem | null) {
-  _item = item;
-  _listeners.forEach((fn) => fn(item));
-}
-
-export function getRoutineDragItem(): RoutineDragItem | null { return _item; }
-
-export function subscribeRoutineDrag(fn: (item: RoutineDragItem | null) => void): () => void {
-  _listeners.add(fn);
-  return () => _listeners.delete(fn);
-}
+export const setRoutineDragItem = channel.set;
+export const getRoutineDragItem = channel.get;
+export const subscribeRoutineDrag = channel.subscribe;
