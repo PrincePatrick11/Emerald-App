@@ -29,8 +29,6 @@ interface UIState {
   historyIndex: number;
   rightSidebarOpen: boolean;
   editActions: EditActions | null;
-  operationsSubTab: string | null;
-  wikiSubTab: string | null;
   leftListOpen: boolean;
   leftListTab: LeftListTabId;
   searchQuery: string;
@@ -49,6 +47,7 @@ interface UIState {
   editorFontId: FontId;
 
   setActiveView: (view: ActiveView) => void;
+  closeAllTabs: () => void;
   openViewInNewTab: (view: ActiveView) => void;
   addTab: (view?: ActiveView) => void;
   selectTab: (id: string) => void;
@@ -59,8 +58,6 @@ interface UIState {
   navigateForward: () => void;
   toggleRightSidebar: () => void;
   setEditActions: (actions: EditActions | null) => void;
-  setOperationsSubTab: (id: string | null) => void;
-  setWikiSubTab: (category: string | null) => void;
   toggleLeftList: () => void;
   setLeftListTab: (tab: LeftListTabId) => void;
   setSearchQuery: (q: string) => void;
@@ -151,8 +148,6 @@ export const useUIStore = create<UIState>((set) => ({
   historyIndex: 0,
   rightSidebarOpen: true,
   editActions: null,
-  operationsSubTab: null,
-  wikiSubTab: null,
   leftListOpen: true,
   leftListTab: 'journal',
   searchQuery: '',
@@ -188,6 +183,20 @@ export const useUIStore = create<UIState>((set) => ({
     saveTabs(tabs, activeTabId);
 
     return { ...withNavigationState(s, view), tabs, activeTabId, ...openSidebar };
+  }),
+
+  // Fuer Vault-Wechsel und Replace-Import: Tabs und History tragen Eintrags-IDs,
+  // die es in der neuen Datenbank nicht gibt — beides faellt auf den frischen
+  // Startzustand zurueck (keine Tabs, Home), wie beim allerersten Start.
+  closeAllTabs: () => set(() => {
+    saveTabs([], null);
+    return {
+      tabs: [],
+      activeTabId: null,
+      activeView: { type: 'home' },
+      history: [{ type: 'home' }],
+      historyIndex: 0,
+    };
   }),
 
   openViewInNewTab: (view) => set((s) => {
@@ -269,8 +278,6 @@ export const useUIStore = create<UIState>((set) => ({
   }),
   toggleRightSidebar: () => set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),
   setEditActions: (actions) => set({ editActions: actions }),
-  setOperationsSubTab: (id) => set({ operationsSubTab: id }),
-  setWikiSubTab: (category) => set({ wikiSubTab: category }),
   toggleLeftList: () => set((s) => ({ leftListOpen: !s.leftListOpen })),
   setLeftListTab: (tab) => set({ leftListTab: tab }),
   setSearchQuery: (q) => set({ searchQuery: q }),

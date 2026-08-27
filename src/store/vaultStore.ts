@@ -53,8 +53,9 @@ async function openActiveVault(): Promise<void> {
   await resetDbCache();
   // runMigrations is idempotent, so this is also what initialises a fresh vault.
   await getDb();
-  // Navigate to home first to avoid stale open-entry state
-  useUIStore.getState().setActiveView({ type: 'home' });
+  // Tabs und History zeigen per Eintrags-ID in den alten Vault — alles zu,
+  // nicht nur der aktive Tab auf Home.
+  useUIStore.getState().closeAllTabs();
   // Undo entries reference rows of the old vault by id — drop them
   useUndoStore.getState().clear();
   // Die globale Suche haelt den Klartext jedes Eintrags unter dessen id fest.

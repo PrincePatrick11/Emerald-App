@@ -979,8 +979,11 @@ export async function importDatabase(
   // Reload all store data from the (now modified) active vault
   console.log(`[backup] import complete (${mode}) into ${await getActiveDbFile()}`);
 
+  // replace tauscht die Zeilen unter den offenen Tabs weg — deren Eintrags-IDs
+  // stammen aus dem Stand vor dem Import. merge behaelt bestehende Zeilen, da
+  // bleiben die Tabs gueltig; add-vault laeuft ueber switchVault und raeumt dort.
   if (mode === 'replace') {
-    useUIStore.getState().setActiveView({ type: 'home' });
+    useUIStore.getState().closeAllTabs();
   }
 
   // Die globale Suche merkt sich den Klartext eines Eintrags unter (id,
