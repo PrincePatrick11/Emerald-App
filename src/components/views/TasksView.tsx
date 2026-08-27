@@ -8,9 +8,12 @@ import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { generateId } from '../../lib/helpers';
+import { viewTypeForEntryType } from '../../lib/modules';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import { FALLBACK_CATEGORY } from '../../lib/schema';
+import { sortItems } from '../../lib/sortItems';
 import Dashboard from '../ui/Dashboard';
+import Dropdown from '../ui/Dropdown';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import LinkPickerModal from '../editor/LinkPickerModal';
 import Button from '../ui/Button';
@@ -75,19 +78,10 @@ export default function TasksView() {
     return true;
   });
 
-  const sortedTasks = [...filteredTasks].sort((a, b) => {
-    if (tasksPrefs.sort === 'alpha_asc') return a.title.localeCompare(b.title);
-    if (tasksPrefs.sort === 'alpha_desc') return b.title.localeCompare(a.title);
-    if (tasksPrefs.sort === 'date_desc') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    if (tasksPrefs.sort === 'date_asc') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-    if (tasksPrefs.sort === 'category') {
-      const catA = getCategory(a.category_id)?.name ?? '';
-      const catB = getCategory(b.category_id)?.name ?? '';
-      const catCmp = catA.localeCompare(catB);
-      return catCmp !== 0 ? catCmp : a.sort_order - b.sort_order;
-    }
-    const priorityOrder = { high: 0, medium: 1, low: 2 };
-    return priorityOrder[a.priority] - priorityOrder[b.priority];
+  const sortedTasks = sortItems(filteredTasks, tasksPrefs.sort, {
+    date: (task) => task.created_at,
+    category: (task) => getCategory(task.category_id)?.name ?? '',
+    tiebreak: (a, b) => a.sort_order - b.sort_order,
   });
 
   const groupedTasks = tasksPrefs.sort === 'category'
@@ -511,22 +505,8 @@ const TaskRow = memo(function TaskRow({
     title: resolveTaskLinkTitle(link.target_type, link.target_id),
   })), [taskLinks, resolveTaskLinkTitle]);
 
-  const [showPriorityMenu, setShowPriorityMenu] = useState(false);
-  const priorityRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (showPriorityMenu && priorityRef.current && !priorityRef.current.contains(e.target as Node)) {
-        setShowPriorityMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showPriorityMenu]);
-
   const handlePriorityChange = async (priority: TaskPriority) => {
     await updateTask(task.id, { priority });
-    setShowPriorityMenu(false);
   };
 
   const handleCategoryChange = async (categoryId: string) => {
@@ -627,8 +607,7 @@ const TaskRow = memo(function TaskRow({
                 className="tasks-linked-entry text-xs cursor-pointer px-1.5 py-0.5 rounded transition-colors"
                 title={`${link.target_type}: ${link.title}`}
                 onClick={() => {
-                  const typeMap: Record<string, string> = { journal: 'journal', wiki: 'wiki', operation: 'operations' };
-                  useUIStore.getState().setActiveView({ type: typeMap[link.target_type] as any, id: link.target_id, mode: 'view' });
+                  useUIStore.getState().setActiveView({ type: viewTypeForEntryType(link.target_type), id: link.target_id, mode: 'view' });
                 }}
               >
                 {link.title}
@@ -664,33 +643,28 @@ const TaskRow = memo(function TaskRow({
             <Link2 size={12} />
           </button>
 
-          <div className="relative" ref={priorityRef}>
-            <button
-              onClick={() => setShowPriorityMenu((o) => !o)}
-              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${TASK_PRIORITY_PILL_CLASSES[task.priority]}`}
-              title={t('tasks.priority.' + task.priority)}
-            >
-              <Flag size={11} />
-            </button>
-            {showPriorityMenu && (
-              <div className="tasks-menu absolute right-0 top-full mt-1 z-50 rounded-lg shadow-xl py-1 min-w-[120px]">
-                {(['high', 'medium', 'low'] as TaskPriority[]).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => handlePriorityChange(p)}
-                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors flex items-center gap-2 ${
-                      task.priority === p
-                        ? `tasks-menu-item-active ${TASK_PRIORITY_COLORS[p]}`
-                        : 'tasks-menu-item-idle text-stone-400 hover:text-stone-200'
-                    }`}
-                  >
-                    <Flag size={11} />
-                    <span>{priorityLabels[p]}</span>
-                  </button>
-                ))}
-              </div>
+          <Dropdown<TaskPriority>
+            value={task.priority}
+            options={(['high', 'medium', 'low'] as TaskPriority[]).map((p) => ({
+              value: p,
+              label: priorityLabels[p],
+              icon: <Flag size={11} />,
+              className: task.priority === p ? TASK_PRIORITY_COLORS[p] : undefined,
+            }))}
+            onChange={handlePriorityChange}
+            align="right"
+            trigger={({ open, toggle }) => (
+              <button
+                onClick={toggle}
+                aria-haspopup="listbox"
+                aria-expanded={open}
+                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${TASK_PRIORITY_PILL_CLASSES[task.priority]}`}
+                title={t('tasks.priority.' + task.priority)}
+              >
+                <Flag size={11} />
+              </button>
             )}
-          </div>
+          />
 
           <button
             onClick={handleDelete}

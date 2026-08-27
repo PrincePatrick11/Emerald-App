@@ -1,8 +1,13 @@
 import type { TFunction } from 'i18next';
 import { BUILTIN_ALTAR_CATEGORIES } from './schema';
 
-/** Nur Wiki und Operations haben ein `is_builtin`-Flag mit Locale-Keys (`<module>.categories.<id>`). */
-export type CategoryModule = 'wiki' | 'operations';
+/**
+ * Nur Wiki und Operations haben ein `is_builtin`-Flag mit Locale-Keys
+ * (`<module>.categories.<id>`). Bewusst nicht `CategoryModuleId` aus
+ * lib/modules: das hier ist eine i18n-Eigenschaft zweier Module, kein
+ * Modulbegriff.
+ */
+export type BuiltinLabelModule = 'wiki' | 'operations';
 
 export interface LabelableCategory {
   id: string;
@@ -19,7 +24,7 @@ export interface LabelableCategory {
  */
 export function categoryLabel(
   t: TFunction,
-  module: CategoryModule,
+  module: BuiltinLabelModule,
   cat: LabelableCategory | null | undefined,
   fallback = '',
 ): string {

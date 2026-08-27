@@ -1,9 +1,8 @@
 import { create } from 'zustand';
 import { getDb, sweepDanglingLinks } from '../lib/db';
 import { FALLBACK_CATEGORY, reassignCategoryContent } from '../lib/schema';
-import { useJournalStore } from './journalStore';
+import { trashWiring } from './moduleWiring';
 import { useWikiStore } from './wikiStore';
-import { useTagStore } from './tagStore';
 import { useOperationStore } from './operationStore';
 import { useTaskStore } from './taskStore';
 import type { OperationCategory, WikiCategoryDef } from '../types';
@@ -18,28 +17,6 @@ interface TrashState {
   permanentlyDelete: (item: TrashedItem) => Promise<void>;
   emptyTrash: () => Promise<void>;
 }
-
-const restoreHandlers: Record<string, (id: string) => Promise<void>> = {
-  journal:           async (id) => { await useJournalStore.getState().restoreEntry(id); },
-  wiki:              async (id) => { await useWikiStore.getState().restoreArticle(id); },
-  operation:         async (id) => { await useOperationStore.getState().restoreOperation(id); },
-  wiki_category:     async (id) => { await useWikiStore.getState().restoreWikiCategory(id); },
-  operation_category: async (id) => { await useOperationStore.getState().restoreCategory(id); },
-  tag:               async (id) => { await useTagStore.getState().restoreTag(id); },
-  task:              async (id) => { await useTaskStore.getState().restoreTask(id); },
-  task_category:     async (id) => { await useTaskStore.getState().restoreCategory(id); },
-};
-
-const permanentDeleteHandlers: Record<string, (id: string) => Promise<void>> = {
-  journal:           async (id) => { await useJournalStore.getState().permanentlyDeleteEntry(id); },
-  wiki:              async (id) => { await useWikiStore.getState().permanentlyDeleteArticle(id); },
-  operation:         async (id) => { await useOperationStore.getState().permanentlyDeleteOperation(id); },
-  wiki_category:     async (id) => { await useWikiStore.getState().permanentlyDeleteWikiCategory(id); },
-  operation_category: async (id) => { await useOperationStore.getState().permanentlyDeleteCategory(id); },
-  tag:               async (id) => { await useTagStore.getState().permanentlyDeleteTag(id); },
-  task:              async (id) => { await useTaskStore.getState().permanentlyDeleteTask(id); },
-  task_category:     async (id) => { await useTaskStore.getState().permanentlyDeleteCategory(id); },
-};
 
 export const useTrashStore = create<TrashState>((set) => ({
   items: [],
@@ -90,16 +67,12 @@ export const useTrashStore = create<TrashState>((set) => ({
   },
 
   restore: async (item) => {
-    const handler = restoreHandlers[item.type];
-    if (!handler) { console.error('Unknown trash item type in restore():', item.type); return; }
-    await handler(item.id);
+    await trashWiring[item.type].restore(item.id);
     set((s) => ({ items: s.items.filter((i) => i.id !== item.id) }));
   },
 
   permanentlyDelete: async (item) => {
-    const handler = permanentDeleteHandlers[item.type];
-    if (!handler) { console.error('Unknown trash item type in permanentlyDelete():', item.type); return; }
-    await handler(item.id);
+    await trashWiring[item.type].permanentlyDelete(item.id);
     set((s) => ({ items: s.items.filter((i) => i.id !== item.id) }));
   },
 

@@ -1,13 +1,18 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { CSSProperties, ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { useOutsideClick } from '../../hooks/useOutsideClick';
 
 export interface DropdownOption<T extends string> {
   value: T;
   label: string;
   /** Optionales führendes Emoji in der Menüzeile (CategorySelect). */
   emoji?: string;
+  /** Optionales führendes Icon vor dem Label (TaskRow-Prioritätsmenü: Flag). */
+  icon?: ReactNode;
+  /** Zusätzliche Klassen für die Menüzeile, z. B. eine Prioritätsfarbe auf der aktiven Zeile. */
+  className?: string;
 }
 
 interface Props<T extends string> {
@@ -40,21 +45,8 @@ export default function Dropdown<T extends string>({
   const [portalPos, setPortalPos] = useState<CSSProperties | null>(null);
   const selected = options.find((o) => o.value === value)?.label ?? value;
 
-  useEffect(() => {
-    if (!open) return;
-    const onMouse = (e: MouseEvent) => {
-      if (wrapRef.current?.contains(e.target as Node)) return;
-      if (menuRef.current?.contains(e.target as Node)) return;
-      setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', onMouse);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onMouse);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
+  // menuRef zusätzlich: im Portal-Modus ist das Menü kein Nachfahre des Wrappers.
+  useOutsideClick(open, () => setOpen(false), { refs: [wrapRef, menuRef], escape: true });
 
   useLayoutEffect(() => {
     if (!open || !portal || !wrapRef.current) return;
@@ -86,13 +78,14 @@ export default function Dropdown<T extends string>({
         <button
           key={o.value}
           onClick={() => { onChange(o.value); setOpen(false); }}
-          className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+          className={`w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs transition-colors ${
             value === o.value
               ? 'list-toolbar-option-active'
               : 'list-toolbar-option-idle'
-          }`}
+          } ${o.className ?? ''}`}
         >
-          {o.emoji && <span className="mr-1.5">{o.emoji}</span>}
+          {o.emoji && <span>{o.emoji}</span>}
+          {o.icon}
           {o.label}
         </button>
       ))}

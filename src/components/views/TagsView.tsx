@@ -211,9 +211,9 @@ export default function TagsView() {
                   <span className="flex-1 truncate text-xs text-left">{tag.name}</span>
                   {confirmDeleteName === tag.name ? (
                     <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      <span className="text-xs text-stone-400">{t('trash.sure')}</span>
-                      <span onClick={() => handleDelete(tag)} className="text-xs text-red-400 hover:text-red-300 cursor-pointer px-1">{t('trash.confirmYes')}</span>
-                      <span onClick={() => setConfirmDeleteName(null)} className="text-xs text-stone-500 hover:text-stone-300 cursor-pointer">{t('trash.confirmNo')}</span>
+                      <span className="text-xs text-stone-400">{t('common.confirmSure')}</span>
+                      <span onClick={() => handleDelete(tag)} className="text-xs text-red-400 hover:text-red-300 cursor-pointer px-1">{t('common.confirmYes')}</span>
+                      <span onClick={() => setConfirmDeleteName(null)} className="text-xs text-stone-500 hover:text-stone-300 cursor-pointer">{t('common.confirmNo')}</span>
                     </span>
                   ) : (
                     <>

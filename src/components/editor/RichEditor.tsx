@@ -24,7 +24,7 @@ import type { SuggestionItem } from './SuggestionList';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { getDragItem, setDragItem, subscribeDrag } from '../../lib/dragState';
-import { viewTypeForEntryType } from '../../lib/tabs';
+import { viewTypeForEntryType } from '../../lib/modules';
 import type { ContentType } from '../../types';
 import { getRoutineDragItem, setRoutineDragItem, subscribeRoutineDrag, type RoutineDragItem } from '../../lib/routineDragState';
 import { getCategoryEmoji } from '../wiki/WikiList';
@@ -57,7 +57,8 @@ interface RichEditorProps {
 
 export default function RichEditor({
   initialContent,
-  placeholder = 'Begin writing...',
+  // Kein englischer Default: alle Views übergeben ihren lokalisierten Placeholder.
+  placeholder = '',
   onChange,
   editable = true,
 }: RichEditorProps) {
@@ -538,7 +539,7 @@ export default function RichEditor({
             <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>PNG, JPEG, GIF, WebP, SVG</p>
           </div>
           <Button onClick={() => setDragFormatError(false)} variant="secondary" className="w-full">
-            OK
+            {t('common.ok')}
           </Button>
         </Modal>
       )}

@@ -765,22 +765,6 @@ html[data-theme='emerald-parchment'] .border-stone-600 { border-color: var(--bor
   font-weight: 500;
 }
 
-.tasks-menu {
-  background-color: var(--menu-bg);
-  border: 1px solid var(--menu-border);
-  box-shadow: var(--menu-shadow);
-}
-
-.tasks-menu-item-active {
-  background-color: var(--menu-item-active-bg);
-  color: var(--menu-item-active-text);
-}
-
-.tasks-menu-item-idle:hover {
-  background-color: var(--menu-item-hover-bg);
-  color: var(--menu-item-hover-text);
-}
-
 .tasks-linked-entry {
   color: rgba(0, 230, 153, 0.78);
   background: rgba(0, 122, 77, 0.2);
@@ -1751,15 +1735,17 @@ html[data-theme='emerald-parchment'] .link-picker-tab-idle:hover {
   color: var(--link-picker-tab-idle-hover-text);
 }
 
-html[data-theme='emerald-parchment'] .tasks-menu-item-active.text-red-400 {
+/* Prioritätsfarben der aktiven Menüzeile (TaskRow-Prioritätsmenü auf ui/Dropdown)
+   in Parchment-lesbare Töne übersetzen. */
+html[data-theme='emerald-parchment'] .list-toolbar-option-active.text-red-400 {
   color: #b63f32;
 }
 
-html[data-theme='emerald-parchment'] .tasks-menu-item-active.text-yellow-400 {
+html[data-theme='emerald-parchment'] .list-toolbar-option-active.text-yellow-400 {
   color: #9a5c00;
 }
 
-html[data-theme='emerald-parchment'] .tasks-menu-item-active.text-green-400 {
+html[data-theme='emerald-parchment'] .list-toolbar-option-active.text-green-400 {
   color: #0b6e48;
 }
 

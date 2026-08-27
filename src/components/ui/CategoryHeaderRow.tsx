@@ -68,8 +68,8 @@ export default function CategoryHeaderRow<C extends CategoryLike>({
         {canDelete && (
           editor.confirmDeleteCatId === category.id ? (
             <>
-              <Button onClick={() => editor.handleDeleteCat(category.id)} variant="danger" className="text-xs px-1">{t('trash.confirmYes')}</Button>
-              <Button onClick={() => editor.setConfirmDeleteCatId(null)} variant="ghost" className="text-xs">{t('trash.confirmNo')}</Button>
+              <Button onClick={() => editor.handleDeleteCat(category.id)} variant="danger" className="text-xs px-1">{t('common.confirmYes')}</Button>
+              <Button onClick={() => editor.setConfirmDeleteCatId(null)} variant="ghost" className="text-xs">{t('common.confirmNo')}</Button>
             </>
           ) : (
             <Button onClick={() => editor.handleDeleteCat(category.id)} variant="danger" className="p-0.5 ml-1">

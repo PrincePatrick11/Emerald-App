@@ -2,37 +2,24 @@ import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { Trash2, RotateCcw, BookOpen, Library, Tag, Wand2, FolderOpen, CheckSquare, Square, ListTodo } from 'lucide-react';
+import { Trash2, RotateCcw, CheckSquare, Square } from 'lucide-react';
+import { TRASH_KIND_ICONS } from '../../lib/modules';
 import { useTrashStore } from '../../store/trashStore';
 import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { differenceInDays } from 'date-fns';
-import { formatMonthGroup, formatTimeDistance } from '../../lib/formatDate';
+import { formatTimeDistance } from '../../lib/formatDate';
+import { sortItems } from '../../lib/sortItems';
+import { groupBy, groupByMonth } from '../../lib/groupBy';
 import { categoryLabel } from '../../lib/categories';
 import Dashboard from '../ui/Dashboard';
 import Button from '../ui/Button';
 import type { TrashedItem } from '../../types';
-import type { SortMode } from '../../store/uiStore';
 
 function typeIcon(type: TrashedItem['type']) {
-  if (type === 'journal') return <BookOpen size={14} className="text-stone-500 flex-shrink-0" />;
-  if (type === 'wiki') return <Library size={14} className="text-stone-500 flex-shrink-0" />;
-  if (type === 'operation') return <Wand2 size={14} className="text-stone-500 flex-shrink-0" />;
-  if (type === 'wiki_category' || type === 'operation_category' || type === 'task_category')
-    return <FolderOpen size={14} className="text-stone-500 flex-shrink-0" />;
-  if (type === 'task') return <ListTodo size={14} className="text-stone-500 flex-shrink-0" />;
-  return <Tag size={14} className="text-stone-500 flex-shrink-0" />;
-}
-
-function sortItems(items: TrashedItem[], sort: SortMode): TrashedItem[] {
-  return [...items].sort((a, b) => {
-    if (sort === 'date_desc')  return new Date(b.deleted_at).getTime() - new Date(a.deleted_at).getTime();
-    if (sort === 'date_asc')   return new Date(a.deleted_at).getTime() - new Date(b.deleted_at).getTime();
-    if (sort === 'alpha_asc')  return a.title.localeCompare(b.title);
-    if (sort === 'alpha_desc') return b.title.localeCompare(a.title);
-    return 0;
-  });
+  const Icon = TRASH_KIND_ICONS[type];
+  return <Icon size={14} className="text-stone-500 flex-shrink-0" />;
 }
 
 function SectionHeader({ label, count }: { label: string; count: number }) {
@@ -104,20 +91,20 @@ function ItemRow({ item, confirmingId, setConfirmingId, restore, handlePermanent
       <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
         {confirming ? (
           <>
-            <span className="text-xs text-stone-400">{t('trash.sure')}</span>
+            <span className="text-xs text-stone-400">{t('common.confirmSure')}</span>
             <Button
               onClick={() => handlePermanentDelete(item)}
               variant="danger"
               className="text-xs px-2.5 py-1.5"
             >
-              {t('trash.confirmYes')}
+              {t('common.confirmYes')}
             </Button>
             <Button
               onClick={() => setConfirmingId(null)}
               variant="ghost"
               className="text-xs px-2 py-1.5"
             >
-              {t('trash.confirmNo')}
+              {t('common.confirmNo')}
             </Button>
           </>
         ) : (
@@ -172,12 +159,12 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, handlePermanen
       <div className="flex items-center gap-1 pt-1 border-t border-stone-700/40" onClick={(e) => e.stopPropagation()}>
         {confirming ? (
           <>
-            <span className="text-xs text-stone-400">{t('trash.sure')}</span>
+            <span className="text-xs text-stone-400">{t('common.confirmSure')}</span>
             <Button onClick={() => handlePermanentDelete(item)} variant="danger" className="text-xs px-2 py-1">
-              {t('trash.confirmYes')}
+              {t('common.confirmYes')}
             </Button>
             <Button onClick={() => setConfirmingId(null)} variant="ghost" className="text-xs px-2 py-1">
-              {t('trash.confirmNo')}
+              {t('common.confirmNo')}
             </Button>
           </>
         ) : (
@@ -264,7 +251,8 @@ export default function TrashView() {
 
   const itemProps: ItemSharedProps = { confirmingId, setConfirmingId, restore, handlePermanentDelete, selectedIds, onToggleSelect: toggleSelect, t };
 
-  const sorted = sortItems(items, trashPrefs.sort === 'category' ? 'date_desc' : trashPrefs.sort);
+  // Kein category-Getter: 'category' fällt im Helper auf date_desc zurück.
+  const sorted = sortItems(items, trashPrefs.sort, { date: (i) => i.deleted_at });
 
   // ── Grouped by type/category ───────────────────────────────────────────────
   const renderGrouped = (viewMode: 'list' | 'cards') => {
@@ -280,18 +268,8 @@ export default function TrashView() {
         ? <div className="space-y-1">{subset.map((item) => <ItemRow key={item.id} item={item} {...itemProps} />)}</div>
         : <div className="grid grid-cols-3 gap-3">{subset.map((item) => <ItemCard key={item.id} item={item} {...itemProps} />)}</div>;
 
-    const wikiByCategory = new Map<string, TrashedItem[]>();
-    for (const item of wiki) {
-      const key = item.category ?? 'other';
-      if (!wikiByCategory.has(key)) wikiByCategory.set(key, []);
-      wikiByCategory.get(key)!.push(item);
-    }
-    const opsByCategory = new Map<string, TrashedItem[]>();
-    for (const item of operations) {
-      const key = item.category ?? '—';
-      if (!opsByCategory.has(key)) opsByCategory.set(key, []);
-      opsByCategory.get(key)!.push(item);
-    }
+    const wikiByCategory = groupBy(wiki, (item) => item.category ?? 'other');
+    const opsByCategory = groupBy(operations, (item) => item.category ?? '—');
 
     return (
       <div>
@@ -304,13 +282,13 @@ export default function TrashView() {
         {wiki.length > 0 && (
           <>
             <SectionHeader label={t('nav.wiki')} count={wiki.length} />
-            {[...wikiByCategory.entries()].map(([catKey, catItems]) => {
+            {wikiByCategory.map(({ label: catKey, items: catItems }) => {
               // trashStore joint c.name als category — der Schlüssel ist der Name, nicht die id.
               const catDef = wikiCategories.find((c) => c.name === catKey);
               const label = catDef ? `${catDef.emoji} ${categoryLabel(t, 'wiki', catDef)}` : catKey;
               return (
                 <div key={catKey}>
-                  {wikiByCategory.size > 1 && <SubSectionHeader label={label} />}
+                  {wikiByCategory.length > 1 && <SubSectionHeader label={label} />}
                   {renderItems(catItems)}
                 </div>
               );
@@ -320,12 +298,12 @@ export default function TrashView() {
         {operations.length > 0 && (
           <>
             <SectionHeader label={t('nav.operations')} count={operations.length} />
-            {[...opsByCategory.entries()].map(([catName, catItems]) => {
+            {opsByCategory.map(({ label: catName, items: catItems }) => {
               const catDef = opCategories.find((c) => c.name === catName);
               const label = catDef ? `${catDef.emoji} ${categoryLabel(t, 'operations', catDef)}` : catName;
               return (
                 <div key={catName}>
-                  {opsByCategory.size > 1 && <SubSectionHeader label={label} />}
+                  {opsByCategory.length > 1 && <SubSectionHeader label={label} />}
                   {renderItems(catItems)}
                 </div>
               );
@@ -346,7 +324,7 @@ export default function TrashView() {
         )}
         {cats.length > 0 && (
           <>
-            <SectionHeader label="Categories" count={cats.length} />
+            <SectionHeader label={t('trash.categories')} count={cats.length} />
             {renderItems(cats)}
           </>
         )}
@@ -356,17 +334,12 @@ export default function TrashView() {
 
   // ── Timeline ───────────────────────────────────────────────────────────────
   const renderTimeline = () => {
-    const byMonth = new Map<string, TrashedItem[]>();
-    for (const item of sorted) {
-      const key = formatMonthGroup(item.deleted_at);
-      if (!byMonth.has(key)) byMonth.set(key, []);
-      byMonth.get(key)!.push(item);
-    }
+    const byMonth = groupByMonth(sorted, (i) => i.deleted_at);
     return (
       <div className="space-y-5">
-        {[...byMonth.entries()].map(([month, monthItems]) => (
-          <div key={month}>
-            <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2 px-1">{month}</p>
+        {byMonth.map(({ label, items: monthItems }) => (
+          <div key={label}>
+            <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2 px-1">{label}</p>
             <div className="space-y-1">
               {monthItems.map((item) => <ItemRow key={item.id} item={item} {...itemProps} />)}
             </div>
@@ -404,7 +377,7 @@ export default function TrashView() {
       {hasSelection && (
         <>
           {confirmingBulkDelete && (
-            <span className="text-xs text-stone-400">{t('trash.sure')}</span>
+            <span className="text-xs text-stone-400">{t('common.confirmSure')}</span>
           )}
           <Button
             onClick={handleBulkDelete}
@@ -413,12 +386,12 @@ export default function TrashView() {
           >
             <Trash2 size={12} />
             {confirmingBulkDelete
-              ? t('trash.confirmYes')
+              ? t('common.confirmYes')
               : t('trash.deleteSelected', { count: selectedIds.size })}
           </Button>
           {confirmingBulkDelete && (
             <Button onClick={() => setConfirmingBulkDelete(false)} variant="ghost" className="text-xs px-2 py-1.5 rounded-md">
-              {t('trash.confirmNo')}
+              {t('common.confirmNo')}
             </Button>
           )}
           <div className="w-px h-4 bg-stone-700" />
@@ -434,11 +407,11 @@ export default function TrashView() {
             variant="danger"
             className="text-xs px-3 py-1.5 rounded-md bg-[var(--danger-bg)] border border-[var(--danger-border)] hover:border-[var(--danger-hover-border)]"
           >
-            {confirmingEmpty ? t('trash.confirmYes') : t('trash.emptyTrash')}
+            {confirmingEmpty ? t('common.confirmYes') : t('trash.emptyTrash')}
           </Button>
           {confirmingEmpty && (
             <Button onClick={() => setConfirmingEmpty(false)} variant="ghost" className="text-xs px-2 py-1.5 rounded-md">
-              {t('trash.confirmNo')}
+              {t('common.confirmNo')}
             </Button>
           )}
         </div>
@@ -448,7 +421,7 @@ export default function TrashView() {
 
   const renderTrashContent = () => (
     <>
-      {loading && <p className="text-sm text-stone-600">{t('trash.loading')}</p>}
+      {loading && <p className="text-sm text-stone-600">{t('common.loading')}</p>}
 
       {!loading && items.length === 0 && (
         <div className="flex flex-col items-center justify-center h-full gap-3 text-center">

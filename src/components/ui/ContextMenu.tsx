@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { createPortal } from 'react-dom';
 import type { ReactNode } from 'react';
 
@@ -44,20 +45,8 @@ export default function ContextMenu({ x, y, actions, onClose }: Props) {
     });
   }, [x, y]);
 
-  useEffect(() => {
-    const onMouse = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) onClose();
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    // Delay to skip the right-click mousedown that opened this menu
-    const tid = setTimeout(() => document.addEventListener('mousedown', onMouse), 50);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      clearTimeout(tid);
-      document.removeEventListener('mousedown', onMouse);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [onClose]);
+  // Delay, um das rechtsklickende mousedown zu ueberspringen, das dieses Menue oeffnete.
+  useOutsideClick(true, onClose, { refs: [ref], escape: true, delay: 50 });
 
   // Portal nach `document.body`, aus demselben Grund wie bei `EmojiPicker`:
   // `.app-sidebar` und `.app-main` tragen in beiden Themes `position: relative;

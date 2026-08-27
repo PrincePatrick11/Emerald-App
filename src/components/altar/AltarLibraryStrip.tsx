@@ -96,7 +96,7 @@ function ItemModal({
 
   return (
     <Modal
-      title={item ? t('editor.edit') : t('altar.addItem')}
+      title={item ? t('editor.edit') : t('altar.addElement')}
       onClose={onClose}
       widthClassName="w-full max-w-md"
       bodyClassName="p-4 space-y-3"
@@ -120,7 +120,7 @@ function ItemModal({
         </div>
         {imageError && <p className="text-xs text-red-400">{imageError}</p>}
         <input ref={imageInputRef} type="file" accept={ACCEPTED_IMAGE_MIME} className="hidden" onChange={handleImageChange} />
-        <input ref={nameInputRef} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t('altar.itemName')} className="w-full bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" />
+        <input ref={nameInputRef} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t('altar.elementName')} className="w-full bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" />
         <div className="flex flex-wrap gap-1">
           {categories.map((cat) => (
             <button key={cat.id} onClick={() => { setEditCategory(cat.id); setEditEmoji(''); }} className={`text-xs px-2 py-1 rounded-md transition-colors ${editCategory === cat.id ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{cat.emoji} {altarCategoryLabel(t, cat)}</button>
@@ -130,8 +130,8 @@ function ItemModal({
           <div className="flex items-center justify-between rounded-lg border border-red-700/40 bg-red-950/20 px-3 py-2">
             <span className="text-xs text-red-300">{t('common.deleteConfirm')}</span>
             <span className="flex items-center gap-2">
-              <Button onClick={doDelete} variant="danger" className="text-xs">{t('trash.confirmYes')}</Button>
-              <Button onClick={() => setConfirmDelete(false)} variant="ghost" className="text-xs">{t('trash.confirmNo')}</Button>
+              <Button onClick={doDelete} variant="danger" className="text-xs">{t('common.confirmYes')}</Button>
+              <Button onClick={() => setConfirmDelete(false)} variant="ghost" className="text-xs">{t('common.confirmNo')}</Button>
             </span>
           </div>
         ) : (
@@ -208,7 +208,7 @@ function CategoryModal({
 
   return (
     <Modal
-      title={category ? t('editor.edit') : (t('altar.addCategory') ?? 'Add Category')}
+      title={category ? t('editor.edit') : t('altar.addCategory')}
       onClose={onClose}
       widthClassName="w-full max-w-xs"
       bodyClassName="p-4 space-y-3"
@@ -222,15 +222,15 @@ function CategoryModal({
               <button onClick={toggle} className="w-10 h-10 flex items-center justify-center text-2xl bg-stone-800/60 rounded-lg hover:bg-stone-700/60 transition-colors">{catEmoji}</button>
             )}
           />
-          <input value={catName} onChange={(e) => { setCatName(e.target.value); setNameError(''); }} placeholder={t('altar.categoryName') ?? 'Category name'} className="flex-1 bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" onKeyDown={(e) => { if (e.key === 'Enter') save(); }} autoFocus />
+          <input value={catName} onChange={(e) => { setCatName(e.target.value); setNameError(''); }} placeholder={t('altar.categoryName')} className="flex-1 bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" onKeyDown={(e) => { if (e.key === 'Enter') save(); }} autoFocus />
         </div>
         {nameError && <p className="text-xs text-red-400">{nameError}</p>}
         {category && !isFallback && confirmDelete ? (
           <div className="flex items-center justify-between rounded-lg border border-red-700/40 bg-red-950/20 px-3 py-2">
             <span className="text-xs text-red-300">{t('common.deleteConfirm')}</span>
             <span className="flex items-center gap-2">
-              <Button onClick={doDelete} variant="danger" className="text-xs">{t('trash.confirmYes')}</Button>
-              <Button onClick={() => setConfirmDelete(false)} variant="ghost" className="text-xs">{t('trash.confirmNo')}</Button>
+              <Button onClick={doDelete} variant="danger" className="text-xs">{t('common.confirmYes')}</Button>
+              <Button onClick={() => setConfirmDelete(false)} variant="ghost" className="text-xs">{t('common.confirmNo')}</Button>
             </span>
           </div>
         ) : (
@@ -462,7 +462,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
       <div className={`pointer-events-none absolute top-0 left-0 right-0 h-1 transition-colors ${(isResizing || isResizeHotspot) ? 'bg-jade-500/20' : 'bg-transparent'}`} />
       <div className="mb-3 flex items-start justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{t('altar.libraryTitle')}</p>
-        <Button onClick={openCreateModal} variant="ghost" className="flex-shrink-0 flex items-center gap-1 text-xs" title={t('altar.addItem')}><Plus size={12} />{t('altar.element')}</Button>
+        <Button onClick={openCreateModal} variant="ghost" className="flex-shrink-0 flex items-center gap-1 text-xs" title={t('altar.addElement')}><Plus size={12} />{t('altar.element')}</Button>
       </div>
       <div className="mb-3 flex items-center gap-1">
         <div className="relative flex-1 min-w-0">
@@ -495,7 +495,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
         <button onClick={openAddCategoryModal} className="flex-shrink-0 px-2 py-1 rounded-md text-xs text-stone-600 hover:text-stone-400 transition-colors flex items-center gap-1" title={t('altar.addCategory')}><Plus size={11} />{t('altar.category')}</button>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto pr-1">
-        {filteredItems.length === 0 && <p className="text-xs text-stone-700 px-2 py-3">{t('altar.noItems')}</p>}
+        {filteredItems.length === 0 && <p className="text-xs text-stone-700 px-2 py-3">{t('altar.noElements')}</p>}
         <div className="grid [grid-template-columns:repeat(auto-fill,70px)] gap-1.5 justify-start">
           {filteredItems.map((item) => (
             <div key={item.id} onPointerDown={(e) => { if (!editable) return; e.preventDefault(); setAltarDragItem(item); }} className={`group w-[70px] h-[85px] rounded-md border border-stone-700/60 bg-stone-900/40 px-1.5 py-2 flex flex-col ${editable ? 'cursor-grab active:cursor-grabbing' : 'cursor-default opacity-90'}`}>

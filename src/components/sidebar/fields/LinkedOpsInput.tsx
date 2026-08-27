@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { useOperationStore } from '../../../store/operationStore';
+import { useOutsideClick } from '../../../hooks/useOutsideClick';
 
 export default function LinkedOpsInput({
   ids, onChange, inputCls,
@@ -17,14 +18,7 @@ export default function LinkedOpsInput({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+  useOutsideClick(open, () => setOpen(false), { refs: [ref] });
 
   const filtered = useMemo(() =>
     operations

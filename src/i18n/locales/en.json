@@ -1,12 +1,12 @@
 {
-  "app": {
-    "name": "Emerald"
-  },
   "common": {
-    "yes": "Yes",
-    "no": "No",
     "delete": "Delete",
     "deleteConfirm": "Delete?",
+    "confirmSure": "Sure?",
+    "confirmYes": "Yes, delete",
+    "confirmNo": "Cancel",
+    "ok": "OK",
+    "loading": "Loading...",
     "unsupportedImageFormat": "Unsupported format. Allowed: PNG, JPEG, GIF, WebP, SVG",
     "searchEmoji": "Search emoji…",
     "noEmojiResults": "No matches",
@@ -42,15 +42,12 @@
     "journal": "Journal",
     "wiki": "Wiki",
     "altar": "Altar",
-    "creation": "Creation",
     "tags": "Tags",
     "trash": "Trash",
     "operations": "Operations",
     "tasks": "Tasks",
     "settings": "Settings",
-    "vaults": "Vaults",
-    "newEntry": "New Entry",
-    "newArticle": "New Article"
+    "vaults": "Vaults"
   },
   "sidebar": {
     "collapseList": "Collapse entry list",
@@ -68,6 +65,7 @@
     "all": "All",
     "addCategory": "Add category",
     "categoryName": "Category name…",
+    "uncategorized": "Uncategorized",
     "active": "Active",
     "inactive": "Inactive",
     "endDate": "End Date",
@@ -80,22 +78,22 @@
     }
   },
   "altar": {
-    "addItem": "Add item",
+    "addElement": "Add element",
     "element": "Element",
     "category": "Category",
     "addCategory": "Add category",
     "categoryName": "Category name…",
     "newAltar": "New altar",
     "libraryTitle": "Altar Library",
-    "itemName": "Name…",
+    "elementName": "Name…",
     "all": "All",
     "uncategorized": "Uncategorized",
-    "noItems": "No items yet.",
+    "noElements": "No elements yet.",
     "none": "No altars yet.",
     "start": "Create your first altar.",
     "untitled": "Untitled Altar",
     "uploadImage": "Upload image",
-    "favicon": "Favicon",
+    "favicon": "Icon",
     "background": "Background",
     "changeBackground": "Change Background",
     "customBackground": "Custom",
@@ -128,8 +126,8 @@
     "gridToggleScale": "Scale",
     "canvasOptions": "Canvas options",
     "ratio": "Ratio",
-    "chooseEmoji": "Choose symbol…",
-    "itemsPlaced": "items placed",
+    "chooseEmoji": "Choose emoji…",
+    "elementsPlaced": "elements placed",
     "placedElements": "Placed Elements",
     "noPlacedElements": "No elements on this altar yet.",
     "summary": "Summary",
@@ -308,13 +306,12 @@
     "globalPlaceholder": "Search everything…",
     "hint": "Titles, tags and content across every module.",
     "clear": "Clear search",
-    "altarItems": "Altar item",
+    "altarElements": "Altar element",
     "categories": "Category",
     "showMore": "Show {{count}} more result",
     "showMore_other": "Show {{count}} more results"
   },
   "routines": {
-    "title": "Routines",
     "newRoutine": "New routine",
     "namePlaceholder": "Name…",
     "contentPlaceholder": "Markdown supported…"
@@ -376,6 +373,7 @@
     "chooseFolder": "Choose folder…",
     "defaultFolder": "Default folder",
     "openDbFile": "Choose emerald.db",
+    "dbFileFilter": "Emerald Vault",
     "relocate": "Locate again…",
     "missing": "Folder not found",
     "accessDenied": "No access to the folder",
@@ -458,13 +456,11 @@
     "delete": "Delete"
   },
   "backlinks": {
-    "title": "Backlinks",
     "none": "No backlinks yet."
   },
   "trash": {
     "title": "Trash",
     "empty": "Trash is empty.",
-    "loading": "Loading...",
     "emptyTrash": "Empty Trash",
     "restore": "Restore",
     "deletePermanently": "Delete permanently",
@@ -473,11 +469,9 @@
     "daysLeft": "{{count}} day left",
     "daysLeft_other": "{{count}} days left",
     "confirmEmpty": "Delete everything?",
-    "sure": "Sure?",
-    "confirmYes": "Yes, delete",
-    "confirmNo": "Cancel",
     "selectAll": "Select all",
     "deselectAll": "Deselect all",
+    "categories": "Categories",
     "deleteSelected": "Delete selected ({{count}})"
   },
   "menu": {

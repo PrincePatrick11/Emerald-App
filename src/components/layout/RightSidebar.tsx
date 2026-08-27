@@ -1,13 +1,25 @@
 import { useTranslation } from 'react-i18next';
+import type { ComponentType } from 'react';
 import { Pencil, Check, X, Trash2, Maximize2, Minimize2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
 import type { ActiveView } from '../../types';
+import type { ViewId } from '../../lib/modules';
 import JournalPropertiesPanel from '../sidebar/panels/JournalPropertiesPanel';
 import WikiPropertiesPanel from '../sidebar/panels/WikiPropertiesPanel';
 import OperationPropertiesPanel from '../sidebar/panels/OperationPropertiesPanel';
 import AltarSidebarPanel from '../sidebar/panels/AltarSidebarPanel';
 import Button from '../ui/Button';
+
+// Eager, nicht lazy: die Panels hängen ohnehin an Stores, die beim Start
+// geladen sind, und die Seitenleiste ist ab dem ersten Frame sichtbar.
+// tasks hat bewusst kein Panel (Aufgaben werden inline bearbeitet).
+const PROPERTIES_PANELS: Partial<Record<ViewId, ComponentType>> = {
+  journal: JournalPropertiesPanel,
+  wiki: WikiPropertiesPanel,
+  operations: OperationPropertiesPanel,
+  altar: AltarSidebarPanel,
+};
 
 /* Mirrors the entry-list tab bar in LeftSidebarEntryList so both sidebars put their
    bottom border on the same line. Keep the two in sync — with one known
@@ -19,18 +31,9 @@ const ACTION_BAR_CLASSES = 'flex items-center gap-0.5 px-3 h-14 border-b border-
 
 function PropertiesContent({ activeView }: { activeView: ActiveView }) {
   const { t } = useTranslation();
-  switch (activeView.type) {
-    case 'journal':
-      return <JournalPropertiesPanel />;
-    case 'wiki':
-      return <WikiPropertiesPanel />;
-    case 'operations':
-      return <OperationPropertiesPanel />;
-    case 'altar':
-      return <AltarSidebarPanel />;
-    default:
-      return <p className="text-xs text-stone-600 px-2 py-3">{t('properties.noEntry')}</p>;
-  }
+  const Panel = PROPERTIES_PANELS[activeView.type];
+  if (!Panel) return <p className="text-xs text-stone-600 px-2 py-3">{t('properties.noEntry')}</p>;
+  return <Panel />;
 }
 
 function RightSidebarActionBar() {

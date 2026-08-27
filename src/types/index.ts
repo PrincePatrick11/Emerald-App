@@ -1,3 +1,5 @@
+import type { TrashKind, ViewId } from '../lib/modules';
+
 export type ContentType = 'journal' | 'wiki' | 'operation';
 
 export interface JournalEntry {
@@ -82,7 +84,7 @@ export interface Operation {
 export interface TrashedItem {
   id: string;
   title: string;
-  type: 'journal' | 'wiki' | 'tag' | 'operation' | 'wiki_category' | 'operation_category' | 'task' | 'task_category';
+  type: TrashKind;
   deleted_at: string;
   category?: string;
 }
@@ -218,7 +220,9 @@ export interface Task {
 }
 
 export interface ActiveView {
-  type: ContentType | 'home' | 'tags' | 'trash' | 'altar' | 'operations' | 'tasks';
+  // ViewId statt der alten Ad-hoc-Union: die enthielt über ContentType auch
+  // 'operation' (singular), das als View-Typ nie gültig war.
+  type: ViewId;
   id?: string;
   mode?: 'view' | 'edit';
 }

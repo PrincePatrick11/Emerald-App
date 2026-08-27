@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Library, BookOpen, Wand2 } from 'lucide-react';
 import { useUIStore } from '../../../store/uiStore';
 import { fetchBacklinks, type BacklinkEntry } from '../../../lib/links';
-import { viewTypeForEntryType } from '../../../lib/tabs';
+import { viewTypeForEntryType } from '../../../lib/modules';
 
 export default function BacklinksPanel({ currentId }: { currentId?: string }) {
   const { t } = useTranslation();
@@ -30,7 +30,7 @@ export default function BacklinksPanel({ currentId }: { currentId?: string }) {
   }
 
   if (loading) {
-    return <p className="text-xs text-stone-600 px-2 py-3">Loading…</p>;
+    return <p className="text-xs text-stone-600 px-2 py-3">{t('common.loading')}</p>;
   }
 
   if (backlinks.length === 0) {

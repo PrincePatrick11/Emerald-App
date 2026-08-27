@@ -13,9 +13,10 @@ import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import { getMoonPhase, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId, isImageIcon } from '../../lib/helpers';
-import { viewTypeForEntryType } from '../../lib/tabs';
+import { viewTypeForEntryType } from '../../lib/modules';
 import { categoryLabel } from '../../lib/categories';
 import { formatDayHeading, formatEntryDate } from '../../lib/formatDate';
+import { sortItems } from '../../lib/sortItems';
 import type { MoonPhase } from '../../types';
 import type { HomeSort, HomeView, HomeSectionPrefs } from '../../store/uiStore';
 
@@ -36,8 +37,8 @@ function SectionToolbar({
   const sortOptions: { value: HomeSort; label: string }[] = [
     { value: 'date_desc',  label: t('home.newest') },
     { value: 'date_asc',   label: t('home.oldest') },
-    { value: 'alpha_asc',  label: 'A → Z' },
-    { value: 'alpha_desc', label: 'Z → A' },
+    { value: 'alpha_asc',  label: t('listView.alphaAsc') },
+    { value: 'alpha_desc', label: t('listView.alphaDesc') },
   ];
   const viewOptions: { value: HomeView; label: string }[] = [
     { value: 'list',  label: t('listView.list') },
@@ -61,18 +62,6 @@ function SectionToolbar({
 }
 
 // ── Sort helpers ──────────────────────────────────────────────────────────────
-
-function applySort<T extends { title?: string; created_at?: string; updated_at?: string }>(
-  items: T[], sort: HomeSort, dateField: 'created_at' | 'updated_at' = 'created_at'
-): T[] {
-  return [...items].sort((a, b) => {
-    if (sort === 'date_desc') return new Date(b[dateField]!).getTime() - new Date(a[dateField]!).getTime();
-    if (sort === 'date_asc')  return new Date(a[dateField]!).getTime() - new Date(b[dateField]!).getTime();
-    if (sort === 'alpha_asc') return (a.title ?? '').localeCompare(b.title ?? '');
-    if (sort === 'alpha_desc') return (b.title ?? '').localeCompare(a.title ?? '');
-    return 0;
-  });
-}
 
 function applyCount<T>(items: T[], count: number): T[] {
   return count === 0 ? items : items.slice(0, count);
@@ -150,9 +139,9 @@ export default function HomeView() {
     : [];
 
   // Sorted + sliced data
-  const journalItems = applyCount(applySort(entries, homeJournalPrefs.sort, 'created_at'), homeJournalPrefs.count);
-  const opsItems     = applyCount(applySort(operations, homeOpsPrefs.sort, 'updated_at'), homeOpsPrefs.count);
-  const wikiItems    = applyCount(applySort(articles, homeWikiPrefs.sort, 'updated_at'), homeWikiPrefs.count);
+  const journalItems = applyCount(sortItems(entries, homeJournalPrefs.sort, { date: (e) => e.created_at }), homeJournalPrefs.count);
+  const opsItems     = applyCount(sortItems(operations, homeOpsPrefs.sort, { date: (o) => o.updated_at }), homeOpsPrefs.count);
+  const wikiItems    = applyCount(sortItems(articles, homeWikiPrefs.sort, { date: (a) => a.updated_at }), homeWikiPrefs.count);
 
   return (
     <div className="h-full overflow-y-auto">

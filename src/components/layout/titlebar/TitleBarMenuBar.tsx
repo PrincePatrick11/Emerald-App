@@ -1,4 +1,5 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
+import { useOutsideClick } from '../../../hooks/useOutsideClick';
 import { Menu } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
@@ -34,19 +35,7 @@ export default function TitleBarMenuBar({ compact }: { compact: boolean }) {
   const [focusPanelOnOpen, setFocusPanelOnOpen] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (openMenu === null) return;
-    const onMouseDown = (e: MouseEvent) => {
-      if (!barRef.current?.contains(e.target as Node)) setOpenMenu(null);
-    };
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenMenu(null); };
-    document.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onMouseDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [openMenu]);
+  useOutsideClick(openMenu !== null, () => setOpenMenu(null), { refs: [barRef], escape: true });
 
   const enabled = computeMenuEnabledState(activeView, operations);
   const close = () => setOpenMenu(null);

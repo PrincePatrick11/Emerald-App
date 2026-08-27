@@ -1,21 +1,24 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Trash2, Copy, Pencil } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import { useUIStore } from '../../store/uiStore';
 import { useEntryEditor } from '../../hooks/useEntryEditor';
+import { useEditActions } from '../../hooks/useEditActions';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
 import RichEditor from '../editor/RichEditor';
-import TagInput from '../editor/TagInput';
+import EntryDetailFrame from '../ui/EntryDetailFrame';
 import Dashboard from '../ui/Dashboard';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId } from '../../lib/helpers';
 import { formatEntryDate, formatEntryDateLong, formatMonthGroup } from '../../lib/formatDate';
+import { sortItems } from '../../lib/sortItems';
+import { groupBy } from '../../lib/groupBy';
 import type { JournalEntry, MoonPhase } from '../../types';
 
 const MOON_PHASE_ORDER: MoonPhase[] = [
@@ -25,8 +28,8 @@ const MOON_PHASE_ORDER: MoonPhase[] = [
 
 export default function JournalView() {
   const { t } = useTranslation();
-  const { activeView, setActiveView, setEditActions, journalPrefs, setJournalPrefs } = useUIStore(
-    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, setEditActions: s.setEditActions, journalPrefs: s.journalPrefs, setJournalPrefs: s.setJournalPrefs }))
+  const { activeView, setActiveView, journalPrefs, setJournalPrefs } = useUIStore(
+    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, journalPrefs: s.journalPrefs, setJournalPrefs: s.setJournalPrefs }))
   );
   const { entries, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useJournalStore(
     useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
@@ -59,26 +62,22 @@ export default function JournalView() {
   const linkedWikiIdsRef = useRef<string[]>(entry?.linked_wiki_ids ?? []);
   linkedWikiIdsRef.current = entry?.linked_wiki_ids ?? [];
 
-  // Der Editor-Inhalt wird pro Tastendruck in diesen Ref gespiegelt statt in
-  // State — ein State-Update haette die komplette View pro Anschlag neu
-  // gerendert. Gelesen wird er erst beim Speichern (buildPatch).
-  const pendingHtmlRef = useRef('');
   // Cancel verwirft die ungespeicherten letzten Sekunden, indem der Editor
   // ueber den Key frisch vom letzten gespeicherten Stand mountet.
   const [editorEpoch, setEditorEpoch] = useState(0);
 
-  const { triggerAutoSave, cancelAutoSave } = useEntryEditor({
+  const { triggerAutoSave, cancelAutoSave, contentRef, handleContentChange } = useEntryEditor({
     entityId: entry?.id,
     isEditing,
     ready: !!entry && loadedEntryId === entry.id,
-    buildPatch: () => ({ title, content: pendingHtmlRef.current, tags }),
+    buildPatch: (content) => ({ title, content, tags }),
     update: updateEntry,
   });
 
   useEffect(() => {
     if (entry) {
       setTitle(entry.title);
-      pendingHtmlRef.current = entry.content;
+      contentRef.current = entry.content;
       setTags(entry.tags ?? []);
       setLoadedEntryId(entry.id);
     } else {
@@ -154,7 +153,7 @@ export default function JournalView() {
   const handleDone = async () => {
     if (!entry) return;
     cancelAutoSave();
-    await updateEntry(entry.id, { title, content: pendingHtmlRef.current, tags });
+    await updateEntry(entry.id, { title, content: contentRef.current, tags });
     setActiveView({ type: 'journal', id: entry.id, mode: 'view' });
   };
 
@@ -163,7 +162,7 @@ export default function JournalView() {
     if (entry) {
       setTitle(entry.title);
       setTags(entry.tags ?? []);
-      pendingHtmlRef.current = entry.content;
+      contentRef.current = entry.content;
       setEditorEpoch((e) => e + 1);
     }
     setActiveView({ type: 'journal', id: entry!.id, mode: 'view' });
@@ -178,23 +177,7 @@ export default function JournalView() {
     setActiveView({ type: 'journal' });
   };
 
-  const handleContentChange = useCallback((html: string) => {
-    pendingHtmlRef.current = html;
-    triggerAutoSave();
-  }, [triggerAutoSave]);
-
-  const editHandlersRef = useRef({ onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
-  editHandlersRef.current = { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete };
-
-  useEffect(() => {
-    if (!isEditing) return;
-    setEditActions({
-      onSave: () => editHandlersRef.current.onSave(),
-      onCancel: () => editHandlersRef.current.onCancel(),
-      onDelete: () => editHandlersRef.current.onDelete(),
-    });
-    return () => setEditActions(null);
-  }, [isEditing]);
+  useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
 
   const enterEditMode = () => {
     if (!isEditing && entry) setActiveView({ type: 'journal', id: entry.id, mode: 'edit' });
@@ -223,29 +206,17 @@ export default function JournalView() {
 
     const activeFilterCount = filterPhases.length > 0 ? 1 : 0;
 
-    const sorted = [...filtered].sort((a, b) => {
-      if (sort === 'alpha_asc') return a.title.localeCompare(b.title);
-      if (sort === 'alpha_desc') return b.title.localeCompare(a.title);
-      if (sort === 'category') return (a.moon_phase ?? '').localeCompare(b.moon_phase ?? '');
-      if (sort === 'date_asc') return a.created_at.localeCompare(b.created_at);
-      return b.created_at.localeCompare(a.created_at); // date_desc
+    const sorted = sortItems(filtered, sort, {
+      date: (e) => e.created_at,
+      // 'category' heißt im Journal: nach Mondphase.
+      category: (e) => e.moon_phase ?? '',
     });
 
     // Group for timeline (by month) or category sort (by moon phase)
-    const grouped: { label: string; items: JournalEntry[] }[] = (() => {
-      if (view === 'timeline' || sort === 'category') {
-        const map = new Map<string, JournalEntry[]>();
-        sorted.forEach((e) => {
-          const key = view === 'timeline'
-            ? formatMonthGroup(e.created_at)
-            : t(`moonPhase.${e.moon_phase}`);
-          if (!map.has(key)) map.set(key, []);
-          map.get(key)!.push(e);
-        });
-        return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
-      }
-      return [{ label: '', items: sorted }];
-    })();
+    const grouped: { label: string; items: JournalEntry[] }[] =
+      view === 'timeline' || sort === 'category'
+        ? groupBy(sorted, (e) => (view === 'timeline' ? formatMonthGroup(e.created_at) : t(`moonPhase.${e.moon_phase}`)))
+        : [{ label: '', items: sorted }];
 
     const go = (e: JournalEntry) => setActiveView({ type: 'journal', id: e.id, mode: 'view' });
 
@@ -341,41 +312,10 @@ export default function JournalView() {
     );
   }
 
-  return (
-    <div className="h-full flex flex-col">
-      {/* Topbar */}
-      <div className="flex items-center justify-between px-6 h-14 border-b border-stone-700/60 flex-shrink-0">
-        <div className="flex items-center gap-2 text-xs text-stone-600">
-          <button onClick={() => setActiveView({ type: 'journal' })} className="text-stone-500 transition-colors hover:text-stone-300">
-            {t('nav.journal')}
-          </button>
-          <span>{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</span>
-          <span>{formatEntryDateLong(entry.created_at)}</span>
-          {entry.moon_phase && <span>· {t(`moonPhase.${entry.moon_phase}`)}</span>}
-          {isEditing && <span className="text-stone-700 italic ml-1">{t('editor.editing')}</span>}
-        </div>
-      </div>
-
-      {/* Title — double-click enters edit mode */}
-      <div className="px-8 pt-8 pb-4 flex-shrink-0" onDoubleClick={enterEditMode}>
-        {isEditing ? (
-          <input
-            autoFocus
-            type="text"
-            value={title}
-            onChange={(e) => { const nextTitle = e.target.value; setTitle(nextTitle); triggerAutoSave(); }}
-            placeholder={t('journal.untitled')}
-            className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100
-                       placeholder-stone-700 outline-none selectable"
-          />
-        ) : (
-          <h1 className="entry-view-title text-2xl font-semibold text-stone-100 cursor-text"
-              title={t('editor.doubleClickEdit')}>
-            {entry.title || t('journal.untitled')}
-          </h1>
-        )}
-      </div>
-
+  // Paradigma-/Bannung-/Meditations-Chips plus verknuepfte Operationen und
+  // Wiki-Artikel — der Journal-eigene Inhalt des belowTitle-Slots.
+  const propertyChips = (
+    <>
       {/* Paradigm + Bannung + Meditation — one row */}
       {(entry.paradigm_id || entry.is_bannung || entry.is_meditation) && (() => {
         const chipCls = 'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-stone-800/60 border border-stone-700/40 text-stone-400 hover:text-stone-200 hover:border-stone-600 transition-colors';
@@ -476,27 +416,36 @@ export default function JournalView() {
         </div>
       )}
 
-      {/* Tags */}
-      <div className="px-8 pb-3 flex-shrink-0" onDoubleClick={enterEditMode}>
-        <TagInput
-          tags={tags}
-          onChange={(newTags) => { setTags(newTags); triggerAutoSave(); }}
-          readOnly={true}
-        />
-      </div>
+    </>
+  );
 
-      {/* Editor — double-click enters edit mode */}
-      <div className="flex-1 overflow-hidden px-8 pb-8" onDoubleClick={enterEditMode}>
-        {loadedEntryId === entry.id && (
-          <RichEditor
-            key={`${entry.id}:${editorEpoch}`}
-            initialContent={entry.content}
-            placeholder={t('journal.placeholder')}
-            onChange={handleContentChange}
-            editable={isEditing}
-          />
-        )}
-      </div>
-    </div>
+  return (
+    <EntryDetailFrame
+      module="journal"
+      isEditing={isEditing}
+      onEnterEditMode={enterEditMode}
+      breadcrumbMeta={
+        <>
+          <span>{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</span>
+          <span>·</span>
+          <span>{formatEntryDateLong(entry.created_at)}</span>
+          {entry.moon_phase && <><span>·</span><span>{t(`moonPhase.${entry.moon_phase}`)}</span></>}
+        </>
+      }
+      title={isEditing ? title : entry.title}
+      onTitleChange={(nextTitle) => { setTitle(nextTitle); triggerAutoSave(); }}
+      belowTitle={propertyChips}
+      tags={{ value: tags, onChange: (newTags) => { setTags(newTags); triggerAutoSave(); } }}
+    >
+      {loadedEntryId === entry.id && (
+        <RichEditor
+          key={`${entry.id}:${editorEpoch}`}
+          initialContent={entry.content}
+          placeholder={t('journal.placeholder')}
+          onChange={handleContentChange}
+          editable={isEditing}
+        />
+      )}
+    </EntryDetailFrame>
   );
 }

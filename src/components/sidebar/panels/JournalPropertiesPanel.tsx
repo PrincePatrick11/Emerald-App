@@ -10,6 +10,7 @@ import LinkedWikiInput from '../fields/LinkedWikiInput';
 import PropertiesEditView from '../fields/PropertiesEditView';
 import PropertiesReadView from '../fields/PropertiesReadView';
 import { PropertySummaryRow } from '../fields/PropertySummaryRow';
+import SelectField from '../fields/SelectField';
 import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
 
 export default function JournalPropertiesPanel() {
@@ -91,53 +92,35 @@ export default function JournalPropertiesPanel() {
 
   return (
     <PropertiesEditView>
-      <div>
-        <p className="label-xs mb-2">🌀 {t('properties.paradigma')}</p>
-        <select
-          value={entry.paradigm_id ?? ''}
-          onChange={(e) => updateEntry(entry.id, { paradigm_id: e.target.value || null })}
-          className={inputCls + ' cursor-pointer'}
-        >
-          <option value="">{t('properties.none')}</option>
-          {paradigmArticles.map((a) => (
-            <option key={a.id} value={a.id}>{a.title}</option>
-          ))}
-        </select>
-      </div>
+      <SelectField
+        label={`🌀 ${t('properties.paradigma')}`}
+        value={entry.paradigm_id}
+        options={paradigmArticles}
+        getId={(a) => a.id}
+        getLabel={(a) => a.title}
+        noneLabel={t('properties.none')}
+        onChange={(paradigm_id) => updateEntry(entry.id, { paradigm_id })}
+      />
 
-      <div>
-        <p className="label-xs mb-2">🚫 {t('properties.bannung')}</p>
-        <select
-          value={entry.bannung_type_wiki_id ?? ''}
-          onChange={(e) => updateEntry(entry.id, {
-            bannung_type_wiki_id: e.target.value || null,
-            is_bannung: !!e.target.value,
-          })}
-          className={inputCls + ' cursor-pointer'}
-        >
-          <option value="">{t('properties.none')}</option>
-          {bannungArticles.map((a) => (
-            <option key={a.id} value={a.id}>{a.title}</option>
-          ))}
-        </select>
-      </div>
+      <SelectField
+        label={`🚫 ${t('properties.bannung')}`}
+        value={entry.bannung_type_wiki_id}
+        options={bannungArticles}
+        getId={(a) => a.id}
+        getLabel={(a) => a.title}
+        noneLabel={t('properties.none')}
+        onChange={(id) => updateEntry(entry.id, { bannung_type_wiki_id: id, is_bannung: !!id })}
+      />
 
-      <div>
-        <p className="label-xs mb-2">🧘 {t('properties.meditation')}</p>
-        <select
-          value={entry.meditation_type_wiki_id ?? ''}
-          onChange={(e) => updateEntry(entry.id, {
-            meditation_type_wiki_id: e.target.value || null,
-            is_meditation: !!e.target.value,
-          })}
-          className={inputCls + ' cursor-pointer'}
-        >
-          <option value="">{t('properties.none')}</option>
-          {meditationArticles.map((a) => (
-            <option key={a.id} value={a.id}>{a.title}</option>
-          ))}
-        </select>
-      </div>
+      <SelectField
+        label={`🧘 ${t('properties.meditation')}`}
+        value={entry.meditation_type_wiki_id}
+        options={meditationArticles}
+        getId={(a) => a.id}
+        getLabel={(a) => a.title}
+        noneLabel={t('properties.none')}
+        onChange={(id) => updateEntry(entry.id, { meditation_type_wiki_id: id, is_meditation: !!id })}
+      />
       {entry.is_meditation && (
         <div>
           <p className="label-xs mb-2">⏱ {t('properties.meditationDuration')}</p>

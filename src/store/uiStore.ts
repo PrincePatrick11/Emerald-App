@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createTabId, isContentView, type OpenTab } from '../lib/tabs';
+import { isViewId, moduleMeta, type LeftListTabId } from '../lib/modules';
 import { normalizeEditorFontId, normalizeThemeId, normalizeUIFontId } from '../themes/theme';
 import type { ActiveView } from '../types';
 
@@ -31,7 +32,7 @@ interface UIState {
   operationsSubTab: string | null;
   wikiSubTab: string | null;
   leftListOpen: boolean;
-  leftListTab: 'all' | 'journal' | 'tasks' | 'operations' | 'wiki' | 'altar';
+  leftListTab: LeftListTabId;
   searchQuery: string;
   journalPrefs: ListPrefs;
   wikiPrefs: ListPrefs;
@@ -61,7 +62,7 @@ interface UIState {
   setOperationsSubTab: (id: string | null) => void;
   setWikiSubTab: (category: string | null) => void;
   toggleLeftList: () => void;
-  setLeftListTab: (tab: 'all' | 'journal' | 'tasks' | 'operations' | 'wiki' | 'altar') => void;
+  setLeftListTab: (tab: LeftListTabId) => void;
   setSearchQuery: (q: string) => void;
   setJournalPrefs: (p: Partial<ListPrefs>) => void;
   setWikiPrefs: (p: Partial<ListPrefs>) => void;
@@ -96,7 +97,9 @@ function loadSavedEditorFontId(): FontId {
 function normalizeSavedTab(tab: unknown): OpenTab | null {
   if (!tab || typeof tab !== 'object') return null;
   const candidate = tab as { id?: string; key?: string; view?: ActiveView };
-  if (!candidate.view?.type) return null;
+  // isViewId: localStorage kann Tab-Typen aus älteren Versionen tragen —
+  // die fallen hier sauber weg, statt als Geister-View zu rendern.
+  if (!candidate.view?.type || !isViewId(candidate.view.type)) return null;
   return { id: candidate.id ?? candidate.key ?? createTabId(), view: candidate.view };
 }
 
@@ -169,8 +172,7 @@ export const useUIStore = create<UIState>((set) => ({
 
   setActiveView: (view) => set((s) => {
     // Save/Cancel/Delete live only in the right sidebar, so edit mode must not start with it closed.
-    const usesEditorSidebar = view.type === 'journal' || view.type === 'wiki'
-      || view.type === 'operations' || view.type === 'altar';
+    const usesEditorSidebar = moduleMeta(view.type)?.usesEditorSidebar ?? false;
     const openSidebar = view.mode === 'edit' && usesEditorSidebar && !s.rightSidebarOpen
       ? { rightSidebarOpen: true }
       : {};

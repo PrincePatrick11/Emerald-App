@@ -2,7 +2,8 @@ import type {
   ActiveView, AltarItem, AltarRecord, JournalEntry, Operation, Tag, Task, WikiArticle,
 } from '../types';
 import { foldTypography, plainTextFor } from './searchText';
-import { viewTypeForEntryType } from './tabs';
+import { viewTypeForEntryType } from './modules';
+import type { CategoryModuleId } from './modules';
 
 /**
  * The global search behind the title bar's field.
@@ -21,8 +22,6 @@ export type SearchKind =
   | 'journal' | 'wiki' | 'operation' | 'task'
   | 'altar' | 'altarItem' | 'tag' | 'category';
 
-/** The module a category belongs to, which is the only way to open one. */
-export type CategoryModule = 'wiki' | 'operations' | 'tasks' | 'altar';
 
 export interface SearchSnippet {
   before: string;
@@ -49,7 +48,7 @@ export interface SearchHit {
   /** Only ever set for `matchedIn: 'content'`. */
   snippet?: SearchSnippet;
   /** Only set for `kind: 'category'`. */
-  module?: CategoryModule;
+  module?: CategoryModuleId;
   categoryId?: string;
   entryNumber?: number;
   /** Sort tie-break. Tags and categories have no timestamp and pass `''`. */
@@ -61,7 +60,7 @@ export interface SearchCategory {
   id: string;
   /** Already translated: built-in categories are named by a locale key. */
   name: string;
-  module: CategoryModule;
+  module: CategoryModuleId;
 }
 
 export interface SearchCorpus {

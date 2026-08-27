@@ -121,7 +121,7 @@ export default function TitleBar() {
           draggable={false}
           src="/emerald-icon.png"
           alt="Emerald"
-          title={t('app.name')}
+          title="Emerald"
           className="flex-shrink-0 w-5 h-5 rounded-md object-cover [-webkit-user-drag:none]"
         />
 

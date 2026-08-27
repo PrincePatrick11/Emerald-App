@@ -200,10 +200,10 @@ function DeleteConfirmRow({
             30px-Reihe wie Edit/Loeschen auf den Vault-Karten, ohne
             handgeschriebene Padding-Ketten. */}
         <Button onClick={onConfirm} tone="danger" className="shrink-0" disabled={busy}>
-          {busy ? <Loader2 size={12} className="animate-spin" /> : t('trash.confirmYes')}
+          {busy ? <Loader2 size={12} className="animate-spin" /> : t('common.confirmYes')}
         </Button>
         <Button onClick={onCancel} tone="neutral" className="shrink-0">
-          {t('trash.confirmNo')}
+          {t('common.confirmNo')}
         </Button>
       </div>
 
@@ -443,7 +443,7 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
     const picked = await openDialog({
       multiple: false,
       title: t('vault.openDbFile'),
-      filters: [{ name: 'Emerald Vault', extensions: ['db'] }],
+      filters: [{ name: t('vault.dbFileFilter'), extensions: ['db'] }],
     });
     if (!picked) return null;
     const file = typeof picked === 'string' ? picked : picked[0];

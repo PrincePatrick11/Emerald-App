@@ -29,7 +29,8 @@ This is the structural map — where things live. What the shared building block
 src/
 ├── components/
 │   ├── layout/       AppShell, LeftSidebarRail, LeftSidebarEntryList, RightSidebar, MainArea,
-│   │                 SettingsModal, TabBar
+│   │                 SettingsModal, TabBar, moduleViews.ts (component-layer half of the
+│   │                 module registry: ViewId → lazy view; import-restricted to MainArea only)
 │   │   └── titlebar/ TitleBar (custom window chrome), WindowControls, TitleBarMenuBar,
 │   │                 MenuDropdown, TitleBarSearch (global search field), TitleBarSearchResults
 │   │                 (results dropdown), useIsMaximized, editCommands
@@ -43,7 +44,8 @@ src/
 │   │   │             AltarSidebarPanel, RoutinesPanel (currently unrendered), BacklinksPanel
 │   │   │             (currently unrendered)
 │   │   └── fields/   PropertiesReadView / PropertiesEditView (read vs. edit layout shell),
-│   │                 PropertySummaryRow, Favicon, Banner,
+│   │                 PropertySummaryRow, Favicon, Banner, SelectField (shared category-field
+│   │                 native select for Journal/Operations properties panels),
 │   │                 AltarReadingSummary, LinkedOpsInput, LinkedWikiInput, PlacedElementRow
 │   ├── altar/        AltarCanvas, AltarCard, AltarCardPreview, AltarItemVisual,
 │   │                 AltarLibraryStrip, AltarRenameField
@@ -51,19 +53,28 @@ src/
 │   └── ui/           Button, Modal, ContextMenu, EmojiPicker, Dashboard, EntryListTab,
 │                     ListToolbar, FilterPanel, RailButton, TabIconButton, UndoToast,
 │                     ImportDestinationModal, Dropdown, CategoryHeaderRow, CategoryAddRow,
-│                     CategorySelect — the shared component layer; what each one
-│                     encapsulates and where it can be extended is in components.md
+│                     CategorySelect, EntryDetailFrame — the shared component layer; what each
+│                     one encapsulates and where it can be extended is in components.md
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, routineStore, undoStore,
-│                     trashStore, vaultStore, importStore
+│                     trashStore, vaultStore, importStore,
+│                     moduleWiring.ts (store-layer half of the module registry: per-module
+│                                      reload, trash restore/permanent-delete, and the
+│                                      startup/vault-switch/import reload sequence — see
+│                                      Module Registry below)
 ├── hooks/            useCategoryEditor (shared add/edit/delete-with-confirm category logic,
 │                                      used by TasksView, WikiView, OperationsView),
 │                     useEntryEditor (debounced auto-save + save-on-navigate + save-on-unmount,
 │                                      used by JournalView, WikiView, OperationsView),
+│                     useEditActions (registers Save/Cancel/Delete into the right sidebar,
+│                                      used by all five entry views),
+│                     useOutsideClick (mousedown-outside(+Escape) dismiss pattern, used by
+│                                      eight menus/popovers),
 │                     useGlobalSearch (assembles the search corpus from the stores and runs it
 │                                      against the query; backs the title bar's search field)
 ├── lib/              db.ts, schema.ts, normalizeSchema.ts, row.ts,
-│                     links.ts, tabs.ts, globalSearch.ts, searchText.ts,
+│                     links.ts, tabs.ts (tab IDs, isContentView), globalSearch.ts, searchText.ts,
+│                     modules.ts (the module registry — see Module Registry below),
 │                     dragChannel.ts (generic set/get/subscribe factory), dragState.ts,
 │                     altarDragState.ts, routineDragState.ts (all three are thin named-export
 │                                      adapters over their own createDragChannel() instance),
@@ -73,6 +84,8 @@ src/
 │                     formatDate.ts (locale-aware date-fns formatting, wired into
 │                                      changeAppLanguage; export.ts/emeraldFormat.ts stay
 │                                      locale-independent on purpose),
+│                     sortItems.ts (the one SortMode comparator for every dashboard),
+│                     groupBy.ts (groupBy/groupByMonth → DashboardGroup[]),
 │                     exportData.ts, emeraldFormat.ts, vaultManager.ts, dbBackup.ts,
 │                     helpers.ts (incl. isImageIcon, generateId,
 │                                      hexToRgb, isValidHexColor, readFileAsDataUrl,
@@ -110,6 +123,59 @@ src-tauri/
 
 `getCategoryEmoji` currently lives in `src/components/wiki/WikiList.tsx` and is imported by both UI and non-UI modules (for example export helpers). This works, but it is a layering compromise because a pure utility function is sourced from a component file. If category emoji mappings become more complex, move this helper into `src/lib/` (or a shared constants module) to keep library code independent from React component modules.
 
+### Module Registry
+
+`src/lib/modules.ts` is the one source of truth for "which modules exist and what belongs to
+each" — icon, nav-label key, untitled-placeholder key, the module's `ContentType` (or `null`
+for Tasks/Altar, which are not link targets), and whether it uses the right sidebar's editor
+action bar. `ENTRY_MODULE_IDS` (`journal`/`tasks`/`operations`/`wiki`/`altar`) is the canonical
+order — it drives the rail's icon order and the entry list's tab order. `MODULES` is the
+`Record<EntryModuleId, ModuleMeta>` everything else reads; `MODULE_LIST` is its array form for
+loops. `ViewId` (`EntryModuleId | AuxViewId`, where `AuxViewId` is `home`/`tags`/`trash`) is
+what `ActiveView['type']` actually is — replacing an ad-hoc union that, via `ContentType`, used
+to also admit `'operation'` (singular), a value no view ever had. `isViewId()` guards
+persisted tabs at load time, so a localStorage entry from a since-removed view type is dropped
+rather than crashing the router. `TRASH_KINDS`/`TRASH_KIND_ICONS` cover the (larger) set of
+trash-only kinds, including the two category kinds that have no `ModuleMeta` of their own.
+
+`viewTypeForEntryType(entryType)` lives here too (moved from `lib/tabs.ts`, which now holds
+only tab ids and `isContentView`) — the one place translating the data model's `operation`
+(singular; what `links.target_type`, drag payloads, and the internal-link mark all carry) into
+`ActiveView`'s `operations` (plural, named after the module). It is now a reverse lookup over
+`MODULES` instead of its own copy of the mapping, so `ModuleMeta.entryType` is the single
+source both directions read.
+
+This file's import rule is deliberately narrow: only `lucide-react` and type-only imports (its
+edge to `types/index.ts` runs both ways, but only as `import type`, which disappears at
+compile time — a runtime import either direction would create a real cycle). No stores, no
+React components. Two thinner layers build on top of it, kept separate so this file itself
+stays free of both:
+
+- **`src/store/moduleWiring.ts`** — the store-layer half. `moduleWiring` maps each
+  `EntryModuleId` to its store's reload function; `trashWiring` maps each `TrashKind` to its
+  restore/permanently-delete pair. `reloadAllStores()` is the canonical startup/vault-switch
+  reload sequence — tags, then categories (Wiki's own fetch plus Operations' `fetchAll`, which
+  loads its categories together with its content), then every module's content plus routines —
+  replacing three hand-maintained copies of the same list that used to live in `vaultStore`,
+  `dbBackup`, and `AppShell`. The sequencing is deliberate, not a hard data dependency: no
+  fetcher reads another store, but loading tags and categories first means a list never renders
+  a frame with unresolved category or tag names. `reloadModules(ids)` reloads a targeted subset
+  (used by the Emerald-format import, to reload only the modules the import touched). Import
+  rule: content stores only — never `uiStore`, `vaultStore`, or `trashStore`, which point at
+  this module instead.
+- **`src/components/layout/moduleViews.ts`** — the component-layer half. `VIEW_COMPONENTS` maps
+  every `ViewId` to its `React.lazy` view. Import rule: **only `MainArea` may import this
+  file** — any other importer risks pulling every view's lazy chunk (including TipTap, via
+  Journal/Wiki/Operations) into its own bundle.
+
+Consumers read the registry instead of repeating it: `LeftSidebarRail` loops `MODULE_LIST` for
+its module icons; `LeftSidebarEntryList` builds its `TABS`/`TAB_LISTS` from it; `RightSidebar`
+builds its `PROPERTIES_PANELS` record from it; `TabBar` reads it for fallback titles and icons;
+`TrashView` reads `TRASH_KIND_ICONS`; `TitleBarSearchResults` builds its `KIND_META` record from
+it; `uiStore` reads it for `LeftListTabId` and the `usesEditorSidebar` flag and uses `isViewId`
+as a load-time guard; and `TasksView`'s former `typeMap` + `as any` cast is gone in favour of
+calling `viewTypeForEntryType` directly.
+
 ### Edit Mode Architecture
 
 The main content area renders only the title and body. All metadata — tags, category, icon, cover image — is edited exclusively in the right sidebar's Properties panel. The sidebar writes directly to the relevant store; the main area subscribes to the same store fields and updates accordingly.
@@ -120,24 +186,13 @@ Unlike earlier versions, the Properties panel itself is now gated by the entry's
 
 `RightSidebar.tsx` renders a `RightSidebarActionBar` pinned above the scrollable Properties content, replacing what used to be separate Edit/Save/Cancel/Delete buttons duplicated in every entry view's header. The bar reads `uiStore.editActions` (set via `setEditActions({ onSave, onCancel, onDelete? })`) to know what to call — in edit mode it shows Done/Delete/Cancel; in view mode it shows Edit (plus a Fullscreen toggle for Altar); a loaded Sigil operation shows nothing, matching `OperationSigilView`'s existing edit-mode guard.
 
-Each of the five entry views registers its handlers the same way:
+Each of the five entry views registers its handlers through the shared `useEditActions(active, handlers)` hook (`src/hooks/useEditActions.ts`) — previously each view carried its own copy of the same ref-latched effect:
 
 ```ts
-const editHandlersRef = useRef({ onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
-editHandlersRef.current = { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete };
-
-useEffect(() => {
-  if (!isEditing) return;
-  setEditActions({
-    onSave: () => editHandlersRef.current.onSave(),
-    onCancel: () => editHandlersRef.current.onCancel(),
-    onDelete: () => editHandlersRef.current.onDelete(),
-  });
-  return () => setEditActions(null);
-}, [isEditing]);
+useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
 ```
 
-The ref exists for the same stale-closure reason as the auto-save pattern below: `setEditActions` only needs to run when `isEditing` flips, not on every keystroke, but the handlers it registers must still see the latest `title`/`content`/etc. at call time. An earlier version of this effect had no dependency array and called `setEditActions` unconditionally on every render, which combined with a whole-store `useUIStore()` subscription in the same component to produce an infinite render loop (each `setEditActions` call re-rendered the subscriber, which re-ran the effect, which called `setEditActions` again) and a blank screen on startup. Keep the effect scoped to `[isEditing]` and keep sidebar-consuming components on per-field selectors (see Store Selectors above) to avoid reintroducing it.
+Inside the hook, the handlers are kept in a ref that is overwritten on every render, and the effect itself only depends on `active`: `setEditActions` only needs to run when edit mode flips, not on every keystroke, but the handlers it registers must still see the latest `title`/`content`/etc. at call time. An earlier, pre-hook version of this effect had no dependency array and called `setEditActions` unconditionally on every render, which combined with a whole-store `useUIStore()` subscription in the same component to produce an infinite render loop (each `setEditActions` call re-rendered the subscriber, which re-ran the effect, which called `setEditActions` again) and a blank screen on startup. Keep sidebar-consuming components on per-field selectors (see Store Selectors above) to avoid reintroducing it — the hook itself already scopes its effect to `[active]`.
 
 ### Store Selectors
 
@@ -234,7 +289,7 @@ Emerald uses browser-like tabs to keep multiple pieces of content open at the sa
 - `activeTabId` stores which tab is currently selected.
 - Each tab contains an `ActiveView`, so a tab can represent a journal entry, wiki article, operation, sigil, altar, or a top-level view.
 
-Tab IDs and helper functions live in `src/lib/tabs.ts`. It also exports `viewTypeForEntryType()`, the one place that translates the data model's `operation` (singular — what `links.target_type`, the drag payload, and the internal-link mark all carry) into `ActiveView`'s `operations` (plural, named after the module rather than the record). The mapping used to be copied at each call site; `RichEditor.tsx`, `BacklinksPanel.tsx`, `HomeView.tsx`, and `globalSearch.ts` (see [Global Search](#global-search) below) now call the shared function instead.
+Tab IDs and `isContentView` live in `src/lib/tabs.ts`. `viewTypeForEntryType()` — the one place that translates the data model's `operation` (singular — what `links.target_type`, the drag payload, and the internal-link mark all carry) into `ActiveView`'s `operations` (plural, named after the module rather than the record) — now lives in `src/lib/modules.ts` as part of the module registry (see [Module Registry](#module-registry) above), a reverse lookup over `MODULES` rather than its own mapping. The mapping used to be copied at each call site; `RichEditor.tsx`, `BacklinksPanel.tsx`, `HomeView.tsx`, `TasksView.tsx`, and `globalSearch.ts` (see [Global Search](#global-search) below) now call the shared function instead.
 
 Tabs are persisted in `localStorage` using:
 
@@ -266,7 +321,7 @@ This means users can keep several entries open while still using back/forward na
 
 The left sidebar is two independent components rendered side by side inside `AppShell`'s `app-sidebar-left` container:
 
-- **`LeftSidebarRail`** (`src/components/layout/LeftSidebarRail.tsx`) — a fixed-width (56px, `RAIL_WIDTH`, defined and exported here and imported by `AppShell`) icon column: the entry-list collapse/expand toggle, the right-sidebar collapse/expand toggle (sharing the `PanelToggleIcon` component via a `mirrored` variant so the two icons read as left/right mirrors), then the six navigation icons (Home/Journal/Tasks/Operations/Wiki/Altar), and a bottom nav block: Tags/Trash grouped together, then — below a divider — Vault (opens `VaultModal`) and Settings. The app logo, back/forward and the search shortcut are *not* here; they moved into the title bar (see [Window Chrome](#window-chrome)). The nav icons only call `setActiveView(...)` — they carry no active/selected styling and are intentionally decoupled from `leftListTab` below, since navigating the main view and browsing a different module's entry list are independent actions. Home is the one whose target is not a content view: `isContentView` is false for it, so it overwrites the active tab rather than opening a new one. Note that lucide exports `Home` as an alias of `House`, so its SVG carries the class `.lucide-house`, not `.lucide-home` — relevant to anything selecting the rail icons by class.
+- **`LeftSidebarRail`** (`src/components/layout/LeftSidebarRail.tsx`) — a fixed-width (56px, `RAIL_WIDTH`, defined and exported here and imported by `AppShell`) icon column: the entry-list collapse/expand toggle, the right-sidebar collapse/expand toggle (sharing the `PanelToggleIcon` component via a `mirrored` variant so the two icons read as left/right mirrors), then the six navigation icons (Home/Journal/Tasks/Operations/Wiki/Altar, rendered from a loop over `MODULE_LIST`/`AUX_VIEWS` — see [Module Registry](#module-registry) above), and a bottom nav block: Tags/Trash grouped together, then — below a divider — Vault (opens `VaultModal`) and Settings. The app logo, back/forward and the search shortcut are *not* here; they moved into the title bar (see [Window Chrome](#window-chrome)). The nav icons only call `setActiveView(...)` — they carry no active/selected styling and are intentionally decoupled from `leftListTab` below, since navigating the main view and browsing a different module's entry list are independent actions. Home is the one whose target is not a content view: `isContentView` is false for it, so it overwrites the active tab rather than opening a new one. Note that lucide exports `Home` as an alias of `House`, so its SVG carries the class `.lucide-house`, not `.lucide-home` — relevant to anything selecting the rail icons by class.
 - **`LeftSidebarEntryList`** (`src/components/layout/LeftSidebarEntryList.tsx`) — the adjoining panel, shown only while `uiStore.leftListOpen` is true. Its six tabs (`TabIconButton`) write to `uiStore.leftListTab`; the active tab determines which list renders below: five per-module lists (`JournalList`, `TasksList`, `OperationsList`, `WikiList`, `AltarList`) plus `AllList`, which combines all five into one list sorted by `updated_at` descending. Each per-module list is a one-line `<EntryListTab {...config} />` wrapper around a `use*Config()` hook (`useJournalConfig`, `useTasksConfig`, `useOperationsConfig`, `useWikiConfig`, `useAltarConfig`) returning an `EntryListTabProps<T>` object; `AllList` calls all five hooks and flattens their configs through `toAllRows()` into type-erased `AllRow` objects, so the combined list reuses each module's real handlers (duplicate, delete-with-undo, rename, context menu) rather than reimplementing them. `EntryListTabProps<T>` itself is the shared contract with `EntryListTab<T>` (`src/components/ui/EntryListTab.tsx`), which owns search filtering, inline rename, the "+" quick-create flow, drag-start wiring, and the right-click `ContextMenu`; callers supply accessor functions (`getId`/`getTitle`/`getIcon`/`getDateStr`) and the action list. Tasks is the one caller that needs a materially different row (an independent checkbox toggle) and opts out via the `renderRow` render-prop instead of the accessor props — which also means `renderRow` cannot survive `toAllRows()`'s type erasure, so Tasks fall back to the plain accessor-based row inside `AllList`. `EntryListTab` also takes an optional `canDrag(item)` gate so a mixed list can withhold the grab cursor from rows that aren't drag sources (Tasks, Altar) while still allowing it for the rest.
 
 `AppShell` owns the width/resize logic: the rail is fixed at `RAIL_WIDTH`, and only the entry-list panel's width (`entry-list-width` in `localStorage`, `ENTRY_LIST_MIN` = 180) is user-resizable via the same drag-handle pattern used for the right sidebar. The outer `<aside>` width is computed as `RAIL_WIDTH + (leftListOpen ? entryListWidth : 0)`, and the resize handle only renders while the list is open.
@@ -301,7 +356,7 @@ The schema itself lives in `src/lib/schema.ts`, not in `db.ts`: fresh vaults exe
 
 ### Startup loading and lazy data
 
-`AppShell` fires all seven store fetches in parallel on mount and again on every vault switch (`reloadAllStores`). Views do **not** refetch on mount — `TasksView` and `AltarView` used to, redundantly; a view that mounts before the startup fetch resolves simply renders its empty state until the store fills.
+`AppShell` calls `reloadAllStores()` (`src/store/moduleWiring.ts`) on mount and again on every vault switch — see [Module Registry](#module-registry) above for what it does and why it now loads tags, then categories, then content in sequence rather than firing all seven fetches in parallel. Views do **not** refetch on mount — `TasksView` and `AltarView` used to, redundantly; a view that mounts before the startup fetch resolves simply renders its empty state until the store fills.
 
 Two deliberate exceptions to "the store holds the whole row":
 
@@ -310,7 +365,7 @@ Two deliberate exceptions to "the store holds the whole row":
 
 ### Code splitting
 
-`MainArea` loads all eight views with `React.lazy`, so TipTap (the largest chunk) only loads when a Journal/Wiki/Operations view first opens. `SettingsModal` is lazy for the same reason (it pulls the whole `dbBackup` machinery). `menuActions.runMenuAction` imports the export/import modules (`export.ts`, `exportData.ts`, `emeraldFormat.ts`, `altarExport.ts` — and with them `turndown` and `marked`) with `await import()` per action, and `src/i18n/index.ts` ships only `en` eagerly (see the module map). `vite.config.ts` deliberately has **no catch-all vendor chunk** — Rollup splits along these `import()` boundaries, and a blanket `return "vendor"` would pull the lazy libraries back into the eager bundle.
+`MainArea` loads all eight views with `React.lazy` via `VIEW_COMPONENTS` in `src/components/layout/moduleViews.ts` (see [Module Registry](#module-registry) above), so TipTap (the largest chunk) only loads when a Journal/Wiki/Operations view first opens. `SettingsModal` is lazy for the same reason (it pulls the whole `dbBackup` machinery). `menuActions.runMenuAction` imports the export/import modules (`export.ts`, `exportData.ts`, `emeraldFormat.ts`, `altarExport.ts` — and with them `turndown` and `marked`) with `await import()` per action, and `src/i18n/index.ts` ships only `en` eagerly (see the module map). `vite.config.ts` deliberately has **no catch-all vendor chunk** — Rollup splits along these `import()` boundaries, and a blanket `return "vendor"` would pull the lazy libraries back into the eager bundle.
 
 ## Image Storage System
 

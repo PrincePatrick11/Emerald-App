@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { useTagStore } from '../../store/tagStore';
+import { useOutsideClick } from '../../hooks/useOutsideClick';
 
 interface TagInputProps {
   tags: string[];
@@ -49,15 +50,10 @@ export default function TagInput({ tags, onChange, readOnly = false }: TagInputP
     }
   };
 
-  // Close dropdown on outside click
+  // Close dropdown on outside click. Escape wird nicht hier, sondern im
+  // onKeyDown des Inputs behandelt (siehe handleKeyDown).
   const wrapperRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (!wrapperRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  useOutsideClick(open, () => setOpen(false), { refs: [wrapperRef] });
 
   if (readOnly) {
     if (tags.length === 0) return null;

@@ -23,7 +23,8 @@ interface UseEntryEditorOptions<TPatch> {
   entityId: string | undefined;
   isEditing: boolean;
   ready: boolean;
-  buildPatch: () => TPatch;
+  /** Erhält den aktuellen Editor-Inhalt (den Content-Mirror-Ref des Hooks) als Argument. */
+  buildPatch: (content: string) => TPatch;
   update: (id: string, patch: TPatch) => Promise<void>;
   debounceMs?: number;
 }
@@ -47,6 +48,12 @@ export function useEntryEditor<TPatch>({
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Der Editor-Inhalt wird pro Tastendruck in diesen Ref gespiegelt statt in
+  // State — ein State-Update haette die komplette View pro Anschlag neu
+  // gerendert. Gelesen wird er erst beim Speichern (als buildPatch-Argument).
+  // Die View setzt ihn beim Laden und bei Cancel auf den gespeicherten Stand.
+  const contentRef = useRef('');
+
   // `timer.current === null` heisst "kein Save ausstehend" — Done und Cancel
   // rufen cancelAutoSave() und machen den Flush unten damit zum No-op; ein
   // blosses Zuruecklassen der toten Handle wuerde diese Frage unbeantwortbar
@@ -65,9 +72,14 @@ export function useEntryEditor<TPatch>({
       // Fire-and-forget: waehrend `withDbClosed` laeuft (Vault-Dateien werden
       // geloescht) lehnt `getDb()` ab, und die Aenderung gehoert ohnehin zu
       // dem Vault, der gerade verschwindet.
-      void updateRef.current(id, buildPatchRef.current()).catch(() => {});
+      void updateRef.current(id, buildPatchRef.current(contentRef.current)).catch(() => {});
     }, debounceMs);
   }, [debounceMs]);
+
+  const handleContentChange = useCallback((html: string) => {
+    contentRef.current = html;
+    triggerAutoSave();
+  }, [triggerAutoSave]);
 
   const prevRef = useRef<{ id: string; isEditing: boolean } | null>(null);
 
@@ -79,7 +91,7 @@ export function useEntryEditor<TPatch>({
         // bereits gewechselt, buildPatch liest aber noch den State des
         // vorherigen Eintrags (siehe Kopfkommentar).
         cancelAutoSave();
-        void updateRef.current(prev.id, buildPatchRef.current()).catch(console.error);
+        void updateRef.current(prev.id, buildPatchRef.current(contentRef.current)).catch(console.error);
         prevRef.current = null;
       } else if (!isEditing && timer.current !== null) {
         // Edit-Modus verlassen ohne Done/Cancel (Klick auf denselben Eintrag
@@ -88,7 +100,7 @@ export function useEntryEditor<TPatch>({
         // Tipparbeit verwerfen. Done/Cancel entschaerfen den Timer vorher —
         // fuer die ist das hier ein No-op.
         cancelAutoSave();
-        void updateRef.current(prev.id, buildPatchRef.current()).catch(console.error);
+        void updateRef.current(prev.id, buildPatchRef.current(contentRef.current)).catch(console.error);
       }
     }
     if (ready && entityId) {
@@ -104,10 +116,10 @@ export function useEntryEditor<TPatch>({
       cancelAutoSave();
       const prev = prevRef.current;
       if (prev?.isEditing && !editorSavesSuspended()) {
-        void updateRef.current(prev.id, buildPatchRef.current()).catch(console.error);
+        void updateRef.current(prev.id, buildPatchRef.current(contentRef.current)).catch(console.error);
       }
     };
   }, [cancelAutoSave]);
 
-  return { triggerAutoSave, cancelAutoSave };
+  return { triggerAutoSave, cancelAutoSave, contentRef, handleContentChange };
 }

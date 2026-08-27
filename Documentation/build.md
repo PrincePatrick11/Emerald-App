@@ -21,7 +21,9 @@ rather than queueing behind it.
 **`frontend`** (`ubuntu-latest`, once — the frontend build is platform-independent,
 so the glibc argument below does not apply to it):
 `npm run check:schema` (needs `esbuild`, declared in `devDependencies`), then
-`npm run build`, which is `tsc && vite build --configLoader runner` and so carries
+`npm run check:i18n` (`scripts/i18n-check.mjs` — the four locale files carry the same
+keys and the same `{{placeholder}}`s, see [`internationalization.md`](internationalization.md)),
+then `npm run build`, which is `tsc && vite build --configLoader runner` and so carries
 the typecheck.
 
 All workflows pin **Node 22**, and `package.json` records the same floor under

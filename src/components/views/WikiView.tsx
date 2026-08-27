@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Trash2, Pencil, Copy, PanelTopOpen } from 'lucide-react';
@@ -8,23 +8,26 @@ import CategoryHeaderRow from '../ui/CategoryHeaderRow';
 import CategoryAddRow from '../ui/CategoryAddRow';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { categoryLabel } from '../../lib/categories';
-import { formatEntryDate, formatMonthGroup } from '../../lib/formatDate';
+import { formatEntryDate } from '../../lib/formatDate';
+import { sortItems } from '../../lib/sortItems';
+import { groupByMonth } from '../../lib/groupBy';
 
 import { useUIStore } from '../../store/uiStore';
 import { useEntryEditor } from '../../hooks/useEntryEditor';
+import { useEditActions } from '../../hooks/useEditActions';
 import { useWikiStore } from '../../store/wikiStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import RichEditor from '../editor/RichEditor';
-import TagInput from '../editor/TagInput';
+import EntryDetailFrame from '../ui/EntryDetailFrame';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import type { WikiCategory } from '../../types';
 
 
 export default function WikiView() {
   const { t } = useTranslation();
-  const { activeView, setActiveView, setEditActions, openViewInNewTab, wikiPrefs, setWikiPrefs } = useUIStore(
-    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, setEditActions: s.setEditActions, openViewInNewTab: s.openViewInNewTab, wikiPrefs: s.wikiPrefs, setWikiPrefs: s.setWikiPrefs }))
+  const { activeView, setActiveView, openViewInNewTab, wikiPrefs, setWikiPrefs } = useUIStore(
+    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab, wikiPrefs: s.wikiPrefs, setWikiPrefs: s.setWikiPrefs }))
   );
   const { articles, wikiCategories, createArticle, duplicateArticle, updateArticle, deleteArticle, restoreArticle, getArticle, addWikiCategory, updateWikiCategory, deleteWikiCategory, restoreWikiCategory, } = useWikiStore(
     useShallow((s) => ({ articles: s.articles, wikiCategories: s.wikiCategories, createArticle: s.createArticle, duplicateArticle: s.duplicateArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle, getArticle: s.getArticle, addWikiCategory: s.addWikiCategory, updateWikiCategory: s.updateWikiCategory, deleteWikiCategory: s.deleteWikiCategory, restoreWikiCategory: s.restoreWikiCategory }))
@@ -47,15 +50,13 @@ export default function WikiView() {
   const [icon, setIcon] = useState<string | null>(null);
   const [loadedArticleId, setLoadedArticleId] = useState<string | null>(null);
 
-  // Content-Mirror im Ref statt State — siehe JournalView.
-  const pendingHtmlRef = useRef('');
   const [editorEpoch, setEditorEpoch] = useState(0);
 
-  const { triggerAutoSave, cancelAutoSave } = useEntryEditor({
+  const { triggerAutoSave, cancelAutoSave, contentRef, handleContentChange } = useEntryEditor({
     entityId: article?.id,
     isEditing,
     ready: !!article && loadedArticleId === article.id,
-    buildPatch: () => ({ title, content: pendingHtmlRef.current, category_id: category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined }),
+    buildPatch: (content) => ({ title, content, category_id: category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined }),
     update: updateArticle,
   });
 
@@ -70,7 +71,7 @@ export default function WikiView() {
   useEffect(() => {
     if (article) {
       setTitle(article.title);
-      pendingHtmlRef.current = article.content;
+      contentRef.current = article.content;
       setCategory(article.category_id);
       setTags(article.tags ?? []);
       setCoverImage(article.cover_image ?? null);
@@ -115,7 +116,7 @@ export default function WikiView() {
   const handleDone = async () => {
     if (!article) return;
     cancelAutoSave();
-    await updateArticle(article.id, { title, content: pendingHtmlRef.current, category_id: category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined });
+    await updateArticle(article.id, { title, content: contentRef.current, category_id: category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined });
     setActiveView({ type: 'wiki', id: article.id, mode: 'view' });
   };
 
@@ -127,7 +128,7 @@ export default function WikiView() {
       setTags(article.tags ?? []);
       setCoverImage(article.cover_image ?? null);
       setIcon(article.icon ?? null);
-      pendingHtmlRef.current = article.content;
+      contentRef.current = article.content;
       setEditorEpoch((e) => e + 1);
     }
     setActiveView({ type: 'wiki', id: article!.id, mode: 'view' });
@@ -142,23 +143,7 @@ export default function WikiView() {
     setActiveView({ type: 'wiki' });
   };
 
-  const handleContentChange = useCallback((html: string) => {
-    pendingHtmlRef.current = html;
-    triggerAutoSave();
-  }, [triggerAutoSave]);
-
-  const editHandlersRef = useRef({ onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
-  editHandlersRef.current = { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete };
-
-  useEffect(() => {
-    if (!isEditing) return;
-    setEditActions({
-      onSave: () => editHandlersRef.current.onSave(),
-      onCancel: () => editHandlersRef.current.onCancel(),
-      onDelete: () => editHandlersRef.current.onDelete(),
-    });
-    return () => setEditActions(null);
-  }, [isEditing]);
+  useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
 
   const handleNew = async () => {
     const a = await createArticle();
@@ -218,12 +203,11 @@ export default function WikiView() {
 
     const activeFilterCount = filterCatIds.length > 0 ? 1 : 0;
 
-    const sortedArticles = [...filtered].sort((a, b) => {
-      if (sort === 'alpha_asc') return a.title.localeCompare(b.title);
-      if (sort === 'alpha_desc') return b.title.localeCompare(a.title);
-      if (sort === 'category') return (a.category_id ?? '').localeCompare(b.category_id ?? '');
-      if (sort === 'date_asc') return a.created_at.localeCompare(b.created_at);
-      return b.created_at.localeCompare(a.created_at); // date_desc
+    const sortedArticles = sortItems(filtered, sort, {
+      date: (a) => a.created_at,
+      // Bewusste Korrektur: vorher wurde die rohe category_id verglichen,
+      // sortiert wird jetzt nach dem angezeigten Kategorienamen.
+      category: (a) => catById[a.category_id]?.name ?? '',
     });
 
     const groupedByCat = wikiCategories.map((cat) => ({
@@ -232,15 +216,7 @@ export default function WikiView() {
     }));
 
     // For timeline (by month)
-    const timelineGroups: { label: string; items: typeof articles }[] = (() => {
-      const map = new Map<string, typeof articles>();
-      sortedArticles.forEach((a) => {
-        const key = formatMonthGroup(a.created_at);
-        if (!map.has(key)) map.set(key, []);
-        map.get(key)!.push(a);
-      });
-      return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
-    })();
+    const timelineGroups = groupByMonth(sortedArticles, (a) => a.created_at);
 
     const renderArticle = (a: typeof articles[0]) => {
       const cat = catById[a.category_id];
@@ -313,8 +289,6 @@ export default function WikiView() {
       items: arts,
     }));
 
-    const timelineDashboardGroups: DashboardGroup<Article>[] = timelineGroups.map(({ label, items }) => ({ label, items }));
-
     const renderCategoryHeader = (group: DashboardGroup<Article>) => {
       const cat = catById[group.key!];
       if (!cat) return null;
@@ -367,7 +341,7 @@ export default function WikiView() {
         noResultsMessage={t('search.noResults')}
         grouping={
           view === 'timeline'
-            ? { mode: 'timeline', groups: timelineDashboardGroups }
+            ? { mode: 'timeline', groups: timelineGroups }
             : sort === 'category'
               ? {
                   mode: 'category',
@@ -397,14 +371,12 @@ export default function WikiView() {
   const currentCat = wikiCategories.find((c) => c.id === (isEditing ? category : article.category_id));
 
   return (
-    <div className="h-full flex flex-col">
-
-      {/* Topbar */}
-      <div className="flex items-center justify-between px-6 h-14 border-b border-stone-700/60 flex-shrink-0">
-        <div className="flex items-center gap-2 text-xs text-stone-600">
-          <button onClick={() => setActiveView({ type: 'wiki' })} className="text-stone-500 transition-colors hover:text-stone-300">
-            {t('nav.wiki')}
-          </button>
+    <EntryDetailFrame
+      module="wiki"
+      isEditing={isEditing}
+      onEnterEditMode={enterEditMode}
+      breadcrumbMeta={
+        <>
           {isImageIcon(article.icon)
             ? <img src={article.icon!} alt="" className="w-5 h-5 object-cover rounded" />
             : <span>{currentCat?.emoji ?? getCategoryEmoji(article.category_id)}</span>
@@ -412,14 +384,9 @@ export default function WikiView() {
           <span className="capitalize">{categoryLabel(t, 'wiki', currentCat, article.category_id)}</span>
           <span>·</span>
           <span>{formatEntryDate(article.updated_at)}</span>
-          {isEditing && <span className="text-stone-700 italic ml-1">{t('editor.editing')}</span>}
-        </div>
-      </div>
-
-
-
-      {/* Cover image — view mode hero */}
-      {!isEditing && coverImage && (
+        </>
+      }
+      aboveTitle={!isEditing && coverImage && (
         <div className="flex-shrink-0 px-8 pt-5">
           <img
             src={coverImage}
@@ -428,49 +395,19 @@ export default function WikiView() {
           />
         </div>
       )}
-
-      {/* Title — double-click enters edit mode */}
-      <div className="px-8 pt-6 pb-4 flex-shrink-0" onDoubleClick={enterEditMode}>
-        {isEditing ? (
-          <input
-            autoFocus
-            type="text"
-            value={title}
-            onChange={(e) => { const nextTitle = e.target.value; setTitle(nextTitle); triggerAutoSave(); }}
-            placeholder={t('wiki.untitled')}
-            className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100
-                       placeholder-stone-700 outline-none selectable"
-          />
-        ) : (
-          <h1 className="entry-view-title text-2xl font-semibold text-stone-100 cursor-text"
-              title={t('editor.doubleClickEdit')}>
-            {article.title || t('wiki.untitled')}
-          </h1>
-        )}
-      </div>
-
-
-      {/* Tags */}
-      <div className="px-8 pb-3 flex-shrink-0" onDoubleClick={enterEditMode}>
-        <TagInput
-          tags={tags}
-          onChange={(newTags) => { setTags(newTags); triggerAutoSave(); }}
-          readOnly={true}
+      title={isEditing ? title : article.title}
+      onTitleChange={(nextTitle) => { setTitle(nextTitle); triggerAutoSave(); }}
+      tags={{ value: tags, onChange: (newTags) => { setTags(newTags); triggerAutoSave(); } }}
+    >
+      {loadedArticleId === article.id && (
+        <RichEditor
+          key={`${article.id}:${editorEpoch}`}
+          initialContent={article.content}
+          placeholder={t('wiki.placeholder')}
+          onChange={handleContentChange}
+          editable={isEditing}
         />
-      </div>
-
-      {/* Editor — double-click enters edit mode */}
-      <div className="flex-1 overflow-hidden px-8 pb-8" onDoubleClick={enterEditMode}>
-        {loadedArticleId === article.id && (
-          <RichEditor
-            key={`${article.id}:${editorEpoch}`}
-            initialContent={article.content}
-            placeholder={t('wiki.placeholder')}
-            onChange={handleContentChange}
-            editable={isEditing}
-          />
-        )}
-      </div>
-    </div>
+      )}
+    </EntryDetailFrame>
   );
 }

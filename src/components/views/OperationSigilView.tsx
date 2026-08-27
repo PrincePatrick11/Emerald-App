@@ -9,10 +9,12 @@ import {
   Undo2,
 } from 'lucide-react';
 import Button from '../ui/Button';
+import EntryDetailFrame from '../ui/EntryDetailFrame';
 import { useUIStore } from '../../store/uiStore';
+import { useEditActions } from '../../hooks/useEditActions';
 import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
-import { generateId } from '../../lib/helpers';
+import { generateId, isImageIcon } from '../../lib/helpers';
 import { categoryLabel } from '../../lib/categories';
 import { formatEntryDate } from '../../lib/formatDate';
 import { editorSavesSuspended } from '../../lib/editorLock';
@@ -229,7 +231,6 @@ function DrawingCanvas({
 export default function OperationSigilView({ operation }: { operation: Operation }) {
   const { t } = useTranslation();
   const setActiveView = useUIStore((s) => s.setActiveView);
-  const setEditActions = useUIStore((s) => s.setEditActions);
   const updateOperation = useOperationStore((s) => s.updateOperation);
   const deleteOperation = useOperationStore((s) => s.deleteOperation);
   const restoreOperation = useOperationStore((s) => s.restoreOperation);
@@ -416,18 +417,7 @@ export default function OperationSigilView({ operation }: { operation: Operation
     setActiveView({ type: 'operations' });
   };
 
-  const editHandlersRef = useRef({ onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
-  editHandlersRef.current = { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete };
-
-  useEffect(() => {
-    if (!isEditing) return;
-    setEditActions({
-      onSave: () => editHandlersRef.current.onSave(),
-      onCancel: () => editHandlersRef.current.onCancel(),
-      onDelete: () => editHandlersRef.current.onDelete(),
-    });
-    return () => setEditActions(null);
-  }, [isEditing]);
+  useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
 
   const enterEditMode = () => {
     if (isEditing || operation.is_loaded) return;
@@ -523,229 +513,218 @@ export default function OperationSigilView({ operation }: { operation: Operation
     triggerAutoSave();
   };
 
+  const sigilBreadcrumbIcon = operation.icon || currentCategory?.emoji;
+
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex h-14 flex-shrink-0 items-center justify-between border-b border-stone-700/60 px-6">
-        <div className="flex items-center gap-2 text-xs text-stone-600">
-          <button onClick={() => setActiveView({ type: 'operations' })} className="text-stone-500 transition-colors hover:text-stone-300">
-            {t('nav.operations')}
-          </button>
-          {currentCategory?.emoji && <span>{currentCategory.emoji}</span>}
+    <EntryDetailFrame
+      module="operations"
+      isEditing={isEditing}
+      onEnterEditMode={enterEditMode}
+      breadcrumbMeta={
+        <>
+          {/* Bild-Icon-Support wie im Operations-Detail — vorher zeigte der
+              Sigil-Breadcrumb nur das Kategorie-Emoji. */}
+          {sigilBreadcrumbIcon && (isImageIcon(sigilBreadcrumbIcon)
+            ? <img src={sigilBreadcrumbIcon} alt="" className="w-5 h-5 object-cover rounded" />
+            : <span>{sigilBreadcrumbIcon}</span>)}
           <span>{categoryLabel(t, 'operations', currentCategory, '—')}</span>
           <span>·</span>
           <span>{formatEntryDate(operation.updated_at)}</span>
-          {isEditing && <span className="ml-1 italic text-stone-700">{t('editor.editing')}</span>}
-        </div>
-        <div className="flex items-center gap-2">
-          {isEditing ? null : (
-            operation.is_loaded && (
-              <Button
-                onClick={sigilVisible ? handleHideSigil : handleShowSigil}
-                variant="ghost"
-                className="text-xs"
-              >
-                {sigilVisible ? t('creation.hideSigil') : t('creation.showSigil')}
-              </Button>
-            )
-          )}
-        </div>
-      </div>
-
-      <div className="flex-shrink-0 px-8 pb-4 pt-8" onDoubleClick={enterEditMode}>
-        {isEditing ? (
-          <input
-            autoFocus
-            type="text"
-            value={title}
-            onChange={(event) => { setTitle(event.target.value); triggerAutoSave(); }}
-            placeholder={t('operations.untitled')}
-            className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100 outline-none placeholder-stone-700 selectable"
-          />
-        ) : (
-          <h1 className="entry-view-title cursor-text text-2xl font-semibold text-stone-100" title={t('editor.doubleClickEdit')}>
-            {operation.title || t('operations.untitled')}
-          </h1>
-        )}
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-8 pb-8">
-        <div className="mx-auto max-w-6xl space-y-5">
-          {isEditing && (
-            <div className="panel space-y-5 p-5">
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div className="space-y-2">
-                  <p className="label-xs">{t('creation.intention')}</p>
-                  <textarea
-                    value={intentionText}
-                    onChange={(event) => { setIntentionText(event.target.value); triggerAutoSave(); }}
-                    placeholder={t('creation.intentionPlaceholder')}
-                    className="entry-view-body min-h-28 w-full rounded-xl border border-stone-700/50 bg-stone-900/70 px-3 py-2 text-sm text-stone-300 outline-none placeholder-stone-600 resize-y selectable"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <p className="label-xs">{t('creation.shortenSigil')}</p>
-                  <textarea
-                    value={manualLetterText}
-                    onChange={(event) => setManualLetterText(event.target.value.toUpperCase())}
-                    placeholder={t('creation.manualLetterPlaceholder')}
-                    className="min-h-28 w-full rounded-xl border border-stone-700/50 bg-stone-900/70 px-3 py-2 text-sm text-stone-300 outline-none placeholder-stone-600 resize-y selectable"
-                  />
-                </div>
+        </>
+      }
+      topbarRight={
+        isEditing ? null : (
+          operation.is_loaded && (
+            <Button
+              onClick={sigilVisible ? handleHideSigil : handleShowSigil}
+              variant="ghost"
+              className="text-xs"
+            >
+              {sigilVisible ? t('creation.hideSigil') : t('creation.showSigil')}
+            </Button>
+          )
+        )
+      }
+      title={isEditing ? title : operation.title}
+      onTitleChange={(nextTitle) => { setTitle(nextTitle); triggerAutoSave(); }}
+      body="scroll"
+    >
+      <div className="mx-auto max-w-6xl space-y-5">
+        {isEditing && (
+          <div className="panel space-y-5 p-5">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="space-y-2">
+                <p className="label-xs">{t('creation.intention')}</p>
+                <textarea
+                  value={intentionText}
+                  onChange={(event) => { setIntentionText(event.target.value); triggerAutoSave(); }}
+                  placeholder={t('creation.intentionPlaceholder')}
+                  className="entry-view-body min-h-28 w-full rounded-xl border border-stone-700/50 bg-stone-900/70 px-3 py-2 text-sm text-stone-300 outline-none placeholder-stone-600 resize-y selectable"
+                />
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={handlePrepareManualLetters} variant="secondary">
-                  {t('creation.addLetter')}
-                </Button>
-                <Button onClick={handlePrepareLetters} variant="primary">
-                  {t('creation.prepareLetters')}
-                </Button>
-              </div>
-
-              <div className="space-y-3">
-                <p className="label-xs">{t('creation.letterBank')}</p>
-                {letterBank.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {letterBank.map((letter) => {
-                      const implemented = implementedLetters.includes(letter);
-                      return (
-                        <button
-                          key={letter}
-                          onClick={() => toggleImplementedLetter(letter)}
-                          className={`h-10 w-10 rounded-md border text-sm font-semibold transition-colors ${
-                            implemented
-                              ? 'border-jade-800/40 bg-jade-900/30 text-jade-400'
-                              : 'border-stone-700/50 bg-stone-800/70 text-stone-300 hover:border-stone-600'
-                          }`}
-                        >
-                          {letter}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-xs text-stone-600">{t('creation.noLetters')}</p>
-                )}
+              <div className="space-y-2">
+                <p className="label-xs">{t('creation.shortenSigil')}</p>
+                <textarea
+                  value={manualLetterText}
+                  onChange={(event) => setManualLetterText(event.target.value.toUpperCase())}
+                  placeholder={t('creation.manualLetterPlaceholder')}
+                  className="min-h-28 w-full rounded-xl border border-stone-700/50 bg-stone-900/70 px-3 py-2 text-sm text-stone-300 outline-none placeholder-stone-600 resize-y selectable"
+                />
               </div>
             </div>
-          )}
 
-          <div className="panel p-5">
-            {!isEditing && isAutoHiddenSigil && operation.target_reveal_date && (
-              <p className="mb-3 text-sm text-stone-500">
-                {t('creation.hiddenUntilDate', { date: formatEntryDate(operation.target_reveal_date) })}
-              </p>
-            )}
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={handlePrepareManualLetters} variant="secondary">
+                {t('creation.addLetter')}
+              </Button>
+              <Button onClick={handlePrepareLetters} variant="primary">
+                {t('creation.prepareLetters')}
+              </Button>
+            </div>
 
-            <div className="rounded-xl border border-stone-700/40 bg-stone-900/35 p-3">
-              {isEditing || sigilVisible ? (
-                <DrawingCanvas
-                  initialData={drawingData}
-                  mode={drawMode}
-                  brushColor={brushColor}
-                  brushSize={brushSize}
-                  clearVersion={clearVersion}
-                  editable={isEditing}
-                  onChange={handleCanvasChange}
-                />
-              ) : (
-                <div className="flex aspect-[3/2] items-center justify-center rounded-xl border border-stone-700/50 bg-stone-900/70 p-6">
-                  <ImageIcon size={34} className="text-stone-700" />
+            <div className="space-y-3">
+              <p className="label-xs">{t('creation.letterBank')}</p>
+              {letterBank.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {letterBank.map((letter) => {
+                    const implemented = implementedLetters.includes(letter);
+                    return (
+                      <button
+                        key={letter}
+                        onClick={() => toggleImplementedLetter(letter)}
+                        className={`h-10 w-10 rounded-md border text-sm font-semibold transition-colors ${
+                          implemented
+                            ? 'border-jade-800/40 bg-jade-900/30 text-jade-400'
+                            : 'border-stone-700/50 bg-stone-800/70 text-stone-300 hover:border-stone-600'
+                        }`}
+                      >
+                        {letter}
+                      </button>
+                    );
+                  })}
                 </div>
+              ) : (
+                <p className="text-xs text-stone-600">{t('creation.noLetters')}</p>
               )}
             </div>
+          </div>
+        )}
 
-            {!isEditing && !operation.is_loaded && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                <div className="flex items-center gap-2 rounded-md border border-stone-700/40 bg-stone-800/40 px-3 py-1.5">
-                  <span className="text-xs text-stone-500">{t('creation.timerLabel')}</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={loadDelayInput}
-                    onChange={(event) => setLoadDelayInput(event.target.value)}
-                    className="w-16 bg-transparent text-xs text-stone-300 outline-none"
-                    placeholder={t('creation.timerSeconds')}
-                  />
-                </div>
-                <Button
-                  onClick={handleSigilLoaded}
-                  disabled={!operation.target_reveal_date}
-                  variant="secondary"
-                >
-                  {loadCountdown != null ? `${loadCountdown}s` : t('creation.loadSigille')}
-                </Button>
+        <div className="panel p-5">
+          {!isEditing && isAutoHiddenSigil && operation.target_reveal_date && (
+            <p className="mb-3 text-sm text-stone-500">
+              {t('creation.hiddenUntilDate', { date: formatEntryDate(operation.target_reveal_date) })}
+            </p>
+          )}
+
+          <div className="rounded-xl border border-stone-700/40 bg-stone-900/35 p-3">
+            {isEditing || sigilVisible ? (
+              <DrawingCanvas
+                initialData={drawingData}
+                mode={drawMode}
+                brushColor={brushColor}
+                brushSize={brushSize}
+                clearVersion={clearVersion}
+                editable={isEditing}
+                onChange={handleCanvasChange}
+              />
+            ) : (
+              <div className="flex aspect-[3/2] items-center justify-center rounded-xl border border-stone-700/50 bg-stone-900/70 p-6">
+                <ImageIcon size={34} className="text-stone-700" />
               </div>
             )}
-
-            {isEditing && (
-              <>
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <div className="sigil-tool-toggle flex items-center gap-1 rounded-lg border border-stone-700/40 bg-stone-800/70 p-1">
-                    <button
-                      onClick={() => setDrawMode('draw')}
-                      className={`sigil-tool-btn flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
-                        drawMode === 'draw' ? 'bg-stone-700 text-stone-100' : 'text-stone-400 hover:text-stone-200'
-                      }`}
-                    >
-                      <PenTool size={13} />
-                      {t('creation.tools.draw')}
-                    </button>
-                    <button
-                      onClick={() => setDrawMode('erase')}
-                      className={`sigil-tool-btn flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
-                        drawMode === 'erase' ? 'bg-stone-700 text-stone-100' : 'text-stone-400 hover:text-stone-200'
-                      }`}
-                    >
-                      <Eraser size={13} />
-                      {t('creation.tools.erase')}
-                    </button>
-                  </div>
-                  <div className="sigil-brush-controls flex items-center gap-2 text-xs text-stone-400">
-                    <span>{t('creation.brushSize')}</span>
-                    <input
-                      type="range"
-                      min={2}
-                      max={48}
-                      value={brushSize}
-                      onChange={(event) => setBrushSize(Number(event.target.value))}
-                      className="sigil-brush-slider accent-jade-400"
-                    />
-                    <span className="w-7 text-right text-stone-500">{brushSize}</span>
-                  </div>
-                  <Button onClick={handleUndoStroke} disabled={historyIndex <= 0} variant="ghost" className="text-xs">
-                    <Undo2 size={13} />
-                    {t('creation.undo')}
-                  </Button>
-                  <Button onClick={handleRedoStroke} disabled={historyIndex >= drawingHistory.length - 1} variant="ghost" className="text-xs">
-                    <Redo2 size={13} />
-                    {t('creation.redo')}
-                  </Button>
-                  <Button onClick={() => setClearVersion((value) => value + 1)} variant="ghost" className="text-xs">
-                    <RotateCcw size={13} />
-                    {t('creation.clear')}
-                  </Button>
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {SIGIL_COLORS.map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => setBrushColor(color)}
-                      className={`h-8 w-8 rounded-full border-2 transition-transform ${
-                        brushColor === color ? 'scale-105 border-stone-200' : 'border-stone-700 hover:border-stone-500'
-                      }`}
-                      style={{ backgroundColor: color }}
-                      aria-label={color}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
           </div>
+
+          {!isEditing && !operation.is_loaded && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <div className="flex items-center gap-2 rounded-md border border-stone-700/40 bg-stone-800/40 px-3 py-1.5">
+                <span className="text-xs text-stone-500">{t('creation.timerLabel')}</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={loadDelayInput}
+                  onChange={(event) => setLoadDelayInput(event.target.value)}
+                  className="w-16 bg-transparent text-xs text-stone-300 outline-none"
+                  placeholder={t('creation.timerSeconds')}
+                />
+              </div>
+              <Button
+                onClick={handleSigilLoaded}
+                disabled={!operation.target_reveal_date}
+                variant="secondary"
+              >
+                {loadCountdown != null ? `${loadCountdown}s` : t('creation.loadSigille')}
+              </Button>
+            </div>
+          )}
+
+          {isEditing && (
+            <>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <div className="sigil-tool-toggle flex items-center gap-1 rounded-lg border border-stone-700/40 bg-stone-800/70 p-1">
+                  <button
+                    onClick={() => setDrawMode('draw')}
+                    className={`sigil-tool-btn flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
+                      drawMode === 'draw' ? 'bg-stone-700 text-stone-100' : 'text-stone-400 hover:text-stone-200'
+                    }`}
+                  >
+                    <PenTool size={13} />
+                    {t('creation.tools.draw')}
+                  </button>
+                  <button
+                    onClick={() => setDrawMode('erase')}
+                    className={`sigil-tool-btn flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
+                      drawMode === 'erase' ? 'bg-stone-700 text-stone-100' : 'text-stone-400 hover:text-stone-200'
+                    }`}
+                  >
+                    <Eraser size={13} />
+                    {t('creation.tools.erase')}
+                  </button>
+                </div>
+                <div className="sigil-brush-controls flex items-center gap-2 text-xs text-stone-400">
+                  <span>{t('creation.brushSize')}</span>
+                  <input
+                    type="range"
+                    min={2}
+                    max={48}
+                    value={brushSize}
+                    onChange={(event) => setBrushSize(Number(event.target.value))}
+                    className="sigil-brush-slider accent-jade-400"
+                  />
+                  <span className="w-7 text-right text-stone-500">{brushSize}</span>
+                </div>
+                <Button onClick={handleUndoStroke} disabled={historyIndex <= 0} variant="ghost" className="text-xs">
+                  <Undo2 size={13} />
+                  {t('creation.undo')}
+                </Button>
+                <Button onClick={handleRedoStroke} disabled={historyIndex >= drawingHistory.length - 1} variant="ghost" className="text-xs">
+                  <Redo2 size={13} />
+                  {t('creation.redo')}
+                </Button>
+                <Button onClick={() => setClearVersion((value) => value + 1)} variant="ghost" className="text-xs">
+                  <RotateCcw size={13} />
+                  {t('creation.clear')}
+                </Button>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {SIGIL_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => setBrushColor(color)}
+                    className={`h-8 w-8 rounded-full border-2 transition-transform ${
+                      brushColor === color ? 'scale-105 border-stone-200' : 'border-stone-700 hover:border-stone-500'
+                    }`}
+                    style={{ backgroundColor: color }}
+                    aria-label={color}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
-    </div>
+    </EntryDetailFrame>
   );
 }

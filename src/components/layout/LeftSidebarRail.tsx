@@ -1,17 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
-import {
-  BookOpen,
-  Home,
-  Library,
-  Tag,
-  Trash2,
-  Flame,
-  Wand2,
-  Settings,
-  CheckSquare,
-} from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { Suspense, lazy, useState } from 'react';
+import { AUX_VIEWS, MODULE_LIST } from '../../lib/modules';
 import { useUIStore } from '../../store/uiStore';
 import { useVaultStore } from '../../store/vaultStore';
 import VaultModal, { VaultGlyph } from './VaultModal';
@@ -80,34 +71,24 @@ export default function LeftSidebarRail() {
             Titelleiste, das niemand als Navigationsziel liest.
             Achtung bei MCP-Selektoren: lucide exportiert `Home` als Alias von
             `House`, das SVG traegt also `.lucide-house`, nicht `.lucide-home`. */}
-        <RailButton onClick={() => setActiveView({ type: 'home' })} title={t('nav.home')}>
-          <Home size={18} />
+        <RailButton onClick={() => setActiveView({ type: 'home' })} title={t(AUX_VIEWS.home.navLabelKey)}>
+          <AUX_VIEWS.home.icon size={18} />
         </RailButton>
-        <RailButton onClick={() => setActiveView({ type: 'journal' })} title={t('nav.journal')}>
-          <BookOpen size={18} />
-        </RailButton>
-        <RailButton onClick={() => setActiveView({ type: 'tasks' })} title={t('nav.tasks')}>
-          <CheckSquare size={18} />
-        </RailButton>
-        <RailButton onClick={() => setActiveView({ type: 'operations' })} title={t('nav.operations')}>
-          <Wand2 size={18} />
-        </RailButton>
-        <RailButton onClick={() => setActiveView({ type: 'wiki' })} title={t('nav.wiki')}>
-          <Library size={18} />
-        </RailButton>
-        <RailButton onClick={() => setActiveView({ type: 'altar' })} title={t('nav.altar')}>
-          <Flame size={18} />
-        </RailButton>
+        {MODULE_LIST.map((mod) => (
+          <RailButton key={mod.id} onClick={() => setActiveView({ type: mod.id })} title={t(mod.navLabelKey)}>
+            <mod.icon size={18} />
+          </RailButton>
+        ))}
       </div>
 
       {/* Bottom nav — always visible: Tags/Trash grouped, Vault/Settings set apart below a divider */}
       <div className="sidebar-bottom-bar w-full flex-1 flex flex-col items-center justify-end py-2">
         <div className="flex flex-col items-center gap-0.5">
-          <RailButton onClick={() => setActiveView({ type: 'tags' })} title={t('nav.tags')}>
-            <Tag size={18} />
+          <RailButton onClick={() => setActiveView({ type: 'tags' })} title={t(AUX_VIEWS.tags.navLabelKey)}>
+            <AUX_VIEWS.tags.icon size={18} />
           </RailButton>
-          <RailButton onClick={() => setActiveView({ type: 'trash' })} title={t('nav.trash')}>
-            <Trash2 size={18} />
+          <RailButton onClick={() => setActiveView({ type: 'trash' })} title={t(AUX_VIEWS.trash.navLabelKey)}>
+            <AUX_VIEWS.trash.icon size={18} />
           </RailButton>
         </div>
         <div className="rail-divider w-8 border-t my-1.5" />

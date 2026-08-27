@@ -30,6 +30,9 @@ jobs:
       - name: Check schema
         run: npm run check:schema
 
+      - name: Check i18n
+        run: npm run check:i18n
+
       # `npm run build` ist tsc + vite — der Typecheck steckt darin.
       - name: Typecheck and build
         run: npm run build

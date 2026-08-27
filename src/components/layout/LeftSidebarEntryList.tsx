@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { formatEntryDate } from '../../lib/formatDate';
 import { categoryLabel } from '../../lib/categories';
-import { BookOpen, Wand2, Library, Flame, CheckSquare, Square, Copy, Pencil, Trash2, PanelTopOpen, LayoutList } from 'lucide-react';
+import { MODULE_LIST, type LeftListTabId } from '../../lib/modules';
+import { Flame, CheckSquare, Square, Copy, Pencil, Trash2, PanelTopOpen, LayoutList, type LucideIcon } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useOperationStore } from '../../store/operationStore';
@@ -23,14 +24,11 @@ import type { ContextMenuAction } from '../ui/ContextMenu';
 
 /** Die Tabs ohne ihre Beschriftungen, die `t()` brauchen und deshalb in der
  *  Komponente bleiben. Auf Modulebene, damit `ENTRY_LIST_TABS_WIDTH` unten
- *  ihre Anzahl zaehlen kann, statt sie danebenzuschreiben. */
-const TABS: Array<{ id: 'all' | 'journal' | 'tasks' | 'operations' | 'wiki' | 'altar'; icon: ReactNode }> = [
-  { id: 'all', icon: <LayoutList size={14} /> },
-  { id: 'journal', icon: <BookOpen size={14} /> },
-  { id: 'tasks', icon: <CheckSquare size={14} /> },
-  { id: 'operations', icon: <Wand2 size={14} /> },
-  { id: 'wiki', icon: <Library size={14} /> },
-  { id: 'altar', icon: <Flame size={14} /> },
+ *  ihre Anzahl zaehlen kann, statt sie danebenzuschreiben. Reihenfolge und
+ *  Icons kommen aus der Modul-Registry; nur der 'all'-Tab ist eigener Bestand. */
+const TABS: Array<{ id: LeftListTabId; icon: LucideIcon }> = [
+  { id: 'all', icon: LayoutList },
+  ...MODULE_LIST.map((mod) => ({ id: mod.id as LeftListTabId, icon: mod.icon })),
 ];
 
 /* Die Geometrie der Tab-Leiste, in Zahlen statt nur in Utility-Klassen: die
@@ -65,22 +63,32 @@ export default function LeftSidebarEntryList() {
           Reihe statt stumm ueber den Rand zu laufen. Flexbox entscheidet das
           selbst — keine Schwelle, kein ResizeObserver, kein Oszillieren. */}
       <div className="flex flex-wrap items-center gap-0.5 px-3 py-2 min-h-14 border-b border-stone-700/60 flex-shrink-0">
-        {TABS.map(({ id, icon }) => (
+        {TABS.map(({ id, icon: Icon }) => (
           <TabIconButton key={id} active={leftListTab === id} onClick={() => setLeftListTab(id)} title={t(`nav.${id}`)}>
-            {icon}
+            <Icon size={14} />
           </TabIconButton>
         ))}
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
-        {leftListTab === 'all' && <AllList />}
-        {leftListTab === 'journal' && <JournalList />}
-        {leftListTab === 'tasks' && <TasksList />}
-        {leftListTab === 'operations' && <OperationsList />}
-        {leftListTab === 'wiki' && <WikiList />}
-        {leftListTab === 'altar' && <AltarList />}
+        <ActiveList tab={leftListTab} />
       </div>
     </div>
   );
+}
+
+/** Ein Component pro Tab; die Config-Hooks je Modul bleiben die Fachlogik. */
+const TAB_LISTS: Record<LeftListTabId, ComponentType> = {
+  all: AllList,
+  journal: JournalList,
+  tasks: TasksList,
+  operations: OperationsList,
+  wiki: WikiList,
+  altar: AltarList,
+};
+
+function ActiveList({ tab }: { tab: LeftListTabId }) {
+  const List = TAB_LISTS[tab];
+  return <List />;
 }
 
 // ── All ──────────────────────────────────────────────────────────────────────

@@ -113,7 +113,7 @@ export default function AltarReadingSummary() {
       />
       <PropertySummaryRow
         label={t('altar.summaryElements')}
-        value={`${placedCount} ${t('altar.itemsPlaced')}`}
+        value={`${placedCount} ${t('altar.elementsPlaced')}`}
       />
     </PropertiesReadView>
   );

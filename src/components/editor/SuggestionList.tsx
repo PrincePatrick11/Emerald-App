@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BookOpen, Library, Wand2 } from 'lucide-react';
 
 export interface SuggestionItem {
@@ -21,6 +22,7 @@ export interface SuggestionListRef {
 
 const SuggestionList = forwardRef<SuggestionListRef, Props>(
   ({ items, command }, ref) => {
+    const { t } = useTranslation();
     const [selectedIndex, setSelectedIndex] = useState(0);
 
     useEffect(() => setSelectedIndex(0), [items]);
@@ -51,7 +53,7 @@ const SuggestionList = forwardRef<SuggestionListRef, Props>(
     if (items.length === 0) {
       return (
         <div className="bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-xs text-stone-500 shadow-xl">
-          No results
+          {t('search.noResultsShort')}
         </div>
       );
     }

@@ -1,14 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useTranslation } from 'react-i18next';
-import { useJournalStore } from '../../store/journalStore';
-import { useWikiStore } from '../../store/wikiStore';
 import { isAltarFullscreen, useUIStore } from '../../store/uiStore';
-import { useTagStore } from '../../store/tagStore';
 import { useOperationStore } from '../../store/operationStore';
-import { useAltarStore } from '../../store/altarStore';
-import { useTaskStore } from '../../store/taskStore';
-import { useRoutineStore } from '../../store/routineStore';
+import { reloadAllStores } from '../../store/moduleWiring';
 import { hasActiveVault, useVaultStore } from '../../store/vaultStore';
 import { invoke } from '@tauri-apps/api/core';
 import { computeMenuEnabledState, runMenuAction, SELF_CONTAINED_MENU_ACTIONS } from '../../lib/menuActions';
@@ -69,13 +64,6 @@ function loadSavedWidth(key: string, min: number, fallback: number): number {
 
 export default function AppShell() {
   const { t, i18n } = useTranslation();
-  const fetchEntries = useJournalStore((s) => s.fetchEntries);
-  const fetchArticles = useWikiStore((s) => s.fetchArticles);
-  const fetchTags = useTagStore((s) => s.fetchTags);
-  const fetchAll = useOperationStore((s) => s.fetchAll);
-  const fetchAllTasks = useTaskStore((s) => s.fetchAll);
-  const fetchRoutines = useRoutineStore((s) => s.fetchRoutines);
-  const fetchAltars = useAltarStore((s) => s.fetchAltars);
   const loadVaults = useVaultStore((s) => s.loadVaults);
   const vaultsLoaded = useVaultStore((s) => s.loaded);
   const vaults = useVaultStore((s) => s.vaults);
@@ -119,7 +107,7 @@ export default function AppShell() {
       // liesse. Der erste Vault wird ueber `switchVault` aktiviert, und das
       // endet in `reloadAllStores()` — dieser Effekt laeuft dafuer nicht erneut.
       if (!hasActiveVault(useVaultStore.getState())) return;
-      return Promise.all([fetchEntries(), fetchArticles(), fetchTags(), fetchAll(), fetchAllTasks(), fetchRoutines(), fetchAltars()]);
+      return reloadAllStores();
     });
   }, []);
 

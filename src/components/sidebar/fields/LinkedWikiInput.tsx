@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { useWikiStore } from '../../../store/wikiStore';
+import { useOutsideClick } from '../../../hooks/useOutsideClick';
 import { getCategoryEmoji } from '../../wiki/WikiList';
 
 export default function LinkedWikiInput({
@@ -18,14 +19,7 @@ export default function LinkedWikiInput({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+  useOutsideClick(open, () => setOpen(false), { refs: [ref] });
 
   const filtered = useMemo(() =>
     articles

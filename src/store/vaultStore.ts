@@ -12,14 +12,8 @@ import {
 } from '../lib/vaultManager';
 import { resetDbCache, getDb, withDbClosed } from '../lib/db';
 import { clearSearchTextCache } from '../lib/searchText';
-import { useJournalStore } from './journalStore';
-import { useWikiStore } from './wikiStore';
-import { useOperationStore } from './operationStore';
-import { useTagStore } from './tagStore';
-import { useRoutineStore } from './routineStore';
-import { useAltarStore } from './altarStore';
+import { reloadAllStores } from './moduleWiring';
 import { useUIStore } from './uiStore';
-import { useTaskStore } from './taskStore';
 import { useUndoStore } from './undoStore';
 
 interface VaultStore {
@@ -35,25 +29,6 @@ interface VaultStore {
   /** Resolves to whether the vault's folder is gone — `false` when it stayed
    *  because something else still lies in it (see `delete_vault_files`). */
   removeVault: (id: string, deleteFiles?: boolean) => Promise<boolean>;
-}
-
-async function reloadAllStores(): Promise<void> {
-  // Die globale Suche haelt den Klartext jedes Eintrags unter dessen id fest.
-  // Die ids des eben geschlossenen Vaults werden nie wieder erfragt, also
-  // waere ihr Text ein Leck, das mit jedem Wechsel weiterwaechst.
-  clearSearchTextCache();
-  await useTagStore.getState().fetchTags();
-  await Promise.all([
-    useWikiStore.getState().fetchCategories(),
-    useOperationStore.getState().fetchAll(),
-  ]);
-  await Promise.all([
-    useJournalStore.getState().fetchEntries(),
-    useWikiStore.getState().fetchArticles(),
-    useRoutineStore.getState().fetchRoutines(),
-    useAltarStore.getState().fetchAltars(),
-    useTaskStore.getState().fetchAll(),
-  ]);
 }
 
 /**
@@ -82,6 +57,10 @@ async function openActiveVault(): Promise<void> {
   useUIStore.getState().setActiveView({ type: 'home' });
   // Undo entries reference rows of the old vault by id — drop them
   useUndoStore.getState().clear();
+  // Die globale Suche haelt den Klartext jedes Eintrags unter dessen id fest.
+  // Die ids des eben geschlossenen Vaults werden nie wieder erfragt, also
+  // waere ihr Text ein Leck, das mit jedem Wechsel weiterwaechst.
+  clearSearchTextCache();
   await reloadAllStores();
 }
 

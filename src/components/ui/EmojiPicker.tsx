@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -97,32 +98,10 @@ export default function EmojiPicker({
     return () => { cancelled = true; };
   }, [open, locale]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onMouse = (e: MouseEvent) => {
-      const target = e.target as Node;
-      // Das Popover haengt im Portal und ist damit kein Nachfahre des Triggers
-      // mehr — ohne die zweite Pruefung schloesse jeder Klick hinein den Picker.
-      if (ref.current?.contains(target) || popoverRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      // In der Capture-Phase, und dort mit `stopPropagation`: `Modal` haengt
-      // seinen Escape-Handler in der Bubble-Phase ans Dokument, und dort
-      // gewinnt, wer zuerst registriert hat — also immer das Modal, das schon
-      // beim Mount da war. Ohne das schloesse ein Escape im offenen Picker das
-      // ganze Modal samt laufender Bearbeitung, statt nur den Picker.
-      e.stopPropagation();
-      setOpen(false);
-    };
-    document.addEventListener('mousedown', onMouse);
-    document.addEventListener('keydown', onKey, true);
-    return () => {
-      document.removeEventListener('mousedown', onMouse);
-      document.removeEventListener('keydown', onKey, true);
-    };
-  }, [open]);
+  // popoverRef zusätzlich: das Popover haengt im Portal und ist kein Nachfahre
+  // des Triggers mehr. `escape: 'capture'`, damit Escape nur den Picker
+  // schliesst und nicht das umgebende Modal (dessen Bubble-Handler gewinnt sonst).
+  useOutsideClick(open, () => setOpen(false), { refs: [ref, popoverRef], escape: 'capture' });
 
   /**
    * Anchors the portalled popover to the trigger, in viewport coordinates.

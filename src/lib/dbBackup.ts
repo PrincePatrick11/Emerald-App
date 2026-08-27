@@ -25,13 +25,7 @@ import { imageRefsInHtml, isStoredImage, readImageAsBase64, saveImage } from './
 import { clearSearchTextCache } from './searchText';
 import { IMAGE_FIELDS, imageColumns } from './schema';
 import { useVaultStore } from '../store/vaultStore';
-import { useJournalStore } from '../store/journalStore';
-import { useWikiStore } from '../store/wikiStore';
-import { useOperationStore } from '../store/operationStore';
-import { useTagStore } from '../store/tagStore';
-import { useRoutineStore } from '../store/routineStore';
-import { useAltarStore } from '../store/altarStore';
-import { useTaskStore } from '../store/taskStore';
+import { reloadAllStores } from '../store/moduleWiring';
 import { useUIStore } from '../store/uiStore';
 import { resumeEditorSaves, suspendEditorSaves } from './editorLock';
 
@@ -995,18 +989,7 @@ export async function importDatabase(
   // alten Text — der neue waere bis zum Neustart unauffindbar.
   clearSearchTextCache();
 
-  await useTagStore.getState().fetchTags();
-  await Promise.all([
-    useWikiStore.getState().fetchCategories(),
-    useOperationStore.getState().fetchAll(),
-  ]);
-  await Promise.all([
-    useJournalStore.getState().fetchEntries(),
-    useWikiStore.getState().fetchArticles(),
-    useRoutineStore.getState().fetchRoutines(),
-    useAltarStore.getState().fetchAltars(),
-    useTaskStore.getState().fetchAll(),
-  ]);
+  await reloadAllStores();
   } finally {
     if (suspendSaves) resumeEditorSaves();
   }

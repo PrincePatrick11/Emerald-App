@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Trash2, Pencil, Copy, PanelTopOpen } from 'lucide-react';
@@ -8,21 +8,24 @@ import CategoryHeaderRow from '../ui/CategoryHeaderRow';
 import CategoryAddRow from '../ui/CategoryAddRow';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { categoryLabel } from '../../lib/categories';
-import { formatEntryDate, formatMonthGroup } from '../../lib/formatDate';
+import { formatEntryDate } from '../../lib/formatDate';
+import { sortItems } from '../../lib/sortItems';
+import { groupByMonth } from '../../lib/groupBy';
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import { useEntryEditor } from '../../hooks/useEntryEditor';
+import { useEditActions } from '../../hooks/useEditActions';
 import RichEditor from '../editor/RichEditor';
-import TagInput from '../editor/TagInput';
+import EntryDetailFrame from '../ui/EntryDetailFrame';
 import OperationSigilView from './OperationSigilView';
 
 
 export default function OperationsView() {
   const { t } = useTranslation();
-  const { activeView, setActiveView, setEditActions, openViewInNewTab, operationsPrefs, setOperationsPrefs } = useUIStore(
-    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, setEditActions: s.setEditActions, openViewInNewTab: s.openViewInNewTab, operationsPrefs: s.operationsPrefs, setOperationsPrefs: s.setOperationsPrefs }))
+  const { activeView, setActiveView, openViewInNewTab, operationsPrefs, setOperationsPrefs } = useUIStore(
+    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab, operationsPrefs: s.operationsPrefs, setOperationsPrefs: s.setOperationsPrefs }))
   );
   const { operations, categories, createOperation, duplicateOperation, updateOperation, deleteOperation, restoreOperation, getOperation, addCategory, updateCategory, deleteCategory, restoreCategory } = useOperationStore(
     useShallow((s) => ({ operations: s.operations, categories: s.categories, createOperation: s.createOperation, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation, getOperation: s.getOperation, addCategory: s.addCategory, updateCategory: s.updateCategory, deleteCategory: s.deleteCategory, restoreCategory: s.restoreCategory }))
@@ -58,15 +61,13 @@ export default function OperationsView() {
   const [endDate, setEndDate] = useState<string>('');
   const [version, setVersion] = useState<string>('');
 
-  // Content-Mirror im Ref statt State — siehe JournalView.
-  const pendingHtmlRef = useRef('');
   const [editorEpoch, setEditorEpoch] = useState(0);
 
-  const { triggerAutoSave, cancelAutoSave } = useEntryEditor({
+  const { triggerAutoSave, cancelAutoSave, contentRef, handleContentChange } = useEntryEditor({
     entityId: operation?.id,
     isEditing,
     ready: !!operation && loadedOperationId === operation.id,
-    buildPatch: () => ({ title, content: pendingHtmlRef.current, category_id: categoryId, tags, is_active: isActive, end_date: endDate || null, version: version || null }),
+    buildPatch: (content) => ({ title, content, category_id: categoryId, tags, is_active: isActive, end_date: endDate || null, version: version || null }),
     update: updateOperation,
   });
 
@@ -81,7 +82,7 @@ export default function OperationsView() {
   useEffect(() => {
     if (operation) {
       setTitle(operation.title);
-      pendingHtmlRef.current = operation.content;
+      contentRef.current = operation.content;
       setCategoryId(operation.category_id);
       setTags(operation.tags ?? []);
       setIsActive(operation.is_active ?? true);
@@ -161,7 +162,7 @@ export default function OperationsView() {
   const handleDone = async () => {
     if (!operation) return;
     cancelAutoSave();
-    await updateOperation(operation.id, { title, content: pendingHtmlRef.current, category_id: categoryId, tags, is_active: isActive, end_date: endDate || null, version: version || null });
+    await updateOperation(operation.id, { title, content: contentRef.current, category_id: categoryId, tags, is_active: isActive, end_date: endDate || null, version: version || null });
     setActiveView({ type: 'operations', id: operation.id, mode: 'view' });
   };
 
@@ -174,7 +175,7 @@ export default function OperationsView() {
       setIsActive(operation.is_active ?? true);
       setEndDate(operation.end_date ?? '');
       setVersion(operation.version ?? '');
-      pendingHtmlRef.current = operation.content;
+      contentRef.current = operation.content;
       setEditorEpoch((e) => e + 1);
     }
     setActiveView({ type: 'operations', id: operation!.id, mode: 'view' });
@@ -189,24 +190,8 @@ export default function OperationsView() {
     setActiveView({ type: 'operations' });
   };
 
-  const handleContentChange = useCallback((html: string) => {
-    pendingHtmlRef.current = html;
-    triggerAutoSave();
-  }, [triggerAutoSave]);
-
-  const editHandlersRef = useRef({ onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
-  editHandlersRef.current = { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete };
-
   // Sigil operations delegate rendering (and editActions registration) to OperationSigilView.
-  useEffect(() => {
-    if (!isEditing || isSigilOperation) return;
-    setEditActions({
-      onSave: () => editHandlersRef.current.onSave(),
-      onCancel: () => editHandlersRef.current.onCancel(),
-      onDelete: () => editHandlersRef.current.onDelete(),
-    });
-    return () => setEditActions(null);
-  }, [isEditing, isSigilOperation]);
+  useEditActions(isEditing && !isSigilOperation, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
 
   const enterEditMode = () => {
     if (!isEditing && operation) setActiveView({ type: 'operations', id: operation.id, mode: 'edit' });
@@ -254,16 +239,9 @@ export default function OperationsView() {
       (filterCatIds.length > 0 ? 1 : 0) +
       (filterStatus.length > 0 ? 1 : 0);
 
-    const sortedOps = [...filtered].sort((a, b) => {
-      if (sort === 'alpha_asc') return a.title.localeCompare(b.title);
-      if (sort === 'alpha_desc') return b.title.localeCompare(a.title);
-      if (sort === 'category') {
-        const ca = catById[a.category_id]?.name ?? '';
-        const cb = catById[b.category_id]?.name ?? '';
-        return ca.localeCompare(cb);
-      }
-      if (sort === 'date_asc') return a.updated_at.localeCompare(b.updated_at);
-      return b.updated_at.localeCompare(a.updated_at); // date_desc
+    const sortedOps = sortItems(filtered, sort, {
+      date: (o) => o.updated_at,
+      category: (o) => catById[o.category_id]?.name ?? '',
     });
 
     const groupedByCat = categories.map((cat) => ({
@@ -272,15 +250,7 @@ export default function OperationsView() {
     }));
     const uncategorized = sortedOps.filter((o) => !categories.find((c) => c.id === o.category_id));
 
-    const timelineGroups: { label: string; items: typeof operations }[] = (() => {
-      const map = new Map<string, typeof operations>();
-      sortedOps.forEach((o) => {
-        const key = formatMonthGroup(o.updated_at);
-        if (!map.has(key)) map.set(key, []);
-        map.get(key)!.push(o);
-      });
-      return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
-    })();
+    const timelineGroups = groupByMonth(sortedOps, (o) => o.updated_at);
 
     const renderOp = (op: typeof operations[0]) => {
       const cat = catById[op.category_id];
@@ -411,7 +381,7 @@ export default function OperationsView() {
       items: ops,
     }));
     if (uncategorized.length > 0) {
-      catGroups.push({ key: '__uncategorized__', label: '📄 Other', items: uncategorized });
+      catGroups.push({ key: '__uncategorized__', label: `📄 ${t('operations.uncategorized')}`, items: uncategorized });
     }
 
     const renderCategoryHeader = (group: DashboardGroup<Operation>) => {
@@ -513,13 +483,12 @@ export default function OperationsView() {
   const operationIcon = operation.icon || currentCat?.emoji || '⚡';
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Topbar */}
-      <div className="flex items-center justify-between px-6 h-14 border-b border-stone-700/60 flex-shrink-0">
-        <div className="flex items-center gap-2 text-xs text-stone-600">
-          <button onClick={() => setActiveView({ type: 'operations' })} className="text-stone-500 transition-colors hover:text-stone-300">
-            {t('nav.operations')}
-          </button>
+    <EntryDetailFrame
+      module="operations"
+      isEditing={isEditing}
+      onEnterEditMode={enterEditMode}
+      breadcrumbMeta={
+        <>
           {isImageIcon(operationIcon)
             ? <img src={operationIcon} alt="" className="w-5 h-5 object-cover rounded" />
             : <span>{operationIcon}</span>
@@ -527,81 +496,63 @@ export default function OperationsView() {
           <span>{categoryLabel(t, 'operations', currentCat, '—')}</span>
           <span>·</span>
           <span>{formatEntryDate(operation.updated_at)}</span>
-          {isEditing && <span className="text-stone-700 italic ml-1">{t('editor.editing')}</span>}
-        </div>
-      </div>
+        </>
+      }
+      title={isEditing ? title : operation.title}
+      onTitleChange={(nextTitle) => { setTitle(nextTitle); triggerAutoSave(); }}
+      belowTitle={
+        <>
+          {/* Cover image — read mode hero (bewusst nach dem Titel, anders als im Wiki) */}
+          {!isEditing && operation.cover_image && (
+            <div className="flex-shrink-0 px-8 pt-5">
+              <img src={operation.cover_image} alt="" className="w-full max-h-48 object-cover rounded-lg border border-stone-700/40" />
+            </div>
+          )}
 
-      {/* Title */}
-      <div className="px-8 pt-6 pb-4 flex-shrink-0" onDoubleClick={enterEditMode}>
-        {isEditing ? (
-          <input autoFocus type="text" value={title}
-            onChange={(e) => { const nextTitle = e.target.value; setTitle(nextTitle); triggerAutoSave(); }}
-            placeholder={t('operations.untitled')}
-            className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100
-                       placeholder-stone-700 outline-none selectable" />
-        ) : (
-          <h1 className="entry-view-title text-2xl font-semibold text-stone-100 cursor-text">
-            {operation.title || t('operations.untitled')}
-          </h1>
-        )}
-      </div>
+          {/* Built-in properties */}
+          <div className="px-8 pb-3 flex-shrink-0 flex flex-wrap gap-2">
+            {/* Active / Inactive — clickable toggle */}
+            <button
+              onClick={() => updateOperation(operation.id, { is_active: !operation.is_active })}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                !!operation.is_active
+                  ? 'bg-jade-900/40 text-jade-400 border-jade-800/40 hover:bg-jade-900/60'
+                  : 'bg-stone-800/60 text-stone-500 border-stone-700/40 hover:bg-stone-700/60'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${!!operation.is_active ? 'bg-jade-400' : 'bg-stone-600'}`} />
+              {!!operation.is_active ? t('operations.active') : t('operations.inactive')}
+            </button>
 
-      {/* Cover image — read mode hero */}
-      {!isEditing && operation.cover_image && (
-        <div className="flex-shrink-0 px-8 pt-5">
-          <img src={operation.cover_image} alt="" className="w-full max-h-48 object-cover rounded-lg border border-stone-700/40" />
-        </div>
+            {operation.end_date && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs bg-stone-800/60 border border-stone-700/40">
+                <span className="text-stone-600">{t('operations.endDate')}:</span>
+                <span className="text-stone-300">
+                  {formatEntryDate(operation.end_date)}
+                </span>
+              </span>
+            )}
+
+            {operation.version && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs bg-stone-800/60 border border-stone-700/40">
+                <span className="text-stone-600">{t('operations.version')}:</span>
+                <span className="text-stone-300">{operation.version}</span>
+              </span>
+            )}
+          </div>
+        </>
+      }
+      tags={{ value: tags, onChange: (newTags) => { setTags(newTags); triggerAutoSave(); } }}
+    >
+      {loadedOperationId === operation.id && (
+        <RichEditor
+          key={`${operation.id}:${editorEpoch}`}
+          initialContent={operation.content}
+          placeholder={t('operations.placeholder')}
+          onChange={handleContentChange}
+          editable={isEditing}
+        />
       )}
-
-      {/* Built-in properties */}
-      <div className="px-8 pb-3 flex-shrink-0 flex flex-wrap gap-2">
-        {/* Active / Inactive — clickable toggle */}
-        <button
-          onClick={() => updateOperation(operation.id, { is_active: !operation.is_active })}
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
-            !!operation.is_active
-              ? 'bg-jade-900/40 text-jade-400 border-jade-800/40 hover:bg-jade-900/60'
-              : 'bg-stone-800/60 text-stone-500 border-stone-700/40 hover:bg-stone-700/60'
-          }`}
-        >
-          <span className={`w-1.5 h-1.5 rounded-full ${!!operation.is_active ? 'bg-jade-400' : 'bg-stone-600'}`} />
-          {!!operation.is_active ? t('operations.active') : t('operations.inactive')}
-        </button>
-
-        {operation.end_date && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs bg-stone-800/60 border border-stone-700/40">
-            <span className="text-stone-600">{t('operations.endDate')}:</span>
-            <span className="text-stone-300">
-              {formatEntryDate(operation.end_date)}
-            </span>
-          </span>
-        )}
-
-        {operation.version && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs bg-stone-800/60 border border-stone-700/40">
-            <span className="text-stone-600">{t('operations.version')}:</span>
-            <span className="text-stone-300">{operation.version}</span>
-          </span>
-        )}
-      </div>
-
-      {/* Tags */}
-      <div className="px-8 pb-3 flex-shrink-0" onDoubleClick={enterEditMode}>
-        <TagInput tags={tags} onChange={(newTags) => { setTags(newTags); triggerAutoSave(); }} readOnly={true} />
-      </div>
-
-      {/* Editor */}
-      <div className="flex-1 overflow-hidden px-8 pb-8" onDoubleClick={enterEditMode}>
-        {loadedOperationId === operation.id && (
-          <RichEditor
-            key={`${operation.id}:${editorEpoch}`}
-            initialContent={operation.content}
-            placeholder={t('operations.placeholder')}
-            onChange={handleContentChange}
-            editable={isEditing}
-          />
-        )}
-      </div>
-    </div>
+    </EntryDetailFrame>
   );
 }

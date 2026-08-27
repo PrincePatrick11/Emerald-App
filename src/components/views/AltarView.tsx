@@ -2,12 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
 import { Maximize2, Minimize2 } from 'lucide-react';
-import { formatEntryDate, formatMonthGroup } from '../../lib/formatDate';
+import { formatEntryDate } from '../../lib/formatDate';
+import { sortItems } from '../../lib/sortItems';
+import { groupByMonth } from '../../lib/groupBy';
 import { useAltarStore } from '../../store/altarStore';
 import { useUIStore } from '../../store/uiStore';
+import { useEditActions } from '../../hooks/useEditActions';
 import { getAltarBackgroundStyle, DEFAULT_ALTAR_RESOLUTION, parseResolution, isRatioFormat } from '../../lib/altarConstants';
 import type { AltarRecord } from '../../types';
-import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
+import Dashboard from '../ui/Dashboard';
 import ContextMenu from '../ui/ContextMenu';
 import Button from '../ui/Button';
 import { AltarCanvas, captureCurrentAltar } from '../altar/AltarCanvas';
@@ -32,7 +35,6 @@ export default function AltarView() {
   );
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
-  const setEditActions = useUIStore((s) => s.setEditActions);
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const altarPrefs = useUIStore((s) => s.altarPrefs);
   const setAltarPrefs = useUIStore((s) => s.setAltarPrefs);
@@ -211,18 +213,7 @@ export default function AltarView() {
     }
   };
 
-  const editHandlersRef = useRef({ onSave: handleDone, onCancel: handleCancel, onDelete: handleDeleteActive });
-  editHandlersRef.current = { onSave: handleDone, onCancel: handleCancel, onDelete: handleDeleteActive };
-
-  useEffect(() => {
-    if (!isEditing) return;
-    setEditActions({
-      onSave: () => editHandlersRef.current.onSave(),
-      onCancel: () => editHandlersRef.current.onCancel(),
-      onDelete: () => editHandlersRef.current.onDelete(),
-    });
-    return () => setEditActions(null);
-  }, [isEditing]);
+  useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDeleteActive });
 
   const backgroundSrc = imageSrc(activeAltar?.background_image_data);
 
@@ -234,24 +225,9 @@ export default function AltarView() {
         )
       : altars;
 
-    const sorted = [...filtered].sort((a, b) => {
-      const sort = altarPrefs.sort;
-      if (sort === 'alpha_asc') return a.title.localeCompare(b.title);
-      if (sort === 'alpha_desc') return b.title.localeCompare(a.title);
-      if (sort === 'date_asc') return a.updated_at.localeCompare(b.updated_at);
-      return b.updated_at.localeCompare(a.updated_at);
-    });
-
-    const grouped = altarPrefs.view === 'timeline'
-      ? Array.from(
-          sorted.reduce((map, altar) => {
-            const label = formatMonthGroup(altar.updated_at);
-            if (!map.has(label)) map.set(label, []);
-            map.get(label)!.push(altar);
-            return map;
-          }, new Map<string, AltarRecord[]>())
-        )
-      : [['', sorted] as const];
+    // Kein category-Getter: Altäre haben keine Kategorien, der onSort-Handler
+    // unten mappt 'category' bereits auf date_desc.
+    const sorted = sortItems(filtered, altarPrefs.sort, { date: (a) => a.updated_at });
 
     const filteredCount = filtered.length;
 
@@ -301,7 +277,7 @@ export default function AltarView() {
         noResultsMessage={t('search.noResults')}
         grouping={
           altarPrefs.view === 'timeline'
-            ? { mode: 'timeline', groups: grouped.map(([label, items]): DashboardGroup<AltarRecord> => ({ label, items })) }
+            ? { mode: 'timeline', groups: groupByMonth(sorted, (a) => a.updated_at) }
             : { mode: 'flat' }
         }
         contextMenuSlot={ctxMenu && (

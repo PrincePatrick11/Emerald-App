@@ -1,4 +1,4 @@
-import { BookOpen, Flame, Home, Library, MoreHorizontal, Plus, Tag, Trash2, Wand2, X, CheckSquare } from 'lucide-react';
+import { Flame, MoreHorizontal, Plus, X } from 'lucide-react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -14,28 +14,13 @@ import { useWikiStore } from '../../store/wikiStore';
 import type { ActiveView, MoonPhase } from '../../types';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import { imageSrc } from '../../lib/images';
+import { AUX_VIEWS, moduleMeta, type AuxViewId } from '../../lib/modules';
 
 function getFallbackTitle(view: ActiveView, t: TFunction) {
-  switch (view.type) {
-    case 'home':
-      return t('nav.home');
-    case 'journal':
-      return view.id ? t('journal.untitled') : t('nav.journal');
-    case 'wiki':
-      return view.id ? t('wiki.untitled') : t('nav.wiki');
-    case 'operations':
-      return view.id ? t('operations.untitled') : t('nav.operations');
-    case 'altar':
-      return view.id ? t('altar.untitled') : t('nav.altar');
-    case 'tasks':
-      return view.id ? t('tasks.untitled') : t('nav.tasks');
-    case 'tags':
-      return t('nav.tags');
-    case 'trash':
-      return t('nav.trash');
-    default:
-      return '';
-  }
+  const meta = moduleMeta(view.type);
+  if (meta) return view.id ? t(meta.untitledKey) : t(meta.navLabelKey);
+  const aux = AUX_VIEWS[view.type as AuxViewId];
+  return aux ? t(aux.navLabelKey) : '';
 }
 
 function renderIconValue(icon: string | null | undefined, fallback: ReactNode) {
@@ -115,26 +100,8 @@ export default function TabBar() {
       return <AltarTabIcon iconData={altar?.icon_data} />;
     }
 
-    switch (view.type) {
-      case 'home':
-        return <Home size={13} />;
-      case 'journal':
-        return <BookOpen size={13} />;
-      case 'wiki':
-        return <Library size={13} />;
-      case 'operations':
-        return <Wand2 size={13} />;
-      case 'altar':
-        return <Flame size={13} />;
-      case 'tags':
-        return <Tag size={13} />;
-      case 'trash':
-        return <Trash2 size={13} />;
-      case 'tasks':
-        return <CheckSquare size={13} />;
-      default:
-        return <MoreHorizontal size={13} />;
-    }
+    const Icon = moduleMeta(view.type)?.icon ?? AUX_VIEWS[view.type as AuxViewId]?.icon ?? MoreHorizontal;
+    return <Icon size={13} />;
   };
 
   return (

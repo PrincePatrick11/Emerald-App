@@ -1,8 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useOutsideClick } from '../../../hooks/useOutsideClick';
 import { createPortal } from 'react-dom';
-import { BookOpen, CheckSquare, Flame, Folder, Library, Sparkles, Tag, Wand2 } from 'lucide-react';
+import { Folder, Sparkles, Tag, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { comparable, type CategoryModule, type SearchHit, type SearchKind, type SearchResults } from '../../../lib/globalSearch';
+import { comparable, type SearchHit, type SearchKind, type SearchResults } from '../../../lib/globalSearch';
+import { MODULES } from '../../../lib/modules';
 
 /** Abstand des Panels zur Fensterkante und zum Suchfeld darüber. */
 const VIEWPORT_MARGIN = 8;
@@ -17,41 +19,25 @@ const ANCHOR_GAP = 4;
  *  ein Abstand zur Fensterkante ist wirklich ein Abstand. */
 const MIN_PANEL_REM = 24;
 
-const KIND_ICONS: Record<SearchKind, ReactNode> = {
-  journal: <BookOpen size={13} />,
-  wiki: <Library size={13} />,
-  operation: <Wand2 size={13} />,
-  task: <CheckSquare size={13} />,
-  altar: <Flame size={13} />,
-  altarItem: <Sparkles size={13} />,
-  tag: <Tag size={13} />,
-  category: <Folder size={13} />,
+/** Die Suche spricht Datenmodell-Vokabular ('operation' singular, 'task') —
+ *  die Modul-Kinds ziehen Icon und nav-Label aus der Registry, die drei
+ *  Nicht-Modul-Kinds haben eigene. Ein totales Record: ein neuer SearchKind
+ *  ohne Eintrag hier ist ein Compile-Fehler, kein Laufzeit-Loch. */
+const KIND_META: Record<SearchKind, { icon: LucideIcon; labelKey: string }> = {
+  journal: { icon: MODULES.journal.icon, labelKey: MODULES.journal.navLabelKey },
+  wiki: { icon: MODULES.wiki.icon, labelKey: MODULES.wiki.navLabelKey },
+  operation: { icon: MODULES.operations.icon, labelKey: MODULES.operations.navLabelKey },
+  task: { icon: MODULES.tasks.icon, labelKey: MODULES.tasks.navLabelKey },
+  altar: { icon: MODULES.altar.icon, labelKey: MODULES.altar.navLabelKey },
+  altarItem: { icon: Sparkles, labelKey: 'search.altarElements' },
+  tag: { icon: Tag, labelKey: 'nav.tags' },
+  category: { icon: Folder, labelKey: 'search.categories' },
 };
 
-/** Die Modul-Labels kommen aus `nav.*` — dieselben Beschriftungen, die die
- *  Tabs der Eintragsliste tragen. Nur was dort keinen Eintrag hat, bekommt
- *  einen eigenen Schlüssel. */
-const KIND_LABEL_KEYS: Record<SearchKind, string> = {
-  journal: 'nav.journal',
-  wiki: 'nav.wiki',
-  operation: 'nav.operations',
-  task: 'nav.tasks',
-  altar: 'nav.altar',
-  altarItem: 'search.altarItems',
-  tag: 'nav.tags',
-  category: 'search.categories',
-};
-
-/** Kategorien tragen zusaetzlich ihr Modul. Die vier Kategorie-Tabellen teilen
- *  sich Built-in-Ids, also stehen `Herb` aus dem Wiki und `Herb` vom Altar
- *  gleichzeitig in der Liste — ohne das Modul waeren die beiden Zeilen nicht
- *  zu unterscheiden, obwohl sie woandershin fuehren. Wieder `nav.*`. */
-const MODULE_LABEL_KEYS: Record<CategoryModule, string> = {
-  wiki: 'nav.wiki',
-  operations: 'nav.operations',
-  tasks: 'nav.tasks',
-  altar: 'nav.altar',
-};
+function kindIcon(kind: SearchKind): ReactNode {
+  const Icon = KIND_META[kind].icon;
+  return <Icon size={13} />;
+}
 
 /**
  * Hebt die Fundstelle im Titel hervor.
@@ -140,22 +126,14 @@ export default function TitleBarSearchResults({
   // Ein Klick daneben schließt — das Suchfeld selbst ausgenommen, sonst schlüge
   // sein eigener Fokus-Klick die Liste sofort wieder zu.
   //
-  // In der Capture-Phase, und das ist keine Feinheit: Tauris `drag.js` hängt
+  // `capture: true`, und das ist keine Feinheit: Tauris `drag.js` hängt
   // seinen eigenen mousedown-Listener aus einem Init-Skript an `document` —
   // also vor allem, was die App registriert — und ruft auf einem Element mit
   // `data-tauri-drag-region` `stopImmediatePropagation()`. Genau so ein Element
   // ist der Zwischenraum links und rechts des Suchfelds, und das ist die
   // natürlichste Stelle, um „daneben" zu klicken. In der Bubble-Phase zöge der
   // Klick dort das Fenster und ließe die Trefferliste offen stehen.
-  useEffect(() => {
-    const onMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (panelRef.current?.contains(target) || anchorRef.current?.contains(target)) return;
-      onClose();
-    };
-    document.addEventListener('mousedown', onMouseDown, true);
-    return () => document.removeEventListener('mousedown', onMouseDown, true);
-  }, [anchorRef, onClose]);
+  useOutsideClick(true, onClose, { refs: [panelRef, anchorRef], capture: true });
 
   // Die Tastaturauswahl in den Blick holen. `block: 'nearest'` scrollt nur,
   // wenn die Zeile wirklich ausserhalb liegt.
@@ -201,7 +179,7 @@ export default function TitleBarSearchResults({
               onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => onSelect(hit, e.ctrlKey || e.metaKey)}
             >
-              <span className="flex-shrink-0 mt-0.5">{KIND_ICONS[hit.kind]}</span>
+              <span className="flex-shrink-0 mt-0.5">{kindIcon(hit.kind)}</span>
 
               <span className="flex-1 min-w-0">
                 <span className="search-result-title block">
@@ -217,13 +195,16 @@ export default function TitleBarSearchResults({
               </span>
 
               <span className="search-result-badge mt-0.5">
-                {t(KIND_LABEL_KEYS[hit.kind])}
+                {t(KIND_META[hit.kind].labelKey)}
                 {hit.entryNumber != null && <span>#{hit.entryNumber}</span>}
                 {/* Schliessen sich aus: eine Kategorie hat keine Eintragsnummer. */}
                 {hit.module && (
                   <>
                     <span aria-hidden="true">·</span>
-                    <span>{t(MODULE_LABEL_KEYS[hit.module])}</span>
+                    {/* Kategorien tragen zusaetzlich ihr Modul: die vier Kategorie-
+                        Tabellen teilen sich Built-in-Ids, ohne Modul waeren `Herb`
+                        (Wiki) und `Herb` (Altar) nicht zu unterscheiden. */}
+                    <span>{t(MODULES[hit.module].navLabelKey)}</span>
                   </>
                 )}
               </span>

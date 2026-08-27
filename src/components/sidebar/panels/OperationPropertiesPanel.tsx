@@ -10,6 +10,7 @@ import PropertiesReadView from '../fields/PropertiesReadView';
 import { PropertySummaryRow } from '../fields/PropertySummaryRow';
 import Favicon from '../fields/Favicon';
 import Banner from '../fields/Banner';
+import SelectField from '../fields/SelectField';
 import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
 import { categoryLabel } from '../../../lib/categories';
 import { formatEntryDate } from '../../../lib/formatDate';
@@ -125,21 +126,15 @@ export default function OperationPropertiesPanel() {
 
       {sigilOperation && (
         <>
-          <div>
-            <p className="label-xs mb-2">⚡ {t('creation.chargingTechnique')}</p>
-            {/* Bewusst nativ statt CategorySelect: kleine feste Artikel-Liste ohne
-                Builtin/Custom-Unterscheidung — der Themed-Picker gilt nur für Kategorien. */}
-            <select
-              value={sigilOperation.charging_technique_wiki_id ?? ''}
-              onChange={(e) => updateOperation(sigilOperation.id, { charging_technique_wiki_id: e.target.value || null })}
-              className={inputCls + ' cursor-pointer'}
-            >
-              <option value="">{t('properties.none')}</option>
-              {sigilChargingArticles.map((article) => (
-                <option key={article.id} value={article.id}>{article.title}</option>
-              ))}
-            </select>
-          </div>
+          <SelectField
+            label={`⚡ ${t('creation.chargingTechnique')}`}
+            value={sigilOperation.charging_technique_wiki_id}
+            options={sigilChargingArticles}
+            getId={(a) => a.id}
+            getLabel={(a) => a.title}
+            noneLabel={t('properties.none')}
+            onChange={(charging_technique_wiki_id) => updateOperation(sigilOperation.id, { charging_technique_wiki_id })}
+          />
 
           <div>
             <p className="label-xs mb-2">📅 {t('creation.targetDate')}</p>

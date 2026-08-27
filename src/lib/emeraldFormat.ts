@@ -10,6 +10,7 @@ import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { useTagStore } from '../store/tagStore';
 import { useAltarStore } from '../store/altarStore';
+import { reloadModules } from '../store/moduleWiring';
 import { useImportStore } from '../store/importStore';
 import { getDb } from './db';
 import { BUILTIN_WIKI_CATEGORIES } from './schema';
@@ -314,14 +315,7 @@ async function remapImages(content: string, images: Record<string, string>): Pro
 
 /** Re-reads the relevant store from DB so the UI reflects the imported data. */
 async function refreshAfterImport(type: EmeraldFile['type']): Promise<void> {
-  await useTagStore.getState().fetchTags();
-  if (type === 'journal') {
-    await useJournalStore.getState().fetchEntries();
-  } else if (type === 'wiki') {
-    await useWikiStore.getState().fetchArticles();
-  } else {
-    await useOperationStore.getState().fetchAll();
-  }
+  await reloadModules([type]);
 }
 
 // ── Import from Emerald ──────────────────────────────────────────────────────
@@ -356,7 +350,7 @@ export async function importFromEmerald(): Promise<void> {
       await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
       return;
     }
-    await useAltarStore.getState().fetchAltars();
+    await refreshAfterImport(file.type);
     useUIStore.getState().setActiveView({ type: 'altar', id: newAltarId });
     await message('Altar imported successfully!', { title: 'Import', kind: 'info' });
     return;
