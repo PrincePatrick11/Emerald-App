@@ -255,7 +255,8 @@
     "changeIcon": "Icon ändern",
     "removeIcon": "Icon entfernen",
     "addCategory": "Kategorie hinzufügen",
-    "categoryName": "Kategoriename…"
+    "categoryName": "Kategoriename…",
+    "uncategorized": "Ohne Kategorie"
   },
   "editor": {
     "done": "Fertig",
@@ -345,6 +346,7 @@
   },
   "filters": {
     "toggle": "Filter",
+    "all": "Alle",
     "clearAll": "Alle löschen",
     "category": "Kategorie",
     "moonPhase": "Mondphase",

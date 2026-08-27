@@ -255,7 +255,8 @@
     "changeIcon": "Change icon",
     "removeIcon": "Remove icon",
     "addCategory": "Add category",
-    "categoryName": "Category name…"
+    "categoryName": "Category name…",
+    "uncategorized": "Uncategorized"
   },
   "editor": {
     "done": "Done",
@@ -345,6 +346,7 @@
   },
   "filters": {
     "toggle": "Filters",
+    "all": "All",
     "clearAll": "Clear all",
     "category": "Category",
     "moonPhase": "Moon Phase",

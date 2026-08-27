@@ -23,6 +23,9 @@ type DashboardGrouping<T> =
       renderAddCategory?: () => ReactNode;
       /** Shown instead of the item list when a group has zero items (default: a muted em-dash). */
       renderEmptyGroup?: (group: DashboardGroup<T>) => ReactNode;
+      /** Collapsed groups render only their header — the chevron lives in the
+       *  caller's renderGroupHeader (CategoryHeaderRow's onToggleCollapse). */
+      isGroupCollapsed?: (group: DashboardGroup<T>) => boolean;
     }
   | { mode: 'custom'; render: () => ReactNode };
 
@@ -214,9 +217,11 @@ export default function Dashboard<T>({
         {grouping.groups.map((group) => (
           <div key={group.key ?? group.label}>
             {grouping.renderGroupHeader?.(group)}
-            {group.items.length === 0
-              ? (grouping.renderEmptyGroup?.(group) ?? <p className="text-xs text-stone-700 px-1 py-1">—</p>)
-              : renderItems(group.items)}
+            {grouping.isGroupCollapsed?.(group)
+              ? null
+              : group.items.length === 0
+                ? (grouping.renderEmptyGroup?.(group) ?? <p className="text-xs text-stone-700 px-1 py-1">—</p>)
+                : renderItems(group.items)}
           </div>
         ))}
       </div>

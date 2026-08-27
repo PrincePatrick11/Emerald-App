@@ -28,7 +28,7 @@ The journal is the primary day-to-day writing space. Each entry has a title and 
 
 The wiki stores reference articles about anything relevant to your practice: rituals, deities, herbs, symbols, concepts, spells, tools, and more.
 
-**Categories.** Each article belongs to one category. Twelve built-in categories cover the most common types. You can add custom categories from the list view. Category sort groups articles by category with inline category management. Deleting a custom category moves its articles to the built-in **Other** category rather than losing the association; built-in categories, including Other, cannot be deleted.
+**Categories.** Each article belongs to one category. Twelve built-in categories cover the most common types. You can add custom categories from the list view. Category sort groups articles by category with inline category management; each category's group can be collapsed and expanded. Moving a custom category to Trash leaves its articles' category association as-is — they show in an "Uncategorized" group at the end of the list until the category is restored (bringing them back) or deleted permanently, which then moves them to the built-in **Other** category. Built-in categories, including Other, cannot be deleted. The category filter (in the toolbar's filter panel) lists every category, including empty ones, plus an "All" chip that clears the selection and an "Uncategorized" chip that appears whenever an article's category has been deleted.
 
 **Icons.** Articles can have a custom icon: either an emoji character or an image. Image icons render only when the icon value is a local-safe source (`/` path), a `data:image/...` URL, or a `blob:` URL. Remote `http://` and `https://` icon URLs are not rendered as images.
 
@@ -42,7 +42,7 @@ The wiki stores reference articles about anything relevant to your practice: rit
 
 Operations track magical workings: rituals in progress, ongoing practices, servitors, and sigils.
 
-**Categories.** Three built-in categories (Sigils, Servitors and Other) and any number of custom categories you define. Categories have a name and an emoji. Deleting a custom category moves its operations to the built-in **Other** category rather than losing the association; built-in categories, including Other, cannot be deleted.
+**Categories.** Three built-in categories (Sigils, Servitors and Other) and any number of custom categories you define. Categories have a name and an emoji, and their group in the list can be collapsed and expanded. Moving a custom category to Trash leaves its operations' category association as-is — they show in an "Uncategorized" group at the end of the list until the category is restored (bringing them back) or deleted permanently, which then moves them to the built-in **Other** category. Built-in categories, including Other, cannot be deleted. The category filter lists every category, including empty ones, plus an "All" chip that clears the selection and an "Uncategorized" chip that appears whenever an operation's category has been deleted.
 
 **Active / Inactive.** Each operation can be marked active or inactive. The status badge in the operation's read view is clickable and saves immediately. The filter panel lets you filter the list to active or inactive operations.
 
@@ -215,7 +215,7 @@ Dropping a routine into an open entry appends its content as formatted paragraph
 
 The Tasks module provides a hierarchical task manager with categories, priorities, and cross-references to Journal entries, Wiki articles, and Operations.
 
-**Categories.** A default "Allgemein" category is seeded on first launch and cannot be deleted. You can create, rename, and delete custom categories from the list view via the pencil button on each category header. Deleting a category moves its tasks to "Allgemein" — they are not lost. Categories show an emoji icon, a name, and a task count badge.
+**Categories.** A default "Allgemein" category is seeded on first launch and cannot be deleted. You can create, rename, and delete custom categories from the list view via the pencil button on each category header. Moving a category to Trash leaves its tasks pointing at it — they show in the "Uncategorized" group in the meantime — until the category is restored (bringing its tasks back with it) or deleted permanently, which then moves the tasks to "Allgemein". Categories show an emoji icon, a name, and a task count badge.
 
 **Subtasks.** Every task can have nested subtasks to any depth. Subtasks are indented under their parent and can be expanded or collapsed. Marking a parent task as completed recursively marks all subtasks as completed (and vice versa). Deleting a parent task also deletes all its descendants.
 
@@ -225,7 +225,7 @@ The Tasks module provides a hierarchical task manager with categories, prioritie
 
 **Toolbar.** The list supports a search bar, five sort orders (Category, Newest, Oldest, A–Z, Z–A), and a Show/Hide Completed toggle. Only the List view is available.
 
-**Filter panel.** Filters by category (multi-select chips) and priority (multi-select pill buttons). Active filters show a count badge on the filter toggle button. When a category filter is active, only the selected categories are shown in the grouped view.
+**Filter panel.** Filters by category (multi-select chips, including every category whether or not it currently has tasks, plus an "All" chip that clears the selection and an "Uncategorized" chip whenever a task's category has been deleted) and priority (multi-select pill buttons). Active filters show a count badge on the filter toggle button. When a category filter is active, only the selected categories are shown in the grouped view.
 
 **Grouped view.** When sorted by Category, tasks are grouped under collapsible category headers. An always-visible "Uncategorized" section collects tasks without a category — it cannot be deleted.
 

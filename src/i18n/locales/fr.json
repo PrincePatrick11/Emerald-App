@@ -255,7 +255,8 @@
     "changeIcon": "Changer l'icône",
     "removeIcon": "Supprimer l'icône",
     "addCategory": "Ajouter une catégorie",
-    "categoryName": "Nom de catégorie…"
+    "categoryName": "Nom de catégorie…",
+    "uncategorized": "Sans catégorie"
   },
   "editor": {
     "done": "Terminé",
@@ -345,6 +346,7 @@
   },
   "filters": {
     "toggle": "Filtres",
+    "all": "Toutes",
     "clearAll": "Tout effacer",
     "category": "Catégorie",
     "moonPhase": "Phase lunaire",

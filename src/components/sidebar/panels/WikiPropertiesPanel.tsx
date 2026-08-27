@@ -29,7 +29,8 @@ export default function WikiPropertiesPanel() {
   if (!isEditing) {
     return (
       <PropertiesReadView>
-        <PropertySummaryRow label={t('properties.category')} value={category ? `${category.emoji} ${categoryLabel(t, 'wiki', category)}` : article.category_id} />
+        {/* Gelöschte Kategorie: „Keine" statt der rohen category_id. */}
+        <PropertySummaryRow label={t('properties.category')} value={category ? `${category.emoji} ${categoryLabel(t, 'wiki', category)}` : t('properties.none')} />
         <Favicon value={article.icon} readOnly label={t('properties.icon')} />
         <Banner value={article.cover_image} readOnly />
         <div>

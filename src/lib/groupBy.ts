@@ -21,3 +21,31 @@ export function groupBy<T>(items: readonly T[], keyFn: (item: T) => string): Das
 export function groupByMonth<T>(items: readonly T[], date: (item: T) => string): DashboardGroup<T>[] {
   return groupBy(items, (item) => formatMonthGroup(date(item)));
 }
+
+/** Gruppenschlüssel des Waisen-Buckets — nie als Kategorie-id vergeben. */
+export const UNCATEGORIZED_KEY = '__uncategorized__';
+
+/**
+ * Kategorie-Gruppierung mit Waisen-Bucket: eine Gruppe je Kategorie (auch
+ * leere), dahinter — nur wenn nötig — „Ohne Kategorie" für Einträge, deren
+ * Kategorie im Papierkorb liegt. Kategorien behalten ihre Reihenfolge, die
+ * Einträge die der übergebenen (vorsortierten) Liste.
+ */
+export function groupByCategory<T, C extends { id: string }>(
+  items: readonly T[],
+  categories: readonly C[],
+  categoryId: (item: T) => string,
+  label: (cat: C) => string,
+  uncategorizedLabel: string,
+): DashboardGroup<T>[] {
+  const groups: DashboardGroup<T>[] = categories.map((cat) => ({
+    key: cat.id,
+    label: label(cat),
+    items: items.filter((item) => categoryId(item) === cat.id),
+  }));
+  const orphans = items.filter((item) => !categories.some((c) => c.id === categoryId(item)));
+  if (orphans.length > 0) {
+    groups.push({ key: UNCATEGORIZED_KEY, label: uncategorizedLabel, items: orphans });
+  }
+  return groups;
+}

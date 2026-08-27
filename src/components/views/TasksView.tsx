@@ -10,8 +10,10 @@ import { useOperationStore } from '../../store/operationStore';
 import { generateId } from '../../lib/helpers';
 import { viewTypeForEntryType } from '../../lib/modules';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
+import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { FALLBACK_CATEGORY } from '../../lib/schema';
 import { sortItems } from '../../lib/sortItems';
+import { UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import Dashboard from '../ui/Dashboard';
 import Dropdown from '../ui/Dropdown';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
@@ -20,8 +22,10 @@ import Button from '../ui/Button';
 import CategoryHeaderRow from '../ui/CategoryHeaderRow';
 import CategoryAddRow from '../ui/CategoryAddRow';
 import CategorySelect from '../ui/CategorySelect';
+import CollapseChevron from '../ui/CollapseChevron';
+import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import {
-  Plus, ChevronDown, ChevronRight, Flag, Trash2,
+  Plus, Flag, Trash2,
   CheckSquare, Square, Link2,
 } from 'lucide-react';
 import type { Task, TaskPriority } from '../../types';
@@ -62,7 +66,7 @@ export default function TasksView() {
   const [filterCategory, setFilterCategory] = useState<Set<string>>(new Set());
   const [filterPriority, setFilterPriority] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
-  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const { collapsed: collapsedCategories, toggle: toggleCategoryCollapse, expand: expandCategories } = useCollapsedSet();
   const [linkModal, setLinkModal] = useState<{ taskId: string } | null>(null);
 
   // Kein Refetch beim Mount: AppShell laedt die Tasks beim Start und beim
@@ -73,7 +77,11 @@ export default function TasksView() {
   const filteredTasks = rootTasks.filter((task) => {
     if (!showCompleted && task.completed) return false;
     if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    if (filterCategory.size > 0 && !filterCategory.has(task.category_id)) return false;
+    // Der „Ohne Kategorie"-Chip wählt die Waisen aus — deren category_id
+    // (gelöschte Kategorie) steht nie selbst in der Chip-Auswahl.
+    if (filterCategory.size > 0 &&
+        !filterCategory.has(task.category_id) &&
+        !(filterCategory.has(UNCATEGORIZED_KEY) && !getCategory(task.category_id))) return false;
     if (filterPriority.size > 0 && !filterPriority.has(task.priority)) return false;
     return true;
   });
@@ -97,7 +105,7 @@ export default function TasksView() {
     ? sortedTasks.filter((t) => !t.category_id || !getCategory(t.category_id))
     : [];
 
-  const uncatCollapsed = collapsedCategories.has('__uncategorized__');
+  const uncatCollapsed = collapsedCategories.has(UNCATEGORIZED_KEY);
 
   const visibleCategories = filterCategory.size > 0
     ? categories.filter((c) => filterCategory.has(c.id))
@@ -126,14 +134,6 @@ export default function TasksView() {
     });
   }, []);
 
-  const toggleCategoryCollapse = useCallback((catId: string) => {
-    setCollapsedCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(catId)) next.delete(catId);
-      else next.add(catId);
-      return next;
-    });
-  }, []);
 
   /**
    * Der Tiefenlink aus der globalen Suche.
@@ -168,12 +168,7 @@ export default function TasksView() {
     setFilterCategory(new Set());
     setFilterPriority(new Set());
     if (target.completed) setShowCompleted(true);
-    setCollapsedCategories((prev) => {
-      const next = new Set(prev);
-      next.delete(target.category_id);
-      next.delete('__uncategorized__');
-      return next;
-    });
+    expandCategories(target.category_id, UNCATEGORIZED_KEY);
 
     // Eine Unteraufgabe ist nur sichtbar, wenn jede Zeile über ihr offen ist.
     const ancestors: string[] = [];
@@ -225,41 +220,6 @@ export default function TasksView() {
           placeholder={t('tasks.categoryName')}
         />
 
-        {uncategorized.length > 0 && (
-          <div className="mb-6 space-y-1.5">
-            {/* Bewusst nicht CategoryHeaderRow: dieser Block hat keinen Editor
-                (kein Umbenennen/Löschen) und damit eine andere Form. */}
-            <div className="flex items-center gap-2 mb-2">
-              <button
-                onClick={() => toggleCategoryCollapse('__uncategorized__')}
-                className="text-stone-500 hover:text-stone-300 flex-shrink-0"
-              >
-                {uncatCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-              </button>
-              <span className="w-5 text-center flex-shrink-0 text-base">📄</span>
-              <p className="text-xs text-stone-600 font-semibold uppercase tracking-wider">{t('tasks.uncategorized')}</p>
-              <span className="text-xs text-stone-500">({uncategorized.length})</span>
-            </div>
-            {!uncatCollapsed && uncategorized.map((task) => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    editingId={editingId}
-                    editValue={editValue}
-                    setEditValue={setEditValue}
-                    setEditingId={setEditingId}
-                    handleSaveEdit={handleSaveEdit}
-                    toggleExpand={toggleExpand}
-                    expandedTasks={expandedTasks}
-                    setCtxMenu={setCtxMenu}
-                    setLinkModal={setLinkModal}
-                    resolveTaskLinkTitle={resolveTaskLinkTitle}
-                    t={t}
-                  />
-                ))}
-          </div>
-        )}
-
         {groupedTasks
           ? visibleCategories.map((cat) => {
               const catTasks = groupedTasks[cat.id] || [];
@@ -272,14 +232,8 @@ export default function TasksView() {
                     label={cat.name}
                     editor={catEditor}
                     canDelete={cat.id !== FALLBACK_CATEGORY.tasks}
-                    leading={
-                      <button
-                        onClick={() => toggleCategoryCollapse(cat.id)}
-                        className="text-stone-500 hover:text-stone-300 flex-shrink-0"
-                      >
-                        {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-                      </button>
-                    }
+                    collapsed={isCollapsed}
+                    onToggleCollapse={() => toggleCategoryCollapse(cat.id)}
                     meta={<span className="text-xs text-stone-500">({catTasks.length})</span>}
                     actions={
                       <Button
@@ -336,6 +290,36 @@ export default function TasksView() {
               />
             ))}</div>}
 
+        {/* Ganz unten, wie der Waisen-Bucket in Wiki/Operations. */}
+        {uncategorized.length > 0 && (
+          <div className="mb-6 space-y-1.5">
+            <CollapsibleGroupHeader
+              collapsed={uncatCollapsed}
+              onToggleCollapse={() => toggleCategoryCollapse(UNCATEGORIZED_KEY)}
+              emoji="📄"
+              label={t('tasks.uncategorized')}
+              meta={<span className="text-xs text-stone-500">({uncategorized.length})</span>}
+            />
+            {!uncatCollapsed && uncategorized.map((task) => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    editingId={editingId}
+                    editValue={editValue}
+                    setEditValue={setEditValue}
+                    setEditingId={setEditingId}
+                    handleSaveEdit={handleSaveEdit}
+                    toggleExpand={toggleExpand}
+                    expandedTasks={expandedTasks}
+                    setCtxMenu={setCtxMenu}
+                    setLinkModal={setLinkModal}
+                    resolveTaskLinkTitle={resolveTaskLinkTitle}
+                    t={t}
+                  />
+                ))}
+          </div>
+        )}
+
         {categories.length === 0 && sortedTasks.length === 0 && !searchQuery && (
           <div className="py-20 text-center">
             <p className="text-stone-600 text-sm">{t('tasks.empty')}</p>
@@ -387,13 +371,20 @@ export default function TasksView() {
           activeFilterCount,
           panelProps: {
             chipLabel: t('tasks.filter.category'),
-            chips: categories.map((c) => ({ value: c.id, label: c.name, emoji: c.emoji })),
+            // „Ohne Kategorie" nur, wenn es tatsächlich Waisen gibt.
+            chips: [
+              ...categories.map((c) => ({ value: c.id, label: c.name, emoji: c.emoji })),
+              ...(rootTasks.some((task) => !getCategory(task.category_id))
+                ? [{ value: UNCATEGORIZED_KEY, label: t('tasks.uncategorized'), emoji: '📄' }]
+                : []),
+            ],
             selectedChips: [...filterCategory],
             onChipToggle: (v) => setFilterCategory((prev) => {
               const next = new Set(prev);
               if (next.has(v)) next.delete(v); else next.add(v);
               return next;
             }),
+            onAllChips: () => setFilterCategory(new Set()),
             onClearAll: () => {
               setFilterCategory(new Set());
               setFilterPriority(new Set());
@@ -564,12 +555,7 @@ const TaskRow = memo(function TaskRow({
         </button>
 
         {hasSubtasks && (
-          <button
-            onClick={() => toggleExpand(task.id)}
-            className="text-stone-500 hover:text-stone-300 flex-shrink-0"
-          >
-            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          </button>
+          <CollapseChevron collapsed={!isExpanded} onToggle={() => toggleExpand(task.id)} />
         )}
 
         {!hasSubtasks && <span className="w-3.5 flex-shrink-0" />}

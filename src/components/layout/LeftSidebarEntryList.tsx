@@ -340,8 +340,10 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
     getTitle: (a) => a.title,
     getDateStr: (a) => {
       const cat = catById[a.category_id];
-      const catLabel = categoryLabel(t, 'wiki', cat, a.category_id);
-      return `${catLabel} · ${formatEntryDate(a.updated_at)}`;
+      // Kein Fallback auf die rohe category_id — bei gelöschter Kategorie
+      // entfällt das Label, wie eine Zeile höher bei den Operationen.
+      const catLabel = categoryLabel(t, 'wiki', cat);
+      return `${catLabel}${catLabel ? ' · ' : ''}${formatEntryDate(a.updated_at)}`;
     },
     getIcon: (a) => {
       const cat = catById[a.category_id];

@@ -218,7 +218,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const db = await getDb();
     const cat = get().categories.find((c) => c.id === id);
     if (!cat) return false;
-    // Ziel des Umhängens — siehe taskStore.deleteCategory.
+    // Ziel des Umhängens — siehe taskStore.permanentlyDeleteCategory.
+    // (Altar-Kategorien kennen keinen Papierkorb, hier wird sofort umgehängt.)
     if (id === FALLBACK_CATEGORY.altar_items) return false;
     await reassignCategoryContent(db, 'altar_items', id);
     await db.execute('DELETE FROM altar_categories WHERE id=$1', [id]);

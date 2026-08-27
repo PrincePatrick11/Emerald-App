@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Check, X, Trash2, Pencil } from 'lucide-react';
 import EmojiPicker from './EmojiPicker';
 import Button from './Button';
+import CollapsibleGroupHeader from './CollapsibleGroupHeader';
 import type { CategoryEditorApi, CategoryLike } from '../../hooks/useCategoryEditor';
 
 interface Props<C extends CategoryLike> {
@@ -12,9 +13,10 @@ interface Props<C extends CategoryLike> {
   editor: CategoryEditorApi<C>;
   /** Blendet den Lösch-Knopf aus: Wiki/Ops geben `!cat.is_builtin`, Tasks `id !== FALLBACK_CATEGORY.tasks`. */
   canDelete?: boolean;
-  /** Nur im Lese-Modus gerendert (Tasks: Collapse-Chevron). */
-  leading?: ReactNode;
-  /** Nur im Lese-Modus, hinter dem Label (Tasks: „(n)"-Zähler). */
+  /** Zusammen mit `collapsed`: rendert den Auf-/Zuklapp-Chevron vor dem Emoji (nur Lese-Modus). */
+  onToggleCollapse?: () => void;
+  collapsed?: boolean;
+  /** Nur im Lese-Modus, hinter dem Label („(n)"-Zähler). */
   meta?: ReactNode;
   /** Nur im Lese-Modus, vor dem Bearbeiten-Stift (Tasks: „+"-Knopf). */
   actions?: ReactNode;
@@ -26,7 +28,7 @@ interface Props<C extends CategoryLike> {
  * useCategoryEditor; modulspezifisches läuft über label und die Slots.
  */
 export default function CategoryHeaderRow<C extends CategoryLike>({
-  category, label, editor, canDelete = true, leading, meta, actions,
+  category, label, editor, canDelete = true, onToggleCollapse, collapsed = false, meta, actions,
 }: Props<C>) {
   const { t } = useTranslation();
 
@@ -82,21 +84,26 @@ export default function CategoryHeaderRow<C extends CategoryLike>({
   }
 
   return (
-    <div className="flex items-center gap-2 mb-2">
-      {leading}
-      <span className="w-5 text-center flex-shrink-0 text-base">{category.emoji}</span>
-      <p className="text-xs text-stone-600 font-semibold uppercase tracking-wider flex-1">{label}</p>
-      {meta}
-      {actions}
-      {/* Roh statt btn-ghost: das 11px-Icon soll bündig in der Textzeile sitzen,
-          Button-Padding würde die Zeilenhöhe aufblähen. War in allen drei Views identisch. */}
-      <button
-        onClick={() => editor.startEditCat(category)}
-        className="text-stone-500 hover:text-stone-300 transition-colors p-0.5"
-        title={t('editor.edit')}
-      >
-        <Pencil size={11} />
-      </button>
-    </div>
+    <CollapsibleGroupHeader
+      onToggleCollapse={onToggleCollapse}
+      collapsed={collapsed}
+      emoji={category.emoji}
+      label={label}
+      meta={meta}
+      actions={
+        <>
+          {actions}
+          {/* Roh statt btn-ghost: das 11px-Icon soll bündig in der Textzeile sitzen,
+              Button-Padding würde die Zeilenhöhe aufblähen. War in allen drei Views identisch. */}
+          <button
+            onClick={() => editor.startEditCat(category)}
+            className="text-stone-500 hover:text-stone-300 transition-colors p-0.5"
+            title={t('editor.edit')}
+          >
+            <Pencil size={11} />
+          </button>
+        </>
+      }
+    />
   );
 }

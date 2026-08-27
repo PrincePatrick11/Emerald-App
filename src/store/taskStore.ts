@@ -225,20 +225,17 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const db = await getDb();
     const cat = get().categories.find((c) => c.id === id);
     if (!cat) return false;
-    // Die Default-Kategorie ist das Ziel, auf das alles andere umgehängt wird.
-    // Sie selbst zu löschen ließe ihre Aufgaben ohne gültige Kategorie
-    // zurück und blockierte danach jedes Leeren des Papierkorbs.
+    // Die Default-Kategorie ist das Ziel, auf das beim endgültigen Löschen
+    // umgehängt wird. Sie selbst zu löschen blockierte jedes Leeren des
+    // Papierkorbs.
     if (id === FALLBACK_CATEGORY.tasks) return false;
+    // Beim Soft-Delete NICHT umhängen — wie bei Wiki und Operations: die
+    // Aufgaben behalten ihre category_id (die Kategoriezeile bleibt stehen,
+    // der Foreign Key ist zufrieden) und erscheinen unter „Ohne Kategorie".
+    // Ein Restore der Kategorie holt sie so verlustfrei zurück; umgehängt
+    // wird erst in permanentlyDeleteCategory.
     await db.execute('UPDATE task_categories SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
-    // Vorher stand hier category_id='' — eine Kategorie, die es nicht gibt.
-    // Der Foreign Key lässt das nicht mehr zu, und die Aufgaben waren damit
-    // ohnehin keiner Kategorie mehr zugeordnet.
-    await reassignCategoryContent(db, 'tasks', id);
-    const fallback = FALLBACK_CATEGORY.tasks;
-    set((s) => ({
-      categories: s.categories.filter((c) => c.id !== id),
-      tasks: s.tasks.map((t) => t.category_id === id ? { ...t, category_id: fallback } : t),
-    }));
+    set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }));
     return true;
   },
 
@@ -247,17 +244,21 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     await db.execute('UPDATE task_categories SET deleted_at=NULL WHERE id=$1', [id]);
     const rows = await db.select<DbRow[]>('SELECT * FROM task_categories WHERE id=$1', [id]);
     if (rows.length > 0) {
-      set((s) => ({ categories: [...s.categories, fromRow.taskCategory(rows[0])] }));
+      // An der alten Position einsortieren, nicht anhängen — wie wiki/operationStore.
+      set((s) => ({
+        categories: [...s.categories, fromRow.taskCategory(rows[0])].sort((a, b) => a.sort_order - b.sort_order),
+      }));
     }
   },
 
   permanentlyDeleteCategory: async (id: string) => {
     if (id === FALLBACK_CATEGORY.tasks) return;
     const db = await getDb();
+    // Erst hier wird umgehängt: der Soft-Delete lässt die category_id der
+    // Aufgaben bewusst stehen („Ohne Kategorie"), aber die Zeile endgültig zu
+    // löschen, während Aufgaben darauf zeigen, verbietet der Foreign Key.
     await reassignCategoryContent(db, 'tasks', id);
     await db.execute('DELETE FROM task_categories WHERE id=$1', [id]);
-    // deleteCategory haengt beim Soft-Delete bereits um; das hier faengt den
-    // Fall ab, dass eine Task-Zeile im Store doch noch auf die Kategorie zeigt.
     set((s) => ({
       categories: s.categories.filter((c) => c.id !== id),
       tasks: s.tasks.map((t) => (t.category_id === id ? { ...t, category_id: FALLBACK_CATEGORY.tasks } : t)),

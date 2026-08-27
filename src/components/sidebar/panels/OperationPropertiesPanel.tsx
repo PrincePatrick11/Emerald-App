@@ -40,7 +40,8 @@ export default function OperationPropertiesPanel() {
 
   const inputCls = OP_PROP_SELECT_CLASSES;
   const category = opCategories.find((c) => c.id === op.category_id);
-  const categoryDisplay = category ? `${category.emoji} ${categoryLabel(t, 'operations', category)}` : op.category_id;
+  // Gelöschte Kategorie: „Keine" statt der rohen category_id.
+  const categoryDisplay = category ? `${category.emoji} ${categoryLabel(t, 'operations', category)}` : t('properties.none');
 
   if (!isEditing) {
     if (sigilOperation) {

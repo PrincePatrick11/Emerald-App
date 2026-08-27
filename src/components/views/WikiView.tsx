@@ -6,11 +6,12 @@ import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import CategoryHeaderRow from '../ui/CategoryHeaderRow';
 import CategoryAddRow from '../ui/CategoryAddRow';
+import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { categoryLabel } from '../../lib/categories';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
-import { groupByMonth } from '../../lib/groupBy';
+import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 
 import { useUIStore } from '../../store/uiStore';
 import { useEntryEditor } from '../../hooks/useEntryEditor';
@@ -18,6 +19,7 @@ import { useEditActions } from '../../hooks/useEditActions';
 import { useWikiStore } from '../../store/wikiStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
+import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import RichEditor from '../editor/RichEditor';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
 import { getCategoryEmoji } from '../wiki/WikiList';
@@ -43,6 +45,7 @@ export default function WikiView() {
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
+  const { collapsed: collapsedCats, toggle: toggleCatCollapse } = useCollapsedSet();
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<WikiCategory>('other');
   const [tags, setTags] = useState<string[]>([]);
@@ -193,13 +196,23 @@ export default function WikiView() {
 
     const catFiltered = filterCatIds.length === 0
       ? searchFiltered
-      : searchFiltered.filter((a) => filterCatIds.includes(a.category_id));
+      : searchFiltered.filter((a) =>
+          filterCatIds.includes(a.category_id) ||
+          // Der „Ohne Kategorie"-Chip wählt die Waisen aus — deren category_id
+          // (gelöschte Kategorie) steht nie selbst in der Chip-Auswahl.
+          (filterCatIds.includes(UNCATEGORIZED_KEY) && !catById[a.category_id]));
 
     const filtered = catFiltered;
 
-    const catChips = wikiCategories
-      .filter((c) => articles.some((a) => a.category_id === c.id))
-      .map((c) => ({ value: c.id, label: categoryLabel(t, 'wiki', c), emoji: c.emoji }));
+    // Alle Kategorien anbieten, auch leere — die Leiste ist auch der Weg, sich
+    // gezielt EINE Kategorie anzeigen zu lassen, nicht nur ein Ausschlussfilter.
+    // „Ohne Kategorie" nur, wenn es tatsächlich Waisen gibt.
+    const catChips = [
+      ...wikiCategories.map((c) => ({ value: c.id, label: categoryLabel(t, 'wiki', c), emoji: c.emoji })),
+      ...(articles.some((a) => !catById[a.category_id])
+        ? [{ value: UNCATEGORIZED_KEY, label: t('wiki.uncategorized'), emoji: '📄' }]
+        : []),
+    ];
 
     const activeFilterCount = filterCatIds.length > 0 ? 1 : 0;
 
@@ -210,10 +223,6 @@ export default function WikiView() {
       category: (a) => catById[a.category_id]?.name ?? '',
     });
 
-    const groupedByCat = wikiCategories.map((cat) => ({
-      cat,
-      arts: sortedArticles.filter((a) => a.category_id === cat.id),
-    }));
 
     // For timeline (by month)
     const timelineGroups = groupByMonth(sortedArticles, (a) => a.created_at);
@@ -221,8 +230,10 @@ export default function WikiView() {
     const renderArticle = (a: typeof articles[0]) => {
       const cat = catById[a.category_id];
       const iconEl = isImageIcon(a.icon) ? <img src={a.icon!} alt="" className="w-5 h-5 object-cover rounded inline" /> : (cat?.emoji ?? '📄');
-      const catLabel = categoryLabel(t, 'wiki', cat, a.category_id);
-      const dateStr = `${catLabel} · ${formatEntryDate(a.updated_at)}`;
+      // Ohne Fallback auf die rohe category_id: bei gelöschter Kategorie stünde
+      // hier sonst deren id als Label (wie in OperationsView entfällt es dann).
+      const catLabel = categoryLabel(t, 'wiki', cat);
+      const dateStr = `${catLabel}${catLabel ? ' · ' : ''}${formatEntryDate(a.updated_at)}`;
       if (renamingId === a.id) return (
         <div key={a.id} className={view === 'cards' ? 'panel-interactive px-4 py-4 text-left' : 'panel-interactive w-full flex items-center gap-3 px-4 py-3'}>
           {view === 'cards' ? (
@@ -283,13 +294,30 @@ export default function WikiView() {
 
     type Article = typeof articles[number];
 
-    const catGroups: DashboardGroup<Article>[] = groupedByCat.map(({ cat, arts }) => ({
-      key: cat.id,
-      label: categoryLabel(t, 'wiki', cat),
-      items: arts,
-    }));
+    // Abgewählte Kategorien ganz ausblenden statt sie leer stehen zu lassen —
+    // wie visibleCategories in TasksView.
+    const visibleCategories = filterCatIds.length > 0
+      ? wikiCategories.filter((c) => filterCatIds.includes(c.id))
+      : wikiCategories;
+    // Der Waisen-Bucket fängt Artikel auf, deren Kategorie im Papierkorb liegt —
+    // sonst verschwänden sie aus der Kategorien-Gruppierung.
+    const catGroups: DashboardGroup<Article>[] = groupByCategory(
+      sortedArticles, visibleCategories, (a) => a.category_id,
+      (c) => categoryLabel(t, 'wiki', c), t('wiki.uncategorized'),
+    );
 
     const renderCategoryHeader = (group: DashboardGroup<Article>) => {
+      if (group.key === UNCATEGORIZED_KEY) {
+        return (
+          <CollapsibleGroupHeader
+            collapsed={collapsedCats.has(UNCATEGORIZED_KEY)}
+            onToggleCollapse={() => toggleCatCollapse(UNCATEGORIZED_KEY)}
+            emoji="📄"
+            label={group.label}
+            meta={<span className="text-xs text-stone-500">({group.items.length})</span>}
+          />
+        );
+      }
       const cat = catById[group.key!];
       if (!cat) return null;
       return (
@@ -298,6 +326,9 @@ export default function WikiView() {
           label={categoryLabel(t, 'wiki', cat)}
           editor={catEditor}
           canDelete={!cat.is_builtin}
+          collapsed={collapsedCats.has(cat.id)}
+          onToggleCollapse={() => toggleCatCollapse(cat.id)}
+          meta={<span className="text-xs text-stone-500">({group.items.length})</span>}
         />
       );
     };
@@ -329,6 +360,7 @@ export default function WikiView() {
             chips: catChips,
             selectedChips: filterCatIds,
             onChipToggle: (v) => setFilterCatIds((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
+            onAllChips: () => setFilterCatIds([]),
             onClearAll: () => setFilterCatIds([]),
           },
         }}
@@ -337,7 +369,10 @@ export default function WikiView() {
         renderItem={renderArticle}
         isEmpty={articles.length === 0 && wikiCategories.length === 0}
         emptyState={{ message: t('wiki.noArticles'), actionLabel: t('wiki.startDocumenting'), onAction: handleNew }}
-        hasNoResults={filtered.length === 0}
+        // Bei aktivem Kategorie-Filter ohne Suchtext trotzdem die Gruppierung
+        // rendern: eine ausgewählte leere Kategorie soll ihren Kopf samt
+        // Leer-Hinweis zeigen, nicht „Keine Ergebnisse".
+        hasNoResults={filtered.length === 0 && !(sort === 'category' && view !== 'timeline' && filterCatIds.length > 0 && !search)}
         noResultsMessage={t('search.noResults')}
         grouping={
           view === 'timeline'
@@ -349,6 +384,7 @@ export default function WikiView() {
                   renderGroupHeader: renderCategoryHeader,
                   renderAddCategory,
                   renderEmptyGroup: () => <p className="text-xs text-stone-700 px-1 py-1">{t('wiki.noArticles')}</p>,
+                  isGroupCollapsed: (g) => collapsedCats.has(g.key!),
                 }
               : { mode: 'flat' }
         }
@@ -381,7 +417,7 @@ export default function WikiView() {
             ? <img src={article.icon!} alt="" className="w-5 h-5 object-cover rounded" />
             : <span>{currentCat?.emoji ?? getCategoryEmoji(article.category_id)}</span>
           }
-          <span className="capitalize">{categoryLabel(t, 'wiki', currentCat, article.category_id)}</span>
+          <span className="capitalize">{categoryLabel(t, 'wiki', currentCat, '—')}</span>
           <span>·</span>
           <span>{formatEntryDate(article.updated_at)}</span>
         </>

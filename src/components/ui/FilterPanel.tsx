@@ -39,6 +39,9 @@ export interface FilterPanelProps {
   chips?: FilterChip[];
   selectedChips?: string[];
   onChipToggle?: (value: string) => void;
+  /** Rendert vor den Chips einen „Alle"-Chip: aktiv bei leerer Auswahl,
+   *  Klick leert sie (= alles anzeigen). */
+  onAllChips?: () => void;
 
   statusChips?: FilterChip[];
   selectedStatus?: string[];
@@ -68,6 +71,7 @@ export default function FilterPanel({
   chips,
   selectedChips = [],
   onChipToggle,
+  onAllChips,
   statusChips,
   selectedStatus = [],
   onStatusToggle,
@@ -85,6 +89,11 @@ export default function FilterPanel({
             <span className="text-xs font-semibold text-stone-600 uppercase tracking-wider">{chipLabel}</span>
           )}
           <div className="flex flex-wrap gap-1.5">
+            {onAllChips && (
+              <FilterChipButton active={selectedChips.length === 0} onClick={onAllChips}>
+                {t('filters.all')}
+              </FilterChipButton>
+            )}
             {chips.map((chip) => (
               <Chip key={chip.value} chip={chip} active={selectedChips.includes(chip.value)} onToggle={onChipToggle!} />
             ))}

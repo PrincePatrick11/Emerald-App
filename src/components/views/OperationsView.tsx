@@ -6,15 +6,17 @@ import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import CategoryHeaderRow from '../ui/CategoryHeaderRow';
 import CategoryAddRow from '../ui/CategoryAddRow';
+import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { categoryLabel } from '../../lib/categories';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
-import { groupByMonth } from '../../lib/groupBy';
+import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
+import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEditActions } from '../../hooks/useEditActions';
 import RichEditor from '../editor/RichEditor';
@@ -53,6 +55,7 @@ export default function OperationsView() {
   const [showFilters, setShowFilters] = useState(false);
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
+  const { collapsed: collapsedCats, toggle: toggleCatCollapse } = useCollapsedSet();
   const [title, setTitle] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -213,7 +216,11 @@ export default function OperationsView() {
 
     const catFiltered = filterCatIds.length === 0
       ? searchFiltered
-      : searchFiltered.filter((o) => filterCatIds.includes(o.category_id));
+      : searchFiltered.filter((o) =>
+          filterCatIds.includes(o.category_id) ||
+          // Der „Ohne Kategorie"-Chip wählt die Waisen aus — deren category_id
+          // (gelöschte Kategorie) steht nie selbst in der Chip-Auswahl.
+          (filterCatIds.includes(UNCATEGORIZED_KEY) && !catById[o.category_id]));
 
     const statusFiltered = filterStatus.length === 0
       ? catFiltered
@@ -226,9 +233,15 @@ export default function OperationsView() {
 
     const opCatName = (c: typeof categories[0]) => categoryLabel(t, 'operations', c);
 
-    const catChips = categories
-      .filter((c) => operations.some((o) => o.category_id === c.id))
-      .map((c) => ({ value: c.id, label: opCatName(c), emoji: c.emoji }));
+    // Alle Kategorien anbieten, auch leere — die Leiste ist auch der Weg, sich
+    // gezielt EINE Kategorie anzeigen zu lassen, nicht nur ein Ausschlussfilter.
+    // „Ohne Kategorie" nur, wenn es tatsächlich Waisen gibt.
+    const catChips = [
+      ...categories.map((c) => ({ value: c.id, label: opCatName(c), emoji: c.emoji })),
+      ...(operations.some((o) => !catById[o.category_id])
+        ? [{ value: UNCATEGORIZED_KEY, label: t('operations.uncategorized'), emoji: '📄' }]
+        : []),
+    ];
 
     const statusChips = [
       { value: 'active', label: t('operations.active'), emoji: '●' },
@@ -244,11 +257,6 @@ export default function OperationsView() {
       category: (o) => catById[o.category_id]?.name ?? '',
     });
 
-    const groupedByCat = categories.map((cat) => ({
-      cat,
-      ops: sortedOps.filter((o) => o.category_id === cat.id),
-    }));
-    const uncategorized = sortedOps.filter((o) => !categories.find((c) => c.id === o.category_id));
 
     const timelineGroups = groupByMonth(sortedOps, (o) => o.updated_at);
 
@@ -375,18 +383,29 @@ export default function OperationsView() {
 
     type Operation = typeof operations[number];
 
-    const catGroups: DashboardGroup<Operation>[] = groupedByCat.map(({ cat, ops }) => ({
-      key: cat.id,
-      label: categoryLabel(t, 'operations', cat),
-      items: ops,
-    }));
-    if (uncategorized.length > 0) {
-      catGroups.push({ key: '__uncategorized__', label: `📄 ${t('operations.uncategorized')}`, items: uncategorized });
-    }
+    // Abgewählte Kategorien ganz ausblenden statt sie leer stehen zu lassen —
+    // wie visibleCategories in TasksView.
+    const visibleCategories = filterCatIds.length > 0
+      ? categories.filter((c) => filterCatIds.includes(c.id))
+      : categories;
+    // Der Waisen-Bucket fängt Operationen auf, deren Kategorie im Papierkorb
+    // liegt — sonst verschwänden sie aus der Kategorien-Gruppierung.
+    const catGroups: DashboardGroup<Operation>[] = groupByCategory(
+      sortedOps, visibleCategories, (o) => o.category_id,
+      opCatName, t('operations.uncategorized'),
+    );
 
     const renderCategoryHeader = (group: DashboardGroup<Operation>) => {
-      if (group.key === '__uncategorized__') {
-        return <p className="text-xs text-stone-600 font-semibold uppercase tracking-wider mb-2">{group.label}</p>;
+      if (group.key === UNCATEGORIZED_KEY) {
+        return (
+          <CollapsibleGroupHeader
+            collapsed={collapsedCats.has(UNCATEGORIZED_KEY)}
+            onToggleCollapse={() => toggleCatCollapse(UNCATEGORIZED_KEY)}
+            emoji="📄"
+            label={group.label}
+            meta={<span className="text-xs text-stone-500">({group.items.length})</span>}
+          />
+        );
       }
       const cat = catById[group.key!];
       if (!cat) return null;
@@ -396,6 +415,9 @@ export default function OperationsView() {
           label={categoryLabel(t, 'operations', cat)}
           editor={catEditor}
           canDelete={!cat.is_builtin}
+          collapsed={collapsedCats.has(cat.id)}
+          onToggleCollapse={() => toggleCatCollapse(cat.id)}
+          meta={<span className="text-xs text-stone-500">({group.items.length})</span>}
         />
       );
     };
@@ -427,6 +449,7 @@ export default function OperationsView() {
             chips: catChips,
             selectedChips: filterCatIds,
             onChipToggle: (v) => setFilterCatIds((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
+            onAllChips: () => setFilterCatIds([]),
             statusChips,
             selectedStatus: filterStatus,
             onStatusToggle: (v) => setFilterStatus((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
@@ -438,7 +461,10 @@ export default function OperationsView() {
         renderItem={renderOp}
         isEmpty={operations.length === 0 && categories.length === 0}
         emptyState={{ message: t('operations.none'), actionLabel: t('operations.start'), onAction: handleNew }}
-        hasNoResults={filtered.length === 0}
+        // Bei aktivem Kategorie-Filter ohne Suchtext trotzdem die Gruppierung
+        // rendern: eine ausgewählte leere Kategorie soll ihren Kopf samt
+        // Leer-Hinweis zeigen, nicht „Keine Ergebnisse".
+        hasNoResults={filtered.length === 0 && !(sort === 'category' && view !== 'timeline' && filterCatIds.length > 0 && !search)}
         noResultsMessage={t('search.noResults')}
         grouping={
           view === 'timeline'
@@ -450,6 +476,7 @@ export default function OperationsView() {
                   renderGroupHeader: renderCategoryHeader,
                   renderAddCategory,
                   renderEmptyGroup: () => <p className="text-xs text-stone-700 px-1 py-1">{t('operations.none')}</p>,
+                  isGroupCollapsed: (g) => collapsedCats.has(g.key!),
                 }
               : { mode: 'flat' }
         }

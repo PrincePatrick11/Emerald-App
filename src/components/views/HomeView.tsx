@@ -330,7 +330,9 @@ export default function HomeView() {
               {wikiItems.map((article) => {
                 const cat = wikiCategories.find((c) => c.id === article.category_id);
                 const icon = cat?.emoji ?? getCategoryEmoji(article.category_id);
-                const catLabel = categoryLabel(t, 'wiki', cat, article.category_id);
+                // Kein Fallback auf die rohe category_id — bei gelöschter
+                // Kategorie entfällt das Label.
+                const catLabel = categoryLabel(t, 'wiki', cat);
                 return (
                   <button
                     key={article.id}
@@ -348,7 +350,7 @@ export default function HomeView() {
                           {article.title}
                         </div>
                         <div className="home-item-meta text-xs capitalize mt-0.5">
-                          {catLabel} · {formatEntryDate(article.updated_at)}
+                          {catLabel ? `${catLabel} · ` : ''}{formatEntryDate(article.updated_at)}
                         </div>
                       </div>
                     </div>
@@ -361,7 +363,7 @@ export default function HomeView() {
               {wikiItems.map((article) => {
                 const cat = wikiCategories.find((c) => c.id === article.category_id);
                 const icon = cat?.emoji ?? getCategoryEmoji(article.category_id);
-                const catLabel = categoryLabel(t, 'wiki', cat, article.category_id);
+                const catLabel = categoryLabel(t, 'wiki', cat);
                 return (
                   <button
                     key={article.id}
@@ -375,7 +377,7 @@ export default function HomeView() {
                     }
                     <div className="home-item-title text-sm font-medium truncate">{article.title}</div>
                     <div className="home-item-meta text-xs capitalize mt-0.5">
-                      {catLabel} · {formatEntryDate(article.updated_at)}
+                      {catLabel ? `${catLabel} · ` : ''}{formatEntryDate(article.updated_at)}
                     </div>
                   </button>
                 );
