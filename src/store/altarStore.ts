@@ -3,6 +3,7 @@ import { saveImage } from '../lib/images';
 import { getDb } from '../lib/db';
 import { ALTAR_RATIOS, DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY, DEFAULT_OVERLAY_COLOR, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE, isRatioFormat, parseResolution } from '../lib/altarConstants';
 import { generateId, isValidHexColor, nowIso } from '../lib/helpers';
+import { serialKey, serialized } from '../lib/serialize';
 import { bool, fromRow, toInt, type DbRow } from '../lib/row';
 import { FALLBACK_CATEGORY, reassignCategoryContent } from '../lib/schema';
 import type { AltarCategory, AltarItem, AltarItemCategory, AltarPlacement, AltarRecord } from '../types';
@@ -377,7 +378,10 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     return copy;
   },
 
-  updateAltar: async (id, patch) => {
+  // serialized (grid/resolution share the key): see lib/serialize.ts. The most
+  // realistic collision here is the automatic thumbnail save, which goes
+  // through updateAltar and would overlap with an intention autosave.
+  updateAltar: (id, patch) => serialized(serialKey('altar', id), async () => {
     const db = await getDb();
     const altar = get().altars.find((entry) => entry.id === id);
     if (!altar) return;
@@ -395,9 +399,9 @@ export const useAltarStore = create<AltarState>((set, get) => ({
         intention: s.activeAltarId === id ? next.intention : s.intention,
       };
     });
-  },
+  }),
 
-  updateAltarGrid: async (id, patch) => {
+  updateAltarGrid: (id, patch) => serialized(serialKey('altar', id), async () => {
     const db = await getDb();
     const altar = get().altars.find((entry) => entry.id === id);
     if (!altar) return;
@@ -420,9 +424,9 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     set((s) => ({
       altars: s.altars.map((entry) => (entry.id === id ? next : entry)).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
     }));
-  },
+  }),
 
-  updateAltarResolution: async (id, resolution) => {
+  updateAltarResolution: (id, resolution) => serialized(serialKey('altar', id), async () => {
     const db = await getDb();
     const altar = get().altars.find((entry) => entry.id === id);
     if (!altar) return;
@@ -440,7 +444,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
         .map((entry) => (entry.id === id ? { ...entry, resolution: safeRes, updated_at, thumbnail_data: null } : entry))
         .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
     }));
-  },
+  }),
 
   bumpAltarUpdatedAt: async (id) => {
     const db = await getDb();
@@ -484,7 +488,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     return item;
   },
 
-  updateItem: async (id, patch) => {
+  // serialized: see lib/serialize.ts.
+  updateItem: (id, patch) => serialized(serialKey('altarItem', id), async () => {
     const db = await getDb();
     const item = get().items.find((i) => i.id === id);
     if (!item) return;
@@ -498,7 +503,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       placements: s.placements.map((p) => (p.item_id === id ? { ...p, name: updated.name, emoji: updated.emoji, category_id: updated.category_id, image_data: updated.image_data } : p)),
       previewPlacements: mapEachPreview(s.previewPlacements, (p) => p.item_id === id ? { ...p, name: updated.name, emoji: updated.emoji, category_id: updated.category_id, image_data: updated.image_data } : p),
     }));
-  },
+  }),
 
   deleteItem: async (id) => {
     const db = await getDb();
@@ -580,7 +585,9 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
   },
 
-  updatePlacement: async (id, patch) => {
+  // serialized: see lib/serialize.ts. bumpAltarUpdatedAt at the end stays
+  // outside any chain — it only writes updated_at, which cannot collide.
+  updatePlacement: (id, patch) => serialized(serialKey('placement', id), async () => {
     const db = await getDb();
     const current = get().placements.find((entry) => entry.id === id);
     if (!current) return;
@@ -596,7 +603,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     }));
     const activeAltarId = get().activeAltarId;
     if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
-  },
+  }),
 
   bringPlacementForward: async (id) => {
     const sorted = [...get().placements].sort((a, b) => a.z_index - b.z_index);
@@ -612,6 +619,11 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     await get().swapPlacementZIndex(sorted[index - 1].id, sorted[index].id);
   },
 
+  // Deliberately NOT serialized (same for sendPlacementToBack): these write
+  // z_index across several placements at once — queueing them would need to
+  // hold multiple keys together. They are discrete one-click actions writing a
+  // single column; a z_index momentarily lost to a racing full-row
+  // updatePlacement costs a layer order, not content.
   swapPlacementZIndex: async (idA, idB) => {
     const a = get().placements.find((p) => p.id === idA);
     const b = get().placements.find((p) => p.id === idB);

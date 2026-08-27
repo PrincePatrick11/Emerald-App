@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { getDb } from '../lib/db';
 import { generateId, nowIso } from '../lib/helpers';
+import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, type DbRow } from '../lib/row';
 import type { Routine } from '../types';
 
@@ -34,7 +35,8 @@ export const useRoutineStore = create<RoutineState>((set, get) => ({
     return routine;
   },
 
-  updateRoutine: async (id, patch) => {
+  // serialized: siehe lib/serialize.ts.
+  updateRoutine: (id, patch) => serialized(serialKey('routine', id), async () => {
     const db = await getDb();
     const now = nowIso();
     const routine = get().routines.find((r) => r.id === id);
@@ -45,7 +47,7 @@ export const useRoutineStore = create<RoutineState>((set, get) => ({
       [merged.name, merged.emoji, merged.content, JSON.stringify(merged.tags), JSON.stringify(merged.operation_ids), JSON.stringify(merged.wiki_ids), merged.updated_at, id]
     );
     set((s) => ({ routines: s.routines.map((r) => r.id === id ? merged : r) }));
-  },
+  }),
 
   deleteRoutine: async (id) => {
     const db = await getDb();

@@ -6,6 +6,7 @@ import { useWikiStore } from './wikiStore';
 import { useOperationStore } from './operationStore';
 import { useTaskStore } from './taskStore';
 import { generateId, nowIso } from '../lib/helpers';
+import { serialKey, serialized } from '../lib/serialize';
 import type { Tag } from '../types';
 
 const TAG_COLORS = [
@@ -58,7 +59,8 @@ export const useTagStore = create<TagState>((set, get) => ({
     return tag;
   },
 
-  updateTag: async (id, patch) => {
+  // serialized: siehe lib/serialize.ts.
+  updateTag: (id, patch) => serialized(serialKey('tag', id), async () => {
     const db = await getDb();
     const tag = get().tags.find((t) => t.id === id);
     if (!tag) return;
@@ -69,7 +71,7 @@ export const useTagStore = create<TagState>((set, get) => ({
       id,
     ]);
     set((s) => ({ tags: s.tags.map((t) => (t.id === id ? updated : t)) }));
-  },
+  }),
 
   deleteTag: async (name) => {
     const db = await getDb();

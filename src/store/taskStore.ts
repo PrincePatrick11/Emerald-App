@@ -3,6 +3,7 @@ import type Database from '@tauri-apps/plugin-sql';
 import { getDb } from '../lib/db';
 import { FALLBACK_CATEGORY, reassignCategoryContent } from '../lib/schema';
 import { generateId, nowIso } from '../lib/helpers';
+import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, toInt, type DbRow } from '../lib/row';
 import type { Task, TaskCategory, TaskLink } from '../types';
 
@@ -97,7 +98,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     return newTask;
   },
 
-  updateTask: async (id: string, patch: Partial<Task>) => {
+  // serialized: siehe lib/serialize.ts. Gleicher Schlüssel wie toggleComplete —
+  // updateTask schreibt die ganze Zeile aus einem Snapshot-Merge, toggleComplete
+  // liest den Zustand vor dem Kippen; überlappend überschriebe einer den anderen.
+  updateTask: (id: string, patch: Partial<Task>) => serialized(serialKey('task', id), async () => {
     const db = await getDb();
     const now = nowIso();
     const task = get().tasks.find((t) => t.id === id);
@@ -120,9 +124,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     );
 
     set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? merged : t)) }));
-  },
+  }),
 
-  toggleComplete: async (id: string) => {
+  toggleComplete: (id: string) => serialized(serialKey('task', id), async () => {
     const db = await getDb();
     const now = nowIso();
     const task = get().tasks.find((t) => t.id === id);
@@ -133,10 +137,15 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const idsToUpdate = collectDescendantIds(get().tasks, id);
 
     for (const tid of idsToUpdate) {
-      await db.execute(
+      const write = () => db.execute(
         'UPDATE tasks SET completed=$1, completed_at=$2, updated_at=$3 WHERE id=$4',
         [toInt(newCompleted), newCompletedAt, now, tid]
       );
+      // Nachfahren über deren eigene Kette, damit ein gleichzeitiges updateTask
+      // auf ein Kind dessen completed-Spalten nicht zurückdreht. Die Wurzel
+      // selbst läuft schon unter diesem Schlüssel — einreihen wartete auf sich.
+      if (tid === id) await write();
+      else await serialized(serialKey('task', tid), write);
     }
 
     set((s) => ({
@@ -146,7 +155,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           : t
       ),
     }));
-  },
+  }),
 
   deleteTask: async (id: string) => {
     const db = await getDb();

@@ -4,6 +4,7 @@ import { getDb, nextEntryNumber } from '../lib/db';
 import { FALLBACK_CATEGORY, reassignCategoryContent } from '../lib/schema';
 import { syncLinks } from '../lib/links';
 import { generateId, nowIso } from '../lib/helpers';
+import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, toInt, type DbRow } from '../lib/row';
 import type { Operation, OperationCategory } from '../types';
 import i18n from '../i18n';
@@ -148,7 +149,8 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     return get().operations.find((o) => o.id === copy.id) ?? copy;
   },
 
-  updateOperation: async (id, patch) => {
+  // serialized: siehe lib/serialize.ts.
+  updateOperation: (id, patch) => serialized(serialKey('operation', id), async () => {
     const db = await getDb();
     const now = nowIso();
     const op = get().operations.find((o) => o.id === id);
@@ -192,8 +194,9 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     set((s) => ({
       operations: s.operations.map((o) => (o.id === id ? { ...o, ...patch, updated_at: now } : o)),
     }));
-    syncLinks(id, 'operation', merged.content).catch(console.error);
-  },
+    // Eigener Schlüssel statt awaiten — wie in journalStore.updateEntry.
+    void serialized(serialKey('links', id), () => syncLinks(id, 'operation', merged.content));
+  }),
 
   deleteOperation: async (id) => {
     const db = await getDb();

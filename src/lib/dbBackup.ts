@@ -28,6 +28,7 @@ import { useVaultStore } from '../store/vaultStore';
 import { reloadAllStores } from '../store/moduleWiring';
 import { useUIStore } from '../store/uiStore';
 import { resumeEditorSaves, suspendEditorSaves } from './editorLock';
+import { drainSerialized } from './serialize';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public types
@@ -942,6 +943,10 @@ export async function importDatabase(
   const suspendSaves = mode !== 'merge';
   if (suspendSaves) suspendEditorSaves();
   try {
+
+  // Die Sperre stoppt nur künftige Saves — bereits eingereihte Store-Writes
+  // erst zu Ende laufen lassen, bevor replace/add-vault die Zeilen austauscht.
+  if (suspendSaves) await drainSerialized();
 
   // Apply type-level filtering first, then subcategory filtering
   const filteredBackup: BackupFile = {

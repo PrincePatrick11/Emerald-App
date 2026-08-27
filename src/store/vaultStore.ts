@@ -12,6 +12,7 @@ import {
 } from '../lib/vaultManager';
 import { resetDbCache, getDb, withDbClosed } from '../lib/db';
 import { clearSearchTextCache } from '../lib/searchText';
+import { drainSerialized } from '../lib/serialize';
 import { reloadAllStores } from './moduleWiring';
 import { useUIStore } from './uiStore';
 import { useUndoStore } from './undoStore';
@@ -49,6 +50,9 @@ export function hasActiveVault(state: Pick<VaultStore, 'vaults' | 'activeVaultId
  * opened is the caller's decision — switching goes back, deleting cannot.
  */
 async function openActiveVault(): Promise<void> {
+  // Eingereihte Store-Writes des alten Vaults zu Ende bringen, bevor die
+  // Verbindung darunter geschlossen wird.
+  await drainSerialized();
   // Drop cached connections so getDb() loads the vault that is active now.
   await resetDbCache();
   // runMigrations is idempotent, so this is also what initialises a fresh vault.

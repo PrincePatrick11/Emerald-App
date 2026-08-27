@@ -4,6 +4,7 @@ import { getDb, nextEntryNumber } from '../lib/db';
 import { FALLBACK_CATEGORY, reassignCategoryContent } from '../lib/schema';
 import { syncLinks } from '../lib/links';
 import { generateId, nowIso } from '../lib/helpers';
+import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, type DbRow } from '../lib/row';
 import type { WikiArticle, WikiCategory, WikiCategoryDef } from '../types';
 import i18n from '../i18n';
@@ -151,7 +152,8 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     return get().articles.find((a) => a.id === copy.id) ?? copy;
   },
 
-  updateArticle: async (id, patch) => {
+  // serialized: siehe lib/serialize.ts.
+  updateArticle: (id, patch) => serialized(serialKey('wiki', id), async () => {
     const db = await getDb();
     const now = nowIso();
     const article = get().articles.find((a) => a.id === id);
@@ -185,8 +187,9 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     set((s) => ({
       articles: s.articles.map((a) => (a.id === id ? merged : a)),
     }));
-    syncLinks(id, 'wiki', merged.content).catch(console.error);
-  },
+    // Eigener Schlüssel statt awaiten — wie in journalStore.updateEntry.
+    void serialized(serialKey('links', id), () => syncLinks(id, 'wiki', merged.content));
+  }),
 
   deleteArticle: async (id) => {
     const db = await getDb();

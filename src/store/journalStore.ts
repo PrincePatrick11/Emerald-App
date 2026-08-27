@@ -4,6 +4,7 @@ import { getDb, nextEntryNumber } from '../lib/db';
 import { getMoonPhase } from '../lib/moonPhase';
 import { syncLinks } from '../lib/links';
 import { generateId, nowIso } from '../lib/helpers';
+import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, toInt, type DbRow } from '../lib/row';
 import type { JournalEntry } from '../types';
 import i18n from '../i18n';
@@ -114,7 +115,8 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     return get().entries.find((e) => e.id === copy.id) ?? copy;
   },
 
-  updateEntry: async (id, patch) => {
+  // serialized: siehe lib/serialize.ts.
+  updateEntry: (id, patch) => serialized(serialKey('journal', id), async () => {
     const db = await getDb();
     const now = nowIso();
     const updated = { ...patch, updated_at: now };
@@ -148,8 +150,10 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     set((s) => ({
       entries: s.entries.map((e) => (e.id === id ? merged : e)),
     }));
-    syncLinks(id, 'journal', merged.content).catch(console.error);
-  },
+    // Eigener Schlüssel statt awaiten: syncLinks (DELETE + INSERTs) soll auch
+    // serialisiert laufen, aber die Update-Kette nicht auf sich warten lassen.
+    void serialized(serialKey('links', id), () => syncLinks(id, 'journal', merged.content));
+  }),
 
   deleteEntry: async (id) => {
     const db = await getDb();
