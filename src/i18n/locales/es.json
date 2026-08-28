@@ -192,7 +192,8 @@
     "untitled": "Entrada sin título",
     "placeholder": "Comienza tu registro...",
     "noEntries": "Aún no hay entradas en el diario.",
-    "startWriting": "Escribe tu primera entrada."
+    "startWriting": "Escribe tu primera entrada.",
+    "noPhase": "Sin fase lunar"
   },
   "creation": {
     "intention": "Intención",
@@ -541,7 +542,6 @@
     "linkEntry": "Enlazar entrada",
     "hideCompleted": "Ocultar completadas",
     "showCompleted": "Mostrar completadas",
-    "emptyCategory": "Sin tareas en esta categoría",
     "uncategorized": "Sin categoría",
     "untitled": "Tarea sin título",
     "categoryName": "Nombre de categoría…"

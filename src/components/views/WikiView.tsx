@@ -45,7 +45,7 @@ export default function WikiView() {
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
-  const { collapsed: collapsedCats, toggle: toggleCatCollapse } = useCollapsedSet();
+  const { collapsed: collapsedCats, toggle: toggleCatCollapse } = useCollapsedSet('wiki');
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<WikiCategory>('other');
   const [tags, setTags] = useState<string[]>([]);

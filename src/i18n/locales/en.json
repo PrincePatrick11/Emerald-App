@@ -192,7 +192,8 @@
     "untitled": "Untitled Entry",
     "placeholder": "Begin your record...",
     "noEntries": "No journal entries yet.",
-    "startWriting": "Start writing your first entry."
+    "startWriting": "Start writing your first entry.",
+    "noPhase": "No moon phase"
   },
   "creation": {
     "intention": "Intention",
@@ -541,7 +542,6 @@
     "linkEntry": "Link entry",
     "hideCompleted": "Hide completed",
     "showCompleted": "Show completed",
-    "emptyCategory": "No tasks in this category",
     "uncategorized": "Uncategorized",
     "untitled": "Untitled Task",
     "categoryName": "Category name…"

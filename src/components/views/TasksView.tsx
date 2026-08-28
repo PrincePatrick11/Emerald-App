@@ -66,7 +66,7 @@ export default function TasksView() {
   const [filterCategory, setFilterCategory] = useState<Set<string>>(new Set());
   const [filterPriority, setFilterPriority] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
-  const { collapsed: collapsedCategories, toggle: toggleCategoryCollapse, expand: expandCategories } = useCollapsedSet();
+  const { collapsed: collapsedCategories, toggle: toggleCategoryCollapse, expand: expandCategories } = useCollapsedSet('tasks');
   const [linkModal, setLinkModal] = useState<{ taskId: string } | null>(null);
 
   // Kein Refetch beim Mount: AppShell laedt die Tasks beim Start und beim
@@ -248,7 +248,7 @@ export default function TasksView() {
                   />
                   {!isCollapsed && (
                     isEmpty ? (
-                      <p className="text-xs text-stone-700 px-1 py-1">— {t('tasks.emptyCategory')} —</p>
+                      <p className="text-xs text-stone-700 px-1 py-1">{t('tasks.empty')}</p>
                     ) : (
                       catTasks.map((task) => (
                         <TaskRow

@@ -192,7 +192,8 @@
     "untitled": "Entrée sans titre",
     "placeholder": "Commencez votre enregistrement...",
     "noEntries": "Pas encore d'entrées dans le journal.",
-    "startWriting": "Écrivez votre première entrée."
+    "startWriting": "Écrivez votre première entrée.",
+    "noPhase": "Sans phase lunaire"
   },
   "creation": {
     "intention": "Intention",
@@ -541,7 +542,6 @@
     "linkEntry": "Lier une entrée",
     "hideCompleted": "Masquer terminées",
     "showCompleted": "Afficher terminées",
-    "emptyCategory": "Aucune tâche dans cette catégorie",
     "uncategorized": "Sans catégorie",
     "untitled": "Tâche sans titre",
     "categoryName": "Nom de catégorie…"

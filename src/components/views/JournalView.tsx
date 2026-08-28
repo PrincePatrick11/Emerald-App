@@ -12,13 +12,15 @@ import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
 import RichEditor from '../editor/RichEditor';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
-import Dashboard from '../ui/Dashboard';
+import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
+import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
+import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId } from '../../lib/helpers';
-import { formatEntryDate, formatEntryDateLong, formatMonthGroup } from '../../lib/formatDate';
+import { formatEntryDate, formatEntryDateLong } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
-import { groupBy } from '../../lib/groupBy';
+import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import type { JournalEntry, MoonPhase } from '../../types';
 
 const MOON_PHASE_ORDER: MoonPhase[] = [
@@ -50,6 +52,7 @@ export default function JournalView() {
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterPhases, setFilterPhases] = useState<string[]>([]);
+  const { collapsed: collapsedPhases, toggle: togglePhaseCollapse } = useCollapsedSet('journal');
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [loadedEntryId, setLoadedEntryId] = useState<string | null>(null);
@@ -196,13 +199,21 @@ export default function JournalView() {
 
     const phaseFiltered = filterPhases.length === 0
       ? searchFiltered
-      : searchFiltered.filter((e) => e.moon_phase != null && filterPhases.includes(e.moon_phase));
+      : searchFiltered.filter((e) =>
+          (e.moon_phase != null && filterPhases.includes(e.moon_phase)) ||
+          // Der „Ohne Mondphase"-Chip wählt Einträge ohne Phase aus.
+          (filterPhases.includes(UNCATEGORIZED_KEY) && e.moon_phase == null));
 
     const filtered = phaseFiltered;
 
-    const phaseChips = MOON_PHASE_ORDER
-      .filter((p) => entries.some((e) => e.moon_phase === p))
-      .map((p) => ({ value: p, label: t(`moonPhase.${p}`), emoji: MOON_PHASE_SYMBOLS[p] }));
+    // Alle Phasen anbieten, auch die ohne Einträge — wie die Kategorie-Chips
+    // in Wiki/Operations/Tasks. „Ohne Mondphase" nur, wenn es solche Einträge gibt.
+    const phaseChips = [
+      ...MOON_PHASE_ORDER.map((p) => ({ value: p, label: t(`moonPhase.${p}`), emoji: MOON_PHASE_SYMBOLS[p] })),
+      ...(entries.some((e) => e.moon_phase == null)
+        ? [{ value: UNCATEGORIZED_KEY, label: t('journal.noPhase'), emoji: '📓' }]
+        : []),
+    ];
 
     const activeFilterCount = filterPhases.length > 0 ? 1 : 0;
 
@@ -212,11 +223,29 @@ export default function JournalView() {
       category: (e) => e.moon_phase ?? '',
     });
 
-    // Group for timeline (by month) or category sort (by moon phase)
-    const grouped: { label: string; items: JournalEntry[] }[] =
-      view === 'timeline' || sort === 'category'
-        ? groupBy(sorted, (e) => (view === 'timeline' ? formatMonthGroup(e.created_at) : t(`moonPhase.${e.moon_phase}`)))
-        : [{ label: '', items: sorted }];
+    const timelineGroups = groupByMonth(sorted, (e) => e.created_at);
+
+    // „Kategorie" heißt im Journal: nach Mondphase — gerendert mit denselben
+    // Gruppenköpfen wie die Kategorie-Gruppen der anderen Module. Die Phasen
+    // sind fest (Mondzyklus-Reihenfolge), abgewählte werden ausgeblendet;
+    // der Waisen-Bucket fängt Einträge ohne Phase auf.
+    const visiblePhases = filterPhases.length > 0
+      ? MOON_PHASE_ORDER.filter((p) => filterPhases.includes(p))
+      : MOON_PHASE_ORDER;
+    const phaseGroups: DashboardGroup<JournalEntry>[] = groupByCategory(
+      sorted, visiblePhases.map((p) => ({ id: p })), (e) => e.moon_phase ?? '',
+      (c) => t(`moonPhase.${c.id}`), t('journal.noPhase'),
+    );
+
+    const renderPhaseHeader = (group: DashboardGroup<JournalEntry>) => (
+      <CollapsibleGroupHeader
+        collapsed={collapsedPhases.has(group.key!)}
+        onToggleCollapse={() => togglePhaseCollapse(group.key!)}
+        emoji={group.key === UNCATEGORIZED_KEY ? '📓' : MOON_PHASE_SYMBOLS[group.key as MoonPhase]}
+        label={group.label}
+        meta={<span className="text-xs text-stone-500">({group.items.length})</span>}
+      />
+    );
 
     const go = (e: JournalEntry) => setActiveView({ type: 'journal', id: e.id, mode: 'view' });
 
@@ -282,6 +311,7 @@ export default function JournalView() {
             chips: phaseChips,
             selectedChips: filterPhases,
             onChipToggle: (v) => setFilterPhases((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
+            onAllChips: () => setFilterPhases([]),
             onClearAll: () => setFilterPhases([]),
           },
         }}
@@ -290,12 +320,23 @@ export default function JournalView() {
         renderItem={renderEntry}
         isEmpty={entries.length === 0}
         emptyState={{ message: t('journal.noEntries'), actionLabel: t('journal.startWriting'), onAction: handleNew }}
-        hasNoResults={filtered.length === 0}
+        // Bei aktivem Phasen-Filter ohne Suchtext trotzdem die Gruppierung
+        // rendern: eine ausgewählte leere Phase soll ihren Kopf samt
+        // Leer-Hinweis zeigen, nicht „Keine Ergebnisse".
+        hasNoResults={filtered.length === 0 && !(sort === 'category' && view !== 'timeline' && filterPhases.length > 0 && !search)}
         noResultsMessage={t('search.noResults')}
         grouping={
-          view === 'timeline' || sort === 'category'
-            ? { mode: 'timeline', groups: grouped }
-            : { mode: 'flat' }
+          view === 'timeline'
+            ? { mode: 'timeline', groups: timelineGroups }
+            : sort === 'category'
+              ? {
+                  mode: 'category',
+                  groups: phaseGroups,
+                  renderGroupHeader: renderPhaseHeader,
+                  renderEmptyGroup: () => <p className="text-xs text-stone-700 px-1 py-1">{t('journal.noEntries')}</p>,
+                  isGroupCollapsed: (g) => collapsedPhases.has(g.key!),
+                }
+              : { mode: 'flat' }
         }
         contextMenuSlot={ctxMenu && (
           <ContextMenu

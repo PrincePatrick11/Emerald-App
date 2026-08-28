@@ -55,7 +55,7 @@ export default function OperationsView() {
   const [showFilters, setShowFilters] = useState(false);
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
-  const { collapsed: collapsedCats, toggle: toggleCatCollapse } = useCollapsedSet();
+  const { collapsed: collapsedCats, toggle: toggleCatCollapse } = useCollapsedSet('operations');
   const [title, setTitle] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [tags, setTags] = useState<string[]>([]);

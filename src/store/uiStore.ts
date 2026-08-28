@@ -45,8 +45,14 @@ interface UIState {
   theme: ThemeId;
   uiFontId: FontId;
   editorFontId: FontId;
+  /** Zugeklappte Kategorie-Gruppen je Modul (siehe hooks/useCollapsedSet).
+   *  Im Store statt View-lokal, weil MainArea die Views beim Modulwechsel
+   *  unmountet; bewusst nicht persistiert — zugeklappt ist eine Arbeitsgeste. */
+  collapsedGroups: Record<string, ReadonlySet<string>>;
 
   setActiveView: (view: ActiveView) => void;
+  toggleCollapsedGroup: (scope: string, id: string) => void;
+  expandCollapsedGroups: (scope: string, ids: string[]) => void;
   closeAllTabs: () => void;
   openViewInNewTab: (view: ActiveView) => void;
   addTab: (view?: ActiveView) => void;
@@ -164,6 +170,22 @@ export const useUIStore = create<UIState>((set) => ({
   homeJournalPrefs: { sort: 'date_desc', view: 'list', count: 5 },
   homeOpsPrefs:     { sort: 'date_desc', view: 'list', count: 5 },
   homeWikiPrefs:    { sort: 'alpha_asc', view: 'cards', count: 6 },
+  collapsedGroups: {},
+
+  toggleCollapsedGroup: (scope, id) => set((s) => {
+    const next = new Set(s.collapsedGroups[scope] ?? []);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return { collapsedGroups: { ...s.collapsedGroups, [scope]: next } };
+  }),
+
+  expandCollapsedGroups: (scope, ids) => set((s) => {
+    const prev = s.collapsedGroups[scope];
+    if (!prev || !ids.some((id) => prev.has(id))) return s;
+    const next = new Set(prev);
+    for (const id of ids) next.delete(id);
+    return { collapsedGroups: { ...s.collapsedGroups, [scope]: next } };
+  }),
 
   setActiveView: (view) => set((s) => {
     // Save/Cancel/Delete live only in the right sidebar, so edit mode must not start with it closed.
@@ -196,6 +218,8 @@ export const useUIStore = create<UIState>((set) => ({
       activeView: { type: 'home' },
       history: [{ type: 'home' }],
       historyIndex: 0,
+      // Die Klapp-Zustände zeigen per Kategorie-id in den alten Vault.
+      collapsedGroups: {},
     };
   }),
 

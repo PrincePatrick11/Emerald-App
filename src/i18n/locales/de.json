@@ -192,7 +192,8 @@
     "untitled": "Unbenannter Eintrag",
     "placeholder": "Beginne deine Aufzeichnung...",
     "noEntries": "Noch keine Journaleinträge.",
-    "startWriting": "Schreibe deinen ersten Eintrag."
+    "startWriting": "Schreibe deinen ersten Eintrag.",
+    "noPhase": "Ohne Mondphase"
   },
   "creation": {
     "intention": "Intention",
@@ -541,7 +542,6 @@
     "linkEntry": "Eintrag verlinken",
     "hideCompleted": "Erledigte ausblenden",
     "showCompleted": "Erledigte anzeigen",
-    "emptyCategory": "Keine Aufgaben in dieser Kategorie",
     "uncategorized": "Ohne Kategorie",
     "untitled": "Unbenannte Aufgabe",
     "categoryName": "Kategoriename…"
