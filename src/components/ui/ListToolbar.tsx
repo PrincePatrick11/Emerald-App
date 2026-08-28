@@ -72,7 +72,7 @@ export default function ListToolbar({ view, sort, onView, onSort, viewOptions: v
           />
           {search && (
             <button onClick={() => onSearch('')} className="list-toolbar-clear transition-colors flex-shrink-0">
-              <X size={11} />
+              <X size={12} />
             </button>
           )}
         </div>

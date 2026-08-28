@@ -20,7 +20,6 @@ type DashboardGrouping<T> =
       mode: 'category';
       groups: DashboardGroup<T>[];
       renderGroupHeader?: (group: DashboardGroup<T>) => ReactNode;
-      renderAddCategory?: () => ReactNode;
       /** Shown instead of the item list when a group has zero items (default: a muted em-dash). */
       renderEmptyGroup?: (group: DashboardGroup<T>) => ReactNode;
       /** Collapsed groups render only their header — the chevron lives in the
@@ -54,6 +53,8 @@ interface DashboardBaseProps<T> {
   headerLeft?: ReactNode;
   titleClassName?: string;
   primaryAction?: { label: string; onClick: () => void };
+  /** Links vom Primär-Knopf, z. B. „Kategorie hinzufügen". */
+  secondaryAction?: { label: string; onClick: () => void };
   /** Fully replaces the topbar-right slot (Trash's bulk-select controls). */
   headerRight?: ReactNode;
   headerClassName?: string;
@@ -134,6 +135,7 @@ export default function Dashboard<T>({
   headerLeft,
   titleClassName = DEFAULT_TITLE_CLASSNAME,
   primaryAction,
+  secondaryAction,
   headerRight,
   headerClassName = DEFAULT_HEADER_CLASSNAME,
   view,
@@ -211,10 +213,16 @@ export default function Dashboard<T>({
     }
 
     // mode === 'category'
+    // „Nur mit Einträgen" wird hier zentral ausgewertet — die Views reichen den
+    // Schalter nur als Chip-Zustand durch. Bleibt danach keine Gruppe übrig,
+    // greift der „Keine Ergebnisse"-Hinweis, den sonst hasNoResults liefert.
+    const groups = filters?.panelProps.nonEmptyOnly
+      ? grouping.groups.filter((group) => group.items.length > 0)
+      : grouping.groups;
     return (
       <div className="space-y-6">
-        {grouping.renderAddCategory?.()}
-        {grouping.groups.map((group) => (
+        {groups.length === 0 && <p className={noResultsClassName}>{noResultsMessage}</p>}
+        {groups.map((group) => (
           <div key={group.key ?? group.label}>
             {grouping.renderGroupHeader?.(group)}
             {grouping.isGroupCollapsed?.(group)
@@ -233,10 +241,15 @@ export default function Dashboard<T>({
       <div className={headerClassName}>
         {headerLeft ?? <h1 className={titleClassName}>{title}</h1>}
         {headerRight ?? (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+            {secondaryAction && (
+              <Button onClick={secondaryAction.onClick} variant="secondary">
+                <Plus size={14} />{secondaryAction.label}
+              </Button>
+            )}
             {primaryAction && (
               <Button onClick={primaryAction.onClick} variant="primary">
-                <Plus size={13} />{primaryAction.label}
+                <Plus size={14} />{primaryAction.label}
               </Button>
             )}
           </div>

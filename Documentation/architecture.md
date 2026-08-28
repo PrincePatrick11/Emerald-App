@@ -52,7 +52,7 @@ src/
 │   ├── wiki/         WikiList (rendering + category emoji helper)
 │   └── ui/           Button, Modal, ContextMenu, EmojiPicker, Dashboard, EntryListTab,
 │                     ListToolbar, FilterPanel, RailButton, TabIconButton, UndoToast,
-│                     ImportDestinationModal, Dropdown, CategoryHeaderRow, CategoryAddRow,
+│                     ImportDestinationModal, Dropdown, CategoryHeaderRow, CategoryAddModal,
 │                     CategorySelect, EntryDetailFrame — the shared component layer; what each
 │                     one encapsulates and where it can be extended is in components.md
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,

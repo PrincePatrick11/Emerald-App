@@ -18,9 +18,9 @@ import Dashboard from '../ui/Dashboard';
 import Dropdown from '../ui/Dropdown';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import LinkPickerModal from '../editor/LinkPickerModal';
-import Button from '../ui/Button';
+import { FilterChipButton } from '../ui/FilterPanel';
 import CategoryHeaderRow from '../ui/CategoryHeaderRow';
-import CategoryAddRow from '../ui/CategoryAddRow';
+import CategoryAddModal from '../ui/CategoryAddModal';
 import CategorySelect from '../ui/CategorySelect';
 import CollapseChevron from '../ui/CollapseChevron';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
@@ -66,6 +66,7 @@ export default function TasksView() {
   const [filterCategory, setFilterCategory] = useState<Set<string>>(new Set());
   const [filterPriority, setFilterPriority] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
+  const [hideEmptyCats, setHideEmptyCats] = useState(false);
   const { collapsed: collapsedCategories, toggle: toggleCategoryCollapse, expand: expandCategories } = useCollapsedSet('tasks');
   const [linkModal, setLinkModal] = useState<{ taskId: string } | null>(null);
 
@@ -107,9 +108,20 @@ export default function TasksView() {
 
   const uncatCollapsed = collapsedCategories.has(UNCATEGORIZED_KEY);
 
-  const visibleCategories = filterCategory.size > 0
+  const chipFilteredCategories = filterCategory.size > 0
     ? categories.filter((c) => filterCategory.has(c.id))
     : categories;
+  // „Nur mit Einträgen": leere Kategorie-Gruppen ganz weglassen. Tasks rendert
+  // im custom-Modus selbst, deshalb greift Dashboards zentrale Auswertung hier
+  // nicht. Der Waisen-Block hängt nicht dran — er erscheint nur, wenn er voll ist.
+  const visibleCategories = hideEmptyCats && groupedTasks
+    ? chipFilteredCategories.filter((c) => (groupedTasks[c.id]?.length ?? 0) > 0)
+    : chipFilteredCategories;
+
+  // Der Waisen-Block: auch leer sichtbar, wenn sein Chip gewählt ist — außer
+  // „Nur mit Einträgen" blendet Leeres aus (Pendant zu forceUncategorized).
+  const showUncatBlock = groupedTasks !== null &&
+    (uncategorized.length > 0 || (filterCategory.has(UNCATEGORIZED_KEY) && !hideEmptyCats));
 
   const handleCreateTask = async (categoryId?: string) => {
     const cat = categoryId ?? FALLBACK_CATEGORY.tasks;
@@ -196,7 +208,7 @@ export default function TasksView() {
     return () => cancelAnimationFrame(frame);
   }, [pendingScrollId]);
 
-  const activeFilterCount = filterCategory.size + filterPriority.size;
+  const activeFilterCount = filterCategory.size + filterPriority.size + (hideEmptyCats ? 1 : 0);
 
   const resolveTaskLinkTitle = useCallback((targetType: string, targetId: string) => {
     if (targetType === 'journal') {
@@ -213,13 +225,6 @@ export default function TasksView() {
 
   const renderTasksContent = () => (
     <>
-        {/* Add Category at top */}
-        <CategoryAddRow
-          editor={catEditor}
-          buttonLabel={t('tasks.newCategory')}
-          placeholder={t('tasks.categoryName')}
-        />
-
         {groupedTasks
           ? visibleCategories.map((cat) => {
               const catTasks = groupedTasks[cat.id] || [];
@@ -234,17 +239,9 @@ export default function TasksView() {
                     canDelete={cat.id !== FALLBACK_CATEGORY.tasks}
                     collapsed={isCollapsed}
                     onToggleCollapse={() => toggleCategoryCollapse(cat.id)}
-                    meta={<span className="text-xs text-stone-500">({catTasks.length})</span>}
-                    actions={
-                      <Button
-                        onClick={() => handleCreateTask(cat.id)}
-                        variant="ghost"
-                        className="p-1"
-                        title={t('tasks.newTask')}
-                      >
-                        <Plus size={14} />
-                      </Button>
-                    }
+                    count={catTasks.length}
+                    onAdd={() => handleCreateTask(cat.id)}
+                    addTitle={t('tasks.newTask')}
                   />
                   {!isCollapsed && (
                     isEmpty ? (
@@ -290,16 +287,21 @@ export default function TasksView() {
               />
             ))}</div>}
 
-        {/* Ganz unten, wie der Waisen-Bucket in Wiki/Operations. */}
-        {uncategorized.length > 0 && (
+        {/* Ganz unten, wie der Waisen-Bucket in Wiki/Operations. Bei
+            ausgewähltem „Ohne Kategorie"-Chip auch leer — mit Leer-Hinweis,
+            wie jede andere leere Kategorie. */}
+        {showUncatBlock && (
           <div className="mb-6 space-y-1.5">
             <CollapsibleGroupHeader
               collapsed={uncatCollapsed}
               onToggleCollapse={() => toggleCategoryCollapse(UNCATEGORIZED_KEY)}
               emoji="📄"
               label={t('tasks.uncategorized')}
-              meta={<span className="text-xs text-stone-500">({uncategorized.length})</span>}
+              count={uncategorized.length}
             />
+            {!uncatCollapsed && uncategorized.length === 0 && (
+              <p className="text-xs text-stone-700 px-1 py-1">{t('tasks.empty')}</p>
+            )}
             {!uncatCollapsed && uncategorized.map((task) => (
                   <TaskRow
                     key={task.id}
@@ -318,6 +320,13 @@ export default function TasksView() {
                   />
                 ))}
           </div>
+        )}
+
+        {/* Custom-Modus-Pendant zu Dashboards zentralem Rückfall: blenden die
+            Filter alle Gruppen aus, kein leerer Content-Bereich, sondern
+            „Keine Ergebnisse". */}
+        {groupedTasks && visibleCategories.length === 0 && !showUncatBlock && categories.length > 0 && !searchQuery && (
+          <p className="text-center py-20 text-stone-600 text-sm">{t('search.noResults')}</p>
         )}
 
         {categories.length === 0 && sortedTasks.length === 0 && !searchQuery && (
@@ -345,6 +354,7 @@ export default function TasksView() {
       <Dashboard<Task>
         title={t('nav.tasks')}
         primaryAction={{ label: t('tasks.newTask'), onClick: () => handleCreateTask() }}
+        secondaryAction={{ label: t('tasks.newCategory'), onClick: () => catEditor.setAddingCategory(true) }}
         view={tasksPrefs.view}
         sort={tasksPrefs.sort}
         onView={(v) => setTasksPrefs({ view: v })}
@@ -352,31 +362,16 @@ export default function TasksView() {
         viewOptions={[{ value: 'list' as const, label: t('listView.list') }]}
         search={searchQuery}
         onSearch={setSearchQuery}
-        toolbarExtraActions={
-          <button
-            onClick={() => setShowCompleted((o) => !o)}
-            className={`flex items-center justify-center p-1.5 rounded-md transition-colors ${
-              showCompleted
-                ? 'bg-jade-900/50 border border-jade-800/40 text-jade-400'
-                : 'bg-stone-800/70 hover:bg-stone-700/70 text-stone-500 hover:text-stone-300'
-            }`}
-            title={showCompleted ? t('tasks.hideCompleted') : t('tasks.showCompleted')}
-          >
-            <CheckSquare size={13} />
-          </button>
-        }
         filters={{
           showFilters: filterOpen,
           onToggleFilters: () => setFilterOpen((o) => !o),
           activeFilterCount,
           panelProps: {
             chipLabel: t('tasks.filter.category'),
-            // „Ohne Kategorie" nur, wenn es tatsächlich Waisen gibt.
+            // „Ohne Kategorie" immer dabei, auch ohne Waisen.
             chips: [
               ...categories.map((c) => ({ value: c.id, label: c.name, emoji: c.emoji })),
-              ...(rootTasks.some((task) => !getCategory(task.category_id))
-                ? [{ value: UNCATEGORIZED_KEY, label: t('tasks.uncategorized'), emoji: '📄' }]
-                : []),
+              { value: UNCATEGORIZED_KEY, label: t('tasks.uncategorized'), emoji: '📄' },
             ],
             selectedChips: [...filterCategory],
             onChipToggle: (v) => setFilterCategory((prev) => {
@@ -385,9 +380,20 @@ export default function TasksView() {
               return next;
             }),
             onAllChips: () => setFilterCategory(new Set()),
+            nonEmptyOnly: hideEmptyCats,
+            onNonEmptyToggle: () => setHideEmptyCats((v) => !v),
+            // „Erledigte anzeigen" ist ein Anzeige-Schalter, kein Filter:
+            // zählt nicht in activeFilterCount, „Alle löschen" lässt ihn stehen.
+            displayExtras: (
+              <FilterChipButton active={showCompleted} onClick={() => setShowCompleted((o) => !o)}>
+                <CheckSquare size={12} />
+                {t('tasks.showCompleted')}
+              </FilterChipButton>
+            ),
             onClearAll: () => {
               setFilterCategory(new Set());
               setFilterPriority(new Set());
+              setHideEmptyCats(false);
             },
           },
           extraPanelContent: (
@@ -433,6 +439,8 @@ export default function TasksView() {
           onClose={() => setLinkModal(null)}
         />
       )}
+
+      <CategoryAddModal editor={catEditor} title={t('tasks.newCategory')} placeholder={t('tasks.categoryName')} />
     </>
   );
 }
@@ -634,7 +642,7 @@ const TaskRow = memo(function TaskRow({
             options={(['high', 'medium', 'low'] as TaskPriority[]).map((p) => ({
               value: p,
               label: priorityLabels[p],
-              icon: <Flag size={11} />,
+              icon: <Flag size={12} />,
               className: task.priority === p ? TASK_PRIORITY_COLORS[p] : undefined,
             }))}
             onChange={handlePriorityChange}
@@ -647,7 +655,7 @@ const TaskRow = memo(function TaskRow({
                 className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${TASK_PRIORITY_PILL_CLASSES[task.priority]}`}
                 title={t('tasks.priority.' + task.priority)}
               >
-                <Flag size={11} />
+                <Flag size={12} />
               </button>
             )}
           />

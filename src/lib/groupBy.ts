@@ -30,6 +30,10 @@ export const UNCATEGORIZED_KEY = '__uncategorized__';
  * leere), dahinter — nur wenn nötig — „Ohne Kategorie" für Einträge, deren
  * Kategorie im Papierkorb liegt. Kategorien behalten ihre Reihenfolge, die
  * Einträge die der übergebenen (vorsortierten) Liste.
+ *
+ * `forceUncategorized` erzwingt den Waisen-Bucket auch leer — für den Fall,
+ * dass der „Ohne Kategorie"-Filterchip ausgewählt ist: dann soll sein Kopf
+ * mit Leer-Hinweis erscheinen, wie bei jeder anderen leeren Kategorie.
  */
 export function groupByCategory<T, C extends { id: string }>(
   items: readonly T[],
@@ -37,6 +41,7 @@ export function groupByCategory<T, C extends { id: string }>(
   categoryId: (item: T) => string,
   label: (cat: C) => string,
   uncategorizedLabel: string,
+  forceUncategorized = false,
 ): DashboardGroup<T>[] {
   const groups: DashboardGroup<T>[] = categories.map((cat) => ({
     key: cat.id,
@@ -44,7 +49,7 @@ export function groupByCategory<T, C extends { id: string }>(
     items: items.filter((item) => categoryId(item) === cat.id),
   }));
   const orphans = items.filter((item) => !categories.some((c) => c.id === categoryId(item)));
-  if (orphans.length > 0) {
+  if (orphans.length > 0 || forceUncategorized) {
     groups.push({ key: UNCATEGORIZED_KEY, label: uncategorizedLabel, items: orphans });
   }
   return groups;

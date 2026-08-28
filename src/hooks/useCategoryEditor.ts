@@ -98,6 +98,6 @@ export function useCategoryEditor<C extends CategoryLike>(
   };
 }
 
-/** Das komplette Editor-Objekt, wie es CategoryHeaderRow/CategoryAddRow entgegennehmen. */
+/** Das komplette Editor-Objekt, wie es CategoryHeaderRow/CategoryAddModal entgegennehmen. */
 export type CategoryEditorApi<C extends CategoryLike = CategoryLike> =
   ReturnType<typeof useCategoryEditor<C>>;

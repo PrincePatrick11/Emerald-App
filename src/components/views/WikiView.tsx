@@ -5,7 +5,7 @@ import { Trash2, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import CategoryHeaderRow from '../ui/CategoryHeaderRow';
-import CategoryAddRow from '../ui/CategoryAddRow';
+import CategoryAddModal from '../ui/CategoryAddModal';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { categoryLabel } from '../../lib/categories';
@@ -45,6 +45,7 @@ export default function WikiView() {
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
+  const [hideEmptyCats, setHideEmptyCats] = useState(false);
   const { collapsed: collapsedCats, toggle: toggleCatCollapse } = useCollapsedSet('wiki');
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<WikiCategory>('other');
@@ -148,8 +149,10 @@ export default function WikiView() {
 
   useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
 
-  const handleNew = async () => {
-    const a = await createArticle();
+  // Ohne Argument fällt createArticle auf „other" zurück; der „+"-Knopf am
+  // Kategorienkopf gibt seine Kategorie mit — wie handleCreateTask(cat.id).
+  const handleNew = async (categoryId?: string) => {
+    const a = await createArticle(categoryId);
     setActiveView({ type: 'wiki', id: a.id, mode: 'edit' });
   };
 
@@ -206,15 +209,13 @@ export default function WikiView() {
 
     // Alle Kategorien anbieten, auch leere — die Leiste ist auch der Weg, sich
     // gezielt EINE Kategorie anzeigen zu lassen, nicht nur ein Ausschlussfilter.
-    // „Ohne Kategorie" nur, wenn es tatsächlich Waisen gibt.
+    // „Ohne Kategorie" immer dabei, auch ohne Waisen.
     const catChips = [
       ...wikiCategories.map((c) => ({ value: c.id, label: categoryLabel(t, 'wiki', c), emoji: c.emoji })),
-      ...(articles.some((a) => !catById[a.category_id])
-        ? [{ value: UNCATEGORIZED_KEY, label: t('wiki.uncategorized'), emoji: '📄' }]
-        : []),
+      { value: UNCATEGORIZED_KEY, label: t('wiki.uncategorized'), emoji: '📄' },
     ];
 
-    const activeFilterCount = filterCatIds.length > 0 ? 1 : 0;
+    const activeFilterCount = (filterCatIds.length > 0 ? 1 : 0) + (hideEmptyCats ? 1 : 0);
 
     const sortedArticles = sortItems(filtered, sort, {
       date: (a) => a.created_at,
@@ -304,6 +305,7 @@ export default function WikiView() {
     const catGroups: DashboardGroup<Article>[] = groupByCategory(
       sortedArticles, visibleCategories, (a) => a.category_id,
       (c) => categoryLabel(t, 'wiki', c), t('wiki.uncategorized'),
+      filterCatIds.includes(UNCATEGORIZED_KEY),
     );
 
     const renderCategoryHeader = (group: DashboardGroup<Article>) => {
@@ -314,7 +316,7 @@ export default function WikiView() {
             onToggleCollapse={() => toggleCatCollapse(UNCATEGORIZED_KEY)}
             emoji="📄"
             label={group.label}
-            meta={<span className="text-xs text-stone-500">({group.items.length})</span>}
+            count={group.items.length}
           />
         );
       }
@@ -328,23 +330,21 @@ export default function WikiView() {
           canDelete={!cat.is_builtin}
           collapsed={collapsedCats.has(cat.id)}
           onToggleCollapse={() => toggleCatCollapse(cat.id)}
-          meta={<span className="text-xs text-stone-500">({group.items.length})</span>}
+          count={group.items.length}
+          onAdd={() => handleNew(cat.id)}
+          addTitle={t('wiki.newArticle')}
         />
       );
     };
 
-    const renderAddCategory = () => (
-      <CategoryAddRow
-        editor={catEditor}
-        buttonLabel={t('wiki.addCategory')}
-        placeholder={t('wiki.categoryName')}
-      />
-    );
-
     return (
+      <>
       <Dashboard<Article>
         title={t('wiki.title')}
-        primaryAction={{ label: t('wiki.newArticle'), onClick: handleNew }}
+        // Gewrappt, nicht durchgereicht: onClick liefert ein MouseEvent, das
+        // sonst als categoryId in handleNew landet.
+        primaryAction={{ label: t('wiki.newArticle'), onClick: () => handleNew() }}
+        secondaryAction={{ label: t('wiki.addCategory'), onClick: () => catEditor.setAddingCategory(true) }}
         view={view}
         sort={sort}
         onView={(v) => setWikiPrefs({ view: v })}
@@ -361,17 +361,20 @@ export default function WikiView() {
             selectedChips: filterCatIds,
             onChipToggle: (v) => setFilterCatIds((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
             onAllChips: () => setFilterCatIds([]),
-            onClearAll: () => setFilterCatIds([]),
+            nonEmptyOnly: hideEmptyCats,
+            onNonEmptyToggle: () => setHideEmptyCats((v) => !v),
+            onClearAll: () => { setFilterCatIds([]); setHideEmptyCats(false); },
           },
         }}
         items={sortedArticles}
         itemKey={(a) => a.id}
         renderItem={renderArticle}
         isEmpty={articles.length === 0 && wikiCategories.length === 0}
-        emptyState={{ message: t('wiki.noArticles'), actionLabel: t('wiki.startDocumenting'), onAction: handleNew }}
+        emptyState={{ message: t('wiki.noArticles'), actionLabel: t('wiki.startDocumenting'), onAction: () => handleNew() }}
         // Bei aktivem Kategorie-Filter ohne Suchtext trotzdem die Gruppierung
         // rendern: eine ausgewählte leere Kategorie soll ihren Kopf samt
-        // Leer-Hinweis zeigen, nicht „Keine Ergebnisse".
+        // Leer-Hinweis zeigen, nicht „Keine Ergebnisse". („Nur mit Einträgen"
+        // wertet Dashboard selbst aus und zeigt notfalls den Hinweis.)
         hasNoResults={filtered.length === 0 && !(sort === 'category' && view !== 'timeline' && filterCatIds.length > 0 && !search)}
         noResultsMessage={t('search.noResults')}
         grouping={
@@ -382,7 +385,6 @@ export default function WikiView() {
                   mode: 'category',
                   groups: catGroups,
                   renderGroupHeader: renderCategoryHeader,
-                  renderAddCategory,
                   renderEmptyGroup: () => <p className="text-xs text-stone-700 px-1 py-1">{t('wiki.noArticles')}</p>,
                   isGroupCollapsed: (g) => collapsedCats.has(g.key!),
                 }
@@ -401,6 +403,8 @@ export default function WikiView() {
           />
         )}
       />
+      <CategoryAddModal editor={catEditor} title={t('wiki.addCategory')} placeholder={t('wiki.categoryName')} />
+      </>
     );
   }
 

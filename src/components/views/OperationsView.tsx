@@ -5,7 +5,7 @@ import { Trash2, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import CategoryHeaderRow from '../ui/CategoryHeaderRow';
-import CategoryAddRow from '../ui/CategoryAddRow';
+import CategoryAddModal from '../ui/CategoryAddModal';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { categoryLabel } from '../../lib/categories';
@@ -54,6 +54,7 @@ export default function OperationsView() {
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
+  const [hideEmptyCats, setHideEmptyCats] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
   const { collapsed: collapsedCats, toggle: toggleCatCollapse } = useCollapsedSet('operations');
   const [title, setTitle] = useState('');
@@ -133,6 +134,12 @@ export default function OperationsView() {
     const defaultCat = categories[0];
     if (!defaultCat) return;
     const op = await createOperation(defaultCat.id);
+    setActiveView({ type: 'operations', id: op.id, mode: 'edit' });
+  };
+
+  // Der „+"-Knopf am Kategorienkopf — wie handleCreateTask(cat.id) in TasksView.
+  const handleNewInCategory = async (categoryId: string) => {
+    const op = await createOperation(categoryId);
     setActiveView({ type: 'operations', id: op.id, mode: 'edit' });
   };
 
@@ -235,12 +242,10 @@ export default function OperationsView() {
 
     // Alle Kategorien anbieten, auch leere — die Leiste ist auch der Weg, sich
     // gezielt EINE Kategorie anzeigen zu lassen, nicht nur ein Ausschlussfilter.
-    // „Ohne Kategorie" nur, wenn es tatsächlich Waisen gibt.
+    // „Ohne Kategorie" immer dabei, auch ohne Waisen.
     const catChips = [
       ...categories.map((c) => ({ value: c.id, label: opCatName(c), emoji: c.emoji })),
-      ...(operations.some((o) => !catById[o.category_id])
-        ? [{ value: UNCATEGORIZED_KEY, label: t('operations.uncategorized'), emoji: '📄' }]
-        : []),
+      { value: UNCATEGORIZED_KEY, label: t('operations.uncategorized'), emoji: '📄' },
     ];
 
     const statusChips = [
@@ -250,7 +255,8 @@ export default function OperationsView() {
 
     const activeFilterCount =
       (filterCatIds.length > 0 ? 1 : 0) +
-      (filterStatus.length > 0 ? 1 : 0);
+      (filterStatus.length > 0 ? 1 : 0) +
+      (hideEmptyCats ? 1 : 0);
 
     const sortedOps = sortItems(filtered, sort, {
       date: (o) => o.updated_at,
@@ -393,6 +399,7 @@ export default function OperationsView() {
     const catGroups: DashboardGroup<Operation>[] = groupByCategory(
       sortedOps, visibleCategories, (o) => o.category_id,
       opCatName, t('operations.uncategorized'),
+      filterCatIds.includes(UNCATEGORIZED_KEY),
     );
 
     const renderCategoryHeader = (group: DashboardGroup<Operation>) => {
@@ -403,7 +410,7 @@ export default function OperationsView() {
             onToggleCollapse={() => toggleCatCollapse(UNCATEGORIZED_KEY)}
             emoji="📄"
             label={group.label}
-            meta={<span className="text-xs text-stone-500">({group.items.length})</span>}
+            count={group.items.length}
           />
         );
       }
@@ -417,23 +424,19 @@ export default function OperationsView() {
           canDelete={!cat.is_builtin}
           collapsed={collapsedCats.has(cat.id)}
           onToggleCollapse={() => toggleCatCollapse(cat.id)}
-          meta={<span className="text-xs text-stone-500">({group.items.length})</span>}
+          count={group.items.length}
+          onAdd={() => handleNewInCategory(cat.id)}
+          addTitle={t('operations.new')}
         />
       );
     };
 
-    const renderAddCategory = () => (
-      <CategoryAddRow
-        editor={catEditor}
-        buttonLabel={t('operations.addCategory')}
-        placeholder={t('operations.categoryName')}
-      />
-    );
-
     return (
+      <>
       <Dashboard<Operation>
         title={t('nav.operations')}
         primaryAction={{ label: t('operations.new'), onClick: handleNew }}
+        secondaryAction={{ label: t('operations.addCategory'), onClick: () => catEditor.setAddingCategory(true) }}
         view={view}
         sort={sort}
         onView={(v) => setOperationsPrefs({ view: v })}
@@ -450,10 +453,12 @@ export default function OperationsView() {
             selectedChips: filterCatIds,
             onChipToggle: (v) => setFilterCatIds((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
             onAllChips: () => setFilterCatIds([]),
+            nonEmptyOnly: hideEmptyCats,
+            onNonEmptyToggle: () => setHideEmptyCats((v) => !v),
             statusChips,
             selectedStatus: filterStatus,
             onStatusToggle: (v) => setFilterStatus((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
-            onClearAll: () => { setFilterCatIds([]); setFilterStatus([]); },
+            onClearAll: () => { setFilterCatIds([]); setFilterStatus([]); setHideEmptyCats(false); },
           },
         }}
         items={sortedOps}
@@ -463,7 +468,8 @@ export default function OperationsView() {
         emptyState={{ message: t('operations.none'), actionLabel: t('operations.start'), onAction: handleNew }}
         // Bei aktivem Kategorie-Filter ohne Suchtext trotzdem die Gruppierung
         // rendern: eine ausgewählte leere Kategorie soll ihren Kopf samt
-        // Leer-Hinweis zeigen, nicht „Keine Ergebnisse".
+        // Leer-Hinweis zeigen, nicht „Keine Ergebnisse". („Nur mit Einträgen"
+        // wertet Dashboard selbst aus und zeigt notfalls den Hinweis.)
         hasNoResults={filtered.length === 0 && !(sort === 'category' && view !== 'timeline' && filterCatIds.length > 0 && !search)}
         noResultsMessage={t('search.noResults')}
         grouping={
@@ -474,7 +480,6 @@ export default function OperationsView() {
                   mode: 'category',
                   groups: catGroups,
                   renderGroupHeader: renderCategoryHeader,
-                  renderAddCategory,
                   renderEmptyGroup: () => <p className="text-xs text-stone-700 px-1 py-1">{t('operations.none')}</p>,
                   isGroupCollapsed: (g) => collapsedCats.has(g.key!),
                 }
@@ -496,6 +501,8 @@ export default function OperationsView() {
           />
         )}
       />
+      <CategoryAddModal editor={catEditor} title={t('operations.addCategory')} placeholder={t('operations.categoryName')} />
+      </>
     );
   }
 

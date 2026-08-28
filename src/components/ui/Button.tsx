@@ -33,6 +33,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   tone?: ButtonTone;
   /** Icon-only square — for secondary actions sharing the row with a primary one. */
   compact?: boolean;
+  /** Nur im tone-Modus: 24px statt 30px hoch — für dichte Zeilen wie die
+   *  Kategorien-Köpfe, deren Textzeile ein 30px-Button aufblähen würde.
+   *  Icons darin gehören auf die 12px-Stufe. */
+  small?: boolean;
   /** Stretches to fill the row instead of sizing to its content — the primary
    *  action in a dedicated action bar (e.g. RightSidebar's Edit/Done). */
   fill?: boolean;
@@ -43,6 +47,7 @@ export default function Button({
   variant = 'secondary',
   tone,
   compact,
+  small,
   fill,
   active,
   type = 'button',
@@ -52,8 +57,8 @@ export default function Button({
 }: ButtonProps) {
   const toneClass = tone && ((active && ACTIVE_TONE_CLASSES[tone]) || TONE_CLASSES[tone]);
   const baseClass = toneClass
-    ? `sidebar-action-btn flex h-[30px] items-center justify-center gap-1.5 rounded-md border text-[11px] font-semibold transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none ${
-        compact ? 'w-[30px] flex-shrink-0' : `min-w-0 px-2 ${fill ? 'flex-1' : ''}`
+    ? `sidebar-action-btn flex ${small ? 'h-6' : 'h-[30px]'} items-center justify-center gap-1.5 rounded-md border text-[11px] font-semibold transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none ${
+        compact ? `${small ? 'w-6' : 'w-[30px]'} flex-shrink-0` : `min-w-0 px-2 ${fill ? 'flex-1' : ''}`
       } ${toneClass}`
     : VARIANT_CLASS[variant];
 

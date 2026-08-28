@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, X, Trash2, Pencil } from 'lucide-react';
+import { Check, X, Trash2, Pencil, Plus } from 'lucide-react';
 import EmojiPicker from './EmojiPicker';
 import Button from './Button';
 import CollapsibleGroupHeader from './CollapsibleGroupHeader';
@@ -16,9 +16,15 @@ interface Props<C extends CategoryLike> {
   /** Zusammen mit `collapsed`: rendert den Auf-/Zuklapp-Chevron vor dem Emoji (nur Lese-Modus). */
   onToggleCollapse?: () => void;
   collapsed?: boolean;
-  /** Nur im Lese-Modus, hinter dem Label („(n)"-Zähler). */
+  /** Der „(n)"-Zähler hinter dem Label (nur Lese-Modus). */
+  count?: number;
+  /** Zusammen mit `addTitle`: der „+"-Knopf vor dem Bearbeiten-Stift —
+   *  „Eintrag direkt in dieser Kategorie anlegen" (nur Lese-Modus). */
+  onAdd?: () => void;
+  addTitle?: string;
+  /** Nur im Lese-Modus, hinter dem Zähler. */
   meta?: ReactNode;
-  /** Nur im Lese-Modus, vor dem Bearbeiten-Stift (Tasks: „+"-Knopf). */
+  /** Nur im Lese-Modus, vor dem Bearbeiten-Stift. */
   actions?: ReactNode;
 }
 
@@ -28,7 +34,7 @@ interface Props<C extends CategoryLike> {
  * useCategoryEditor; modulspezifisches läuft über label und die Slots.
  */
 export default function CategoryHeaderRow<C extends CategoryLike>({
-  category, label, editor, canDelete = true, onToggleCollapse, collapsed = false, meta, actions,
+  category, label, editor, canDelete = true, onToggleCollapse, collapsed = false, count, onAdd, addTitle, meta, actions,
 }: Props<C>) {
   const { t } = useTranslation();
 
@@ -63,18 +69,22 @@ export default function CategoryHeaderRow<C extends CategoryLike>({
           }}
           className="input-field flex-1 rounded-md px-2 py-0.5 text-xs outline-none font-semibold uppercase tracking-wider"
         />
-        {/* Rohe Buttons statt btn-ghost: die Theme-Regel .btn-ghost:hover (0-3-0)
-            schlägt text-jade-400 und würde die Jade-Färbung beim Hover schlucken. */}
-        <button onClick={editor.handleSaveEditCat} className="text-jade-400 hover:text-jade-300"><Check size={12} /></button>
-        <button onClick={cancelEdit} className="text-stone-600 hover:text-stone-400"><X size={12} /></button>
+        {/* Die getönten Row-Actions der Button-Komponente wie im VaultModal,
+            in der 24px-small-Reihe — 30px würde die Kategoriezeile aufblähen. */}
+        <Button tone="jade" compact small title={t('common.save')} aria-label={t('common.save')} onClick={editor.handleSaveEditCat}>
+          <Check size={12} />
+        </Button>
+        <Button tone="neutral" compact small title={t('common.cancel')} aria-label={t('common.cancel')} onClick={cancelEdit}>
+          <X size={12} />
+        </Button>
         {canDelete && (
           editor.confirmDeleteCatId === category.id ? (
             <>
-              <Button onClick={() => editor.handleDeleteCat(category.id)} variant="danger" className="text-xs px-1">{t('common.confirmYes')}</Button>
-              <Button onClick={() => editor.setConfirmDeleteCatId(null)} variant="ghost" className="text-xs">{t('common.confirmNo')}</Button>
+              <Button onClick={() => editor.handleDeleteCat(category.id)} tone="danger" small className="shrink-0">{t('common.confirmYes')}</Button>
+              <Button onClick={() => editor.setConfirmDeleteCatId(null)} tone="neutral" small className="shrink-0">{t('common.confirmNo')}</Button>
             </>
           ) : (
-            <Button onClick={() => editor.handleDeleteCat(category.id)} variant="danger" className="p-0.5 ml-1">
+            <Button tone="danger" compact small title={t('common.delete')} aria-label={t('common.delete')} onClick={() => editor.handleDeleteCat(category.id)}>
               <Trash2 size={12} />
             </Button>
           )
@@ -89,19 +99,28 @@ export default function CategoryHeaderRow<C extends CategoryLike>({
       collapsed={collapsed}
       emoji={category.emoji}
       label={label}
+      count={count}
       meta={meta}
       actions={
         <>
+          {/* Dieselben getönten Row-Actions wie im Editiermodus — jade fürs
+              Anlegen, amber fürs Bearbeiten, in der 24px-small-Reihe. */}
+          {onAdd && (
+            <Button tone="jade" compact small title={addTitle} aria-label={addTitle} onClick={onAdd}>
+              <Plus size={12} />
+            </Button>
+          )}
           {actions}
-          {/* Roh statt btn-ghost: das 11px-Icon soll bündig in der Textzeile sitzen,
-              Button-Padding würde die Zeilenhöhe aufblähen. War in allen drei Views identisch. */}
-          <button
-            onClick={() => editor.startEditCat(category)}
-            className="text-stone-500 hover:text-stone-300 transition-colors p-0.5"
+          <Button
+            tone="amber"
+            compact
+            small
             title={t('editor.edit')}
+            aria-label={t('editor.edit')}
+            onClick={() => editor.startEditCat(category)}
           >
-            <Pencil size={11} />
-          </button>
+            <Pencil size={12} />
+          </Button>
         </>
       }
     />

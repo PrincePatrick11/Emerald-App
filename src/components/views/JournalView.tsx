@@ -52,6 +52,7 @@ export default function JournalView() {
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterPhases, setFilterPhases] = useState<string[]>([]);
+  const [hideEmptyPhases, setHideEmptyPhases] = useState(false);
   const { collapsed: collapsedPhases, toggle: togglePhaseCollapse } = useCollapsedSet('journal');
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -207,15 +208,13 @@ export default function JournalView() {
     const filtered = phaseFiltered;
 
     // Alle Phasen anbieten, auch die ohne Einträge — wie die Kategorie-Chips
-    // in Wiki/Operations/Tasks. „Ohne Mondphase" nur, wenn es solche Einträge gibt.
+    // in Wiki/Operations/Tasks. „Ohne Mondphase" immer dabei.
     const phaseChips = [
       ...MOON_PHASE_ORDER.map((p) => ({ value: p, label: t(`moonPhase.${p}`), emoji: MOON_PHASE_SYMBOLS[p] })),
-      ...(entries.some((e) => e.moon_phase == null)
-        ? [{ value: UNCATEGORIZED_KEY, label: t('journal.noPhase'), emoji: '📓' }]
-        : []),
+      { value: UNCATEGORIZED_KEY, label: t('journal.noPhase'), emoji: '📓' },
     ];
 
-    const activeFilterCount = filterPhases.length > 0 ? 1 : 0;
+    const activeFilterCount = (filterPhases.length > 0 ? 1 : 0) + (hideEmptyPhases ? 1 : 0);
 
     const sorted = sortItems(filtered, sort, {
       date: (e) => e.created_at,
@@ -235,6 +234,7 @@ export default function JournalView() {
     const phaseGroups: DashboardGroup<JournalEntry>[] = groupByCategory(
       sorted, visiblePhases.map((p) => ({ id: p })), (e) => e.moon_phase ?? '',
       (c) => t(`moonPhase.${c.id}`), t('journal.noPhase'),
+      filterPhases.includes(UNCATEGORIZED_KEY),
     );
 
     const renderPhaseHeader = (group: DashboardGroup<JournalEntry>) => (
@@ -243,7 +243,7 @@ export default function JournalView() {
         onToggleCollapse={() => togglePhaseCollapse(group.key!)}
         emoji={group.key === UNCATEGORIZED_KEY ? '📓' : MOON_PHASE_SYMBOLS[group.key as MoonPhase]}
         label={group.label}
-        meta={<span className="text-xs text-stone-500">({group.items.length})</span>}
+        count={group.items.length}
       />
     );
 
@@ -312,7 +312,9 @@ export default function JournalView() {
             selectedChips: filterPhases,
             onChipToggle: (v) => setFilterPhases((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
             onAllChips: () => setFilterPhases([]),
-            onClearAll: () => setFilterPhases([]),
+            nonEmptyOnly: hideEmptyPhases,
+            onNonEmptyToggle: () => setHideEmptyPhases((v) => !v),
+            onClearAll: () => { setFilterPhases([]); setHideEmptyPhases(false); },
           },
         }}
         items={sorted}
@@ -322,7 +324,8 @@ export default function JournalView() {
         emptyState={{ message: t('journal.noEntries'), actionLabel: t('journal.startWriting'), onAction: handleNew }}
         // Bei aktivem Phasen-Filter ohne Suchtext trotzdem die Gruppierung
         // rendern: eine ausgewählte leere Phase soll ihren Kopf samt
-        // Leer-Hinweis zeigen, nicht „Keine Ergebnisse".
+        // Leer-Hinweis zeigen, nicht „Keine Ergebnisse". („Nur mit Einträgen"
+        // wertet Dashboard selbst aus und zeigt notfalls den Hinweis.)
         hasNoResults={filtered.length === 0 && !(sort === 'category' && view !== 'timeline' && filterPhases.length > 0 && !search)}
         noResultsMessage={t('search.noResults')}
         grouping={
