@@ -28,6 +28,12 @@ interface UIState {
   history: ActiveView[];
   historyIndex: number;
   rightSidebarOpen: boolean;
+  /** Experiment „Kopfzeile in der Seitenleiste": das Portal-Ziel, das die
+   *  rechte Seitenleiste in Listenansichten stellt. Dashboard portalt seinen
+   *  kompletten Kopf (Titel, Aktionen, Toolbar, Filter) hinein; `null` heißt
+   *  Leiste zu oder Detailansicht — dann rendert Dashboard den Kopf wieder
+   *  inline im Hauptbereich. Bewusst nicht persistiert (DOM-Knoten). */
+  listHeaderHost: HTMLElement | null;
   editActions: EditActions | null;
   leftListOpen: boolean;
   leftListTab: LeftListTabId;
@@ -63,6 +69,7 @@ interface UIState {
   navigateBack: () => void;
   navigateForward: () => void;
   toggleRightSidebar: () => void;
+  setListHeaderHost: (el: HTMLElement | null) => void;
   setEditActions: (actions: EditActions | null) => void;
   toggleLeftList: () => void;
   setLeftListTab: (tab: LeftListTabId) => void;
@@ -153,6 +160,7 @@ export const useUIStore = create<UIState>((set) => ({
   history: [{ type: 'home' }],
   historyIndex: 0,
   rightSidebarOpen: true,
+  listHeaderHost: null,
   editActions: null,
   leftListOpen: true,
   leftListTab: 'journal',
@@ -301,6 +309,10 @@ export const useUIStore = create<UIState>((set) => ({
     return { historyIndex, activeView, tabs };
   }),
   toggleRightSidebar: () => set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),
+
+  // Als Ref-Callback gedacht: React ruft ihn beim Unmount mit `null` auf,
+  // womit der Inline-Fallback im Dashboard automatisch wieder greift.
+  setListHeaderHost: (el) => set((s) => (s.listHeaderHost === el ? s : { listHeaderHost: el })),
   setEditActions: (actions) => set({ editActions: actions }),
   toggleLeftList: () => set((s) => ({ leftListOpen: !s.leftListOpen })),
   setLeftListTab: (tab) => set({ leftListTab: tab }),

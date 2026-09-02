@@ -390,35 +390,27 @@ export default function TasksView() {
                 {t('tasks.showCompleted')}
               </FilterChipButton>
             ),
+            // Prioritäten als zweite Chip-Gruppe des FilterPanels — das war
+            // vorher eine handgebaute Zeile unter dem Panel, die im schmalen
+            // Seitenleisten-Layout überlief.
+            statusLabel: t('tasks.filter.priority'),
+            statusChips: (['high', 'medium', 'low'] as const).map((p) => ({
+              value: p,
+              label: t('tasks.priority.' + p),
+              icon: <Flag size={12} />,
+            })),
+            selectedStatus: [...filterPriority],
+            onStatusToggle: (v) => setFilterPriority((prev) => {
+              const next = new Set(prev);
+              if (next.has(v)) next.delete(v); else next.add(v);
+              return next;
+            }),
             onClearAll: () => {
               setFilterCategory(new Set());
               setFilterPriority(new Set());
               setHideEmptyCats(false);
             },
           },
-          extraPanelContent: (
-            <div className="px-8 py-2 border-b border-stone-700/40 bg-stone-900/50 flex items-center gap-2">
-              <span className="text-xs font-semibold text-stone-600 uppercase tracking-wider">{t('tasks.filter.priority')}</span>
-              {(['high', 'medium', 'low'] as const).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setFilterPriority((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(p)) next.delete(p); else next.add(p);
-                    return next;
-                  })}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${
-                    filterPriority.has(p)
-                      ? 'bg-jade-900/50 border-jade-800/40 text-jade-400'
-                      : 'bg-stone-800/60 border-stone-700/60 text-stone-500 hover:text-stone-300 hover:border-stone-600'
-                  }`}
-                >
-                  <Flag size={12} />
-                  {t('tasks.priority.' + p)}
-                </button>
-              ))}
-            </div>
-          ),
         }}
         items={sortedTasks}
         itemKey={(task) => task.id}

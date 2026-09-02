@@ -1,9 +1,10 @@
 import { Fragment, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus } from 'lucide-react';
 import Button from './Button';
 import ListToolbar from './ListToolbar';
 import FilterPanel, { type FilterPanelProps } from './FilterPanel';
-import type { ViewMode, SortMode } from '../../store/uiStore';
+import { useUIStore, type ViewMode, type SortMode } from '../../store/uiStore';
 
 export interface DashboardGroup<T> {
   /** Stable key for React lists; defaults to `label` when omitted. */
@@ -42,8 +43,6 @@ export interface DashboardFilters {
   onToggleFilters: () => void;
   activeFilterCount: number;
   panelProps: Omit<FilterPanelProps, 'activeFilterCount'>;
-  /** Rendered directly below FilterPanel, e.g. Tasks' priority-chip row. */
-  extraPanelContent?: ReactNode;
 }
 
 interface DashboardBaseProps<T> {
@@ -236,8 +235,18 @@ export default function Dashboard<T>({
     );
   };
 
-  return (
-    <div className="h-full flex flex-col">
+  // Experiment „Kopfzeile in der Seitenleiste": Die rechte Seitenleiste stellt
+  // in Listenansichten ein Portal-Ziel (RightSidebar → setListHeaderHost).
+  // Solange es existiert, wandert der komplette Kopf dorthin; ist die Leiste
+  // zu (oder noch nicht gemountet), bleibt er inline — sonst käme man an
+  // „Neuer Eintrag", Suche und Filter nicht mehr heran. Der rightSidebarOpen-
+  // Zusatz lässt den Kopf sofort beim Zuklappen zurückfallen: AppShell hält
+  // die Leiste für die 200ms-Animation noch gemountet (inert), der Host wäre
+  // also noch da, aber unbenutzbar.
+  const listHeaderHost = useUIStore((s) => (s.rightSidebarOpen ? s.listHeaderHost : null));
+
+  const inlineHeader = (
+    <>
       <div className={headerClassName}>
         {headerLeft ?? <h1 className={titleClassName}>{title}</h1>}
         {headerRight ?? (
@@ -271,11 +280,65 @@ export default function Dashboard<T>({
       />
 
       {filters?.showFilters && (
-        <>
-          <FilterPanel {...filters.panelProps} activeFilterCount={filters.activeFilterCount} />
-          {filters.extraPanelContent}
-        </>
+        <FilterPanel {...filters.panelProps} activeFilterCount={filters.activeFilterCount} />
       )}
+    </>
+  );
+
+  const sidebarHeader = (
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* h-14 + px-3 wie die Aktionsleiste der Detailansichten, damit die
+          Trennlinie mit der Tab-Leiste der Eintragsliste fluchtet. */}
+      <div className="flex items-center px-3 h-14 border-b border-stone-700/60 flex-shrink-0 min-w-0">
+        {headerLeft ?? <h1 className={`${titleClassName} truncate`}>{title}</h1>}
+      </div>
+      {/* Eine Einzugsquelle pro Spalte (design.md): dieselbe p-3-Spalte wie der
+          Properties-Container in RightSidebar — Toolbar und FilterPanel bringen
+          im vertikalen Modus kein eigenes Streifen-Chrome mit. */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-4">
+        {(headerRight || primaryAction || secondaryAction) && (
+          <div className="flex flex-col gap-1.5">
+            {headerRight ?? (
+              <>
+                {primaryAction && (
+                  <Button onClick={primaryAction.onClick} variant="primary" className="w-full justify-center">
+                    <Plus size={14} />{primaryAction.label}
+                  </Button>
+                )}
+                {secondaryAction && (
+                  <Button onClick={secondaryAction.onClick} variant="secondary" className="w-full justify-center">
+                    <Plus size={14} />{secondaryAction.label}
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        <ListToolbar
+          vertical
+          view={view}
+          sort={sort}
+          onView={onView}
+          onSort={onSort}
+          viewOptions={viewOptions}
+          search={search}
+          onSearch={onSearch}
+          extraActions={toolbarExtraActions}
+        />
+
+        {/* In der Seitenleiste ist Platz in der Höhe: das FilterPanel steht
+            dauerhaft, der Auf/Zu-Zustand gilt nur für den Inline-Fallback. */}
+        {filters && (
+          <FilterPanel vertical {...filters.panelProps} activeFilterCount={filters.activeFilterCount} />
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="h-full flex flex-col">
+      {listHeaderHost ? createPortal(sidebarHeader, listHeaderHost) : inlineHeader}
 
       <div className={contentClassName}>{renderContent()}</div>
 

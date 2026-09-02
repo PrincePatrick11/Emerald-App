@@ -117,7 +117,23 @@ function RightSidebarActionBar() {
 }
 
 export default function RightSidebar() {
+  const { t } = useTranslation();
   const activeView = useUIStore((s) => s.activeView);
+  const setListHeaderHost = useUIStore((s) => s.setListHeaderHost);
+
+  // Experiment „Kopfzeile in der Seitenleiste": In Listenansichten (kein
+  // geöffneter Eintrag) gehört die Leiste dem Dashboard-Kopf — Titel,
+  // Aktions-Buttons, Toolbar und Filter portalt Dashboard hierher. Der
+  // Platzhalter zeigt sich nur, solange nichts hineinportalt ist (Home/Tags
+  // haben kein Dashboard) — `only:` = :only-child, Portal-Inhalt wird als
+  // Geschwisterknoten angehängt und blendet ihn damit aus.
+  if (!activeView.id) {
+    return (
+      <div ref={setListHeaderHost} className="flex flex-col h-full">
+        <p className="hidden only:block text-xs text-stone-600 px-3 py-3">{t('properties.noEntry')}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">

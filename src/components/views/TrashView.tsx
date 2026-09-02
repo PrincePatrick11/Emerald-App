@@ -352,10 +352,13 @@ export default function TrashView() {
   const hasSelection = selectedIds.size > 0;
   const allSelected = items.length > 0 && selectedIds.size === items.length;
 
+  // min-w-0/truncate und flex-wrap: die beiden Slots landen im Seitenleisten-
+  // Experiment in einer schmalen Spalte (Dashboard portalt den Kopf dorthin)
+  // und müssen dort umbrechen statt überzulaufen.
   const headerLeft = (
-    <div className="flex items-center gap-3">
-      <Trash2 size={18} className="text-stone-500" />
-      <h1 className="text-lg font-semibold text-stone-200">{t('trash.title')}</h1>
+    <div className="flex items-center gap-3 min-w-0">
+      <Trash2 size={18} className="text-stone-500 flex-shrink-0" />
+      <h1 className="text-lg font-semibold text-stone-200 truncate">{t('trash.title')}</h1>
       {items.length > 0 && (
         <span className="text-xs text-stone-500 bg-stone-700/50 px-2 py-0.5 rounded-full">
           {items.length}
@@ -364,7 +367,7 @@ export default function TrashView() {
       {items.length > 0 && (
         <button
           onClick={allSelected ? deselectAll : selectAll}
-          className="text-xs text-stone-500 hover:text-stone-300 transition-colors"
+          className="text-xs text-stone-500 hover:text-stone-300 transition-colors whitespace-nowrap"
         >
           {allSelected ? t('trash.deselectAll') : t('trash.selectAll')}
         </button>
@@ -373,7 +376,7 @@ export default function TrashView() {
   );
 
   const headerRight = (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 flex-wrap">
       {hasSelection && (
         <>
           {confirmingBulkDelete && (
@@ -398,7 +401,7 @@ export default function TrashView() {
         </>
       )}
       {items.length > 0 && !hasSelection && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {confirmingEmpty && (
             <span className="text-xs text-stone-400">{t('trash.confirmEmpty')}</span>
           )}
