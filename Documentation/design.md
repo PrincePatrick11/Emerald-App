@@ -337,8 +337,8 @@ two states oscillate; a language change discards the cache. In altar focus mode 
 never collapses — there is no search field to protect there. The window's minimum width is
 720px.
 
-The search pill is `h-7` (28px), not the ~34px of the entry list search: in a 40px bar a
-34px field would nearly fill the bar.
+The search pill is `h-8` (32px), not the ~34px of the entry list search: in a 40px bar a
+34px field would nearly fill the bar, while 32px keeps 4px of air above and below.
 
 **Window buttons** (`WindowControls.tsx`, Windows and Linux only): 46×40px, square, no
 gap, flush into the window corner — the Windows Fluent geometry. The glyphs are inline SVG

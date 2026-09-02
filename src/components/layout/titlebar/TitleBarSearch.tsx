@@ -134,7 +134,7 @@ export default function TitleBarSearch() {
           sie ebenfalls. Sie hier allein zu streichen liesse die beiden
           Suchfelder in Parchment auseinanderlaufen — sie gehoert an beiden
           Stellen gemeinsam entfernt oder gar nicht (Documentation/design.md). */}
-      <div className="titlebar-search sidebar-search-inner flex items-center gap-2 rounded-md px-2.5 h-7 bg-stone-700/40">
+      <div className="titlebar-search sidebar-search-inner flex items-center gap-2 rounded-md px-2.5 h-8 bg-stone-700/40">
         <Search size={14} className="flex-shrink-0" />
         <input
           ref={inputRef}
