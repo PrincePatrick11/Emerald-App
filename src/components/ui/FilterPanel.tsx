@@ -150,7 +150,8 @@ export default function FilterPanel({
         </div>
       )}
 
-      {/* Status chips (Operations) */}
+      {/* Zweite Chip-Gruppe mit eigenem Label — Operations: Status,
+          Tasks: Prioritäten (statusLabel). */}
       {statusChips && statusChips.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <span className={labelClass}>{statusLabel ?? t('filters.status')}</span>

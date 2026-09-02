@@ -13,6 +13,10 @@ export interface DropdownOption<T extends string> {
   icon?: ReactNode;
   /** Zusätzliche Klassen für die Menüzeile, z. B. eine Prioritätsfarbe auf der aktiven Zeile. */
   className?: string;
+  /** Nicht wählbar in der aktuellen Kombination (ListToolbar: Alpha-/Kategorie-
+   *  Sortierung im Zeitstrahl); `title` erklärt warum. */
+  disabled?: boolean;
+  title?: string;
 }
 
 interface Props<T extends string> {
@@ -78,7 +82,9 @@ export default function Dropdown<T extends string>({
         <button
           key={o.value}
           onClick={() => { onChange(o.value); setOpen(false); }}
-          className={`w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs transition-colors ${
+          disabled={o.disabled}
+          title={o.title}
+          className={`w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             value === o.value
               ? 'list-toolbar-option-active'
               : 'list-toolbar-option-idle'

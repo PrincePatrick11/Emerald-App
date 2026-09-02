@@ -390,9 +390,8 @@ export default function TasksView() {
                 {t('tasks.showCompleted')}
               </FilterChipButton>
             ),
-            // Prioritäten als zweite Chip-Gruppe des FilterPanels — das war
-            // vorher eine handgebaute Zeile unter dem Panel, die im schmalen
-            // Seitenleisten-Layout überlief.
+            // Prioritäten als zweite Chip-Gruppe des FilterPanels (statusChips
+            // mit eigenem Label) — dieselbe Mechanik wie der Operations-Status.
             statusLabel: t('tasks.filter.priority'),
             statusChips: (['high', 'medium', 'low'] as const).map((p) => ({
               value: p,

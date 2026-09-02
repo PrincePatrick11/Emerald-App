@@ -182,9 +182,13 @@ because it is unclear whether `font-mono` is needed at all.*
 **8. Emerald Noctis lacks the generic focus rule.** Parchment has
 `html[data-theme='emerald-parchment'] button:focus-visible` (`index.css:1426`); Noctis has
 `:focus-visible` only for individual classes (`.window-control`, `.titlebar-menu-trigger`,
-`.menu-item`, `.link-picker-row`). Every button outside that list looks unfocused in
-Noctis. It shows most on the `RightSidebarActionBar`, since that became the only home of
-the entry actions. *Cost: one rule, mirrored from Parchment.*
+`.menu-item`, `.link-picker-row`, `.filter-chip`, `.sidebar-action-btn`,
+`.right-sidebar-tab-idle`/`-active`). The last three cover `Button`'s tone mode (so
+`RightSidebarActionBar`'s buttons, among every other tone-mode use, now get a ring) and the
+sidebar's tab/segment toggles — the same per-class patch `.filter-chip` already had, not
+the missing generic rule. The four base `Button` variants (`primary`/`secondary`/`ghost`/
+`danger`) and any plain `<button>` written directly in a view still look unfocused in
+Noctis. *Cost: one rule, mirrored from Parchment.*
 
 **9. The entry actions live exclusively in a collapsible surface.**
 Edit/Done/Delete/Cancel exist only in the right sidebar. Collapsing it mid-edit leaves no

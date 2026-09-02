@@ -194,6 +194,46 @@ useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete
 
 Inside the hook, the handlers are kept in a ref that is overwritten on every render, and the effect itself only depends on `active`: `setEditActions` only needs to run when edit mode flips, not on every keystroke, but the handlers it registers must still see the latest `title`/`content`/etc. at call time. An earlier, pre-hook version of this effect had no dependency array and called `setEditActions` unconditionally on every render, which combined with a whole-store `useUIStore()` subscription in the same component to produce an infinite render loop (each `setEditActions` call re-rendered the subscriber, which re-ran the effect, which called `setEditActions` again) and a blank screen on startup. Keep sidebar-consuming components on per-field selectors (see Store Selectors above) to avoid reintroducing it — the hook itself already scopes its effect to `[active]`.
 
+### List Header Portal
+
+In list views (every module except Home/Tags), `Dashboard`'s whole header — title row,
+toolbar, and filter panel — can render inside the right sidebar instead of above the list.
+`RightSidebar.tsx` mounts a host `<div>` on its list-view branch (no entry open) and hands
+its DOM node to `uiStore.listHeaderHost` through a ref callback (`setListHeaderHost`);
+`Dashboard` reads the field back and, whenever it is non-null *and* `rightSidebarOpen` is
+true, `createPortal`s a second header tree into it instead of rendering its own inline one.
+Checking `rightSidebarOpen` rather than just the host's existence is what makes closing the
+sidebar fall the header back inline immediately: `AppShell` keeps the sidebar mounted
+(`inert`) for the 200ms collapse animation described above, so the host div would otherwise
+still exist but be unusable for that stretch. Home and Tags render only the existing
+placeholder text in the host, since they have no `Dashboard` to portal.
+
+Invariant: exactly one writer (the host div's ref callback) and one reader (`Dashboard`) at
+a time — `MainArea` only ever renders one view, so at most one `Dashboard` ever portals into
+the host. `listHeaderHost` deliberately isn't persisted; it's a DOM node.
+
+The inline and sidebar header trees share one `toolbarCommon` prop bag
+(`view`/`sort`/`onView`/`onSort`/`viewOptions`/`search`/`onSearch`), so a future prop added
+to only one branch is the obvious drift to watch for. `headerRight` replaces the header's
+action slot in **both** trees — inline, the topbar-right slot; portalled into the sidebar,
+the title row's buttons, rendered instead in the scrollable column below it, where a wide
+slot (Trash's bulk-select controls) has room to wrap. `headerClassName` and
+`filters.showFilters`/`onToggleFilters` apply to the inline tree only: the sidebar tree has
+fixed `h-14` chrome and shows its `FilterPanel` permanently rather than behind a toggle.
+`Dashboard`'s `toolbarExtraActions` prop and `FilterPanelProps.extraPanelContent` slot were
+removed in the same pass — Tasks' priority filter moved into `FilterPanel`'s own
+`statusChips`/`statusLabel` instead of a bespoke extra slot.
+
+`ListToolbar` and `FilterPanel` each gained a `vertical` prop for the sidebar-portalled
+header: a column layout without their usual `.list-toolbar`/`.filter-panel` strip chrome
+(those classes carry per-theme background overrides that would repaint the sidebar's own
+surface otherwise), search on its own full-width row, and, for `ListToolbar`, view/sort
+presented as icon-toggle rows (a private `IconToggleGroup`, built on `TabIconButton`'s new
+`compact` size) instead of `Dropdown`s. Both presentations share the same disabled-options
+predicate for Timeline (`sortBlockedInTimeline` in `ListToolbar.tsx`): A→Z, Z→A and Category
+sorting are disabled with an explanatory tooltip, since the timeline already orders its
+entries by date and ignores those modes regardless of what's picked.
+
 ### Store Selectors
 
 Every component subscribes to individual store fields, never the whole store:

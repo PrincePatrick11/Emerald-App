@@ -16,7 +16,9 @@ const TONE_CLASSES: Record<ButtonTone, string> = {
   jade: 'border-jade-700/60 bg-jade-900/30 text-jade-300 hover:bg-jade-900/50 hover:border-jade-500/70',
   amber: 'border-amber-700/60 bg-amber-900/30 text-amber-300 hover:bg-amber-900/50 hover:border-amber-500/70',
   danger: 'border-red-700/60 bg-red-950/30 text-red-200 hover:bg-red-950/50 hover:border-red-500',
-  neutral: 'border-stone-700/60 bg-stone-900/45 text-stone-400 hover:bg-stone-800/60 hover:text-stone-200',
+  // border-stone-600/70 statt -700/60: neben einem Jade-Button wirkte der
+  // neutrale Rahmen sonst fast unsichtbar (beide Themes haben Brücken dafür).
+  neutral: 'border-stone-600/70 bg-stone-900/45 text-stone-400 hover:bg-stone-800/60 hover:text-stone-200',
 };
 
 const ACTIVE_TONE_CLASSES: Partial<Record<ButtonTone, string>> = {

@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus } from 'lucide-react';
+import { FolderPlus, Plus } from 'lucide-react';
 import Button from './Button';
 import ListToolbar from './ListToolbar';
 import FilterPanel, { type FilterPanelProps } from './FilterPanel';
@@ -39,6 +39,8 @@ export interface DashboardEmptyState {
 }
 
 export interface DashboardFilters {
+  /** Nur Inline-Kopf: im Seitenleisten-Modus steht das FilterPanel dauerhaft,
+   *  der Auf/Zu-Zustand greift erst wieder, wenn die Leiste zugeklappt ist. */
   showFilters: boolean;
   onToggleFilters: () => void;
   activeFilterCount: number;
@@ -51,11 +53,16 @@ interface DashboardBaseProps<T> {
   /** Fully replaces the topbar-left slot (icon + title + badge + selection controls). */
   headerLeft?: ReactNode;
   titleClassName?: string;
+  /** Inline als beschrifteter Button, im Seitenleisten-Kopf als kompakter
+   *  Jade-Icon-Button (Label wird title/aria-label). */
   primaryAction?: { label: string; onClick: () => void };
   /** Links vom Primär-Knopf, z. B. „Kategorie hinzufügen". */
   secondaryAction?: { label: string; onClick: () => void };
-  /** Fully replaces the topbar-right slot (Trash's bulk-select controls). */
+  /** Fully replaces the action slot — in BOTH header trees: inline the
+   *  topbar-right, im Seitenleisten-Modus die Titelzeilen-Buttons (gerendert
+   *  in der Scroll-Spalte, wo Platz zum Umbrechen ist). Trash's bulk-select. */
   headerRight?: ReactNode;
+  /** Nur Inline-Kopf; die Seitenleisten-Titelzeile hat festes Chrome. */
   headerClassName?: string;
 
   // ListToolbar passthrough
@@ -66,7 +73,6 @@ interface DashboardBaseProps<T> {
   viewOptions?: { value: ViewMode; label: string }[];
   search?: string;
   onSearch?: (v: string) => void;
-  toolbarExtraActions?: ReactNode;
 
   // FilterPanel (omit entirely for views with no filter concept)
   filters?: DashboardFilters;
@@ -144,7 +150,6 @@ export default function Dashboard<T>({
   viewOptions,
   search,
   onSearch,
-  toolbarExtraActions,
   filters,
   items,
   itemKey,
@@ -245,6 +250,10 @@ export default function Dashboard<T>({
   // also noch da, aber unbenutzbar.
   const listHeaderHost = useUIStore((s) => (s.rightSidebarOpen ? s.listHeaderHost : null));
 
+  // Beide Kopf-Bäume teilen sich die Toolbar-Props — eine künftige Prop, die
+  // nur in einem Zweig nachgezogen wird, ist der naheliegendste Drift.
+  const toolbarCommon = { view, sort, onView, onSort, viewOptions, search, onSearch };
+
   const inlineHeader = (
     <>
       <div className={headerClassName}>
@@ -266,17 +275,10 @@ export default function Dashboard<T>({
       </div>
 
       <ListToolbar
-        view={view}
-        sort={sort}
-        onView={onView}
-        onSort={onSort}
-        viewOptions={viewOptions}
-        search={search}
-        onSearch={onSearch}
+        {...toolbarCommon}
         showFilters={filters?.showFilters}
         onToggleFilters={filters?.onToggleFilters}
         activeFilterCount={filters?.activeFilterCount}
-        extraActions={toolbarExtraActions}
       />
 
       {filters?.showFilters && (
@@ -288,44 +290,49 @@ export default function Dashboard<T>({
   const sidebarHeader = (
     <div className="flex flex-col flex-1 min-h-0">
       {/* h-14 + px-3 wie die Aktionsleiste der Detailansichten, damit die
-          Trennlinie mit der Tab-Leiste der Eintragsliste fluchtet. */}
-      <div className="flex items-center px-3 h-14 border-b border-stone-700/60 flex-shrink-0 min-w-0">
+          Trennlinie mit der Tab-Leiste der Eintragsliste fluchtet. Die
+          Aktionen sitzen als kompakte tone-Buttons rechts im Titel, ihr Label
+          wandert in title/aria-label. `headerRight` ersetzt sie — derselbe
+          Vertrag wie inline —, wohnt aber in der Scroll-Spalte darunter, wo
+          eine breite Slot-Zeile (Trash-Bulk-Aktionen) umbrechen kann. */}
+      <div className="flex items-center gap-2 px-3 h-14 border-b border-stone-700/60 flex-shrink-0 min-w-0">
         {headerLeft ?? <h1 className={`${titleClassName} truncate`}>{title}</h1>}
+        {!headerRight && (primaryAction || secondaryAction) && (
+          <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+            {secondaryAction && (
+              // FolderPlus statt Plus: neben dem Jade-Plus für den neuen
+              // Eintrag wären zwei identische Pluszeichen nicht unterscheidbar.
+              <Button
+                tone="neutral"
+                compact
+                onClick={secondaryAction.onClick}
+                title={secondaryAction.label}
+                aria-label={secondaryAction.label}
+              >
+                <FolderPlus size={14} />
+              </Button>
+            )}
+            {primaryAction && (
+              <Button
+                tone="jade"
+                compact
+                onClick={primaryAction.onClick}
+                title={primaryAction.label}
+                aria-label={primaryAction.label}
+              >
+                <Plus size={14} />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
       {/* Eine Einzugsquelle pro Spalte (design.md): dieselbe p-3-Spalte wie der
           Properties-Container in RightSidebar — Toolbar und FilterPanel bringen
           im vertikalen Modus kein eigenes Streifen-Chrome mit. */}
       <div className="flex-1 overflow-y-auto p-3 space-y-4">
-        {(headerRight || primaryAction || secondaryAction) && (
-          <div className="flex flex-col gap-1.5">
-            {headerRight ?? (
-              <>
-                {primaryAction && (
-                  <Button onClick={primaryAction.onClick} variant="primary" className="w-full justify-center">
-                    <Plus size={14} />{primaryAction.label}
-                  </Button>
-                )}
-                {secondaryAction && (
-                  <Button onClick={secondaryAction.onClick} variant="secondary" className="w-full justify-center">
-                    <Plus size={14} />{secondaryAction.label}
-                  </Button>
-                )}
-              </>
-            )}
-          </div>
-        )}
+        {headerRight && <div className="flex flex-col gap-1.5">{headerRight}</div>}
 
-        <ListToolbar
-          vertical
-          view={view}
-          sort={sort}
-          onView={onView}
-          onSort={onSort}
-          viewOptions={viewOptions}
-          search={search}
-          onSearch={onSearch}
-          extraActions={toolbarExtraActions}
-        />
+        <ListToolbar vertical {...toolbarCommon} />
 
         {/* In der Seitenleiste ist Platz in der Höhe: das FilterPanel steht
             dauerhaft, der Auf/Zu-Zustand gilt nur für den Inline-Fallback. */}

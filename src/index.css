@@ -510,6 +510,18 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
   }
 
+  /* Gleiche Begruendung wie .filter-chip:focus-visible direkt darueber: die
+     tone-Buttons (sidebar-action-btn) und die Tab-/Segment-Toggles
+     (TabIconButton) sind fokussierbar, Noctis hat aber keine generische
+     button:focus-visible-Regel — ohne eigenen Ring blieben sie dort
+     tastatur-unsichtbar. */
+  .sidebar-action-btn:focus-visible,
+  .right-sidebar-tab-idle:focus-visible,
+  .right-sidebar-tab-active:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+
   .emoji-picker-popover {
     background-color: var(--menu-bg);
     border-color: var(--menu-border);
@@ -1169,7 +1181,7 @@ html[data-theme='emerald-noctis'] .altar-category-chip {
   color: #b49d87;
 }
 
-html[data-theme='emerald-noctis'] .right-sidebar-tab-idle:hover,
+html[data-theme='emerald-noctis'] .right-sidebar-tab-idle:hover:not(:disabled),
 html[data-theme='emerald-noctis'] .app-sidebar-right .text-stone-500.hover\:text-stone-300:hover,
 html[data-theme='emerald-noctis'] .app-sidebar-left .text-stone-500.hover\:text-stone-300:hover,
 html[data-theme='emerald-noctis'] .task-action-btn:hover,
@@ -1593,7 +1605,7 @@ html[data-theme='emerald-parchment'] .right-sidebar-tab-idle {
   color: #7f6448;
 }
 
-html[data-theme='emerald-parchment'] .right-sidebar-tab-idle:hover,
+html[data-theme='emerald-parchment'] .right-sidebar-tab-idle:hover:not(:disabled),
 html[data-theme='emerald-parchment'] .app-sidebar-right .text-stone-500.hover\:text-stone-300:hover,
 html[data-theme='emerald-parchment'] .app-sidebar-left .text-stone-500.hover\:text-stone-300:hover {
   color: #2f2114;

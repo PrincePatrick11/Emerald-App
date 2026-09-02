@@ -27,7 +27,8 @@
     "dateAsc": "Älteste zuerst",
     "alphaAsc": "A → Z",
     "alphaDesc": "Z → A",
-    "category": "Kategorie"
+    "category": "Kategorie",
+    "notAvailableInTimeline": "Im Zeitstrahl nicht verfügbar"
   },
   "undo": {
     "action": "Rückgängig",

@@ -124,13 +124,18 @@ export default function RightSidebar() {
   // Experiment „Kopfzeile in der Seitenleiste": In Listenansichten (kein
   // geöffneter Eintrag) gehört die Leiste dem Dashboard-Kopf — Titel,
   // Aktions-Buttons, Toolbar und Filter portalt Dashboard hierher. Der
-  // Platzhalter zeigt sich nur, solange nichts hineinportalt ist (Home/Tags
-  // haben kein Dashboard) — `only:` = :only-child, Portal-Inhalt wird als
-  // Geschwisterknoten angehängt und blendet ihn damit aus.
+  // Platzhalter erscheint nur in Views ohne Dashboard (Home/Tags) — an einen
+  // leeren Host geknüpft (`only:`-Trick) blitzte er stattdessen in jeder
+  // Lücke auf, in der der Portal-Inhalt legitim fehlt: während der
+  // 200ms-Zuklapp-Animation und solange der Chunk einer lazy geladenen
+  // Listenansicht noch lädt.
   if (!activeView.id) {
+    const hasDashboard = activeView.type !== 'home' && activeView.type !== 'tags';
     return (
       <div ref={setListHeaderHost} className="flex flex-col h-full">
-        <p className="hidden only:block text-xs text-stone-600 px-3 py-3">{t('properties.noEntry')}</p>
+        {!hasDashboard && (
+          <p className="text-xs text-stone-600 px-2 py-3">{t('properties.noEntry')}</p>
+        )}
       </div>
     );
   }

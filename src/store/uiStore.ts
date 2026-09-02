@@ -32,7 +32,10 @@ interface UIState {
    *  rechte Seitenleiste in Listenansichten stellt. Dashboard portalt seinen
    *  kompletten Kopf (Titel, Aktionen, Toolbar, Filter) hinein; `null` heißt
    *  Leiste zu oder Detailansicht — dann rendert Dashboard den Kopf wieder
-   *  inline im Hauptbereich. Bewusst nicht persistiert (DOM-Knoten). */
+   *  inline im Hauptbereich. Invariante: genau EIN Schreiber (der Host-Div in
+   *  RightSidebars Listen-Zweig) und genau ein Leser (Dashboard); MainArea
+   *  rendert immer nur eine View, also portalt nie mehr als ein Dashboard.
+   *  Bewusst nicht persistiert (DOM-Knoten). */
   listHeaderHost: HTMLElement | null;
   editActions: EditActions | null;
   leftListOpen: boolean;
