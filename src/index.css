@@ -629,6 +629,17 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   color: var(--text-muted);
 }
 
+/* Die Farbe kommt aus der `hr`-Regel im Base-Layer — hier nur der Abstand. */
+.tiptap hr {
+  @apply my-6 border-0 border-t;
+}
+
+/* Die Trennlinie ist ein Blocknode ohne Text — ohne eigenen Auswahlzustand
+   bliebe unsichtbar, dass sie beim Loeschen gemeint ist. */
+.tiptap hr.ProseMirror-selectednode {
+  border-color: var(--accent);
+}
+
 .tiptap code {
   @apply px-1.5 py-0.5 rounded text-sm font-mono;
   background-color: var(--editor-code-bg);

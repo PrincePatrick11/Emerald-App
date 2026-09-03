@@ -6,7 +6,7 @@ The Home view (the rail's top button, also the default view of a fresh tab) is a
 
 ## Journal
 
-The journal is the primary day-to-day writing space. Each entry has a title and a rich-text body edited with TipTap.
+The journal is the primary day-to-day writing space. Each entry has a title and a rich-text body edited with TipTap. Besides the usual formatting (headings, lists, quotes, code, images, links), the toolbar can insert a horizontal rule and align paragraphs, headings, and images left, center, or right — the same three alignment buttons apply to both; an image aligns through its own attribute rather than the paragraph's, since it's a block node with its own width. All of this is shared by Wiki and Operations, which use the same editor.
 
 **Moon phase.** When you create an entry, the current lunar phase is calculated automatically and stored. You can change it in the Properties sidebar. The phase appears as an icon and label below the title in read mode, and is included in exports.
 

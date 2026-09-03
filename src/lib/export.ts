@@ -315,7 +315,11 @@ const PRINT_CSS = `
   /* Content */
   .entry-content h1, .entry-content h2, .entry-content h3 { margin-top: 1.3em; margin-bottom: 0.4em; }
   .entry-content p  { margin-bottom: 0.8em; }
+  /* Die Ausrichtung eines Bildes steht als margin-left/-right in seinem
+     style-Attribut und schlaegt diese Kurzform — nur die vertikalen
+     Abstaende kommen von hier. */
   .entry-content img { display: block; max-width: 100%; height: auto; margin: 0.6em 0; border-radius: 4px; }
+  .entry-content hr { border: 0; border-top: 1px solid #ccc; margin: 1.4em 0; }
   .entry-content pre {
     background: #f5f5f5; padding: 0.8em 1em; border-radius: 4px;
     white-space: pre-wrap; font-size: 0.85em; margin: 0.8em 0;

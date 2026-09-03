@@ -6,6 +6,7 @@ import Typography from '@tiptap/extension-typography';
 import Highlight from '@tiptap/extension-highlight';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
+import TextAlign from '@tiptap/extension-text-align';
 import { ResizableImage } from './ResizableImageExtension';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
@@ -14,7 +15,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { ExternalLink, Pencil, Trash2, Check, X, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import EditorToolbar from './EditorToolbar';
+import EditorToolbar, { TEXT_ALIGN_TYPES } from './EditorToolbar';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import LinkPickerModal from './LinkPickerModal';
@@ -188,6 +189,11 @@ export default function RichEditor({
       Highlight.configure({ multicolor: false }),
       TaskList,
       TaskItem.configure({ nested: true }),
+      // Bilder richten sich ueber ihr eigenes `align`-Attribut aus (Blocknode mit
+      // eigener Breite) — `text-align` auf dem Absatz erreicht sie nicht.
+      // Bilder bleiben aussen vor: sie richten sich ueber ihr eigenes
+      // `align`-Attribut aus, siehe `alignMargins` in ResizableImageExtension.
+      TextAlign.configure({ types: [...TEXT_ALIGN_TYPES] }),
       createInternalLinkExtension(
         (query) => {
           const q = query.toLowerCase();

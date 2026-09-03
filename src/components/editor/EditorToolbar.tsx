@@ -21,7 +21,22 @@ import {
   ImagePlus,
   Check,
   X,
+  Minus,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
 } from 'lucide-react';
+import type { Alignment } from './ResizableImageExtension';
+
+/**
+ * Die Knotentypen, fuer die `TextAlign` in `RichEditor` konfiguriert ist. Steht
+ * hier, damit die Toolbar die Buttons dort sperren kann, wo die Ausrichtung
+ * nichts bewirken wuerde — in einem Codeblock etwa.
+ */
+export const TEXT_ALIGN_TYPES = ['heading', 'paragraph'] as const;
+
+/** Alles ausser links: nur diese Werte stehen als Attribut im Dokument. */
+const EXPLICIT_ALIGNMENTS = ['center', 'right', 'justify'] as const;
 
 interface Props {
   editor: Editor;
@@ -63,6 +78,36 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
     editor.chain().focus().run();
   };
 
+
+  // Dieselben drei Buttons bedienen zwei Ziele: ein ausgewaehltes Bild ist ein
+  // eigener Blocknode mit eigener Breite, `text-align` des Absatzes erreicht es
+  // nicht. Wie die beiden Seiten linksbuendig ablegen, steht bei `alignMargins`.
+  const imageSelected = editor.isActive('image');
+  const textAlignable = TEXT_ALIGN_TYPES.some((type) => editor.isActive(type));
+  const alignDisabled = !imageSelected && !textAlignable;
+
+  const applyAlign = (align: Alignment) => {
+    if (imageSelected) {
+      editor.chain().focus().setImageAlign(align).run();
+      return;
+    }
+    if (align === 'left') {
+      editor.chain().focus().unsetTextAlign().run();
+      return;
+    }
+    editor.chain().focus().setTextAlign(align).run();
+  };
+
+  const isAlignActive = (align: Alignment) => {
+    if (imageSelected) return editor.getAttributes('image').align === align;
+    if (alignDisabled) return false;
+    // Ein Absatz ohne Attribut ist linksbuendig — und aelterer Inhalt traegt
+    // vielleicht ein ausgeschriebenes `left`. Beides muss den Button erhellen.
+    if (align === 'left') {
+      return !EXPLICIT_ALIGNMENTS.some((a) => editor.isActive({ textAlign: a }));
+    }
+    return editor.isActive({ textAlign: align });
+  };
 
   const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -155,6 +200,42 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
           title={t('editor.toolbar.blockquote')}
         >
           <Quote size={14} />
+        </ToolbarBtn>
+        <ToolbarBtn
+          onClick={() => editor.chain().focus().setHorizontalRule().run()}
+          active={false}
+          title={t('editor.toolbar.horizontalRule')}
+        >
+          <Minus size={14} />
+        </ToolbarBtn>
+      </ToolbarGroup>
+
+      <ToolbarDivider />
+
+      <ToolbarGroup>
+        <ToolbarBtn
+          onClick={() => applyAlign('left')}
+          active={isAlignActive('left')}
+          disabled={alignDisabled}
+          title={t('editor.toolbar.alignLeft')}
+        >
+          <AlignLeft size={14} />
+        </ToolbarBtn>
+        <ToolbarBtn
+          onClick={() => applyAlign('center')}
+          active={isAlignActive('center')}
+          disabled={alignDisabled}
+          title={t('editor.toolbar.alignCenter')}
+        >
+          <AlignCenter size={14} />
+        </ToolbarBtn>
+        <ToolbarBtn
+          onClick={() => applyAlign('right')}
+          active={isAlignActive('right')}
+          disabled={alignDisabled}
+          title={t('editor.toolbar.alignRight')}
+        >
+          <AlignRight size={14} />
         </ToolbarBtn>
       </ToolbarGroup>
 
@@ -258,8 +339,10 @@ function ToolbarGroup({ children }: { children: React.ReactNode }) {
   return <div className="flex items-center gap-0.5">{children}</div>;
 }
 
+// Der schmale Rand ist Absicht: die Leiste bricht um, wenn der Editorbereich
+// eng wird, und jeder gesparte Pixel schiebt diesen Umbruch weiter hinaus.
 function ToolbarDivider() {
-  return <div className="w-px h-4 bg-stone-700/60 mx-1" />;
+  return <div className="w-px h-4 bg-stone-700/60 mx-0.5" />;
 }
 
 function ToolbarBtn({
@@ -275,12 +358,14 @@ function ToolbarBtn({
   title: string;
   disabled?: boolean;
 }) {
+  // `p-1` statt der sonst ueblichen 26px: die Leiste traegt inzwischen 18
+  // Buttons und bricht sonst schon bei geoeffneter rechter Spalte um.
   return (
     <button
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className={`editor-toolbar-btn p-1.5 rounded-md transition-colors duration-100 ${
+      className={`editor-toolbar-btn p-1 rounded-md transition-colors duration-100 ${
         active
           ? 'editor-toolbar-btn-active bg-stone-700 text-stone-100'
           : disabled

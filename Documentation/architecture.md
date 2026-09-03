@@ -343,6 +343,12 @@ After every save, `syncLinks(sourceId, sourceType, htmlContent)` in `src/lib/lin
 
 Backlinks are fetched on demand by `fetchBacklinks(targetId)`, which joins the `links` table with each content table to return entry titles and types.
 
+### Text and Image Alignment
+
+`RichEditor` configures `@tiptap/extension-text-align` for `heading` and `paragraph` only (the type list is `TEXT_ALIGN_TYPES`, exported from `EditorToolbar.tsx` so the extension config and the toolbar's own disabled-state check read from one list instead of two that could drift). Left alignment is deliberately the *absence* of the `textAlign` attribute rather than an explicit `"left"` value: the installed extension serialises whatever value it is given, `left` included, and leaving it unset keeps a freshly-typed paragraph's HTML free of a redundant attribute.
+
+An image aligns through its own `align` attribute on the custom node in `ResizableImageExtension.tsx` instead — a paragraph's `text-align` never reaches it, since the image is a block node with its own width. `align` (`'left' | 'center' | 'right'`, exported as the `Alignment` type — it names both the text and the image case, since the toolbar's three buttons drive both) serialises as `data-align` plus inline `margin-left`/`margin-right` (`alignMargins()`); `alignFromLegacyStyle()` reads the alignment back out of the margins alone for images stored before `data-align` existed. `data-align` is allowlisted in the DOMPurify config for `.emerald` import (`src/lib/emeraldFormat.ts`) but deliberately not for PDF export's sanitisation — nothing in that path reads the attribute, and alignment survives PDF export through the inline margins regardless.
+
 ### Global Search
 
 The title bar's search field searches every module by title, tag, and body text. It is a pure in-memory filter, not a database query: `useGlobalSearch` (`src/hooks/useGlobalSearch.ts`) assembles a `SearchCorpus` from the Zustand stores `AppShell` already loads at startup, and `searchCorpus()` (`src/lib/globalSearch.ts`) scores and sorts it. There is no FTS5 table and no migration — the stores are already the single source of truth (see [Data Flow](#data-flow) above), and duplicating them into a second searchable copy would only be a second place to keep in sync.

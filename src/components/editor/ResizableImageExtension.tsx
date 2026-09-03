@@ -4,6 +4,43 @@ import type { NodeViewProps } from '@tiptap/react';
 import { useRef, useState } from 'react';
 import { imageSrc, storedImageName } from '../../lib/images';
 
+/** Gilt fuer Text wie fuer Bilder — die Toolbar bedient beides mit denselben Buttons. */
+export type Alignment = 'left' | 'center' | 'right';
+
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    resizableImage: {
+      /** Richtet das ausgewaehlte Bild links, mittig oder rechts aus. */
+      setImageAlign: (align: Alignment) => ReturnType;
+    };
+  }
+}
+
+/**
+ * Ausrichtung eines Bildes als Randverteilung — das Bild ist ein Blocknode mit
+ * eigener Breite, `text-align` des Absatzes greift bei ihm nicht.
+ *
+ * Die beiden Seiten der Ausrichtung legen "links" bewusst verschieden ab:
+ * Text hat dafuer gar kein Attribut (die TextAlign-Erweiterung schreibt jeden
+ * Wert ins HTML, den sie bekommt, `left` eingeschlossen), das Bild dagegen
+ * traegt `align: 'left'` als Standard und schreibt es aus. Es braucht den Wert,
+ * weil seine Raender sonst von der vorigen Ausrichtung stehen blieben.
+ */
+function alignMargins(align: unknown) {
+  if (align === 'center') return { marginLeft: 'auto', marginRight: 'auto' };
+  if (align === 'right') return { marginLeft: 'auto', marginRight: '0' };
+  return { marginLeft: '0', marginRight: 'auto' };
+}
+
+/**
+ * Gegenstueck zu `alignMargins` fuer Inhalt, der noch vor `data-align`
+ * gespeichert wurde: dort verraet allein die Randverteilung die Ausrichtung.
+ */
+function alignFromLegacyStyle(img: HTMLImageElement): Alignment {
+  if (img.style.marginLeft !== 'auto') return 'left';
+  return img.style.marginRight === 'auto' ? 'center' : 'right';
+}
+
 function ResizableImageView({ node, updateAttributes, selected, editor }: NodeViewProps) {
   const imgRef = useRef<HTMLImageElement>(null);
   const [hovered, setHovered] = useState(false);
@@ -43,7 +80,11 @@ function ResizableImageView({ node, updateAttributes, selected, editor }: NodeVi
 
   return (
     <NodeViewWrapper
-      style={{ display: 'block', width: node.attrs.width ?? '100%' }}
+      style={{
+        display: 'block',
+        width: node.attrs.width ?? '100%',
+        ...alignMargins(node.attrs.align),
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -84,6 +125,7 @@ export const ResizableImage = Node.create({
       alt:   { default: null },
       title: { default: null },
       width: { default: '300px' },
+      align: { default: 'left' },
     };
   },
 
@@ -104,15 +146,32 @@ export const ResizableImage = Node.create({
             alt:   img.getAttribute('alt'),
             title: img.getAttribute('title'),
             width: img.style.width || img.getAttribute('width') || '100%',
+            align: img.getAttribute('data-align') ?? alignFromLegacyStyle(img),
           };
         },
       },
     ];
   },
 
+  addCommands() {
+    return {
+      setImageAlign:
+        (align: Alignment) =>
+        ({ commands }) =>
+          commands.updateAttributes(this.name, { align }),
+    };
+  },
+
   renderHTML({ HTMLAttributes }) {
-    const { width, ...rest } = HTMLAttributes;
-    return ['img', mergeAttributes(rest, { style: `width:${width ?? '100%'}` })];
+    const { width, align, ...rest } = HTMLAttributes;
+    const { marginLeft, marginRight } = alignMargins(align);
+    return [
+      'img',
+      mergeAttributes(rest, {
+        'data-align': align,
+        style: `width:${width ?? '100%'};display:block;margin-left:${marginLeft};margin-right:${marginRight}`,
+      }),
+    ];
   },
 
   addNodeView() {

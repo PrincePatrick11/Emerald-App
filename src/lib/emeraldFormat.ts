@@ -358,9 +358,10 @@ export async function importFromEmerald(): Promise<void> {
 
   const remapped = await remapImages(file.content, file.images ?? {});
   // Sanitize imported HTML — strip scripts and event handlers while preserving
-  // TipTap-specific data-* attributes (internal link chips) and inline styles (image widths).
+  // TipTap-specific data-* attributes (internal link chips, image alignment)
+  // and inline styles (image width, text alignment, image margins).
   const content = DOMPurify.sanitize(remapped, {
-    ADD_ATTR: ['data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon'],
+    ADD_ATTR: ['data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon', 'data-align'],
   });
   const tagNames = await ensureTagNames(file.meta.tags ?? []);
 
