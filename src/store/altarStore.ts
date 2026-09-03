@@ -464,6 +464,10 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const db = await getDb();
     const { altars, activeAltarId, items } = get();
     await db.execute('DELETE FROM altar_placements WHERE altar_id=$1', [id]);
+    // Altäre sind Link-Ziele der Editoren und von task_links (nie Quellen) —
+    // beide polymorphen Tabellen mit abräumen, wie journal/wikiStore es tun.
+    await db.execute('DELETE FROM links WHERE target_id=$1', [id]);
+    await db.execute('DELETE FROM task_links WHERE target_id=$1', [id]);
     await db.execute('DELETE FROM altars WHERE id=$1', [id]);
     const nextAltars = altars.filter((altar) => altar.id !== id);
     const nextActiveId = activeAltarId === id ? (nextAltars[0]?.id ?? null) : activeAltarId;

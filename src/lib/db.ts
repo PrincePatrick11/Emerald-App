@@ -220,10 +220,15 @@ export async function nextEntryNumber(
   return rows[0]?.n ?? 1;
 }
 
-/** Alle IDs, auf die eine polymorphe Verknüpfung zeigen darf. */
+/** Alle IDs, auf die eine polymorphe Verknüpfung zeigen darf — muss die
+ *  Typenliste von `checkIntegrity` (schema.ts) spiegeln, sonst löscht der
+ *  Sweep genau die Zeilen, die die Diagnose für gültig hält. Soft-gelöschte
+ *  Zeilen zählen bewusst mit: Papierkorb-Inhalte sind noch keine Waisen. */
 const CONTENT_IDS = `(SELECT id FROM journal_entries
                       UNION ALL SELECT id FROM wiki_articles
-                      UNION ALL SELECT id FROM operations)`;
+                      UNION ALL SELECT id FROM operations
+                      UNION ALL SELECT id FROM tasks
+                      UNION ALL SELECT id FROM altars)`;
 
 async function runPeriodicCleanup(db: Database): Promise<void> {
   // Auto-purge trash items older than 30 days

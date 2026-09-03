@@ -18,6 +18,7 @@ import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { getCategoryEmoji } from '../wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId } from '../../lib/helpers';
+import { discardNewEntry } from '../../lib/discardNewEntry';
 import { formatEntryDate, formatEntryDateLong } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
@@ -33,8 +34,8 @@ export default function JournalView() {
   const { activeView, setActiveView, journalPrefs, setJournalPrefs } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, journalPrefs: s.journalPrefs, setJournalPrefs: s.setJournalPrefs }))
   );
-  const { entries, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useJournalStore(
-    useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
+  const { entries, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry, permanentlyDeleteEntry, getEntry } = useJournalStore(
+    useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, permanentlyDeleteEntry: s.permanentlyDeleteEntry, getEntry: s.getEntry }))
   );
   const pushUndo = useUndoStore((s) => s.push);
   const getWikiArticle = useWikiStore((s) => s.getArticle);
@@ -70,11 +71,14 @@ export default function JournalView() {
   // ueber den Key frisch vom letzten gespeicherten Stand mountet.
   const [editorEpoch, setEditorEpoch] = useState(0);
 
-  const { triggerAutoSave, cancelAutoSave, contentRef, handleContentChange } = useEntryEditor({
+  const { triggerAutoSave, cancelAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
     entityId: entry?.id,
     isEditing,
     ready: !!entry && loadedEntryId === entry.id,
     buildPatch: (content) => ({ title, content, tags }),
+    // Tags gehören dem Properties-Panel (sofort gespeichert) — Cancel setzt
+    // nur zurück, was der Editor selbst besitzt.
+    buildRestorePatch: (content) => ({ title, content }),
     update: updateEntry,
   });
 
@@ -125,7 +129,7 @@ export default function JournalView() {
 
   const handleNew = async () => {
     const e = await createEntry();
-    setActiveView({ type: 'journal', id: e.id, mode: 'edit' });
+    setActiveView({ type: 'journal', id: e.id, mode: 'edit', isNew: true });
   };
 
   const openCtxMenu = (e: React.MouseEvent, id: string) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); };
@@ -161,12 +165,23 @@ export default function JournalView() {
     setActiveView({ type: 'journal', id: entry.id, mode: 'view' });
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     cancelAutoSave();
+    if (activeView.isNew && entry) {
+      await discardNewEntry(entry.id, deleteEntry, permanentlyDeleteEntry);
+      setActiveView({ type: 'journal' });
+      return;
+    }
     if (entry) {
-      setTitle(entry.title);
+      // Nicht auf den Store-Stand zurück — nach dem ersten Debounce-Autosave
+      // IST der Store der editierte Stand. restoreOnCancel schreibt die beim
+      // Betreten des Edit-Modus gemerkten Editor-Felder zurück; die Setter
+      // hier fangen den Fall vor dem ersten Autosave ab (Store unverändert,
+      // Sync-Effekte laufen nicht). Panel-Felder (Tags) bleiben Store-Wahrheit.
+      const from = (await restoreOnCancel()) ?? { title: entry.title, content: entry.content };
+      setTitle(from.title);
       setTags(entry.tags ?? []);
-      contentRef.current = entry.content;
+      contentRef.current = from.content;
       setEditorEpoch((e) => e + 1);
     }
     setActiveView({ type: 'journal', id: entry!.id, mode: 'view' });
@@ -182,10 +197,6 @@ export default function JournalView() {
   };
 
   useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
-
-  const enterEditMode = () => {
-    if (!isEditing && entry) setActiveView({ type: 'journal', id: entry.id, mode: 'edit' });
-  };
 
   // List view
   if (!entry) {
@@ -467,7 +478,6 @@ export default function JournalView() {
     <EntryDetailFrame
       module="journal"
       isEditing={isEditing}
-      onEnterEditMode={enterEditMode}
       breadcrumbMeta={
         <>
           <span>{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</span>

@@ -12,7 +12,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { getDb } from './db';
+import { getDb, sweepDanglingLinks } from './db';
 import {
   addVault,
   getActiveDbFile,
@@ -758,6 +758,11 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   await insertTasks(db, d.tasks ?? []);
   if (d.taskLinks) await insertRows(db, 'task_links', d.taskLinks);
   if (d.links) await insertRows(db, 'links', d.links, true);
+
+  // Ein Teil-Replace (z. B. nur Tasks) kann Verknüpfungen des Bestands auf
+  // gerade ersetzte Ziele verwaisen lassen — und importierte links/task_links
+  // können auf abgewählte Typen zeigen. Gleicher Sweep wie beim Papierkorb.
+  await sweepDanglingLinks(db);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -909,6 +914,10 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   await insertTasks(db, tasks);
   await insertRows(db, 'task_links', taskLinks, true);
   await insertRows(db, 'links', links, true);
+
+  // Importierte links/task_links können auf Ziele zeigen, die der
+  // Typ-/Kategorie-Filter gerade abgewählt hat — wie in doReplace ausfegen.
+  await sweepDanglingLinks(db);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

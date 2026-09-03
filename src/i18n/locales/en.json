@@ -268,7 +268,6 @@
     "delete": "Delete",
     "edit": "Edit",
     "editing": "editing…",
-    "doubleClickEdit": "Double-click to edit",
     "confirm": "Confirm",
     "editLink": "Edit link",
     "removeLink": "Remove link",
@@ -521,6 +520,8 @@
     "tabJournal": "Journal",
     "tabWiki": "Wiki",
     "tabOperations": "Operations",
+    "tabTasks": "Tasks",
+    "tabAltar": "Altar",
     "noResults": "No entries found"
   },
   "importDestination": {

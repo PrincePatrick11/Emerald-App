@@ -50,19 +50,19 @@ export interface ModuleMeta {
   untitledKey: string;
   /**
    * Das Datenmodell-Gegenstück in `links.target_type`/Drag-Payloads —
-   * `'operation'` singular! tasks/altar sind keine Link-Ziele: null.
+   * `'operation'` singular! tasks/altar heißen dort `'task'`/`'altar'`.
    */
-  entryType: ContentType | null;
+  entryType: ContentType;
   /** Save/Cancel/Delete leben in der rechten Seitenleiste. */
   usesEditorSidebar: boolean;
 }
 
 export const MODULES: Record<EntryModuleId, ModuleMeta> = {
   journal: { id: 'journal', icon: BookOpen, navLabelKey: 'nav.journal', untitledKey: 'journal.untitled', entryType: 'journal', usesEditorSidebar: true },
-  tasks: { id: 'tasks', icon: CheckSquare, navLabelKey: 'nav.tasks', untitledKey: 'tasks.untitled', entryType: null, usesEditorSidebar: false },
+  tasks: { id: 'tasks', icon: CheckSquare, navLabelKey: 'nav.tasks', untitledKey: 'tasks.untitled', entryType: 'task', usesEditorSidebar: false },
   operations: { id: 'operations', icon: Wand2, navLabelKey: 'nav.operations', untitledKey: 'operations.untitled', entryType: 'operation', usesEditorSidebar: true },
   wiki: { id: 'wiki', icon: Library, navLabelKey: 'nav.wiki', untitledKey: 'wiki.untitled', entryType: 'wiki', usesEditorSidebar: true },
-  altar: { id: 'altar', icon: Flame, navLabelKey: 'nav.altar', untitledKey: 'altar.untitled', entryType: null, usesEditorSidebar: true },
+  altar: { id: 'altar', icon: Flame, navLabelKey: 'nav.altar', untitledKey: 'altar.untitled', entryType: 'altar', usesEditorSidebar: true },
 };
 
 export const MODULE_LIST: readonly ModuleMeta[] = ENTRY_MODULE_IDS.map((id) => MODULES[id]);

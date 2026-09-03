@@ -7,6 +7,7 @@ import { useUndoStore } from '../../store/undoStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
+import { useAltarStore } from '../../store/altarStore';
 import { generateId } from '../../lib/helpers';
 import { viewTypeForEntryType } from '../../lib/modules';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
@@ -54,6 +55,7 @@ export default function TasksView() {
   const journalEntries = useJournalStore((s) => s.entries);
   const wikiArticles = useWikiStore((s) => s.articles);
   const operations = useOperationStore((s) => s.operations);
+  const altars = useAltarStore((s) => s.altars);
 
   const catEditor = useCategoryEditor({ addCategory, updateCategory, deleteCategory, restoreCategory }, { defaultEmoji: '📋' });
 
@@ -220,8 +222,14 @@ export default function TasksView() {
     if (targetType === 'operation') {
       return operations.find((operation) => operation.id === targetId)?.title ?? 'Unknown';
     }
+    if (targetType === 'task') {
+      return tasks.find((task) => task.id === targetId)?.title ?? 'Unknown';
+    }
+    if (targetType === 'altar') {
+      return altars.find((altar) => altar.id === targetId)?.title ?? 'Unknown';
+    }
     return 'Unknown';
-  }, [journalEntries, wikiArticles, operations]);
+  }, [journalEntries, wikiArticles, operations, tasks, altars]);
 
   const renderTasksContent = () => (
     <>

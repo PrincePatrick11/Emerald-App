@@ -132,7 +132,7 @@ export default function AltarView() {
 
   const handleNew = async () => {
     const altar = await createAltar();
-    setActiveView({ type: 'altar', id: altar.id, mode: 'edit' });
+    setActiveView({ type: 'altar', id: altar.id, mode: 'edit', isNew: true });
   };
 
   const openAltar = async (altar: AltarRecord) => {
@@ -172,11 +172,6 @@ export default function AltarView() {
     await openAltar(altar);
   };
 
-  const enterEditMode = () => {
-    if (!activeAltar || isEditing) return;
-    setActiveView({ type: 'altar', id: activeAltar.id, mode: 'edit' });
-  };
-
   const handleDone = async () => {
     if (!activeAltar) return;
     thumbnailSavingRef.current = true;
@@ -197,6 +192,28 @@ export default function AltarView() {
 
   const handleCancel = async () => {
     if (!activeAltar) return;
+    // Ein nie mit „Fertig" bestätigter Altar wird beim Abbrechen verworfen —
+    // er sollte nie existieren. Kein Thumbnail-Capture für einen Altar, den es
+    // gleich nicht mehr gibt; das Flag hält den isEditing-Cleanup-Effekt davon
+    // ab (gleiches Muster wie handleDone: erst navigieren, Flag erst nach den
+    // Awaits zurücksetzen, damit der Cleanup beim Commit es noch gesetzt sieht).
+    if (activeView.isNew) {
+      thumbnailSavingRef.current = true;
+      const altarId = activeAltar.id;
+      setActiveView({ type: 'altar' });
+      // Sofort selbst löschen statt es dem activeView.id-Effekt zu überlassen:
+      // deleteAltar würde sonst je nach Flush-Reihenfolge für einen Frame den
+      // nächstbesten Altar aktiv setzen.
+      clearActiveAltar();
+      try {
+        await deleteAltar(altarId);
+      } catch (err) {
+        console.error('[handleCancel]', err);
+      } finally {
+        thumbnailSavingRef.current = false;
+      }
+      return;
+    }
     thumbnailSavingRef.current = true;
     const altarId = activeAltar.id;
     setTitle(activeAltar.title);
@@ -333,7 +350,7 @@ export default function AltarView() {
       </div>
 
       {!altarWindowFullscreen && (
-        <div className="px-6 pt-6 pb-4 border-b border-stone-700/30" onDoubleClick={enterEditMode}>
+        <div className="px-6 pt-6 pb-4 border-b border-stone-700/30">
           {isEditing ? (
             <input
               autoFocus
@@ -344,7 +361,7 @@ export default function AltarView() {
               placeholder={t('altar.untitled')}
             />
           ) : (
-            <h1 className="entry-view-title w-full cursor-text text-2xl font-semibold text-stone-100">
+            <h1 className="entry-view-title w-full text-2xl font-semibold text-stone-100">
               {activeAltar.title || t('altar.untitled')}
             </h1>
           )}

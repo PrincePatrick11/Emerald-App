@@ -511,13 +511,15 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   /* Gleiche Begruendung wie .filter-chip:focus-visible direkt darueber: die
-     tone-Buttons (sidebar-action-btn) und die Tab-/Segment-Toggles
-     (TabIconButton) sind fokussierbar, Noctis hat aber keine generische
-     button:focus-visible-Regel — ohne eigenen Ring blieben sie dort
-     tastatur-unsichtbar. */
+     tone-Buttons (sidebar-action-btn), die Tab-/Segment-Toggles
+     (TabIconButton) und die Link-Picker-Tabs sind fokussierbar, Noctis hat
+     aber keine generische button:focus-visible-Regel — ohne eigenen Ring
+     blieben sie dort tastatur-unsichtbar. */
   .sidebar-action-btn:focus-visible,
   .right-sidebar-tab-idle:focus-visible,
-  .right-sidebar-tab-active:focus-visible {
+  .right-sidebar-tab-active:focus-visible,
+  .link-picker-tab-idle:focus-visible,
+  .link-picker-tab-active:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
   }

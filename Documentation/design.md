@@ -183,12 +183,12 @@ because it is unclear whether `font-mono` is needed at all.*
 `html[data-theme='emerald-parchment'] button:focus-visible` (`index.css:1426`); Noctis has
 `:focus-visible` only for individual classes (`.window-control`, `.titlebar-menu-trigger`,
 `.menu-item`, `.link-picker-row`, `.filter-chip`, `.sidebar-action-btn`,
-`.right-sidebar-tab-idle`/`-active`). The last three cover `Button`'s tone mode (so
-`RightSidebarActionBar`'s buttons, among every other tone-mode use, now get a ring) and the
-sidebar's tab/segment toggles — the same per-class patch `.filter-chip` already had, not
-the missing generic rule. The four base `Button` variants (`primary`/`secondary`/`ghost`/
-`danger`) and any plain `<button>` written directly in a view still look unfocused in
-Noctis. *Cost: one rule, mirrored from Parchment.*
+`.right-sidebar-tab-idle`/`-active`, `.link-picker-tab-idle`/`-active`). The last four cover
+`Button`'s tone mode (so `RightSidebarActionBar`'s buttons, among every other tone-mode use,
+now get a ring) and the sidebar's and link picker's tab/segment toggles — the same per-class
+patch `.filter-chip` already had, not the missing generic rule. The four base `Button`
+variants (`primary`/`secondary`/`ghost`/`danger`) and any plain `<button>` written directly
+in a view still look unfocused in Noctis. *Cost: one rule, mirrored from Parchment.*
 
 **9. The entry actions live exclusively in a collapsible surface.**
 Edit/Done/Delete/Cancel exist only in the right sidebar. Collapsing it mid-edit leaves no
@@ -202,6 +202,12 @@ is `min-h-14` and wraps onto a second row below 226px panel width, while
 `RightSidebarActionBar` stays `h-14`. **Deliberate:** growing the right bar too would mean
 enlarging it for a reason that has nothing to do with its own content. The point is
 recorded here so the deviation is not reported as a bug.
+
+**11. `LinkPickerModal`'s six tabs are a hand-written button, not `TabIconButton`.**
+`TabIconButton`'s active state is wired to the stone tone the two sidebars use; the picker
+needs the jade tone the modal is themed in instead, and the component has no tone variant
+for that yet. The deviation is commented at the definition (`LinkPickerModal.tsx`).
+*Cost: add a `tone` prop to `TabIconButton`, then switch the picker over.*
 
 ---
 

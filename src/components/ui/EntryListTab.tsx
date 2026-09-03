@@ -29,8 +29,6 @@ export interface EntryListTabProps<T> {
   onOpen?: (item: T) => void;
   onOpenNewTab?: (item: T) => void;
   onDragStart?: (item: T) => void;
-  /** Per-item drag gate — lets a mixed list keep the grab cursor off rows that cannot be dragged. */
-  canDrag?: (item: T) => boolean;
   onRename: (item: T, newTitle: string) => void | Promise<void>;
   contextMenuActions: (item: T, startRename: () => void) => ContextMenuAction[];
   emptyMessage: string;
@@ -42,7 +40,7 @@ export interface EntryListTabProps<T> {
 }
 
 export default function EntryListTab<T>({
-  items, getId, getTitle, getDateStr, getIcon, isActive, onOpen, onOpenNewTab, onDragStart, canDrag,
+  items, getId, getTitle, getDateStr, getIcon, isActive, onOpen, onOpenNewTab, onDragStart,
   onRename, contextMenuActions, emptyMessage, onCreate, createTitle, renderRow,
 }: EntryListTabProps<T>) {
   const { t } = useTranslation();
@@ -134,7 +132,7 @@ export default function EntryListTab<T>({
               const dateStr = getDateStr?.(item);
               const icon = getIcon?.(item);
               const active = isActive?.(item) ?? false;
-              const dragHandler = onDragStart && (canDrag?.(item) ?? true) ? onDragStart : undefined;
+              const dragHandler = onDragStart;
 
               if (renamingId === id) {
                 return (

@@ -8,6 +8,7 @@ import CategoryHeaderRow from '../ui/CategoryHeaderRow';
 import CategoryAddModal from '../ui/CategoryAddModal';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
+import { discardNewEntry } from '../../lib/discardNewEntry';
 import { categoryLabel } from '../../lib/categories';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
@@ -29,8 +30,8 @@ export default function OperationsView() {
   const { activeView, setActiveView, openViewInNewTab, operationsPrefs, setOperationsPrefs } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab, operationsPrefs: s.operationsPrefs, setOperationsPrefs: s.setOperationsPrefs }))
   );
-  const { operations, categories, createOperation, duplicateOperation, updateOperation, deleteOperation, restoreOperation, getOperation, addCategory, updateCategory, deleteCategory, restoreCategory } = useOperationStore(
-    useShallow((s) => ({ operations: s.operations, categories: s.categories, createOperation: s.createOperation, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation, getOperation: s.getOperation, addCategory: s.addCategory, updateCategory: s.updateCategory, deleteCategory: s.deleteCategory, restoreCategory: s.restoreCategory }))
+  const { operations, categories, createOperation, duplicateOperation, updateOperation, deleteOperation, restoreOperation, permanentlyDeleteOperation, getOperation, addCategory, updateCategory, deleteCategory, restoreCategory } = useOperationStore(
+    useShallow((s) => ({ operations: s.operations, categories: s.categories, createOperation: s.createOperation, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation, permanentlyDeleteOperation: s.permanentlyDeleteOperation, getOperation: s.getOperation, addCategory: s.addCategory, updateCategory: s.updateCategory, deleteCategory: s.deleteCategory, restoreCategory: s.restoreCategory }))
   );
   const pushUndo = useUndoStore((s) => s.push);
 
@@ -67,11 +68,14 @@ export default function OperationsView() {
 
   const [editorEpoch, setEditorEpoch] = useState(0);
 
-  const { triggerAutoSave, cancelAutoSave, contentRef, handleContentChange } = useEntryEditor({
+  const { triggerAutoSave, cancelAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
     entityId: operation?.id,
     isEditing,
     ready: !!operation && loadedOperationId === operation.id,
     buildPatch: (content) => ({ title, content, category_id: categoryId, tags, is_active: isActive, end_date: endDate || null, version: version || null }),
+    // Kategorie, Tags, Status, Enddatum, Version gehören dem Properties-Panel
+    // (sofort gespeichert) — Cancel setzt nur zurück, was der Editor besitzt.
+    buildRestorePatch: (content) => ({ title, content }),
     update: updateOperation,
   });
 
@@ -134,13 +138,13 @@ export default function OperationsView() {
     const defaultCat = categories[0];
     if (!defaultCat) return;
     const op = await createOperation(defaultCat.id);
-    setActiveView({ type: 'operations', id: op.id, mode: 'edit' });
+    setActiveView({ type: 'operations', id: op.id, mode: 'edit', isNew: true });
   };
 
   // Der „+"-Knopf am Kategorienkopf — wie handleCreateTask(cat.id) in TasksView.
   const handleNewInCategory = async (categoryId: string) => {
     const op = await createOperation(categoryId);
-    setActiveView({ type: 'operations', id: op.id, mode: 'edit' });
+    setActiveView({ type: 'operations', id: op.id, mode: 'edit', isNew: true });
   };
 
   const openCtxMenu = (e: React.MouseEvent, id: string) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); };
@@ -176,16 +180,27 @@ export default function OperationsView() {
     setActiveView({ type: 'operations', id: operation.id, mode: 'view' });
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     cancelAutoSave();
+    if (activeView.isNew && operation) {
+      await discardNewEntry(operation.id, deleteOperation, permanentlyDeleteOperation);
+      setActiveView({ type: 'operations' });
+      return;
+    }
     if (operation) {
-      setTitle(operation.title);
+      // Nicht auf den Store-Stand zurück — nach dem ersten Debounce-Autosave
+      // IST der Store der editierte Stand. restoreOnCancel schreibt die beim
+      // Betreten des Edit-Modus gemerkten Editor-Felder zurück; die Setter
+      // hier fangen den Fall vor dem ersten Autosave ab (Store unverändert,
+      // Sync-Effekte laufen nicht). Panel-Felder bleiben Store-Wahrheit.
+      const from = (await restoreOnCancel()) ?? { title: operation.title, content: operation.content };
+      setTitle(from.title);
       setCategoryId(operation.category_id);
       setTags(operation.tags ?? []);
       setIsActive(operation.is_active ?? true);
       setEndDate(operation.end_date ?? '');
       setVersion(operation.version ?? '');
-      contentRef.current = operation.content;
+      contentRef.current = from.content;
       setEditorEpoch((e) => e + 1);
     }
     setActiveView({ type: 'operations', id: operation!.id, mode: 'view' });
@@ -202,10 +217,6 @@ export default function OperationsView() {
 
   // Sigil operations delegate rendering (and editActions registration) to OperationSigilView.
   useEditActions(isEditing && !isSigilOperation, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
-
-  const enterEditMode = () => {
-    if (!isEditing && operation) setActiveView({ type: 'operations', id: operation.id, mode: 'edit' });
-  };
 
   const getCatById = (id: string) => categories.find((c) => c.id === id);
 
@@ -520,7 +531,6 @@ export default function OperationsView() {
     <EntryDetailFrame
       module="operations"
       isEditing={isEditing}
-      onEnterEditMode={enterEditMode}
       breadcrumbMeta={
         <>
           {isImageIcon(operationIcon)

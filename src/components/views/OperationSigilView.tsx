@@ -15,6 +15,7 @@ import { useEditActions } from '../../hooks/useEditActions';
 import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
 import { generateId, isImageIcon } from '../../lib/helpers';
+import { discardNewEntry } from '../../lib/discardNewEntry';
 import { categoryLabel } from '../../lib/categories';
 import { formatEntryDate } from '../../lib/formatDate';
 import { editorSavesSuspended } from '../../lib/editorLock';
@@ -231,9 +232,11 @@ function DrawingCanvas({
 export default function OperationSigilView({ operation }: { operation: Operation }) {
   const { t } = useTranslation();
   const setActiveView = useUIStore((s) => s.setActiveView);
+  const isNewOperation = useUIStore((s) => s.activeView.isNew === true);
   const updateOperation = useOperationStore((s) => s.updateOperation);
   const deleteOperation = useOperationStore((s) => s.deleteOperation);
   const restoreOperation = useOperationStore((s) => s.restoreOperation);
+  const permanentlyDeleteOperation = useOperationStore((s) => s.permanentlyDeleteOperation);
   const categories = useOperationStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
 
@@ -300,6 +303,31 @@ export default function OperationSigilView({ operation }: { operation: Operation
     ...pendingRef.current,
     thumbnail_data: await sigilThumbnail(pendingRef.current.drawing_data),
   }), []);
+
+  // Der Editor-Stand beim Betreten des Edit-Modus — Cancel kann sich nicht auf
+  // den Store verlassen, der 1s-Autosave hat ihn dann längst überschrieben
+  // (gleiches Muster wie useEntryEditor.restoreOnCancel). Nur die Felder, die
+  // dieser View selbst editiert: description und target_reveal_date pflegt
+  // das Properties-Panel (sofort gespeichert), thumbnail_data wird beim
+  // Zurückschreiben aus der Zeichnung abgeleitet. Beim Einstieg spiegelt
+  // pendingRef noch exakt das Gespeicherte.
+  const editorFields = (p: typeof pendingRef.current) => ({
+    title: p.title,
+    intention_text: p.intention_text,
+    letter_bank: p.letter_bank,
+    implemented_letters: p.implemented_letters,
+    drawing_data: p.drawing_data,
+  });
+  const editBaselineRef = useRef<{ id: string; patch: ReturnType<typeof editorFields> } | null>(null);
+  useEffect(() => {
+    if (isEditing && hydratedId === operation.id) {
+      if (editBaselineRef.current?.id !== operation.id) {
+        editBaselineRef.current = { id: operation.id, patch: editorFields(pendingRef.current) };
+      }
+    } else {
+      editBaselineRef.current = null;
+    }
+  }, [isEditing, hydratedId, operation.id]);
 
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const triggerAutoSave = useCallback(() => {
@@ -394,15 +422,43 @@ export default function OperationSigilView({ operation }: { operation: Operation
     setActiveView({ type: 'operations', id: operation.id, mode: 'view' });
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    setTitle(operation.title);
+    if (isNewOperation) {
+      await discardNewEntry(operation.id, deleteOperation, permanentlyDeleteOperation);
+      setActiveView({ type: 'operations' });
+      return;
+    }
+    // Nicht auf den Store-Stand zurück — nach dem ersten Autosave IST der
+    // Store der editierte Stand. Die beim Einstieg gemerkte Baseline der
+    // Editor-Felder wird zurückgeschrieben (nur, wenn sich etwas geändert
+    // hat); scheitert das, geht es trotzdem in den View-Modus, auf Store-Stand.
+    let baseline = editBaselineRef.current?.id === operation.id ? editBaselineRef.current.patch : null;
+    if (baseline && JSON.stringify(baseline) !== JSON.stringify(editorFields(pendingRef.current))) {
+      try {
+        await updateOperation(operation.id, {
+          ...baseline,
+          thumbnail_data: await sigilThumbnail(baseline.drawing_data),
+        });
+      } catch (e) {
+        console.error('[OperationSigilView] restore on cancel failed:', e);
+        baseline = null;
+      }
+    }
+    const from = baseline ?? {
+      title: operation.title,
+      intention_text: operation.intention_text ?? '',
+      letter_bank: operation.letter_bank ?? [],
+      implemented_letters: operation.implemented_letters ?? [],
+      drawing_data: operation.drawing_data ?? null,
+    };
+    setTitle(from.title);
     setDescription(operation.description ?? '');
     setTargetRevealDate(operation.target_reveal_date ?? '');
-    setIntentionText(operation.intention_text ?? '');
-    setLetterBank(operation.letter_bank ?? []);
-    setImplementedLetters(operation.implemented_letters ?? []);
-    const nextDrawing = operation.drawing_data ?? null;
+    setIntentionText(from.intention_text);
+    setLetterBank(from.letter_bank);
+    setImplementedLetters(from.implemented_letters);
+    const nextDrawing = from.drawing_data;
     setDrawingData(nextDrawing);
     setDrawingHistory(nextDrawing ? [null, nextDrawing] : [null]);
     setHistoryIndex(nextDrawing ? 1 : 0);
@@ -418,11 +474,6 @@ export default function OperationSigilView({ operation }: { operation: Operation
   };
 
   useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
-
-  const enterEditMode = () => {
-    if (isEditing || operation.is_loaded) return;
-    setActiveView({ type: 'operations', id: operation.id, mode: 'edit' });
-  };
 
   const handleCanvasChange = useCallback((dataUrl: string | null) => {
     const currentHistory = drawingHistoryRef.current;
@@ -519,7 +570,6 @@ export default function OperationSigilView({ operation }: { operation: Operation
     <EntryDetailFrame
       module="operations"
       isEditing={isEditing}
-      onEnterEditMode={enterEditMode}
       breadcrumbMeta={
         <>
           {/* Bild-Icon-Support wie im Operations-Detail — vorher zeigte der

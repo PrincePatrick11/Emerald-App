@@ -83,9 +83,10 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // source_id/target_id sind polymorph — sie zeigen je nach *_type auf
-  // journal_entries, wiki_articles oder operations. Ein Foreign Key ist hier
-  // nicht deklarierbar; checkIntegrity() prüft die Beziehung stattdessen.
+  // source_id/target_id sind polymorph — Quellen sind journal_entries,
+  // wiki_articles oder operations (die Module mit Editor); Ziele zusätzlich
+  // tasks und altars. Ein Foreign Key ist hier nicht deklarierbar;
+  // checkIntegrity() prüft die Beziehung stattdessen.
   links: `
     CREATE TABLE links (
       source_id TEXT NOT NULL,
@@ -491,6 +492,8 @@ export async function checkIntegrity(db: Database): Promise<Orphan[]> {
     journal: 'journal_entries',
     wiki: 'wiki_articles',
     operation: 'operations',
+    task: 'tasks',
+    altar: 'altars',
   };
 
   for (const [type, target] of Object.entries(contentTables)) {

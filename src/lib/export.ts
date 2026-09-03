@@ -7,7 +7,10 @@ import DOMPurify from 'dompurify';
 import type { ExportData, ChipData } from './exportData';
 import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
+import { useTaskStore } from '../store/taskStore';
+import { useAltarStore } from '../store/altarStore';
 import { getCategoryEmoji } from '../components/wiki/WikiList';
+import { DEFAULT_ENTRY_EMOJI } from '../components/editor/SuggestionList';
 import i18n from '../i18n';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -62,6 +65,8 @@ function resolveInternalLinkIcons(html: string): string {
 
   const { articles, wikiCategories } = useWikiStore.getState();
   const { operations, categories: opCats } = useOperationStore.getState();
+  const { tasks, categories: taskCats } = useTaskStore.getState();
+  const { altars } = useAltarStore.getState();
 
   for (const el of links) {
     // Only fill missing icons
@@ -87,6 +92,16 @@ function resolveInternalLinkIcons(html: string): string {
         const cat = opCats.find(c => c.id === op.category_id);
         icon = op.icon ?? cat?.emoji ?? '⚡';
       }
+    } else if (entryType === 'task') {
+      // Task-Chips aus Sidebar-Drags tragen kein data-icon — wie im
+      // Live-Lookup des Editors: Kategorie-Emoji, sonst der Chip-Fallback.
+      const task = tasks.find(t => t.id === id);
+      if (task) icon = taskCats.find(c => c.id === task.category_id)?.emoji ?? DEFAULT_ENTRY_EMOJI.task;
+    } else if (entryType === 'altar') {
+      // Altar-Chips speichern icon_data bewusst nie in den Attrs (data-URL);
+      // erst hier im Export wird es aufgelöst.
+      const altar = altars.find(a => a.id === id);
+      if (altar) icon = altar.icon_data ?? DEFAULT_ENTRY_EMOJI.altar;
     }
     if (icon) el.setAttribute('data-icon', icon);
   }

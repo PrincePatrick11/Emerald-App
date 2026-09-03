@@ -112,7 +112,8 @@ interface AllRow {
   open: () => void;
   /** Absent for Tasks, which have no standalone view to open in a tab. */
   openNewTab?: () => void;
-  /** Absent for Tasks and Altars, which are not drag sources. */
+  /** Optional nur wegen der Typ-Erasure über EntryListTabProps — inzwischen
+   *  liefern alle fünf Configs ein onDragStart. */
   dragStart?: () => void;
   rename: (title: string) => void | Promise<void>;
   actions: (startRename: () => void) => ContextMenuAction[];
@@ -169,7 +170,6 @@ function AllList() {
       onOpen={(r) => r.open()}
       onOpenNewTab={(r) => r.openNewTab?.()}
       onDragStart={(r) => r.dragStart?.()}
-      canDrag={(r) => Boolean(r.dragStart)}
       onRename={(r, title) => r.rename(title)}
       contextMenuActions={(r, startRename) => r.actions(startRename)}
       emptyMessage={t('sidebar.allEmpty')}
@@ -190,7 +190,7 @@ function useJournalConfig(): EntryListTabProps<JournalEntry> {
 
   const handleNewJournalEntry = async () => {
     const entry = await createEntry();
-    setActiveView({ type: 'journal', id: entry.id, mode: 'edit' });
+    setActiveView({ type: 'journal', id: entry.id, mode: 'edit', isNew: true });
   };
 
   const handleDuplicate = async (entry: (typeof entries)[number]) => {
@@ -249,7 +249,7 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
     const categoryId = categories[0]?.id;
     if (!categoryId) return;
     const op = await createOperation(categoryId);
-    setActiveView({ type: 'operations', id: op.id, mode: 'edit' });
+    setActiveView({ type: 'operations', id: op.id, mode: 'edit', isNew: true });
   };
 
   const handleDuplicate = async (op: (typeof operations)[number]) => {
@@ -318,7 +318,7 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
   const handleNewArticle = async () => {
     const category = wikiCategories[0]?.id ?? 'other';
     const article = await createArticle(category);
-    setActiveView({ type: 'wiki', id: article.id, mode: 'edit' });
+    setActiveView({ type: 'wiki', id: article.id, mode: 'edit', isNew: true });
   };
 
   const handleDuplicate = async (article: (typeof articles)[number]) => {
@@ -384,7 +384,7 @@ function useAltarConfig(): EntryListTabProps<AltarRecord> {
 
   const handleNewAltar = async () => {
     const altar = await createAltar();
-    setActiveView({ type: 'altar', id: altar.id, mode: 'edit' });
+    setActiveView({ type: 'altar', id: altar.id, mode: 'edit', isNew: true });
   };
 
   const sorted = altars.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at));
@@ -400,6 +400,7 @@ function useAltarConfig(): EntryListTabProps<AltarRecord> {
     isActive: (a) => activeView.id === a.id,
     onOpen: (a) => setActiveView({ type: 'altar', id: a.id, mode: 'view' }),
     onOpenNewTab: (a) => openViewInNewTab({ type: 'altar', id: a.id, mode: 'view' }),
+    onDragStart: (a) => setDragItem({ id: a.id, entryType: 'altar', label: a.title }),
     onRename: (a, title) => updateAltar(a.id, { title }),
     contextMenuActions: (a, startRename) => [
       { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'altar', id: a.id, mode: 'view' }) },
@@ -431,6 +432,11 @@ function useTasksConfig(): EntryListTabProps<Task> {
   /** Aufgaben haben keine eigene Seite; die id waehlt die Zeile in `TasksView`
    *  aus, die sich daraufhin sichtbar macht und markiert. */
   const openTask = (id: string) => setActiveView({ type: 'tasks', id });
+
+  // Eine Payload für beide Drag-Stellen (Standard-Config fürs „Alle"-Tab und
+  // der Hand-Griff im renderRow unten), damit sie nicht auseinanderdriften.
+  const taskDragItem = (task: Task) =>
+    setDragItem({ id: task.id, entryType: 'task', label: task.title, category: catById[task.category_id]?.emoji });
 
   const handleNewTask = async () => {
     const task = await createTask(FALLBACK_CATEGORY.tasks);
@@ -466,6 +472,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
       : <Square size={16} className="flex-shrink-0 text-stone-600" />),
     isActive: (task) => activeView.id === task.id,
     onOpen: (task) => openTask(task.id),
+    onDragStart: taskDragItem,
     onRename: (task, title) => updateTask(task.id, { title }),
     contextMenuActions: (task, startRename) => [
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
@@ -505,7 +512,20 @@ function useTasksConfig(): EntryListTabProps<Task> {
           >
             {task.completed ? <CheckSquare size={16} /> : <Square size={16} />}
           </button>
-          <button onClick={() => openTask(task.id)} className="flex-1 min-w-0 text-left">
+          <button
+            // renderRow umgeht EntryListTabs zentrale Drag-Verdrahtung, daher
+            // hier derselbe pointerdown-Griff wie dort: setzt nur den Drag-
+            // Kanal, der Klick zum Öffnen feuert weiterhin normal. Den Kanal
+            // räumt erst der pointerup eines gemounteten RichEditors — nach
+            // einem blossen Klick bleibt der Wert folgenlos stehen.
+            onPointerDown={(e) => {
+              if (e.button !== 0) return;
+              e.preventDefault();
+              taskDragItem(task);
+            }}
+            onClick={() => openTask(task.id)}
+            className="flex-1 min-w-0 text-left cursor-grab active:cursor-grabbing"
+          >
             <div className={`truncate ${task.completed ? 'line-through text-stone-500' : ''}`}>{task.title}</div>
             {dateStr && <div className="text-xs text-stone-600 mt-0.5">{dateStr}</div>}
           </button>

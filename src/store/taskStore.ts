@@ -5,7 +5,7 @@ import { FALLBACK_CATEGORY, reassignCategoryContent } from '../lib/schema';
 import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, toInt, type DbRow } from '../lib/row';
-import type { Task, TaskCategory, TaskLink } from '../types';
+import type { ContentType, Task, TaskCategory, TaskLink } from '../types';
 
 function collectDescendantIds(tasks: Task[], parentId: string): string[] {
   const ids: string[] = [];
@@ -45,7 +45,7 @@ interface TaskState {
   permanentlyDeleteCategory: (id: string) => Promise<void>;
   getCategory: (id: string) => TaskCategory | undefined;
 
-  addLink: (taskId: string, targetId: string, targetType: 'journal' | 'wiki' | 'operation') => Promise<void>;
+  addLink: (taskId: string, targetId: string, targetType: ContentType) => Promise<void>;
   removeLink: (id: string) => Promise<void>;
   getLinksForTask: (taskId: string) => TaskLink[];
   getLinksForTarget: (targetId: string) => TaskLink[];
@@ -165,6 +165,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     for (const tid of idsToDelete) {
       await db.execute('UPDATE tasks SET deleted_at=$1 WHERE id=$2', [now, tid]);
     }
+    // Nur die eigene (task_id-)Seite: der Soft-Delete ist umkehrbar, und
+    // Zeilen, die auf die Aufgabe ZEIGEN (task_links.target_id, links),
+    // bleiben stehen — sweepDanglingLinks zählt Papierkorb-Inhalte als
+    // gültig, endgültig räumt erst permanentlyDeleteTask ab.
     for (const tid of idsToDelete) {
       await db.execute('DELETE FROM task_links WHERE task_id=$1', [tid]);
     }
@@ -187,12 +191,15 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const idsToDelete = collectDescendantIds(get().tasks, id);
 
     for (const tid of idsToDelete) {
-      await db.execute('DELETE FROM task_links WHERE task_id=$1', [tid]);
+      await db.execute('DELETE FROM task_links WHERE task_id=$1 OR target_id=$1', [tid]);
+      // Aufgaben sind Link-Ziele der Editoren (nie Quellen) — wie bei
+      // journal/wikiStore räumt das endgültige Löschen die links-Zeilen mit ab.
+      await db.execute('DELETE FROM links WHERE target_id=$1', [tid]);
       await db.execute('DELETE FROM tasks WHERE id=$1', [tid]);
     }
     set((s) => ({
       tasks: s.tasks.filter((t) => !idsToDelete.includes(t.id)),
-      links: s.links.filter((l) => !idsToDelete.includes(l.task_id)),
+      links: s.links.filter((l) => !idsToDelete.includes(l.task_id) && !idsToDelete.includes(l.target_id)),
     }));
   },
 
@@ -267,7 +274,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   getCategory: (id: string) => get().categories.find((c) => c.id === id),
 
-  addLink: async (taskId: string, targetId: string, targetType: 'journal' | 'wiki' | 'operation') => {
+  addLink: async (taskId: string, targetId: string, targetType: ContentType) => {
     const db = await getDb();
     const id = generateId();
     await db.execute(

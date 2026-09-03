@@ -73,13 +73,15 @@ Eight relations are declared, with deliberately chosen delete behaviour rather t
 
 ### What foreign keys cannot cover
 
-`links.source_id` / `links.target_id` and `task_links.target_id` are **polymorphic** — the accompanying `*_type` column decides whether the target is a journal entry, a wiki article, or an operation. SQL has no polymorphic foreign key. The same applies to the JSON-array references (`routines.operation_ids`, `journal_entries.linked_wiki_ids`) and to the loose optional ID columns `paradigm_id`, `bannung_type_wiki_id`, `meditation_type_wiki_id`, `charging_technique_wiki_id`. (The `tags` columns are also unconstrained JSON arrays, but they hold tag *names*, not IDs — there is nothing to orphan-check them against.)
+`links.source_id` / `links.target_id` and `task_links.target_id` are **polymorphic** — the accompanying `*_type` column decides what kind of row the target is. SQL has no polymorphic foreign key. The same applies to the JSON-array references (`routines.operation_ids`, `journal_entries.linked_wiki_ids`) and to the loose optional ID columns `paradigm_id`, `bannung_type_wiki_id`, `meditation_type_wiki_id`, `charging_technique_wiki_id`. (The `tags` columns are also unconstrained JSON arrays, but they hold tag *names*, not IDs — there is nothing to orphan-check them against.)
+
+`source_type`/`source_id` on `links` are narrower than the target side: only Journal, Wiki, and Operations have an editor to type `[[` into, so a link can only *originate* from one of those three (`source_type: 'journal' | 'wiki' | 'operation'`, matching `BacklinkEntry.type` in `src/lib/links.ts`). A link's *target* — on `links` and on `task_links` — can additionally be a Task or an Altar, both of which are link destinations only (`target_type`/`ContentType`: `'journal' | 'wiki' | 'operation' | 'task' | 'altar'`).
 
 These are exactly the places where orphans accumulate, and they are unguarded. Two things stand in for the missing constraints:
 
-`checkIntegrity(db)` in `schema.ts` reports orphans across the ID-bearing JSON arrays (`journal_entries.linked_operation_ids` / `linked_wiki_ids`, `routines.operation_ids` / `wiki_ids`), which it parses in JavaScript, since SQL cannot. It is a diagnostic: it scans whole tables and is not called on the production path.
+`checkIntegrity(db)` in `schema.ts` reports orphans across the ID-bearing JSON arrays (`journal_entries.linked_operation_ids` / `linked_wiki_ids`, `routines.operation_ids` / `wiki_ids`), which it parses in JavaScript, since SQL cannot. It is a diagnostic: it scans whole tables and is not called on the production path. Its `contentTables` map (deciding which table a `*_type` value points at) has to be kept in step by hand with `CONTENT_IDS` below — the two are separate, hand-maintained lists over the same five types.
 
-`sweepDanglingLinks(db)` in `db.ts` deletes link rows whose endpoint no longer exists. Both the 30-day purge and emptying the trash call it, so the two paths cannot drift; before, only the trash cleaned up, and only for journal and wiki entries.
+`sweepDanglingLinks(db)` in `db.ts` deletes `links`/`task_links` rows whose endpoint no longer exists, checked against `CONTENT_IDS` (a `UNION ALL` of live ids across `journal_entries`, `wiki_articles`, `operations`, `tasks`, `altars` — soft-deleted rows count as valid, since trashed content isn't an orphan yet). Every trash-emptying and permanent-delete path that can leave a link dangling calls it: the 30-day purge, `altarStore.deleteAltar` and `taskStore.permanentlyDeleteTask` additionally delete the rows that point *at* them directly (`links`/`task_links WHERE target_id = …`) before the row itself goes, and `dbBackup`'s `doReplace`/`doMerge` call `sweepDanglingLinks` once the import finishes, since a partial restore (e.g. Tasks only) or an imported link row can point at something the import didn't bring back. A task's own *soft* delete only removes the `task_links` rows where the task is the source (`task_links.task_id`) — rows that point at it as a target are left standing, matching the rule that trashed content isn't yet an orphan; the permanent delete removes both directions.
 
 ### Deleting a category never deletes its content
 
@@ -120,9 +122,9 @@ Internal `[[wiki-style]]` references between entries. `source_id` and `target_id
 | Column | Type | Notes |
 |---|---|---|
 | source_id | TEXT | part of composite PK |
-| source_type | TEXT | `'journal'` \| `'wiki'` \| `'operation'` |
+| source_type | TEXT | `'journal'` \| `'wiki'` \| `'operation'` — only the modules with an editor can be a link source |
 | target_id | TEXT | part of composite PK |
-| target_type | TEXT | as above |
+| target_type | TEXT | `'journal'` \| `'wiki'` \| `'operation'` \| `'task'` \| `'altar'` |
 
 ### routines
 
@@ -316,14 +318,14 @@ The obsolete `scale` column, from which older versions derived a fallback size, 
 
 ### task_links
 
-Links a task to a journal entry, wiki article, or operation. `target_id` is polymorphic — no foreign key possible.
+Links a task to a journal entry, wiki article, operation, another task, or an altar. `target_id` is polymorphic — no foreign key possible.
 
 | Column | Type | Notes |
 |---|---|---|
 | id | TEXT PK | UUID |
 | task_id | TEXT | **FK → tasks.id**, CASCADE |
 | target_id | TEXT | polymorphic |
-| target_type | TEXT | `'journal'` \| `'wiki'` \| `'operation'` |
+| target_type | TEXT | `'journal'` \| `'wiki'` \| `'operation'` \| `'task'` \| `'altar'` |
 
 `UNIQUE (task_id, target_id, target_type)` — the table previously allowed duplicate rows for the same link.
 

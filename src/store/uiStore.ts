@@ -113,7 +113,10 @@ function normalizeSavedTab(tab: unknown): OpenTab | null {
   // isViewId: localStorage kann Tab-Typen aus älteren Versionen tragen —
   // die fallen hier sauber weg, statt als Geister-View zu rendern.
   if (!candidate.view?.type || !isViewId(candidate.view.type)) return null;
-  return { id: candidate.id ?? candidate.key ?? createTabId(), view: candidate.view };
+  // isNew ist ein Sitzungs-Flag, kein Tab-Zustand: überlebte es den Neustart,
+  // würde Cancel einen längst autogespeicherten Eintrag endgültig löschen.
+  const { isNew: _isNew, ...view } = candidate.view;
+  return { id: candidate.id ?? candidate.key ?? createTabId(), view };
 }
 
 function loadSavedTabs(): { tabs: OpenTab[]; activeTabId: string | null } {
@@ -146,9 +149,13 @@ export function isAltarFullscreen(s: Pick<UIState, 'activeView' | 'altarWindowFu
 
 function withNavigationState(s: UIState, view: ActiveView) {
   const current = s.history[s.historyIndex];
-  const isNewPage = !current || current.type !== view.type || current.id !== view.id;
-  if (!isNewPage) return { activeView: view };
-  const history = [...s.history.slice(0, s.historyIndex + 1), view];
+  const isDifferentPage = !current || current.type !== view.type || current.id !== view.id;
+  if (!isDifferentPage) return { activeView: view };
+  // isNew nicht in die History: käme man per Back auf die frische Edit-View
+  // zurück, würde Cancel einen längst autogespeicherten Eintrag löschen —
+  // gleiche Regel wie beim Tab-Restore in normalizeSavedTab.
+  const { isNew: _isNew, ...historyView } = view;
+  const history = [...s.history.slice(0, s.historyIndex + 1), historyView];
   return { activeView: view, history, historyIndex: history.length - 1 };
 }
 

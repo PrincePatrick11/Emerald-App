@@ -8,6 +8,7 @@ import CategoryHeaderRow from '../ui/CategoryHeaderRow';
 import CategoryAddModal from '../ui/CategoryAddModal';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
+import { discardNewEntry } from '../../lib/discardNewEntry';
 import { categoryLabel } from '../../lib/categories';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
@@ -31,8 +32,8 @@ export default function WikiView() {
   const { activeView, setActiveView, openViewInNewTab, wikiPrefs, setWikiPrefs } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab, wikiPrefs: s.wikiPrefs, setWikiPrefs: s.setWikiPrefs }))
   );
-  const { articles, wikiCategories, createArticle, duplicateArticle, updateArticle, deleteArticle, restoreArticle, getArticle, addWikiCategory, updateWikiCategory, deleteWikiCategory, restoreWikiCategory, } = useWikiStore(
-    useShallow((s) => ({ articles: s.articles, wikiCategories: s.wikiCategories, createArticle: s.createArticle, duplicateArticle: s.duplicateArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle, getArticle: s.getArticle, addWikiCategory: s.addWikiCategory, updateWikiCategory: s.updateWikiCategory, deleteWikiCategory: s.deleteWikiCategory, restoreWikiCategory: s.restoreWikiCategory }))
+  const { articles, wikiCategories, createArticle, duplicateArticle, updateArticle, deleteArticle, restoreArticle, permanentlyDeleteArticle, getArticle, addWikiCategory, updateWikiCategory, deleteWikiCategory, restoreWikiCategory, } = useWikiStore(
+    useShallow((s) => ({ articles: s.articles, wikiCategories: s.wikiCategories, createArticle: s.createArticle, duplicateArticle: s.duplicateArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle, permanentlyDeleteArticle: s.permanentlyDeleteArticle, getArticle: s.getArticle, addWikiCategory: s.addWikiCategory, updateWikiCategory: s.updateWikiCategory, deleteWikiCategory: s.deleteWikiCategory, restoreWikiCategory: s.restoreWikiCategory }))
   );
   const pushUndo = useUndoStore((s) => s.push);
 
@@ -56,11 +57,14 @@ export default function WikiView() {
 
   const [editorEpoch, setEditorEpoch] = useState(0);
 
-  const { triggerAutoSave, cancelAutoSave, contentRef, handleContentChange } = useEntryEditor({
+  const { triggerAutoSave, cancelAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
     entityId: article?.id,
     isEditing,
     ready: !!article && loadedArticleId === article.id,
     buildPatch: (content) => ({ title, content, category_id: category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined }),
+    // Kategorie, Tags, Cover, Icon gehören dem Properties-Panel (sofort
+    // gespeichert) — Cancel setzt nur zurück, was der Editor selbst besitzt.
+    buildRestorePatch: (content) => ({ title, content }),
     update: updateArticle,
   });
 
@@ -124,15 +128,26 @@ export default function WikiView() {
     setActiveView({ type: 'wiki', id: article.id, mode: 'view' });
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     cancelAutoSave();
+    if (activeView.isNew && article) {
+      await discardNewEntry(article.id, deleteArticle, permanentlyDeleteArticle);
+      setActiveView({ type: 'wiki' });
+      return;
+    }
     if (article) {
-      setTitle(article.title);
+      // Nicht auf den Store-Stand zurück — nach dem ersten Debounce-Autosave
+      // IST der Store der editierte Stand. restoreOnCancel schreibt die beim
+      // Betreten des Edit-Modus gemerkten Editor-Felder zurück; die Setter
+      // hier fangen den Fall vor dem ersten Autosave ab (Store unverändert,
+      // Sync-Effekte laufen nicht). Panel-Felder bleiben Store-Wahrheit.
+      const from = (await restoreOnCancel()) ?? { title: article.title, content: article.content };
+      setTitle(from.title);
       setCategory(article.category_id);
       setTags(article.tags ?? []);
       setCoverImage(article.cover_image ?? null);
       setIcon(article.icon ?? null);
-      contentRef.current = article.content;
+      contentRef.current = from.content;
       setEditorEpoch((e) => e + 1);
     }
     setActiveView({ type: 'wiki', id: article!.id, mode: 'view' });
@@ -153,7 +168,7 @@ export default function WikiView() {
   // Kategorienkopf gibt seine Kategorie mit — wie handleCreateTask(cat.id).
   const handleNew = async (categoryId?: string) => {
     const a = await createArticle(categoryId);
-    setActiveView({ type: 'wiki', id: a.id, mode: 'edit' });
+    setActiveView({ type: 'wiki', id: a.id, mode: 'edit', isNew: true });
   };
 
   const openCtxMenu = (e: React.MouseEvent, id: string) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); };
@@ -180,10 +195,6 @@ export default function WikiView() {
     await deleteArticle(id);
     pushUndo({ id: generateId(), description: t('undo.articleDeleted'), undo: () => restoreArticle(id) });
     if (activeView.id === id) setActiveView({ type: 'wiki' });
-  };
-
-  const enterEditMode = () => {
-    if (!isEditing && article) setActiveView({ type: 'wiki', id: article.id, mode: 'edit' });
   };
 
   if (!article) {
@@ -414,7 +425,6 @@ export default function WikiView() {
     <EntryDetailFrame
       module="wiki"
       isEditing={isEditing}
-      onEnterEditMode={enterEditMode}
       breadcrumbMeta={
         <>
           {isImageIcon(article.icon)

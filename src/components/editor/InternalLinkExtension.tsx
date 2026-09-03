@@ -4,14 +4,14 @@ import { ReactRenderer, ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/r
 import type { NodeViewRendererProps } from '@tiptap/react';
 import tippy, { type Instance } from 'tippy.js';
 import SuggestionList, {
+  DEFAULT_ENTRY_EMOJI,
   type SuggestionItem,
   type SuggestionListRef,
 } from './SuggestionList';
+import type { ContentType } from '../../types';
 
 function getDefaultIcon(entryType: string): string {
-  if (entryType === 'journal') return '📓';
-  if (entryType === 'wiki') return '📚';
-  return '⚡';
+  return DEFAULT_ENTRY_EMOJI[entryType as ContentType] ?? DEFAULT_ENTRY_EMOJI.operation;
 }
 
 interface InternalLinkOptions {

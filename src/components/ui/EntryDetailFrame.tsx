@@ -8,7 +8,6 @@ interface EntryDetailFrameProps {
   /** Bestimmt Breadcrumb-Ziel/-Label und den Untitled-Platzhalter (Registry). */
   module: EntryModuleId;
   isEditing: boolean;
-  onEnterEditMode: () => void;
   /** Spans nach dem Zurück-Button: Icon, Kategorie, `·`, Datum. */
   breadcrumbMeta?: ReactNode;
   /** Rechte Topbar-Seite (Sigil: Show/Hide-Button). */
@@ -22,7 +21,7 @@ interface EntryDetailFrameProps {
   belowTitle?: ReactNode;
   /** Weglassen = keine Tag-Zeile (Sigil). Immer readOnly — editiert wird im Properties-Panel. */
   tags?: { value: string[]; onChange: (tags: string[]) => void };
-  /** 'editor' (Default): overflow-hidden + Doppelklick-Edit. 'scroll': eigener Scrollbereich ohne Doppelklick (Sigil). */
+  /** 'editor' (Default): overflow-hidden, der Editor scrollt selbst. 'scroll': eigener Scrollbereich (Sigil). */
   body?: 'editor' | 'scroll';
   children: ReactNode;
 }
@@ -39,7 +38,7 @@ interface EntryDetailFrameProps {
  * sie Zeilen spart.
  */
 export default function EntryDetailFrame({
-  module, isEditing, onEnterEditMode, breadcrumbMeta, topbarRight,
+  module, isEditing, breadcrumbMeta, topbarRight,
   title, onTitleChange, aboveTitle, belowTitle, tags, body = 'editor', children,
 }: EntryDetailFrameProps) {
   const { t } = useTranslation();
@@ -62,8 +61,8 @@ export default function EntryDetailFrame({
 
       {aboveTitle}
 
-      {/* Title — double-click enters edit mode */}
-      <div className="px-8 pt-6 pb-4 flex-shrink-0" onDoubleClick={onEnterEditMode}>
+      {/* Title */}
+      <div className="px-8 pt-6 pb-4 flex-shrink-0">
         {isEditing ? (
           <input
             autoFocus
@@ -75,8 +74,7 @@ export default function EntryDetailFrame({
                        placeholder-stone-700 outline-none selectable"
           />
         ) : (
-          <h1 className="entry-view-title text-2xl font-semibold text-stone-100 cursor-text"
-              title={t('editor.doubleClickEdit')}>
+          <h1 className="entry-view-title text-2xl font-semibold text-stone-100">
             {title || t(meta.untitledKey)}
           </h1>
         )}
@@ -85,7 +83,7 @@ export default function EntryDetailFrame({
       {belowTitle}
 
       {tags && (
-        <div className="px-8 pb-3 flex-shrink-0" onDoubleClick={onEnterEditMode}>
+        <div className="px-8 pb-3 flex-shrink-0">
           <TagInput tags={tags.value} onChange={tags.onChange} readOnly={true} />
         </div>
       )}
@@ -93,7 +91,7 @@ export default function EntryDetailFrame({
       {body === 'scroll' ? (
         <div className="flex-1 overflow-y-auto px-8 pb-8">{children}</div>
       ) : (
-        <div className="flex-1 overflow-hidden px-8 pb-8" onDoubleClick={onEnterEditMode}>{children}</div>
+        <div className="flex-1 overflow-hidden px-8 pb-8">{children}</div>
       )}
     </div>
   );

@@ -20,7 +20,7 @@ import Modal from '../ui/Modal';
 import LinkPickerModal from './LinkPickerModal';
 import { createInternalLinkExtension } from './InternalLinkExtension';
 import { ExternalDropExtension } from './ExternalDropExtension';
-import type { SuggestionItem } from './SuggestionList';
+import { DEFAULT_ENTRY_EMOJI, type SuggestionItem } from './SuggestionList';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { getDragItem, setDragItem, subscribeDrag } from '../../lib/dragState';
@@ -33,6 +33,8 @@ import type { MoonPhase } from '../../types';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
+import { useTaskStore } from '../../store/taskStore';
+import { useAltarStore } from '../../store/altarStore';
 import { useUIStore } from '../../store/uiStore';
 import { isAcceptedImageFile } from '../../lib/helpers';
 
@@ -67,6 +69,9 @@ export default function RichEditor({
   const wikiCategories = useWikiStore((s) => s.wikiCategories);
   const operations = useOperationStore((s) => s.operations);
   const categories = useOperationStore((s) => s.categories);
+  const tasks = useTaskStore((s) => s.tasks);
+  const taskCategories = useTaskStore((s) => s.categories);
+  const altars = useAltarStore((s) => s.altars);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const { t } = useTranslation();
 
@@ -80,10 +85,10 @@ export default function RichEditor({
 
   // Always-fresh icon lookup ref — returns the current icon for any entry from the store.
   // Backed by a ref so the extension closure never goes stale after initial mount.
-  const storeRef = useRef({ entries, articles, wikiCategories, operations, categories });
-  storeRef.current = { entries, articles, wikiCategories, operations, categories };
+  const storeRef = useRef({ entries, articles, wikiCategories, operations, categories, tasks, taskCategories, altars });
+  storeRef.current = { entries, articles, wikiCategories, operations, categories, tasks, taskCategories, altars };
   const getIconRef = useRef((id: string, entryType: string): string | null => {
-    const { entries, articles, wikiCategories, operations, categories } = storeRef.current;
+    const { entries, articles, wikiCategories, operations, categories, tasks, taskCategories, altars } = storeRef.current;
     if (entryType === 'journal') {
       const e = entries.find((e) => e.id === id);
       return e ? (MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓') : null;
@@ -99,20 +104,37 @@ export default function RichEditor({
       if (!o) return null;
       return o.icon || categories.find((c) => c.id === o.category_id)?.emoji || '⚡';
     }
+    if (entryType === 'task') {
+      const task = tasks.find((task) => task.id === id);
+      if (!task) return null;
+      return taskCategories.find((c) => c.id === task.category_id)?.emoji || DEFAULT_ENTRY_EMOJI.task;
+    }
+    if (entryType === 'altar') {
+      const altar = altars.find((a) => a.id === id);
+      if (!altar) return null;
+      // icon_data ist eine data-URL und bleibt bewusst nur hier im Live-Lookup —
+      // in die Node-Attrs (und damit ins gespeicherte HTML) gehört sie nicht.
+      return altar.icon_data || DEFAULT_ENTRY_EMOJI.altar;
+    }
     return null;
   });
 
   const getLabelRef = useRef((id: string, entryType: string): string | null => {
-    const { entries, articles, operations } = storeRef.current;
+    const { entries, articles, operations, tasks, altars } = storeRef.current;
     if (entryType === 'journal') return entries.find((e) => e.id === id)?.title ?? null;
     if (entryType === 'wiki') return articles.find((a) => a.id === id)?.title ?? null;
     if (entryType === 'operation') return operations.find((o) => o.id === id)?.title ?? null;
+    if (entryType === 'task') return tasks.find((task) => task.id === id)?.title ?? null;
+    if (entryType === 'altar') return altars.find((a) => a.id === id)?.title ?? null;
     return null;
   });
 
   // Always-fresh items ref so the extension closure never goes stale.
   // icon priority: journal → moon phase emoji; wiki → custom icon or category emoji;
-  // operation → category emoji (stored on the category row, not the operation itself).
+  // operation → category emoji (stored on the category row, not the operation itself);
+  // task → category emoji; altar → none (see below).
+  // Blockreihenfolge von Hand mit der Rail (Registry) synchron gehalten, wie
+  // LinkPickerModal.allItems — nichts erzwingt das.
   const itemsRef = useRef<SuggestionItem[]>([]);
   itemsRef.current = [
     ...entries.map((e) => ({
@@ -122,13 +144,11 @@ export default function RichEditor({
       icon: MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓',
       entry_number: e.entry_number,
     })),
-    ...articles.map((a) => ({
-      id: a.id,
-      entryType: 'wiki' as const,
-      label: a.title,
-      category: a.category_id,
-      icon: a.icon || (wikiCategories.find((c) => c.id === a.category_id)?.emoji ?? getCategoryEmoji(a.category_id as any)),
-      entry_number: a.entry_number,
+    ...tasks.map((task) => ({
+      id: task.id,
+      entryType: 'task' as const,
+      label: task.title,
+      icon: taskCategories.find((c) => c.id === task.category_id)?.emoji || DEFAULT_ENTRY_EMOJI.task,
     })),
     ...operations.map((o) => ({
       id: o.id,
@@ -137,6 +157,22 @@ export default function RichEditor({
       category: categories.find((c) => c.id === o.category_id)?.emoji,
       icon: o.icon || categories.find((c) => c.id === o.category_id)?.emoji || '⚡',
       entry_number: o.entry_number,
+    })),
+    ...articles.map((a) => ({
+      id: a.id,
+      entryType: 'wiki' as const,
+      label: a.title,
+      category: a.category_id,
+      icon: a.icon || (wikiCategories.find((c) => c.id === a.category_id)?.emoji ?? getCategoryEmoji(a.category_id as any)),
+      entry_number: a.entry_number,
+    })),
+    // Kein icon: item.icon landet beim Einfügen in den Node-Attrs, und die
+    // einzige Altar-Grafik (icon_data) ist eine data-URL — Anzeige über den
+    // Live-Lookup in getIconRef, gespeichert wird nur der Fallback des Chips.
+    ...altars.map((a) => ({
+      id: a.id,
+      entryType: 'altar' as const,
+      label: a.title,
     })),
   ];
 
@@ -383,7 +419,7 @@ export default function RichEditor({
       const { id, entryType: rawEntryType } = (e as CustomEvent<{ id: string; entryType: string }>).detail;
       const entryType = rawEntryType?.trim();
       // Validate inputs before navigating — guards against synthetic events from XSS in editor content
-      const VALID_TYPES = ['journal', 'wiki', 'operation'] as const;
+      const VALID_TYPES = ['journal', 'wiki', 'operation', 'task', 'altar'] as const;
       // Accept standard UUIDs and merge-prefixed IDs (8-char base36 prefix prepended during merge import)
       const UUID_RE = /^([0-9a-z]{8}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!VALID_TYPES.includes(entryType as any) || !UUID_RE.test(id)) return;
@@ -558,9 +594,11 @@ export default function RichEditor({
             </>
           ) : wikiDragItem ? (
             <>
-              {wikiDragItem.entryType === 'operation' && wikiDragItem.category ? (
+              {/* Bei Operationen und Aufgaben trägt category bereits das Emoji;
+                  nur beim Wiki ist es die Kategorie-id für den Lookup. */}
+              {(wikiDragItem.entryType === 'operation' || wikiDragItem.entryType === 'task') && wikiDragItem.category ? (
                 <span className="text-sm">{wikiDragItem.category}</span>
-              ) : wikiDragItem.category ? (
+              ) : wikiDragItem.entryType === 'wiki' && wikiDragItem.category ? (
                 <span className="text-sm">{getCategoryEmoji(wikiDragItem.category as any)}</span>
               ) : null}
               <span className="text-xs text-jade-400">{wikiDragItem.label}</span>

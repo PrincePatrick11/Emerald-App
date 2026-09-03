@@ -19,26 +19,37 @@ import { editorSavesSuspended } from '../lib/editorLock';
  * Gate schriebe ein Mount direkt im Edit-Modus (StrictMode-Doppelmount, per
  * localStorage restaurierter Edit-Tab) den noch leeren Titel in die DB.
  */
-interface UseEntryEditorOptions<TPatch> {
+interface UseEntryEditorOptions<TPatch, TRestore = TPatch> {
   entityId: string | undefined;
   isEditing: boolean;
   ready: boolean;
   /** Erhält den aktuellen Editor-Inhalt (den Content-Mirror-Ref des Hooks) als Argument. */
   buildPatch: (content: string) => TPatch;
-  update: (id: string, patch: TPatch) => Promise<void>;
+  /**
+   * Was Cancel zurücksetzt — nur die Felder, die der Editor selbst besitzt
+   * (Titel, Inhalt). Alles, was das Properties-Panel während des Editierens
+   * direkt speichert (Kategorie, Tags, Status …), gehört NICHT hinein: das
+   * ist bereits gewollt persistiert und darf ein Cancel nicht zurückdrehen.
+   * Default: buildPatch — nur für Aufrufer ohne Panel-Felder sinnvoll.
+   */
+  buildRestorePatch?: (content: string) => TRestore;
+  update: (id: string, patch: TPatch | TRestore) => Promise<void>;
   debounceMs?: number;
 }
 
-export function useEntryEditor<TPatch>({
+export function useEntryEditor<TPatch, TRestore = TPatch>({
   entityId,
   isEditing,
   ready,
   buildPatch,
+  buildRestorePatch,
   update,
   debounceMs = 1500,
-}: UseEntryEditorOptions<TPatch>) {
+}: UseEntryEditorOptions<TPatch, TRestore>) {
   const buildPatchRef = useRef(buildPatch);
   buildPatchRef.current = buildPatch;
+  const buildRestorePatchRef = useRef(buildRestorePatch);
+  buildRestorePatchRef.current = buildRestorePatch;
   const updateRef = useRef(update);
   updateRef.current = update;
   const isEditingRef = useRef(isEditing);
@@ -81,6 +92,52 @@ export function useEntryEditor<TPatch>({
     triggerAutoSave();
   }, [triggerAutoSave]);
 
+  // Der Editor-Stand beim Betreten des Edit-Modus. Cancel kann sich nicht auf
+  // den Store verlassen — nach dem ersten Debounce-Autosave IST der Store
+  // bereits der editierte Stand, ein "Zurücksetzen" darauf wäre ein No-op.
+  // Beim Einstieg spiegelt der lokale State noch exakt das Gespeicherte, der
+  // Restore-Patch liefert hier also die Vorher-Werte. Das `ready`-Gate hält
+  // die Erfassung zurück, bis die View ihren State aus dem Eintrag geladen
+  // hat — die Hook-Effekte laufen vor den Load-Effekten der View.
+  const restoreFields = (content: string): TRestore =>
+    (buildRestorePatchRef.current ?? (buildPatchRef.current as unknown as (c: string) => TRestore))(content);
+  const baselineRef = useRef<{ id: string; patch: TRestore } | null>(null);
+  useEffect(() => {
+    if (isEditing && ready && entityId) {
+      if (baselineRef.current?.id !== entityId) {
+        baselineRef.current = { id: entityId, patch: restoreFields(contentRef.current) };
+      }
+    } else {
+      baselineRef.current = null;
+    }
+  }, [isEditing, ready, entityId]);
+
+  /**
+   * Der Cancel-Pfad: entschärft den Timer und schreibt den Einstiegs-Stand der
+   * Editor-Felder zurück in Store und DB (Schreibzugriff nur, wenn sich etwas
+   * geändert hat — kein updated_at-Bump für ein folgenloses Cancel). Gibt die
+   * Baseline zurück, damit die View ihren lokalen State daraus setzt; null nur,
+   * wenn es keine Baseline gab oder der Schreibzugriff scheiterte — dann fällt
+   * die View auf den Store-Stand zurück und verlässt den Edit-Modus trotzdem.
+   */
+  const restoreOnCancel = useCallback(async (): Promise<TRestore | null> => {
+    cancelAutoSave();
+    const baseline = baselineRef.current;
+    if (!baseline) return null;
+    const current = restoreFields(contentRef.current);
+    if (JSON.stringify(current) !== JSON.stringify(baseline.patch)) {
+      try {
+        await updateRef.current(baseline.id, baseline.patch);
+      } catch (e) {
+        console.error('[useEntryEditor] restore on cancel failed:', e);
+        return null;
+      }
+      // Ein Tastendruck während des Awaits hätte den Timer neu scharf gemacht.
+      cancelAutoSave();
+    }
+    return baseline.patch;
+  }, [cancelAutoSave]);
+
   const prevRef = useRef<{ id: string; isEditing: boolean } | null>(null);
 
   useEffect(() => {
@@ -121,5 +178,5 @@ export function useEntryEditor<TPatch>({
     };
   }, [cancelAutoSave]);
 
-  return { triggerAutoSave, cancelAutoSave, contentRef, handleContentChange };
+  return { triggerAutoSave, cancelAutoSave, restoreOnCancel, contentRef, handleContentChange };
 }

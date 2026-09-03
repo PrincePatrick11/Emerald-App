@@ -80,7 +80,7 @@ function RightSidebarActionBar() {
     );
   }
 
-  // A loaded sigil operation can't be edited (matches OperationSigilView's enterEditMode guard).
+  // A loaded sigil operation can't be edited — hide the Edit button for it.
   const op = activeView.type === 'operations'
     ? operations.find((o) => o.id === activeView.id)
     : undefined;

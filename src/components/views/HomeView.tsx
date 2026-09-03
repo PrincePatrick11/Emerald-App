@@ -92,7 +92,7 @@ export default function HomeView() {
 
   const handleNewEntry = async () => {
     const entry = await createEntry();
-    setActiveView({ type: 'journal', id: entry.id, mode: 'edit' });
+    setActiveView({ type: 'journal', id: entry.id, mode: 'edit', isNew: true });
   };
 
   const openCtx = (e: React.MouseEvent, target: CtxTarget) => {

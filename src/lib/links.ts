@@ -3,6 +3,8 @@ import { getDb } from './db';
 export interface BacklinkEntry {
   id: string;
   title: string;
+  /** Bewusst schmaler als ContentType: Link-QUELLEN sind nur die Module mit
+   *  Editor — tasks/altar können Ziel sein, aber nie Quelle. */
   type: 'journal' | 'wiki' | 'operation';
 }
 

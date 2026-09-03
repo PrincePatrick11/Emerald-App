@@ -1,6 +1,6 @@
 import type { TrashKind, ViewId } from '../lib/modules';
 
-export type ContentType = 'journal' | 'wiki' | 'operation';
+export type ContentType = 'journal' | 'wiki' | 'operation' | 'task' | 'altar';
 
 export interface JournalEntry {
   id: string;
@@ -225,4 +225,8 @@ export interface ActiveView {
   type: ViewId;
   id?: string;
   mode?: 'view' | 'edit';
+  /** Frisch angelegt und noch nie mit „Fertig" bestätigt — Cancel verwirft
+   *  den Eintrag wieder, statt nur zum letzten Speicherstand zurückzukehren.
+   *  Wird von jedem „Neu"-Handler gesetzt und fällt beim Speichern weg. */
+  isNew?: boolean;
 }

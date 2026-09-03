@@ -126,9 +126,12 @@ src-tauri/
 ### Module Registry
 
 `src/lib/modules.ts` is the one source of truth for "which modules exist and what belongs to
-each" — icon, nav-label key, untitled-placeholder key, the module's `ContentType` (or `null`
-for Tasks/Altar, which are not link targets), and whether it uses the right sidebar's editor
-action bar. `ENTRY_MODULE_IDS` (`journal`/`tasks`/`operations`/`wiki`/`altar`) is the canonical
+each" — icon, nav-label key, untitled-placeholder key, the module's `ContentType`, and whether
+it uses the right sidebar's editor action bar. `ModuleMeta.entryType` is non-null for all five
+modules: Tasks and Altar are link *targets* (`'task'`/`'altar'` in `ContentType`) even though,
+lacking an editor of their own, they can never be a link's *source* — `BacklinkEntry.type` in
+`src/lib/links.ts` stays the narrower `'journal' | 'wiki' | 'operation'` for exactly that
+reason. `ENTRY_MODULE_IDS` (`journal`/`tasks`/`operations`/`wiki`/`altar`) is the canonical
 order — it drives the rail's icon order and the entry list's tab order. `MODULES` is the
 `Record<EntryModuleId, ModuleMeta>` everything else reads; `MODULE_LIST` is its array form for
 loops. `ViewId` (`EntryModuleId | AuxViewId`, where `AuxViewId` is `home`/`tags`/`trash`) is
@@ -144,6 +147,16 @@ only tab ids and `isContentView`) — the one place translating the data model's
 `ActiveView`'s `operations` (plural, named after the module). It is now a reverse lookup over
 `MODULES` instead of its own copy of the mapping, so `ModuleMeta.entryType` is the single
 source both directions read.
+
+A second, smaller registry sits in `src/components/editor/SuggestionList.tsx` —
+`ENTRY_TYPE_ICONS`, `DEFAULT_ENTRY_EMOJI`, and `ENTRY_TYPE_LABEL_KEYS`, each keyed by
+`ContentType` (link type) rather than `EntryModuleId`/`ViewId` (view type). It is deliberately
+not folded into `MODULES`: the icon a link chip shows, the emoji fallback when neither a
+custom icon nor a category emoji applies, and a link picker tab's label are all keyed by what
+a link points *at*, which for Journal is a moon-phase emoji rather than the module's own
+`BookOpen` icon — a concern `ModuleMeta` has no field for and that would only muddy it.
+`LinkPickerModal`, `InternalLinkExtension`, `RichEditor`'s `[[` suggestion popup, and
+`export.ts`'s icon resolution all read from this registry instead of repeating the mapping.
 
 This file's import rule is deliberately narrow: only `lucide-react` and type-only imports (its
 edge to `types/index.ts` runs both ways, but only as `import type`, which disappears at
@@ -180,7 +193,36 @@ calling `viewTypeForEntryType` directly.
 
 The main content area renders only the title and body. All metadata — tags, category, icon, cover image — is edited exclusively in the right sidebar's Properties panel. The sidebar writes directly to the relevant store; the main area subscribes to the same store fields and updates accordingly.
 
-Unlike earlier versions, the Properties panel itself is now gated by the entry's edit state (`activeView.mode === 'edit'`): each panel renders a read-only summary (`PropertiesReadView` + `PropertySummaryRow`) while viewing, and swaps to editable form fields (`PropertiesEditView`) only once the entry is opened for editing. Entering/leaving edit mode is triggered from the sidebar's own action bar, not from the main content area.
+Unlike earlier versions, the Properties panel itself is now gated by the entry's edit state (`activeView.mode === 'edit'`): each panel renders a read-only summary (`PropertiesReadView` + `PropertySummaryRow`) while viewing, and swaps to editable form fields (`PropertiesEditView`) only once the entry is opened for editing. Entering/leaving edit mode is triggered from the sidebar's own action bar, not from the main content area — there is no double-click-to-edit gesture on the entry itself; `EntryDetailFrame` has no `onEnterEditMode` prop.
+
+### Cancel: discarding new entries and reverting autosaved edits
+
+`ActiveView.isNew` marks an entry that was just created by a "New" action (Journal, Wiki,
+Operations, Altar — every handler that calls `setActiveView({ ..., mode: 'edit' })` for a
+freshly created row sets it) and never confirmed with Done. It is a session-only flag,
+deliberately kept out of persisted state: `uiStore`'s `normalizeSavedTab` strips it when
+restoring tabs from localStorage, and `withNavigationState` strips it before pushing onto the
+back/forward history — both for the same reason, so that returning to the entry later (a
+restart, or Back) can never make Cancel treat an entry that has lived past its creation
+session as still-discardable. When Cancel fires on a still-`isNew` entry, `discardNewEntry`
+(`src/lib/discardNewEntry.ts`) soft-deletes then immediately hard-deletes it — no trash, no
+undo, since from the user's perspective the entry was never created. Altar has no soft-delete
+of its own, so `AltarView`'s Cancel path calls `deleteAltar` directly instead of going through
+this helper.
+
+For an entry that *was* confirmed before, Cancel cannot simply restore "the store's current
+state" — Journal, Wiki, Operations, and the Sigil view all autosave the title/body a short
+debounce after typing stops, so by the time Cancel is pressed the store already holds the
+edited values. `useEntryEditor` (`src/hooks/useEntryEditor.ts`) instead captures a baseline of
+the editor-owned fields (`buildRestorePatch`, defaulting to `buildPatch` — Journal/Wiki/
+Operations pass `{title, content}`) the moment edit mode is entered, and `restoreOnCancel()`
+writes that baseline back on Cancel (skipping the write if nothing changed, so a no-op Cancel
+doesn't bump `updated_at`). Deliberately out of scope: Properties-panel fields (category, tags,
+cover, icon, status, end date, version) save directly to the store as they're changed and are
+never part of the baseline — Cancel must not undo something the panel already committed.
+`OperationSigilView` carries its own equivalent (`editBaselineRef`, covering title,
+`intention_text`, `letter_bank`, `implemented_letters`, `drawing_data`) rather than going
+through the hook, since its autosave and field set don't match the other three views'.
 
 ### Right Sidebar Action Bar
 
