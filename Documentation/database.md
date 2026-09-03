@@ -11,7 +11,7 @@ Two consumers share those strings, and that sharing is the point of the file:
 - the **baseline path** in `runMigrations`, which fresh vaults take;
 - **migration v33** `normalize_schema`, which rebuilds the tables of existing vaults.
 
-Because both execute the same DDL, they cannot drift apart. `npm run check:schema` proves it: it builds one vault each way and compares `sqlite_master`, `PRAGMA table_info`, `PRAGMA foreign_key_list`, and every index, table by table. The script covers more than the schema comparison — it also exercises resume-after-crash, migration v35's image-reference rewrite, and the constants that are mirrored between `images.rs` / `schema.ts` / `vault.rs` / `vaultManager.ts` / `tauri.conf.json` (image extensions, vault file names, scheme name). It needs `esbuild`, which is declared in `devDependencies`. Without that coupling and that check, the two paths quietly diverge after a few releases and nobody notices until a user hits an error.
+Because both execute the same DDL, they cannot drift apart. `npm run check:schema` proves it: it builds one vault each way and compares `sqlite_master`, `PRAGMA table_info`, `PRAGMA foreign_key_list`, and every index, table by table. The script covers more than the schema comparison — it also exercises resume-after-crash, migration v35's image-reference rewrite, migration v36's journal-link rewrite (below), and the constants that are mirrored between `images.rs` / `schema.ts` / `vault.rs` / `vaultManager.ts` / `tauri.conf.json` (image extensions, vault file names, scheme name). It needs `esbuild`, which is declared in `devDependencies`. Without that coupling and that check, the two paths quietly diverge after a few releases and nobody notices until a user hits an error.
 
 ## Migration Model
 
@@ -27,7 +27,7 @@ The emptiness check looks at `sqlite_master`, not at `schema_version`: a databas
 
 Afterwards `runPeriodicCleanup(db)` purges trashed rows older than 30 days. It is **not** a migration — idempotent, time-dependent, and run on every vault open.
 
-The current version is **35**, and `BASELINE_VERSION` in `schema.ts` must equal the highest entry in `MIGRATIONS`. `runMigrations` throws at startup if the two disagree, so a new migration cannot be added without updating the baseline.
+The current version is **36**, and `BASELINE_VERSION` in `schema.ts` must equal the highest entry in `MIGRATIONS`. `runMigrations` throws at startup if the two disagree, so a new migration cannot be added without updating the baseline.
 
 Note that **version 24 is genuinely missing** — no entry with that number has existed for some time. The runner tolerates gaps; it only requires each version to be above the last applied one.
 
@@ -38,6 +38,8 @@ Migrations v1–v32 carry `legacy: true`. Only for those does the runner swallow
 That leniency is convenient and was actively harmful. It aborts the **entire remaining body** of a migration and still records it as done. Migration v4 is the case in point: v1 already creates `altars` with `background_preset`, and v4 opens with an `ALTER TABLE` for that same column. On every database, that throws, gets swallowed, and everything after it — `altar_placements.altar_id` and the default-altar seeding — never runs. The emergency migrations v30 and v31 exist to patch one symptom of this; they add the missing placement columns back but cannot restore the seeding.
 
 v33 repairs the rest: placements without a valid altar are given one, and if the vault has no altar at all, the default altar v4 intended to create is finally created, which makes those placements visible again.
+
+**v36 `journal_linked_ids_to_content`** rewrites `journal_entries.linked_operation_ids`/`linked_wiki_ids` into internal-link chip blocks appended to `content` (`src/lib/migrateLinkedIdsToContent.ts`), then clears both columns and rebuilds the affected rows' `links` table entries (the migration writes past the store layer, so `syncLinks` never runs for it). A target already in the trash is skipped rather than carried over as a dead chip, a target already linked in the content is not appended twice, and a row whose column holds invalid JSON is left completely untouched (logged via `console.warn`) so a retry on the next launch can still pick it up — the migration is resumable rather than all-or-nothing.
 
 Before v33's rebuild touches anything, `normalizeSchema.ts` writes a full file backup of the database via `VACUUM INTO` to `{vaultDir}/emerald.db.pre-v33.bak`. The name is fixed, the file is never cleaned up, and on image-heavy vaults it can be sizeable — but it is the escape hatch if the one migration that rewrites every table goes wrong. (Opening a vault additionally takes a `VACUUM INTO` backup right before the normalization runs, see the changelog for 0.2.0.)
 
@@ -201,8 +203,8 @@ Numeric grid defaults must stay in sync with `DEFAULT_GRID_*` in `altarConstants
 | moon_phase | TEXT | one of the eight `MoonPhase` keys, or NULL |
 | mood | TEXT | unused; reserved |
 | paradigm_id | TEXT | wiki article id, no FK (optional) |
-| linked_operation_ids | TEXT | JSON array, NOT NULL DEFAULT `'[]'` |
-| linked_wiki_ids | TEXT | JSON array, NOT NULL DEFAULT `'[]'` |
+| linked_operation_ids | TEXT | JSON array, NOT NULL DEFAULT `'[]'`; legacy — see note below |
+| linked_wiki_ids | TEXT | JSON array, NOT NULL DEFAULT `'[]'`; legacy — see note below |
 | is_bannung | INTEGER | boolean 0/1 |
 | bannung_type_wiki_id | TEXT | wiki article id, no FK |
 | is_meditation | INTEGER | boolean 0/1 |
@@ -213,6 +215,8 @@ Numeric grid defaults must stay in sync with `DEFAULT_GRID_*` in `altarConstants
 | deleted_at | TEXT | NULL = active |
 
 Both `linked_*_ids` columns were nullable until v33, unlike every other JSON array in the schema; consumers had to special-case `NULL` for exactly those two.
+
+**Legacy since v36.** What an entry links now lives in its `content` as internal-link chips (see [`architecture.md` → Internal Links](architecture.md#internal-links)), read by the right sidebar's "Linked entries" field across all five entry types, not just operations and wiki articles. The two ID columns above are no longer written when a link is created; they remain in the schema only because export, `.emeralddb` backup/restore, and `checkIntegrity` still have to round-trip a backup taken before v36. The UI reads them exactly once, as a read-only bridge for entries a pre-v36 backup restored straight into these columns (`legacyIds` in `LinkedEntriesField`) — a link created from here on is always a content chip.
 
 ### wiki_articles
 

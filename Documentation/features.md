@@ -16,7 +16,7 @@ The journal is the primary day-to-day writing space. Each entry has a title and 
 - *Banishing* — the banishing technique used. Setting this marks the entry as a banishing (`is_bannung = true`).
 - *Meditation* — the meditation type used. Setting this marks the entry as a meditation (`is_meditation = true`). A duration field (in minutes) becomes available when a meditation type is selected.
 
-**Linked Operations and Wiki Articles.** Any journal entry can reference one or more operations and wiki articles. These appear as clickable chips below the title in read mode and are included in Markdown and Emerald exports.
+**Linked entries.** The Properties sidebar's "Linked entries" field (above the tags) lists everything the entry links in its own text — journal entries, wiki articles, operations, tasks, and altars alike — read directly out of the rich-text content rather than tracked as a separate list. In edit mode, searching and picking a result there appends the link to the bottom of the entry as its own block: a divider, the linked item's category as a heading, then the link chip — one block per link, never merged into an earlier one, and the cursor jumps there afterwards. Clicking a listed link jumps to that spot in the text and briefly highlights it (only navigating to the target instead if the link somehow isn't in the text); the "×" removes it — the whole block if it's one of these appended blocks, just the chip if it sits inline in running text you wrote around it. The same field, in the same place, is available on Wiki articles and Operations (except Sigil-category operations, which have no rich-text body to link from). Links are included in Markdown and Emerald exports.
 
 **Tags.** Free-form labels shared across the app. Tag names are stored directly on entries (not as IDs). The Tags view lets you see all entries carrying a particular tag.
 
@@ -213,7 +213,7 @@ Routines are reusable content blocks that you can drop into any journal entry.
 
 Each routine has a name, an emoji, plain-text content (Markdown is supported), and optional lists of operations and wiki articles to link.
 
-Dropping a routine into an open entry appends its content as formatted paragraphs and merges its tags, linked operations, and linked wiki articles into the current entry. The drag-and-drop mechanism (`routine-drop` event, handled by JournalView/WikiView/OperationsView) is intact, but its source — a `RoutinesPanel` in the right sidebar — was removed along with the old sidebar tab bar and is not currently rendered anywhere, so there is presently no UI path to start the drag.
+Dropping a routine into an open entry appends its content as formatted paragraphs, merges its tags into the current entry, and appends its linked operations and wiki articles as link-chip blocks at the bottom of the entry — the same block shape the Linked entries field itself creates when you add a link there, not a write to a separate column. The drag-and-drop mechanism (`routine-drop` event, handled by JournalView/WikiView/OperationsView) is intact, but its source — a `RoutinesPanel` in the right sidebar — was removed along with the old sidebar tab bar and is not currently rendered anywhere, so there is presently no UI path to start the drag.
 
 ## Tasks
 
@@ -294,7 +294,9 @@ A nested **Export as Image** submenu (Export → Export as Image → JPEG… / P
 
 ### Markdown Export
 
-Saves a `.md` file with a frontmatter block followed by the entry body. Frontmatter includes date, moon phase, paradigm, banishing, meditation, linked operations, linked wiki articles, category, status, end date, version, and tags. Images are stripped (not included). Internal link chips become `[[Title]]` wiki-link syntax. Linked operations and wiki articles include their UUID: `Operations: Title [uuid]`.
+Saves a `.md` file with a frontmatter block followed by the entry body. Frontmatter includes date, moon phase, paradigm, banishing, meditation, category, status, end date, version, and tags. Images are stripped (not included). Internal link chips become `[[Title]]` wiki-link syntax — that is where a journal entry's links live since migration v36, so they travel in the body rather than in frontmatter.
+
+The frontmatter can still carry `Operations:` and `Wiki:` lines with a UUID (`Operations: Title [uuid]`), but only for entries whose legacy `linked_operation_ids`/`linked_wiki_ids` columns are still filled — i.e. restored from a pre-v36 backup. Import understands both: those lines are resolved and appended to the body as link-chip blocks, never written back to the columns.
 
 ### Emerald Format
 

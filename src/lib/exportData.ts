@@ -67,6 +67,13 @@ export async function collectExportData(): Promise<ExportData | null> {
     const bannungArt     = entry.bannung_type_wiki_id    ? articles.find(a => a.id === entry.bannung_type_wiki_id)    : undefined;
     const meditationArt  = entry.meditation_type_wiki_id ? articles.find(a => a.id === entry.meditation_type_wiki_id) : undefined;
 
+    // Altbestands-Brücke. Seit Migration v36 stehen Journal-Verknüpfungen als
+    // Chips IM Inhalt, und `export.ts` rendert sie von dort (resolveInternalLinkIcons /
+    // transformInternalLinks) — für migrierte Einträge sind diese beiden Listen
+    // deshalb leer, und das ist richtig: sonst stünde derselbe Link zweimal im
+    // Export, einmal als eigener Abschnitt und einmal im Text. Gefüllt sind sie
+    // nur noch bei Einträgen, die ein Backup oder ein .emerald-Import aus der
+    // Zeit davor wieder in die Spalten geschrieben hat.
     const linkedOps = (entry.linked_operation_ids ?? [])
       .map(id => operations.find(o => o.id === id)).filter(Boolean)
       .map(op => {

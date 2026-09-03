@@ -28,6 +28,22 @@ import {
 } from 'lucide-react';
 import type { ContentType } from '../types';
 
+/**
+ * Emoji-Fallback je Link-Typ, wenn weder ein eigenes Icon noch ein
+ * Kategorie-Emoji greift — eine Wahrheit für Chip-NodeView, Editor-Lookups,
+ * Picker, Export und die Migration v36. Steht hier statt in `SuggestionList`,
+ * weil auch `lib/`-Module (bis hinunter zu `db.ts`) sie brauchen und dorthin
+ * keine Komponente importiert werden darf; `SuggestionList` re-exportiert sie
+ * für die Komponenten, die sie schon von dort holen.
+ */
+export const DEFAULT_ENTRY_EMOJI: Record<ContentType, string> = {
+  journal: '📓',
+  wiki: '📚',
+  operation: '⚡',
+  task: '✅',
+  altar: '🔥',
+};
+
 /** Reihenfolge = Rail- und Eintragslisten-Tab-Reihenfolge. */
 export const ENTRY_MODULE_IDS = ['journal', 'tasks', 'operations', 'wiki', 'altar'] as const;
 export type EntryModuleId = (typeof ENTRY_MODULE_IDS)[number];

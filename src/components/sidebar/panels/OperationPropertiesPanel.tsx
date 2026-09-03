@@ -5,6 +5,7 @@ import { useUIStore } from '../../../store/uiStore';
 import { useWikiStore } from '../../../store/wikiStore';
 import { useOperationStore } from '../../../store/operationStore';
 import TagInput from '../../editor/TagInput';
+import LinkedEntriesField from '../fields/LinkedEntriesField';
 import PropertiesEditView from '../fields/PropertiesEditView';
 import PropertiesReadView from '../fields/PropertiesReadView';
 import { PropertySummaryRow } from '../fields/PropertySummaryRow';
@@ -84,6 +85,8 @@ export default function OperationPropertiesPanel() {
             </div>
           </div>
 
+          {/* Kein Verlinkungs-Feld: Sigil-Operationen rendern OperationSigilView
+              statt eines RichEditors und haben keinen verlinkbaren Fließtext. */}
           <div>
             <p className="label-xs mb-2">{t('properties.tags')}</p>
             <TagInput tags={op.tags ?? []} onChange={() => {}} readOnly />
@@ -104,6 +107,10 @@ export default function OperationPropertiesPanel() {
         />
         <PropertySummaryRow label={t('operations.endDate')} value={op.end_date ? formatEntryDate(op.end_date) : t('properties.none')} />
         <PropertySummaryRow label={t('operations.version')} value={op.version || t('properties.none')} />
+        <div>
+          <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
+          <LinkedEntriesField content={op.content} />
+        </div>
         <div>
           <p className="label-xs mb-2">{t('properties.tags')}</p>
           <TagInput tags={op.tags ?? []} onChange={() => {}} readOnly />
@@ -255,6 +262,13 @@ export default function OperationPropertiesPanel() {
               className="w-full min-h-32 bg-transparent text-xs text-stone-300 outline-none placeholder-stone-600 resize-y selectable"
             />
           </div>
+        </div>
+      )}
+
+      {!sigilOperation && (
+        <div>
+          <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
+          <LinkedEntriesField content={op.content} editable inputCls={inputCls} />
         </div>
       )}
 

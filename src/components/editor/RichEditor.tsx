@@ -1,4 +1,5 @@
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, type Editor } from '@tiptap/react';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -26,6 +27,12 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { getDragItem, setDragItem, subscribeDrag } from '../../lib/dragState';
 import { viewTypeForEntryType } from '../../lib/modules';
+import {
+  APPEND_ENTRY_LINK_EVENT, REMOVE_ENTRY_LINK_EVENT, REVEAL_ENTRY_LINK_EVENT,
+  isValidLinkTarget, subscribeEntryLinkRequest, type EntryLinkRequest,
+} from '../../lib/links';
+import { internalLinkBlockHtml } from '../../lib/internalLinkHtml';
+import { useLinkItems } from '../../hooks/useLinkItems';
 import type { ContentType } from '../../types';
 import { getRoutineDragItem, setRoutineDragItem, subscribeRoutineDrag, type RoutineDragItem } from '../../lib/routineDragState';
 import { getCategoryEmoji } from '../wiki/WikiList';
@@ -42,6 +49,166 @@ import { isAcceptedImageFile } from '../../lib/helpers';
 interface LinkPopupState {
   href: string;
   rect: DOMRect;
+}
+
+/** Position des ERSTEN Link-Chips für `id`/`entryType` im Dokument, oder `null`.
+ *  Ein zweifach verlinktes Ziel wird also immer an seiner ersten Stelle
+ *  gefunden — für „ist das schon verlinkt?" und „zeig mir die Stelle" reicht
+ *  das, ein zweiter Treffer bräuchte erst eine Bedienung dafür. */
+function findEntryLinkPos(doc: ProseMirrorNode, target: { id: string; entryType: string }): number | null {
+  let found: number | null = null;
+  doc.descendants((node, pos) => {
+    if (found !== null) return false;
+    if (node.type.name === 'internalLink' && node.attrs.id === target.id && node.attrs.entryType === target.entryType) {
+      found = pos;
+      return false;
+    }
+    return true;
+  });
+  return found;
+}
+
+/**
+ * Hängt einen internen Link ganz unten an den Eintrag an, jedes Mal als
+ * vollständiger Block: Trennlinie, Kategorie des Ziels als Überschrift, dann
+ * der Link. Bewusst ohne Zusammenfassen — zwei Links derselben Kategorie
+ * bekommen zwei Blöcke.
+ *
+ * Wie der Block aussieht, sagt `internalLinkBlockHtml` — eine Definition für
+ * das Einfügen hier und für die Migration v36, die dieselben Blöcke ohne
+ * Editor schreiben muss.
+ *
+ * Ein bereits verlinktes Ziel wird nicht ein zweites Mal angehängt. Der Cursor
+ * springt anschließend hinter den neuen Link: das Feld in der Seitenleiste
+ * verliert dabei den Fokus, was gewollt ist — man sieht, wo der Link gelandet
+ * ist, statt blind weiterzuklicken.
+ */
+function appendEntryLink(editor: Editor, item: EntryLinkRequest): void {
+  const { doc } = editor.state;
+  if (findEntryLinkPos(doc, item) !== null) return;
+
+  const html = internalLinkBlockHtml(
+    {
+      id: item.id,
+      entryType: item.entryType,
+      label: item.label,
+      icon: item.icon ?? null,
+      entry_number: item.entry_number ?? null,
+    },
+    item.categoryLabel ?? '',
+  );
+
+  // insertContentAt setzt die Selektion ans Ende des Eingefügten; focus() holt
+  // sie in den Editor, scrollIntoView bringt den neuen Block ins Bild.
+  editor.chain().insertContentAt(doc.content.size, html).focus().scrollIntoView().run();
+}
+
+/**
+ * Entfernt einen Link aus dem Eintrag. Stand er in einem eigenen
+ * Verlinkungs-Block — Trennlinie, Überschrift, Absatz nur mit diesem Chip, so
+ * wie `appendEntryLink` ihn anlegt —, fällt der ganze Block weg. Steht er
+ * mitten im Fließtext, verschwindet nur der Chip und der Satz bleibt stehen.
+ *
+ * Gibt `false` zurück, wenn der Link nicht im Inhalt steht (etwa bei einer
+ * Verknüpfung aus den alten Spalten).
+ */
+/** Trägt der Absatz nur diesen einen Chip (plus Leerraum)? */
+function holdsOnlyLink(paragraph: ProseMirrorNode, target: { id: string; entryType: string }): boolean {
+  let only = true;
+  paragraph.forEach((child) => {
+    if (child.type.name === 'internalLink') {
+      if (child.attrs.id !== target.id || child.attrs.entryType !== target.entryType) only = false;
+      return;
+    }
+    if (child.isText && !(child.text ?? '').trim()) return;
+    only = false;
+  });
+  return only;
+}
+
+function removeEntryLink(editor: Editor, target: { id: string; entryType: string }): boolean {
+  const { doc } = editor.state;
+  const pos = findEntryLinkPos(doc, target);
+  if (pos === null) return false;
+
+  const $pos = doc.resolve(pos);
+  const parent = $pos.parent;
+
+  // Ein Verlinkungs-Block ist NUR, was `appendEntryLink` anlegt: ein Absatz
+  // direkt im Dokument, der nichts als diesen Chip trägt, mit einer Trennlinie
+  // davor und höchstens einer Überschrift dazwischen. Alles andere — ein Chip
+  // in einer Liste, in einem Zitat, unter einer selbst getippten Überschrift —
+  // ist Fließtext, und dort wird nur der Chip entfernt. Ohne diese engen
+  // Grenzen risse das Löschen fremde Blöcke mit.
+  if ($pos.depth === 1 && parent.type.name === 'paragraph' && holdsOnlyLink(parent, target)) {
+    const paragraphPos = $pos.before(1);
+    const index = $pos.index(0);
+    const prev = index >= 1 ? doc.child(index - 1) : null;
+    const prevPrev = index >= 2 ? doc.child(index - 2) : null;
+
+    let from = paragraphPos;
+    if (prev?.type.name === 'horizontalRule') {
+      from -= prev.nodeSize;
+    } else if (prev?.type.name === 'heading' && prevPrev?.type.name === 'horizontalRule') {
+      from -= prev.nodeSize + prevPrev.nodeSize;
+    } else {
+      from = -1; // keine eröffnende Trennlinie — also kein Block von uns
+    }
+
+    if (from >= 0) {
+      editor.chain().deleteRange({ from, to: paragraphPos + parent.nodeSize }).run();
+      return true;
+    }
+  }
+
+  editor.chain().deleteRange({ from: pos, to: pos + doc.nodeAt(pos)!.nodeSize }).run();
+  return true;
+}
+
+const REVEAL_CLASS = 'is-revealed';
+/** Muss zur Dauer von `internal-link-reveal` in index.css passen. */
+const REVEAL_MS = 1600;
+let revealTimer: number | undefined;
+let revealedEl: HTMLElement | undefined;
+
+/**
+ * Springt zum Link-Chip im Inhalt und hebt ihn kurz hervor. Gibt `false`
+ * zurück, wenn der Eintrag ihn nicht enthält — dann hat der Aufrufer die Wahl,
+ * stattdessen zum Ziel zu navigieren.
+ *
+ * Timer und markiertes Element liegen modulweit, damit ein zweiter Klick auf
+ * denselben Chip wieder aufblitzt (Klasse ab, Reflow, Klasse an) statt am noch
+ * laufenden ersten Durchlauf hängenzubleiben. Nur ein Chip ist je markiert.
+ */
+function revealEntryLink(editor: Editor, target: { id: string; entryType: string }): boolean {
+  const pos = findEntryLinkPos(editor.state.doc, target);
+  if (pos === null) return false;
+
+  // Im Edit-Modus zusätzlich echt selektieren, damit der Cursor dort steht;
+  // im Lesemodus zeigt ProseMirror keine Selektion, dort trägt die Klasse.
+  if (editor.isEditable) editor.chain().setNodeSelection(pos).focus().run();
+
+  const dom = editor.view.nodeDOM(pos);
+  const el = dom instanceof HTMLElement
+    ? (dom.querySelector<HTMLElement>('.internal-link-chip') ?? dom)
+    : null;
+  if (!el) return true;
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  el.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
+
+  if (revealTimer !== undefined) window.clearTimeout(revealTimer);
+  revealedEl?.classList.remove(REVEAL_CLASS);
+  el.classList.remove(REVEAL_CLASS);
+  void el.offsetWidth; // Reflow erzwingen, sonst startet die Animation nicht neu.
+  el.classList.add(REVEAL_CLASS);
+  revealedEl = el;
+  revealTimer = window.setTimeout(() => {
+    el.classList.remove(REVEAL_CLASS);
+    revealTimer = undefined;
+    revealedEl = undefined;
+  }, REVEAL_MS);
+  return true;
 }
 
 interface RichEditorProps {
@@ -92,7 +259,7 @@ export default function RichEditor({
     const { entries, articles, wikiCategories, operations, categories, tasks, taskCategories, altars } = storeRef.current;
     if (entryType === 'journal') {
       const e = entries.find((e) => e.id === id);
-      return e ? (MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓') : null;
+      return e ? (MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? DEFAULT_ENTRY_EMOJI.journal) : null;
     }
     if (entryType === 'wiki') {
       const a = articles.find((a) => a.id === id);
@@ -103,7 +270,7 @@ export default function RichEditor({
     if (entryType === 'operation') {
       const o = operations.find((o) => o.id === id);
       if (!o) return null;
-      return o.icon || categories.find((c) => c.id === o.category_id)?.emoji || '⚡';
+      return o.icon || categories.find((c) => c.id === o.category_id)?.emoji || DEFAULT_ENTRY_EMOJI.operation;
     }
     if (entryType === 'task') {
       const task = tasks.find((task) => task.id === id);
@@ -131,51 +298,9 @@ export default function RichEditor({
   });
 
   // Always-fresh items ref so the extension closure never goes stale.
-  // icon priority: journal → moon phase emoji; wiki → custom icon or category emoji;
-  // operation → category emoji (stored on the category row, not the operation itself);
-  // task → category emoji; altar → none (see below).
-  // Blockreihenfolge von Hand mit der Rail (Registry) synchron gehalten, wie
-  // LinkPickerModal.allItems — nichts erzwingt das.
+  const linkItems = useLinkItems();
   const itemsRef = useRef<SuggestionItem[]>([]);
-  itemsRef.current = [
-    ...entries.map((e) => ({
-      id: e.id,
-      entryType: 'journal' as const,
-      label: e.title,
-      icon: MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓',
-      entry_number: e.entry_number,
-    })),
-    ...tasks.map((task) => ({
-      id: task.id,
-      entryType: 'task' as const,
-      label: task.title,
-      icon: taskCategories.find((c) => c.id === task.category_id)?.emoji || DEFAULT_ENTRY_EMOJI.task,
-    })),
-    ...operations.map((o) => ({
-      id: o.id,
-      entryType: 'operation' as const,
-      label: o.title,
-      category: categories.find((c) => c.id === o.category_id)?.emoji,
-      icon: o.icon || categories.find((c) => c.id === o.category_id)?.emoji || '⚡',
-      entry_number: o.entry_number,
-    })),
-    ...articles.map((a) => ({
-      id: a.id,
-      entryType: 'wiki' as const,
-      label: a.title,
-      category: a.category_id,
-      icon: a.icon || (wikiCategories.find((c) => c.id === a.category_id)?.emoji ?? getCategoryEmoji(a.category_id as any)),
-      entry_number: a.entry_number,
-    })),
-    // Kein icon: item.icon landet beim Einfügen in den Node-Attrs, und die
-    // einzige Altar-Grafik (icon_data) ist eine data-URL — Anzeige über den
-    // Live-Lookup in getIconRef, gespeichert wird nur der Fallback des Chips.
-    ...altars.map((a) => ({
-      id: a.id,
-      entryType: 'altar' as const,
-      label: a.title,
-    })),
-  ];
+  itemsRef.current = linkItems;
 
   const editor = useEditor({
     extensions: [
@@ -315,9 +440,20 @@ export default function RichEditor({
 
       editor.chain().focus().insertContentAt(pos.pos, html).run();
 
-      // Fire event so the active view can merge the routine's tags + operation_ids + wiki_ids
-      if (dragItem.tags.length > 0 || dragItem.operation_ids.length > 0 || dragItem.wiki_ids.length > 0) {
-        document.dispatchEvent(new CustomEvent('routine-drop', { detail: { tags: dragItem.tags, operation_ids: dragItem.operation_ids, wiki_ids: dragItem.wiki_ids } }));
+      // Die Operationen und Wiki-Artikel der Routine landen als Link-Chips
+      // unten im Eintrag — dort, wo das Verlinkungs-Feld der Seitenleiste sie
+      // auch wieder findet. (Früher: eigene Spalten am Journal-Eintrag.)
+      for (const link of [
+        ...dragItem.operation_ids.map((id) => ({ id, entryType: 'operation' as const })),
+        ...dragItem.wiki_ids.map((id) => ({ id, entryType: 'wiki' as const })),
+      ]) {
+        const item = itemsRef.current.find((i) => i.entryType === link.entryType && i.id === link.id);
+        if (item) appendEntryLink(editor, item);
+      }
+
+      // Tags bleiben Sache der View — sie besitzt den lokalen Tag-State.
+      if (dragItem.tags.length > 0) {
+        document.dispatchEvent(new CustomEvent('routine-drop', { detail: { tags: dragItem.tags } }));
       }
     };
 
@@ -375,6 +511,31 @@ export default function RichEditor({
     editor?.setEditable(editable);
   }, [editable, editor]);
 
+  // Anhängen und Entfernen aus dem Verlinkungs-Feld — nur im Edit-Modus.
+  // Bleibt die Quittung aus (kein editierbarer Editor, weil der Eintrag noch
+  // nicht geladen ist), weiß das Feld, dass sein Klick ins Leere ging.
+  useEffect(() => {
+    if (!editor || !editable) return;
+    const off = [
+      subscribeEntryLinkRequest(APPEND_ENTRY_LINK_EVENT, (item) => {
+        appendEntryLink(editor, item);
+        return true;
+      }),
+      subscribeEntryLinkRequest(REMOVE_ENTRY_LINK_EVENT, (target) => removeEntryLink(editor, target)),
+    ];
+    return () => off.forEach((fn) => fn());
+  }, [editor, editable]);
+
+  // Klick auf einen Chip im Verlinkungs-Feld → zur Stelle im Eintrag springen.
+  // Anders als die beiden oben auch im Lesemodus: dort ist es der Normalfall.
+  useEffect(() => {
+    if (!editor) return;
+    return subscribeEntryLinkRequest(
+      REVEAL_ENTRY_LINK_EVENT,
+      (target) => revealEntryLink(editor, target),
+    );
+  }, [editor]);
+
   // File drag & drop from Finder via Tauri's native drag-drop API
   const editorRef = useRef(editor);
   editorRef.current = editor;
@@ -424,11 +585,9 @@ export default function RichEditor({
     const handler = (e: Event) => {
       const { id, entryType: rawEntryType } = (e as CustomEvent<{ id: string; entryType: string }>).detail;
       const entryType = rawEntryType?.trim();
-      // Validate inputs before navigating — guards against synthetic events from XSS in editor content
-      const VALID_TYPES = ['journal', 'wiki', 'operation', 'task', 'altar'] as const;
-      // Accept standard UUIDs and merge-prefixed IDs (8-char base36 prefix prepended during merge import)
-      const UUID_RE = /^([0-9a-z]{8}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!VALID_TYPES.includes(entryType as any) || !UUID_RE.test(id)) return;
+      // Prüfen, bevor navigiert wird — schützt gegen synthetische Events aus
+      // XSS im Editor-Inhalt. Dieselbe Prüfung wie beim Anhängen und Anzeigen.
+      if (!isValidLinkTarget({ id, entryType })) return;
       setActiveView({ type: viewTypeForEntryType(entryType as ContentType), id, mode: 'view' });
     };
     document.addEventListener('internal-link-navigate', handler);

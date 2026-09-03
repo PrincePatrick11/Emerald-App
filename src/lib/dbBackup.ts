@@ -13,6 +13,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { getDb, sweepDanglingLinks } from './db';
+import { remapInternalLinks } from './internalLinkHtml';
 import {
   addVault,
   getActiveDbFile,
@@ -850,17 +851,44 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     return out;
   }
 
+  /**
+   * Die Ziel-IDs der internen Link-Chips IM `content` mitziehen. `remapEntry`
+   * behandelt `content` nur als Bildpfad-Feld; die `data-id`-Attribute darin
+   * blieben sonst auf den alten, hier umbenannten IDs stehen — und weil die
+   * `links`-Tabelle weiter unten sehr wohl umgeschrieben wird, widersprächen
+   * sich Tabelle und Text. Der erste Speichervorgang ließe dann `syncLinks`
+   * über den veralteten Inhalt laufen und die richtigen Zeilen löschen.
+   *
+   * Bewusst immer eine ID zurückgeben: `null` würde den Chip durch seinen Text
+   * ersetzen, und beim Merge existiert das Ziel ja. `remapId` lässt unbekannte
+   * IDs unverändert — dieselbe Konvention wie `remapJsonIds`. Kein `label`:
+   * der Titel des Ziels ändert sich beim Merge nicht.
+   *
+   * Ein Inhalt MIT Chips läuft dabei einmal durch Parsen und Serialisieren und
+   * kann danach minimal anders formatiert sein (Anführungszeichen, leere
+   * Elemente); einer ohne bleibt Byte für Byte gleich. Bewusst in Kauf
+   * genommen: das Markup stammt von TipTap, das es ohnehin bei jedem Speichern
+   * neu schreibt.
+   */
+  const withContentLinks = (row: Row): Row => {
+    if (typeof row.content !== 'string') return row;
+    return {
+      ...row,
+      content: remapInternalLinks(row.content, (link) => ({ id: String(remapId(link.id)) })),
+    };
+  };
+
   const journalEntries = (d.journalEntries ?? []).map((r: Row) =>
-    remapEntry(r, ['content'], ['paradigm_id', 'bannung_type_wiki_id', 'meditation_type_wiki_id'], ['linked_operation_ids', 'linked_wiki_ids'], 'journal_entries')
+    withContentLinks(remapEntry(r, ['content'], ['paradigm_id', 'bannung_type_wiki_id', 'meditation_type_wiki_id'], ['linked_operation_ids', 'linked_wiki_ids'], 'journal_entries'))
   );
   const wikiArticles = (d.wikiArticles ?? []).map((r: Row) => {
-    const row = remapEntry(r, ['content', 'icon', 'cover_image'], [], [], 'wiki_articles');
+    const row = withContentLinks(remapEntry(r, ['content', 'icon', 'cover_image'], [], [], 'wiki_articles'));
     // slug has a UNIQUE constraint — prefix it to avoid collisions on merge
     if (typeof row.slug === 'string') row.slug = `${prefix}-${row.slug}`;
     return row;
   });
   const operations = (d.operations ?? []).map((r: Row) =>
-    remapEntry(r, ['content', 'icon', 'cover_image', 'drawing_data', 'thumbnail_data'], ['charging_technique_wiki_id'], [], 'operations')
+    withContentLinks(remapEntry(r, ['content', 'icon', 'cover_image', 'drawing_data', 'thumbnail_data'], ['charging_technique_wiki_id'], [], 'operations'))
   );
   const routines = (d.routines ?? []).map((r: Row) =>
     remapEntry(r, [], [], ['operation_ids', 'wiki_ids'])

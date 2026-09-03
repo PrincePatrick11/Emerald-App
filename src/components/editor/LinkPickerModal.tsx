@@ -1,15 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, LayoutList, X } from 'lucide-react';
 import { MODULE_LIST } from '../../lib/modules';
-import { useJournalStore } from '../../store/journalStore';
-import { useWikiStore } from '../../store/wikiStore';
-import { useOperationStore } from '../../store/operationStore';
-import { useTaskStore } from '../../store/taskStore';
-import { useAltarStore } from '../../store/altarStore';
-import { getCategoryEmoji } from '../wiki/WikiList';
-import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
-import type { ContentType, MoonPhase } from '../../types';
-import { DEFAULT_ENTRY_EMOJI, ENTRY_TYPE_ICONS, ENTRY_TYPE_LABEL_KEYS, type SuggestionItem } from './SuggestionList';
+import { useLinkItems } from '../../hooks/useLinkItems';
+import { isImageIcon } from '../../lib/helpers';
+import type { ContentType } from '../../types';
+import { ENTRY_TYPE_ICONS, ENTRY_TYPE_LABEL_KEYS, type SuggestionItem } from './SuggestionList';
 import { useTranslation } from 'react-i18next';
 import Modal from '../ui/Modal';
 
@@ -30,70 +25,13 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('all');
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const entries = useJournalStore((s) => s.entries);
-  const articles = useWikiStore((s) => s.articles);
-  const wikiCategories = useWikiStore((s) => s.wikiCategories);
-  const operations = useOperationStore((s) => s.operations);
-  const opCategories = useOperationStore((s) => s.categories);
-  const tasks = useTaskStore((s) => s.tasks);
-  const taskCategories = useTaskStore((s) => s.categories);
-  const altars = useAltarStore((s) => s.altars);
-
   // Focus search on open
   useEffect(() => {
     searchRef.current?.focus();
   }, []);
 
-  // Blockreihenfolge von Hand mit LINK_TYPE_ORDER (Rail) synchron gehalten —
-  // nichts erzwingt das —, damit der „Alle"-Tab die Module in derselben Folge
-  // zeigt wie die Rail und die Tab-Leiste.
-  const allItems = useMemo<SuggestionItem[]>(() => [
-    ...entries
-      .filter((e) => !e.deleted_at)
-      .map((e) => ({
-        id: e.id,
-        entryType: 'journal' as const,
-        label: e.title,
-        icon: MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓',
-        entry_number: e.entry_number,
-      })),
-    ...tasks
-      .filter((task) => !task.deleted_at)
-      .map((task) => ({
-        id: task.id,
-        entryType: 'task' as const,
-        label: task.title,
-        icon: taskCategories.find((c) => c.id === task.category_id)?.emoji || DEFAULT_ENTRY_EMOJI.task,
-      })),
-    ...operations
-      .filter((o) => !o.deleted_at)
-      .map((o) => ({
-        id: o.id,
-        entryType: 'operation' as const,
-        label: o.title,
-        category: opCategories.find((c) => c.id === o.category_id)?.emoji,
-        icon: o.icon || opCategories.find((c) => c.id === o.category_id)?.emoji || '⚡',
-        entry_number: o.entry_number,
-      })),
-    ...articles
-      .filter((a) => !a.deleted_at)
-      .map((a) => ({
-        id: a.id,
-        entryType: 'wiki' as const,
-        label: a.title,
-        category: a.category_id,
-        icon: a.icon || (wikiCategories.find((c) => c.id === a.category_id)?.emoji ?? getCategoryEmoji(a.category_id as any)),
-        entry_number: a.entry_number,
-      })),
-    // Kein icon — wie in RichEditors itemsRef: icon_data ist eine data-URL
-    // und landete sonst in den Node-Attrs; Zeile und Chip rendern den
-    // Emoji-Fallback über getDefaultIcon.
-    ...altars.map((a) => ({
-      id: a.id,
-      entryType: 'altar' as const,
-      label: a.title,
-    })),
-  ], [entries, articles, wikiCategories, operations, opCategories, tasks, taskCategories, altars]);
+  // Reihenfolge = LINK_TYPE_ORDER (Rail), siehe useLinkItems.
+  const allItems: SuggestionItem[] = useLinkItems();
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
@@ -203,11 +141,14 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
                   >
                     {/* Icon */}
                     <span className="text-base w-5 flex-shrink-0 flex items-center justify-center">
-                      {item.icon?.startsWith('data:') ? (
-                        <img src={item.icon} alt="" className="w-4 h-4 object-contain" />
-                      ) : (
-                        item.icon
-                      )}
+                      {(() => {
+                        // displayIcon zuerst: Altäre tragen ihre Grafik nur dort
+                        // (siehe SuggestionItem), `icon` bliebe leer.
+                        const icon = item.displayIcon || item.icon;
+                        return isImageIcon(icon)
+                          ? <img src={icon} alt="" className="w-4 h-4 object-contain" />
+                          : icon;
+                      })()}
                     </span>
 
                     {/* Title */}

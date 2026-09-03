@@ -12,16 +12,131 @@ import { useTagStore } from '../store/tagStore';
 import { useAltarStore } from '../store/altarStore';
 import { reloadModules } from '../store/moduleWiring';
 import { useImportStore } from '../store/importStore';
+import { useTaskStore } from '../store/taskStore';
 import { getDb } from './db';
 import { BUILTIN_WIKI_CATEGORIES } from './schema';
 import { toInt } from './row';
 import { generateId } from './helpers';
+import i18n from '../i18n';
+import { buildLinkItems, linkItemKey, linkItemsByKey } from './linkItems';
+import {
+  extractInternalLinks, internalLinkBlockHtml, remapInternalLinks,
+} from './internalLinkHtml';
+import type { SuggestionItem } from '../components/editor/SuggestionList';
 import {
   DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY,
   DEFAULT_OVERLAY_COLOR, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE,
 } from './altarConstants';
 import { MOON_PHASE_SYMBOLS } from './moonPhase';
 import { noAltarOpenMessage } from './altarExport';
+
+// ── Link-Chips über Vault-Grenzen ────────────────────────────────────────────
+
+/** `buildLinkItems` über die aktuellen Stores — die React-freie Variante von
+ *  `useLinkItems`, für die Import-/Export-Pfade. */
+function linkItemsSnapshot(): SuggestionItem[] {
+  const wiki = useWikiStore.getState();
+  const ops = useOperationStore.getState();
+  const tasks = useTaskStore.getState();
+  return buildLinkItems({
+    entries: useJournalStore.getState().entries,
+    tasks: tasks.tasks,
+    taskCategories: tasks.categories,
+    operations: ops.operations,
+    opCategories: ops.categories,
+    articles: wiki.articles,
+    wikiCategories: wiki.wikiCategories,
+    altars: useAltarStore.getState().altars,
+  }, i18n.t);
+}
+
+/** Der Titel jedes Link-Chips im Inhalt — wandert als `meta.contentLinks` mit. */
+function collectContentLinks(content: string): EmeraldMeta['contentLinks'] {
+  const byKey = linkItemsByKey(linkItemsSnapshot());
+  const seen = new Set<string>();
+  const out: NonNullable<EmeraldMeta['contentLinks']> = [];
+  for (const link of extractInternalLinks(content)) {
+    const key = linkItemKey(link);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ id: link.id, entryType: link.entryType, title: byKey.get(key)?.label ?? '' });
+  }
+  return out.length ? out : undefined;
+}
+
+/**
+ * Zeigt jeden Link-Chip des importierten Inhalts auf das Ziel IM DIESEN Vault:
+ * erst über die ID (derselbe Vault oder ein bereits übereinstimmender Eintrag),
+ * dann über den Titel aus `meta.contentLinks` — und für alte Dateien ohne dieses
+ * meta über das `data-label`, das im Chip selbst steht. Findet sich nichts,
+ * wird der Chip zu seinem Text (siehe `remapInternalLinks`).
+ *
+ * In jedem Treffer wird auch das Label auf den Titel des lokalen Ziels gesetzt.
+ * Sonst könnte der Chip etwas anderes behaupten, als er trifft: der Titel-Weg
+ * schreibt die ID um und ließe den mitgelieferten Text stehen, und selbst bei
+ * einem ID-Treffer kann das Ziel hier längst umbenannt sein. Angezeigt wird der
+ * Text nur da, wo kein Live-Lookup greift — im Export und in Markdown.
+ */
+function remapImportedLinks(
+  content: string,
+  manifest: EmeraldMeta['contentLinks'],
+  items: SuggestionItem[],
+): string {
+  const byKey = linkItemsByKey(items);
+  const titleByKey = new Map((manifest ?? []).map((l) => [linkItemKey(l), l.title]));
+
+  return remapInternalLinks(content, (link) => {
+    const key = linkItemKey(link);
+    const local = byKey.get(key);
+    if (local) return { id: local.id, label: local.label };
+
+    const title = titleByKey.get(key) || link.label;
+    if (!title) return null;
+    const match = items.find((i) => i.entryType === link.entryType && i.label === title);
+    return match ? { id: match.id, label: match.label } : null;
+  });
+}
+
+/**
+ * Hängt die Verknüpfungen aus den abgelösten Journal-Spalten als Blöcke an den
+ * Inhalt — damit eine `.emerald`- oder Markdown-Datei von vor Migration v36
+ * dort landet, wo Verknüpfungen heute leben, statt in Spalten ohne Anzeige.
+ *
+ * `opIds` und `wikiIds` müssen bereits auf DIESEN Vault aufgelöst sein; das
+ * Auflösen selbst unterscheidet sich je Dateiformat und bleibt beim Aufrufer.
+ */
+function appendLegacyLinks(
+  content: string,
+  items: SuggestionItem[],
+  opIds: string[],
+  wikiIds: string[],
+): string {
+  // Was der Inhalt schon verlinkt, wird nicht erneut angehängt — über beide
+  // Listen hinweg, deshalb eine gemeinsame Menge.
+  const already = new Set(extractInternalLinks(content).map(linkItemKey));
+  let out = content;
+
+  for (const [ids, entryType] of [[opIds, 'operation'], [wikiIds, 'wiki']] as const) {
+    for (const id of ids) {
+      const key = linkItemKey({ id, entryType });
+      if (already.has(key)) continue;
+      already.add(key);
+      const item = items.find((i) => linkItemKey(i) === key);
+      if (!item) continue;
+      out += internalLinkBlockHtml(
+        {
+          id: item.id,
+          entryType,
+          label: item.label,
+          icon: item.icon ?? null,
+          entry_number: item.entry_number ?? null,
+        },
+        item.categoryLabel ?? '',
+      );
+    }
+  }
+  return out;
+}
 
 // ── File format ──────────────────────────────────────────────────────────────
 
@@ -44,6 +159,10 @@ interface EmeraldMeta {
   isMeditation?: boolean;
   meditationTitle?: string;
   meditationDuration?: number;
+  // Altbestand: die beiden abgelösten Journal-Spalten. Seit Migration v36
+  // stehen Journal-Verknüpfungen im `content` und reisen über `contentLinks`;
+  // gefüllt sind diese Felder nur noch für Einträge, deren Spalten ein Backup
+  // von vor v36 wiederhergestellt hat.
   linkedOps?: Array<{ id: string; title: string }>;
   linkedWiki?: Array<{ id: string; title: string }>;
   // legacy (v1 files written before ID was stored)
@@ -61,6 +180,15 @@ interface EmeraldMeta {
   icon?: string;
   // common
   tags?: string[];
+  /**
+   * Titel zu jedem Link-Chip im `content` — die Reparaturhilfe für den Import
+   * in einen FREMDEN Vault, wo dieselbe Notiz eine andere ID hat. Ohne das
+   * zeigen die Chips nach dem Import auf IDs, die es dort nicht gibt.
+   *
+   * Ersetzt `linkedOps`/`linkedWiki` in dieser Rolle und deckt dabei alle fünf
+   * Modul-Typen ab, nicht nur Operationen und Wiki-Artikel.
+   */
+  contentLinks?: Array<{ id: string; entryType: string; title: string }>;
   // altar — background_image_data is a stored image filename, so it's routed
   // through `images` like content images. icon_data, thumbnail_data, and item
   // images are already data: URLs (or a plain emoji, for icon) in the DB, so
@@ -200,6 +328,10 @@ export async function exportAsEmerald(): Promise<void> {
     meta.icon      = op.icon ?? undefined;
     meta.tags      = (op.tags ?? []) as string[];
   }
+
+  // Titel zu jedem Link-Chip im Inhalt — gilt für alle drei Typen, denn
+  // Journal, Wiki und Operationen können gleichermaßen verlinken.
+  meta.contentLinks = collectContentLinks(content);
 
   // Embed all local images from content as base64
   const images: Record<string, string> = {};
@@ -360,15 +492,29 @@ export async function importFromEmerald(): Promise<void> {
   // Sanitize imported HTML — strip scripts and event handlers while preserving
   // TipTap-specific data-* attributes (internal link chips, image alignment)
   // and inline styles (image width, text alignment, image margins).
-  const content = DOMPurify.sanitize(remapped, {
-    ADD_ATTR: ['data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon', 'data-align'],
+  // Eine Momentaufnahme für den ganzen Import: der Remap und, beim Journal, die
+  // Alt-Verknüpfungen brauchen dieselbe Liste, und zwischen beiden ändert sich
+  // am Bestand nichts.
+  const items = linkItemsSnapshot();
+
+  // Link-Ziele zuerst auf diesen Vault zeigen, DOMPurify danach: der Remap
+  // parst das HTML und serialisiert es wieder, und ein solcher Umlauf darf
+  // niemals NACH dem Sanitizer stehen — sonst ist das, was in die Datenbank
+  // geht, nicht mehr das, was er geprüft hat. Der Remap selbst liest nur
+  // data-Attribute und ersetzt Knoten, braucht also keinen sauberen Input.
+  const relinked = remapImportedLinks(remapped, file.meta.contentLinks, items);
+  const content = DOMPurify.sanitize(relinked, {
+    ADD_ATTR: [
+      'data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon',
+      'data-entry-number', 'data-align',
+    ],
   });
   const tagNames = await ensureTagNames(file.meta.tags ?? []);
 
   let newId: string;
   try {
     if (file.type === 'journal') {
-      newId = await importJournalEntry(file, content, tagNames);
+      newId = await importJournalEntry(file, content, tagNames, items);
     } else if (file.type === 'wiki') {
       newId = await importWikiArticle(file, content, tagNames);
     } else {
@@ -384,7 +530,9 @@ export async function importFromEmerald(): Promise<void> {
   await message('Entry imported successfully!', { title: 'Import', kind: 'info' });
 }
 
-async function importJournalEntry(file: EmeraldFile, content: string, tagNames: string[]): Promise<string> {
+async function importJournalEntry(
+  file: EmeraldFile, content: string, tagNames: string[], items: SuggestionItem[],
+): Promise<string> {
   const { createEntry, updateEntry } = useJournalStore.getState();
   const { articles }   = useWikiStore.getState();
   const { operations } = useOperationStore.getState();
@@ -414,10 +562,14 @@ async function importJournalEntry(file: EmeraldFile, content: string, tagNames: 
       : (file.meta.linkedWikiTitles ?? []).map(t => articles.find(a => a.title === t)?.id)
   ).filter(Boolean) as string[];
 
+  // Dateien von vor Migration v36 tragen ihre Journal-Verknüpfungen noch im
+  // meta statt im Inhalt. Sie werden hier zu Blöcken im Text — in die Spalten
+  // geschrieben würden sie nur noch in der read-only Brücke des
+  // Verlinkungs-Felds erscheinen: kein Chip, kein Rückverweis, kein Suchtreffer.
   const entry = await createEntry();
   await updateEntry(entry.id, {
     title: file.title,
-    content,
+    content: appendLegacyLinks(content, items, linkedOpIds, linkedWikiIds),
     tags: tagNames,
     moon_phase: file.meta.moonPhase ?? null,
     paradigm_id: paradigmId,
@@ -426,8 +578,6 @@ async function importJournalEntry(file: EmeraldFile, content: string, tagNames: 
     is_meditation: file.meta.isMeditation ?? false,
     meditation_type_wiki_id: meditationId,
     meditation_duration: file.meta.meditationDuration ?? null,
-    linked_operation_ids: linkedOpIds,
-    linked_wiki_ids: linkedWikiIds,
   });
   return entry.id;
 }
@@ -790,9 +940,13 @@ async function importJournalFromMarkdown(
       : articles.find(a => a.title === title)?.id
     ).filter(Boolean) as string[];
 
+  // Wie beim `.emerald`-Import: die Verknüpfungen aus der Markdown-Kopfzeile
+  // landen als Blöcke im Text, nicht in den abgelösten Spalten.
+  const content = appendLegacyLinks(html, linkItemsSnapshot(), linkedOpIds, linkedWikiIds);
+
   const entry = await createEntry();
   await updateEntry(entry.id, {
-    title, content: html, tags: tagNames,
+    title, content, tags: tagNames,
     moon_phase: moonPhase,
     paradigm_id: paradigmId,
     is_bannung: !!bannungName,
@@ -800,8 +954,6 @@ async function importJournalFromMarkdown(
     is_meditation: !!meditationName,
     meditation_type_wiki_id: meditationId,
     meditation_duration: meditationDuration,
-    linked_operation_ids: linkedOpIds,
-    linked_wiki_ids: linkedWikiIds,
   });
   return entry.id;
 }

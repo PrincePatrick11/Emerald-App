@@ -766,6 +766,36 @@ html[data-theme='emerald-parchment'] .border-stone-600 { border-color: var(--bor
   background-color: var(--link-chip-bg-hover);
 }
 
+/* Kurzzeitige Markierung, wenn das Verlinkungs-Feld der rechten Seitenleiste
+   zu diesem Chip gesprungen ist. Der Ring liegt außen (box-shadow statt
+   border), damit der Chip beim Aufblitzen nicht in der Zeile springt.
+
+   Bewusst --focus-ring und NICHT --link-chip-border: letzteres ist in
+   emerald-noctis `transparent` (der ruhende Chip hat dort keinen Rand), der
+   Ring wäre im dunklen Theme also unsichtbar gewesen. --focus-ring trägt in
+   beiden Themes eine sichtbare Farbe und ist genau dafür da, den Blick kurz
+   auf eine Stelle zu ziehen. */
+.internal-link-chip.is-revealed {
+  background-color: var(--link-chip-bg-hover);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+  animation: internal-link-reveal 1.6s ease-out;
+}
+
+@keyframes internal-link-reveal {
+  0%, 55% { box-shadow: 0 0 0 2px var(--focus-ring); }
+  100%    { box-shadow: 0 0 0 2px transparent; }
+}
+
+/* Ohne Bewegung bleibt der Ring einfach stehen, bis die Klasse nach 1,6s
+   wieder entfernt wird — die Markierung geht nicht verloren, nur das
+   Ausblenden. (Wie bei .app-sidebar-animated: WebKitGTK vor 2.38 meldet immer
+   `no-preference` und kann sie nicht abbestellen.) */
+@media (prefers-reduced-motion: reduce) {
+  .internal-link-chip.is-revealed {
+    animation: none;
+  }
+}
+
 .internal-link-chip:hover .internal-link-label {
   color: var(--link-chip-text-hover);
 }
@@ -844,6 +874,14 @@ html[data-theme='emerald-parchment'] .border-stone-600 { border-color: var(--bor
   background-color: var(--linked-chip-bg);
   border-color: var(--linked-chip-border);
   color: var(--linked-chip-text);
+}
+
+/* Die Knöpfe im Chip — Springen und Entfernen. `--focus-ring` trägt in beiden
+   Themes eine sichtbare Farbe, die Regel gilt damit für beide. */
+.linked-entry-chip button:focus-visible {
+  outline: none;
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .linked-entry-menu {

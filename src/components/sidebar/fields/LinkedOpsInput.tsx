@@ -1,9 +1,15 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
 import { useOperationStore } from '../../../store/operationStore';
-import { useOutsideClick } from '../../../hooks/useOutsideClick';
+import { isImageIcon } from '../../../lib/helpers';
+import { DEFAULT_ENTRY_EMOJI } from '../../../lib/modules';
+import LinkedEntryPicker, { LINK_RESULT_LIMIT, LinkedEntryChip } from './LinkedEntryPicker';
 
+/**
+ * ID-Array-Editor für Operationen — heute nur noch für Routinen-Vorlagen
+ * (`RoutinesPanel`). Was ein EINTRAG verlinkt, steht in seinem Inhalt und
+ * gehört ins `LinkedEntriesField`.
+ */
 export default function LinkedOpsInput({
   ids, onChange, inputCls,
 }: {
@@ -15,79 +21,49 @@ export default function LinkedOpsInput({
   const operations = useOperationStore((s) => s.operations);
   const categories = useOperationStore((s) => s.categories);
   const [query, setQuery] = useState('');
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
 
-  useOutsideClick(open, () => setOpen(false), { refs: [ref] });
+  const iconOf = (op: typeof operations[number]) =>
+    op.icon || categories.find((c) => c.id === op.category_id)?.emoji || DEFAULT_ENTRY_EMOJI.operation;
 
   const filtered = useMemo(() =>
     operations
       .filter((o) => !ids.includes(o.id) && !o.deleted_at &&
         o.title.toLowerCase().includes(query.toLowerCase()))
-      .slice(0, 8),
+      .slice(0, LINK_RESULT_LIMIT),
     [operations, ids, query]);
 
   const selectedOps = useMemo(() =>
     ids.map((id) => operations.find((o) => o.id === id)).filter(Boolean) as typeof operations,
     [ids, operations]);
 
+  const opIcon = (icon: string) => isImageIcon(icon)
+    ? <img src={icon} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
+    : <span className="flex-shrink-0">{icon}</span>;
+
   return (
-    <div ref={ref} className="space-y-1.5">
-      {/* Selected chips */}
-      {selectedOps.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {selectedOps.map((op) => {
-            const cat = categories.find((c) => c.id === op.category_id);
-            const opIcon = op.icon || cat?.emoji || '⚡';
-            return (
-              <span key={op.id} className="linked-entry-chip flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-stone-800/60 border border-stone-700/40 text-stone-300">
-                {opIcon.startsWith('data:')
-                  ? <img src={opIcon} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
-                  : <span>{opIcon}</span>}
-                <span className="truncate max-w-[110px]">{op.title}</span>
-                <button
-                  onClick={() => onChange(ids.filter((i) => i !== op.id))}
-                  className="text-stone-600 hover:text-stone-400 ml-0.5 flex-shrink-0"
-                >
-                  <X size={10} />
-                </button>
-              </span>
-            );
-          })}
-        </div>
-      )}
-      {/* Search */}
-      <div className="relative">
-        <input
-          value={query}
-          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          placeholder={t('search.operations')}
-          className={inputCls}
+    <LinkedEntryPicker
+      chips={selectedOps.map((op) => (
+        <LinkedEntryChip
+          key={op.id}
+          icon={opIcon(iconOf(op))}
+          label={op.title}
+          onRemove={() => onChange(ids.filter((i) => i !== op.id))}
+          removeTitle={t('properties.removeLink')}
         />
-        {open && (
-          <div className="linked-entry-menu absolute top-full left-0 right-0 mt-1 z-50 border border-stone-700/60 rounded-lg shadow-xl py-1 max-h-40 overflow-y-auto">
-            {filtered.length === 0 ? (
-              <p className="text-xs text-stone-600 px-3 py-2">{t('search.noResultsShort')}</p>
-            ) : filtered.map((op) => {
-              const cat = categories.find((c) => c.id === op.category_id);
-              const opIcon = op.icon || cat?.emoji || '⚡';
-              return (
-                <button
-                  key={op.id}
-                  onMouseDown={(e) => { e.preventDefault(); onChange([...ids, op.id]); setQuery(''); setOpen(false); }}
-                  className="linked-entry-menu-item w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs text-stone-400 hover:text-stone-200"
-                >
-                  {opIcon.startsWith('data:')
-                    ? <img src={opIcon} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
-                    : <span>{opIcon}</span>}
-                  <span className="truncate">{op.title}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
+      ))}
+      results={filtered}
+      resultKey={(op) => op.id}
+      onSelect={(op) => onChange([...ids, op.id])}
+      query={query}
+      onQueryChange={setQuery}
+      placeholder={t('search.operations')}
+      inputCls={inputCls}
+      renderResult={(op) => (
+        <>
+          {opIcon(iconOf(op))}
+          <span className="truncate">{op.title}</span>
+        </>
+      )}
+    />
   );
 }

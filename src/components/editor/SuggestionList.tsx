@@ -2,15 +2,11 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BookOpen, CheckSquare, Flame, Library, Wand2, type LucideIcon } from 'lucide-react';
 import type { ContentType } from '../../types';
+import type { SuggestionItem } from '../../lib/linkItems';
 
-export interface SuggestionItem {
-  id: string;
-  entryType: ContentType;
-  label: string;
-  category?: string;
-  icon?: string;
-  entry_number?: number;
-}
+/** Wohnt in `lib/linkItems.ts` bei `buildLinkItems`, das diese Werte erzeugt —
+ *  hier nur weitergereicht für die Komponenten, die den Typ von hier holen. */
+export type { SuggestionItem };
 
 /** Nicht die Registry (`MODULES`): die ist nach View-Typ (plural) verschlüsselt,
  *  hier zählt der Link-Typ. Eine Reihe für die Suggestion-Liste und
@@ -23,15 +19,9 @@ export const ENTRY_TYPE_ICONS: Record<ContentType, LucideIcon> = {
   altar: Flame,
 };
 
-/** Emoji-Fallback je Link-Typ, wenn weder eigenes Icon noch Kategorie-Emoji
- *  greift — eine Wahrheit für Chip-NodeView, Editor-Lookups, Picker, Export. */
-export const DEFAULT_ENTRY_EMOJI: Record<ContentType, string> = {
-  journal: '📓',
-  wiki: '📚',
-  operation: '⚡',
-  task: '✅',
-  altar: '🔥',
-};
+/** Wohnt in `lib/modules.ts`, damit auch `lib/` sie erreicht — hier nur
+ *  weitergereicht für die Komponenten, die sie von hier importieren. */
+export { DEFAULT_ENTRY_EMOJI } from '../../lib/modules';
 
 /** Übersetzte Typ-Labels — Tabs und Badges im LinkPicker, Badge hier. */
 export const ENTRY_TYPE_LABEL_KEYS: Record<ContentType, string> = {

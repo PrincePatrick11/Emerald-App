@@ -1,4 +1,6 @@
 import { getDb } from './db';
+import { extractInternalLinks } from './internalLinkHtml';
+import type { ContentType } from '../types';
 
 export interface BacklinkEntry {
   id: string;
@@ -8,17 +10,106 @@ export interface BacklinkEntry {
   type: 'journal' | 'wiki' | 'operation';
 }
 
-/** Parses HTML content and returns all internal link nodes found. */
-function extractInternalLinks(
-  html: string
-): Array<{ id: string; entryType: string }> {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-  const spans = doc.querySelectorAll('span[data-type="internalLink"]');
-  return Array.from(spans).map((span) => ({
-    id: span.getAttribute('data-id') ?? '',
-    entryType: span.getAttribute('data-entry-type') ?? 'wiki',
-  })).filter((l) => l.id);
+/** Was das Verlinkungs-Feld der Seitenleiste an den Editor schickt. Deckt sich
+ *  mit `SuggestionItem` (dort mit `label` als Pflichtfeld), bleibt hier aber
+ *  eigenständig: `lib/` importiert keine Komponenten. */
+export interface EntryLinkRequest {
+  id: string;
+  entryType: ContentType;
+  label: string;
+  icon?: string | null;
+  /** Überschrift über dem angehängten Link — siehe `SuggestionItem.categoryLabel`. */
+  categoryLabel?: string;
+  entry_number?: number | null;
+}
+
+const VALID_ENTRY_TYPES: readonly string[] = ['journal', 'wiki', 'operation', 'task', 'altar'];
+/** Standard-UUIDs und die beim Merge-Import vorangestellte 8-Zeichen-Kennung. */
+const LINK_ID_RE = /^([0-9a-z]{8}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Ist das ein plausibles Link-Ziel? Die Link-Events reisen über
+ * `document` und sind damit für jedes Skript im WebView erreichbar; die
+ * Handler prüfen deshalb, was sie bekommen, bevor sie navigieren oder gar in
+ * den Eintrag schreiben. Eine Prüfung für alle drei Events (Navigieren,
+ * Anhängen, Anzeigen) — vorher hatte nur das Navigieren eine, als Kopie.
+ */
+export function isValidLinkTarget(target: { id?: unknown; entryType?: unknown } | null | undefined): boolean {
+  if (!target) return false;
+  return typeof target.id === 'string'
+    && LINK_ID_RE.test(target.id)
+    && VALID_ENTRY_TYPES.includes(String(target.entryType).trim());
+}
+
+/**
+ * Die Seitenleiste kennt den TipTap-Editor nicht — sie bittet ihn per Event,
+ * einen Link unten anzuhängen. Dasselbe Muster wie `internal-link-navigate`
+ * und `routine-drop`; der Editor der geöffneten Ansicht hört zu, solange er
+ * editierbar ist.
+ */
+export const APPEND_ENTRY_LINK_EVENT = 'entry-link-append';
+
+/** `true`, wenn ein editierbarer Editor die Bitte angenommen hat (er quittiert
+ *  mit `preventDefault`). `false` heißt: es lauscht gerade keiner — der Aufrufer
+ *  darf den Link dann nicht als eingefügt behandeln. */
+export function requestEntryLinkAppend(item: EntryLinkRequest): boolean {
+  const event = new CustomEvent<EntryLinkRequest>(APPEND_ENTRY_LINK_EVENT, {
+    detail: item,
+    cancelable: true,
+  });
+  return !document.dispatchEvent(event);
+}
+
+/**
+ * Bitte an den geöffneten Editor, zu einem Link im Inhalt zu springen und ihn
+ * kurz hervorzuheben. Gegenstück zum Anhängen — nach derselben Quittungsregel:
+ * `false` heißt, der Link steht nicht (mehr) im Eintrag, und der Aufrufer darf
+ * stattdessen zum Ziel navigieren.
+ */
+export const REVEAL_ENTRY_LINK_EVENT = 'entry-link-reveal';
+
+export function requestEntryLinkReveal(target: { id: string; entryType: ContentType }): boolean {
+  const event = new CustomEvent(REVEAL_ENTRY_LINK_EVENT, {
+    detail: target,
+    cancelable: true,
+  });
+  return !document.dispatchEvent(event);
+}
+
+/**
+ * Bitte an den Editor, den Link aus dem Inhalt zu entfernen. Nach derselben
+ * Quittungsregel: `false` heißt, es lauscht kein editierbarer Editor oder der
+ * Link steht nicht im Text.
+ */
+export const REMOVE_ENTRY_LINK_EVENT = 'entry-link-remove';
+
+export function requestEntryLinkRemove(target: { id: string; entryType: ContentType }): boolean {
+  const event = new CustomEvent(REMOVE_ENTRY_LINK_EVENT, {
+    detail: target,
+    cancelable: true,
+  });
+  return !document.dispatchEvent(event);
+}
+
+/**
+ * Die Gegenseite der drei `requestEntryLink*`-Bitten: prüft das Ziel und
+ * quittiert per `preventDefault`, wenn `handler` die Bitte angenommen hat.
+ * Gibt die Abmeldefunktion zurück.
+ *
+ * Zusammen mit den Request-Funktionen liegt damit das ganze Protokoll hier —
+ * vorher stand die Empfängerseite dreimal fast gleich im RichEditor.
+ */
+export function subscribeEntryLinkRequest(
+  eventName: string,
+  handler: (target: EntryLinkRequest) => boolean,
+): () => void {
+  const listener = (e: Event) => {
+    const detail = (e as CustomEvent<EntryLinkRequest>).detail;
+    if (!isValidLinkTarget(detail)) return;
+    if (handler(detail)) e.preventDefault();
+  };
+  document.addEventListener(eventName, listener);
+  return () => document.removeEventListener(eventName, listener);
 }
 
 /** Updates the links table for a given source after content is saved. */

@@ -258,6 +258,47 @@ async function seedImageRefs(db) {
   );
 }
 
+/**
+ * Journal-Verknuepfungen, wie sie vor v36 in den Spalten standen: eine
+ * Operation und ein Wiki-Artikel, davon einer zusaetzlich schon als Chip im
+ * Text (darf nicht doppelt angehaengt werden), plus eine Zeile mit kaputtem
+ * JSON, die die Migration in Ruhe lassen muss.
+ *
+ * Eigene Datenbank statt seedLegacyData, damit die Zaehl-Pruefungen dort nicht
+ * verrutschen.
+ */
+async function seedLinkedIds(db) {
+  const chip = '<span data-type="internalLink" class="internal-link" data-id="w1" data-entry-type="wiki" data-label="Artikel">Artikel</span>';
+  // j1: der Normalfall — eine Operation und ein Artikel, beide nur in den Spalten.
+  await db.execute(
+    `INSERT INTO journal_entries (id,title,content,created_at,updated_at,tags,linked_operation_ids,linked_wiki_ids)
+     VALUES ('j1','Eintrag','<p>Bestehender Text</p>',$1,$1,'[]','["o1"]','["w1"]')`,
+    [now]
+  );
+  // j2: kaputtes JSON.
+  await db.execute(
+    `INSERT INTO journal_entries (id,title,content,created_at,updated_at,tags,linked_operation_ids)
+     VALUES ('j2','Zweiter','<p>Zweiter</p>',$1,$1,'[]','{oops')`,
+    [now]
+  );
+  // j3: w1 steht schon als Chip im Text (kein zweiter Block), w2 gibt es nicht.
+  await db.execute(
+    `INSERT INTO journal_entries (id,title,content,created_at,updated_at,tags,linked_wiki_ids)
+     VALUES ('j3','Dritter',$2,$1,$1,'[]','["w1","w2"]')`,
+    [now, `<p>${chip}</p>`]
+  );
+  await db.execute(
+    `INSERT INTO wiki_articles (id,title,slug,content,category,created_at,updated_at,tags)
+     VALUES ('w1','Artikel','artikel','','ritual',$1,$1,'[]')`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags)
+     VALUES ('o1','Operation','','sigils',$1,$1,'[]')`,
+    [now]
+  );
+}
+
 async function seedLegacyData(db) {
   await db.execute(
     `INSERT INTO journal_entries (id,title,content,created_at,updated_at,tags,linked_wiki_ids)
@@ -636,6 +677,75 @@ console.log('\n8. Migration v35: Bildverweise\n');
     [...used].join(', ')
   );
   v35.close();
+}
+
+console.log('\n8b. Migration v36: Journal-Verknuepfungen in den Inhalt\n');
+
+{
+  const v36 = await buildViaChain('v36.db', seedLinkedIds);
+  const [entry] = await v36.select(
+    "SELECT content, linked_operation_ids, linked_wiki_ids FROM journal_entries WHERE id='j1'"
+  );
+  const [broken] = await v36.select(
+    "SELECT content, linked_operation_ids FROM journal_entries WHERE id='j2'"
+  );
+  const links = await v36.select("SELECT target_id, target_type FROM links WHERE source_id='j1'");
+
+  check(
+    'die Operation steht als Link-Chip im Inhalt',
+    entry.content.includes('data-id="o1"') && entry.content.includes('data-entry-type="operation"'),
+    entry.content
+  );
+  check(
+    'der Wiki-Artikel ebenso',
+    entry.content.includes('data-id="w1"') && entry.content.includes('data-entry-type="wiki"'),
+    entry.content
+  );
+  check(
+    'jeder Link bekam Trennlinie und Kategorie-Ueberschrift',
+    (entry.content.match(/<hr>/g) ?? []).length === 2 && (entry.content.match(/<h3>/g) ?? []).length === 2,
+    entry.content
+  );
+  check(
+    'der vorhandene Text blieb davor stehen',
+    entry.content.startsWith('<p>Bestehender Text</p>'),
+    entry.content
+  );
+  check(
+    'die beiden Spalten sind geleert',
+    entry.linked_operation_ids === '[]' && entry.linked_wiki_ids === '[]',
+    `${entry.linked_operation_ids} / ${entry.linked_wiki_ids}`
+  );
+  // Die Migration schreibt an den Stores vorbei und muss den Spiegel selbst
+  // nachziehen — sonst fehlen dem Eintrag seine Rueckverweise.
+  check(
+    'die links-Tabelle wurde nachgezogen',
+    links.length === 2 && links.some((l) => l.target_id === 'o1' && l.target_type === 'operation'),
+    JSON.stringify(links)
+  );
+  // Kaputtes JSON darf die Spalte nicht leeren: der Originalwert waere sonst
+  // unwiederbringlich weg.
+  check(
+    'kaputtes JSON laesst die Zeile unangetastet',
+    broken.linked_operation_ids === '{oops' && broken.content === '<p>Zweiter</p>',
+    `${broken.linked_operation_ids} / ${broken.content}`
+  );
+
+  const [third] = await v36.select(
+    "SELECT content, linked_wiki_ids FROM journal_entries WHERE id='j3'"
+  );
+  check(
+    'ein bereits im Text verlinktes Ziel wird nicht doppelt angehaengt',
+    (third.content.match(/data-id="w1"/g) ?? []).length === 1 && !third.content.includes('<hr>'),
+    third.content
+  );
+  check(
+    'ein nicht mehr existierendes Ziel wird uebersprungen, die Spalte trotzdem geleert',
+    !third.content.includes('data-id="w2"') && third.linked_wiki_ids === '[]',
+    `${third.content} / ${third.linked_wiki_ids}`
+  );
+
+  v36.close();
 }
 
 /* ------------------------------------------------------------------ *

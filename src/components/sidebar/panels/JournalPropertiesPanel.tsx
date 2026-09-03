@@ -2,11 +2,9 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
 import { useWikiStore } from '../../../store/wikiStore';
-import { useOperationStore } from '../../../store/operationStore';
 import { useJournalStore } from '../../../store/journalStore';
 import TagInput from '../../editor/TagInput';
-import LinkedOpsInput from '../fields/LinkedOpsInput';
-import LinkedWikiInput from '../fields/LinkedWikiInput';
+import LinkedEntriesField from '../fields/LinkedEntriesField';
 import PropertiesEditView from '../fields/PropertiesEditView';
 import PropertiesReadView from '../fields/PropertiesReadView';
 import { PropertySummaryRow } from '../fields/PropertySummaryRow';
@@ -16,14 +14,18 @@ import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
 export default function JournalPropertiesPanel() {
   const { t } = useTranslation();
   const activeView = useUIStore((s) => s.activeView);
-  const setActiveView = useUIStore((s) => s.setActiveView);
   const isEditing = activeView.mode === 'edit';
   const articles = useWikiStore((s) => s.articles);
-  const operations = useOperationStore((s) => s.operations);
   const entries = useJournalStore((s) => s.entries);
   const updateEntry = useJournalStore((s) => s.updateEntry);
 
   const entry = activeView.id ? entries.find((e) => e.id === activeView.id) : null;
+
+  // Verknüpfungen aus den alten Spalten — siehe `legacyIds` in LinkedEntriesField.
+  const legacyLinks = useMemo(() => [
+    ...(entry?.linked_operation_ids ?? []).map((id) => ({ id, entryType: 'operation' as const })),
+    ...(entry?.linked_wiki_ids ?? []).map((id) => ({ id, entryType: 'wiki' as const })),
+  ], [entry?.linked_operation_ids, entry?.linked_wiki_ids]);
 
   const paradigmArticles = useMemo(() => articles.filter((a) => a.category_id === 'paradigm'), [articles]);
   const bannungArticles = useMemo(() => articles.filter((a) => a.category_id === 'bannung' && !a.deleted_at), [articles]);
@@ -39,8 +41,6 @@ export default function JournalPropertiesPanel() {
     const paradigmaArt = entry.paradigm_id ? articles.find((a) => a.id === entry.paradigm_id) : undefined;
     const bannungArt = entry.bannung_type_wiki_id ? articles.find((a) => a.id === entry.bannung_type_wiki_id) : undefined;
     const meditationArt = entry.meditation_type_wiki_id ? articles.find((a) => a.id === entry.meditation_type_wiki_id) : undefined;
-    const linkedOps = (entry.linked_operation_ids ?? []).map((id) => operations.find((o) => o.id === id)).filter(Boolean) as typeof operations;
-    const linkedWiki = (entry.linked_wiki_ids ?? []).map((id) => articles.find((a) => a.id === id)).filter(Boolean) as typeof articles;
 
     return (
       <PropertiesReadView>
@@ -50,38 +50,10 @@ export default function JournalPropertiesPanel() {
           label={`🧘 ${t('properties.meditation')}`}
           value={meditationArt ? `${meditationArt.title}${entry.meditation_duration ? ` (${entry.meditation_duration} min)` : ''}` : t('properties.none')}
         />
-        {linkedOps.length > 0 && (
-          <div>
-            <p className="label-xs mb-2">⚡ {t('properties.linkedOperations')}</p>
-            <div className="flex flex-wrap gap-1">
-              {linkedOps.map((op) => (
-                <button
-                  key={op.id}
-                  onClick={() => setActiveView({ type: 'operations', id: op.id, mode: 'view' })}
-                  className="linked-entry-chip flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-stone-800/60 border border-stone-700/40 text-stone-300 hover:border-stone-500/60 transition-colors"
-                >
-                  <span className="truncate max-w-[140px]">{op.title}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {linkedWiki.length > 0 && (
-          <div>
-            <p className="label-xs mb-2">📖 {t('properties.linkedWikiArticles')}</p>
-            <div className="flex flex-wrap gap-1">
-              {linkedWiki.map((a) => (
-                <button
-                  key={a.id}
-                  onClick={() => setActiveView({ type: 'wiki', id: a.id, mode: 'view' })}
-                  className="linked-entry-chip flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-stone-800/60 border border-stone-700/40 text-stone-300 hover:border-stone-500/60 transition-colors"
-                >
-                  <span className="truncate max-w-[140px]">{a.title}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        <div>
+          <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
+          <LinkedEntriesField content={entry.content} legacyIds={legacyLinks} />
+        </div>
         <div>
           <p className="label-xs mb-2">{t('properties.tags')}</p>
           <TagInput tags={entry.tags ?? []} onChange={() => {}} readOnly />
@@ -136,21 +108,8 @@ export default function JournalPropertiesPanel() {
       )}
 
       <div>
-        <p className="label-xs mb-2">⚡ {t('properties.linkedOperations')}</p>
-        <LinkedOpsInput
-          ids={entry.linked_operation_ids ?? []}
-          onChange={(ids) => updateEntry(entry.id, { linked_operation_ids: ids })}
-          inputCls={inputCls}
-        />
-      </div>
-
-      <div>
-        <p className="label-xs mb-2">📖 {t('properties.linkedWikiArticles')}</p>
-        <LinkedWikiInput
-          ids={entry.linked_wiki_ids ?? []}
-          onChange={(ids) => updateEntry(entry.id, { linked_wiki_ids: ids })}
-          inputCls={inputCls}
-        />
+        <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
+        <LinkedEntriesField content={entry.content} legacyIds={legacyLinks} editable inputCls={inputCls} />
       </div>
 
       <div>

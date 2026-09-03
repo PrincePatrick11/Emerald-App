@@ -1,10 +1,14 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
 import { useWikiStore } from '../../../store/wikiStore';
-import { useOutsideClick } from '../../../hooks/useOutsideClick';
 import { getCategoryEmoji } from '../../wiki/WikiList';
+import LinkedEntryPicker, { LINK_RESULT_LIMIT, LinkedEntryChip } from './LinkedEntryPicker';
 
+/**
+ * ID-Array-Editor für Wiki-Artikel — heute nur noch für Routinen-Vorlagen
+ * (`RoutinesPanel`). Was ein EINTRAG verlinkt, steht in seinem Inhalt und
+ * gehört ins `LinkedEntriesField`.
+ */
 export default function LinkedWikiInput({
   ids, onChange, inputCls,
 }: {
@@ -16,16 +20,12 @@ export default function LinkedWikiInput({
   const articles = useWikiStore((s) => s.articles);
   const wikiCategories = useWikiStore((s) => s.wikiCategories);
   const [query, setQuery] = useState('');
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useOutsideClick(open, () => setOpen(false), { refs: [ref] });
 
   const filtered = useMemo(() =>
     articles
       .filter((a) => !ids.includes(a.id) && !a.deleted_at && a.category_id !== 'paradigm' &&
         a.title.toLowerCase().includes(query.toLowerCase()))
-      .slice(0, 8),
+      .slice(0, LINK_RESULT_LIMIT),
     [articles, ids, query]);
 
   const selectedArticles = useMemo(() =>
@@ -38,48 +38,29 @@ export default function LinkedWikiInput({
   };
 
   return (
-    <div ref={ref} className="space-y-1.5">
-      {selectedArticles.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {selectedArticles.map((article) => (
-            <span key={article.id} className="linked-entry-chip flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-stone-800/60 border border-stone-700/40 text-stone-300">
-              <span>{articleIcon(article)}</span>
-              <span className="truncate max-w-[110px]">{article.title}</span>
-              <button
-                onClick={() => onChange(ids.filter((i) => i !== article.id))}
-                className="text-stone-600 hover:text-stone-400 ml-0.5 flex-shrink-0"
-              >
-                <X size={10} />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="relative">
-        <input
-          value={query}
-          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          placeholder={t('search.wikiArticles')}
-          className={inputCls}
+    <LinkedEntryPicker
+      chips={selectedArticles.map((article) => (
+        <LinkedEntryChip
+          key={article.id}
+          icon={<span className="flex-shrink-0">{articleIcon(article)}</span>}
+          label={article.title}
+          onRemove={() => onChange(ids.filter((i) => i !== article.id))}
+          removeTitle={t('properties.removeLink')}
         />
-        {open && (
-          <div className="linked-entry-menu absolute top-full left-0 right-0 mt-1 z-50 border border-stone-700/60 rounded-lg shadow-xl py-1 max-h-40 overflow-y-auto">
-            {filtered.length === 0 ? (
-              <p className="text-xs text-stone-600 px-3 py-2">{t('search.noResultsShort')}</p>
-            ) : filtered.map((article) => (
-              <button
-                key={article.id}
-                onMouseDown={(e) => { e.preventDefault(); onChange([...ids, article.id]); setQuery(''); setOpen(false); }}
-                className="linked-entry-menu-item w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs text-stone-400 hover:text-stone-200"
-              >
-                <span>{articleIcon(article)}</span>
-                <span className="truncate">{article.title}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+      ))}
+      results={filtered}
+      resultKey={(article) => article.id}
+      onSelect={(article) => onChange([...ids, article.id])}
+      query={query}
+      onQueryChange={setQuery}
+      placeholder={t('search.wikiArticles')}
+      inputCls={inputCls}
+      renderResult={(article) => (
+        <>
+          <span className="flex-shrink-0">{articleIcon(article)}</span>
+          <span className="truncate">{article.title}</span>
+        </>
+      )}
+    />
   );
 }

@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
 import { useWikiStore } from '../../../store/wikiStore';
 import TagInput from '../../editor/TagInput';
+import LinkedEntriesField from '../fields/LinkedEntriesField';
 import PropertiesEditView from '../fields/PropertiesEditView';
 import PropertiesReadView from '../fields/PropertiesReadView';
 import { PropertySummaryRow } from '../fields/PropertySummaryRow';
@@ -9,6 +10,7 @@ import Favicon from '../fields/Favicon';
 import Banner from '../fields/Banner';
 import CategorySelect from '../../ui/CategorySelect';
 import { categoryLabel } from '../../../lib/categories';
+import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
 
 export default function WikiPropertiesPanel() {
   const { t } = useTranslation();
@@ -33,6 +35,10 @@ export default function WikiPropertiesPanel() {
         <PropertySummaryRow label={t('properties.category')} value={category ? `${category.emoji} ${categoryLabel(t, 'wiki', category)}` : t('properties.none')} />
         <Favicon value={article.icon} readOnly label={t('properties.icon')} />
         <Banner value={article.cover_image} readOnly />
+        <div>
+          <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
+          <LinkedEntriesField content={article.content} />
+        </div>
         <div>
           <p className="label-xs mb-2">{t('properties.tags')}</p>
           <TagInput tags={article.tags ?? []} onChange={() => {}} readOnly />
@@ -66,6 +72,11 @@ export default function WikiPropertiesPanel() {
         onChange={(cover_image) => updateArticle(article.id, { cover_image })}
         onRemove={() => updateArticle(article.id, { cover_image: undefined })}
       />
+
+      <div>
+        <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
+        <LinkedEntriesField content={article.content} editable inputCls={OP_PROP_SELECT_CLASSES} />
+      </div>
 
       <div>
         <p className="label-xs mb-2">{t('properties.tags')}</p>

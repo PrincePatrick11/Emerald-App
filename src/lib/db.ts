@@ -4,6 +4,7 @@ import { getActiveDbConnectionString, getActiveVaultId } from './vaultManager';
 import { BASELINE_VERSION, IMAGE_FIELDS, TABLE_DDL, createSchema, ddlIfNotExists, seedBuiltins, storedImageName } from './schema';
 import { normalizeSchema } from './normalizeSchema';
 import { adoptLegacyImages, rewriteImageRefs } from './images';
+import { migrateLinkedIdsToContent } from './migrateLinkedIdsToContent';
 
 // Per-vault DB cache: SQLite identifier → Database instance
 const _dbCache = new Map<string, Database>();
@@ -1083,6 +1084,22 @@ export const MIGRATIONS: Migration[] = [
       for (const { sql, params } of updates) {
         await db.execute(sql, params);
       }
+    },
+  },
+  {
+    // Die Journal-Spalten `linked_operation_ids`/`linked_wiki_ids` waren die
+    // beiden Verknüpfungs-Felder in der rechten Seitenleiste. An ihre Stelle
+    // tritt das Verlinkungs-Feld, das die Links aus dem INHALT des Eintrags
+    // liest — die Spalten hätten damit keine Anzeige mehr. Ihr Inhalt zieht
+    // deshalb hier einmalig als Link-Chip in den Text um.
+    //
+    // Die Spalten selbst bleiben (Export, Import und checkIntegrity kennen
+    // sie), werden aber geleert: dieselbe Verknüpfung soll nicht an zwei
+    // Stellen stehen.
+    version: 36,
+    name: 'journal_linked_ids_to_content',
+    up: async (db) => {
+      await migrateLinkedIdsToContent(db);
     },
   },
 ];

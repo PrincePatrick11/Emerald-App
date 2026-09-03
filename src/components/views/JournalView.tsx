@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Trash2, Copy, Pencil } from 'lucide-react';
@@ -8,7 +8,6 @@ import { useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEditActions } from '../../hooks/useEditActions';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
-import { useOperationStore } from '../../store/operationStore';
 import { useUndoStore } from '../../store/undoStore';
 import RichEditor from '../editor/RichEditor';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
@@ -40,9 +39,6 @@ export default function JournalView() {
   const pushUndo = useUndoStore((s) => s.push);
   const getWikiArticle = useWikiStore((s) => s.getArticle);
   const wikiCategories = useWikiStore((s) => s.wikiCategories);
-  const { operations, categories: opCategories } = useOperationStore(
-    useShallow((s) => ({ operations: s.operations, categories: s.categories }))
-  );
 
   const entry = activeView.id ? getEntry(activeView.id) : null;
   const isEditing = activeView.mode === 'edit';
@@ -58,14 +54,6 @@ export default function JournalView() {
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [loadedEntryId, setLoadedEntryId] = useState<string | null>(null);
-
-  // Always-fresh refs
-  const entryIdRef = useRef<string | undefined>(undefined);
-  entryIdRef.current = entry?.id;
-  const linkedOpIdsRef = useRef<string[]>(entry?.linked_operation_ids ?? []);
-  linkedOpIdsRef.current = entry?.linked_operation_ids ?? [];
-  const linkedWikiIdsRef = useRef<string[]>(entry?.linked_wiki_ids ?? []);
-  linkedWikiIdsRef.current = entry?.linked_wiki_ids ?? [];
 
   // Cancel verwirft die ungespeicherten letzten Sekunden, indem der Editor
   // ueber den Key frisch vom letzten gespeicherten Stand mountet.
@@ -104,28 +92,21 @@ export default function JournalView() {
     if (entry) setTitle(entry.title);
   }, [entry?.title]);
 
-  // Apply tags + operation_ids + wiki_ids from a dropped routine
+  // Apply tags from a dropped routine — die verknüpften Operationen und
+  // Wiki-Artikel der Routine hängt der Editor selbst als Link-Chips an.
   useEffect(() => {
     if (!isEditing || !entry) return;
     const handler = (e: Event) => {
-      const { tags: routineTags, operation_ids: routineOpIds = [], wiki_ids: routineWikiIds = [] } = (e as CustomEvent<{ tags: string[]; operation_ids: string[]; wiki_ids: string[] }>).detail;
-      if (routineTags.length > 0) {
-        setTags((prev) => {
-          const nextTags = [...new Set([...prev, ...routineTags])];
-          triggerAutoSave();
-          return nextTags;
-        });
-      }
-      if ((routineOpIds.length > 0 || routineWikiIds.length > 0) && entryIdRef.current) {
-        const patch: Partial<import('../../types').JournalEntry> = {};
-        if (routineOpIds.length > 0) patch.linked_operation_ids = [...new Set([...linkedOpIdsRef.current, ...routineOpIds])];
-        if (routineWikiIds.length > 0) patch.linked_wiki_ids = [...new Set([...linkedWikiIdsRef.current, ...routineWikiIds])];
-        updateEntry(entryIdRef.current, patch);
-      }
+      const { tags: routineTags } = (e as CustomEvent<{ tags: string[] }>).detail;
+      setTags((prev) => {
+        const nextTags = [...new Set([...prev, ...routineTags])];
+        triggerAutoSave();
+        return nextTags;
+      });
     };
     document.addEventListener('routine-drop', handler);
     return () => document.removeEventListener('routine-drop', handler);
-  }, [isEditing, entry?.id, triggerAutoSave, updateEntry]);
+  }, [isEditing, entry?.id, triggerAutoSave]);
 
   const handleNew = async () => {
     const e = await createEntry();
@@ -367,8 +348,10 @@ export default function JournalView() {
     );
   }
 
-  // Paradigma-/Bannung-/Meditations-Chips plus verknuepfte Operationen und
-  // Wiki-Artikel — der Journal-eigene Inhalt des belowTitle-Slots.
+  // Paradigma-/Bannung-/Meditations-Chips — der Journal-eigene Inhalt des
+  // belowTitle-Slots. Verlinkte Einträge stehen hier bewusst NICHT mehr: sie
+  // sind Chips im Fließtext und stehen gesammelt im Verlinkungs-Feld der
+  // rechten Seitenleiste.
   const propertyChips = (
     <>
       {/* Paradigm + Bannung + Meditation — one row */}
@@ -424,53 +407,6 @@ export default function JournalView() {
           </div>
         );
       })()}
-
-      {/* Linked operations chips */}
-      {(entry.linked_operation_ids ?? []).length > 0 && (
-        <div className="px-8 pb-2 flex-shrink-0 flex flex-wrap gap-1.5">
-          {(entry.linked_operation_ids ?? []).map((opId) => {
-            const op = operations.find((o) => o.id === opId);
-            if (!op) return null;
-            const cat = opCategories.find((c) => c.id === op.category_id);
-            const opIcon = op.icon || cat?.emoji || '⚡';
-            return (
-              <button
-                key={opId}
-                onClick={() => setActiveView({ type: 'operations', id: op.id, mode: 'view' })}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-stone-800/60 border border-stone-700/40 text-stone-400 hover:text-stone-200 hover:border-stone-600 transition-colors"
-              >
-                {opIcon.startsWith('data:')
-                  ? <img src={opIcon} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
-                  : <span>{opIcon}</span>}
-                <span>{op.title}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Linked wiki chips */}
-      {(entry.linked_wiki_ids ?? []).length > 0 && (
-        <div className="px-8 pb-2 flex-shrink-0 flex flex-wrap gap-1.5">
-          {(entry.linked_wiki_ids ?? []).map((wikiId) => {
-            const article = getWikiArticle(wikiId);
-            if (!article || article.category_id === 'paradigm') return null;
-            const cat = wikiCategories.find((c) => c.id === article.category_id);
-            const icon = cat?.emoji ?? getCategoryEmoji(article.category_id);
-            return (
-              <button
-                key={wikiId}
-                onClick={() => setActiveView({ type: 'wiki', id: article.id, mode: 'view' })}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-stone-800/60 border border-stone-700/40 text-stone-400 hover:text-stone-200 hover:border-stone-600 transition-colors"
-              >
-                <span>{icon}</span>
-                <span>{article.title}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
     </>
   );
 

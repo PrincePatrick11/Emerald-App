@@ -98,7 +98,7 @@ export default function TagInput({ tags, onChange, readOnly = false }: TagInputP
               onClick={() => removeTag(name)}
               className="opacity-60 hover:opacity-100 transition-opacity"
             >
-              <X size={10} />
+              <X size={12} />
             </button>
           </span>
         );
