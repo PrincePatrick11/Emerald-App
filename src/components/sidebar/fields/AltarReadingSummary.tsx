@@ -85,7 +85,7 @@ export default function AltarReadingSummary() {
     >
       {activeAltar.icon_data && (
         <PropertySummaryRow
-          label="Favicon"
+          label={t('properties.icon')}
           value={<FaviconGlyph value={activeAltar.icon_data} />}
         />
       )}

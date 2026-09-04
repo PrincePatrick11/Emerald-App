@@ -88,9 +88,8 @@ function findEntryLinkPos(doc: ProseMirrorNode, target: { id: string; entryType:
  * Seitenleiste verliert dabei den Fokus, was gewollt ist: man sieht, wo der
  * Link gelandet ist, statt blind weiterzuklicken.
  *
- * Der Cursor landet dabei hinter dem Chip, nicht auf ihm: frisch eingefügt
- * schreibt man weiter, und eine Knotenauswahl auf dem Chip würde ihn beim
- * ersten Tastendruck ersetzen.
+ * Der Cursor landet dabei am Ende des Link-Absatzes statt auf dem Chip —
+ * warum, steht bei `caretAtBlockEnd` an `revealEntryLink`.
  */
 function appendEntryLink(editor: Editor, item: EntryLinkRequest): void {
   const { doc } = editor.state;
@@ -119,7 +118,7 @@ function appendEntryLink(editor: Editor, item: EntryLinkRequest): void {
   // des Chips ist gerendert — `revealEntryLink` braucht beides, um zu scrollen
   // und die Markierung zu setzen.
   requestAnimationFrame(() => {
-    if (!editor.isDestroyed) revealEntryLink(editor, item, { caretAfter: true });
+    if (!editor.isDestroyed) revealEntryLink(editor, item, { caretAtBlockEnd: true });
   });
 }
 
@@ -209,14 +208,16 @@ let revealedEl: HTMLElement | undefined;
  * denselben Chip wieder aufblitzt (Klasse ab, Reflow, Klasse an) statt am noch
  * laufenden ersten Durchlauf hängenzubleiben. Nur ein Chip ist je markiert.
  *
- * `caretAfter` setzt den Cursor hinter den Chip statt auf ihn — für das frische
- * Einfügen, nach dem man weiterschreibt. Beim Nachschlagen eines vorhandenen
- * Links bleibt die Knotenauswahl: dort ist „das hier ist gemeint" die Aussage.
+ * `caretAtBlockEnd` setzt den Cursor ans Ende des Absatzes, in dem der Chip
+ * steht, statt den Chip selbst auszuwählen — für das frische Einfügen, nach dem
+ * man weiterschreibt: eine Knotenauswahl würde der erste Tastendruck durch das
+ * Getippte ersetzen. Beim Nachschlagen eines vorhandenen Links bleibt sie, dort
+ * ist „das hier ist gemeint" die Aussage.
  */
 function revealEntryLink(
   editor: Editor,
   target: { id: string; entryType: string },
-  { caretAfter = false }: { caretAfter?: boolean } = {},
+  { caretAtBlockEnd = false }: { caretAtBlockEnd?: boolean } = {},
 ): boolean {
   const pos = findEntryLinkPos(editor.state.doc, target);
   if (pos === null) return false;
@@ -225,16 +226,11 @@ function revealEntryLink(
   // im Lesemodus zeigt ProseMirror keine Selektion, dort trägt die Klasse.
   if (editor.isEditable) {
     const chain = editor.chain();
-    if (caretAfter) {
-      // Ans Ende des Absatzes, nicht direkt hinter den Chip: `internalLinkBlockHtml`
-      // hängt ein Leerzeichen an, und dahinter schreibt man weiter.
-      const $pos = editor.state.doc.resolve(pos);
-      chain.setTextSelection($pos.parent.isTextblock
-        ? $pos.end()
-        : pos + (editor.state.doc.nodeAt(pos)?.nodeSize ?? 1));
-    } else {
-      chain.setNodeSelection(pos);
-    }
+    // `internalLink` ist ein Inline-Knoten, sein Elternteil also immer ein
+    // Textblock — `end()` ist damit das Ende des Absatzes: hinter dem Chip und
+    // hinter dem Leerzeichen, das `internalLinkBlockHtml` anhängt.
+    if (caretAtBlockEnd) chain.setTextSelection(editor.state.doc.resolve(pos).end());
+    else chain.setNodeSelection(pos);
     chain.focus().run();
   }
 

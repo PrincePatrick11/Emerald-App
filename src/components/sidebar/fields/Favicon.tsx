@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImagePlus, Smile, X } from 'lucide-react';
-import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, isImageIcon } from '../../../lib/helpers';
+import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, isImageIcon, readFileAsDataUrl } from '../../../lib/helpers';
 import EmojiPicker from '../../ui/EmojiPicker';
 import Button from '../../ui/Button';
 
@@ -27,9 +27,10 @@ interface FaviconProps {
  * Das Icon-Feld: Glyph plus die drei Aktionen (Bild wählen, Emoji wählen,
  * entfernen) in einer Zeile.
  *
- * Bewusst ohne eigene Beschriftung und ohne umschließenden Block — beide
- * Aufrufer bringen ihre Überschrift selbst mit: `IconCoverField` teilt sie sich
- * mit dem Titelbild, der Altar hat seinen eigenen aufklappbaren Kopf.
+ * Gibt nur diese Zeile zurück: keine Beschriftung, kein „— Keine —" im
+ * Lesemodus. Beides bringen die Aufrufer mit — `IconCoverField` teilt sich die
+ * Überschrift mit dem Titelbild und trägt das „— Keine —" für beide Felder
+ * zusammen, der Altar hat seinen eigenen aufklappbaren Kopf.
  *
  * Die Aktionen sind tonkodierte `Button`s in der dichten 24px-Stufe, wie die
  * Kategorien-Köpfe sie benutzen — sie müssen sich im `IconCoverField` eine
@@ -41,19 +42,21 @@ export default function Favicon({ value, onChange, onRemove, readOnly = false }:
   const inputRef = useRef<HTMLInputElement>(null);
   const pickFile = () => inputRef.current?.click();
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    if (!isAcceptedImageFile(file) || file.type === 'image/svg+xml') { e.target.value = ''; return; }
-    const reader = new FileReader();
-    reader.onloadend = () => onChange?.(reader.result as string);
-    reader.readAsDataURL(file);
     e.target.value = '';
+    if (!file) return;
+    if (!isAcceptedImageFile(file) || file.type === 'image/svg+xml') return;
+    try {
+      onChange?.(await readFileAsDataUrl(file));
+    } catch (err) {
+      // Lieber gar nichts setzen als ein leeres Icon: ein abgebrochener Lesevorgang
+      // hat kein Ergebnis, und der bisherige Wert ist besser als keiner.
+      console.error('Failed to read icon:', err);
+    }
   };
 
-  // Das „— Keine —" trägt der Aufrufer für Icon und Titelbild zusammen; ein
-  // eigenes hier würde es doppeln.
-  if (readOnly) return value ? <FaviconGlyph value={value} /> : null;
+  if (readOnly) return <FaviconGlyph value={value} />;
 
   return (
     <>
@@ -61,6 +64,10 @@ export default function Favicon({ value, onChange, onRemove, readOnly = false }:
       <EmojiPicker
         value={value ?? ''}
         onChange={(emoji) => onChange?.(emoji)}
+        // Nicht der `flex-shrink-0`-Default: sonst könnte die Knopfzeile unten
+        // nie umbrechen, sondern liefe in einer langen Sprache aus der
+        // Seitenleiste heraus.
+        wrapperClassName="relative min-w-0"
         trigger={({ toggle }) => (
           <div className="flex flex-wrap items-center gap-1.5">
             {value && <FaviconGlyph value={value} />}

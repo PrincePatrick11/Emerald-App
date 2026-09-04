@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImagePlus, X } from 'lucide-react';
-import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../../lib/helpers';
+import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, readFileAsDataUrl } from '../../../lib/helpers';
 import Button from '../../ui/Button';
 
 interface BannerProps {
@@ -25,19 +25,22 @@ export default function Banner({ value, onChange, onRemove, readOnly = false }: 
   const inputRef = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
     if (!isAcceptedImageFile(file)) {
       setNotice(t('common.unsupportedImageFormat'));
       window.setTimeout(() => setNotice(null), 2500);
-      e.target.value = '';
       return;
     }
-    const reader = new FileReader();
-    reader.onloadend = () => onChange?.(reader.result as string);
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    try {
+      onChange?.(await readFileAsDataUrl(file));
+    } catch (err) {
+      // Lieber gar nichts setzen als ein leeres Titelbild: ein abgebrochener
+      // Lesevorgang hat kein Ergebnis, und der bisherige Wert ist besser als keiner.
+      console.error('Failed to read cover image:', err);
+    }
   };
 
   const preview = value

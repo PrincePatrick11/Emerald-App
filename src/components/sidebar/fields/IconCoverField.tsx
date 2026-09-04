@@ -34,6 +34,8 @@ export default function IconCoverField({
       {readOnly && !icon && !cover ? (
         <p className="text-xs text-stone-600">{t('properties.none')}</p>
       ) : (
+        // `flex-wrap` ist tragend, nicht kosmetisch: das gesetzte Titelbild
+        // ist `w-full` und kommt nur dadurch unter die Knopfzeile statt in sie.
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <Favicon
             value={icon}
