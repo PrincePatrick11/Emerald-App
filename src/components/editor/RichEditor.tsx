@@ -87,6 +87,10 @@ function findEntryLinkPos(doc: ProseMirrorNode, target: { id: string; entryType:
  * Bewegung wie beim Klick auf einen Chip im Verlinkungs-Feld. Das Feld in der
  * Seitenleiste verliert dabei den Fokus, was gewollt ist: man sieht, wo der
  * Link gelandet ist, statt blind weiterzuklicken.
+ *
+ * Der Cursor landet dabei hinter dem Chip, nicht auf ihm: frisch eingefügt
+ * schreibt man weiter, und eine Knotenauswahl auf dem Chip würde ihn beim
+ * ersten Tastendruck ersetzen.
  */
 function appendEntryLink(editor: Editor, item: EntryLinkRequest): void {
   const { doc } = editor.state;
@@ -115,7 +119,7 @@ function appendEntryLink(editor: Editor, item: EntryLinkRequest): void {
   // des Chips ist gerendert — `revealEntryLink` braucht beides, um zu scrollen
   // und die Markierung zu setzen.
   requestAnimationFrame(() => {
-    if (!editor.isDestroyed) revealEntryLink(editor, item);
+    if (!editor.isDestroyed) revealEntryLink(editor, item, { caretAfter: true });
   });
 }
 
@@ -204,14 +208,35 @@ let revealedEl: HTMLElement | undefined;
  * Timer und markiertes Element liegen modulweit, damit ein zweiter Klick auf
  * denselben Chip wieder aufblitzt (Klasse ab, Reflow, Klasse an) statt am noch
  * laufenden ersten Durchlauf hängenzubleiben. Nur ein Chip ist je markiert.
+ *
+ * `caretAfter` setzt den Cursor hinter den Chip statt auf ihn — für das frische
+ * Einfügen, nach dem man weiterschreibt. Beim Nachschlagen eines vorhandenen
+ * Links bleibt die Knotenauswahl: dort ist „das hier ist gemeint" die Aussage.
  */
-function revealEntryLink(editor: Editor, target: { id: string; entryType: string }): boolean {
+function revealEntryLink(
+  editor: Editor,
+  target: { id: string; entryType: string },
+  { caretAfter = false }: { caretAfter?: boolean } = {},
+): boolean {
   const pos = findEntryLinkPos(editor.state.doc, target);
   if (pos === null) return false;
 
   // Im Edit-Modus zusätzlich echt selektieren, damit der Cursor dort steht;
   // im Lesemodus zeigt ProseMirror keine Selektion, dort trägt die Klasse.
-  if (editor.isEditable) editor.chain().setNodeSelection(pos).focus().run();
+  if (editor.isEditable) {
+    const chain = editor.chain();
+    if (caretAfter) {
+      // Ans Ende des Absatzes, nicht direkt hinter den Chip: `internalLinkBlockHtml`
+      // hängt ein Leerzeichen an, und dahinter schreibt man weiter.
+      const $pos = editor.state.doc.resolve(pos);
+      chain.setTextSelection($pos.parent.isTextblock
+        ? $pos.end()
+        : pos + (editor.state.doc.nodeAt(pos)?.nodeSize ?? 1));
+    } else {
+      chain.setNodeSelection(pos);
+    }
+    chain.focus().run();
+  }
 
   const dom = editor.view.nodeDOM(pos);
   const el = dom instanceof HTMLElement

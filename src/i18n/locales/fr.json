@@ -342,7 +342,9 @@
     "noLinkedEntries": "Aucune entrée liée pour l'instant.",
     "removeLink": "Retirer l'entrée liée",
     "icon": "Icône",
+    "emoji": "Emoji",
     "coverImage": "Image de couverture",
+    "iconAndCover": "Icône + Image de couverture",
     "addCoverImage": "Ajouter une image de couverture",
     "change": "Modifier",
     "remove": "Supprimer"

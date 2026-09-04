@@ -342,7 +342,9 @@
     "noLinkedEntries": "Aún no hay entradas enlazadas.",
     "removeLink": "Quitar entrada enlazada",
     "icon": "Icono",
+    "emoji": "Emoji",
     "coverImage": "Imagen de portada",
+    "iconAndCover": "Icono + Imagen de portada",
     "addCoverImage": "Añadir imagen de portada",
     "change": "Cambiar",
     "remove": "Eliminar"

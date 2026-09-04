@@ -342,7 +342,9 @@
     "noLinkedEntries": "No linked entries yet.",
     "removeLink": "Remove linked entry",
     "icon": "Icon",
+    "emoji": "Emoji",
     "coverImage": "Cover Image",
+    "iconAndCover": "Icon + Cover Image",
     "addCoverImage": "Add Cover Image",
     "change": "Change",
     "remove": "Remove"

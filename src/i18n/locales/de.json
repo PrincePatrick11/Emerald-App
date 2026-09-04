@@ -342,7 +342,9 @@
     "noLinkedEntries": "Noch keine Verlinkungen.",
     "removeLink": "Verlinkung entfernen",
     "icon": "Icon",
+    "emoji": "Emoji",
     "coverImage": "Titelbild",
+    "iconAndCover": "Icon + Titelbild",
     "addCoverImage": "Titelbild hinzufügen",
     "change": "Ändern",
     "remove": "Entfernen"

@@ -9,8 +9,7 @@ import LinkedEntriesField from '../fields/LinkedEntriesField';
 import PropertiesEditView from '../fields/PropertiesEditView';
 import PropertiesReadView from '../fields/PropertiesReadView';
 import { PropertySummaryRow } from '../fields/PropertySummaryRow';
-import Favicon from '../fields/Favicon';
-import Banner from '../fields/Banner';
+import IconCoverField from '../fields/IconCoverField';
 import SelectField from '../fields/SelectField';
 import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
 import { categoryLabel } from '../../../lib/categories';
@@ -98,8 +97,7 @@ export default function OperationPropertiesPanel() {
     return (
       <PropertiesReadView>
         <PropertySummaryRow label={t('properties.category')} value={categoryDisplay} />
-        <Favicon value={op.icon} readOnly label={t('properties.icon')} />
-        <Banner value={op.cover_image} readOnly />
+        <IconCoverField icon={op.icon} cover={op.cover_image} readOnly />
         <PropertySummaryRow
           label={t('operations.active')}
           value=""
@@ -158,17 +156,13 @@ export default function OperationPropertiesPanel() {
 
       {!sigilOperation && (
         <>
-          <Favicon
-            value={op.icon}
-            onChange={(icon) => updateOperation(op.id, { icon })}
-            onRemove={() => updateOperation(op.id, { icon: undefined })}
-            label={t('properties.icon')}
-          />
-
-          <Banner
-            value={op.cover_image}
-            onChange={(cover_image) => updateOperation(op.id, { cover_image })}
-            onRemove={() => updateOperation(op.id, { cover_image: undefined })}
+          <IconCoverField
+            icon={op.icon}
+            cover={op.cover_image}
+            onIconChange={(icon) => updateOperation(op.id, { icon })}
+            onIconRemove={() => updateOperation(op.id, { icon: undefined })}
+            onCoverChange={(cover_image) => updateOperation(op.id, { cover_image })}
+            onCoverRemove={() => updateOperation(op.id, { cover_image: undefined })}
           />
 
           <div>

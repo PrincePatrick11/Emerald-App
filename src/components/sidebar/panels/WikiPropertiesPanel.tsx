@@ -6,8 +6,7 @@ import LinkedEntriesField from '../fields/LinkedEntriesField';
 import PropertiesEditView from '../fields/PropertiesEditView';
 import PropertiesReadView from '../fields/PropertiesReadView';
 import { PropertySummaryRow } from '../fields/PropertySummaryRow';
-import Favicon from '../fields/Favicon';
-import Banner from '../fields/Banner';
+import IconCoverField from '../fields/IconCoverField';
 import CategorySelect from '../../ui/CategorySelect';
 import { categoryLabel } from '../../../lib/categories';
 import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
@@ -33,8 +32,7 @@ export default function WikiPropertiesPanel() {
       <PropertiesReadView>
         {/* Gelöschte Kategorie: „Keine" statt der rohen category_id. */}
         <PropertySummaryRow label={t('properties.category')} value={category ? `${category.emoji} ${categoryLabel(t, 'wiki', category)}` : t('properties.none')} />
-        <Favicon value={article.icon} readOnly label={t('properties.icon')} />
-        <Banner value={article.cover_image} readOnly />
+        <IconCoverField icon={article.icon} cover={article.cover_image} readOnly />
         <div>
           <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
           <LinkedEntriesField content={article.content} />
@@ -60,17 +58,13 @@ export default function WikiPropertiesPanel() {
         />
       </div>
 
-      <Favicon
-        value={article.icon}
-        onChange={(icon) => updateArticle(article.id, { icon })}
-        onRemove={() => updateArticle(article.id, { icon: undefined })}
-        label={t('properties.icon')}
-      />
-
-      <Banner
-        value={article.cover_image}
-        onChange={(cover_image) => updateArticle(article.id, { cover_image })}
-        onRemove={() => updateArticle(article.id, { cover_image: undefined })}
+      <IconCoverField
+        icon={article.icon}
+        cover={article.cover_image}
+        onIconChange={(icon) => updateArticle(article.id, { icon })}
+        onIconRemove={() => updateArticle(article.id, { icon: undefined })}
+        onCoverChange={(cover_image) => updateArticle(article.id, { cover_image })}
+        onCoverRemove={() => updateArticle(article.id, { cover_image: undefined })}
       />
 
       <div>
