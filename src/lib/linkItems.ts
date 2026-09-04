@@ -38,6 +38,12 @@ export interface SuggestionItem {
    * auch beim Sortieren), Altäre haben gar keine und nehmen den Modulnamen.
    */
   categoryLabel?: string;
+  /**
+   * `updated_at` des Ziels — nur zum Sortieren. Der Link-Picker zeigt ohne
+   * Suchbegriff die zuletzt bearbeiteten Einträge, damit dort nicht bloß das
+   * erste Modul der Liste steht.
+   */
+  updatedAt?: string;
   entry_number?: number;
 }
 
@@ -89,6 +95,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
       label: e.title,
       icon: MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? DEFAULT_ENTRY_EMOJI.journal,
       categoryLabel: e.moon_phase ? t(`moonPhase.${e.moon_phase}`) : t('journal.noPhase'),
+      updatedAt: e.updated_at,
       entry_number: e.entry_number,
     })),
     ...s.tasks.map((task) => {
@@ -101,6 +108,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
         // Aufgaben-Kategorien haben keine Builtin-Keys — der gespeicherte Name
         // ist der Anzeigename (siehe lib/categories).
         categoryLabel: cat?.name,
+        updatedAt: task.updated_at,
       };
     }),
     ...s.operations.map((o) => {
@@ -112,6 +120,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
         category: cat?.emoji,
         ...splitIcon(o.icon, cat?.emoji || DEFAULT_ENTRY_EMOJI.operation),
         categoryLabel: categoryLabel(t, 'operations', cat),
+        updatedAt: o.updated_at,
         entry_number: o.entry_number,
       };
     }),
@@ -124,6 +133,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
         category: a.category_id,
         ...splitIcon(a.icon, cat?.emoji ?? getCategoryEmoji(a.category_id)),
         categoryLabel: categoryLabel(t, 'wiki', cat),
+        updatedAt: a.updated_at,
         entry_number: a.entry_number,
       };
     }),
@@ -138,6 +148,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
       // Altäre kennen keine Kategorien (altar_categories gehören den Elementen
       // auf dem Altar, nicht dem Altar selbst) — es bleibt der Modulname.
       categoryLabel: t('nav.altar'),
+      updatedAt: a.updated_at,
     })),
   ];
 }

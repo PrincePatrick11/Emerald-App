@@ -5,6 +5,7 @@ import { BASELINE_VERSION, IMAGE_FIELDS, TABLE_DDL, createSchema, ddlIfNotExists
 import { normalizeSchema } from './normalizeSchema';
 import { adoptLegacyImages, rewriteImageRefs } from './images';
 import { migrateLinkedIdsToContent } from './migrateLinkedIdsToContent';
+import { migrateJournalFieldsToContent } from './migrateJournalFieldsToContent';
 
 // Per-vault DB cache: SQLite identifier → Database instance
 const _dbCache = new Map<string, Database>();
@@ -1100,6 +1101,19 @@ export const MIGRATIONS: Migration[] = [
     name: 'journal_linked_ids_to_content',
     up: async (db) => {
       await migrateLinkedIdsToContent(db);
+    },
+  },
+  {
+    // Paradigma, Bannung und Meditation waren drei feste Felder am
+    // Journal-Eintrag, jedes auf eine Wiki-Kategorie festgelegt. Sie sind weg —
+    // ein Eintrag verlinkt jetzt frei, und das Verlinkungs-Feld zeigt die Ziele
+    // nach Kategorie sortiert. Wie bei v36 ziehen die gespeicherten Werte
+    // einmalig als Link-Chip in den Text um; die Spalten bleiben im Schema und
+    // werden geleert.
+    version: 37,
+    name: 'journal_paradigm_bannung_meditation_to_content',
+    up: async (db) => {
+      await migrateJournalFieldsToContent(db);
     },
   },
 ];

@@ -63,6 +63,10 @@ export async function collectExportData(): Promise<ExportData | null> {
     const entry = entries.find(e => e.id === view.id);
     if (!entry) return null;
 
+    // Ebenfalls Altbestands-Brücke: seit Migration v37 sind Paradigma, Bannung
+    // und Meditation gewöhnliche Link-Chips im Inhalt, die drei Spalten sind
+    // geleert. Der Zweig bleibt für eine Datenbank, die noch vor v37 steht —
+    // etwa beim Export direkt nach dem Einspielen eines alten Backups.
     const paradigmaArt   = entry.paradigm_id            ? articles.find(a => a.id === entry.paradigm_id)            : undefined;
     const bannungArt     = entry.bannung_type_wiki_id    ? articles.find(a => a.id === entry.bannung_type_wiki_id)    : undefined;
     const meditationArt  = entry.meditation_type_wiki_id ? articles.find(a => a.id === entry.meditation_type_wiki_id) : undefined;

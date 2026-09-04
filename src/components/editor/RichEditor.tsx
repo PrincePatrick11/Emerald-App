@@ -75,18 +75,24 @@ function findEntryLinkPos(doc: ProseMirrorNode, target: { id: string; entryType:
  * bekommen zwei Blöcke.
  *
  * Wie der Block aussieht, sagt `internalLinkBlockHtml` — eine Definition für
- * das Einfügen hier und für die Migration v36, die dieselben Blöcke ohne
- * Editor schreiben muss.
+ * das Einfügen hier und für die Migrationen v36/v37, die dieselben Blöcke ohne
+ * Editor schreiben müssen.
  *
- * Ein bereits verlinktes Ziel wird nicht ein zweites Mal angehängt. Der Cursor
- * springt anschließend hinter den neuen Link: das Feld in der Seitenleiste
- * verliert dabei den Fokus, was gewollt ist — man sieht, wo der Link gelandet
- * ist, statt blind weiterzuklicken.
+ * Ist der Eintrag noch leer, entfällt die Trennlinie und der leere Absatz wird
+ * ersetzt: die Linie trennt den Text von den Links, und Text gibt es dann noch
+ * keinen.
+ *
+ * Ein bereits verlinktes Ziel wird nicht ein zweites Mal angehängt. Danach
+ * springt die Ansicht zum neuen Link und hebt ihn kurz hervor — dieselbe
+ * Bewegung wie beim Klick auf einen Chip im Verlinkungs-Feld. Das Feld in der
+ * Seitenleiste verliert dabei den Fokus, was gewollt ist: man sieht, wo der
+ * Link gelandet ist, statt blind weiterzuklicken.
  */
 function appendEntryLink(editor: Editor, item: EntryLinkRequest): void {
   const { doc } = editor.state;
   if (findEntryLinkPos(doc, item) !== null) return;
 
+  const empty = editor.isEmpty;
   const html = internalLinkBlockHtml(
     {
       id: item.id,
@@ -96,11 +102,21 @@ function appendEntryLink(editor: Editor, item: EntryLinkRequest): void {
       entry_number: item.entry_number ?? null,
     },
     item.categoryLabel ?? '',
+    { separator: !empty },
   );
 
-  // insertContentAt setzt die Selektion ans Ende des Eingefügten; focus() holt
-  // sie in den Editor, scrollIntoView bringt den neuen Block ins Bild.
-  editor.chain().insertContentAt(doc.content.size, html).focus().scrollIntoView().run();
+  editor
+    .chain()
+    .insertContentAt(empty ? { from: 0, to: doc.content.size } : doc.content.size, html)
+    .focus()
+    .run();
+
+  // Einen Frame später: der Absatz steht dann im DOM, und die React-NodeView
+  // des Chips ist gerendert — `revealEntryLink` braucht beides, um zu scrollen
+  // und die Markierung zu setzen.
+  requestAnimationFrame(() => {
+    if (!editor.isDestroyed) revealEntryLink(editor, item);
+  });
 }
 
 /**
@@ -126,7 +142,7 @@ function holdsOnlyLink(paragraph: ProseMirrorNode, target: { id: string; entryTy
   return only;
 }
 
-function removeEntryLink(editor: Editor, target: { id: string; entryType: string }): boolean {
+function removeEntryLink(editor: Editor, target: EntryLinkRequest): boolean {
   const { doc } = editor.state;
   const pos = findEntryLinkPos(doc, target);
   if (pos === null) return false;
@@ -136,7 +152,8 @@ function removeEntryLink(editor: Editor, target: { id: string; entryType: string
 
   // Ein Verlinkungs-Block ist NUR, was `appendEntryLink` anlegt: ein Absatz
   // direkt im Dokument, der nichts als diesen Chip trägt, mit einer Trennlinie
-  // davor und höchstens einer Überschrift dazwischen. Alles andere — ein Chip
+  // davor und höchstens einer Überschrift dazwischen — oder, als allererster
+  // Block eines zuvor leeren Eintrags, ohne Trennlinie. Alles andere — ein Chip
   // in einer Liste, in einem Zitat, unter einer selbst getippten Überschrift —
   // ist Fließtext, und dort wird nur der Chip entfernt. Ohne diese engen
   // Grenzen risse das Löschen fremde Blöcke mit.
@@ -151,6 +168,14 @@ function removeEntryLink(editor: Editor, target: { id: string; entryType: string
       from -= prev.nodeSize;
     } else if (prev?.type.name === 'heading' && prevPrev?.type.name === 'horizontalRule') {
       from -= prev.nodeSize + prevPrev.nodeSize;
+    } else if (
+      // Der erste Block in einem zuvor leeren Eintrag: er beginnt mit der
+      // Überschrift, ohne Trennlinie davor. Damit hier keine selbst getippte
+      // Überschrift mitgeht, muss ihr Text genau die Kategorie des Ziels sein.
+      prev?.type.name === 'heading' && index === 1 &&
+      target.categoryLabel && prev.textContent === target.categoryLabel
+    ) {
+      from -= prev.nodeSize;
     } else {
       from = -1; // keine eröffnende Trennlinie — also kein Block von uns
     }

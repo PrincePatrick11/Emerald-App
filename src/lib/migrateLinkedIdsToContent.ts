@@ -8,6 +8,7 @@ import { getCategoryEmoji } from '../components/wiki/WikiList';
 import {
   extractInternalLinks,
   internalLinkBlockHtml,
+  isBlankContent,
   type InternalLinkChip,
 } from './internalLinkHtml';
 
@@ -124,6 +125,9 @@ export async function migrateLinkedIdsToContent(db: Database): Promise<void> {
 
     let appended = '';
     let broken = false;
+    // Bei einem leeren Eintrag bleibt die erste Trennlinie weg — sie trennt
+    // Text von Links, und Text gibt es dort keinen.
+    let separator = !isBlankContent(content);
 
     for (const source of sources) {
       const ids = parseIds(entry[source.column]);
@@ -161,7 +165,12 @@ export async function migrateLinkedIdsToContent(db: Database): Promise<void> {
           entry_number: row.entry_number,
         };
         // Ohne Kategorie lieber gar keine Überschrift als ein „Keine".
-        appended += internalLinkBlockHtml(chip, categoryLabel(t, source.module, toLabelable(cat)));
+        appended += internalLinkBlockHtml(
+          chip,
+          categoryLabel(t, source.module, toLabelable(cat)),
+          { separator }
+        );
+        separator = true;
       }
     }
 

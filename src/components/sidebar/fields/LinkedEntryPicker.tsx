@@ -7,8 +7,11 @@ import { useOutsideClick } from '../../../hooks/useOutsideClick';
 import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
 
 interface Props<T> {
-  /** Die Chips darüber (typischerweise `LinkedEntryChip`); die umbrechende
-   *  Zeile drumherum zieht der Picker. */
+  /**
+   * Der Block über der Suchzeile, typischerweise `LinkedEntryChip`s. Ihre
+   * Anordnung gehört dem Feld: die beiden ID-Felder legen sie in eine
+   * umbrechende Zeile, das Verlinkungs-Feld gruppiert sie nach Kategorie.
+   */
   chips?: ReactNode;
   /** Treffer zur aktuellen Eingabe; das Filtern bleibt beim Aufrufer, der
    *  seinen Bestand kennt. */
@@ -26,7 +29,11 @@ interface Props<T> {
 /** Höhe des Menüs (`max-h-40`) — ab hier klappt es nach oben. */
 const MENU_MAX_HEIGHT = 160;
 
-/** So viele Treffer zeigt die Liste. Eine Zahl für alle drei Felder. */
+/**
+ * So viele Treffer zeigen die beiden ID-Felder (`LinkedOpsInput`,
+ * `LinkedWikiInput`) — die suchen je in EINEM Modul. Das Verlinkungs-Feld hat
+ * alle fünf in einem Topf und setzt seine eigene, höhere Grenze.
+ */
 export const LINK_RESULT_LIMIT = 8;
 
 /**
@@ -137,7 +144,7 @@ export default function LinkedEntryPicker<T>({
 
   return (
     <div className="space-y-1.5">
-      {chips && <div className="flex flex-wrap gap-1">{chips}</div>}
+      {chips}
       <div ref={wrapRef} className="relative">
         <input
           value={query}

@@ -80,10 +80,17 @@ export function requestEntryLinkReveal(target: { id: string; entryType: ContentT
  * Bitte an den Editor, den Link aus dem Inhalt zu entfernen. Nach derselben
  * Quittungsregel: `false` heißt, es lauscht kein editierbarer Editor oder der
  * Link steht nicht im Text.
+ *
+ * `categoryLabel` gehört mit dazu, auch wenn es zum Finden des Links nicht
+ * gebraucht wird: der Editor räumt einen angehängten Verlinkungs-Block nur
+ * dann mitsamt seiner Überschrift ab, wenn deren Text genau diese Kategorie
+ * ist. Ohne die Angabe bliebe die Überschrift stehen.
  */
 export const REMOVE_ENTRY_LINK_EVENT = 'entry-link-remove';
 
-export function requestEntryLinkRemove(target: { id: string; entryType: ContentType }): boolean {
+export function requestEntryLinkRemove(
+  target: { id: string; entryType: ContentType; categoryLabel?: string },
+): boolean {
   const event = new CustomEvent(REMOVE_ENTRY_LINK_EVENT, {
     detail: target,
     cancelable: true,

@@ -287,6 +287,12 @@ async function seedLinkedIds(db) {
      VALUES ('j3','Dritter',$2,$1,$1,'[]','["w1","w2"]')`,
     [now, `<p>${chip}</p>`]
   );
+  // j4: noch leerer Eintrag — der erste Block kommt ohne Trennlinie.
+  await db.execute(
+    `INSERT INTO journal_entries (id,title,content,created_at,updated_at,tags,linked_operation_ids)
+     VALUES ('j4','Vierter','<p></p>',$1,$1,'[]','["o1"]')`,
+    [now]
+  );
   await db.execute(
     `INSERT INTO wiki_articles (id,title,slug,content,category,created_at,updated_at,tags)
      VALUES ('w1','Artikel','artikel','','ritual',$1,$1,'[]')`,
@@ -295,6 +301,42 @@ async function seedLinkedIds(db) {
   await db.execute(
     `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags)
      VALUES ('o1','Operation','','sigils',$1,$1,'[]')`,
+    [now]
+  );
+}
+
+/**
+ * Die drei festen Journal-Felder, wie sie vor v37 in den Spalten standen:
+ * einmal vollstaendig mit Artikeln und Dauer, einmal ein gesetztes is_bannung
+ * ohne Artikel (den Haken gab es vor der Auswahl dahinter), einmal ein
+ * Paradigma, dessen Artikel nicht mehr existiert.
+ */
+async function seedJournalFields(db) {
+  for (const [id, title, category] of [
+    ['w1', 'Chaos', 'paradigm'],
+    ['w2', 'LBRP', 'bannung'],
+    ['w3', 'Stilles Sitzen', 'meditation'],
+  ]) {
+    await db.execute(
+      `INSERT INTO wiki_articles (id,title,slug,content,category,created_at,updated_at,tags)
+       VALUES ($1,$2,$1,'',$3,$4,$4,'[]')`,
+      [id, title, category, now]
+    );
+  }
+  await db.execute(
+    `INSERT INTO journal_entries (id,title,content,created_at,updated_at,tags,
+       paradigm_id,is_bannung,bannung_type_wiki_id,is_meditation,meditation_type_wiki_id,meditation_duration)
+     VALUES ('j1','Eintrag','<p>Bestehender Text</p>',$1,$1,'[]','w1',1,'w2',1,'w3',20)`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO journal_entries (id,title,content,created_at,updated_at,tags,is_bannung)
+     VALUES ('j2','Zweiter','<p></p>',$1,$1,'[]',1)`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO journal_entries (id,title,content,created_at,updated_at,tags,paradigm_id)
+     VALUES ('j3','Dritter','<p>Text</p>',$1,$1,'[]','weg')`,
     [now]
   );
 }
@@ -745,7 +787,78 @@ console.log('\n8b. Migration v36: Journal-Verknuepfungen in den Inhalt\n');
     `${third.content} / ${third.linked_wiki_ids}`
   );
 
+  const [fourth] = await v36.select("SELECT content FROM journal_entries WHERE id='j4'");
+  check(
+    'im leeren Eintrag bleibt die Trennlinie weg',
+    !fourth.content.includes('<hr>') && fourth.content.includes('data-id="o1"'),
+    fourth.content
+  );
+
   v36.close();
+}
+
+console.log('\n8c. Migration v37: Paradigma/Bannung/Meditation in den Inhalt\n');
+
+{
+  const v37 = await buildViaChain('v37.db', seedJournalFields);
+  const [entry] = await v37.select(
+    `SELECT content, paradigm_id, is_bannung, bannung_type_wiki_id,
+            is_meditation, meditation_type_wiki_id, meditation_duration
+       FROM journal_entries WHERE id='j1'`
+  );
+  const links = await v37.select("SELECT target_id, target_type FROM links WHERE source_id='j1'");
+
+  check(
+    'alle drei Felder stehen als Link-Chip im Inhalt',
+    ['w1', 'w2', 'w3'].every((id) => entry.content.includes(`data-id="${id}"`)),
+    entry.content
+  );
+  check(
+    'jedes bekam Trennlinie und Kategorie-Ueberschrift',
+    (entry.content.match(/<hr>/g) ?? []).length === 3 && (entry.content.match(/<h3>/g) ?? []).length === 3,
+    entry.content
+  );
+  // Die Dauer hat kein Link-Ziel und wuerde ohne den Textzusatz verschwinden.
+  check(
+    'die Meditationsdauer steht als Text hinter ihrem Chip',
+    /data-id="w3"[\s\S]*?<\/span> \(20 min\)/.test(entry.content),
+    entry.content
+  );
+  check(
+    'der vorhandene Text blieb davor stehen',
+    entry.content.startsWith('<p>Bestehender Text</p>'),
+    entry.content
+  );
+  check(
+    'alle sechs Spalten sind geleert',
+    entry.paradigm_id === null && entry.is_bannung === 0 && entry.bannung_type_wiki_id === null &&
+      entry.is_meditation === 0 && entry.meditation_type_wiki_id === null && entry.meditation_duration === null,
+    JSON.stringify(entry)
+  );
+  check(
+    'die links-Tabelle wurde nachgezogen',
+    links.length === 3 && links.every((l) => l.target_type === 'wiki'),
+    JSON.stringify(links)
+  );
+
+  const [flagOnly] = await v37.select("SELECT content, is_bannung FROM journal_entries WHERE id='j2'");
+  // Ein Haken ohne Artikel kann keinen Chip ergeben — der Name der Kategorie
+  // bleibt als Text, sonst waere die Angabe ersatzlos weg.
+  check(
+    'ein gesetztes is_bannung ohne Artikel wird zu Text, im leeren Eintrag ohne Trennlinie',
+    /<p>🚫 .+<\/p>/.test(flagOnly.content) && !flagOnly.content.includes('<hr>') &&
+      !flagOnly.content.includes('data-type="internalLink"') && flagOnly.is_bannung === 0,
+    flagOnly.content
+  );
+
+  const [gone] = await v37.select("SELECT content, paradigm_id FROM journal_entries WHERE id='j3'");
+  check(
+    'ein nicht mehr existierender Artikel wird uebersprungen, die Spalte trotzdem geleert',
+    gone.content === '<p>Text</p>' && gone.paradigm_id === null,
+    `${gone.content} / ${gone.paradigm_id}`
+  );
+
+  v37.close();
 }
 
 /* ------------------------------------------------------------------ *

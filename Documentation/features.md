@@ -10,13 +10,9 @@ The journal is the primary day-to-day writing space. Each entry has a title and 
 
 **Moon phase.** When you create an entry, the current lunar phase is calculated automatically and stored. You can change it in the Properties sidebar. The phase appears as an icon and label below the title in read mode, and is included in exports.
 
-**Paradigm, Banishing, Meditation.** These three fixed properties in the Properties sidebar let you link an entry to wiki articles of the corresponding category:
+**Linked entries.** The Properties sidebar's "Linked entries" field (above the tags) lists everything the entry links in its own text — journal entries, wiki articles, operations, tasks, and altars alike — read directly out of the rich-text content rather than tracked as a separate list. The listed chips are grouped by category, each under a small heading, so links of a kind stay together regardless of where in the text they were added. In edit mode, searching and picking a result there appends the link to the bottom of the entry as its own block: a divider, the linked item's category as a heading, then the link chip — one block per link, never merged into an earlier one, and the view jumps to it and briefly highlights it afterwards. The search shows up to 50 matches, most recently updated first. Clicking a listed link does the same jump-and-highlight (only navigating to the target instead if the link somehow isn't in the text); the "×" removes it — the whole block if it's one of these appended blocks, just the chip if it sits inline in running text you wrote around it. An entry with no text yet gets its first link block without a leading divider, since there's nothing above it to separate from. The same field, in the same place, is available on Wiki articles and Operations (except Sigil-category operations, which have no rich-text body to link from). Links are included in Markdown and Emerald exports.
 
-- *Paradigm* — the magical framework or system you were working within.
-- *Banishing* — the banishing technique used. Setting this marks the entry as a banishing (`is_bannung = true`).
-- *Meditation* — the meditation type used. Setting this marks the entry as a meditation (`is_meditation = true`). A duration field (in minutes) becomes available when a meditation type is selected.
-
-**Linked entries.** The Properties sidebar's "Linked entries" field (above the tags) lists everything the entry links in its own text — journal entries, wiki articles, operations, tasks, and altars alike — read directly out of the rich-text content rather than tracked as a separate list. In edit mode, searching and picking a result there appends the link to the bottom of the entry as its own block: a divider, the linked item's category as a heading, then the link chip — one block per link, never merged into an earlier one, and the cursor jumps there afterwards. Clicking a listed link jumps to that spot in the text and briefly highlights it (only navigating to the target instead if the link somehow isn't in the text); the "×" removes it — the whole block if it's one of these appended blocks, just the chip if it sits inline in running text you wrote around it. The same field, in the same place, is available on Wiki articles and Operations (except Sigil-category operations, which have no rich-text body to link from). Links are included in Markdown and Emerald exports.
+Journal used to also carry three fixed properties here — Paradigm, Banishing, and Meditation, each a dropdown tied to one wiki article — shown as their own dedicated rows and as chips below the title. They're gone: whatever they pointed to is now an ordinary link, grouped into the "Linked entries" field above like anything else. Existing entries were converted automatically the first time the vault was opened with this version.
 
 **Tags.** Free-form labels shared across the app. Tag names are stored directly on entries (not as IDs). The Tags view lets you see all entries carrying a particular tag.
 
@@ -35,8 +31,6 @@ The wiki stores reference articles about anything relevant to your practice: rit
 **Cover Images.** A banner image displayed at the top of the article in read mode. Stored as an inline data-URL directly on the entry row, not as a file in the vault's image folder.
 
 **Backlinks.** `fetchBacklinks` and the `BacklinksPanel` component that lists every journal entry, wiki article, or operation linking to the current article still exist, but the panel is not currently surfaced anywhere in the UI — it was removed from the right sidebar along with the old tab bar and has not yet been reintroduced elsewhere.
-
-**Special categories.** `paradigm`, `bannung`, and `meditation` articles are used as the target for the matching journal entry properties. These categories are not shown as generic filter chips in the wiki list.
 
 ## Operations
 
@@ -294,7 +288,7 @@ A nested **Export as Image** submenu (Export → Export as Image → JPEG… / P
 
 ### Markdown Export
 
-Saves a `.md` file with a frontmatter block followed by the entry body. Frontmatter includes date, moon phase, paradigm, banishing, meditation, category, status, end date, version, and tags. Images are stripped (not included). Internal link chips become `[[Title]]` wiki-link syntax — that is where a journal entry's links live since migration v36, so they travel in the body rather than in frontmatter.
+Saves a `.md` file with a frontmatter block followed by the entry body. Frontmatter includes date, moon phase, category, status, end date, version, and tags — plus paradigm/banishing/meditation, but only for an entry whose underlying columns still carry a pre-migration value (see [`database.md`](database.md#journal_entries)); a journal entry written or edited with this version never populates them, since those three now live as ordinary links. Images are stripped (not included). Internal link chips become `[[Title]]` wiki-link syntax — that is where a journal entry's links live since migration v36 (and, for Paradigm/Banishing/Meditation, v37), so they travel in the body rather than in frontmatter.
 
 The frontmatter can still carry `Operations:` and `Wiki:` lines with a UUID (`Operations: Title [uuid]`), but only for entries whose legacy `linked_operation_ids`/`linked_wiki_ids` columns are still filled — i.e. restored from a pre-v36 backup. Import understands both: those lines are resolved and appended to the body as link-chip blocks, never written back to the columns.
 

@@ -1,7 +1,7 @@
 import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
 
 interface SelectFieldProps<T> {
-  /** Fertiger Label-String inkl. Emoji, z. B. `🌀 ${t('properties.paradigma')}`. */
+  /** Fertiger Label-String inkl. Emoji, z. B. `⚡ ${t('creation.chargingTechnique')}`. */
   label: string;
   value: string | null | undefined;
   options: readonly T[];

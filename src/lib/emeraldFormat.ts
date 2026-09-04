@@ -20,8 +20,11 @@ import { generateId } from './helpers';
 import i18n from '../i18n';
 import { buildLinkItems, linkItemKey, linkItemsByKey } from './linkItems';
 import {
-  extractInternalLinks, internalLinkBlockHtml, remapInternalLinks,
+  extractInternalLinks, internalLinkBlockHtml, isBlankContent, plainBlockHtml, remapInternalLinks,
 } from './internalLinkHtml';
+import {
+  LEGACY_JOURNAL_FIELDS, type LegacyJournalField,
+} from './migrateJournalFieldsToContent';
 import type { SuggestionItem } from '../components/editor/SuggestionList';
 import {
   DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY,
@@ -97,45 +100,93 @@ function remapImportedLinks(
   });
 }
 
+/** Ein aufgelöstes Ziel aus den abgelösten Spalten, plus optionalem Text
+ *  dahinter (die Meditationsdauer, die kein eigenes Ziel hat). */
+interface LegacyLinkTarget {
+  id: string | null;
+  entryType: 'operation' | 'wiki';
+  suffix?: string;
+  /**
+   * Was als reiner Textabsatz erscheint, wenn sich kein Ziel auflösen lässt.
+   * Ohne das ginge eine Angabe verloren, die in diesem Vault kein Gegenstück
+   * hat — genau der Fall, den Migration v37 mit `plainBlockHtml` abfängt.
+   */
+  fallbackText?: string;
+}
+
 /**
  * Hängt die Verknüpfungen aus den abgelösten Journal-Spalten als Blöcke an den
- * Inhalt — damit eine `.emerald`- oder Markdown-Datei von vor Migration v36
- * dort landet, wo Verknüpfungen heute leben, statt in Spalten ohne Anzeige.
+ * Inhalt — damit eine `.emerald`- oder Markdown-Datei von vor den Migrationen
+ * v36/v37 dort landet, wo Verknüpfungen heute leben, statt in Spalten ohne
+ * Anzeige. Das betrifft `linked_operation_ids`/`linked_wiki_ids` ebenso wie
+ * Paradigma, Bannung und Meditation.
  *
- * `opIds` und `wikiIds` müssen bereits auf DIESEN Vault aufgelöst sein; das
- * Auflösen selbst unterscheidet sich je Dateiformat und bleibt beim Aufrufer.
+ * Die IDs müssen bereits auf DIESEN Vault aufgelöst sein; das Auflösen selbst
+ * unterscheidet sich je Dateiformat und bleibt beim Aufrufer.
  */
 function appendLegacyLinks(
   content: string,
   items: SuggestionItem[],
-  opIds: string[],
-  wikiIds: string[],
+  targets: LegacyLinkTarget[],
 ): string {
-  // Was der Inhalt schon verlinkt, wird nicht erneut angehängt — über beide
-  // Listen hinweg, deshalb eine gemeinsame Menge.
+  // Was der Inhalt schon verlinkt, wird nicht erneut angehängt — über alle
+  // Quellen hinweg, deshalb eine gemeinsame Menge.
   const already = new Set(extractInternalLinks(content).map(linkItemKey));
+  let separator = !isBlankContent(content);
   let out = content;
 
-  for (const [ids, entryType] of [[opIds, 'operation'], [wikiIds, 'wiki']] as const) {
-    for (const id of ids) {
-      const key = linkItemKey({ id, entryType });
-      if (already.has(key)) continue;
-      already.add(key);
-      const item = items.find((i) => linkItemKey(i) === key);
-      if (!item) continue;
-      out += internalLinkBlockHtml(
-        {
-          id: item.id,
-          entryType,
-          label: item.label,
-          icon: item.icon ?? null,
-          entry_number: item.entry_number ?? null,
-        },
-        item.categoryLabel ?? '',
-      );
+  for (const { id, entryType, suffix, fallbackText } of targets) {
+    const key = id ? linkItemKey({ id, entryType }) : null;
+    const item = key && !already.has(key) ? items.find((i) => linkItemKey(i) === key) : undefined;
+    if (!item) {
+      // Kein Ziel in diesem Vault — die Worte bleiben wenigstens als Text
+      // stehen, sofern der Aufrufer welche mitgegeben hat.
+      if (!fallbackText || (key && already.has(key))) continue;
+      out += plainBlockHtml(suffix ? `${fallbackText} ${suffix}` : fallbackText, { separator });
+      separator = true;
+      continue;
     }
+    already.add(key!);
+    out += internalLinkBlockHtml(
+      {
+        id: item.id,
+        entryType,
+        label: item.label,
+        icon: item.icon ?? null,
+        entry_number: item.entry_number ?? null,
+      },
+      item.categoryLabel ?? '',
+      { separator, suffix },
+    );
+    separator = true;
   }
   return out;
+}
+
+/**
+ * Die drei abgelösten Journal-Felder als Blöcke. `active` ist das alte Häkchen
+ * aus `is_bannung`/`is_meditation`: war es gesetzt, ohne dass sich in DIESEM
+ * Vault ein Artikel dazu findet, bleibt — wie in Migration v37 — wenigstens ein
+ * Textabsatz übrig statt gar nichts.
+ */
+function legacyFieldTargets(fields: Array<{
+  key: LegacyJournalField;
+  id: string | null;
+  /** Der Titel aus der Datei; steht auch dann noch da, wenn er hier nichts trifft. */
+  title?: string | null;
+  active?: boolean;
+  suffix?: string;
+}>): LegacyLinkTarget[] {
+  return fields
+    .filter((f) => f.id || f.title || f.active)
+    .map((f) => ({
+      id: f.id,
+      entryType: 'wiki' as const,
+      suffix: f.suffix,
+      fallbackText: `${LEGACY_JOURNAL_FIELDS[f.key].emoji} ${
+        f.title || i18n.t(`wiki.categories.${f.key}`) || LEGACY_JOURNAL_FIELDS[f.key].fallbackName
+      }`,
+    }));
 }
 
 // ── File format ──────────────────────────────────────────────────────────────
@@ -562,22 +613,28 @@ async function importJournalEntry(
       : (file.meta.linkedWikiTitles ?? []).map(t => articles.find(a => a.title === t)?.id)
   ).filter(Boolean) as string[];
 
-  // Dateien von vor Migration v36 tragen ihre Journal-Verknüpfungen noch im
-  // meta statt im Inhalt. Sie werden hier zu Blöcken im Text — in die Spalten
-  // geschrieben würden sie nur noch in der read-only Brücke des
-  // Verlinkungs-Felds erscheinen: kein Chip, kein Rückverweis, kein Suchtreffer.
+  // Dateien von vor den Migrationen v36/v37 tragen ihre Verknüpfungen und die
+  // drei Felder Paradigma/Bannung/Meditation noch im meta statt im Inhalt. Sie
+  // werden hier zu Blöcken im Text — in die Spalten geschrieben hätten sie
+  // keine Anzeige mehr: kein Chip, kein Rückverweis, kein Suchtreffer.
   const entry = await createEntry();
   await updateEntry(entry.id, {
     title: file.title,
-    content: appendLegacyLinks(content, items, linkedOpIds, linkedWikiIds),
+    content: appendLegacyLinks(content, items, [
+      ...linkedOpIds.map((id) => ({ id, entryType: 'operation' as const })),
+      ...linkedWikiIds.map((id) => ({ id, entryType: 'wiki' as const })),
+      ...legacyFieldTargets([
+        { key: 'paradigm', id: paradigmId, title: file.meta.paradigmaTitle },
+        { key: 'bannung', id: bannungId, title: file.meta.bannungTitle, active: file.meta.isBannung },
+        {
+          key: 'meditation', id: meditationId, title: file.meta.meditationTitle,
+          active: file.meta.isMeditation,
+          suffix: file.meta.meditationDuration ? `(${file.meta.meditationDuration} min)` : undefined,
+        },
+      ]),
+    ]),
     tags: tagNames,
     moon_phase: file.meta.moonPhase ?? null,
-    paradigm_id: paradigmId,
-    is_bannung: file.meta.isBannung ?? false,
-    bannung_type_wiki_id: bannungId,
-    is_meditation: file.meta.isMeditation ?? false,
-    meditation_type_wiki_id: meditationId,
-    meditation_duration: file.meta.meditationDuration ?? null,
   });
   return entry.id;
 }
@@ -940,20 +997,25 @@ async function importJournalFromMarkdown(
       : articles.find(a => a.title === title)?.id
     ).filter(Boolean) as string[];
 
-  // Wie beim `.emerald`-Import: die Verknüpfungen aus der Markdown-Kopfzeile
-  // landen als Blöcke im Text, nicht in den abgelösten Spalten.
-  const content = appendLegacyLinks(html, linkItemsSnapshot(), linkedOpIds, linkedWikiIds);
+  // Wie beim `.emerald`-Import: alles aus der Markdown-Kopfzeile landet als
+  // Block im Text, nicht in den abgelösten Spalten.
+  const content = appendLegacyLinks(html, linkItemsSnapshot(), [
+    ...linkedOpIds.map((id) => ({ id, entryType: 'operation' as const })),
+    ...linkedWikiIds.map((id) => ({ id, entryType: 'wiki' as const })),
+    ...legacyFieldTargets([
+      { key: 'paradigm', id: paradigmId, title: paradigmaName },
+      { key: 'bannung', id: bannungId, title: bannungName },
+      {
+        key: 'meditation', id: meditationId, title: meditationName,
+        suffix: meditationDuration ? `(${meditationDuration} min)` : undefined,
+      },
+    ]),
+  ]);
 
   const entry = await createEntry();
   await updateEntry(entry.id, {
     title, content, tags: tagNames,
     moon_phase: moonPhase,
-    paradigm_id: paradigmId,
-    is_bannung: !!bannungName,
-    bannung_type_wiki_id: bannungId,
-    is_meditation: !!meditationName,
-    meditation_type_wiki_id: meditationId,
-    meditation_duration: meditationDuration,
   });
   return entry.id;
 }

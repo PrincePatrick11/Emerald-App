@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
 import { useLinkItems } from '../../../hooks/useLinkItems';
-import LinkedEntryPicker, { LINK_RESULT_LIMIT, LinkedEntryChip } from './LinkedEntryPicker';
+import LinkedEntryPicker, { LinkedEntryChip } from './LinkedEntryPicker';
 import {
   requestEntryLinkAppend, requestEntryLinkRemove, requestEntryLinkReveal,
 } from '../../../lib/links';
@@ -31,6 +31,29 @@ interface Props {
   editable?: boolean;
   /** Klassen der Suchzeile (OP_PROP_SELECT_CLASSES der Panels). */
   inputCls?: string;
+}
+
+/**
+ * So viele Vorschläge zeigt die Liste. Deutlich mehr als bei den beiden
+ * ID-Feldern (`LINK_RESULT_LIMIT`), weil hier alle fünf Module in einem Topf
+ * liegen: bei acht Treffern bekäme man ohne Suchbegriff nur das erste Modul zu
+ * sehen. Das Menü ist auf `max-h-40` begrenzt und scrollt.
+ */
+const RESULT_LIMIT = 50;
+
+/** Zuletzt bearbeitet zuerst — ohne Zeitstempel ans Ende. */
+function byRecency(a: SuggestionItem, b: SuggestionItem): number {
+  return (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '');
+}
+
+/** Nach Kategorie, darin nach Titel. Einträge ohne Kategorie kommen zuletzt. */
+function byCategory(a: SuggestionItem, b: SuggestionItem): number {
+  const ca = a.categoryLabel ?? '';
+  const cb = b.categoryLabel ?? '';
+  // Erst die Frage „hat überhaupt eine Kategorie?" — ein Platzhalterzeichen am
+  // Ende des Alphabets wäre kürzer, aber die Kollation darf es ignorieren.
+  if (!ca !== !cb) return ca ? -1 : 1;
+  return ca.localeCompare(cb) || a.label.localeCompare(b.label);
 }
 
 function ItemIcon({ item }: { item: SuggestionItem }) {
@@ -85,7 +108,10 @@ export default function LinkedEntriesField({ content, legacyIds, editable = fals
       seen.add(key);
       out.push({ item, inContent });
     }
-    return out;
+    // Nach Kategorie sortiert, nicht in der Reihenfolge des Textes: gleichartige
+    // Verlinkungen stehen so beieinander, unabhängig davon, wann sie in den
+    // Eintrag geraten sind.
+    return out.sort((a, b) => byCategory(a.item, b.item));
   }, [content, legacyIds, pending, removed, byKey]);
 
   const filtered = useMemo(() => {
@@ -93,7 +119,10 @@ export default function LinkedEntriesField({ content, legacyIds, editable = fals
     const q = query.toLowerCase();
     return items
       .filter((i) => !linkedKeys.has(itemKey(i)) && i.label.toLowerCase().includes(q))
-      .slice(0, LINK_RESULT_LIMIT);
+      // Zuletzt bearbeitet zuerst — sonst entschiede die Modul-Reihenfolge aus
+      // `buildLinkItems`, und ohne Suchbegriff stünde nur Journal in der Liste.
+      .sort(byRecency)
+      .slice(0, RESULT_LIMIT);
   }, [items, linked, query]);
 
   /**
@@ -121,32 +150,59 @@ export default function LinkedEntriesField({ content, legacyIds, editable = fals
     setRemoved((prev) => [...prev, itemKey(item)]);
   };
 
-  const chips = linked.map(({ item, inContent }) => (
-    <LinkedEntryChip
-      key={itemKey(item)}
-      icon={<ItemIcon item={item} />}
-      label={item.label}
-      labelMaxWidth="max-w-[140px]"
-      onClick={() => reveal(item)}
-      // Nur was im Inhalt steht, lässt sich von hier entfernen.
-      onRemove={editable && inContent ? () => remove(item) : undefined}
-      removeTitle={t('properties.removeLink')}
-    />
-  ));
+  // `linked` ist bereits nach Kategorie sortiert — gleiche Kategorien stehen
+  // also beieinander, und ein Durchlauf reicht, um sie zu Gruppen zu bündeln.
+  const groups: Array<{ label: string; entries: typeof linked }> = [];
+  for (const entry of linked) {
+    const label = entry.item.categoryLabel ?? '';
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) last.entries.push(entry);
+    else groups.push({ label, entries: [entry] });
+  }
+
+  const chips = groups.length === 0 ? undefined : (
+    <div className="space-y-2">
+      {groups.map((group) => (
+        <div key={group.label} className="space-y-1">
+          {/* Ohne Kategorie keine Überschrift — die Gruppe steht am Ende.
+              Bewusst nicht `PropertySummarySectionTitle`: das ist der Titel
+              einer Abschnittsgruppe im Panel und läge damit über der
+              Feldbeschriftung, unter der diese Überschrift steht. Sie muss eine
+              Stufe leiser sein als `label-xs` — dieselbe Kombination benutzt
+              `PlacedElementRow` für seine Unterbeschriftungen. */}
+          {group.label && (
+            <p className="text-[10px] uppercase tracking-wider text-stone-500">{group.label}</p>
+          )}
+          <div className="flex flex-wrap gap-1">
+            {group.entries.map(({ item, inContent }) => (
+              <LinkedEntryChip
+                key={itemKey(item)}
+                icon={<ItemIcon item={item} />}
+                label={item.label}
+                labelMaxWidth="max-w-[140px]"
+                onClick={() => reveal(item)}
+                // Nur was im Inhalt steht, lässt sich von hier entfernen.
+                onRemove={editable && inContent ? () => remove(item) : undefined}
+                removeTitle={t('properties.removeLink')}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   if (!editable) {
     return (
       <div className="space-y-1.5">
-        {chips.length > 0
-          ? <div className="flex flex-wrap gap-1">{chips}</div>
-          : <p className="text-xs text-stone-600">{t('properties.noLinkedEntries')}</p>}
+        {chips ?? <p className="text-xs text-stone-600">{t('properties.noLinkedEntries')}</p>}
       </div>
     );
   }
 
   return (
     <LinkedEntryPicker
-      chips={chips.length > 0 ? chips : undefined}
+      chips={chips}
       results={filtered}
       resultKey={itemKey}
       onSelect={add}

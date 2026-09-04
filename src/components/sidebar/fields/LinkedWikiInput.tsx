@@ -39,15 +39,19 @@ export default function LinkedWikiInput({
 
   return (
     <LinkedEntryPicker
-      chips={selectedArticles.map((article) => (
-        <LinkedEntryChip
-          key={article.id}
-          icon={<span className="flex-shrink-0">{articleIcon(article)}</span>}
-          label={article.title}
-          onRemove={() => onChange(ids.filter((i) => i !== article.id))}
-          removeTitle={t('properties.removeLink')}
-        />
-      ))}
+      chips={selectedArticles.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {selectedArticles.map((article) => (
+            <LinkedEntryChip
+              key={article.id}
+              icon={<span className="flex-shrink-0">{articleIcon(article)}</span>}
+              label={article.title}
+              onRemove={() => onChange(ids.filter((i) => i !== article.id))}
+              removeTitle={t('properties.removeLink')}
+            />
+          ))}
+        </div>
+      )}
       results={filtered}
       resultKey={(article) => article.id}
       onSelect={(article) => onChange([...ids, article.id])}

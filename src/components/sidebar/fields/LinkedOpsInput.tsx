@@ -42,15 +42,19 @@ export default function LinkedOpsInput({
 
   return (
     <LinkedEntryPicker
-      chips={selectedOps.map((op) => (
-        <LinkedEntryChip
-          key={op.id}
-          icon={opIcon(iconOf(op))}
-          label={op.title}
-          onRemove={() => onChange(ids.filter((i) => i !== op.id))}
-          removeTitle={t('properties.removeLink')}
-        />
-      ))}
+      chips={selectedOps.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {selectedOps.map((op) => (
+            <LinkedEntryChip
+              key={op.id}
+              icon={opIcon(iconOf(op))}
+              label={op.title}
+              onRemove={() => onChange(ids.filter((i) => i !== op.id))}
+              removeTitle={t('properties.removeLink')}
+            />
+          ))}
+        </div>
+      )}
       results={filtered}
       resultKey={(op) => op.id}
       onSelect={(op) => onChange([...ids, op.id])}

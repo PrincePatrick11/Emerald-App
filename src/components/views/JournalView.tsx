@@ -7,14 +7,12 @@ import { useUIStore } from '../../store/uiStore';
 import { useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEditActions } from '../../hooks/useEditActions';
 import { useJournalStore } from '../../store/journalStore';
-import { useWikiStore } from '../../store/wikiStore';
 import { useUndoStore } from '../../store/undoStore';
 import RichEditor from '../editor/RichEditor';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
-import { getCategoryEmoji } from '../wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
@@ -37,8 +35,6 @@ export default function JournalView() {
     useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, permanentlyDeleteEntry: s.permanentlyDeleteEntry, getEntry: s.getEntry }))
   );
   const pushUndo = useUndoStore((s) => s.push);
-  const getWikiArticle = useWikiStore((s) => s.getArticle);
-  const wikiCategories = useWikiStore((s) => s.wikiCategories);
 
   const entry = activeView.id ? getEntry(activeView.id) : null;
   const isEditing = activeView.mode === 'edit';
@@ -348,68 +344,10 @@ export default function JournalView() {
     );
   }
 
-  // Paradigma-/Bannung-/Meditations-Chips — der Journal-eigene Inhalt des
-  // belowTitle-Slots. Verlinkte Einträge stehen hier bewusst NICHT mehr: sie
-  // sind Chips im Fließtext und stehen gesammelt im Verlinkungs-Feld der
-  // rechten Seitenleiste.
-  const propertyChips = (
-    <>
-      {/* Paradigm + Bannung + Meditation — one row */}
-      {(entry.paradigm_id || entry.is_bannung || entry.is_meditation) && (() => {
-        const chipCls = 'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-stone-800/60 border border-stone-700/40 text-stone-400 hover:text-stone-200 hover:border-stone-600 transition-colors';
-        const spanCls = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-stone-800/60 border border-stone-700/40 text-stone-400';
-
-        const renderIcon = (icon: string) => icon.startsWith('data:')
-          ? <img src={icon} alt="" className="w-3.5 h-3.5 object-cover rounded flex-shrink-0" />
-          : <span>{icon}</span>;
-
-        const paradigm = entry.paradigm_id ? getWikiArticle(entry.paradigm_id) : null;
-        const bannungArticle = entry.bannung_type_wiki_id ? getWikiArticle(entry.bannung_type_wiki_id) : null;
-        const meditationArticle = entry.meditation_type_wiki_id ? getWikiArticle(entry.meditation_type_wiki_id) : null;
-
-        return (
-          <div className="px-8 pb-2 flex-shrink-0 flex flex-wrap gap-1.5">
-            {paradigm && (() => {
-              const icon = paradigm.icon || (wikiCategories.find((c) => c.id === paradigm.category_id)?.emoji ?? getCategoryEmoji(paradigm.category_id));
-              return (
-                <button onClick={() => setActiveView({ type: 'wiki', id: paradigm.id, mode: 'view' })} className={chipCls}>
-                  {renderIcon(icon)}<span>{paradigm.title}</span>
-                </button>
-              );
-            })()}
-            {entry.is_bannung && (() => {
-              const icon = bannungArticle
-                ? (bannungArticle.icon || (wikiCategories.find((c) => c.id === bannungArticle.category_id)?.emoji ?? getCategoryEmoji(bannungArticle.category_id)))
-                : '🚫';
-              const label = bannungArticle ? bannungArticle.title : 'Bannung';
-              return bannungArticle
-                ? <button onClick={() => setActiveView({ type: 'wiki', id: bannungArticle.id, mode: 'view' })} className={chipCls}>{renderIcon(icon)}<span>{label}</span></button>
-                : <span className={spanCls}>{renderIcon(icon)}<span>{label}</span></span>;
-            })()}
-            {entry.is_meditation && (() => {
-              const icon = meditationArticle
-                ? (meditationArticle.icon || (wikiCategories.find((c) => c.id === meditationArticle.category_id)?.emoji ?? getCategoryEmoji(meditationArticle.category_id)))
-                : '🧘';
-              const label = meditationArticle ? meditationArticle.title : 'Meditation';
-              return (
-                <>
-                  {meditationArticle
-                    ? <button onClick={() => setActiveView({ type: 'wiki', id: meditationArticle.id, mode: 'view' })} className={chipCls}>{renderIcon(icon)}<span>{label}</span></button>
-                    : <span className={spanCls}>{renderIcon(icon)}<span>{label}</span></span>}
-                  {entry.meditation_duration != null && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs bg-stone-800/60 border border-stone-700/40 text-stone-400">
-                      <span>⏱</span><span>{entry.meditation_duration} min</span>
-                    </span>
-                  )}
-                </>
-              );
-            })()}
-          </div>
-        );
-      })()}
-    </>
-  );
-
+  // Unter dem Titel steht beim Journal nichts mehr: die Verlinkungs-Badges sind
+  // seit v36 Chips im Fließtext, die Paradigma-/Bannung-/Meditations-Chips seit
+  // v37 ebenfalls. Gesammelt zeigt beides das Verlinkungs-Feld der rechten
+  // Seitenleiste, nach Kategorie sortiert.
   return (
     <EntryDetailFrame
       module="journal"
@@ -424,7 +362,6 @@ export default function JournalView() {
       }
       title={isEditing ? title : entry.title}
       onTitleChange={(nextTitle) => { setTitle(nextTitle); triggerAutoSave(); }}
-      belowTitle={propertyChips}
       tags={{ value: tags, onChange: (newTags) => { setTags(newTags); triggerAutoSave(); } }}
     >
       {loadedEntryId === entry.id && (

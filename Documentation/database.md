@@ -27,7 +27,7 @@ The emptiness check looks at `sqlite_master`, not at `schema_version`: a databas
 
 Afterwards `runPeriodicCleanup(db)` purges trashed rows older than 30 days. It is **not** a migration — idempotent, time-dependent, and run on every vault open.
 
-The current version is **36**, and `BASELINE_VERSION` in `schema.ts` must equal the highest entry in `MIGRATIONS`. `runMigrations` throws at startup if the two disagree, so a new migration cannot be added without updating the baseline.
+The current version is **37**, and `BASELINE_VERSION` in `schema.ts` must equal the highest entry in `MIGRATIONS`. `runMigrations` throws at startup if the two disagree, so a new migration cannot be added without updating the baseline.
 
 Note that **version 24 is genuinely missing** — no entry with that number has existed for some time. The runner tolerates gaps; it only requires each version to be above the last applied one.
 
@@ -202,14 +202,14 @@ Numeric grid defaults must stay in sync with `DEFAULT_GRID_*` in `altarConstants
 | entry_number | INTEGER | stable per row — see Key Conventions |
 | moon_phase | TEXT | one of the eight `MoonPhase` keys, or NULL |
 | mood | TEXT | unused; reserved |
-| paradigm_id | TEXT | wiki article id, no FK (optional) |
+| paradigm_id | TEXT | wiki article id, no FK (optional); legacy — see note below |
 | linked_operation_ids | TEXT | JSON array, NOT NULL DEFAULT `'[]'`; legacy — see note below |
 | linked_wiki_ids | TEXT | JSON array, NOT NULL DEFAULT `'[]'`; legacy — see note below |
-| is_bannung | INTEGER | boolean 0/1 |
-| bannung_type_wiki_id | TEXT | wiki article id, no FK |
-| is_meditation | INTEGER | boolean 0/1 |
-| meditation_duration | INTEGER | minutes, nullable |
-| meditation_type_wiki_id | TEXT | wiki article id, no FK |
+| is_bannung | INTEGER | boolean 0/1; legacy — see note below |
+| bannung_type_wiki_id | TEXT | wiki article id, no FK; legacy — see note below |
+| is_meditation | INTEGER | boolean 0/1; legacy — see note below |
+| meditation_duration | INTEGER | minutes, nullable; legacy — see note below |
+| meditation_type_wiki_id | TEXT | wiki article id, no FK; legacy — see note below |
 | tags | TEXT | JSON array of tag **names** |
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active |
@@ -217,6 +217,8 @@ Numeric grid defaults must stay in sync with `DEFAULT_GRID_*` in `altarConstants
 Both `linked_*_ids` columns were nullable until v33, unlike every other JSON array in the schema; consumers had to special-case `NULL` for exactly those two.
 
 **Legacy since v36.** What an entry links now lives in its `content` as internal-link chips (see [`architecture.md` → Internal Links](architecture.md#internal-links)), read by the right sidebar's "Linked entries" field across all five entry types, not just operations and wiki articles. The two ID columns above are no longer written when a link is created; they remain in the schema only because export, `.emeralddb` backup/restore, and `checkIntegrity` still have to round-trip a backup taken before v36. The UI reads them exactly once, as a read-only bridge for entries a pre-v36 backup restored straight into these columns (`legacyIds` in `LinkedEntriesField`) — a link created from here on is always a content chip.
+
+**Legacy since v37.** `paradigm_id`, `is_bannung`, `bannung_type_wiki_id`, `is_meditation`, `meditation_duration`, and `meditation_type_wiki_id` were three fixed Journal properties — Paradigm, Banishing, and Meditation — each tied to a wiki article. `JournalPropertiesPanel` no longer reads or writes any of the six; a set article is now an ordinary link chip in the entry's `content`, the same as the two columns above. Migration v37 rewrites existing rows once and clears all six columns; they stay in the schema only so export, `.emeralddb` backup/restore, and `checkIntegrity` can still round-trip a backup taken before v37. Unlike `linked_operation_ids`/`linked_wiki_ids`, there is no read-only UI bridge for these six — a restore that repopulates them (from a pre-v37 `.emeralddb` backup, imported without re-running the migration) leaves data sitting in the columns with nothing in the app reading it back out.
 
 ### wiki_articles
 

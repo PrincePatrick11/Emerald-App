@@ -43,6 +43,21 @@ export function extractInternalLinks(
   return out;
 }
 
+/**
+ * Trägt das gespeicherte HTML sichtbaren Inhalt? Ein frischer Eintrag ist
+ * `<p></p>` — vor den ersten Verlinkungs-Block gehört dort keine Trennlinie,
+ * denn sie trennt den Text von den Links, und Text gibt es noch keinen.
+ *
+ * Wie `extractInternalLinks` bewusst ohne `DOMParser`: die Migrationen fragen
+ * das ebenfalls, und die laufen im Schema-Harness unter Node.
+ */
+export function isBlankContent(html: string): boolean {
+  if (!html) return true;
+  // Elemente, die für sich stehen — ein Bild ohne ein Wort daneben ist Inhalt.
+  if (/<(img|hr|br|iframe|table|svg|video|audio|span)\b/i.test(html)) return false;
+  return !html.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim();
+}
+
 export interface ParsedInternalLink {
   id: string;
   entryType: string;
@@ -93,7 +108,7 @@ export function remapInternalLinks(
   return doc.body.innerHTML;
 }
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -128,12 +143,37 @@ export function internalLinkChipHtml(chip: InternalLinkChip): string {
   return `<span ${rendered}>${escapeHtml(chip.label || chip.id)}</span>`;
 }
 
+export interface LinkBlockOptions {
+  /** `false` lässt die Trennlinie weg — für den ersten Block in einem noch
+   *  leeren Eintrag, wo es nichts zu trennen gibt (siehe `isBlankContent`). */
+  separator?: boolean;
+  /** Text hinter dem Chip, im selben Absatz. Trägt die Meditationsdauer aus
+   *  dem abgelösten Journal-Feld („(20 min)"), die kein Link-Ziel hat. */
+  suffix?: string;
+}
+
 /**
  * Ein angehängter Verlinkungs-Block: Trennlinie, Kategorie als Überschrift,
  * dann der Chip. Die eine Definition dieses Blocks — `appendEntryLink` im
- * RichEditor, die Migration v36 und der `.emerald`-Import setzen alle hier an.
+ * RichEditor, die Migrationen v36/v37 und der `.emerald`-Import setzen alle
+ * hier an.
  */
-export function internalLinkBlockHtml(chip: InternalLinkChip, categoryLabel: string): string {
+export function internalLinkBlockHtml(
+  chip: InternalLinkChip,
+  categoryLabel: string,
+  { separator = true, suffix }: LinkBlockOptions = {},
+): string {
+  const rule = separator ? '<hr>' : '';
   const heading = categoryLabel ? `<h3>${escapeHtml(categoryLabel)}</h3>` : '';
-  return `<hr>${heading}<p>${internalLinkChipHtml(chip)} </p>`;
+  const tail = suffix ? ` ${escapeHtml(suffix)}` : '';
+  return `${rule}${heading}<p>${internalLinkChipHtml(chip)}${tail} </p>`;
+}
+
+/**
+ * Derselbe Block ohne Chip — für eine abgelöste Angabe, deren Ziel es nicht
+ * (mehr) gibt: ein gesetztes `is_bannung` ohne Artikel etwa. Ohne das ginge bei
+ * der Migration v37 die Information ersatzlos verloren.
+ */
+export function plainBlockHtml(text: string, { separator = true }: LinkBlockOptions = {}): string {
+  return `${separator ? '<hr>' : ''}<p>${escapeHtml(text)}</p>`;
 }
