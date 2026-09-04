@@ -351,7 +351,7 @@ The `deleted_at` indexes matter because `runPeriodicCleanup` runs a range scan a
 
 **Timestamps.** ISO 8601 text produced by `nowIso()`, sorted and compared lexicographically. `due_date`, `end_date`, and `target_reveal_date` are the exception: they come from `<input type="date">` and are date-only `YYYY-MM-DD`.
 
-**Base64 in SQLite.** The rule below is to keep image data in files. Nine columns predate it and still hold data-URLs — the `legacy` group of `IMAGE_FIELDS` in `schema.ts`: `wiki_articles.icon` / `cover_image`, `operations.icon` / `cover_image` / `drawing_data` / `thumbnail_data`, `altars.thumbnail_data` / `icon_data`, and `altar_items.image_data` (the last of which this file described as a file path until the code was checked). `Favicon.tsx` and `Banner.tsx` read the uploaded file with `FileReader.readAsDataURL`, and `AltarLibraryStrip.tsx` does the same with `readFileAsDataUrl`; none of the three go through `save_image`. Every consumer tests the value with `startsWith('data:image/')`. Do not add more.
+**Base64 in SQLite.** The rule below is to keep image data in files. Nine columns predate it and still hold data-URLs — the `legacy` group of `IMAGE_FIELDS` in `schema.ts`: `wiki_articles.icon` / `cover_image`, `operations.icon` / `cover_image` / `drawing_data` / `thumbnail_data`, `altars.thumbnail_data` / `icon_data`, and `altar_items.image_data` (the last of which this file described as a file path until the code was checked). `Favicon.tsx`, `Banner.tsx`, and `AltarLibraryStrip.tsx` all read the uploaded file with the shared `readFileAsDataUrl` helper (`lib/helpers.ts`); none of the three go through `save_image`. Every consumer tests the value with `startsWith('data:image/')`. Do not add more.
 
 ## Sigil Workflow
 
@@ -457,7 +457,7 @@ Images are restored via `save_image`, which returns the filename they were given
 | `plain` | the column *is* the reference | yes | yes |
 | `legacy` | the column holds a data-URL | no | yes |
 
-The `legacy` group is why the list has to be complete rather than only naming the rewritable columns: `collectUsedImageFilenames` decides which file the cleanup action may delete, so a column missing from it would be a reference nobody sees. Rewriting them would break their renderers — `Favicon` and `Banner` write `icon` / `cover_image` with `FileReader` and test them with `isImageIcon`, which only accepts `data:` / `blob:` / `/`.
+The `legacy` group is why the list has to be complete rather than only naming the rewritable columns: `collectUsedImageFilenames` decides which file the cleanup action may delete, so a column missing from it would be a reference nobody sees. Rewriting them would break their renderers — `Favicon` and `Banner` write `icon` / `cover_image` via `readFileAsDataUrl` and test them with `isImageIcon`, which only accepts `data:` / `blob:` / `/`.
 
 ## Rules for Future Schema Changes
 
