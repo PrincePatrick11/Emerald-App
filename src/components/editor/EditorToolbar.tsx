@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
-import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
+import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, readFileAsDataUrl } from '../../lib/helpers';
 import {
   Bold,
   Italic,
@@ -109,19 +109,20 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
     return editor.isActive({ textAlign: align });
   };
 
-  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
     if (!isAcceptedImageFile(file)) {
       setImageError(t('common.unsupportedImageFormat'));
       window.setTimeout(() => setImageError(null), 2500);
-      e.target.value = '';
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => onInsertImage(reader.result as string);
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    try {
+      onInsertImage(await readFileAsDataUrl(file));
+    } catch (err) {
+      console.error('Failed to read image:', err);
+    }
   };
 
   return (

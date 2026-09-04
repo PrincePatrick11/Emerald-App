@@ -211,9 +211,12 @@ Open, deliberately recorded, and not an excuse for further copies.
 6. **`AltarReadingSummary` rebuilds `PropertySummaryRow` raw.** Its local `BackgroundRow`
    repeats the row's exact class chain (`flex items-center gap-2 px-3 py-2 rounded-lg
    bg-stone-900/45 border border-stone-700/60`) instead of using the component.
-7. **Two hand-written buttons in `AltarSidebarPanel`** carry the full `Button
-   tone="neutral"` class chain as raw Tailwind, in a file that imports and uses `Button`
-   a few lines above.
+7. **The altar's ratio and overlay-colour toggles** carry the full `Button tone="neutral"`
+   class chain as raw Tailwind (`AltarSidebarPanel`, mirrored in `PlacedElementRow`), in a
+   file that imports and uses `Button` a few lines above. Whether they belong in `Button`
+   at all is open: they are selection toggles, structurally closer to a chip than to an
+   action button. The background picker's change/remove/upload buttons, once part of this
+   item, now run through `Button`'s tone mode.
 8. **A third dropdown row class** exists besides `.menu-item`/`.context-menu-item-*`:
    `linked-entry-menu-item`, with its own raw chain. Now defined in one place
    (`LinkedEntryPicker`, shared by `LinkedEntriesField`, `LinkedOpsInput` and

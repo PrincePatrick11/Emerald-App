@@ -101,7 +101,7 @@ function ItemModal({
       widthClassName="w-full max-w-md"
       bodyClassName="p-4 space-y-3"
     >
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <EmojiPicker
             value={editEmoji}
             onChange={(emoji) => { setEditEmoji(emoji); setEditImageData(null); }}
@@ -116,7 +116,7 @@ function ItemModal({
               </button>
             )}
           />
-          <button onClick={() => imageInputRef.current?.click()} className="flex-shrink-0 flex items-center gap-1 px-2 py-2 bg-stone-800/60 rounded-lg hover:bg-stone-700/60 transition-colors text-stone-500 hover:text-stone-300" title={t('altar.uploadImage')}><ImagePlus size={14} /></button>
+          <Button tone="neutral" compact title={t('altar.uploadImage')} aria-label={t('altar.uploadImage')} onClick={() => imageInputRef.current?.click()}><ImagePlus size={14} /></Button>
         </div>
         {imageError && <p className="text-xs text-red-400">{imageError}</p>}
         <input ref={imageInputRef} type="file" accept={ACCEPTED_IMAGE_MIME} className="hidden" onChange={handleImageChange} />

@@ -375,30 +375,24 @@ const [gridOpen, setGridOpen] = useState(true);
                           )}
                         </div>
                         <div className="col-span-3 flex gap-1.5">
-                        <button
-                          onClick={openModal}
-                          className="flex flex-1 items-center justify-center gap-1 rounded border border-stone-600/70 bg-stone-800/70 py-1 text-[10px] uppercase tracking-wide text-stone-300 hover:border-stone-400 transition-colors"
-                        >
-                          <Pencil size={9} />{t('altar.change')}
-                        </button>
-                        <Button
-                          onClick={removeGradient}
-                          variant="danger"
-                          className="flex flex-1 items-center justify-center gap-1 rounded border py-1 text-[10px] uppercase tracking-wide bg-[var(--danger-bg)] border-[var(--danger-border)] hover:border-[var(--danger-hover-border)]"
-                        >
-                          <Trash2 size={9} />{t('altar.remove')}
+                        <Button tone="neutral" small fill onClick={openModal}>
+                          <Pencil size={12} />{t('altar.change')}
+                        </Button>
+                        <Button tone="danger" small fill onClick={removeGradient}>
+                          <Trash2 size={12} />{t('altar.remove')}
                         </Button>
                         </div>
                       </div>
                     ) : (
-                      <button
+                      <Button
+                        tone="neutral"
                         onClick={() => { if (isEditing) openModal(); }}
                         disabled={!isEditing}
-                        className="flex w-full items-center justify-center gap-1.5 rounded-md border border-stone-700/50 bg-stone-900/45 py-1.5 text-[11px] text-stone-400 hover:border-stone-500/60 hover:text-stone-300 transition-colors"
+                        className="w-full"
                       >
                         <div className="h-3 w-5 rounded-sm flex-shrink-0" style={{ background: generateGradientStyle(GRADIENT_PRESET_COLORS[0]) }} />
                         {t('altar.backgrounds.gradient')}
-                      </button>
+                      </Button>
                     )}
                     {gradientModalOpen && (() => {
                       const res = activeAltar.resolution;
@@ -504,28 +498,18 @@ const [gridOpen, setGridOpen] = useState(true);
                     )}
                   </div>
                   <div className="col-span-3 flex gap-1.5">
-                  <button
-                    onClick={() => backgroundInputRef.current?.click()}
-                    className="flex flex-1 items-center justify-center gap-1 rounded border border-stone-600/70 bg-stone-800/70 py-1 text-[10px] uppercase tracking-wide text-stone-300 hover:border-stone-400 transition-colors"
-                  >
-                    <Pencil size={9} />{t('altar.change')}
-                  </button>
-                  <Button
-                    onClick={removeCustomBackground}
-                    variant="danger"
-                    className="flex flex-1 items-center justify-center gap-1 rounded border py-1 text-[10px] uppercase tracking-wide bg-[var(--danger-bg)] border-[var(--danger-border)] hover:border-[var(--danger-hover-border)]"
-                  >
-                    <Trash2 size={9} />{t('altar.remove')}
+                  <Button tone="neutral" small fill onClick={() => backgroundInputRef.current?.click()}>
+                    <Pencil size={12} />{t('altar.change')}
+                  </Button>
+                  <Button tone="danger" small fill onClick={removeCustomBackground}>
+                    <Trash2 size={12} />{t('altar.remove')}
                   </Button>
                   </div>
                 </div>
               ) : (
-                <button
-                  onClick={() => backgroundInputRef.current?.click()}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-md border border-stone-700/50 bg-stone-900/45 py-1.5 text-[11px] text-stone-400 hover:border-stone-500/60 hover:text-stone-300 transition-colors"
-                >
+                <Button tone="neutral" onClick={() => backgroundInputRef.current?.click()} className="w-full">
                   <ImageIcon size={12} />{t('altar.customBackground')}
-                </button>
+                </Button>
               )}
             </div>
           ) : (
