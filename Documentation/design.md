@@ -182,7 +182,7 @@ because it is unclear whether `font-mono` is needed at all.*
 **8. Emerald Noctis lacks the generic focus rule.** Parchment has
 `html[data-theme='emerald-parchment'] button:focus-visible` (`index.css:1426`); Noctis has
 `:focus-visible` only for individual classes (`.window-control`, `.titlebar-menu-trigger`,
-`.menu-item`, `.link-picker-row`, `.filter-chip`, `.sidebar-action-btn`,
+`.menu-item`, `.link-picker-row`, `.filter-chip`, `.sidebar-action-btn`, `.altar-item-tile`,
 `.right-sidebar-tab-idle`/`-active`, `.link-picker-tab-idle`/`-active`). The last four cover
 `Button`'s tone mode (so `RightSidebarActionBar`'s buttons, among every other tone-mode use,
 now get a ring) and the sidebar's and link picker's tab/segment toggles — the same per-class
