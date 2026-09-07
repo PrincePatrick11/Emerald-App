@@ -83,8 +83,7 @@ export default function SettingsModal({ onClose }: Props) {
     includeJournal: true, includeWiki: true, includeOperations: true,
     includeRoutines: true, includeAltars: true, includeTasks: true, includeTags: true,
   });
-  const [excludedWikiCats] = useState<Set<string>>(new Set());
-  const [excludedOpCats] = useState<Set<string>>(new Set());
+  const [excludedCategoryIds] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
   const [importDone, setImportDone] = useState(false);
   const [importError, setImportError] = useState('');
@@ -171,8 +170,7 @@ export default function SettingsModal({ onClose }: Props) {
     setImportDone(false);
     setImportError('');
     const categoryFilters: ImportCategoryFilters = {
-      excludedWikiCategoryIds: excludedWikiCats,
-      excludedOpCategoryIds: excludedOpCats,
+      excludedCategoryIds,
     };
     const vaultName = newVaultName.trim() || t('settings.importedVault');
     const vaultTarget = importMode === 'add-vault'

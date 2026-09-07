@@ -9,7 +9,7 @@ import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { useTaskStore } from '../store/taskStore';
 import { useAltarStore } from '../store/altarStore';
-import { getCategoryEmoji } from '../components/wiki/WikiList';
+import { useCategoryStore } from '../store/categoryStore';
 import { DEFAULT_ENTRY_EMOJI } from '../components/editor/SuggestionList';
 import i18n from '../i18n';
 
@@ -63,9 +63,10 @@ function resolveInternalLinkIcons(html: string): string {
   const links = doc.querySelectorAll<HTMLElement>('span[data-type="internalLink"]');
   if (!links.length) return html;
 
-  const { articles, wikiCategories } = useWikiStore.getState();
-  const { operations, categories: opCats } = useOperationStore.getState();
-  const { tasks, categories: taskCats } = useTaskStore.getState();
+  const { articles } = useWikiStore.getState();
+  const { operations } = useOperationStore.getState();
+  const { tasks } = useTaskStore.getState();
+  const { categories } = useCategoryStore.getState();
   const { altars } = useAltarStore.getState();
 
   for (const el of links) {
@@ -82,21 +83,21 @@ function resolveInternalLinkIcons(html: string): string {
         if (article.icon?.startsWith('data:')) {
           icon = article.icon;
         } else {
-          const cat = wikiCategories.find(c => c.id === article.category_id);
-          icon = cat?.emoji ?? getCategoryEmoji(article.category_id);
+          const cat = categories.find(c => c.id === article.category_id);
+          icon = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
         }
       }
     } else if (entryType === 'operation') {
       const op = operations.find(o => o.id === id);
       if (op) {
-        const cat = opCats.find(c => c.id === op.category_id);
+        const cat = categories.find(c => c.id === op.category_id);
         icon = op.icon ?? cat?.emoji ?? '⚡';
       }
     } else if (entryType === 'task') {
       // Task-Chips aus Sidebar-Drags tragen kein data-icon — wie im
       // Live-Lookup des Editors: Kategorie-Emoji, sonst der Chip-Fallback.
       const task = tasks.find(t => t.id === id);
-      if (task) icon = taskCats.find(c => c.id === task.category_id)?.emoji ?? DEFAULT_ENTRY_EMOJI.task;
+      if (task) icon = categories.find(c => c.id === task.category_id)?.emoji ?? DEFAULT_ENTRY_EMOJI.task;
     } else if (entryType === 'altar') {
       // Altar-Chips speichern icon_data bewusst nie in den Attrs (data-URL);
       // erst hier im Export wird es aufgelöst.
@@ -187,19 +188,15 @@ function buildTopBar(data: ExportData): string {
     const sp = data.moonPhase.indexOf(' ');
     icon     = sp > 0 ? data.moonPhase.slice(0, sp) : data.moonPhase;
     moonName = sp > 0 ? data.moonPhase.slice(sp + 1) : '';
-  } else if (data.wikiCategory) {
-    const ic = data.entryIcon ?? data.wikiCategory.icon;
-    icon = (!ic || ic.startsWith('data:')) ? '📖' : ic;
-    moonName = data.wikiCategory.label;
-  } else if (data.opCategory) {
-    const ic = data.entryIcon ?? data.opCategory.icon;
-    icon = (!ic || ic.startsWith('data:')) ? '⚡' : ic;
-    moonName = data.opCategory.label;
+  } else if (data.category) {
+    const ic = data.entryIcon ?? data.category.icon;
+    icon = (!ic || ic.startsWith('data:')) ? (data.type === 'wiki' ? '📖' : '⚡') : ic;
+    moonName = data.category.label;
   }
 
   // Render icon: data-URL → <img>, else emoji text
   const safeEntryIcon = sanitizeDataImageUrl(data.entryIcon);
-  const iconHtml = (safeEntryIcon && (data.wikiCategory || data.opCategory))
+  const iconHtml = (safeEntryIcon && data.category)
     ? `<img src="${safeEntryIcon}" class="topbar-icon-img">`
     : `<span class="topbar-icon">${htmlEscape(icon)}</span>`;
 
@@ -219,7 +216,7 @@ function buildMetaHtml(data: ExportData): string {
     const dur = data.meditation.duration ? ` <span class="chip-badge">${data.meditation.duration} min</span>` : '';
     propChips.push(chip(data.meditation) + dur);
   }
-  // wikiCategory and opCategory are shown in the topbar, not here
+  // the category is shown in the topbar, not here
   if (data.isActive !== undefined) {
     propChips.push(`<span class="chip chip-${data.isActive ? 'active' : 'stone'}">${data.isActive ? 'Active' : 'Inactive'}</span>`);
   }
@@ -464,8 +461,7 @@ export async function exportAsMarkdown(data: ExportData): Promise<void> {
   }
   if (data.linkedOps?.length)   lines.push(`Operations: ${data.linkedOps.map(o => (`${mdIcon(o.icon, o.fallbackIcon)}${o.label}`.trim()) + (o.id ? ` [${o.id}]` : '')).join(', ')}`);
   if (data.linkedWiki?.length)  lines.push(`Wiki: ${data.linkedWiki.map(w => (`${mdIcon(w.icon, w.fallbackIcon)}${w.label}`.trim()) + (w.id ? ` [${w.id}]` : '')).join(', ')}`);
-  if (data.wikiCategory)        lines.push(`Category: ${mdIcon(data.wikiCategory.icon, data.wikiCategory.fallbackIcon)}${data.wikiCategory.label}`.trim());
-  if (data.opCategory)          lines.push(`Category: ${mdIcon(data.opCategory.icon, data.opCategory.fallbackIcon)}${data.opCategory.label}`.trim());
+  if (data.category)            lines.push(`Category: ${mdIcon(data.category.icon, data.category.fallbackIcon)}${data.category.label}`.trim());
   if (data.isActive !== undefined) lines.push(`Status: ${data.isActive ? 'Active' : 'Inactive'}`);
   if (data.endDate)             lines.push(`End Date: ${format(new Date(data.endDate), 'MMM d, yyyy')}`);
   if (data.version)             lines.push(`Version: ${data.version}`);

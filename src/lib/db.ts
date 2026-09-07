@@ -6,6 +6,8 @@ import { normalizeSchema } from './normalizeSchema';
 import { adoptLegacyImages, rewriteImageRefs } from './images';
 import { migrateLinkedIdsToContent } from './migrateLinkedIdsToContent';
 import { migrateJournalFieldsToContent } from './migrateJournalFieldsToContent';
+import { mergeCategoryTables } from './mergeCategoryTables';
+import i18n from '../i18n';
 
 // Per-vault DB cache: SQLite identifier → Database instance
 const _dbCache = new Map<string, Database>();
@@ -145,7 +147,10 @@ export async function runMigrations(db: Database): Promise<void> {
   // Frische Datei: Baseline direkt anlegen und die Kette überspringen.
   if (await isEmptyDatabase(db)) {
     await createSchema(db);
-    await seedBuiltins(db);
+    // Das Starter-Set entsteht in der Sprache, die beim ersten Öffnen aktiv
+    // ist — `main.tsx` wartet die gespeicherte Sprache ab, bevor irgendetwas
+    // die Datenbank öffnet.
+    await seedBuiltins(db, (key) => i18n.t(`categories.starter.${key}`));
     const now = new Date().toISOString();
     await db.execute(
       'INSERT INTO schema_version (version, name, applied_at) VALUES ($1, $2, $3)',
@@ -183,12 +188,13 @@ export async function runMigrations(db: Database): Promise<void> {
  * Öffnen eines Vaults, bewusst getrennt vom Migrationssystem — idempotent,
  * zeitabhängig und kein Teil der Schema-Historie.
  *
- * Kategorietabellen stehen bewusst **nicht** hier. Eine Kategorie nach 30 Tagen
- * hart zu löschen, während Artikel, Operationen oder Tasks noch darauf zeigen,
- * hinterließ ins Leere zeigende `category_id`-Werte — still und unbemerkt. Seit
- * v33 verhindert ein Foreign Key mit ON DELETE RESTRICT das ohnehin. Kategorien
- * werden nur noch über den Papierkorb entfernt, und dort werden ihre Inhalte
- * vorher auf die Default-Kategorie umgehängt (siehe `reassignCategoryContent`).
+ * `categories` steht bewusst **nicht** hier. Eine Kategorie nach 30 Tagen hart
+ * zu löschen, während Artikel, Operationen, Tasks oder Altar-Elemente noch
+ * darauf zeigen, hinterließ ins Leere zeigende `category_id`-Werte — still und
+ * unbemerkt. Seit v33 verhindert ein Foreign Key mit ON DELETE RESTRICT das
+ * ohnehin. Kategorien werden nur noch über den Papierkorb entfernt, und dort
+ * werden ihre Inhalte vorher auf das Sammelbecken umgehängt (siehe
+ * `reassignCategoryContent`).
  *
  * Table names interpolated into SQL — must stay a hardcoded literal list.
  */
@@ -1115,5 +1121,18 @@ export const MIGRATIONS: Migration[] = [
     up: async (db) => {
       await migrateJournalFieldsToContent(db);
     },
+  },
+  {
+    // Vier Kategorie-Tabellen — eine je Modul, drei davon zeichengleich —
+    // werden die eine `categories`. Eine Kategorie kann seitdem Artikel,
+    // Operationen, Aufgaben und Altar-Elemente zugleich halten. Eingebaut
+    // bleiben nur `other` und `sigils`; alle anderen Builtins werden normale
+    // Kategorien, gleichnamige aus verschiedenen Modulen gehen ineinander auf.
+    //
+    // Der Ablauf steht in `mergeCategoryTables.ts` — ein Rebuild wie v33, mit
+    // der Foreign-Key-Falle beim Umbenennen, die dort erklärt ist.
+    version: 38,
+    name: 'merge_category_tables',
+    up: mergeCategoryTables,
   },
 ];

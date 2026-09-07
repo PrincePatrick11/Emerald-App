@@ -201,11 +201,11 @@ async function buildViaBaseline() {
 }
 
 /**
- * Der Kettenpfad: spielt v1–v32 so ab, wie eine bestehende Datenbank sie
- * gelaufen ist — inklusive des Schluckens von „already applied"-Fehlern, an dem
- * v4 scheitert. Danach übernimmt runMigrations und wendet v33 an.
+ * Spielt v1–v32 so ab, wie eine bestehende Datenbank sie gelaufen ist —
+ * inklusive des Schluckens von „already applied"-Fehlern, an dem v4 scheitert.
+ * Danach steht das Schema von vor dem Rebuild; `seed` darf es befüllen.
  */
-async function buildViaChain(name, seed) {
+async function chainTo32(name, seed) {
   const db = freshDb(name);
   await db.execute(ddlIfNotExists(TABLE_DDL.schema_version));
 
@@ -223,7 +223,13 @@ async function buildViaChain(name, seed) {
   }
 
   if (seed) await seed(db);
-  await runMigrations(db); // wendet v33 an
+  return db;
+}
+
+/** Der Kettenpfad: v1–v32, dann übernimmt runMigrations und wendet v33–v38 an. */
+async function buildViaChain(name, seed) {
+  const db = await chainTo32(name, seed);
+  await runMigrations(db);
   return db;
 }
 
@@ -341,6 +347,83 @@ async function seedJournalFields(db) {
   );
 }
 
+/**
+ * Kategorien, wie v38 sie zusammenlegen muss — gegen das Schema von vor v33
+ * gesetzt, damit sie die ganze Kette durchlaufen: eine eigene Wiki-Kategorie
+ * „candle" (kleingeschrieben) gegen das eingebaute Altar-„Candle", eine eigene
+ * Operations-Kategorie „Ritual" gegen das eingebaute Wiki-„ritual", ein
+ * gelöschtes Wiki-„Foo" gegen ein aktives Tasks-„foo", eine Aufgabe in
+ * „general" — und an jeder Kategorie ein Inhalt, dazu Platzierungen und
+ * Aufgaben-Verknüpfungen, die den Umbau der Kind-Tabellen überleben müssen.
+ */
+async function seedCategoryMerge(db) {
+  await db.execute(
+    `INSERT INTO wiki_categories (id,name,emoji,sort_order,is_builtin) VALUES ('wc1','candle','🔥',50,0)`
+  );
+  await db.execute(
+    `INSERT INTO wiki_categories (id,name,emoji,sort_order,is_builtin,deleted_at) VALUES ('wc2','Foo','🅵',51,0,$1)`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO operation_categories (id,name,emoji,sort_order,is_builtin) VALUES ('oc1','Ritual','🪄',5,0)`
+  );
+  await db.execute(
+    `INSERT INTO task_categories (id,name,emoji,sort_order,is_builtin) VALUES ('tc1','foo','🅵',1,0)`
+  );
+  await db.execute(
+    `INSERT INTO wiki_articles (id,title,slug,content,category,created_at,updated_at,tags)
+     VALUES ('w1','Kerzenkunde','kerzenkunde','','wc1',$1,$1,'[]')`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO wiki_articles (id,title,slug,content,category,created_at,updated_at,tags)
+     VALUES ('w2','Ritualaufbau','ritualaufbau','','ritual',$1,$1,'[]')`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags)
+     VALUES ('o1','Abendritual','','oc1',$1,$1,'[]')`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags)
+     VALUES ('o2','Sigill','','sigils',$1,$1,'[]')`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO tasks (id,title,description,category_id,created_at,updated_at,tags)
+     VALUES ('t1','Allgemeines','','general',$1,$1,'[]')`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO tasks (id,title,description,category_id,parent_task_id,created_at,updated_at,tags)
+     VALUES ('t2','Foo-Aufgabe','','tc1','t1',$1,$1,'[]')`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO task_links (id,task_id,target_id,target_type) VALUES ('tl1','t1','w1','wiki')`
+  );
+  await db.execute(
+    `INSERT INTO altars (id,title,intention,background_preset,created_at,updated_at)
+     VALUES ('a1','Altar','','midnight',$1,$1)`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO altar_items (id,name,emoji,category,note,created_at) VALUES ('i1','Kerze','🕯️','Candle','',$1)`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO altar_items (id,name,emoji,category,note,created_at) VALUES ('i2','Ding','✨','Other','',$1)`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO altar_placements (id,altar_id,item_id,x,y) VALUES ('p1','a1','i1',10,20)`
+  );
+  await db.execute(
+    `INSERT INTO altar_placements (id,altar_id,item_id,x,y) VALUES ('p2','a1','i2',30,40)`
+  );
+}
+
 async function seedLegacyData(db) {
   await db.execute(
     `INSERT INTO journal_entries (id,title,content,created_at,updated_at,tags,linked_wiki_ids)
@@ -439,9 +522,12 @@ check(
 );
 
 const droppedCheck = await chain.select(
-  "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('creations','altar_intentions','custom_properties') OR name LIKE '%_old'"
+  `SELECT name FROM sqlite_master WHERE type='table' AND name IN (
+     'creations','altar_intentions','custom_properties',
+     'wiki_categories','operation_categories','task_categories','altar_categories','_category_id_map'
+   ) OR name LIKE '%_old'`
 );
-check('Altlasten und _old-Tabellen entfernt', droppedCheck.length === 0, JSON.stringify(droppedCheck));
+check('Altlasten, alte Kategorie-Tabellen und _old-Tabellen entfernt', droppedCheck.length === 0, JSON.stringify(droppedCheck));
 
 console.log('\n2. Foreign Keys\n');
 for (const [label, db] of [['baseline', baseline], ['kette', chain]]) {
@@ -550,7 +636,7 @@ console.log('\n5. Kategorie löschen verliert keine Einträge\n');
 {
   const db = baseline;
   await db.execute(
-    `INSERT INTO wiki_categories (id,name,emoji,sort_order,is_builtin)
+    `INSERT INTO categories (id,name,emoji,sort_order,is_builtin)
      VALUES ('temporaer','Temporär','🧪',99,0)`
   );
   await db.execute(
@@ -558,21 +644,27 @@ console.log('\n5. Kategorie löschen verliert keine Einträge\n');
      VALUES ('a1','Wichtiger Artikel','wichtig','Inhalt','temporaer',$1,$1,'[]')`,
     [now]
   );
+  // Dieselbe Kategorie hält seit v38 auch Inhalte der anderen Module.
+  await db.execute(
+    `INSERT INTO tasks (id,title,description,category_id,created_at,updated_at,tags)
+     VALUES ('a1t','Aufgabe','','temporaer',$1,$1,'[]')`,
+    [now]
+  );
 
   // Ohne Umhängen muss ON DELETE RESTRICT das Löschen verweigern — sonst
   // entstünde wieder eine category_id ohne Gegenstück.
   let blocked = false;
   try {
-    await db.execute("DELETE FROM wiki_categories WHERE id='temporaer'");
+    await db.execute("DELETE FROM categories WHERE id='temporaer'");
   } catch {
     blocked = true;
   }
   check('RESTRICT verweigert das Löschen einer belegten Kategorie', blocked);
 
-  const moved = await reassignCategoryContent(db, 'wiki_articles', 'temporaer');
-  check('reassignCategoryContent hat den Artikel umgehängt', moved === 1);
+  const moved = await reassignCategoryContent(db, 'temporaer');
+  check('reassignCategoryContent hat Artikel und Aufgabe umgehängt', moved === 2);
 
-  await db.execute("DELETE FROM wiki_categories WHERE id='temporaer'");
+  await db.execute("DELETE FROM categories WHERE id='temporaer'");
 
   const [article] = await db.select("SELECT title, category_id FROM wiki_articles WHERE id='a1'");
   check('Artikel existiert nach der Kategorielöschung weiter', article !== undefined);
@@ -601,7 +693,7 @@ console.log('\n6. Einfügereihenfolge beim Import\n');
     for (const t of kind) {
       await db.execute(
         `INSERT INTO tasks (id,title,description,category_id,parent_task_id,created_at,updated_at,tags)
-         VALUES ($1,$2,'','general',$3,$4,$4,'[]')`,
+         VALUES ($1,$2,'','other',$3,$4,$4,'[]')`,
         [t.id, t.title, t.parent_task_id, now]
       );
     }
@@ -614,7 +706,7 @@ console.log('\n6. Einfügereihenfolge beim Import\n');
   for (const t of kind) {
     await db.execute(
       `INSERT INTO tasks (id,title,description,category_id,parent_task_id,created_at,updated_at,tags)
-       VALUES ($1,$2,'','general',NULL,$3,$3,'[]')`,
+       VALUES ($1,$2,'','other',NULL,$3,$3,'[]')`,
       [t.id, t.title, now]
     );
   }
@@ -653,11 +745,10 @@ if (backups.length) {
   // alreadyRebuilt-Prüfung liefe repairLegacyDamage beim nächsten Start gegen
   // das bereits umbenannte Schema ("no such column: category") — und weil v33
   // kein legacy-Flag trägt, ließe sich der Vault nie wieder öffnen.
-  // Über die Kette gebaut, damit v1–v32 gestempelt bleiben: Nach dem Entfernen
-  // der v33-Zeile steht der Stand auf 32 und genau v33 läuft erneut — der
-  // Zustand, den ein Absturz kurz vor dem Stempeln hinterlässt.
-  const db = await buildViaChain('resume.db');
-  await db.execute('DELETE FROM schema_version WHERE version = 33');
+  // Nachgestellt, wie es passiert: v1–v32 gestempelt, v33 einmal durchgelaufen,
+  // aber nicht gestempelt — dann übernimmt runMigrations mit v33 erneut.
+  const db = await chainTo32('resume.db');
+  await MIGRATIONS.find((m) => m.version === 33).up(db);
 
   let resumed = true;
   let message = '';
@@ -667,7 +758,7 @@ if (backups.length) {
     resumed = false;
     message = String(err?.message ?? err);
   }
-  check('abgebrochener Rebuild bricht beim nächsten Start nicht', resumed, message);
+  check('abgebrochener v33-Rebuild bricht beim nächsten Start nicht', resumed, message);
   check(
     'Schema nach der Wiederaufnahme unverändert',
     (await db.select(
@@ -677,6 +768,28 @@ if (backups.length) {
   check(
     'Wiederaufnahme hinterlässt keine FK-Verletzung',
     (await db.select('PRAGMA foreign_key_check')).length === 0
+  );
+  db.close();
+}
+
+{
+  // Dasselbe für v38: fertig umgebaut, aber ungestempelt. Beim nächsten Start
+  // erkennt contentRebuilt den Stand und holt nur das Aufräumen nach.
+  const db = await buildViaChain('resume38.db');
+  await db.execute('DELETE FROM schema_version WHERE version = 38');
+
+  let resumed = true;
+  let message = '';
+  try {
+    await runMigrations(db);
+  } catch (err) {
+    resumed = false;
+    message = String(err?.message ?? err);
+  }
+  check('abgebrochener v38-Rebuild bricht beim nächsten Start nicht', resumed, message);
+  check(
+    'Schema nach der v38-Wiederaufnahme unverändert',
+    JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA)
   );
   db.close();
 }
@@ -859,6 +972,115 @@ console.log('\n8c. Migration v37: Paradigma/Bannung/Meditation in den Inhalt\n')
   );
 
   v37.close();
+}
+
+console.log('\n8d. Migration v38: vier Kategorie-Tabellen werden eine\n');
+
+{
+  const v38 = await buildViaChain('v38.db', seedCategoryMerge);
+  const one = async (sql) => (await v38.select(sql))[0];
+  const cats = await v38.select('SELECT id, name, emoji, is_builtin, deleted_at, sort_order FROM categories ORDER BY sort_order');
+  const byId = new Map(cats.map((c) => [c.id, c]));
+
+  check(
+    'die vier alten Tabellen sind weg, die eine ist da',
+    (await v38.select(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('wiki_categories','operation_categories','task_categories','altar_categories','_category_id_map')"
+    )).length === 0 && byId.size > 0
+  );
+  check(
+    'genau ein „Sonstiges", eingebaut — die drei „other" und das Tasks-„general" gingen darin auf',
+    cats.filter((c) => c.name.toLowerCase() === 'other' || c.id === 'general').length === 1 &&
+      byId.get('other')?.is_builtin === 1,
+    JSON.stringify(cats)
+  );
+  check('„sigils" bleibt eingebaut', byId.get('sigils')?.is_builtin === 1);
+  check(
+    'eigene Wiki-„candle" und eingebaute Altar-„Candle" sind eine Kategorie (Wiki gewinnt)',
+    byId.has('wc1') && !byId.has('candle') && byId.get('wc1').emoji === '🔥',
+    JSON.stringify(cats)
+  );
+  check(
+    'das Altar-Element hängt jetzt an der zusammengelegten Kategorie',
+    (await one("SELECT category_id c FROM altar_items WHERE id='i1'")).c === 'wc1'
+  );
+  check(
+    'eigene Operations-„Ritual" ging im Wiki-„ritual" auf, die Operation folgt',
+    !byId.has('oc1') && byId.has('ritual') &&
+      (await one("SELECT category_id c FROM operations WHERE id='o1'")).c === 'ritual'
+  );
+  check(
+    'ehemalige Builtins sind normale Kategorien mit übersetztem Namen',
+    byId.get('ritual')?.is_builtin === 0 && byId.get('ritual')?.name === 'Ritual'
+  );
+  check(
+    'gelöschtes Wiki-„Foo" und aktives Tasks-„foo" sind eine aktive Kategorie',
+    byId.has('wc2') && byId.get('wc2').deleted_at === null && !byId.has('tc1') &&
+      (await one("SELECT category_id c FROM tasks WHERE id='t2'")).c === 'wc2'
+  );
+  check(
+    'Aufgabe aus „general" liegt in „other"',
+    (await one("SELECT category_id c FROM tasks WHERE id='t1'")).c === 'other'
+  );
+  check(
+    'Unteraufgabe behält ihren Elternteil',
+    (await one("SELECT parent_task_id p FROM tasks WHERE id='t2'")).p === 't1'
+  );
+  check(
+    'Artikel unverändert an ihren Kategorien',
+    (await one("SELECT category_id c FROM wiki_articles WHERE id='w1'")).c === 'wc1' &&
+      (await one("SELECT category_id c FROM wiki_articles WHERE id='w2'")).c === 'ritual'
+  );
+  // Die Falle des Umbaus: das Umbenennen von altar_items/tasks biegt die
+  // Fremdschlüssel der Kind-Tabellen um — ohne den Mit-Umbau nähme das DROP
+  // der *_old-Tabellen alle Platzierungen und Aufgaben-Verknüpfungen mit.
+  check(
+    'Altar-Platzierungen haben den Umbau überlebt',
+    (await one('SELECT COUNT(*) n FROM altar_placements')).n === 2
+  );
+  check(
+    'Aufgaben-Verknüpfungen haben den Umbau überlebt',
+    (await one('SELECT COUNT(*) n FROM task_links')).n === 1
+  );
+  check(
+    'Sigillen vorn, Sonstiges hinten',
+    cats[0].id === 'sigils' && cats[cats.length - 1].id === 'other'
+  );
+  const v38Violations = await v38.select('PRAGMA foreign_key_check');
+  check('v38: foreign_key_check leer', v38Violations.length === 0, JSON.stringify(v38Violations));
+  check(
+    'v38: Schema identisch mit der Baseline',
+    JSON.stringify(await readSchema(v38)) === JSON.stringify(schemaA)
+  );
+
+  const v38Backups = readdirSync(join(workDir, 'v38')).filter((f) => f.includes('.pre-v38'));
+  check(`v38 hat genau eine Sicherung angelegt (${v38Backups.length})`, v38Backups.length === 1, v38Backups.join(', '));
+  if (v38Backups.length) {
+    const restored = new HarnessDb(join(workDir, 'v38', v38Backups[0]));
+    const hasOld = await restored.select(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='wiki_categories'"
+    );
+    check('v38-Sicherung enthält den Zustand *vor* dem Zusammenlegen', hasOld.length === 1);
+    restored.close();
+  }
+  v38.close();
+}
+
+console.log('\n8e. Frischer Vault: Builtins und Starter-Set\n');
+
+{
+  const cats = await baseline.select('SELECT id, name, is_builtin, sort_order FROM categories ORDER BY sort_order');
+  check(
+    'genau zwei Builtins: sigils vorn, other hinten',
+    cats.filter((c) => c.is_builtin === 1).length === 2 &&
+      cats[0].id === 'sigils' && cats[cats.length - 1].id === 'other',
+    JSON.stringify(cats)
+  );
+  check(
+    'Starter-Set als normale Kategorien, übersetzt (Harness: en)',
+    cats.some((c) => c.id === 'herbs' && c.is_builtin === 0 && c.name === 'Herbs'),
+    JSON.stringify(cats)
+  );
 }
 
 /* ------------------------------------------------------------------ *

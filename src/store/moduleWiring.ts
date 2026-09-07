@@ -4,9 +4,9 @@
  * bzw. endgültig gelöscht.
  *
  * Import-Regel dieser Datei: nur Content-Stores (journal/wiki/operation/task/
- * altar/tag/routine) — niemals uiStore, vaultStore oder trashStore, die
- * ihrerseits hierher zeigen (dürfen). Alle Zugriffe laufen zur Laufzeit über
- * `getState()`, nicht zur Import-Zeit.
+ * altar/tag/routine/category) — niemals uiStore, vaultStore oder trashStore,
+ * die ihrerseits hierher zeigen (dürfen). Alle Zugriffe laufen zur Laufzeit
+ * über `getState()`, nicht zur Import-Zeit.
  */
 import { useJournalStore } from './journalStore';
 import { useWikiStore } from './wikiStore';
@@ -15,6 +15,7 @@ import { useTaskStore } from './taskStore';
 import { useAltarStore } from './altarStore';
 import { useTagStore } from './tagStore';
 import { useRoutineStore } from './routineStore';
+import { useCategoryStore } from './categoryStore';
 import { ENTRY_MODULE_IDS, type EntryModuleId, type TrashKind } from '../lib/modules';
 
 /** Lädt den Inhalt eines Moduls neu aus der aktiven DB. */
@@ -42,13 +43,9 @@ export const trashWiring: Record<TrashKind, {
     restore: (id) => useOperationStore.getState().restoreOperation(id),
     permanentlyDelete: (id) => useOperationStore.getState().permanentlyDeleteOperation(id),
   },
-  wiki_category: {
-    restore: (id) => useWikiStore.getState().restoreWikiCategory(id),
-    permanentlyDelete: (id) => useWikiStore.getState().permanentlyDeleteWikiCategory(id),
-  },
-  operation_category: {
-    restore: (id) => useOperationStore.getState().restoreCategory(id),
-    permanentlyDelete: (id) => useOperationStore.getState().permanentlyDeleteCategory(id),
+  category: {
+    restore: (id) => useCategoryStore.getState().restoreCategory(id),
+    permanentlyDelete: (id) => useCategoryStore.getState().permanentlyDeleteCategory(id),
   },
   tag: {
     restore: (id) => useTagStore.getState().restoreTag(id),
@@ -58,17 +55,12 @@ export const trashWiring: Record<TrashKind, {
     restore: (id) => useTaskStore.getState().restoreTask(id),
     permanentlyDelete: (id) => useTaskStore.getState().permanentlyDeleteTask(id),
   },
-  task_category: {
-    restore: (id) => useTaskStore.getState().restoreCategory(id),
-    permanentlyDelete: (id) => useTaskStore.getState().permanentlyDeleteCategory(id),
-  },
 };
 
 /**
- * Die kanonische Lade-Sequenz: erst Tags, dann Kategorien (Wiki-Kategorien und
- * Operations-fetchAll, das seine Kategorien mitlädt), dann alle Inhalte plus
- * Routinen. Genutzt von AppShell (Erstladung), vaultStore (Vault-Wechsel) und
- * dbBackup (Import) — vorher drei handgepflegte Kopien derselben Liste.
+ * Die kanonische Lade-Sequenz: erst Tags und Kategorien, dann alle Inhalte
+ * plus Routinen. Genutzt von AppShell (Erstladung), vaultStore (Vault-Wechsel)
+ * und dbBackup (Import) — vorher drei handgepflegte Kopien derselben Liste.
  *
  * Warum sequenziert: keine harte Datenabhängigkeit (kein Fetcher liest einen
  * anderen Store), sondern Darstellung — stehen Tags und Kategorien vor den
@@ -77,21 +69,24 @@ export const trashWiring: Record<TrashKind, {
  * darf zu einem Promise.all zusammenziehen, handelt sich aber den Flash ein.
  */
 export async function reloadAllStores(): Promise<void> {
-  await useTagStore.getState().fetchTags();
   await Promise.all([
-    useWikiStore.getState().fetchCategories(),
-    // operations.reload() lädt Operationen samt Kategorien in einem Zug —
-    // deshalb läuft es hier und nicht noch einmal in der Inhaltsphase.
-    moduleWiring.operations.reload(),
+    useTagStore.getState().fetchTags(),
+    useCategoryStore.getState().fetchCategories(),
   ]);
   await Promise.all([
-    ...ENTRY_MODULE_IDS.filter((id) => id !== 'operations').map((id) => moduleWiring[id].reload()),
+    ...ENTRY_MODULE_IDS.map((id) => moduleWiring[id].reload()),
     useRoutineStore.getState().fetchRoutines(),
   ]);
 }
 
-/** Gezielter Reload einzelner Module (Emerald-Import): Tags + genannte Inhalte. */
+/**
+ * Gezielter Reload einzelner Module (Emerald-Import): Tags, Kategorien und
+ * die genannten Inhalte — Kategorien immer, weil ein Import neue anlegen kann.
+ */
 export async function reloadModules(ids: readonly EntryModuleId[]): Promise<void> {
-  await useTagStore.getState().fetchTags();
+  await Promise.all([
+    useTagStore.getState().fetchTags(),
+    useCategoryStore.getState().fetchCategories(),
+  ]);
   await Promise.all(ids.map((id) => moduleWiring[id].reload()));
 }

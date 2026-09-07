@@ -12,9 +12,9 @@ import { useTaskStore } from '../../store/taskStore';
 import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
 import type { ActiveView, MoonPhase } from '../../types';
-import { getCategoryEmoji } from '../wiki/WikiList';
+import { useCategoryStore } from '../../store/categoryStore';
 import { imageSrc } from '../../lib/images';
-import { AUX_VIEWS, moduleMeta, type AuxViewId } from '../../lib/modules';
+import { AUX_VIEWS, DEFAULT_ENTRY_EMOJI, moduleMeta, type AuxViewId } from '../../lib/modules';
 
 function getFallbackTitle(view: ActiveView, t: TFunction) {
   const meta = moduleMeta(view.type);
@@ -48,8 +48,7 @@ export default function TabBar() {
   const getArticle = useWikiStore((s) => s.getArticle);
   const getOperation = useOperationStore((s) => s.getOperation);
   const getTask = useTaskStore((s) => s.getTask);
-  const operationCategories = useOperationStore((s) => s.categories);
-  const wikiCategories = useWikiStore((s) => s.wikiCategories);
+  const categories = useCategoryStore((s) => s.categories);
   const altars = useAltarStore((s) => s.altars);
   const scrollRef = useRef<HTMLUListElement>(null);
 
@@ -85,13 +84,13 @@ export default function TabBar() {
     }
     if (view.type === 'wiki' && view.id) {
       const article = getArticle(view.id);
-      const categoryIcon = wikiCategories.find((category) => category.id === article?.category_id)?.emoji
-        ?? getCategoryEmoji(article?.category_id as any);
+      const categoryIcon = categories.find((category) => category.id === article?.category_id)?.emoji
+        ?? DEFAULT_ENTRY_EMOJI.wiki;
       return renderIconValue(article?.icon, <span className="text-sm leading-none">{categoryIcon}</span>);
     }
     if (view.type === 'operations' && view.id) {
       const operation = getOperation(view.id);
-      const categoryIcon = operationCategories.find((category) => category.id === operation?.category_id)?.emoji ?? '⚡';
+      const categoryIcon = categories.find((category) => category.id === operation?.category_id)?.emoji ?? '⚡';
       return renderIconValue(operation?.icon, <span className="text-sm leading-none">{categoryIcon}</span>);
     }
 

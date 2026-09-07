@@ -1,13 +1,8 @@
-import type { TFunction } from 'i18next';
-import { BUILTIN_ALTAR_CATEGORIES } from './schema';
+import { FALLBACK_CATEGORY_ID } from './schema';
+import { LEGACY_ALTAR_CATEGORIES, LEGACY_WIKI_CATEGORIES } from './schemaV37';
 
-/**
- * Nur Wiki und Operations haben ein `is_builtin`-Flag mit Locale-Keys
- * (`<module>.categories.<id>`). Bewusst nicht `CategoryModuleId` aus
- * lib/modules: das hier ist eine i18n-Eigenschaft zweier Module, kein
- * Modulbegriff.
- */
-export type BuiltinLabelModule = 'wiki' | 'operations';
+/** Ein Übersetzer — `i18n.t`, das `t` aus useTranslation oder ein durchgereichtes Prop. */
+export type Translate = (key: string) => string;
 
 export interface LabelableCategory {
   id: string;
@@ -16,15 +11,91 @@ export interface LabelableCategory {
 }
 
 /**
- * Anzeigename einer Wiki-/Operations-Kategorie: Builtins über den Locale-Key,
- * eigene über den gespeicherten Namen. Tasks-Kategorien haben keine
- * Builtin-Keys und zeigen direkt `name`; Altar-Kategorien haben zwar Keys
- * (`altar.categories.*`), aber kein `is_builtin`-Flag — die laufen über
- * altarCategoryLabel().
+ * Anzeigename einer Kategorie: Builtins (`other`, `sigils`) über den
+ * Locale-Key `categories.builtin.<id>`, alle anderen über den gespeicherten
+ * Namen. Seit v38 die eine Regel für alle vier Module.
  */
 export function categoryLabel(
-  t: TFunction,
-  module: BuiltinLabelModule,
+  t: Translate,
+  cat: LabelableCategory | null | undefined,
+  fallback = '',
+): string {
+  if (!cat) return fallback;
+  return cat.is_builtin ? t(`categories.builtin.${cat.id}`) : cat.name;
+}
+
+/**
+ * Die Kategorien, die in einer Ansicht als Chips, Gruppen oder Tabs stehen:
+ * alle, auf die mindestens ein Eintrag zeigt, plus das Sammelbecken — in der
+ * Reihenfolge der globalen Liste. Die Volliste bleibt für Zuweisung und
+ * Auflösung; eine Kategorie, die nur in einem anderen Modul benutzt wird,
+ * soll hier keinen leeren Kopf bekommen.
+ */
+export function categoriesUsedBy<C extends { id: string }>(
+  all: readonly C[],
+  items: readonly { category_id: string }[],
+  /** Zusätzlich immer dabei — das Sammelbecken und z. B. eine gerade angelegte Kategorie. */
+  always: readonly (string | null | undefined)[] = [],
+): C[] {
+  const used = new Set<string>([FALLBACK_CATEGORY_ID]);
+  for (const id of always) if (id) used.add(id);
+  for (const item of items) used.add(item.category_id);
+  return all.filter((c) => used.has(c.id));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Vor v38: Kategorien je Modul mit modulbezogenen Locale-Keys. Gebraucht von
+// den Migrationen v36–v38, die auf alten Vaults vor dem Zusammenlegen laufen,
+// und vom Heben alter Sicherungen und `.emerald`-Dateien. Die Keys
+// `wiki.categories.*`, `operations.categories.*`, `altar.categories.*`
+// bleiben genau dafür in den Locales.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type LegacyCategoryTable =
+  | 'wiki_categories'
+  | 'operation_categories'
+  | 'task_categories'
+  | 'altar_categories';
+
+const LEGACY_LABEL_MODULE: Record<LegacyCategoryTable, string | null> = {
+  wiki_categories: 'wiki',
+  operation_categories: 'operations',
+  task_categories: null,
+  altar_categories: 'altar',
+};
+
+/** Locale-Key einer eingebauten Kategorie von vor v38 — null, wo es keine gab (Tasks). */
+export function legacyBuiltinLabelKey(table: LegacyCategoryTable, id: string): string | null {
+  const module = LEGACY_LABEL_MODULE[table];
+  return module ? `${module}.categories.${id}` : null;
+}
+
+const LEGACY_ALTAR_SEED_NAMES = new Map(LEGACY_ALTAR_CATEGORIES.map(([id, name]) => [id, name]));
+
+/**
+ * Der Anzeigename, den eine Kategorie bis v38 hatte: Builtins über ihren
+ * Locale-Key in der aktuellen App-Sprache (v36 hat denselben Weg gewählt),
+ * eigene über den gespeicherten Namen. Altar-Builtins tragen kein Flag — dort
+ * zählt, ob der Seed-Name noch unverändert dasteht. Eine Regel für Migration
+ * v38 und das Heben alter Sicherungen, damit beide beim selben Namen landen.
+ */
+export function legacyDisplayName(
+  i18n: { t: Translate; exists: (key: string) => boolean },
+  table: LegacyCategoryTable,
+  row: { id: string; name: string; is_builtin?: number | boolean | null },
+): string {
+  const builtin = table === 'altar_categories'
+    ? LEGACY_ALTAR_SEED_NAMES.get(row.id) === row.name
+    : !!row.is_builtin;
+  if (!builtin) return row.name;
+  const key = legacyBuiltinLabelKey(table, row.id);
+  return key && i18n.exists(key) ? i18n.t(key) : row.name;
+}
+
+/** Anzeigename einer Wiki-/Operations-Kategorie im Schema von vor v38. */
+export function legacyCategoryLabel(
+  t: Translate,
+  module: 'wiki' | 'operations',
   cat: LabelableCategory | null | undefined,
   fallback = '',
 ): string {
@@ -32,13 +103,9 @@ export function categoryLabel(
   return cat.is_builtin ? t(`${module}.categories.${cat.id}`) : cat.name;
 }
 
-// Die eingebauten Altar-Kategorien liegen mit englischen Seed-Namen in der DB.
-// Solange der Nutzer eine davon nicht umbenannt hat, gewinnt die Übersetzung
-// aus altar.categories.*; ein eigener Name gewinnt immer.
-// (altar_categories hat keine is_builtin-Spalte, deshalb der Namensvergleich.)
-const ALTAR_SEED_NAMES = new Map(BUILTIN_ALTAR_CATEGORIES.map(([id, name]) => [id, name]));
+const LEGACY_WIKI_EMOJI = new Map(LEGACY_WIKI_CATEGORIES.map(([id, , emoji]) => [id, emoji]));
 
-/** Anzeigename einer Altar-Kategorie — Gegenstück zu categoryLabel() für Module ohne is_builtin. */
-export function altarCategoryLabel(t: TFunction, cat: { id: string; name: string }): string {
-  return ALTAR_SEED_NAMES.get(cat.id) === cat.name ? t(`altar.categories.${cat.id}`) : cat.name;
+/** Emoji einer eingebauten Wiki-Kategorie von vor v38, wenn ihre Zeile nicht zur Hand ist. */
+export function legacyWikiCategoryEmoji(id: string): string {
+  return LEGACY_WIKI_EMOJI.get(id) ?? '📄';
 }

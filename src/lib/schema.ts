@@ -1,18 +1,18 @@
 /**
  * Emeralds Schema an einer Stelle.
  *
- * Zwei Verbraucher teilen sich dieses DDL, und das ist der Sinn der Datei:
- *
- *   1. Der Baseline-Pfad in `db.ts` — frische Vaults führen es direkt aus.
- *   2. Migration v33 `normalize_schema` — bestehende Vaults bauen ihre Tabellen
- *      damit neu.
- *
- * Weil beide dieselben Strings benutzen, können sie nicht auseinanderlaufen.
- * Ohne diese Kopplung produziert ein Baseline-Squash erfahrungsgemäß nach ein
- * paar Releases zwei verschiedene Schemata, und niemand merkt es.
+ * Der Baseline-Pfad in `db.ts` führt es für frische Vaults direkt aus; die
+ * Rebuild-Migrationen v33 (`normalizeSchema.ts`, gegen die eingefrorene Kopie
+ * in `schemaV37.ts`) und v38 (`mergeCategoryTables.ts`, gegen dieses DDL)
+ * bringen bestehende Vaults auf denselben Stand. `scripts/schema-check.mjs`
+ * beweist, dass beide Wege beim identischen Schema landen — ohne diese Prüfung
+ * produziert ein Baseline-Squash erfahrungsgemäß nach ein paar Releases zwei
+ * verschiedene Schemata, und niemand merkt es.
  *
  * Wer eine Spalte ändern will, ändert sie hier — und schreibt zusätzlich eine
- * neue Migration ab v34, die dasselbe für bestehende Datenbanken tut.
+ * neue Migration, die dasselbe für bestehende Datenbanken tut. Baut die
+ * Migration eine Tabelle neu, die v33 oder v38 ebenfalls anfassen, bekommen
+ * die ihren alten Stand eingefroren (siehe `schemaV37.ts`).
  */
 import type Database from '@tauri-apps/plugin-sql';
 
@@ -20,7 +20,7 @@ import type Database from '@tauri-apps/plugin-sql';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 37;
+export const BASELINE_VERSION = 38;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
@@ -28,20 +28,17 @@ export const BASELINE_VERSION = 37;
  * Diese Reihenfolge ist nicht kosmetisch. Foreign Keys sind in dieser App
  * dauerhaft aktiv — sqlx setzt `foreign_keys = ON` als Default-Pragma auf jeder
  * Pool-Verbindung — und ein INSERT prüft sofort, ob die Elternzeile existiert.
- * Wer hier umsortiert, bricht Migration v33 und den Backup-Import.
+ * Wer hier umsortiert, bricht die Rebuild-Migrationen und den Backup-Import.
  *
- * `schema_version` steht bewusst vorne und wird von v33 nie neu gebaut: dort
- * steht der Migrationsstand, den der Rebuild gerade abarbeitet.
+ * `schema_version` steht bewusst vorne und wird von keinem Rebuild neu gebaut:
+ * dort steht der Migrationsstand, den der Rebuild gerade abarbeitet.
  */
 export const TABLES = [
   'schema_version',
   'tags',
   'links',
   'routines',
-  'wiki_categories',
-  'operation_categories',
-  'task_categories',
-  'altar_categories',
+  'categories',
   'altars',
   'journal_entries',
   'wiki_articles',
@@ -60,10 +57,8 @@ export const SOFT_DELETE_TABLES = [
   'wiki_articles',
   'tags',
   'operations',
-  'wiki_categories',
-  'operation_categories',
+  'categories',
   'tasks',
-  'task_categories',
 ] as const;
 
 export const TABLE_DDL: Record<TableName, string> = {
@@ -109,43 +104,22 @@ export const TABLE_DDL: Record<TableName, string> = {
       updated_at TEXT NOT NULL
     )`,
 
-  wiki_categories: `
-    CREATE TABLE wiki_categories (
+  // Eine Liste für Wiki, Operationen, Aufgaben und Altar-Elemente (seit v38;
+  // vorher vier gleich gebaute Tabellen je Modul). Eingebaut sind nur `other`
+  // — das Sammelbecken, auf das Inhalte gelöschter Kategorien umgehängt
+  // werden — und `sigils`, an der der Sigil-Editor für Operationen hängt.
+  // Alles andere legt der Nutzer an; Eindeutigkeit der Namen prüft der Store
+  // (categoryKey), nicht die Datenbank — ein UNIQUE-Index würde das
+  // Wiederherstellen aus dem Papierkorb blockieren, sobald eine aktive
+  // gleichnamige Kategorie existiert.
+  categories: `
+    CREATE TABLE categories (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      emoji TEXT NOT NULL DEFAULT '📄',
+      emoji TEXT NOT NULL DEFAULT '📁',
       sort_order INTEGER NOT NULL DEFAULT 0,
       is_builtin INTEGER NOT NULL DEFAULT 0,
       deleted_at TEXT
-    )`,
-
-  operation_categories: `
-    CREATE TABLE operation_categories (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      emoji TEXT NOT NULL DEFAULT '⚡',
-      sort_order INTEGER NOT NULL DEFAULT 0,
-      is_builtin INTEGER NOT NULL DEFAULT 0,
-      deleted_at TEXT
-    )`,
-
-  task_categories: `
-    CREATE TABLE task_categories (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      emoji TEXT NOT NULL DEFAULT '📋',
-      sort_order INTEGER NOT NULL DEFAULT 0,
-      is_builtin INTEGER NOT NULL DEFAULT 0,
-      deleted_at TEXT
-    )`,
-
-  altar_categories: `
-    CREATE TABLE altar_categories (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      emoji TEXT NOT NULL DEFAULT '✨',
-      sort_order INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL
     )`,
 
   altars: `
@@ -203,7 +177,7 @@ export const TABLE_DDL: Record<TableName, string> = {
       title TEXT NOT NULL DEFAULT 'Untitled Article',
       slug TEXT NOT NULL UNIQUE,
       content TEXT NOT NULL DEFAULT '',
-      category_id TEXT NOT NULL DEFAULT 'other' REFERENCES wiki_categories(id) ON DELETE RESTRICT,
+      category_id TEXT NOT NULL DEFAULT 'other' REFERENCES categories(id) ON DELETE RESTRICT,
       entry_number INTEGER,
       cover_image TEXT,
       icon TEXT,
@@ -218,7 +192,7 @@ export const TABLE_DDL: Record<TableName, string> = {
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL DEFAULT 'Untitled Operation',
       content TEXT NOT NULL DEFAULT '',
-      category_id TEXT NOT NULL REFERENCES operation_categories(id) ON DELETE RESTRICT,
+      category_id TEXT NOT NULL DEFAULT 'other' REFERENCES categories(id) ON DELETE RESTRICT,
       entry_number INTEGER,
       description TEXT NOT NULL DEFAULT '',
       icon TEXT,
@@ -251,7 +225,7 @@ export const TABLE_DDL: Record<TableName, string> = {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       emoji TEXT NOT NULL DEFAULT '✨',
-      category_id TEXT NOT NULL DEFAULT 'other' REFERENCES altar_categories(id) ON DELETE RESTRICT,
+      category_id TEXT NOT NULL DEFAULT 'other' REFERENCES categories(id) ON DELETE RESTRICT,
       note TEXT NOT NULL DEFAULT '',
       image_data TEXT,
       created_at TEXT NOT NULL
@@ -262,7 +236,7 @@ export const TABLE_DDL: Record<TableName, string> = {
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL DEFAULT 'Untitled Task',
       description TEXT NOT NULL DEFAULT '',
-      category_id TEXT NOT NULL REFERENCES task_categories(id) ON DELETE RESTRICT,
+      category_id TEXT NOT NULL DEFAULT 'other' REFERENCES categories(id) ON DELETE RESTRICT,
       parent_task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
       priority TEXT NOT NULL DEFAULT 'medium',
       due_date TEXT,
@@ -323,72 +297,42 @@ export const INDEX_DDL: string[] = [
 ];
 
 /**
- * Eingebaute Kategorien, wie sie die Migrationskette v7/v12/v17/v22 erzeugt.
- * Der Baseline-Pfad muss dasselbe Ergebnis liefern, sonst sehen frische Vaults
- * anders aus als migrierte.
- *
- * Die `sort_order` der Altar-Kategorien folgt dem, was v28 rückwirkend vergibt:
- * alphabetisch nach Name, weil alle acht denselben `created_at` bekommen.
+ * Das Sammelbecken: Inhalte einer gelöschten Kategorie landen hier. Eingebaut
+ * und nicht löschbar.
  */
-export const BUILTIN_OPERATION_CATEGORIES: [string, string, string, number][] = [
-  ['sigils', 'Sigils', '🔯', 0],
-  ['servitors', 'Servitors', '👁️', 1],
-  // Ziel für Operationen, deren eigene Kategorie gelöscht wird. Ohne diese
-  // Kategorie wäre `sigils` der einzige eingebaute Kandidat gewesen — und eine
-  // Operation ist nicht dadurch ein Sigill, dass ihre Kategorie verschwindet.
-  ['other', 'Other', '📦', 2],
-];
+export const FALLBACK_CATEGORY_ID = 'other';
 
-export const BUILTIN_WIKI_CATEGORIES: [string, string, string, number][] = [
-  ['paradigm', 'Paradigma', '🌀', 0],
-  ['bannung', 'Bannung', '🚫', 1],
-  ['meditation', 'Meditation', '🧘', 2],
-  ['sigil_charging', 'Sigil Charging', '⚡', 3],
-  ['ritual', 'Ritual', '🕯️', 4],
-  ['deity', 'Deity', '✨', 5],
-  ['herb', 'Herb', '🌿', 6],
-  ['symbol', 'Symbol', '🔮', 7],
-  ['tool', 'Tool', '⚗️', 8],
-  ['concept', 'Concept', '📖', 9],
-  ['spell', 'Spell', '🌙', 10],
-  ['other', 'Other', '📄', 11],
-];
+/**
+ * Die eine Kategorie mit Verhalten: Eine Operation darin ist ein Sigill und
+ * öffnet den Sigil-Editor. Für Artikel, Aufgaben und Altar-Elemente ist sie
+ * eine Kategorie wie jede andere.
+ */
+export const SIGIL_CATEGORY_ID = 'sigils';
 
-export const BUILTIN_ALTAR_CATEGORIES: [string, string, string, number][] = [
-  ['candle', 'Candle', '🕯️', 0],
-  ['crystal', 'Crystal', '🔮', 1],
-  ['deity', 'Deity', '✨', 2],
-  ['herb', 'Herb', '🌿', 3],
-  ['other', 'Other', '📦', 4],
-  ['symbol', 'Symbol', '🌙', 5],
-  ['table', 'Table', '🪵', 6],
-  ['tool', 'Tool', '🔔', 7],
+/** [id, Name (nur Datenbank — angezeigt wird `categories.builtin.<id>`), Emoji]. */
+export const BUILTIN_CATEGORIES: readonly [string, string, string][] = [
+  [SIGIL_CATEGORY_ID, 'Sigils', '🔯'],
+  [FALLBACK_CATEGORY_ID, 'Other', '📦'],
 ];
 
 /**
- * Die Default-Task-Kategorie. Migration v17 legt sie mit `is_builtin = 0` an —
- * das sieht nach einem Versehen aus, ist aber der Stand jeder bestehenden
- * Datenbank, und der Baseline-Pfad muss ihn reproduzieren. Wer das ändern will,
- * braucht eine Migration ab v34 für beide Seiten.
+ * Was ein frischer Vault außer den Builtins bekommt: normale, umbenenn- und
+ * löschbare Kategorien, in der App-Sprache angelegt (`categories.starter.<key>`).
+ * Die Schlüssel sind zugleich die IDs.
  */
-export const DEFAULT_TASK_CATEGORY: [string, string, string, number, number] = [
-  'general',
-  'Allgemein',
-  '📋',
-  0,
-  0,
+export const STARTER_CATEGORIES: readonly [string, string][] = [
+  ['paradigm', '🌀'],
+  ['ritual', '🪄'],
+  ['meditation', '🧘'],
+  ['herbs', '🌿'],
+  ['crystals', '🔮'],
+  ['candles', '🕯️'],
+  ['deities', '✨'],
+  ['tools', '⚗️'],
 ];
 
-/**
- * Kategorie-IDs, auf die verwaiste Inhalte umgehängt werden, wenn ihre eigene
- * Kategorie verschwindet. Sie sind eingebaut und können nicht gelöscht werden.
- */
-export const FALLBACK_CATEGORY = {
-  wiki_articles: 'other',
-  operations: 'other',
-  tasks: 'general',
-  altar_items: 'other',
-} as const;
+/** Die vier Inhaltstabellen mit `category_id`. Literal, weil in SQL interpoliert. */
+export const CATEGORIZED_TABLES = ['wiki_articles', 'operations', 'tasks', 'altar_items'] as const;
 
 /**
  * Dasselbe DDL, aber verträglich mit einer bereits vorhandenen Tabelle.
@@ -410,37 +354,53 @@ export async function createSchema(db: Database): Promise<void> {
   }
 }
 
-/** Legt die eingebauten Kategorien an. Nur für frische Vaults. */
-export async function seedBuiltins(db: Database): Promise<void> {
-  for (const [id, name, emoji, sortOrder] of BUILTIN_OPERATION_CATEGORIES) {
+/** Eine Kategoriezeile, wie `seedBuiltins` und die Migration v38 sie schreiben. */
+export interface CategorySeedRow {
+  id: string;
+  name: string;
+  emoji: string;
+  sort_order: number;
+  is_builtin: boolean;
+  deleted_at: string | null;
+}
+
+export async function insertCategoryRows(db: Database, rows: readonly CategorySeedRow[]): Promise<void> {
+  for (const row of rows) {
     await db.execute(
-      'INSERT INTO operation_categories (id, name, emoji, sort_order, is_builtin) VALUES ($1,$2,$3,$4,1)',
-      [id, name, emoji, sortOrder]
+      'INSERT INTO categories (id, name, emoji, sort_order, is_builtin, deleted_at) VALUES ($1,$2,$3,$4,$5,$6)',
+      [row.id, row.name, row.emoji, row.sort_order, row.is_builtin ? 1 : 0, row.deleted_at]
     );
   }
-  for (const [id, name, emoji, sortOrder] of BUILTIN_WIKI_CATEGORIES) {
-    await db.execute(
-      'INSERT INTO wiki_categories (id, name, emoji, sort_order, is_builtin) VALUES ($1,$2,$3,$4,1)',
-      [id, name, emoji, sortOrder]
-    );
-  }
-  const now = new Date().toISOString();
-  for (const [id, name, emoji, sortOrder] of BUILTIN_ALTAR_CATEGORIES) {
-    await db.execute(
-      'INSERT INTO altar_categories (id, name, emoji, sort_order, created_at) VALUES ($1,$2,$3,$4,$5)',
-      [id, name, emoji, sortOrder, now]
-    );
-  }
-  await db.execute(
-    'INSERT INTO task_categories (id, name, emoji, sort_order, is_builtin) VALUES ($1,$2,$3,$4,$5)',
-    DEFAULT_TASK_CATEGORY
-  );
 }
 
 /**
- * Haengt alle Inhalte einer Kategorie auf die Default-Kategorie um und meldet,
- * wie viele es waren. **Vor** jedem endgültigen Löschen einer Kategorie
- * aufzurufen.
+ * Legt die eingebauten Kategorien und das Starter-Set an. Nur für frische
+ * Vaults. `starterName` übersetzt einen STARTER_CATEGORIES-Schlüssel in die
+ * App-Sprache — der Aufrufer reicht `i18n.t` durch, damit diese Datei frei von
+ * i18n bleibt.
+ */
+export async function seedBuiltins(
+  db: Database,
+  starterName: (key: string) => string
+): Promise<void> {
+  const rows: CategorySeedRow[] = [
+    ...BUILTIN_CATEGORIES.map(([id, name, emoji]) => ({
+      id, name, emoji, is_builtin: true,
+    })),
+    ...STARTER_CATEGORIES.map(([key, emoji]) => ({
+      id: key, name: starterName(key), emoji, is_builtin: false,
+    })),
+  ].map((row, i) => ({ ...row, sort_order: i, deleted_at: null }));
+  // Sonstiges ans Ende, wie es auch die Migration und der Store halten.
+  const other = rows.find((r) => r.id === FALLBACK_CATEGORY_ID)!;
+  const ordered = [...rows.filter((r) => r !== other), other].map((r, i) => ({ ...r, sort_order: i }));
+  await insertCategoryRows(db, ordered);
+}
+
+/**
+ * Haengt alle Inhalte einer Kategorie — in allen vier Modulen — auf das
+ * Sammelbecken um und meldet, wie viele es waren. **Vor** jedem endgültigen
+ * Löschen einer Kategorie aufzurufen.
  *
  * Vorher hat das niemand getan: `runPeriodicCleanup` und `emptyTrash` haben
  * Kategoriezeilen hart gelöscht und die Inhalte unangetastet gelassen, die
@@ -449,23 +409,19 @@ export async function seedBuiltins(db: Database): Promise<void> {
  * statt still Muell zu hinterlassen. Dieser Helfer ist die Gegenseite davon:
  * Er sorgt dafuer, dass das Löschen erlaubt ist, ohne dass ein Inhalt
  * verschwindet.
- *
- * Table name interpolated into SQL — die Schlüssel von FALLBACK_CATEGORY sind
- * literal, andere Werte sind nicht zugelassen.
  */
-export async function reassignCategoryContent(
-  db: Database,
-  table: keyof typeof FALLBACK_CATEGORY,
-  categoryId: string
-): Promise<number> {
-  const fallback = FALLBACK_CATEGORY[table];
-  // Die Default-Kategorie selbst ist eingebaut und wird nie gelöscht.
-  if (categoryId === fallback) return 0;
-  const result = await db.execute(
-    `UPDATE ${table} SET category_id = $1 WHERE category_id = $2`,
-    [fallback, categoryId]
-  );
-  return result.rowsAffected ?? 0;
+export async function reassignCategoryContent(db: Database, categoryId: string): Promise<number> {
+  // Das Sammelbecken selbst ist eingebaut und wird nie gelöscht.
+  if (categoryId === FALLBACK_CATEGORY_ID) return 0;
+  let moved = 0;
+  for (const table of CATEGORIZED_TABLES) {
+    const result = await db.execute(
+      `UPDATE ${table} SET category_id = $1 WHERE category_id = $2`,
+      [FALLBACK_CATEGORY_ID, categoryId]
+    );
+    moved += result.rowsAffected ?? 0;
+  }
+  return moved;
 }
 
 /** Eine verwaiste Referenz: Zeile `id` in `table` zeigt auf ein Ziel, das fehlt. */

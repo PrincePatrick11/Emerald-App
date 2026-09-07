@@ -13,6 +13,7 @@ import EntryDetailFrame from '../ui/EntryDetailFrame';
 import { useUIStore } from '../../store/uiStore';
 import { useEditActions } from '../../hooks/useEditActions';
 import { useOperationStore } from '../../store/operationStore';
+import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
@@ -237,7 +238,7 @@ export default function OperationSigilView({ operation }: { operation: Operation
   const deleteOperation = useOperationStore((s) => s.deleteOperation);
   const restoreOperation = useOperationStore((s) => s.restoreOperation);
   const permanentlyDeleteOperation = useOperationStore((s) => s.permanentlyDeleteOperation);
-  const categories = useOperationStore((s) => s.categories);
+  const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
 
   const isEditing = useUIStore((s) => s.activeView.mode === 'edit');
@@ -577,7 +578,7 @@ export default function OperationSigilView({ operation }: { operation: Operation
           {sigilBreadcrumbIcon && (isImageIcon(sigilBreadcrumbIcon)
             ? <img src={sigilBreadcrumbIcon} alt="" className="w-5 h-5 object-cover rounded" />
             : <span>{sigilBreadcrumbIcon}</span>)}
-          <span>{categoryLabel(t, 'operations', currentCategory, '—')}</span>
+          <span>{categoryLabel(t, currentCategory, '—')}</span>
           <span>·</span>
           <span>{formatEntryDate(operation.updated_at)}</span>
         </>

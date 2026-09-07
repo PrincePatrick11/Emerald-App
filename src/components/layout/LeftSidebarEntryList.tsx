@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { formatEntryDate } from '../../lib/formatDate';
 import { categoryLabel } from '../../lib/categories';
-import { MODULE_LIST, type LeftListTabId } from '../../lib/modules';
+import { DEFAULT_ENTRY_EMOJI, MODULE_LIST, type LeftListTabId } from '../../lib/modules';
 import { Flame, CheckSquare, Square, Copy, Pencil, Trash2, PanelTopOpen, LayoutList, type LucideIcon } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useJournalStore } from '../../store/journalStore';
@@ -11,11 +11,11 @@ import { useOperationStore } from '../../store/operationStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useTaskStore } from '../../store/taskStore';
 import { useAltarStore } from '../../store/altarStore';
+import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import { setDragItem } from '../../lib/dragState';
-import { FALLBACK_CATEGORY } from '../../lib/schema';
+import { FALLBACK_CATEGORY_ID } from '../../lib/schema';
 import { generateId, isImageIcon } from '../../lib/helpers';
-import { getCategoryEmoji } from '../wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import type { AltarRecord, JournalEntry, MoonPhase, Operation, Task, WikiArticle } from '../../types';
 import TabIconButton from '../ui/TabIconButton';
@@ -237,18 +237,17 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { categories, operations, createOperation, duplicateOperation, updateOperation, deleteOperation, restoreOperation } = useOperationStore(
-    useShallow((s) => ({ categories: s.categories, operations: s.operations, createOperation: s.createOperation, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation }))
+  const { operations, createOperation, duplicateOperation, updateOperation, deleteOperation, restoreOperation } = useOperationStore(
+    useShallow((s) => ({ operations: s.operations, createOperation: s.createOperation, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation }))
   );
+  const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
 
   const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
-  const opCatName = (c: (typeof categories)[number]) => categoryLabel(t, 'operations', c);
+  const catName = (c: (typeof categories)[number]) => categoryLabel(t, c);
 
   const handleNewOperation = async () => {
-    const categoryId = categories[0]?.id;
-    if (!categoryId) return;
-    const op = await createOperation(categoryId);
+    const op = await createOperation(FALLBACK_CATEGORY_ID);
     setActiveView({ type: 'operations', id: op.id, mode: 'edit', isNew: true });
   };
 
@@ -271,7 +270,7 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
     getTitle: (op) => op.title,
     getDateStr: (op) => {
       const cat = catById[op.category_id];
-      const catDisplayName = cat ? opCatName(cat) : '';
+      const catDisplayName = cat ? catName(cat) : '';
       return `${catDisplayName}${catDisplayName ? ' · ' : ''}${formatEntryDate(op.updated_at)}`;
     },
     getIcon: (op) => {
@@ -308,16 +307,16 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { articles, wikiCategories, createArticle, duplicateArticle, updateArticle, deleteArticle, restoreArticle } = useWikiStore(
-    useShallow((s) => ({ articles: s.articles, wikiCategories: s.wikiCategories, createArticle: s.createArticle, duplicateArticle: s.duplicateArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle }))
+  const { articles, createArticle, duplicateArticle, updateArticle, deleteArticle, restoreArticle } = useWikiStore(
+    useShallow((s) => ({ articles: s.articles, createArticle: s.createArticle, duplicateArticle: s.duplicateArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle }))
   );
+  const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
 
-  const catById = Object.fromEntries(wikiCategories.map((c) => [c.id, c]));
+  const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
 
   const handleNewArticle = async () => {
-    const category = wikiCategories[0]?.id ?? 'other';
-    const article = await createArticle(category);
+    const article = await createArticle();
     setActiveView({ type: 'wiki', id: article.id, mode: 'edit', isNew: true });
   };
 
@@ -342,19 +341,19 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
       const cat = catById[a.category_id];
       // Kein Fallback auf die rohe category_id — bei gelöschter Kategorie
       // entfällt das Label, wie eine Zeile höher bei den Operationen.
-      const catLabel = categoryLabel(t, 'wiki', cat);
+      const catLabel = categoryLabel(t, cat);
       return `${catLabel}${catLabel ? ' · ' : ''}${formatEntryDate(a.updated_at)}`;
     },
     getIcon: (a) => {
       const cat = catById[a.category_id];
       return isImageIcon(a.icon)
         ? <img src={a.icon} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
-        : <span className="text-base leading-none flex-shrink-0">{cat?.emoji ?? getCategoryEmoji(a.category_id)}</span>;
+        : <span className="text-base leading-none flex-shrink-0">{cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki}</span>;
     },
     isActive: (a) => activeView.id === a.id,
     onOpen: (a) => setActiveView({ type: 'wiki', id: a.id, mode: 'view' }),
     onOpenNewTab: (a) => openViewInNewTab({ type: 'wiki', id: a.id, mode: 'view' }),
-    onDragStart: (a) => setDragItem({ id: a.id, entryType: 'wiki', label: a.title, category: a.category_id }),
+    onDragStart: (a) => setDragItem({ id: a.id, entryType: 'wiki', label: a.title, category: catById[a.category_id]?.emoji }),
     onRename: (a, title) => updateArticle(a.id, { title }),
     contextMenuActions: (a, startRename) => [
       { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'wiki', id: a.id, mode: 'view' }) },
@@ -422,9 +421,10 @@ function useTasksConfig(): EntryListTabProps<Task> {
   const { activeView, setActiveView } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView }))
   );
-  const { categories, tasks, createTask, updateTask, deleteTask, restoreTask } = useTaskStore(
-    useShallow((s) => ({ categories: s.categories, tasks: s.tasks, createTask: s.createTask, updateTask: s.updateTask, deleteTask: s.deleteTask, restoreTask: s.restoreTask }))
+  const { tasks, createTask, updateTask, deleteTask, restoreTask } = useTaskStore(
+    useShallow((s) => ({ tasks: s.tasks, createTask: s.createTask, updateTask: s.updateTask, deleteTask: s.deleteTask, restoreTask: s.restoreTask }))
   );
+  const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
 
   const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
@@ -439,7 +439,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
     setDragItem({ id: task.id, entryType: 'task', label: task.title, category: catById[task.category_id]?.emoji });
 
   const handleNewTask = async () => {
-    const task = await createTask(FALLBACK_CATEGORY.tasks);
+    const task = await createTask(FALLBACK_CATEGORY_ID);
     openTask(task.id);
     return task;
   };

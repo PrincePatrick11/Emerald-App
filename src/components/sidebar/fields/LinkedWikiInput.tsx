@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useWikiStore } from '../../../store/wikiStore';
-import { getCategoryEmoji } from '../../wiki/WikiList';
+import { useCategoryStore } from '../../../store/categoryStore';
+import { DEFAULT_ENTRY_EMOJI } from '../../../lib/modules';
 import LinkedEntryPicker, { LINK_RESULT_LIMIT, LinkedEntryChip } from './LinkedEntryPicker';
 
 /**
@@ -18,23 +19,25 @@ export default function LinkedWikiInput({
 }) {
   const { t } = useTranslation();
   const articles = useWikiStore((s) => s.articles);
-  const wikiCategories = useWikiStore((s) => s.wikiCategories);
+  const categories = useCategoryStore((s) => s.categories);
   const [query, setQuery] = useState('');
 
+  // Bis v38 blieben Artikel der eingebauten Kategorie „Paradigma" hier außen
+  // vor; seitdem ist sie eine Kategorie wie jede andere und kein Grund mehr.
   const filtered = useMemo(() =>
     articles
-      .filter((a) => !ids.includes(a.id) && !a.deleted_at && a.category_id !== 'paradigm' &&
+      .filter((a) => !ids.includes(a.id) && !a.deleted_at &&
         a.title.toLowerCase().includes(query.toLowerCase()))
       .slice(0, LINK_RESULT_LIMIT),
     [articles, ids, query]);
 
   const selectedArticles = useMemo(() =>
-    ids.map((id) => articles.find((a) => a.id === id)).filter((a) => a && a.category_id !== 'paradigm') as typeof articles,
+    ids.map((id) => articles.find((a) => a.id === id)).filter(Boolean) as typeof articles,
     [ids, articles]);
 
   const articleIcon = (article: typeof articles[number]) => {
-    const cat = wikiCategories.find((c) => c.id === article.category_id);
-    return cat?.emoji ?? getCategoryEmoji(article.category_id);
+    const cat = categories.find((c) => c.id === article.category_id);
+    return cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
   };
 
   return (

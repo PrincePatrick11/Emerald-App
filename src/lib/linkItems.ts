@@ -1,12 +1,11 @@
 import type { TFunction } from 'i18next';
-import { getCategoryEmoji } from '../components/wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from './moonPhase';
 import { DEFAULT_ENTRY_EMOJI } from './modules';
 import { categoryLabel } from './categories';
 import { isImageIcon } from './helpers';
 import type {
-  AltarRecord, ContentType, JournalEntry, MoonPhase, Operation, OperationCategory,
-  Task, TaskCategory, WikiArticle, WikiCategoryDef,
+  AltarRecord, Category, ContentType, JournalEntry, MoonPhase, Operation,
+  Task, WikiArticle,
 } from '../types';
 
 /**
@@ -22,6 +21,7 @@ export interface SuggestionItem {
   id: string;
   entryType: ContentType;
   label: string;
+  /** Emoji der Kategorie des Eintrags, wo es eine gibt. */
   category?: string;
   /** Wandert beim Einfügen in die Node-Attrs und damit ins gespeicherte HTML. */
   icon?: string;
@@ -66,11 +66,10 @@ export interface SuggestionItem {
 export interface LinkItemSources {
   entries: JournalEntry[];
   tasks: Task[];
-  taskCategories: TaskCategory[];
   operations: Operation[];
-  opCategories: OperationCategory[];
   articles: WikiArticle[];
-  wikiCategories: WikiCategoryDef[];
+  /** Die eine globale Liste — Aufgaben, Operationen und Artikel zeigen alle hinein. */
+  categories: Category[];
   altars: AltarRecord[];
 }
 
@@ -88,6 +87,7 @@ function splitIcon(icon: string | null | undefined, emojiFallback: string) {
 }
 
 export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem[] {
+  const catById = new Map(s.categories.map((c) => [c.id, c]));
   return [
     ...s.entries.map((e) => ({
       id: e.id,
@@ -99,40 +99,39 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
       entry_number: e.entry_number,
     })),
     ...s.tasks.map((task) => {
-      const cat = s.taskCategories.find((c) => c.id === task.category_id);
+      const cat = catById.get(task.category_id);
       return {
         id: task.id,
         entryType: 'task' as const,
         label: task.title,
+        category: cat?.emoji,
         icon: cat?.emoji || DEFAULT_ENTRY_EMOJI.task,
-        // Aufgaben-Kategorien haben keine Builtin-Keys — der gespeicherte Name
-        // ist der Anzeigename (siehe lib/categories).
-        categoryLabel: cat?.name,
+        categoryLabel: categoryLabel(t, cat),
         updatedAt: task.updated_at,
       };
     }),
     ...s.operations.map((o) => {
-      const cat = s.opCategories.find((c) => c.id === o.category_id);
+      const cat = catById.get(o.category_id);
       return {
         id: o.id,
         entryType: 'operation' as const,
         label: o.title,
         category: cat?.emoji,
         ...splitIcon(o.icon, cat?.emoji || DEFAULT_ENTRY_EMOJI.operation),
-        categoryLabel: categoryLabel(t, 'operations', cat),
+        categoryLabel: categoryLabel(t, cat),
         updatedAt: o.updated_at,
         entry_number: o.entry_number,
       };
     }),
     ...s.articles.map((a) => {
-      const cat = s.wikiCategories.find((c) => c.id === a.category_id);
+      const cat = catById.get(a.category_id);
       return {
         id: a.id,
         entryType: 'wiki' as const,
         label: a.title,
-        category: a.category_id,
-        ...splitIcon(a.icon, cat?.emoji ?? getCategoryEmoji(a.category_id)),
-        categoryLabel: categoryLabel(t, 'wiki', cat),
+        category: cat?.emoji,
+        ...splitIcon(a.icon, cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki),
+        categoryLabel: categoryLabel(t, cat),
         updatedAt: a.updated_at,
         entry_number: a.entry_number,
       };
@@ -145,7 +144,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
       entryType: 'altar' as const,
       label: a.title,
       displayIcon: a.icon_data || DEFAULT_ENTRY_EMOJI.altar,
-      // Altäre kennen keine Kategorien (altar_categories gehören den Elementen
+      // Altäre kennen keine Kategorien (die Kategorien gehören den Elementen
       // auf dem Altar, nicht dem Altar selbst) — es bleibt der Modulname.
       categoryLabel: t('nav.altar'),
       updatedAt: a.updated_at,

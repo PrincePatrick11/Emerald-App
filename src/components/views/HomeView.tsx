@@ -6,14 +6,14 @@ import { useUIStore } from '../../store/uiStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
+import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
-import { getCategoryEmoji } from '../wiki/WikiList';
 import ContextMenu from '../ui/ContextMenu';
 import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import { getMoonPhase, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId, isImageIcon } from '../../lib/helpers';
-import { viewTypeForEntryType } from '../../lib/modules';
+import { DEFAULT_ENTRY_EMOJI, viewTypeForEntryType } from '../../lib/modules';
 import { categoryLabel } from '../../lib/categories';
 import { formatDayHeading, formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
@@ -77,12 +77,13 @@ export default function HomeView() {
   const { entries, createEntry, duplicateEntry, deleteEntry, restoreEntry } = useJournalStore(
     useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
   );
-  const { articles, wikiCategories, duplicateArticle, deleteArticle, restoreArticle } = useWikiStore(
-    useShallow((s) => ({ articles: s.articles, wikiCategories: s.wikiCategories, duplicateArticle: s.duplicateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle }))
+  const { articles, duplicateArticle, deleteArticle, restoreArticle } = useWikiStore(
+    useShallow((s) => ({ articles: s.articles, duplicateArticle: s.duplicateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle }))
   );
-  const { operations, categories, duplicateOperation, deleteOperation, restoreOperation } = useOperationStore(
-    useShallow((s) => ({ operations: s.operations, categories: s.categories, duplicateOperation: s.duplicateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation }))
+  const { operations, duplicateOperation, deleteOperation, restoreOperation } = useOperationStore(
+    useShallow((s) => ({ operations: s.operations, duplicateOperation: s.duplicateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation }))
   );
+  const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
 
   const [ctxMenu, setCtxMenu] = useState<{ target: CtxTarget; x: number; y: number } | null>(null);
@@ -271,7 +272,7 @@ export default function HomeView() {
                           {op.title}
                         </div>
                         <div className="home-item-meta text-xs mt-0.5">
-                          {categoryLabel(t, 'operations', cat)} · {formatEntryDate(op.updated_at)}
+                          {categoryLabel(t, cat)} · {formatEntryDate(op.updated_at)}
                         </div>
                       </div>
                     </div>
@@ -297,7 +298,7 @@ export default function HomeView() {
                     }
                     <div className="home-item-title text-sm font-medium truncate">{op.title}</div>
                     <div className="home-item-meta text-xs mt-0.5">
-                      {categoryLabel(t, 'operations', cat)} · {formatEntryDate(op.updated_at)}
+                      {categoryLabel(t, cat)} · {formatEntryDate(op.updated_at)}
                     </div>
                   </button>
                 );
@@ -328,11 +329,11 @@ export default function HomeView() {
           ) : homeWikiPrefs.view === 'list' ? (
             <div className="space-y-2">
               {wikiItems.map((article) => {
-                const cat = wikiCategories.find((c) => c.id === article.category_id);
-                const icon = cat?.emoji ?? getCategoryEmoji(article.category_id);
+                const cat = categories.find((c) => c.id === article.category_id);
+                const icon = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
                 // Kein Fallback auf die rohe category_id — bei gelöschter
                 // Kategorie entfällt das Label.
-                const catLabel = categoryLabel(t, 'wiki', cat);
+                const catLabel = categoryLabel(t, cat);
                 return (
                   <button
                     key={article.id}
@@ -361,9 +362,9 @@ export default function HomeView() {
           ) : (
             <div className="grid grid-cols-2 gap-2">
               {wikiItems.map((article) => {
-                const cat = wikiCategories.find((c) => c.id === article.category_id);
-                const icon = cat?.emoji ?? getCategoryEmoji(article.category_id);
-                const catLabel = categoryLabel(t, 'wiki', cat);
+                const cat = categories.find((c) => c.id === article.category_id);
+                const icon = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
+                const catLabel = categoryLabel(t, cat);
                 return (
                   <button
                     key={article.id}

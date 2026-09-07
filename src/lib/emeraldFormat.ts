@@ -14,7 +14,11 @@ import { reloadModules } from '../store/moduleWiring';
 import { useImportStore } from '../store/importStore';
 import { useTaskStore } from '../store/taskStore';
 import { getDb } from './db';
-import { BUILTIN_WIKI_CATEGORIES } from './schema';
+import { FALLBACK_CATEGORY_ID } from './schema';
+import { LEGACY_WIKI_CATEGORIES } from './schemaV37';
+import { categoryKey } from './categoryMerge';
+import { categoryLabel } from './categories';
+import { useCategoryStore } from '../store/categoryStore';
 import { toInt } from './row';
 import { generateId } from './helpers';
 import i18n from '../i18n';
@@ -26,6 +30,7 @@ import {
   LEGACY_JOURNAL_FIELDS, type LegacyJournalField,
 } from './migrateJournalFieldsToContent';
 import type { SuggestionItem } from '../components/editor/SuggestionList';
+import type { Category } from '../types';
 import {
   DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY,
   DEFAULT_OVERLAY_COLOR, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE,
@@ -38,17 +43,12 @@ import { noAltarOpenMessage } from './altarExport';
 /** `buildLinkItems` über die aktuellen Stores — die React-freie Variante von
  *  `useLinkItems`, für die Import-/Export-Pfade. */
 function linkItemsSnapshot(): SuggestionItem[] {
-  const wiki = useWikiStore.getState();
-  const ops = useOperationStore.getState();
-  const tasks = useTaskStore.getState();
   return buildLinkItems({
     entries: useJournalStore.getState().entries,
-    tasks: tasks.tasks,
-    taskCategories: tasks.categories,
-    operations: ops.operations,
-    opCategories: ops.categories,
-    articles: wiki.articles,
-    wikiCategories: wiki.wikiCategories,
+    tasks: useTaskStore.getState().tasks,
+    operations: useOperationStore.getState().operations,
+    articles: useWikiStore.getState().articles,
+    categories: useCategoryStore.getState().categories,
     altars: useAltarStore.getState().altars,
   }, i18n.t);
 }
@@ -219,10 +219,19 @@ interface EmeraldMeta {
   // legacy (v1 files written before ID was stored)
   linkedOpsTitles?: string[];
   linkedWikiTitles?: string[];
-  // wiki
+  /**
+   * wiki + operations: die Kategorie über ihren Anzeigenamen (und ihr Emoji,
+   * falls sie im Ziel-Vault erst angelegt werden muss). Der Name, nicht die
+   * ID — eine `.emerald`-Datei wandert zwischen Vaults, und dieselbe selbst
+   * angelegte Kategorie hat dort eine andere ID.
+   */
+  categoryName?: string;
+  categoryEmoji?: string;
+  // Altbestand von vor v38: Wiki nannte die Kategorie über ID (Builtins) oder
+  // Namen, Operationen nur über den Namen. Wird weiter gelesen und, für ältere
+  // App-Versionen, auch weiter geschrieben.
   wikiCategoryId?: string;
   wikiCategoryName?: string;
-  // operations
   opCategoryName?: string;
   isActive?: boolean;
   endDate?: string | null;
@@ -311,8 +320,9 @@ export async function exportAsEmerald(): Promise<void> {
   }
 
   const { entries }                           = useJournalStore.getState();
-  const { articles, wikiCategories }          = useWikiStore.getState();
-  const { operations, categories: opCats }    = useOperationStore.getState();
+  const { articles }    = useWikiStore.getState();
+  const { operations }  = useOperationStore.getState();
+  const { categories }  = useCategoryStore.getState();
   let content = '';
   let title = '';
   let createdAt = '';
@@ -357,9 +367,13 @@ export async function exportAsEmerald(): Promise<void> {
     content   = article.content || '';
     createdAt = article.created_at;
 
-    const cat = wikiCategories.find(c => c.id === article.category_id);
+    const cat = categories.find(c => c.id === article.category_id);
+    meta.categoryName     = categoryLabel(i18n.t, cat) || undefined;
+    meta.categoryEmoji    = cat?.emoji;
     meta.wikiCategoryId   = article.category_id;
-    meta.wikiCategoryName = cat?.name ?? article.category_id;
+    // Kein Rückfall auf die rohe ID: eine Kategorie im Papierkorb ist hier
+    // nicht geladen, und der Import würde aus der UUID einen Namen machen.
+    meta.wikiCategoryName = cat?.name;
     meta.icon             = article.icon ?? undefined;
     meta.tags             = (article.tags ?? []) as string[];
 
@@ -371,7 +385,9 @@ export async function exportAsEmerald(): Promise<void> {
     content   = op.content || '';
     createdAt = op.created_at;
 
-    const cat = opCats.find(c => c.id === op.category_id);
+    const cat = categories.find(c => c.id === op.category_id);
+    meta.categoryName   = categoryLabel(i18n.t, cat) || undefined;
+    meta.categoryEmoji  = cat?.emoji;
     meta.opCategoryName = cat?.name;
     meta.isActive  = !!op.is_active;
     meta.endDate   = op.end_date;
@@ -403,7 +419,8 @@ export async function exportAsEmerald(): Promise<void> {
 }
 
 async function exportAltarAsEmerald(): Promise<void> {
-  const { altars, activeAltarId, items, placements, categories } = useAltarStore.getState();
+  const { altars, activeAltarId, items, placements } = useAltarStore.getState();
+  const { categories } = useCategoryStore.getState();
   const altar = altars.find(a => a.id === activeAltarId);
   if (!altar) {
     await noAltarOpenMessage();
@@ -425,7 +442,8 @@ async function exportAltarAsEmerald(): Promise<void> {
   const altarItems = items.filter(i => placedItemIds.has(i.id));
   const usedCategoryIds = new Set(altarItems.map(i => i.category_id));
   const usedCategories = categories.filter(c => usedCategoryIds.has(c.id));
-  const categoryNameById = new Map(categories.map(c => [c.id, c.name]));
+  // Übersetzte Namen, damit ein deutsches „Sonstiges" im Ziel-Vault wieder das Sammelbecken trifft.
+  const categoryNameById = new Map(categories.map(c => [c.id, categoryLabel(i18n.t, c)]));
 
   const meta: EmeraldMeta = {
     altarBackgroundPreset: altar.background_preset,
@@ -443,10 +461,12 @@ async function exportAltarAsEmerald(): Promise<void> {
     altarRotationSnapAngle: altar.rotation_snap_angle,
     altarSnapScaleToGrid: altar.snap_scale_to_grid,
     altarResolution: altar.resolution,
-    altarCategories: usedCategories.map(c => ({ name: c.name, emoji: c.emoji })),
+    altarCategories: usedCategories.map(c => ({ name: categoryLabel(i18n.t, c), emoji: c.emoji })),
     altarItems: altarItems.map(i => ({
       id: i.id, name: i.name, emoji: i.emoji,
-      category: categoryNameById.get(i.category_id) ?? 'Other', note: i.note,
+      // Leer, wenn die Kategorie im Papierkorb liegt — der Import nimmt dann
+      // das Sammelbecken, statt ein englisches „Other" neben „Sonstiges" anzulegen.
+      category: categoryNameById.get(i.category_id) ?? '', note: i.note,
       imageData: i.image_data ?? undefined,
     })),
     altarPlacements: placements.map(p => ({
@@ -589,7 +609,7 @@ async function importJournalEntry(
   const { operations } = useOperationStore.getState();
 
   const paradigmId = file.meta.paradigmaTitle
-    ? (articles.find(a => a.title === file.meta.paradigmaTitle && a.category_id === 'paradigm')?.id ?? null)
+    ? (articles.find(a => a.title === file.meta.paradigmaTitle)?.id ?? null)
     : null;
   const bannungId = file.meta.bannungTitle
     ? (articles.find(a => a.title === file.meta.bannungTitle)?.id ?? null)
@@ -639,24 +659,70 @@ async function importJournalEntry(
   return entry.id;
 }
 
-// Aus schema.ts abgeleitet statt handgepflegt: Die frühere Kopie hing seit
-// Migration v12 hinterher — 'sigil_charging' fehlte, weshalb ein Artikel dieser
-// Kategorie beim Import still in 'other' landete.
-const BUILTIN_WIKI_CATEGORY_IDS = BUILTIN_WIKI_CATEGORIES.map(([id]) => id);
+/**
+ * Die eine Kategorie-Auflösung des Imports, für alle vier Module: die lokale
+ * Kategorie mit diesem Namen (ohne Groß/Klein, Builtins auch über ihren
+ * übersetzten Namen), sonst neu angelegt; ohne Namen das Sammelbecken.
+ * Vorher hatten Wiki, Operationen und Altar je eine eigene Strategie.
+ */
+async function ensureCategoryByName(name: string | null | undefined, emoji = '📁'): Promise<string> {
+  const trimmed = name?.trim();
+  if (!trimmed) return FALLBACK_CATEGORY_ID;
+  const key = categoryKey(trimmed);
+  const matches = (c: Category) =>
+    categoryKey(c.name) === key || (c.is_builtin && categoryKey(categoryLabel(i18n.t, c)) === key);
+
+  const store = useCategoryStore.getState();
+  const active = store.categories.find(matches);
+  if (active) return active.id;
+
+  // Im Papierkorb? Dann zurückholen statt eine zweite anzulegen — wie der
+  // Backup-Import (resolveImportedCategories).
+  const db = await getDb();
+  const trashed = await db.select<{ id: string; name: string }[]>(
+    'SELECT id, name FROM categories WHERE deleted_at IS NOT NULL'
+  );
+  const hit = trashed.find((c) => categoryKey(c.name) === key);
+  if (hit) {
+    await store.restoreCategory(hit.id);
+    return hit.id;
+  }
+
+  try {
+    return (await store.addCategory(trimmed, emoji || '📁')).id;
+  } catch {
+    // Namenskonflikt aus einem parallelen Anlegen — dann gibt es sie jetzt.
+    return useCategoryStore.getState().categories.find(matches)?.id ?? FALLBACK_CATEGORY_ID;
+  }
+}
+
+const LEGACY_WIKI_BY_ID = new Map(LEGACY_WIKI_CATEGORIES.map(([id, , emoji]) => [id, emoji]));
+
+/**
+ * Name und Emoji der Wiki-Kategorie aus der Datei. Dateien von vor v38 nennen
+ * Builtins nur über ihre ID — die wird über den alten Locale-Key in den Namen
+ * übersetzt, den dieselbe Kategorie in diesem Vault nach der Migration trägt.
+ */
+function legacyWikiCategory(meta: EmeraldMeta): { name: string | undefined; emoji: string | undefined } {
+  const id = meta.wikiCategoryId;
+  if (id && LEGACY_WIKI_BY_ID.has(id)) {
+    const key = `wiki.categories.${id}`;
+    return {
+      name: i18n.exists(key) ? i18n.t(key) : meta.wikiCategoryName,
+      emoji: LEGACY_WIKI_BY_ID.get(id),
+    };
+  }
+  return { name: meta.wikiCategoryName, emoji: undefined };
+}
 
 async function importWikiArticle(file: EmeraldFile, content: string, tagNames: string[]): Promise<string> {
-  const { createArticle, updateArticle, wikiCategories } = useWikiStore.getState();
+  const { createArticle, updateArticle } = useWikiStore.getState();
 
-  let categoryId = 'other';
-  if (file.meta.wikiCategoryId) {
-    if (BUILTIN_WIKI_CATEGORY_IDS.includes(file.meta.wikiCategoryId)) {
-      categoryId = file.meta.wikiCategoryId;
-    } else {
-      // custom category: match by name
-      const found = wikiCategories.find(c => c.name === file.meta.wikiCategoryName && !c.is_builtin);
-      categoryId = found?.id ?? 'other';
-    }
-  }
+  const legacy = legacyWikiCategory(file.meta);
+  const categoryId = await ensureCategoryByName(
+    file.meta.categoryName ?? legacy.name,
+    file.meta.categoryEmoji ?? legacy.emoji ?? '📄',
+  );
 
   const article = await createArticle(categoryId);
   await updateArticle(article.id, {
@@ -670,18 +736,12 @@ async function importWikiArticle(file: EmeraldFile, content: string, tagNames: s
 }
 
 async function importOperationEntry(file: EmeraldFile, content: string, tagNames: string[]): Promise<string> {
-  const { createOperation, updateOperation, categories: opCats, addCategory } = useOperationStore.getState();
+  const { createOperation, updateOperation } = useOperationStore.getState();
 
-  let categoryId: string;
-  const existing = opCats.find(c => c.name === file.meta.opCategoryName);
-  if (existing) {
-    categoryId = existing.id;
-  } else if (file.meta.opCategoryName) {
-    const created = await addCategory(file.meta.opCategoryName, '⚡');
-    categoryId = created.id;
-  } else {
-    categoryId = opCats[0]?.id ?? '';
-  }
+  const categoryId = await ensureCategoryByName(
+    file.meta.categoryName ?? file.meta.opCategoryName,
+    file.meta.categoryEmoji ?? '⚡',
+  );
 
   const op = await createOperation(categoryId);
   await updateOperation(op.id, {
@@ -713,7 +773,9 @@ async function resolveOrCreateItem(
   itemMeta: NonNullable<EmeraldMeta['altarItems']>[number],
 ): Promise<{ id: string; created: boolean }> {
   const { items, addItem } = useAltarStore.getState();
-  const categoryId = localAltarCategoryId(itemMeta.category);
+  // `importAltarEntry` hat die Kategorien der Datei schon angelegt; hier löst
+  // der Name nur noch auf.
+  const categoryId = await ensureCategoryByName(itemMeta.category);
 
   const existingMatch = items.find(i =>
     i.name === itemMeta.name &&
@@ -724,26 +786,6 @@ async function resolveOrCreateItem(
 
   const created = await addItem(itemMeta.name, itemMeta.emoji, categoryId, itemMeta.note, itemMeta.imageData);
   return { id: created.id, created: true };
-}
-
-/**
- * Der Kategorie-Name aus der Datei, übersetzt in die ID dieses Vaults.
- * `ensureAltarCategory` hat den Namen zuvor angelegt, falls er fehlte; bleibt
- * er unauffindbar, fängt 'other' den Fall ab — ohne gültige ID wuerde der
- * Foreign Key das Item ablehnen.
- */
-function localAltarCategoryId(name: string): string {
-  const { categories } = useAltarStore.getState();
-  const match = categories.find(c => c.name.toLowerCase() === name.toLowerCase())
-    ?? categories.find(c => c.id === name);
-  return match?.id ?? 'other';
-}
-
-/** Creates the category if no local category has this name yet (case-insensitive). */
-async function ensureAltarCategory(name: string, emoji: string): Promise<void> {
-  const { categories, addCategory } = useAltarStore.getState();
-  if (categories.some(c => c.name.toLowerCase() === name.toLowerCase())) return;
-  try { await addCategory(name, emoji); } catch { /* created concurrently, or name conflict — keep going */ }
 }
 
 async function remapAltarImagePath(path: string | undefined, images: Record<string, string>): Promise<string | null> {
@@ -797,7 +839,7 @@ async function importAltarEntry(file: EmeraldFile): Promise<string> {
     await updateAltarResolution(altar.id, meta.altarResolution || DEFAULT_ALTAR_RESOLUTION);
 
     for (const cat of meta.altarCategories ?? []) {
-      await ensureAltarCategory(cat.name, cat.emoji);
+      await ensureCategoryByName(cat.name, cat.emoji);
     }
 
     const idMap = new Map<string, string>();
@@ -965,7 +1007,7 @@ async function importJournalFromMarkdown(
 
   const paradigmaName = meta['paradigma'] ? stripIconPrefix(meta['paradigma']) : null;
   const paradigmId = paradigmaName
-    ? (articles.find(a => a.title === paradigmaName && a.category_id === 'paradigm')?.id ?? null)
+    ? (articles.find(a => a.title === paradigmaName)?.id ?? null)
     : null;
 
   const bannungName = meta['bannung'] ? stripIconPrefix(meta['bannung']) : null;
@@ -1024,14 +1066,10 @@ async function importWikiFromMarkdown(
   title: string, html: string, tagNames: string[],
   meta: Record<string, string>,
 ): Promise<string> {
-  const { createArticle, updateArticle, wikiCategories } = useWikiStore.getState();
+  const { createArticle, updateArticle } = useWikiStore.getState();
 
   const categoryName = meta['category'] ? stripIconPrefix(meta['category']) : null;
-  let categoryId = 'other';
-  if (categoryName) {
-    const found = wikiCategories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
-    if (found) categoryId = found.id;
-  }
+  const categoryId = await ensureCategoryByName(categoryName, '📄');
 
   const article = await createArticle(categoryId);
   await updateArticle(article.id, { title, content: html, category_id: categoryId, tags: tagNames });
@@ -1042,21 +1080,10 @@ async function importOperationFromMarkdown(
   title: string, html: string, tagNames: string[],
   meta: Record<string, string>,
 ): Promise<string> {
-  const { createOperation, updateOperation, categories: opCats, addCategory } = useOperationStore.getState();
+  const { createOperation, updateOperation } = useOperationStore.getState();
 
   const categoryName = meta['category'] ? stripIconPrefix(meta['category']) : null;
-  let categoryId: string;
-  const found = categoryName
-    ? opCats.find(c => c.name.toLowerCase() === categoryName.toLowerCase())
-    : null;
-  if (found) {
-    categoryId = found.id;
-  } else if (categoryName) {
-    const created = await addCategory(categoryName, '⚡');
-    categoryId = created.id;
-  } else {
-    categoryId = opCats[0]?.id ?? '';
-  }
+  const categoryId = await ensureCategoryByName(categoryName, '⚡');
 
   const op = await createOperation(categoryId);
   await updateOperation(op.id, {

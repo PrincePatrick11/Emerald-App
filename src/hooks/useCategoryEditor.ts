@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/shallow';
 import { useUndoStore } from '../store/undoStore';
+import { CATEGORY_NAME_TAKEN, useCategoryStore } from '../store/categoryStore';
 import { generateId } from '../lib/helpers';
+import type { Category } from '../types';
 
 export interface CategoryLike {
   id: string;
@@ -9,27 +12,29 @@ export interface CategoryLike {
   emoji: string;
 }
 
-interface CategoryEditorStore<C extends CategoryLike> {
-  addCategory: (name: string, emoji: string) => Promise<C>;
-  updateCategory: (id: string, name: string, emoji: string) => Promise<void>;
-  /** `false`, wenn die Kategorie nicht gelöscht werden darf. */
-  deleteCategory: (id: string) => Promise<boolean | void>;
-  restoreCategory: (id: string) => Promise<void>;
-}
-
-interface UseCategoryEditorOptions<C extends CategoryLike> {
+interface UseCategoryEditorOptions {
+  /** Vorbelegtes Emoji beim Anlegen — je Modul verschieden, die Liste ist dieselbe. */
   defaultEmoji: string;
   /** Called after a category is successfully created, e.g. to select it and trigger an autosave. */
-  onAdded?: (category: C) => void;
+  onAdded?: (category: Category) => void;
 }
 
-/** Shared add/edit/delete-with-confirm state and handlers for a module's category list. */
-export function useCategoryEditor<C extends CategoryLike>(
-  store: CategoryEditorStore<C>,
-  { defaultEmoji, onAdded }: UseCategoryEditorOptions<C>,
-) {
+/**
+ * Add/edit/delete-with-confirm state and handlers over the global category
+ * list (`categoryStore`). Ein Hook für Wiki, Operations, Tasks und den
+ * Altar-Strip — der Store ist seit v38 für alle derselbe.
+ */
+export function useCategoryEditor({ defaultEmoji, onAdded }: UseCategoryEditorOptions) {
   const { t } = useTranslation();
   const pushUndo = useUndoStore((s) => s.push);
+  const store = useCategoryStore(
+    useShallow((s) => ({
+      addCategory: s.addCategory,
+      updateCategory: s.updateCategory,
+      deleteCategory: s.deleteCategory,
+      restoreCategory: s.restoreCategory,
+    })),
+  );
 
   const [addingCategory, setAddingCategory] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -38,49 +43,82 @@ export function useCategoryEditor<C extends CategoryLike>(
   const [editCatName, setEditCatName] = useState('');
   const [editCatEmoji, setEditCatEmoji] = useState(defaultEmoji);
   const [confirmDeleteCatId, setConfirmDeleteCatId] = useState<string | null>(null);
+  /** Fehlermeldung unter dem Namensfeld — heute nur „Name schon vergeben". */
+  const [nameError, setNameError] = useState<string | null>(null);
+  /**
+   * Die zuletzt hier angelegte Kategorie. Die Views zeigen nur Kategorien mit
+   * Einträgen — eine frische hätte sonst keinen Kopf, unter dem man den ersten
+   * Eintrag anlegen könnte (`categoriesUsedBy(…, [lastAddedId])`).
+   */
+  const [lastAddedId, setLastAddedId] = useState<string | null>(null);
+
+  const failedOnName = (err: unknown): boolean => {
+    if (err instanceof Error && err.message === CATEGORY_NAME_TAKEN) {
+      setNameError(t('categories.nameTaken'));
+      return true;
+    }
+    return false;
+  };
 
   const handleAddCategory = async () => {
     if (!newCatName.trim()) return;
-    let cat: C;
+    let cat: Category;
     try {
       cat = await store.addCategory(newCatName.trim(), newCatEmoji);
     } catch (err) {
-      console.error('[useCategoryEditor] addCategory failed:', err);
+      if (!failedOnName(err)) console.error('[useCategoryEditor] addCategory failed:', err);
       return;
     }
     setNewCatName('');
     setNewCatEmoji(defaultEmoji);
+    setNameError(null);
     setAddingCategory(false);
+    setLastAddedId(cat.id);
     onAdded?.(cat);
   };
 
-  const startEditCat = (cat: C) => {
+  const startEditCat = (cat: CategoryLike) => {
     setEditingCatId(cat.id);
     setEditCatName(cat.name);
     setEditCatEmoji(cat.emoji);
+    setNameError(null);
+  };
+
+  const cancelEditCat = () => {
+    setEditingCatId(null);
+    setNameError(null);
   };
 
   const handleSaveEditCat = async () => {
     if (!editingCatId || !editCatName.trim()) return;
-    await store.updateCategory(editingCatId, editCatName.trim(), editCatEmoji);
-    setEditingCatId(null);
-  };
-
-  const handleDeleteCat = async (id: string) => {
-    if (confirmDeleteCatId !== id) {
-      setConfirmDeleteCatId(id);
+    try {
+      await store.updateCategory(editingCatId, editCatName.trim(), editCatEmoji);
+    } catch (err) {
+      if (!failedOnName(err)) console.error('[useCategoryEditor] updateCategory failed:', err);
       return;
     }
+    setEditingCatId(null);
+    setNameError(null);
+  };
+
+  /** Erster Aufruf fragt nach, zweiter löscht. `true`, wenn gelöscht wurde. */
+  const handleDeleteCat = async (id: string): Promise<boolean> => {
+    if (confirmDeleteCatId !== id) {
+      setConfirmDeleteCatId(id);
+      return false;
+    }
     setConfirmDeleteCatId(null);
-    // Eingebaute und Default-Kategorien lehnt der Store ab. Ohne diese Prüfung
-    // meldete die Oberfläche „Kategorie gelöscht" samt Rückgängig-Knopf für
-    // etwas, das nie passiert ist.
-    if ((await store.deleteCategory(id)) === false) return;
+    // Eingebaute Kategorien lehnt der Store ab. Ohne diese Prüfung meldete die
+    // Oberfläche „Kategorie gelöscht" samt Rückgängig-Knopf für etwas, das nie
+    // passiert ist.
+    if ((await store.deleteCategory(id)) === false) return false;
+    if (editingCatId === id) setEditingCatId(null);
     pushUndo({
       id: generateId(),
       description: t('undo.categoryDeleted'),
       undo: () => store.restoreCategory(id),
     });
+    return true;
   };
 
   return {
@@ -91,13 +129,15 @@ export function useCategoryEditor<C extends CategoryLike>(
     editCatName, setEditCatName,
     editCatEmoji, setEditCatEmoji,
     confirmDeleteCatId, setConfirmDeleteCatId,
+    nameError, setNameError,
+    lastAddedId,
     handleAddCategory,
     startEditCat,
+    cancelEditCat,
     handleSaveEditCat,
     handleDeleteCat,
   };
 }
 
-/** Das komplette Editor-Objekt, wie es CategoryHeaderRow/CategoryAddModal entgegennehmen. */
-export type CategoryEditorApi<C extends CategoryLike = CategoryLike> =
-  ReturnType<typeof useCategoryEditor<C>>;
+/** Das komplette Editor-Objekt, wie es CategoryHeaderRow/CategoryModal entgegennehmen. */
+export type CategoryEditorApi = ReturnType<typeof useCategoryEditor>;

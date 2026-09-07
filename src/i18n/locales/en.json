@@ -17,6 +17,26 @@
     "megabytes": "MB",
     "copySuffix": " (Copy)"
   },
+  "categories": {
+    "add": "Add category",
+    "name": "Category name…",
+    "uncategorized": "Uncategorized",
+    "nameTaken": "This category already exists",
+    "builtin": {
+      "other": "Other",
+      "sigils": "Sigils"
+    },
+    "starter": {
+      "paradigm": "Paradigm",
+      "ritual": "Ritual",
+      "meditation": "Meditation",
+      "herbs": "Herbs",
+      "crystals": "Crystals",
+      "candles": "Candles",
+      "deities": "Deities",
+      "tools": "Tools"
+    }
+  },
   "listView": {
     "view": "View",
     "sort": "Sort",
@@ -66,9 +86,6 @@
     "none": "No operations yet.",
     "start": "Start your first operation.",
     "all": "All",
-    "addCategory": "Add category",
-    "categoryName": "Category name…",
-    "uncategorized": "Uncategorized",
     "active": "Active",
     "inactive": "Inactive",
     "endDate": "End Date",
@@ -83,14 +100,10 @@
   "altar": {
     "addElement": "Add element",
     "element": "Element",
-    "category": "Category",
-    "addCategory": "Add category",
-    "categoryName": "Category name…",
     "newAltar": "New altar",
     "libraryTitle": "Altar Library",
     "elementName": "Name…",
     "all": "All",
-    "uncategorized": "Uncategorized",
     "noElements": "No elements yet.",
     "none": "No altars yet.",
     "start": "Create your first altar.",
@@ -257,10 +270,7 @@
     "startDocumenting": "Start documenting your practice.",
     "addIcon": "Add icon",
     "changeIcon": "Change icon",
-    "removeIcon": "Remove icon",
-    "addCategory": "Add category",
-    "categoryName": "Category name…",
-    "uncategorized": "Uncategorized"
+    "removeIcon": "Remove icon"
   },
   "editor": {
     "done": "Done",
@@ -533,10 +543,8 @@
   },
   "tasks": {
     "newTask": "New Task",
-    "newCategory": "Add category",
     "empty": "No tasks yet.",
     "filter": {
-      "category": "Category",
       "priority": "Priority"
     },
     "priority": {
@@ -549,9 +557,7 @@
     "addSubtask": "Add subtask",
     "linkEntry": "Link entry",
     "showCompleted": "Show completed",
-    "uncategorized": "Uncategorized",
-    "untitled": "Untitled Task",
-    "categoryName": "Category name…"
+    "untitled": "Untitled Task"
   },
   "tabBar": {
     "editing": "Editing",

@@ -35,7 +35,7 @@ import { internalLinkBlockHtml } from '../../lib/internalLinkHtml';
 import { useLinkItems } from '../../hooks/useLinkItems';
 import type { ContentType } from '../../types';
 import { getRoutineDragItem, setRoutineDragItem, subscribeRoutineDrag, type RoutineDragItem } from '../../lib/routineDragState';
-import { getCategoryEmoji } from '../wiki/WikiList';
+import { useCategoryStore } from '../../store/categoryStore';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import type { MoonPhase } from '../../types';
 import { useJournalStore } from '../../store/journalStore';
@@ -280,11 +280,9 @@ export default function RichEditor({
 }: RichEditorProps) {
   const entries = useJournalStore((s) => s.entries);
   const articles = useWikiStore((s) => s.articles);
-  const wikiCategories = useWikiStore((s) => s.wikiCategories);
+  const categories = useCategoryStore((s) => s.categories);
   const operations = useOperationStore((s) => s.operations);
-  const categories = useOperationStore((s) => s.categories);
   const tasks = useTaskStore((s) => s.tasks);
-  const taskCategories = useTaskStore((s) => s.categories);
   const altars = useAltarStore((s) => s.altars);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const { t } = useTranslation();
@@ -299,10 +297,10 @@ export default function RichEditor({
 
   // Always-fresh icon lookup ref — returns the current icon for any entry from the store.
   // Backed by a ref so the extension closure never goes stale after initial mount.
-  const storeRef = useRef({ entries, articles, wikiCategories, operations, categories, tasks, taskCategories, altars });
-  storeRef.current = { entries, articles, wikiCategories, operations, categories, tasks, taskCategories, altars };
+  const storeRef = useRef({ entries, articles, categories, operations, tasks, altars });
+  storeRef.current = { entries, articles, categories, operations, tasks, altars };
   const getIconRef = useRef((id: string, entryType: string): string | null => {
-    const { entries, articles, wikiCategories, operations, categories, tasks, taskCategories, altars } = storeRef.current;
+    const { entries, articles, categories, operations, tasks, altars } = storeRef.current;
     if (entryType === 'journal') {
       const e = entries.find((e) => e.id === id);
       return e ? (MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? DEFAULT_ENTRY_EMOJI.journal) : null;
@@ -310,7 +308,7 @@ export default function RichEditor({
     if (entryType === 'wiki') {
       const a = articles.find((a) => a.id === id);
       if (!a) return null;
-      const catEmoji = wikiCategories.find((c) => c.id === a.category_id)?.emoji ?? getCategoryEmoji(a.category_id as any);
+      const catEmoji = categories.find((c) => c.id === a.category_id)?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
       return a.icon || catEmoji;
     }
     if (entryType === 'operation') {
@@ -321,7 +319,7 @@ export default function RichEditor({
     if (entryType === 'task') {
       const task = tasks.find((task) => task.id === id);
       if (!task) return null;
-      return taskCategories.find((c) => c.id === task.category_id)?.emoji || DEFAULT_ENTRY_EMOJI.task;
+      return categories.find((c) => c.id === task.category_id)?.emoji || DEFAULT_ENTRY_EMOJI.task;
     }
     if (entryType === 'altar') {
       const altar = altars.find((a) => a.id === id);
@@ -803,12 +801,9 @@ export default function RichEditor({
             </>
           ) : wikiDragItem ? (
             <>
-              {/* Bei Operationen und Aufgaben trägt category bereits das Emoji;
-                  nur beim Wiki ist es die Kategorie-id für den Lookup. */}
-              {(wikiDragItem.entryType === 'operation' || wikiDragItem.entryType === 'task') && wikiDragItem.category ? (
+              {/* `category` trägt in jedem Modul das Kategorie-Emoji. */}
+              {wikiDragItem.category ? (
                 <span className="text-sm">{wikiDragItem.category}</span>
-              ) : wikiDragItem.entryType === 'wiki' && wikiDragItem.category ? (
-                <span className="text-sm">{getCategoryEmoji(wikiDragItem.category as any)}</span>
               ) : null}
               <span className="text-xs text-jade-400">{wikiDragItem.label}</span>
             </>

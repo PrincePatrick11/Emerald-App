@@ -31,13 +31,9 @@ export interface SearchSnippet {
 
 export interface SearchHit {
   /**
-   * Stable identity of a hit, unique across the whole result list.
-   *
-   * `kind` and `id` together are not enough: the four category tables ship the
-   * same built-in ids — `other` exists in Wiki, Operations *and* Altar,
-   * `herb`/`deity`/`symbol`/`tool` in Wiki and Altar. Two of those are
-   * different things that open different modules, so the module is part of
-   * what tells them apart.
+   * Stable identity of a hit, unique across the whole result list — `kind`
+   * plus `id`. (Until v38 the four category tables shipped the same built-in
+   * ids, and the module had to be part of the key; there is one list now.)
    */
   key: string;
   kind: SearchKind;
@@ -47,7 +43,7 @@ export interface SearchHit {
   matchedIn: 'title' | 'tag' | 'content';
   /** Only ever set for `matchedIn: 'content'`. */
   snippet?: SearchSnippet;
-  /** Only set for `kind: 'category'`. */
+  /** Only for `kind: 'category'`: the module holding most of its entries — unset when nothing uses it. */
   module?: CategoryModuleId;
   categoryId?: string;
   entryNumber?: number;
@@ -60,7 +56,8 @@ export interface SearchCategory {
   id: string;
   /** Already translated: built-in categories are named by a locale key. */
   name: string;
-  module: CategoryModuleId;
+  /** Where a hit on this category opens — the module with most of its entries, none if unused. */
+  module?: CategoryModuleId;
 }
 
 export interface SearchCorpus {
@@ -185,7 +182,7 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
   ) => {
     if (!match) return;
     hits.push({
-      key: `${kind}:${extra.module ?? ''}:${id}`,
+      key: `${kind}:${id}`,
       kind,
       id,
       title,
@@ -265,7 +262,8 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
  *
  * Not every kind has a page of its own: an altar item lives inside the altar
  * module's library and a category is only ever a grouping, so both land on
- * their module rather than on themselves. That is the honest ceiling of what
+ * a module rather than on themselves — a category on the module that uses it
+ * most, and nowhere at all if nothing does. That is the honest ceiling of what
  * the app can address today, not a shortcut.
  */
 export function viewForSearchHit(hit: Pick<SearchHit, 'kind' | 'id' | 'module'>): ActiveView | null {

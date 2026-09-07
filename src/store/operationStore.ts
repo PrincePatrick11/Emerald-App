@@ -1,16 +1,14 @@
 import { create } from 'zustand';
 import type Database from '@tauri-apps/plugin-sql';
 import { getDb, nextEntryNumber } from '../lib/db';
-import { FALLBACK_CATEGORY, reassignCategoryContent } from '../lib/schema';
 import { syncLinks } from '../lib/links';
 import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, toInt, type DbRow } from '../lib/row';
-import type { Operation, OperationCategory } from '../types';
+import type { Operation } from '../types';
 import i18n from '../i18n';
 
 interface OperationState {
-  categories: OperationCategory[];
   operations: Operation[];
 
   fetchAll: () => Promise<void>;
@@ -22,11 +20,6 @@ interface OperationState {
   permanentlyDeleteOperation: (id: string) => Promise<void>;
   getOperation: (id: string) => Operation | undefined;
   ensureDrawingLoaded: (id: string) => Promise<void>;
-  addCategory: (name: string, emoji: string) => Promise<OperationCategory>;
-  updateCategory: (id: string, name: string, emoji: string) => Promise<void>;
-  deleteCategory: (id: string) => Promise<boolean>;
-  restoreCategory: (id: string) => Promise<void>;
-  permanentlyDeleteCategory: (id: string) => Promise<void>;
 }
 
 /**
@@ -62,22 +55,12 @@ function preserveLoadedDrawings(prev: Operation[], fresh: Operation[]): Operatio
 }
 
 export const useOperationStore = create<OperationState>((set, get) => ({
-  categories: [],
   operations: [],
 
   fetchAll: async () => {
     const db = await getDb();
-    // is_builtin kam hier früher ohne Umwandlung durch und lag als 0/1 im
-    // State, obwohl als boolean deklariert — deshalb musste deleteCategory den
-    // Wert an der Verzweigung zu number zurückcasten.
-    const categoryRows = await db.select<DbRow[]>(
-      'SELECT * FROM operation_categories WHERE deleted_at IS NULL ORDER BY sort_order ASC, name ASC'
-    );
     const fresh = await selectAllOperations(db);
-    set((s) => ({
-      categories: categoryRows.map(fromRow.category),
-      operations: preserveLoadedDrawings(s.operations, fresh),
-    }));
+    set((s) => ({ operations: preserveLoadedDrawings(s.operations, fresh) }));
   },
 
   createOperation: async (categoryId) => {
@@ -229,58 +212,6 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     set((s) => ({
       operations: s.operations.map((o) =>
         o.id === id && o.drawing_data === undefined ? { ...o, drawing_data: value } : o
-      ),
-    }));
-  },
-
-  addCategory: async (name, emoji) => {
-    const db = await getDb();
-    const cat: OperationCategory = {
-      id: generateId(), name, emoji, sort_order: 99, is_builtin: false,
-    };
-    await db.execute(
-      `INSERT INTO operation_categories (id, name, emoji, sort_order, is_builtin) VALUES ($1,$2,$3,$4,$5)`,
-      [cat.id, cat.name, cat.emoji, cat.sort_order, 0]
-    );
-    set((s) => ({ categories: [...s.categories, cat] }));
-    return cat;
-  },
-
-  updateCategory: async (id, name, emoji) => {
-    const db = await getDb();
-    await db.execute('UPDATE operation_categories SET name=$1, emoji=$2 WHERE id=$3', [name, emoji, id]);
-    set((s) => ({ categories: s.categories.map((c) => c.id === id ? { ...c, name, emoji } : c) }));
-  },
-
-  deleteCategory: async (id) => {
-    const db = await getDb();
-    const cat = get().categories.find((c) => c.id === id);
-    if (!cat || cat.is_builtin) return false;
-    await db.execute('UPDATE operation_categories SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
-    set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }));
-    return true;
-  },
-
-  restoreCategory: async (id) => {
-    const db = await getDb();
-    await db.execute('UPDATE operation_categories SET deleted_at=NULL WHERE id=$1', [id]);
-    const rows = await db.select<DbRow[]>('SELECT * FROM operation_categories WHERE id=$1', [id]);
-    if (rows[0]) {
-      const cat = fromRow.category(rows[0]);
-      set((s) => ({ categories: [...s.categories, cat].sort((a, b) => a.sort_order - b.sort_order) }));
-    }
-  },
-
-  permanentlyDeleteCategory: async (id) => {
-    const db = await getDb();
-    await reassignCategoryContent(db, 'operations', id);
-    await db.execute('DELETE FROM operation_categories WHERE id=$1', [id]);
-    // Auch im Speicher umhaengen: ein spaeterer updateOperation wuerde die
-    // geloeschte category_id sonst zurueckschreiben und am Foreign Key
-    // scheitern. (Frueher heilte das der Mount-Refetch der View.)
-    set((s) => ({
-      operations: s.operations.map((o) =>
-        o.category_id === id ? { ...o, category_id: FALLBACK_CATEGORY.operations } : o
       ),
     }));
   },

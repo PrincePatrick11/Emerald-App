@@ -2,6 +2,7 @@ import { emit } from '@tauri-apps/api/event';
 import { useUIStore } from '../store/uiStore';
 import { hasActiveVault, useVaultStore } from '../store/vaultStore';
 import type { ActiveView, Operation } from '../types';
+import { SIGIL_CATEGORY_ID } from './schema';
 
 /**
  * The application menu's actions, shared by the two menus that can trigger
@@ -172,7 +173,7 @@ export interface MenuEnabledState {
 export function computeMenuEnabledState(activeView: ActiveView, operations: Operation[]): MenuEnabledState {
   const isSigilOperation =
     activeView.type === 'operations' && !!activeView.id &&
-    operations.find((o) => o.id === activeView.id)?.category_id === 'sigils';
+    operations.find((o) => o.id === activeView.id)?.category_id === SIGIL_CATEGORY_ID;
   const isEntryView =
     (activeView.type === 'journal' ||
      activeView.type === 'wiki' ||

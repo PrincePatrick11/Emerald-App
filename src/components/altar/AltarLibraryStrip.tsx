@@ -1,22 +1,26 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { listen } from '@tauri-apps/api/event';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
-import { Check, ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ImagePlus, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
-import { FALLBACK_CATEGORY } from '../../lib/schema';
-import { altarCategoryLabel } from '../../lib/categories';
+import { useCategoryStore } from '../../store/categoryStore';
+import { FALLBACK_CATEGORY_ID } from '../../lib/schema';
+import { categoriesUsedBy, categoryLabel } from '../../lib/categories';
+import { isCandleEmoji } from '../../lib/altarConstants';
+import { UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import { setAltarDragItem } from '../../lib/altarDragState';
 import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
 import { imageSrc } from '../../lib/images';
-import type { AltarCategory, AltarItem } from '../../types';
+import { useCategoryEditor } from '../../hooks/useCategoryEditor';
+import type { AltarItem, Category } from '../../types';
 import Modal from '../ui/Modal';
 import EmojiPicker from '../ui/EmojiPicker';
 import Button from '../ui/Button';
+import CategoryModal from '../ui/CategoryModal';
 
 const LIBRARY_DEFAULT_HEIGHT = 240;
-const UNCATEGORIZED_TAB = '__uncategorized__' as const;
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
 
 // ─── Item create/edit modal ───────────────────────────────────────────────────
@@ -28,7 +32,8 @@ function ItemModal({
   onClose,
 }: {
   item: AltarItem | null;
-  categories: AltarCategory[];
+  /** Die Volliste — ein Element darf in jede Kategorie, auch eine, die bisher nur das Wiki nutzt. */
+  categories: Category[];
   defaultCategory: string;
   onClose: () => void;
 }) {
@@ -123,140 +128,57 @@ function ItemModal({
         <input ref={nameInputRef} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t('altar.elementName')} className="w-full bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" />
         <div className="flex flex-wrap gap-1">
           {categories.map((cat) => (
-            <button key={cat.id} onClick={() => { setEditCategory(cat.id); setEditEmoji(''); }} className={`text-xs px-2 py-1 rounded-md transition-colors ${editCategory === cat.id ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{cat.emoji} {altarCategoryLabel(t, cat)}</button>
+            <button key={cat.id} onClick={() => { setEditCategory(cat.id); setEditEmoji(''); }} className={`text-xs px-2 py-1 rounded-md transition-colors ${editCategory === cat.id ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{cat.emoji} {categoryLabel(t, cat)}</button>
           ))}
         </div>
+        {/* Dieselbe Lösch-/Speichern-Reihe wie im CategoryModal daneben. */}
         {item && confirmDelete ? (
           <div className="flex items-center justify-between rounded-lg border border-red-700/40 bg-red-950/20 px-3 py-2">
             <span className="text-xs text-red-300">{t('common.deleteConfirm')}</span>
             <span className="flex items-center gap-2">
-              <Button onClick={doDelete} variant="danger" className="text-xs">{t('common.confirmYes')}</Button>
-              <Button onClick={() => setConfirmDelete(false)} variant="ghost" className="text-xs">{t('common.confirmNo')}</Button>
+              <Button tone="danger" onClick={doDelete}>{t('common.confirmYes')}</Button>
+              <Button tone="neutral" onClick={() => setConfirmDelete(false)}>{t('common.confirmNo')}</Button>
             </span>
           </div>
         ) : (
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             {item ? (
-              <Button onClick={doDelete} variant="danger" className="flex items-center gap-1 text-xs">
-                <Trash2 size={11} /> {t('common.delete')}
+              <Button tone="danger" onClick={doDelete} title={t('common.delete')}>
+                <Trash2 size={12} /> {t('common.delete')}
               </Button>
             ) : <span />}
-            <div className="flex items-center gap-1">
-              <Button onClick={onClose} variant="ghost"><X size={13} /></Button>
-              <Button onClick={save} variant="ghost" className="text-jade-400"><Check size={13} /></Button>
-            </div>
+            <span className="flex items-center gap-2">
+              <Button tone="neutral" onClick={onClose}>{t('common.cancel')}</Button>
+              <Button tone="jade" onClick={save} disabled={!editName.trim()}>{t('common.save')}</Button>
+            </span>
           </div>
         )}
     </Modal>
   );
 }
 
-// ─── Category create/edit modal ───────────────────────────────────────────────
-
-function CategoryModal({
-  category,
-  onClose,
-  onTabChange,
-}: {
-  category: AltarCategory | null;
-  onClose: () => void;
-  onTabChange: (tabId: string) => void;
-}) {
-  const { t } = useTranslation();
-  const { addCategory, updateCategory, deleteCategory } = useAltarStore(
-    useShallow((s) => ({ addCategory: s.addCategory, updateCategory: s.updateCategory, deleteCategory: s.deleteCategory })),
-  );
-  // Bewusst der gespeicherte Name, nicht altarCategoryLabel(): das Feld
-  // editiert den DB-Wert. Die Uebersetzung vorzubefuellen wuerde sie beim
-  // Speichern in die DB schreiben und die Kategorie auf eine Sprache nageln.
-  const [catName, setCatName] = useState(category?.name ?? '');
-  const [catEmoji, setCatEmoji] = useState(category?.emoji ?? '📦');
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [nameError, setNameError] = useState('');
-
-  // Die Default-Kategorie ist das Ziel, auf das die Objekte anderer Kategorien
-  // beim Löschen umgehängt werden. Sie selbst zu löschen lehnt der Store ab —
-  // also den Knopf gar nicht erst anbieten, statt still nichts zu tun.
-  const isFallback = category?.id === FALLBACK_CATEGORY.altar_items;
-
-  const save = async () => {
-    if (!catName.trim()) return;
-    setNameError('');
-    const emoji = catEmoji.trim() || '📦';
-    try {
-      if (category) {
-        await updateCategory(category.id, catName.trim(), emoji);
-      } else {
-        const cat = await addCategory(catName.trim(), emoji);
-        onTabChange(cat.id);
-      }
-    } catch (e) {
-      setNameError(e instanceof Error ? e.message : String(e));
-      return;
-    }
-    onClose();
-  };
-
-  const doDelete = async () => {
-    if (!category) return;
-    if (!confirmDelete) { setConfirmDelete(true); return; }
-    await deleteCategory(category.id);
-    // Die Items der Kategorie wandern nach 'other', nicht ins Kategorielose.
-    onTabChange('all');
-    onClose();
-  };
-
-  return (
-    <Modal
-      title={category ? t('editor.edit') : t('altar.addCategory')}
-      onClose={onClose}
-      widthClassName="w-full max-w-xs"
-      bodyClassName="p-4 space-y-3"
-    >
-        <div className="flex gap-2 items-center">
-          <EmojiPicker
-            value={catEmoji}
-            onChange={setCatEmoji}
-            size="lg"
-            trigger={({ toggle }) => (
-              <button onClick={toggle} className="w-10 h-10 flex items-center justify-center text-2xl bg-stone-800/60 rounded-lg hover:bg-stone-700/60 transition-colors">{catEmoji}</button>
-            )}
-          />
-          <input value={catName} onChange={(e) => { setCatName(e.target.value); setNameError(''); }} placeholder={t('altar.categoryName')} className="flex-1 bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" onKeyDown={(e) => { if (e.key === 'Enter') save(); }} autoFocus />
-        </div>
-        {nameError && <p className="text-xs text-red-400">{nameError}</p>}
-        {category && !isFallback && confirmDelete ? (
-          <div className="flex items-center justify-between rounded-lg border border-red-700/40 bg-red-950/20 px-3 py-2">
-            <span className="text-xs text-red-300">{t('common.deleteConfirm')}</span>
-            <span className="flex items-center gap-2">
-              <Button onClick={doDelete} variant="danger" className="text-xs">{t('common.confirmYes')}</Button>
-              <Button onClick={() => setConfirmDelete(false)} variant="ghost" className="text-xs">{t('common.confirmNo')}</Button>
-            </span>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between">
-            {category && !isFallback ? (
-              <Button onClick={doDelete} variant="danger" className="flex items-center gap-1 text-xs">
-                <Trash2 size={11} /> {t('common.delete')}
-              </Button>
-            ) : <span />}
-            <div className="flex items-center gap-1">
-              <Button onClick={onClose} variant="ghost"><X size={13} /></Button>
-              <Button onClick={save} variant="ghost" className="text-jade-400"><Check size={13} /></Button>
-            </div>
-          </div>
-        )}
-    </Modal>
-  );
+/**
+ * Überträgt die Reihenfolge eines Ausschnitts auf die Volliste: Die Plätze,
+ * die Mitglieder des Ausschnitts in `full` belegen, werden in der Reihenfolge
+ * von `subsetOrder` neu besetzt; alles andere bleibt, wo es war. So schreibt
+ * ein Drag in der Tab-Leiste (nur die hier benutzten Kategorien) die globale
+ * Reihenfolge, ohne die im Wiki benutzten Kategorien zu verschieben.
+ */
+function mergeOrder(full: readonly string[], subsetOrder: readonly string[]): string[] {
+  const subset = new Set(subsetOrder);
+  // Der Ausschnitt muss genau die Mitglieder haben, die er in `full` ersetzt —
+  // sonst liefe der Zeiger ins Leere und schriebe `undefined` in die Reihenfolge.
+  if (full.filter((id) => subset.has(id)).length !== subsetOrder.length) return [...full];
+  let i = 0;
+  return full.map((id) => (subset.has(id) ? subsetOrder[i++] : id));
 }
 
 // ─── Library strip ────────────────────────────────────────────────────────────
 
 export function AltarLibraryStrip({ editable }: { editable: boolean }) {
   const { t } = useTranslation();
-  const { items, categories } = useAltarStore(
-    useShallow((s) => ({ items: s.items, categories: s.categories })),
-  );
+  const items = useAltarStore((s) => s.items);
+  const allCategories = useCategoryStore((s) => s.categories);
 
   // Strip-level state
   const [activeCategoryTab, setActiveCategoryTab] = useState<'all' | string>('all');
@@ -277,24 +199,42 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
     return LIBRARY_DEFAULT_HEIGHT;
   });
 
-  // Modal control state (modals manage their own edit state internally)
+  // Modal control state (the item modal manages its own edit state internally)
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AltarItem | null>(null);
-  const [isCatModalOpen, setIsCatModalOpen] = useState(false);
-  const [editingCat, setEditingCat] = useState<AltarCategory | null>(null);
 
-  const hasUncategorized = items.some((i) => !categories.find((c) => c.id === i.category_id));
+  // Kategorien laufen über denselben Editor wie Wiki, Operations und Tasks —
+  // nur dass hier auch das Bearbeiten im Modal statt in einer Kopfzeile passiert.
+  const catEditor = useCategoryEditor({
+    defaultEmoji: '📦',
+    onAdded: (cat) => setActiveCategoryTab(cat.id),
+  });
+  const editingCategory = catEditor.editingCatId
+    ? allCategories.find((c) => c.id === catEditor.editingCatId) ?? null
+    : null;
+  // Die Tabs zeigen nur, was in der Bibliothek vorkommt (plus Sonstiges und
+  // eine gerade angelegte) — die Volliste gilt nur beim Zuweisen im ItemModal.
+  // Memoisiert, weil zwei Effekte unten an der Referenz hängen: ein frisches
+  // Array pro Render ließe checkCatScroll endlos setState aufrufen.
+  const lastAddedId = catEditor.lastAddedId;
+  const categories = useMemo(
+    () => categoriesUsedBy(allCategories, items, [lastAddedId]),
+    [allCategories, items, lastAddedId],
+  );
 
+  const hasUncategorized = items.some((i) => !allCategories.find((c) => c.id === i.category_id));
+
+  // Ein Tab, den es nicht mehr gibt (Kategorie gelöscht, Waisen weg), fällt auf „Alle" zurück.
   useEffect(() => {
-    if (activeCategoryTab === UNCATEGORIZED_TAB && !hasUncategorized) {
-      setActiveCategoryTab('all');
-    }
-  }, [hasUncategorized, activeCategoryTab]);
+    if (activeCategoryTab === 'all') return;
+    const stillThere = activeCategoryTab === UNCATEGORIZED_KEY
+      ? hasUncategorized
+      : categories.some((c) => c.id === activeCategoryTab);
+    if (!stillThere) setActiveCategoryTab('all');
+  }, [hasUncategorized, activeCategoryTab, categories]);
 
   const openCreateModal = () => { setEditingItem(null); setIsItemModalOpen(true); };
   const openEditModal = (item: AltarItem) => { setEditingItem(item); setIsItemModalOpen(true); };
-  const openAddCategoryModal = () => { setEditingCat(null); setIsCatModalOpen(true); };
-  const openEditCategoryModal = (cat: AltarCategory) => { setEditingCat(cat); setIsCatModalOpen(true); };
 
   const startResize = (event: React.MouseEvent) => {
     event.preventDefault();
@@ -414,7 +354,9 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
       setDragCatId(null);
       setLiveOrder(null);
       if (state?.hasMoved && finalOrder) {
-        useAltarStore.getState().reorderCategories(finalOrder);
+        // Die Tabs sind ein Ausschnitt der globalen Liste; geschrieben wird die ganze.
+        const full = useCategoryStore.getState().categories.map((c) => c.id);
+        useCategoryStore.getState().reorderCategories(mergeOrder(full, finalOrder));
       }
     };
 
@@ -422,9 +364,12 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
     document.addEventListener('pointerup', onUp);
   };
 
-  const displayCategories = liveOrder
-    ? liveOrder.map((id) => categories.find((c) => c.id === id)).filter((c): c is AltarCategory => !!c)
-    : categories;
+  const displayCategories = useMemo(
+    () => liveOrder
+      ? liveOrder.map((id) => categories.find((c) => c.id === id)).filter((c): c is Category => !!c)
+      : categories,
+    [liveOrder, categories],
+  );
 
   const checkCatScroll = useCallback(() => {
     const el = catScrollRef.current;
@@ -437,14 +382,15 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
 
   useEffect(() => { checkCatScroll(); }, [displayCategories, checkCatScroll]);
 
-  const defaultCategory = categories[0]?.id ?? '';
+  // Neue Elemente landen in der gerade gewählten Kategorie, sonst im Sammelbecken.
+  const defaultCategory = activeCategoryTab !== 'all' && activeCategoryTab !== UNCATEGORIZED_KEY
+    ? activeCategoryTab
+    : FALLBACK_CATEGORY_ID;
 
-  // Die Tab-IDs sind Kategorie-IDs, und item.category_id haelt seit v33
-  // ebenfalls die ID — der Umweg über den Namen entfällt damit.
   const filteredItems = activeCategoryTab === 'all'
     ? items
-    : activeCategoryTab === UNCATEGORIZED_TAB
-      ? items.filter((i) => !categories.find((c) => c.id === i.category_id))
+    : activeCategoryTab === UNCATEGORIZED_KEY
+      ? items.filter((i) => !allCategories.find((c) => c.id === i.category_id))
       : items.filter((item) => item.category_id === activeCategoryTab);
 
   return (
@@ -478,21 +424,23 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
                 onPointerDown={(e) => handleCatPointerDown(e, cat.id)}
                 className={`group relative flex items-center select-none ${dragCatId === cat.id ? 'opacity-40' : 'opacity-100'}`}
               >
-                <button onClick={() => setActiveCategoryTab(cat.id)} className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap cursor-grab ${activeCategoryTab === cat.id ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{cat.emoji} {altarCategoryLabel(t, cat)}</button>
-                <button onClick={(e) => { e.stopPropagation(); openEditCategoryModal(cat); }} className="absolute -right-1 -top-1 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-stone-700 text-stone-400 hover:text-stone-200 transition-colors" title={t('editor.edit')}><Pencil size={8} /></button>
+                <button onClick={() => setActiveCategoryTab(cat.id)} className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap cursor-grab ${activeCategoryTab === cat.id ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{cat.emoji} {categoryLabel(t, cat)}</button>
+                {!cat.is_builtin && (
+                  <button onClick={(e) => { e.stopPropagation(); catEditor.startEditCat(cat); }} className="absolute -right-1 -top-1 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-stone-700 text-stone-400 hover:text-stone-200 transition-colors" title={t('editor.edit')}><Pencil size={8} /></button>
+                )}
               </div>
             ))}
             {hasUncategorized && (
               <button
-                onClick={() => setActiveCategoryTab(UNCATEGORIZED_TAB)}
-                className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap ${activeCategoryTab === UNCATEGORIZED_TAB ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}
+                onClick={() => setActiveCategoryTab(UNCATEGORIZED_KEY)}
+                className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap ${activeCategoryTab === UNCATEGORIZED_KEY ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}
               >
-                {t('altar.uncategorized')}
+                {t('categories.uncategorized')}
               </button>
             )}
           </div>
         </div>
-        <button onClick={openAddCategoryModal} className="flex-shrink-0 px-2 py-1 rounded-md text-xs text-stone-600 hover:text-stone-400 transition-colors flex items-center gap-1" title={t('altar.addCategory')}><Plus size={11} />{t('altar.category')}</button>
+        <Button onClick={() => catEditor.setAddingCategory(true)} variant="ghost" className="flex-shrink-0 flex items-center gap-1 text-xs" title={t('categories.add')}><Plus size={12} />{t('categories.add')}</Button>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto pr-1">
         {filteredItems.length === 0 && <p className="text-xs text-stone-700 px-2 py-3">{t('altar.noElements')}</p>}
@@ -502,7 +450,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
               <div className="mb-1 w-full h-12 flex items-center justify-center overflow-hidden rounded-sm bg-stone-950/35">
                 {imageSrc(item.image_data)
                   ? <img src={imageSrc(item.image_data)} alt="" className="h-full w-full object-contain" draggable={false} />
-                  : <span className={`leading-none select-none ${item.category_id === 'candle' ? 'candle-flame' : ''}`} style={{ fontSize: 34 }}>{item.emoji}</span>}
+                  : <span className={`leading-none select-none ${isCandleEmoji(item.emoji) ? 'candle-flame' : ''}`} style={{ fontSize: 34 }}>{item.emoji}</span>}
               </div>
               <div className="mt-auto flex items-center gap-1">
                 <span className="flex-1 truncate text-[10px] text-stone-300">{item.name}</span>
@@ -517,20 +465,13 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
         <ItemModal
           key={editingItem?.id ?? 'create'}
           item={editingItem}
-          categories={categories}
+          categories={allCategories}
           defaultCategory={defaultCategory}
           onClose={() => setIsItemModalOpen(false)}
         />
       )}
 
-      {isCatModalOpen && (
-        <CategoryModal
-          key={editingCat?.id ?? 'create'}
-          category={editingCat}
-          onClose={() => setIsCatModalOpen(false)}
-          onTabChange={setActiveCategoryTab}
-        />
-      )}
+      <CategoryModal editor={catEditor} editing={editingCategory} />
     </div>
   );
 }

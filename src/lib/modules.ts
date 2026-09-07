@@ -56,7 +56,7 @@ export type ViewId = EntryModuleId | AuxViewId;
 
 export type LeftListTabId = 'all' | EntryModuleId;
 
-/** Module mit eigenem Kategorien-Slice (Suche, Kategorie-Treffer) — alle außer Journal. */
+/** Module, deren Einträge eine Kategorie tragen — alle außer Journal. */
 export type CategoryModuleId = Exclude<EntryModuleId, 'journal'>;
 
 export interface ModuleMeta {
@@ -121,7 +121,7 @@ export function viewTypeForEntryType(entryType: ContentType): EntryModuleId {
 
 /** Alle Papierkorb-Eintragstypen (`TrashedItem['type']`). */
 export const TRASH_KINDS = [
-  'journal', 'wiki', 'tag', 'operation', 'wiki_category', 'operation_category', 'task', 'task_category',
+  'journal', 'wiki', 'tag', 'operation', 'task', 'category',
 ] as const;
 export type TrashKind = (typeof TRASH_KINDS)[number];
 
@@ -130,10 +130,8 @@ export const TRASH_KIND_ICONS: Record<TrashKind, LucideIcon> = {
   wiki: Library,
   tag: Tag,
   operation: Wand2,
-  wiki_category: FolderOpen,
-  operation_category: FolderOpen,
   // Bewusst ListTodo statt des Rail-Icons CheckSquare: im Papierkorb steht die
   // Liste, nicht die einzelne erledigte Aufgabe.
   task: ListTodo,
-  task_category: FolderOpen,
+  category: FolderOpen,
 };

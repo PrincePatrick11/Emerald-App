@@ -1,6 +1,6 @@
 /**
- * Migration v33 — der Rebuild, der bestehende Datenbanken auf das Schema aus
- * `schema.ts` bringt.
+ * Migration v33 — der Rebuild, der bestehende Datenbanken auf das Schema von
+ * v37 bringt (`schemaV37.ts`; bis v37 war das dasselbe wie `schema.ts`).
  *
  * Warum das nicht die übliche 12-Schritt-Prozedur aus der SQLite-Doku ist:
  * `tauri-plugin-sql` fährt einen sqlx-Connection-Pool (`Pool::connect`,
@@ -34,27 +34,26 @@
  * öffnen.
  */
 import type Database from '@tauri-apps/plugin-sql';
-import { getActiveDbFile } from './vaultManager';
-import { TABLES, TABLE_DDL, INDEX_DDL, FALLBACK_CATEGORY } from './schema';
+import { V37_TABLES, V37_TABLE_DDL, V37_INDEX_DDL } from './schemaV37';
+import {
+  assertForeignKeysIntact,
+  backupDatabaseFile,
+  columnNames,
+  copyTable,
+  createIndexesIfMissing,
+  tableExists,
+} from './dbRebuild';
 
-/** `schema_version` überlebt den Rebuild — dort steht, was gerade läuft. */
-const REBUILT = TABLES.filter((t) => t !== 'schema_version');
+/**
+ * `schema_version` überlebt den Rebuild — dort steht, was gerade läuft.
+ *
+ * Bewusst die eingefrorene v37-Liste, nicht `TABLES` aus `schema.ts`: v33 baut
+ * den Stand von damals, nicht den heutigen (siehe Kopf von `schemaV37.ts`).
+ */
+const REBUILT = V37_TABLES.filter((t) => t !== 'schema_version');
 
 /** Tabellen, die v33 ersatzlos entfernt. */
 const DROPPED = ['creations', 'altar_intentions'] as const;
-
-async function tableExists(db: Database, name: string): Promise<boolean> {
-  const rows = await db.select<{ n: number }[]>(
-    "SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name=$1",
-    [name]
-  );
-  return (rows[0]?.n ?? 0) > 0;
-}
-
-async function columnNames(db: Database, table: string): Promise<Set<string>> {
-  const rows = await db.select<{ name: string }[]>(`PRAGMA table_info(${table})`);
-  return new Set(rows.map((r) => r.name));
-}
 
 /**
  * Stellt den Zustand vor einem abgebrochenen Rebuild wieder her: die halbfertige
@@ -72,42 +71,6 @@ async function rollbackPartialRebuild(db: Database): Promise<void> {
 }
 
 /**
- * Vollständige Kopie der Datenbankdatei, bevor irgendetwas angefasst wird.
- *
- * `VACUUM INTO` statt eines Datei-Kopierens über Rust: Die App hat nur
- * `read_file`/`write_file` auf String-Basis, was eine Binärdatei zerstören
- * würde. VACUUM INTO ist eine einzelne SQL-Anweisung und schreibt einen
- * konsistenten Snapshot.
- *
- * Der Zielname ist bewusst fest und trägt keinen Zeitstempel. Scheitert v33,
- * läuft es beim nächsten Start erneut — mit einem eindeutigen Namen entstünde
- * bei jedem Versuch eine weitere Vollkopie, und da Emerald Bilder als base64 in
- * der Datenbank ablegt, sind die groß. `VACUUM INTO` weigert sich, eine
- * vorhandene Datei zu überschreiben, und genau das dient hier als Erkennung:
- * Liegt der Snapshot schon, ist er von einem früheren Versuch und gültig, denn
- * am Datenbestand hat sich seither nichts geändert.
- *
- * Jeder andere Fehler bricht die Migration ab. Das ist Absicht: Die Datenbank
- * ist dann noch unberührt und v33 ungestempelt. Einen irreversiblen Rebuild
- * ohne Rückfahrkarte zu starten wäre die schlechtere Wahl.
- */
-async function backupDatabaseFile(db: Database): Promise<string> {
-  // Die Sicherung liegt neben der Datenbank, im Vault-Ordner: wer den Ordner
-  // kopiert, nimmt sie mit.
-  const target = `${await getActiveDbFile()}.pre-v33.bak`;
-  try {
-    await db.execute(`VACUUM INTO '${target.replace(/'/g, "''")}'`);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (!/output file already exists/i.test(msg)) throw err;
-    console.info(`[db] v33: Sicherung eines früheren Versuchs liegt bereits unter ${target}`);
-    return target;
-  }
-  console.info(`[db] v33: Sicherung angelegt unter ${target}`);
-  return target;
-}
-
-/**
  * Bringt die alten Tabellen in einen Zustand, den das neue Schema akzeptiert.
  * Läuft noch vor dem Umbenennen, also gegen das alte Schema.
  */
@@ -116,22 +79,23 @@ async function repairLegacyDamage(db: Database): Promise<void> {
   // Entstanden durch den 30-Tage-Purge und `emptyTrash`, die Kategorien hart
   // gelöscht haben, ohne ihre Inhalte anzufassen. Der neue RESTRICT-Foreign-Key
   // würde den Rebuild sonst blockieren.
-  for (const [table, target] of [
-    ['operations', 'operation_categories'],
-    ['tasks', 'task_categories'],
+  // Die Rückfall-IDs von damals als Literale: `general` gab es nur bei Tasks,
+  // und v38 legt später ohnehin alles auf das eine `other` zusammen.
+  for (const [table, target, fallback] of [
+    ['operations', 'operation_categories', 'other'],
+    ['tasks', 'task_categories', 'general'],
   ] as const) {
     await db.execute(
       `UPDATE ${table} SET category_id = $1
         WHERE category_id IS NULL
            OR category_id NOT IN (SELECT id FROM ${target})`,
-      [FALLBACK_CATEGORY[table]]
+      [fallback]
     );
   }
   await db.execute(
-    `UPDATE wiki_articles SET category = $1
+    `UPDATE wiki_articles SET category = 'other'
       WHERE category IS NULL
-         OR category NOT IN (SELECT id FROM wiki_categories)`,
-    [FALLBACK_CATEGORY.wiki_articles]
+         OR category NOT IN (SELECT id FROM wiki_categories)`
   );
 
   // Die Fallback-Kategorien müssen existieren, sonst greift der Foreign Key
@@ -274,57 +238,23 @@ async function renameOldTables(db: Database): Promise<void> {
 
 async function createNewTables(db: Database): Promise<void> {
   for (const table of REBUILT) {
-    await db.execute(TABLE_DDL[table]);
+    await db.execute(V37_TABLE_DDL[table]);
   }
-}
-
-/**
- * Kopiert eine Tabelle spaltenweise. Spalten, die es in der alten Tabelle nicht
- * gibt, werden ausgelassen — dann greift der Default aus dem neuen DDL. Das
- * macht den Rebuild robust gegen Vaults, in denen einzelne Migrationen nie
- * durchgelaufen sind, und davon gibt es in diesem Projekt nachweislich welche.
- */
-async function copyTable(
-  db: Database,
-  table: string,
-  overrides: Record<string, string> = {}
-): Promise<void> {
-  const from = `${table}_old`;
-  if (!(await tableExists(db, from))) return;
-
-  const newCols = await columnNames(db, table);
-  const oldCols = await columnNames(db, from);
-
-  const targets: string[] = [];
-  const exprs: string[] = [];
-  for (const col of newCols) {
-    if (col in overrides) {
-      targets.push(col);
-      exprs.push(overrides[col]);
-    } else if (oldCols.has(col)) {
-      targets.push(col);
-      exprs.push(`o.${col}`);
-    }
-  }
-  if (!targets.length) return;
-
-  await db.execute(
-    `INSERT INTO ${table} (${targets.join(', ')}) SELECT ${exprs.join(', ')} FROM ${from} o`
-  );
 }
 
 async function copyData(db: Database): Promise<void> {
-  // Reihenfolge folgt TABLES: Eltern vor Kindern, weil Foreign Keys aktiv sind.
+  // Reihenfolge folgt V37_TABLES: Eltern vor Kindern, weil Foreign Keys aktiv sind.
   for (const table of REBUILT) {
+    const from = `${table}_old`;
     switch (table) {
       case 'wiki_articles':
-        await copyTable(db, table, { category_id: 'o.category' });
+        await copyTable(db, table, from, { category_id: 'o.category' });
         break;
 
       case 'altar_items':
         // Die alte Spalte hielt den Kategorie-*Namen*. Erst per ID versuchen —
         // falls doch schon eine ID drinsteht — dann per Name, sonst 'other'.
-        await copyTable(db, table, {
+        await copyTable(db, table, from, {
           category_id: `COALESCE(
             (SELECT c.id FROM altar_categories c WHERE c.id = o.category),
             (SELECT c.id FROM altar_categories c WHERE c.name = o.category),
@@ -334,14 +264,14 @@ async function copyData(db: Database): Promise<void> {
         break;
 
       case 'journal_entries':
-        await copyTable(db, table, {
+        await copyTable(db, table, from, {
           linked_operation_ids: "COALESCE(o.linked_operation_ids, '[]')",
           linked_wiki_ids: "COALESCE(o.linked_wiki_ids, '[]')",
         });
         break;
 
       default:
-        await copyTable(db, table);
+        await copyTable(db, table, from);
     }
   }
 }
@@ -352,24 +282,6 @@ async function dropOldTables(db: Database): Promise<void> {
   }
   for (const table of DROPPED) {
     await db.execute(`DROP TABLE IF EXISTS ${table}`);
-  }
-}
-
-async function createIndexes(db: Database): Promise<void> {
-  for (const sql of INDEX_DDL) {
-    // IF NOT EXISTS, damit der Nachhol-Pfad in `alreadyRebuilt` nicht an
-    // bereits angelegten Indizes scheitert.
-    await db.execute(sql.replace('CREATE INDEX ', 'CREATE INDEX IF NOT EXISTS '));
-  }
-}
-
-async function assertForeignKeysIntact(db: Database): Promise<void> {
-  const violations = await db.select<unknown[]>('PRAGMA foreign_key_check');
-  if (violations.length > 0) {
-    throw new Error(
-      `[db] v33: ${violations.length} Foreign-Key-Verletzung(en) nach dem Rebuild. ` +
-        `Erste: ${JSON.stringify(violations[0])}`
-    );
   }
 }
 
@@ -389,17 +301,17 @@ export async function normalizeSchema(db: Database): Promise<void> {
 
   if (await alreadyRebuilt(db)) {
     console.info('[db] v33: Rebuild lag bereits vor, nur Indizes und Prüfung werden nachgeholt');
-    await createIndexes(db);
-    await assertForeignKeysIntact(db);
+    await createIndexesIfMissing(db, V37_INDEX_DDL);
+    await assertForeignKeysIntact(db, 'v33');
     return;
   }
 
-  await backupDatabaseFile(db);
+  await backupDatabaseFile(db, 'v33');
   await repairLegacyDamage(db);
   await renameOldTables(db);
   await createNewTables(db);
   await copyData(db);
   await dropOldTables(db);
-  await createIndexes(db);
-  await assertForeignKeysIntact(db);
+  await createIndexesIfMissing(db, V37_INDEX_DDL);
+  await assertForeignKeysIntact(db, 'v33');
 }

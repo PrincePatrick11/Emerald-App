@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import type { AltarPlacement, AltarRecord } from '../../types';
-import { getAltarBackgroundStyle, resolveResolutionPixels } from '../../lib/altarConstants';
+import { getAltarBackgroundStyle, isCandleEmoji, resolveResolutionPixels } from '../../lib/altarConstants';
 import { AltarItemVisual } from './AltarItemVisual';
 import { imageSrc } from '../../lib/images';
 
@@ -40,7 +40,7 @@ export const AltarCardPreview = memo(function AltarCardPreview({
               height: size,
             }}
           >
-            <AltarItemVisual item={placement} size={size} candleAnimate={placement.category_id === 'candle'} />
+            <AltarItemVisual item={placement} size={size} candleAnimate={isCandleEmoji(placement.emoji)} />
           </div>
         );
       })}

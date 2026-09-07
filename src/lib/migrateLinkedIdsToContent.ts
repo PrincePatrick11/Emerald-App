@@ -1,10 +1,9 @@
 import type Database from '@tauri-apps/plugin-sql';
 import i18n from '../i18n';
-import { categoryLabel } from './categories';
+import { legacyCategoryLabel, legacyWikiCategoryEmoji } from './categories';
 import { DEFAULT_ENTRY_EMOJI } from './modules';
 import { isImageIcon } from './helpers';
 import { linkItemKey } from './linkItems';
-import { getCategoryEmoji } from '../components/wiki/WikiList';
 import {
   extractInternalLinks,
   internalLinkBlockHtml,
@@ -113,7 +112,7 @@ export async function migrateLinkedIdsToContent(db: Database): Promise<void> {
       rows: byId(articles),
       cats: byId(wikiCategories),
       module: 'wiki' as const,
-      iconFallback: (row: TargetRow) => getCategoryEmoji(row.category_id ?? ''),
+      iconFallback: (row: TargetRow) => legacyWikiCategoryEmoji(row.category_id ?? ''),
     },
   ];
 
@@ -167,7 +166,7 @@ export async function migrateLinkedIdsToContent(db: Database): Promise<void> {
         // Ohne Kategorie lieber gar keine Überschrift als ein „Keine".
         appended += internalLinkBlockHtml(
           chip,
-          categoryLabel(t, source.module, toLabelable(cat)),
+          legacyCategoryLabel(t, source.module, toLabelable(cat)),
           { separator }
         );
         separator = true;

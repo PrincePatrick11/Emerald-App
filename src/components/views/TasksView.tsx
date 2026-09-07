@@ -2,6 +2,7 @@ import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { useTaskStore } from '../../store/taskStore';
+import { useCategoryStore } from '../../store/categoryStore';
 import { useUIStore } from '../../store/uiStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useJournalStore } from '../../store/journalStore';
@@ -12,7 +13,8 @@ import { generateId } from '../../lib/helpers';
 import { viewTypeForEntryType } from '../../lib/modules';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
-import { FALLBACK_CATEGORY } from '../../lib/schema';
+import { FALLBACK_CATEGORY_ID } from '../../lib/schema';
+import { categoriesUsedBy, categoryLabel } from '../../lib/categories';
 import { sortItems } from '../../lib/sortItems';
 import { UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import Dashboard from '../ui/Dashboard';
@@ -21,7 +23,7 @@ import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import LinkPickerModal from '../editor/LinkPickerModal';
 import { FilterChipButton } from '../ui/FilterPanel';
 import CategoryHeaderRow from '../ui/CategoryHeaderRow';
-import CategoryAddModal from '../ui/CategoryAddModal';
+import CategoryModal from '../ui/CategoryModal';
 import CategorySelect from '../ui/CategorySelect';
 import CollapseChevron from '../ui/CollapseChevron';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
@@ -48,16 +50,18 @@ export default function TasksView() {
   const tasksPrefs = useUIStore((s) => s.tasksPrefs);
   const setTasksPrefs = useUIStore((s) => s.setTasksPrefs);
 
-  const { categories, tasks, createTask, updateTask, getCategory, addCategory, addLink, updateCategory, deleteCategory, restoreCategory, } = useTaskStore(
-    useShallow((s) => ({ categories: s.categories, tasks: s.tasks, createTask: s.createTask, updateTask: s.updateTask, getCategory: s.getCategory, addCategory: s.addCategory, addLink: s.addLink, updateCategory: s.updateCategory, deleteCategory: s.deleteCategory, restoreCategory: s.restoreCategory }))
+  const { tasks, createTask, updateTask, addLink } = useTaskStore(
+    useShallow((s) => ({ tasks: s.tasks, createTask: s.createTask, updateTask: s.updateTask, addLink: s.addLink }))
   );
+  const categories = useCategoryStore((s) => s.categories);
+  const getCategory = useCategoryStore((s) => s.getCategory);
 
   const journalEntries = useJournalStore((s) => s.entries);
   const wikiArticles = useWikiStore((s) => s.articles);
   const operations = useOperationStore((s) => s.operations);
   const altars = useAltarStore((s) => s.altars);
 
-  const catEditor = useCategoryEditor({ addCategory, updateCategory, deleteCategory, restoreCategory }, { defaultEmoji: '📋' });
+  const catEditor = useCategoryEditor({ defaultEmoji: '📋' });
 
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number; actions: ContextMenuAction[] } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -110,9 +114,11 @@ export default function TasksView() {
 
   const uncatCollapsed = collapsedCategories.has(UNCATEGORIZED_KEY);
 
+  // Chips und Gruppen zeigen nur, was bei den Aufgaben vorkommt (plus Sonstiges).
+  const usedCategories = categoriesUsedBy(categories, tasks, [catEditor.lastAddedId]);
   const chipFilteredCategories = filterCategory.size > 0
-    ? categories.filter((c) => filterCategory.has(c.id))
-    : categories;
+    ? usedCategories.filter((c) => filterCategory.has(c.id))
+    : usedCategories;
   // „Nur mit Einträgen": leere Kategorie-Gruppen ganz weglassen. Tasks rendert
   // im custom-Modus selbst, deshalb greift Dashboards zentrale Auswertung hier
   // nicht. Der Waisen-Block hängt nicht dran — er erscheint nur, wenn er voll ist.
@@ -126,7 +132,7 @@ export default function TasksView() {
     (uncategorized.length > 0 || (filterCategory.has(UNCATEGORIZED_KEY) && !hideEmptyCats));
 
   const handleCreateTask = async (categoryId?: string) => {
-    const cat = categoryId ?? FALLBACK_CATEGORY.tasks;
+    const cat = categoryId ?? FALLBACK_CATEGORY_ID;
     const task = await createTask(cat);
     setEditingId(task.id);
     setEditValue(task.title);
@@ -242,9 +248,8 @@ export default function TasksView() {
                 <div key={cat.id} className="mb-6 space-y-1.5">
                   <CategoryHeaderRow
                     category={cat}
-                    label={cat.name}
+                    label={categoryLabel(t, cat)}
                     editor={catEditor}
-                    canDelete={cat.id !== FALLBACK_CATEGORY.tasks}
                     collapsed={isCollapsed}
                     onToggleCollapse={() => toggleCategoryCollapse(cat.id)}
                     count={catTasks.length}
@@ -304,7 +309,7 @@ export default function TasksView() {
               collapsed={uncatCollapsed}
               onToggleCollapse={() => toggleCategoryCollapse(UNCATEGORIZED_KEY)}
               emoji="📄"
-              label={t('tasks.uncategorized')}
+              label={t('categories.uncategorized')}
               count={uncategorized.length}
             />
             {!uncatCollapsed && uncategorized.length === 0 && (
@@ -362,7 +367,7 @@ export default function TasksView() {
       <Dashboard<Task>
         title={t('nav.tasks')}
         primaryAction={{ label: t('tasks.newTask'), onClick: () => handleCreateTask() }}
-        secondaryAction={{ label: t('tasks.newCategory'), onClick: () => catEditor.setAddingCategory(true) }}
+        secondaryAction={{ label: t('categories.add'), onClick: () => catEditor.setAddingCategory(true) }}
         view={tasksPrefs.view}
         sort={tasksPrefs.sort}
         onView={(v) => setTasksPrefs({ view: v })}
@@ -375,11 +380,11 @@ export default function TasksView() {
           onToggleFilters: () => setFilterOpen((o) => !o),
           activeFilterCount,
           panelProps: {
-            chipLabel: t('tasks.filter.category'),
+            chipLabel: t('filters.category'),
             // „Ohne Kategorie" immer dabei, auch ohne Waisen.
             chips: [
-              ...categories.map((c) => ({ value: c.id, label: c.name, emoji: c.emoji })),
-              { value: UNCATEGORIZED_KEY, label: t('tasks.uncategorized'), emoji: '📄' },
+              ...usedCategories.map((c) => ({ value: c.id, label: categoryLabel(t, c), emoji: c.emoji })),
+              { value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄' },
             ],
             selectedChips: [...filterCategory],
             onChipToggle: (v) => setFilterCategory((prev) => {
@@ -439,7 +444,7 @@ export default function TasksView() {
         />
       )}
 
-      <CategoryAddModal editor={catEditor} title={t('tasks.newCategory')} placeholder={t('tasks.categoryName')} />
+      <CategoryModal editor={catEditor} />
     </>
   );
 }
@@ -468,7 +473,7 @@ const TaskRow = memo(function TaskRow({
   // Zeile zeigt, und verschwindet, sobald anderswohin navigiert wird.
   const isTarget = useUIStore((s) => s.activeView.type === 'tasks' && s.activeView.id === task.id);
   const updateTask = useTaskStore((s) => s.updateTask);
-  const categories = useTaskStore((s) => s.categories);
+  const categories = useCategoryStore((s) => s.categories);
   const getSubtasks = useTaskStore((s) => s.getSubtasks);
   const deleteTask = useTaskStore((s) => s.deleteTask);
   const restoreTask = useTaskStore((s) => s.restoreTask);
@@ -622,10 +627,10 @@ const TaskRow = memo(function TaskRow({
             categories={categories}
             value={task.category_id}
             onChange={handleCategoryChange}
-            getLabel={(c) => c.name}
+            getLabel={(c) => categoryLabel(t, c)}
             variant="chip"
             align="right"
-            title={t('tasks.filter.category')}
+            title={t('filters.category')}
           />
 
           <button

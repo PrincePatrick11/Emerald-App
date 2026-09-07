@@ -17,6 +17,7 @@ import {
   resolveResolutionPixels,
 } from '../../lib/altarConstants';
 import type { AltarImagePresetName } from '../../lib/altarConstants';
+import { isCandleEmoji } from '../../lib/altarConstants';
 import { hexToRgb } from '../../lib/helpers';
 import type { AltarItem, AltarPlacement, AltarRecord } from '../../types';
 import { AltarItemVisual } from './AltarItemVisual';
@@ -609,7 +610,7 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rot
       onWheel={handleWheel}
     >
       <div style={{ opacity: placement.opacity ?? 1 }}>
-        <AltarItemVisual item={placement} size={Math.max(displayWidth, displayHeight)} candleAnimate={placement.category_id === 'candle'} />
+        <AltarItemVisual item={placement} size={Math.max(displayWidth, displayHeight)} candleAnimate={isCandleEmoji(placement.emoji)} />
       </div>
       {(selected || (editable && hovered)) && <span className="absolute inset-0 rounded border border-jade-500/50 pointer-events-none" />}
       {editable && isRotating && (

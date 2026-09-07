@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { SIGIL_CATEGORY_ID } from '../../lib/schema';
 import type { ComponentType } from 'react';
 import { Pencil, Check, X, Trash2, Maximize2, Minimize2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
@@ -84,7 +85,7 @@ function RightSidebarActionBar() {
   const op = activeView.type === 'operations'
     ? operations.find((o) => o.id === activeView.id)
     : undefined;
-  if (op?.category_id === 'sigils' && op.is_loaded) return null;
+  if (op?.category_id === SIGIL_CATEGORY_ID && op.is_loaded) return null;
 
   const isAltar = activeView.type === 'altar';
 

@@ -6,6 +6,7 @@ import { useTagStore } from '../../store/tagStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
+import { useCategoryStore } from '../../store/categoryStore';
 import { useUIStore } from '../../store/uiStore';
 import { useUndoStore } from '../../store/undoStore';
 import { generateId } from '../../lib/helpers';
@@ -27,9 +28,8 @@ export default function TagsView() {
   const pushUndo = useUndoStore((s) => s.push);
   const entries = useJournalStore((s) => s.entries);
   const articles = useWikiStore((s) => s.articles);
-  const { operations, categories: opCategories } = useOperationStore(
-    useShallow((s) => ({ operations: s.operations, categories: s.categories }))
-  );
+  const operations = useOperationStore((s) => s.operations);
+  const categories = useCategoryStore((s) => s.categories);
   const setActiveView = useUIStore((s) => s.setActiveView);
 
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
@@ -300,7 +300,7 @@ export default function TagsView() {
             ))}
 
             {filteredOperations.map((op) => {
-              const cat = opCategories.find((c) => c.id === op.category_id);
+              const cat = categories.find((c) => c.id === op.category_id);
               return (
                 <button
                   key={op.id}
@@ -310,7 +310,7 @@ export default function TagsView() {
                   <Wand2 size={14} className="text-stone-500 flex-shrink-0" />
                   <div>
                     <div className="text-sm text-stone-200">{op.title}</div>
-                    <div className="text-xs text-parchment-500/70 mt-0.5">{cat?.emoji} {categoryLabel(t, 'operations', cat, t('nav.operations'))}</div>
+                    <div className="text-xs text-parchment-500/70 mt-0.5">{cat?.emoji} {categoryLabel(t, cat, t('nav.operations'))}</div>
                   </div>
                 </button>
               );

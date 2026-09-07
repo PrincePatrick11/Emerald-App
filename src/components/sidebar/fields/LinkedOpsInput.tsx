@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useOperationStore } from '../../../store/operationStore';
+import { useCategoryStore } from '../../../store/categoryStore';
 import { isImageIcon } from '../../../lib/helpers';
 import { DEFAULT_ENTRY_EMOJI } from '../../../lib/modules';
 import LinkedEntryPicker, { LINK_RESULT_LIMIT, LinkedEntryChip } from './LinkedEntryPicker';
@@ -19,7 +20,7 @@ export default function LinkedOpsInput({
 }) {
   const { t } = useTranslation();
   const operations = useOperationStore((s) => s.operations);
-  const categories = useOperationStore((s) => s.categories);
+  const categories = useCategoryStore((s) => s.categories);
   const [query, setQuery] = useState('');
 
   const iconOf = (op: typeof operations[number]) =>

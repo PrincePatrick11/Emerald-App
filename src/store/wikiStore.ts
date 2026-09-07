@@ -1,12 +1,12 @@
 import { create } from 'zustand';
 import type Database from '@tauri-apps/plugin-sql';
 import { getDb, nextEntryNumber } from '../lib/db';
-import { FALLBACK_CATEGORY, reassignCategoryContent } from '../lib/schema';
+import { FALLBACK_CATEGORY_ID } from '../lib/schema';
 import { syncLinks } from '../lib/links';
 import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, type DbRow } from '../lib/row';
-import type { WikiArticle, WikiCategory, WikiCategoryDef } from '../types';
+import type { WikiArticle } from '../types';
 import i18n from '../i18n';
 
 function slugify(title: string): string {
@@ -36,12 +36,10 @@ async function uniqueSlugify(db: Database, title: string, excludeId: string): Pr
 
 interface WikiState {
   articles: WikiArticle[];
-  wikiCategories: WikiCategoryDef[];
   loading: boolean;
 
   fetchArticles: () => Promise<void>;
-  fetchCategories: () => Promise<void>;
-  createArticle: (categoryId?: WikiCategory) => Promise<WikiArticle>;
+  createArticle: (categoryId?: string) => Promise<WikiArticle>;
   duplicateArticle: (id: string) => Promise<WikiArticle | undefined>;
   updateArticle: (id: string, patch: Partial<WikiArticle>) => Promise<void>;
   deleteArticle: (id: string) => Promise<void>;
@@ -49,11 +47,6 @@ interface WikiState {
   permanentlyDeleteArticle: (id: string) => Promise<void>;
   getArticle: (id: string) => WikiArticle | undefined;
   getArticleBySlug: (slug: string) => WikiArticle | undefined;
-  addWikiCategory: (name: string, emoji: string) => Promise<WikiCategoryDef>;
-  updateWikiCategory: (id: string, name: string, emoji: string) => Promise<void>;
-  deleteWikiCategory: (id: string) => Promise<boolean>;
-  restoreWikiCategory: (id: string) => Promise<void>;
-  permanentlyDeleteWikiCategory: (id: string) => Promise<void>;
 }
 
 async function selectAllArticles(db: Database): Promise<WikiArticle[]> {
@@ -63,37 +56,21 @@ async function selectAllArticles(db: Database): Promise<WikiArticle[]> {
   return rows.map(fromRow.wikiArticle);
 }
 
-async function selectCategories(db: Database): Promise<WikiCategoryDef[]> {
-  const rows = await db.select<DbRow[]>(
-    'SELECT * FROM wiki_categories WHERE deleted_at IS NULL ORDER BY sort_order ASC, name ASC'
-  );
-  return rows.map(fromRow.category);
-}
-
 export const useWikiStore = create<WikiState>((set, get) => ({
   articles: [],
-  wikiCategories: [],
   loading: false,
-
-  fetchCategories: async () => {
-    const db = await getDb();
-    set({ wikiCategories: await selectCategories(db) });
-  },
 
   fetchArticles: async () => {
     set({ loading: true });
     try {
       const db = await getDb();
-      set({
-        articles: await selectAllArticles(db),
-        wikiCategories: await selectCategories(db),
-      });
+      set({ articles: await selectAllArticles(db) });
     } finally {
       set({ loading: false });
     }
   },
 
-  createArticle: async (categoryId = 'other') => {
+  createArticle: async (categoryId = FALLBACK_CATEGORY_ID) => {
     const db = await getDb();
     const now = nowIso();
     const id = generateId();
@@ -230,54 +207,4 @@ export const useWikiStore = create<WikiState>((set, get) => ({
 
   getArticle: (id) => get().articles.find((a) => a.id === id),
   getArticleBySlug: (slug) => get().articles.find((a) => a.slug === slug),
-
-  addWikiCategory: async (name, emoji) => {
-    const db = await getDb();
-    const cat: WikiCategoryDef = {
-      id: generateId(), name, emoji, sort_order: 99, is_builtin: false,
-    };
-    await db.execute(
-      `INSERT INTO wiki_categories (id, name, emoji, sort_order, is_builtin) VALUES ($1,$2,$3,$4,$5)`,
-      [cat.id, cat.name, cat.emoji, cat.sort_order, 0]
-    );
-    set((s) => ({ wikiCategories: [...s.wikiCategories, cat] }));
-    return cat;
-  },
-
-  updateWikiCategory: async (id, name, emoji) => {
-    const db = await getDb();
-    await db.execute('UPDATE wiki_categories SET name=$1, emoji=$2 WHERE id=$3', [name, emoji, id]);
-    set((s) => ({ wikiCategories: s.wikiCategories.map((c) => c.id === id ? { ...c, name, emoji } : c) }));
-  },
-
-  deleteWikiCategory: async (id) => {
-    const db = await getDb();
-    const cat = get().wikiCategories.find((c) => c.id === id);
-    if (!cat || cat.is_builtin) return false;
-    await db.execute('UPDATE wiki_categories SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
-    set((s) => ({ wikiCategories: s.wikiCategories.filter((c) => c.id !== id) }));
-    return true;
-  },
-
-  restoreWikiCategory: async (id) => {
-    const db = await getDb();
-    await db.execute('UPDATE wiki_categories SET deleted_at=NULL WHERE id=$1', [id]);
-    const rows = await db.select<DbRow[]>('SELECT * FROM wiki_categories WHERE id=$1', [id]);
-    if (rows[0]) {
-      const cat = fromRow.category(rows[0]);
-      set((s) => ({ wikiCategories: [...s.wikiCategories, cat].sort((a, b) => a.sort_order - b.sort_order) }));
-    }
-  },
-
-  permanentlyDeleteWikiCategory: async (id) => {
-    const db = await getDb();
-    await reassignCategoryContent(db, 'wiki_articles', id);
-    await db.execute('DELETE FROM wiki_categories WHERE id=$1', [id]);
-    // Auch im Speicher umhaengen — siehe operationStore.permanentlyDeleteCategory.
-    set((s) => ({
-      articles: s.articles.map((a) =>
-        a.category_id === id ? { ...a, category_id: FALLBACK_CATEGORY.wiki_articles } : a
-      ),
-    }));
-  },
 }));

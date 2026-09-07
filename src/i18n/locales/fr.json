@@ -17,6 +17,26 @@
     "megabytes": "Mo",
     "copySuffix": " (Copie)"
   },
+  "categories": {
+    "add": "Ajouter une catégorie",
+    "name": "Nom de catégorie…",
+    "uncategorized": "Sans catégorie",
+    "nameTaken": "Cette catégorie existe déjà",
+    "builtin": {
+      "other": "Autre",
+      "sigils": "Sigils"
+    },
+    "starter": {
+      "paradigm": "Paradigme",
+      "ritual": "Rituel",
+      "meditation": "Méditation",
+      "herbs": "Herbes",
+      "crystals": "Cristaux",
+      "candles": "Bougies",
+      "deities": "Divinités",
+      "tools": "Outils"
+    }
+  },
   "listView": {
     "view": "Vue",
     "sort": "Tri",
@@ -66,9 +86,6 @@
     "none": "Pas encore d'opérations.",
     "start": "Commencez votre première opération.",
     "all": "Toutes",
-    "addCategory": "Ajouter une catégorie",
-    "categoryName": "Nom de catégorie…",
-    "uncategorized": "Sans catégorie",
     "active": "Active",
     "inactive": "Inactive",
     "endDate": "Date de fin",
@@ -83,14 +100,10 @@
   "altar": {
     "addElement": "Ajouter un élément",
     "element": "Élément",
-    "category": "Catégorie",
-    "addCategory": "Ajouter une catégorie",
-    "categoryName": "Nom de catégorie…",
     "newAltar": "Nouvel autel",
     "libraryTitle": "Bibliothèque de l'autel",
     "elementName": "Nom…",
     "all": "Tous",
-    "uncategorized": "Sans catégorie",
     "noElements": "Pas encore d'éléments.",
     "none": "Pas encore d'autels.",
     "start": "Créez votre premier autel.",
@@ -257,10 +270,7 @@
     "startDocumenting": "Commencez à documenter votre pratique.",
     "addIcon": "Ajouter une icône",
     "changeIcon": "Changer l'icône",
-    "removeIcon": "Supprimer l'icône",
-    "addCategory": "Ajouter une catégorie",
-    "categoryName": "Nom de catégorie…",
-    "uncategorized": "Sans catégorie"
+    "removeIcon": "Supprimer l'icône"
   },
   "editor": {
     "done": "Terminé",
@@ -533,10 +543,8 @@
   },
   "tasks": {
     "newTask": "Nouvelle tâche",
-    "newCategory": "Ajouter une catégorie",
     "empty": "Pas encore de tâches.",
     "filter": {
-      "category": "Catégorie",
       "priority": "Priorité"
     },
     "priority": {
@@ -549,9 +557,7 @@
     "addSubtask": "Ajouter sous-tâche",
     "linkEntry": "Lier une entrée",
     "showCompleted": "Afficher terminées",
-    "uncategorized": "Sans catégorie",
-    "untitled": "Tâche sans titre",
-    "categoryName": "Nom de catégorie…"
+    "untitled": "Tâche sans titre"
   },
   "tabBar": {
     "editing": "En cours de modification",

@@ -1,9 +1,8 @@
 import type Database from '@tauri-apps/plugin-sql';
 import i18n from '../i18n';
-import { categoryLabel } from './categories';
+import { legacyCategoryLabel, legacyWikiCategoryEmoji } from './categories';
 import { isImageIcon } from './helpers';
 import { linkItemKey } from './linkItems';
-import { getCategoryEmoji } from '../components/wiki/WikiList';
 import {
   extractInternalLinks,
   internalLinkBlockHtml,
@@ -140,7 +139,7 @@ export async function migrateJournalFieldsToContent(db: Database): Promise<void>
       // einem englischen Vault dauerhaft „Bannung" im Eintrag. Ohne
       // Kategorie-Zeile bleibt der Name leer — lieber keine Überschrift als
       // eine erfundene.
-      const label = categoryLabel(
+      const label = legacyCategoryLabel(
         t, 'wiki',
         cat ? { id: cat.id, name: cat.name, is_builtin: !!cat.is_builtin } : undefined,
       );
@@ -165,7 +164,7 @@ export async function migrateJournalFieldsToContent(db: Database): Promise<void>
       // steht nur der Emoji-Rückfall (der Chip löst sein Bild live auf).
       const icon = article.icon && !isImageIcon(article.icon)
         ? article.icon
-        : (cat?.emoji || getCategoryEmoji(article.category_id ?? ''));
+        : (cat?.emoji || legacyWikiCategoryEmoji(article.category_id ?? ''));
 
       const chip: InternalLinkChip = {
         id: article.id,

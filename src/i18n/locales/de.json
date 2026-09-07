@@ -17,6 +17,26 @@
     "megabytes": "MB",
     "copySuffix": " (Kopie)"
   },
+  "categories": {
+    "add": "Kategorie hinzufügen",
+    "name": "Kategoriename…",
+    "uncategorized": "Ohne Kategorie",
+    "nameTaken": "Diese Kategorie gibt es schon",
+    "builtin": {
+      "other": "Sonstiges",
+      "sigils": "Sigillen"
+    },
+    "starter": {
+      "paradigm": "Paradigma",
+      "ritual": "Ritual",
+      "meditation": "Meditation",
+      "herbs": "Kräuter",
+      "crystals": "Kristalle",
+      "candles": "Kerzen",
+      "deities": "Gottheiten",
+      "tools": "Werkzeuge"
+    }
+  },
   "listView": {
     "view": "Ansicht",
     "sort": "Sortierung",
@@ -66,9 +86,6 @@
     "none": "Noch keine Operationen.",
     "start": "Starte deine erste Operation.",
     "all": "Alle",
-    "addCategory": "Kategorie hinzufügen",
-    "categoryName": "Kategoriename…",
-    "uncategorized": "Ohne Kategorie",
     "active": "Aktiv",
     "inactive": "Inaktiv",
     "endDate": "Enddatum",
@@ -83,14 +100,10 @@
   "altar": {
     "addElement": "Element hinzufügen",
     "element": "Element",
-    "category": "Kategorie",
-    "addCategory": "Kategorie hinzufügen",
-    "categoryName": "Kategoriename…",
     "newAltar": "Neuer Altar",
     "libraryTitle": "Altar-Bibliothek",
     "elementName": "Name…",
     "all": "Alle",
-    "uncategorized": "Ohne Kategorie",
     "noElements": "Noch keine Elemente.",
     "none": "Noch keine Altäre.",
     "start": "Erstelle deinen ersten Altar.",
@@ -257,10 +270,7 @@
     "startDocumenting": "Beginne deine Praxis zu dokumentieren.",
     "addIcon": "Icon hinzufügen",
     "changeIcon": "Icon ändern",
-    "removeIcon": "Icon entfernen",
-    "addCategory": "Kategorie hinzufügen",
-    "categoryName": "Kategoriename…",
-    "uncategorized": "Ohne Kategorie"
+    "removeIcon": "Icon entfernen"
   },
   "editor": {
     "done": "Fertig",
@@ -533,10 +543,8 @@
   },
   "tasks": {
     "newTask": "Neue Aufgabe",
-    "newCategory": "Kategorie hinzufügen",
     "empty": "Noch keine Aufgaben.",
     "filter": {
-      "category": "Kategorie",
       "priority": "Priorität"
     },
     "priority": {
@@ -549,9 +557,7 @@
     "addSubtask": "Unteraufgabe hinzufügen",
     "linkEntry": "Eintrag verlinken",
     "showCompleted": "Erledigte anzeigen",
-    "uncategorized": "Ohne Kategorie",
-    "untitled": "Unbenannte Aufgabe",
-    "categoryName": "Kategoriename…"
+    "untitled": "Unbenannte Aufgabe"
   },
   "tabBar": {
     "editing": "Wird bearbeitet",

@@ -4,15 +4,14 @@ import { Check, X, Trash2, Pencil, Plus } from 'lucide-react';
 import EmojiPicker from './EmojiPicker';
 import Button from './Button';
 import CollapsibleGroupHeader from './CollapsibleGroupHeader';
-import type { CategoryEditorApi, CategoryLike } from '../../hooks/useCategoryEditor';
+import type { CategoryEditorApi } from '../../hooks/useCategoryEditor';
+import type { Category } from '../../types';
 
-interface Props<C extends CategoryLike> {
-  category: C;
-  /** Fertig aufgelöster Anzeigename — categoryLabel() für Wiki/Operations, cat.name für Tasks. */
+interface Props {
+  category: Category;
+  /** Fertig aufgelöster Anzeigename — categoryLabel(). */
   label: string;
-  editor: CategoryEditorApi<C>;
-  /** Blendet den Lösch-Knopf aus: Wiki/Ops geben `!cat.is_builtin`, Tasks `id !== FALLBACK_CATEGORY.tasks`. */
-  canDelete?: boolean;
+  editor: CategoryEditorApi;
   /** Zusammen mit `collapsed`: rendert den Auf-/Zuklapp-Chevron vor dem Emoji (nur Lese-Modus). */
   onToggleCollapse?: () => void;
   collapsed?: boolean;
@@ -33,13 +32,16 @@ interface Props<C extends CategoryLike> {
  * Bearbeitungsmodus samt Lösch-Bestätigung. Der Zustand kommt komplett aus
  * useCategoryEditor; modulspezifisches läuft über label und die Slots.
  */
-export default function CategoryHeaderRow<C extends CategoryLike>({
-  category, label, editor, canDelete = true, onToggleCollapse, collapsed = false, count, onAdd, addTitle, meta, actions,
-}: Props<C>) {
+export default function CategoryHeaderRow({
+  category, label, editor, onToggleCollapse, collapsed = false, count, onAdd, addTitle, meta, actions,
+}: Props) {
   const { t } = useTranslation();
+  // Sonstiges und Sigillen: nicht löschbar, und ein Umbenennen liefe ins Leere —
+  // ihr Name kommt aus der Locale, nicht aus der Zeile.
+  const canDelete = !category.is_builtin;
 
   const cancelEdit = () => {
-    editor.setEditingCatId(null);
+    editor.cancelEditCat();
     // Sonst bleibt die Ja/Nein-Löschfrage stehen und erscheint beim nächsten Öffnen.
     editor.setConfirmDeleteCatId(null);
   };
@@ -69,6 +71,7 @@ export default function CategoryHeaderRow<C extends CategoryLike>({
           }}
           className="input-field flex-1 rounded-md px-2 py-0.5 text-xs outline-none font-semibold uppercase tracking-wider"
         />
+        {editor.nameError && <span className="text-xs text-[var(--danger-text)] shrink-0">{editor.nameError}</span>}
         {/* Die getönten Row-Actions der Button-Komponente wie im VaultModal,
             in der 24px-small-Reihe — 30px würde die Kategoriezeile aufblähen. */}
         <Button tone="jade" compact small title={t('common.save')} aria-label={t('common.save')} onClick={editor.handleSaveEditCat}>
@@ -111,16 +114,18 @@ export default function CategoryHeaderRow<C extends CategoryLike>({
             </Button>
           )}
           {actions}
-          <Button
-            tone="amber"
-            compact
-            small
-            title={t('editor.edit')}
-            aria-label={t('editor.edit')}
-            onClick={() => editor.startEditCat(category)}
-          >
-            <Pencil size={12} />
-          </Button>
+          {!category.is_builtin && (
+            <Button
+              tone="amber"
+              compact
+              small
+              title={t('editor.edit')}
+              aria-label={t('editor.edit')}
+              onClick={() => editor.startEditCat(category)}
+            >
+              <Pencil size={12} />
+            </Button>
+          )}
         </>
       }
     />

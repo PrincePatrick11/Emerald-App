@@ -1,10 +1,13 @@
 import { useJournalStore } from '../store/journalStore';
 import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
+import { useCategoryStore } from '../store/categoryStore';
 import { useUIStore } from '../store/uiStore';
-import { getCategoryEmoji } from '../components/wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from './moonPhase';
-import type { WikiCategoryDef } from '../types';
+import { DEFAULT_ENTRY_EMOJI } from './modules';
+import { categoryLabel } from './categories';
+import i18n from '../i18n';
+import type { Category } from '../types';
 
 export interface ChipData {
   id?: string;            // entry ID (for import resolution)
@@ -26,10 +29,8 @@ export interface ExportData {
   meditation?: ChipData & { duration?: number };
   linkedOps?: ChipData[];
   linkedWiki?: ChipData[];
-  // wiki
-  wikiCategory?: ChipData;
-  // operation
-  opCategory?: ChipData;
+  // wiki + operation: die Kategorie des Eintrags, in der Kopfzeile gezeigt
+  category?: ChipData;
   // custom icon on the entry itself (wiki article or operation), may be data-URL or emoji
   entryIcon?: string;
   isActive?: boolean;
@@ -39,10 +40,10 @@ export interface ExportData {
   tagNames?: string[];
 }
 
-function wikiIcon(article: { icon?: string; category_id: string }, cats: WikiCategoryDef[]): string {
+function wikiIcon(article: { icon?: string; category_id: string }, cats: Category[]): string {
   if (article.icon?.startsWith('data:')) return article.icon;
   const cat = cats.find(c => c.id === article.category_id);
-  return cat?.emoji ?? getCategoryEmoji(article.category_id);
+  return cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
 }
 
 function moonLabel(phase: string): string {
@@ -53,9 +54,10 @@ export async function collectExportData(): Promise<ExportData | null> {
   const view = useUIStore.getState().activeView;
   if (!view.id) return null;
 
-  const { entries }                     = useJournalStore.getState();
-  const { articles, wikiCategories }    = useWikiStore.getState();
-  const { operations, categories: opCats } = useOperationStore.getState();
+  const { entries }    = useJournalStore.getState();
+  const { articles }   = useWikiStore.getState();
+  const { operations } = useOperationStore.getState();
+  const { categories } = useCategoryStore.getState();
   // entry.tags stores tag names directly (not IDs)
 
   // ── Journal ──────────────────────────────────────────────────────────────
@@ -81,18 +83,17 @@ export async function collectExportData(): Promise<ExportData | null> {
     const linkedOps = (entry.linked_operation_ids ?? [])
       .map(id => operations.find(o => o.id === id)).filter(Boolean)
       .map(op => {
-        const cat = opCats.find(c => c.id === op!.category_id);
-        const fallback = cat?.emoji ?? '⚡';
+        const cat = categories.find(c => c.id === op!.category_id);
+        const fallback = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.operation;
         return { id: op!.id, label: op!.title, icon: op!.icon ?? fallback, fallbackIcon: fallback };
       });
 
     const linkedWiki = (entry.linked_wiki_ids ?? [])
       .map(id => articles.find(a => a.id === id)).filter(Boolean)
-      .filter(a => a!.category_id !== 'paradigm')
       .map(a => {
-        const cat = wikiCategories.find(c => c.id === a!.category_id);
-        const fallback = cat?.emoji ?? getCategoryEmoji(a!.category_id);
-        return { id: a!.id, label: a!.title, icon: wikiIcon(a!, wikiCategories), fallbackIcon: fallback };
+        const cat = categories.find(c => c.id === a!.category_id);
+        const fallback = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
+        return { id: a!.id, label: a!.title, icon: wikiIcon(a!, categories), fallbackIcon: fallback };
       });
 
     const phaseKey = entry.moon_phase as keyof typeof MOON_PHASE_SYMBOLS;
@@ -108,18 +109,18 @@ export async function collectExportData(): Promise<ExportData | null> {
       createdAt: entry.created_at,
       moonPhase,
       paradigma: paradigmaArt ? (() => {
-        const cat = wikiCategories.find(c => c.id === paradigmaArt.category_id);
-        const fallback = cat?.emoji ?? getCategoryEmoji(paradigmaArt.category_id);
-        return { label: paradigmaArt.title, icon: wikiIcon(paradigmaArt, wikiCategories), fallbackIcon: fallback };
+        const cat = categories.find(c => c.id === paradigmaArt.category_id);
+        const fallback = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
+        return { label: paradigmaArt.title, icon: wikiIcon(paradigmaArt, categories), fallbackIcon: fallback };
       })() : undefined,
       bannung: entry.is_bannung ? {
         label: bannungArt?.title ?? 'Bannung',
-        icon: bannungArt ? wikiIcon(bannungArt, wikiCategories) : '🚫',
+        icon: bannungArt ? wikiIcon(bannungArt, categories) : '🚫',
         fallbackIcon: '🚫',
       } : undefined,
       meditation: entry.is_meditation ? {
         label: meditationArt?.title ?? 'Meditation',
-        icon: meditationArt ? wikiIcon(meditationArt, wikiCategories) : '🧘',
+        icon: meditationArt ? wikiIcon(meditationArt, categories) : '🧘',
         fallbackIcon: '🧘',
         duration: entry.meditation_duration ?? undefined,
       } : undefined,
@@ -134,7 +135,7 @@ export async function collectExportData(): Promise<ExportData | null> {
     const article = articles.find(a => a.id === view.id);
     if (!article) return null;
 
-    const cat = wikiCategories.find(c => c.id === article.category_id);
+    const cat = categories.find(c => c.id === article.category_id);
 
     return {
       type: 'wiki',
@@ -142,7 +143,7 @@ export async function collectExportData(): Promise<ExportData | null> {
       entryNumber: article.entry_number,
       content: article.content,
       createdAt: article.created_at,
-      wikiCategory: { label: cat?.name ?? article.category_id, icon: cat?.emoji ?? getCategoryEmoji(article.category_id) },
+      category: cat ? { label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,
       entryIcon: article.icon || undefined,
       tagNames: (article.tags ?? []) as string[],
     };
@@ -153,7 +154,7 @@ export async function collectExportData(): Promise<ExportData | null> {
     const op = operations.find(o => o.id === view.id);
     if (!op) return null;
 
-    const cat = opCats.find(c => c.id === op.category_id);
+    const cat = categories.find(c => c.id === op.category_id);
 
     return {
       type: 'operations',
@@ -161,7 +162,7 @@ export async function collectExportData(): Promise<ExportData | null> {
       entryNumber: op.entry_number,
       content: op.content,
       createdAt: op.created_at,
-      opCategory: cat ? { label: cat.name, icon: cat.emoji } : undefined,
+      category: cat ? { label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,
       entryIcon: op.icon || undefined,
       isActive: !!op.is_active,
       endDate: op.end_date,

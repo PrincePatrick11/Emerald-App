@@ -6,8 +6,7 @@ import { Trash2, RotateCcw, CheckSquare, Square } from 'lucide-react';
 import { TRASH_KIND_ICONS } from '../../lib/modules';
 import { useTrashStore } from '../../store/trashStore';
 import { useUIStore } from '../../store/uiStore';
-import { useWikiStore } from '../../store/wikiStore';
-import { useOperationStore } from '../../store/operationStore';
+import { useCategoryStore } from '../../store/categoryStore';
 import { differenceInDays } from 'date-fns';
 import { formatTimeDistance } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
@@ -190,8 +189,7 @@ export default function TrashView() {
   const { trashPrefs, setTrashPrefs } = useUIStore(
     useShallow((s) => ({ trashPrefs: s.trashPrefs, setTrashPrefs: s.setTrashPrefs }))
   );
-  const wikiCategories = useWikiStore((s) => s.wikiCategories);
-  const opCategories = useOperationStore((s) => s.categories);
+  const categories = useCategoryStore((s) => s.categories);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [confirmingEmpty, setConfirmingEmpty] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -261,7 +259,7 @@ export default function TrashView() {
     const operations = sorted.filter((i) => i.type === 'operation');
     const tags       = sorted.filter((i) => i.type === 'tag');
     const tasks      = sorted.filter((i) => i.type === 'task');
-    const cats       = sorted.filter((i) => i.type === 'wiki_category' || i.type === 'operation_category' || i.type === 'task_category');
+    const cats       = sorted.filter((i) => i.type === 'category');
 
     const renderItems = (subset: TrashedItem[]) =>
       viewMode === 'list'
@@ -284,8 +282,8 @@ export default function TrashView() {
             <SectionHeader label={t('nav.wiki')} count={wiki.length} />
             {wikiByCategory.map(({ label: catKey, items: catItems }) => {
               // trashStore joint c.name als category — der Schlüssel ist der Name, nicht die id.
-              const catDef = wikiCategories.find((c) => c.name === catKey);
-              const label = catDef ? `${catDef.emoji} ${categoryLabel(t, 'wiki', catDef)}` : catKey;
+              const catDef = categories.find((c) => c.name === catKey);
+              const label = catDef ? `${catDef.emoji} ${categoryLabel(t, catDef)}` : catKey;
               return (
                 <div key={catKey}>
                   {wikiByCategory.length > 1 && <SubSectionHeader label={label} />}
@@ -299,8 +297,8 @@ export default function TrashView() {
           <>
             <SectionHeader label={t('nav.operations')} count={operations.length} />
             {opsByCategory.map(({ label: catName, items: catItems }) => {
-              const catDef = opCategories.find((c) => c.name === catName);
-              const label = catDef ? `${catDef.emoji} ${categoryLabel(t, 'operations', catDef)}` : catName;
+              const catDef = categories.find((c) => c.name === catName);
+              const label = catDef ? `${catDef.emoji} ${categoryLabel(t, catDef)}` : catName;
               return (
                 <div key={catName}>
                   {opsByCategory.length > 1 && <SubSectionHeader label={label} />}

@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Lock, Unlock, Trash2, Copy, GripVertical } from 'lucide-react';
+import { isCandleEmoji } from '../../../lib/altarConstants';
 import type { AltarPlacement } from '../../../types';
 import { AltarItemVisual } from '../../altar/AltarItemVisual';
 import Button from '../../ui/Button';
@@ -61,7 +62,7 @@ export const PlacedElementRow = memo(function PlacedElementRow({
             <GripVertical size={12} />
           </span>
         )}
-        <AltarItemVisual item={placement} size={16} candleAnimate={placement.category_id === 'candle'} />
+        <AltarItemVisual item={placement} size={16} candleAnimate={isCandleEmoji(placement.emoji)} />
         <span className="flex-1 truncate text-[11px] font-medium">{placement.name}</span>
         {isEditing && (
           <span className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>

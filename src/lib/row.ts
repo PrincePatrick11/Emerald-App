@@ -16,17 +16,15 @@
  * Beim Lesen `fromRow.*` benutzen, beim Schreiben `toInt` und `toJson`.
  */
 import type {
-  AltarCategory,
   AltarItem,
   AltarRecord,
-  CategoryBase,
+  Category,
   InternalLink,
   JournalEntry,
   Operation,
   Routine,
   Tag,
   Task,
-  TaskCategory,
   TaskLink,
   WikiArticle,
 } from '../types';
@@ -182,27 +180,14 @@ export const fromRow = {
     };
   },
 
-  /** Für `operation_categories` und `wiki_categories` — gleicher Aufbau. */
-  category(r: DbRow): CategoryBase {
+  category(r: DbRow): Category {
     return {
       id: str(r.id),
       name: str(r.name),
       emoji: str(r.emoji),
       sort_order: num(r.sort_order, 0),
       is_builtin: bool(r.is_builtin),
-    };
-  },
-
-  taskCategory(r: DbRow): TaskCategory {
-    return { ...fromRow.category(r), deleted_at: nullableStr(r.deleted_at) };
-  },
-
-  altarCategory(r: DbRow): AltarCategory {
-    return {
-      id: str(r.id),
-      name: str(r.name),
-      emoji: str(r.emoji),
-      sort_order: num(r.sort_order, 0),
+      deleted_at: nullableStr(r.deleted_at),
     };
   },
 

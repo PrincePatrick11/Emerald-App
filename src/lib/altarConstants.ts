@@ -178,3 +178,13 @@ export function getAltarBackgroundStyle(
     : DEFAULT_ALTAR_BACKGROUND;
   return `${overlayLayer}${ALTAR_BACKGROUND_STYLES[preset]}`;
 }
+
+/**
+ * Ob ein Element als Kerze flackern soll. Hing bis v38 an der eingebauten
+ * Altar-Kategorie `candle`; die ist seitdem eine normale, umbenenn- und
+ * löschbare Kategorie, also entscheidet das Emoji des Elements. Der
+ * Variationsselektor U+FE0F ist optional — beide Schreibweisen kommen vor.
+ */
+export function isCandleEmoji(emoji: string | null | undefined): boolean {
+  return (emoji ?? '').replace(/️/g, '') === '\u{1F56F}';
+}

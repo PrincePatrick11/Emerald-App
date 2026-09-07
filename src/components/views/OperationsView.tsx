@@ -5,16 +5,18 @@ import { Trash2, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import CategoryHeaderRow from '../ui/CategoryHeaderRow';
-import CategoryAddModal from '../ui/CategoryAddModal';
+import CategoryModal from '../ui/CategoryModal';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
-import { categoryLabel } from '../../lib/categories';
+import { categoriesUsedBy, categoryLabel } from '../../lib/categories';
+import { FALLBACK_CATEGORY_ID, SIGIL_CATEGORY_ID } from '../../lib/schema';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
+import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
@@ -30,14 +32,15 @@ export default function OperationsView() {
   const { activeView, setActiveView, openViewInNewTab, operationsPrefs, setOperationsPrefs } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab, operationsPrefs: s.operationsPrefs, setOperationsPrefs: s.setOperationsPrefs }))
   );
-  const { operations, categories, createOperation, duplicateOperation, updateOperation, deleteOperation, restoreOperation, permanentlyDeleteOperation, getOperation, addCategory, updateCategory, deleteCategory, restoreCategory } = useOperationStore(
-    useShallow((s) => ({ operations: s.operations, categories: s.categories, createOperation: s.createOperation, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation, permanentlyDeleteOperation: s.permanentlyDeleteOperation, getOperation: s.getOperation, addCategory: s.addCategory, updateCategory: s.updateCategory, deleteCategory: s.deleteCategory, restoreCategory: s.restoreCategory }))
+  const { operations, createOperation, duplicateOperation, updateOperation, deleteOperation, restoreOperation, permanentlyDeleteOperation, getOperation } = useOperationStore(
+    useShallow((s) => ({ operations: s.operations, createOperation: s.createOperation, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation, permanentlyDeleteOperation: s.permanentlyDeleteOperation, getOperation: s.getOperation }))
   );
+  const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
 
   const operation = activeView.id ? getOperation(activeView.id) : null;
   const isEditing = activeView.mode === 'edit';
-  const isSigilOperation = operation?.category_id === 'sigils';
+  const isSigilOperation = operation?.category_id === SIGIL_CATEGORY_ID;
 
   // Die Listen-Query laesst drawing_data weg; der Sigil-Editor braucht es.
   // needsDrawing statt nur der id in den Deps: ein Refetch (Import, Restore)
@@ -79,13 +82,10 @@ export default function OperationsView() {
     update: updateOperation,
   });
 
-  const catEditor = useCategoryEditor(
-    { addCategory, updateCategory, deleteCategory, restoreCategory },
-    {
-      defaultEmoji: '⚡',
-      onAdded: (cat) => { setCategoryId(cat.id); triggerAutoSave(); },
-    },
-  );
+  const catEditor = useCategoryEditor({
+    defaultEmoji: '⚡',
+    onAdded: (cat) => { setCategoryId(cat.id); triggerAutoSave(); },
+  });
 
   useEffect(() => {
     if (operation) {
@@ -135,9 +135,7 @@ export default function OperationsView() {
   }, [isEditing, operation?.id, triggerAutoSave]);
 
   const handleNew = async () => {
-    const defaultCat = categories[0];
-    if (!defaultCat) return;
-    const op = await createOperation(defaultCat.id);
+    const op = await createOperation(FALLBACK_CATEGORY_ID);
     setActiveView({ type: 'operations', id: op.id, mode: 'edit', isNew: true });
   };
 
@@ -224,6 +222,9 @@ export default function OperationsView() {
   if (!operation) {
     const { view, sort } = operationsPrefs;
     const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
+    // Chips und Gruppen zeigen nur, was bei den Operationen vorkommt (plus
+    // Sonstiges); catById bleibt die Volliste, damit fremde Kategorien auflösen.
+    const usedCategories = categoriesUsedBy(categories, operations, [catEditor.lastAddedId]);
 
     const searchFiltered = search
       ? operations.filter((o) =>
@@ -249,14 +250,14 @@ export default function OperationsView() {
 
     const filtered = statusFiltered;
 
-    const opCatName = (c: typeof categories[0]) => categoryLabel(t, 'operations', c);
+    const catName = (c: typeof categories[0]) => categoryLabel(t, c);
 
-    // Alle Kategorien anbieten, auch leere — die Leiste ist auch der Weg, sich
-    // gezielt EINE Kategorie anzeigen zu lassen, nicht nur ein Ausschlussfilter.
-    // „Ohne Kategorie" immer dabei, auch ohne Waisen.
+    // Nur die hier benutzten Kategorien (plus Sonstiges und eine gerade
+    // angelegte) — die Liste ist global, die anderen Module sollen hier keine
+    // leeren Chips hinterlassen. „Ohne Kategorie" immer dabei, auch ohne Waisen.
     const catChips = [
-      ...categories.map((c) => ({ value: c.id, label: opCatName(c), emoji: c.emoji })),
-      { value: UNCATEGORIZED_KEY, label: t('operations.uncategorized'), emoji: '📄' },
+      ...usedCategories.map((c) => ({ value: c.id, label: catName(c), emoji: c.emoji })),
+      { value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄' },
     ];
 
     const statusChips = [
@@ -280,8 +281,8 @@ export default function OperationsView() {
     const renderOp = (op: typeof operations[0]) => {
       const cat = catById[op.category_id];
       const iconValue = op.icon || cat?.emoji || '⚡';
-      const catDisplayName = cat ? opCatName(cat) : '';
-      const isSigil = op.category_id === 'sigils';
+      const catDisplayName = cat ? catName(cat) : '';
+      const isSigil = op.category_id === SIGIL_CATEGORY_ID;
       const dateStr = `${catDisplayName}${catDisplayName ? ' · ' : ''}${formatEntryDate(op.updated_at)}`;
       const createdDate = formatEntryDate(op.created_at);
       const activeDot = <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${op.is_active ? 'bg-jade-400' : 'bg-stone-700'}`} />;
@@ -403,13 +404,13 @@ export default function OperationsView() {
     // Abgewählte Kategorien ganz ausblenden statt sie leer stehen zu lassen —
     // wie visibleCategories in TasksView.
     const visibleCategories = filterCatIds.length > 0
-      ? categories.filter((c) => filterCatIds.includes(c.id))
-      : categories;
+      ? usedCategories.filter((c) => filterCatIds.includes(c.id))
+      : usedCategories;
     // Der Waisen-Bucket fängt Operationen auf, deren Kategorie im Papierkorb
     // liegt — sonst verschwänden sie aus der Kategorien-Gruppierung.
     const catGroups: DashboardGroup<Operation>[] = groupByCategory(
       sortedOps, visibleCategories, (o) => o.category_id,
-      opCatName, t('operations.uncategorized'),
+      catName, t('categories.uncategorized'),
       filterCatIds.includes(UNCATEGORIZED_KEY),
     );
 
@@ -430,9 +431,8 @@ export default function OperationsView() {
       return (
         <CategoryHeaderRow
           category={cat}
-          label={categoryLabel(t, 'operations', cat)}
+          label={categoryLabel(t, cat)}
           editor={catEditor}
-          canDelete={!cat.is_builtin}
           collapsed={collapsedCats.has(cat.id)}
           onToggleCollapse={() => toggleCatCollapse(cat.id)}
           count={group.items.length}
@@ -447,7 +447,7 @@ export default function OperationsView() {
       <Dashboard<Operation>
         title={t('nav.operations')}
         primaryAction={{ label: t('operations.new'), onClick: handleNew }}
-        secondaryAction={{ label: t('operations.addCategory'), onClick: () => catEditor.setAddingCategory(true) }}
+        secondaryAction={{ label: t('categories.add'), onClick: () => catEditor.setAddingCategory(true) }}
         view={view}
         sort={sort}
         onView={(v) => setOperationsPrefs({ view: v })}
@@ -512,7 +512,7 @@ export default function OperationsView() {
           />
         )}
       />
-      <CategoryAddModal editor={catEditor} title={t('operations.addCategory')} placeholder={t('operations.categoryName')} />
+      <CategoryModal editor={catEditor} />
       </>
     );
   }
@@ -537,7 +537,7 @@ export default function OperationsView() {
             ? <img src={operationIcon} alt="" className="w-5 h-5 object-cover rounded" />
             : <span>{operationIcon}</span>
           }
-          <span>{categoryLabel(t, 'operations', currentCat, '—')}</span>
+          <span>{categoryLabel(t, currentCat, '—')}</span>
           <span>·</span>
           <span>{formatEntryDate(operation.updated_at)}</span>
         </>

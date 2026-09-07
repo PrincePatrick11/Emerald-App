@@ -5,6 +5,7 @@ import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { useTaskStore } from '../store/taskStore';
 import { useAltarStore } from '../store/altarStore';
+import { useCategoryStore } from '../store/categoryStore';
 import { buildLinkItems } from '../lib/linkItems';
 import type { SuggestionItem } from '../components/editor/SuggestionList';
 
@@ -16,18 +17,16 @@ export function useLinkItems(): SuggestionItem[] {
   const { t } = useTranslation();
   const entries = useJournalStore((s) => s.entries);
   const articles = useWikiStore((s) => s.articles);
-  const wikiCategories = useWikiStore((s) => s.wikiCategories);
   const operations = useOperationStore((s) => s.operations);
-  const opCategories = useOperationStore((s) => s.categories);
+  const categories = useCategoryStore((s) => s.categories);
   const tasks = useTaskStore((s) => s.tasks);
-  const taskCategories = useTaskStore((s) => s.categories);
   const altars = useAltarStore((s) => s.altars);
 
   return useMemo(
     () => buildLinkItems(
-      { entries, tasks, taskCategories, operations, opCategories, articles, wikiCategories, altars },
+      { entries, tasks, operations, articles, categories, altars },
       t,
     ),
-    [t, entries, articles, wikiCategories, operations, opCategories, tasks, taskCategories, altars],
+    [t, entries, articles, operations, tasks, categories, altars],
   );
 }

@@ -24,7 +24,11 @@ import {
 } from './vaultManager';
 import { imageRefsInHtml, isStoredImage, readImageAsBase64, saveImage } from './images';
 import { clearSearchTextCache } from './searchText';
-import { IMAGE_FIELDS, imageColumns } from './schema';
+import { FALLBACK_CATEGORY_ID, IMAGE_FIELDS, imageColumns } from './schema';
+import { categoryKey, mergeCategoryRows, type CategorySource } from './categoryMerge';
+import { legacyDisplayName, type LegacyCategoryTable } from './categories';
+import i18n from '../i18n';
+import { generateId } from './helpers';
 import { useVaultStore } from '../store/vaultStore';
 import { reloadAllStores } from '../store/moduleWiring';
 import { useUIStore } from '../store/uiStore';
@@ -65,9 +69,8 @@ export interface BackupPreview {
   routinesCount: number;
   altarsCount: number;
   taskCount: number;
-  taskCategoriesCount: number;
-  wikiCategories: BackupCategoryEntry[];
-  opCategories: BackupCategoryEntry[];
+  /** Nur Kategorien, auf die ein Inhalt der Sicherung zeigt. */
+  categories: BackupCategoryEntry[];
 }
 
 /** Which top-level content types to import. */
@@ -81,10 +84,9 @@ export interface ImportTypeFilters {
   includeTags: boolean;
 }
 
-/** Category IDs to exclude during import. Empty set = import all. */
+/** Category IDs (aus der Sicherung) to exclude during import. Empty set = import all. */
 export interface ImportCategoryFilters {
-  excludedWikiCategoryIds: Set<string>;
-  excludedOpCategoryIds: Set<string>;
+  excludedCategoryIds: Set<string>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -97,9 +99,73 @@ type Row = Record<string, any>;
 /**
  * '1' = vor der Schema-Vereinheitlichung (`wiki_articles.category`,
  * `altar_items.category` mit dem Kategorie-*Namen*), '2' = danach, '3' = seit
- * Bilder als Dateiname statt als absoluter Pfad referenziert werden.
+ * Bilder als Dateiname statt als absoluter Pfad referenziert werden, '4' =
+ * seit v38 eine Tabelle `categories` die vier Modul-Tabellen ersetzt
+ * (`data.categories` statt `wikiCategories`/`operationCategories`/
+ * `taskCategories`/`altarCategories`).
  */
-const BACKUP_VERSION = '3' as const;
+const BACKUP_VERSION = '4' as const;
+
+/** Die vier Kategorie-Arrays von Sicherungen bis Version 3. */
+interface LegacyCategoryArrays {
+  wikiCategories?: Row[];
+  operationCategories?: Row[];
+  taskCategories?: Row[];
+  altarCategories?: Row[];
+}
+
+/**
+ * Legt die vier Kategorie-Arrays einer Sicherung bis v3 zu `data.categories`
+ * zusammen — dieselbe Regel wie Migration v38 (`mergeCategoryRows`), inklusive
+ * der Übersetzung eingebauter Kategorien in die aktuelle App-Sprache — und
+ * hängt die vier Inhaltsarrays auf die neuen IDs um.
+ */
+function mergeLegacyCategoryArrays(data: BackupFile['data'] & LegacyCategoryArrays): void {
+  const sources: CategorySource[] = [];
+  const legacy: [keyof LegacyCategoryArrays, LegacyCategoryTable][] = [
+    ['wikiCategories', 'wiki_categories'],
+    ['operationCategories', 'operation_categories'],
+    ['taskCategories', 'task_categories'],
+    ['altarCategories', 'altar_categories'],
+  ];
+  for (const [arrayKey, table] of legacy) {
+    const rows = data[arrayKey];
+    if (!rows) continue;
+    sources.push({
+      table,
+      rows: rows.map((r) => {
+        const id = String(r.id);
+        const name = String(r.name ?? '');
+        return {
+          id,
+          name: legacyDisplayName(i18n, table, { id, name, is_builtin: !!r.is_builtin }),
+          emoji: String(r.emoji ?? '📁'),
+          deleted_at: r.deleted_at == null ? null : String(r.deleted_at),
+        };
+      }),
+    });
+    delete data[arrayKey];
+  }
+  if (!sources.length) return;
+
+  const merged = mergeCategoryRows(sources, {
+    builtinName: (id) => i18n.t(`categories.builtin.${id}`),
+  });
+  data.categories = merged.rows.map((r) => ({
+    id: r.id, name: r.name, emoji: r.emoji, sort_order: r.sort_order,
+    is_builtin: r.is_builtin ? 1 : 0, deleted_at: r.deleted_at,
+  }));
+
+  const remap = (rows: Row[] | undefined, table: LegacyCategoryTable) => {
+    for (const row of rows ?? []) {
+      row.category_id = merged.idMap.get(`${table}:${String(row.category_id)}`) ?? FALLBACK_CATEGORY_ID;
+    }
+  };
+  remap(data.wikiArticles, 'wiki_categories');
+  remap(data.operations, 'operation_categories');
+  remap(data.tasks, 'task_categories');
+  remap(data.altarItems, 'altar_categories');
+}
 
 /**
  * Hebt eine Sicherung im alten Format auf das aktuelle.
@@ -117,63 +183,65 @@ export function migrateBackupPayload(backup: BackupFile): void {
   if (backup.version > BACKUP_VERSION) {
     throw new Error(`Unsupported backup version: ${backup.version}`);
   }
+  const data = backup.data as BackupFile['data'] & LegacyCategoryArrays;
+
+  if (backup.version === '1') {
+    for (const row of data.wikiArticles ?? []) {
+      if (row.category_id === undefined && row.category !== undefined) {
+        row.category_id = row.category;
+      }
+      delete row.category;
+    }
+
+    // altar_items hielt früher den Kategorie-*Namen*. Erst gegen die Kategorien
+    // aus derselben Sicherung aufloesen, sonst auf 'other'.
+    const byName = new Map<string, string>(
+      (data.altarCategories ?? []).map((c) => [String(c.name), String(c.id)])
+    );
+    const byId = new Set((data.altarCategories ?? []).map((c) => String(c.id)));
+    for (const row of data.altarItems ?? []) {
+      if (row.category_id === undefined) {
+        const raw = row.category === undefined ? '' : String(row.category);
+        row.category_id = byId.has(raw) ? raw : (byName.get(raw) ?? 'other');
+      }
+      delete row.category;
+    }
+
+    for (const row of data.journalEntries ?? []) {
+      row.linked_operation_ids = row.linked_operation_ids ?? '[]';
+      row.linked_wiki_ids = row.linked_wiki_ids ?? '[]';
+    }
+  }
 
   // v2 → v3 braucht keinen Schritt: geaendert hat sich nur, dass Bilder als
   // Dateiname statt als absoluter Pfad referenziert werden, und `restoreImages`
   // uebersetzt die Schluessel der Datei so oder so.
-  if (backup.version !== '1') {
-    backup.version = BACKUP_VERSION;
-    return;
-  }
 
-  for (const row of backup.data.wikiArticles ?? []) {
-    if (row.category_id === undefined && row.category !== undefined) {
-      row.category_id = row.category;
-    }
-    delete row.category;
-  }
-
-  // altar_items hielt früher den Kategorie-*Namen*. Erst gegen die Kategorien
-  // aus derselben Sicherung aufloesen, sonst auf 'other'.
-  const byName = new Map<string, string>(
-    (backup.data.altarCategories ?? []).map((c) => [String(c.name), String(c.id)])
-  );
-  const byId = new Set((backup.data.altarCategories ?? []).map((c) => String(c.id)));
-  for (const row of backup.data.altarItems ?? []) {
-    if (row.category_id === undefined) {
-      const raw = row.category === undefined ? '' : String(row.category);
-      row.category_id = byId.has(raw) ? raw : (byName.get(raw) ?? 'other');
-    }
-    delete row.category;
-  }
-
-  for (const row of backup.data.journalEntries ?? []) {
-    row.linked_operation_ids = row.linked_operation_ids ?? '[]';
-    row.linked_wiki_ids = row.linked_wiki_ids ?? '[]';
+  // v3 → v4: vier Kategorie-Arrays werden eines.
+  if (backup.version !== '4') {
+    mergeLegacyCategoryArrays(data);
   }
 
   backup.version = BACKUP_VERSION;
 }
 
 interface BackupFile {
-  version: '1' | '2' | '3';
+  version: '1' | '2' | '3' | '4';
   type: 'backup';
   exportedAt: string;
   filters: BackupOptions;
   data: {
     journalEntries?: Row[];
     wikiArticles?: Row[];
-    wikiCategories?: Row[];
     operations?: Row[];
-    operationCategories?: Row[];
+    /** Die globale Liste; dabei, sobald eines der vier kategorisierten Module dabei ist. */
+    categories?: Row[];
     tags?: Row[];
     routines?: Row[];
     altars?: Row[];
-    altarCategories?: Row[];
     altarItems?: Row[];
     altarPlacements?: Row[];
     tasks?: Row[];
-    taskCategories?: Row[];
     taskLinks?: Row[];
     links?: Row[];
   };
@@ -303,11 +371,6 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
       `SELECT * FROM wiki_articles WHERE 1=1 ${dateClause} ${deletedClause}`,
       dateParams,
     );
-    data.wikiCategories = await db.select<Row[]>(
-      // Auch soft-geloeschte Kategorien: ihre Artikel werden mitexportiert und
-      // brauchen ihr Gegenstueck, sonst scheitert der Import am Foreign Key.
-      `SELECT * FROM wiki_categories`
-    );
     const lnks = await selectWhereIn(
       db,
       (ph) => `SELECT * FROM links WHERE source_type='wiki' AND source_id IN (${ph})`,
@@ -322,9 +385,6 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
     data.operations = await db.select<Row[]>(
       `SELECT * FROM operations WHERE 1=1 ${dateClause} ${deletedClause}`,
       dateParams,
-    );
-    data.operationCategories = await db.select<Row[]>(
-      `SELECT * FROM operation_categories`
     );
     const lnks = await selectWhereIn(
       db,
@@ -349,8 +409,6 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
       `SELECT * FROM altars WHERE 1=1 ${dateClause}`,
       dateParams,
     );
-    // altar_categories has no deleted_at column; export all rows
-    data.altarCategories = await db.select<Row[]>(`SELECT * FROM altar_categories`);
     // Only export items and placements that belong to the filtered altars
     if (!data.altars.length) {
       data.altarItems = [];
@@ -385,9 +443,6 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
 
   // ── Tasks ────────────────────────────────────────────────────────────────
   if (options.includeTasks) {
-    data.taskCategories = await db.select<Row[]>(
-      `SELECT * FROM task_categories`
-    );
     data.tasks = await db.select<Row[]>(
       `SELECT * FROM tasks WHERE 1=1 ${dateClause} ${deletedClause}`,
       dateParams,
@@ -397,6 +452,14 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
       (ph) => `SELECT * FROM task_links WHERE task_id IN (${ph})`,
       data.tasks ?? [],
     );
+  }
+
+  // ── Kategorien ───────────────────────────────────────────────────────────
+  // Die eine Liste, sobald ein kategorisiertes Modul dabei ist. Auch
+  // soft-geloeschte Kategorien: ihre Inhalte werden mitexportiert und
+  // brauchen ihr Gegenstueck, sonst scheitert der Import am Foreign Key.
+  if (options.includeWiki || options.includeOperations || options.includeTasks || options.includeAltars) {
+    data.categories = await db.select<Row[]>(`SELECT * FROM categories`);
   }
 
   // ── Embed images ─────────────────────────────────────────────────────────
@@ -457,8 +520,12 @@ export async function openBackupFile(): Promise<{ path: string; backup: BackupFi
   migrateBackupPayload(backup);
 
   // Only show categories that are actually used by entries in this backup
-  const usedWikiCatIds = new Set((backup.data.wikiArticles ?? []).map((r) => r.category_id as string));
-  const usedOpCatIds = new Set((backup.data.operations ?? []).map((r) => r.category_id as string));
+  const usedCatIds = new Set([
+    ...(backup.data.wikiArticles ?? []),
+    ...(backup.data.operations ?? []),
+    ...(backup.data.tasks ?? []),
+    ...(backup.data.altarItems ?? []),
+  ].map((r) => r.category_id as string));
 
   const preview: BackupPreview = {
     exportedAt: backup.exportedAt,
@@ -468,9 +535,7 @@ export async function openBackupFile(): Promise<{ path: string; backup: BackupFi
     routinesCount: backup.data.routines?.length ?? 0,
     altarsCount: backup.data.altars?.length ?? 0,
     taskCount: backup.data.tasks?.length ?? 0,
-    taskCategoriesCount: backup.data.taskCategories?.length ?? 0,
-    wikiCategories: (backup.data.wikiCategories ?? []).filter((c) => usedWikiCatIds.has(c.id as string)) as BackupCategoryEntry[],
-    opCategories: (backup.data.operationCategories ?? []).filter((c) => usedOpCatIds.has(c.id as string)) as BackupCategoryEntry[],
+    categories: (backup.data.categories ?? []).filter((c) => usedCatIds.has(c.id as string)) as BackupCategoryEntry[],
   };
 
   return { path: filePath, backup, preview };
@@ -575,51 +640,131 @@ function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFi
     ...(f.includeAltars     ? (d.altars      ?? []).map((r) => r.id as string) : []),
     ...(f.includeTasks      ? (d.tasks       ?? []).map((r) => r.id as string) : []),
   ]);
+  const anyCategorized = f.includeWiki || f.includeOperations || f.includeTasks || f.includeAltars;
   return {
     ...d,
     journalEntries:     f.includeJournal    ? d.journalEntries    : [],
     wikiArticles:       f.includeWiki       ? d.wikiArticles      : [],
-    wikiCategories:     f.includeWiki       ? d.wikiCategories    : [],
     operations:         f.includeOperations ? d.operations        : [],
-    operationCategories:f.includeOperations ? d.operationCategories : [],
+    categories:         anyCategorized      ? d.categories        : [],
     routines:           f.includeRoutines   ? d.routines          : [],
     altars:             f.includeAltars     ? d.altars            : [],
-    altarCategories:    f.includeAltars     ? d.altarCategories   : [],
     altarItems:         f.includeAltars     ? d.altarItems        : [],
     altarPlacements:    f.includeAltars     ? d.altarPlacements   : [],
     tasks:              f.includeTasks      ? d.tasks             : [],
-    taskCategories:     f.includeTasks      ? d.taskCategories    : [],
     taskLinks:          f.includeTasks      ? d.taskLinks         : [],
     tags:               f.includeTags       ? d.tags              : [],
     links:            (d.links ?? []).filter((r) => keptContentIds.has(r.source_id as string)),
   };
 }
 
+/**
+ * Lässt Inhalte abgewählter Kategorien weg — in allen vier Modulen. Was an
+ * ihnen hängt (Platzierungen, Aufgaben-Verknüpfungen, Links), fällt mit.
+ */
 function applyCategoryFilters(d: BackupFile['data'], filters: ImportCategoryFilters): BackupFile['data'] {
-  if (!filters.excludedWikiCategoryIds.size && !filters.excludedOpCategoryIds.size) return d;
+  const excluded = filters.excludedCategoryIds;
+  if (!excluded.size) return d;
 
-  const filteredWiki = filters.excludedWikiCategoryIds.size
-    ? (d.wikiArticles ?? []).filter((r) => !filters.excludedWikiCategoryIds.has(r.category_id as string))
-    : d.wikiArticles;
-  const filteredOps = filters.excludedOpCategoryIds.size
-    ? (d.operations ?? []).filter((r) => !filters.excludedOpCategoryIds.has(r.category_id as string))
-    : d.operations;
+  const keep = (rows: Row[] | undefined) =>
+    (rows ?? []).filter((r) => !excluded.has(r.category_id as string));
+  const wikiArticles = keep(d.wikiArticles);
+  const operations = keep(d.operations);
+  const tasks = keep(d.tasks);
+  const altarItems = keep(d.altarItems);
+  const keptItemIds = new Set(altarItems.map((r) => r.id as string));
+  const keptTaskIds = new Set(tasks.map((r) => r.id as string));
 
   const keptIds = new Set([
-    ...(filteredWiki ?? []).map((r) => r.id as string),
-    ...(filteredOps ?? []).map((r) => r.id as string),
+    ...wikiArticles.map((r) => r.id as string),
+    ...operations.map((r) => r.id as string),
     ...(d.journalEntries ?? []).map((r) => r.id as string),
     ...(d.routines ?? []).map((r) => r.id as string),
     ...(d.altars ?? []).map((r) => r.id as string),
-    ...(d.tasks ?? []).map((r) => r.id as string),
+    ...tasks.map((r) => r.id as string),
   ]);
 
   return {
     ...d,
-    wikiArticles: filteredWiki,
-    operations: filteredOps,
+    wikiArticles,
+    operations,
+    tasks,
+    altarItems,
+    altarPlacements: (d.altarPlacements ?? []).filter((r) => keptItemIds.has(r.item_id as string)),
+    taskLinks: (d.taskLinks ?? []).filter((r) => keptTaskIds.has(r.task_id as string)),
     links: (d.links ?? []).filter((r) => keptIds.has(r.source_id as string)),
   };
+}
+
+/**
+ * Übersetzt die Kategorien einer Sicherung in die dieses Vaults: gleiche ID
+ * (die beiden Builtins) oder gleicher Name (ohne Groß/Klein) → lokale Zeile,
+ * sonst neu angelegt. Liefert die Zuordnung Sicherungs-ID → lokale ID, mit
+ * der die vier Inhaltsarrays umgehängt werden (`remapCategoryIds`).
+ *
+ * Kategorien werden nie gelöscht, auch nicht beim Ersetzen: Eine Kategorie
+ * ist seit v38 modulübergreifend, und ein Teil-Replace (nur Wiki) darf den
+ * Aufgaben nicht die Kategorien unter den Füßen wegziehen.
+ */
+async function resolveImportedCategories(
+  db: Awaited<ReturnType<typeof getDb>>,
+  rows: Row[],
+): Promise<Map<string, string>> {
+  const local = await db.select<Row[]>('SELECT id, name, deleted_at, sort_order FROM categories');
+  const localById = new Map(local.map((r) => [String(r.id), r]));
+  const localByKey = new Map(local.map((r) => [categoryKey(String(r.name)), r]));
+  let nextSort = local.reduce((m, r) => Math.max(m, Number(r.sort_order ?? 0)), -1) + 1;
+
+  const map = new Map<string, string>();
+  for (const row of rows) {
+    const id = String(row.id);
+    const name = String(row.name ?? '');
+    const key = categoryKey(name);
+    const match = (row.is_builtin ? localById.get(id) : undefined) ?? localByKey.get(key);
+    if (match) {
+      map.set(id, String(match.id));
+      // Eine importierte aktive Kategorie holt ihr lokales Gegenstück aus dem Papierkorb.
+      if (match.deleted_at != null && row.deleted_at == null) {
+        await db.execute('UPDATE categories SET deleted_at=NULL WHERE id=$1', [match.id]);
+        match.deleted_at = null;
+      }
+      continue;
+    }
+    const newId = localById.has(id) ? generateId() : id;
+    const inserted: Row = {
+      id: newId, name, emoji: String(row.emoji ?? '📁'), sort_order: nextSort++,
+      is_builtin: 0, deleted_at: row.deleted_at ?? null,
+    };
+    await db.execute(
+      'INSERT INTO categories (id, name, emoji, sort_order, is_builtin, deleted_at) VALUES ($1,$2,$3,$4,$5,$6)',
+      [inserted.id, inserted.name, inserted.emoji, inserted.sort_order, inserted.is_builtin, inserted.deleted_at]
+    );
+    localById.set(newId, inserted);
+    localByKey.set(key, inserted);
+    map.set(id, newId);
+  }
+  return map;
+}
+
+/**
+ * Nur die Kategorien, auf die ein Inhalt der (schon gefilterten) Nutzlast
+ * zeigt. Der Export schickt die ganze Tabelle mit; was hier niemand braucht —
+ * abgewählte Typen, ausgeschlossene Kategorien, Ungenutztes — soll im Vault
+ * keine Zeile werden.
+ */
+function usedCategoryRows(d: BackupFile['data']): Row[] {
+  const used = new Set(
+    [...(d.wikiArticles ?? []), ...(d.operations ?? []), ...(d.tasks ?? []), ...(d.altarItems ?? [])]
+      .map((r) => String(r.category_id))
+  );
+  return (d.categories ?? []).filter((c) => used.has(String(c.id)));
+}
+
+function remapCategoryIds(rows: Row[], map: Map<string, string>): Row[] {
+  return rows.map((r) => ({
+    ...r,
+    category_id: map.get(String(r.category_id)) ?? r.category_id,
+  }));
 }
 
 /**
@@ -635,39 +780,24 @@ function applyCategoryFilters(d: BackupFile['data'], filters: ImportCategoryFilt
 async function assertPayloadReferencesResolve(
   db: Awaited<ReturnType<typeof getDb>>,
   d: BackupFile['data'],
-  options: { keepsExistingRows?: boolean } = {},
 ): Promise<void> {
-  // `survivesReplace` sagt, ob doReplace die Kategorien dieser Tabelle stehen
-  // lässt. Bei wiki und operations werden nur die selbst angelegten gelöscht
-  // (`WHERE is_builtin=0`), die eingebauten bleiben und duerfen deshalb als
-  // Ziel zaehlen. task_categories und altar_categories werden komplett geleert
-  // — was dort heute im Vault steht, ist nach dem DELETE weg.
+  // Kategorien überleben jeden Import (siehe resolveImportedCategories) — der
+  // Bestand des Vaults zählt deshalb in beiden Modi als Ziel.
+  const known = new Set((d.categories ?? []).map((c) => String(c.id)));
+  for (const row of await db.select<Row[]>('SELECT id FROM categories')) {
+    known.add(String(row.id));
+  }
+
   const checks = [
-    ['wikiArticles', 'wikiCategories', 'wiki_categories', 'Wiki-Artikel', 'is_builtin=1'],
-    ['operations', 'operationCategories', 'operation_categories', 'Operationen', 'is_builtin=1'],
-    ['tasks', 'taskCategories', 'task_categories', 'Aufgaben', null],
-    ['altarItems', 'altarCategories', 'altar_categories', 'Altar-Objekte', null],
+    ['wikiArticles', 'Wiki-Artikel'],
+    ['operations', 'Operationen'],
+    ['tasks', 'Aufgaben'],
+    ['altarItems', 'Altar-Objekte'],
   ] as const;
 
-  for (const [rowsKey, catsKey, table, label, survivesReplace] of checks) {
-    const rows = d[rowsKey] ?? [];
-    if (!rows.length) continue;
-
-    const known = new Set((d[catsKey] ?? []).map((c) => String(c.id)));
-    if (options.keepsExistingRows) {
-      for (const row of await db.select<Row[]>(`SELECT id FROM ${table}`)) {
-        known.add(String(row.id));
-      }
-    } else if (survivesReplace) {
-      for (const row of await db.select<Row[]>(
-        `SELECT id FROM ${table} WHERE ${survivesReplace}`
-      )) {
-        known.add(String(row.id));
-      }
-    }
-
+  for (const [rowsKey, label] of checks) {
     const missing = new Set<string>();
-    for (const row of rows) {
+    for (const row of d[rowsKey] ?? []) {
       const id = row.category_id == null ? '' : String(row.category_id);
       if (!known.has(id)) missing.add(id || '(leer)');
     }
@@ -694,11 +824,16 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   const IMAGE_FIELDS_ALTAR = imageColumns('altars');
   const IMAGE_FIELDS_ITEM = imageColumns('altar_items');
 
+  // Kategorien zuerst: Die Inhalte bekommen die lokalen IDs, bevor sie
+  // eingefügt werden. Gelöscht wird bei Kategorien nie (siehe dort).
+  const catMap = await resolveImportedCategories(db, usedCategoryRows(d));
+
   const journalEntries = (d.journalEntries ?? []).map((r) => remapRow(r, IMAGE_FIELDS_JOURNAL, pathMap));
-  const wikiArticles = (d.wikiArticles ?? []).map((r) => remapRow(r, IMAGE_FIELDS_WIKI, pathMap));
-  const operations = (d.operations ?? []).map((r) => remapRow(r, IMAGE_FIELDS_OP, pathMap));
+  const wikiArticles = remapCategoryIds((d.wikiArticles ?? []).map((r) => remapRow(r, IMAGE_FIELDS_WIKI, pathMap)), catMap);
+  const operations = remapCategoryIds((d.operations ?? []).map((r) => remapRow(r, IMAGE_FIELDS_OP, pathMap)), catMap);
   const altars = (d.altars ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ALTAR, pathMap));
-  const altarItems = (d.altarItems ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ITEM, pathMap));
+  const altarItems = remapCategoryIds((d.altarItems ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ITEM, pathMap)), catMap);
+  const tasks = remapCategoryIds(d.tasks ?? [], catMap);
 
   // Delete only the content types present in the backup (so a partial backup
   // replacing only Journal data won't wipe wiki/ops).
@@ -707,7 +842,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   const hasOps = (d.operations?.length ?? 0) > 0;
   const hasRoutines = (d.routines?.length ?? 0) > 0;
   const hasAltars = (d.altars?.length ?? 0) > 0;
-  const hasTasks = (d.tasks?.length ?? 0) > 0 || (d.taskCategories?.length ?? 0) > 0;
+  const hasTasks = (d.tasks?.length ?? 0) > 0;
   const hasAny = hasJournal || hasWiki || hasOps || hasTasks || hasRoutines;
 
   // Links: delete only for present entry types
@@ -724,39 +859,27 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
     await db.execute('DELETE FROM altar_placements');
     await db.execute('DELETE FROM altar_items');
     await db.execute('DELETE FROM altars');
-    await db.execute('DELETE FROM altar_categories');
   }
   if (hasTasks) {
     await db.execute('DELETE FROM task_links');
     await db.execute('DELETE FROM tasks');
-    await db.execute('DELETE FROM task_categories');
   }
   if (hasRoutines) await db.execute('DELETE FROM routines');
-  if (hasOps) {
-    await db.execute('DELETE FROM operations');
-    await db.execute('DELETE FROM operation_categories WHERE is_builtin=0');
-  }
+  if (hasOps) await db.execute('DELETE FROM operations');
   if (hasJournal) await db.execute('DELETE FROM journal_entries');
-  if (hasWiki) {
-    await db.execute('DELETE FROM wiki_articles');
-    await db.execute('DELETE FROM wiki_categories WHERE is_builtin=0');
-  }
+  if (hasWiki) await db.execute('DELETE FROM wiki_articles');
   if (hasAny && d.tags) await db.execute('DELETE FROM tags');
 
   // Re-insert
-  if (d.wikiCategories) await insertRows(db, 'wiki_categories', d.wikiCategories, true);
-  if (d.operationCategories) await insertRows(db, 'operation_categories', d.operationCategories, true);
   if (d.tags) await insertRows(db, 'tags', d.tags, true);
   await insertRows(db, 'journal_entries', journalEntries);
   await insertRows(db, 'wiki_articles', wikiArticles);
   await insertRows(db, 'operations', operations);
   if (d.routines) await insertRows(db, 'routines', d.routines);
   await insertRows(db, 'altars', altars);
-  if (d.altarCategories) await insertRows(db, 'altar_categories', d.altarCategories, true);
   await insertRows(db, 'altar_items', altarItems);
   if (d.altarPlacements) await insertRows(db, 'altar_placements', d.altarPlacements);
-  if (d.taskCategories) await insertRows(db, 'task_categories', d.taskCategories, true);
-  await insertTasks(db, d.tasks ?? []);
+  await insertTasks(db, tasks);
   if (d.taskLinks) await insertRows(db, 'task_links', d.taskLinks);
   if (d.links) await insertRows(db, 'links', d.links, true);
 
@@ -775,10 +898,9 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   const d = applyCategoryFilters(backup.data, filters);
 
   // Merge loescht zwar nichts, bricht aber mitten im Einfuegen ab, wenn eine
-  // Kategorie fehlt — und lässt dann halb importierte Daten zurück. Hier
-  // zählt der Bestand des Vaults vollstaendig als Quelle, weil er erhalten
-  // bleibt.
-  await assertPayloadReferencesResolve(db, d, { keepsExistingRows: true });
+  // Kategorie fehlt — und lässt dann halb importierte Daten zurück.
+  await assertPayloadReferencesResolve(db, d);
+  const catMap = await resolveImportedCategories(db, usedCategoryRows(d));
 
   // Prefix = base36 encoding of current timestamp (8 chars, unique per merge)
   const prefix = Date.now().toString(36).slice(-8);
@@ -881,15 +1003,15 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   const journalEntries = (d.journalEntries ?? []).map((r: Row) =>
     withContentLinks(remapEntry(r, ['content'], ['paradigm_id', 'bannung_type_wiki_id', 'meditation_type_wiki_id'], ['linked_operation_ids', 'linked_wiki_ids'], 'journal_entries'))
   );
-  const wikiArticles = (d.wikiArticles ?? []).map((r: Row) => {
+  const wikiArticles = remapCategoryIds((d.wikiArticles ?? []).map((r: Row) => {
     const row = withContentLinks(remapEntry(r, ['content', 'icon', 'cover_image'], [], [], 'wiki_articles'));
     // slug has a UNIQUE constraint — prefix it to avoid collisions on merge
     if (typeof row.slug === 'string') row.slug = `${prefix}-${row.slug}`;
     return row;
-  });
-  const operations = (d.operations ?? []).map((r: Row) =>
+  }), catMap);
+  const operations = remapCategoryIds((d.operations ?? []).map((r: Row) =>
     withContentLinks(remapEntry(r, ['content', 'icon', 'cover_image', 'drawing_data', 'thumbnail_data'], ['charging_technique_wiki_id'], [], 'operations'))
-  );
+  ), catMap);
   const routines = (d.routines ?? []).map((r: Row) =>
     remapEntry(r, [], [], ['operation_ids', 'wiki_ids'])
   );
@@ -900,18 +1022,18 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     // wäre merge die Variante, die ihn nicht mitzieht.
     remapEntry(r, ['background_image_data', 'thumbnail_data', 'icon_data'], [], [])
   );
-  const altarItems = (d.altarItems ?? []).map((r: Row) =>
+  const altarItems = remapCategoryIds((d.altarItems ?? []).map((r: Row) =>
     remapEntry(r, ['image_data'], [], [])
-  );
+  ), catMap);
   const altarPlacements = (d.altarPlacements ?? []).map((r: Row) => ({
     ...r,
     id: pid(r.id as string),
     altar_id: remapId(r.altar_id),
     item_id: remapId(r.item_id),
   }));
-  const tasks = (d.tasks ?? []).map((r: Row) =>
+  const tasks = remapCategoryIds((d.tasks ?? []).map((r: Row) =>
     remapEntry(r, [], ['parent_task_id'], [])
-  );
+  ), catMap);
   const taskLinks = (d.taskLinks ?? []).map((r: Row) => ({
     ...r,
     id: pid(r.id as string),
@@ -924,11 +1046,8 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     target_id: remapId(r.target_id),
   }));
 
-  // Categories and tags: INSERT OR IGNORE (no prefix — shared by name/fixed ID)
-  if (d.wikiCategories) await insertRows(db, 'wiki_categories', d.wikiCategories, true);
-  if (d.operationCategories) await insertRows(db, 'operation_categories', d.operationCategories, true);
-  if (d.altarCategories) await insertRows(db, 'altar_categories', d.altarCategories, true);
-  if (d.taskCategories) await insertRows(db, 'task_categories', d.taskCategories, true);
+  // Kategorien sind schon aufgelöst (resolveImportedCategories oben); Tags:
+  // INSERT OR IGNORE (no prefix — shared by name)
   if (d.tags) await insertRows(db, 'tags', d.tags, true);
 
   // Content: plain INSERT with prefixed IDs (no conflicts possible)
@@ -967,10 +1086,7 @@ export async function importDatabase(
   categoryFilters?: ImportCategoryFilters,
   typeFilters?: ImportTypeFilters,
 ): Promise<void> {
-  const filters: ImportCategoryFilters = categoryFilters ?? {
-    excludedWikiCategoryIds: new Set(),
-    excludedOpCategoryIds: new Set(),
-  };
+  const filters: ImportCategoryFilters = categoryFilters ?? { excludedCategoryIds: new Set<string>() };
 
   // replace behaelt die Original-IDs und add-vault wechselt den Vault: ein
   // offener Editor, den die Navigation dabei unmountet, wuerde seinen

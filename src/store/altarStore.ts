@@ -5,8 +5,8 @@ import { ALTAR_RATIOS, DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAU
 import { generateId, isValidHexColor, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
 import { bool, fromRow, toInt, type DbRow } from '../lib/row';
-import { FALLBACK_CATEGORY, reassignCategoryContent } from '../lib/schema';
-import type { AltarCategory, AltarItem, AltarItemCategory, AltarPlacement, AltarRecord } from '../types';
+import { FALLBACK_CATEGORY_ID } from '../lib/schema';
+import type { AltarItem, AltarPlacement, AltarRecord } from '../types';
 import i18n from '../i18n';
 
 const DEFAULT_PLACEMENT_SIZE = 40;
@@ -52,7 +52,7 @@ function mapPlacementRows(rows: DbRow[], items: AltarItem[]): AltarPlacement[] {
       item_id: String(r.item_id),
       name: item?.name ?? '?',
       emoji: item?.emoji ?? '✨',
-      category_id: item?.category_id ?? 'other',
+      category_id: item?.category_id ?? FALLBACK_CATEGORY_ID,
       x: Number(r.x),
       y: Number(r.y),
       z_index: Number(r.z_index),
@@ -116,14 +116,8 @@ interface AltarState {
   selectedPlacementId: string | null;
   previewPlacements: Record<string, AltarPlacement[]>;
   intention: string;
-  categories: AltarCategory[];
 
   fetchAltars: () => Promise<void>;
-  fetchCategories: () => Promise<void>;
-  addCategory: (name: string, emoji: string) => Promise<AltarCategory>;
-  updateCategory: (id: string, name: string, emoji: string) => Promise<void>;
-  deleteCategory: (id: string) => Promise<boolean>;
-  reorderCategories: (ids: string[]) => Promise<void>;
   setActiveAltar: (id: string) => Promise<void>;
   clearActiveAltar: () => void;
   createAltar: () => Promise<AltarRecord>;
@@ -134,7 +128,7 @@ interface AltarState {
   bumpAltarUpdatedAt: (id: string) => Promise<void>;
   deleteAltar: (id: string) => Promise<void>;
 
-  addItem: (name: string, emoji: string, categoryId: AltarItemCategory, note?: string, imageData?: string) => Promise<AltarItem>;
+  addItem: (name: string, emoji: string, categoryId: string, note?: string, imageData?: string) => Promise<AltarItem>;
   updateItem: (id: string, patch: Partial<Omit<AltarItem, 'id'>>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   placeItem: (item: AltarItem, x: number, y: number) => Promise<void>;
@@ -161,77 +155,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   selectedPlacementId: null,
   previewPlacements: {},
   intention: '',
-  categories: [],
-
-  fetchCategories: async () => {
-    const db = await getDb();
-    const rows = await db.select<DbRow[]>('SELECT * FROM altar_categories ORDER BY sort_order ASC, created_at ASC, name ASC');
-    set({ categories: rows.map(fromRow.altarCategory) });
-  },
-
-  addCategory: async (name, emoji) => {
-    const db = await getDb();
-    const existing = get().categories.find((c) => c.name.toLowerCase() === name.toLowerCase());
-    if (existing) throw new Error(`Category "${name}" already exists`);
-    const maxRow = await db.select<{ m: number }[]>('SELECT COALESCE(MAX(sort_order), -1) as m FROM altar_categories');
-    const sortOrder = (maxRow[0]?.m ?? -1) + 1;
-    const cat: AltarCategory = { id: generateId(), name, emoji, sort_order: sortOrder };
-    await db.execute(
-      'INSERT INTO altar_categories (id, name, emoji, created_at, sort_order) VALUES ($1,$2,$3,$4,$5)',
-      [cat.id, cat.name, cat.emoji, nowIso(), sortOrder]
-    );
-    set((s) => ({ categories: [...s.categories, cat] }));
-    return cat;
-  },
-
-  reorderCategories: async (ids) => {
-    const db = await getDb();
-    const params: (string | number)[] = [];
-    let caseExpr = '';
-    const inParams: string[] = [];
-    for (let i = 0; i < ids.length; i++) {
-      const idIdx = params.length + 1;
-      params.push(ids[i], i);
-      caseExpr += ` WHEN $${idIdx} THEN $${idIdx + 1}`;
-      inParams.push(`$${idIdx}`);
-    }
-    await db.execute(
-      `UPDATE altar_categories SET sort_order = CASE id${caseExpr} END WHERE id IN (${inParams.join(',')})`,
-      params,
-    );
-    const current = get().categories;
-    const sorted = ids.map((id) => current.find((c) => c.id === id)!).filter(Boolean);
-    set({ categories: sorted });
-  },
-
-  updateCategory: async (id, name, emoji) => {
-    const db = await getDb();
-    const conflict = get().categories.find((c) => c.id !== id && c.name.toLowerCase() === name.toLowerCase());
-    if (conflict) throw new Error(`Category "${name}" already exists`);
-    await db.execute('UPDATE altar_categories SET name=$1, emoji=$2 WHERE id=$3', [name, emoji, id]);
-    // Früher musste ein Umbenennen über altar_items kaskadieren, weil dort der
-    // Kategorie-*Name* stand. Seit v33 steht dort die ID, die sich nicht ändert.
-    set((s) => ({ categories: s.categories.map((c) => c.id === id ? { ...c, name, emoji } : c) }));
-  },
-
-  deleteCategory: async (id) => {
-    const db = await getDb();
-    const cat = get().categories.find((c) => c.id === id);
-    if (!cat) return false;
-    // Ziel des Umhängens — siehe taskStore.permanentlyDeleteCategory.
-    // (Altar-Kategorien kennen keinen Papierkorb, hier wird sofort umgehängt.)
-    if (id === FALLBACK_CATEGORY.altar_items) return false;
-    await reassignCategoryContent(db, 'altar_items', id);
-    await db.execute('DELETE FROM altar_categories WHERE id=$1', [id]);
-    set((s) => ({
-      categories: s.categories.filter((c) => c.id !== id),
-      items: s.items.map((i) => (i.category_id === id ? { ...i, category_id: 'other' } : i)),
-    }));
-    return true;
-  },
 
   fetchAltars: async () => {
-    await get().fetchCategories();
     const db = await getDb();
     const itemRows = await db.select<DbRow[]>('SELECT * FROM altar_items ORDER BY name ASC');
     const items = itemRows.map(fromRow.altarItem);

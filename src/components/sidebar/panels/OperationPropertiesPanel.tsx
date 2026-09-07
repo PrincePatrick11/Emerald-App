@@ -4,6 +4,8 @@ import { Eye, EyeOff } from 'lucide-react';
 import { useUIStore } from '../../../store/uiStore';
 import { useWikiStore } from '../../../store/wikiStore';
 import { useOperationStore } from '../../../store/operationStore';
+import { useCategoryStore } from '../../../store/categoryStore';
+import { SIGIL_CATEGORY_ID } from '../../../lib/schema';
 import TagInput from '../../editor/TagInput';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
 import PropertiesEditView from '../fields/PropertiesEditView';
@@ -23,14 +25,17 @@ export default function OperationPropertiesPanel() {
   const isEditing = activeView.mode === 'edit';
   const operations = useOperationStore((s) => s.operations);
   const updateOperation = useOperationStore((s) => s.updateOperation);
-  const opCategories = useOperationStore((s) => s.categories);
+  const categories = useCategoryStore((s) => s.categories);
   const articles = useWikiStore((s) => s.articles);
 
   const op = activeView.id ? operations.find((o) => o.id === activeView.id) : null;
-  const sigilOperation = op?.category_id === 'sigils' ? op : null;
+  const sigilOperation = op?.category_id === SIGIL_CATEGORY_ID ? op : null;
 
-  const sigilChargingArticles = useMemo(
-    () => articles.filter((a) => a.category_id === 'sigil_charging' && !a.deleted_at),
+  // Seit v38 ist „Sigillen-Ladetechnik" keine eingebaute Wiki-Kategorie mehr,
+  // sondern eine, die der Nutzer umbenennen oder löschen kann — deshalb
+  // stehen hier alle Artikel zur Wahl, nicht nur die einer Kategorie.
+  const chargingArticleOptions = useMemo(
+    () => articles.filter((a) => !a.deleted_at),
     [articles]
   );
 
@@ -39,9 +44,9 @@ export default function OperationPropertiesPanel() {
   }
 
   const inputCls = OP_PROP_SELECT_CLASSES;
-  const category = opCategories.find((c) => c.id === op.category_id);
+  const category = categories.find((c) => c.id === op.category_id);
   // Gelöschte Kategorie: „Keine" statt der rohen category_id.
-  const categoryDisplay = category ? `${category.emoji} ${categoryLabel(t, 'operations', category)}` : t('properties.none');
+  const categoryDisplay = category ? `${category.emoji} ${categoryLabel(t, category)}` : t('properties.none');
 
   if (!isEditing) {
     if (sigilOperation) {
@@ -122,10 +127,10 @@ export default function OperationPropertiesPanel() {
       <div>
         <p className="label-xs mb-2">{t('properties.category')}</p>
         <CategorySelect
-          categories={opCategories}
+          categories={categories}
           value={op.category_id}
           onChange={(category_id) => updateOperation(op.id, { category_id })}
-          getLabel={(c) => categoryLabel(t, 'operations', c)}
+          getLabel={(c) => categoryLabel(t, c)}
           variant="field"
         />
       </div>
@@ -135,7 +140,7 @@ export default function OperationPropertiesPanel() {
           <SelectField
             label={`⚡ ${t('creation.chargingTechnique')}`}
             value={sigilOperation.charging_technique_wiki_id}
-            options={sigilChargingArticles}
+            options={chargingArticleOptions}
             getId={(a) => a.id}
             getLabel={(a) => a.title}
             noneLabel={t('properties.none')}

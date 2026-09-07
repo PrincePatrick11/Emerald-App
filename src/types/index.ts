@@ -28,7 +28,7 @@ export interface WikiArticle {
   title: string;
   slug: string;
   content: string; // HTML, wie TipTaps getHTML() es liefert
-  category_id: WikiCategory;
+  category_id: string;
   created_at: string;
   updated_at: string;
   tags: string[];
@@ -38,17 +38,19 @@ export interface WikiArticle {
   entry_number?: number;
 }
 
-export interface CategoryBase {
+/**
+ * Eine Zeile der globalen `categories`-Tabelle — dieselbe Liste für Wiki,
+ * Operationen, Aufgaben und Altar-Elemente. `is_builtin` gilt nur für `other`
+ * und `sigils`; der Anzeigename läuft über `lib/categories.categoryLabel`.
+ */
+export interface Category {
   id: string;
   name: string;
   emoji: string;
   sort_order: number;
   is_builtin: boolean;
+  deleted_at: string | null;
 }
-
-export interface OperationCategory extends CategoryBase {}
-
-export interface WikiCategoryDef extends CategoryBase {}
 
 export interface Operation {
   id: string;
@@ -89,8 +91,6 @@ export interface TrashedItem {
   category?: string;
 }
 
-export type WikiCategory = string;
-
 export interface Tag {
   id: string;
   name: string;
@@ -127,15 +127,6 @@ export type MoonPhase =
   | 'last_quarter'
   | 'waning_crescent';
 
-export type AltarItemCategory = string;
-
-export interface AltarCategory {
-  id: string;
-  name: string;
-  emoji: string;
-  sort_order: number;
-}
-
 export interface AltarRecord {
   id: string;
   title: string;
@@ -163,7 +154,7 @@ export interface AltarItem {
   id: string;
   name: string;
   emoji: string;
-  category_id: AltarItemCategory;
+  category_id: string;
   note: string;
   image_data?: string;
 }
@@ -190,10 +181,6 @@ export interface AltarPlacement {
 }
 
 export type TaskPriority = 'low' | 'medium' | 'high';
-
-export interface TaskCategory extends CategoryBase {
-  deleted_at: string | null;
-}
 
 export interface TaskLink {
   id: string;
