@@ -19,6 +19,7 @@ import Modal from '../ui/Modal';
 import EmojiPicker from '../ui/EmojiPicker';
 import Button from '../ui/Button';
 import CategoryModal from '../ui/CategoryModal';
+import CategorySelect from '../ui/CategorySelect';
 
 const LIBRARY_DEFAULT_HEIGHT = 240;
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
@@ -51,6 +52,13 @@ function ItemModal({
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const getCategoryEmoji = (catId: string) => categories.find((c) => c.id === catId)?.emoji ?? '✨';
+
+  // Ein selbst gewähltes Emoji überlebt den Kategoriewechsel. Nur wenn das
+  // Element bisher das Standard-Emoji seiner Kategorie trug, folgt es der neuen.
+  const changeCategory = (catId: string) => {
+    if (editEmoji === getCategoryEmoji(editCategory)) setEditEmoji('');
+    setEditCategory(catId);
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -126,10 +134,15 @@ function ItemModal({
         {imageError && <p className="text-xs text-red-400">{imageError}</p>}
         <input ref={imageInputRef} type="file" accept={ACCEPTED_IMAGE_MIME} className="hidden" onChange={handleImageChange} />
         <input ref={nameInputRef} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t('altar.elementName')} className="w-full bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" />
-        <div className="flex flex-wrap gap-1">
-          {categories.map((cat) => (
-            <button key={cat.id} onClick={() => { setEditCategory(cat.id); setEditEmoji(''); }} className={`text-xs px-2 py-1 rounded-md transition-colors ${editCategory === cat.id ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{cat.emoji} {categoryLabel(t, cat)}</button>
-          ))}
+        <div>
+          <p className="label-xs mb-1">{t('properties.category')}</p>
+          <CategorySelect
+            categories={categories}
+            value={editCategory}
+            onChange={changeCategory}
+            getLabel={(c) => categoryLabel(t, c)}
+            variant="field"
+          />
         </div>
         {/* Dieselbe Lösch-/Speichern-Reihe wie im CategoryModal daneben. */}
         {item && confirmDelete ? (
@@ -274,6 +287,11 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
   }, []);
 
   const handlePanelMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    // Die Modale hängen im React-Baum unter dem Strip, im DOM aber unter
+    // <body>: ihr Klick käme hier oberhalb der Panel-Kante an und würde als
+    // Resize-Start mit preventDefault verschluckt — das Namensfeld bekam so
+    // keinen Fokus.
+    if (!event.currentTarget.contains(event.target as Node)) return;
     const bounds = event.currentTarget.getBoundingClientRect();
     if (event.clientY - bounds.top <= 6) startResize(event);
   };
