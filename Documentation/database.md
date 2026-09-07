@@ -9,9 +9,11 @@ Emerald uses a single SQLite file per vault, always named `emerald.db`, inside t
 Two consumers share those strings, and that sharing is the point of the file:
 
 - the **baseline path** in `runMigrations`, which fresh vaults take;
-- **migration v33** `normalize_schema`, which rebuilds the tables of existing vaults.
+- **migration v38** `merge_category_tables` (`src/lib/mergeCategoryTables.ts`), which rebuilds the tables of existing vaults against this same DDL.
 
-Because both execute the same DDL, they cannot drift apart. `npm run check:schema` proves it: it builds one vault each way and compares `sqlite_master`, `PRAGMA table_info`, `PRAGMA foreign_key_list`, and every index, table by table. The script covers more than the schema comparison — it also exercises resume-after-crash, migration v35's image-reference rewrite, migration v36's journal-link rewrite (below), and the constants that are mirrored between `images.rs` / `schema.ts` / `vault.rs` / `vaultManager.ts` / `tauri.conf.json` (image extensions, vault file names, scheme name). It needs `esbuild`, which is declared in `devDependencies`. Without that coupling and that check, the two paths quietly diverge after a few releases and nobody notices until a user hits an error.
+**Migration v33** `normalize_schema` no longer builds from `schema.ts` directly. Since v38 replaced the four per-module category tables with one `categories` table, `schema.ts` and the shape v33 has to produce disagree — running v33 against the live DDL would create `categories` on an old vault and then fail copying `wiki_categories`/`operation_categories`/`task_categories`/`altar_categories`, whose columns no longer exist there. `src/lib/schemaV37.ts` freezes v33's target shape instead: the tables that changed since v37 (the four category tables plus the five content tables that referenced them) as their own DDL, everything else re-exported from `schema.ts`. **Whoever changes one of those tables in a later migration must freeze it there too**, or v33 silently starts building the new shape on old vaults.
+
+Because the baseline and both rebuilds ultimately produce the same schema, they cannot drift apart. `npm run check:schema` proves it: it builds a vault each way and compares `sqlite_master`, `PRAGMA table_info`, `PRAGMA foreign_key_list`, and every index, table by table — including a v33 resume-after-crash path and a v38 resume-after-crash path, and a check that a fresh vault seeds the same categories a migrated one ends up with. The script covers more than the schema comparison — it also exercises migration v35's image-reference rewrite, migration v36's journal-link rewrite (below), and the constants that are mirrored between `images.rs` / `schema.ts` / `vault.rs` / `vaultManager.ts` / `tauri.conf.json` (image extensions, vault file names, scheme name). It needs `esbuild`, which is declared in `devDependencies`. Without that coupling and that check, the two paths quietly diverge after a few releases and nobody notices until a user hits an error.
 
 ## Migration Model
 
@@ -19,7 +21,7 @@ Because both execute the same DDL, they cannot drift apart. `npm run check:schem
 
 `runMigrations` takes one of two routes:
 
-**Fresh file** — no tables at all. It executes the DDL from `schema.ts`, seeds the built-in categories, and stamps `schema_version` with a single `baseline` row at `BASELINE_VERSION`. The historical steps are skipped entirely.
+**Fresh file** — no tables at all. It executes the DDL from `schema.ts`, seeds the built-in categories plus the starter set (below) — in whatever language is active when the vault is first opened, since `main.tsx` waits for the stored language before anything touches the database — and stamps `schema_version` with a single `baseline` row at `BASELINE_VERSION`. The historical steps are skipped entirely.
 
 The emptiness check looks at `sqlite_master`, not at `schema_version`: a database old enough to predate the version table has tables but no version row, and must run the chain.
 
@@ -27,7 +29,7 @@ The emptiness check looks at `sqlite_master`, not at `schema_version`: a databas
 
 Afterwards `runPeriodicCleanup(db)` purges trashed rows older than 30 days. It is **not** a migration — idempotent, time-dependent, and run on every vault open.
 
-The current version is **37**, and `BASELINE_VERSION` in `schema.ts` must equal the highest entry in `MIGRATIONS`. `runMigrations` throws at startup if the two disagree, so a new migration cannot be added without updating the baseline.
+The current version is **38**, and `BASELINE_VERSION` in `schema.ts` must equal the highest entry in `MIGRATIONS`. `runMigrations` throws at startup if the two disagree, so a new migration cannot be added without updating the baseline.
 
 Note that **version 24 is genuinely missing** — no entry with that number has existed for some time. The runner tolerates gaps; it only requires each version to be above the last applied one.
 
@@ -41,7 +43,13 @@ v33 repairs the rest: placements without a valid altar are given one, and if the
 
 **v36 `journal_linked_ids_to_content`** rewrites `journal_entries.linked_operation_ids`/`linked_wiki_ids` into internal-link chip blocks appended to `content` (`src/lib/migrateLinkedIdsToContent.ts`), then clears both columns and rebuilds the affected rows' `links` table entries (the migration writes past the store layer, so `syncLinks` never runs for it). A target already in the trash is skipped rather than carried over as a dead chip, a target already linked in the content is not appended twice, and a row whose column holds invalid JSON is left completely untouched (logged via `console.warn`) so a retry on the next launch can still pick it up — the migration is resumable rather than all-or-nothing.
 
-Before v33's rebuild touches anything, `normalizeSchema.ts` writes a full file backup of the database via `VACUUM INTO` to `{vaultDir}/emerald.db.pre-v33.bak`. The name is fixed, the file is never cleaned up, and on image-heavy vaults it can be sizeable — but it is the escape hatch if the one migration that rewrites every table goes wrong. (Opening a vault additionally takes a `VACUUM INTO` backup right before the normalization runs, see the changelog for 0.2.0.)
+**v38 `merge_category_tables`** (`src/lib/mergeCategoryTables.ts`) replaces `wiki_categories`, `operation_categories`, `task_categories`, and `altar_categories` with one global `categories` table and repoints `wiki_articles`, `operations`, `tasks`, and `altar_items` at it. Merging is by case-insensitive display name (`mergeCategoryRows` in `src/lib/categoryMerge.ts`, shared with the fresh-vault seed and the backup-import lift below): two categories from different modules with the same name become one row, ids are kept where possible, `general` and every module's `other` collapse into the one built-in `other`, and if an active and a trashed category would merge, the merged row comes out active. Only `other` (the fallback) and `sigils` (what the sigil editor keys on) stay built-in; every other pre-v38 built-in becomes an ordinary, renameable, deletable category.
+
+It is a rebuild in the same style as v33 (see the Foreign Keys section for why `PRAGMA foreign_keys = OFF` isn't available here), with one trap v33 didn't have to deal with: v33 predates the foreign keys it would otherwise trip. `ALTER TABLE altar_items RENAME TO altar_items_old` repoints `altar_placements`'s foreign key at `altar_items_old`, so if `altar_items_old` were dropped afterwards, `ON DELETE CASCADE` would take every placement with it — the same for `tasks` ← `task_links`. The migration avoids it by rebuilding those two parent/child pairs together: children renamed to `*_old` first (so both halves of a pair point at each other and vanish together), parents copied first into the new table, children dropped first during cleanup.
+
+Because a crash can land mid-rebuild, the migration tracks its own progress in a real table, `_category_id_map` (not `TEMP TABLE` — that's scoped to one pooled connection and might not survive to the next statement). It holds the old-id → new-id mapping the content copy needs, plus one marker row (`src='_state', old_id='content_rebuilt'`) written the instant all six content tables have been copied into their new shape. That marker is the line past which resuming may never roll back: rolling back after it would `DROP TABLE tasks` on the now-populated table and cascade-delete the also-now-populated `task_links` (and the altar equivalent) along with it. Before the marker, resuming just re-runs step 1 (undo the renames) and starts over; after it, resuming only redoes cleanup (drop the `_old` tables and the four retired category tables) and the foreign-key check — nothing is re-copied. If the map table itself is already gone (a crash right at the very end), the migration falls back to checking whether `wiki_articles` already references `categories` to tell the two states apart.
+
+Before v33's or v38's rebuild touches anything, they write a full file backup of the database via `VACUUM INTO` — to `{vaultDir}/emerald.db.pre-v33.bak` and `.pre-v38.bak` respectively. The name is fixed, the file is never cleaned up, and on image-heavy vaults it can be sizeable — but it is the escape hatch if a migration that rewrites every table goes wrong. (Opening a vault additionally takes a `VACUUM INTO` backup right before the normalization runs, see the changelog for 0.2.0.)
 
 The historical migrations themselves are left untouched. Rewriting history is riskier than repairing its outcome, and existing vaults have already run them exactly as written.
 
@@ -68,10 +76,12 @@ Eight relations are declared, with deliberately chosen delete behaviour rather t
 | `altar_placements.item_id` → `altar_items.id` | CASCADE | likewise |
 | `task_links.task_id` → `tasks.id` | CASCADE | likewise |
 | `tasks.parent_task_id` → `tasks.id` | SET NULL | the subtask survives as a standalone task |
-| `wiki_articles.category_id` → `wiki_categories.id` | RESTRICT | content must never vanish with its category |
-| `operations.category_id` → `operation_categories.id` | RESTRICT | likewise |
-| `tasks.category_id` → `task_categories.id` | RESTRICT | likewise |
-| `altar_items.category_id` → `altar_categories.id` | RESTRICT | likewise |
+| `wiki_articles.category_id` → `categories.id` | RESTRICT | content must never vanish with its category |
+| `operations.category_id` → `categories.id` | RESTRICT | likewise |
+| `tasks.category_id` → `categories.id` | RESTRICT | likewise |
+| `altar_items.category_id` → `categories.id` | RESTRICT | likewise |
+
+Since v38 all four point at the same `categories` table (previously each module had its own).
 
 ### What foreign keys cannot cover
 
@@ -87,15 +97,15 @@ These are exactly the places where orphans accumulate, and they are unguarded. T
 
 ### Deleting a category never deletes its content
 
-`RESTRICT` does not delete anything; it refuses a delete that would leave a dangling reference. `reassignCategoryContent(db, table, categoryId)` is the other half: it moves the affected content to the built-in default category (`FALLBACK_CATEGORY` in `schema.ts`) so that the delete becomes permissible. Only a *permanent* category deletion calls it — the per-store `permanentlyDelete*Category` actions (Wiki, Operations, Tasks) and `trashStore.emptyTrash`, plus `altarStore.deleteCategory`, since Altar categories have no trash step of their own and delete outright. A category's *soft* delete (moving it to Trash) never reassigns its content in any module — Wiki, Operations and Tasks all leave the content's `category_id` pointing at the now-trashed category, which the UI groups into an "Uncategorized" bucket; restoring the category from Trash brings it back with no data lost. Reassignment only happens once there is no category row left to point at.
+`RESTRICT` does not delete anything; it refuses a delete that would leave a dangling reference. `reassignCategoryContent(db, categoryId)` in `schema.ts` is the other half: it moves the affected content — across all four categorized tables (`CATEGORIZED_TABLES`: `wiki_articles`, `operations`, `tasks`, `altar_items`) in one call, since a category is shared across modules now — to the built-in fallback (`FALLBACK_CATEGORY_ID`, `'other'`) so that the delete becomes permissible. Only a *permanent* category deletion calls it — `categoryStore.permanentlyDeleteCategory` and `trashStore.emptyTrash`. A category's *soft* delete (moving it to Trash) never reassigns its content — it stays pointing at the now-trashed category, which the UI groups into an "Uncategorized" bucket; restoring the category from Trash brings it back with no data lost. Reassignment only happens once there is no category row left to point at. `reassignCategoriesInMemory` in `categoryStore.ts` is the same move applied to the four already-loaded content stores, so an in-memory row doesn't try to write back a `category_id` the foreign key would now reject.
 
-The default categories themselves (`other` for Wiki, Operations and Altar, `general` for Tasks) cannot be deleted at all. They are the destination everything else is moved to — deleting one would leave its own content stranded and then block every future attempt to empty the trash.
+The two built-ins, `other` and `sigils`, cannot be deleted at all — `other` is the destination everything else is moved to (deleting it would leave its own content stranded and then block every future attempt to empty the trash), and `sigils` is what the sigil editor keys on (`operations.category_id === SIGIL_CATEGORY_ID`).
 
-Before this, categories were hard-deleted while their content was left alone, and articles, operations, and tasks were left pointing at a `category_id` with no matching row. The 30-day purge did the same on its own. Category tables are consequently **no longer in `CLEANUP_TABLES`**; they leave only through the trash, and only after their content has been moved.
+Before this (pre-v33), categories were hard-deleted while their content was left alone, and articles, operations, and tasks were left pointing at a `category_id` with no matching row. The 30-day purge did the same on its own. `categories` is consequently **not in `CLEANUP_TABLES`**; it leaves only through the trash, and only after its content has been moved.
 
 ## Tables
 
-Sixteen tables, listed here in the dependency order `TABLES` declares — parents before children. That order is not cosmetic: inserts are checked against foreign keys immediately, so it governs the rebuild in v33 and the backup import.
+Thirteen tables, listed here in the dependency order `TABLES` declares — parents before children. That order is not cosmetic: inserts are checked against foreign keys immediately, so it governs the rebuild in v33/v38 and the backup import.
 
 ### schema_version
 
@@ -141,32 +151,20 @@ Internal `[[wiki-style]]` references between entries. `source_id` and `target_id
 | wiki_ids | TEXT | JSON array, NOT NULL DEFAULT `'[]'` |
 | created_at / updated_at | TEXT | ISO 8601 |
 
-### wiki_categories, operation_categories, task_categories
+### categories
 
-Identical shape. Defaults for `emoji` differ: `'📄'`, `'⚡'`, `'📋'`.
+Since v38, one list for Wiki, Operations, Tasks, and Altar items — replacing the four identically-shaped per-module tables (`wiki_categories`, `operation_categories`, `task_categories`, `altar_categories`). Journal has no categories (it groups by moon phase instead).
 
 | Column | Type | Notes |
 |---|---|---|
-| id | TEXT PK | fixed string for built-ins (`'sigils'`, `'servitors'`, `'other'`, `'general'`, …), UUID otherwise |
-| name | TEXT | |
-| emoji | TEXT | |
+| id | TEXT PK | `'other'` / `'sigils'` for the two built-ins, UUID otherwise |
+| name | TEXT | ignored for built-ins — their display name comes from `categories.builtin.<id>` in the active locale |
+| emoji | TEXT | NOT NULL DEFAULT `'📁'` |
 | sort_order | INTEGER | NOT NULL DEFAULT 0 |
-| is_builtin | INTEGER | boolean 0/1; built-ins cannot be deleted through the UI |
+| is_builtin | INTEGER | boolean 0/1; true only for `other` and `sigils` — every other pre-v38 built-in is now an ordinary row |
 | deleted_at | TEXT | NULL = active |
 
-The default task category `general` is seeded with `is_builtin = 0`. That looks like an oversight in migration v17, but it is the state of every existing database, so the baseline reproduces it rather than silently diverging.
-
-### altar_categories
-
-No soft delete — deleting an altar category is immediate, and its items move to `other` first.
-
-| Column | Type | Notes |
-|---|---|---|
-| id | TEXT PK | |
-| name | TEXT | |
-| emoji | TEXT | NOT NULL DEFAULT `'✨'` |
-| sort_order | INTEGER | NOT NULL DEFAULT 0 |
-| created_at | TEXT | ISO 8601 |
+No `UNIQUE` on `name` — uniqueness is enforced by the store (`categoryKey`: trimmed, case-insensitive), not the database, because a `UNIQUE` index would block restoring a trashed category from the trash the moment an active one shares its name. `other` is the fallback everything reassigns to on delete (`FALLBACK_CATEGORY_ID`); `sigils` is the one category with behaviour — an operation in it is a sigil and opens the sigil editor (`SIGIL_CATEGORY_ID`). A fresh vault also seeds eight ordinary starter categories (`STARTER_CATEGORIES`: paradigm, ritual, meditation, herbs, crystals, candles, deities, tools), named in the app's language at creation time and freely renamable/deletable from then on.
 
 ### altars
 
@@ -228,7 +226,7 @@ Both `linked_*_ids` columns were nullable until v33, unlike every other JSON arr
 | title | TEXT | default `'Untitled Article'` |
 | slug | TEXT UNIQUE | URL-friendly title |
 | content | TEXT | NOT NULL DEFAULT `''`; HTML produced by TipTap |
-| category_id | TEXT | **FK → wiki_categories.id**, RESTRICT, default `'other'` |
+| category_id | TEXT | **FK → categories.id**, RESTRICT, default `'other'` |
 | entry_number | INTEGER | |
 | cover_image / icon | TEXT | data-URL, or emoji for icon — see the Base64 note under [Key Conventions](#key-conventions) |
 | tags | TEXT | JSON array of tag names |
@@ -244,7 +242,7 @@ Both `linked_*_ids` columns were nullable until v33, unlike every other JSON arr
 | id | TEXT PK | UUID |
 | title | TEXT | default `'Untitled Operation'` |
 | content | TEXT | NOT NULL DEFAULT `''`; HTML produced by TipTap |
-| category_id | TEXT | **FK → operation_categories.id**, RESTRICT |
+| category_id | TEXT | **FK → categories.id**, RESTRICT, default `'other'` |
 | entry_number | INTEGER | |
 | description | TEXT | NOT NULL DEFAULT `''` |
 | icon / cover_image | TEXT | data-URL, or emoji for icon — see the Base64 note under [Key Conventions](#key-conventions) |
@@ -272,7 +270,7 @@ The shared library of objects that can be placed on altars.
 | id | TEXT PK | UUID |
 | name | TEXT | |
 | emoji | TEXT | NOT NULL DEFAULT `'✨'` |
-| category_id | TEXT | **FK → altar_categories.id**, RESTRICT, default `'other'` |
+| category_id | TEXT | **FK → categories.id**, RESTRICT, default `'other'` |
 | note | TEXT | |
 | image_data | TEXT | data-URL, not a path — see the Base64 note under [Key Conventions](#key-conventions) |
 | created_at | TEXT | ISO 8601 |
@@ -286,7 +284,7 @@ Until v33 this column was called `category` and held the category **name** — t
 | id | TEXT PK | UUID |
 | title | TEXT | default `'Untitled Task'` |
 | description | TEXT | |
-| category_id | TEXT | **FK → task_categories.id**, RESTRICT |
+| category_id | TEXT | **FK → categories.id**, RESTRICT, default `'other'` |
 | parent_task_id | TEXT | **FK → tasks.id**, SET NULL |
 | priority | TEXT | `'low'` \| `'medium'` \| `'high'`, default `'medium'` |
 | due_date | TEXT | date-only `YYYY-MM-DD` |
@@ -301,7 +299,7 @@ Tasks have no `entry_number`; migration v9 only added that column to journal ent
 
 The self-reference makes insert order matter: a child inserted before its parent violates the foreign key. `insertTasks` in `dbBackup.ts` inserts with `parent_task_id` NULL and fills it in afterwards.
 
-Unlike `wiki_articles` and `altar_items` (both `DEFAULT 'other'`), `tasks.category_id` and `operations.category_id` have **no SQL-level default** — the column is `NOT NULL` with nothing to fall back on. Every call site that creates a task without letting the user pick a category must pass `FALLBACK_CATEGORY.tasks` (`'general'`) explicitly; passing `''` matches no row in `task_categories` and the insert fails the foreign key silently from the caller's point of view (no task is created, no visible error).
+Since v38 all four categorized tables (`wiki_articles`, `operations`, `tasks`, `altar_items`) default `category_id` to `'other'` at the SQL level, so a call site that omits it no longer has to pass the fallback explicitly. Before v38, `tasks.category_id` and `operations.category_id` had no SQL-level default and every creation call site had to pass the fallback id by hand — passing `''` matched no row and failed the foreign key silently.
 
 ### altar_placements
 
@@ -343,7 +341,7 @@ The `deleted_at` indexes matter because `runPeriodicCleanup` runs a range scan a
 
 ## Key Conventions
 
-**Reading and writing rows.** `src/lib/row.ts` is the only place that converts between SQLite rows and the types in `src/types`. Read with `fromRow.*`, write with `toInt` and `toJson`. SQLite has neither booleans nor arrays: booleans come back as the numbers `0`/`1`, arrays as JSON text. Doing this conversion ad hoc is how `OperationCategory.is_builtin` and `TaskCategory.is_builtin` ended up holding `0`/`1` while being declared `boolean`, which the surrounding code then papered over with casts back to `number`.
+**Reading and writing rows.** `src/lib/row.ts` is the only place that converts between SQLite rows and the types in `src/types`. Read with `fromRow.*` (including `fromRow.category`, since v38), write with `toInt` and `toJson`. SQLite has neither booleans nor arrays: booleans come back as the numbers `0`/`1`, arrays as JSON text.
 
 **tags field.** `entry.tags` on journal entries, wiki articles, operations, tasks, and routines is a JSON array of tag **name** strings such as `["Ritual", "Moon"]`, not UUIDs. The `tags` table exists for autocomplete and colours.
 
@@ -413,27 +411,28 @@ Full vault snapshots are exported and imported via Settings → Backup.
 
 ```json
 {
-  "version": "3",
+  "version": "4",
   "type": "backup",
   "exportedAt": "2026-04-18T...",
   "filters": { "includeJournal": true, "includeWiki": true, "..." : "..." },
   "data": {
-    "journalEntries": [], "wikiArticles": [], "wikiCategories": [],
-    "operations": [], "operationCategories": [], "tags": [],
+    "journalEntries": [], "wikiArticles": [],
+    "operations": [], "tags": [],
     "routines": [],
-    "altars": [], "altarCategories": [], "altarItems": [], "altarPlacements": [],
-    "tasks": [], "taskCategories": [], "taskLinks": [],
+    "altars": [], "altarItems": [], "altarPlacements": [],
+    "tasks": [], "taskLinks": [],
+    "categories": [],
     "links": []
   },
   "images": { "3f2a….png": "data:image/png;base64,..." }
 }
 ```
 
-`version` is `"3"` since image references became filenames. `migrateBackupPayload` only has a v1 lift to apply; a v2 file needs no row changes, because `restoreImages` maps whatever keys the file carries — absolute paths in v1/v2, filenames in v3 — onto the filenames of the images it just wrote, and `remapPaths` substitutes those throughout. `migrateBackupPayload` lifts a `"1"` file on load: `wiki_articles.category` becomes `category_id`, `altar_items.category` is resolved from a category name to an id against the backup's own categories, and null `linked_*_ids` become `'[]'`. Without that step `insertRows` would silently drop the columns it no longer recognises — its `PRAGMA table_info` filter guards against crafted files and cannot tell malicious apart from merely old — and every article from an older backup would land in the default category.
+`version` is `"4"` since v38 replaced the four per-module category arrays (`wikiCategories`/`operationCategories`/`taskCategories`/`altarCategories`) with one `categories` array, exported whenever any of Wiki, Operations, Tasks, or Altars is included. `migrateBackupPayload` lifts a `"1"` file on load: `wiki_articles.category` becomes `category_id`, `altar_items.category` is resolved from a category name to an id against the backup's own categories, and null `linked_*_ids` become `'[]'`. A v2 file needs no row changes, because `restoreImages` maps whatever keys the file carries — absolute paths in v1/v2, filenames in v3+ — onto the filenames of the images it just wrote, and `remapPaths` substitutes those throughout. A file below version `"4"` then runs `mergeLegacyCategoryArrays`: the same merge-by-display-name rule as migration v38 (`mergeCategoryRows`, translating built-in names into the app's current language via `legacyDisplayName`), producing the one `categories` array and remapping every content row's `category_id` onto it. Without that step `insertRows` would silently drop the columns it no longer recognises — its `PRAGMA table_info` filter guards against crafted files and cannot tell malicious apart from merely old — and every article from an older backup would land in the default category.
 
-**Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Routines / Altars / Tasks / Tags`, `dateFrom`, `dateTo`, `includeDeleted`. All content tables (journal, wiki, operations, routines, altars, tasks) are date-filtered on `created_at`; tags and the category tables are not. `includeDeleted` applies to the soft-deletable content tables — `tags` are always exported with `deleted_at IS NULL`, regardless of the option. `altar_items` and `altar_placements` are scoped to exported altars; `task_links` to exported task IDs.
+**Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Routines / Altars / Tasks / Tags`, `dateFrom`, `dateTo`, `includeDeleted`. All content tables (journal, wiki, operations, routines, altars, tasks) are date-filtered on `created_at`; tags and `categories` are not. `includeDeleted` applies to the soft-deletable content tables — `tags` are always exported with `deleted_at IS NULL`, regardless of the option. `altar_items` and `altar_placements` are scoped to exported altars; `task_links` to exported task IDs.
 
-**Before anything is written**, `assertPayloadReferencesResolve` checks that every category a payload references exists — in the file itself, or among the rows the import will leave standing. `doReplace` empties the vault before inserting and cannot use a transaction (see the Foreign Keys section), so a payload that fails halfway would leave nothing behind. The check runs for merge too, where a mid-insert failure would leave a half-imported vault.
+**Before anything is written**, `assertPayloadReferencesResolve` checks that every category a payload references exists — in the file itself, or among the rows the import will leave standing (categories are never deleted by an import, so the target vault's own `categories` always counts, in both replace and merge mode). `doReplace` empties the vault before inserting and cannot use a transaction (see the Foreign Keys section), so a payload that fails halfway would leave nothing behind. The check runs for merge too, where a mid-insert failure would leave a half-imported vault.
 
 Categories are exported in full, including soft-deleted ones. Filtering them by `deleted_at IS NULL` while still exporting their articles produced backups that could not be restored at all once the foreign keys were in place.
 
@@ -441,9 +440,11 @@ Categories are exported in full, including soft-deleted ones. Filtering them by 
 
 | Mode | Behaviour |
 |---|---|
-| `replace` | Deletes only tables the backup has data for (partial-backup-safe), then inserts. The global `tags` table is wiped only when the backup contains Journal, Wiki, Operations, Tasks, *or* Routines data. |
-| `merge` | Generates an 8-char base36 timestamp prefix. All entry IDs are prefixed; cross-references and wiki slugs are remapped. `entry_number` is offset past the highest existing one, since it is now a stored value rather than a read-time `ROWID` and would otherwise collide. Categories and tags use `INSERT OR IGNORE` by original ID/name. |
+| `replace` | Deletes only tables the backup has data for (partial-backup-safe), then inserts. The global `tags` table is wiped only when the backup contains Journal, Wiki, Operations, Tasks, *or* Routines data. `categories` is never deleted (see below). |
+| `merge` | Generates an 8-char base36 timestamp prefix. All entry IDs are prefixed; cross-references and wiki slugs are remapped. `entry_number` is offset past the highest existing one, since it is now a stored value rather than a read-time `ROWID` and would otherwise collide. `categories` is resolved, not merged by `INSERT OR IGNORE`; tags still use `INSERT OR IGNORE` by name. |
 | `add-vault` | Creates a new vault DB → `switchVault()` → runs the replace logic on the empty DB. |
+
+**Categories are resolved, never deleted, on either import mode** — `resolveImportedCategories` in `dbBackup.ts`. A category in the payload matches a local one by id (for the two built-ins) or by case-insensitive name (`categoryKey`, same rule as the store and migration v38); a match restores it from the trash if the local row is trashed but the imported one is active. Anything left over is inserted fresh, with a new id if the payload's id is already taken locally. The four content arrays are then remapped onto the resulting local ids before insertion. The rule is deliberate: a category is shared across all four modules since v38, so a partial replace (Wiki only, say) must not delete categories out from under Tasks or Altar items that a full replace would have left alone.
 
 Rows are inserted parents-first; foreign keys are active during import and reject anything else. The concrete order is hard-coded per import path (`doReplace` and `doMerge` each have their own) and does *not* follow the order in `TABLES` — e.g. `links` goes last, not third.
 
