@@ -2,6 +2,7 @@ import { Fragment, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { FolderPlus, Plus } from 'lucide-react';
 import Button from './Button';
+import CollapseChevron from './CollapseChevron';
 import ListToolbar from './ListToolbar';
 import FilterPanel, { type FilterPanelProps } from './FilterPanel';
 import { useUIStore, type ViewMode, type SortMode } from '../../store/uiStore';
@@ -58,6 +59,10 @@ interface DashboardBaseProps<T> {
   primaryAction?: { label: string; onClick: () => void };
   /** Links vom Primär-Knopf, z. B. „Kategorie hinzufügen". */
   secondaryAction?: { label: string; onClick: () => void };
+  /** Kompakte Icon-Knöpfe ganz links in der Aktionsreihe — in beiden
+   *  Kopf-Bäumen gleich, weil ihr Label ohnehin nur im Tooltip steht.
+   *  Für Nebenschauplätze des Moduls (Altar: die Bibliothek unter den Altären). */
+  extraActions?: { label: string; icon: ReactNode; onClick: () => void }[];
   /** Fully replaces the action slot — in BOTH header trees: inline the
    *  topbar-right, im Seitenleisten-Modus die Titelzeilen-Buttons (gerendert
    *  in der Scroll-Spalte, wo Platz zum Umbrechen ist). Trash's bulk-select. */
@@ -82,6 +87,10 @@ interface DashboardBaseProps<T> {
   itemKey: (item: T) => string;
   noResultsMessage?: string;
   noResultsClassName?: string;
+
+  /** Unter dem Inhalt, auch im Leer- und „Keine Ergebnisse"-Fall — ein
+   *  zweiter Bereich desselben Moduls (Altar: die Bibliothek). */
+  contentFooter?: ReactNode;
 
   cardsClassName?: string;
   listClassName?: string;
@@ -126,10 +135,29 @@ const DEFAULT_EMPTY_MESSAGE_CLASSNAME = 'text-stone-600 text-sm';
 const DEFAULT_EMPTY_ACTION_CLASSNAME = 'mt-4 text-xs text-stone-500 hover:text-stone-300 underline transition-colors';
 const DEFAULT_NO_RESULTS_CLASSNAME = 'text-center py-20 text-stone-600 text-sm';
 
-function GroupDivider({ label }: { label: string }) {
+/**
+ * Die Trennlinien-Ueberschrift der Timeline-Gruppen — Label, danach eine Linie
+ * bis zum Rand. Exportiert, weil auch ein ganzer Abschnitt so ueberschrieben
+ * wird (die Bibliothek im Altar-Dashboard); dort mit Chevron und Zaehler.
+ * Nicht CollapsibleGroupHeader: der hat keine Linie und traegt Kategoriezeilen,
+ * nicht Abschnitte.
+ */
+export function GroupDivider({
+  label, count, collapsed, onToggleCollapse,
+}: {
+  label: string;
+  count?: number;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+}) {
+  const labelClass = 'text-xs font-semibold text-stone-500 uppercase tracking-wider whitespace-nowrap';
   return (
     <div className="flex items-center gap-3 mb-3">
-      <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider whitespace-nowrap">{label}</span>
+      {onToggleCollapse && <CollapseChevron collapsed={!!collapsed} onToggle={onToggleCollapse} />}
+      {onToggleCollapse
+        ? <button onClick={onToggleCollapse} className={`${labelClass} transition-colors hover:text-stone-300`}>{label}</button>
+        : <span className={labelClass}>{label}</span>}
+      {count != null && <span className="text-xs text-stone-500">({count})</span>}
       <div className="flex-1 h-px bg-stone-700/50" />
     </div>
   );
@@ -141,6 +169,7 @@ export default function Dashboard<T>({
   titleClassName = DEFAULT_TITLE_CLASSNAME,
   primaryAction,
   secondaryAction,
+  extraActions,
   headerRight,
   headerClassName = DEFAULT_HEADER_CLASSNAME,
   view,
@@ -160,6 +189,7 @@ export default function Dashboard<T>({
   noResultsMessage,
   noResultsClassName = DEFAULT_NO_RESULTS_CLASSNAME,
   grouping,
+  contentFooter,
   cardsClassName = DEFAULT_CARDS_CLASSNAME,
   listClassName = DEFAULT_LIST_CLASSNAME,
   contentClassName = DEFAULT_CONTENT_CLASSNAME,
@@ -254,12 +284,28 @@ export default function Dashboard<T>({
   // nur in einem Zweig nachgezogen wird, ist der naheliegendste Drift.
   const toolbarCommon = { view, sort, onView, onSort, viewOptions, search, onSearch };
 
+  // Einmal gebaut, in beide Kopf-Bäume gehängt: kompakt sind diese Knöpfe
+  // ohnehin in beiden, ihr Label steht so oder so nur im Tooltip.
+  const extraActionButtons = extraActions?.map((action) => (
+    <Button
+      key={action.label}
+      tone="neutral"
+      compact
+      onClick={action.onClick}
+      title={action.label}
+      aria-label={action.label}
+    >
+      {action.icon}
+    </Button>
+  ));
+
   const inlineHeader = (
     <>
       <div className={headerClassName}>
         {headerLeft ?? <h1 className={titleClassName}>{title}</h1>}
         {headerRight ?? (
           <div className="flex items-center gap-2">
+            {extraActionButtons}
             {secondaryAction && (
               <Button onClick={secondaryAction.onClick} variant="secondary">
                 <Plus size={14} />{secondaryAction.label}
@@ -297,8 +343,9 @@ export default function Dashboard<T>({
           eine breite Slot-Zeile (Trash-Bulk-Aktionen) umbrechen kann. */}
       <div className="flex items-center gap-2 px-3 h-14 border-b border-stone-700/60 flex-shrink-0 min-w-0">
         {headerLeft ?? <h1 className={`${titleClassName} truncate`}>{title}</h1>}
-        {!headerRight && (primaryAction || secondaryAction) && (
+        {!headerRight && (primaryAction || secondaryAction || extraActions?.length) && (
           <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+            {extraActionButtons}
             {secondaryAction && (
               // FolderPlus statt Plus: neben dem Jade-Plus für den neuen
               // Eintrag wären zwei identische Pluszeichen nicht unterscheidbar.
@@ -347,7 +394,10 @@ export default function Dashboard<T>({
     <div className="h-full flex flex-col">
       {listHeaderHost ? createPortal(sidebarHeader, listHeaderHost) : inlineHeader}
 
-      <div className={contentClassName}>{renderContent()}</div>
+      <div className={contentClassName}>
+        {renderContent()}
+        {contentFooter}
+      </div>
 
       {contextMenuSlot}
     </div>

@@ -2,173 +2,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { listen } from '@tauri-apps/api/event';
 import { useTranslation } from 'react-i18next';
-import { useShallow } from 'zustand/shallow';
-import { ImagePlus, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Pencil, Plus } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { FALLBACK_CATEGORY_ID } from '../../lib/schema';
 import { categoriesUsedBy, categoryLabel } from '../../lib/categories';
-import { isCandleEmoji } from '../../lib/altarConstants';
+import { ALTAR_CATEGORY_DEFAULT_EMOJI } from '../../lib/altarConstants';
 import { UNCATEGORIZED_KEY } from '../../lib/groupBy';
-import { setAltarDragItem } from '../../lib/altarDragState';
-import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
-import { imageSrc } from '../../lib/images';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import type { AltarItem, Category } from '../../types';
-import Modal from '../ui/Modal';
-import EmojiPicker from '../ui/EmojiPicker';
 import Button from '../ui/Button';
 import CategoryModal from '../ui/CategoryModal';
-import CategorySelect from '../ui/CategorySelect';
+import { AltarItemModal } from './AltarItemModal';
+import { AltarItemTile } from './AltarItemTile';
 
 const LIBRARY_DEFAULT_HEIGHT = 240;
-const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
-
-// ─── Item create/edit modal ───────────────────────────────────────────────────
-
-function ItemModal({
-  item,
-  categories,
-  defaultCategory,
-  onClose,
-}: {
-  item: AltarItem | null;
-  /** Die Volliste — ein Element darf in jede Kategorie, auch eine, die bisher nur das Wiki nutzt. */
-  categories: Category[];
-  defaultCategory: string;
-  onClose: () => void;
-}) {
-  const { t } = useTranslation();
-  const { addItem, updateItem, deleteItem } = useAltarStore(
-    useShallow((s) => ({ addItem: s.addItem, updateItem: s.updateItem, deleteItem: s.deleteItem })),
-  );
-  const [editName, setEditName] = useState(item?.name ?? '');
-  const [editEmoji, setEditEmoji] = useState(item?.emoji ?? '');
-  const [editCategory, setEditCategory] = useState(item?.category_id ?? defaultCategory);
-  const [editImageData, setEditImageData] = useState<string | null>(item?.image_data ?? null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [imageError, setImageError] = useState<string | null>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const nameInputRef = useRef<HTMLInputElement>(null);
-
-  const getCategoryEmoji = (catId: string) => categories.find((c) => c.id === catId)?.emoji ?? '✨';
-
-  // Ein selbst gewähltes Emoji überlebt den Kategoriewechsel. Nur wenn das
-  // Element bisher das Standard-Emoji seiner Kategorie trug, folgt es der neuen.
-  const changeCategory = (catId: string) => {
-    if (editEmoji === getCategoryEmoji(editCategory)) setEditEmoji('');
-    setEditCategory(catId);
-  };
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!isAcceptedImageFile(file)) {
-      setImageError(t('common.unsupportedImageFormat'));
-      e.target.value = '';
-      return;
-    }
-    if (file.size > IMAGE_MAX_BYTES) {
-      setImageError(t('altar.imageTooLarge', { max: '2 MB' }));
-      e.target.value = '';
-      return;
-    }
-    setImageError(null);
-    readFileAsDataUrl(file).then((data) => {
-      setEditImageData(data);
-      if (!editName.trim()) {
-        setEditName(file.name.replace(/\.[^.]+$/, ''));
-        setTimeout(() => nameInputRef.current?.select(), 0);
-      }
-    });
-    e.target.value = '';
-  };
-
-  const save = async () => {
-    if (!editName.trim()) return;
-    const fallbackEmoji = getCategoryEmoji(editCategory);
-    if (item) {
-      await updateItem(item.id, {
-        name: editName.trim(),
-        emoji: editEmoji || fallbackEmoji,
-        category_id: editCategory,
-        image_data: editImageData ?? undefined,
-      });
-    } else {
-      await addItem(editName.trim(), editEmoji || fallbackEmoji, editCategory, undefined, editImageData ?? undefined);
-    }
-    onClose();
-  };
-
-  const doDelete = async () => {
-    if (!item) return;
-    if (!confirmDelete) { setConfirmDelete(true); return; }
-    await deleteItem(item.id);
-    onClose();
-  };
-
-  return (
-    <Modal
-      title={item ? t('editor.edit') : t('altar.addElement')}
-      onClose={onClose}
-      widthClassName="w-full max-w-md"
-      bodyClassName="p-4 space-y-3"
-    >
-        <div className="flex items-center gap-2">
-          <EmojiPicker
-            value={editEmoji}
-            onChange={(emoji) => { setEditEmoji(emoji); setEditImageData(null); }}
-            size="lg"
-            wrapperClassName="relative flex-1"
-            trigger={({ toggle }) => (
-              <button onClick={toggle} className="w-full flex items-center gap-2 bg-stone-800/60 rounded-lg px-3 py-2 text-sm hover:bg-stone-700/60 transition-colors">
-                {imageSrc(editImageData)
-                  ? <img src={imageSrc(editImageData)} alt="" className="w-6 h-6 object-contain rounded" />
-                  : <span className="text-xl">{editEmoji || getCategoryEmoji(editCategory)}</span>}
-                <span className="text-xs text-stone-500">{t('altar.chooseEmoji')}</span>
-              </button>
-            )}
-          />
-          <Button tone="neutral" compact title={t('altar.uploadImage')} aria-label={t('altar.uploadImage')} onClick={() => imageInputRef.current?.click()}><ImagePlus size={14} /></Button>
-        </div>
-        {imageError && <p className="text-xs text-red-400">{imageError}</p>}
-        <input ref={imageInputRef} type="file" accept={ACCEPTED_IMAGE_MIME} className="hidden" onChange={handleImageChange} />
-        <input ref={nameInputRef} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t('altar.elementName')} className="w-full bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" />
-        <div>
-          <p className="label-xs mb-1">{t('properties.category')}</p>
-          <CategorySelect
-            categories={categories}
-            value={editCategory}
-            onChange={changeCategory}
-            getLabel={(c) => categoryLabel(t, c)}
-            variant="field"
-          />
-        </div>
-        {/* Dieselbe Lösch-/Speichern-Reihe wie im CategoryModal daneben. */}
-        {item && confirmDelete ? (
-          <div className="flex items-center justify-between rounded-lg border border-red-700/40 bg-red-950/20 px-3 py-2">
-            <span className="text-xs text-red-300">{t('common.deleteConfirm')}</span>
-            <span className="flex items-center gap-2">
-              <Button tone="danger" onClick={doDelete}>{t('common.confirmYes')}</Button>
-              <Button tone="neutral" onClick={() => setConfirmDelete(false)}>{t('common.confirmNo')}</Button>
-            </span>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between gap-2">
-            {item ? (
-              <Button tone="danger" onClick={doDelete} title={t('common.delete')}>
-                <Trash2 size={12} /> {t('common.delete')}
-              </Button>
-            ) : <span />}
-            <span className="flex items-center gap-2">
-              <Button tone="neutral" onClick={onClose}>{t('common.cancel')}</Button>
-              <Button tone="jade" onClick={save} disabled={!editName.trim()}>{t('common.save')}</Button>
-            </span>
-          </div>
-        )}
-    </Modal>
-  );
-}
 
 /**
  * Überträgt die Reihenfolge eines Ausschnitts auf die Volliste: Die Plätze,
@@ -219,7 +67,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
   // Kategorien laufen über denselben Editor wie Wiki, Operations und Tasks —
   // nur dass hier auch das Bearbeiten im Modal statt in einer Kopfzeile passiert.
   const catEditor = useCategoryEditor({
-    defaultEmoji: '📦',
+    defaultEmoji: ALTAR_CATEGORY_DEFAULT_EMOJI,
     onAdded: (cat) => setActiveCategoryTab(cat.id),
   });
   const editingCategory = catEditor.editingCatId
@@ -464,23 +312,18 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
         {filteredItems.length === 0 && <p className="text-xs text-stone-700 px-2 py-3">{t('altar.noElements')}</p>}
         <div className="grid [grid-template-columns:repeat(auto-fill,70px)] gap-1.5 justify-start">
           {filteredItems.map((item) => (
-            <div key={item.id} onPointerDown={(e) => { if (!editable) return; e.preventDefault(); setAltarDragItem(item); }} className={`group w-[70px] h-[85px] rounded-md border border-stone-700/60 bg-stone-900/40 px-1.5 py-2 flex flex-col ${editable ? 'cursor-grab active:cursor-grabbing' : 'cursor-default opacity-90'}`}>
-              <div className="mb-1 w-full h-12 flex items-center justify-center overflow-hidden rounded-sm bg-stone-950/35">
-                {imageSrc(item.image_data)
-                  ? <img src={imageSrc(item.image_data)} alt="" className="h-full w-full object-contain" draggable={false} />
-                  : <span className={`leading-none select-none ${isCandleEmoji(item.emoji) ? 'candle-flame' : ''}`} style={{ fontSize: 34 }}>{item.emoji}</span>}
-              </div>
-              <div className="mt-auto flex items-center gap-1">
-                <span className="flex-1 truncate text-[10px] text-stone-300">{item.name}</span>
-                {editable ? <button onClick={(e) => { e.stopPropagation(); openEditModal(item); }} className="text-stone-600 hover:text-stone-300 transition-colors p-0.5" title={t('editor.edit')}><Pencil size={10} /></button> : null}
-              </div>
-            </div>
+            <AltarItemTile
+              key={item.id}
+              item={item}
+              draggable={editable}
+              onEdit={editable ? () => openEditModal(item) : undefined}
+            />
           ))}
         </div>
       </div>
 
       {isItemModalOpen && (
-        <ItemModal
+        <AltarItemModal
           key={editingItem?.id ?? 'create'}
           item={editingItem}
           categories={allCategories}

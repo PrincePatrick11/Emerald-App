@@ -1,12 +1,13 @@
 import { useCallback } from 'react';
 import { useUIStore } from '../store/uiStore';
 
-export type CollapseScope = 'journal' | 'wiki' | 'operations' | 'tasks';
+export type CollapseScope = 'journal' | 'wiki' | 'operations' | 'tasks' | 'altar-library';
 
 const EMPTY: ReadonlySet<string> = new Set();
 
 /**
- * Zuklapp-Zustand der Kategorie-Gruppen eines Moduls (Tasks, Wiki, Operations).
+ * Zuklapp-Zustand der Kategorie-Gruppen eines Moduls (Tasks, Wiki, Operations
+ * und die Bibliothek im Altar-Dashboard).
  *
  * Der Zustand liegt im uiStore, nicht View-lokal: MainArea unmountet die Views
  * beim Modulwechsel, ein useState wäre nach jedem Rail-Klick wieder leer.

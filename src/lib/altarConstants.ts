@@ -63,6 +63,9 @@ export function ratioFromResolution(res: string): AltarRatio | null {
 
 export const DEFAULT_BACKGROUND_OVERLAY = 0.2;
 
+/** Vorbelegtes Emoji beim Anlegen einer Bibliothekskategorie — Leiste wie Dashboard. */
+export const ALTAR_CATEGORY_DEFAULT_EMOJI = '📦';
+
 export const DEFAULT_GRID_SIZE = 32;
 export const DEFAULT_GRID_OPACITY = 0.06;
 export const DEFAULT_GRID_COLOR = '#dce8e2';
