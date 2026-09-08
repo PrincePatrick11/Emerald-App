@@ -11,7 +11,7 @@ import VaultModal, { VaultGlyph } from './VaultModal';
 // hinter sich her — als eigener Chunk erst beim ersten Oeffnen.
 // VaultModal bleibt eager: VaultGlyph wird fuer den Rail-Button gebraucht,
 // und AppShell rendert es beim Erststart ohnehin.
-const SettingsModal = lazy(() => import('./SettingsModal'));
+const SettingsModal = lazy(() => import('./settings/SettingsModal'));
 import RailButton from '../ui/RailButton';
 
 /** Breite der Rail. `AppShell` rechnet damit die Breite des <aside> und

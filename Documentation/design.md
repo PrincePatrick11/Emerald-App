@@ -34,7 +34,7 @@ colour's triple maintenance grew out of.
 case — the `tone="amber"` mode for the edit action in row action bars — and not extended.
 One straggler exists without a deviation comment: the lock indicator in
 `PlacedElementRow` (`text-amber-400 hover:text-amber-300`). The former second one —
-`SettingsModal`'s replace-import warning — now runs on the `--danger-*` tokens, which is
+`settings/BackupPage.tsx`'s replace-import warning — now runs on the `--danger-*` tokens, which is
 also its correct meaning (it announces permanent data loss). A third accent tone needs a
 theme token in both files first.
 
@@ -173,8 +173,7 @@ exist.
 *Cost: move the 19 sites onto `--text-muted` or similar, then delete the scale.*
 
 **5. Icon sizes sit off the scale in roughly a third of cases.** Around 100 occurrences at
-13, 11, 15, 10, 9, 8 and 7px, in places inconsistent within a single file — `SettingsModal.tsx`
-mixes 13 and 14 for section icons with no discernible pattern.
+13, 11, 15, 10, 9, 8 and 7px.
 *Cost: mechanical but widely scattered; best done per file when it is touched anyway.*
 
 **6. Radius-rule violations.** `UndoToast` carries `rounded-xl` (a floating overlay on the
@@ -191,10 +190,14 @@ because it is unclear whether `font-mono` is needed at all.*
 `html[data-theme='emerald-parchment'] button:focus-visible` (`index.css:1426`); Noctis has
 `:focus-visible` only for individual classes (`.window-control`, `.titlebar-menu-trigger`,
 `.menu-item`, `.link-picker-row`, `.filter-chip`, `.sidebar-action-btn`, `.altar-item-tile`,
-`.right-sidebar-tab-idle`/`-active`, `.link-picker-tab-idle`/`-active`). The last four cover
-`Button`'s tone mode (so `RightSidebarActionBar`'s buttons, among every other tone-mode use,
-now get a ring) and the sidebar's and link picker's tab/segment toggles — the same per-class
-patch `.filter-chip` already had, not the missing generic rule. The four base `Button`
+`.right-sidebar-tab-idle`/`-active`, `.link-picker-tab-idle`/`-active`,
+`.settings-choice-btn`, `.settings-nav-item-idle`/`-active`). `.sidebar-action-btn`,
+`.altar-item-tile`, `.right-sidebar-tab-idle`/`-active` and `.link-picker-tab-idle`/`-active`
+cover `Button`'s tone mode (so `RightSidebarActionBar`'s buttons, among every other tone-mode
+use, now get a ring) and the sidebar's and link picker's tab/segment toggles; the two
+Settings classes are the same fix for the settings-page navigation and its choice buttons
+(theme/language/import-mode) — every one of these is the same per-class patch `.filter-chip`
+already had, not the missing generic rule. The four base `Button`
 variants (`primary`/`secondary`/`ghost`/`danger`) and any plain `<button>` written directly
 in a view still look unfocused in Noctis. *Cost: one rule, mirrored from Parchment.*
 

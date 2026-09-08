@@ -82,7 +82,7 @@ release on GitHub.
 
 1. **Verifies the tag against all three version sites.** The version lives in
    `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, and
-   the three must be character-identical — `SettingsModal.tsx` imports
+   the three must be character-identical — `settings/AboutPage.tsx` imports
    `package.json` directly and shows the version in the UI, while the bundle
    filename comes from `Cargo.toml`. A tag of `v0.2.1` against files saying
    `0.2.0` fails the job with an annotation naming which files disagree.

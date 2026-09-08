@@ -8,6 +8,10 @@ export interface ContextMenuAction {
   icon?: ReactNode;
   onClick: () => void;
   danger?: boolean;
+  /** Ausgegraut statt versteckt: ein Menue, dessen Eintraege je nach Lage
+   *  verschwinden, wechselt bei jedem Aufruf die Reihenfolge. Dieselbe
+   *  Bedeutung wie disabled in MenuDropdown. */
+  disabled?: boolean;
 }
 
 interface Props {
@@ -46,7 +50,10 @@ export default function ContextMenu({ x, y, actions, onClose }: Props) {
   }, [x, y]);
 
   // Delay, um das rechtsklickende mousedown zu ueberspringen, das dieses Menue oeffnete.
-  useOutsideClick(true, onClose, { refs: [ref], escape: true, delay: 50 });
+  // Escape in der Capture-Phase: ein Menue ueber einem Modal ist der oberste
+  // Layer, und ohne das Abfangen schloesse dieselbe Taste auch das Modal
+  // darunter, dessen Handler ebenfalls am document haengt.
+  useOutsideClick(true, onClose, { refs: [ref], escape: 'capture', delay: 50 });
 
   // Portal nach `document.body`, aus demselben Grund wie bei `EmojiPicker`:
   // `.app-sidebar` und `.app-main` tragen in beiden Themes `position: relative;
@@ -62,13 +69,19 @@ export default function ContextMenu({ x, y, actions, onClose }: Props) {
       {actions.map((action, i) => (
         <button
           key={i}
-          onMouseDown={(e) => e.stopPropagation()}
+          disabled={action.disabled}
+          // stopPropagation haelt das Menue offen, preventDefault haelt die
+          // Auswahl am Leben: sonst wandert der Fokus beim Mousedown auf
+          // diesen Button, die Markierung im Feld kollabiert und Kopieren
+          // haette nichts mehr zu kopieren. Gleicher Griff wie in
+          // MenuDropdown und TitleBarMenuBar.
+          onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
           onClick={() => { action.onClick(); onClose(); }}
           className={`context-menu-item w-full text-left px-3 py-2 text-xs flex items-center gap-2.5 transition-colors ${
             action.danger
               ? 'context-menu-item-danger text-red-400 hover:text-red-300 hover:bg-red-900/20'
               : 'context-menu-item-default text-stone-300 hover:text-stone-100 hover:bg-stone-700/50'
-          }`}
+          }${action.disabled ? ' opacity-45 cursor-default pointer-events-none' : ''}`}
         >
           {action.icon}
           {action.label}

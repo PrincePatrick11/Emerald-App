@@ -512,10 +512,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
   /* Gleiche Begruendung wie .filter-chip:focus-visible direkt darueber: die
      tone-Buttons (sidebar-action-btn), die Tab-/Segment-Toggles
-     (TabIconButton), die klickbaren Bibliothekskacheln (div[role=button]) und
-     die Link-Picker-Tabs sind fokussierbar, Noctis hat
+     (TabIconButton), die klickbaren Bibliothekskacheln (div[role=button]),
+     die Link-Picker-Tabs und die Settings-Navigation sind fokussierbar, Noctis hat
      aber keine generische button:focus-visible-Regel — ohne eigenen Ring
      blieben sie dort tastatur-unsichtbar. */
+  .settings-choice-btn:focus-visible,
+  .settings-nav-item-idle:focus-visible,
+  .settings-nav-item-active:focus-visible,
   .sidebar-action-btn:focus-visible,
   .altar-item-tile:focus-visible,
   .right-sidebar-tab-idle:focus-visible,
@@ -901,6 +904,41 @@ html[data-theme='emerald-parchment'] .border-stone-600 { border-color: var(--bor
   background-color: var(--menu-bg);
 }
 
+/* Die vier Links im Ueber-Bereich. Farbe aus --accent statt aus einer
+   jade-Utility, damit Parchment dafuer keine weitere Bruecke tragen muss; der
+   Hover mischt Richtung Textfarbe und wird dadurch in Noctis heller und in
+   Parchment dunkler. Der Fokusring ist Pflicht und nicht Kür: Noctis hat keine
+   generische button:focus-visible-Regel. */
+/* Der Rahmen der inaktiven Zeile ist reiner Platzhalter fuer die Breite der
+   aktiven — sichtbar werden soll er nicht. Parchment faerbt mit
+   `html[data-theme='emerald-parchment'] *` jeden Rahmen vor, und dagegen
+   verlieren sowohl die Utility border-transparent als auch eine einfache
+   Klassenregel: gleiche Spezifitaet, die spaetere gewinnt. Deshalb der
+   Attribut-Selektor davor — 0-2-0 statt 0-1-0. */
+html[data-theme] .settings-nav-item-idle {
+  border-color: transparent;
+}
+
+/* Die vier Icon-Links im Ueber-Bereich. Alles aus Theme-Tokens statt aus
+   stone-/jade-Utilities, sonst haengt an jeder Farbe hier eine weitere
+   Parchment-Bruecke. Der Attribut-Selektor davor aus demselben Grund wie eine
+   Regel weiter oben: Parchment faerbt jeden Rahmen vor, und bei gleicher
+   Spezifitaet gewinnt die spaetere Regel. Der Fokusring ist Pflicht — Noctis
+   hat keine generische button:focus-visible-Regel. */
+html[data-theme] .settings-about-link {
+  color: var(--accent);
+}
+
+html[data-theme] .settings-about-link:hover {
+  color: color-mix(in srgb, var(--accent) 78%, var(--text-primary));
+}
+
+html[data-theme] .settings-about-link:focus-visible {
+  outline: none;
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
 .context-menu-item-default:hover {
   background-color: var(--menu-item-hover-bg);
   color: var(--menu-item-hover-text);
@@ -1217,6 +1255,13 @@ html[data-theme='emerald-noctis'] .panel-interactive:hover .home-item-title {
   color: #f4e8db;
 }
 
+/* Die Bereichsnavigation der Einstellungen teilt sich die Werte mit den
+   Sidebar-Tabs, bekommt aber einen eigenen Namen: eine Nav-Zeile in einem
+   Dialog ist etwas anderes als ein Tab-Icon in der Seitenleiste, und die
+   Zeilen sollen sich spaeter aendern koennen, ohne die Leisten mitzuziehen.
+   Beitritt zur bestehenden Gruppe statt eigener Hexwerte, damit die Parität
+   beider Themes bauartbedingt bleibt. */
+html[data-theme='emerald-noctis'] .settings-nav-item-active,
 html[data-theme='emerald-noctis'] .right-sidebar-tab-active,
 html[data-theme='emerald-noctis'] .app-sidebar-right .bg-stone-700.text-stone-200,
 html[data-theme='emerald-noctis'] .app-sidebar-left .bg-stone-700.text-stone-200 {
@@ -1225,6 +1270,7 @@ html[data-theme='emerald-noctis'] .app-sidebar-left .bg-stone-700.text-stone-200
   border: 1px solid rgba(0, 196, 127, 0.34);
 }
 
+html[data-theme='emerald-noctis'] .settings-nav-item-idle,
 html[data-theme='emerald-noctis'] .right-sidebar-tab-idle,
 html[data-theme='emerald-noctis'] .task-action-btn,
 html[data-theme='emerald-noctis'] .linked-entry-menu-item,
@@ -1234,6 +1280,7 @@ html[data-theme='emerald-noctis'] .altar-category-chip {
   color: #b49d87;
 }
 
+html[data-theme='emerald-noctis'] .settings-nav-item-idle:hover,
 html[data-theme='emerald-noctis'] .right-sidebar-tab-idle:hover:not(:disabled),
 html[data-theme='emerald-noctis'] .app-sidebar-right .text-stone-500.hover\:text-stone-300:hover,
 html[data-theme='emerald-noctis'] .app-sidebar-left .text-stone-500.hover\:text-stone-300:hover,
@@ -1648,16 +1695,19 @@ html[data-theme='emerald-parchment'] .tag-color-popover {
   box-shadow: 0 14px 28px rgba(94, 63, 30, 0.2);
 }
 
+html[data-theme='emerald-parchment'] .settings-nav-item-active,
 html[data-theme='emerald-parchment'] .right-sidebar-tab-active {
   background: #d8efe3;
   color: #0b5a3a;
   border: 1px solid rgba(0, 138, 87, 0.34);
 }
 
+html[data-theme='emerald-parchment'] .settings-nav-item-idle,
 html[data-theme='emerald-parchment'] .right-sidebar-tab-idle {
   color: #7f6448;
 }
 
+html[data-theme='emerald-parchment'] .settings-nav-item-idle:hover,
 html[data-theme='emerald-parchment'] .right-sidebar-tab-idle:hover:not(:disabled),
 html[data-theme='emerald-parchment'] .app-sidebar-right .text-stone-500.hover\:text-stone-300:hover,
 html[data-theme='emerald-parchment'] .app-sidebar-left .text-stone-500.hover\:text-stone-300:hover {

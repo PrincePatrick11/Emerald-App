@@ -376,13 +376,15 @@ Right-click any entry in the left sidebar or in any list view (List, Cards, Time
 
 **Delete.** Soft-deletes the entry and shows a 5-second undo toast in the bottom-right corner. If the deleted entry is currently open, the view navigates away.
 
+**Text editing context menu.** Right-clicking into any text input, textarea, or other editable field offers Cut, Copy, Paste, and Select all; right-clicking selected read-only text elsewhere offers Copy. This replaces the WebView's own native menu everywhere except the rich-text editor, which keeps the native one — its spell-check suggestions cannot be reproduced from JavaScript. The commands are the same ones the title bar's Edit menu uses.
+
 ## Language
 
-Settings > Language switches the app language between English, German, Spanish, and French. English is the default and fallback language; the other three locale bundles are loaded on demand the first time they are selected (`changeAppLanguage` in `src/i18n/index.ts`). The choice is persisted in `localStorage` under `app-language` — like the theme, it is applied before the first render so the app never flashes English on launch.
+Settings → General → Language switches the app language between English, German, Spanish, and French. English is the default and fallback language; the other three locale bundles are loaded on demand the first time they are selected (`changeAppLanguage` in `src/i18n/index.ts`). The choice is persisted in `localStorage` under `app-language` — like the theme, it is applied before the first render so the app never flashes English on launch.
 
 ## Typography
 
-Emerald provides two independent font controls in Settings > Appearance:
+Emerald provides two independent font controls in Settings → General → Appearance:
 
 - **UI font** — Controls the typeface used across the application shell, sidebars, settings, lists, and all non-editor UI. Default: **Inter**.
 - **Editor body font** — Controls the typeface used in the TipTap rich-text editor body, entry titles, and the read-mode body of journal entries, wiki articles, operations, sigils, and the altar view. Default: **Lora**.
@@ -395,7 +397,7 @@ Font preferences are stored in `localStorage` under the keys `ui-font-id` and `e
 
 ## Theming
 
-Emerald ships with two named themes, selectable in Settings > Appearance:
+Emerald ships with two named themes, selectable in Settings → General → Appearance:
 
 - **Emerald Noctis** — Dark theme with warm stone tones and jade green accents. This is the default.
 - **Emerald Parchment** — Light theme with parchment-like warm beige backgrounds, structured panel shadows, and adapted accent colours.

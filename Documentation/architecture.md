@@ -29,8 +29,14 @@ This is the structural map — where things live. What the shared building block
 src/
 ├── components/
 │   ├── layout/       AppShell, LeftSidebarRail, LeftSidebarEntryList, RightSidebar, MainArea,
-│   │                 SettingsModal, TabBar, moduleViews.ts (component-layer half of the
+│   │                 TabBar, moduleViews.ts (component-layer half of the
 │   │                 module registry: ViewId → lazy view; import-restricted to MainArea only)
+│   │   ├── settings/ SettingsModal (two-pane shell: vertical nav + scrolling content pane,
+│   │   │             fixed `w-[680px]`/`h-[600px]` so switching pages never resizes the
+│   │   │             card), one component per page — GeneralPage, BackupPage, StoragePage,
+│   │   │             AboutPage — plus SettingsSection/SettingsChoiceButton (shared building
+│   │   │             blocks, see components.md) and BrandIcons (GitHub/Patreon/Discord marks
+│   │   │             as inline SVGs — lucide carries no brand icons)
 │   │   └── titlebar/ TitleBar (custom window chrome), WindowControls, TitleBarMenuBar,
 │   │                 MenuDropdown, TitleBarSearch (global search field), TitleBarSearchResults
 │   │                 (results dropdown), useIsMaximized, editCommands
@@ -53,11 +59,15 @@ src/
 │   │                 AltarItemModal (add/edit item dialog, extracted from AltarLibraryStrip),
 │   │                 AltarLibrarySection (the Altar dashboard's library-under-the-altars
 │   │                 section)
-│   └── ui/           Button, Modal, ContextMenu, EmojiPicker, Dashboard, EntryListTab,
-│                     ListToolbar, FilterPanel, RailButton, TabIconButton, UndoToast,
-│                     ImportDestinationModal, Dropdown, CategoryHeaderRow, CategoryModal,
-│                     CategorySelect, EntryDetailFrame — the shared component layer; what each
-│                     one encapsulates and where it can be extended is in components.md
+│   └── ui/           Button, Modal, ContextMenu, EditContextMenu (the app's own text
+│                     right-click menu — mounted once in `App.tsx`, alongside `AppShell`
+│                     rather than inside it, since `AppShell` returns early for the first-run
+│                     vault-setup screen and the menu has to reach that screen's fields too),
+│                     EmojiPicker, Dashboard, EntryListTab, ListToolbar, FilterPanel,
+│                     RailButton, TabIconButton, UndoToast, ImportDestinationModal, Dropdown,
+│                     CategoryHeaderRow, CategoryModal, CategorySelect, EntryDetailFrame — the
+│                     shared component layer; what each one encapsulates and where it can be
+│                     extended is in components.md
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, categoryStore (the one Wiki/Operations/Tasks/Altar category
 │                                      list, see Categories below), routineStore, undoStore,
