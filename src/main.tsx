@@ -8,6 +8,7 @@ import "./index.css";
 import "tippy.js/dist/tippy.css";
 import { applyTheme, normalizeThemeId } from "./themes/theme";
 import { platformName } from "./lib/platform";
+import { initSplash } from "./lib/splash";
 
 // Load Google Fonts asynchronously so they never block the initial render.
 // The render-blocking <link rel="stylesheet"> was moved here from index.html.
@@ -36,6 +37,10 @@ const languageReady =
 // Sicherheitsnetz: settelt der Locale-Chunk wider Erwarten nie, rendert die
 // App nach 2s trotzdem (dann englisch) statt ein leeres Fenster zu zeigen.
 const languageDeadline = new Promise<void>((resolve) => setTimeout(resolve, 2000));
+
+// Muss laufen, solange der Ladebildschirm noch im DOM steht — deshalb hier
+// und nicht in einer Komponente. Warum, steht an `initSplash()`.
+initSplash();
 
 void Promise.race([languageReady, languageDeadline]).then(() => {
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

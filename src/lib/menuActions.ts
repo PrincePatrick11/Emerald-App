@@ -1,6 +1,7 @@
 import { emit } from '@tauri-apps/api/event';
 import { useUIStore } from '../store/uiStore';
 import { hasActiveVault, useVaultStore } from '../store/vaultStore';
+import { showSplash } from './splash';
 import type { ActiveView, Operation } from '../types';
 import { SIGIL_CATEGORY_ID } from './schema';
 
@@ -17,6 +18,7 @@ export type MenuActionId =
   | 'reset-sidebar-widths'
   | 'toggle-left-list'
   | 'toggle-right-sidebar'
+  | 'show-splash'
   | 'export-pdf'
   | 'export-markdown'
   | 'export-emerald'
@@ -39,6 +41,7 @@ export type SelfContainedMenuActionId = Exclude<MenuActionId, 'reset-sidebar-wid
 const SELF_CONTAINED: Record<SelfContainedMenuActionId, true> = {
   'toggle-left-list': true,
   'toggle-right-sidebar': true,
+  'show-splash': true,
   'export-pdf': true,
   'export-markdown': true,
   'export-emerald': true,
@@ -65,6 +68,13 @@ export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void
       return;
     case 'toggle-right-sidebar':
       useUIStore.getState().toggleRightSidebar();
+      return;
+    // Zeigt den Ladebildschirm noch einmal an, bis irgendwo hingeklickt wird.
+    // Steht hier oben bei den beiden Toggles, weil er wie sie keinen Vault
+    // braucht — er soll sich auch waehrend der Vault-Einrichtung ansehen
+    // lassen, das ist der Moment, in dem man ihn am ehesten sucht.
+    case 'show-splash':
+      showSplash();
       return;
   }
 

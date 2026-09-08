@@ -60,6 +60,7 @@ export default function TitleBarMenuBar({ compact }: { compact: boolean }) {
         { kind: 'item', label: t('menu.properties'), checked: rightSidebarOpen, onSelect: () => dispatchMenuAction('toggle-right-sidebar') },
         { kind: 'separator' },
         { kind: 'item', label: t('menu.resetView'), onSelect: () => dispatchMenuAction('reset-sidebar-widths') },
+        { kind: 'item', label: t('menu.showSplash'), onSelect: () => dispatchMenuAction('show-splash') },
       ],
     },
     {

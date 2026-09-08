@@ -7,10 +7,152 @@
     <title>Emerald</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Die Stile des Ladebildschirms. Eine eigene Datei aus `public/` und
+         kein <style> im Dokument — warum, steht oben in `public/splash.css`;
+         es ist keine Geschmacksfrage. Als <link> im <head> blockiert sie das
+         Rendern und steht damit im allerersten Frame. -->
+    <link rel="stylesheet" href="/splash.css" />
+
+    <script>
+      /* Zwei Dinge, die laufen muessen, bevor es das Bundle gibt.
+
+         1. Das gespeicherte Theme setzen, damit der Ladebildschirm gleich in
+            den richtigen Farben erscheint. Bewusste Kopie von
+            `normalizeThemeId()` aus `src/themes/theme.ts`: dieses Skript
+            laeuft vor dem Bundle und darf nichts importieren.
+
+         2. Ein letztes Sicherheitsnetz aufspannen. Regulaer raeumt `AppShell`
+            den Bildschirm ab, ersatzweise der Timer aus `initSplash()`
+            (`lib/splash.ts`). Beides steckt im Bundle — laedt das nicht oder
+            wirft ein Import, laeuft keines von beiden. Der Bildschirm bliebe
+            dann fuer immer stehen, und weil er auf Windows und Linux die
+            eigenen Fensterknoepfe verdeckt (`decorations: false`), bliebe nur
+            noch Alt+F4. Deshalb liegt dieser eine Timer hier, wo ihn kein
+            Bundle-Fehler erreichen kann. Er raeumt hart ab, ohne Ausblenden,
+            und laeuft spaeter als der regulaere, damit er ihm nicht
+            zuvorkommt.
+
+         Tauri hasht Inline-Skripte beim Bauen und haengt den sha256 an
+         `script-src`, dieses Skript laeuft also trotz `script-src 'self'`.
+         Einen Nonce bekommt es nicht — der Selektor dafuer ist
+         `script[src^='http']` und trifft hier nichts. Fuer `<style>` gilt das
+         nicht, siehe `public/splash.css`. */
+      (function () {
+        var raw = null;
+        try {
+          raw = localStorage.getItem('theme-id') || localStorage.getItem('theme');
+        } catch (e) {
+          /* Kein Zugriff auf localStorage — dann eben das Standard-Theme. */
+        }
+        document.documentElement.dataset.theme =
+          raw === 'emerald-parchment' || raw === 'light' ? 'emerald-parchment' : 'emerald-noctis';
+
+        setTimeout(function () {
+          var el = document.getElementById('splash');
+          if (el) el.remove();
+        }, 15000);
+      })();
+    </script>
   </head>
 
   <body>
+    <div id="splash" class="splash" data-tauri-drag-region>
+      <svg class="splash-gem" viewBox="-128 -128 512 512" aria-hidden="true">
+        <defs>
+          <!-- Die Farben aller Stops stehen in `splash.css`, nicht hier:
+               `var()` in einem SVG-Praesentationsattribut wird nicht von jeder
+               Engine ersetzt. Mehrstufiger Abfall statt zweier Stops, weil
+               eine Zweistop-Interpolation ueber so eine lange, flache Rampe in
+               8 Bit sichtbare Ringe zeigt. -->
+          <radialGradient id="splash-glow" gradientUnits="userSpaceOnUse" cx="128" cy="122" r="241">
+            <stop offset="0%"   stop-opacity="0.22" />
+            <stop offset="30%"  stop-opacity="0.15" />
+            <stop offset="55%"  stop-opacity="0.07" />
+            <stop offset="78%"  stop-opacity="0.02" />
+            <stop offset="100%" stop-opacity="0" />
+          </radialGradient>
+          <!-- Der Atem: helles Licht aus der Mitte des Steins. -->
+          <radialGradient id="splash-breath-grad" gradientUnits="userSpaceOnUse"
+                          cx="128" cy="122" r="86">
+            <stop offset="0%"   stop-opacity="0.20" />
+            <stop offset="55%"  stop-opacity="0.08" />
+            <stop offset="100%" stop-opacity="0" />
+          </radialGradient>
+          <linearGradient id="splash-table" x1="0" y1="0" x2="0" y2="1">
+            <stop class="splash-table-top"    offset="0%" />
+            <stop class="splash-table-bottom" offset="100%" />
+          </linearGradient>
+          <linearGradient id="splash-band" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stop-opacity="0" />
+            <stop offset="50%"  stop-opacity="1" />
+            <stop offset="100%" stop-opacity="0" />
+          </linearGradient>
+          <clipPath id="splash-clip">
+            <polygon points="74,77 97,54 159,54 182,77 182,167 159,190 97,190 74,167" />
+          </clipPath>
+        </defs>
+
+        <!-- Der Schein. r=241 liegt vollstaendig in der viewBox — siehe den
+             Kommentar an `.splash-gem` in `splash.css`. -->
+        <circle class="splash-halo" cx="128" cy="122" r="241" fill="url(#splash-glow)" />
+
+        <!-- Der Smaragd: Krone aus acht Facetten, Tafel, Stufenschliff -->
+        <g clip-path="url(#splash-clip)">
+          <polygon class="splash-facet" points="74,77 97,54 105,71 91,89" />
+          <polygon class="splash-facet" points="97,54 159,54 151,71 105,71" />
+          <polygon class="splash-facet" points="159,54 182,77 165,89 151,71" />
+          <polygon class="splash-facet" points="182,77 182,167 165,155 165,89" />
+          <polygon class="splash-facet" points="182,167 159,190 151,173 165,155" />
+          <polygon class="splash-facet" points="159,190 97,190 105,173 151,173" />
+          <polygon class="splash-facet" points="97,190 74,167 91,155 105,173" />
+          <polygon class="splash-facet" points="74,167 74,77 91,89 91,155" />
+
+          <polygon points="91,89 105,71 151,71 165,89 165,155 151,173 105,173 91,155"
+                   fill="url(#splash-table)" opacity="0.9" />
+
+          <circle class="splash-breath" cx="128" cy="122" r="86"
+                  fill="url(#splash-breath-grad)" />
+
+          <!-- Die Schliffkanten als eigene Linien. Ohne sie entstuenden sie
+               nur dort, wo zwei Facettenfuellungen aneinanderstossen — und so
+               eine Naht wird von beiden Seiten unabhaengig kantengeglaettet,
+               also weich. -->
+          <path class="splash-cut" fill="none"
+                d="M74,77 L91,89 M97,54 L105,71 M159,54 L151,71 M182,77 L165,89
+                   M182,167 L165,155 M159,190 L151,173 M97,190 L105,173 M74,167 L91,155
+                   M91,89 L105,71 L151,71 L165,89 L165,155 L151,173 L105,173 L91,155 Z" />
+
+          <polygon class="splash-step" fill="none" stroke-width="1" opacity="0.28"
+                   points="102,90 111,78 145,78 154,90 154,154 145,166 111,166 102,154" />
+
+          <!-- Die Neigung sitzt an dieser Gruppe und nicht am Rechteck: die
+               CSS-Animation auf `transform` wuerde ein `transform`-Attribut am
+               Rechteck selbst ersetzen, und das Band liefe aufrecht. -->
+          <g transform="rotate(18 128 122)">
+            <rect class="splash-sheen" x="44" y="38" width="33" height="174"
+                  fill="url(#splash-band)" opacity="0.5" />
+          </g>
+        </g>
+
+        <polygon class="splash-outline" fill="none" stroke-width="2"
+                 stroke-linejoin="round" opacity="0.95"
+                 points="74,77 97,54 159,54 182,77 182,167 159,190 97,190 74,167" />
+
+        <!-- Funken: Vierstrahler, gezeichnet als vier nach innen gebogene
+             Viertel um den Mittelpunkt. -->
+        <path class="splash-spark"
+              d="M51,41 Q51,51 61,51 Q51,51 51,61 Q51,51 41,51 Q51,51 51,41 Z" />
+        <path class="splash-spark"
+              d="M207,158 Q207,166 215,166 Q207,166 207,174 Q207,166 199,166 Q207,166 207,158 Z" />
+        <path class="splash-spark"
+              d="M128,212 Q128,221 137,221 Q128,221 128,230 Q128,221 119,221 Q128,221 128,212 Z" />
+      </svg>
+      <div class="splash-word">Emerald App</div>
+      <div class="splash-rail"></div>
+    </div>
+
     <div id="root"></div>
-<script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

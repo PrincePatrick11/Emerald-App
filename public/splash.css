@@ -1,0 +1,300 @@
+/* ── Ladebildschirm ─────────────────────────────────────────────────────────
+   Die Stile des Startbildschirms aus `index.html`.
+
+   Warum eine eigene Datei in `public/` und kein `<style>` im Dokument: Tauri
+   haengt jedem `<style>`-Element beim Bauen einen Nonce an (`inject_nonce`
+   mit dem blanken Selektor `style`). Sobald ein Nonce in `style-src` steht,
+   ignoriert CSP3 das `'unsafe-inline'` daneben — und damit waeren alle
+   `style={{…}}`-Attribute der App blockiert, unter anderem die Breiten der
+   Seitenleisten in `AppShell`. In `tauri:dev` faellt das nicht auf, weil dort
+   ueberhaupt keine CSP greift; es traefe erst das Paket.
+
+   Warum trotzdem nicht in `index.css`: die Regeln muessen im allerersten
+   Frame stehen, vor dem Bundle und vor den Theme-Dateien. Ein `<link>` im
+   `<head>` blockiert das Rendern und erfuellt das; das Bundle nicht.
+
+   --splash-bg, --splash-gem und --splash-text sind Kopien von --bg-app,
+   --accent und --text-subtle aus `src/themes/*.css`. Aendern sie sich dort,
+   gehoeren sie hier nachgezogen. --splash-bg steht zusaetzlich als
+   `backgroundColor` in `src-tauri/tauri.conf.json` und den drei Plattform-
+   Dateien daneben — nicht in `tauri.dev.conf.json`, die darf keinen
+   `app.windows`-Schluessel bekommen. JSON traegt keine Kommentare, deshalb
+   steht der Hinweis hier: die Fensterfarbe ist bewusst nur die dunkle,
+   Parchment-Nutzer sehen fuer einen Wimpernschlag Dunkel statt Hell.
+
+   Die drei uebrigen sind keine Kopien: --splash-gem-deep ist in Parchment
+   --accent-strong, in Noctis waere das #00a066 und der Verlauf ueber die
+   Tafel des Steins damit zu flach, um als Schliff zu lesen. --splash-sheen
+   ist frei gewaehltes Weiss, --splash-rail-track ein Tint von --splash-gem —
+   wer --accent aendert, muss also auch die beiden rgba-Werte anfassen. */
+
+:root {
+  --splash-bg: #15110d;
+  --splash-gem: #00c47f;
+  --splash-gem-deep: #007a4d;
+  --splash-text: #78716c;
+  --splash-sheen: rgba(255, 255, 255, 0.55);
+  --splash-rail-track: rgba(0, 196, 127, 0.18);
+}
+html[data-theme='emerald-parchment'] {
+  --splash-bg: #f7efdf;
+  --splash-gem: #008a57;
+  --splash-gem-deep: #006941;
+  --splash-text: #775c41;
+  --splash-sheen: rgba(255, 255, 255, 0.85);
+  --splash-rail-track: rgba(0, 138, 87, 0.22);
+}
+
+/* Bleibt nach dem Splash stehen und haelt den Grund hinter `body`.
+   Muss deshalb dauerhaft zu --bg-app passen, nicht nur beim Start. */
+html {
+  background: var(--splash-bg);
+}
+
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+  background: var(--splash-bg);
+  transition: opacity 420ms ease-out;
+}
+
+.splash.is-hiding {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── Der Stein ─────────────────────────────────────────────────────────────
+   512px auf eine viewBox von 512 Einheiten — eine Nutzereinheit ist genau ein
+   Geraetepixel. Das ist keine Willkuer: laege eine viewBox von 200 auf 256px
+   (Faktor 1,28), landete jede Koordinate zwischen zwei Pixeln und jede
+   Strichstaerke auf einem Bruchteil, und der Browser verteilte jede Kante
+   kantenglaettend ueber zwei bis drei Pixel — der Stein wirkte unscharf,
+   obwohl er Vektor ist.
+
+   Das Element ist doppelt so gross wie der sichtbare Aufbau und zieht die
+   Differenz per negativem Rand wieder ab: fuers Layout zaehlen 256px, gemalt
+   werden 512. So passt der Schein (r=241) vollstaendig in die viewBox, statt
+   per `overflow: visible` darueber hinausragen zu muessen — WebKit behandelt
+   `overflow` auf dem aeussersten <svg> unzuverlaessig, und wuerde es dort
+   beschneiden, saesse genau der gruene Rechteckrand um den Stein, gegen den
+   `.splash-halo` unten ankaempft.
+
+   Wer die Groesse aendert, braucht ein ganzzahliges Verhaeltnis von viewBox
+   zu Pixeln, sonst ist die Schaerfe weg. */
+.splash-gem {
+  width: 512px;
+  height: 512px;
+  margin: -128px;
+  animation: splash-float 4.6s ease-in-out infinite;
+}
+
+/* Farben als CSS-Regeln, nicht als `fill="var(…)"` am Element: `var()` in
+   einem SVG-Praesentationsattribut wird nicht von jeder Engine ersetzt. Wo es
+   nicht ersetzt wird, ist der Wert ungueltig und faellt auf den Startwert
+   zurueck — `fill` auf Schwarz, `stroke` auf `none`. Der Stein waere ein
+   schwarzes Achteck auf fast schwarzem Grund, ohne Fehlermeldung. In einer
+   echten CSS-Deklaration ist `var()` ueberall eindeutig unterstuetzt. */
+#splash-glow stop        { stop-color: var(--splash-gem); }
+#splash-breath-grad stop { stop-color: var(--splash-sheen); }
+#splash-band stop        { stop-color: var(--splash-sheen); }
+#splash-table .splash-table-top    { stop-color: var(--splash-gem); }
+#splash-table .splash-table-bottom { stop-color: var(--splash-gem-deep); }
+
+.splash-outline { stroke: var(--splash-gem); }
+.splash-step    { stroke: var(--splash-sheen); }
+.splash-spark   { fill: var(--splash-gem); }
+
+/* ── Der Schein ────────────────────────────────────────────────────────────
+   Steht still, und das ist eine Entscheidung gegen ein Symptom, das sich im
+   Code nicht messen laesst.
+
+   Wird er animiert, erscheint auf dem Bildschirm ein schwach helleres
+   Rechteck in der Groesse des sich aendernden Bereichs. Im Renderer ist davon
+   nichts zu sehen: per CDP aufgenommene Screenshots entstehen vor dem
+   GPU-Compositing und vor einer etwaigen Fernsitzungs-Kodierung und sind
+   ueber alle Phasen des Zyklus hinweg sauber. Durchprobiert und jeweils am
+   Bildschirm verworfen: `opacity`, `fill-opacity`, und eine auf 8000
+   Einheiten aufgeblasene Form, deren Box ausserhalb des Fensters liegt.
+
+   Also: nicht wieder animieren. Das Atmen liegt in `.splash-breath`, im
+   Stein und auf die Clipmaske beschnitten — diese Flaeche aendert sich durch
+   Facettenfunkeln und Lichtband ohnehin jeden Frame. */
+.splash-halo {
+  fill-opacity: 0.8;
+}
+
+.splash-breath {
+  fill-opacity: 0.25;
+  animation: splash-breath 3.4s ease-in-out infinite;
+}
+
+/* Das Lichtband wandert waagerecht; die Neigung sitzt am <g> darum herum und
+   nicht hier. Eine CSS-Animation auf `transform` ersetzt das Attribut
+   `transform="rotate(…)"` vollstaendig — stand die Drehung am Rechteck
+   selbst, lief das Band aufrecht und war nur unter Reduced Motion geneigt.
+   Dieselbe Falle wie bei --o weiter unten. */
+.splash-sheen {
+  transform-box: view-box;
+  transform-origin: 0 0;
+  animation: splash-sheen 3s ease-in-out infinite;
+}
+
+/* ── Die Facetten ──────────────────────────────────────────────────────────
+   Die Deckkraft einer Facette *ist* der Schliff — sie sagt, wie steil die
+   Flaeche zum Licht steht. Deshalb steht sie hier als --o und nicht als
+   `opacity="…"` am Polygon: eine CSS-Animation auf `opacity` schlaegt das
+   Praesentationsattribut. Standen die Werte im Markup, liefen alle acht
+   Facetten zwischen denselben zwei Zahlen, und jede sprang beim Ablauf ihrer
+   Verzoegerung sichtbar auf den Animationswert — der Stein verlor seinen
+   Schliff, eine Facette nach der anderen.
+
+   Zuordnung ueber die Dokumentreihenfolge der Polygone: werden sie umsortiert,
+   wandern Deckkraft und Verzoegerung mit der Position, nicht mit der Facette.
+   Dasselbe gilt fuer die Funken. */
+.splash-facet {
+  fill: var(--splash-gem);
+  opacity: var(--o);
+  animation: splash-twinkle 3.6s ease-in-out infinite;
+}
+.splash-facet:nth-of-type(1) { --o: 0.30; animation-delay: 0s; }
+.splash-facet:nth-of-type(2) { --o: 0.58; animation-delay: 0.45s; }
+.splash-facet:nth-of-type(3) { --o: 0.36; animation-delay: 0.9s; }
+.splash-facet:nth-of-type(4) { --o: 0.62; animation-delay: 1.35s; }
+.splash-facet:nth-of-type(5) { --o: 0.32; animation-delay: 1.8s; }
+.splash-facet:nth-of-type(6) { --o: 0.50; animation-delay: 2.25s; }
+.splash-facet:nth-of-type(7) { --o: 0.40; animation-delay: 2.7s; }
+.splash-facet:nth-of-type(8) { --o: 0.56; animation-delay: 3.15s; }
+
+/* Die Schliffkanten als eigene Linien. Ohne sie entstehen sie nur dort, wo
+   zwei Facettenfuellungen aneinanderstossen — und so eine Naht wird von
+   beiden Seiten unabhaengig kantengeglaettet, also weich. */
+.splash-cut {
+  stroke: var(--splash-gem);
+  stroke-width: 1;
+  opacity: 0.75;
+}
+
+/* `fill-box` statt der Voreinstellung `view-box`: sonst skaliert der Funke um
+   die Mitte des gesamten SVG und wandert dabei sichtbar auf den Stein zu,
+   statt an seinem Platz aufzublitzen. */
+.splash-spark {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: splash-spark 2.6s ease-in-out infinite;
+}
+.splash-spark:nth-of-type(2) { animation-delay: 0.8s; }
+.splash-spark:nth-of-type(3) { animation-delay: 1.6s; }
+
+/* ── Schriftzug und Balken ─────────────────────────────────────────────────
+   Der Schriftzug sagt "Emerald App", waehrend das Produkt sonst ueberall
+   "Emerald" heisst (Fenstertitel, Ueber-Dialog, `productName`). Bewusst so
+   gewuenscht und deshalb hier vermerkt, damit es nicht als Vertipper
+   zurueckkorrigiert wird.
+
+   Feste Serifenkette statt var(--font-editor): Lora laedt erst spaeter nach,
+   und ein Font-Swap mitten im Ladebildschirm waere sichtbarer als der
+   Unterschied zwischen den Schriften. Georgia liegt auf Windows und macOS,
+   auf Linux uebernehmen Liberation bzw. DejaVu. */
+.splash-word {
+  position: relative;
+  font-family: Georgia, 'Liberation Serif', 'DejaVu Serif', 'Times New Roman', serif;
+  font-size: 26px;
+  letter-spacing: 0.42em;
+  text-indent: 0.42em;
+  text-transform: uppercase;
+  color: var(--splash-text);
+  animation: splash-word 1.4s ease-out;
+}
+
+.splash-rail {
+  position: relative;
+  width: 216px;
+  height: 3px;
+  border-radius: 1.5px;
+  /* Die Spur wird ueber ihre eigene Farbe gedaempft, nicht ueber `opacity` —
+     das wuerde den Balken im ::after mitdimmen und ihn gegen die Spur
+     unsichtbar machen. */
+  background: var(--splash-rail-track);
+  overflow: hidden;
+}
+.splash-rail::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  border-radius: 1.5px;
+  background: var(--splash-gem);
+  animation: splash-rail 1.6s ease-in-out infinite;
+}
+
+@keyframes splash-float {
+  0%, 100% { transform: translateY(-4px) rotate(-1.2deg); }
+  50%      { transform: translateY(4px)  rotate(1.2deg); }
+}
+@keyframes splash-breath {
+  0%, 100% { fill-opacity: 0.25; }
+  50%      { fill-opacity: 1; }
+}
+/* Das Band laeuft eine halbe viewBox-Breite nach jeder Seite. */
+@keyframes splash-sheen {
+  0%, 12%   { transform: translateX(-123px); }
+  62%, 100% { transform: translateX(123px); }
+}
+@keyframes splash-twinkle {
+  0%, 100% { opacity: var(--o); }
+  50%      { opacity: calc(var(--o) * 0.62); }
+}
+@keyframes splash-spark {
+  0%, 100% { opacity: 0;    transform: translateY(4px)  scale(0.6); }
+  50%      { opacity: 0.85; transform: translateY(-6px) scale(1); }
+}
+@keyframes splash-spark-still {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 0.85; }
+}
+@keyframes splash-word {
+  0%   { opacity: 0; letter-spacing: 0.9em; }
+  100% { opacity: 1; letter-spacing: 0.42em; }
+}
+@keyframes splash-rail {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+
+/* Abbestellt wird die Bewegung, nicht die Animation.
+
+   Weg: das Schweben des Steins, das wandernde Lichtband, das Zusammenziehen
+   des Schriftzugs, und der Sprung der Funken (die blitzen weiter, nur ohne
+   `translate` und `scale`).
+
+   Bleibt: der Fortschrittsbalken, das Atmen des Steins, das Funkeln der
+   Facetten und das Blitzen der Funken — alles reine Deckkraftwechsel. Ein
+   Ladebildschirm ohne jede Bewegung sagt das Gegenteil von dem, was er soll.
+
+   Das ist die Linie, auf der auch der Rest der App liegt: `index.css`
+   bestellt genau zwei Dinge ab, die Breiten-Transition der Seitenleisten und
+   den Link-Reveal. Die Spinner (`animate-spin`) und die Kerzenflamme laufen
+   dort unter Reduced Motion weiter.
+
+   Weil die Basiszustaende oben schon die Endzustaende sind, steht der Stein
+   danach sichtbar da, statt zu verschwinden. Das Lichtband ist die Ausnahme:
+   angehalten stuende es als Streifen am linken Rand des Steins, es muss also
+   ganz weg. */
+@media (prefers-reduced-motion: reduce) {
+  .splash-gem,
+  .splash-word {
+    animation: none;
+  }
+  .splash-sheen {
+    display: none;
+  }
+  .splash-spark {
+    animation-name: splash-spark-still;
+  }
+}

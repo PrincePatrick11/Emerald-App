@@ -2,6 +2,10 @@ import type { FontId, ThemeId } from '../store/uiStore';
 
 export const DEFAULT_THEME_ID: ThemeId = 'emerald-noctis';
 
+/** Ein neues Theme braucht zusätzlich einen Zweig im Boot-Skript in
+ *  `index.html` — das läuft vor dem Bundle und kann `normalizeThemeId()`
+ *  nicht aufrufen. Fehlt der Zweig, startet das neue Theme mit den Farben
+ *  des Ladebildschirms von Noctis. */
 export const THEME_OPTIONS: Array<{ id: ThemeId; label: string }> = [
   { id: 'emerald-noctis', label: 'Emerald Noctis' },
   { id: 'emerald-parchment', label: 'Emerald Parchment' },

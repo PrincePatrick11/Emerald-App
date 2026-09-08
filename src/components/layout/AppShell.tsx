@@ -7,6 +7,7 @@ import { reloadAllStores } from '../../store/moduleWiring';
 import { hasActiveVault, useVaultStore } from '../../store/vaultStore';
 import { invoke } from '@tauri-apps/api/core';
 import { computeMenuEnabledState, runMenuAction, SELF_CONTAINED_MENU_ACTIONS } from '../../lib/menuActions';
+import { hideSplash } from '../../lib/splash';
 import TitleBar from './titlebar/TitleBar';
 import LeftSidebarRail, { RAIL_WIDTH } from './LeftSidebarRail';
 import LeftSidebarEntryList, { ENTRY_LIST_TABS_WIDTH } from './LeftSidebarEntryList';
@@ -108,7 +109,15 @@ export default function AppShell() {
       // endet in `reloadAllStores()` — dieser Effekt laeuft dafuer nicht erneut.
       if (!hasActiveVault(useVaultStore.getState())) return;
       return reloadAllStores();
-    });
+    })
+      // Ohne `catch` bliebe der Fehler eine unbehandelte Rejection in der
+      // Konsole — sichtbar nur, wenn jemand hinschaut.
+      .catch((err) => console.error('[boot] initial load failed', err))
+      // Ab hier steht entweder der geladene Inhalt oder — beim Erststart —
+      // das Vault-Setup. Beides ist ein fertiger Bildschirm, also kann der
+      // Ladebildschirm weg. Auch im Fehlerfall: eine leere Oberflaeche ist
+      // immer noch besser als ein Ladebildschirm, der nie endet.
+      .finally(hideSplash);
   }, []);
 
   // Sync menu bar labels with the current language
@@ -119,6 +128,7 @@ export default function AppShell() {
       export:          t('menu.export'),
       import:          t('menu.import'),
       resetView:       t('menu.resetView'),
+      showSplash:      t('menu.showSplash'),
       entryList:       t('menu.entryList'),
       properties:      t('menu.properties'),
       exportPdf:       t('menu.exportPdf'),

@@ -505,6 +505,7 @@
     "entryList": "Liste des entrées",
     "properties": "Propriétés",
     "resetView": "Réinitialiser la vue",
+    "showSplash": "Afficher l'écran de chargement",
     "exportPdf": "Exporter en PDF…",
     "exportMarkdown": "Exporter en Markdown…",
     "exportEmerald": "Exporter en Emerald…",

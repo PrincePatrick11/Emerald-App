@@ -152,6 +152,8 @@ The overlay is applied on top of all background types — colour presets, gradie
 
 ## Navigation
 
+**Loading screen.** On startup, before the app itself is ready, a loading screen covers the window: a breathing emerald gem with facets that twinkle in sequence, the wordmark, and a progress rail, on the app's own dark background rather than a blank one. It stays up for at least about a second so a fast local start doesn't just flash it, then fades away once your vault's data (or, on a brand-new install, vault setup) is ready to show. A **Show Loading Screen** item at the bottom of the *View* menu replays it as a preview, closed again by clicking anywhere or pressing Escape.
+
 **Window title bar.** The app draws its own title bar across the top of the window: the Emerald logo, the application menu, back/forward navigation through the view history, a search field, and — on Windows and Linux — the minimise / maximise / close buttons. The logo is decoration, not a button: clicking it used to be the only way to the dashboard, which now has its own Home button at the top of the left rail. macOS keeps its native window buttons and its native menu bar instead, so its title bar shows only the logo, navigation and search. The search field searches everything in the vault — see [Search](#search) below. It fills whatever space is left between the menu and the window controls and is always visible; if the window gets narrow enough to squeeze it too far, the four menus (Edit/View/Export/Import) fold into a single menu button instead, so the search field never has to hide. The app's minimum window width is 720px.
 
 **Left sidebar structure.** The left sidebar has two parts side by side:

@@ -744,7 +744,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `read_file(path)` | Read a file and return its UTF-8 content. Same extension allowlist and root confinement as `write_file`. |
 | `ensure_app_storage_dirs()` | Create app data and app config directories if they don't exist. Called before frontend writes vault metadata or opens SQLite. |
 | `export_pdf(html, path, page_size?)` | Render the supplied HTML to a PDF at `path` by driving the app's own webview. The frontend first prompts the user for a save location via the `dialog` plugin and passes the chosen path here. `page_size`, an optional `(width_in, height_in)` tuple in inches, overrides the default Letter/Portrait page with a custom size — used only by the Altar PDF export (see below); Journal/Wiki/Operations export calls it without `page_size` and gets the old default behavior. Per-platform implementations live in `src-tauri/src/pdf_export/{windows,macos,linux}.rs`, all behind the same `pub async fn export_pdf` signature; `mod.rs` does the `#[cfg(target_os = "…")]` re-export so `lib.rs` calls `pdf_export::export_pdf` without knowing which platform it's on. |
-| `update_menu_labels(...)` | Update native menu item labels for i18n (edit, view, export, import submenus and their items, including the View menu's two `CheckMenuItem`s, which need their own `MenuItemKind::Check` arm). macOS only in effect — see [Window Chrome](#window-chrome). |
+| `update_menu_labels(...)` | Update native menu item labels for i18n (edit, view, export, import submenus and their items, including `show_splash` and the View menu's two `CheckMenuItem`s, which need their own `MenuItemKind::Check` arm). macOS only in effect — see [Window Chrome](#window-chrome). |
 | `set_view_menu_checked(left_list, right_sidebar)` | Mirror the frontend's sidebar visibility onto the View menu's two check items. Called on every change, since the rail's own toggles can flip the same state without the menu being opened. macOS only in effect. |
 | `set_export_menu_enabled(entry, pdf, emerald)` | Enable/disable the native "Export as …" items for the current view. Driven by `computeMenuEnabledState`; macOS only in effect. |
 | `set_altar_export_menu_enabled(enabled)` | Enable/disable the native "Export as Image" submenu. macOS only in effect. |
@@ -762,10 +762,11 @@ Tauri menu events (not `invoke`) are emitted by the native menu and received in 
 | `toggle-left-list` | View > Entry List |
 | `toggle-right-sidebar` | View > Properties |
 | `reset-sidebar-widths` | View > Reset View |
+| `show-splash` | View > Show Loading Screen |
 | `navigate-back` | Mouse back button (macOS NSEvent monitor) |
 | `navigate-forward` | Mouse forward button (macOS NSEvent monitor) |
 
-Only `reset-sidebar-widths` is still emitted from the frontend as well — the HTML menu bar re-emits it so `AppShell`'s existing listener handles it identically on both platforms. The other ten are called directly through `runMenuAction`. The two sidebar toggles are handled at the very top of `runMenuAction`, above its no-active-vault guard: they touch no database, and muda (Tauri's menu crate) flips a native check item's tick *itself* before emitting the event. Returning early would leave macOS showing a tick with no state behind it, which the `[leftListOpen, rightSidebarOpen]`-keyed sync effect would then never correct.
+Only `reset-sidebar-widths` is still emitted from the frontend as well — the HTML menu bar re-emits it so `AppShell`'s existing listener handles it identically on both platforms. The other eleven are called directly through `runMenuAction`. The two sidebar toggles and `show-splash` are handled at the very top of `runMenuAction`, above its no-active-vault guard: none of the three touches a database, and `show-splash` in particular should work during vault setup too — that's the moment a loading screen is most likely to be looked for again. For the two toggles specifically there is a second reason to return early there: muda (Tauri's menu crate) flips a native check item's tick *itself* before emitting the event, and falling through to the guard would leave macOS showing a tick with no state behind it, which the `[leftListOpen, rightSidebarOpen]`-keyed sync effect would then never correct.
 
 ## Window Chrome
 
@@ -800,6 +801,18 @@ Both menus resolve to the same code. `src/lib/menuActions.ts` owns the action im
 
 - **Windows 11 Snap Layouts.** With `decorations: false` the hover flyout on the maximise button is gone; restoring it needs `WM_NCHITTEST` returning `HTMAXBUTTON` from Rust. `Win+Arrow` and drag-to-edge snapping still work.
 - **Paste in the HTML Edit menu** goes through `navigator.clipboard.read()` replayed as a synthetic `ClipboardEvent` (`editCommands.ts`), because `document.execCommand('paste')` is blocked in WebView2 and WKWebView. Going through a real event rather than `insertText` lets ProseMirror apply its own paste handling and keep `text/html` formatting; images are carried as `File` entries on the `DataTransfer` so `RichEditor`'s `handlePaste` still finds them via `getAsFile()`. `Ctrl+V` always works natively regardless.
+
+### Loading Screen and Boot Order
+
+The loading screen's markup (`#splash` in `index.html`) and its styles (`public/splash.css`, linked from `<head>`) exist outside the React tree on purpose: React only takes over once the bundle has loaded and `main.tsx` has run, and by then a plain white window would already have been visible for however long that takes. A render-blocking `<link>` and inline markup are the only way to have something on screen in the very first frame. `src/lib/splash.ts` owns everything past that point:
+
+- **`initSplash()`** runs at the top level of `main.tsx` — module-eval time, while `#splash` is still guaranteed to be in the DOM — and does two things: it clones `#splash` for later reuse by `showSplash()`, and it arms a 10s fallback timer that calls `hideSplash()` regardless of what the rest of the app is doing.
+- **`hideSplash()`** is called from `AppShell`'s initial-load effect once the vault's data has loaded (or, on a fresh install, once vault setup itself is showing) — success or failure both count, so a failed load still uncovers a usable screen instead of leaving the loading screen up forever. It enforces a roughly 900ms minimum display time so a fast local SQLite read doesn't just flash the screen once, and fades the element out (CSS `transition`) before removing it. It is idempotent, since both the initial-load effect and the fallback timer can call it.
+- **`showSplash()`** clones the saved template again and shows it as a preview, dismissed by a click or Escape — used by the View menu's **Show Loading Screen** item (`show-splash` in the menu-event table above).
+
+Two independent safety nets exist because they cover different failure modes: the 10s timer in `initSplash()` (inside the bundle) handles a slow or stuck data load; a second, harder-edged 15s timer inside the inline `<script>` in `index.html` itself handles the bundle never loading or throwing on import, which the first timer can't — it lives in the same code that might not run. That second timer skips the fade and just removes the element, and deliberately outlasts the first so it never fires ahead of the normal path. Left stuck, the loading screen would be unrecoverable on Windows and Linux, where it sits over the app's own window chrome (`decorations: false`) and hides the only close button.
+
+The inline boot `<script>` also sets `html[data-theme]` from `localStorage` before the loading screen's first paint, so the screen appears in the correct theme's colours rather than defaulting to one and flashing to the other. It is a deliberate, comment-flagged copy of `normalizeThemeId()` from `src/themes/theme.ts` — the real function lives in the bundle this script runs before.
 
 ## PDF Export
 

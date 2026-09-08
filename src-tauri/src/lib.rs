@@ -343,11 +343,22 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
         true,
         None::<&str>,
     )?;
+    // Zeigt den Ladebildschirm noch einmal, bis irgendwo hingeklickt wird.
+    // Kein Check-Eintrag: es gibt keinen Zustand, der sichtbar bliebe — die
+    // Vorschau schliesst sich selbst und meldet das dem Menue nicht zurueck.
+    let show_splash_item = MenuItem::with_id(
+        app,
+        "show-splash",
+        "Show Loading Screen",
+        true,
+        None::<&str>,
+    )?;
     let view_submenu = Submenu::with_id_and_items(app, "view-submenu", "View", true, &[
         &toggle_left_item,
         &toggle_right_item,
         &PredefinedMenuItem::separator(app)?,
         &reset_item,
+        &show_splash_item,
     ])?;
     // Export items start disabled — the frontend enables them once a
     // journal / wiki / operations entry is actually open (PDF is also
@@ -443,6 +454,7 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
     app.on_menu_event(|app, event| {
         match event.id().as_ref() {
             "reset-sidebar-widths" => { app.emit("reset-sidebar-widths", ()).ok(); }
+            "show-splash"          => { app.emit("show-splash", ()).ok(); }
             "toggle-left-list"     => { app.emit("toggle-left-list", ()).ok(); }
             "toggle-right-sidebar" => { app.emit("toggle-right-sidebar", ()).ok(); }
             "export-pdf"           => { app.emit("export-pdf", ()).ok(); }
@@ -599,6 +611,7 @@ fn update_menu_labels(
     export: String,
     import: String,
     reset_view: String,
+    show_splash: String,
     entry_list: String,
     properties: String,
     export_pdf: String,
@@ -646,6 +659,7 @@ fn update_menu_labels(
                     let child_id = item.id().0.as_str().to_owned();
                     let new_child_text = match child_id.as_str() {
                         "reset-sidebar-widths" => Some(reset_view.as_str()),
+                        "show-splash"          => Some(show_splash.as_str()),
                         "export-pdf"           => Some(export_pdf.as_str()),
                         "export-markdown"      => Some(export_markdown.as_str()),
                         "export-emerald"       => Some(export_emerald.as_str()),

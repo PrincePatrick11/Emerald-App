@@ -48,9 +48,17 @@ not via a per-site red treatment of its own.
 - Applied through `data-ui-font`/`data-editor-font` on `<html>`, never through a direct
   `font-family` in a component.
 - Eight selectable Google Fonts. The stylesheet `<link>` is injected at runtime in
-  `src/main.tsx` (moved there from `index.html` so it never blocks the first render;
-  `index.html` keeps only the two `preconnect` hints). A ninth font means `theme.ts`
-  **and** that link in `main.tsx` — both or neither.
+  `src/main.tsx` (moved there from `index.html` so it never blocks the first render).
+  A ninth font means `theme.ts` **and** that link in `main.tsx` — both or neither.
+  `index.html`'s `<head>` otherwise keeps only the two `preconnect` hints and one more,
+  deliberately render-blocking `<link>`: `public/splash.css`, the startup loading
+  screen's styles (see [Loading Screen and Boot Order](architecture.md#loading-screen-and-boot-order)
+  in `architecture.md`). Its `--splash-bg` / `--splash-gem` / `--splash-text` are hand-kept
+  copies of `--bg-app` / `--accent` / `--text-subtle` from `src/themes/*.css` — change one,
+  update the other. `--splash-bg` is copied a second time, as the literal `backgroundColor`
+  in `src-tauri/tauri.conf.json` and the three `tauri.{windows,macos,linux}.conf.json` (not
+  `tauri.dev.conf.json`, which must not gain an `app.windows` key — see the traps in
+  `CLAUDE.md`), so the window's pre-paint frame is dark instead of white.
 - `font-mono` is currently unusable, see [Open Points](#open-points).
 
 ### Border Radius
