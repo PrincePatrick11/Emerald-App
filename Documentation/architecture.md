@@ -810,6 +810,18 @@ The loading screen's markup (`#splash` in `index.html`) and its styles (`public/
 - **`hideSplash()`** is called from `AppShell`'s initial-load effect once the vault's data has loaded (or, on a fresh install, once vault setup itself is showing) — success or failure both count, so a failed load still uncovers a usable screen instead of leaving the loading screen up forever. It enforces a roughly 900ms minimum display time so a fast local SQLite read doesn't just flash the screen once, and fades the element out (CSS `transition`) before removing it. It is idempotent, since both the initial-load effect and the fallback timer can call it.
 - **`showSplash()`** clones the saved template again and shows it as a preview, dismissed by a click or Escape — used by the View menu's **Show Loading Screen** item (`show-splash` in the menu-event table above).
 
+The screen's root carries `data-tauri-drag-region`, but a `.splash-drag` strip across its
+top (2.5rem, matching the title bar's `h-10` behind it) repeats the attribute a second
+time. Tauri reads `data-tauri-drag-region` off the element directly under the cursor and
+does not walk up the tree, so a click swallowed by a child never reaches the root's own
+attribute — which happens twice here: `.splash-gem` sits on top of the strip in paint
+order (it animates via `transform` and, at minimum window height, its 512px box reaches
+into the strip through a negative margin) and so needs `pointer-events: none` to stay out
+of the way, and `showSplash()`'s preview deliberately *removes* the attribute from its
+clone's root so a click can dismiss it — which used to mean the preview could not be
+dragged at all. The strip keeps its own attribute regardless of what the root's is doing,
+so the window stays draggable during normal boot and in the preview alike.
+
 Two independent safety nets exist because they cover different failure modes: the 10s timer in `initSplash()` (inside the bundle) handles a slow or stuck data load; a second, harder-edged 15s timer inside the inline `<script>` in `index.html` itself handles the bundle never loading or throwing on import, which the first timer can't — it lives in the same code that might not run. That second timer skips the fade and just removes the element, and deliberately outlasts the first so it never fires ahead of the normal path. Left stuck, the loading screen would be unrecoverable on Windows and Linux, where it sits over the app's own window chrome (`decorations: false`) and hides the only close button.
 
 The inline boot `<script>` also sets `html[data-theme]` from `localStorage` before the loading screen's first paint, so the screen appears in the correct theme's colours rather than defaulting to one and flashing to the other. It is a deliberate, comment-flagged copy of `normalizeThemeId()` from `src/themes/theme.ts` — the real function lives in the bundle this script runs before.

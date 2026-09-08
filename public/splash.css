@@ -69,6 +69,30 @@ html {
   pointer-events: none;
 }
 
+/* Der Ziehstreifen ueber die volle Breite, so hoch wie die Titelleiste
+   dahinter (`h-10` an <header> in `TitleBar.tsx`). Absolut positioniert und
+   damit ausserhalb des Flexflusses: als Flexkind verschoebe er den Stein
+   nach unten. Ohne ihn liesse sich das Fenster waehrend des Ladens nur an
+   der Hintergrundflaeche ziehen — und in der Menue-Vorschau, die das Attribut
+   am Wurzelelement entfernt, ueberhaupt nicht mehr. */
+.splash-drag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* 2.5rem und nicht 40px: `h-10` ist selbst eine rem-Angabe, und auf
+     WebKitGTK leitet sich die Wurzelschriftgroesse aus der GTK-Textskalierung
+     ab. Fest verdrahtet liefe der Streifen dort aus der Titelleiste heraus. */
+  height: 2.5rem;
+  /* OS-11: `.splash-gem` traegt eine `transform`-Animation und malt damit ueber
+     diesem Streifen, obwohl es im Baum spaeter kommt. Sein Kasten ist 512px
+     gross und ragt per negativem Rand 128px nach oben — bei `minHeight: 600`
+     reicht er bis y = -8 und schluckte den Druck auf die Mitte des Streifens.
+     Die Marke ist ohnehin reine Dekoration und braucht keine Zeigerereignisse;
+     ein Klick soll das Wurzelelement erreichen, das die Vorschau schliesst. */
+  z-index: 1;
+}
+
 /* ── Der Stein ─────────────────────────────────────────────────────────────
    512px auf eine viewBox von 512 Einheiten — eine Nutzereinheit ist genau ein
    Geraetepixel. Das ist keine Willkuer: laege eine viewBox von 200 auf 256px
@@ -91,6 +115,7 @@ html {
   width: 512px;
   height: 512px;
   margin: -128px;
+  pointer-events: none;
   animation: splash-float 4.6s ease-in-out infinite;
 }
 
@@ -192,11 +217,6 @@ html {
 .splash-spark:nth-of-type(3) { animation-delay: 1.6s; }
 
 /* ── Schriftzug und Balken ─────────────────────────────────────────────────
-   Der Schriftzug sagt "Emerald App", waehrend das Produkt sonst ueberall
-   "Emerald" heisst (Fenstertitel, Ueber-Dialog, `productName`). Bewusst so
-   gewuenscht und deshalb hier vermerkt, damit es nicht als Vertipper
-   zurueckkorrigiert wird.
-
    Feste Serifenkette statt var(--font-editor): Lora laedt erst spaeter nach,
    und ein Font-Swap mitten im Ladebildschirm waere sichtbarer als der
    Unterschied zwischen den Schriften. Georgia liegt auf Windows und macOS,

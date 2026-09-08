@@ -95,7 +95,8 @@ export function showSplash(): void {
   // Und das Drag-Region muss weg: Tauri fängt den mousedown darauf ab und
   // zieht daran das Fenster — auf allen drei Plattformen, nicht nur dort, wo
   // die Titelleiste selbst gezeichnet wird. Ein `click` käme nie an, und
-  // genau der soll die Vorschau schließen.
+  // genau der soll die Vorschau schließen. Nur hier am Wurzelelement; der
+  // Streifen `.splash-drag` darunter behält seines.
   el.removeAttribute('data-tauri-drag-region');
 
   const dismiss = () => {

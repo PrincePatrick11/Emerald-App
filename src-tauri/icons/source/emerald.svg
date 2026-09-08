@@ -1,0 +1,59 @@
+<!-- Vorlage fuer die App-Symbole — nicht zur Laufzeit geladen, sondern von
+     `npx tauri icon` rasterisiert (resvg). Windows und Linux:
+     freigestellt, ohne Kasten.
+
+     Erzeugt wurde der Satz mit zwei Laeufen in getrennte Ausgabeordner, weil
+     jeder Lauf alle Ziele schreibt und der zweite den ersten sonst
+     ueberschriebe:
+
+       npx tauri icon src-tauri/icons/source/emerald.svg       -o <tmp-a>
+       npx tauri icon src-tauri/icons/source/emerald-macos.svg -o <tmp-b>
+
+     Aus <tmp-a> stammt alles in `src-tauri/icons/`, aus <tmp-b> allein
+     `icon.icns` — die einzige Datei, die nur macOS liest.
+
+     Derselbe Schliff wie der Stein in `index.html`, in `ui/EmeraldMark.tsx`
+     und in der Schwesterdatei `emerald-macos.svg`, und in denselben Koordinaten
+     (74..182 x 54..190). Farben stehen hier als Literale: die Datei wird
+     ausserhalb der App gelesen, es gibt keine CSS-Variablen.
+
+     Die Zahlen im <g transform> sind hergeleitet, nicht geraten: der Stein
+     ist 108 x 136 gross mit Mitte (128,122). Zu einer Zielhoehe h ist der
+     Massstab s = h/136, und die Verschiebung t = 512 - s*(128,122), damit die
+     Mitte auf der Mitte der 1024er Flaeche landet. Hier h = 816 (s = 6), also
+     80% der Kantenlaenge — mehr liesse den hochkant stehenden Stein neben
+     quadratischen Nachbarn in der Taskleiste zu gross wirken.
+     Unter den Facetten liegt eine deckende Grundflaeche: ohne sie stuenden
+     ihre Deckkraften ueber der Transparenz und der Stein verblasste auf
+     hellem Desktop. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="table" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#00c47f"/>
+      <stop offset="100%" stop-color="#007a4d"/>
+    </linearGradient>
+  </defs>
+    <g transform="translate(-256,-220) scale(6)">
+      <polygon points="74,77 97,54 159,54 182,77 182,167 159,190 97,190 74,167" fill="#0b1a14"/>
+      <g fill="#00c47f">
+        <polygon points="74,77 97,54 105,71 91,89" opacity="0.30"/>
+        <polygon points="97,54 159,54 151,71 105,71" opacity="0.58"/>
+        <polygon points="159,54 182,77 165,89 151,71" opacity="0.36"/>
+        <polygon points="182,77 182,167 165,155 165,89" opacity="0.62"/>
+        <polygon points="182,167 159,190 151,173 165,155" opacity="0.32"/>
+        <polygon points="159,190 97,190 105,173 151,173" opacity="0.50"/>
+        <polygon points="97,190 74,167 91,155 105,173" opacity="0.40"/>
+        <polygon points="74,167 74,77 91,89 91,155" opacity="0.56"/>
+      </g>
+      <polygon points="91,89 105,71 151,71 165,89 165,155 151,173 105,173 91,155"
+               fill="url(#table)" opacity="0.9"/>
+      <path fill="none" stroke="#00c47f" stroke-width="1" opacity="0.75"
+            d="M74,77 L91,89 M97,54 L105,71 M159,54 L151,71 M182,77 L165,89
+               M182,167 L165,155 M159,190 L151,173 M97,190 L105,173 M74,167 L91,155
+               M91,89 L105,71 L151,71 L165,89 L165,155 L151,173 L105,173 L91,155 Z"/>
+      <polygon points="102,90 111,78 145,78 154,90 154,154 145,166 111,166 102,154"
+               fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1" opacity="0.28"/>
+      <polygon points="74,77 97,54 159,54 182,77 182,167 159,190 97,190 74,167"
+               fill="none" stroke="#00c47f" stroke-width="2" stroke-linejoin="round" opacity="0.95"/>
+    </g>
+</svg>

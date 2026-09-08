@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { isAltarFullscreen, useUIStore } from '../../../store/uiStore';
 import { hasActiveVault, useVaultStore } from '../../../store/vaultStore';
 import { usesCustomWindowControls, usesHtmlMenuBar } from '../../../lib/platform';
+import EmeraldMark from '../../ui/EmeraldMark';
 import RailButton from '../../ui/RailButton';
 import TitleBarMenuBar from './TitleBarMenuBar';
 import TitleBarSearch from './TitleBarSearch';
@@ -111,19 +112,23 @@ export default function TitleBar() {
       <div ref={leftRef} data-tauri-drag-region className="flex items-center gap-1 h-full flex-shrink-0 pl-2">
         {/* Reines Logo, kein Control: der Weg zum Dashboard sitzt jetzt in der
             Rail, und `data-tauri-drag-region` gibt die Fensterecke ans Ziehen
-            zurueck, statt sie an einen Klick zu binden. */}
-        <img
+            zurueck, statt sie an einen Klick zu binden.
+
+            Das Attribut sitzt am Wrapper und nicht am <svg>: Tauri liest es
+            am Element unter dem Zeiger, und das waere je nach Stelle ein
+            <polygon> darin. `pointer-events-none` an der Marke schiebt die
+            Zeigerpruefung zuverlaessig auf den Wrapper zurueck — und erledigt
+            nebenbei, wofuer das fruehere <img> hier `draggable={false}`
+            brauchte: als Drag-Quelle startete es auf macOS beim zweiten Druck
+            eines Doppelklicks ein natives Bild-Drag, statt das Fenster zu
+            maximieren. Ein Inline-SVG ist keine. */}
+        <div
           data-tauri-drag-region
-          // Ein <img> ist von Haus aus eine Drag-Quelle. Tauris drag.js laesst
-          // auf macOS den zweiten Druck eines Doppelklicks (`e.detail === 2`)
-          // ohne `preventDefault()` durch — ohne das hier startete WKWebView
-          // dort ein natives Bild-Drag statt das Fenster zu maximieren.
-          draggable={false}
-          src="/emerald-icon.png"
-          alt="Emerald"
-          title="Emerald"
-          className="flex-shrink-0 w-5 h-5 rounded-md object-cover [-webkit-user-drag:none]"
-        />
+          title="Emerald App"
+          className="flex-shrink-0 flex items-center"
+        >
+          <EmeraldMark size={20} className="pointer-events-none" />
+        </div>
 
         {/* Not gated on `minimal`: on Windows and Linux this is the only
             route to the altar's image export, and distraction-free mode is

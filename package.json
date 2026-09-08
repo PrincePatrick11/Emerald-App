@@ -18,6 +18,7 @@
     "build": "tsc && vite build --configLoader runner",
     "check:schema": "node scripts/schema-check.mjs",
     "check:i18n": "node scripts/i18n-check.mjs",
+    "icons": "node scripts/make-icons.mjs",
     "preview": "vite preview --configLoader runner",
     "tauri": "tauri",
     "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json"

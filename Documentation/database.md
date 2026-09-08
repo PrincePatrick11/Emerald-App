@@ -1,6 +1,6 @@
 # Database
 
-Emerald uses a single SQLite file per vault, always named `emerald.db`, inside that vault's own directory. Where that directory sits is the user's choice — see [Multi-Vault System](#multi-vault-system). A vault created without picking a folder — whether through the vault modal or the `.emeralddb` add-vault import — defaults to `{documentDir}/Emerald Vaults/{name}`. Vaults migrated from a pre-multi-vault installation instead live under `{appDataDir}/vaults/{id}/` (which is also the fallback when the documents folder cannot be resolved); on macOS that is `~/Library/Application Support/com.emerald.magical-journal/vaults/…` for the production build and a separate directory for the dev build (`com.emerald.magical-journal.dev`).
+Emerald uses a single SQLite file per vault, always named `emerald.db`, inside that vault's own directory. Where that directory sits is the user's choice — see [Multi-Vault System](#multi-vault-system). A vault created without picking a folder — whether through the vault modal or the `.emeralddb` add-vault import — defaults to `{documentDir}/Emerald Vaults/{name}`. Vaults migrated from a pre-multi-vault installation instead live under `{appDataDir}/vaults/{id}/` (which is also the fallback when the documents folder cannot be resolved); on macOS that is `~/Library/Application Support/com.emerald.app/vaults/…` for the production build and a separate directory for the dev build (`com.emerald.app.dev`).
 
 ## Where the schema lives
 

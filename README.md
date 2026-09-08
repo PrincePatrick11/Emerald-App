@@ -99,7 +99,7 @@ works there, it is only the release that no longer ships one.
 
 **macOS** — The app is not notarised. Gatekeeper will block it on first launch.
 Right-click the app in Finder → **Open** → confirm. After the first approval it opens normally.
-Alternatively, run `sudo xattr -cr /Applications/Emerald.app` in Terminal.
+Alternatively, run `sudo xattr -cr "/Applications/Emerald App.app"` in Terminal.
 
 **Windows** — SmartScreen may show a warning. Click **More info → Run anyway**.
 
@@ -109,11 +109,11 @@ Alternatively, run `sudo xattr -cr /Applications/Emerald.app` in Terminal.
 
 ```bash
 npm install
-npm run tauri:dev     # dev build — separate database, title "Emerald Dev"
+npm run tauri:dev     # dev build — separate database, "Emerald App Dev"
 npm run tauri build   # production build
 ```
 
-The dev build uses a separate app identity (`com.emerald.magical-journal.dev`) and database, so it won't interfere with an installed production build.
+The dev build uses a separate app identity (`com.emerald.app.dev`) and database, so it won't interfere with an installed production build.
 
 ---
 

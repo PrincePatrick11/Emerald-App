@@ -296,7 +296,11 @@ async fn export_pdf(app: tauri::AppHandle, html: String, path: String, page_size
 /// they become no-ops on the platforms that never get here.
 #[cfg(target_os = "macos")]
 fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
-    let app_submenu = Submenu::with_items(app, "Emerald", true, &[
+    // Der Name der Anwendung in der macOS-Menueleiste. Haengt am
+    // `productName` in `tauri.conf.json` — beide gehoeren zusammen geaendert.
+    // Bewusst ohne den Zusatz aus `tauri.dev.conf.json`: im Dev-Build heisst
+    // die App "Emerald App Dev", das Menue hier trotzdem nur "Emerald App".
+    let app_submenu = Submenu::with_items(app, "Emerald App", true, &[
         &PredefinedMenuItem::about(app, None, None)?,
         &PredefinedMenuItem::separator(app)?,
         &PredefinedMenuItem::hide(app, None)?,

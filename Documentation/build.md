@@ -130,7 +130,7 @@ platform-specific file over it, and the window chrome depends on exactly that.
 | `tauri.windows.conf.json` | `decorations: false`, `shadow: true` — the undecorated window behind the custom title bar |
 | `tauri.linux.conf.json` | `decorations: false` |
 | `tauri.macos.conf.json` | `titleBarStyle: "Overlay"`, `hiddenTitle: true`, `trafficLightPosition` — native traffic lights stay |
-| `tauri.dev.conf.json` | dev identifier `com.emerald.magical-journal.dev` and `productName: "Emerald Dev"`; selected by `npm run tauri:dev` |
+| `tauri.dev.conf.json` | dev identifier `com.emerald.app.dev` and `productName: "Emerald App Dev"`; selected by `npm run tauri:dev`. The window *title* is not in here — it comes from the platform file and reads `Emerald App` in dev too |
 
 **These files replace arrays and objects wholesale rather than merging them.**
 Each platform file therefore repeats the complete window object, and
@@ -140,6 +140,59 @@ settings vanish for dev builds.
 `bundle.targets` in `tauri.conf.json` is `"all"`, so macOS and Windows build more
 bundle formats than the release uploads (the workflow filters to `.dmg` and
 `.exe`/`.msi`); only Linux narrows the build itself with `--bundles deb,appimage`.
+
+## Product name vs. identifier
+
+`productName` (`"Emerald App"`, dev `"Emerald App Dev"`) and `identifier`
+(`com.emerald.app`, dev `com.emerald.app.dev`) in `tauri.conf.json` /
+`tauri.dev.conf.json` name two different things and changing one does not
+imply the other:
+
+- **`productName`** names the built artifact — the executable, the
+  installation folder, the bundle. Renaming it does not move a single byte of
+  a user's data.
+- **`identifier`** is what the OS uses to key `app_data_dir()` /
+  `app_config_dir()` (and, on Windows, the WebView2 profile). Renaming it
+  *does* move where the app looks for its data.
+
+Both changed together for the "Emerald" → "Emerald App" rename (identifier
+`com.emerald.magical-journal` → `com.emerald.app`). That has a real
+consequence for anyone upgrading an existing installation, since installers
+key "is this an upgrade of the same app?" off `productName`, not
+`identifier`: on Windows, NSIS's uninstall registry key is named after
+`productName`, so it no longer recognises a prior "Emerald" install as the
+same app and both can end up listed side by side; on macOS,
+`Emerald App.app` installs next to an existing `Emerald.app` instead of
+replacing it. Because the identifier moved too, the two are entirely
+separate applications as far as the system is concerned, data directory
+included — the old install keeps its own copy of everything until it is
+deleted. This was accepted knowingly for this rename; a user upgrading
+across it has to remove the old installation, and carry its data over,
+by hand.
+
+**Naming convention going forward:** the product is "Emerald App" — window
+title, macOS menu, About card, PDF-export window titles. The user's data and
+the file format stay plain "Emerald" — vault folder names
+(`Documents/Emerald Vaults/{name}`), the `.emeralddb` backup file-picker
+filter ("Emerald Backup"), and the `.emerald` export format and its menu
+entries ("Export as Emerald…" / "From Emerald…"). Those name what the data
+*is*, not what the program is called, and stay untouched by a future product
+rename.
+
+## App icons
+
+`npm run icons` (`scripts/make-icons.mjs`) regenerates every binary icon
+under `src-tauri/icons/` plus `public/favicon.svg`, from two hand-maintained
+SVG templates in `src-tauri/icons/source/`: `emerald.svg` (cut out, no
+background — what Windows and Linux use) and `emerald-macos.svg` (the same
+mark sitting on the rounded plate macOS expects — 824 of 1024px, corner
+radius 185, i.e. the OS's own ~22.5% proportion). `tauri icon` writes *all*
+targets on every run, so the two templates are rasterised into separate
+temp directories and only `icon.icns` — the one file macOS reads — is taken
+from the plate run; a single plain `tauri icon <file>` invocation would
+silently overwrite one platform's icon with the other's shape. Not run in
+CI: the generated files are committed, since the Rust build needs them and
+regenerating them is a design decision, not a build step.
 
 ## Signing
 

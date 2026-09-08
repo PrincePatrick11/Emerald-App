@@ -18,7 +18,7 @@ npm install --cache /tmp/npm-emerald-cache
 npm run tauri:dev
 ```
 
-The dev build uses a separate database and app identity (`com.emerald.magical-journal.dev`) so it won't interfere with an installed production build.
+The dev build uses a separate database and app identity (`com.emerald.app.dev`) so it won't interfere with an installed production build.
 
 ## Guidelines
 

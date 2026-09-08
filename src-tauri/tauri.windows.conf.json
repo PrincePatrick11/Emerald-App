@@ -3,7 +3,7 @@
   "app": {
     "windows": [
       {
-        "title": "Emerald",
+        "title": "Emerald App",
         "width": 1280,
         "height": 800,
         "minWidth": 720,

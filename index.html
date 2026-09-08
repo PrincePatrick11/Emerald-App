@@ -2,9 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Emerald</title>
+    <title>Emerald App</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
@@ -58,6 +58,13 @@
 
   <body>
     <div id="splash" class="splash" data-tauri-drag-region>
+      <!-- Der Streifen, an dem das Fenster haengt. Das Attribut wird nicht
+           vererbt — Tauri liest es am Element unter dem Zeiger —, es steht
+           deshalb hier ein zweites Mal. Am Wurzelelement ihrer Kopie nimmt
+           die Menue-Vorschau es wieder weg, damit ein Klick sie schliessen
+           kann; dieser Streifen bleibt und traegt das Ziehen durch beide
+           Faelle. Warum, steht bei `.splash-drag` in `public/splash.css`. -->
+      <div class="splash-drag" data-tauri-drag-region></div>
       <svg class="splash-gem" viewBox="-128 -128 512 512" aria-hidden="true">
         <defs>
           <!-- Die Farben aller Stops stehen in `splash.css`, nicht hier:

@@ -5,6 +5,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { LANGUAGE_OPTIONS, changeAppLanguage } from '../../i18n';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
+import EmeraldMark from '../ui/EmeraldMark';
 import { VaultLocationRow } from './VaultModal';
 import { FilterChipButton } from '../ui/FilterPanel';
 import {
@@ -653,9 +654,12 @@ export default function SettingsModal({ onClose }: Props) {
               {t('settings.about')}
             </div>
             <div className="rounded-lg bg-stone-800/60 border border-stone-700/40 px-4 py-3 space-y-1.5">
-              <div className="flex justify-between text-sm">
-                <span className="text-stone-500">{t('settings.appName')}</span>
-                <span className="text-stone-300">Emerald</span>
+              {/* Die Marke steht anstelle einer Zeile "App — Emerald App":
+                  sie sagt dasselbe und ist die einzige stehende Stelle, an
+                  der der Stein gross genug fuer seinen Schliff ist. */}
+              <div className="flex items-center gap-2.5 pb-2.5 mb-1 border-b border-stone-700/40">
+                <EmeraldMark size={30} />
+                <span className="text-sm text-stone-300">Emerald App</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-stone-500">{t('settings.version')}</span>

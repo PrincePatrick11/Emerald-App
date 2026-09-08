@@ -407,7 +407,6 @@
   "settings": {
     "language": "Language",
     "about": "About",
-    "appName": "App",
     "version": "Version",
     "description": "Description",
     "descriptionValue": "A desktop app for documenting magical practice",

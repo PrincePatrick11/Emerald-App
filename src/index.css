@@ -2176,3 +2176,33 @@ html[data-theme='emerald-parchment'] .from-stone-900 {
 html[data-theme='emerald-parchment'] .altar-cat-scroll-fade {
   width: 3.5rem;
 }
+
+/* ── Emerald-Marke ────────────────────────────────────────────────────────────
+   Die Farben von `components/ui/EmeraldMark.tsx` stehen hier und nicht als
+   `fill="var(--accent)"` am Element: `var()` in einem SVG-Praesentations-
+   attribut wird nicht von jeder Engine ersetzt, und wo es nicht ersetzt wird,
+   ist der Wert ungueltig und faellt auf den Startwert zurueck — `fill` auf
+   Schwarz, `stroke` auf `none`. Die Marke waere ein schwarzes Achteck, ohne
+   Fehlermeldung. Genau der Grund, aus dem `public/splash.css` den Stein des
+   Ladebildschirms ueber Klassen einfaerbt statt am Element. */
+/* Die Daempfung ist nicht dieselbe in beiden Themen, und zwar aus einem
+   Grund, der sich beim Bauen leicht uebersehen laesst: auf dem dunklen Noctis
+   naehert weniger Deckkraft die Marke dem Hintergrund an und nimmt ihr das
+   Grelle. Auf dem hellen Parchment tut sie dasselbe — und dort heisst
+   "naeher am Hintergrund" ausgebleicht. Der Stein steht dort deshalb voll da;
+   dunkles Gruen auf Pergament ist von sich aus ruhig genug. */
+.emerald-mark { --mark-crown: 0.55; --mark-table: 0.5; }
+html[data-theme='emerald-parchment'] .emerald-mark { --mark-crown: 1; --mark-table: 0.9; }
+
+.emerald-mark-crown        { fill: var(--accent); opacity: var(--mark-crown); }
+.emerald-mark-table        { opacity: var(--mark-table); }
+.emerald-mark-outline      { stroke: var(--accent); }
+.emerald-mark-table-top    { stop-color: var(--accent); }
+.emerald-mark-table-bottom { stop-color: var(--accent-strong); }
+
+/* Der Stufenschliff ist ein Lichtreflex und kein Themenfarbton — er liegt
+   immer auf der eingefaerbten Tafel, nie auf dem App-Hintergrund. Auf dem
+   helleren Parchment-Gruen muss er dafuer kraeftiger sein, sonst verschwindet
+   er; dieselbe Staffelung, die `--splash-sheen` zwischen den Themen macht. */
+.emerald-mark-step { stroke: rgba(255, 255, 255, 0.26); }
+html[data-theme='emerald-parchment'] .emerald-mark-step { stroke: rgba(255, 255, 255, 0.42); }

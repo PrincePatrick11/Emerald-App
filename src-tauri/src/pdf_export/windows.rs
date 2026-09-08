@@ -80,7 +80,7 @@ pub async fn export_pdf(
     let win = WebviewWindowBuilder::new(app, "pdf-export", WebviewUrl::External(url))
         .visible(false)
         .inner_size(800.0, 600.0)
-        .title("Emerald PDF Export")
+        .title("Emerald App PDF Export")
         .on_page_load(move |_win, payload| {
             if matches!(payload.event(), PageLoadEvent::Finished) {
                 let tx = page_tx.lock().unwrap().take();
