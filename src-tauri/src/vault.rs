@@ -875,11 +875,14 @@ mod tests {
             "bild"
         );
         assert!(previous.join(VAULTS_FILE).is_file(), "die Quelle bleibt");
-        assert!(
-            !root.join("com.emerald.app.adopting").exists(),
-            "kein Rest des Zwischenordners"
-        );
-        std::fs::remove_dir_all(&root).unwrap();
+        let leftovers: Vec<_> = std::fs::read_dir(&current)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n.ends_with(".adopting"))
+            .collect();
+        assert!(leftovers.is_empty(), "Reste des Zwischenschritts: {leftovers:?}");
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// Der Fall, der ueber "einmalig" entscheidet: laeuft die Uebernahme ein
@@ -898,7 +901,7 @@ mod tests {
             std::fs::read_to_string(current.join(VAULTS_FILE)).unwrap(),
             "neuer Bestand"
         );
-        std::fs::remove_dir_all(&root).unwrap();
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
@@ -909,7 +912,7 @@ mod tests {
         adopt_into(&current).unwrap();
 
         assert!(!current.exists());
-        std::fs::remove_dir_all(&root).unwrap();
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// Nur Pfade, die im alten Verzeichnis lagen, werden umgeschrieben — die
@@ -939,7 +942,7 @@ mod tests {
                 chosen.to_string_lossy().into_owned(),
             ]
         );
-        std::fs::remove_dir_all(&root).unwrap();
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// Ein `..` im gespeicherten Pfad ueberlebte `strip_prefix`/`join` und
@@ -960,7 +963,7 @@ mod tests {
             vec![climbing.to_string_lossy().into_owned()],
             "unveraendert stehen geblieben"
         );
-        std::fs::remove_dir_all(&root).unwrap();
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// Der Linux-Fall: das Zielverzeichnis ist dort zugleich das
@@ -984,7 +987,7 @@ mod tests {
             "neue Kekse",
             "das Webview-Profil bleibt unberuehrt"
         );
-        std::fs::remove_dir_all(&root).unwrap();
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// Eine Registry, die sich nicht lesen laesst, darf die Uebernahme nicht
@@ -1005,6 +1008,6 @@ mod tests {
             "{ das ist kein JSON"
         );
         assert!(current.join("images").join("a.jpg").is_file());
-        std::fs::remove_dir_all(&root).unwrap();
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

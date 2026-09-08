@@ -1,0 +1,97 @@
+name: Rust tests
+
+# Eine eigene Datei statt einer Zeile in `ci.yml`, weil das hier ein
+# Verfallsdatum hat: `cargo test` deckt heute genau eine Sache ab — die
+# Uebernahme der Daten aus dem Verzeichnis des vorigen Identifiers
+# (`adopt_previous_identifier_dirs` in `src-tauri/src/vault.rs`). Faellt die
+# eines Tages raus und bleibt nichts uebrig, geht diese Datei in einem Zug mit,
+# ohne dass jemand in `ci.yml` herumschneiden muss.
+#
+# Was die Matrix bringt, und was nicht — der Unterschied ist wichtig genug fuer
+# eigene Zeilen, weil er sonst falsch erinnert wird:
+#
+# Sie bringt: dass die Tests ueberhaupt *laufen* statt nur zu uebersetzen (die
+# Rust-Seite wird hier zum ersten Mal bei einem Push auch gelinkt), und die drei
+# Pfad-Parser und `rename`-Semantiken gegeneinander. Der Test um `..` in einem
+# gespeicherten Pfad etwa sagt auf Windows etwas anderes aus als auf Linux.
+#
+# Sie bringt *nicht* den Fall, an dem die erste Fassung der Uebernahme
+# gescheitert waere. Der liegt nicht im Code, sondern in Tauris Startreihenfolge
+# — auf Linux existiert das Zielverzeichnis bereits, weil das erste Fenster es
+# als Webview-Profil anlegt — und `vault.rs` hat kein einziges
+# `cfg(target_os)`. Der Test stellt fremde Dateien im Ziel nach; dass die
+# wirklich dort landen, bevor unser Code laeuft, kann nur ein echter Start
+# zeigen. Der steht als eigener Punkt in `Documentation/build.md` unter
+# "Cutting a release" und wird von dieser Datei **nicht** abgeloest.
+
+on:
+  push:
+    branches: ['**']
+    # Nur wenn die Rust-Seite sich bewegt. Der Lauf kostet dieselbe
+    # Vorbereitung wie `ci.yml` (Toolchain, Linux-Pakete, Frontend-Build, weil
+    # `tauri-build` ohne `dist/` abbricht), und den Preis lohnt es nur zu
+    # zahlen, wenn es etwas Neues zu pruefen gibt.
+    paths:
+      - 'src-tauri/**'
+      - '.github/workflows/rust-tests.yml'
+  pull_request:
+    paths:
+      - 'src-tauri/**'
+      - '.github/workflows/rust-tests.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: cargo test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Ein rotes Linux soll den macOS-Lauf nicht abwuergen; die Tests fassen
+      # Pfade und `rename` an, und die verhalten sich je Plattform anders —
+      # jedes der drei Ergebnisse ist fuer sich interessant.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-14, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        timeout-minutes: 10
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev
+
+      - run: npm ci
+
+      # Wie in `ci.yml`: `tauri-build` liest `frontendDist: "../dist"` und
+      # bricht ab, wenn das Verzeichnis fehlt. Auch ein Testlauf kommt daran
+      # nicht vorbei, obwohl er vom Frontend nichts anfasst.
+      - name: Build frontend
+        run: npm run build
+
+      # `--lib` mit Absicht: Integrationstests unter `src-tauri/tests/` und
+      # Doc-Tests gibt es nicht. Kommen welche dazu, gehoert das Flag weg.
+      - name: Run tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --lib

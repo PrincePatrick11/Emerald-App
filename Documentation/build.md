@@ -1,16 +1,17 @@
 # Build & Release
 
-How Emerald gets from a commit to a downloadable binary. Three GitHub Actions
+How Emerald gets from a commit to a downloadable binary. Four GitHub Actions
 workflows do the work; this file says what each one is for, what it does *not*
 cover, and what has to be true before a tag is pushed.
 
-## The three workflows
+## The four workflows
 
 | Workflow | Trigger | Purpose |
 |---|---|---|
 | [`ci.yml`](../.github/workflows/ci.yml) | every push, every pull request | Does it still compile — on all three operating systems? |
 | [`manual-desktop-builds.yml`](../.github/workflows/manual-desktop-builds.yml) | `workflow_dispatch` | Real bundles on demand, as downloadable artifacts. The dress rehearsal before a tag. |
 | [`release.yml`](../.github/workflows/release.yml) | pushing a `v*` tag | Creates the GitHub release and uploads the signed bundles to it. |
+| [`rust-tests.yml`](../.github/workflows/rust-tests.yml) | pushes and pull requests that touch `src-tauri/**` | `cargo test` on all three. Deliberately its own file, not a line in `ci.yml`: what it runs has an expiry date — see [Known gaps](#known-gaps). |
 
 ## CI — the smoke detector
 
@@ -278,8 +279,18 @@ Delete this section once that release is out.
 - Nothing runs clippy, and warnings do not fail a build. (`src-tauri/Cargo.toml`
   declares an empty `cargo-clippy` feature so that a manual clippy run compiles;
   CI does not use it.)
-- Almost nothing is covered by automated tests, and CI runs none of what
-  there is. `cargo test` covers exactly one area — the adoption of a previous
-  identifier's data in `vault.rs` — and `ci.yml` only runs `cargo check`, so
-  even those eight tests pass unnoticed. Everything else is verified by
-  running the app by hand.
+- Almost nothing is covered by automated tests. The eight in `vault.rs` cover
+  exactly one area — the adoption of a previous identifier's data — and
+  `rust-tests.yml` runs them on all three platforms. Everything else in the app
+  is verified by running it by hand.
+- **What that workflow does not prove**, and it is worth being precise because
+  the mistake is tempting: `vault.rs` has no `cfg(target_os)` at all, so its
+  tests are the same eight everywhere. The matrix buys the three path parsers
+  and `rename` semantics against each other — plus the fact that the Rust side
+  is now *linked* on a push and not only checked. It does **not** cover the
+  Linux case that shaped the adoption, because that one lives in Tauri's
+  startup order rather than in our code. Only a real start on Linux shows it,
+  which is why the [release checklist](#once-for-the-first-release-that-carries-the-new-identifier)
+  still asks for one.
+- The apt package list for Linux now exists in four workflow files. Adding a
+  system dependency in `ci.yml` alone leaves the others red on Linux only.
