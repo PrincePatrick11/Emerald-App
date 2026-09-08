@@ -167,8 +167,45 @@ replacing it. Because the identifier moved too, the two are entirely
 separate applications as far as the system is concerned, data directory
 included — the old install keeps its own copy of everything until it is
 deleted. This was accepted knowingly for this rename; a user upgrading
-across it has to remove the old installation, and carry its data over,
-by hand.
+across it has to remove the old installation by hand.
+
+The *data* half of that is handled for them, in the app rather than in any
+installer: `adopt_previous_identifier_dirs` (`src-tauri/src/vault.rs`) copies
+the previous identifier's data across on first start. It copies rather than
+moves, so a failure leaves the old installation working as a fallback; every
+entry is written beside its place and made visible with a `rename`, and a run
+that fails part-way takes back what it placed, so a half-finished adoption can
+never masquerade as a finished one. It rewrites the absolute paths inside the
+copied `vaults.json`, which would otherwise still point a pre-0.2.1-migrated
+vault (`{appDataDir}/vaults/{id}`) at the old folder. And it runs over both
+`app_data_dir` and `app_config_dir`, for the reason spelled out at
+`migrate_vault_layout` — on Linux those are two different directories.
+
+Two things about it are not free choices, and both come from Linux:
+
+- **It hangs off a plugin's `setup`, not the app's.** Tauri's own `setup`
+  builds the configured windows *before* it calls the user hook
+  (`tauri/src/app.rs`), and the first window creates the webview profile under
+  `LocalData/{identifier}` (`manager/webview.rs`, with `create_dir_all`). On
+  Linux `dirs::data_local_dir()` *is* `data_dir()`, so that profile directory
+  is the very directory being adopted into. A plugin `setup` runs inside
+  `Builder::build()`, before the event loop and before any window. It also
+  means the copy blocks no window thread.
+- **It adopts a named list, and triggers on that same list** — `vaults.json`,
+  `images/`, `vaults/`, `emerald*` — rather than copying whatever is there
+  into whatever is empty. Same reason: on Linux the old directory is also the
+  old install's webview profile, whose cookies have no business in the new
+  one. As a side effect `desktop.ini` and `.DS_Store` cannot block an adoption
+  either.
+
+An installer hook was the obvious alternative and is the wrong tool: NSIS is
+Windows-only, so the `.dmg` and `.deb`/`.AppImage` would need their own answer
+anyway. What the adoption cannot carry is `localStorage` — theme, language,
+sidebar widths. On Windows and Linux that lives in the webview profile keyed
+by the identifier; on macOS WKWebView keeps it under `~/Library/WebKit/
+{identifier}` instead. Copying a browser profile across identifiers is
+platform-specific and brittle, for three settings that are re-picked in
+seconds.
 
 **Naming convention going forward:** the product is "Emerald App" — window
 title, macOS menu, About card, PDF-export window titles. The user's data and

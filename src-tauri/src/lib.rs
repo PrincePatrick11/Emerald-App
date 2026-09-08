@@ -700,6 +700,25 @@ fn update_menu_labels(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
+        // Die Daten einer Installation aufnehmen, die noch unter dem vorigen
+        // Identifier liegt.
+        //
+        // Als Plugin und nicht im `setup` unten, obwohl es dort hingehoerte:
+        // Tauris eigenes `setup` baut zuerst die Fenster aus der Konfiguration
+        // und ruft erst danach unseren Hook. Mit dem ersten Fenster entsteht
+        // auf Linux und Windows das Webview-Profil unter
+        // `LocalData/{identifier}` — und auf Linux ist das dasselbe
+        // Verzeichnis wie `app_data_dir`. Die Uebernahme faende es also bereits
+        // bewohnt vor. Ein Plugin-`setup` laeuft noch in `Builder::build()`,
+        // vor der Ereignisschleife und vor jedem Fenster.
+        .plugin(
+            tauri::plugin::Builder::<tauri::Wry, ()>::new("emerald-adopt")
+                .setup(|app, _api| {
+                    vault::adopt_previous_identifier_dirs(app);
+                    Ok(())
+                })
+                .build(),
+        )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_sql::Builder::new().build())

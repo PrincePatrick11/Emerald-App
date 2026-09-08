@@ -29,6 +29,8 @@ pub const VAULTS_SUBDIR: &str = "vaults";
 pub const VAULT_HOME_DIR: &str = "Emerald Vaults";
 /// Where the database export offers to write its `.emeralddb`, inside the vault.
 pub const BACKUP_SUBDIR: &str = "backup";
+/// The registry the frontend owns, in the app data directory.
+const VAULTS_FILE: &str = "vaults.json";
 
 /// `vault id → absolute directory`, mirrored from `vaults.json`.
 #[derive(Default)]
@@ -152,6 +154,361 @@ fn move_file(from: &Path, to: &Path) -> Result<(), String> {
     }
     std::fs::copy(from, to).map_err(|e| format!("copy {}: {e}", from.display()))?;
     std::fs::remove_file(from).map_err(|e| format!("remove {}: {e}", from.display()))
+}
+
+// ── Uebernahme aus dem Verzeichnis des vorigen Identifiers ───────────────────
+
+/// Der Identifier vor 0.2.1.
+///
+/// Eingefrorene Geschichte, kein Konfigurationswert: unter diesem Namen liefen
+/// die zehn Releases bis v0.1.3.6, und so heissen deren Verzeichnisse bis
+/// heute. Wird der Identifier je erneut gewechselt, kommt eine weitere Stufe
+/// dazu — dieser Wert bleibt, was er ist.
+const PREVIOUS_IDENTIFIER: &str = "com.emerald.magical-journal";
+
+/// So tief, wie hier je etwas liegen kann (`vaults/{id}/images/`), mit
+/// reichlich Luft. Die Grenze ist kein Geschmack, sondern der Boden unter der
+/// Rekursion: ein Stack-Overflow ist ein `abort` und kein `Err`, den
+/// [`adopt_previous_identifier_dirs`] auffangen koennte.
+const MAX_COPY_DEPTH: u32 = 16;
+
+/// Das Verzeichnis, das derselben Installation unter dem vorigen Identifier
+/// entspraeche.
+///
+/// Abgeleitet aus dem Namen des aktuellen und nicht aus einer zweiten
+/// Konstante: so steht der jetzige Identifier hier nirgends, und der naechste
+/// Wechsel fasst diese Zeile nicht an. Das `.dev` des Dev-Builds wandert mit,
+/// damit der nicht aus dem Produktivordner schoepft.
+fn previous_dir(current: &Path) -> Option<PathBuf> {
+    let name = current.file_name()?.to_str()?;
+    let suffix = if name.ends_with(".dev") { ".dev" } else { "" };
+    Some(current.with_file_name(format!("{PREVIOUS_IDENTIFIER}{suffix}")))
+}
+
+/// Was von der alten Installation ueberhaupt uebernommen wird, am Namen
+/// erkannt.
+///
+/// Eine Liste und nicht "alles, was dort liegt", weil in diesem Verzeichnis
+/// nicht nur unsere Daten liegen. Auf Linux ist `app_data_dir` zugleich das
+/// Webview-Profil: `dirs::data_local_dir()` ist dort dieselbe Funktion wie
+/// `data_dir()`, und Tauri legt das Profil unter `LocalData/{identifier}` an.
+/// Der alte Ordner enthaelt dort also auch Cookies und den `localStorage` der
+/// Altinstallation — die haben im Profil der neuen nichts verloren, schon gar
+/// nicht, waehrend WebKitGTK es geoeffnet haelt.
+///
+/// Dieselbe Liste beantwortet die Frage, ob hier schon uebernommen wurde.
+/// Kommt ein weiteres eigenes Artefakt hinzu, gehoert es hierher.
+fn is_own_data(name: &str) -> bool {
+    name == VAULTS_FILE
+        || name == IMAGES_SUBDIR
+        || name == VAULTS_SUBDIR
+        // `emerald.db`, die flachen `emerald-{uuid}.db` des Alt-Layouts, ihre
+        // `-journal`-Beilagen und die `.pre-vNN.bak`-Sicherungen.
+        || name.starts_with("emerald")
+}
+
+/// Ob in `dir` noch nichts von uns liegt.
+///
+/// Bewusst nicht "das Verzeichnis ist leer". Auf Linux legt Tauri es an, bevor
+/// das erste Fenster steht, und WebKitGTK schreibt hinein; auf Windows und
+/// macOS koennen `desktop.ini` und `.DS_Store` darin auftauchen. Ein leerer
+/// Ordner waere also die falsche Frage — die richtige ist, ob eine fruehere
+/// Uebernahme oder ein Start der neuen Version hier schon etwas hinterlassen
+/// hat.
+fn holds_no_data_yet(dir: &Path) -> bool {
+    match std::fs::read_dir(dir) {
+        Ok(entries) => !entries
+            .flatten()
+            .any(|e| e.file_name().to_str().is_some_and(is_own_data)),
+        // `read_dir` wirft fuer "gibt es nicht" und "darf ich nicht" denselben
+        // Fehler, `metadata` unterscheidet sie. Nicht da heisst frei; alles
+        // andere heisst: nichts anfassen.
+        Err(_) => matches!(
+            std::fs::metadata(dir),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound
+        ),
+    }
+}
+
+/// Raeumt einen Pfad weg, gleich ob Datei oder Verzeichnis. Was es nicht gibt,
+/// ist nichts zu tun.
+fn clear(path: &Path) -> Result<(), String> {
+    let removed = match std::fs::symlink_metadata(path) {
+        Ok(md) if md.is_dir() => std::fs::remove_dir_all(path),
+        Ok(_) => std::fs::remove_file(path),
+        Err(_) => return Ok(()),
+    };
+    removed.map_err(|e| format!("clear {}: {e}", path.display()))
+}
+
+/// Kopiert einen Verzeichnisbaum. Symlinks bleiben liegen: hier steht keiner,
+/// und einem zu folgen hiesse aus einem Verzeichnis zu kopieren, ueber das die
+/// App nichts weiss.
+fn copy_dir(from: &Path, to: &Path, depth: u32) -> Result<(), String> {
+    if depth > MAX_COPY_DEPTH {
+        return Err(format!("too deep at {}", from.display()));
+    }
+    std::fs::create_dir_all(to).map_err(|e| format!("create {}: {e}", to.display()))?;
+    for entry in std::fs::read_dir(from).map_err(|e| format!("read {}: {e}", from.display()))? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        // `file_type` loest Symlinks nicht auf, sie sind hier also weder das
+        // eine noch das andere und fallen durch.
+        let kind = entry.file_type().map_err(|e| e.to_string())?;
+        let target = to.join(entry.file_name());
+        if kind.is_dir() {
+            copy_dir(&entry.path(), &target, depth + 1)?;
+        } else if kind.is_file() {
+            std::fs::copy(entry.path(), &target)
+                .map_err(|e| format!("copy {}: {e}", entry.path().display()))?;
+        }
+    }
+    Ok(())
+}
+
+/// Legt `source` unter `target` ab, ohne dass es dort je halb steht:
+/// geschrieben wird daneben, und erst das abschliessende `rename` — im selben
+/// Verzeichnis, also ein Namenstausch und keine Kopie — macht es sichtbar.
+///
+/// Darauf ruht alles Weitere. Ein halb kopiertes `emerald.db` unter seinem
+/// richtigen Namen saehe beim naechsten Start wie eine gelungene Uebernahme
+/// aus und wuerde nie wiederholt.
+fn place_atomically(source: &Path, target: &Path) -> Result<(), String> {
+    let name = target
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| format!("unnamed target {}", target.display()))?;
+    let staging = target.with_file_name(format!("{name}.adopting"));
+    clear(&staging)?;
+
+    let staged = if source.is_dir() {
+        copy_dir(source, &staging, 0)
+    } else {
+        std::fs::copy(source, &staging)
+            .map(|_| ())
+            .map_err(|e| format!("copy {}: {e}", source.display()))
+    };
+    let placed = staged.and_then(|()| {
+        std::fs::rename(&staging, target).map_err(|e| format!("place {}: {e}", target.display()))
+    });
+    if placed.is_err() {
+        let _ = clear(&staging);
+    }
+    placed
+}
+
+/// Zieht die Pfade in der kopierten `vaults.json` von `old_root` auf
+/// `new_root` um.
+///
+/// Die Datei speichert je Vault ein absolutes Verzeichnis. Fuer die ueblichen —
+/// vom Nutzer gewaehlt, meist unter `Dokumente` — aendert sich dadurch nichts.
+/// Ein aus dem Vor-0.2.1-Layout migrierter Vault liegt dagegen unter
+/// `{appDataDir}/vaults/{id}`, und damit steckt der alte Identifier in seinem
+/// gespeicherten Pfad. Bliebe der stehen, laese und schriebe die neue Version
+/// weiter im alten Ordner, waehrend die Kopie daneben still veraltete.
+///
+/// Eine unlesbare Datei ist kein Fehler. Sie bleibt dann, wie sie ist, und das
+/// ist die bessere Haelfte einer schlechten Wahl: die alte Installation stand
+/// schon vor derselben Datei, und eine Kopie mit unangetasteter Registry laesst
+/// sich von Hand richten — eine ausgefallene Uebernahme sieht dagegen aus wie
+/// ein leeres Journal.
+fn retarget_registry(file: &Path, old_root: &Path, new_root: &Path) -> Result<(), String> {
+    let raw = std::fs::read_to_string(file).map_err(|e| format!("read {}: {e}", file.display()))?;
+    let mut doc: serde_json::Value = match serde_json::from_str(&raw) {
+        Ok(doc) => doc,
+        Err(e) => {
+            eprintln!("[vault] {} kept as is, could not parse it: {e}", file.display());
+            return Ok(());
+        }
+    };
+
+    let Some(vaults) = doc.get_mut("vaults").and_then(|v| v.as_array_mut()) else {
+        return Ok(());
+    };
+    let mut moved_any = false;
+    for vault in vaults {
+        let Some(path) = vault.get("path").and_then(|p| p.as_str()).map(PathBuf::from) else {
+            continue;
+        };
+        if let Ok(rest) = path.strip_prefix(old_root) {
+            // `strip_prefix` und `join` arbeiten rein lexikalisch: ein `..` im
+            // gespeicherten Pfad ueberlebte die Umschreibung und zeigte danach
+            // aus dem Datenverzeichnis heraus. Anderswo waere das egal, hier
+            // nicht — diese Registry kommt aus einem Ordner, den die App nicht
+            // verwaltet, und `register_vaults` laesst jeden absoluten Pfad
+            // durch. Also nur umschreiben, was ausschliesslich aus
+            // gewoehnlichen Namen besteht; alles andere bleibt stehen, wie es
+            // war, und faellt dem Nutzer als fehlender Vault auf, statt still
+            // woandershin zu zeigen.
+            if !rest
+                .components()
+                .all(|c| matches!(c, std::path::Component::Normal(_)))
+            {
+                continue;
+            }
+            let moved = new_root.join(rest).to_string_lossy().into_owned();
+            vault["path"] = serde_json::Value::String(moved);
+            moved_any = true;
+        }
+    }
+
+    // Nichts umgeschrieben heisst: die Datei nicht anfassen. Sonst schriebe
+    // diese Funktion sie allein fuer die Formatierung neu — und die aelteste
+    // Fassung der Registry, die es noch gibt, kennt `path` gar nicht, sondern
+    // `dbName` (siehe `migrate_vault_layout`). Die faellt hier durch, und sie
+    // soll unveraendert weiterreisen.
+    if !moved_any {
+        return Ok(());
+    }
+
+    // Beim Neuschreiben sortiert serde_json die Schluessel eines Objekts
+    // alphabetisch. Folgenlos — gelesen wird die Datei als JSON —, aber es
+    // erklaert, warum sie danach anders aussieht, als sie hineinging.
+    let text = serde_json::to_string_pretty(&doc).map_err(|e| e.to_string())?;
+    std::fs::write(file, text).map_err(|e| format!("write {}: {e}", file.display()))
+}
+
+/// Legt die Registry als letztes ab — kopieren, umschreiben, dann sichtbar
+/// machen.
+///
+/// Die Reihenfolge ist der Grund, warum es diese Funktion getrennt gibt: waere
+/// erst die Datei da und danach die Umschreibung, hinterliesse ein Abbruch
+/// dazwischen eine Registry, die auf den alten Ordner zeigt und dabei
+/// uebernommen aussieht.
+fn place_registry(source: &Path, target: &Path, previous: &Path, current: &Path) -> Result<(), String> {
+    let staging = target.with_file_name(format!("{VAULTS_FILE}.adopting"));
+    clear(&staging)?;
+
+    let placed = std::fs::copy(source, &staging)
+        .map(|_| ())
+        .map_err(|e| format!("copy {}: {e}", source.display()))
+        .and_then(|()| retarget_registry(&staging, previous, current))
+        .and_then(|()| {
+            std::fs::rename(&staging, target)
+                .map_err(|e| format!("place {}: {e}", target.display()))
+        });
+    if placed.is_err() {
+        let _ = clear(&staging);
+    }
+    placed
+}
+
+/// Holt jeden eigenen Eintrag herueber und merkt sich in `placed`, was
+/// tatsaechlich abgelegt wurde — das braucht der Aufrufer zum Zuruecknehmen.
+fn adopt_entries(previous: &Path, current: &Path, placed: &mut Vec<PathBuf>) -> Result<(), String> {
+    std::fs::create_dir_all(current).map_err(|e| format!("create {}: {e}", current.display()))?;
+
+    let mut registry = None;
+    for entry in
+        std::fs::read_dir(previous).map_err(|e| format!("read {}: {e}", previous.display()))?
+    {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+            continue;
+        };
+        if !is_own_data(&name) {
+            continue;
+        }
+        // Die Registry zum Schluss, siehe `place_registry`.
+        if name == VAULTS_FILE {
+            registry = Some(entry.path());
+            continue;
+        }
+        let target = current.join(&name);
+        place_atomically(&entry.path(), &target)?;
+        placed.push(target);
+    }
+
+    if let Some(source) = registry {
+        let target = current.join(VAULTS_FILE);
+        place_registry(&source, &target, previous, current)?;
+        placed.push(target);
+    }
+    Ok(())
+}
+
+/// Uebernimmt ein Verzeichnis, wenn es das des Vorgaengers gibt und im eigenen
+/// noch nichts von uns liegt.
+///
+/// **Kopiert, verschiebt nicht.** `previous` wird nur gelesen. Die alte
+/// Installation bleibt lauffaehig und ist die Rueckfallebene.
+///
+/// **Ganz oder gar nicht.** Jeder einzelne Eintrag entsteht neben seinem Platz
+/// und wird per `rename` sichtbar; scheitert einer, wird zurueckgenommen, was
+/// dieser Lauf abgelegt hat. Danach liegt hier wieder nichts von uns, und der
+/// naechste Start versucht es erneut. Das Zuruecknehmen ist gefahrlos, weil
+/// die Pruefung oben zusichert, dass vor diesem Lauf nichts von uns hier lag.
+///
+/// **Nur die eigenen Daten**, siehe [`is_own_data`] — der alte Ordner ist auf
+/// Linux zugleich das Webview-Profil der Altinstallation.
+fn adopt_into(current: &Path) -> Result<(), String> {
+    let Some(previous) = previous_dir(current) else {
+        return Ok(());
+    };
+    // `symlink_metadata` und nicht `is_dir()`: das folgte einem Symlink, und
+    // der Wurzelordner ist der einzige, den `copy_dir` nicht selbst
+    // ueberspringt. Zeigte er auf einen Vorfahren des Zielordners, kopierte
+    // sich der Zwischenordner in sich selbst. Die Metadaten eines Links sind
+    // nie die eines Verzeichnisses, die Bedingung faengt also beides.
+    if !std::fs::symlink_metadata(&previous).is_ok_and(|m| m.is_dir()) {
+        return Ok(());
+    }
+    if !holds_no_data_yet(current) {
+        return Ok(());
+    }
+
+    let mut placed = Vec::new();
+    let outcome = adopt_entries(&previous, current, &mut placed);
+    if outcome.is_err() {
+        for target in placed.iter().rev() {
+            let _ = clear(target);
+        }
+    }
+    outcome
+}
+
+/// Uebernimmt beim ersten Start die Daten aus dem Verzeichnis des vorigen
+/// Identifiers.
+///
+/// Tauri leitet `app_data_dir` und `app_config_dir` aus dem `identifier` ab.
+/// Mit dem Wechsel auf `com.emerald.app` schaut die App also woanders nach als
+/// jede Installation bis v0.1.3.6 — deren `vaults.json` liegt unversehrt
+/// nebenan, und ohne diesen Schritt begruesste die neue Version einen
+/// langjaehrigen Nutzer mit einem leeren Journal.
+///
+/// Was uebernommen wird und unter welchen Zusicherungen, steht an
+/// [`adopt_into`]. Hier bleibt das Aeussere:
+///
+/// **Bricht den Start nicht ab.** Eine misslungene Uebernahme ist ein leeres
+/// Journal neben unversehrten Daten und von Hand zu beheben; ein `?` an dieser
+/// Stelle waere eine App, die gar nicht erst hochkommt.
+///
+/// **Laeuft, bevor es ein Fenster gibt** — als Plugin-`setup`, siehe den
+/// Aufruf in `lib.rs`. Das Kopieren blockiert dadurch keinen Fensterthread und
+/// niemand kann auf eine eingefrorene Oberflaeche sehen.
+pub fn adopt_previous_identifier_dirs(app: &tauri::AppHandle) {
+    // Auf Windows und macOS sind beide dasselbe Verzeichnis, auf Linux nicht —
+    // siehe `migrate_vault_layout`. Doppelt liefe harmlos (der zweite Durchgang
+    // faende das Ziel nicht mehr frei), aber die Fehlermeldung waere eine zu
+    // viel. Bewusst `contains` und nicht `dedup`: das entfernt nur benachbarte
+    // Gleiche und griffe bei einem dritten Eintrag still daneben.
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    for dir in [
+        app.path().app_data_dir().ok(),
+        app.path().app_config_dir().ok(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        if !dirs.contains(&dir) {
+            dirs.push(dir);
+        }
+    }
+
+    for current in dirs {
+        if let Err(e) = adopt_into(&current) {
+            eprintln!("[vault] could not adopt into {}: {e}", current.display());
+        }
+    }
 }
 
 // ── commands ─────────────────────────────────────────────────────────────────
@@ -441,4 +798,213 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
     std::fs::remove_dir(dir.join(BACKUP_SUBDIR)).ok();
 
     Ok(std::fs::remove_dir(&dir).is_ok())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static NEXT: AtomicUsize = AtomicUsize::new(0);
+
+    /// Ein eigenes Elternverzeichnis je Test. `adopt_into` leitet den Quell-
+    /// aus dem Zielordner ab und erwartet beide nebeneinander, ein gemeinsamer
+    /// Temp-Ordner liesse die Tests einander ins Handwerk pfuschen.
+    fn scratch() -> PathBuf {
+        let n = NEXT.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("emerald-adopt-{}-{n}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn write(path: &Path, body: &str) {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, body).unwrap();
+    }
+
+    fn registry(entries: &[(&str, &Path)]) -> String {
+        let vaults: Vec<serde_json::Value> = entries
+            .iter()
+            .map(|(id, path)| serde_json::json!({ "id": id, "path": path.to_string_lossy() }))
+            .collect();
+        serde_json::json!({ "version": 2, "vaults": vaults }).to_string()
+    }
+
+    fn paths_in(file: &Path) -> Vec<String> {
+        let doc: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(file).unwrap()).unwrap();
+        doc["vaults"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v["path"].as_str().unwrap().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn the_dev_build_adopts_from_the_dev_predecessor() {
+        let base = Path::new("/parent");
+        assert_eq!(
+            previous_dir(&base.join("com.emerald.app")).unwrap(),
+            base.join(PREVIOUS_IDENTIFIER)
+        );
+        assert_eq!(
+            previous_dir(&base.join("com.emerald.app.dev")).unwrap(),
+            base.join(format!("{PREVIOUS_IDENTIFIER}.dev"))
+        );
+    }
+
+    #[test]
+    fn copies_the_whole_tree_and_leaves_the_source_standing() {
+        let root = scratch();
+        let previous = root.join(PREVIOUS_IDENTIFIER);
+        let current = root.join("com.emerald.app");
+        write(&previous.join(VAULTS_FILE), &registry(&[]));
+        write(&previous.join("images").join("a.jpg"), "bild");
+        write(&previous.join("vaults").join("abc").join(DB_FILE), "datenbank");
+
+        adopt_into(&current).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(current.join("vaults").join("abc").join(DB_FILE)).unwrap(),
+            "datenbank"
+        );
+        assert_eq!(
+            std::fs::read_to_string(current.join("images").join("a.jpg")).unwrap(),
+            "bild"
+        );
+        assert!(previous.join(VAULTS_FILE).is_file(), "die Quelle bleibt");
+        assert!(
+            !root.join("com.emerald.app.adopting").exists(),
+            "kein Rest des Zwischenordners"
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// Der Fall, der ueber "einmalig" entscheidet: laeuft die Uebernahme ein
+    /// zweites Mal, ueberschriebe sie das, was der Nutzer seither angelegt hat.
+    #[test]
+    fn keeps_its_hands_off_a_directory_that_already_holds_something() {
+        let root = scratch();
+        let previous = root.join(PREVIOUS_IDENTIFIER);
+        let current = root.join("com.emerald.app");
+        write(&previous.join(VAULTS_FILE), &registry(&[]));
+        write(&current.join(VAULTS_FILE), "neuer Bestand");
+
+        adopt_into(&current).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(current.join(VAULTS_FILE)).unwrap(),
+            "neuer Bestand"
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_missing_predecessor_is_not_an_error() {
+        let root = scratch();
+        let current = root.join("com.emerald.app");
+
+        adopt_into(&current).unwrap();
+
+        assert!(!current.exists());
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// Nur Pfade, die im alten Verzeichnis lagen, werden umgeschrieben — die
+    /// vom Nutzer gewaehlten Vaults liegen woanders und bleiben, wo sie sind.
+    #[test]
+    fn moves_only_the_paths_that_pointed_into_the_old_directory() {
+        let root = scratch();
+        let previous = root.join(PREVIOUS_IDENTIFIER);
+        let current = root.join("com.emerald.app");
+        let migrated = previous.join(VAULTS_SUBDIR).join("abc");
+        let chosen = root.join("Documents").join("Kampfmagie");
+        write(
+            &previous.join(VAULTS_FILE),
+            &registry(&[("a", &migrated), ("b", &chosen)]),
+        );
+
+        adopt_into(&current).unwrap();
+
+        assert_eq!(
+            paths_in(&current.join(VAULTS_FILE)),
+            vec![
+                current
+                    .join(VAULTS_SUBDIR)
+                    .join("abc")
+                    .to_string_lossy()
+                    .into_owned(),
+                chosen.to_string_lossy().into_owned(),
+            ]
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// Ein `..` im gespeicherten Pfad ueberlebte `strip_prefix`/`join` und
+    /// zeigte danach aus dem Datenverzeichnis heraus. Solche Eintraege bleiben
+    /// unangetastet stehen, statt still woandershin zu zeigen.
+    #[test]
+    fn refuses_to_retarget_a_path_that_climbs_out() {
+        let root = scratch();
+        let previous = root.join(PREVIOUS_IDENTIFIER);
+        let current = root.join("com.emerald.app");
+        let climbing = previous.join(VAULTS_SUBDIR).join("..").join("..").join("woanders");
+        write(&previous.join(VAULTS_FILE), &registry(&[("a", &climbing)]));
+
+        adopt_into(&current).unwrap();
+
+        assert_eq!(
+            paths_in(&current.join(VAULTS_FILE)),
+            vec![climbing.to_string_lossy().into_owned()],
+            "unveraendert stehen geblieben"
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// Der Linux-Fall: das Zielverzeichnis ist dort zugleich das
+    /// Webview-Profil und existiert schon, bevor das erste Fenster steht.
+    /// Fremde Dateien darin duerfen die Uebernahme nicht verhindern — und
+    /// unsere duerfen ihre nicht ueberschreiben.
+    #[test]
+    fn foreign_files_in_the_target_neither_block_nor_get_touched() {
+        let root = scratch();
+        let previous = root.join(PREVIOUS_IDENTIFIER);
+        let current = root.join("com.emerald.app");
+        write(&previous.join(VAULTS_FILE), &registry(&[]));
+        write(&previous.join("cookies"), "alte Kekse");
+        write(&current.join("cookies"), "neue Kekse");
+
+        adopt_into(&current).unwrap();
+
+        assert!(current.join(VAULTS_FILE).is_file(), "trotzdem uebernommen");
+        assert_eq!(
+            std::fs::read_to_string(current.join("cookies")).unwrap(),
+            "neue Kekse",
+            "das Webview-Profil bleibt unberuehrt"
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// Eine Registry, die sich nicht lesen laesst, darf die Uebernahme nicht
+    /// verhindern — sonst faende der Nutzer ein leeres Journal statt einer
+    /// Kopie, die er von Hand richten kann.
+    #[test]
+    fn an_unreadable_registry_still_gets_copied() {
+        let root = scratch();
+        let previous = root.join(PREVIOUS_IDENTIFIER);
+        let current = root.join("com.emerald.app");
+        write(&previous.join(VAULTS_FILE), "{ das ist kein JSON");
+        write(&previous.join("images").join("a.jpg"), "bild");
+
+        adopt_into(&current).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(current.join(VAULTS_FILE)).unwrap(),
+            "{ das ist kein JSON"
+        );
+        assert!(current.join("images").join("a.jpg").is_file());
+        std::fs::remove_dir_all(&root).unwrap();
+    }
 }
