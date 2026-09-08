@@ -251,6 +251,25 @@ Windows builds are unsigned; SmartScreen warns on first run.
 3. Commit, push, then tag and push the tag. `prepare-release` re-checks the
    versions; if step 1 was skipped it fails there rather than later.
 
+### Once, for the first release that carries the new identifier
+
+The identifier changed in 0.2.x (see [Product name vs. identifier](#product-name-vs-identifier)),
+so that release is the one where `adopt_previous_identifier_dirs` runs for
+real, on machines that are not the author's. It is verified on Windows only —
+the other two were reasoned about, not run. Before tagging, take a bundle from
+`manual-desktop-builds.yml` per platform and check it there:
+
+| Platform | Put this in place first | Then confirm after the first start |
+| --- | --- | --- |
+| Windows | `%APPDATA%\com.emerald.magical-journal` with a `vaults.json`, `%APPDATA%\com.emerald.app` absent | the vaults are listed, and no `*.adopting` is left beside them |
+| macOS | the same pair under `~/Library/Application Support/` | as above |
+| Linux | the same pair under **both** `~/.local/share/` and `~/.config/` — they are separate directories there | as above, and specifically that adoption happened *despite* `~/.local/share/com.emerald.app` already existing: Tauri creates it as the webview profile before any of our code runs, and getting that wrong would skip the adoption for good |
+
+The Linux row is the one worth the trouble. It is the case the first
+implementation got wrong, and the only one no test here can reach.
+
+Delete this section once that release is out.
+
 ## Known gaps
 
 - CI proves compilation, not bundling. Only a manual or release build does that.
@@ -259,5 +278,8 @@ Windows builds are unsigned; SmartScreen warns on first run.
 - Nothing runs clippy, and warnings do not fail a build. (`src-tauri/Cargo.toml`
   declares an empty `cargo-clippy` feature so that a manual clippy run compiles;
   CI does not use it.)
-- There are no automated tests. CI proves the code compiles, nothing more —
-  behaviour is only ever verified by running the app by hand.
+- Almost nothing is covered by automated tests, and CI runs none of what
+  there is. `cargo test` covers exactly one area — the adoption of a previous
+  identifier's data in `vault.rs` — and `ci.yml` only runs `cargo check`, so
+  even those eight tests pass unnoticed. Everything else is verified by
+  running the app by hand.
