@@ -9,7 +9,7 @@ import CategoryModal from '../ui/CategoryModal';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
-import { categoriesUsedBy, categoryLabel } from '../../lib/categories';
+import { categoriesUsedBy, categoryLabel, hasUncategorized } from '../../lib/categories';
 import { FALLBACK_CATEGORY_ID } from '../../lib/schema';
 import { DEFAULT_ENTRY_EMOJI } from '../../lib/modules';
 import { formatEntryDate } from '../../lib/formatDate';
@@ -222,13 +222,14 @@ export default function WikiView() {
 
     // Nur die hier benutzten Kategorien (plus Sonstiges und eine gerade
     // angelegte) — die Liste ist global, die anderen Module sollen hier keine
-    // leeren Chips hinterlassen. „Ohne Kategorie" nur, wenn es Waisen gibt:
-    // Artikel, deren Kategorie im Papierkorb liegt. Sonst wäre es ein Filter
-    // auf eine leere Menge.
-    const hasUncategorized = articles.some((a) => !catById[a.category_id]);
+    // leeren Chips hinterlassen.
+    // „Ohne Kategorie" nur, wenn es Waisen gibt — oder solange der Chip noch
+    // ausgewählt ist: verschwände er unter der aktiven Auswahl, bliebe ein
+    // Filter wirksam, den nichts mehr anzeigt.
+    const showUncatChip = hasUncategorized(categories, articles) || filterCatIds.includes(UNCATEGORIZED_KEY);
     const catChips = [
       ...usedCategories.map((c) => ({ value: c.id, label: categoryLabel(t, c), emoji: c.emoji })),
-      ...(hasUncategorized ? [{ value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄' }] : []),
+      ...(showUncatChip ? [{ value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄' }] : []),
     ];
 
     const activeFilterCount = filterCatIds.length > 0 ? 1 : 0;
@@ -316,7 +317,7 @@ export default function WikiView() {
     const catGroups: DashboardGroup<Article>[] = groupByCategory(
       sortedArticles, visibleCategories, (a) => a.category_id,
       (c) => categoryLabel(t, c), t('categories.uncategorized'),
-      [catEditor.lastAddedId],
+      catEditor.lastAddedId,
     );
 
     const renderCategoryHeader = (group: DashboardGroup<Article>) => {
@@ -380,11 +381,11 @@ export default function WikiView() {
         renderItem={renderArticle}
         isEmpty={articles.length === 0 && categories.length === 0}
         emptyState={{ message: t('wiki.noArticles'), actionLabel: t('wiki.startDocumenting'), onAction: () => handleNew() }}
-        // Bei aktivem Kategorie-Filter ohne Suchtext trotzdem die Gruppierung
-        // Bei einer gerade angelegten Kategorie trotzdem die Gruppierung
-        // rendern: ihr leerer Kopf ist der Ort, an dem der erste Eintrag
-        // entsteht. Sonst zeigt Dashboard selbst „Keine Ergebnisse".
-        hasNoResults={filtered.length === 0 && !(grouping === 'grouped' && view !== 'timeline' && !!catEditor.lastAddedId)}
+        // Im gruppierten Modus entscheidet Dashboard selbst: überlebt keine
+        // Gruppe, zeigt es „Keine Ergebnisse" — und ein leerer Kopf (die
+        // gerade angelegte Kategorie) hat dort Vorrang. Dieser Zweig darf ihm
+        // also nicht zuvorkommen.
+        hasNoResults={filtered.length === 0 && !(grouping === 'grouped' && view !== 'timeline')}
         noResultsMessage={t('search.noResults')}
         grouping={
           view === 'timeline'

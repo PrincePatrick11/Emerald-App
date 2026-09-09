@@ -14,7 +14,7 @@ import { viewTypeForEntryType } from '../../lib/modules';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { FALLBACK_CATEGORY_ID } from '../../lib/schema';
-import { categoriesUsedBy, categoryLabel } from '../../lib/categories';
+import { categoriesUsedBy, categoryLabel, hasUncategorized } from '../../lib/categories';
 import { sortItems } from '../../lib/sortItems';
 import { UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import Dashboard from '../ui/Dashboard';
@@ -115,8 +115,11 @@ export default function TasksView() {
   // Chips und Gruppen zeigen nur, was bei den Aufgaben vorkommt (plus Sonstiges).
   const usedCategories = categoriesUsedBy(categories, tasks, [catEditor.lastAddedId]);
   // Waisen: ihre Kategorie liegt im Papierkorb. Ohne sie gibt es nichts zu
-  // filtern, dann entfällt der „Ohne Kategorie"-Chip.
-  const hasUncategorized = tasks.some((task) => !getCategory(task.category_id));
+  // filtern, dann entfällt der „Ohne Kategorie"-Chip — es sei denn, er ist
+  // noch ausgewählt; sonst bliebe ein Filter wirksam, den nichts anzeigt.
+  // Über `rootTasks`, nicht über alle: der Waisen-Block zeigt nur Wurzeln,
+  // ein Chip über eine verwaiste Unteraufgabe fände also nichts.
+  const showUncatChip = hasUncategorized(categories, rootTasks) || filterCategory.has(UNCATEGORIZED_KEY);
   const chipFilteredCategories = filterCategory.size > 0
     ? usedCategories.filter((c) => filterCategory.has(c.id))
     : usedCategories;
@@ -301,9 +304,8 @@ export default function TasksView() {
               />
             ))}</div>}
 
-        {/* Ganz unten, wie der Waisen-Bucket in Wiki/Operations. Bei
-            ausgewähltem „Ohne Kategorie"-Chip auch leer — mit Leer-Hinweis,
-            wie jede andere leere Kategorie. */}
+        {/* Ganz unten, wie der Waisen-Bucket in Wiki/Operations — und wie
+            dort nur, wenn er etwas enthält. */}
         {showUncatBlock && (
           <div className="mb-6 space-y-1.5">
             <CollapsibleGroupHeader
@@ -313,9 +315,6 @@ export default function TasksView() {
               label={t('categories.uncategorized')}
               count={uncategorized.length}
             />
-            {!uncatCollapsed && uncategorized.length === 0 && (
-              <p className="text-xs text-stone-700 px-1 py-1">{t('tasks.empty')}</p>
-            )}
             {!uncatCollapsed && uncategorized.map((task) => (
                   <TaskRow
                     key={task.id}
@@ -390,7 +389,7 @@ export default function TasksView() {
             // „Ohne Kategorie" nur, wenn es Waisen gibt.
             chips: [
               ...usedCategories.map((c) => ({ value: c.id, label: categoryLabel(t, c), emoji: c.emoji })),
-              ...(hasUncategorized ? [{ value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄' }] : []),
+              ...(showUncatChip ? [{ value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄' }] : []),
             ],
             selectedChips: [...filterCategory],
             onChipToggle: (v) => setFilterCategory((prev) => {

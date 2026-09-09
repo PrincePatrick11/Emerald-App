@@ -9,7 +9,7 @@ import CategoryModal from '../ui/CategoryModal';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
-import { categoriesUsedBy, categoryLabel } from '../../lib/categories';
+import { categoriesUsedBy, categoryLabel, hasUncategorized } from '../../lib/categories';
 import { FALLBACK_CATEGORY_ID, SIGIL_CATEGORY_ID } from '../../lib/schema';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
@@ -254,12 +254,14 @@ export default function OperationsView() {
 
     // Nur die hier benutzten Kategorien (plus Sonstiges und eine gerade
     // angelegte) — die Liste ist global, die anderen Module sollen hier keine
-    // leeren Chips hinterlassen. „Ohne Kategorie" nur, wenn es Waisen gibt:
-    // Operationen, deren Kategorie im Papierkorb liegt.
-    const hasUncategorized = operations.some((o) => !catById[o.category_id]);
+    // leeren Chips hinterlassen.
+    // „Ohne Kategorie" nur, wenn es Waisen gibt — oder solange der Chip noch
+    // ausgewählt ist: verschwände er unter der aktiven Auswahl, bliebe ein
+    // Filter wirksam, den nichts mehr anzeigt.
+    const showUncatChip = hasUncategorized(categories, operations) || filterCatIds.includes(UNCATEGORIZED_KEY);
     const catChips = [
       ...usedCategories.map((c) => ({ value: c.id, label: catName(c), emoji: c.emoji })),
-      ...(hasUncategorized ? [{ value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄' }] : []),
+      ...(showUncatChip ? [{ value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄' }] : []),
     ];
 
     const statusChips = [
@@ -413,7 +415,7 @@ export default function OperationsView() {
     const catGroups: DashboardGroup<Operation>[] = groupByCategory(
       sortedOps, visibleCategories, (o) => o.category_id,
       catName, t('categories.uncategorized'),
-      [catEditor.lastAddedId],
+      catEditor.lastAddedId,
     );
 
     const renderCategoryHeader = (group: DashboardGroup<Operation>) => {
@@ -478,11 +480,11 @@ export default function OperationsView() {
         renderItem={renderOp}
         isEmpty={operations.length === 0 && categories.length === 0}
         emptyState={{ message: t('operations.none'), actionLabel: t('operations.start'), onAction: handleNew }}
-        // Bei aktivem Kategorie-Filter ohne Suchtext trotzdem die Gruppierung
-        // rendern: eine ausgewählte leere Kategorie soll ihren Kopf samt
-        // Leer-Hinweis zeigen, nicht „Keine Ergebnisse". („Nur mit Einträgen"
-        // wertet Dashboard selbst aus und zeigt notfalls den Hinweis.)
-        hasNoResults={filtered.length === 0 && !(grouping === 'grouped' && view !== 'timeline' && filterCatIds.length > 0 && !search)}
+        // Im gruppierten Modus entscheidet Dashboard selbst: überlebt keine
+        // Gruppe, zeigt es „Keine Ergebnisse" — und ein leerer Kopf (die
+        // gerade angelegte Kategorie) hat dort Vorrang. Dieser Zweig darf ihm
+        // also nicht zuvorkommen.
+        hasNoResults={filtered.length === 0 && !(grouping === 'grouped' && view !== 'timeline')}
         noResultsMessage={t('search.noResults')}
         grouping={
           view === 'timeline'

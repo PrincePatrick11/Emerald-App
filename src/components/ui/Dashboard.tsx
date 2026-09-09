@@ -282,6 +282,8 @@ export default function Dashboard<T>({
     // den Operationen. Ausnahme ist die gerade angelegte (keepWhenEmpty).
     // Bleibt danach keine Gruppe übrig, greift der „Keine Ergebnisse"-Hinweis,
     // den sonst hasNoResults liefert.
+    // Nicht die einzige Stelle: Tasks rendert im custom-Modus und führt
+    // dieselbe Regel selbst (TasksView, `visibleCategories`).
     const groups = grouping.groups.filter((group) => group.items.length > 0 || group.keepWhenEmpty);
     return (
       <div className="space-y-6">

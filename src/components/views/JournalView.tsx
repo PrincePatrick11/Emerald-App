@@ -190,18 +190,28 @@ export default function JournalView() {
       ? searchFiltered
       : searchFiltered.filter((e) =>
           (e.moon_phase != null && filterPhases.includes(e.moon_phase)) ||
-          // Der „Ohne Mondphase"-Chip wählt Einträge ohne Phase aus.
-          (filterPhases.includes(UNCATEGORIZED_KEY) && e.moon_phase == null));
+          // Der „Ohne Mondphase"-Chip wählt Einträge ohne Phase aus — und
+          // solche mit einer, die nicht zum Zyklus gehört: die landen auch in
+          // der Waisen-Gruppe, der Chip muss sie also erwischen.
+          (filterPhases.includes(UNCATEGORIZED_KEY)
+            && !MOON_PHASE_ORDER.includes(e.moon_phase as MoonPhase)));
 
     const filtered = phaseFiltered;
 
-    // Alle Phasen anbieten, auch die ohne Einträge — sie sind ein fester
-    // Zyklus, keine wachsende Liste. „Ohne Mondphase" dagegen nur, wenn es
-    // Einträge ohne Phase gibt.
-    const hasNoPhase = entries.some((e) => !e.moon_phase);
+    // Alle acht Phasen anbieten, auch die ohne Einträge — sie sind ein fester
+    // Zyklus, keine wachsende Liste; die Gruppen darunter zeigen trotzdem nur
+    // die belegten. „Ohne Mondphase" dagegen nur, wenn es solche Einträge
+    // gibt — oder solange der Chip ausgewählt ist, sonst bliebe ein Filter
+    // wirksam, den nichts mehr anzeigt.
+    //
+    // Nicht `!e.moon_phase`, sondern die Zugehörigkeit zum Zyklus: ein Import
+    // kann eine unbekannte Phase schreiben (emeraldFormat reicht sie
+    // ungeprüft durch), und die landet in derselben Waisen-Gruppe.
+    const showNoPhaseChip = entries.some((e) => !MOON_PHASE_ORDER.includes(e.moon_phase as MoonPhase))
+      || filterPhases.includes(UNCATEGORIZED_KEY);
     const phaseChips = [
       ...MOON_PHASE_ORDER.map((p) => ({ value: p, label: t(`moonPhase.${p}`), emoji: MOON_PHASE_SYMBOLS[p] })),
-      ...(hasNoPhase ? [{ value: UNCATEGORIZED_KEY, label: t('journal.noPhase'), emoji: '📓' }] : []),
+      ...(showNoPhaseChip ? [{ value: UNCATEGORIZED_KEY, label: t('journal.noPhase'), emoji: '📓' }] : []),
     ];
 
     const activeFilterCount = filterPhases.length > 0 ? 1 : 0;
@@ -211,9 +221,10 @@ export default function JournalView() {
     const timelineGroups = groupByMonth(sorted, (e) => e.created_at);
 
     // Gruppiert heißt im Journal: nach Mondphase — gerendert mit denselben
-    // Gruppenköpfen wie die Kategorie-Gruppen der anderen Module. Die Phasen
-    // sind fest (Mondzyklus-Reihenfolge), abgewählte werden ausgeblendet;
-    // der Waisen-Bucket fängt Einträge ohne Phase auf.
+    // Gruppenköpfen wie die Kategorie-Gruppen der anderen Module, in fester
+    // Zyklus-Reihenfolge. Abgewählte Phasen fallen weg, leere ebenso (das
+    // erledigt Dashboard zentral); der Waisen-Bucket fängt Einträge ohne
+    // Phase auf.
     const visiblePhases = filterPhases.length > 0
       ? MOON_PHASE_ORDER.filter((p) => filterPhases.includes(p))
       : MOON_PHASE_ORDER;
@@ -308,11 +319,11 @@ export default function JournalView() {
         renderItem={renderEntry}
         isEmpty={entries.length === 0}
         emptyState={{ message: t('journal.noEntries'), actionLabel: t('journal.startWriting'), onAction: handleNew }}
-        // Bei aktivem Phasen-Filter ohne Suchtext trotzdem die Gruppierung
-        // rendern: eine ausgewählte leere Phase soll ihren Kopf samt
-        // Leer-Hinweis zeigen, nicht „Keine Ergebnisse". („Nur mit Einträgen"
-        // wertet Dashboard selbst aus und zeigt notfalls den Hinweis.)
-        hasNoResults={filtered.length === 0 && !(grouping === 'grouped' && view !== 'timeline' && filterPhases.length > 0 && !search)}
+        // Im gruppierten Modus entscheidet Dashboard selbst: überlebt keine
+        // Gruppe, zeigt es „Keine Ergebnisse" — und ein leerer Kopf (die
+        // gerade angelegte Kategorie) hat dort Vorrang. Dieser Zweig darf ihm
+        // also nicht zuvorkommen.
+        hasNoResults={filtered.length === 0 && !(grouping === 'grouped' && view !== 'timeline')}
         noResultsMessage={t('search.noResults')}
         grouping={
           view === 'timeline'
@@ -322,7 +333,9 @@ export default function JournalView() {
                   mode: 'category',
                   groups: phaseGroups,
                   renderGroupHeader: renderPhaseHeader,
-                  renderEmptyGroup: () => <p className="text-xs text-stone-700 px-1 py-1">{t('journal.noEntries')}</p>,
+                  // Kein renderEmptyGroup: das Journal kennt keine leere
+                  // Gruppe mehr — Phasen ohne Einträge fallen weg, und eine
+                  // „gerade angelegte" Phase gibt es nicht.
                   isGroupCollapsed: (g) => collapsedPhases.has(g.key!),
                 }
               : { mode: 'flat' }

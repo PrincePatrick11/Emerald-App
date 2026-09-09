@@ -43,6 +43,21 @@ export function categoriesUsedBy<C extends { id: string }>(
   return all.filter((c) => used.has(c.id));
 }
 
+/**
+ * Zeigt mindestens ein Eintrag auf eine Kategorie, die es nicht (mehr) gibt?
+ *
+ * Das sind die Waisen, die `groupByCategory` in den „Ohne Kategorie"-Bucket
+ * sortiert. Die Chip-Liste fragt hier, ob es den Chip überhaupt braucht —
+ * dieselbe Frage wie `categoriesUsedBy` daneben, nur andersherum.
+ */
+export function hasUncategorized<C extends { id: string }>(
+  all: readonly C[],
+  items: readonly { category_id: string }[],
+): boolean {
+  const ids = new Set(all.map((c) => c.id));
+  return items.some((item) => !ids.has(item.category_id));
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Vor v38: Kategorien je Modul mit modulbezogenen Locale-Keys. Gebraucht von
 // den Migrationen v36–v38, die auf alten Vaults vor dem Zusammenlegen laufen,
