@@ -1,19 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
-import { FolderPlus, Maximize2, Minimize2, PackagePlus } from 'lucide-react';
+import { Flame, FolderPlus, Maximize2, Minimize2, PackagePlus } from 'lucide-react';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
+import { isCardView, isWideCardView } from '../../lib/viewMode';
 import { groupByMonth } from '../../lib/groupBy';
 import { useAltarStore } from '../../store/altarStore';
 import { useCategoryStore } from '../../store/categoryStore';
-import { useUIStore } from '../../store/uiStore';
+import { useUIStore, ALTAR_LIBRARY_SORTS } from '../../store/uiStore';
 import { useEditActions } from '../../hooks/useEditActions';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
+import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { getAltarBackgroundStyle, DEFAULT_ALTAR_RESOLUTION, parseResolution, isRatioFormat, ALTAR_CATEGORY_DEFAULT_EMOJI } from '../../lib/altarConstants';
 import { FALLBACK_CATEGORY_ID } from '../../lib/schema';
 import type { AltarItem, AltarRecord } from '../../types';
-import Dashboard from '../ui/Dashboard';
+import Dashboard, { GroupDivider } from '../ui/Dashboard';
+import IconToggleGroup from '../ui/IconToggleGroup';
+import { GROUPING_ICONS, SORT_ICONS } from '../ui/ListToolbar';
+import { FilterChipButton } from '../ui/FilterPanel';
 import ContextMenu from '../ui/ContextMenu';
 import Button from '../ui/Button';
 import CategoryModal from '../ui/CategoryModal';
@@ -23,6 +28,17 @@ import { AltarItemModal } from '../altar/AltarItemModal';
 import { AltarLibrarySection } from '../altar/AltarLibrarySection';
 import { AltarCard, AltarListRow, buildAltarContextMenuActions } from '../altar/AltarCard';
 import { imageSrc } from '../../lib/images';
+import type { AltarLibrarySort } from '../../store/uiStore';
+
+/** Dieselben Beschriftungen wie die Toolbar-Sortierung — „A → Z" meint in der
+ *  Bibliothek nur den Elementnamen statt den Altartitel, das Wort bleibt. */
+const LIBRARY_SORT_LABEL_KEYS: Record<AltarLibrarySort, string> = {
+  alpha_asc: 'listView.alphaAsc',
+  alpha_desc: 'listView.alphaDesc',
+  date_desc: 'listView.dateDesc',
+};
+
+
 
 export default function AltarView() {
   const { t } = useTranslation();
@@ -46,11 +62,19 @@ export default function AltarView() {
   const setAltarPrefs = useUIStore((s) => s.setAltarPrefs);
   const altarWindowFullscreen = useUIStore((s) => s.altarWindowFullscreen);
   const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
+  const altarShowPreview = useUIStore((s) => s.altarShowPreview);
+  const setAltarShowPreview = useUIStore((s) => s.setAltarShowPreview);
+  const libraryPrefs = useUIStore((s) => s.altarLibraryPrefs);
+  const setLibraryPrefs = useUIStore((s) => s.setAltarLibraryPrefs);
 
   const allCategories = useCategoryStore((s) => s.categories);
 
   const [search, setSearch] = useState('');
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  // Wie die Bibliothek darunter: der Abschnitt lässt sich zuklappen, und das
+  // bleibt so — dieselbe Vorliebe, derselbe Hook.
+  const [altarsCollapsed, toggleAltars] = usePersistedFlag('altar-list-collapsed');
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [title, setTitle] = useState('');
@@ -258,17 +282,17 @@ export default function AltarView() {
         )
       : altars;
 
-    // Kein category-Getter: Altäre haben keine Kategorien, der onSort-Handler
-    // unten mappt 'category' bereits auf date_desc.
     const sorted = sortItems(filtered, altarPrefs.sort, { date: (a) => a.updated_at });
 
     const filteredCount = filtered.length;
 
     const renderAltarItem = (altar: AltarRecord) =>
-      altarPrefs.view === 'cards' ? (
+      isCardView(altarPrefs.view) ? (
         <AltarCard
           altar={altar}
           previewItems={previewPlacements[altar.id] ?? []}
+          showPreview={altarShowPreview}
+          wide={isWideCardView(altarPrefs.view)}
           isRenaming={renamingId === altar.id}
           renameValue={renameValue}
           onChangeRename={setRenameValue}
@@ -281,6 +305,7 @@ export default function AltarView() {
         <AltarListRow
           altar={altar}
           previewItems={previewPlacements[altar.id] ?? []}
+          showPreview={altarShowPreview}
           isRenaming={renamingId === altar.id}
           renameValue={renameValue}
           onChangeRename={setRenameValue}
@@ -290,6 +315,35 @@ export default function AltarView() {
           onContextMenu={(event) => { event.preventDefault(); setCtxMenu({ id: altar.id, x: event.clientX, y: event.clientY }); }}
         />
       );
+
+    // Die Regler der Bibliothek stehen beim übrigen Dashboard-Kopf, nicht im
+    // Inhalt: im Seitenleisten-Modus landen sie damit in derselben Spalte wie
+    // Suche, Ansicht und Sortierung — und die Bibliothek darunter bleibt der
+    // reine Inhalt.
+    // Dieselben Segment-Reihen wie Ansicht und Sortierung im Kopf darüber:
+    // die Regler stehen in derselben schmalen Spalte und sollen sich gleich
+    // bedienen lassen. Die Beschriftungen wandern in title/aria-label.
+    const libraryControls = (
+      <>
+        <IconToggleGroup
+          label={t('listView.sort')}
+          options={ALTAR_LIBRARY_SORTS.map((value) => ({ value, label: t(LIBRARY_SORT_LABEL_KEYS[value]) }))}
+          icons={SORT_ICONS}
+          value={libraryPrefs.sort}
+          onChange={(sort) => setLibraryPrefs({ sort })}
+        />
+        <IconToggleGroup
+          label={t('listView.grouping')}
+          options={[
+            { value: 'grouped' as const, label: t('listView.category') },
+            { value: 'flat' as const, label: t('listView.ungrouped') },
+          ]}
+          icons={GROUPING_ICONS}
+          value={libraryPrefs.grouping}
+          onChange={(grouping) => setLibraryPrefs({ grouping })}
+        />
+      </>
+    );
 
     return (
       <>
@@ -307,16 +361,45 @@ export default function AltarView() {
         view={altarPrefs.view}
         sort={altarPrefs.sort}
         onView={(next) => setAltarPrefs({ view: next })}
-        onSort={(next) => setAltarPrefs({ sort: next === 'category' ? 'date_desc' : next })}
+        onSort={(next) => setAltarPrefs({ sort: next })}
         search={search}
         onSearch={setSearch}
-        items={sorted}
+        // Nur ein Anzeige-Schalter, kein Filter: er zählt nicht als aktiver
+        // Filter, und es gibt nichts zu „Alle löschen".
+        filters={{
+          showFilters: filterOpen,
+          onToggleFilters: () => setFilterOpen((open) => !open),
+          activeFilterCount: 0,
+          panelProps: {
+            displayExtras: (
+              <FilterChipButton active={altarShowPreview} onClick={() => setAltarShowPreview(!altarShowPreview)}>
+                <Flame size={12} />
+                {t('altar.showPreview')}
+              </FilterChipButton>
+            ),
+            extraGroups: [{ label: t('altar.libraryTitle'), content: libraryControls }],
+          },
+        }}
+        // Zugeklappt eine leere Liste statt eines Sonderzweigs: der Leer- und
+        // der „Keine Ergebnisse"-Hinweis gehören zum ausgeklappten Abschnitt
+        // und dürfen nicht anstelle der zugeklappten Überschrift stehen.
+        items={altarsCollapsed ? [] : sorted}
         itemKey={(altar) => altar.id}
         renderItem={renderAltarItem}
-        isEmpty={altars.length === 0}
+        isEmpty={!altarsCollapsed && altars.length === 0}
         emptyState={{ message: t('altar.none'), actionLabel: t('altar.start'), onAction: handleNew }}
-        hasNoResults={filteredCount === 0}
+        hasNoResults={!altarsCollapsed && filteredCount === 0}
         noResultsMessage={t('search.noResults')}
+        contentHeader={
+          <GroupDivider
+            // Mehrzahl, nicht t('nav.altar'): das ist die Überschrift über
+            // einer Liste, kein Modulname in der Leiste.
+            label={t('altar.sectionTitle')}
+            count={filteredCount}
+            collapsed={altarsCollapsed}
+            onToggleCollapse={toggleAltars}
+          />
+        }
         contentFooter={
           <AltarLibrarySection
             search={search}
@@ -326,7 +409,7 @@ export default function AltarView() {
           />
         }
         grouping={
-          altarPrefs.view === 'timeline'
+          altarPrefs.view === 'timeline' && !altarsCollapsed
             ? { mode: 'timeline', groups: groupByMonth(sorted, (a) => a.updated_at) }
             : { mode: 'flat' }
         }

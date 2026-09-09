@@ -1,70 +1,43 @@
 import { useTranslation } from 'react-i18next';
 import {
   ArrowDownAZ, ArrowDownZA, CalendarArrowDown, CalendarArrowUp, CalendarRange,
-  Layers, LayoutGrid, List, Search, SlidersHorizontal, X, type LucideIcon,
+  Grid3x3, Layers, LayoutGrid, List, Search, SlidersHorizontal, StretchHorizontal, X, type LucideIcon,
 } from 'lucide-react';
-import type { ViewMode, SortMode } from '../../store/uiStore';
+import type { ViewMode, SortMode, GroupingMode } from '../../store/uiStore';
+import type { DashboardGroupBy } from './Dashboard';
 import Dropdown from './Dropdown';
-import TabIconButton from './TabIconButton';
+import IconToggleGroup from './IconToggleGroup';
 
-/* Icon je Modus für die vertikale (Seitenleisten-)Variante, in der die beiden
-   Dropdowns als wählbare Icon-Reihen stehen. Das Label des jeweiligen
-   Dropdown-Eintrags wandert in title/aria-label. */
+/* Icon je Modus für die vertikale (Seitenleisten-)Variante, in der die drei
+   Dropdowns (Ansicht, Sortierung, Gruppierung) als wählbare Icon-Reihen
+   stehen. Das Label des jeweiligen Dropdown-Eintrags wandert in
+   title/aria-label.
+
+   SORT_ICONS ist exportiert: die Altar-Bibliothek stellt im selben Kopf ihre
+   eigene, kleinere Sortier-Reihe und soll je Modus dasselbe Glyph zeigen. */
 const VIEW_ICONS: Record<ViewMode, LucideIcon> = {
   list: List,
   cards: LayoutGrid,
+  cards_wide: StretchHorizontal,
   timeline: CalendarRange,
 };
-const SORT_ICONS: Record<SortMode, LucideIcon> = {
+/** Reihenfolge der Sortier-Auswahl. */
+const ALL_SORT_MODES: SortMode[] = ['date_desc', 'date_asc', 'alpha_asc', 'alpha_desc'];
+
+export const SORT_ICONS: Record<SortMode, LucideIcon> = {
   date_desc: CalendarArrowDown,
   date_asc: CalendarArrowUp,
   alpha_asc: ArrowDownAZ,
   alpha_desc: ArrowDownZA,
-  category: Layers,
 };
 
-function IconToggleGroup<T extends string>({ label, options, icons, value, onChange, isDisabled, disabledHint }: {
-  label: string;
-  options: { value: T; label: string }[];
-  icons: Record<T, LucideIcon>;
-  value: T;
-  onChange: (v: T) => void;
-  /** Optionen, die in der aktuellen Kombination nichts bewirken (Zeitstrahl
-   *  ignoriert Alpha-/Kategorie-Sortierung) — ausgegraut statt versteckt,
-   *  damit die Reihe nicht springt. */
-  isDisabled?: (v: T) => boolean;
-  /** Tooltip-Zusatz für deaktivierte Optionen („Im Zeitstrahl ohne Wirkung"). */
-  disabledHint?: string;
-}) {
-  return (
-    // Segment-Optik: ein gemeinsamer Rahmen um die Reihe, die aktive Auswahl
-    // füllt ihr Segment (TabIconButton). Ohne sichtbare Überschrift — die
-    // Icons erklären sich über ihre Tooltips, das Label bleibt als aria-label
-    // der Gruppe. gap-px, damit Ansicht (3) + Sortierung (5) bei
-    // Standard-Leistenbreite zusammen in eine Zeile passen.
-    <div role="group" aria-label={label} className="inline-flex gap-px p-0.5 rounded-md border border-stone-700/60 bg-stone-800/60">
-      {options.map((option) => {
-        const Icon: LucideIcon = icons[option.value];
-        const disabled = isDisabled?.(option.value) ?? false;
-        const title = disabled && disabledHint ? `${option.label} — ${disabledHint}` : option.label;
-        return (
-          <TabIconButton
-            key={option.value}
-            compact
-            active={value === option.value}
-            aria-pressed={value === option.value}
-            onClick={() => onChange(option.value)}
-            disabled={disabled}
-            title={title}
-            aria-label={title}
-          >
-            <Icon size={14} />
-          </TabIconButton>
-        );
-      })}
-    </div>
-  );
-}
+/** Auch von der Altar-Bibliothek benutzt, die im selben Kopf ihre eigene
+ *  Gruppierung stellt. `Grid3x3` statt `LayoutGrid` fürs flache Raster:
+ *  LayoutGrid steht in der Reihe darüber schon für die Kartenansicht. */
+export const GROUPING_ICONS: Record<GroupingMode, LucideIcon> = {
+  grouped: Layers,
+  flat: Grid3x3,
+};
 
 interface Props {
   view: ViewMode;
@@ -72,6 +45,9 @@ interface Props {
   onView: (v: ViewMode) => void;
   onSort: (s: SortMode) => void;
   viewOptions?: { value: ViewMode; label: string }[];
+  /** Die Gruppierungs-Achse; fehlt sie, zeigt die Leiste nur Ansicht und
+   *  Sortierung. Siehe DashboardGroupBy. */
+  groupBy?: DashboardGroupBy;
   search?: string;
   onSearch?: (v: string) => void;
   showFilters?: boolean;
@@ -83,30 +59,41 @@ interface Props {
 }
 
 /** Der Zeitstrahl gruppiert nach Monat über die *sortierte* Liste:
- *  Neueste/Älteste zuerst drehen ihn um und bleiben wählbar, Alpha-/Kategorie-
- *  Sortierung würde die Monatsreihenfolge verwürfeln bzw. wird von der
- *  Gruppierung ignoriert — beide Darreichungsformen (Segmente und Dropdown)
- *  sperren deshalb dieselben Optionen. */
+ *  Neueste/Älteste zuerst drehen ihn um und bleiben wählbar, die Alpha-Modi
+ *  würden die Monatsreihenfolge verwürfeln — beide Darreichungsformen
+ *  (Segmente und Dropdown) sperren deshalb dieselben Optionen. Die
+ *  Gruppierungs-Achse sperrt der Zeitstrahl ganz: dort gruppieren die
+ *  Monate. */
 const sortBlockedInTimeline = (v: SortMode) => v !== 'date_desc' && v !== 'date_asc';
 
-export default function ListToolbar({ view, sort, onView, onSort, viewOptions: viewOptionsProp, search, onSearch, showFilters, onToggleFilters, activeFilterCount = 0, vertical }: Props) {
+export default function ListToolbar({ view, sort, onView, onSort, viewOptions: viewOptionsProp, groupBy, search, onSearch, showFilters, onToggleFilters, activeFilterCount = 0, vertical }: Props) {
   const { t } = useTranslation();
 
   const viewOptions = viewOptionsProp ?? [
     { value: 'list' as const, label: t('listView.list') },
     { value: 'cards' as const, label: t('listView.cards') },
+    { value: 'cards_wide' as const, label: t('listView.cardsWide') },
     { value: 'timeline' as const, label: t('listView.timeline') },
   ];
 
-  const sortOptions: { value: SortMode; label: string }[] = [
-    { value: 'date_desc', label: t('listView.dateDesc') },
-    { value: 'date_asc',  label: t('listView.dateAsc') },
-    { value: 'alpha_asc', label: t('listView.alphaAsc') },
-    { value: 'alpha_desc',label: t('listView.alphaDesc') },
-    { value: 'category',  label: t('listView.category') },
-  ];
+  const sortLabels: Record<SortMode, string> = {
+    date_desc: t('listView.dateDesc'),
+    date_asc: t('listView.dateAsc'),
+    alpha_asc: t('listView.alphaAsc'),
+    alpha_desc: t('listView.alphaDesc'),
+  };
+  const sortOptions = ALL_SORT_MODES.map((value) => ({ value, label: sortLabels[value] }));
 
   const sortDisabled = view === 'timeline' ? sortBlockedInTimeline : undefined;
+
+  // Im Zeitstrahl gruppieren die Monate; die Achse hat dort keine Wirkung und
+  // wird komplett ausgegraut — dieselbe Behandlung wie die gesperrten
+  // Sortiermodi, statt die Reihe verschwinden zu lassen.
+  const groupingOptions: { value: GroupingMode; label: string }[] = [
+    { value: 'grouped', label: groupBy?.label ?? t('listView.category') },
+    { value: 'flat', label: t('listView.ungrouped') },
+  ];
+  const groupingDisabled = view === 'timeline' ? () => true : undefined;
 
   const onSearchFn = onSearch;
   // Vertikal auf dem Höhenmaß der Eintragslisten-Suche (text-sm + Icon 14
@@ -158,6 +145,17 @@ export default function ListToolbar({ view, sort, onView, onSort, viewOptions: v
             isDisabled={sortDisabled}
             disabledHint={t('listView.notAvailableInTimeline')}
           />
+          {groupBy && (
+            <IconToggleGroup
+              label={t('listView.grouping')}
+              options={groupingOptions}
+              icons={GROUPING_ICONS}
+              value={groupBy.value}
+              onChange={groupBy.onChange}
+              isDisabled={groupingDisabled}
+              disabledHint={t('listView.notAvailableInTimeline')}
+            />
+          )}
         </>
       ) : (
         <>
@@ -172,6 +170,16 @@ export default function ListToolbar({ view, sort, onView, onSort, viewOptions: v
               : o)}
             onChange={onSort}
           />
+          {groupBy && (
+            <Dropdown
+              label={t('listView.grouping') + ': '}
+              value={groupBy.value}
+              options={groupingOptions.map((o) => groupingDisabled?.()
+                ? { ...o, disabled: true, title: t('listView.notAvailableInTimeline') }
+                : o)}
+              onChange={groupBy.onChange}
+            />
+          )}
         </>
       )}
       {/* Vertikal (Seitenleiste) gibt es keinen Filter-Knopf — das FilterPanel

@@ -128,8 +128,10 @@ interface AltarState {
   bumpAltarUpdatedAt: (id: string) => Promise<void>;
   deleteAltar: (id: string) => Promise<void>;
 
-  addItem: (name: string, emoji: string, categoryId: string, note?: string, imageData?: string) => Promise<AltarItem>;
-  updateItem: (id: string, patch: Partial<Omit<AltarItem, 'id'>>) => Promise<void>;
+  /** `createdAt` nur für den Import, der das Datum der Datei übernimmt;
+   *  sonst jetzt. */
+  addItem: (name: string, emoji: string, categoryId: string, note?: string, imageData?: string, createdAt?: string) => Promise<AltarItem>;
+  updateItem: (id: string, patch: Partial<Pick<AltarItem, 'name' | 'emoji' | 'category_id' | 'note' | 'image_data'>>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   placeItem: (item: AltarItem, x: number, y: number) => Promise<void>;
   selectPlacement: (id: string | null) => void;
@@ -407,12 +409,12 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     });
   },
 
-  addItem: async (name, emoji, categoryId, note = '', imageData) => {
+  addItem: async (name, emoji, categoryId, note = '', imageData, createdAt) => {
     const db = await getDb();
-    const item: AltarItem = { id: generateId(), name, emoji, category_id: categoryId, note, image_data: imageData };
+    const item: AltarItem = { id: generateId(), name, emoji, category_id: categoryId, note, image_data: imageData, created_at: createdAt ?? nowIso() };
     await db.execute(
       'INSERT INTO altar_items (id, name, emoji, category_id, note, image_data, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-      [item.id, item.name, item.emoji, item.category_id, item.note, item.image_data ?? null, nowIso()]
+      [item.id, item.name, item.emoji, item.category_id, item.note, item.image_data ?? null, item.created_at]
     );
     set((s) => ({ items: [...s.items, item].sort((a, b) => a.name.localeCompare(b.name)) }));
     return item;

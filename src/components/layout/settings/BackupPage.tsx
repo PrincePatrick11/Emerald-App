@@ -278,6 +278,7 @@ export default function BackupPage() {
                   importedFile.preview.opsCount && `${importedFile.preview.opsCount} O`,
                   importedFile.preview.routinesCount && `${importedFile.preview.routinesCount} R`,
                   importedFile.preview.altarsCount && `${importedFile.preview.altarsCount} A`,
+                  importedFile.preview.altarItemsCount && `${importedFile.preview.altarItemsCount} E`,
                   importedFile.preview.taskCount && `${importedFile.preview.taskCount} T`,
                 ].filter(Boolean).join(', ')}
               </p>

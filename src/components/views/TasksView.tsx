@@ -72,7 +72,6 @@ export default function TasksView() {
   const [filterCategory, setFilterCategory] = useState<Set<string>>(new Set());
   const [filterPriority, setFilterPriority] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
-  const [hideEmptyCats, setHideEmptyCats] = useState(false);
   const { collapsed: collapsedCategories, toggle: toggleCategoryCollapse, expand: expandCategories } = useCollapsedSet('tasks');
   const [linkModal, setLinkModal] = useState<{ taskId: string } | null>(null);
 
@@ -95,11 +94,10 @@ export default function TasksView() {
 
   const sortedTasks = sortItems(filteredTasks, tasksPrefs.sort, {
     date: (task) => task.created_at,
-    category: (task) => getCategory(task.category_id)?.name ?? '',
     tiebreak: (a, b) => a.sort_order - b.sort_order,
   });
 
-  const groupedTasks = tasksPrefs.sort === 'category'
+  const groupedTasks = tasksPrefs.grouping === 'grouped'
     ? sortedTasks.reduce((acc, task) => {
         const catId = task.category_id;
         if (!acc[catId]) acc[catId] = [];
@@ -108,7 +106,7 @@ export default function TasksView() {
       }, {} as Record<string, typeof sortedTasks>)
     : null;
 
-  const uncategorized = tasksPrefs.sort === 'category'
+  const uncategorized = tasksPrefs.grouping === 'grouped'
     ? sortedTasks.filter((t) => !t.category_id || !getCategory(t.category_id))
     : [];
 
@@ -116,20 +114,23 @@ export default function TasksView() {
 
   // Chips und Gruppen zeigen nur, was bei den Aufgaben vorkommt (plus Sonstiges).
   const usedCategories = categoriesUsedBy(categories, tasks, [catEditor.lastAddedId]);
+  // Waisen: ihre Kategorie liegt im Papierkorb. Ohne sie gibt es nichts zu
+  // filtern, dann entfällt der „Ohne Kategorie"-Chip.
+  const hasUncategorized = tasks.some((task) => !getCategory(task.category_id));
   const chipFilteredCategories = filterCategory.size > 0
     ? usedCategories.filter((c) => filterCategory.has(c.id))
     : usedCategories;
-  // „Nur mit Einträgen": leere Kategorie-Gruppen ganz weglassen. Tasks rendert
-  // im custom-Modus selbst, deshalb greift Dashboards zentrale Auswertung hier
-  // nicht. Der Waisen-Block hängt nicht dran — er erscheint nur, wenn er voll ist.
-  const visibleCategories = hideEmptyCats && groupedTasks
-    ? chipFilteredCategories.filter((c) => (groupedTasks[c.id]?.length ?? 0) > 0)
+  // Leere Kategorie-Gruppen fallen weg — Tasks rendert im custom-Modus selbst,
+  // deshalb greift Dashboards zentrale Auswertung hier nicht. Ausnahme wie
+  // dort: die gerade angelegte Kategorie behält ihren Kopf, unter dem die
+  // erste Aufgabe entsteht.
+  const visibleCategories = groupedTasks
+    ? chipFilteredCategories.filter((c) =>
+        (groupedTasks[c.id]?.length ?? 0) > 0 || c.id === catEditor.lastAddedId)
     : chipFilteredCategories;
 
-  // Der Waisen-Block: auch leer sichtbar, wenn sein Chip gewählt ist — außer
-  // „Nur mit Einträgen" blendet Leeres aus (Pendant zu forceUncategorized).
-  const showUncatBlock = groupedTasks !== null &&
-    (uncategorized.length > 0 || (filterCategory.has(UNCATEGORIZED_KEY) && !hideEmptyCats));
+  // Der Waisen-Block erscheint nur, wenn er etwas enthält.
+  const showUncatBlock = groupedTasks !== null && uncategorized.length > 0;
 
   const handleCreateTask = async (categoryId?: string) => {
     const cat = categoryId ?? FALLBACK_CATEGORY_ID;
@@ -216,7 +217,7 @@ export default function TasksView() {
     return () => cancelAnimationFrame(frame);
   }, [pendingScrollId]);
 
-  const activeFilterCount = filterCategory.size + filterPriority.size + (hideEmptyCats ? 1 : 0);
+  const activeFilterCount = filterCategory.size + filterPriority.size;
 
   const resolveTaskLinkTitle = useCallback((targetType: string, targetId: string) => {
     if (targetType === 'journal') {
@@ -337,8 +338,10 @@ export default function TasksView() {
 
         {/* Custom-Modus-Pendant zu Dashboards zentralem Rückfall: blenden die
             Filter alle Gruppen aus, kein leerer Content-Bereich, sondern
-            „Keine Ergebnisse". */}
-        {groupedTasks && visibleCategories.length === 0 && !showUncatBlock && categories.length > 0 && !searchQuery && (
+            „Keine Ergebnisse". Nur, solange es überhaupt passende Aufgaben
+            gibt — bleibt gar keine übrig, greift der Zweig ganz unten, der
+            auch die Ansicht ohne Gruppen abdeckt. */}
+        {groupedTasks && sortedTasks.length > 0 && visibleCategories.length === 0 && !showUncatBlock && categories.length > 0 && !searchQuery && (
           <p className="text-center py-20 text-stone-600 text-sm">{t('search.noResults')}</p>
         )}
 
@@ -354,7 +357,9 @@ export default function TasksView() {
           </div>
         )}
 
-        {searchQuery && sortedTasks.length === 0 && (
+        {/* Nicht nur bei Suchtext: ohne Gruppen kann auch ein Kategorie- oder
+            Prioritäts-Chip alles wegfiltern, und dann stand hier nichts. */}
+        {sortedTasks.length === 0 && tasks.length > 0 && (
           <div className="py-20 text-center">
             <p className="text-stone-600 text-sm">{t('search.noResults')}</p>
           </div>
@@ -372,6 +377,7 @@ export default function TasksView() {
         sort={tasksPrefs.sort}
         onView={(v) => setTasksPrefs({ view: v })}
         onSort={(s) => setTasksPrefs({ sort: s })}
+        groupBy={{ value: tasksPrefs.grouping, onChange: (g) => setTasksPrefs({ grouping: g }) }}
         viewOptions={[{ value: 'list' as const, label: t('listView.list') }]}
         search={searchQuery}
         onSearch={setSearchQuery}
@@ -381,10 +387,10 @@ export default function TasksView() {
           activeFilterCount,
           panelProps: {
             chipLabel: t('filters.category'),
-            // „Ohne Kategorie" immer dabei, auch ohne Waisen.
+            // „Ohne Kategorie" nur, wenn es Waisen gibt.
             chips: [
               ...usedCategories.map((c) => ({ value: c.id, label: categoryLabel(t, c), emoji: c.emoji })),
-              { value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄' },
+              ...(hasUncategorized ? [{ value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄' }] : []),
             ],
             selectedChips: [...filterCategory],
             onChipToggle: (v) => setFilterCategory((prev) => {
@@ -393,8 +399,6 @@ export default function TasksView() {
               return next;
             }),
             onAllChips: () => setFilterCategory(new Set()),
-            nonEmptyOnly: hideEmptyCats,
-            onNonEmptyToggle: () => setHideEmptyCats((v) => !v),
             // „Erledigte anzeigen" ist ein Anzeige-Schalter, kein Filter:
             // zählt nicht in activeFilterCount, „Alle löschen" lässt ihn stehen.
             displayExtras: (
@@ -420,7 +424,6 @@ export default function TasksView() {
             onClearAll: () => {
               setFilterCategory(new Set());
               setFilterPriority(new Set());
-              setHideEmptyCats(false);
             },
           },
         }}

@@ -224,6 +224,7 @@ export const fromRow = {
       category_id: str(r.category_id),
       note: str(r.note),
       image_data: r.image_data == null ? undefined : String(r.image_data),
+      created_at: str(r.created_at),
     };
   },
 

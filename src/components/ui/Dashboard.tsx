@@ -5,7 +5,8 @@ import Button from './Button';
 import CollapseChevron from './CollapseChevron';
 import ListToolbar from './ListToolbar';
 import FilterPanel, { type FilterPanelProps } from './FilterPanel';
-import { useUIStore, type ViewMode, type SortMode } from '../../store/uiStore';
+import { useUIStore, type ViewMode, type SortMode, type GroupingMode } from '../../store/uiStore';
+import { isCardView, isWideCardView } from '../../lib/viewMode';
 
 export interface DashboardGroup<T> {
   /** Stable key for React lists; defaults to `label` when omitted. */
@@ -13,6 +14,9 @@ export interface DashboardGroup<T> {
   /** Empty string renders no header/divider (e.g. a flat, ungrouped bucket). */
   label: string;
   items: T[];
+  /** Überlebt die Leer-Filterung im Kategorie-Modus — die gerade angelegte
+   *  Kategorie braucht ihren Kopf, um den ersten Eintrag aufzunehmen. */
+  keepWhenEmpty?: boolean;
 }
 
 type DashboardGrouping<T> =
@@ -37,6 +41,14 @@ export interface DashboardEmptyState {
   className?: string;
   messageClassName?: string;
   actionClassName?: string;
+}
+
+export interface DashboardGroupBy {
+  value: GroupingMode;
+  onChange: (g: GroupingMode) => void;
+  /** Wonach gruppiert wird, in den Worten des Moduls — „Mondphase" im
+   *  Journal, „Typ" im Papierkorb. Default: „Kategorie". */
+  label?: string;
 }
 
 export interface DashboardFilters {
@@ -76,6 +88,12 @@ interface DashboardBaseProps<T> {
   onView: (v: ViewMode) => void;
   onSort: (s: SortMode) => void;
   viewOptions?: { value: ViewMode; label: string }[];
+  /** Die Gruppierungs-Achse der Toolbar — als ein Objekt, damit Wert und
+   *  Handler nicht einzeln fehlen können und der Name sich nicht mit
+   *  `grouping` unten verwechselt, das die Struktur des Inhalts beschreibt.
+   *  Ohne sie zeigt die Toolbar nur Ansicht und Sortierung (Altar: seine
+   *  Altäre haben nichts zu gruppieren). */
+  groupBy?: DashboardGroupBy;
   search?: string;
   onSearch?: (v: string) => void;
 
@@ -88,11 +106,19 @@ interface DashboardBaseProps<T> {
   noResultsMessage?: string;
   noResultsClassName?: string;
 
+  /** Über dem Inhalt, auch im Leer- und „Keine Ergebnisse"-Fall — die
+   *  Abschnitts-Überschrift des Hauptbereichs (Altar: „Altäre" mit Chevron,
+   *  passend zu der der Bibliothek darunter). */
+  contentHeader?: ReactNode;
   /** Unter dem Inhalt, auch im Leer- und „Keine Ergebnisse"-Fall — ein
    *  zweiter Bereich desselben Moduls (Altar: die Bibliothek). */
   contentFooter?: ReactNode;
 
   cardsClassName?: string;
+  /** Raster der Ansicht „Karten in voller Breite" — eine Spalte statt drei.
+   *  Eigene Prop statt einer Variante von `cardsClassName`, weil Module die
+   *  breite Karte anders füllen dürfen (Altar: höhere Vorschau). */
+  wideCardsClassName?: string;
   listClassName?: string;
   contentClassName?: string;
   /** <ContextMenu> stays caller-owned since its trigger is wired inside renderItem. */
@@ -128,6 +154,7 @@ export type DashboardProps<T> = DashboardBaseProps<T> & DashboardContentProps<T>
 const DEFAULT_HEADER_CLASSNAME = 'flex items-center justify-between px-8 h-14 border-b border-stone-700/60';
 const DEFAULT_CONTENT_CLASSNAME = 'flex-1 overflow-y-auto px-8 py-6';
 const DEFAULT_CARDS_CLASSNAME = 'grid grid-cols-3 gap-3';
+const DEFAULT_WIDE_CARDS_CLASSNAME = 'grid grid-cols-1 gap-3';
 const DEFAULT_LIST_CLASSNAME = 'space-y-1.5';
 const DEFAULT_TITLE_CLASSNAME = 'text-lg font-semibold text-stone-100';
 const DEFAULT_EMPTY_WRAPPER_CLASSNAME = 'text-center py-20';
@@ -177,6 +204,7 @@ export default function Dashboard<T>({
   onView,
   onSort,
   viewOptions,
+  groupBy,
   search,
   onSearch,
   filters,
@@ -189,15 +217,17 @@ export default function Dashboard<T>({
   noResultsMessage,
   noResultsClassName = DEFAULT_NO_RESULTS_CLASSNAME,
   grouping,
+  contentHeader,
   contentFooter,
   cardsClassName = DEFAULT_CARDS_CLASSNAME,
+  wideCardsClassName = DEFAULT_WIDE_CARDS_CLASSNAME,
   listClassName = DEFAULT_LIST_CLASSNAME,
   contentClassName = DEFAULT_CONTENT_CLASSNAME,
   contextMenuSlot,
 }: DashboardProps<T>) {
   const renderItems = (subset: T[]) =>
-    view === 'cards' ? (
-      <div className={cardsClassName}>
+    isCardView(view) ? (
+      <div className={isWideCardView(view) ? wideCardsClassName : cardsClassName}>
         {subset.map((item) => <Fragment key={itemKey(item)}>{renderItem!(item)}</Fragment>)}
       </div>
     ) : (
@@ -247,12 +277,12 @@ export default function Dashboard<T>({
     }
 
     // mode === 'category'
-    // „Nur mit Einträgen" wird hier zentral ausgewertet — die Views reichen den
-    // Schalter nur als Chip-Zustand durch. Bleibt danach keine Gruppe übrig,
-    // greift der „Keine Ergebnisse"-Hinweis, den sonst hasNoResults liefert.
-    const groups = filters?.panelProps.nonEmptyOnly
-      ? grouping.groups.filter((group) => group.items.length > 0)
-      : grouping.groups;
+    // Leere Gruppen fallen hier zentral weg: die Kategorienliste ist global,
+    // eine im Wiki angelegte Kategorie stünde sonst als leerer Kopf auch in
+    // den Operationen. Ausnahme ist die gerade angelegte (keepWhenEmpty).
+    // Bleibt danach keine Gruppe übrig, greift der „Keine Ergebnisse"-Hinweis,
+    // den sonst hasNoResults liefert.
+    const groups = grouping.groups.filter((group) => group.items.length > 0 || group.keepWhenEmpty);
     return (
       <div className="space-y-6">
         {groups.length === 0 && <p className={noResultsClassName}>{noResultsMessage}</p>}
@@ -282,7 +312,7 @@ export default function Dashboard<T>({
 
   // Beide Kopf-Bäume teilen sich die Toolbar-Props — eine künftige Prop, die
   // nur in einem Zweig nachgezogen wird, ist der naheliegendste Drift.
-  const toolbarCommon = { view, sort, onView, onSort, viewOptions, search, onSearch };
+  const toolbarCommon = { view, sort, onView, onSort, viewOptions, groupBy, search, onSearch };
 
   // Einmal gebaut, in beide Kopf-Bäume gehängt: kompakt sind diese Knöpfe
   // ohnehin in beiden, ihr Label steht so oder so nur im Tooltip.
@@ -395,6 +425,7 @@ export default function Dashboard<T>({
       {listHeaderHost ? createPortal(sidebarHeader, listHeaderHost) : inlineHeader}
 
       <div className={contentClassName}>
+        {contentHeader}
         {renderContent()}
         {contentFooter}
       </div>

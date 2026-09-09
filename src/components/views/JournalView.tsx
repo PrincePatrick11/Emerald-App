@@ -18,6 +18,7 @@ import { generateId } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
 import { formatEntryDate, formatEntryDateLong } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
+import { isCardView } from '../../lib/viewMode';
 import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import type { JournalEntry, MoonPhase } from '../../types';
 
@@ -45,7 +46,6 @@ export default function JournalView() {
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterPhases, setFilterPhases] = useState<string[]>([]);
-  const [hideEmptyPhases, setHideEmptyPhases] = useState(false);
   const { collapsed: collapsedPhases, toggle: togglePhaseCollapse } = useCollapsedSet('journal');
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -177,7 +177,7 @@ export default function JournalView() {
 
   // List view
   if (!entry) {
-    const { view, sort } = journalPrefs;
+    const { view, sort, grouping } = journalPrefs;
 
     const searchFiltered = search
       ? entries.filter((e) =>
@@ -195,24 +195,22 @@ export default function JournalView() {
 
     const filtered = phaseFiltered;
 
-    // Alle Phasen anbieten, auch die ohne Einträge — wie die Kategorie-Chips
-    // in Wiki/Operations/Tasks. „Ohne Mondphase" immer dabei.
+    // Alle Phasen anbieten, auch die ohne Einträge — sie sind ein fester
+    // Zyklus, keine wachsende Liste. „Ohne Mondphase" dagegen nur, wenn es
+    // Einträge ohne Phase gibt.
+    const hasNoPhase = entries.some((e) => !e.moon_phase);
     const phaseChips = [
       ...MOON_PHASE_ORDER.map((p) => ({ value: p, label: t(`moonPhase.${p}`), emoji: MOON_PHASE_SYMBOLS[p] })),
-      { value: UNCATEGORIZED_KEY, label: t('journal.noPhase'), emoji: '📓' },
+      ...(hasNoPhase ? [{ value: UNCATEGORIZED_KEY, label: t('journal.noPhase'), emoji: '📓' }] : []),
     ];
 
-    const activeFilterCount = (filterPhases.length > 0 ? 1 : 0) + (hideEmptyPhases ? 1 : 0);
+    const activeFilterCount = filterPhases.length > 0 ? 1 : 0;
 
-    const sorted = sortItems(filtered, sort, {
-      date: (e) => e.created_at,
-      // 'category' heißt im Journal: nach Mondphase.
-      category: (e) => e.moon_phase ?? '',
-    });
+    const sorted = sortItems(filtered, sort, { date: (e) => e.created_at });
 
     const timelineGroups = groupByMonth(sorted, (e) => e.created_at);
 
-    // „Kategorie" heißt im Journal: nach Mondphase — gerendert mit denselben
+    // Gruppiert heißt im Journal: nach Mondphase — gerendert mit denselben
     // Gruppenköpfen wie die Kategorie-Gruppen der anderen Module. Die Phasen
     // sind fest (Mondzyklus-Reihenfolge), abgewählte werden ausgeblendet;
     // der Waisen-Bucket fängt Einträge ohne Phase auf.
@@ -222,7 +220,6 @@ export default function JournalView() {
     const phaseGroups: DashboardGroup<JournalEntry>[] = groupByCategory(
       sorted, visiblePhases.map((p) => ({ id: p })), (e) => e.moon_phase ?? '',
       (c) => t(`moonPhase.${c.id}`), t('journal.noPhase'),
-      filterPhases.includes(UNCATEGORIZED_KEY),
     );
 
     const renderPhaseHeader = (group: DashboardGroup<JournalEntry>) => (
@@ -240,7 +237,7 @@ export default function JournalView() {
     const renderEntry = (e: JournalEntry) => {
       const icon = MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓';
       if (renamingId === e.id) {
-        return view === 'cards' ? (
+        return isCardView(view) ? (
           <div className="panel-interactive px-4 py-4 text-left">
             <div className="text-2xl mb-2">{icon}</div>
             <input autoFocus value={renameValue} onChange={(ev) => setRenameValue(ev.target.value)}
@@ -258,7 +255,7 @@ export default function JournalView() {
           </div>
         );
       }
-      return view === 'cards' ? (
+      return isCardView(view) ? (
         <button onClick={() => go(e)} onContextMenu={(ev) => openCtxMenu(ev, e.id)} className="panel-interactive px-4 py-4 text-left">
           <div className="text-2xl mb-2">{icon}</div>
           <div className="text-sm font-medium text-stone-200 truncate mb-1">{e.title}</div>
@@ -288,6 +285,9 @@ export default function JournalView() {
         sort={sort}
         onView={(v) => setJournalPrefs({ view: v })}
         onSort={(s) => setJournalPrefs({ sort: s })}
+        // Das Journal gruppiert nach Mondphase, nicht nach Kategorie — die
+        // Option trägt deshalb das Wort, das auch über seinen Filter-Chips steht.
+        groupBy={{ value: grouping, onChange: (g) => setJournalPrefs({ grouping: g }), label: t('filters.moonPhase') }}
         search={search}
         onSearch={setSearch}
         filters={{
@@ -300,9 +300,7 @@ export default function JournalView() {
             selectedChips: filterPhases,
             onChipToggle: (v) => setFilterPhases((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
             onAllChips: () => setFilterPhases([]),
-            nonEmptyOnly: hideEmptyPhases,
-            onNonEmptyToggle: () => setHideEmptyPhases((v) => !v),
-            onClearAll: () => { setFilterPhases([]); setHideEmptyPhases(false); },
+            onClearAll: () => setFilterPhases([]),
           },
         }}
         items={sorted}
@@ -314,12 +312,12 @@ export default function JournalView() {
         // rendern: eine ausgewählte leere Phase soll ihren Kopf samt
         // Leer-Hinweis zeigen, nicht „Keine Ergebnisse". („Nur mit Einträgen"
         // wertet Dashboard selbst aus und zeigt notfalls den Hinweis.)
-        hasNoResults={filtered.length === 0 && !(sort === 'category' && view !== 'timeline' && filterPhases.length > 0 && !search)}
+        hasNoResults={filtered.length === 0 && !(grouping === 'grouped' && view !== 'timeline' && filterPhases.length > 0 && !search)}
         noResultsMessage={t('search.noResults')}
         grouping={
           view === 'timeline'
             ? { mode: 'timeline', groups: timelineGroups }
-            : sort === 'category'
+            : grouping === 'grouped'
               ? {
                   mode: 'category',
                   groups: phaseGroups,

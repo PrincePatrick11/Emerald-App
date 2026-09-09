@@ -40,14 +40,18 @@
   "listView": {
     "view": "Vue",
     "sort": "Tri",
+    "grouping": "Regroupement",
     "list": "Liste",
     "cards": "Cartes",
+    "cardsWide": "Cartes (pleine largeur)",
     "timeline": "Chronologie",
     "dateDesc": "Plus récents d'abord",
     "dateAsc": "Plus anciens d'abord",
     "alphaAsc": "A → Z",
     "alphaDesc": "Z → A",
     "category": "Catégorie",
+    "ungrouped": "Non groupé",
+    "type": "Type",
     "notAvailableInTimeline": "Indisponible dans la chronologie"
   },
   "undo": {
@@ -102,6 +106,7 @@
     "element": "Élément",
     "newAltar": "Nouvel autel",
     "libraryTitle": "Bibliothèque de l'autel",
+    "sectionTitle": "Autels",
     "elementName": "Nom…",
     "all": "Tous",
     "noElements": "Pas encore d'éléments.",
@@ -200,7 +205,8 @@
       "tool": "Outil",
       "table": "Table",
       "other": "Autre"
-    }
+    },
+    "showPreview": "Aperçu de l'autel"
   },
   "journal": {
     "title": "Journal",
@@ -363,7 +369,6 @@
     "toggle": "Filtres",
     "all": "Toutes",
     "display": "Affichage",
-    "nonEmptyOnly": "Avec entrées uniquement",
     "clearAll": "Tout effacer",
     "category": "Catégorie",
     "moonPhase": "Phase lunaire",

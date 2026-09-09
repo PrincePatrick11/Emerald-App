@@ -5,14 +5,23 @@ import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, isImageIcon, readFileAsDataUr
 import EmojiPicker from '../../ui/EmojiPicker';
 import Button from '../../ui/Button';
 
-/** Nur das Glyph, ohne Auswahl — 20px, die Größe einer Zeilen-Meta-Angabe. */
-export function FaviconGlyph({ value }: { value?: string | null }) {
+/**
+ * Nur das Glyph, ohne Auswahl. Standard 20px, die Größe einer
+ * Zeilen-Meta-Angabe; `className` ersetzt das Maß, wo das Icon groß stehen
+ * soll (die Altar-Karte, wenn sie die Vorschau ersetzt).
+ *
+ * Die eine Stelle, die weiß, dass ein Icon entweder ein Bild oder ein Emoji
+ * ist — wer das selbst entscheidet, vergisst die Emoji-Hälfte.
+ */
+export function FaviconGlyph({ value, className = 'w-5 h-5 text-base' }: {
+  value?: string | null;
+  className?: string;
+}) {
   if (!value) return null;
-  const cls = 'w-5 h-5 text-base';
   return isImageIcon(value) ? (
-    <img src={value} alt="" className={`${cls} object-cover rounded border border-stone-700/40 flex-shrink-0`} />
+    <img src={value} alt="" className={`${className} object-contain rounded border border-stone-700/40 flex-shrink-0`} />
   ) : (
-    <span className={`${cls} leading-none flex items-center justify-center flex-shrink-0`}>{value}</span>
+    <span className={`${className} leading-none flex items-center justify-center flex-shrink-0`}>{value}</span>
   );
 }
 

@@ -14,6 +14,7 @@ import { FALLBACK_CATEGORY_ID } from '../../lib/schema';
 import { DEFAULT_ENTRY_EMOJI } from '../../lib/modules';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
+import { isCardView } from '../../lib/viewMode';
 import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 
 import { useUIStore } from '../../store/uiStore';
@@ -48,7 +49,6 @@ export default function WikiView() {
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
-  const [hideEmptyCats, setHideEmptyCats] = useState(false);
   const { collapsed: collapsedCats, toggle: toggleCatCollapse } = useCollapsedSet('wiki');
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState(FALLBACK_CATEGORY_ID);
@@ -197,7 +197,7 @@ export default function WikiView() {
   };
 
   if (!article) {
-    const { view, sort } = wikiPrefs;
+    const { view, sort, grouping } = wikiPrefs;
     const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
     // Chips und Gruppen zeigen nur, was im Wiki vorkommt (plus Sonstiges);
     // catById bleibt die Volliste, damit fremde Kategorien auflösen.
@@ -222,20 +222,18 @@ export default function WikiView() {
 
     // Nur die hier benutzten Kategorien (plus Sonstiges und eine gerade
     // angelegte) — die Liste ist global, die anderen Module sollen hier keine
-    // leeren Chips hinterlassen. „Ohne Kategorie" immer dabei, auch ohne Waisen.
+    // leeren Chips hinterlassen. „Ohne Kategorie" nur, wenn es Waisen gibt:
+    // Artikel, deren Kategorie im Papierkorb liegt. Sonst wäre es ein Filter
+    // auf eine leere Menge.
+    const hasUncategorized = articles.some((a) => !catById[a.category_id]);
     const catChips = [
       ...usedCategories.map((c) => ({ value: c.id, label: categoryLabel(t, c), emoji: c.emoji })),
-      { value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄' },
+      ...(hasUncategorized ? [{ value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄' }] : []),
     ];
 
-    const activeFilterCount = (filterCatIds.length > 0 ? 1 : 0) + (hideEmptyCats ? 1 : 0);
+    const activeFilterCount = filterCatIds.length > 0 ? 1 : 0;
 
-    const sortedArticles = sortItems(filtered, sort, {
-      date: (a) => a.created_at,
-      // Bewusste Korrektur: vorher wurde die rohe category_id verglichen,
-      // sortiert wird jetzt nach dem angezeigten Kategorienamen.
-      category: (a) => catById[a.category_id]?.name ?? '',
-    });
+    const sortedArticles = sortItems(filtered, sort, { date: (a) => a.created_at });
 
 
     // For timeline (by month)
@@ -249,8 +247,8 @@ export default function WikiView() {
       const catLabel = categoryLabel(t, cat);
       const dateStr = `${catLabel}${catLabel ? ' · ' : ''}${formatEntryDate(a.updated_at)}`;
       if (renamingId === a.id) return (
-        <div key={a.id} className={view === 'cards' ? 'panel-interactive px-4 py-4 text-left' : 'panel-interactive w-full flex items-center gap-3 px-4 py-3'}>
-          {view === 'cards' ? (
+        <div key={a.id} className={isCardView(view) ? 'panel-interactive px-4 py-4 text-left' : 'panel-interactive w-full flex items-center gap-3 px-4 py-3'}>
+          {isCardView(view) ? (
             <>
               <div className="flex items-center gap-2 mb-2">
                 {isImageIcon(a.icon) ? <img src={a.icon!} alt="" className="w-6 h-6 object-cover rounded" /> : <span className="text-xl">{cat?.emoji ?? '📄'}</span>}
@@ -282,12 +280,12 @@ export default function WikiView() {
             }
           }}
           onContextMenu={(e) => openCtxMenu(e, a.id)}
-          className={view === 'cards'
+          className={isCardView(view)
             ? 'panel-interactive px-4 py-4 text-left'
             : 'panel-interactive w-full text-left flex items-center gap-3 px-4 py-3 group'
           }
         >
-          {view === 'cards' ? (
+          {isCardView(view) ? (
             <>
               <div className="flex items-center gap-2 mb-2">
                 {isImageIcon(a.icon) ? <img src={a.icon!} alt="" className="w-6 h-6 object-cover rounded" /> : <span className="text-xl">{cat?.emoji ?? '📄'}</span>}
@@ -318,7 +316,7 @@ export default function WikiView() {
     const catGroups: DashboardGroup<Article>[] = groupByCategory(
       sortedArticles, visibleCategories, (a) => a.category_id,
       (c) => categoryLabel(t, c), t('categories.uncategorized'),
-      filterCatIds.includes(UNCATEGORIZED_KEY),
+      [catEditor.lastAddedId],
     );
 
     const renderCategoryHeader = (group: DashboardGroup<Article>) => {
@@ -361,6 +359,7 @@ export default function WikiView() {
         sort={sort}
         onView={(v) => setWikiPrefs({ view: v })}
         onSort={(s) => setWikiPrefs({ sort: s })}
+        groupBy={{ value: grouping, onChange: (g) => setWikiPrefs({ grouping: g }) }}
         search={search}
         onSearch={setSearch}
         filters={{
@@ -373,9 +372,7 @@ export default function WikiView() {
             selectedChips: filterCatIds,
             onChipToggle: (v) => setFilterCatIds((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
             onAllChips: () => setFilterCatIds([]),
-            nonEmptyOnly: hideEmptyCats,
-            onNonEmptyToggle: () => setHideEmptyCats((v) => !v),
-            onClearAll: () => { setFilterCatIds([]); setHideEmptyCats(false); },
+            onClearAll: () => setFilterCatIds([]),
           },
         }}
         items={sortedArticles}
@@ -384,15 +381,15 @@ export default function WikiView() {
         isEmpty={articles.length === 0 && categories.length === 0}
         emptyState={{ message: t('wiki.noArticles'), actionLabel: t('wiki.startDocumenting'), onAction: () => handleNew() }}
         // Bei aktivem Kategorie-Filter ohne Suchtext trotzdem die Gruppierung
-        // rendern: eine ausgewählte leere Kategorie soll ihren Kopf samt
-        // Leer-Hinweis zeigen, nicht „Keine Ergebnisse". („Nur mit Einträgen"
-        // wertet Dashboard selbst aus und zeigt notfalls den Hinweis.)
-        hasNoResults={filtered.length === 0 && !(sort === 'category' && view !== 'timeline' && filterCatIds.length > 0 && !search)}
+        // Bei einer gerade angelegten Kategorie trotzdem die Gruppierung
+        // rendern: ihr leerer Kopf ist der Ort, an dem der erste Eintrag
+        // entsteht. Sonst zeigt Dashboard selbst „Keine Ergebnisse".
+        hasNoResults={filtered.length === 0 && !(grouping === 'grouped' && view !== 'timeline' && !!catEditor.lastAddedId)}
         noResultsMessage={t('search.noResults')}
         grouping={
           view === 'timeline'
             ? { mode: 'timeline', groups: timelineGroups }
-            : sort === 'category'
+            : grouping === 'grouped'
               ? {
                   mode: 'category',
                   groups: catGroups,

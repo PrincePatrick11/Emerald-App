@@ -68,6 +68,9 @@ export interface BackupPreview {
   opsCount: number;
   routinesCount: number;
   altarsCount: number;
+  /** Eigener Zähler: die Bibliothek reist unabhängig von den Altären, eine
+   *  Datei kann null Altäre und trotzdem Elemente tragen. */
+  altarItemsCount: number;
   taskCount: number;
   /** Nur Kategorien, auf die ein Inhalt der Sicherung zeigt. */
   categories: BackupCategoryEntry[];
@@ -409,29 +412,23 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
       `SELECT * FROM altars WHERE 1=1 ${dateClause}`,
       dateParams,
     );
-    // Only export items and placements that belong to the filtered altars
-    if (!data.altars.length) {
-      data.altarItems = [];
-      data.altarPlacements = [];
-    } else {
-      data.altarPlacements = await selectWhereIn(
-        db,
-        (ph) => `SELECT * FROM altar_placements WHERE altar_id IN (${ph})`,
-        data.altars,
-      );
-      // altar_items aren't directly tied to an altar (linked via placements)
-      const placedItems = await selectWhereIn(
-        db,
-        (ph) => `SELECT DISTINCT item_id FROM altar_placements WHERE altar_id IN (${ph})`,
-        data.altars,
-      );
-      data.altarItems = await selectWhereIn(
-        db,
-        (ph) => `SELECT * FROM altar_items WHERE id IN (${ph})`,
-        placedItems,
-        'item_id',
-      );
-    }
+    // Die Bibliothek ist eine eigene Sammlung, kein Anhängsel der Altäre:
+    // ein Element wird im Dashboard angelegt, sortiert und gepflegt, ohne je
+    // auf einer Leinwand zu liegen. Früher nahm der Export nur die
+    // *platzierten* Elemente der gefilterten Altäre mit — die übrigen
+    // fehlten in der Sicherung, und weil ein Replace-Restore `altar_items`
+    // vorher komplett leert, waren sie danach weg. Deshalb vollständig,
+    // unabhängig vom Datumsfilter der Altäre und auch dann, wenn gar kein
+    // Altar übrig bleibt.
+    data.altarItems = await db.select<Row[]>('SELECT * FROM altar_items');
+    // Platzierungen bleiben an ihre Altäre gebunden — ohne Altar kein Ort.
+    data.altarPlacements = data.altars.length
+      ? await selectWhereIn(
+          db,
+          (ph) => `SELECT * FROM altar_placements WHERE altar_id IN (${ph})`,
+          data.altars,
+        )
+      : [];
     collectImageRefs('altars', data.altars, allImagePaths);
     collectImageRefs('altar_items', data.altarItems, allImagePaths);
   }
@@ -534,6 +531,7 @@ export async function openBackupFile(): Promise<{ path: string; backup: BackupFi
     opsCount: backup.data.operations?.length ?? 0,
     routinesCount: backup.data.routines?.length ?? 0,
     altarsCount: backup.data.altars?.length ?? 0,
+    altarItemsCount: backup.data.altarItems?.length ?? 0,
     taskCount: backup.data.tasks?.length ?? 0,
     categories: (backup.data.categories ?? []).filter((c) => usedCatIds.has(c.id as string)) as BackupCategoryEntry[],
   };
@@ -855,6 +853,12 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   if (hasOps) {
     await db.execute(`DELETE FROM links WHERE source_type='operation'`);
   }
+  // Die Bibliothek hängt an `hasAltars`, obwohl der Export sie inzwischen
+  // unabhängig von den Altären mitnimmt: `altar_placements.item_id` ist
+  // ON DELETE CASCADE, ein Leeren von `altar_items` risse also den Altären
+  // des Bestands ihre Platzierungen weg — genau denen, die diese Datei gar
+  // nicht ersetzt. Ohne Altäre in der Datei wird die Bibliothek deshalb
+  // ergänzt statt ersetzt (siehe insertRows unten).
   if (hasAltars) {
     await db.execute('DELETE FROM altar_placements');
     await db.execute('DELETE FROM altar_items');
@@ -877,7 +881,14 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   await insertRows(db, 'operations', operations);
   if (d.routines) await insertRows(db, 'routines', d.routines);
   await insertRows(db, 'altars', altars);
-  await insertRows(db, 'altar_items', altarItems);
+  // OR IGNORE, wenn oben nicht geleert wurde: die Datei kann eine Bibliothek
+  // ohne Altäre tragen (Datumsfilter, oder ein Vault, der nur Elemente hat),
+  // und ein blanker INSERT liefe dann in den Primärschlüssel — mitten in
+  // einem Restore, der schon gelöscht hat und keine Transaktion kennt. Der
+  // Preis: eine in der Datei geänderte Fassung eines vorhandenen Elements
+  // bleibt in diesem einen Fall außen vor.
+  const keepExistingLibrary = !hasAltars;
+  await insertRows(db, 'altar_items', altarItems, keepExistingLibrary);
   if (d.altarPlacements) await insertRows(db, 'altar_placements', d.altarPlacements);
   await insertTasks(db, tasks);
   if (d.taskLinks) await insertRows(db, 'task_links', d.taskLinks);

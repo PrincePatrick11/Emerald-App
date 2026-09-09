@@ -236,7 +236,7 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
   for (const item of corpus.altarItems) {
     push('altarItem', item.id, item.name,
       matchRecord(q, item.name, null, () => [item.note]),
-      { categoryId: item.category_id });
+      { categoryId: item.category_id, updatedAt: item.created_at });
   }
 
   for (const tag of corpus.tags) {

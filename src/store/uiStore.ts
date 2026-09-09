@@ -4,11 +4,26 @@ import { isViewId, moduleMeta, type LeftListTabId } from '../lib/modules';
 import { normalizeEditorFontId, normalizeThemeId, normalizeUIFontId } from '../themes/theme';
 import type { ActiveView } from '../types';
 
-export type ViewMode = 'list' | 'cards' | 'timeline';
-export type SortMode = 'date_desc' | 'date_asc' | 'alpha_asc' | 'alpha_desc' | 'category';
-export interface ListPrefs { view: ViewMode; sort: SortMode; }
+export type ViewMode = 'list' | 'cards' | 'cards_wide' | 'timeline';
+export type SortMode = 'date_desc' | 'date_asc' | 'alpha_asc' | 'alpha_desc';
+/** Gruppierung als eigene Achse neben Ansicht und Sortierung. Früher war
+ *  „Kategorie" ein SortMode — was zwei Entscheidungen in einen Knopf legte:
+ *  wer nach Kategorien gruppieren wollte, verlor damit seine Sortierung. */
+export type GroupingMode = 'grouped' | 'flat';
+export interface ListPrefs { view: ViewMode; sort: SortMode; grouping: GroupingMode; }
 
-export type HomeSort = 'date_desc' | 'date_asc' | 'alpha_asc' | 'alpha_desc';
+/** Die Regler der Altar-Bibliothek. Ein Ausschnitt der SortMode — Elemente
+ *  haben kein „zuletzt bearbeitet", und die Kategorie ist dort die
+ *  Gruppierung, keine Sortierung. Im Store, weil die Regler in der rechten
+ *  Seitenleiste sitzen (AltarView) und der Abschnitt darunter sie liest
+ *  (AltarLibrarySection). */
+export type AltarLibrarySort = Extract<SortMode, 'alpha_asc' | 'alpha_desc' | 'date_desc'>;
+export interface AltarLibraryPrefs { sort: AltarLibrarySort; grouping: GroupingMode; }
+export const ALTAR_LIBRARY_SORTS: AltarLibrarySort[] = ['alpha_asc', 'alpha_desc', 'date_desc'];
+
+/** Seit „Kategorie" kein Sortiermodus mehr ist, deckungsgleich mit SortMode.
+ *  Als Alias, damit die beiden nicht auseinanderlaufen. */
+export type HomeSort = SortMode;
 export type HomeView = 'list' | 'cards';
 export interface HomeSectionPrefs { sort: HomeSort; view: HomeView; count: number; } // count 0 = all
 
@@ -48,6 +63,14 @@ interface UIState {
   altarPrefs: ListPrefs;
   trashPrefs: ListPrefs;
   altarWindowFullscreen: boolean;
+  /** Altar-Dashboard: Vorschau der Leinwand auf den Karten und in der Liste.
+   *  Aus heißt Flammen-Icon statt Vorschau. Anders als die übrigen
+   *  Listen-Prefs dauerhaft (localStorage) — es ist eine Vorliebe, keine
+   *  Arbeitsgeste. */
+  altarShowPreview: boolean;
+  /** Sortierung und Gruppierung der Bibliothek — wie altarShowPreview eine
+   *  Vorliebe und darum dauerhaft. */
+  altarLibraryPrefs: AltarLibraryPrefs;
   homeJournalPrefs: HomeSectionPrefs;
   homeOpsPrefs: HomeSectionPrefs;
   homeWikiPrefs: HomeSectionPrefs;
@@ -84,12 +107,30 @@ interface UIState {
   setAltarPrefs: (p: Partial<ListPrefs>) => void;
   setTrashPrefs: (p: Partial<ListPrefs>) => void;
   setAltarWindowFullscreen: (enabled: boolean) => void;
+  setAltarShowPreview: (enabled: boolean) => void;
+  setAltarLibraryPrefs: (p: Partial<AltarLibraryPrefs>) => void;
   setHomeJournalPrefs: (p: Partial<HomeSectionPrefs>) => void;
   setHomeOpsPrefs: (p: Partial<HomeSectionPrefs>) => void;
   setHomeWikiPrefs: (p: Partial<HomeSectionPrefs>) => void;
   setTheme: (t: ThemeId) => void;
   setUIFontId: (fontId: FontId) => void;
   setEditorFontId: (fontId: FontId) => void;
+}
+
+const ALTAR_SHOW_PREVIEW_KEY = 'altar-show-preview';
+const ALTAR_LIBRARY_SORT_KEY = 'altar-library-sort';
+const ALTAR_LIBRARY_GROUPING_KEY = 'altar-library-grouping';
+
+function loadAltarLibraryPrefs(): AltarLibraryPrefs {
+  // Gespeicherte Werte werden geprüft, nicht geglaubt: der Schlüssel überlebt
+  // eine Version, in der die Auswahl anders hieß.
+  const savedSort = localStorage.getItem(ALTAR_LIBRARY_SORT_KEY);
+  return {
+    sort: ALTAR_LIBRARY_SORTS.includes(savedSort as AltarLibrarySort)
+      ? (savedSort as AltarLibrarySort)
+      : 'alpha_asc',
+    grouping: localStorage.getItem(ALTAR_LIBRARY_GROUPING_KEY) === 'flat' ? 'flat' : 'grouped',
+  };
 }
 
 function loadSavedTheme(): ThemeId {
@@ -178,13 +219,26 @@ export const useUIStore = create<UIState>((set) => ({
   theme: loadSavedTheme(),
   uiFontId: loadSavedUIFontId(),
   editorFontId: loadSavedEditorFontId(),
-  journalPrefs: { view: 'list', sort: 'date_desc' },
-  wikiPrefs: { view: 'cards', sort: 'category' },
-  operationsPrefs: { view: 'list', sort: 'category' },
-  tasksPrefs: { view: 'list', sort: 'category' },
-  altarPrefs: { view: 'cards', sort: 'date_desc' },
-  trashPrefs: { view: 'list', sort: 'date_desc' },
+  // Wo „Kategorie" bisher der Sortiermodus war (Wiki, Operationen,
+  // Aufgaben), steht jetzt `grouping: 'grouped'` — dieselbe Ansicht wie
+  // vorher. Innerhalb einer Gruppe verglich der alte Modus nur den
+  // Gruppennamen, war also für jede sichtbare Zeile gleich; die Reihenfolge
+  // kam faktisch aus dem Store. Der neue Sortierwert bildet genau die nach:
+  // Wiki lädt `ORDER BY title` (alpha_asc), Operationen `updated_at DESC`
+  // und Aufgaben `created_at DESC` (date_desc). Journal, Altar und
+  // Papierkorb waren nie gruppiert und bleiben 'flat'.
+  journalPrefs: { view: 'list', sort: 'date_desc', grouping: 'flat' },
+  wikiPrefs: { view: 'cards', sort: 'alpha_asc', grouping: 'grouped' },
+  operationsPrefs: { view: 'list', sort: 'date_desc', grouping: 'grouped' },
+  tasksPrefs: { view: 'list', sort: 'date_desc', grouping: 'grouped' },
+  // `grouping` bleibt beim Altar ungenutzt: Altäre tragen keine Kategorien,
+  // das Dashboard reicht die Achse deshalb nicht an die Toolbar durch. Das
+  // Feld steht nur da, weil alle Module dieselbe ListPrefs teilen.
+  altarPrefs: { view: 'cards', sort: 'date_desc', grouping: 'flat' },
+  trashPrefs: { view: 'list', sort: 'date_desc', grouping: 'flat' },
   altarWindowFullscreen: false,
+  altarShowPreview: localStorage.getItem(ALTAR_SHOW_PREVIEW_KEY) !== '0',
+  altarLibraryPrefs: loadAltarLibraryPrefs(),
   homeJournalPrefs: { sort: 'date_desc', view: 'list', count: 5 },
   homeOpsPrefs:     { sort: 'date_desc', view: 'list', count: 5 },
   homeWikiPrefs:    { sort: 'alpha_asc', view: 'cards', count: 6 },
@@ -334,6 +388,16 @@ export const useUIStore = create<UIState>((set) => ({
   setAltarPrefs: (p) => set((s) => ({ altarPrefs: { ...s.altarPrefs, ...p } })),
   setTrashPrefs: (p) => set((s) => ({ trashPrefs: { ...s.trashPrefs, ...p } })),
   setAltarWindowFullscreen: (enabled) => set({ altarWindowFullscreen: enabled }),
+  setAltarShowPreview: (enabled) => {
+    localStorage.setItem(ALTAR_SHOW_PREVIEW_KEY, enabled ? '1' : '0');
+    set({ altarShowPreview: enabled });
+  },
+  setAltarLibraryPrefs: (p) => set((s) => {
+    const next = { ...s.altarLibraryPrefs, ...p };
+    localStorage.setItem(ALTAR_LIBRARY_SORT_KEY, next.sort);
+    localStorage.setItem(ALTAR_LIBRARY_GROUPING_KEY, next.grouping);
+    return { altarLibraryPrefs: next };
+  }),
   setHomeJournalPrefs: (p) => set((s) => ({ homeJournalPrefs: { ...s.homeJournalPrefs, ...p } })),
   setHomeOpsPrefs:     (p) => set((s) => ({ homeOpsPrefs:     { ...s.homeOpsPrefs,     ...p } })),
   setHomeWikiPrefs:    (p) => set((s) => ({ homeWikiPrefs:    { ...s.homeWikiPrefs,    ...p } })),

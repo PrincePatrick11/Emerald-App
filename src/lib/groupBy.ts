@@ -26,14 +26,15 @@ export function groupByMonth<T>(items: readonly T[], date: (item: T) => string):
 export const UNCATEGORIZED_KEY = '__uncategorized__';
 
 /**
- * Kategorie-Gruppierung mit Waisen-Bucket: eine Gruppe je Kategorie (auch
- * leere), dahinter — nur wenn nötig — „Ohne Kategorie" für Einträge, deren
- * Kategorie im Papierkorb liegt. Kategorien behalten ihre Reihenfolge, die
- * Einträge die der übergebenen (vorsortierten) Liste.
+ * Kategorie-Gruppierung mit Waisen-Bucket: eine Gruppe je Kategorie, dahinter
+ * — nur wenn nötig — „Ohne Kategorie" für Einträge, deren Kategorie im
+ * Papierkorb liegt. Kategorien behalten ihre Reihenfolge, die Einträge die der
+ * übergebenen (vorsortierten) Liste.
  *
- * `forceUncategorized` erzwingt den Waisen-Bucket auch leer — für den Fall,
- * dass der „Ohne Kategorie"-Filterchip ausgewählt ist: dann soll sein Kopf
- * mit Leer-Hinweis erscheinen, wie bei jeder anderen leeren Kategorie.
+ * Leere Gruppen entstehen hier weiterhin; das Dashboard wirft sie beim Rendern
+ * weg — bis auf die, die `keepEmptyIds` nennt. Das ist die gerade angelegte
+ * Kategorie: sie hat naturgemäß noch nichts und braucht trotzdem ihren Kopf,
+ * unter dem man den ersten Eintrag anlegt.
  */
 export function groupByCategory<T, C extends { id: string }>(
   items: readonly T[],
@@ -41,15 +42,17 @@ export function groupByCategory<T, C extends { id: string }>(
   categoryId: (item: T) => string,
   label: (cat: C) => string,
   uncategorizedLabel: string,
-  forceUncategorized = false,
+  keepEmptyIds: readonly (string | null | undefined)[] = [],
 ): DashboardGroup<T>[] {
+  const keep = new Set(keepEmptyIds.filter((id): id is string => !!id));
   const groups: DashboardGroup<T>[] = categories.map((cat) => ({
     key: cat.id,
     label: label(cat),
     items: items.filter((item) => categoryId(item) === cat.id),
+    keepWhenEmpty: keep.has(cat.id),
   }));
   const orphans = items.filter((item) => !categories.some((c) => c.id === categoryId(item)));
-  if (orphans.length > 0 || forceUncategorized) {
+  if (orphans.length > 0) {
     groups.push({ key: UNCATEGORIZED_KEY, label: uncategorizedLabel, items: orphans });
   }
   return groups;

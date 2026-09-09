@@ -5,11 +5,12 @@ import type { TFunction } from 'i18next';
 import { Trash2, RotateCcw, CheckSquare, Square } from 'lucide-react';
 import { TRASH_KIND_ICONS } from '../../lib/modules';
 import { useTrashStore } from '../../store/trashStore';
-import { useUIStore } from '../../store/uiStore';
+import { useUIStore, type ViewMode } from '../../store/uiStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { differenceInDays } from 'date-fns';
 import { formatTimeDistance } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
+import { isCardView, isWideCardView } from '../../lib/viewMode';
 import { groupBy, groupByMonth } from '../../lib/groupBy';
 import { categoryLabel } from '../../lib/categories';
 import Dashboard from '../ui/Dashboard';
@@ -249,11 +250,15 @@ export default function TrashView() {
 
   const itemProps: ItemSharedProps = { confirmingId, setConfirmingId, restore, handlePermanentDelete, selectedIds, onToggleSelect: toggleSelect, t };
 
-  // Kein category-Getter: 'category' fällt im Helper auf date_desc zurück.
   const sorted = sortItems(items, trashPrefs.sort, { date: (i) => i.deleted_at });
 
   // ── Grouped by type/category ───────────────────────────────────────────────
-  const renderGrouped = (viewMode: 'list' | 'cards') => {
+  // Ein Raster für beide Kartenansichten: drei Spalten, in voller Breite eine.
+  const cardsGridClass = isWideCardView(trashPrefs.view) ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-3 gap-3';
+
+  // Ohne 'timeline': der Zeitstrahl hat seinen eigenen Zweig, sonst fiele er
+  // hier stillschweigend in den Karten-Ast.
+  const renderGrouped = (viewMode: Exclude<ViewMode, 'timeline'>) => {
     const journal    = sorted.filter((i) => i.type === 'journal');
     const wiki       = sorted.filter((i) => i.type === 'wiki');
     const operations = sorted.filter((i) => i.type === 'operation');
@@ -264,7 +269,7 @@ export default function TrashView() {
     const renderItems = (subset: TrashedItem[]) =>
       viewMode === 'list'
         ? <div className="space-y-1">{subset.map((item) => <ItemRow key={item.id} item={item} {...itemProps} />)}</div>
-        : <div className="grid grid-cols-3 gap-3">{subset.map((item) => <ItemCard key={item.id} item={item} {...itemProps} />)}</div>;
+        : <div className={cardsGridClass}>{subset.map((item) => <ItemCard key={item.id} item={item} {...itemProps} />)}</div>;
 
     const wikiByCategory = groupBy(wiki, (item) => item.category ?? 'other');
     const opsByCategory = groupBy(operations, (item) => item.category ?? '—');
@@ -434,9 +439,9 @@ export default function TrashView() {
       {!loading && items.length > 0 && (
         <div className="space-y-1">
           <p className="text-xs text-stone-600 mb-3">{t('trash.retentionNote')}</p>
-          {trashPrefs.sort === 'category' && trashPrefs.view !== 'timeline' && renderGrouped(trashPrefs.view)}
-          {trashPrefs.sort !== 'category' && trashPrefs.view === 'list'     && <div className="space-y-1">{sorted.map((item) => <ItemRow key={item.id} item={item} {...itemProps} />)}</div>}
-          {trashPrefs.sort !== 'category' && trashPrefs.view === 'cards'    && <div className="grid grid-cols-3 gap-3">{sorted.map((item) => <ItemCard key={item.id} item={item} {...itemProps} />)}</div>}
+          {trashPrefs.grouping === 'grouped' && trashPrefs.view !== 'timeline' && renderGrouped(trashPrefs.view)}
+          {trashPrefs.grouping !== 'grouped' && trashPrefs.view === 'list'     && <div className="space-y-1">{sorted.map((item) => <ItemRow key={item.id} item={item} {...itemProps} />)}</div>}
+          {trashPrefs.grouping !== 'grouped' && isCardView(trashPrefs.view)  && <div className={cardsGridClass}>{sorted.map((item) => <ItemCard key={item.id} item={item} {...itemProps} />)}</div>}
           {trashPrefs.view === 'timeline' && renderTimeline()}
         </div>
       )}
@@ -453,6 +458,8 @@ export default function TrashView() {
       sort={trashPrefs.sort}
       onView={(v) => setTrashPrefs({ view: v })}
       onSort={(s) => setTrashPrefs({ sort: s })}
+      // Der Papierkorb gruppiert nach Eintragstyp, nicht nach Kategorie.
+      groupBy={{ value: trashPrefs.grouping, onChange: (g) => setTrashPrefs({ grouping: g }), label: t('listView.type') }}
       items={items}
       itemKey={(item) => item.id}
       grouping={{ mode: 'custom', render: renderTrashContent }}

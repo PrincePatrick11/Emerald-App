@@ -282,6 +282,9 @@ interface EmeraldMeta {
     category: string;
     note: string;
     imageData?: string;
+    /** Fehlt in Dateien vor der Bibliotheks-Sortierung — der Import stempelt
+     *  dann die Importzeit, wie er es vorher immer tat. */
+    createdAt?: string;
   }>;
   altarPlacements?: Array<{
     itemId: string;
@@ -468,6 +471,7 @@ async function exportAltarAsEmerald(): Promise<void> {
       // das Sammelbecken, statt ein englisches „Other" neben „Sonstiges" anzulegen.
       category: categoryNameById.get(i.category_id) ?? '', note: i.note,
       imageData: i.image_data ?? undefined,
+      createdAt: i.created_at,
     })),
     altarPlacements: placements.map(p => ({
       itemId: p.item_id, x: p.x, y: p.y, z_index: p.z_index, width: p.width, height: p.height,
@@ -784,7 +788,11 @@ async function resolveOrCreateItem(
   );
   if (existingMatch) return { id: existingMatch.id, created: false };
 
-  const created = await addItem(itemMeta.name, itemMeta.emoji, categoryId, itemMeta.note, itemMeta.imageData);
+  // createdAt kommt aus einer fremden Datei und landet in einer NOT-NULL-
+  // Spalte: nur ein String wird durchgereicht, alles andere fällt auf jetzt
+  // zurück (wie bei Dateien, die das Feld noch nicht kennen).
+  const createdAt = typeof itemMeta.createdAt === 'string' ? itemMeta.createdAt : undefined;
+  const created = await addItem(itemMeta.name, itemMeta.emoji, categoryId, itemMeta.note, itemMeta.imageData, createdAt);
   return { id: created.id, created: true };
 }
 

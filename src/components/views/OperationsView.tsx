@@ -13,6 +13,7 @@ import { categoriesUsedBy, categoryLabel } from '../../lib/categories';
 import { FALLBACK_CATEGORY_ID, SIGIL_CATEGORY_ID } from '../../lib/schema';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
+import { isCardView, isWideCardView } from '../../lib/viewMode';
 import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
@@ -58,7 +59,6 @@ export default function OperationsView() {
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
-  const [hideEmptyCats, setHideEmptyCats] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
   const { collapsed: collapsedCats, toggle: toggleCatCollapse } = useCollapsedSet('operations');
   const [title, setTitle] = useState('');
@@ -220,7 +220,7 @@ export default function OperationsView() {
 
   // List view
   if (!operation) {
-    const { view, sort } = operationsPrefs;
+    const { view, sort, grouping } = operationsPrefs;
     const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
     // Chips und Gruppen zeigen nur, was bei den Operationen vorkommt (plus
     // Sonstiges); catById bleibt die Volliste, damit fremde Kategorien auflösen.
@@ -254,10 +254,12 @@ export default function OperationsView() {
 
     // Nur die hier benutzten Kategorien (plus Sonstiges und eine gerade
     // angelegte) — die Liste ist global, die anderen Module sollen hier keine
-    // leeren Chips hinterlassen. „Ohne Kategorie" immer dabei, auch ohne Waisen.
+    // leeren Chips hinterlassen. „Ohne Kategorie" nur, wenn es Waisen gibt:
+    // Operationen, deren Kategorie im Papierkorb liegt.
+    const hasUncategorized = operations.some((o) => !catById[o.category_id]);
     const catChips = [
       ...usedCategories.map((c) => ({ value: c.id, label: catName(c), emoji: c.emoji })),
-      { value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄' },
+      ...(hasUncategorized ? [{ value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄' }] : []),
     ];
 
     const statusChips = [
@@ -267,13 +269,9 @@ export default function OperationsView() {
 
     const activeFilterCount =
       (filterCatIds.length > 0 ? 1 : 0) +
-      (filterStatus.length > 0 ? 1 : 0) +
-      (hideEmptyCats ? 1 : 0);
+      (filterStatus.length > 0 ? 1 : 0);
 
-    const sortedOps = sortItems(filtered, sort, {
-      date: (o) => o.updated_at,
-      category: (o) => catById[o.category_id]?.name ?? '',
-    });
+    const sortedOps = sortItems(filtered, sort, { date: (o) => o.updated_at });
 
 
     const timelineGroups = groupByMonth(sortedOps, (o) => o.updated_at);
@@ -287,8 +285,8 @@ export default function OperationsView() {
       const createdDate = formatEntryDate(op.created_at);
       const activeDot = <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${op.is_active ? 'bg-jade-400' : 'bg-stone-700'}`} />;
       if (renamingId === op.id) return (
-        <div key={op.id} className={view === 'cards' ? 'panel-interactive px-4 py-4 text-left' : 'panel-interactive w-full flex items-center gap-3 px-4 py-3'}>
-          {view === 'cards' ? (
+        <div key={op.id} className={isCardView(view) ? 'panel-interactive px-4 py-4 text-left' : 'panel-interactive w-full flex items-center gap-3 px-4 py-3'}>
+          {isCardView(view) ? (
             <>
               {isImageIcon(iconValue)
                 ? <img src={iconValue} alt="" className="w-6 h-6 object-cover rounded mb-2" />
@@ -328,15 +326,19 @@ export default function OperationsView() {
             }
           }}
           onContextMenu={(e) => openCtxMenu(e, op.id)}
-          className={view === 'cards'
+          className={isCardView(view)
             ? 'panel-interactive px-4 py-4 text-left'
             : 'panel-interactive w-full text-left flex items-center gap-3 px-4 py-3 group'
           }
         >
-          {view === 'cards' ? (
+          {isCardView(view) ? (
             <>
               {isSigil ? (
-                <div className="mb-3 overflow-hidden rounded-lg border border-stone-700/40 bg-stone-900/70">
+                // In voller Breite gedeckelt: der 4:3-Kasten wäre sonst so
+                // breit wie die Karte und machte die Sigillen-Zeile fünfmal
+                // so hoch wie jede andere. Im Dreier-Raster gleicht das Grid
+                // die Zeilenhöhe selbst aus, dort darf er die Spalte füllen.
+                <div className={`mb-3 overflow-hidden rounded-lg border border-stone-700/40 bg-stone-900/70 ${isWideCardView(view) ? 'w-16 mx-auto' : ''}`}>
                   <div className="aspect-[4/3] flex items-center justify-center bg-[radial-gradient(circle_at_top,rgba(0,230,153,0.08),transparent_60%)]">
                     {op.thumbnail_data && op.show_sigil ? (
                       <img src={op.thumbnail_data} alt="" className="h-full w-full object-contain" />
@@ -411,7 +413,7 @@ export default function OperationsView() {
     const catGroups: DashboardGroup<Operation>[] = groupByCategory(
       sortedOps, visibleCategories, (o) => o.category_id,
       catName, t('categories.uncategorized'),
-      filterCatIds.includes(UNCATEGORIZED_KEY),
+      [catEditor.lastAddedId],
     );
 
     const renderCategoryHeader = (group: DashboardGroup<Operation>) => {
@@ -452,6 +454,7 @@ export default function OperationsView() {
         sort={sort}
         onView={(v) => setOperationsPrefs({ view: v })}
         onSort={(s) => setOperationsPrefs({ sort: s })}
+        groupBy={{ value: grouping, onChange: (g) => setOperationsPrefs({ grouping: g }) }}
         search={search}
         onSearch={setSearch}
         filters={{
@@ -464,12 +467,10 @@ export default function OperationsView() {
             selectedChips: filterCatIds,
             onChipToggle: (v) => setFilterCatIds((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
             onAllChips: () => setFilterCatIds([]),
-            nonEmptyOnly: hideEmptyCats,
-            onNonEmptyToggle: () => setHideEmptyCats((v) => !v),
             statusChips,
             selectedStatus: filterStatus,
             onStatusToggle: (v) => setFilterStatus((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
-            onClearAll: () => { setFilterCatIds([]); setFilterStatus([]); setHideEmptyCats(false); },
+            onClearAll: () => { setFilterCatIds([]); setFilterStatus([]); },
           },
         }}
         items={sortedOps}
@@ -481,12 +482,12 @@ export default function OperationsView() {
         // rendern: eine ausgewählte leere Kategorie soll ihren Kopf samt
         // Leer-Hinweis zeigen, nicht „Keine Ergebnisse". („Nur mit Einträgen"
         // wertet Dashboard selbst aus und zeigt notfalls den Hinweis.)
-        hasNoResults={filtered.length === 0 && !(sort === 'category' && view !== 'timeline' && filterCatIds.length > 0 && !search)}
+        hasNoResults={filtered.length === 0 && !(grouping === 'grouped' && view !== 'timeline' && filterCatIds.length > 0 && !search)}
         noResultsMessage={t('search.noResults')}
         grouping={
           view === 'timeline'
             ? { mode: 'timeline', groups: timelineGroups }
-            : sort === 'category'
+            : grouping === 'grouped'
               ? {
                   mode: 'category',
                   groups: catGroups,

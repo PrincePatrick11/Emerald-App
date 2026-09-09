@@ -40,14 +40,18 @@
   "listView": {
     "view": "View",
     "sort": "Sort",
+    "grouping": "Grouping",
     "list": "List",
     "cards": "Cards",
+    "cardsWide": "Cards (full width)",
     "timeline": "Timeline",
     "dateDesc": "Newest first",
     "dateAsc": "Oldest first",
     "alphaAsc": "A → Z",
     "alphaDesc": "Z → A",
     "category": "Category",
+    "ungrouped": "Ungrouped",
+    "type": "Type",
     "notAvailableInTimeline": "Not available in timeline view"
   },
   "undo": {
@@ -102,6 +106,7 @@
     "element": "Element",
     "newAltar": "New altar",
     "libraryTitle": "Altar Library",
+    "sectionTitle": "Altars",
     "elementName": "Name…",
     "all": "All",
     "noElements": "No elements yet.",
@@ -200,7 +205,8 @@
       "tool": "Tool",
       "table": "Table",
       "other": "Other"
-    }
+    },
+    "showPreview": "Altar preview"
   },
   "journal": {
     "title": "Journal",
@@ -363,7 +369,6 @@
     "toggle": "Filters",
     "all": "All",
     "display": "Display",
-    "nonEmptyOnly": "Only with entries",
     "clearAll": "Clear all",
     "category": "Category",
     "moonPhase": "Moon Phase",
