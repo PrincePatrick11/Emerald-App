@@ -43,7 +43,6 @@ export default function WikiView() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [search, setSearch] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
   const { collapsed: collapsedCats, toggle: toggleCatCollapse } = useCollapsedSet('wiki');
   const [title, setTitle] = useState('');
@@ -349,8 +348,6 @@ export default function WikiView() {
         search={search}
         onSearch={setSearch}
         filters={{
-          showFilters,
-          onToggleFilters: () => setShowFilters((v) => !v),
           activeFilterCount,
           panelProps: {
             chipLabel: t('filters.category'),

@@ -54,7 +54,6 @@ export default function OperationsView() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [search, setSearch] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
   const { collapsed: collapsedCats, toggle: toggleCatCollapse } = useCollapsedSet('operations');
@@ -447,8 +446,6 @@ export default function OperationsView() {
         search={search}
         onSearch={setSearch}
         filters={{
-          showFilters,
-          onToggleFilters: () => setShowFilters((v) => !v),
           activeFilterCount,
           panelProps: {
             chipLabel: t('filters.category'),

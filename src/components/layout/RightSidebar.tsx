@@ -23,7 +23,7 @@ const PROPERTIES_PANELS: Partial<Record<ViewId, ComponentType>> = {
 };
 
 /**
- * Views ohne Einträge. Die Abfrage steht *vor* der auf `activeView.id`: ein
+ * Views ohne Einträge. Sie bekommen nie die Eintrags-Aktionsleiste: ein
  * Tiefenlink aus der Suche (`{ type: 'tags' | 'categories', id }`) trägt eine
  * id, bekäme sonst die Eintrags-Aktionsleiste und darin einen
  * „Bearbeiten"-Knopf, der `mode: 'edit'` auf eine Ansicht ohne Editor setzt.
@@ -31,9 +31,8 @@ const PROPERTIES_PANELS: Partial<Record<ViewId, ComponentType>> = {
 const VIEWS_WITHOUT_ENTRIES: ReadonlySet<ViewId> = new Set<ViewId>(['home', 'tags', 'categories']);
 
 /**
- * Davon die, die auch keinen Dashboard-Kopf hierher portalen — nur für die
- * steht der Platzhalter. Home und Kategorien sind bewusst nicht dabei: keine
- * Einträge, aber ein Dashboard.
+ * Davon die ohne Dashboard — nur für die steht der Platzhalter. Home und
+ * Kategorien sind bewusst nicht dabei: keine Einträge, aber ein Dashboard.
  */
 const VIEWS_WITHOUT_DASHBOARD: ReadonlySet<ViewId> = new Set<ViewId>(['tags']);
 
@@ -136,16 +135,19 @@ export default function RightSidebar() {
   const { t } = useTranslation();
   const activeView = useUIStore((s) => s.activeView);
   const setListHeaderHost = useUIStore((s) => s.setListHeaderHost);
+  const dashboardMounted = useUIStore((s) => s.dashboardMounted);
 
-  // Experiment „Kopfzeile in der Seitenleiste": In Listenansichten (kein
-  // geöffneter Eintrag) gehört die Leiste dem Dashboard-Kopf — Titel,
-  // Aktions-Buttons, Toolbar und Filter portalt Dashboard hierher. Der
-  // Platzhalter erscheint nur in Views ohne Dashboard (Tags) —
-  // an einen leeren Host geknüpft (`only:`-Trick) blitzte er stattdessen in
-  // jeder Lücke auf, in der der Portal-Inhalt legitim fehlt: während der
-  // 200ms-Zuklapp-Animation und solange der Chunk einer lazy geladenen
-  // Listenansicht noch lädt.
-  if (VIEWS_WITHOUT_ENTRIES.has(activeView.type)) {
+  // Ist ein Dashboard gemountet, gehört die Leiste seinem Kopf — Titel,
+  // Aktions-Buttons, Toolbar und Filter portalt es hierher. Das entscheidet
+  // seine Anmeldung, nicht `activeView.id`: Aufgaben zeigen ihre Liste auch
+  // mit einer id (Sprungziel, kein offener Eintrag), und die id eines
+  // gelöschten Eintrags fällt ebenfalls aufs Dashboard zurück.
+  // Views ohne Einträge und Listenansichten ohne id bekommen den Host auch
+  // vor der Anmeldung, damit er bereitsteht, solange der Chunk einer lazy
+  // geladenen Ansicht noch lädt. Der Platzhalter erscheint nur in Views ohne
+  // Dashboard (Tags) — an einen leeren Host geknüpft (`only:`-Trick) blitzte
+  // er stattdessen genau in dieser Ladelücke auf.
+  if (dashboardMounted || VIEWS_WITHOUT_ENTRIES.has(activeView.type) || !activeView.id) {
     return (
       <div ref={setListHeaderHost} className="flex flex-col h-full">
         {VIEWS_WITHOUT_DASHBOARD.has(activeView.type) && (
@@ -153,10 +155,6 @@ export default function RightSidebar() {
         )}
       </div>
     );
-  }
-
-  if (!activeView.id) {
-    return <div ref={setListHeaderHost} className="flex flex-col h-full" />;
   }
 
   return (

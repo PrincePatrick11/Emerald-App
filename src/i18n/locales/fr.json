@@ -80,10 +80,6 @@
     "vaults": "Vaults"
   },
   "sidebar": {
-    "collapseList": "Réduire la liste des entrées",
-    "expandList": "Développer la liste des entrées",
-    "collapseProperties": "Réduire les propriétés",
-    "expandProperties": "Développer les propriétés",
     "allEmpty": "Aucune entrée pour le moment"
   },
   "operations": {
@@ -369,7 +365,6 @@
     "remove": "Supprimer"
   },
   "filters": {
-    "toggle": "Filtres",
     "all": "Toutes",
     "display": "Affichage",
     "clearAll": "Tout effacer",

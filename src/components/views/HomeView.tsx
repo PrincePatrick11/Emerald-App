@@ -144,10 +144,10 @@ export default function HomeView() {
   const opsItems     = applyCount(sortItems(operations, homeOpsPrefs.sort, { date: (o) => o.updated_at }), homeOpsPrefs.count);
   const wikiItems    = applyCount(sortItems(articles, homeWikiPrefs.sort, { date: (a) => a.updated_at }), homeWikiPrefs.count);
 
-  // Datum und Mondphase als Titel — zweizeilig, passt in die h-14-Kopfzeile
-  // beider Kopf-Bäume. Über `Dashboard`, damit der Kopf wie in den Modulen in
-  // die rechte Seitenleiste wandert; Toolbar gibt es keine, jede Sektion
-  // bringt ihre eigene mit.
+  // Datum und Mondphase als Titel — zweizeilig, passt in die h-14-Kopfzeile.
+  // Über `Dashboard`, damit der Kopf wie in den Modulen in der rechten
+  // Seitenleiste steht; Toolbar gibt es keine, jede Sektion bringt ihre
+  // eigene mit.
   const headerLeft = (
     <div className="min-w-0">
       <h1 className="text-lg font-semibold text-stone-100 leading-tight truncate">

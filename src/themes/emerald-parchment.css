@@ -79,6 +79,4 @@ html[data-theme='emerald-parchment'] {
   --search-bg: rgba(248, 239, 223, 0.92);
   --search-border: rgba(146, 107, 68, 0.38);
   --search-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  --list-toolbar-bg: rgba(247, 236, 217, 0.92);
-  --list-toolbar-border: rgba(146, 107, 68, 0.36);
 }

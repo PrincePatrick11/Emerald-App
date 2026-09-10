@@ -259,54 +259,68 @@ Inside the hook, the handlers are kept in a ref that is overwritten on every ren
 
 ### List Header Portal
 
-In list views (every module, plus Home and Categories — everything but Tags), `Dashboard`'s whole header — title row,
-toolbar, and filter panel — can render inside the right sidebar instead of above the list.
-`RightSidebar.tsx` mounts a host `<div>` on its list-view branch (no entry open) and hands
-its DOM node to `uiStore.listHeaderHost` through a ref callback (`setListHeaderHost`);
-`Dashboard` reads the field back and, whenever it is non-null *and* `rightSidebarOpen` is
-true, `createPortal`s a second header tree into it instead of rendering its own inline one.
-Checking `rightSidebarOpen` rather than just the host's existence is what makes closing the
-sidebar fall the header back inline immediately: `AppShell` keeps the sidebar mounted
-(`inert`) for the 200ms collapse animation described above, so the host div would otherwise
-still exist but be unusable for that stretch. Tags renders only the existing placeholder
-text in the host, since it has no `Dashboard` to portal. Home and Categories have no
-entries of their own either, but go through `Dashboard` (`grouping: 'custom'`) precisely so
-their title and primary action portal like everyone else's.
+In list views (every module, plus Home and Categories — everything but Tags), `Dashboard`'s
+whole header — title row, toolbar, and filter panel — lives **only** in the right sidebar;
+there is no inline fallback above the list. `RightSidebar.tsx` mounts a host `<div>` and
+hands its DOM node to `uiStore.listHeaderHost` through a ref callback (`setListHeaderHost`);
+`Dashboard` reads the field back and, whenever it is non-null, `createPortal`s its header
+tree into it. Closing the right sidebar has nothing to fall back to — the header disappears
+along with the sidebar and the list gets the full height back, deliberately: `AppShell`
+keeps the sidebar mounted (`inert`) for the 200ms collapse animation described above, so the
+header stays visible inside it for that stretch and vanishes once `RightSidebar` actually
+unmounts and its ref callback clears `listHeaderHost`.
+
+`RightSidebar` decides whether to offer the host from `uiStore.dashboardMounted`, not from
+`activeView.id`. `Dashboard` announces itself in a `useLayoutEffect`
+(`setDashboardMounted(true)`/`(false)` on mount/unmount — a layout effect rather than a
+passive one, so opening an entry switches the sidebar over to the action bar before the
+first paint instead of a frame late) and `RightSidebar` renders the host whenever a
+`Dashboard` is mounted. Guessing from `activeView.id` used to get this wrong twice: Tasks
+carries an id even while showing its list (a jump target from the left list or global
+search, not an open entry), and a stale id left behind by a just-deleted Journal/Wiki/
+Operations entry falls back to that module's `Dashboard` too — both used to land on the
+entry action bar instead, complete with a meaningless Edit button. `VIEWS_WITHOUT_ENTRIES`
+(`home`/`tags`/`categories`) and a missing `activeView.id` still offer the host up front too,
+alongside `dashboardMounted`, so it exists before a lazily-loaded list view's chunk has
+finished loading and `Dashboard` has had a chance to mount. Only Tags — the one view in
+`VIEWS_WITHOUT_ENTRIES` with no `Dashboard` at all (`VIEWS_WITHOUT_DASHBOARD`) — renders the
+existing `properties.noEntry` placeholder text into that host instead of waiting on a portal
+that will never come. Home and Categories have no entries of their own either, but go
+through `Dashboard` (`grouping: 'custom'`) precisely so their title and primary action
+portal like everyone else's.
 
 Invariant: exactly one writer (the host div's ref callback) and one reader (`Dashboard`) at
 a time — `MainArea` only ever renders one view, so at most one `Dashboard` ever portals into
-the host. `listHeaderHost` deliberately isn't persisted; it's a DOM node.
+the host, and `dashboardMounted` only ever reflects that one instance. `listHeaderHost`
+deliberately isn't persisted; it's a DOM node.
 
-The inline and sidebar header trees share one `toolbarCommon` prop bag
-(`view`/`sort`/`onView`/`onSort`/`viewOptions`/`groupBy`/`search`/`onSearch`), so a future prop added
-to only one branch is the obvious drift to watch for. `groupBy` (`{ value, onChange, label? }`)
-carries the grouping axis — independent of `sort` since a session change split "group by
-category" out of `SortMode` into its own `GroupingMode`; a module that has nothing to group
-(Altar's altars) simply omits it, and the toolbar then shows only view and sort. `headerRight` replaces the header's
-action slot in **both** trees — inline, the topbar-right slot; portalled into the sidebar,
-the title row's buttons, rendered instead in the scrollable column below it, where a wide
-slot (Trash's bulk-select controls) has room to wrap. `headerClassName` and
-`filters.showFilters`/`onToggleFilters` apply to the inline tree only: the sidebar tree has
-fixed `h-14` chrome and shows its `FilterPanel` permanently rather than behind a toggle.
-`Dashboard`'s `toolbarExtraActions` prop and `FilterPanelProps.extraPanelContent` slot were
-removed in the same pass — Tasks' priority filter moved into `FilterPanel`'s own
-`statusChips`/`statusLabel` instead of a bespoke extra slot.
+`groupBy` (`{ value, onChange, label? }`) carries the grouping axis — independent of `sort`
+since a session change split "group by category" out of `SortMode` into its own
+`GroupingMode`; a module that has nothing to group (Altar's altars) simply omits it, and the
+toolbar then shows only view and sort. `headerRight` replaces the header's action slot,
+rendered in the scrollable column below the title row, where a wide slot (Trash's
+bulk-select controls) has room to wrap. `Dashboard`'s `toolbarExtraActions` prop and
+`FilterPanelProps.extraPanelContent` slot were removed in an earlier pass — Tasks' priority
+filter moved into `FilterPanel`'s own `statusChips`/`statusLabel` instead of a bespoke extra
+slot.
 
-`extraActions` (compact icon buttons right of `primaryAction`, on the same row in both header trees — in the sidebar the labelled button fills that row and they keep their size beside it) and `contentFooter`
-(rendered below the content in both the normal, empty, and no-results states) exist for a
-module's own secondary area rather than another module-wide pattern — so far the Altar
-dashboard's library section is the only user of either, see [Altar UI
+`extraActions` (compact icon buttons right of `primaryAction`, on the same row — the
+labelled button fills that row and they keep their square size beside it) and
+`contentFooter` (rendered below the content in the normal, empty, and no-results states
+alike) exist for a module's own secondary area rather than another module-wide pattern — so
+far the Altar dashboard's library section is the only user of either, see [Altar UI
 Composition](#altar-ui-composition) below.
 
-`ListToolbar` and `FilterPanel` each gained a `vertical` prop for the sidebar-portalled
-header: a column layout without their usual `.list-toolbar`/`.filter-panel` strip chrome
-(those classes carry per-theme background overrides that would repaint the sidebar's own
-surface otherwise), search on its own full-width row, and, for `ListToolbar`, view/sort
-presented as icon-toggle rows (a private `IconToggleGroup`, built on `TabIconButton`'s new
-`compact` size) instead of `Dropdown`s. Both presentations share the same disabled-options
-predicate for Timeline (`sortBlockedInTimeline` in `ListToolbar.tsx`): A→Z, Z→A and Category
-sorting are disabled with an explanatory tooltip, since the timeline already orders its
-entries by date and ignores those modes regardless of what's picked.
+`ListToolbar` and `FilterPanel` now have only this one, sidebar-column presentation — no
+horizontal strip variant and no filter-toggle button; `FilterPanel` stands permanently
+visible under the toolbar instead of behind one. Search sits on its own full-width row, and
+`ListToolbar`'s view/sort/grouping render as icon-toggle rows (a private `IconToggleGroup`,
+built on `TabIconButton`'s `compact` size) instead of `Dropdown`s — `Dropdown` itself is
+unrelated to this header now, used only by `CategorySelect`, `TaskRow`'s priority menu, and
+`HomeView`'s own per-section toolbar. The disabled-options predicate for Timeline
+(`sortBlockedInTimeline` in `ListToolbar.tsx`) is unchanged: A→Z, Z→A and Category sorting
+are disabled with an explanatory tooltip, since the timeline already orders its entries by
+date and ignores those modes regardless of what's picked.
 
 ### Store Selectors
 
@@ -414,7 +428,7 @@ The title bar's search field searches every module by title, tag, and body text.
 
 `viewForSearchHit()` maps a hit to an `ActiveView`. Tasks, tags and categories have no page per record — the hit opens their view addressed by the record's id, and `TasksView`/`TagsView`/`CategoriesView` each run an effect keyed on the `activeView` *object* itself (not the id inside it, which stays the same if the same result is opened twice) that clears search/filters/collapsed state and scrolls the matching row into view; `CategoriesView` has no selection to set, so it highlights the row for two seconds instead. A `handledView` ref stops a later store mutation from re-triggering that scroll-and-clear and from overwriting filters the user has since changed themselves.
 
-Those three deep links carry an id into a view that has no *entries*, which is why `RightSidebar` tests its `VIEWS_WITHOUT_ENTRIES` set **before** it tests `activeView.id`: the other way round, `{ type: 'categories', id }` would reach the entry action bar and get an Edit button that sets `mode: 'edit'` on a view with no editor.
+Those three deep links carry an id into a view that has no *entries* — `{ type: 'categories', id }` (or `'tags'`/`'home'`) must never reach the entry action bar and its Edit button, which sets `mode: 'edit'` on a view with no editor. `RightSidebar` avoids that by offering the list-header host whenever `activeView.type` is in `VIEWS_WITHOUT_ENTRIES`, regardless of whether `activeView.id` is set — see [List Header Portal](#list-header-portal) above.
 
 ### Drag and Drop
 
@@ -466,7 +480,7 @@ This means users can keep several entries open while still using back/forward na
 
 The left sidebar is two independent components rendered side by side inside `AppShell`'s `app-sidebar-left` container:
 
-- **`LeftSidebarRail`** (`src/components/layout/LeftSidebarRail.tsx`) — a fixed-width (56px, `RAIL_WIDTH`, defined and exported here and imported by `AppShell`) icon column: the entry-list collapse/expand toggle, the right-sidebar collapse/expand toggle (sharing the `PanelToggleIcon` component via a `mirrored` variant so the two icons read as left/right mirrors), then the six navigation icons (Home/Journal/Tasks/Operations/Wiki/Altar, rendered from a loop over `MODULE_LIST`/`AUX_VIEWS` — see [Module Registry](#module-registry) above), and a bottom nav block: Tags/Trash grouped together, then — below a divider — Vault (opens `VaultModal`) and Settings. The app logo, back/forward and the search shortcut are *not* here; they moved into the title bar (see [Window Chrome](#window-chrome)). The nav icons only call `setActiveView(...)` — they carry no active/selected styling and are intentionally decoupled from `leftListTab` below, since navigating the main view and browsing a different module's entry list are independent actions. Home is the one whose target is not a content view: `isContentView` is false for it, so it overwrites the active tab rather than opening a new one. Note that lucide exports `Home` as an alias of `House`, so its SVG carries the class `.lucide-house`, not `.lucide-home` — relevant to anything selecting the rail icons by class.
+- **`LeftSidebarRail`** (`src/components/layout/LeftSidebarRail.tsx`) — a fixed-width (56px, `RAIL_WIDTH`, defined and exported here and imported by `AppShell`) icon column: the six navigation icons (Home/Journal/Tasks/Operations/Wiki/Altar, rendered from a loop over `MODULE_LIST`/`AUX_VIEWS` — see [Module Registry](#module-registry) above), and a bottom nav block: Tags/Trash grouped together, then — below a divider — Vault (opens `VaultModal`) and Settings. The rail carries no panel-toggle buttons of its own: the entry list and right sidebar are both toggled from the *View* menu (`TitleBarMenuBar.tsx`, native on macOS; `menu.entryList`/`menu.properties`) instead — a pair of rail buttons (`PanelToggleIcon`, mirrored left/right) duplicated that same control and were removed. The app logo, back/forward and the search shortcut are *not* here either; they moved into the title bar (see [Window Chrome](#window-chrome)). The nav icons only call `setActiveView(...)` — they carry no active/selected styling and are intentionally decoupled from `leftListTab` below, since navigating the main view and browsing a different module's entry list are independent actions. Home is the one whose target is not a content view: `isContentView` is false for it, so it overwrites the active tab rather than opening a new one. Note that lucide exports `Home` as an alias of `House`, so its SVG carries the class `.lucide-house`, not `.lucide-home` — relevant to anything selecting the rail icons by class.
 - **`LeftSidebarEntryList`** (`src/components/layout/LeftSidebarEntryList.tsx`) — the adjoining panel, shown only while `uiStore.leftListOpen` is true. Its six tabs (`TabIconButton`) write to `uiStore.leftListTab`; the active tab determines which list renders below: five per-module lists (`JournalList`, `TasksList`, `OperationsList`, `WikiList`, `AltarList`) plus `AllList`, which combines all five into one list sorted by `updated_at` descending. Each per-module list is a one-line `<EntryListTab {...config} />` wrapper around a `use*Config()` hook (`useJournalConfig`, `useTasksConfig`, `useOperationsConfig`, `useWikiConfig`, `useAltarConfig`) returning an `EntryListTabProps<T>` object; `AllList` calls all five hooks and flattens their configs through `toAllRows()` into type-erased `AllRow` objects, so the combined list reuses each module's real handlers (duplicate, delete-with-undo, rename, context menu) rather than reimplementing them. `EntryListTabProps<T>` itself is the shared contract with `EntryListTab<T>` (`src/components/ui/EntryListTab.tsx`), which owns search filtering, inline rename, the "+" quick-create flow, drag-start wiring, and the right-click `ContextMenu`; callers supply accessor functions (`getId`/`getTitle`/`getIcon`/`getDateStr`) and the action list. Tasks is the one caller that needs a materially different row (an independent checkbox toggle) and opts out via the `renderRow` render-prop instead of the accessor props — which also means `renderRow` cannot survive `toAllRows()`'s type erasure, so Tasks fall back to the plain accessor-based row inside `AllList`. `EntryListTab` also takes an optional `canDrag(item)` gate so a mixed list can withhold the grab cursor from rows that aren't drag sources (Tasks, Altar) while still allowing it for the rest.
 
 `AppShell` owns the width/resize logic: the rail is fixed at `RAIL_WIDTH`, and only the entry-list panel's width (`entry-list-width` in `localStorage`, `ENTRY_LIST_MIN` = 180) is user-resizable via the same drag-handle pattern used for the right sidebar. The outer `<aside>` width is computed as `RAIL_WIDTH + (leftListOpen ? entryListWidth : 0)`, and the resize handle only renders while the list is open.
@@ -778,7 +792,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `ensure_app_storage_dirs()` | Create app data and app config directories if they don't exist. Called before frontend writes vault metadata or opens SQLite. |
 | `export_pdf(html, path, page_size?)` | Render the supplied HTML to a PDF at `path` by driving the app's own webview. The frontend first prompts the user for a save location via the `dialog` plugin and passes the chosen path here. `page_size`, an optional `(width_in, height_in)` tuple in inches, overrides the default Letter/Portrait page with a custom size — used only by the Altar PDF export (see below); Journal/Wiki/Operations export calls it without `page_size` and gets the old default behavior. Per-platform implementations live in `src-tauri/src/pdf_export/{windows,macos,linux}.rs`, all behind the same `pub async fn export_pdf` signature; `mod.rs` does the `#[cfg(target_os = "…")]` re-export so `lib.rs` calls `pdf_export::export_pdf` without knowing which platform it's on. |
 | `update_menu_labels(...)` | Update native menu item labels for i18n (edit, view, export, import submenus and their items, including `show_splash` and the View menu's two `CheckMenuItem`s, which need their own `MenuItemKind::Check` arm). macOS only in effect — see [Window Chrome](#window-chrome). |
-| `set_view_menu_checked(left_list, right_sidebar)` | Mirror the frontend's sidebar visibility onto the View menu's two check items. Called on every change, since the rail's own toggles can flip the same state without the menu being opened. macOS only in effect. |
+| `set_view_menu_checked(left_list, right_sidebar)` | Mirror the frontend's sidebar visibility onto the View menu's two check items. Called on every change, since other actions besides the menu itself can flip the same state (e.g. `setActiveView` opening the right sidebar for edit mode). macOS only in effect. |
 | `set_export_menu_enabled(entry, pdf, emerald)` | Enable/disable the native "Export as …" items for the current view. Driven by `computeMenuEnabledState`; macOS only in effect. |
 | `set_altar_export_menu_enabled(enabled)` | Enable/disable the native "Export as Image" submenu. macOS only in effect. |
 

@@ -115,9 +115,9 @@ scrolling properties container (`p-3` in `RightSidebar.tsx`, with a comment in p
 a panel adds its own padding again, the summary rows end up visibly indented differently
 from the button in the action bar above them.
 
-There is no enforced spacing scale. Observed practice: `px-8` for toolbar strips in the
-main area, `px-3`/`p-3` in the sidebars, `px-4 py-3` through `px-5 py-4` in modal headers
-and bodies.
+There is no enforced spacing scale. Observed practice: `px-8` for main-area content columns
+(`Dashboard`'s content, `EntryDetailFrame`), `px-3`/`p-3` in the sidebars, `px-4 py-3`
+through `px-5 py-4` in modal headers and bodies.
 
 ### States
 

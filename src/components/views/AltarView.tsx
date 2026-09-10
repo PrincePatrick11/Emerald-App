@@ -68,7 +68,6 @@ export default function AltarView() {
 
   const [search, setSearch] = useState('');
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [filterOpen, setFilterOpen] = useState(false);
   // Wie die Bibliothek darunter: der Abschnitt lässt sich zuklappen, und das
   // bleibt so — dieselbe Vorliebe, derselbe Hook.
   const [altarsCollapsed, toggleAltars] = usePersistedFlag('altar-list-collapsed');
@@ -347,8 +346,8 @@ export default function AltarView() {
         primaryAction={{ label: t('altar.newAltar'), onClick: handleNew }}
         // „Element" steht hier statt bei den Aktionen mit Beschriftung: es
         // gehört zur Bibliothek unter den Altären, nicht zu den Altären selbst,
-        // und soll darum in beiden Kopf-Bäumen als Icon danebenstehen — der
-        // beschriftete Platz bleibt dem neuen Altar.
+        // und steht darum als Icon daneben — der beschriftete Platz bleibt
+        // dem neuen Altar.
         extraActions={[
           { label: t('altar.addElement'), icon: <PackagePlus size={14} />, onClick: () => openNewElement() },
         ]}
@@ -361,8 +360,6 @@ export default function AltarView() {
         // Nur ein Anzeige-Schalter, kein Filter: er zählt nicht als aktiver
         // Filter, und es gibt nichts zu „Alle löschen".
         filters={{
-          showFilters: filterOpen,
-          onToggleFilters: () => setFilterOpen((open) => !open),
           activeFilterCount: 0,
           panelProps: {
             displayExtras: (

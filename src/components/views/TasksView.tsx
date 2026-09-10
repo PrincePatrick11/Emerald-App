@@ -64,7 +64,6 @@ export default function TasksView() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [filterOpen, setFilterOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<Set<string>>(new Set());
   const [filterPriority, setFilterPriority] = useState<Set<string>>(new Set());
@@ -373,8 +372,6 @@ export default function TasksView() {
         search={searchQuery}
         onSearch={setSearchQuery}
         filters={{
-          showFilters: filterOpen,
-          onToggleFilters: () => setFilterOpen((o) => !o),
           activeFilterCount,
           panelProps: {
             chipLabel: t('filters.category'),

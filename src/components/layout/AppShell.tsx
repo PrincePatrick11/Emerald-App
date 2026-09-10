@@ -158,8 +158,9 @@ export default function AppShell() {
       .catch(() => {/* desktop-only, ignore in browser preview */});
   }, [activeView.type, activeView.id, activeView.mode]);
 
-  // Same idea for the View menu's two check items — the rail's own toggle
-  // buttons change this state without the menu ever being opened.
+  // Same idea for the View menu's two check items — this state also changes
+  // without the menu ever being opened (`setActiveView` opens the right
+  // sidebar for edit mode).
   useEffect(() => {
     invoke('set_view_menu_checked', { leftList: leftListOpen, rightSidebar: rightSidebarOpen })
       .catch(() => {/* desktop-only, ignore in browser preview */});

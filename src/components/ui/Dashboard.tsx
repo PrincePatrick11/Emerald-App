@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, useLayoutEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus } from 'lucide-react';
 import Button from './Button';
@@ -49,34 +49,26 @@ export interface DashboardGroupBy {
 }
 
 export interface DashboardFilters {
-  /** Nur Inline-Kopf: im Seitenleisten-Modus steht das FilterPanel dauerhaft,
-   *  der Auf/Zu-Zustand greift erst wieder, wenn die Leiste zugeklappt ist. */
-  showFilters: boolean;
-  onToggleFilters: () => void;
   activeFilterCount: number;
   panelProps: Omit<FilterPanelProps, 'activeFilterCount'>;
 }
 
 interface DashboardBaseProps<T> {
-  // Topbar
+  // Kopf — steht in der rechten Seitenleiste
   title?: string;
-  /** Fully replaces the topbar-left slot (icon + title + badge + selection controls). */
+  /** Ersetzt den Inhalt der Titelzeile (Icon + Titel + Badge). */
   headerLeft?: ReactNode;
   titleClassName?: string;
-  /** Beschrifteter Jade-Knopf, in beiden Kopf-Bäumen gleich. In der
-   *  Seitenleiste darf dafür der Titel daneben abschneiden: die Aktion ist
-   *  das, wofür man den Kopf aufsucht, der Titel steht auch im Tab. */
+  /** Beschrifteter Jade-Knopf auf eigener voller Zeile unter dem Titel —
+   *  neben dem Titel bliebe von ihm in der schmalen Spalte nichts Lesbares. */
   primaryAction?: { label: string; onClick: () => void };
-  /** Kompakte Icon-Knöpfe rechts neben der Primäraktion, in derselben Reihe —
-   *  in beiden Kopf-Bäumen gleich, ihr Label steht nur im Tooltip. Für
-   *  Nebenschauplätze des Moduls (Altar: die Bibliothek unter den Altären). */
+  /** Kompakte Icon-Knöpfe rechts neben der Primäraktion, in derselben Reihe;
+   *  ihr Label steht nur im Tooltip. Für Nebenschauplätze des Moduls (Altar:
+   *  die Bibliothek unter den Altären). */
   extraActions?: { label: string; icon: ReactNode; onClick: () => void }[];
-  /** Fully replaces the action slot — in BOTH header trees: inline the
-   *  topbar-right, im Seitenleisten-Modus die Titelzeilen-Buttons (gerendert
-   *  in der Scroll-Spalte, wo Platz zum Umbrechen ist). Trash's bulk-select. */
+  /** Ersetzt die Aktionszeile (Primär- und Nebenaktionen) — dort darf eine
+   *  breite Slot-Zeile umbrechen. Trash's bulk-select. */
   headerRight?: ReactNode;
-  /** Nur Inline-Kopf; die Seitenleisten-Titelzeile hat festes Chrome. */
-  headerClassName?: string;
 
   // ListToolbar passthrough. Ansicht und Sortierung sind optional wie
   // `groupBy`: ohne Handler entfällt die jeweilige Reihe.
@@ -148,7 +140,6 @@ type DashboardContentProps<T> =
 
 export type DashboardProps<T> = DashboardBaseProps<T> & DashboardContentProps<T>;
 
-const DEFAULT_HEADER_CLASSNAME = 'flex items-center justify-between px-8 h-14 border-b border-stone-700/60';
 const DEFAULT_CONTENT_CLASSNAME = 'flex-1 overflow-y-auto px-8 py-6';
 const DEFAULT_CARDS_CLASSNAME = 'grid grid-cols-3 gap-3';
 const DEFAULT_WIDE_CARDS_CLASSNAME = 'grid grid-cols-1 gap-3';
@@ -194,7 +185,6 @@ export default function Dashboard<T>({
   primaryAction,
   extraActions,
   headerRight,
-  headerClassName = DEFAULT_HEADER_CLASSNAME,
   view,
   sort,
   onView,
@@ -300,22 +290,24 @@ export default function Dashboard<T>({
     );
   };
 
-  // Experiment „Kopfzeile in der Seitenleiste": Die rechte Seitenleiste stellt
-  // in Listenansichten ein Portal-Ziel (RightSidebar → setListHeaderHost).
-  // Solange es existiert, wandert der komplette Kopf dorthin; ist die Leiste
-  // zu (oder noch nicht gemountet), bleibt er inline — sonst käme man an
-  // „Neuer Eintrag", Suche und Filter nicht mehr heran. Der rightSidebarOpen-
-  // Zusatz lässt den Kopf sofort beim Zuklappen zurückfallen: AppShell hält
-  // die Leiste für die 200ms-Animation noch gemountet (inert), der Host wäre
-  // also noch da, aber unbenutzbar.
-  const listHeaderHost = useUIStore((s) => (s.rightSidebarOpen ? s.listHeaderHost : null));
+  // Der Kopf wohnt ausschließlich in der rechten Seitenleiste: Sie stellt in
+  // Listenansichten ein Portal-Ziel (RightSidebar → setListHeaderHost). Ist
+  // sie zu, gibt es keinen Kopf — bewusst, die Liste bekommt dann die ganze
+  // Höhe. Beim Zuklappen hält AppShell die Leiste für die 200ms-Animation
+  // noch gemountet (inert); der Kopf fährt mit ihr hinaus und verschwindet,
+  // wenn der Host abgemeldet wird.
+  const listHeaderHost = useUIStore((s) => s.listHeaderHost);
 
-  // Beide Kopf-Bäume teilen sich die Toolbar-Props — eine künftige Prop, die
-  // nur in einem Zweig nachgezogen wird, ist der naheliegendste Drift.
-  const toolbarCommon = { view, sort, onView, onSort, viewOptions, groupBy, search, onSearch };
+  // Anmelden, damit RightSidebar das Portal-Ziel stellt (siehe
+  // `uiStore.dashboardMounted`). Layout- statt Passiv-Effekt: Oeffnet ein
+  // Klick einen Eintrag, muss die Leiste noch vor dem Zeichnen auf die
+  // Aktionsleiste umschalten, sonst stuende einen Frame lang ein leerer Host da.
+  const setDashboardMounted = useUIStore((s) => s.setDashboardMounted);
+  useLayoutEffect(() => {
+    setDashboardMounted(true);
+    return () => setDashboardMounted(false);
+  }, [setDashboardMounted]);
 
-  // Einmal gebaut, in beide Kopf-Bäume gehängt: kompakt sind diese Knöpfe
-  // in beiden, ihr Label steht so oder so nur im Tooltip.
   const extraActionButtons = extraActions?.map((action) => (
     <Button
       key={action.label}
@@ -329,56 +321,26 @@ export default function Dashboard<T>({
     </Button>
   ));
 
-  const inlineHeader = (
-    <>
-      <div className={headerClassName}>
-        {headerLeft ?? <h1 className={titleClassName}>{title}</h1>}
-        {headerRight ?? (
-          <div className="flex items-center gap-2">
-            {primaryAction && (
-              <Button onClick={primaryAction.onClick} variant="primary">
-                <Plus size={14} />{primaryAction.label}
-              </Button>
-            )}
-            {extraActionButtons}
-          </div>
-        )}
-      </div>
-
-      <ListToolbar
-        {...toolbarCommon}
-        showFilters={filters?.showFilters}
-        onToggleFilters={filters?.onToggleFilters}
-        activeFilterCount={filters?.activeFilterCount}
-      />
-
-      {filters?.showFilters && (
-        <FilterPanel {...filters.panelProps} activeFilterCount={filters.activeFilterCount} />
-      )}
-    </>
-  );
-
-  const sidebarHeader = (
+  const header = (
     <div className="flex flex-col flex-1 min-h-0">
       {/* h-14 + px-3 wie die Aktionsleiste der Detailansichten, damit die
           Trennlinie mit der Tab-Leiste der Eintragsliste fluchtet. Die Zeile
           gehört allein dem Titel: die Aktionen bekommen darunter eine eigene
           volle Zeile in der Scroll-Spalte — neben dem Titel bliebe von einer
           beschrifteten Primäraktion in dieser schmalen Spalte nichts
-          Lesbares übrig. `headerRight` ersetzt sie — derselbe Vertrag wie
-          inline —, dort kann eine breite Slot-Zeile (Trash-Bulk-Aktionen)
-          umbrechen. */}
+          Lesbares übrig. `headerRight` ersetzt sie; dort kann eine breite
+          Slot-Zeile (Trash-Bulk-Aktionen) umbrechen. */}
       <div className="flex items-center gap-2 px-3 h-14 border-b border-stone-700/60 flex-shrink-0 min-w-0">
         {headerLeft ?? <h1 className={`${titleClassName} truncate`}>{title}</h1>}
       </div>
       {/* Eine Einzugsquelle pro Spalte (design.md): dieselbe p-3-Spalte wie der
           Properties-Container in RightSidebar — Toolbar und FilterPanel bringen
-          im vertikalen Modus kein eigenes Streifen-Chrome mit. */}
+          kein eigenes Streifen-Chrome mit. */}
       <div className="flex-1 overflow-y-auto p-3 space-y-4">
         {headerRight && <div className="flex flex-col gap-1.5">{headerRight}</div>}
 
         {/* Die Primäraktion füllt die Zeile, die Nebenaktionen bleiben daneben
-            kompakt — dieselbe Reihenfolge wie inline. */}
+            kompakt. */}
         {!headerRight && (primaryAction || !!extraActions?.length) && (
           <div className="flex items-center gap-1.5">
             {primaryAction && (
@@ -391,12 +353,21 @@ export default function Dashboard<T>({
           </div>
         )}
 
-        <ListToolbar vertical {...toolbarCommon} />
+        <ListToolbar
+          view={view}
+          sort={sort}
+          onView={onView}
+          onSort={onSort}
+          viewOptions={viewOptions}
+          groupBy={groupBy}
+          search={search}
+          onSearch={onSearch}
+        />
 
         {/* In der Seitenleiste ist Platz in der Höhe: das FilterPanel steht
-            dauerhaft, der Auf/Zu-Zustand gilt nur für den Inline-Fallback. */}
+            dauerhaft, statt hinter einem Auf/Zu-Knopf. */}
         {filters && (
-          <FilterPanel vertical {...filters.panelProps} activeFilterCount={filters.activeFilterCount} />
+          <FilterPanel {...filters.panelProps} activeFilterCount={filters.activeFilterCount} />
         )}
       </div>
     </div>
@@ -404,7 +375,7 @@ export default function Dashboard<T>({
 
   return (
     <div className="h-full flex flex-col">
-      {listHeaderHost ? createPortal(sidebarHeader, listHeaderHost) : inlineHeader}
+      {listHeaderHost && createPortal(header, listHeaderHost)}
 
       <div className={contentClassName}>
         {contentHeader}

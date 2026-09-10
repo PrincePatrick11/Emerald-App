@@ -43,15 +43,20 @@ interface UIState {
   history: ActiveView[];
   historyIndex: number;
   rightSidebarOpen: boolean;
-  /** Experiment „Kopfzeile in der Seitenleiste": das Portal-Ziel, das die
-   *  rechte Seitenleiste in Listenansichten stellt. Dashboard portalt seinen
-   *  kompletten Kopf (Titel, Aktionen, Toolbar, Filter) hinein; `null` heißt
-   *  Leiste zu oder Detailansicht — dann rendert Dashboard den Kopf wieder
-   *  inline im Hauptbereich. Invariante: genau EIN Schreiber (der Host-Div in
+  /** Das Portal-Ziel, das die rechte Seitenleiste in Listenansichten stellt.
+   *  Dashboard portalt seinen kompletten Kopf (Titel, Aktionen, Toolbar,
+   *  Filter) hinein; `null` heißt Leiste zu oder Detailansicht — dann hat
+   *  Dashboard keinen Kopf. Invariante: genau EIN Schreiber (der Host-Div in
    *  RightSidebars Listen-Zweig) und genau ein Leser (Dashboard); MainArea
    *  rendert immer nur eine View, also portalt nie mehr als ein Dashboard.
    *  Bewusst nicht persistiert (DOM-Knoten). */
   listHeaderHost: HTMLElement | null;
+  /** Ob gerade ein `Dashboard` gemountet ist — es meldet sich selbst an.
+   *  RightSidebar stellt daran das Portal-Ziel, statt aus `activeView.id` zu
+   *  raten: Aufgaben zeigen ihre Liste auch mit einer id (Sprungziel, kein
+   *  offener Eintrag), und die id eines geloeschten Eintrags laesst Journal,
+   *  Wiki und Operationen ebenfalls auf ihr Dashboard zurueckfallen. */
+  dashboardMounted: boolean;
   editActions: EditActions | null;
   leftListOpen: boolean;
   leftListTab: LeftListTabId;
@@ -96,6 +101,7 @@ interface UIState {
   navigateForward: () => void;
   toggleRightSidebar: () => void;
   setListHeaderHost: (el: HTMLElement | null) => void;
+  setDashboardMounted: (mounted: boolean) => void;
   setEditActions: (actions: EditActions | null) => void;
   toggleLeftList: () => void;
   setLeftListTab: (tab: LeftListTabId) => void;
@@ -212,6 +218,7 @@ export const useUIStore = create<UIState>((set) => ({
   historyIndex: 0,
   rightSidebarOpen: true,
   listHeaderHost: null,
+  dashboardMounted: false,
   editActions: null,
   leftListOpen: true,
   leftListTab: 'journal',
@@ -375,8 +382,9 @@ export const useUIStore = create<UIState>((set) => ({
   toggleRightSidebar: () => set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),
 
   // Als Ref-Callback gedacht: React ruft ihn beim Unmount mit `null` auf,
-  // womit der Inline-Fallback im Dashboard automatisch wieder greift.
+  // womit der Dashboard-Kopf mit der Leiste verschwindet.
   setListHeaderHost: (el) => set((s) => (s.listHeaderHost === el ? s : { listHeaderHost: el })),
+  setDashboardMounted: (mounted) => set((s) => (s.dashboardMounted === mounted ? s : { dashboardMounted: mounted })),
   setEditActions: (actions) => set({ editActions: actions }),
   toggleLeftList: () => set((s) => ({ leftListOpen: !s.leftListOpen })),
   setLeftListTab: (tab) => set({ leftListTab: tab }),

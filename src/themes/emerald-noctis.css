@@ -80,6 +80,4 @@ html[data-theme='emerald-noctis'] {
   --search-bg: rgba(34, 28, 24, 0.9);
   --search-border: rgba(109, 91, 75, 0.5);
   --search-inset: inset 0 1px 0 rgba(255, 241, 223, 0.06);
-  --list-toolbar-bg: rgba(31, 25, 21, 0.9);
-  --list-toolbar-border: rgba(109, 91, 75, 0.46);
 }
