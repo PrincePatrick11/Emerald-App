@@ -409,8 +409,7 @@ export async function exportAsEmerald(): Promise<void> {
     if (!op) return;
     type      = 'operations';
     title     = op.title || 'Untitled';
-    // Eine verborgene Sigille geht nicht hinaus (das Menü sperrt den Export ohnehin).
-    content   = withoutConcealed(op.content || '', todayIso());
+    content   = op.content || '';
     createdAt = op.created_at;
 
     const cat = categories.find(c => c.id === op.category_id);
@@ -420,6 +419,11 @@ export async function exportAsEmerald(): Promise<void> {
     meta.icon      = op.icon ?? undefined;
     meta.tags      = (op.tags ?? []) as string[];
   }
+
+  // Eine geladene, noch verborgene Sigille geht nicht hinaus — Sigillen-Blöcke
+  // gibt es in jeder Eintragsart. Vor Links, Definitionen und Bildern, damit
+  // auch die eingebettete Zeichnung fehlt.
+  content = withoutConcealed(content, todayIso());
 
   // Titel zu jedem Link-Chip im Inhalt — gilt für alle drei Typen, denn
   // Journal, Wiki und Operationen können gleichermaßen verlinken.

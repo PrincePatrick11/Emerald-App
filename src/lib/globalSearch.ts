@@ -195,10 +195,19 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
     });
   };
 
+  // Eine geladene, noch verborgene Sigille ist auch für die Suche verborgen —
+  // in jeder Eintragsart. Der Zustand steckt im Cache-Stempel: am Zieldatum
+  // wird neu gelesen.
+  const today = todayIso();
+  const visibleText = (id: string, updatedAt: string, content: string) => {
+    const visible = withoutConcealed(content, today);
+    return plainTextFor(id, visible === content ? updatedAt : `${updatedAt}|concealed`, visible);
+  };
+
   for (const entry of corpus.journal.filter(notDeleted)) {
     push('journal', entry.id, entry.title,
       matchRecord(q, entry.title, entry.tags,
-        () => [plainTextFor(entry.id, entry.updated_at, entry.content)]),
+        () => [visibleText(entry.id, entry.updated_at, entry.content)]),
       { updatedAt: entry.updated_at, entryNumber: entry.entry_number });
   }
 
@@ -207,18 +216,13 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
       // The slug rides along with the tags: it is a short handle the way a tag
       // is, and it is what an internal link spells once the title has drifted.
       matchRecord(q, article.title, [...article.tags, article.slug],
-        () => [plainTextFor(article.id, article.updated_at, article.content)]),
+        () => [visibleText(article.id, article.updated_at, article.content)]),
       { updatedAt: article.updated_at, categoryId: article.category_id, entryNumber: article.entry_number });
   }
 
-  const today = todayIso();
   for (const op of corpus.operations.filter(notDeleted)) {
-    // Eine geladene, noch verborgene Sigille ist auch für die Suche verborgen.
-    // Der Zustand steckt im Cache-Stempel: am Zieldatum wird neu gelesen.
-    const visible = withoutConcealed(op.content, today);
-    const stamp = visible === op.content ? op.updated_at : `${op.updated_at}|concealed`;
     push('operation', op.id, op.title,
-      matchRecord(q, op.title, op.tags, () => [plainTextFor(op.id, stamp, visible)]),
+      matchRecord(q, op.title, op.tags, () => [visibleText(op.id, op.updated_at, op.content)]),
       { updatedAt: op.updated_at, categoryId: op.category_id, entryNumber: op.entry_number });
   }
 

@@ -323,7 +323,8 @@ export interface FallbackText {
   moonName: (phase: MoonPhase) => string;
 }
 
-function valueHtml(element: ElementDef, model: FieldsModel, text: FallbackText): string | null {
+/** Der Wert eines Feldes als HTML (kein Slot) — `null` für leer. Fallback und Export teilen ihn. */
+export function fieldValueHtml(element: ElementDef, model: FieldsModel, text: FallbackText): string | null {
   if (isElementEmpty(element, model)) return null;
   const value = model.values[element.id];
   switch (element.kind) {
@@ -368,7 +369,7 @@ export function serializeFields(block: BlockInstance, model: FieldsModel, text: 
       return element.archived ? slotRow(element.id, slot) : `${dt}${slotRow(element.id, slot)}`;
     }
     if (element.archived) return '';
-    const html = valueHtml(element, model, text);
+    const html = fieldValueHtml(element, model, text);
     return html === null ? '' : `${dt}<dd>${html}</dd>`;
   });
   // Slots ohne bekanntes Element bleiben stehen, wie die verwaisten Werte —

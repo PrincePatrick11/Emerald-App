@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { entryBlockSummary } from '../../lib/blocks/entrySummary';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Trash2, Pencil, Copy, PanelTopOpen } from 'lucide-react';
@@ -41,7 +42,9 @@ export default function WikiView() {
   const pushUndo = useUndoStore((s) => s.push);
 
   const article = activeView.id ? getArticle(activeView.id) : null;
-  const isEditing = activeView.mode === 'edit';
+  // Eine geladene Sigille mit Sperre „ganzer Eintrag" öffnet nie im Bearbeitungsmodus.
+  const locked = !!article && !!entryBlockSummary(article.id, article.content).sigil?.lockEntry;
+  const isEditing = activeView.mode === 'edit' && !locked;
 
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);

@@ -4,6 +4,8 @@ import type { ComponentType } from 'react';
 import { Pencil, Check, X, Trash2, Maximize2, Minimize2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
+import { useJournalStore } from '../../store/journalStore';
+import { useWikiStore } from '../../store/wikiStore';
 import type { ActiveView } from '../../types';
 import { moduleMeta, type ViewId } from '../../lib/modules';
 import BlockSidebarArea from '../blocks/BlockSidebarArea';
@@ -45,7 +47,12 @@ function RightSidebarActionBar() {
   const editActions = useUIStore((s) => s.editActions);
   const altarWindowFullscreen = useUIStore((s) => s.altarWindowFullscreen);
   const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
-  const operations = useOperationStore((s) => s.operations);
+  // Der Inhalt des offenen Eintrags — für die Sperre einer geladenen Sigille.
+  // Alle drei Hooks laufen immer; nur der passende liefert etwas.
+  const journalContent = useJournalStore((s) => (activeView.type === 'journal' ? s.entries.find((e) => e.id === activeView.id)?.content : undefined));
+  const wikiContent = useWikiStore((s) => (activeView.type === 'wiki' ? s.articles.find((a) => a.id === activeView.id)?.content : undefined));
+  const operationContent = useOperationStore((s) => (activeView.type === 'operations' ? s.operations.find((o) => o.id === activeView.id)?.content : undefined));
+  const content = journalContent ?? wikiContent ?? operationContent;
 
   if (!activeView.id) return null;
   const isEditing = activeView.mode === 'edit';
@@ -83,11 +90,8 @@ function RightSidebarActionBar() {
   }
 
   // Eine geladene Sigille mit Sperre „ganzer Eintrag" lässt sich nicht
-  // bearbeiten — der Ladung-Block entscheidet, nicht mehr die Kategorie.
-  const op = activeView.type === 'operations'
-    ? operations.find((o) => o.id === activeView.id)
-    : undefined;
-  if (op && entryBlockSummary(op.id, op.content).sigil?.lockEntry) return null;
+  // bearbeiten — der Ladung-Block entscheidet, in jeder Eintragsart.
+  if (content !== undefined && entryBlockSummary(activeView.id, content).sigil?.lockEntry) return null;
 
   const isAltar = activeView.type === 'altar';
 

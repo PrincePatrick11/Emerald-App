@@ -1,5 +1,7 @@
 import { useJournalStore } from '../store/journalStore';
-import { contentForExport } from './blocks/exportContent';
+import { renderBlocksForExport, type ExportText } from './blocks/exportRender';
+import { blockLabel, fieldFallbackText } from './blocks/blockAttrs';
+import { formatIsoDateLong } from './formatDate';
 import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { useCategoryStore } from '../store/categoryStore';
@@ -15,6 +17,22 @@ export interface ChipData {
   label: string;
   icon?: string;          // emoji or data-URL
   fallbackIcon?: string;  // plain emoji to use when icon is a data-URL (markdown export)
+}
+
+/** Die Texte, mit denen die Blöcke in der aktuellen Sprache exportiert werden. */
+function exportText(): ExportText {
+  const t = i18n.t;
+  return {
+    title: (block, meta) => blockLabel(t, block, meta),
+    fields: fieldFallbackText(t),
+    date: formatIsoDateLong,
+    number: (value) => value.toLocaleString(i18n.language),
+    targetDate: t('creation.targetDate'),
+    technique: t('creation.chargingTechnique'),
+    loaded: t('blocks.sigil.loaded'),
+    notLoaded: t('blocks.sigil.notLoaded'),
+    drawing: t('blocks.types.sigilCanvas.label'),
+  };
 }
 
 export interface ExportData {
@@ -103,7 +121,7 @@ export async function collectExportData(): Promise<ExportData | null> {
       type: 'journal',
       title: entry.title || 'Untitled',
       entryNumber: entry.entry_number,
-      content: contentForExport(entry.content),
+      content: renderBlocksForExport(entry.content, exportText()),
       createdAt: entry.created_at,
       moonPhase,
       paradigma: paradigmaArt ? (() => {
@@ -139,7 +157,7 @@ export async function collectExportData(): Promise<ExportData | null> {
       type: 'wiki',
       title: article.title || 'Untitled',
       entryNumber: article.entry_number,
-      content: contentForExport(article.content),
+      content: renderBlocksForExport(article.content, exportText()),
       createdAt: article.created_at,
       category: cat ? { label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,
       entryIcon: article.icon || undefined,
@@ -158,7 +176,7 @@ export async function collectExportData(): Promise<ExportData | null> {
       type: 'operations',
       title: op.title || 'Untitled',
       entryNumber: op.entry_number,
-      content: contentForExport(op.content),
+      content: renderBlocksForExport(op.content, exportText()),
       createdAt: op.created_at,
       category: cat ? { label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,
       entryIcon: op.icon || undefined,

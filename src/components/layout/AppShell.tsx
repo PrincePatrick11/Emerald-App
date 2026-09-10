@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useTranslation } from 'react-i18next';
 import { isAltarFullscreen, useUIStore } from '../../store/uiStore';
-import { useOperationStore } from '../../store/operationStore';
 import { reloadAllStores } from '../../store/moduleWiring';
 import { hasActiveVault, useVaultStore } from '../../store/vaultStore';
 import { invoke } from '@tauri-apps/api/core';
@@ -148,7 +147,7 @@ export default function AppShell() {
   // greys out exactly the same items. No-ops on Windows/Linux, where no
   // native menu is installed and the Rust commands bail out early.
   useEffect(() => {
-    const enabled = computeMenuEnabledState(activeView, useOperationStore.getState().operations);
+    const enabled = computeMenuEnabledState(activeView);
     invoke('set_export_menu_enabled', {
       entryEnabled: enabled.entryEnabled,
       pdfEnabled: enabled.pdfEnabled,

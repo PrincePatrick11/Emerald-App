@@ -79,3 +79,16 @@ export function formatDayHeading(date: string | Date): string {
 export function formatTimeDistance(date: string | Date): string {
   return formatDistanceToNow(new Date(date), { locale: activeLocale });
 }
+
+/**
+ * Ein ISO-Datum (`YYYY-MM-DD`) in der langen Form der App-Sprache. Als lokales
+ * Datum gebaut — die ISO-Zeichenkette direkt hieße UTC-Mitternacht und damit
+ * westlich von Greenwich den Vortag. Ein unmögliches Datum (31. Februar) bleibt
+ * roh stehen, statt still in den März zu rollen.
+ */
+export function formatIsoDateLong(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  if (!y || date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return iso;
+  return formatEntryDateLong(date);
+}

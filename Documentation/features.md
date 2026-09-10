@@ -57,7 +57,7 @@ A sigil is an operation with three blocks — **Sigil calculator**, **Sigil draw
 1. In the calculator, write the intention and use "Reduce automatically" (or "Reduce manually") to get the letter bank — each letter once. Tick letters off as you work them into the drawing.
 2. Draw the sigil in the drawing block: pen and eraser, brush size, seven colours, undo/redo, clear. It is saved as an image file.
 3. In the charge block, set a reveal date and link a charging technique — any wiki article — and choose what charging locks: the whole entry (as before) or only calculator and drawing.
-4. In read mode, charge the sigil — optionally after a timer — and confirm. Until the reveal date, calculator and drawing are hidden (also on list cards and in search) and export is unavailable; from that day on they show again, still locked. "Unload sigil" (with confirmation) lifts the lock. A duplicated sigil comes unloaded.
+4. In read mode, charge the sigil — optionally after a timer — and confirm. Until the reveal date, calculator and drawing are hidden (also on list cards and in search) and left out of exports; from that day on they show again, still locked. "Unload sigil" (with confirmation) lifts the lock. A duplicated sigil comes unloaded.
 
 Existing sigils were converted when the vault was first opened with this version: intention, letters, drawing, charge state, reveal date, charging technique and notes all carried over (the notes as a text block), and a sigil that was hidden without being charged has its drawing block hidden with the eye. A backup is written next to the database before this conversion.
 
@@ -280,13 +280,13 @@ New vaults are not switched to automatically — except during first-start setup
 
 All export and import actions are in the application menu. Where that menu lives depends on the platform: on macOS it is the native menu in the system menu bar at the top of the screen; on Windows and Linux it is rendered in the app's own title bar. Both offer the same items with the same enabled/disabled rules. The menu bar stays available in the altar's distraction-free full-window mode, since that is where image export is most often wanted.
 
-> **A charged, still concealed sigil can't be exported.** Export (Markdown, PDF, Emerald) works for Journal and Wiki entries, for altars, and for every operation — sigils included, their blocks exported as their readable fallback (intention and letters, the drawing as an image). Only while an operation's sigil is charged and its reveal date not yet reached are all three "Export as …" items greyed out, so calculator and drawing can't leave the app early. Import is unaffected.
+> **Exports show an entry the way read mode does.** Markdown and PDF render each block on its own: hidden blocks (the eye) are left out, field blocks list only the fields read mode shows, as label and value, block titles appear as headings where read mode shows them, and a sigil exports its intention and letters, its drawing (in Markdown a placeholder) and its charge. While a sigil is charged and its reveal date not yet reached, calculator and drawing are left out of every export, `.emerald` included — the rest of the entry exports normally. Import is unaffected.
 
 ### PDF Export
 
 Prompts a native save dialog for the destination and writes the PDF directly to disk — there is no preview window and no system print dialog. The PDF is rendered by the app's own webview (WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux), so emoji render as proper colored glyphs (Segoe UI Emoji / Apple Color Emoji / Noto Color Emoji) without any frontend rasterisation. The suggested filename is `<Title>_YYYY-MM-DD.pdf`; the user picks the actual location in the OS save dialog. Images in the entry are embedded as base64 before the PDF is generated; internal link chips are rendered as styled spans inside the content.
 
-The **Export → Export as PDF…** menu item is available while a Journal / Wiki / Operations entry is open, or while an Altar is open in **reading view** (not while editing it) — it is disabled on the home view, the tag manager, the trash, and while a concealed sigil is open (see note above). For Journal/Wiki/Operations it exports the entry text as described above; for an open Altar it instead exports the rendered altar image as a single-page PDF (see Altar PDF Export below).
+The **Export → Export as PDF…** menu item is available while a Journal / Wiki / Operations entry is open, or while an Altar is open in **reading view** (not while editing it) — it is disabled on the home view, the tag manager, the trash. For Journal/Wiki/Operations it exports the entry text as described above; for an open Altar it instead exports the rendered altar image as a single-page PDF (see Altar PDF Export below).
 
 ### Altar PDF Export
 
@@ -298,7 +298,7 @@ A nested **Export as Image** submenu (Export → Export as Image → JPEG… / P
 
 ### Markdown Export
 
-Saves a `.md` file with a frontmatter block followed by the entry body. Frontmatter includes date, moon phase, category, and tags (an operation's status, end date and version are a block in the body since v40; older files that still carry them in the frontmatter are turned into that block on import) — plus paradigm/banishing/meditation, but only for an entry whose underlying columns still carry a pre-migration value (see [`database.md`](database.md#journal_entries)); a journal entry written or edited with this version never populates them, since those three now live as ordinary links. Images are stripped (not included). Internal link chips become `[[Title]]` wiki-link syntax — that is where a journal entry's links live since migration v36 (and, for Paradigm/Banishing/Meditation, v37), so they travel in the body rather than in frontmatter.
+Saves a `.md` file with a frontmatter block followed by the entry body. Frontmatter includes date, moon phase, category, and tags (an operation's status, end date and version are a block in the body since v40; older files that still carry them in the frontmatter are turned into that block on import) — plus paradigm/banishing/meditation, but only for an entry whose underlying columns still carry a pre-migration value (see [`database.md`](database.md#journal_entries)); a journal entry written or edited with this version never populates them, since those three now live as ordinary links. Images are stripped; a block image (the sigil drawing, an image field) leaves its label as a placeholder, `*[Label]*`. Internal link chips become `[[Title]]` wiki-link syntax — that is where a journal entry's links live since migration v36 (and, for Paradigm/Banishing/Meditation, v37), so they travel in the body rather than in frontmatter.
 
 The frontmatter can still carry `Operations:` and `Wiki:` lines with a UUID (`Operations: Title [uuid]`), but only for entries whose legacy `linked_operation_ids`/`linked_wiki_ids` columns are still filled — i.e. restored from a pre-v36 backup. Import understands both: those lines are resolved and appended to the body as link-chip blocks, never written back to the columns.
 
@@ -306,7 +306,7 @@ The frontmatter can still carry `Operations:` and `Wiki:` lines with a UUID (`Op
 
 The Emerald format (`.emerald` file extension) is a JSON file that captures the full entry — or, for altars, the full altar — including all metadata and embedded images. It is designed for lossless transfer between Emerald installations.
 
-The single **Export → Export as Emerald…** menu item is shared between Journal/Wiki/Operations entries and altars: it is enabled whenever a Journal / Wiki / Operations entry is open, or an Altar is open in reading view, and exports whichever is currently active. (A concealed sigil is excluded — see the note at the top of this section.)
+The single **Export → Export as Emerald…** menu item is shared between Journal/Wiki/Operations entries and altars: it is enabled whenever a Journal / Wiki / Operations entry is open, or an Altar is open in reading view, and exports whichever is currently active.
 
 The file structure:
 

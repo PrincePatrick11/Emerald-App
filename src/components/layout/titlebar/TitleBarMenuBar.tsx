@@ -3,7 +3,6 @@ import { useOutsideClick } from '../../../hooks/useOutsideClick';
 import { Menu } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
-import { useOperationStore } from '../../../store/operationStore';
 import { computeMenuEnabledState, dispatchMenuAction } from '../../../lib/menuActions';
 import { cutSelection, copySelection, pasteFromClipboard, selectAll } from './editCommands';
 import MenuDropdown, { type MenuNode } from './MenuDropdown';
@@ -28,7 +27,6 @@ export default function TitleBarMenuBar({ compact }: { compact: boolean }) {
   const activeView = useUIStore((s) => s.activeView);
   const leftListOpen = useUIStore((s) => s.leftListOpen);
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
-  const operations = useOperationStore((s) => s.operations);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   // Only a keyboard-opened menu pulls focus into its panel. Opening by mouse
   // must leave focus where it was, or Cut/Copy lose the editor's selection.
@@ -37,7 +35,7 @@ export default function TitleBarMenuBar({ compact }: { compact: boolean }) {
 
   useOutsideClick(openMenu !== null, () => setOpenMenu(null), { refs: [barRef], escape: true });
 
-  const enabled = computeMenuEnabledState(activeView, operations);
+  const enabled = computeMenuEnabledState(activeView);
   const close = () => setOpenMenu(null);
 
   const menus: Array<{ id: string; label: string; nodes: MenuNode[] }> = [

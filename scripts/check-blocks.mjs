@@ -30,7 +30,7 @@ writeFileSync(
    export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
    export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
    export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded, sigilImage, withSigilImage, letterList } from '${root}/src/lib/blocks/sigil';
-   export { contentForExport } from '${root}/src/lib/blocks/exportContent';
+   export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';`
 );
@@ -60,7 +60,7 @@ const {
   withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID,
   extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock,
   createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded,
-  sigilImage, withSigilImage, letterList, contentForExport,
+  sigilImage, withSigilImage, letterList, renderBlocksForExport,
 } = bundle;
 
 const failures = [];
@@ -477,9 +477,46 @@ console.log('\n4f. Sigillen-Blöcke\n');
   check('eine Kopie wird entladen', !sigilState(parseBlocks(unloaded), '2029-12-31').loaded && withChargeUnloaded(unloaded) === unloaded);
 
   const secret = { ...createTextBlock('<p>geheim</p>'), attrs: { 'data-block-hidden': '1' } };
-  const exported = contentForExport(serializeBlocks([createTextBlock('<p>sichtbar</p>'), secret, ...blocks]), '2029-12-31');
+  const exportText = {
+    title: (b) => `T:${b.type}`, date: (iso) => `D:${iso}`, number: (n) => `N:${n}`, targetDate: 'Ziel', technique: 'Technik',
+    loaded: 'Geladen', notLoaded: 'Offen', drawing: 'Zeichnung',
+    fields: { label: (e) => e.label || e.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p },
+  };
+  const exportedContent = serializeBlocks([createTextBlock('<p>sichtbar</p>'), secret, ...blocks]);
+  const exported = renderBlocksForExport(exportedContent, exportText, '2029-12-31');
   check('Export: ausgeblendete Blöcke und die verborgene Sigille fehlen, die Ladung bleibt',
-    exported.includes('sichtbar') && !exported.includes('geheim') && !exported.includes('core.sigil.canvas') && exported.includes('core.sigil.charge'), exported);
+    exported.includes('sichtbar') && !exported.includes('geheim') && !exported.includes('Ich') && !exported.includes('<img')
+      && exported.includes('<dt>Ziel</dt><dd>D:2030-01-01</dd>') && exported.includes('Geladen'), exported);
+  check('Export: keine Sections, Titel als Überschrift, Text ohne Titel',
+    !exported.includes('<section') && exported.includes('<h3>T:core.sigil.charge</h3>') && !exported.includes('T:core.text'), exported);
+  const revealed = renderBlocksForExport(exportedContent, exportText, '2030-02-01');
+  check('Export nach dem Zieldatum: Rechner und Zeichnung (mit Alt-Text) sind dabei',
+    revealed.includes('Ich &lt;b&gt;bin') && revealed.includes(`<img src="${'ab'.repeat(32)}.png" alt="Zeichnung" data-export-placeholder="1">`), revealed);
+
+  const fieldsBlock = {
+    id: 'fx', type: 'core.fields', html: '',
+    attrs: {
+      'data-block-config': JSON.stringify({
+        elements: [
+          { id: 'e1', kind: 'date', label: 'Datum' },
+          { id: 'e2', kind: 'number', label: 'Leer' },
+          { id: 'e3', kind: 'shorttext', label: 'Alt', archived: true },
+          { id: 'e4', kind: 'number', label: 'Menge' },
+        ],
+        display: { readHideEmpty: true },
+      }),
+      'data-block-data': JSON.stringify({ values: { e1: '2030-05-01', e3: 'weg', e4: 3 } }),
+    },
+  };
+  const titled = { ...createTextBlock('<p>mit Titel</p>'), attrs: { 'data-block-show-title': '1' } };
+  const fieldsOut = renderBlocksForExport(serializeBlocks([fieldsBlock, titled]), exportText, '2030-01-01');
+  check('Export: Felder wie im Lesemodus — formatiert, ohne Leeres und Archiviertes',
+    fieldsOut.includes('<dt>Datum</dt><dd>D:2030-05-01</dd>') && fieldsOut.includes('<dt>Menge</dt><dd>N:3</dd>')
+      && !fieldsOut.includes('Leer') && !fieldsOut.includes('weg'), fieldsOut);
+  check('Export: ein Textblock mit eingeschaltetem Titel trägt ihn', fieldsOut.includes('<h3>T:core.text</h3><p>mit Titel</p>'), fieldsOut);
+
+  const journalSigil = serializeBlocks([createTextBlock('<p>Tagebuch</p>'), ...blocks]);
+  check('eine Sigille im Journal verbirgt sich genauso', !withoutConcealed(journalSigil, '2029-12-31').includes('core.sigil.calc'));
   check('Buchstabenliste: höchstens 500, nur kurze Zeichenketten',
     letterList([...Array(2000).fill('A'), 'x'.repeat(9), 3]).length === 500 && letterList(['AB', 'x'.repeat(9), 3]).join() === 'AB');
   const t0 = Date.now();

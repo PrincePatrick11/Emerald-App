@@ -7,7 +7,7 @@ import {
   activeElements, imageFromSlot, isElementEmpty, isHiddenInRead, linkFromSlot, parseFields, serializeFields,
   type ChecklistItem, type ElementDef, type FieldValue, type FieldsModel,
 } from '../../lib/blocks/fields';
-import { formatEntryDateLong } from '../../lib/formatDate';
+import { formatIsoDateLong } from '../../lib/formatDate';
 import UnknownBlock from './UnknownBlock';
 import { escapeHtml } from '../../lib/internalLinkHtml';
 import { LinkEditor, LinkTarget } from './BlockLink';
@@ -303,7 +303,7 @@ function FieldReader({ element, model, set }: { element: ElementDef; model: Fiel
     case 'number':
       return <span>{(value as number).toLocaleString(i18n.language)}</span>;
     case 'date':
-      return <span>{formatIsoDate(value as string)}</span>;
+      return <span>{formatIsoDateLong(value as string)}</span>;
     case 'select':
       return <span>{element.options?.find((o) => o.id === value)?.label ?? ''}</span>;
     case 'toggle':
@@ -337,15 +337,3 @@ function FieldReader({ element, model, set }: { element: ElementDef; model: Fiel
   }
 }
 
-/**
- * Ein ISO-Datum (`YYYY-MM-DD`) in der Sprache der App. Als lokales Datum
- * gebaut — die ISO-Zeichenkette direkt hieße UTC-Mitternacht und damit westlich
- * von Greenwich den Vortag. Ein unmögliches Datum (31. Februar) bleibt roh
- * stehen, statt still in den März zu rollen.
- */
-function formatIsoDate(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  if (!y || date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return iso;
-  return formatEntryDateLong(date);
-}

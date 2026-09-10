@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { entryBlockSummary } from '../../lib/blocks/entrySummary';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Trash2, Copy, Pencil } from 'lucide-react';
@@ -33,7 +34,9 @@ export default function JournalView() {
   const pushUndo = useUndoStore((s) => s.push);
 
   const entry = activeView.id ? getEntry(activeView.id) : null;
-  const isEditing = activeView.mode === 'edit';
+  // Eine geladene Sigille mit Sperre „ganzer Eintrag" öffnet nie im Bearbeitungsmodus.
+  const locked = !!entry && !!entryBlockSummary(entry.id, entry.content).sigil?.lockEntry;
+  const isEditing = activeView.mode === 'edit' && !locked;
 
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);

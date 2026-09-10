@@ -64,12 +64,6 @@ export function todayIso(now = new Date()): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-/** `YYYY-MM-DD` als lokales Datum — die ISO-Zeichenkette hieße UTC-Mitternacht und westlich davon den Vortag. */
-export function localDate(iso: string): Date {
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
 /** Klartext als Absätze, eine Zeile je `<p>`, escaped. */
 export function textParagraphs(text: string): string {
   return text.split('\n').map((line) => `<p>${escapeHtml(line)}</p>`).join('');

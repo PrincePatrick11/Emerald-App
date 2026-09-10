@@ -50,8 +50,16 @@ async function embedImages(html: string): Promise<string> {
   return rewriteImageRefs(html, (ref) => resolved.get(ref) ?? null);
 }
 
+/**
+ * Bilder fallen im Markdown weg. Die Bilder der Blöcke (Sigillen-Zeichnung,
+ * Bildfeld; `data-export-placeholder`) lassen ihre Beschriftung als
+ * Platzhalter stehen — Bilder im Text verschwinden wie bisher ganz.
+ */
 function stripImages(html: string): string {
-  return html.replace(/<img[^>]*>/gi, '');
+  return html.replace(/<img\b[^>]*>/gi, (tag) => {
+    const alt = /\bdata-export-placeholder=/i.test(tag) ? /\balt="([^"]+)"/i.exec(tag)?.[1] : undefined;
+    return alt ? `<em>[${alt}]</em>` : '';
+  });
 }
 
 /**
@@ -305,6 +313,10 @@ const PRINT_CSS = `
   /* Content */
   .entry-content h1, .entry-content h2, .entry-content h3 { margin-top: 1.3em; margin-bottom: 0.4em; }
   .entry-content p  { margin-bottom: 0.8em; }
+  .entry-content dl { margin-bottom: 0.8em; }
+  .entry-content dt { font-size: 0.85em; font-weight: 600; color: #666; margin-top: 0.4em; }
+  .entry-content dd { margin: 0 0 0.3em 0; }
+  .entry-content dd ul { margin-bottom: 0; }
   /* Die Ausrichtung eines Bildes steht als margin-left/-right in seinem
      style-Attribut und schlaegt diese Kurzform — nur die vertikalen
      Abstaende kommen von hier. */
@@ -439,6 +451,27 @@ export async function exportAsMarkdown(data: ExportData): Promise<void> {
         (node as HTMLElement).textContent || '';
       return `[[${label.trim()}]]`;
     },
+  });
+
+  // Feldblöcke kommen als `<dl>`: „**Beschriftung:** Wert", ein Absatz je Feld.
+  // Ein mehrzeiliger Wert (Checkliste) beginnt in eigener Zeile, sonst klebte
+  // sein erster Punkt an der Beschriftung. Turndown fügt Stücke mit der
+  // größeren Zahl Umbrüche an ihren Rändern zusammen — daher je zwei.
+  td.addRule('definitionTerm', {
+    filter: 'dt',
+    replacement: (content) => `\n\n**${content.trim()}:** `,
+  });
+  td.addRule('definitionValue', {
+    filter: 'dd',
+    replacement: (content) => {
+      const value = content.trim();
+      return value.includes('\n') ? `\n\n${value}\n\n` : `${value}\n\n`;
+    },
+  });
+  // Umgesetzte Buchstaben des Sigillen-Rechners.
+  td.addRule('strikethrough', {
+    filter: ['s', 'del'],
+    replacement: (content) => `~~${content}~~`,
   });
 
   // Build frontmatter / header block

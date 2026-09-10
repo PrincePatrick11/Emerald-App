@@ -2,8 +2,7 @@ import { emit } from '@tauri-apps/api/event';
 import { useUIStore } from '../store/uiStore';
 import { hasActiveVault, useVaultStore } from '../store/vaultStore';
 import { showSplash } from './splash';
-import type { ActiveView, Operation } from '../types';
-import { entryBlockSummary } from './blocks/entrySummary';
+import type { ActiveView } from '../types';
 
 /**
  * The application menu's actions, shared by the two menus that can trigger
@@ -161,7 +160,7 @@ export function dispatchMenuAction(id: MenuActionId): void {
 }
 
 export interface MenuEnabledState {
-  /** Markdown export — journal / wiki / operation entries, except a concealed sigil. */
+  /** Markdown export — journal / wiki / operation entries. */
   entryEnabled: boolean;
   /** PDF export — entries, plus an Altar's reading view (exports the rendered altar). */
   pdfEnabled: boolean;
@@ -173,22 +172,16 @@ export interface MenuEnabledState {
 
 /**
  * Decides which export menu items are available for the current view. Pure so
- * that the HTML menu bar can call it during render off a subscribed
- * `operations` list rather than reading the store outside React.
+ * that the HTML menu bar can call it during render.
  *
- * An operation whose sigil is charged and still concealed is excluded: its
- * calculator and drawing must not leave the app before the reveal date, and
- * the export does not yet leave concealed blocks out on its own.
+ * A concealed sigil needs no exception here: the export leaves its calculator
+ * and drawing out on its own (`renderBlocksForExport`, `withoutConcealed`).
  */
-export function computeMenuEnabledState(activeView: ActiveView, operations: Operation[]): MenuEnabledState {
-  const op = activeView.type === 'operations' && activeView.id
-    ? operations.find((o) => o.id === activeView.id)
-    : undefined;
-  const isConcealed = !!op && !!entryBlockSummary(op.id, op.content).sigil?.concealed;
+export function computeMenuEnabledState(activeView: ActiveView): MenuEnabledState {
   const isEntryView =
     (activeView.type === 'journal' ||
      activeView.type === 'wiki' ||
-     (activeView.type === 'operations' && !isConcealed)) &&
+     activeView.type === 'operations') &&
     !!activeView.id;
   const isAltarReadingView =
     activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit';

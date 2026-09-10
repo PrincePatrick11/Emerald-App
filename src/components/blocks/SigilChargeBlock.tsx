@@ -5,9 +5,9 @@ import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import { linkFromSlot } from '../../lib/blocks/fields';
 import {
-  localDate, parseSigilCharge, serializeSigilCharge, type SigilCharge, type SigilLockScope,
+  parseSigilCharge, serializeSigilCharge, type SigilCharge, type SigilLockScope,
 } from '../../lib/blocks/sigil';
-import { formatEntryDateLong } from '../../lib/formatDate';
+import { formatIsoDateLong } from '../../lib/formatDate';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import UnknownBlock from './UnknownBlock';
 import { LinkEditor, LinkTarget } from './BlockLink';
@@ -57,7 +57,7 @@ function ChargeReader({ charge, concealed, onPersist }: {
   onPersist?: (next: ChargeData) => void;
 }) {
   const { t } = useTranslation();
-  const date = charge.revealDate ? formatEntryDateLong(localDate(charge.revealDate)) : null;
+  const date = charge.revealDate ? formatIsoDateLong(charge.revealDate) : null;
   const status = charge.loaded
     ? `${t('blocks.sigil.loaded')} · ${concealed ? t('creation.hiddenUntilDate', { date: date ?? '—' }) : t('blocks.sigil.revealedSince', { date: date ?? '—' })}`
     : t('blocks.sigil.notLoaded');
