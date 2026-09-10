@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { SIGIL_CATEGORY_ID } from '../../lib/schema';
+import { entryBlockSummary } from '../../lib/blocks/entrySummary';
 import type { ComponentType } from 'react';
 import { Pencil, Check, X, Trash2, Maximize2, Minimize2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
@@ -82,11 +82,12 @@ function RightSidebarActionBar() {
     );
   }
 
-  // A loaded sigil operation can't be edited — hide the Edit button for it.
+  // Eine geladene Sigille mit Sperre „ganzer Eintrag" lässt sich nicht
+  // bearbeiten — der Ladung-Block entscheidet, nicht mehr die Kategorie.
   const op = activeView.type === 'operations'
     ? operations.find((o) => o.id === activeView.id)
     : undefined;
-  if (op?.category_id === SIGIL_CATEGORY_ID && op.is_loaded) return null;
+  if (op && entryBlockSummary(op.id, op.content).sigil?.lockEntry) return null;
 
   const isAltar = activeView.type === 'altar';
 

@@ -1,10 +1,7 @@
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CheckSquare, ImagePlus, Plus, Square, ToggleLeft, ToggleRight, X } from 'lucide-react';
 import Dropdown from '../ui/Dropdown';
-import LinkedEntryPicker, { LinkedEntryChip, LinkItemIcon } from '../sidebar/fields/LinkedEntryPicker';
-import { useUIStore } from '../../store/uiStore';
-import { useLinkItems } from '../../hooks/useLinkItems';
 import { elementLabel } from '../../lib/blocks/blockAttrs';
 import {
   activeElements, imageFromSlot, isElementEmpty, isHiddenInRead, linkFromSlot, parseFields, serializeFields,
@@ -12,20 +9,15 @@ import {
 } from '../../lib/blocks/fields';
 import { formatEntryDateLong } from '../../lib/formatDate';
 import UnknownBlock from './UnknownBlock';
-import { escapeHtml, internalLinkChipHtml, toInternalLinkChip } from '../../lib/internalLinkHtml';
+import { escapeHtml } from '../../lib/internalLinkHtml';
+import { LinkEditor, LinkTarget } from './BlockLink';
 import { imageSrc, saveImage } from '../../lib/images';
 import { ACCEPTED_IMAGE_MIME, generateId, isAcceptedImageFile, readFileAsDataUrl } from '../../lib/helpers';
-import { isValidLinkTarget } from '../../lib/links';
-import { linkItemKey, linkItemsByKey, type SuggestionItem } from '../../lib/linkItems';
 import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
-import { viewTypeForEntryType } from '../../lib/modules';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
-import type { ContentType, MoonPhase } from '../../types';
+import type { MoonPhase } from '../../types';
 import { useFieldFallbackText } from './useFieldFallbackText';
 import type { BlockViewProps } from './blockViews';
-
-/** So viele Vorschläge zeigt das Verknüpfungs-Feld — wie das Verlinkungs-Feld der Seitenleiste. */
-const LINK_RESULT_LIMIT = 50;
 
 type Setter = (value: FieldValue | undefined) => void;
 
@@ -236,74 +228,6 @@ function CheckButton({ checked, onToggle }: { checked: boolean; onToggle?: () =>
     >
       <Icon size={14} />
     </button>
-  );
-}
-
-function LinkEditor({ slot, onChange }: { slot: string | undefined; onChange: (html: string | null) => void }) {
-  const { t } = useTranslation();
-  const items = useLinkItems();
-  const [query, setQuery] = useState('');
-  const current = linkFromSlot(slot);
-
-  const results = useMemo(() => {
-    const q = query.toLowerCase();
-    return items
-      .filter((i) => i.label.toLowerCase().includes(q))
-      .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
-      .slice(0, LINK_RESULT_LIMIT);
-  }, [items, query]);
-
-  if (current) {
-    return (
-      <LinkTarget
-        target={current}
-        onRemove={() => onChange(null)}
-      />
-    );
-  }
-  return (
-    <LinkedEntryPicker<SuggestionItem>
-      results={results}
-      resultKey={linkItemKey}
-      onSelect={(item) => onChange(internalLinkChipHtml(toInternalLinkChip(item)))}
-      query={query}
-      onQueryChange={setQuery}
-      placeholder={t('linkPicker.searchPlaceholder')}
-      renderResult={(item) => (
-        <>
-          <LinkItemIcon item={item} />
-          <span className="flex-1 truncate">{item.label}</span>
-        </>
-      )}
-    />
-  );
-}
-
-/** Ein verknüpfter Eintrag — mit aktuellem Titel und Icon, solange es ihn gibt. */
-function LinkTarget({ target, onRemove }: { target: { id: string; entryType: string; label: string }; onRemove?: () => void }) {
-  const { t } = useTranslation();
-  const items = useLinkItems();
-  const setActiveView = useUIStore((s) => s.setActiveView);
-  const { id, entryType } = target;
-  const live = useMemo(
-    () => linkItemsByKey(items).get(linkItemKey({ id, entryType: entryType as ContentType })),
-    [items, id, entryType],
-  );
-  const open = () => {
-    if (!isValidLinkTarget(target)) return;
-    setActiveView({ type: viewTypeForEntryType(target.entryType as ContentType), id: target.id, mode: 'view' });
-  };
-  return (
-    <span className="inline-flex">
-      <LinkedEntryChip
-        icon={live ? <LinkItemIcon item={live} /> : null}
-        label={live?.label ?? target.label}
-        labelMaxWidth="max-w-[240px]"
-        onClick={onRemove ? undefined : open}
-        onRemove={onRemove}
-        removeTitle={t('properties.removeLink')}
-      />
-    </span>
   );
 }
 

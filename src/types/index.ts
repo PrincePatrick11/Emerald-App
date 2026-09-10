@@ -61,25 +61,12 @@ export interface Operation {
   updated_at: string;
   tags: string[];
   deleted_at: string | null;
-  // is_active/end_date/version: seit v40 ein Block im Inhalt (lib/blocks/legacyStatus.ts);
-  // die Spalten stehen noch im Schema, die App liest und schreibt sie nicht mehr.
+  // Status/Enddatum/Version (v40, lib/blocks/legacyStatus.ts) und die
+  // Sigillen-Felder samt Notizen (v41, lib/blocks/sigil.ts) sind Blöcke im
+  // Inhalt; ihre Spalten stehen noch im Schema, die App liest sie nicht mehr.
   entry_number?: number;
   icon?: string;
   cover_image?: string;
-  description?: string;
-  target_reveal_date?: string | null;
-  charging_technique_wiki_id?: string | null;
-  is_loaded?: boolean;
-  intention_text?: string;
-  letter_bank?: string[];
-  implemented_letters?: string[];
-  show_intention_in_properties?: boolean;
-  show_letter_bank_in_properties?: boolean;
-  show_sigil?: boolean;
-  /** Tri-State: `undefined` = von der Listen-Query nicht geladen (siehe
-   *  operationStore.ensureDrawingLoaded), `null` = hat keine Zeichnung. */
-  drawing_data?: string | null;
-  thumbnail_data?: string | null;
 }
 
 export interface TrashedItem {

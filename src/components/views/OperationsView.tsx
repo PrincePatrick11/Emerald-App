@@ -10,7 +10,9 @@ import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
 import { categoriesUsedBy, categoryLabel, hasUncategorized } from '../../lib/categories';
-import { FALLBACK_CATEGORY_ID, SIGIL_CATEGORY_ID } from '../../lib/schema';
+import { FALLBACK_CATEGORY_ID } from '../../lib/schema';
+import { entryBlockSummary } from '../../lib/blocks/entrySummary';
+import { imageSrc } from '../../lib/images';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView, isWideCardView } from '../../lib/viewMode';
@@ -25,7 +27,6 @@ import { useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEditActions } from '../../hooks/useEditActions';
 import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
-import OperationSigilView from './OperationSigilView';
 
 
 export default function OperationsView() {
@@ -40,18 +41,10 @@ export default function OperationsView() {
   const pushUndo = useUndoStore((s) => s.push);
 
   const operation = activeView.id ? getOperation(activeView.id) : null;
-  const isEditing = activeView.mode === 'edit';
-  const isSigilOperation = operation?.category_id === SIGIL_CATEGORY_ID;
-
-  // Die Listen-Query laesst drawing_data weg; der Sigil-Editor braucht es.
-  // needsDrawing statt nur der id in den Deps: ein Refetch (Import, Restore)
-  // setzt drawing_data auf undefined zurueck, ohne dass die id wechselt —
-  // der Effekt muss dann erneut nachladen, sonst bleibt das Gate unten leer.
-  const ensureDrawingLoaded = useOperationStore((s) => s.ensureDrawingLoaded);
-  const needsDrawing = isSigilOperation && operation?.drawing_data === undefined;
-  useEffect(() => {
-    if (needsDrawing && operation) void ensureDrawingLoaded(operation.id);
-  }, [needsDrawing, operation?.id, ensureDrawingLoaded]);
+  // Eine geladene Sigille mit Sperre „ganzer Eintrag" öffnet nie im
+  // Bearbeitungsmodus — gleich, woher der kommt (Seitenleiste, Home, Tab).
+  const locked = !!operation && !!entryBlockSummary(operation.id, operation.content).sigil?.lockEntry;
+  const isEditing = activeView.mode === 'edit' && !locked;
 
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -200,8 +193,7 @@ export default function OperationsView() {
     setActiveView({ type: 'operations' });
   };
 
-  // Sigil operations delegate rendering (and editActions registration) to OperationSigilView.
-  useEditActions(isEditing && !isSigilOperation, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
+  useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
 
   const getCatById = (id: string) => categories.find((c) => c.id === id);
 
@@ -253,7 +245,9 @@ export default function OperationsView() {
       const cat = catById[op.category_id];
       const iconValue = op.icon || cat?.emoji || '⚡';
       const catDisplayName = cat ? catName(cat) : '';
-      const isSigil = op.category_id === SIGIL_CATEGORY_ID;
+      // Eine Operation mit Sigillen-Blöcken bekommt die Sigillen-Karte — egal in welcher Kategorie.
+      const sigil = entryBlockSummary(op.id, op.content).sigil;
+      const isSigil = !!sigil;
       const dateStr = `${catDisplayName}${catDisplayName ? ' · ' : ''}${formatEntryDate(op.updated_at)}`;
       const createdDate = formatEntryDate(op.created_at);
       if (renamingId === op.id) return (
@@ -310,8 +304,8 @@ export default function OperationsView() {
                 // die Zeilenhöhe selbst aus, dort darf er die Spalte füllen.
                 <div className={`mb-3 overflow-hidden rounded-lg border border-stone-700/40 bg-stone-900/70 ${isWideCardView(view) ? 'w-16 mx-auto' : ''}`}>
                   <div className="aspect-[4/3] flex items-center justify-center bg-[radial-gradient(circle_at_top,rgba(0,230,153,0.08),transparent_60%)]">
-                    {op.thumbnail_data && op.show_sigil ? (
-                      <img src={op.thumbnail_data} alt="" className="h-full w-full object-contain" />
+                    {sigil?.image && !sigil.concealed ? (
+                      <img src={imageSrc(sigil.image)} alt="" loading="lazy" className="h-full w-full object-contain" />
                     ) : (
                       <span className="text-xl">{iconValue}</span>
                     )}
@@ -326,8 +320,8 @@ export default function OperationsView() {
               {isSigil ? (
                 <>
                   <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                    {op.target_reveal_date && (
-                      <span className="text-jade-400/80">{t('creation.targetDate')}: {formatEntryDate(op.target_reveal_date)}</span>
+                    {sigil?.revealDate && (
+                      <span className="text-jade-400/80">{t('creation.targetDate')}: {formatEntryDate(sigil.revealDate)}</span>
                     )}
                     <span className="text-parchment-500/70">{createdDate}</span>
                   </div>
@@ -356,7 +350,7 @@ export default function OperationsView() {
               <span className="flex-1 text-sm text-stone-300 truncate">{op.title}</span>
               {isSigil ? (
                 <span className="text-xs text-parchment-500/70 flex-shrink-0">
-                  {op.target_reveal_date ? `${t('creation.targetDate')}: ${formatEntryDate(op.target_reveal_date)}` : createdDate}
+                  {sigil?.revealDate ? `${t('creation.targetDate')}: ${formatEntryDate(sigil.revealDate)}` : createdDate}
                 </span>
               ) : (
                 <span className="text-xs text-parchment-500/70 flex-shrink-0">{dateStr}</span>
@@ -479,13 +473,6 @@ export default function OperationsView() {
       <CategoryModal editor={catEditor} />
       </>
     );
-  }
-
-  if (isSigilOperation) {
-    // Kurz leer rendern, bis ensureDrawingLoaded die Zeichnung nachgeladen hat —
-    // sonst initialisiert der Canvas seine Historie mit "keine Zeichnung".
-    if (operation.drawing_data === undefined) return null;
-    return <OperationSigilView operation={operation} />;
   }
 
   const currentCat = getCatById(isEditing ? categoryId : operation.category_id);

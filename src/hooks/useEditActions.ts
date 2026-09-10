@@ -4,7 +4,7 @@ import { useUIStore, type EditActions } from '../store/uiStore';
 /**
  * Registriert Save/Cancel/Delete der aktiven View in der rechten Seitenleiste,
  * solange `active` wahr ist — vorher fünfmal kopiert (Journal/Wiki/Operations/
- * Altar/Sigil).
+ * Altar und die frühere Sigillen-Ansicht).
  *
  * Die Handler laufen über einen Ref: die Sidebar ruft dadurch nie eine
  * veraltete Closure, und der Effekt muss nicht bei jedem Render

@@ -1,8 +1,12 @@
 import type { ComponentType } from 'react';
 import { TEXT_BLOCK_TYPE, type BlockInstance } from '../../lib/blocks/types';
 import { FIELDS_BLOCK_TYPE } from '../../lib/blocks/fields';
+import { SIGIL_CALC_TYPE, SIGIL_CANVAS_TYPE, SIGIL_CHARGE_TYPE, type SigilState } from '../../lib/blocks/sigil';
 import TextBlock from './TextBlock';
 import FieldsBlock from './FieldsBlock';
+import SigilCalcBlock from './SigilCalcBlock';
+import SigilCanvasBlock from './SigilCanvasBlock';
+import SigilChargeBlock from './SigilChargeBlock';
 
 /**
  * Welche Komponente einen Blocktyp darstellt — der Komponenten-Teil der
@@ -26,13 +30,18 @@ export interface BlockViewProps {
   /** Bearbeitungsmodus: den ganzen Block ersetzen (Strukturänderung, rendert neu). */
   onBlockChange: (next: BlockInstance) => void;
   /**
-   * Lesemodus: eine erlaubte Änderung (Checkliste abhaken, Ja/Nein) sofort in
-   * den Eintrag schreiben. Fehlt, wenn der Eintrag das nicht erlaubt.
+   * Lesemodus: eine erlaubte Änderung (Checkliste abhaken, Ja/Nein, Sigille
+   * laden) sofort in den Eintrag schreiben. Fehlt, wenn der Eintrag das nicht erlaubt.
    */
   onPersist?: (next: BlockInstance) => void;
+  /** Was der Ladung-Block dem Eintrag gibt: gesperrt, verborgen (siehe `sigilState`). */
+  sigil: SigilState;
 }
 
 export const BLOCK_VIEWS: ReadonlyMap<string, ComponentType<BlockViewProps>> = new Map<string, ComponentType<BlockViewProps>>([
   [TEXT_BLOCK_TYPE, TextBlock],
   [FIELDS_BLOCK_TYPE, FieldsBlock],
+  [SIGIL_CALC_TYPE, SigilCalcBlock],
+  [SIGIL_CANVAS_TYPE, SigilCanvasBlock],
+  [SIGIL_CHARGE_TYPE, SigilChargeBlock],
 ]);

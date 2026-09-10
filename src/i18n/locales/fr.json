@@ -217,26 +217,18 @@
   "creation": {
     "intention": "Intention",
     "intentionPlaceholder": "Écrivez la phrase ou l'intention que vous voulez réduire en sigil...",
-    "intentionEmpty": "Aucune intention enregistrée pour le moment.",
     "prepareLetters": "Réduire automatiquement",
     "addLetter": "Réduire manuellement",
     "shortenSigil": "Réduire le sigil",
     "manualLetterPlaceholder": "Saisissez une chaîne pour le jeu de lettres manuel...",
-    "hideIntention": "Masquer l'intention",
-    "showIntention": "Afficher l'intention",
-    "hideSigil": "Masquer le sigil",
-    "showSigil": "Afficher le sigil",
     "hiddenUntilDate": "Le sigil reste masqué jusqu'au {{date}}.",
     "loadSigille": "Charger le sigil",
     "unloadSigil": "Décharger le sigil",
     "timerLabel": "Timer:",
     "timerSeconds": "Secondes",
-    "hidden": "Masqué",
     "chargingTechnique": "Technique de chargement",
     "letterBank": "Jeu de lettres",
     "noLetters": "Aucune lettre préparée pour le moment.",
-    "description": "Notes",
-    "descriptionPlaceholder": "Consignez les notes, le contexte rituel ou les observations liées à ce sigil...",
     "targetDate": "Date cible",
     "brushSize": "Pinceau",
     "undo": "Annuler",
@@ -245,9 +237,6 @@
     "tools": {
       "draw": "Dessiner",
       "erase": "Effacer"
-    },
-    "types": {
-      "sigil": "Sigil"
     }
   },
   "wiki": {
@@ -300,6 +289,18 @@
       "fields": {
         "label": "Champs",
         "description": "Valeurs avec libellé : texte, nombre, date, choix, oui/non, liste de contrôle, lien, image, phase lunaire."
+      },
+      "sigilCalc": {
+        "label": "Calculateur de sigil",
+        "description": "Réduire une intention à sa banque de lettres et cocher les lettres utilisées dans le dessin."
+      },
+      "sigilCanvas": {
+        "label": "Dessin du sigil",
+        "description": "Dessiner le sigil — enregistré comme image, masqué tant qu'il est chargé."
+      },
+      "sigilCharge": {
+        "label": "Charge",
+        "description": "Date cible, technique de charge et charger le sigil. Chargé, il verrouille l'entrée ou seulement les blocs du sigil."
       }
     },
     "kinds": {
@@ -391,6 +392,22 @@
       "active": "Active",
       "endDate": "Date de fin",
       "version": "Version"
+    },
+    "sigil": {
+      "hidden": "Masqué tant que le sigil est chargé",
+      "emptyDrawing": "Pas encore de dessin",
+      "loaded": "Chargé",
+      "notLoaded": "Pas encore chargé",
+      "revealedSince": "révélé depuis le {{date}}",
+      "noRevealDate": "Définissez une date cible en modifiant pour charger le sigil",
+      "loadConfirm": "Charger le sigil ? Le calculateur et le dessin restent masqués jusqu'au {{date}}.",
+      "unloadConfirm": "Décharger le sigil ? Il redevient modifiable aussitôt.",
+      "lockScope": "Chargé, verrouille",
+      "lockEntry": "toute l'entrée",
+      "lockSigil": "seulement le calculateur et le dessin",
+      "locked": "Verrouillé tant que le sigil est chargé",
+      "saveFailed": "Le dessin n'a pas pu être enregistré",
+      "loadFailed": "Le dessin n'a pas pu être chargé — fermez puis rouvrez l'entrée"
     }
   },
   "editor": {

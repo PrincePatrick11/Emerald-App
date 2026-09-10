@@ -33,7 +33,7 @@ The emptiness check looks at `sqlite_master`, not at `schema_version`: a databas
 
 Afterwards `runPeriodicCleanup(db)` purges trashed rows older than 30 days. It is **not** a migration — idempotent, time-dependent, and run on every vault open.
 
-The current version is **40** (v40 `operation_status_to_blocks`, `src/lib/migrateOperationStatusToBlocks.ts`: every operation that was inactive or had an end date or version gets a copy of the "Status" block — created only if some operation needs it — at the top of its content, the columns are reset, `updated_at` stays), and `BASELINE_VERSION` in `schema.ts` must equal the highest entry in `MIGRATIONS`. `runMigrations` throws at startup if the two disagree, so a new migration cannot be added without updating the baseline.
+The current version is **41** (v41 `sigils_to_blocks`, `src/lib/migrateLegacySigils.ts`: sigils become calculator, drawing and charge blocks, see [Sigil Workflow](#sigil-workflow); v40 `operation_status_to_blocks`, `src/lib/migrateOperationStatusToBlocks.ts`: every operation that was inactive or had an end date or version gets a copy of the "Status" block — created only if some operation needs it — at the top of its content, the columns are reset, `updated_at` stays), and `BASELINE_VERSION` in `schema.ts` must equal the highest entry in `MIGRATIONS`. `runMigrations` throws at startup if the two disagree, so a new migration cannot be added without updating the baseline.
 
 Note that **version 24 is genuinely missing** — no entry with that number has existed for some time. The runner tolerates gaps; it only requires each version to be above the last applied one.
 
@@ -103,7 +103,7 @@ These are exactly the places where orphans accumulate, and they are unguarded. T
 
 `RESTRICT` does not delete anything; it refuses a delete that would leave a dangling reference. `reassignCategoryContent(db, categoryId)` in `schema.ts` is the other half: it moves the affected content — across all four categorized tables (`CATEGORIZED_TABLES`: `wiki_articles`, `operations`, `tasks`, `altar_items`) in one call, since a category is shared across modules now — to the built-in fallback (`FALLBACK_CATEGORY_ID`, `'other'`) so that the delete becomes permissible. Only a *permanent* category deletion calls it — `categoryStore.permanentlyDeleteCategory` and `trashStore.emptyTrash`. A category's *soft* delete (moving it to Trash) never reassigns its content — it stays pointing at the now-trashed category, which the UI groups into an "Uncategorized" bucket; restoring the category from Trash brings it back with no data lost. Reassignment only happens once there is no category row left to point at. `reassignCategoriesInMemory` in `categoryStore.ts` is the same move applied to the four already-loaded content stores, so an in-memory row doesn't try to write back a `category_id` the foreign key would now reject.
 
-The two built-ins, `other` and `sigils`, cannot be deleted at all — `other` is the destination everything else is moved to (deleting it would leave its own content stranded and then block every future attempt to empty the trash), and `sigils` is what the sigil editor keys on (`operations.category_id === SIGIL_CATEGORY_ID`).
+The two built-ins, `other` and `sigils`, cannot be deleted at all — `other` is the destination everything else is moved to (deleting it would leave its own content stranded and then block every future attempt to empty the trash), and `sigils` gives a new operation its sigil blocks (`defaultBlocksFor` in `src/lib/blocks/layouts.ts`).
 
 Before this (pre-v33), categories were hard-deleted while their content was left alone, and articles, operations, and tasks were left pointing at a `category_id` with no matching row. The 30-day purge did the same on its own. `categories` is consequently **not in `CLEANUP_TABLES`**; it leaves only through the trash, and only after its content has been moved.
 
@@ -270,15 +270,7 @@ Both `linked_*_ids` columns were nullable until v33, unlike every other JSON arr
 | description | TEXT | NOT NULL DEFAULT `''` |
 | icon / cover_image | TEXT | data-URL, or emoji for icon — see the Base64 note under [Key Conventions](#key-conventions) |
 | version / is_active / end_date | TEXT / INTEGER / TEXT | **legacy since v40** — status, end date and version are a block in `content` now (a copy of the user-built block "Status", `core-status`). Migration v40 moved every set value there and reset the columns (`1`, `NULL`, `NULL`); the app neither reads nor writes them. They stay for restoring older backups, whose rows go through the same converter (`convertLegacyStatusRows`) on import |
-| target_reveal_date | TEXT | date-only `YYYY-MM-DD` from `<input type="date">` |
-| charging_technique_wiki_id | TEXT | wiki article id, no FK |
-| is_loaded | INTEGER | boolean 0/1 |
-| intention_text | TEXT | |
-| letter_bank / implemented_letters | TEXT | JSON arrays |
-| show_intention_in_properties | INTEGER | boolean, default 1 |
-| show_letter_bank_in_properties | INTEGER | boolean, default 1 |
-| show_sigil | INTEGER | boolean, default 1 |
-| drawing_data / thumbnail_data | TEXT | data-URLs |
+| description, target_reveal_date, charging_technique_wiki_id, is_loaded, intention_text, letter_bank / implemented_letters, show_intention_in_properties, show_letter_bank_in_properties, show_sigil, drawing_data / thumbnail_data | — | **legacy since v41** — a sigil is blocks in `content` now (see [Sigil Workflow](#sigil-workflow)). Migration v41 moved every set value there and reset the columns (`''`, `NULL`, `0`, `'[]'`, `1`); the app neither reads nor writes them. They stay for restoring older backups, whose rows go through the same converter on import |
 | tags | TEXT | JSON array of tag names |
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active |
@@ -375,13 +367,13 @@ The `deleted_at` indexes matter because `runPeriodicCleanup` runs a range scan a
 
 ## Sigil Workflow
 
-A sigil is an operation row with `category_id = 'sigils'`:
+Since v41 a sigil is not a kind of row but three blocks in an operation's `content` (`src/lib/blocks/sigil.ts`) — in any category; a new operation in `sigils` starts with them (`lib/blocks/layouts.ts`):
 
-1. **Intention** — the practitioner writes their magical intention in `intention_text`.
-2. **Letter reduction** — unique letters go into `letter_bank`; the ones to use are marked in `implemented_letters`.
-3. **Drawing** — the canvas drawing is serialised to `drawing_data`, with a `thumbnail_data` copy for list views.
-4. **Visibility** — `show_sigil` controls display; `target_reveal_date` can defer it to a future date.
-5. **Loading** — `is_loaded` marks the sigil as charged; `charging_technique_wiki_id` points at a wiki article describing the technique.
+1. **Calculator** (`core.sigil.calc`) — the intention, the letter bank (each letter once) and the letters already implemented, as JSON in `data-block-data`.
+2. **Drawing** (`core.sigil.canvas`) — the drawing as a stored image file: `<img src="{sha}.png">` in the block, so the image cleanup sees it. No base64 in content; intermediate strokes saved while drawing become unused files that "Delete unused images" removes.
+3. **Charge** (`core.sigil.charge`) — `loaded`, `revealDate` and `lock` (`entry` — the whole entry, the former behaviour — or `sigil` — only calculator and drawing) as JSON; the charging technique as a real link chip in the markup, so the links table and backlinks see it.
+
+The entry's state comes from the charge block (`sigilState`): charged and before the reveal date the sigil is *concealed* (calculator and drawing hidden in both modes, left out of search, cards and export; export disabled); charged it is *locked* (`lock: 'entry'` hides Edit and blocks read-mode writes except unloading, `'sigil'` makes the two blocks read-only; date and lock scope are fixed while charged). Migration v41 (`migrateLegacySigils.ts`, after a `VACUUM INTO .pre-v41.bak` when there is anything to convert) turned every row with sigil data — and every operation in `sigils` — into these blocks, with the old notes (`description`) as a text block after them. A drawing is written through `save_image` (only PNG/JPEG/GIF/WebP data URLs up to ~25 MB — anything else is dropped rather than retried forever; letter banks are capped at 500 entries); a hidden drawing (`show_sigil = 0`, not charged) becomes a hidden drawing block; an operation whose content already carries sigil blocks gets no second set. If saving fails the row is left entirely untouched and `getDb` retries it on every vault open (`convertLegacySigils` without the category rule — a sigil whose blocks the user removed must not get them back). Backup imports run the same conversion on the rows they just inserted.
 
 The standalone Creation module that preceded this is gone. Its `creations` table was removed in v33 and its rows were carried over into `operations` under `category_id = 'sigils'`; the backup format never exported that table, so those rows had been silently lost on every restore.
 
@@ -434,7 +426,7 @@ Full vault snapshots are exported and imported via Settings → Backup.
 
 ```json
 {
-  "version": "5",
+  "version": "6",
   "type": "backup",
   "exportedAt": "2026-04-18T...",
   "filters": { "includeJournal": true, "includeWiki": true, "..." : "..." },
@@ -452,7 +444,7 @@ Full vault snapshots are exported and imported via Settings → Backup.
 }
 ```
 
-`version` is `"5"` since v39 added `blockDefinitions` — the whole `block_definitions` table including trashed rows, exported whenever Journal, Wiki or Operations is included; a `"4"` file needs no conversion, it simply brings no blocks. It was `"4"` since v38 replaced the four per-module category arrays (`wikiCategories`/`operationCategories`/`taskCategories`/`altarCategories`) with one `categories` array, exported whenever any of Wiki, Operations, Tasks, or Altars is included. `migrateBackupPayload` lifts a `"1"` file on load: `wiki_articles.category` becomes `category_id`, `altar_items.category` is resolved from a category name to an id against the backup's own categories, and null `linked_*_ids` become `'[]'`. A v2 file needs no row changes, because `restoreImages` maps whatever keys the file carries — absolute paths in v1/v2, filenames in v3+ — onto the filenames of the images it just wrote, and `remapPaths` substitutes those throughout. A file below version `"4"` then runs `mergeLegacyCategoryArrays`: the same merge-by-display-name rule as migration v38 (`mergeCategoryRows`, translating built-in names into the app's current language via `legacyDisplayName`), producing the one `categories` array and remapping every content row's `category_id` onto it. Without that step `insertRows` would silently drop the columns it no longer recognises — its `PRAGMA table_info` filter guards against crafted files and cannot tell malicious apart from merely old — and every article from an older backup would land in the default category.
+`version` is `"6"` since v41 moved sigils into content: an older file's operation rows with sigil columns are converted after insertion (`convertLegacySigils`, limited to the inserted ids; empty `sigils` operations get the sigil blocks only from files below `"6"`, since in a newer one the user may have removed them on purpose). It was `"5"` since v39 added `blockDefinitions` — the whole `block_definitions` table including trashed rows, exported whenever Journal, Wiki or Operations is included; a `"4"` file needs no conversion, it simply brings no blocks. It was `"4"` since v38 replaced the four per-module category arrays (`wikiCategories`/`operationCategories`/`taskCategories`/`altarCategories`) with one `categories` array, exported whenever any of Wiki, Operations, Tasks, or Altars is included. `migrateBackupPayload` lifts a `"1"` file on load: `wiki_articles.category` becomes `category_id`, `altar_items.category` is resolved from a category name to an id against the backup's own categories, and null `linked_*_ids` become `'[]'`. A v2 file needs no row changes, because `restoreImages` maps whatever keys the file carries — absolute paths in v1/v2, filenames in v3+ — onto the filenames of the images it just wrote, and `remapPaths` substitutes those throughout. A file below version `"4"` then runs `mergeLegacyCategoryArrays`: the same merge-by-display-name rule as migration v38 (`mergeCategoryRows`, translating built-in names into the app's current language via `legacyDisplayName`), producing the one `categories` array and remapping every content row's `category_id` onto it. Without that step `insertRows` would silently drop the columns it no longer recognises — its `PRAGMA table_info` filter guards against crafted files and cannot tell malicious apart from merely old — and every article from an older backup would land in the default category.
 
 **Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Routines / Altars / Tasks / Tags`, `dateFrom`, `dateTo`, `includeDeleted`. All content tables (journal, wiki, operations, routines, altars, tasks) are date-filtered on `created_at`; tags, `categories` and `block_definitions` are not (block definitions always travel complete, trashed rows included). `includeDeleted` applies to the soft-deletable content tables — `tags` are always exported with `deleted_at IS NULL`, regardless of the option. `task_links` is scoped to exported task IDs.
 

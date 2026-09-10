@@ -217,26 +217,18 @@
   "creation": {
     "intention": "Intention",
     "intentionPlaceholder": "Write the sentence or intention you want to reduce into a sigil...",
-    "intentionEmpty": "No intention recorded yet.",
     "prepareLetters": "Reduce automatically",
     "addLetter": "Reduce manually",
     "shortenSigil": "Reduce sigil",
     "manualLetterPlaceholder": "Enter a string for the manual letter bank...",
-    "hideIntention": "Hide intention",
-    "showIntention": "Show intention",
-    "hideSigil": "Hide sigil",
-    "showSigil": "Show sigil",
     "hiddenUntilDate": "The sigil stays hidden until {{date}}.",
     "loadSigille": "Load sigil",
     "unloadSigil": "Unload sigil",
     "timerLabel": "Timer:",
     "timerSeconds": "Seconds",
-    "hidden": "Hidden",
     "chargingTechnique": "Charging technique",
     "letterBank": "Letter Bank",
     "noLetters": "No letters prepared yet.",
-    "description": "Notes",
-    "descriptionPlaceholder": "Capture supporting notes, ritual context, or observations about this sigil...",
     "targetDate": "Target date",
     "brushSize": "Brush",
     "undo": "Undo",
@@ -245,9 +237,6 @@
     "tools": {
       "draw": "Draw",
       "erase": "Erase"
-    },
-    "types": {
-      "sigil": "Sigil"
     }
   },
   "wiki": {
@@ -300,6 +289,18 @@
       "fields": {
         "label": "Fields",
         "description": "Labelled values: text, number, date, choice, yes/no, checklist, link, image, moon phase."
+      },
+      "sigilCalc": {
+        "label": "Sigil calculator",
+        "description": "Reduce an intention to its letter bank and tick off the letters used in the drawing."
+      },
+      "sigilCanvas": {
+        "label": "Sigil drawing",
+        "description": "Draw the sigil — saved as an image, hidden while it is loaded."
+      },
+      "sigilCharge": {
+        "label": "Charge",
+        "description": "Target date, charging technique and loading the sigil. While loaded it locks the entry or just the sigil blocks."
       }
     },
     "kinds": {
@@ -391,6 +392,22 @@
       "active": "Active",
       "endDate": "End date",
       "version": "Version"
+    },
+    "sigil": {
+      "hidden": "Hidden while the sigil is loaded",
+      "emptyDrawing": "No drawing yet",
+      "loaded": "Loaded",
+      "notLoaded": "Not loaded yet",
+      "revealedSince": "revealed since {{date}}",
+      "noRevealDate": "Set a target date while editing to load the sigil",
+      "loadConfirm": "Load the sigil? Calculator and drawing stay hidden until {{date}}.",
+      "unloadConfirm": "Unload the sigil? It can be edited again right away.",
+      "lockScope": "While loaded, lock",
+      "lockEntry": "the whole entry",
+      "lockSigil": "only calculator and drawing",
+      "locked": "Locked while the sigil is loaded",
+      "saveFailed": "Couldn't save the drawing",
+      "loadFailed": "Couldn't load the drawing — close and reopen the entry to try again"
     }
   },
   "editor": {

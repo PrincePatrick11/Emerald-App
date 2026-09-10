@@ -37,8 +37,8 @@ export type DbRow = Record<string, unknown>;
 
 /**
  * INTEGER 0/1 → boolean. `fallback` greift nur bei NULL/undefined, also für
- * Spalten, die vor ihrer Einführung keinen Wert hatten (etwa `show_sigil`, das
- * standardmäßig an ist).
+ * Spalten, die vor ihrer Einführung keinen Wert hatten (Schalter, die
+ * standardmäßig an sind).
  */
 export function bool(v: unknown, fallback = false): boolean {
   if (v === null || v === undefined) return fallback;
@@ -139,23 +139,6 @@ export const fromRow = {
       entry_number: nullableNum(r.entry_number) ?? undefined,
       icon: r.icon == null ? undefined : String(r.icon),
       cover_image: r.cover_image == null ? undefined : String(r.cover_image),
-      description: str(r.description),
-      target_reveal_date: nullableStr(r.target_reveal_date),
-      charging_technique_wiki_id: nullableStr(r.charging_technique_wiki_id),
-      is_loaded: bool(r.is_loaded),
-      intention_text: str(r.intention_text),
-      letter_bank: jsonArray(r.letter_bank),
-      implemented_letters: jsonArray(r.implemented_letters),
-      // Diese drei sind standardmäßig an — vor ihrer Einführung gab es keinen
-      // Wert, und ein fehlender Wert darf das Sigil nicht ausblenden.
-      show_intention_in_properties: bool(r.show_intention_in_properties, true),
-      show_letter_bank_in_properties: bool(r.show_letter_bank_in_properties, true),
-      show_sigil: bool(r.show_sigil, true),
-      // undefined bleibt undefined: die Listen-Query des operationStore laesst
-      // drawing_data bewusst weg ("noch nicht geladen"); NULL aus der DB heisst
-      // dagegen "hat keine Zeichnung".
-      drawing_data: r.drawing_data === undefined ? undefined : nullableStr(r.drawing_data),
-      thumbnail_data: nullableStr(r.thumbnail_data),
     };
   },
 

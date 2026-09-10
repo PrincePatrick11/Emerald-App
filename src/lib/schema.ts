@@ -20,7 +20,7 @@ import type Database from '@tauri-apps/plugin-sql';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 40;
+export const BASELINE_VERSION = 41;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
@@ -113,7 +113,7 @@ export const TABLE_DDL: Record<TableName, string> = {
   // Eine Liste für Wiki, Operationen, Aufgaben und Altar-Elemente (seit v38;
   // vorher vier gleich gebaute Tabellen je Modul). Eingebaut sind nur `other`
   // — das Sammelbecken, auf das Inhalte gelöschter Kategorien umgehängt
-  // werden — und `sigils`, an der der Sigil-Editor für Operationen hängt.
+  // werden — und `sigils`, deren neue Operationen mit den Sigillen-Blöcken beginnen.
   // Alles andere legt der Nutzer an; Eindeutigkeit der Namen prüft der Store
   // (categoryKey), nicht die Datenbank — ein UNIQUE-Index würde das
   // Wiederherstellen aus dem Papierkorb blockieren, sobald eine aktive
@@ -343,8 +343,8 @@ export const INDEX_DDL: readonly string[] = [...INDEX_DDL_V38, BLOCK_DEFINITIONS
 export const FALLBACK_CATEGORY_ID = 'other';
 
 /**
- * Die eine Kategorie mit Verhalten: Eine Operation darin ist ein Sigill und
- * öffnet den Sigil-Editor. Für Artikel, Aufgaben und Altar-Elemente ist sie
+ * Die eine Kategorie mit Verhalten: Eine neue Operation darin beginnt mit den
+ * Sigillen-Blöcken (`lib/blocks/layouts.ts`). Für Artikel, Aufgaben und Altar-Elemente ist sie
  * eine Kategorie wie jede andere.
  */
 export const SIGIL_CATEGORY_ID = 'sigils';

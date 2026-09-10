@@ -34,6 +34,7 @@ import { resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockType
 import { blockIcon, createFromPreset } from '../../lib/blocks/presets';
 import { blockOrigin, isOutdatedCopy, updateInstanceToDefinition, type BlockDefinition } from '../../lib/blocks/definitions';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
+import { SIGIL_CHARGE_TYPE, sigilState, todayIso } from '../../lib/blocks/sigil';
 import { blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
 import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockAttrName, type BlockInstance } from '../../lib/blocks/types';
 import { useBlockSessionStore, type BlockStackApi } from '../../store/blockSessionStore';
@@ -118,6 +119,9 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
   useEffect(() => { setBlocks(blocksRef.current); }, [isEditing]);
 
   const resetEpoch = useExternalContentReset(initialContent, isEditing, blocksRef, setBlocks, onChangeRef);
+
+  // Gesperrt und verborgen kommt vom Ladung-Block der Sigille; alle Blöcke sehen denselben Stand.
+  const sigil = useMemo(() => sigilState(blocks, todayIso()), [blocks]);
 
   const definitions = useBlockDefinitionStore((s) => s.definitions);
   /** Die Definition, wenn der Block eine veraltete Kopie von ihr ist — dann gibt es „Block aktualisieren". */
@@ -382,7 +386,12 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
           isEditing={isEditing}
           onHtmlChange={(html) => updateHtml(block.id, html)}
           onBlockChange={(next) => updateBlock(block.id, next)}
-          onPersist={!isEditing && onReadModeChange ? (next) => persistRead(block.id, next) : undefined}
+          // Gesperrt „ganzer Eintrag": auch aus dem Lesemodus keine Änderung —
+          // entladen geht nur über die Ladung selbst (die sperrt sich nie aus).
+          onPersist={!isEditing && onReadModeChange && (!sigil.lockEntry || block.type === SIGIL_CHARGE_TYPE)
+            ? (next) => persistRead(block.id, next)
+            : undefined}
+          sigil={sigil}
         />
       </BlockErrorBoundary>
     );

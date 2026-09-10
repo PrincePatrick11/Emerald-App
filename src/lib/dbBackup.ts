@@ -29,6 +29,7 @@ import { DEFAULT_DEFINITION_ICON, definitionToRow, isDefinitionId, type BlockDef
 import { convertLegacyStatusRows, STATUS_DEFINITION_ID } from './blocks/legacyStatus';
 import { definitionById, nextDefinitionSortOrder } from './blockDefinitionRows';
 import { fromRow } from './row';
+import { convertLegacySigils } from './migrateLegacySigils';
 import { FALLBACK_CATEGORY_ID, IMAGE_FIELDS, imageColumns } from './schema';
 import { categoryKey, mergeCategoryRows, type CategorySource } from './categoryMerge';
 import { legacyDisplayName, type LegacyCategoryTable } from './categories';
@@ -111,9 +112,10 @@ type Row = Record<string, any>;
  * seit v38 eine Tabelle `categories` die vier Modul-Tabellen ersetzt
  * (`data.categories` statt `wikiCategories`/`operationCategories`/
  * `taskCategories`/`altarCategories`), '5' = seit v39 die eigenen Blöcke als
- * `data.blockDefinitions` mitreisen.
+ * `data.blockDefinitions` mitreisen, '6' = seit v41 tragen Operationen ihre
+ * Sigille als Blöcke im Inhalt statt in eigenen Spalten.
  */
-const BACKUP_VERSION = '5' as const;
+const BACKUP_VERSION = '6' as const;
 
 /** Die vier Kategorie-Arrays von Sicherungen bis Version 3. */
 interface LegacyCategoryArrays {
@@ -236,11 +238,16 @@ export function migrateBackupPayload(backup: BackupFile): void {
   // v4 → v5 braucht keinen Schritt: neu ist nur das Array `blockDefinitions`,
   // und eine Datei ohne es bringt schlicht keine eigenen Blöcke mit.
 
+  // v5 → v6 braucht keinen Schritt an der Datei: Sigillen-Spalten alter
+  // Operationen wandelt der Import nach dem Einfügen um (`convertLegacySigils`).
+  backup.sourceVersion = version;
   backup.version = BACKUP_VERSION;
 }
 
 interface BackupFile {
-  version: '1' | '2' | '3' | '4' | '5';
+  version: '1' | '2' | '3' | '4' | '5' | '6';
+  /** Die Version, mit der die Datei geschrieben wurde — `migrateBackupPayload` setzt `version` auf die aktuelle. */
+  sourceVersion?: number;
   type: 'backup';
   exportedAt: string;
   filters: BackupOptions;
@@ -660,6 +667,26 @@ async function insertBlockDefinitions(
 }
 
 /**
+ * Sigillen-Spalten importierter Operationen (Sicherungen von vor v41) in
+ * Blöcke umwandeln — derselbe Weg wie Migration v41, nur für die gerade
+ * eingefügten Zeilen. Leere Operationen der Kategorie „Sigillen" bekommen das
+ * Sigillen-Set nur aus Dateien vor Version 6: in einer neueren hat der Nutzer
+ * die Blöcke womöglich bewusst entfernt. Eine Zeichnung, die sich nicht
+ * speichern lässt, holt `getDb` beim nächsten Öffnen nach.
+ */
+async function convertImportedSigils(
+  db: Awaited<ReturnType<typeof getDb>>,
+  backup: BackupFile,
+  operations: Row[],
+): Promise<void> {
+  if (!operations.length) return;
+  await convertLegacySigils(db, {
+    includeSigilCategory: (backup.sourceVersion ?? Number(BACKUP_VERSION)) < 6,
+    ids: new Set(operations.map((r) => String(r.id))),
+  });
+}
+
+/**
  * Die „Status"-Definition, nach der alte Operationszeilen umgeschrieben
  * werden: die des Vaults (auch im Papierkorb), sonst die der Datei — wie in
  * Migration v40. Sonst passten die neuen Kopien nicht zu dem „Status", den es
@@ -999,6 +1026,8 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   if (d.taskLinks) await insertRows(db, 'task_links', d.taskLinks);
   if (d.links) await insertRows(db, 'links', d.links, true);
 
+  await convertImportedSigils(db, backup, operations);
+
   // Ein Teil-Replace (z. B. nur Tasks) kann Verknüpfungen des Bestands auf
   // gerade ersetzte Ziele verwaisen lassen — und importierte links/task_links
   // können auf abgewählte Typen zeigen. Gleicher Sweep wie beim Papierkorb.
@@ -1181,6 +1210,8 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   await insertTasks(db, tasks);
   await insertRows(db, 'task_links', taskLinks, true);
   await insertRows(db, 'links', links, true);
+
+  await convertImportedSigils(db, backup, operations);
 
   // Importierte links/task_links können auf Ziele zeigen, die der
   // Typ-/Kategorie-Filter gerade abgewählt hat — wie in doReplace ausfegen.

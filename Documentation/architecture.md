@@ -44,7 +44,7 @@ src/
 │   │                 TagInput, ResizableImageExtension, ExternalDropExtension,
 │   │                 EditorToolbar, LinkPickerModal, SuggestionList
 │   ├── views/        HomeView, JournalView, WikiView, TagsView, AltarView,
-│   │                 OperationsView, OperationSigilView, TrashView, TasksView
+│   │                 OperationsView, TrashView, TasksView, BlocksView
 │   ├── sidebar/
 │   │   ├── panels/   JournalPropertiesPanel, WikiPropertiesPanel, OperationPropertiesPanel,
 │   │   │             AltarSidebarPanel, RoutinesPanel (currently unrendered), BacklinksPanel
@@ -112,7 +112,7 @@ src/
 │                                      findUnusedImages — the image pipeline, see Image
 │                                      Storage System below),
 │                     thumbnail.ts (shared thumbnail encoder: WebP quality ladder under the
-│                                      512-KB cap, used by altar cards and sigil lists),
+│                                      512-KB cap, used by altar cards),
 │                     altarConstants.ts, altarExport.ts, styleClasses.ts,
 │                     emojiSearchData/{en,de,es,fr}.json (localised emoji search datasets,
 │                                      generated from emojibase-data, lazy-loaded per locale)
@@ -229,7 +229,7 @@ of its own, so `AltarView`'s Cancel path calls `deleteAltar` directly instead of
 this helper.
 
 For an entry that *was* confirmed before, Cancel cannot simply restore "the store's current
-state" — Journal, Wiki, Operations, and the Sigil view all autosave the title/body a short
+state" — Journal, Wiki, and Operations all autosave the title/body a short
 debounce after typing stops, so by the time Cancel is pressed the store already holds the
 edited values. `useEntryEditor` (`src/hooks/useEntryEditor.ts`) instead captures a baseline of
 the editor-owned fields (`buildRestorePatch`, defaulting to `buildPatch` — Journal/Wiki/
@@ -239,9 +239,8 @@ doesn't bump `updated_at`). Deliberately out of scope: Properties-panel fields (
 cover, icon) save directly to the store as they're changed and are never part of the baseline
 (an operation's status, end date and version are a block in `content` since v40, so Cancel does
 revert them) — Cancel must not undo something the panel already committed.
-`OperationSigilView` carries its own equivalent (`editBaselineRef`, covering title,
-`intention_text`, `letter_bank`, `implemented_letters`, `drawing_data`) rather than going
-through the hook, since its autosave and field set don't match the other three views'.
+Sigils need no variant of their own any more: since v41 they are blocks in `content`, so the
+same `{title, content}` baseline covers intention, letters, drawing and charge.
 
 ### Right Sidebar Action Bar
 
@@ -341,11 +340,11 @@ Since v38, Wiki, Operations, Tasks, and Altar items share one category list — 
 
 ### Content Blocks
 
-Journal, Wiki and Operations entries (except the Sigil view, for now) render their body as a
-vertical stack of blocks — `BlockStack` (`src/components/blocks/BlockStack.tsx`) inside
-`EntryDetailFrame`'s `body="scroll"`. The block types so far are text (`core.text`, one
-`RichEditor` per block) and fields (`core.fields`, below), which also carries the user-built
-blocks of the Blocks view; sigil tools arrive in a later phase.
+Journal, Wiki and Operations entries render their body as a vertical stack of blocks —
+`BlockStack` (`src/components/blocks/BlockStack.tsx`) inside `EntryDetailFrame`'s
+`body="scroll"`. The block types are text (`core.text`, one `RichEditor` per block), fields
+(`core.fields`, below — which also carries the user-built blocks of the Blocks view and an
+operation's Status) and the three sigil blocks (`core.sigil.calc`/`.canvas`/`.charge`, below).
 
 **Stored format.** Blocks live in the existing `content` column, not in a side table — every
 pipeline that already reads `content` (search, `syncLinks`, image cleanup, merge-import link
@@ -443,6 +442,20 @@ block types can contribute their own sidebar sections via `components/blocks/blo
 (read/edit variant each; empty so far — the text block has nothing of its own to set). That file
 must never import TipTap: the sidebar is loaded eagerly.
 
+**Sigil blocks (`lib/blocks/sigil.ts`).** Calculator, drawing and charge replace the former
+`OperationSigilView` and its columns (migration v41, `migrateLegacySigils.ts`). The drawing is an
+image file (`saveImage`) referenced by `<img src>` in the canvas block, loaded into the canvas as a
+data URL (`readImageAsBase64`) — an `emerald-img:` URL would taint the canvas and `toDataURL` would
+throw. Saving is asynchronous and may finish after Done; `SigilCanvasBlock` keeps the save in the
+part that stays mounted across modes and writes through `onPersist` if editing has ended, and drops
+the result if the stack was unmounted (another entry may own it now). The entry's state comes from
+the first readable charge block: `sigilState(blocks, today)` → `concealed` (charged, before the
+reveal date: calculator and drawing hidden in read mode; `withoutConcealed` keeps them out of search;
+the menu disables export), `lockEntry` (hides Edit in `RightSidebar`) and `lockSigil` (the two tool
+blocks read-only while editing). `BlockStack` computes it once per structure and passes it to every
+view as `sigil`; lists, sidebar and menu read it from `entryBlockSummary`. Loading and unloading
+are read-mode writes through `onPersist`, like ticking a checklist.
+
 **User-built blocks — copies, not live links.** The Blocks view (`views/BlocksView.tsx`, an aux
 view on the rail) edits rows of `block_definitions` (v39, `blockDefinitionStore`): name, emoji,
 elements, display rules (`readHideEmpty`, `readOnly`, plus `showTitle`, which becomes the
@@ -486,9 +499,7 @@ full-document serialisation per keystroke) is gone. Switching entries remounts
 the stack via its `key` (`` `${id}:${editorEpoch}` ``), and Cancel bumps
 `editorEpoch` to remount from the last saved content. Since the whole block
 stack serialises into that one `content` string, Cancel's `{title, content}`
-baseline reverts every block change of the session. `OperationSigilView` keeps its own variant of
-this lifecycle: its pending state is canvas data, not HTML, and its save
-path builds a downscaled thumbnail first.
+baseline reverts every block change of the session — sigil blocks included, since v41.
 
 Two guards protect these save paths: `ready` (the view's `loadedEntryId`
 gate) arms the navigate/unmount saves only after local state is hydrated,
@@ -559,7 +570,7 @@ Emerald uses browser-like tabs to keep multiple pieces of content open at the sa
 
 - `tabs` stores the list of open tabs.
 - `activeTabId` stores which tab is currently selected.
-- Each tab contains an `ActiveView`, so a tab can represent a journal entry, wiki article, operation, sigil, altar, or a top-level view.
+- Each tab contains an `ActiveView`, so a tab can represent a journal entry, wiki article, operation, altar, or a top-level view.
 
 Tab IDs and `isContentView` live in `src/lib/tabs.ts`. `viewTypeForEntryType()` — the one place that translates the data model's `operation` (singular — what `links.target_type`, the drag payload, and the internal-link mark all carry) into `ActiveView`'s `operations` (plural, named after the module rather than the record) — now lives in `src/lib/modules.ts` as part of the module registry (see [Module Registry](#module-registry) above), a reverse lookup over `MODULES` rather than its own mapping. The mapping used to be copied at each call site; `RichEditor.tsx`, `BacklinksPanel.tsx`, `HomeView.tsx`, `TasksView.tsx`, and `globalSearch.ts` (see [Global Search](#global-search) below) now call the shared function instead.
 
@@ -634,7 +645,7 @@ The schema itself lives in `src/lib/schema.ts`, not in `db.ts`: fresh vaults exe
 
 Two deliberate exceptions to "the store holds the whole row":
 
-- **`operations.drawing_data` is not in the list query.** It holds full sigil drawings as base64 — by far the widest column — and only the sigil editor needs it. `OPERATION_LIST_COLUMNS` in `operationStore.ts` omits it; in the store, `drawing_data: undefined` means *not loaded* and `null` means *has no drawing*. `ensureDrawingLoaded(id)` fetches it on demand (OperationsView gates `OperationSigilView` on it), and `updateOperation` only writes the column when the merged value is not `undefined` — otherwise a rename from the sidebar would persist the placeholder as `NULL` and erase the drawing. `fromRow.operation` preserves the distinction (absent column → `undefined`). Two guard rails around refetches: `preserveLoadedDrawings` carries already-loaded drawings across `fetchAll`/`restoreOperation` (so an import or undo doesn't unmount an open sigil editor), and `sigilThumbnail` in `OperationSigilView` downscales the drawing to a real ≤300px thumbnail at save time — `thumbnail_data` used to be a 1:1 copy of the drawing, which would have pulled the full drawing back into the list query through the other column.
+- **Sigil drawings are files, not columns.** Until v41 `operations.drawing_data` held every sigil drawing as base64 — by far the widest column — which forced a lazy-loading dance (`ensureDrawingLoaded`, `preserveLoadedDrawings`, a separate `thumbnail_data`). Since v41 the drawing is an image file referenced from the canvas block's `<img src>`, so the operation list query (`OPERATION_COLUMNS`) carries only small columns, and list cards show the image lazily through `imageSrc` (`entryBlockSummary(...).sigil.image`).
 - **`altar_placements` load in one query.** `fetchAltars` selects the whole table once and groups rows by `altar_id` in JS (`mapPlacementRows` + a `Map` over items); it used to run one query per altar on every startup and every AltarView mount.
 
 ### Store write serialization
@@ -876,7 +887,7 @@ src/App.tsx                  # Subscribes to uiFontId/editorFontId and calls app
 - `--font-ui` is applied to the root `body` element (all UI chrome).
 - `--font-editor` is applied to `.tiptap`, `.entry-view-title`, and `.entry-view-body`.
 
-This means the editor font controls the TipTap editor body, entry titles in all detail views (journal, wiki, operations, sigil, altar), and the read-mode body text. There is no separate heading font — headings inherit the editor body font.
+This means the editor font controls the TipTap editor body, entry titles in all detail views (journal, wiki, operations, altar), and the read-mode body text. There is no separate heading font — headings inherit the editor body font.
 
 **Defaults.** UI font defaults to **Inter**; editor body font defaults to **Lora**. Invalid or missing stored values fall back to these defaults via `normalizeUIFontId()` / `normalizeEditorFontId()`.
 
@@ -1059,7 +1070,7 @@ The three "Export as …" menu items (`export-pdf`, `export-markdown`, `export-e
 - **Rust (`src-tauri/src/lib.rs`)** — the menu items are constructed with `enabled: false` in the `setup` block, so they start greyed out. The `set_export_menu_enabled(app, entry_enabled, pdf_enabled, emerald_enabled)` Tauri command walks the `export-submenu` and sets `export-markdown` from `entry_enabled`, `export-pdf` from `pdf_enabled`, and `export-emerald` from `emerald_enabled`, all independently.
 - **Frontend (`src/components/layout/AppShell.tsx`)** — a single `useEffect` keyed on `activeView.type`, `activeView.id`, and `activeView.mode` calls `invoke('set_export_menu_enabled', { entryEnabled, pdfEnabled, emeraldEnabled })` with `entryEnabled = (activeView.type ∈ {journal, wiki}) && !!activeView.id`, and both `pdfEnabled` and `emeraldEnabled` set to `entryEnabled || (activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit')`. The same effect also calls `set_altar_export_menu_enabled` (see below), since all three depend on the same view-state inputs. The `export-pdf` listener itself re-reads `useUIStore.getState().activeView` at click time: if it resolves to an Altar reading view, it calls `saveAltarPDF()` (`src/lib/altarExport.ts`) instead of the usual `exportAsPDF(data)` path.
 
-  **Sigil-category Operations are temporarily excluded from `entryEnabled`.** `isEntryView` computes `isSigilOperation` (an open Operations entry whose `category_id === 'sigils'`) and requires `activeView.type === 'operations' && !isSigilOperation`, so all three "Export as …" items are disabled specifically while a Sigil is open — Sigils have their own dedicated view (`OperationSigilView`) and export isn't wired up for that category yet. Non-Sigil Operations (e.g. Servitors, custom categories) are unaffected and export normally. This is a stopgap, not a permanent restriction: remove the `!isSigilOperation` condition once Sigil export is implemented and verified. Journal, Wiki, non-Sigil Operations, and the Altar reading-view export path are all unaffected.
+  **A concealed sigil is excluded from `entryEnabled`.** `isEntryView` asks `entryBlockSummary(op.id, op.content).sigil?.concealed` — a charged sigil before its reveal date — and disables all three "Export as …" items while such an operation is open, so calculator and drawing can't leave the app early. Every other operation exports normally, sigils included (their blocks go out as their readable fallback). Behind the gate, `contentForExport` (`lib/blocks/exportContent.ts`) strips hidden blocks and concealed sigil blocks from what `collectExportData` hands the PDF/HTML/Markdown pipelines; the `.emerald` export keeps hidden blocks (they are data, flagged as hidden) but drops concealed ones via `withoutConcealed`. Once the export renders blocks itself and leaves concealed ones out (Phase 6), this gate can go.
 
 There is still only one `export-emerald` menu item — it is not duplicated per content type; `exportAsEmerald()` in `src/lib/emeraldFormat.ts` branches internally on `activeView.type` to export either the open entry or the open altar. The same one-menu-item-branches-internally pattern now also applies to `export-pdf`.
 

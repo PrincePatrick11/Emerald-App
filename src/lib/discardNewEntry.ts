@@ -1,7 +1,7 @@
 /**
  * Verwirft einen per `ActiveView.isNew` markierten, nie mit „Fertig"
- * bestätigten Eintrag endgültig — der Cancel-Pfad von Journal, Wiki,
- * Operations und Sigil (der Altar hat keinen Soft-Delete und geht eigene
+ * bestätigten Eintrag endgültig — der Cancel-Pfad von Journal, Wiki
+ * und Operations (der Altar hat keinen Soft-Delete und geht eigene
  * Wege in `AltarView.handleCancel`).
  *
  * Warum beide Schritte: der Soft-Delete nimmt den Eintrag aus dem

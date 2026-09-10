@@ -10,8 +10,6 @@ interface EntryDetailFrameProps {
   isEditing: boolean;
   /** Spans nach dem Zurück-Button: Icon, Kategorie, `·`, Datum. */
   breadcrumbMeta?: ReactNode;
-  /** Rechte Topbar-Seite (Sigil: Show/Hide-Button). */
-  topbarRight?: ReactNode;
   /** Edit-Mode: lokaler Titel-State; View-Mode: gespeicherter Titel. */
   title: string;
   onTitleChange: (value: string) => void;
@@ -19,15 +17,15 @@ interface EntryDetailFrameProps {
   aboveTitle?: ReactNode;
   /** Zwischen Titel und Tags (Journal: Chips; Operations: Cover + Property-Chips). */
   belowTitle?: ReactNode;
-  /** Weglassen = keine Tag-Zeile (Sigil). Immer readOnly — editiert wird im Properties-Panel. */
+  /** Weglassen = keine Tag-Zeile. Immer readOnly — editiert wird im Properties-Panel. */
   tags?: { value: string[]; onChange: (tags: string[]) => void };
   /** Der Körper scrollt im Frame — die sticky Toolbar des BlockStack braucht den Scrollbereich hier, nicht im Editor. */
   children: ReactNode;
 }
 
 /**
- * Der gemeinsame Detail-View-Rahmen von Journal, Wiki, Operations und
- * OperationSigilView: Topbar mit Breadcrumb und Editing-Marker, Titelblock
+ * Der gemeinsame Detail-View-Rahmen von Journal, Wiki und Operations (auch
+ * Sigillen, seit v41 Blöcke): Topbar mit Breadcrumb und Editing-Marker, Titelblock
  * (Input ↔ h1), optionale Tag-Zeile, Body-Container. `useEntryEditor`,
  * `setEditActions` und der `editorEpoch`-Key bleiben in den Views — der Frame
  * ist rein präsentational plus dem einen Zurück-Klick.
@@ -37,7 +35,7 @@ interface EntryDetailFrameProps {
  * sie Zeilen spart.
  */
 export default function EntryDetailFrame({
-  module, isEditing, breadcrumbMeta, topbarRight,
+  module, isEditing, breadcrumbMeta,
   title, onTitleChange, aboveTitle, belowTitle, tags, children,
 }: EntryDetailFrameProps) {
   const { t } = useTranslation();
@@ -55,7 +53,6 @@ export default function EntryDetailFrame({
           {breadcrumbMeta}
           {isEditing && <span className="text-stone-700 italic ml-1">{t('editor.editing')}</span>}
         </div>
-        {topbarRight != null && <div className="flex items-center gap-2">{topbarRight}</div>}
       </div>
 
       {aboveTitle}

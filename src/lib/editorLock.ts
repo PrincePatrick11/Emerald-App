@@ -6,7 +6,7 @@
  * VOR-Import-Inhalt ueber die gerade wiederhergestellte Zeile — stiller
  * Datenverlust, den es (verteilt auf drei Kopien) schon vor dem
  * useEntryEditor-Hook gab. dbBackup haelt die Sperre um replace- und
- * add-vault-Importe; der Hook und der Sigil-Editor pruefen sie vor jedem
+ * add-vault-Importe; der Hook prueft sie vor jedem
  * automatischen Speichern.
  *
  * Ein Zaehler statt eines booleschen Flags, damit sich verschachtelte oder

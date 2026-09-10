@@ -217,26 +217,18 @@
   "creation": {
     "intention": "Intention",
     "intentionPlaceholder": "Schreibe den Satz oder die Absicht auf, die du zu einem Sigill verdichten willst...",
-    "intentionEmpty": "Noch keine Intention eingetragen.",
     "prepareLetters": "Automatisch kürzen",
     "addLetter": "Manuell kürzen",
     "shortenSigil": "Sigile kürzen",
     "manualLetterPlaceholder": "String für manuelle Buchstaben eingeben...",
-    "hideIntention": "Intention ausblenden",
-    "showIntention": "Intention anzeigen",
-    "hideSigil": "Sigill ausblenden",
-    "showSigil": "Sigill anzeigen",
     "hiddenUntilDate": "Das Sigill bleibt bis zum {{date}} ausgeblendet.",
     "loadSigille": "Sigill laden",
     "unloadSigil": "Sigill entladen",
     "timerLabel": "Timer:",
     "timerSeconds": "Sekunden",
-    "hidden": "Ausgeblendet",
     "chargingTechnique": "Ladetechnik",
     "letterBank": "Buchstabensatz",
     "noLetters": "Noch keine Buchstaben vorbereitet.",
-    "description": "Notizen",
-    "descriptionPlaceholder": "Halte begleitende Notizen, rituellen Kontext oder Beobachtungen zu diesem Sigill fest...",
     "targetDate": "Zieldatum",
     "brushSize": "Pinsel",
     "undo": "Rückgängig",
@@ -245,9 +237,6 @@
     "tools": {
       "draw": "Zeichnen",
       "erase": "Radieren"
-    },
-    "types": {
-      "sigil": "Sigill"
     }
   },
   "wiki": {
@@ -300,6 +289,18 @@
       "fields": {
         "label": "Felder",
         "description": "Beschriftete Werte: Text, Zahl, Datum, Auswahl, Ja/Nein, Checkliste, Verknüpfung, Bild, Mondphase."
+      },
+      "sigilCalc": {
+        "label": "Sigillen-Rechner",
+        "description": "Die Absicht auf ihre Buchstabenbank kürzen und abhaken, welche Buchstaben in der Zeichnung stecken."
+      },
+      "sigilCanvas": {
+        "label": "Sigillen-Zeichnung",
+        "description": "Die Sigille zeichnen — gespeichert als Bild, verborgen, solange sie geladen ist."
+      },
+      "sigilCharge": {
+        "label": "Ladung",
+        "description": "Zieldatum, Ladetechnik und das Laden der Sigille. Geladen sperrt sie den Eintrag oder nur die Sigillen-Blöcke."
       }
     },
     "kinds": {
@@ -391,6 +392,22 @@
       "active": "Aktiv",
       "endDate": "Enddatum",
       "version": "Version"
+    },
+    "sigil": {
+      "hidden": "Verborgen, solange die Sigille geladen ist",
+      "emptyDrawing": "Noch keine Zeichnung",
+      "loaded": "Geladen",
+      "notLoaded": "Noch nicht geladen",
+      "revealedSince": "enthüllt seit {{date}}",
+      "noRevealDate": "Beim Bearbeiten ein Zieldatum setzen, um die Sigille zu laden",
+      "loadConfirm": "Sigille laden? Rechner und Zeichnung bleiben bis {{date}} verborgen.",
+      "unloadConfirm": "Sigille entladen? Sie lässt sich danach sofort wieder bearbeiten.",
+      "lockScope": "Geladen sperrt",
+      "lockEntry": "den ganzen Eintrag",
+      "lockSigil": "nur Rechner und Zeichnung",
+      "locked": "Gesperrt, solange die Sigille geladen ist",
+      "saveFailed": "Die Zeichnung ließ sich nicht speichern",
+      "loadFailed": "Die Zeichnung ließ sich nicht laden — den Eintrag schließen und neu öffnen"
     }
   },
   "editor": {

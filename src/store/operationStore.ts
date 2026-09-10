@@ -4,7 +4,10 @@ import { getDb, nextEntryNumber } from '../lib/db';
 import { syncLinks } from '../lib/links';
 import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
-import { fromRow, toInt, type DbRow } from '../lib/row';
+import { fromRow, type DbRow } from '../lib/row';
+import { serializeBlocks } from '../lib/blocks/blockHtml';
+import { defaultBlocksFor } from '../lib/blocks/layouts';
+import { withChargeUnloaded } from '../lib/blocks/sigil';
 import type { Operation } from '../types';
 import i18n from '../i18n';
 
@@ -19,39 +22,21 @@ interface OperationState {
   restoreOperation: (id: string) => Promise<void>;
   permanentlyDeleteOperation: (id: string) => Promise<void>;
   getOperation: (id: string) => Operation | undefined;
-  ensureDrawingLoaded: (id: string) => Promise<void>;
 }
 
 /**
- * Alle Spalten AUSSER drawing_data — das sind die vollen Sigil-Zeichnungen als
- * Base64, mit Abstand die groesste Spalte der Tabelle. Listen und Dashboard
- * brauchen nur thumbnail_data; die Zeichnung laedt `ensureDrawingLoaded` erst,
- * wenn der Sigil-Editor sie oeffnet. Im Store heisst `drawing_data: undefined`
- * daher "noch nicht geladen", `null` "hat keine Zeichnung".
+ * Die Spalten, die die App liest und schreibt. Status/Enddatum/Version (v40)
+ * und alles, was die Sigille ausmachte — Absicht, Buchstaben, Zeichnung,
+ * Ladung, Notizen (v41) —, sind Blöcke im Inhalt. Die Spalten stehen noch im
+ * Schema, für ältere Backups.
  */
-const OPERATION_LIST_COLUMNS =
-  'id, title, content, category_id, entry_number, description, icon, cover_image, ' +
-  'target_reveal_date, charging_technique_wiki_id, is_loaded, ' +
-  'intention_text, letter_bank, implemented_letters, show_intention_in_properties, ' +
-  'show_letter_bank_in_properties, show_sigil, thumbnail_data, tags, created_at, updated_at, deleted_at';
+const OPERATION_COLUMNS = 'id, title, content, category_id, entry_number, icon, cover_image, tags, created_at, updated_at, deleted_at';
 
 async function selectAllOperations(db: Database): Promise<Operation[]> {
   const rows = await db.select<DbRow[]>(
-    `SELECT ${OPERATION_LIST_COLUMNS} FROM operations WHERE deleted_at IS NULL ORDER BY updated_at DESC`
+    `SELECT ${OPERATION_COLUMNS} FROM operations WHERE deleted_at IS NULL ORDER BY updated_at DESC`
   );
   return rows.map(fromRow.operation);
-}
-
-/**
- * Ein Refetch liefert alle Zeichnungen als "nicht geladen" zurueck. Bereits
- * geladene bleiben erhalten — sonst wuerde ein Import oder Undo-Restore den
- * offenen Sigil-Editor unmounten und ungespeicherte Striche verwerfen.
- */
-function preserveLoadedDrawings(prev: Operation[], fresh: Operation[]): Operation[] {
-  const loaded = new Map(
-    prev.filter((o) => o.drawing_data !== undefined).map((o) => [o.id, o.drawing_data])
-  );
-  return fresh.map((o) => (loaded.has(o.id) ? { ...o, drawing_data: loaded.get(o.id) } : o));
 }
 
 export const useOperationStore = create<OperationState>((set, get) => ({
@@ -59,8 +44,7 @@ export const useOperationStore = create<OperationState>((set, get) => ({
 
   fetchAll: async () => {
     const db = await getDb();
-    const fresh = await selectAllOperations(db);
-    set((s) => ({ operations: preserveLoadedDrawings(s.operations, fresh) }));
+    set({ operations: await selectAllOperations(db) });
   },
 
   createOperation: async (categoryId) => {
@@ -68,47 +52,27 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     const now = nowIso();
     const op: Operation = {
       entry_number: await nextEntryNumber(db, 'operations'),
-      id: generateId(), title: 'Untitled Operation', content: '',
+      id: generateId(),
+      title: 'Untitled Operation',
+      // Die Kategorie „Sigillen" beginnt mit Rechner, Zeichnung und Ladung.
+      content: serializeBlocks(defaultBlocksFor('operation', categoryId)),
       category_id: categoryId, created_at: now, updated_at: now, tags: [], deleted_at: null,
-      description: '',
-      target_reveal_date: null,
-      charging_technique_wiki_id: null,
-      is_loaded: false,
-      intention_text: '',
-      letter_bank: [],
-      implemented_letters: [],
-      show_intention_in_properties: true,
-      show_letter_bank_in_properties: true,
-      show_sigil: true,
-      drawing_data: null,
-      thumbnail_data: null,
     };
     await db.execute(
-      `INSERT INTO operations (
-        id, title, content, category_id, created_at, updated_at, tags, description,
-        target_reveal_date, charging_technique_wiki_id, is_loaded, intention_text, letter_bank,
-        implemented_letters, show_intention_in_properties, show_letter_bank_in_properties,
-        show_sigil, drawing_data, thumbnail_data, entry_number
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
-      [
-        op.id, op.title, op.content, op.category_id, op.created_at, op.updated_at, JSON.stringify(op.tags),
-        op.description, op.target_reveal_date, op.charging_technique_wiki_id, 0, op.intention_text,
-        JSON.stringify(op.letter_bank), JSON.stringify(op.implemented_letters),
-        1, 1, 1, op.drawing_data, op.thumbnail_data, op.entry_number ?? null,
-      ]
+      `INSERT INTO operations (id, title, content, category_id, created_at, updated_at, tags, entry_number)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [op.id, op.title, op.content, op.category_id, op.created_at, op.updated_at, JSON.stringify(op.tags), op.entry_number ?? null]
     );
     set((s) => ({ operations: [op, ...s.operations] }));
     return op;
   },
 
   /**
-   * Kopiert alle Inhaltsfelder — auch die Sigil-Felder samt Zeichnung, die
-   * dafuer zuerst nachgeladen wird. Die drei Aufrufer zaehlten die Felder
-   * frueher jeweils selbst auf, mit drei verschiedenen (und allesamt
-   * unvollstaendigen) Listen; Sigil-Zeichnungen gingen dabei immer verloren.
+   * Kopiert alle Inhaltsfelder. Eine geladene Sigille kommt entladen mit:
+   * eine Kopie, die man nie bearbeiten kann, wäre sinnlos — das
+   * Enthüllungsdatum bleibt.
    */
   duplicateOperation: async (id) => {
-    await get().ensureDrawingLoaded(id);
     const src = get().operations.find((o) => o.id === id);
     if (!src) return undefined;
     const copy = await get().createOperation(src.category_id);
@@ -120,13 +84,10 @@ export const useOperationStore = create<OperationState>((set, get) => ({
       entry_number: _number,
       ...fields
     } = src;
-    // is_loaded wird bewusst NICHT uebernommen: eine "geladene" Sigil-
-    // Operation ist gesperrt und ihr Sigil versiegelt — eine Kopie, die man
-    // nie bearbeiten kann, waere sinnlos. target_reveal_date bleibt erhalten.
     await get().updateOperation(copy.id, {
       ...fields,
       title: src.title + i18n.t('common.copySuffix'),
-      is_loaded: false,
+      content: withChargeUnloaded(src.content),
     });
     return get().operations.find((o) => o.id === copy.id) ?? copy;
   },
@@ -138,43 +99,19 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     const op = get().operations.find((o) => o.id === id);
     if (!op) return;
     const merged = { ...op, ...patch, updated_at: now };
-    // drawing_data wird nur mitgeschrieben, wenn es geladen ist oder im Patch
-    // steckt — sonst wuerde ein Rename aus der Sidebar den `undefined`-Platz-
-    // halter als NULL persistieren und die Zeichnung loeschen.
-    //
     // Die $N-Platzhalter MUESSEN in Textreihenfolge aufsteigen: SQLite vergibt
     // die Bind-Indizes nach dem ersten Auftreten, nicht nach der Ziffer, und
-    // tauri-plugin-sql bindet rein positionell. Ein $20 vor dem $19 wuerde
-    // id und drawing_data vertauschen und das UPDATE traefe keine Zeile.
-    //
-    // is_active/end_date/version schreibt die App seit v40 nicht mehr — sie
-    // sind ein Block im Inhalt (lib/blocks/legacyStatus.ts).
-    const writeDrawing = merged.drawing_data !== undefined;
+    // tauri-plugin-sql bindet rein positionell.
     await db.execute(
       `UPDATE operations SET
-        title=$1, content=$2, category_id=$3, updated_at=$4, tags=$5,
-        icon=$6, cover_image=$7, description=$8, target_reveal_date=$9, charging_technique_wiki_id=$10,
-        is_loaded=$11, intention_text=$12, letter_bank=$13, implemented_letters=$14,
-        show_intention_in_properties=$15, show_letter_bank_in_properties=$16, show_sigil=$17,
-        thumbnail_data=$18${writeDrawing ? ', drawing_data=$19' : ''}
-       WHERE id=${writeDrawing ? '$20' : '$19'}`,
+        title=$1, content=$2, category_id=$3, updated_at=$4, tags=$5, icon=$6, cover_image=$7
+       WHERE id=$8`,
       [
         merged.title, merged.content, merged.category_id, merged.updated_at, JSON.stringify(merged.tags),
-        merged.icon ?? null, merged.cover_image ?? null, merged.description ?? '',
-        merged.target_reveal_date ?? null, merged.charging_technique_wiki_id ?? null,
-        toInt(merged.is_loaded), merged.intention_text ?? '',
-        JSON.stringify(merged.letter_bank ?? []), JSON.stringify(merged.implemented_letters ?? []),
-        toInt(merged.show_intention_in_properties, true),
-        toInt(merged.show_letter_bank_in_properties, true),
-        toInt(merged.show_sigil, true),
-        merged.thumbnail_data ?? null,
-        ...(writeDrawing ? [merged.drawing_data] : []),
+        merged.icon ?? null, merged.cover_image ?? null,
         id,
       ]
     );
-    // Aus dem aktuellen State mergen, nicht `merged` einsetzen: zwischen dem
-    // Snapshot oben und diesem set() kann ensureDrawingLoaded gelaufen sein,
-    // und `merged` truege dann noch drawing_data: undefined.
     set((s) => ({
       operations: s.operations.map((o) => (o.id === id ? { ...o, ...patch, updated_at: now } : o)),
     }));
@@ -193,8 +130,7 @@ export const useOperationStore = create<OperationState>((set, get) => ({
   restoreOperation: async (id) => {
     const db = await getDb();
     await db.execute('UPDATE operations SET deleted_at=NULL WHERE id=$1', [id]);
-    const fresh = await selectAllOperations(db);
-    set((s) => ({ operations: preserveLoadedDrawings(s.operations, fresh) }));
+    set({ operations: await selectAllOperations(db) });
   },
 
   permanentlyDeleteOperation: async (id) => {
@@ -203,17 +139,4 @@ export const useOperationStore = create<OperationState>((set, get) => ({
   },
 
   getOperation: (id) => get().operations.find((o) => o.id === id),
-
-  ensureDrawingLoaded: async (id) => {
-    const op = get().operations.find((o) => o.id === id);
-    if (!op || op.drawing_data !== undefined) return;
-    const db = await getDb();
-    const rows = await db.select<DbRow[]>('SELECT drawing_data FROM operations WHERE id=$1', [id]);
-    const value = rows[0]?.drawing_data == null ? null : String(rows[0].drawing_data);
-    set((s) => ({
-      operations: s.operations.map((o) =>
-        o.id === id && o.drawing_data === undefined ? { ...o, drawing_data: value } : o
-      ),
-    }));
-  },
 }));

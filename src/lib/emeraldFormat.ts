@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { todayIso, withoutConcealed } from './blocks/sigil';
 import { imageRefsInHtml, isStoredImage, readImageAsBase64, rewriteImageRefs, saveImage } from './images';
 import { open as openDialog, save, message } from '@tauri-apps/plugin-dialog';
 import { format } from 'date-fns';
@@ -408,7 +409,8 @@ export async function exportAsEmerald(): Promise<void> {
     if (!op) return;
     type      = 'operations';
     title     = op.title || 'Untitled';
-    content   = op.content || '';
+    // Eine verborgene Sigille geht nicht hinaus (das Menü sperrt den Export ohnehin).
+    content   = withoutConcealed(op.content || '', todayIso());
     createdAt = op.created_at;
 
     const cat = categories.find(c => c.id === op.category_id);

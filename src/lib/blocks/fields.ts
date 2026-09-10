@@ -208,7 +208,9 @@ function parseValue(kind: ElementKind, raw: unknown): FieldValue | undefined {
   }
 }
 
-const SLOT_RE = /<dd\b[^>]*?\bdata-block-slot="el:([^"]+)"[^>]*>([\s\S]*?)<\/dd>/gi;
+// Die Attribut-Abschnitte begrenzt (IDs sind ohnehin höchstens 64 Zeichen):
+// ungebremst liefe der Regex auf präpariertem Markup quadratisch.
+const SLOT_RE = /<dd\b[^<>]{0,256}?\bdata-block-slot="el:([^"]{1,200})"[^<>]{0,256}>([\s\S]*?)<\/dd>/gi;
 
 // Blöcke sind unveränderliche Werte: dasselbe Objekt, dasselbe Modell. Der
 // Stapel, die Seitenleiste, Name und Icon lesen denselben Block pro Render

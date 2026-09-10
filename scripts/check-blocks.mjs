@@ -29,6 +29,8 @@ writeFileSync(
    export { instantiateDefinition, updateInstanceToDefinition, isOutdatedCopy, blockOrigin, updateCopiesInContent, removeCopiesFromContent, parseDefinitionElements, parseDefinitionDisplay } from '${root}/src/lib/blocks/definitions';
    export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
    export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
+   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded, sigilImage, withSigilImage, letterList } from '${root}/src/lib/blocks/sigil';
+   export { contentForExport } from '${root}/src/lib/blocks/exportContent';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';`
 );
@@ -56,6 +58,9 @@ const {
   instantiateDefinition, updateInstanceToDefinition, isOutdatedCopy, blockOrigin, updateCopiesInContent,
   removeCopiesFromContent, parseDefinitionElements, parseDefinitionDisplay, entryBlockSummary,
   withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID,
+  extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock,
+  createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded,
+  sigilImage, withSigilImage, letterList, contentForExport,
 } = bundle;
 
 const failures = [];
@@ -434,6 +439,52 @@ console.log('\n4e. Altstatus der Operationen wird ein Block\n');
     raw.name === 'Status' && raw.elements.map((e) => e.label).join() === 'Active,End date,Version', raw);
   const rawHtml = parseBlocks(withLegacyStatus('', { isActive: false, endDate: null, version: null }, raw, (key) => key))[0].html;
   check('ohne Übersetzung: auch der Fallback-Text ohne Schlüssel', rawHtml.includes('No') && !rawHtml.includes('blocks.'), rawHtml);
+}
+
+console.log('\n4f. Sigillen-Blöcke\n');
+{
+  check('Buchstabenbank: jeder Buchstabe einmal, groß, ohne Akzente',
+    extractUniqueLetters('Äpfel äpfel!').join('') === 'APFEL', extractUniqueLetters('Äpfel äpfel!'));
+
+  const calc = serializeSigilCalc(createSigilCalcBlock(), { intention: 'Ich <b>bin</b>', letters: ['I', 'C'], implemented: ['I', 'X'] });
+  const calcBack = parseSigilCalc(parseBlocks(serializeBlocks([calc, createTextBlock('<p>x</p>')]))[0]);
+  check('Rechner: Round-Trip, Umgesetztes nur aus der Bank',
+    calcBack.intention === 'Ich <b>bin</b>' && calcBack.letters.join() === 'I,C' && calcBack.implemented.join() === 'I', calcBack);
+  check('Rechner: der Fallback ist escaped', calc.html.includes('&lt;b&gt;') && !calc.html.includes('<b>'), calc.html);
+
+  const canvas = withSigilImage(createSigilCanvasBlock(), `${'ab'.repeat(32)}.png`);
+  check('Zeichnung: der Dateiname steht als src im Markup', sigilImage(canvas) === `${'ab'.repeat(32)}.png` && canvas.html.startsWith('<img src="'));
+
+  const odd = parseSigilCharge({ ...createSigilChargeBlock(), attrs: { 'data-block-data': JSON.stringify({ loaded: 'ja', revealDate: 'morgen', lock: 'alles' }) } });
+  check('Ladung: Unsinn fällt auf sichere Werte zurück', !odd.loaded && odd.revealDate === null && odd.lock === 'entry', odd);
+
+  const charged = serializeSigilCharge(createSigilChargeBlock(), { loaded: true, revealDate: '2030-01-01', lock: 'entry', technique: null });
+  const blocks = [calc, canvas, charged];
+  const before = sigilState(blocks, '2029-12-31');
+  const after = sigilState(blocks, '2030-01-01');
+  check('geladen vor dem Datum: verborgen und ganz gesperrt', before.concealed && before.lockEntry && before.lockSigil, before);
+  check('am Enthüllungstag: sichtbar, aber weiter gesperrt', !after.concealed && after.lockEntry, after);
+  const sigilOnly = sigilState([serializeSigilCharge(createSigilChargeBlock(), { loaded: true, revealDate: '2030-01-01', lock: 'sigil', technique: null })], '2029-01-01');
+  check('Sperre „nur Sigille": Eintrag bearbeitbar, Sigillen-Blöcke nicht', !sigilOnly.lockEntry && sigilOnly.lockSigil);
+
+  const content = serializeBlocks([createTextBlock('<p>Notiz</p>'), ...blocks]);
+  const hiddenContent = withoutConcealed(content, '2029-12-31');
+  check('verborgen: Suche und Export sehen Rechner und Zeichnung nicht',
+    !hiddenContent.includes('core.sigil.calc') && !hiddenContent.includes('core.sigil.canvas') && hiddenContent.includes('Notiz'), hiddenContent);
+  check('enthüllt: alles bleibt', withoutConcealed(content, '2030-02-01') === content);
+
+  const unloaded = withChargeUnloaded(content);
+  check('eine Kopie wird entladen', !sigilState(parseBlocks(unloaded), '2029-12-31').loaded && withChargeUnloaded(unloaded) === unloaded);
+
+  const secret = { ...createTextBlock('<p>geheim</p>'), attrs: { 'data-block-hidden': '1' } };
+  const exported = contentForExport(serializeBlocks([createTextBlock('<p>sichtbar</p>'), secret, ...blocks]), '2029-12-31');
+  check('Export: ausgeblendete Blöcke und die verborgene Sigille fehlen, die Ladung bleibt',
+    exported.includes('sichtbar') && !exported.includes('geheim') && !exported.includes('core.sigil.canvas') && exported.includes('core.sigil.charge'), exported);
+  check('Buchstabenliste: höchstens 500, nur kurze Zeichenketten',
+    letterList([...Array(2000).fill('A'), 'x'.repeat(9), 3]).length === 500 && letterList(['AB', 'x'.repeat(9), 3]).join() === 'AB');
+  const t0 = Date.now();
+  parseSigilCharge({ ...createSigilChargeBlock(), html: '<p '.repeat(50000) });
+  check('Ladetechnik-Regex bleibt auf präpariertem Markup schnell', Date.now() - t0 < 500, `${Date.now() - t0} ms`);
 }
 
 console.log('\n5. Was aus dem Inhalt abgeleitet wird, sieht die Blöcke durch\n');

@@ -217,26 +217,18 @@
   "creation": {
     "intention": "Intención",
     "intentionPlaceholder": "Escribe la frase o intención que quieres reducir a un sigilo...",
-    "intentionEmpty": "Aún no hay intención guardada.",
     "prepareLetters": "Reducir automáticamente",
     "addLetter": "Reducir manualmente",
     "shortenSigil": "Reducir sigilo",
     "manualLetterPlaceholder": "Introduce un texto para el banco manual de letras...",
-    "hideIntention": "Ocultar intención",
-    "showIntention": "Mostrar intención",
-    "hideSigil": "Ocultar sigilo",
-    "showSigil": "Mostrar sigilo",
     "hiddenUntilDate": "El sigilo permanece oculto hasta {{date}}.",
     "loadSigille": "Cargar sigilo",
     "unloadSigil": "Descargar sigilo",
     "timerLabel": "Timer:",
     "timerSeconds": "Segundos",
-    "hidden": "Oculto",
     "chargingTechnique": "Técnica de carga",
     "letterBank": "Banco de letras",
     "noLetters": "Aún no hay letras preparadas.",
-    "description": "Notas",
-    "descriptionPlaceholder": "Guarda notas, contexto ritual u observaciones sobre este sigilo...",
     "targetDate": "Fecha objetivo",
     "brushSize": "Pincel",
     "undo": "Deshacer",
@@ -245,9 +237,6 @@
     "tools": {
       "draw": "Dibujar",
       "erase": "Borrar"
-    },
-    "types": {
-      "sigil": "Sigilo"
     }
   },
   "wiki": {
@@ -300,6 +289,18 @@
       "fields": {
         "label": "Campos",
         "description": "Valores con etiqueta: texto, número, fecha, selección, sí/no, lista de verificación, enlace, imagen, fase lunar."
+      },
+      "sigilCalc": {
+        "label": "Calculadora de sigilo",
+        "description": "Reduce una intención a su banco de letras y marca las letras usadas en el dibujo."
+      },
+      "sigilCanvas": {
+        "label": "Dibujo del sigilo",
+        "description": "Dibuja el sigilo — se guarda como imagen y se oculta mientras está cargado."
+      },
+      "sigilCharge": {
+        "label": "Carga",
+        "description": "Fecha objetivo, técnica de carga y cargar el sigilo. Cargado bloquea la entrada o solo los bloques del sigilo."
       }
     },
     "kinds": {
@@ -391,6 +392,22 @@
       "active": "Activa",
       "endDate": "Fecha de fin",
       "version": "Versión"
+    },
+    "sigil": {
+      "hidden": "Oculto mientras el sigilo está cargado",
+      "emptyDrawing": "Aún no hay dibujo",
+      "loaded": "Cargado",
+      "notLoaded": "Aún no cargado",
+      "revealedSince": "revelado desde {{date}}",
+      "noRevealDate": "Pon una fecha objetivo al editar para cargar el sigilo",
+      "loadConfirm": "¿Cargar el sigilo? La calculadora y el dibujo quedan ocultos hasta el {{date}}.",
+      "unloadConfirm": "¿Descargar el sigilo? Se podrá editar de nuevo enseguida.",
+      "lockScope": "Cargado bloquea",
+      "lockEntry": "toda la entrada",
+      "lockSigil": "solo calculadora y dibujo",
+      "locked": "Bloqueado mientras el sigilo está cargado",
+      "saveFailed": "No se pudo guardar el dibujo",
+      "loadFailed": "No se pudo cargar el dibujo — cierra y vuelve a abrir la entrada"
     }
   },
   "editor": {

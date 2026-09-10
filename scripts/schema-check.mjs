@@ -69,9 +69,15 @@ const STUBS = {
       static async load() { throw new Error('Database.load wird im Harness nicht benutzt'); }
     }`,
   '@tauri-apps/api/core': `
-    export async function invoke(cmd) {
+    export async function invoke(cmd, args) {
       // vaultManager liest vaults.json und legt es beim ersten Fehlschlag an.
       if (cmd === 'read_file') throw new Error('ENOENT (Harness)');
+      // Migration v41 speichert Sigillen-Zeichnungen als Datei: ein fester
+      // Name, und ein erzwungener Fehlschlag, wenn die Data-URL „FAIL" trägt.
+      if (cmd === 'save_image') {
+        if (String(args?.dataUrl ?? '').includes('FAIL')) throw new Error('save_image failed (Harness)');
+        return '${'c'.repeat(64)}.png';
+      }
       // Ohne vaults.json entscheidet dieses Command, ob ein Erststart vorliegt
       // (leere Vault-Liste) oder eine Altinstallation adoptiert wird. Der
       // Harness braucht den zweiten Fall: eine leere Liste hiesse kein aktiver
@@ -107,7 +113,8 @@ writeFileSync(
   entry,
   `export { runMigrations, MIGRATIONS } from '${process.cwd().replace(/\\/g, '/')}/src/lib/db';
    export { TABLES, TABLE_DDL, ddlIfNotExists, checkIntegrity, reassignCategoryContent, collectUsedImageFilenames } from '${process.cwd().replace(/\\/g, '/')}/src/lib/schema';
-   export { invalidateVaultCache } from '${process.cwd().replace(/\\/g, '/')}/src/lib/vaultManager';`
+   export { invalidateVaultCache } from '${process.cwd().replace(/\\/g, '/')}/src/lib/vaultManager';
+   export { convertLegacySigils } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLegacySigils';`
 );
 
 const bundlePath = join(workDir, 'bundle.mjs');
@@ -125,7 +132,7 @@ process.env.EMERALD_HARNESS_DIR = workDir;
 const {
   runMigrations, MIGRATIONS, TABLES, TABLE_DDL,
   ddlIfNotExists, checkIntegrity, reassignCategoryContent,
-  collectUsedImageFilenames, invalidateVaultCache,
+  collectUsedImageFilenames, invalidateVaultCache, convertLegacySigils,
 } = await import(pathToFileURL(bundlePath).href);
 
 /* ------------------------------------------------------------------ *
@@ -427,21 +434,75 @@ async function seedCategoryMerge(db) {
 /**
  * Operationen, wie v40 sie vorfindet: eine inaktive mit Text, eine aktive mit
  * Enddatum und Version ohne Text, eine im Normalzustand, die unberührt bleiben muss.
+ * Bewusst nicht in „Sigillen" — dort legt v41 danach das Sigillen-Set davor.
  */
 async function seedOperationStatus(db) {
   await db.execute(
     `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags,is_active,end_date,version)
-     VALUES ('s1','Ruhend','<p>Text</p>','sigils',$1,$1,'[]',0,NULL,NULL)`,
+     VALUES ('s1','Ruhend','<p>Text</p>','other',$1,$1,'[]',0,NULL,NULL)`,
     [now]
   );
   await db.execute(
     `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags,is_active,end_date,version)
-     VALUES ('s2','Befristet','','sigils',$1,$1,'[]',1,'2026-03-01','1.2')`,
+     VALUES ('s2','Befristet','','other',$1,$1,'[]',1,'2026-03-01','1.2')`,
     [now]
   );
   await db.execute(
     `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags)
-     VALUES ('s3','Normal','<p>unberührt</p>','sigils',$1,$1,'[]')`,
+     VALUES ('s3','Normal','<p>unberührt</p>','other',$1,$1,'[]')`,
+    [now]
+  );
+}
+
+/**
+ * Sigillen, wie v41 sie vorfindet: eine vollständige (Zeichnung, Absicht,
+ * Buchstaben, geladen, Datum, Ladetechnik, Notizen), eine, deren Zeichnung
+ * sich nicht speichern lässt, eine leere in der Kategorie und eine
+ * gewöhnliche Operation mit Notizen.
+ */
+async function seedSigils(db) {
+  await db.execute(
+    `INSERT INTO wiki_articles (id,title,slug,content,category,created_at,updated_at,tags)
+     VALUES ('wt1','Ekstase','ekstase','','other',$1,$1,'[]')`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags,description,intention_text,
+       letter_bank,implemented_letters,drawing_data,is_loaded,target_reveal_date,charging_technique_wiki_id)
+     VALUES ('g1','Stärke','','sigils',$1,$1,'[]','Notiz','Ich bin stark','["I","C"]','["I"]',
+       'data:image/png;base64,AAAA',1,'2099-01-01','wt1')`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags,drawing_data)
+     VALUES ('g2','Klemmt','','sigils',$1,$1,'[]','data:image/png;base64,FAIL')`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags)
+     VALUES ('g3','Leer','','sigils',$1,$1,'[]')`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags,description)
+     VALUES ('g4','Gewöhnlich','<p>Text</p>','other',$1,$1,'[]','Nur Notiz')`,
+    [now]
+  );
+  // Ausgeblendete Zeichnung, eine Zeichnung, die kein Bild ist, und eine
+  // Operation, die schon Sigillen-Blöcke trägt (ein abgebrochener v41-Lauf).
+  await db.execute(
+    `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags,drawing_data,show_sigil)
+     VALUES ('g5','Versteckt','','sigils',$1,$1,'[]','data:image/png;base64,CCCC',0)`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags,drawing_data)
+     VALUES ('g6','Kein Bild','','sigils',$1,$1,'[]','data:text/html;base64,PHNjcmlwdD4=')`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags)
+     VALUES ('g7','Schon Blöcke','<section data-block="core.sigil.calc" data-block-id="x1"></section>','sigils',$1,$1,'[]')`,
     [now]
   );
 }
@@ -1137,7 +1198,7 @@ console.log('\n8f. Migration v40: Status, Enddatum und Version werden ein Block\
   const plain = await buildViaChain('v40-plain.db', async (db) => {
     await db.execute(
       `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags)
-       VALUES ('p1','Normal','<p>x</p>','sigils',$1,$1,'[]')`,
+       VALUES ('p1','Normal','<p>x</p>','other',$1,$1,'[]')`,
       [now]
     );
   });
@@ -1148,6 +1209,99 @@ console.log('\n8f. Migration v40: Status, Enddatum und Version werden ein Block\
   plain.close();
   check('v40: Schema identisch mit der Baseline', JSON.stringify(await readSchema(v40)) === JSON.stringify(schemaA));
   v40.close();
+}
+
+console.log('\n8g. Migration v41: Sigillen werden Blöcke\n');
+
+{
+  const v41 = await buildViaChain('v41.db', seedSigils);
+  const op = async (id) => (await v41.select(
+    'SELECT content, drawing_data, intention_text, is_loaded, description, updated_at FROM operations WHERE id=?1', [id]
+  ))[0];
+  const [g1, g2, g3, g4] = [await op('g1'), await op('g2'), await op('g3'), await op('g4')];
+  const image = `${'c'.repeat(64)}.png`;
+
+  check(
+    'vollständige Sigille: Rechner, Zeichnung (als Datei), Ladung, Notizen',
+    g1.content.startsWith('<section data-block="core.sigil.calc"') && g1.content.includes(`src="${image}"`) &&
+      g1.content.includes('data-block="core.sigil.charge"') && g1.content.includes('data-id="wt1"') &&
+      g1.content.includes('<p>Notiz</p>') && g1.content.includes('Ich bin stark'),
+    g1.content
+  );
+  check('keine Base64-Zeichnung im Inhalt', !g1.content.includes('base64'));
+  check(
+    'die Sigillen-Spalten sind geleert',
+    g1.drawing_data === null && g1.intention_text === '' && g1.is_loaded === 0 && g1.description === '',
+    JSON.stringify(g1)
+  );
+  check(
+    'die Ladetechnik steht in der links-Tabelle',
+    (await v41.select("SELECT COUNT(*) AS n FROM links WHERE source_id='g1' AND target_id='wt1'"))[0].n === 1
+  );
+  check(
+    'scheitert das Speichern der Zeichnung, bleibt die Zeile unberührt',
+    g2.drawing_data === 'data:image/png;base64,FAIL' && g2.content === '',
+    JSON.stringify(g2)
+  );
+  check(
+    'die leere Operation der Kategorie bekommt das Sigillen-Set',
+    ['core.sigil.calc', 'core.sigil.canvas', 'core.sigil.charge'].every((t) => g3.content.includes(`data-block="${t}"`)),
+    g3.content
+  );
+  check(
+    'eine gewöhnliche Operation mit Notizen bekommt nur den Textblock',
+    g4.content.includes('Nur Notiz') && g4.content.includes('<p>Text</p>') && !g4.content.includes('core.sigil'),
+    g4.content
+  );
+  check('updated_at bleibt, wie es war', [g1, g2, g3, g4].every((r) => r.updated_at === now));
+  check(
+    'v41 hat vorher eine Sicherung angelegt',
+    readdirSync(join(workDir, 'v41')).some((f) => f.includes('.pre-v41'))
+  );
+
+  // Nachholen beim Öffnen: nur Zeilen mit Altdaten — eine Sigille, der der
+  // Nutzer die Blöcke genommen hat, bekommt sie nicht zurück.
+  await v41.execute("UPDATE operations SET content='<p>ohne</p>' WHERE id='g3'");
+  await v41.execute("UPDATE operations SET drawing_data='data:image/png;base64,BBBB' WHERE id='g2'");
+  const retry = await convertLegacySigils(v41, { includeSigilCategory: false });
+  const [g2b, g3b] = [await op('g2'), await op('g3')];
+  check('das Nachholen wandelt die gescheiterte Zeile um', retry.converted === 1 && g2b.content.includes(`src="${image}"`), JSON.stringify(retry));
+  check('das Nachholen fügt einer geleerten Sigille nichts hinzu', g3b.content === '<p>ohne</p>', g3b.content);
+
+  const [g5, g6, g7] = [await op('g5'), await op('g6'), await op('g7')];
+  check(
+    '`show_sigil = 0` ohne Ladung: der Zeichnungs-Block ist ausgeblendet',
+    /<section data-block="core\.sigil\.canvas"[^>]*data-block-hidden="1"/.test(g5.content),
+    g5.content
+  );
+  check(
+    'eine Zeichnung, die kein Bild ist, wird verworfen statt endlos wiederholt',
+    g6.drawing_data === null && g6.content.includes('core.sigil.calc') && !g6.content.includes('src='),
+    JSON.stringify(g6)
+  );
+  check(
+    'trägt der Inhalt schon Sigillen-Blöcke, kommt kein zweites Set dazu',
+    g7.content.split('core.sigil.calc').length === 2,
+    g7.content
+  );
+
+  // Import: nur die eingefügten Zeilen, samt leerer Operationen der Kategorie.
+  await v41.execute(
+    `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags,intention_text)
+     VALUES ('h1','Importiert','','sigils',?1,?1,'[]','A'), ('h2','Fremd','','other',?1,?1,'[]','B'),
+            ('h3','Leer importiert','','sigils',?1,?1,'[]','')`,
+    [now]
+  );
+  const imported = await convertLegacySigils(v41, { includeSigilCategory: true, ids: new Set(['h1', 'h3']) });
+  const [h1, h2, h3] = [await op('h1'), await op('h2'), await op('h3')];
+  check(
+    'Import: nur die eingefügten Zeilen werden umgewandelt',
+    imported.converted === 2 && h1.content.includes('core.sigil.calc') && h3.content.includes('core.sigil.charge') && h2.content === '',
+    JSON.stringify(imported)
+  );
+
+  check('v41: Schema identisch mit der Baseline', JSON.stringify(await readSchema(v41)) === JSON.stringify(schemaA));
+  v41.close();
 }
 
 /* ------------------------------------------------------------------ *

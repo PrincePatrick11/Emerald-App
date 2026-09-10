@@ -200,8 +200,7 @@ async function renderAltarThumbnail(
 ): Promise<string | null> {
   const canvas = await _renderAltar(altar, backgroundSrc, placements, nativeW, nativeH, THUMBNAIL_W);
   if (!canvas) return null;
-  // WebP-Leiter mit JPEG-Fallback und 512-KB-Deckel — geteilt mit den
-  // Sigil-Thumbnails in lib/thumbnail.ts.
+  // WebP-Leiter mit JPEG-Fallback und 512-KB-Deckel aus lib/thumbnail.ts.
   return canvasToCappedThumbnail(canvas, 'jpeg');
 }
 

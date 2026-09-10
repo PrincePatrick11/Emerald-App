@@ -2,6 +2,7 @@ import type {
   ActiveView, AltarItem, AltarRecord, JournalEntry, Operation, Tag, Task, WikiArticle,
 } from '../types';
 import { foldTypography, plainTextFor } from './searchText';
+import { todayIso, withoutConcealed } from './blocks/sigil';
 import { viewTypeForEntryType } from './modules';
 import type { CategoryModuleId } from './modules';
 
@@ -210,13 +211,14 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
       { updatedAt: article.updated_at, categoryId: article.category_id, entryNumber: article.entry_number });
   }
 
+  const today = todayIso();
   for (const op of corpus.operations.filter(notDeleted)) {
+    // Eine geladene, noch verborgene Sigille ist auch für die Suche verborgen.
+    // Der Zustand steckt im Cache-Stempel: am Zieldatum wird neu gelesen.
+    const visible = withoutConcealed(op.content, today);
+    const stamp = visible === op.content ? op.updated_at : `${op.updated_at}|concealed`;
     push('operation', op.id, op.title,
-      matchRecord(q, op.title, op.tags, () => [
-        op.description ?? '',
-        op.intention_text ?? '',
-        plainTextFor(op.id, op.updated_at, op.content),
-      ]),
+      matchRecord(q, op.title, op.tags, () => [plainTextFor(op.id, stamp, visible)]),
       { updatedAt: op.updated_at, categoryId: op.category_id, entryNumber: op.entry_number });
   }
 

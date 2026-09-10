@@ -1,11 +1,11 @@
 /**
- * Gemeinsame Thumbnail-Erzeugung fuer Altar-Karten und Sigil-Listen.
+ * Thumbnail-Erzeugung fuer die Altar-Karten (frueher auch fuer die Sigil-
+ * Listen; seit v41 zeigen die Karten die gespeicherte Zeichnung selbst).
  *
- * Beide rendern auf THUMBNAIL_W Breite und pressen das Ergebnis unter
+ * Rendert auf THUMBNAIL_W Breite und presst das Ergebnis unter
  * THUMBNAIL_MAX_BYTES: erst WebP ueber eine Qualitaetsleiter, dann das
- * verlustfreie bzw. verlustbehaftete Fallback-Format des Aufrufers.
- * Altaere nehmen JPEG (deckende Szene), Sigille PNG — ihre Zeichnungen
- * liegen auf transparentem Grund, den JPEG schwarz fuellen wuerde.
+ * Fallback-Format des Aufrufers (Altaere: JPEG, deckende Szene; PNG fuer
+ * transparenten Grund, den JPEG schwarz fuellen wuerde).
  *
  * Die 512-KB-Grenze war frueher ein vierfach kopiertes Literal (drei
  * Capture-Stellen in AltarView plus die Downscale-Schleife hier) — sie

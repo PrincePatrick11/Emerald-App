@@ -142,7 +142,7 @@ Several validation rules protect against malformed, oversized, or untrusted data
 
 **`getGradientColor` validation.** `getGradientColor` in `altarConstants.ts` now validates the extracted hex colour against `/^#[0-9a-fA-F]{6}$/` and returns `null` for values that do not match. Call sites (`getAltarBackgroundStyle`, `renderAltarThumbnail`) treat a `null` return as an invalid preset and fall back to the default background. This prevents malformed `gradient:` preset strings from reaching canvas colour parsing or CSS interpolation.
 
-**Thumbnail size cap.** The 512 KB limit lives in one place now — `THUMBNAIL_MAX_BYTES` in `src/lib/thumbnail.ts` — imported by the three capture sites in `AltarView` and enforced inside `canvasToCappedThumbnail`, the shared WebP/JPEG/PNG quality ladder used by both altar and sigil thumbnails. This bounds the size of data stored in `altars.thumbnail_data` and `operations.thumbnail_data` and prevents oversized blobs from accumulating in the SQLite file.
+**Thumbnail size cap.** The 512 KB limit lives in one place now — `THUMBNAIL_MAX_BYTES` in `src/lib/thumbnail.ts` — imported by the three capture sites in `AltarView` and enforced inside `canvasToCappedThumbnail`, the shared WebP/JPEG/PNG quality ladder used by the altar thumbnails. This bounds the size of data stored in `altars.thumbnail_data` (`operations.thumbnail_data` is a legacy column, empty since v41) and prevents oversized blobs from accumulating in the SQLite file.
 
 ## Backup Import Column Validation
 

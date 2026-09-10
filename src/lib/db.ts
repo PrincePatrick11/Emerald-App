@@ -10,8 +10,9 @@ import { adoptLegacyImages, rewriteImageRefs } from './images';
 import { migrateLinkedIdsToContent } from './migrateLinkedIdsToContent';
 import { migrateJournalFieldsToContent } from './migrateJournalFieldsToContent';
 import { mergeCategoryTables } from './mergeCategoryTables';
-import { createIndexesIfMissing } from './dbRebuild';
+import { backupDatabaseFile, createIndexesIfMissing } from './dbRebuild';
 import { migrateOperationStatusToBlocks } from './migrateOperationStatusToBlocks';
+import { convertLegacySigils, hasLegacySigilRows } from './migrateLegacySigils';
 import i18n from '../i18n';
 
 // Per-vault DB cache: SQLite identifier → Database instance
@@ -85,6 +86,11 @@ export async function getDb(): Promise<Database> {
     const db = await Database.load(identifier);
     await runMigrations(db);
     await runPeriodicCleanup(db);
+    // Sigillen-Zeichnungen, die v41 (oder ein Backup-Import) nicht als Datei
+    // speichern konnte — bei jedem Öffnen ein neuer Versuch. Scheitern darf
+    // das Öffnen daran nicht: die Zeilen bleiben einfach, wie sie sind.
+    await convertLegacySigils(db, { includeSigilCategory: false })
+      .catch((e: unknown) => console.error('[db] legacy sigils:', e));
     _dbCache.set(identifier, db);
     _initPromises.delete(identifier);
     return db;
@@ -1162,5 +1168,18 @@ export const MIGRATIONS: Migration[] = [
     version: 40,
     name: 'operation_status_to_blocks',
     up: migrateOperationStatusToBlocks,
+  },
+  {
+    // Die Sigillen-Operation verliert ihre eigene Ansicht und ihre eigenen
+    // Spalten: Rechner, Zeichnung und Ladung werden Blöcke im Inhalt, die
+    // Zeichnung eine Bilddatei. Vorher eine Sicherung — die Zeichnungen
+    // wandern aus der Datenbank in Dateien. Ablauf in `migrateLegacySigils.ts`;
+    // was hier am Speichern scheitert, holt `getDb` bei jedem Öffnen nach.
+    version: 41,
+    name: 'sigils_to_blocks',
+    up: async (db) => {
+      if (await hasLegacySigilRows(db)) await backupDatabaseFile(db, 'v41');
+      await convertLegacySigils(db, { includeSigilCategory: true });
+    },
   },
 ];

@@ -1,4 +1,5 @@
 import { useJournalStore } from '../store/journalStore';
+import { contentForExport } from './blocks/exportContent';
 import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { useCategoryStore } from '../store/categoryStore';
@@ -102,7 +103,7 @@ export async function collectExportData(): Promise<ExportData | null> {
       type: 'journal',
       title: entry.title || 'Untitled',
       entryNumber: entry.entry_number,
-      content: entry.content,
+      content: contentForExport(entry.content),
       createdAt: entry.created_at,
       moonPhase,
       paradigma: paradigmaArt ? (() => {
@@ -138,7 +139,7 @@ export async function collectExportData(): Promise<ExportData | null> {
       type: 'wiki',
       title: article.title || 'Untitled',
       entryNumber: article.entry_number,
-      content: article.content,
+      content: contentForExport(article.content),
       createdAt: article.created_at,
       category: cat ? { label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,
       entryIcon: article.icon || undefined,
@@ -157,7 +158,7 @@ export async function collectExportData(): Promise<ExportData | null> {
       type: 'operations',
       title: op.title || 'Untitled',
       entryNumber: op.entry_number,
-      content: op.content,
+      content: contentForExport(op.content),
       createdAt: op.created_at,
       category: cat ? { label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,
       entryIcon: op.icon || undefined,
