@@ -25,7 +25,7 @@ import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
-import RichEditor from '../editor/RichEditor';
+import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
 
 
@@ -449,12 +449,12 @@ export default function WikiView() {
       tags={{ value: tags, onChange: (newTags) => { setTags(newTags); triggerAutoSave(); } }}
     >
       {loadedArticleId === article.id && (
-        <RichEditor
+        <BlockStack
           key={`${article.id}:${editorEpoch}`}
           initialContent={article.content}
           placeholder={t('wiki.placeholder')}
           onChange={handleContentChange}
-          editable={isEditing}
+          isEditing={isEditing}
         />
       )}
     </EntryDetailFrame>

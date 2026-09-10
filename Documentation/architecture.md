@@ -335,8 +335,61 @@ Since v38, Wiki, Operations, Tasks, and Altar items share one category list — 
 - **`CategoryModal`** (`src/components/ui/CategoryModal.tsx`, replacing the old `CategoryAddModal`) is the add/edit dialog, driven entirely by a `useCategoryEditor` return value: passed only `editor`, it is add-mode; passed `editor` plus `editing: Category`, it becomes edit mode with an inline delete-with-confirm row. Wiki, Operations, and Tasks edit inline in their own `CategoryHeaderRow` instead and only ever mount the modal in add mode; the Altar library strip has no header row of its own to edit inline in, so it is the only caller that passes `editing` and uses the modal for both.
 - **`CategoryHeaderRow`** takes a `category: Category` (previously a module-specific category type) and hides its edit/delete controls for builtins (`category.is_builtin`), rather than each module deciding for itself which ids count as builtin.
 - **`lib/categories.ts`**: `categoryLabel(t, cat)` is the one display-name rule for all four modules — a builtin (`other`/`sigils`) is named via `categories.builtin.<id>` in the active locale, everything else via its stored `name`. `categoriesUsedBy(all, items, always)` returns the categories a view should actually render as chips/groups/tabs: every category at least one item points at, plus the fallback, plus whatever ids the caller passes in `always` (typically the just-created category's id — a brand-new category has no items yet and would otherwise render no group to create the first one under). The rest of the file (`legacyCategoryLabel`, `legacyBuiltinLabelKey`, `legacyDisplayName`, `legacyWikiCategoryEmoji`) exists only for migrations v36–v38 and for importing files/backups written before v38, resolving an old per-module builtin id or name back to a display name; nothing in the live UI reads it.
-- Dragging an entry out of the left sidebar's entry list (`setDragItem` in `src/lib/dragState.ts`, read by the editor's drop indicator in `RichEditor.tsx`) carries the source category's **emoji** in its `category` field for every module now. Wiki's drag payload used to carry the raw `category_id` string there instead of resolving it to an emoji first — the drop indicator would have shown an id, not an icon; Tasks and the others already resolved it correctly, and Wiki now goes through the same `catById[...]?.emoji` lookup.
+- Dragging an entry out of the left sidebar's entry list (`setDragItem` in `src/lib/dragState.ts`, read by the drag ghost in `DragGhost.tsx`) carries the source category's **emoji** in its `category` field for every module now. Wiki's drag payload used to carry the raw `category_id` string there instead of resolving it to an emoji first — the drop indicator would have shown an id, not an icon; Tasks and the others already resolved it correctly, and Wiki now goes through the same `catById[...]?.emoji` lookup.
 - **Altar-specific fallout:** `altarStore` no longer carries a `categories` slice or its own five category actions — it reads `useCategoryStore` like every other module now. Whether a placed item should flicker like a candle no longer depends on the builtin Altar category `candle` (that category is an ordinary, renameable/deletable row since v38); `isCandleEmoji(emoji)` in `altarConstants.ts` checks the item's own emoji (`🕯️`, with or without the variation selector) instead. The Altar tab strip's drag-to-reorder writes through `useCategoryStore.getState().reorderCategories(mergeOrder(full, finalOrder))` — `mergeOrder` splices the dragged subset's new order back into the full global list, since the strip only ever shows (and can only reorder) the categories that hold at least one altar item, not the complete list reordering would otherwise clobber.
+
+### Content Blocks
+
+Journal, Wiki and Operations entries (except the Sigil view, for now) render their body as a
+vertical stack of blocks — `BlockStack` (`src/components/blocks/BlockStack.tsx`) inside
+`EntryDetailFrame`'s `body="scroll"`. The only block type so far is text (`core.text`, one
+`RichEditor` per block); the machinery is the foundation for functional blocks (fields, sigil
+tools, user-built blocks) arriving in later phases.
+
+**Stored format.** Blocks live in the existing `content` column, not in a side table — every
+pipeline that already reads `content` (search, `syncLinks`, image cleanup, merge-import link
+remapping, `.emerald`, backup, export) keeps working unchanged. Each block is a top-level
+`<section data-block="<type>" data-block-id="<id>" …>inner HTML</section>`
+(`src/lib/blocks/blockHtml.ts`). Three rules carry the format:
+
+1. Content *outside* a block section is text. Legacy content with no wrapper at all is one text
+   block, and raw HTML that an import or migration appends becomes another — no migration was
+   needed.
+2. A single text block with no further attributes is written **without** a wrapper. Most
+   entries therefore stay byte-for-byte what they were.
+3. Sections only ever appear at the top level; TipTap has no section node, so none can end up
+   inside a text block.
+
+`parseBlocks`/`serializeBlocks` are deliberately `DOMParser`-free (like `extractInternalLinks`),
+so migrations and `scripts/check-blocks.mjs` (`npm run check:blocks`, also in CI) can use them
+under Node. Only `data-*` attributes are carried through; a block of a type this version doesn't
+know, or with a `data-block-v` newer than its registry entry, renders its inner HTML through
+DOMPurify (`UnknownBlock`), can only be moved or removed, and is written back untouched.
+
+**Registry, two halves** — mirroring `modules.ts`/`moduleViews.ts`. `src/lib/blocks/`
+(`types.ts`, `blockTypes.ts`, `blockHtml.ts`) is pure: types, `lucide-react` and other pure
+`lib` modules only — no React, stores or TipTap — because migrations and export will need it.
+`src/components/blocks/blockViews.ts` maps a type to its component; only `BlockStack` imports it,
+since the text block pulls in TipTap.
+
+**One owner for document-wide listeners.** Everything that used to hang off each `RichEditor`
+at `document` level now lives once per open entry in `BlockStack`, because with several text
+blocks every request would otherwise hit every block: the three `lib/links.ts` link requests
+(append goes to the last-focused text block, else the last one; reveal/remove try each block in
+order), chip-click navigation (`useInternalLinkNavigation`), file drops from the OS
+(`useEditorFileDrop`), pointer drops from the left list and routines (`useEditorPointerDrops`,
+which finds the editor under the pointer and always clears the drag), the drag ghost
+(`DragGhost`), the one sticky `EditorToolbar` bound to the focused editor, and `LinkPickerModal`.
+`RichEditor` itself is now just a text block's writing surface; the link commands it used to
+keep private live in `src/components/editor/editorCommands.ts`.
+
+**Keystrokes don't re-render the stack.** A text block's new HTML goes into `blocksRef` and,
+serialised, to `useEntryEditor.handleContentChange`; React state only changes on structural
+edits (add, duplicate, remove, reorder). Read and edit mode share one component tree —
+`Reorder.Group` stays mounted and is simply inert in read mode, `BlockFrame` keeps its body at
+the same position — because a mode switch that remounted a text block would rebuild it from the
+last structural snapshot rather than the latest keystrokes. Reordering uses framer-motion's
+`Reorder` with `dragListener={false}`; only the grip starts a drag, so text selection still works.
 
 ### Auto-Save (the `useEntryEditor` hook)
 
@@ -351,12 +404,14 @@ hook's effects — the hook call sits above them in the component body).
 
 The editor content itself is mirrored into a `pendingHtmlRef` on each
 keystroke rather than into React state: a state update would re-render the
-whole view per keystroke. `RichEditor`'s `content` prop is consequently an
-**initial value only** — the old effect that compared `editor.getHTML()`
-against the prop on every render (a second full-document serialisation per
-keystroke) is gone. Switching entries remounts the editor via its `key`
-(`` `${id}:${editorEpoch}` ``), and Cancel bumps `editorEpoch` to remount
-from the last saved content. `OperationSigilView` keeps its own variant of
+whole view per keystroke. `BlockStack`'s `initialContent` (and each
+`RichEditor`'s) is consequently an **initial value only** — the old effect
+that compared `editor.getHTML()` against the prop on every render (a second
+full-document serialisation per keystroke) is gone. Switching entries remounts
+the stack via its `key` (`` `${id}:${editorEpoch}` ``), and Cancel bumps
+`editorEpoch` to remount from the last saved content. Since the whole block
+stack serialises into that one `content` string, Cancel's `{title, content}`
+baseline reverts every block change of the session. `OperationSigilView` keeps its own variant of
 this lifecycle: its pending state is canvas data, not HTML, and its save
 path builds a downscaled thumbnail first.
 
@@ -380,7 +435,7 @@ Backlinks are fetched on demand by `fetchBacklinks(targetId)`, which joins the `
 
 **What an entry links** — Journal, Wiki and Operations' right-sidebar "Linked entries" field (`LinkedEntriesField`) — is read straight out of the same content, via `extractInternalLinks` (`src/lib/internalLinkHtml.ts`), rather than tracked as its own list. That file is deliberately `DOMParser`-free for reading (regex over the opening `<span>` tag): it sits on the database path too — migration v36 and the schema-check Node harness call it outside a browser — while writing/remapping a chip's markup (`remapInternalLinks`) does use a real `DOMParser`, since correctness there matters more than portability.
 
-The sidebar field has no reference to the TipTap instance of whichever view happens to be open, so it talks to it through three `document`-level custom events defined in `lib/links.ts`: `requestEntryLinkAppend`/`requestEntryLinkReveal`/`requestEntryLinkRemove`, each paired with `subscribeEntryLinkRequest` on the `RichEditor` side. A request resolves to `true` only when an editable, currently-mounted editor accepted it via `preventDefault()`; the field falls back accordingly — `reveal`, for instance, navigates to the target view instead of jumping to it in text when nothing answered. `isValidLinkTarget` guards all three (and the pre-existing navigate-on-click handler), since the events are reachable by any script in the WebView.
+The sidebar field has no reference to the TipTap instance of whichever view happens to be open, so it talks to it through three `document`-level custom events defined in `lib/links.ts`: `requestEntryLinkAppend`/`requestEntryLinkReveal`/`requestEntryLinkRemove`, each paired with `subscribeEntryLinkRequest` on the `BlockStack` side, which routes the request to the right text block (see [Content Blocks](#content-blocks)). A request resolves to `true` only when an editable, currently-mounted editor accepted it via `preventDefault()`; the field falls back accordingly — `reveal`, for instance, navigates to the target view instead of jumping to it in text when nothing answered. `isValidLinkTarget` guards all three (and the pre-existing navigate-on-click handler), since the events are reachable by any script in the WebView.
 
 Appending a link (from the field, from `[[`-picker selection, or from a dropped routine's operations/wiki articles) always adds a full block — a horizontal rule, the target's category as an `<h3>`, then the chip — never merges into an existing block; `internalLinkBlockHtml` is the one definition of that shape, shared by the editor's `appendEntryLink`, migrations v36/v37, and `.emerald`/Markdown import's legacy-column bridge (below). Removing a link deletes that whole block if the chip is the sole content of one of these appended blocks (`removeEntryLink` checks for the preceding rule/heading before treating it as one), or just the chip if it sits inline in text the user wrote around it. Appending also jumps to the new block and briefly highlights it via `revealEntryLink`, run a frame later so the chip's node view has actually rendered — the same function the `reveal`-on-click path already used, but with its `caretAtBlockEnd` option set: appending leaves a text selection at the end of the chip's paragraph, ready to keep typing, where clicking an existing chip (`reveal`-on-click, and the field's own "jump to it" navigation) still selects the chip itself as a node, since there "this one" is the point being made. `internalLink` is an inline atom, so its parent is always a textblock — there is no other case to branch on, and the position math no longer pretends there is.
 
@@ -417,6 +472,11 @@ Tauri's WKWebView does not pass HTML5 drag events to JavaScript. All drag-and-dr
 1. `onPointerDown` on the draggable element calls a setter in a module-level drag state module (e.g. `dragState.ts`, `altarDragState.ts`).
 2. The drop target registers `pointermove` and `pointerup` listeners on `document` while a drag is in progress.
 3. On `pointerup`, the target reads the drag state and applies the drop.
+
+Drops into an entry's text register exactly one such listener per open entry
+(`useEditorPointerDrops`, mounted by `BlockStack`): it hit-tests the text blocks' editors and
+clears the drag whether or not one was hit. One listener per text block would let the first
+clear the drag before the block under the pointer saw it.
 
 ### Tabs and Workspace State
 

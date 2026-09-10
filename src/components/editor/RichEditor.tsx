@@ -1,5 +1,4 @@
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
-import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -10,31 +9,17 @@ import TaskItem from '@tiptap/extension-task-item';
 import TextAlign from '@tiptap/extension-text-align';
 import { ResizableImage } from './ResizableImageExtension';
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { getCurrentWebview } from '@tauri-apps/api/webview';
-import { saveImage, copyImageFile } from '../../lib/images';
+import { saveImage } from '../../lib/images';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { ExternalLink, Pencil, Trash2, Check, X, AlertCircle } from 'lucide-react';
+import { ExternalLink, Pencil, Trash2, Check, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import EditorToolbar, { TEXT_ALIGN_TYPES } from './EditorToolbar';
+import { TEXT_ALIGN_TYPES } from './EditorToolbar';
 import Button from '../ui/Button';
-import Modal from '../ui/Modal';
-import LinkPickerModal from './LinkPickerModal';
 import { createInternalLinkExtension } from './InternalLinkExtension';
 import { ExternalDropExtension } from './ExternalDropExtension';
 import { DEFAULT_ENTRY_EMOJI, type SuggestionItem } from './SuggestionList';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
-import { getDragItem, setDragItem, subscribeDrag } from '../../lib/dragState';
-import { viewTypeForEntryType } from '../../lib/modules';
-import {
-  APPEND_ENTRY_LINK_EVENT, REMOVE_ENTRY_LINK_EVENT, REVEAL_ENTRY_LINK_EVENT,
-  isValidLinkTarget, subscribeEntryLinkRequest, type EntryLinkRequest,
-} from '../../lib/links';
-import { internalLinkBlockHtml } from '../../lib/internalLinkHtml';
 import { useLinkItems } from '../../hooks/useLinkItems';
-import type { ContentType } from '../../types';
-import { getRoutineDragItem, setRoutineDragItem, subscribeRoutineDrag, type RoutineDragItem } from '../../lib/routineDragState';
 import { useCategoryStore } from '../../store/categoryStore';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import type { MoonPhase } from '../../types';
@@ -43,7 +28,6 @@ import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useTaskStore } from '../../store/taskStore';
 import { useAltarStore } from '../../store/altarStore';
-import { useUIStore } from '../../store/uiStore';
 import { isAcceptedImageFile, readFileAsDataUrl } from '../../lib/helpers';
 
 interface LinkPopupState {
@@ -51,216 +35,10 @@ interface LinkPopupState {
   rect: DOMRect;
 }
 
-/** Position des ERSTEN Link-Chips für `id`/`entryType` im Dokument, oder `null`.
- *  Ein zweifach verlinktes Ziel wird also immer an seiner ersten Stelle
- *  gefunden — für „ist das schon verlinkt?" und „zeig mir die Stelle" reicht
- *  das, ein zweiter Treffer bräuchte erst eine Bedienung dafür. */
-function findEntryLinkPos(doc: ProseMirrorNode, target: { id: string; entryType: string }): number | null {
-  let found: number | null = null;
-  doc.descendants((node, pos) => {
-    if (found !== null) return false;
-    if (node.type.name === 'internalLink' && node.attrs.id === target.id && node.attrs.entryType === target.entryType) {
-      found = pos;
-      return false;
-    }
-    return true;
-  });
-  return found;
-}
-
-/**
- * Hängt einen internen Link ganz unten an den Eintrag an, jedes Mal als
- * vollständiger Block: Trennlinie, Kategorie des Ziels als Überschrift, dann
- * der Link. Bewusst ohne Zusammenfassen — zwei Links derselben Kategorie
- * bekommen zwei Blöcke.
- *
- * Wie der Block aussieht, sagt `internalLinkBlockHtml` — eine Definition für
- * das Einfügen hier und für die Migrationen v36/v37, die dieselben Blöcke ohne
- * Editor schreiben müssen.
- *
- * Ist der Eintrag noch leer, entfällt die Trennlinie und der leere Absatz wird
- * ersetzt: die Linie trennt den Text von den Links, und Text gibt es dann noch
- * keinen.
- *
- * Ein bereits verlinktes Ziel wird nicht ein zweites Mal angehängt. Danach
- * springt die Ansicht zum neuen Link und hebt ihn kurz hervor — dieselbe
- * Bewegung wie beim Klick auf einen Chip im Verlinkungs-Feld. Das Feld in der
- * Seitenleiste verliert dabei den Fokus, was gewollt ist: man sieht, wo der
- * Link gelandet ist, statt blind weiterzuklicken.
- *
- * Der Cursor landet dabei am Ende des Link-Absatzes statt auf dem Chip —
- * warum, steht bei `caretAtBlockEnd` an `revealEntryLink`.
- */
-function appendEntryLink(editor: Editor, item: EntryLinkRequest): void {
-  const { doc } = editor.state;
-  if (findEntryLinkPos(doc, item) !== null) return;
-
-  const empty = editor.isEmpty;
-  const html = internalLinkBlockHtml(
-    {
-      id: item.id,
-      entryType: item.entryType,
-      label: item.label,
-      icon: item.icon ?? null,
-      entry_number: item.entry_number ?? null,
-    },
-    item.categoryLabel ?? '',
-    { separator: !empty },
-  );
-
-  editor
-    .chain()
-    .insertContentAt(empty ? { from: 0, to: doc.content.size } : doc.content.size, html)
-    .focus()
-    .run();
-
-  // Einen Frame später: der Absatz steht dann im DOM, und die React-NodeView
-  // des Chips ist gerendert — `revealEntryLink` braucht beides, um zu scrollen
-  // und die Markierung zu setzen.
-  requestAnimationFrame(() => {
-    if (!editor.isDestroyed) revealEntryLink(editor, item, { caretAtBlockEnd: true });
-  });
-}
-
-/**
- * Entfernt einen Link aus dem Eintrag. Stand er in einem eigenen
- * Verlinkungs-Block — Trennlinie, Überschrift, Absatz nur mit diesem Chip, so
- * wie `appendEntryLink` ihn anlegt —, fällt der ganze Block weg. Steht er
- * mitten im Fließtext, verschwindet nur der Chip und der Satz bleibt stehen.
- *
- * Gibt `false` zurück, wenn der Link nicht im Inhalt steht (etwa bei einer
- * Verknüpfung aus den alten Spalten).
- */
-/** Trägt der Absatz nur diesen einen Chip (plus Leerraum)? */
-function holdsOnlyLink(paragraph: ProseMirrorNode, target: { id: string; entryType: string }): boolean {
-  let only = true;
-  paragraph.forEach((child) => {
-    if (child.type.name === 'internalLink') {
-      if (child.attrs.id !== target.id || child.attrs.entryType !== target.entryType) only = false;
-      return;
-    }
-    if (child.isText && !(child.text ?? '').trim()) return;
-    only = false;
-  });
-  return only;
-}
-
-function removeEntryLink(editor: Editor, target: EntryLinkRequest): boolean {
-  const { doc } = editor.state;
-  const pos = findEntryLinkPos(doc, target);
-  if (pos === null) return false;
-
-  const $pos = doc.resolve(pos);
-  const parent = $pos.parent;
-
-  // Ein Verlinkungs-Block ist NUR, was `appendEntryLink` anlegt: ein Absatz
-  // direkt im Dokument, der nichts als diesen Chip trägt, mit einer Trennlinie
-  // davor und höchstens einer Überschrift dazwischen — oder, als allererster
-  // Block eines zuvor leeren Eintrags, ohne Trennlinie. Alles andere — ein Chip
-  // in einer Liste, in einem Zitat, unter einer selbst getippten Überschrift —
-  // ist Fließtext, und dort wird nur der Chip entfernt. Ohne diese engen
-  // Grenzen risse das Löschen fremde Blöcke mit.
-  if ($pos.depth === 1 && parent.type.name === 'paragraph' && holdsOnlyLink(parent, target)) {
-    const paragraphPos = $pos.before(1);
-    const index = $pos.index(0);
-    const prev = index >= 1 ? doc.child(index - 1) : null;
-    const prevPrev = index >= 2 ? doc.child(index - 2) : null;
-
-    let from = paragraphPos;
-    if (prev?.type.name === 'horizontalRule') {
-      from -= prev.nodeSize;
-    } else if (prev?.type.name === 'heading' && prevPrev?.type.name === 'horizontalRule') {
-      from -= prev.nodeSize + prevPrev.nodeSize;
-    } else if (
-      // Der erste Block in einem zuvor leeren Eintrag: er beginnt mit der
-      // Überschrift, ohne Trennlinie davor. Damit hier keine selbst getippte
-      // Überschrift mitgeht, muss ihr Text genau die Kategorie des Ziels sein.
-      prev?.type.name === 'heading' && index === 1 &&
-      target.categoryLabel && prev.textContent === target.categoryLabel
-    ) {
-      from -= prev.nodeSize;
-    } else {
-      from = -1; // keine eröffnende Trennlinie — also kein Block von uns
-    }
-
-    if (from >= 0) {
-      editor.chain().deleteRange({ from, to: paragraphPos + parent.nodeSize }).run();
-      return true;
-    }
-  }
-
-  editor.chain().deleteRange({ from: pos, to: pos + doc.nodeAt(pos)!.nodeSize }).run();
-  return true;
-}
-
-const REVEAL_CLASS = 'is-revealed';
-/** Muss zur Dauer von `internal-link-reveal` in index.css passen. */
-const REVEAL_MS = 1600;
-let revealTimer: number | undefined;
-let revealedEl: HTMLElement | undefined;
-
-/**
- * Springt zum Link-Chip im Inhalt und hebt ihn kurz hervor. Gibt `false`
- * zurück, wenn der Eintrag ihn nicht enthält — dann hat der Aufrufer die Wahl,
- * stattdessen zum Ziel zu navigieren.
- *
- * Timer und markiertes Element liegen modulweit, damit ein zweiter Klick auf
- * denselben Chip wieder aufblitzt (Klasse ab, Reflow, Klasse an) statt am noch
- * laufenden ersten Durchlauf hängenzubleiben. Nur ein Chip ist je markiert.
- *
- * `caretAtBlockEnd` setzt den Cursor ans Ende des Absatzes, in dem der Chip
- * steht, statt den Chip selbst auszuwählen — für das frische Einfügen, nach dem
- * man weiterschreibt: eine Knotenauswahl würde der erste Tastendruck durch das
- * Getippte ersetzen. Beim Nachschlagen eines vorhandenen Links bleibt sie, dort
- * ist „das hier ist gemeint" die Aussage.
- */
-function revealEntryLink(
-  editor: Editor,
-  target: { id: string; entryType: string },
-  { caretAtBlockEnd = false }: { caretAtBlockEnd?: boolean } = {},
-): boolean {
-  const pos = findEntryLinkPos(editor.state.doc, target);
-  if (pos === null) return false;
-
-  // Im Edit-Modus zusätzlich echt selektieren, damit der Cursor dort steht;
-  // im Lesemodus zeigt ProseMirror keine Selektion, dort trägt die Klasse.
-  if (editor.isEditable) {
-    const chain = editor.chain();
-    // `internalLink` ist ein Inline-Knoten, sein Elternteil also immer ein
-    // Textblock — `end()` ist damit das Ende des Absatzes: hinter dem Chip und
-    // hinter dem Leerzeichen, das `internalLinkBlockHtml` anhängt.
-    if (caretAtBlockEnd) chain.setTextSelection(editor.state.doc.resolve(pos).end());
-    else chain.setNodeSelection(pos);
-    chain.focus().run();
-  }
-
-  const dom = editor.view.nodeDOM(pos);
-  const el = dom instanceof HTMLElement
-    ? (dom.querySelector<HTMLElement>('.internal-link-chip') ?? dom)
-    : null;
-  if (!el) return true;
-
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  el.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
-
-  if (revealTimer !== undefined) window.clearTimeout(revealTimer);
-  revealedEl?.classList.remove(REVEAL_CLASS);
-  el.classList.remove(REVEAL_CLASS);
-  void el.offsetWidth; // Reflow erzwingen, sonst startet die Animation nicht neu.
-  el.classList.add(REVEAL_CLASS);
-  revealedEl = el;
-  revealTimer = window.setTimeout(() => {
-    el.classList.remove(REVEAL_CLASS);
-    revealTimer = undefined;
-    revealedEl = undefined;
-  }, REVEAL_MS);
-  return true;
-}
-
 interface RichEditorProps {
   /**
-   * Nur der INITIALWERT — der Editor ist danach unkontrolliert. Die Views
-   * mounten ihn per `key` neu, wenn ein anderer Eintrag geladen oder Cancel
+   * Nur der INITIALWERT — der Editor ist danach unkontrolliert. Der Stapel
+   * mountet ihn per `key` neu, wenn ein anderer Eintrag geladen oder Cancel
    * gedrueckt wird. Der fruehere Sync-Effekt, der bei jedem Render
    * `getHTML()` mit dem Prop verglich, war zusammen mit `onUpdate` eine
    * doppelte Serialisierung des gesamten Dokuments pro Tastendruck.
@@ -269,14 +47,30 @@ interface RichEditorProps {
   placeholder?: string;
   onChange: (content: string) => void;
   editable?: boolean;
+  /** Meldet die Editor-Instanz, sobald sie steht, und `null` beim Abbau. */
+  onEditorReady?: (editor: Editor | null) => void;
 }
 
+/**
+ * Die Schreibfläche eines Textblocks.
+ *
+ * Alles, was es pro geöffnetem Eintrag nur EINMAL geben darf, hält der
+ * `BlockStack`: Toolbar, Linkauswahl, die Link-Bitten der Seitenleiste, die
+ * Navigation per Chip-Klick, Drops (Dateien aus dem Explorer, Einträge aus der
+ * linken Liste, Routinen) und das Drag-Schild. Das hing früher hier und damit
+ * pro Editor am `document` — mit mehreren Textblöcken hätte jede Bitte jeden
+ * Block getroffen.
+ *
+ * Hier bleibt, was an genau diesem Editor hängt: Extensions und Chip-Lookups,
+ * das Popup für externe Links und Einfügen per Paste.
+ */
 export default function RichEditor({
   initialContent,
-  // Kein englischer Default: alle Views übergeben ihren lokalisierten Placeholder.
+  // Kein englischer Default: der Stapel übergibt den lokalisierten Placeholder.
   placeholder = '',
   onChange,
   editable = true,
+  onEditorReady,
 }: RichEditorProps) {
   const entries = useJournalStore((s) => s.entries);
   const articles = useWikiStore((s) => s.articles);
@@ -284,16 +78,12 @@ export default function RichEditor({
   const operations = useOperationStore((s) => s.operations);
   const tasks = useTaskStore((s) => s.tasks);
   const altars = useAltarStore((s) => s.altars);
-  const setActiveView = useUIStore((s) => s.setActiveView);
   const { t } = useTranslation();
 
   // Link popup state (edit mode only)
   const [linkPopup, setLinkPopup] = useState<LinkPopupState | null>(null);
   const [editingHref, setEditingHref] = useState<string | null>(null);
   const linkPopupRef = useRef<HTMLDivElement>(null);
-
-  // Link picker modal state
-  const [linkPickerOpen, setLinkPickerOpen] = useState(false);
 
   // Always-fresh icon lookup ref — returns the current icon for any entry from the store.
   // Backed by a ref so the extension closure never goes stale after initial mount.
@@ -358,10 +148,9 @@ export default function RichEditor({
       Highlight.configure({ multicolor: false }),
       TaskList,
       TaskItem.configure({ nested: true }),
-      // Bilder richten sich ueber ihr eigenes `align`-Attribut aus (Blocknode mit
-      // eigener Breite) — `text-align` auf dem Absatz erreicht sie nicht.
       // Bilder bleiben aussen vor: sie richten sich ueber ihr eigenes
-      // `align`-Attribut aus, siehe `alignMargins` in ResizableImageExtension.
+      // `align`-Attribut aus (Blocknode mit eigener Breite), siehe
+      // `alignMargins` in ResizableImageExtension.
       TextAlign.configure({ types: [...TEXT_ALIGN_TYPES] }),
       createInternalLinkExtension(
         (query) => {
@@ -404,6 +193,14 @@ export default function RichEditor({
     },
   });
 
+  const onEditorReadyRef = useRef(onEditorReady);
+  onEditorReadyRef.current = onEditorReady;
+  useEffect(() => {
+    if (!editor) return;
+    onEditorReadyRef.current?.(editor);
+    return () => onEditorReadyRef.current?.(null);
+  }, [editor]);
+
   // Track cursor position to show link popup in edit mode
   const updateLinkPopup = useCallback(() => {
     if (!editor || !editable) return;
@@ -432,8 +229,7 @@ export default function RichEditor({
 
   useEffect(() => {
     if (!editor || !editable) return;
-    editor.on('selectionUpdate', updateLinkPopup);
-    editor.on('blur', () => {
+    const onBlur = () => {
       // Delay so popup click events can fire before hiding
       setTimeout(() => {
         if (!linkPopupRef.current?.contains(document.activeElement)) {
@@ -441,200 +237,18 @@ export default function RichEditor({
           setEditingHref(null);
         }
       }, 150);
-    });
+    };
+    editor.on('selectionUpdate', updateLinkPopup);
+    editor.on('blur', onBlur);
     return () => {
       editor.off('selectionUpdate', updateLinkPopup);
+      editor.off('blur', onBlur);
     };
   }, [editor, editable, updateLinkPopup]);
-
-  // Wiki/Ops sidebar → editor drop via pointer events
-  const [wikiDragItem, setWikiDragItem] = useState<SuggestionItem | null>(null);
-  const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
-  useEffect(() => subscribeDrag(setWikiDragItem), []);
-
-  // Routine sidebar → editor drop
-  const [routineDragItem, setRoutineDragItemState] = useState<RoutineDragItem | null>(null);
-  useEffect(() => subscribeRoutineDrag(setRoutineDragItemState), []);
-
-  useEffect(() => {
-    if (!routineDragItem) return;
-
-    const handlePointerMove = (e: PointerEvent) => {
-      setGhostPos({ x: e.clientX, y: e.clientY });
-    };
-
-    const handlePointerUp = (e: PointerEvent) => {
-      const dragItem = getRoutineDragItem();
-      setRoutineDragItem(null);
-      if (!dragItem || !editor || !editable) return;
-
-      const editorEl = editor.view.dom;
-      const rect = editorEl.getBoundingClientRect();
-      if (e.clientX < rect.left || e.clientX > rect.right ||
-          e.clientY < rect.top  || e.clientY > rect.bottom) return;
-
-      const pos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
-      if (!pos) return;
-
-      // Parse markdown, sanitize, and insert as formatted HTML
-      const rawHtml = (marked.parse(dragItem.content || '') as string) || '<p></p>';
-      const html = DOMPurify.sanitize(rawHtml, { USE_PROFILES: { html: true } });
-
-      editor.chain().focus().insertContentAt(pos.pos, html).run();
-
-      // Die Operationen und Wiki-Artikel der Routine landen als Link-Chips
-      // unten im Eintrag — dort, wo das Verlinkungs-Feld der Seitenleiste sie
-      // auch wieder findet. (Früher: eigene Spalten am Journal-Eintrag.)
-      for (const link of [
-        ...dragItem.operation_ids.map((id) => ({ id, entryType: 'operation' as const })),
-        ...dragItem.wiki_ids.map((id) => ({ id, entryType: 'wiki' as const })),
-      ]) {
-        const item = itemsRef.current.find((i) => i.entryType === link.entryType && i.id === link.id);
-        if (item) appendEntryLink(editor, item);
-      }
-
-      // Tags bleiben Sache der View — sie besitzt den lokalen Tag-State.
-      if (dragItem.tags.length > 0) {
-        document.dispatchEvent(new CustomEvent('routine-drop', { detail: { tags: dragItem.tags } }));
-      }
-    };
-
-    document.addEventListener('pointermove', handlePointerMove);
-    document.addEventListener('pointerup', handlePointerUp);
-    return () => {
-      document.removeEventListener('pointermove', handlePointerMove);
-      document.removeEventListener('pointerup', handlePointerUp);
-    };
-  }, [routineDragItem, editor, editable]);
-
-  useEffect(() => {
-    if (!wikiDragItem) {
-      setGhostPos(null);
-      return;
-    }
-
-    const handlePointerMove = (e: PointerEvent) => {
-      setGhostPos({ x: e.clientX, y: e.clientY });
-    };
-
-    const handlePointerUp = (e: PointerEvent) => {
-      const dragItem = getDragItem();
-      setDragItem(null);
-      if (!dragItem || !editor || !editable) return;
-
-      // Check if pointer landed inside the editor
-      const editorEl = editor.view.dom;
-      const rect = editorEl.getBoundingClientRect();
-      if (e.clientX < rect.left || e.clientX > rect.right ||
-          e.clientY < rect.top  || e.clientY > rect.bottom) return;
-
-      // Resolve ProseMirror position from coordinates
-      const pos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
-      if (!pos) return;
-
-      editor.chain()
-        .focus()
-        .insertContentAt(pos.pos, {
-          type: 'internalLink',
-          attrs: { id: dragItem.id, entryType: dragItem.entryType, label: dragItem.label, icon: dragItem.icon ?? null },
-        })
-        .run();
-    };
-
-    document.addEventListener('pointermove', handlePointerMove);
-    document.addEventListener('pointerup', handlePointerUp);
-    return () => {
-      document.removeEventListener('pointermove', handlePointerMove);
-      document.removeEventListener('pointerup', handlePointerUp);
-    };
-  }, [wikiDragItem, editor, editable]);
 
   useEffect(() => {
     editor?.setEditable(editable);
   }, [editable, editor]);
-
-  // Anhängen und Entfernen aus dem Verlinkungs-Feld — nur im Edit-Modus.
-  // Bleibt die Quittung aus (kein editierbarer Editor, weil der Eintrag noch
-  // nicht geladen ist), weiß das Feld, dass sein Klick ins Leere ging.
-  useEffect(() => {
-    if (!editor || !editable) return;
-    const off = [
-      subscribeEntryLinkRequest(APPEND_ENTRY_LINK_EVENT, (item) => {
-        appendEntryLink(editor, item);
-        return true;
-      }),
-      subscribeEntryLinkRequest(REMOVE_ENTRY_LINK_EVENT, (target) => removeEntryLink(editor, target)),
-    ];
-    return () => off.forEach((fn) => fn());
-  }, [editor, editable]);
-
-  // Klick auf einen Chip im Verlinkungs-Feld → zur Stelle im Eintrag springen.
-  // Anders als die beiden oben auch im Lesemodus: dort ist es der Normalfall.
-  useEffect(() => {
-    if (!editor) return;
-    return subscribeEntryLinkRequest(
-      REVEAL_ENTRY_LINK_EVENT,
-      (target) => revealEntryLink(editor, target),
-    );
-  }, [editor]);
-
-  // File drag & drop from Finder via Tauri's native drag-drop API
-  const editorRef = useRef(editor);
-  editorRef.current = editor;
-
-  const [fileDragOver, setFileDragOver] = useState(false);
-  const [dragFormatError, setDragFormatError] = useState(false);
-  useEffect(() => {
-    if (!editable) return;
-    const unlistenRef = { fn: undefined as (() => void) | undefined };
-
-    getCurrentWebview()
-      .onDragDropEvent(async (event) => {
-        const { type } = event.payload;
-
-        if (type === 'enter' || type === 'over') { setFileDragOver(true); return; }
-        if (type === 'leave') { setFileDragOver(false); return; }
-
-        if (type === 'drop') {
-          setFileDragOver(false);
-          const { paths } = event.payload;
-          const imagePaths = paths.filter((p) => /\.(png|jpe?g|gif|webp|svg)$/i.test(p));
-          if (!imagePaths.length) { setDragFormatError(true); return; }
-
-          const ed = editorRef.current;
-          if (!ed) return;
-
-          for (const path of imagePaths) {
-            try {
-              const src = await copyImageFile(path);
-              ed.chain().focus().insertContent({ type: 'image', attrs: { src } }).run();
-            } catch (e) {
-              console.error('[DnD] failed:', path, e);
-            }
-          }
-        }
-      })
-      .then((fn) => { unlistenRef.fn = fn; })
-      .catch((e) => console.error('[DnD] setup failed:', e));
-
-    return () => { unlistenRef.fn?.(); };
-  }, [editable]);
-
-  // Navigate to internal link via CustomEvent (fired by InternalLinkNodeView).
-  // Only active in read mode — edit mode ignores clicks so the cursor can be placed.
-  useEffect(() => {
-    if (editable) return;
-    const handler = (e: Event) => {
-      const { id, entryType: rawEntryType } = (e as CustomEvent<{ id: string; entryType: string }>).detail;
-      const entryType = rawEntryType?.trim();
-      // Prüfen, bevor navigiert wird — schützt gegen synthetische Events aus
-      // XSS im Editor-Inhalt. Dieselbe Prüfung wie beim Anhängen und Anzeigen.
-      if (!isValidLinkTarget({ id, entryType })) return;
-      setActiveView({ type: viewTypeForEntryType(entryType as ContentType), id, mode: 'view' });
-    };
-    document.addEventListener('internal-link-navigate', handler);
-    return () => document.removeEventListener('internal-link-navigate', handler);
-  }, [editable, setActiveView]);
 
   // Open external links in browser (read mode only)
   useEffect(() => {
@@ -674,26 +288,8 @@ export default function RichEditor({
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {editable && editor && (
-        <EditorToolbar
-          editor={editor}
-          onInsertImage={async (dataUrl) => {
-            try {
-              const src = await saveImage(dataUrl);
-              editor.chain().focus().insertContent({ type: 'image', attrs: { src } }).run();
-            } catch (e) {
-              console.error('Failed to save image:', e);
-            }
-          }}
-          onOpenLinkPicker={() => setLinkPickerOpen(true)}
-        />
-      )}
-      <div
-        className={`flex-1 overflow-y-auto relative ${((wikiDragItem || routineDragItem) && editable) || fileDragOver ? 'ring-1 ring-inset ring-jade-700/50' : ''}`}
-      >
-        <EditorContent editor={editor} className="h-full" />
-      </div>
+    <div className="relative">
+      <EditorContent editor={editor} />
 
       {/* Link popup — shown in edit mode when cursor is inside an external link */}
       {editable && linkPopup && (
@@ -747,67 +343,6 @@ export default function RichEditor({
               </Button>
             </>
           )}
-        </div>
-      )}
-
-      {/* Link picker modal — opened via toolbar link button */}
-      {editable && linkPickerOpen && editor && (
-        <LinkPickerModal
-          onSelect={(item) => {
-            editor.chain().focus().insertContent({
-              type: 'internalLink',
-              attrs: {
-                id: item.id,
-                entryType: item.entryType,
-                label: item.label,
-                icon: item.icon ?? null,
-                entry_number: item.entry_number ?? null,
-              },
-            }).insertContent(' ').run();
-          }}
-          onClose={() => setLinkPickerOpen(false)}
-        />
-      )}
-
-      {/* Drag-drop format error modal */}
-      {dragFormatError && (
-        <Modal
-          title={t('common.unsupportedImageFormat')}
-          onClose={() => setDragFormatError(false)}
-          widthClassName="w-72"
-          bodyClassName="px-4 py-3"
-        >
-          <div className="flex items-center gap-2 text-red-400 mb-2">
-            <AlertCircle size={14} />
-            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>PNG, JPEG, GIF, WebP, SVG</p>
-          </div>
-          <Button onClick={() => setDragFormatError(false)} variant="secondary" className="w-full">
-            {t('common.ok')}
-          </Button>
-        </Modal>
-      )}
-
-      {/* Floating ghost following cursor during drag */}
-      {(wikiDragItem || routineDragItem) && ghostPos && (
-        <div
-          className="fixed pointer-events-none z-50 flex items-center gap-1.5 px-2 py-1
-                     bg-stone-800 border border-stone-600 rounded shadow-lg opacity-90"
-          style={{ left: ghostPos.x + 12, top: ghostPos.y + 12 }}
-        >
-          {routineDragItem ? (
-            <>
-              <span className="text-sm">{routineDragItem.emoji}</span>
-              <span className="text-xs text-jade-400">{routineDragItem.name}</span>
-            </>
-          ) : wikiDragItem ? (
-            <>
-              {/* `category` trägt in jedem Modul das Kategorie-Emoji. */}
-              {wikiDragItem.category ? (
-                <span className="text-sm">{wikiDragItem.category}</span>
-              ) : null}
-              <span className="text-xs text-jade-400">{wikiDragItem.label}</span>
-            </>
-          ) : null}
         </div>
       )}
     </div>

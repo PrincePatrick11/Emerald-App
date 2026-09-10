@@ -278,6 +278,20 @@
     "changeIcon": "Change icon",
     "removeIcon": "Remove icon"
   },
+  "blocks": {
+    "add": "Add block",
+    "actions": "Block actions",
+    "dragToMove": "Drag to move",
+    "remove": "Remove block",
+    "unknown": "Unknown block ({{type}})",
+    "types": {
+      "text": {
+        "label": "Text",
+        "description": "Formatted text with headings, lists, images and links.",
+        "placeholder": "Keep writing…"
+      }
+    }
+  },
   "editor": {
     "done": "Done",
     "cancel": "Cancel",

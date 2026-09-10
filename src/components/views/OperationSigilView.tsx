@@ -598,7 +598,6 @@ export default function OperationSigilView({ operation }: { operation: Operation
       }
       title={isEditing ? title : operation.title}
       onTitleChange={(nextTitle) => { setTitle(nextTitle); triggerAutoSave(); }}
-      body="scroll"
     >
       <div className="mx-auto max-w-6xl space-y-5">
         {isEditing && (

@@ -8,7 +8,7 @@ import { useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEditActions } from '../../hooks/useEditActions';
 import { useJournalStore } from '../../store/journalStore';
 import { useUndoStore } from '../../store/undoStore';
-import RichEditor from '../editor/RichEditor';
+import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
@@ -376,12 +376,12 @@ export default function JournalView() {
       tags={{ value: tags, onChange: (newTags) => { setTags(newTags); triggerAutoSave(); } }}
     >
       {loadedEntryId === entry.id && (
-        <RichEditor
+        <BlockStack
           key={`${entry.id}:${editorEpoch}`}
           initialContent={entry.content}
           placeholder={t('journal.placeholder')}
           onChange={handleContentChange}
-          editable={isEditing}
+          isEditing={isEditing}
         />
       )}
     </EntryDetailFrame>

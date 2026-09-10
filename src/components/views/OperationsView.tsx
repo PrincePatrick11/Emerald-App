@@ -23,7 +23,7 @@ import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEditActions } from '../../hooks/useEditActions';
-import RichEditor from '../editor/RichEditor';
+import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
 import OperationSigilView from './OperationSigilView';
 
@@ -592,12 +592,12 @@ export default function OperationsView() {
       tags={{ value: tags, onChange: (newTags) => { setTags(newTags); triggerAutoSave(); } }}
     >
       {loadedOperationId === operation.id && (
-        <RichEditor
+        <BlockStack
           key={`${operation.id}:${editorEpoch}`}
           initialContent={operation.content}
           placeholder={t('operations.placeholder')}
           onChange={handleContentChange}
-          editable={isEditing}
+          isEditing={isEditing}
         />
       )}
     </EntryDetailFrame>

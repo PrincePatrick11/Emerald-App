@@ -278,6 +278,20 @@
     "changeIcon": "Icon ändern",
     "removeIcon": "Icon entfernen"
   },
+  "blocks": {
+    "add": "Block hinzufügen",
+    "actions": "Block-Aktionen",
+    "dragToMove": "Ziehen zum Verschieben",
+    "remove": "Block entfernen",
+    "unknown": "Unbekannter Block ({{type}})",
+    "types": {
+      "text": {
+        "label": "Text",
+        "description": "Formatierter Text mit Überschriften, Listen, Bildern und Verknüpfungen.",
+        "placeholder": "Weiterschreiben …"
+      }
+    }
+  },
   "editor": {
     "done": "Fertig",
     "cancel": "Abbrechen",

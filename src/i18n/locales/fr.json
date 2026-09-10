@@ -278,6 +278,20 @@
     "changeIcon": "Changer l'icône",
     "removeIcon": "Supprimer l'icône"
   },
+  "blocks": {
+    "add": "Ajouter un bloc",
+    "actions": "Actions du bloc",
+    "dragToMove": "Glisser pour déplacer",
+    "remove": "Supprimer le bloc",
+    "unknown": "Bloc inconnu ({{type}})",
+    "types": {
+      "text": {
+        "label": "Texte",
+        "description": "Texte mis en forme avec titres, listes, images et liens.",
+        "placeholder": "Continuez à écrire…"
+      }
+    }
+  },
   "editor": {
     "done": "Terminé",
     "cancel": "Annuler",

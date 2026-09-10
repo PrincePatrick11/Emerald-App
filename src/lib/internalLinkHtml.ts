@@ -124,6 +124,24 @@ export interface InternalLinkChip {
   entry_number?: number | null;
 }
 
+/** Die Chip-Attribute eines Link-Ziels — dieselben Namen wie die Node-Attribute
+ *  der `InternalLinkExtension`, also auch direkt als `attrs` einsetzbar. */
+export function toInternalLinkChip(item: {
+  id: string;
+  entryType: ContentType;
+  label: string;
+  icon?: string | null;
+  entry_number?: number | null;
+}): InternalLinkChip {
+  return {
+    id: item.id,
+    entryType: item.entryType,
+    label: item.label,
+    icon: item.icon ?? null,
+    entry_number: item.entry_number ?? null,
+  };
+}
+
 /**
  * Der Chip so, wie TipTaps `renderHTML` ihn schreiben würde. Leere Attribute
  * bleiben weg — `mergeAttributes` lässt `null` ebenfalls fallen.

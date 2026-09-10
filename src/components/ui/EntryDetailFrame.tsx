@@ -21,8 +21,7 @@ interface EntryDetailFrameProps {
   belowTitle?: ReactNode;
   /** Weglassen = keine Tag-Zeile (Sigil). Immer readOnly — editiert wird im Properties-Panel. */
   tags?: { value: string[]; onChange: (tags: string[]) => void };
-  /** 'editor' (Default): overflow-hidden, der Editor scrollt selbst. 'scroll': eigener Scrollbereich (Sigil). */
-  body?: 'editor' | 'scroll';
+  /** Der Körper scrollt im Frame — die sticky Toolbar des BlockStack braucht den Scrollbereich hier, nicht im Editor. */
   children: ReactNode;
 }
 
@@ -39,7 +38,7 @@ interface EntryDetailFrameProps {
  */
 export default function EntryDetailFrame({
   module, isEditing, breadcrumbMeta, topbarRight,
-  title, onTitleChange, aboveTitle, belowTitle, tags, body = 'editor', children,
+  title, onTitleChange, aboveTitle, belowTitle, tags, children,
 }: EntryDetailFrameProps) {
   const { t } = useTranslation();
   const setActiveView = useUIStore((s) => s.setActiveView);
@@ -88,11 +87,7 @@ export default function EntryDetailFrame({
         </div>
       )}
 
-      {body === 'scroll' ? (
-        <div className="flex-1 overflow-y-auto px-8 pb-8">{children}</div>
-      ) : (
-        <div className="flex-1 overflow-hidden px-8 pb-8">{children}</div>
-      )}
+      <div className="flex-1 overflow-y-auto px-8 pb-8">{children}</div>
     </div>
   );
 }
