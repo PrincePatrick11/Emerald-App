@@ -282,6 +282,13 @@
     "add": "Ajouter un bloc",
     "actions": "Actions du bloc",
     "dragToMove": "Glisser pour déplacer",
+    "sidebarTitle": "Blocs",
+    "hide": "Masquer",
+    "show": "Afficher",
+    "hiddenHint": "Masqué — invisible en mode lecture",
+    "rename": "Renommer",
+    "showTitle": "Afficher le titre en mode lecture",
+    "jumpTo": "Aller au bloc",
     "remove": "Supprimer le bloc",
     "unknown": "Bloc inconnu ({{type}})",
     "types": {

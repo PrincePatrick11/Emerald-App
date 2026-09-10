@@ -451,6 +451,7 @@ export default function WikiView() {
       {loadedArticleId === article.id && (
         <BlockStack
           key={`${article.id}:${editorEpoch}`}
+          entryId={article.id}
           initialContent={article.content}
           placeholder={t('wiki.placeholder')}
           onChange={handleContentChange}

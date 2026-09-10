@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
-import { Check, ChevronDown, ChevronRight, Grid3x3, Image as ImageIcon, Magnet, Pencil, RotateCw, Scaling, Trash2, X } from 'lucide-react';
+import { Check, Grid3x3, Image as ImageIcon, Magnet, Pencil, RotateCw, Scaling, Trash2, X } from 'lucide-react';
+import SidebarSectionHeader from '../fields/SidebarSectionHeader';
 import { useAltarStore } from '../../../store/altarStore';
 import {
   ALTAR_RATIOS,
@@ -242,13 +243,7 @@ const [gridOpen, setGridOpen] = useState(true);
       {activeAltar && isEditing && (
         <div className="pb-5">
           <>
-              <button
-                onClick={() => setFaviconOpen((v) => !v)}
-                className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
-              >
-                {faviconOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                {t('altar.favicon')}
-              </button>
+              <SidebarSectionHeader label={t('altar.favicon')} open={faviconOpen} onToggle={() => setFaviconOpen((v) => !v)} />
               {faviconOpen && (
                 <div className="mt-2 mb-4">
                   <Favicon
@@ -258,13 +253,12 @@ const [gridOpen, setGridOpen] = useState(true);
                   />
                 </div>
               )}
-              <button
-                onClick={() => setCanvasOptionsOpen((v) => !v)}
-                className="flex items-center gap-1 mt-4 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
-              >
-                {canvasOptionsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                {t('altar.canvasOptions')}
-              </button>
+              <SidebarSectionHeader
+                label={t('altar.canvasOptions')}
+                open={canvasOptionsOpen}
+                onToggle={() => setCanvasOptionsOpen((v) => !v)}
+                className="mt-4"
+              />
               {canvasOptionsOpen && (
                 <div className="mt-2">
                   <p className="mb-1.5 text-[11px] uppercase tracking-wider text-stone-500">{t('altar.ratio')}</p>
@@ -290,13 +284,11 @@ const [gridOpen, setGridOpen] = useState(true);
               )}
           </>
           <div className={isEditing ? 'mt-4' : ''}>
-          <button
-            onClick={() => setBackgroundOpen((v) => !v)}
-            className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
-          >
-            {backgroundOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            {isEditing ? t('altar.changeBackground') : t('altar.background')}
-          </button>
+          <SidebarSectionHeader
+            label={isEditing ? t('altar.changeBackground') : t('altar.background')}
+            open={backgroundOpen}
+            onToggle={() => setBackgroundOpen((v) => !v)}
+          />
           {backgroundOpen && (isEditing ? (
             <div className="mt-2 space-y-1.5">
               <div className="grid grid-cols-4 gap-1.5">
@@ -554,13 +546,12 @@ const [gridOpen, setGridOpen] = useState(true);
           </div>
           {isEditing && (
             <>
-              <button
-                onClick={() => setOverlayOpen((v) => !v)}
-                className="mt-4 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
-              >
-                {overlayOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                {t('altar.overlayOptions')}
-              </button>
+              <SidebarSectionHeader
+                label={t('altar.overlayOptions')}
+                open={overlayOpen}
+                onToggle={() => setOverlayOpen((v) => !v)}
+                className="mt-4"
+              />
               {overlayOpen && (() => {
                 const overlayPercent = Math.round((activeAltar.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY) * 100);
                 const overlayColor = activeAltar.background_overlay_color ?? 'dark';
@@ -610,13 +601,12 @@ const [gridOpen, setGridOpen] = useState(true);
                   </div>
                 );
               })()}
-              <button
-                onClick={() => setGridOpen((v) => !v)}
-                className="mt-4 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
-              >
-                {gridOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                {t('altar.gridOptions')}
-              </button>
+              <SidebarSectionHeader
+                label={t('altar.gridOptions')}
+                open={gridOpen}
+                onToggle={() => setGridOpen((v) => !v)}
+                className="mt-4"
+              />
               {gridOpen && <>
               <div className="mt-2 grid grid-cols-4 gap-1">
                 {([
@@ -728,13 +718,12 @@ const [gridOpen, setGridOpen] = useState(true);
 
       {activeAltar && isEditing && (
         <div className="pb-4 border-t border-stone-700/60">
-          <button
-            onClick={() => setPlacementsOpen((v) => !v)}
-            className="pt-4 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-400"
-          >
-            {placementsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            {t('altar.placedElements')}
-          </button>
+          <SidebarSectionHeader
+            label={t('altar.placedElements')}
+            open={placementsOpen}
+            onToggle={() => setPlacementsOpen((v) => !v)}
+            className="pt-4"
+          />
           {placementsOpen && <div ref={listRef} className="mt-2 space-y-1 pr-1" onClick={(e) => { if (e.target === e.currentTarget) selectPlacement(null); }}>
             {sortedPlacements.length === 0 && (
               <p className="px-2 py-2 text-xs text-stone-600">{t('altar.noPlacedElements')}</p>

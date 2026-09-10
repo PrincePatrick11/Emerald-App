@@ -391,6 +391,33 @@ the same position — because a mode switch that remounted a text block would re
 last structural snapshot rather than the latest keystrokes. Reordering uses framer-motion's
 `Reorder` with `dragListener={false}`; only the grip starts a drag, so text selection still works.
 
+**Instance attributes.** Every block, whatever its type, can carry `data-block-hidden="1"`
+(hidden: gone in read mode — via CSS, so the tree stays stable — greyed out while editing),
+`data-block-title` (its own title instead of the type name) and `data-block-show-title`
+(`"1"`/`"0"`, overriding the type's `defaultShowTitle` for the read-mode heading). The names
+live in `BLOCK_ATTR` (`lib/blocks/types.ts`), the rules in `lib/blocks/blockAttrs.ts`. Because
+they sit on the block, they are part of `content`: Cancel reverts them with the text, and a
+text block whose switches are back at their defaults is stored without a wrapper again
+(`showTitleAttrValue` drops a value that equals the default).
+
+**Sidebar block manager.** The right sidebar and the main area are sibling trees, so `BlockStack`
+publishes its structure — on structural changes only, not per keystroke — plus a stable API
+(`insert`/`duplicate`/`remove`/`reorder`/`setAttr`/`reveal`) to `useBlockSessionStore`
+(`src/store/blockSessionStore.ts`), the same idea as `uiStore.editActions`. The API object is
+created once and forwards to the latest closures through a ref, so `clear(api)` on unmount only
+removes the session that stack itself published — a remount (Cancel, entry switch) may already
+have replaced it. After unmount the API forwards nothing: a stale call would otherwise reach the
+now-open entry through the view's `onChange`. Each mount gets a fresh `sessionId`, which keys the
+sidebar's manager so an open menu or rename can't outlive a Cancel remount. Only edit mode
+writes: renaming is edit-only, and a type's read-mode sidebar view gets no `setAttr` — a change
+made in read mode would miss autosave and be swallowed by the next Cancel baseline. `BlockSidebarArea`, rendered by `RightSidebar` for modules with
+`ModuleMeta.usesBlocks`, shows the session only if its `entryId` matches the open entry: in edit
+mode a reorderable list with eye, rename, "show title in read mode", duplicate and remove; in
+read mode an outline whose rows jump to their block, only when there is more than one. Below it,
+block types can contribute their own sidebar sections via `components/blocks/blockSidebarViews.ts`
+(read/edit variant each; empty so far — the text block has nothing of its own to set). That file
+must never import TipTap: the sidebar is loaded eagerly.
+
 ### Auto-Save (the `useEntryEditor` hook)
 
 Debounced auto-save (1.5s), save-on-navigate and save-on-unmount live in

@@ -282,6 +282,13 @@
     "add": "Añadir bloque",
     "actions": "Acciones del bloque",
     "dragToMove": "Arrastra para mover",
+    "sidebarTitle": "Bloques",
+    "hide": "Ocultar",
+    "show": "Mostrar",
+    "hiddenHint": "Oculto — no se muestra en modo lectura",
+    "rename": "Renombrar",
+    "showTitle": "Mostrar título en modo lectura",
+    "jumpTo": "Ir al bloque",
     "remove": "Eliminar bloque",
     "unknown": "Bloque desconocido ({{type}})",
     "types": {

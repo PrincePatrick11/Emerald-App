@@ -5,6 +5,7 @@ import type { TFunction } from 'i18next';
 import { LazyMotion, Reorder, domAnimation } from 'framer-motion';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
+import { REORDER_SPRING } from '../../lib/motion';
 import { useAltarStore } from '../../store/altarStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useOperationStore } from '../../store/operationStore';
@@ -121,7 +122,7 @@ export default function TabBar() {
                 key={tab.id}
                 value={tab.id}
                 whileDrag={{ scale: 1.005 }}
-                transition={{ type: 'spring', stiffness: 520, damping: 38, mass: 0.65 }}
+                transition={REORDER_SPRING}
                 style={{ position: 'relative' }}
                 className={`tab-item group flex min-w-32 max-w-56 flex-1 items-center gap-2 rounded-t-lg border px-3 py-2 text-xs transition-colors ${
                   isActive

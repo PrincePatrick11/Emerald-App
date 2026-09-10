@@ -594,6 +594,7 @@ export default function OperationsView() {
       {loadedOperationId === operation.id && (
         <BlockStack
           key={`${operation.id}:${editorEpoch}`}
+          entryId={operation.id}
           initialContent={operation.content}
           placeholder={t('operations.placeholder')}
           onChange={handleContentChange}

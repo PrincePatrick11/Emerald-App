@@ -5,7 +5,8 @@ import { Pencil, Check, X, Trash2, Maximize2, Minimize2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
 import type { ActiveView } from '../../types';
-import type { ViewId } from '../../lib/modules';
+import { moduleMeta, type ViewId } from '../../lib/modules';
+import BlockSidebarArea from '../blocks/BlockSidebarArea';
 import JournalPropertiesPanel from '../sidebar/panels/JournalPropertiesPanel';
 import WikiPropertiesPanel from '../sidebar/panels/WikiPropertiesPanel';
 import OperationPropertiesPanel from '../sidebar/panels/OperationPropertiesPanel';
@@ -150,6 +151,7 @@ export default function RightSidebar() {
           that alignment again. */}
       <div className="flex-1 overflow-y-auto p-3">
         <PropertiesContent activeView={activeView} />
+        {moduleMeta(activeView.type)?.usesBlocks && <BlockSidebarArea />}
       </div>
     </div>
   );

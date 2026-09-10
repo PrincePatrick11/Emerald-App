@@ -1,5 +1,5 @@
 import { Type, type LucideIcon } from 'lucide-react';
-import { TEXT_BLOCK_TYPE, type BlockInstance, type BlockTypeId } from './types';
+import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockInstance, type BlockTypeId } from './types';
 
 /**
  * Die Registry der Blocktypen — der reine Teil (Metadaten). Welche Komponente
@@ -26,6 +26,9 @@ export interface BlockTypeMeta {
    * unbekannter Typ behandelt: angezeigt als Fallback, unverändert gespeichert.
    */
   dataVersion: number;
+  /** Titel im Lesemodus zeigen, solange die Instanz nichts anderes sagt.
+   *  Text fließt ohne Überschrift, Feld- und Werkzeugblöcke tragen eine. */
+  defaultShowTitle: boolean;
 }
 
 // Eine Map statt eines Objekts: der Typ kommt aus gespeichertem Inhalt, und
@@ -39,6 +42,7 @@ const BLOCK_TYPES = new Map<string, BlockTypeMeta>([
     descriptionKey: 'blocks.types.text.description',
     group: 'text',
     dataVersion: 1,
+    defaultShowTitle: false,
   }],
 ]);
 
@@ -53,6 +57,6 @@ export const BLOCK_TYPE_LIST: readonly BlockTypeMeta[] = [...BLOCK_TYPES.values(
 export function resolveBlockType(block: BlockInstance): BlockTypeMeta | undefined {
   const meta = BLOCK_TYPES.get(block.type);
   if (!meta) return undefined;
-  const version = Number(block.attrs['data-block-v'] ?? 1);
+  const version = Number(block.attrs[BLOCK_ATTR.version] ?? 1);
   return Number.isFinite(version) && version <= meta.dataVersion ? meta : undefined;
 }

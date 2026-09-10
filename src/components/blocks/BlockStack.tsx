@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type Mou
 import { Reorder, useDragControls } from 'framer-motion';
 import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
-import { Copy, Plus, Puzzle, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Plus, Puzzle } from 'lucide-react';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import EditorToolbar from '../editor/EditorToolbar';
 import LinkPickerModal from '../editor/LinkPickerModal';
@@ -21,16 +21,23 @@ import {
 } from '../../lib/links';
 import { internalLinkBlockHtml, toInternalLinkChip } from '../../lib/internalLinkHtml';
 import { generateId } from '../../lib/helpers';
+import { REORDER_SPRING } from '../../lib/motion';
+import { flashReveal, scrollIntoViewCentered } from '../../lib/reveal';
 import { createTextBlock, neutralizeSectionTags, parseBlocks, serializeBlocks } from '../../lib/blocks/blockHtml';
-import { BLOCK_TYPE_LIST, resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockTypes';
-import { TEXT_BLOCK_TYPE, type BlockInstance } from '../../lib/blocks/types';
+import { resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockTypes';
+import { blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
+import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockAttrName, type BlockInstance } from '../../lib/blocks/types';
+import { useBlockSessionStore, type BlockStackApi } from '../../store/blockSessionStore';
 import { BLOCK_VIEWS } from './blockViews';
 import { BlockStackContext, type BlockStackContextValue } from './blockStackContext';
+import { addBlockActions, commonBlockActions } from './blockActions';
 import { useTextEditorRegistry } from './useTextEditorRegistry';
 import BlockFrame from './BlockFrame';
 import UnknownBlock from './UnknownBlock';
 
 interface BlockStackProps {
+  /** Der Eintrag, dem der Stapel gehört — die Seitenleiste bedient nur die passende Sitzung. */
+  entryId: string;
   /**
    * Nur der INITIALWERT, wie bei RichEditor: der Stapel ist danach
    * unkontrolliert. Die Views mounten ihn per `key` neu, wenn ein anderer
@@ -50,6 +57,10 @@ function newBlock(type: string): BlockInstance | null {
   return type === TEXT_BLOCK_TYPE ? createTextBlock() : null;
 }
 
+const REVEAL_CLASS = 'block-stack-item--revealed';
+/** Muss zur Dauer von `block-reveal` in index.css passen. */
+const REVEAL_MS = 1600;
+
 /**
  * Der Inhalt eines Eintrags als Stapel von Blöcken — Lesen und Bearbeiten.
  *
@@ -58,16 +69,17 @@ function newBlock(type: string): BlockInstance | null {
  * per Chip-Klick, Drops (Dateien, Einträge aus der linken Liste, Routinen),
  * Toolbar und Linkauswahl. Das hing früher am einzelnen RichEditor; mit
  * mehreren Textblöcken würde sonst jede Bitte in jedem Block ausgeführt. Welcher
- * Editor eine Bitte bekommt, entscheidet `useTextEditorRegistry`.
+ * Editor eine Bitte bekommt, entscheidet `useTextEditorRegistry`. Die
+ * Block-Verwaltung der Seitenleiste bedient ihn über `blockSessionStore`.
  *
  * Text-Eingaben ändern keinen React-State: das neue HTML landet in `blocksRef`
  * und geht serialisiert an `onChange`. State wird es erst bei
- * Strukturänderungen (hinzufügen, entfernen, verschieben), damit nicht jeder
- * Tastendruck den ganzen Stapel neu rendert. `blocks[i].html` im State ist
- * deshalb nur der Stand beim letzten Strukturwechsel — der lebende Stand steht
- * im Ref (und im Editor).
+ * Strukturänderungen (hinzufügen, entfernen, verschieben, Attribute), damit
+ * nicht jeder Tastendruck den ganzen Stapel neu rendert. `blocks[i].html` im
+ * State ist deshalb nur der Stand beim letzten Strukturwechsel — der lebende
+ * Stand steht im Ref (und im Editor).
  */
-export default function BlockStack({ initialContent, isEditing, placeholder, onChange }: BlockStackProps) {
+export default function BlockStack({ entryId, initialContent, isEditing, placeholder, onChange }: BlockStackProps) {
   const { t } = useTranslation();
 
   const [blocks, setBlocks] = useState<BlockInstance[]>(() => {
@@ -198,25 +210,78 @@ export default function BlockStack({ initialContent, isEditing, placeholder, onC
     commit(ids.map((id) => byId.get(id)!));
   };
 
+  const setAttr = (id: string, name: BlockAttrName, value: string | null) => {
+    const block = blocksRef.current.find((b) => b.id === id);
+    // Unveränderter Wert (Enter auf einem unveränderten Titel): kein Commit,
+    // also auch kein Autosave und kein Neu-Rendern.
+    if (!block || (block.attrs[name] ?? null) === value) return;
+    commit(blocksRef.current.map((b) => (b.id === id ? withBlockAttr(b, name, value) : b)));
+  };
+
+  const reveal = (id: string) => {
+    const el = stackRef.current?.querySelector<HTMLElement>(`[data-block-item="${CSS.escape(id)}"]`);
+    if (!el) return;
+    scrollIntoViewCentered(el);
+    flashReveal(el, REVEAL_CLASS, REVEAL_MS);
+  };
+
+  /* ---------------- Sitzung für die Seitenleiste ---------------- */
+
+  // Die Handgriffe ändern sich pro Render (sie lesen die aktuelle Closure); die
+  // Seitenleiste bekommt ein stabiles Objekt, das an die jeweils neuesten
+  // weiterreicht. Stabil heißt: `clear` beim Unmount erkennt „seine" Sitzung.
+  // Nach dem Abbau reicht es nichts mehr weiter — ein veralteter Aufruf käme
+  // sonst über `onChange` im Eintrag an, der jetzt offen ist.
+  const apiRef = useRef<BlockStackApi>(null!);
+  apiRef.current = { insert: insertAt, duplicate, remove, reorder, setAttr, reveal };
+  const mountedRef = useRef(false);
+  const api = useMemo<BlockStackApi>(() => {
+    const live = () => (mountedRef.current ? apiRef.current : null);
+    return {
+      insert: (index, type) => live()?.insert(index, type),
+      duplicate: (id) => live()?.duplicate(id),
+      remove: (id) => live()?.remove(id),
+      reorder: (ids) => live()?.reorder(ids),
+      setAttr: (id, name, value) => live()?.setAttr(id, name, value),
+      reveal: (id) => live()?.reveal(id),
+    };
+  }, []);
+  const [sessionId] = useState(generateId);
+
+  useEffect(() => {
+    useBlockSessionStore.getState().publish({ sessionId, entryId, blocks, isEditing, api });
+  }, [sessionId, entryId, blocks, isEditing, api]);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      useBlockSessionStore.getState().clear(api);
+    };
+  }, [api]);
+
+  /* ---------------- Menüs und Darstellung ---------------- */
+
   const openAddMenu = (e: MouseEvent, index: number) => setMenu({
     x: e.clientX,
     y: e.clientY,
-    actions: BLOCK_TYPE_LIST.map((meta) => {
-      const Icon = meta.icon;
-      return { label: t(meta.labelKey), icon: <Icon size={12} />, onClick: () => insertAt(index, meta.id) };
-    }),
+    actions: addBlockActions(t, (type) => insertAt(index, type)),
   });
 
-  const openBlockMenu = (e: MouseEvent, block: BlockInstance, known: boolean) => setMenu({
-    x: e.clientX,
-    y: e.clientY,
-    actions: [
-      // Ein unbekannter Block lässt sich nur verschieben und entfernen — eine
-      // Kopie seiner Daten wäre ohne den Typ, der sie versteht, nichts wert.
-      ...(known ? [{ label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => duplicate(block.id) }] : []),
-      { label: t('blocks.remove'), icon: <Trash2 size={12} />, onClick: () => remove(block.id), danger: true },
-    ],
-  });
+  const openBlockMenu = (e: MouseEvent, block: BlockInstance, meta: BlockTypeMeta | undefined) => {
+    const hidden = isBlockHidden(block);
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      actions: [
+        {
+          label: hidden ? t('blocks.show') : t('blocks.hide'),
+          icon: hidden ? <Eye size={12} /> : <EyeOff size={12} />,
+          onClick: () => setAttr(block.id, BLOCK_ATTR.hidden, hiddenAttrValue(!hidden)),
+        },
+        ...commonBlockActions(t, meta, { duplicate: () => duplicate(block.id), remove: () => remove(block.id) }),
+      ],
+    });
+  };
 
   const renderBody = (block: BlockInstance, meta: BlockTypeMeta | undefined) => {
     const View = meta ? BLOCK_VIEWS.get(meta.id) : undefined;
@@ -248,6 +313,7 @@ export default function BlockStack({ initialContent, isEditing, placeholder, onC
       >
         {blocks.map((block, index) => {
           const meta = resolveBlockType(block);
+          const label = blockLabel(t, block, meta);
           return (
             <StackItem key={block.id} id={block.id}>
               {(startDrag) => (
@@ -255,9 +321,11 @@ export default function BlockStack({ initialContent, isEditing, placeholder, onC
                   <BlockFrame
                     isEditing={isEditing}
                     icon={meta?.icon ?? Puzzle}
-                    label={meta ? t(meta.labelKey) : t('blocks.unknown', { type: block.type })}
+                    label={label}
+                    hidden={isBlockHidden(block)}
+                    showReadTitle={showsTitleInRead(block, meta)}
                     onGripPointerDown={startDrag}
-                    onOpenMenu={(e) => openBlockMenu(e, block, !!meta)}
+                    onOpenMenu={(e) => openBlockMenu(e, block, meta)}
                   >
                     {renderBody(block, meta)}
                   </BlockFrame>
@@ -295,9 +363,10 @@ function StackItem({ id, children }: { id: string; children: (startDrag: (e: Poi
       value={id}
       dragListener={false}
       dragControls={controls}
-      transition={{ type: 'spring', stiffness: 520, damping: 38, mass: 0.65 }}
+      transition={REORDER_SPRING}
       style={{ position: 'relative' }}
       className="block-stack-item"
+      data-block-item={id}
     >
       {children((e) => controls.start(e))}
     </Reorder.Item>

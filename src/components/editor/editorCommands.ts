@@ -1,6 +1,7 @@
 import type { Editor } from '@tiptap/react';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { saveImage } from '../../lib/images';
+import { flashReveal, scrollIntoViewCentered } from '../../lib/reveal';
 import { internalLinkBlockHtml, toInternalLinkChip } from '../../lib/internalLinkHtml';
 import type { EntryLinkRequest } from '../../lib/links';
 import type { SuggestionItem } from './SuggestionList';
@@ -149,17 +150,14 @@ export function removeEntryLink(editor: Editor, target: EntryLinkRequest): boole
 const REVEAL_CLASS = 'is-revealed';
 /** Muss zur Dauer von `internal-link-reveal` in index.css passen. */
 const REVEAL_MS = 1600;
-let revealTimer: number | undefined;
-let revealedEl: HTMLElement | undefined;
 
 /**
  * Springt zum Link-Chip im Inhalt und hebt ihn kurz hervor. Gibt `false`
  * zurück, wenn der Eintrag ihn nicht enthält — dann hat der Aufrufer die Wahl,
  * stattdessen zum Ziel zu navigieren.
  *
- * Timer und markiertes Element liegen modulweit, damit ein zweiter Klick auf
- * denselben Chip wieder aufblitzt (Klasse ab, Reflow, Klasse an) statt am noch
- * laufenden ersten Durchlauf hängenzubleiben. Nur ein Chip ist je markiert.
+ * Scrollen und Aufblitzen übernimmt `lib/reveal.ts`: nur ein Chip ist je
+ * markiert, und ein zweiter Klick auf denselben blitzt neu auf.
  *
  * `caretAtBlockEnd` setzt den Cursor ans Ende des Absatzes, in dem der Chip
  * steht, statt den Chip selbst auszuwählen — für das frische Einfügen, nach dem
@@ -193,20 +191,8 @@ export function revealEntryLink(
     : null;
   if (!el) return true;
 
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  el.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
-
-  if (revealTimer !== undefined) window.clearTimeout(revealTimer);
-  revealedEl?.classList.remove(REVEAL_CLASS);
-  el.classList.remove(REVEAL_CLASS);
-  void el.offsetWidth; // Reflow erzwingen, sonst startet die Animation nicht neu.
-  el.classList.add(REVEAL_CLASS);
-  revealedEl = el;
-  revealTimer = window.setTimeout(() => {
-    el.classList.remove(REVEAL_CLASS);
-    revealTimer = undefined;
-    revealedEl = undefined;
-  }, REVEAL_MS);
+  scrollIntoViewCentered(el);
+  flashReveal(el, REVEAL_CLASS, REVEAL_MS);
   return true;
 }
 

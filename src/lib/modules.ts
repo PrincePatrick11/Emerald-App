@@ -71,14 +71,16 @@ export interface ModuleMeta {
   entryType: ContentType;
   /** Save/Cancel/Delete leben in der rechten Seitenleiste. */
   usesEditorSidebar: boolean;
+  /** Der Inhalt ist ein Blockstapel — die Seitenleiste zeigt die Block-Verwaltung. */
+  usesBlocks: boolean;
 }
 
 export const MODULES: Record<EntryModuleId, ModuleMeta> = {
-  journal: { id: 'journal', icon: BookOpen, navLabelKey: 'nav.journal', untitledKey: 'journal.untitled', entryType: 'journal', usesEditorSidebar: true },
-  tasks: { id: 'tasks', icon: CheckSquare, navLabelKey: 'nav.tasks', untitledKey: 'tasks.untitled', entryType: 'task', usesEditorSidebar: false },
-  operations: { id: 'operations', icon: Wand2, navLabelKey: 'nav.operations', untitledKey: 'operations.untitled', entryType: 'operation', usesEditorSidebar: true },
-  wiki: { id: 'wiki', icon: Library, navLabelKey: 'nav.wiki', untitledKey: 'wiki.untitled', entryType: 'wiki', usesEditorSidebar: true },
-  altar: { id: 'altar', icon: Flame, navLabelKey: 'nav.altar', untitledKey: 'altar.untitled', entryType: 'altar', usesEditorSidebar: true },
+  journal: { id: 'journal', icon: BookOpen, navLabelKey: 'nav.journal', untitledKey: 'journal.untitled', entryType: 'journal', usesEditorSidebar: true, usesBlocks: true },
+  tasks: { id: 'tasks', icon: CheckSquare, navLabelKey: 'nav.tasks', untitledKey: 'tasks.untitled', entryType: 'task', usesEditorSidebar: false, usesBlocks: false },
+  operations: { id: 'operations', icon: Wand2, navLabelKey: 'nav.operations', untitledKey: 'operations.untitled', entryType: 'operation', usesEditorSidebar: true, usesBlocks: true },
+  wiki: { id: 'wiki', icon: Library, navLabelKey: 'nav.wiki', untitledKey: 'wiki.untitled', entryType: 'wiki', usesEditorSidebar: true, usesBlocks: true },
+  altar: { id: 'altar', icon: Flame, navLabelKey: 'nav.altar', untitledKey: 'altar.untitled', entryType: 'altar', usesEditorSidebar: true, usesBlocks: false },
 };
 
 export const MODULE_LIST: readonly ModuleMeta[] = ENTRY_MODULE_IDS.map((id) => MODULES[id]);

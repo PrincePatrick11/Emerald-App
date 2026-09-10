@@ -282,6 +282,13 @@
     "add": "Add block",
     "actions": "Block actions",
     "dragToMove": "Drag to move",
+    "sidebarTitle": "Blocks",
+    "hide": "Hide",
+    "show": "Show",
+    "hiddenHint": "Hidden — not shown in read mode",
+    "rename": "Rename",
+    "showTitle": "Show title in read mode",
+    "jumpTo": "Jump to block",
     "remove": "Remove block",
     "unknown": "Unknown block ({{type}})",
     "types": {

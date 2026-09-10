@@ -282,6 +282,13 @@
     "add": "Block hinzufügen",
     "actions": "Block-Aktionen",
     "dragToMove": "Ziehen zum Verschieben",
+    "sidebarTitle": "Blöcke",
+    "hide": "Ausblenden",
+    "show": "Anzeigen",
+    "hiddenHint": "Ausgeblendet — im Lesemodus nicht sichtbar",
+    "rename": "Umbenennen",
+    "showTitle": "Titel im Lesemodus zeigen",
+    "jumpTo": "Zum Block springen",
     "remove": "Block entfernen",
     "unknown": "Unbekannter Block ({{type}})",
     "types": {

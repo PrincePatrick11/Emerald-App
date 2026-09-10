@@ -29,7 +29,7 @@ export function PropertySummaryRow({ label, value, badge }: PropertySummaryRowPr
 export function PropertySummarySectionTitle({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-1 pt-3 pb-1">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">{label}</span>
+      <span className="sidebar-section-title">{label}</span>
     </div>
   );
 }

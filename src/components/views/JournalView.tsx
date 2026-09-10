@@ -378,6 +378,7 @@ export default function JournalView() {
       {loadedEntryId === entry.id && (
         <BlockStack
           key={`${entry.id}:${editorEpoch}`}
+          entryId={entry.id}
           initialContent={entry.content}
           placeholder={t('journal.placeholder')}
           onChange={handleContentChange}

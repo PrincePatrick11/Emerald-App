@@ -14,6 +14,25 @@ export type BlockTypeId = `${string}.${string}`;
 /** Der Textblock: TipTap-HTML als inneres HTML seiner Section. */
 export const TEXT_BLOCK_TYPE = 'core.text' satisfies BlockTypeId;
 
+/** Name eines Section-Attributs — nur `data-*` übersteht das Lesen (siehe `parseBlocks`). */
+export type BlockAttrName = `data-${string}`;
+
+/**
+ * Die Instanz-Attribute, die jeder Block tragen kann, unabhängig vom Typ.
+ * Sie stehen am Block selbst — und damit im Inhalt: Cancel dreht sie mit dem
+ * Text zurück, Export und Backup tragen sie ohne eigenes Feld.
+ */
+export const BLOCK_ATTR = {
+  /** Datenformat-Version des Typs; fehlt = 1. */
+  version: 'data-block-v',
+  /** `"1"`: im Lesemodus ausgeblendet, im Bearbeitungsmodus ausgegraut. */
+  hidden: 'data-block-hidden',
+  /** Eigener Titel statt des Typnamens. */
+  title: 'data-block-title',
+  /** `"1"`/`"0"`: Titel im Lesemodus zeigen — fehlt = Standard des Typs. */
+  showTitle: 'data-block-show-title',
+} as const;
+
 /**
  * Ein Block, wie er im gespeicherten `content` steht.
  *

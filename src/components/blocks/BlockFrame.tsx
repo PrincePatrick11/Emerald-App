@@ -1,12 +1,17 @@
 import type { PointerEvent, MouseEvent, ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { GripVertical, MoreHorizontal } from 'lucide-react';
+import { EyeOff, GripVertical, MoreHorizontal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface BlockFrameProps {
   isEditing: boolean;
   icon: LucideIcon;
+  /** Eigener Titel der Instanz oder der Typname. */
   label: string;
+  /** Ausgeblendet: im Lesemodus weg, im Bearbeitungsmodus ausgegraut. */
+  hidden: boolean;
+  /** Titel im Lesemodus zeigen (Anzeigeregel des Blocks). */
+  showReadTitle: boolean;
   onGripPointerDown: (e: PointerEvent) => void;
   onOpenMenu: (e: MouseEvent) => void;
   children: ReactNode;
@@ -14,18 +19,28 @@ interface BlockFrameProps {
 
 /**
  * Die Hülle um einen Block. Im Lesemodus unsichtbar — die Blöcke fließen wie
- * ein Dokument. Im Bearbeitungsmodus ein dezenter Rahmen mit Griff zum
- * Verschieben, Typ und Menü.
+ * ein Dokument, höchstens mit einem dezenten Titel darüber. Im
+ * Bearbeitungsmodus ein Rahmen mit Griff zum Verschieben, Titel und Menü.
  *
  * Der Inhalt steht in beiden Modi an derselben Stelle im Baum: wechselte die
  * Struktur mit dem Modus, montierte React den Block neu, und ein Textblock
- * verlöre seinen Editor samt ungespeicherter Eingabe.
+ * verlöre seinen Editor samt ungespeicherter Eingabe. Aus demselben Grund
+ * wird ein ausgeblendeter Block im Lesemodus per CSS versteckt, nicht
+ * weggelassen.
  */
-export default function BlockFrame({ isEditing, icon: Icon, label, onGripPointerDown, onOpenMenu, children }: BlockFrameProps) {
+export default function BlockFrame({
+  isEditing, icon: Icon, label, hidden, showReadTitle, onGripPointerDown, onOpenMenu, children,
+}: BlockFrameProps) {
   const { t } = useTranslation();
+  const className = [
+    'block-frame',
+    isEditing && 'block-frame--editing',
+    hidden && 'block-frame--hidden',
+  ].filter(Boolean).join(' ');
+
   return (
-    <div className={isEditing ? 'block-frame block-frame--editing' : 'block-frame'}>
-      {isEditing && (
+    <div className={className}>
+      {isEditing ? (
         <div className="block-frame-header">
           <button
             type="button"
@@ -38,6 +53,11 @@ export default function BlockFrame({ isEditing, icon: Icon, label, onGripPointer
           </button>
           <Icon size={12} className="flex-shrink-0" />
           <span className="block-frame-label">{label}</span>
+          {hidden && (
+            <span className="block-frame-hidden-mark" title={t('blocks.hiddenHint')}>
+              <EyeOff size={12} />
+            </span>
+          )}
           <button
             type="button"
             className="block-frame-menu"
@@ -48,7 +68,9 @@ export default function BlockFrame({ isEditing, icon: Icon, label, onGripPointer
             <MoreHorizontal size={14} />
           </button>
         </div>
-      )}
+      ) : showReadTitle ? (
+        <div className="label-xs block-read-title">{label}</div>
+      ) : null}
       <div className="block-frame-body">{children}</div>
     </div>
   );
