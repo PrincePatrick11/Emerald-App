@@ -15,6 +15,9 @@ import { generateId, nowIso } from '../lib/helpers';
 import { fromRow, type DbRow } from '../lib/row';
 import { serialized, serialKey } from '../lib/serialize';
 import {
+  insertDefinitionRow as insertDefinition, nextDefinitionSortOrder as nextSortOrder,
+} from '../lib/blockDefinitionRows';
+import {
   DEFAULT_DEFINITION_DISPLAY, DEFAULT_DEFINITION_ICON, sameShape, type BlockDefinition,
 } from '../lib/blocks/definitions';
 
@@ -47,22 +50,6 @@ async function selectActive(db: Database): Promise<BlockDefinition[]> {
   return rows.map(fromRow.blockDefinition);
 }
 
-async function nextSortOrder(db: Database): Promise<number> {
-  const rows = await db.select<{ n: number }[]>('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM block_definitions');
-  return rows[0]?.n ?? 0;
-}
-
-async function insertDefinition(db: Database, def: BlockDefinition): Promise<void> {
-  await db.execute(
-    `INSERT INTO block_definitions
-       (id, name, icon, description, elements, display, revision, sort_order, created_at, updated_at, deleted_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-    [
-      def.id, def.name, def.icon, def.description, JSON.stringify(def.elements), JSON.stringify(def.display),
-      def.revision, def.sort_order, def.created_at, def.updated_at, def.deleted_at,
-    ]
-  );
-}
 
 export const useBlockDefinitionStore = create<BlockDefinitionState>((set, get) => ({
   definitions: [],

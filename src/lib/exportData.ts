@@ -33,9 +33,6 @@ export interface ExportData {
   category?: ChipData;
   // custom icon on the entry itself (wiki article or operation), may be data-URL or emoji
   entryIcon?: string;
-  isActive?: boolean;
-  endDate?: string | null;
-  version?: string | null;
   // common
   tagNames?: string[];
 }
@@ -164,9 +161,6 @@ export async function collectExportData(): Promise<ExportData | null> {
       createdAt: op.created_at,
       category: cat ? { label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,
       entryIcon: op.icon || undefined,
-      isActive: !!op.is_active,
-      endDate: op.end_date,
-      version: op.version,
       tagNames: (op.tags ?? []) as string[],
     };
   }

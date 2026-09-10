@@ -22,6 +22,10 @@ import { useCategoryStore } from '../store/categoryStore';
 import { useBlockDefinitionStore } from '../store/blockDefinitionStore';
 import { fromRow, toInt } from './row';
 import { isDefinitionId } from './blocks/definitions';
+import {
+  hasLegacyStatus, legacyStatusOfRow, statusDefinition, STATUS_DEFINITION_ID, withLegacyStatus, type LegacyStatus,
+} from './blocks/legacyStatus';
+import { definitionById } from './blockDefinitionRows';
 import { entryBlockSummary } from './blocks/entrySummary';
 import { generateId, nowIso } from './helpers';
 import i18n from '../i18n';
@@ -243,6 +247,8 @@ interface EmeraldMeta {
   wikiCategoryId?: string;
   wikiCategoryName?: string;
   opCategoryName?: string;
+  // Altbestand bis v39 (Operationen): wird beim Import zum Status-Block
+  // (lib/blocks/legacyStatus.ts), geschrieben wird es nicht mehr.
   isActive?: boolean;
   endDate?: string | null;
   version?: string | null;
@@ -409,9 +415,6 @@ export async function exportAsEmerald(): Promise<void> {
     meta.categoryName   = categoryLabel(i18n.t, cat) || undefined;
     meta.categoryEmoji  = cat?.emoji;
     meta.opCategoryName = cat?.name;
-    meta.isActive  = !!op.is_active;
-    meta.endDate   = op.end_date;
-    meta.version   = op.version;
     meta.icon      = op.icon ?? undefined;
     meta.tags      = (op.tags ?? []) as string[];
   }
@@ -543,6 +546,19 @@ async function importBlockDefinitions(raw: EmeraldMeta['blockDefinitions']): Pro
   await useBlockDefinitionStore.getState().importDefinitions(defs);
 }
 
+/**
+ * Status/Enddatum/Version aus einer Datei von vor v40 als Status-Block vor den
+ * Inhalt — wie Migration v40, nach derselben Definition: der vorhandenen
+ * (auch aus dem Papierkorb), sonst einer neuen.
+ */
+async function withImportedStatus(content: string, status: LegacyStatus): Promise<string> {
+  if (!hasLegacyStatus(status)) return content;
+  const existing = await definitionById(await getDb(), STATUS_DEFINITION_ID);
+  const def = existing ?? statusDefinition(i18n.t, nowIso());
+  if (!existing) await useBlockDefinitionStore.getState().importDefinitions([def]);
+  return withLegacyStatus(content, status, def, i18n.t);
+}
+
 // ── Import helpers ───────────────────────────────────────────────────────────
 
 /** Ensures each tag name exists in the tags table, then returns the names unchanged.
@@ -624,7 +640,15 @@ export async function importFromEmerald(): Promise<void> {
   // geht, nicht mehr das, was er geprüft hat. Der Remap selbst liest nur
   // data-Attribute und ersetzt Knoten, braucht also keinen sauberen Input.
   const relinked = remapImportedLinks(remapped, file.meta.contentLinks, items);
-  const content = DOMPurify.sanitize(relinked, {
+  // Status/Enddatum/Version einer Operation von vor v40 als Block — ebenfalls
+  // VOR dem Sanitizer, aus demselben Grund wie der Remap. Die Werte stammen
+  // aus der Datei und werden geprüft wie eine Backup-Zeile.
+  const withStatus = file.type === 'operations'
+    ? await withImportedStatus(relinked, legacyStatusOfRow({
+        is_active: file.meta.isActive, end_date: file.meta.endDate, version: file.meta.version,
+      }))
+    : relinked;
+  const content = DOMPurify.sanitize(withStatus, {
     ADD_ATTR: [
       'data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon',
       'data-entry-number', 'data-align',
@@ -802,9 +826,6 @@ async function importOperationEntry(file: EmeraldFile, content: string, tagNames
     content,
     category_id: categoryId,
     tags: tagNames,
-    is_active: file.meta.isActive ?? true,
-    end_date: file.meta.endDate ?? null,
-    version: file.meta.version ?? null,
     icon: file.meta.icon ?? undefined,
   });
   return op.id;
@@ -1142,12 +1163,14 @@ async function importOperationFromMarkdown(
   const categoryName = meta['category'] ? stripIconPrefix(meta['category']) : null;
   const categoryId = await ensureCategoryByName(categoryName, '⚡');
 
-  const op = await createOperation(categoryId);
-  await updateOperation(op.id, {
-    title, content: html, category_id: categoryId, tags: tagNames,
-    is_active: meta['status'] ? meta['status'].toLowerCase() === 'active' : true,
-    end_date: meta['end date'] ?? null,
+  // „Status"/„End Date"/„Version" im Kopf stammen aus Exporten bis v39. Vor
+  // dem Anlegen: scheitert die Umwandlung, bleibt keine leere Operation zurück.
+  const content = await withImportedStatus(html, {
+    isActive: meta['status'] ? meta['status'].toLowerCase() === 'active' : true,
+    endDate: meta['end date'] ?? null,
     version: meta['version'] ?? null,
   });
+  const op = await createOperation(categoryId);
+  await updateOperation(op.id, { title, content, category_id: categoryId, tags: tagNames });
   return op.id;
 }

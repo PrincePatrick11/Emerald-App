@@ -20,7 +20,7 @@ import type Database from '@tauri-apps/plugin-sql';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 39;
+export const BASELINE_VERSION = 40;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.

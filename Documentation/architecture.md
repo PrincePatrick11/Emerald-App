@@ -236,8 +236,9 @@ the editor-owned fields (`buildRestorePatch`, defaulting to `buildPatch` — Jou
 Operations pass `{title, content}`) the moment edit mode is entered, and `restoreOnCancel()`
 writes that baseline back on Cancel (skipping the write if nothing changed, so a no-op Cancel
 doesn't bump `updated_at`). Deliberately out of scope: Properties-panel fields (category, tags,
-cover, icon, status, end date, version) save directly to the store as they're changed and are
-never part of the baseline — Cancel must not undo something the panel already committed.
+cover, icon) save directly to the store as they're changed and are never part of the baseline
+(an operation's status, end date and version are a block in `content` since v40, so Cancel does
+revert them) — Cancel must not undo something the panel already committed.
 `OperationSigilView` carries its own equivalent (`editBaselineRef`, covering title,
 `intention_text`, `letter_bank`, `implemented_letters`, `drawing_data`) rather than going
 through the hook, since its autosave and field set don't match the other three views'.

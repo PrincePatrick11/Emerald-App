@@ -1,7 +1,9 @@
 import type { TFunction } from 'i18next';
 import { BLOCK_ATTR, type BlockAttrName, type BlockInstance } from './types';
 import type { BlockTypeMeta } from './blockTypes';
-import { activeElements, elementKindLabelKey, FIELDS_BLOCK_TYPE, parseFields, type ElementDef } from './fields';
+import {
+  activeElements, elementKindLabelKey, FIELDS_BLOCK_TYPE, parseFields, type ElementDef, type FallbackText,
+} from './fields';
 
 /**
  * Lesen und Setzen der Instanz-Attribute aus `BLOCK_ATTR` — dieselben Regeln
@@ -42,6 +44,26 @@ export function blockTypeLabel(t: TFunction, block: BlockInstance, meta: BlockTy
     if (elements.length === 1) return elementLabel(t, elements[0]);
   }
   return t(meta.labelKey);
+}
+
+/**
+ * `t(key)` — außer i18n ist noch nicht bereit und gibt den Schlüssel selbst
+ * zurück; dann `fallback`. Für Texte, die fest in Inhalt oder Definition
+ * landen: dort bliebe sonst für immer „blocks.fields.no" stehen.
+ */
+export function translatedOr(t: TFunction, key: string, fallback: string): string {
+  const value = t(key);
+  return typeof value === 'string' && value && value !== key ? value : fallback;
+}
+
+/** Die Texte, mit denen `serializeFields` den lesbaren Fallback schreibt — in der Sprache von `t`. */
+export function fieldFallbackText(t: TFunction): FallbackText {
+  return {
+    label: (element) => elementLabel(t, element),
+    yes: translatedOr(t, 'blocks.fields.yes', 'Yes'),
+    no: translatedOr(t, 'blocks.fields.no', 'No'),
+    moonName: (phase) => translatedOr(t, `moonPhase.${phase}`, phase),
+  };
 }
 
 /** Wie ein eigener Block (Definition) heißt: sein Name, sonst „Unbenannter Block". */

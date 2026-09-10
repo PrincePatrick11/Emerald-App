@@ -103,13 +103,6 @@ export default function OperationPropertiesPanel() {
       <PropertiesReadView>
         <PropertySummaryRow label={t('properties.category')} value={categoryDisplay} />
         <IconCoverField icon={op.icon} cover={op.cover_image} readOnly />
-        <PropertySummaryRow
-          label={t('operations.active')}
-          value=""
-          badge={op.is_active ? { label: t('operations.active'), tone: 'jade' } : { label: t('operations.inactive'), tone: 'muted' }}
-        />
-        <PropertySummaryRow label={t('operations.endDate')} value={op.end_date ? formatEntryDate(op.end_date) : t('properties.none')} />
-        <PropertySummaryRow label={t('operations.version')} value={op.version || t('properties.none')} />
         <div>
           <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
           <LinkedEntriesField content={op.content} />
@@ -169,40 +162,6 @@ export default function OperationPropertiesPanel() {
             onCoverChange={(cover_image) => updateOperation(op.id, { cover_image })}
             onCoverRemove={() => updateOperation(op.id, { cover_image: undefined })}
           />
-
-          <div>
-            <p className="label-xs mb-2">{t('operations.active')}</p>
-            <button
-              onClick={() => updateOperation(op.id, { is_active: !op.is_active })}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                op.is_active
-                  ? 'bg-jade-900/40 text-jade-400 border border-jade-800/40'
-                  : 'bg-stone-800/60 text-stone-500 border border-stone-700/40'
-              }`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${op.is_active ? 'bg-jade-400' : 'bg-stone-600'}`} />
-              {op.is_active ? t('operations.active') : t('operations.inactive')}
-            </button>
-          </div>
-          <div>
-            <p className="label-xs mb-2">{t('operations.endDate')}</p>
-            <input
-              type="date"
-              value={op.end_date ?? ''}
-              onChange={(e) => updateOperation(op.id, { end_date: e.target.value || null })}
-              className={inputCls}
-            />
-          </div>
-          <div>
-            <p className="label-xs mb-2">{t('operations.version')}</p>
-            <input
-              type="text"
-              value={op.version ?? ''}
-              onChange={(e) => updateOperation(op.id, { version: e.target.value || null })}
-              placeholder={t('operations.versionPlaceholder')}
-              className={inputCls}
-            />
-          </div>
         </>
       )}
 

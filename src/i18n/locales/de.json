@@ -92,11 +92,6 @@
     "none": "Noch keine Operationen.",
     "start": "Starte deine erste Operation.",
     "all": "Alle",
-    "active": "Aktiv",
-    "inactive": "Inaktiv",
-    "endDate": "Enddatum",
-    "version": "Version",
-    "versionPlaceholder": "z.B. 1.0",
     "categories": {
       "sigils": "Sigillen",
       "servitors": "Servitoren",
@@ -390,6 +385,12 @@
       "continue": "Weiter",
       "removeAndDelete": "Aus {{count}} Eintrag entfernen und löschen",
       "removeAndDelete_other": "Aus {{count}} Einträgen entfernen und löschen"
+    },
+    "status": {
+      "name": "Status",
+      "active": "Aktiv",
+      "endDate": "Enddatum",
+      "version": "Version"
     }
   },
   "editor": {

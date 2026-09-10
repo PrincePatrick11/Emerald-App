@@ -33,7 +33,7 @@ The emptiness check looks at `sqlite_master`, not at `schema_version`: a databas
 
 Afterwards `runPeriodicCleanup(db)` purges trashed rows older than 30 days. It is **not** a migration — idempotent, time-dependent, and run on every vault open.
 
-The current version is **39**, and `BASELINE_VERSION` in `schema.ts` must equal the highest entry in `MIGRATIONS`. `runMigrations` throws at startup if the two disagree, so a new migration cannot be added without updating the baseline.
+The current version is **40** (v40 `operation_status_to_blocks`, `src/lib/migrateOperationStatusToBlocks.ts`: every operation that was inactive or had an end date or version gets a copy of the "Status" block — created only if some operation needs it — at the top of its content, the columns are reset, `updated_at` stays), and `BASELINE_VERSION` in `schema.ts` must equal the highest entry in `MIGRATIONS`. `runMigrations` throws at startup if the two disagree, so a new migration cannot be added without updating the baseline.
 
 Note that **version 24 is genuinely missing** — no entry with that number has existed for some time. The runner tolerates gaps; it only requires each version to be above the last applied one.
 
@@ -269,9 +269,8 @@ Both `linked_*_ids` columns were nullable until v33, unlike every other JSON arr
 | entry_number | INTEGER | |
 | description | TEXT | NOT NULL DEFAULT `''` |
 | icon / cover_image | TEXT | data-URL, or emoji for icon — see the Base64 note under [Key Conventions](#key-conventions) |
-| version | TEXT | free-text version label |
-| is_active | INTEGER | boolean, NOT NULL DEFAULT 1 |
-| end_date / target_reveal_date | TEXT | date-only `YYYY-MM-DD` from `<input type="date">` |
+| version / is_active / end_date | TEXT / INTEGER / TEXT | **legacy since v40** — status, end date and version are a block in `content` now (a copy of the user-built block "Status", `core-status`). Migration v40 moved every set value there and reset the columns (`1`, `NULL`, `NULL`); the app neither reads nor writes them. They stay for restoring older backups, whose rows go through the same converter (`convertLegacyStatusRows`) on import |
+| target_reveal_date | TEXT | date-only `YYYY-MM-DD` from `<input type="date">` |
 | charging_technique_wiki_id | TEXT | wiki article id, no FK |
 | is_loaded | INTEGER | boolean 0/1 |
 | intention_text | TEXT | |
@@ -370,7 +369,7 @@ The `deleted_at` indexes matter because `runPeriodicCleanup` runs a range scan a
 
 **entry_number.** A stable, compact, human-readable number, shown in the link picker as `#12`. Migration v9 backfilled it once from `ROWID`. Until v33, no insert ever wrote the column — the stores masked that by selecting `ROWID as entry_number` and overlaying the persisted value, which meant a replace-import that reassigned ROWIDs shifted every displayed number. The alias is gone; `nextEntryNumber(db, table)` in `db.ts` assigns the number at insert time, and v33 backfills the rows that never had one.
 
-**Timestamps.** ISO 8601 text produced by `nowIso()`, sorted and compared lexicographically. `due_date`, `end_date`, and `target_reveal_date` are the exception: they come from `<input type="date">` and are date-only `YYYY-MM-DD`.
+**Timestamps.** ISO 8601 text produced by `nowIso()`, sorted and compared lexicographically. `due_date`, the legacy `end_date`, and `target_reveal_date` are the exception: they come from `<input type="date">` and are date-only `YYYY-MM-DD`.
 
 **Base64 in SQLite.** The rule below is to keep image data in files. Nine columns predate it and still hold data-URLs — the `legacy` group of `IMAGE_FIELDS` in `schema.ts`: `wiki_articles.icon` / `cover_image`, `operations.icon` / `cover_image` / `drawing_data` / `thumbnail_data`, `altars.thumbnail_data` / `icon_data`, and `altar_items.image_data` (the last of which this file described as a file path until the code was checked). `Favicon.tsx`, `Banner.tsx`, and `AltarLibraryStrip.tsx` all read the uploaded file with the shared `readFileAsDataUrl` helper (`lib/helpers.ts`); none of the three go through `save_image`. Every consumer tests the value with `startsWith('data:image/')`. Do not add more.
 
@@ -474,6 +473,8 @@ Categories are exported in full, including soft-deleted ones. Filtering them by 
 **Categories are resolved, never deleted, on either import mode** — `resolveImportedCategories` in `dbBackup.ts`. A category in the payload matches a local one by id (for the two built-ins) or by case-insensitive name (`categoryKey`, same rule as the store and migration v38); a match restores it from the trash if the local row is trashed but the imported one is active. Anything left over is inserted fresh, with a new id if the payload's id is already taken locally. The four content arrays are then remapped onto the resulting local ids before insertion. The rule is deliberate: a category is shared across all four modules since v38, so a partial replace (Wiki only, say) must not delete categories out from under Tasks or Altar items that a full replace would have left alone.
 
 **Block definitions are added, never replaced or deleted**, in both modes — `insertBlockDefinitions`, an `INSERT OR IGNORE` by id without the merge prefix, since the copies in the imported content name their definition by exactly that id. It runs before `doReplace`'s first `DELETE` and normalises every row to the full column set first (ids must pass `isDefinitionId`; rows without one are dropped), so a malformed array in a crafted file can neither abort a replace that has already emptied tables nor slip a partial row past `insertRows`, which takes its column list from the first row. A definition that already exists locally (even in the trash) keeps its local version; the copies render from their own content either way.
+
+**Operation rows from before v40** — any backup version whose operations still carry `is_active = 0`, an `end_date` or a `version` — go through the same converter as migration v40 (`convertLegacyStatusRows`) in both modes, before the first `DELETE`: the Status block is prepended to `content` and the columns are reset. The copies follow the vault's own "Status" definition if there is one (even in the trash), else the one in the file; only if neither exists is a new one added, at the end of the list.
 
 Rows are inserted parents-first; foreign keys are active during import and reject anything else. The concrete order is hard-coded per import path (`doReplace` and `doMerge` each have their own) and does *not* follow the order in `TABLES` — e.g. `links` goes last, not third.
 

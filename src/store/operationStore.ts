@@ -30,8 +30,8 @@ interface OperationState {
  * daher "noch nicht geladen", `null` "hat keine Zeichnung".
  */
 const OPERATION_LIST_COLUMNS =
-  'id, title, content, category_id, entry_number, description, icon, cover_image, version, ' +
-  'is_active, end_date, target_reveal_date, charging_technique_wiki_id, is_loaded, ' +
+  'id, title, content, category_id, entry_number, description, icon, cover_image, ' +
+  'target_reveal_date, charging_technique_wiki_id, is_loaded, ' +
   'intention_text, letter_bank, implemented_letters, show_intention_in_properties, ' +
   'show_letter_bank_in_properties, show_sigil, thumbnail_data, tags, created_at, updated_at, deleted_at';
 
@@ -70,7 +70,6 @@ export const useOperationStore = create<OperationState>((set, get) => ({
       entry_number: await nextEntryNumber(db, 'operations'),
       id: generateId(), title: 'Untitled Operation', content: '',
       category_id: categoryId, created_at: now, updated_at: now, tags: [], deleted_at: null,
-      is_active: true, end_date: null, version: null,
       description: '',
       target_reveal_date: null,
       charging_technique_wiki_id: null,
@@ -86,13 +85,13 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     };
     await db.execute(
       `INSERT INTO operations (
-        id, title, content, category_id, created_at, updated_at, tags, is_active, description,
+        id, title, content, category_id, created_at, updated_at, tags, description,
         target_reveal_date, charging_technique_wiki_id, is_loaded, intention_text, letter_bank,
         implemented_letters, show_intention_in_properties, show_letter_bank_in_properties,
         show_sigil, drawing_data, thumbnail_data, entry_number
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
       [
-        op.id, op.title, op.content, op.category_id, op.created_at, op.updated_at, JSON.stringify(op.tags), 1,
+        op.id, op.title, op.content, op.category_id, op.created_at, op.updated_at, JSON.stringify(op.tags),
         op.description, op.target_reveal_date, op.charging_technique_wiki_id, 0, op.intention_text,
         JSON.stringify(op.letter_bank), JSON.stringify(op.implemented_letters),
         1, 1, 1, op.drawing_data, op.thumbnail_data, op.entry_number ?? null,
@@ -145,20 +144,22 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     //
     // Die $N-Platzhalter MUESSEN in Textreihenfolge aufsteigen: SQLite vergibt
     // die Bind-Indizes nach dem ersten Auftreten, nicht nach der Ziffer, und
-    // tauri-plugin-sql bindet rein positionell. Ein $23 vor dem $22 wuerde
+    // tauri-plugin-sql bindet rein positionell. Ein $20 vor dem $19 wuerde
     // id und drawing_data vertauschen und das UPDATE traefe keine Zeile.
+    //
+    // is_active/end_date/version schreibt die App seit v40 nicht mehr — sie
+    // sind ein Block im Inhalt (lib/blocks/legacyStatus.ts).
     const writeDrawing = merged.drawing_data !== undefined;
     await db.execute(
       `UPDATE operations SET
-        title=$1, content=$2, category_id=$3, updated_at=$4, tags=$5, is_active=$6, end_date=$7, version=$8,
-        icon=$9, cover_image=$10, description=$11, target_reveal_date=$12, charging_technique_wiki_id=$13,
-        is_loaded=$14, intention_text=$15, letter_bank=$16, implemented_letters=$17,
-        show_intention_in_properties=$18, show_letter_bank_in_properties=$19, show_sigil=$20,
-        thumbnail_data=$21${writeDrawing ? ', drawing_data=$22' : ''}
-       WHERE id=${writeDrawing ? '$23' : '$22'}`,
+        title=$1, content=$2, category_id=$3, updated_at=$4, tags=$5,
+        icon=$6, cover_image=$7, description=$8, target_reveal_date=$9, charging_technique_wiki_id=$10,
+        is_loaded=$11, intention_text=$12, letter_bank=$13, implemented_letters=$14,
+        show_intention_in_properties=$15, show_letter_bank_in_properties=$16, show_sigil=$17,
+        thumbnail_data=$18${writeDrawing ? ', drawing_data=$19' : ''}
+       WHERE id=${writeDrawing ? '$20' : '$19'}`,
       [
         merged.title, merged.content, merged.category_id, merged.updated_at, JSON.stringify(merged.tags),
-        toInt(merged.is_active, true), merged.end_date ?? null, merged.version ?? null,
         merged.icon ?? null, merged.cover_image ?? null, merged.description ?? '',
         merged.target_reveal_date ?? null, merged.charging_technique_wiki_id ?? null,
         toInt(merged.is_loaded), merged.intention_text ?? '',

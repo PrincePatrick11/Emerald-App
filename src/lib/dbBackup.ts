@@ -25,7 +25,10 @@ import {
 import { imageRefsInHtml, isStoredImage, readImageAsBase64, saveImage } from './images';
 import { clearSearchTextCache } from './searchText';
 import { clearEntrySummaryCache } from './blocks/entrySummary';
-import { DEFAULT_DEFINITION_ICON, isDefinitionId } from './blocks/definitions';
+import { DEFAULT_DEFINITION_ICON, definitionToRow, isDefinitionId, type BlockDefinition } from './blocks/definitions';
+import { convertLegacyStatusRows, STATUS_DEFINITION_ID } from './blocks/legacyStatus';
+import { definitionById, nextDefinitionSortOrder } from './blockDefinitionRows';
+import { fromRow } from './row';
 import { FALLBACK_CATEGORY_ID, IMAGE_FIELDS, imageColumns } from './schema';
 import { categoryKey, mergeCategoryRows, type CategorySource } from './categoryMerge';
 import { legacyDisplayName, type LegacyCategoryTable } from './categories';
@@ -657,6 +660,39 @@ async function insertBlockDefinitions(
 }
 
 /**
+ * Die „Status"-Definition, nach der alte Operationszeilen umgeschrieben
+ * werden: die des Vaults (auch im Papierkorb), sonst die der Datei — wie in
+ * Migration v40. Sonst passten die neuen Kopien nicht zu dem „Status", den es
+ * danach im Vault gibt, und zeigten sofort „Neuere Version".
+ */
+async function statusDefinitionForImport(
+  db: Awaited<ReturnType<typeof getDb>>,
+  fileRows: unknown,
+): Promise<BlockDefinition | undefined> {
+  const local = await definitionById(db, STATUS_DEFINITION_ID);
+  if (local) return local;
+  const fromFile = Array.isArray(fileRows)
+    ? fileRows.find((r): r is Row => typeof r === 'object' && r !== null && (r as Row).id === STATUS_DEFINITION_ID)
+    : undefined;
+  return fromFile ? fromRow.blockDefinition(fromFile) : undefined;
+}
+
+/**
+ * Die Definitionen der Datei, dahinter „Status", wenn die Umwandlung sie neu
+ * angelegt hat (es gab sie weder im Vault noch in der Datei) — am Ende der Liste.
+ */
+async function withStatusDefinition(
+  db: Awaited<ReturnType<typeof getDb>>,
+  fileRows: unknown,
+  used: BlockDefinition | null,
+  existing: BlockDefinition | undefined,
+): Promise<unknown[]> {
+  const rows = Array.isArray(fileRows) ? fileRows : [];
+  if (!used || existing) return rows;
+  return [...rows, definitionToRow({ ...used, sort_order: await nextDefinitionSortOrder(db) })];
+}
+
+/**
  * `tasks.parent_task_id` zeigt auf dieselbe Tabelle. Steht ein Kind in der
  * Sicherung vor seinem Elternteil, schlägt der Foreign Key beim INSERT fehl.
  * Deshalb erst ohne Elternbezug einfügen und ihn danach nachtragen — dann
@@ -886,7 +922,13 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
 
   const journalEntries = (d.journalEntries ?? []).map((r) => remapRow(r, IMAGE_FIELDS_JOURNAL, pathMap));
   const wikiArticles = remapCategoryIds((d.wikiArticles ?? []).map((r) => remapRow(r, IMAGE_FIELDS_WIKI, pathMap)), catMap);
-  const operations = remapCategoryIds((d.operations ?? []).map((r) => remapRow(r, IMAGE_FIELDS_OP, pathMap)), catMap);
+  // Sicherungen bis v39 tragen Status/Enddatum/Version noch in den Spalten.
+  const replaceStatus = await statusDefinitionForImport(db, d.blockDefinitions);
+  const replaceOps = convertLegacyStatusRows(
+    remapCategoryIds((d.operations ?? []).map((r) => remapRow(r, IMAGE_FIELDS_OP, pathMap)), catMap),
+    i18n.t, nowIso(), replaceStatus,
+  );
+  const operations = replaceOps.rows;
   const altars = (d.altars ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ALTAR, pathMap));
   const altarItems = remapCategoryIds((d.altarItems ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ITEM, pathMap)), catMap);
   const tasks = remapCategoryIds(d.tasks ?? [], catMap);
@@ -894,7 +936,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   // Eigene Blöcke wie Kategorien: nie gelöscht, Fehlendes nach ID ergänzt,
   // Vorhandenes bleibt. VOR dem ersten DELETE — scheitert hier etwas an einer
   // präparierten Datei, ist noch nichts verloren (keine Transaktion, s. o.).
-  await insertBlockDefinitions(db, d.blockDefinitions);
+  await insertBlockDefinitions(db, await withStatusDefinition(db, d.blockDefinitions, replaceOps.definition, replaceStatus));
 
   // Delete only the content types present in the backup (so a partial backup
   // replacing only Journal data won't wipe wiki/ops).
@@ -1083,9 +1125,11 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     if (typeof row.slug === 'string') row.slug = `${prefix}-${row.slug}`;
     return row;
   }), catMap);
-  const operations = remapCategoryIds((d.operations ?? []).map((r: Row) =>
+  const mergeStatus = await statusDefinitionForImport(db, d.blockDefinitions);
+  const mergeOps = convertLegacyStatusRows(remapCategoryIds((d.operations ?? []).map((r: Row) =>
     withContentLinks(remapEntry(r, ['content', 'icon', 'cover_image', 'drawing_data', 'thumbnail_data'], ['charging_technique_wiki_id'], [], 'operations'))
-  ), catMap);
+  ), catMap), i18n.t, nowIso(), mergeStatus);
+  const operations = mergeOps.rows;
   const routines = (d.routines ?? []).map((r: Row) =>
     remapEntry(r, [], [], ['operation_ids', 'wiki_ids'])
   );
@@ -1124,7 +1168,7 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   // INSERT OR IGNORE (no prefix — shared by name)
   if (d.tags) await insertRows(db, 'tags', d.tags, true);
   // Ohne Präfix: die Kopien im Inhalt nennen ihre Definition über genau diese ID.
-  await insertBlockDefinitions(db, d.blockDefinitions);
+  await insertBlockDefinitions(db, await withStatusDefinition(db, d.blockDefinitions, mergeOps.definition, mergeStatus));
 
   // Content: plain INSERT with prefixed IDs (no conflicts possible)
   await insertRows(db, 'journal_entries', journalEntries);

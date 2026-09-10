@@ -92,11 +92,6 @@
     "none": "No operations yet.",
     "start": "Start your first operation.",
     "all": "All",
-    "active": "Active",
-    "inactive": "Inactive",
-    "endDate": "End Date",
-    "version": "Version",
-    "versionPlaceholder": "e.g. 1.0",
     "categories": {
       "sigils": "Sigils",
       "servitors": "Servitors",
@@ -390,6 +385,12 @@
       "continue": "Continue",
       "removeAndDelete": "Remove from {{count}} entry and delete",
       "removeAndDelete_other": "Remove from {{count}} entries and delete"
+    },
+    "status": {
+      "name": "Status",
+      "active": "Active",
+      "endDate": "End date",
+      "version": "Version"
     }
   },
   "editor": {

@@ -61,9 +61,8 @@ export interface Operation {
   updated_at: string;
   tags: string[];
   deleted_at: string | null;
-  is_active: boolean;
-  end_date: string | null;
-  version: string | null;
+  // is_active/end_date/version: seit v40 ein Block im Inhalt (lib/blocks/legacyStatus.ts);
+  // die Spalten stehen noch im Schema, die App liest und schreibt sie nicht mehr.
   entry_number?: number;
   icon?: string;
   cover_image?: string;

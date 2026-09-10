@@ -424,6 +424,28 @@ async function seedCategoryMerge(db) {
   );
 }
 
+/**
+ * Operationen, wie v40 sie vorfindet: eine inaktive mit Text, eine aktive mit
+ * Enddatum und Version ohne Text, eine im Normalzustand, die unberührt bleiben muss.
+ */
+async function seedOperationStatus(db) {
+  await db.execute(
+    `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags,is_active,end_date,version)
+     VALUES ('s1','Ruhend','<p>Text</p>','sigils',$1,$1,'[]',0,NULL,NULL)`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags,is_active,end_date,version)
+     VALUES ('s2','Befristet','','sigils',$1,$1,'[]',1,'2026-03-01','1.2')`,
+    [now]
+  );
+  await db.execute(
+    `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags)
+     VALUES ('s3','Normal','<p>unberührt</p>','sigils',$1,$1,'[]')`,
+    [now]
+  );
+}
+
 async function seedLegacyData(db) {
   await db.execute(
     `INSERT INTO journal_entries (id,title,content,created_at,updated_at,tags,linked_wiki_ids)
@@ -1081,6 +1103,51 @@ console.log('\n8e. Frischer Vault: Builtins und Starter-Set\n');
     cats.some((c) => c.id === 'herbs' && c.is_builtin === 0 && c.name === 'Herbs'),
     JSON.stringify(cats)
   );
+}
+
+console.log('\n8f. Migration v40: Status, Enddatum und Version werden ein Block\n');
+
+{
+  const v40 = await buildViaChain('v40.db', seedOperationStatus);
+  const op = async (id) => (await v40.select('SELECT content, is_active, end_date, version, updated_at FROM operations WHERE id=?1', [id]))[0];
+  const [s1, s2, s3] = [await op('s1'), await op('s2'), await op('s3')];
+  const defs = await v40.select("SELECT id, elements FROM block_definitions WHERE id='core-status'");
+
+  check(
+    'die inaktive Operation hat den Status-Block vor ihrem Text',
+    // Mit zwei Blöcken bekommt auch der Text seinen Wrapper.
+    s1.content.startsWith('<section data-block="core.fields"') && s1.content.includes('data-block-origin="core-status"') &&
+      s1.content.endsWith('<p>Text</p></section>'),
+    s1.content
+  );
+  check('Enddatum und Version stehen im Block', s2.content.includes('2026-03-01') && s2.content.includes('1.2'), s2.content);
+  check(
+    'die drei Spalten sind geleert',
+    [s1, s2].every((r) => r.is_active === 1 && r.end_date === null && r.version === null),
+    JSON.stringify([s1, s2])
+  );
+  check('eine Operation ohne Altstatus bleibt unberührt', s3.content === '<p>unberührt</p>', s3.content);
+  check('updated_at bleibt, wie es war', [s1, s2, s3].every((r) => r.updated_at === now));
+  check(
+    'die Definition „Status" gibt es genau einmal, mit drei Elementen',
+    defs.length === 1 && JSON.parse(defs[0].elements).length === 3,
+    JSON.stringify(defs)
+  );
+  // Über die Kette, nicht die Baseline: nur dort läuft v40 überhaupt.
+  const plain = await buildViaChain('v40-plain.db', async (db) => {
+    await db.execute(
+      `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags)
+       VALUES ('p1','Normal','<p>x</p>','sigils',$1,$1,'[]')`,
+      [now]
+    );
+  });
+  check(
+    'ohne Altstatus legt v40 keine Definition an',
+    (await plain.select('SELECT COUNT(*) AS n FROM block_definitions'))[0].n === 0
+  );
+  plain.close();
+  check('v40: Schema identisch mit der Baseline', JSON.stringify(await readSchema(v40)) === JSON.stringify(schemaA));
+  v40.close();
 }
 
 /* ------------------------------------------------------------------ *

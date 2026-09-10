@@ -217,11 +217,6 @@ function buildMetaHtml(data: ExportData): string {
     propChips.push(chip(data.meditation) + dur);
   }
   // the category is shown in the topbar, not here
-  if (data.isActive !== undefined) {
-    propChips.push(`<span class="chip chip-${data.isActive ? 'active' : 'stone'}">${data.isActive ? 'Active' : 'Inactive'}</span>`);
-  }
-  if (data.endDate) propChips.push(`<span class="chip chip-stone">Ends ${format(new Date(data.endDate), 'MMM d, yyyy')}</span>`);
-  if (data.version)  propChips.push(`<span class="chip chip-stone">v${htmlEscape(data.version)}</span>`);
   if (propChips.length) parts.push(`<div class="meta-row">${propChips.join('')}</div>`);
 
   // Linked ops
@@ -299,8 +294,6 @@ const PRINT_CSS = `
   }
   .chip-img { width: 14px; height: 14px; object-fit: cover; border-radius: 2px; }
   .chip-emoji { font-size: 1em; line-height: 1; }
-  .chip-stone { background: #f2f2f2; }
-  .chip-active { background: #d4f5e7; border-color: #7ecba6; color: #1a5c3a; }
   .chip-badge {
     display: inline-block; font-size: 0.9em;
     background: #e8e8e8; border-radius: 4px; padding: 0 5px; margin-left: 2px;
@@ -462,9 +455,6 @@ export async function exportAsMarkdown(data: ExportData): Promise<void> {
   if (data.linkedOps?.length)   lines.push(`Operations: ${data.linkedOps.map(o => (`${mdIcon(o.icon, o.fallbackIcon)}${o.label}`.trim()) + (o.id ? ` [${o.id}]` : '')).join(', ')}`);
   if (data.linkedWiki?.length)  lines.push(`Wiki: ${data.linkedWiki.map(w => (`${mdIcon(w.icon, w.fallbackIcon)}${w.label}`.trim()) + (w.id ? ` [${w.id}]` : '')).join(', ')}`);
   if (data.category)            lines.push(`Category: ${mdIcon(data.category.icon, data.category.fallbackIcon)}${data.category.label}`.trim());
-  if (data.isActive !== undefined) lines.push(`Status: ${data.isActive ? 'Active' : 'Inactive'}`);
-  if (data.endDate)             lines.push(`End Date: ${format(new Date(data.endDate), 'MMM d, yyyy')}`);
-  if (data.version)             lines.push(`Version: ${data.version}`);
   if (data.tagNames?.length)    lines.push(`Tags: ${data.tagNames.join(', ')}`);
   lines.push('', '---', '');
   lines.push(td.turndown(stripped), '');

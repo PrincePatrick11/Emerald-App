@@ -61,6 +61,11 @@ export interface BlockDefinition {
   deleted_at: string | null;
 }
 
+/** Die Definition als Datenbankzeile — `elements`/`display` als JSON-Text. */
+export function definitionToRow(def: BlockDefinition) {
+  return { ...def, elements: JSON.stringify(def.elements), display: JSON.stringify(def.display) };
+}
+
 /** Was eine Definition an ihre Kopien weitergibt — ändert es sich, steigt die Revision. */
 export type DefinitionShape = Pick<BlockDefinition, 'name' | 'icon' | 'elements' | 'display'>;
 

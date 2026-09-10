@@ -59,15 +59,11 @@ export default function OperationsView() {
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
-  const [filterStatus, setFilterStatus] = useState<string[]>([]);
   const { collapsed: collapsedCats, toggle: toggleCatCollapse } = useCollapsedSet('operations');
   const [title, setTitle] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [loadedOperationId, setLoadedOperationId] = useState<string | null>(null);
-  const [isActive, setIsActive] = useState(true);
-  const [endDate, setEndDate] = useState<string>('');
-  const [version, setVersion] = useState<string>('');
 
   const [editorEpoch, setEditorEpoch] = useState(0);
 
@@ -75,8 +71,8 @@ export default function OperationsView() {
     entityId: operation?.id,
     isEditing,
     ready: !!operation && loadedOperationId === operation.id,
-    buildPatch: (content) => ({ title, content, category_id: categoryId, tags, is_active: isActive, end_date: endDate || null, version: version || null }),
-    // Kategorie, Tags, Status, Enddatum, Version gehören dem Properties-Panel
+    buildPatch: (content) => ({ title, content, category_id: categoryId, tags }),
+    // Kategorie und Tags gehören dem Properties-Panel
     // (sofort gespeichert) — Cancel setzt nur zurück, was der Editor besitzt.
     buildRestorePatch: (content) => ({ title, content }),
     update: updateOperation,
@@ -93,9 +89,6 @@ export default function OperationsView() {
       contentRef.current = operation.content;
       setCategoryId(operation.category_id);
       setTags(operation.tags ?? []);
-      setIsActive(operation.is_active ?? true);
-      setEndDate(operation.end_date ?? '');
-      setVersion(operation.version ?? '');
       setLoadedOperationId(operation.id);
     } else {
       setLoadedOperationId(null);
@@ -107,11 +100,8 @@ export default function OperationsView() {
     if (operation) {
       setTags(operation.tags ?? []);
       setCategoryId(operation.category_id);
-      setIsActive(!!operation.is_active);
-      setEndDate(operation.end_date ?? '');
-      setVersion(operation.version ?? '');
     }
-  }, [operation?.tags, operation?.category_id, operation?.is_active, operation?.end_date, operation?.version]);
+  }, [operation?.tags, operation?.category_id]);
 
   // Titel ebenso: ein Rename aus der Sidebar bei offenem Edit-Modus wuerde
   // sonst vom naechsten Autosave zurueckgedreht.
@@ -174,7 +164,7 @@ export default function OperationsView() {
   const handleDone = async () => {
     if (!operation) return;
     cancelAutoSave();
-    await updateOperation(operation.id, { title, content: contentRef.current, category_id: categoryId, tags, is_active: isActive, end_date: endDate || null, version: version || null });
+    await updateOperation(operation.id, { title, content: contentRef.current, category_id: categoryId, tags });
     setActiveView({ type: 'operations', id: operation.id, mode: 'view' });
   };
 
@@ -195,9 +185,6 @@ export default function OperationsView() {
       setTitle(from.title);
       setCategoryId(operation.category_id);
       setTags(operation.tags ?? []);
-      setIsActive(operation.is_active ?? true);
-      setEndDate(operation.end_date ?? '');
-      setVersion(operation.version ?? '');
       contentRef.current = from.content;
       setEditorEpoch((e) => e + 1);
     }
@@ -233,22 +220,13 @@ export default function OperationsView() {
         )
       : operations;
 
-    const catFiltered = filterCatIds.length === 0
+    const filtered = filterCatIds.length === 0
       ? searchFiltered
       : searchFiltered.filter((o) =>
           filterCatIds.includes(o.category_id) ||
           // Der „Ohne Kategorie"-Chip wählt die Waisen aus — deren category_id
           // (gelöschte Kategorie) steht nie selbst in der Chip-Auswahl.
           (filterCatIds.includes(UNCATEGORIZED_KEY) && !catById[o.category_id]));
-
-    const statusFiltered = filterStatus.length === 0
-      ? catFiltered
-      : catFiltered.filter((o) => {
-          const active = (o.is_active as unknown as number) !== 0;
-          return filterStatus.includes(active ? 'active' : 'inactive');
-        });
-
-    const filtered = statusFiltered;
 
     const catName = (c: typeof categories[0]) => categoryLabel(t, c);
 
@@ -264,14 +242,7 @@ export default function OperationsView() {
       ...(showUncatChip ? [{ value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄' }] : []),
     ];
 
-    const statusChips = [
-      { value: 'active', label: t('operations.active'), emoji: '●' },
-      { value: 'inactive', label: t('operations.inactive'), emoji: '○' },
-    ];
-
-    const activeFilterCount =
-      (filterCatIds.length > 0 ? 1 : 0) +
-      (filterStatus.length > 0 ? 1 : 0);
+    const activeFilterCount = filterCatIds.length > 0 ? 1 : 0;
 
     const sortedOps = sortItems(filtered, sort, { date: (o) => o.updated_at });
 
@@ -285,7 +256,6 @@ export default function OperationsView() {
       const isSigil = op.category_id === SIGIL_CATEGORY_ID;
       const dateStr = `${catDisplayName}${catDisplayName ? ' · ' : ''}${formatEntryDate(op.updated_at)}`;
       const createdDate = formatEntryDate(op.created_at);
-      const activeDot = <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${op.is_active ? 'bg-jade-400' : 'bg-stone-700'}`} />;
       if (renamingId === op.id) return (
         <div key={op.id} className={isCardView(view) ? 'panel-interactive px-4 py-4 text-left' : 'panel-interactive w-full flex items-center gap-3 px-4 py-3'}>
           {isCardView(view) ? (
@@ -297,9 +267,8 @@ export default function OperationsView() {
               <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
                 onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
                 className="text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1" />
-              <div className="flex items-center justify-between mt-1">
+              <div className="mt-1">
                 <span className="text-xs text-parchment-500/70">{dateStr}</span>
-                {activeDot}
               </div>
             </>
           ) : (
@@ -311,7 +280,6 @@ export default function OperationsView() {
               <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
                 onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
                 className="flex-1 bg-transparent text-sm text-stone-300 outline-none selectable" />
-              {activeDot}
               <span className="text-xs text-parchment-500/70 flex-shrink-0">{dateStr}</span>
             </>
           )}
@@ -374,9 +342,8 @@ export default function OperationsView() {
                   )}
                 </>
               ) : (
-                <div className="flex items-center justify-between mt-1">
+                <div className="mt-1">
                   <span className="text-xs text-parchment-500/70">{dateStr}</span>
-                  {activeDot}
                 </div>
               )}
             </>
@@ -392,10 +359,7 @@ export default function OperationsView() {
                   {op.target_reveal_date ? `${t('creation.targetDate')}: ${formatEntryDate(op.target_reveal_date)}` : createdDate}
                 </span>
               ) : (
-                <>
-                  {activeDot}
-                  <span className="text-xs text-parchment-500/70 flex-shrink-0">{dateStr}</span>
-                </>
+                <span className="text-xs text-parchment-500/70 flex-shrink-0">{dateStr}</span>
               )}
             </>
           )}
@@ -469,10 +433,7 @@ export default function OperationsView() {
             selectedChips: filterCatIds,
             onChipToggle: (v) => setFilterCatIds((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
             onAllChips: () => setFilterCatIds([]),
-            statusChips,
-            selectedStatus: filterStatus,
-            onStatusToggle: (v) => setFilterStatus((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
-            onClearAll: () => { setFilterCatIds([]); setFilterStatus([]); },
+            onClearAll: () => setFilterCatIds([]),
           },
         }}
         items={sortedOps}
@@ -547,48 +508,12 @@ export default function OperationsView() {
       }
       title={isEditing ? title : operation.title}
       onTitleChange={(nextTitle) => { setTitle(nextTitle); triggerAutoSave(); }}
-      belowTitle={
-        <>
-          {/* Cover image — read mode hero (bewusst nach dem Titel, anders als im Wiki) */}
-          {!isEditing && operation.cover_image && (
-            <div className="flex-shrink-0 px-8 pt-5">
-              <img src={operation.cover_image} alt="" className="w-full max-h-48 object-cover rounded-lg border border-stone-700/40" />
-            </div>
-          )}
-
-          {/* Built-in properties */}
-          <div className="px-8 pb-3 flex-shrink-0 flex flex-wrap gap-2">
-            {/* Active / Inactive — clickable toggle */}
-            <button
-              onClick={() => updateOperation(operation.id, { is_active: !operation.is_active })}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
-                !!operation.is_active
-                  ? 'bg-jade-900/40 text-jade-400 border-jade-800/40 hover:bg-jade-900/60'
-                  : 'bg-stone-800/60 text-stone-500 border-stone-700/40 hover:bg-stone-700/60'
-              }`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${!!operation.is_active ? 'bg-jade-400' : 'bg-stone-600'}`} />
-              {!!operation.is_active ? t('operations.active') : t('operations.inactive')}
-            </button>
-
-            {operation.end_date && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs bg-stone-800/60 border border-stone-700/40">
-                <span className="text-stone-600">{t('operations.endDate')}:</span>
-                <span className="text-stone-300">
-                  {formatEntryDate(operation.end_date)}
-                </span>
-              </span>
-            )}
-
-            {operation.version && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs bg-stone-800/60 border border-stone-700/40">
-                <span className="text-stone-600">{t('operations.version')}:</span>
-                <span className="text-stone-300">{operation.version}</span>
-              </span>
-            )}
-          </div>
-        </>
-      }
+      // Cover image — read mode hero (bewusst nach dem Titel, anders als im Wiki)
+      belowTitle={!isEditing && operation.cover_image && (
+        <div className="flex-shrink-0 px-8 pt-5">
+          <img src={operation.cover_image} alt="" className="w-full max-h-48 object-cover rounded-lg border border-stone-700/40" />
+        </div>
+      )}
       tags={{ value: tags, onChange: (newTags) => { setTags(newTags); triggerAutoSave(); } }}
     >
       {loadedOperationId === operation.id && (

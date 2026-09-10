@@ -11,6 +11,7 @@ import { migrateLinkedIdsToContent } from './migrateLinkedIdsToContent';
 import { migrateJournalFieldsToContent } from './migrateJournalFieldsToContent';
 import { mergeCategoryTables } from './mergeCategoryTables';
 import { createIndexesIfMissing } from './dbRebuild';
+import { migrateOperationStatusToBlocks } from './migrateOperationStatusToBlocks';
 import i18n from '../i18n';
 
 // Per-vault DB cache: SQLite identifier → Database instance
@@ -1152,5 +1153,14 @@ export const MIGRATIONS: Migration[] = [
       await db.execute(ddlIfNotExists(TABLE_DDL.block_definitions));
       await createIndexesIfMissing(db, [BLOCK_DEFINITIONS_INDEX_DDL]);
     },
+  },
+  {
+    // Status, Enddatum und Version der Operationen waren feste Spalten mit
+    // Filter, Listenpunkt und Chips. Sie werden die Kopie eines eigenen
+    // Blocks „Status" im Inhalt; die Spalten bleiben und werden geleert.
+    // Ablauf in `migrateOperationStatusToBlocks.ts`.
+    version: 40,
+    name: 'operation_status_to_blocks',
+    up: migrateOperationStatusToBlocks,
   },
 ];

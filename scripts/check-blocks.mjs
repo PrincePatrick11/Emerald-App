@@ -28,6 +28,7 @@ writeFileSync(
    export { parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot } from '${root}/src/lib/blocks/fields';
    export { instantiateDefinition, updateInstanceToDefinition, isOutdatedCopy, blockOrigin, updateCopiesInContent, removeCopiesFromContent, parseDefinitionElements, parseDefinitionDisplay } from '${root}/src/lib/blocks/definitions';
    export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
+   export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';`
 );
@@ -54,6 +55,7 @@ const {
   internalLinkChipHtml,
   instantiateDefinition, updateInstanceToDefinition, isOutdatedCopy, blockOrigin, updateCopiesInContent,
   removeCopiesFromContent, parseDefinitionElements, parseDefinitionDisplay, entryBlockSummary,
+  withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID,
 } = bundle;
 
 const failures = [];
@@ -390,6 +392,48 @@ console.log('\n4d. Eigene Blöcke: Kopien und Aktualisieren\n');
     parseDefinitionElements(JSON.stringify([
       { id: '__proto__', kind: 'date', label: '' }, { id: 'ok', kind: 'date', label: '' }, { id: 'ok', kind: 'number', label: '' },
     ])).map((e) => e.id).join() === 'ok');
+}
+
+console.log('\n4e. Altstatus der Operationen wird ein Block\n');
+{
+  const labels = {
+    'blocks.status.name': 'Status', 'blocks.status.active': 'Aktiv', 'blocks.status.endDate': 'Enddatum',
+    'blocks.status.version': 'Version', 'blocks.fields.yes': 'Ja', 'blocks.fields.no': 'Nein',
+  };
+  const t = (key) => labels[key] ?? key;
+  const def = statusDefinition(t, '2026-01-01T00:00:00.000Z');
+
+  check('Aktiv ohne Enddatum und Version ist kein Altstatus',
+    !hasLegacyStatus({ isActive: true, endDate: null, version: ' ' }) && hasLegacyStatus({ isActive: false, endDate: null, version: null }));
+
+  const out = withLegacyStatus('<p>Text</p>', { isActive: false, endDate: '2026-03-01', version: ' 1.2 ' }, def, t);
+  const [status, text] = parseBlocks(out);
+  const model = parseFields(status);
+  check('der Status-Block steht vor dem Inhalt, der Text bleibt',
+    status?.type === 'core.fields' && status.attrs['data-block-origin'] === STATUS_DEFINITION_ID && text?.html === '<p>Text</p>', out);
+  check('Werte: inaktiv, Enddatum, Version getrimmt',
+    model.values.active === false && model.values['end-date'] === '2026-03-01' && model.values.version === '1.2', model.values);
+  check('der Fallback nennt die Werte lesbar', status.html.includes('Nein') && status.html.includes('1.2'), status.html);
+
+  const md = parseFields(parseBlocks(withLegacyStatus('', { isActive: true, endDate: 'Sep 10, 2026', version: null }, def, t))[0]);
+  check('ein Datum aus einem Markdown-Export wird ISO', md.values['end-date'] === '2026-09-10', md.values);
+
+  const rows = [
+    { id: 'a', content: '<p>x</p>', is_active: 0, end_date: null, version: null },
+    { id: 'b', content: '<p>y</p>', is_active: 1, end_date: null, version: '' },
+  ];
+  const converted = convertLegacyStatusRows(rows, t, 'now');
+  check('convertLegacyStatusRows: nur die Zeile mit Altstatus, Spalten geleert',
+    converted.definition?.id === STATUS_DEFINITION_ID && converted.rows[1] === rows[1] &&
+      converted.rows[0].is_active === 1 && converted.rows[0].content.includes('data-block-origin'), converted.rows);
+  check('ohne Altstatus braucht es keine Definition', convertLegacyStatusRows([rows[1]], t, 'now').definition === null);
+
+  // i18n noch nicht bereit: `t` gibt den Schlüssel zurück — nie als Beschriftung verewigen.
+  const raw = statusDefinition((key) => key, 'now');
+  check('ohne Übersetzung: englische Beschriftungen statt Schlüssel',
+    raw.name === 'Status' && raw.elements.map((e) => e.label).join() === 'Active,End date,Version', raw);
+  const rawHtml = parseBlocks(withLegacyStatus('', { isActive: false, endDate: null, version: null }, raw, (key) => key))[0].html;
+  check('ohne Übersetzung: auch der Fallback-Text ohne Schlüssel', rawHtml.includes('No') && !rawHtml.includes('blocks.'), rawHtml);
 }
 
 console.log('\n5. Was aus dem Inhalt abgeleitet wird, sieht die Blöcke durch\n');
