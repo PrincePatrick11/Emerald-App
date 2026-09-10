@@ -9,7 +9,23 @@
  * übersetzt an — wer eine eingebaute Kategorie von früher einspeist, hat sie
  * vorher über ihren Locale-Key aufgelöst (siehe `legacyBuiltinLabelKey`).
  */
-import { FALLBACK_CATEGORY_ID, SIGIL_CATEGORY_ID, BUILTIN_CATEGORIES, type CategorySeedRow } from './schema';
+import { FALLBACK_CATEGORY_ID, SIGIL_CATEGORY_ID, type CategorySeedRow } from './schema';
+
+/**
+ * Die beiden Builtins, wie v38 sie kannte — eingefroren statt aus
+ * `BUILTIN_CATEGORIES` gelesen.
+ *
+ * v39 hat `other` den Sonderstatus genommen; die Konstante in `schema.ts`
+ * führt es deshalb nicht mehr. Diese Datei baut aber ausschließlich Daten von
+ * *vor* v38 um, und dort war es eingebaut: Ein aufsteigender Vault muss erst
+ * denselben Stand bekommen, den v38 immer erzeugt hat, damit v39 ihn danach
+ * genauso degradiert wie jeden anderen. Zöge die Liste hier mit, verlöre der
+ * Aufstieg das Zusammenlegen der vier Modul-„Sonstiges" in eine Zeile.
+ */
+const PRE_V39_BUILTINS: readonly [string, string, string][] = [
+  [SIGIL_CATEGORY_ID, 'Sigils', '🔯'],
+  [FALLBACK_CATEGORY_ID, 'Other', '📦'],
+];
 
 export interface CategorySourceRow {
   id: string;
@@ -68,7 +84,7 @@ export function mergeCategoryRows(sources: CategorySource[], opts: MergeOptions)
   };
 
   const builtin = new Map<string, MergedCategory>();
-  for (const [id, name, emoji] of BUILTIN_CATEGORIES) {
+  for (const [id, name, emoji] of PRE_V39_BUILTINS) {
     builtin.set(id, register({
       id, name, emoji, sort_order: 0, is_builtin: true, deleted_at: null,
     }));

@@ -1,4 +1,4 @@
-import { FALLBACK_CATEGORY_ID } from './schema';
+import { CATEGORY_MODULE_IDS, type CategoryModuleId } from './modules';
 import { LEGACY_ALTAR_CATEGORIES, LEGACY_WIKI_CATEGORIES } from './schemaV37';
 
 /** Ein Übersetzer — `i18n.t`, das `t` aus useTranslation oder ein durchgereichtes Prop. */
@@ -26,36 +26,96 @@ export function categoryLabel(
 
 /**
  * Die Kategorien, die in einer Ansicht als Chips, Gruppen oder Tabs stehen:
- * alle, auf die mindestens ein Eintrag zeigt, plus das Sammelbecken — in der
- * Reihenfolge der globalen Liste. Die Volliste bleibt für Zuweisung und
- * Auflösung; eine Kategorie, die nur in einem anderen Modul benutzt wird,
- * soll hier keinen leeren Kopf bekommen.
+ * alle, auf die mindestens ein Eintrag zeigt, in der Reihenfolge der globalen
+ * Liste. Die Volliste bleibt für Zuweisung und Auflösung; eine Kategorie, die
+ * nur in einem anderen Modul benutzt wird, soll hier keinen leeren Kopf
+ * bekommen — auch eine gerade angelegte nicht: verwaltet wird in der
+ * Kategorien-Ansicht, zugewiesen am Eintrag.
+ *
+ * Bis v39 war das Sammelbecken `other` immer dabei, weil jeder Eintrag eine
+ * Kategorie tragen musste und die Tab-Leiste ein Ziel brauchte. Einträge ohne
+ * Kategorie sammelt jetzt der „Ohne Kategorie"-Bucket.
  */
 export function categoriesUsedBy<C extends { id: string }>(
   all: readonly C[],
-  items: readonly { category_id: string }[],
-  /** Zusätzlich immer dabei — das Sammelbecken und z. B. eine gerade angelegte Kategorie. */
-  always: readonly (string | null | undefined)[] = [],
+  items: readonly { category_id: string | null }[],
 ): C[] {
-  const used = new Set<string>([FALLBACK_CATEGORY_ID]);
-  for (const id of always) if (id) used.add(id);
-  for (const item of items) used.add(item.category_id);
+  const used = new Set<string>();
+  for (const item of items) if (item.category_id) used.add(item.category_id);
   return all.filter((c) => used.has(c.id));
 }
 
 /**
- * Zeigt mindestens ein Eintrag auf eine Kategorie, die es nicht (mehr) gibt?
+ * Nachschlagen mit einer `category_id`, die `null` sein darf. Ergebnis ist
+ * `undefined`, wenn der Eintrag keine Kategorie hat *oder* seine nicht mehr
+ * auflöst (Papierkorb) — für den Leser derselbe Zustand, und `categoryLabel`
+ * nimmt beides entgegen.
+ */
+export function lookupCategory<C>(byId: ReadonlyMap<string, C>, id: string | null | undefined): C | undefined;
+export function lookupCategory<C>(byId: Readonly<Record<string, C>>, id: string | null | undefined): C | undefined;
+export function lookupCategory<C>(
+  byId: ReadonlyMap<string, C> | Readonly<Record<string, C>>,
+  id: string | null | undefined,
+): C | undefined {
+  if (!id) return undefined;
+  return byId instanceof Map ? byId.get(id) : (byId as Readonly<Record<string, C>>)[id];
+}
+
+/** Wie oft eine Kategorie je Modul benutzt wird. */
+export type CategoryUsage = Record<CategoryModuleId, number>;
+
+/** Die vier Eintragslisten, aus denen sich die Nutzung einer Kategorie ergibt. */
+export type CategorySources = Record<CategoryModuleId, readonly { category_id: string | null }[]>;
+
+export const emptyCategoryUsage = (): CategoryUsage => ({ wiki: 0, operations: 0, tasks: 0, altar: 0 });
+
+/**
+ * Wie viele Einträge je Modul auf jede Kategorie zeigen — ein Durchlauf je
+ * Liste statt einer Filterung je Kategorie. Kategorien ohne einen einzigen
+ * Eintrag fehlen in der Map; `emptyCategoryUsage()` ist ihr Ersatzwert.
  *
- * Das sind die Waisen, die `groupByCategory` in den „Ohne Kategorie"-Bucket
- * sortiert. Die Chip-Liste fragt hier, ob es den Chip überhaupt braucht —
- * dieselbe Frage wie `categoriesUsedBy` daneben, nur andersherum.
+ * Eine Wahrheit für die Kategorien-Ansicht (zeigt alle vier Zahlen) und die
+ * globale Suche (nimmt nur die größte davon). Sonst gäbe ein fünftes
+ * kategorisiertes Modul zwei Stellen zu pflegen, und beide widersprächen sich
+ * über dieselbe Kategorie.
+ */
+export function categoryUsageCounts(sources: CategorySources): Map<string, CategoryUsage> {
+  const counts = new Map<string, CategoryUsage>();
+  for (const module of CATEGORY_MODULE_IDS) {
+    for (const item of sources[module]) {
+      if (!item.category_id) continue;
+      let usage = counts.get(item.category_id);
+      if (!usage) counts.set(item.category_id, (usage = emptyCategoryUsage()));
+      usage[module] += 1;
+    }
+  }
+  return counts;
+}
+
+/**
+ * Das Modul, das eine Kategorie am meisten benutzt — undefined, wenn keines.
+ * Bei Gleichstand gewinnt das in `ENTRY_MODULE_IDS` frühere.
+ */
+export function dominantCategoryModule(usage: CategoryUsage | undefined): CategoryModuleId | undefined {
+  if (!usage) return undefined;
+  return CATEGORY_MODULE_IDS.reduce((best, id) => (usage[id] > usage[best] ? id : best));
+}
+
+/**
+ * Gibt es Einträge ohne Kategorie? Zwei Fälle, derselbe Bucket: Der Eintrag
+ * trägt gar keine (`null` — seit v39 der Normalfall eines neuen), oder seine
+ * Kategorie liegt im Papierkorb und löst nicht mehr auf.
+ *
+ * Das sind die, die `groupByCategory` in den „Ohne Kategorie"-Bucket sortiert.
+ * Die Chip-Liste fragt hier, ob es den Chip überhaupt braucht — dieselbe Frage
+ * wie `categoriesUsedBy` daneben, nur andersherum.
  */
 export function hasUncategorized<C extends { id: string }>(
   all: readonly C[],
-  items: readonly { category_id: string }[],
+  items: readonly { category_id: string | null }[],
 ): boolean {
   const ids = new Set(all.map((c) => c.id));
-  return items.some((item) => !ids.has(item.category_id));
+  return items.some((item) => !item.category_id || !ids.has(item.category_id));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

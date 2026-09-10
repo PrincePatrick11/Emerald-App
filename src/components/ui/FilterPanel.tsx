@@ -65,9 +65,6 @@ export interface FilterPanelProps {
    *  deren activeFilterCount nie über null geht — dann wird der Knopf, der
    *  ihn allein aufruft, ohnehin nicht gerendert. */
   onClearAll?: () => void;
-  /** Schmale Spalten-Variante für die rechte Seitenleiste (Dashboard-Portal):
-   *  Gruppen untereinander statt nebeneinander, enger Einzug. */
-  vertical?: boolean;
 }
 
 function Chip({
@@ -100,26 +97,17 @@ export default function FilterPanel({
   extraGroups,
   activeFilterCount,
   onClearAll,
-  vertical,
 }: FilterPanelProps) {
   const { t } = useTranslation();
 
-  // Vertikal: Gruppenlabels in der Seitenleisten-Sprache (label-xs wie die
-  // Properties-Panels) statt der Streifen-Optik des Hauptbereichs.
-  const labelClass = vertical ? 'label-xs' : 'text-xs font-semibold text-stone-600 uppercase tracking-wider';
-
   return (
-    // Vertikal ohne `.filter-panel` und ohne eigenes px/bg: die Spalte der
-    // Seitenleiste liefert den Einzug, und die Theme-Overrides der Klasse
-    // würden den Streifen-Hintergrund sonst wieder anmalen.
-    <div className={vertical
-      ? 'flex flex-col gap-4'
-      : 'filter-panel px-8 py-3 border-b border-stone-700/40 bg-stone-900/50 flex flex-wrap gap-x-6 gap-y-3 items-start'
-    }>
+    // Gruppen untereinander, ohne eigenes px/bg: die Spalte der rechten
+    // Seitenleiste (Dashboard-Portal) liefert den Einzug.
+    <div className="flex flex-col gap-4">
       {/* Anzeige-Schalter — eigene Gruppe vor den Auswahl-Chips. */}
       {displayExtras && (
         <div className="flex flex-col gap-1.5">
-          <span className={labelClass}>{t('filters.display')}</span>
+          <span className="label-xs">{t('filters.display')}</span>
           <div className="flex flex-wrap gap-1.5">{displayExtras}</div>
         </div>
       )}
@@ -127,7 +115,7 @@ export default function FilterPanel({
       {/* Primary chips (category / moon phase) */}
       {chips && chips.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          {chipLabel && <span className={labelClass}>{chipLabel}</span>}
+          {chipLabel && <span className="label-xs">{chipLabel}</span>}
           <div className="flex flex-wrap gap-1.5">
             {onAllChips && (
               <FilterChipButton active={selectedChips.length === 0} onClick={onAllChips}>
@@ -145,7 +133,7 @@ export default function FilterPanel({
           Tasks: Prioritäten (statusLabel). */}
       {statusChips && statusChips.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <span className={labelClass}>{statusLabel ?? t('filters.status')}</span>
+          <span className="label-xs">{statusLabel ?? t('filters.status')}</span>
           <div className="flex flex-wrap gap-1.5">
             {statusChips.map((chip) => (
               <Chip key={chip.value} chip={chip} active={selectedStatus.includes(chip.value)} onToggle={onStatusToggle!} />
@@ -156,7 +144,7 @@ export default function FilterPanel({
 
       {extraGroups?.map((group) => (
         <div key={group.label} className="flex flex-col gap-1.5">
-          <span className={labelClass}>{group.label}</span>
+          <span className="label-xs">{group.label}</span>
           <div className="flex flex-wrap gap-1.5">{group.content}</div>
         </div>
       ))}

@@ -22,6 +22,8 @@
     "name": "Kategoriename…",
     "uncategorized": "Ohne Kategorie",
     "nameTaken": "Diese Kategorie gibt es schon",
+    "dragHint": "Zum Sortieren ziehen.",
+    "builtinHint": "Eingebaut — nicht umbenenn- oder löschbar.",
     "builtin": {
       "other": "Sonstiges",
       "sigils": "Sigillen"
@@ -71,6 +73,7 @@
     "wiki": "Wiki",
     "altar": "Altar",
     "tags": "Tags",
+    "categories": "Kategorien",
     "trash": "Papierkorb",
     "blocks": "Blöcke",
     "operations": "Operationen",
@@ -79,10 +82,6 @@
     "vaults": "Vaults"
   },
   "sidebar": {
-    "collapseList": "Eintragsliste einklappen",
-    "expandList": "Eintragsliste ausklappen",
-    "collapseProperties": "Eigenschaften einklappen",
-    "expandProperties": "Eigenschaften ausklappen",
     "allEmpty": "Noch keine Einträge"
   },
   "operations": {
@@ -498,7 +497,6 @@
     "remove": "Entfernen"
   },
   "filters": {
-    "toggle": "Filter",
     "all": "Alle",
     "display": "Anzeige",
     "clearAll": "Alle löschen",

@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { useShallow } from 'zustand/shallow';
 import { Settings } from 'lucide-react';
 import { Suspense, lazy, useState } from 'react';
 import { AUX_VIEWS, MODULE_LIST } from '../../lib/modules';
@@ -20,30 +19,9 @@ import RailButton from '../ui/RailButton';
  *  geklippte Rail *und* eine falsche Breite rechts ergeben. */
 export const RAIL_WIDTH = 56;
 
-function PanelToggleIcon({ active, mirrored, size = 16 }: { active: boolean; mirrored?: boolean; size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect width="18" height="18" x="3" y="3" rx="2" />
-      <path d={mirrored ? 'M15 3v18' : 'M9 3v18'} />
-      {active && <path d="M4.5 4.5l15 15" />}
-    </svg>
-  );
-}
-
 export default function LeftSidebarRail() {
   const { t } = useTranslation();
-  const { setActiveView, leftListOpen, toggleLeftList, rightSidebarOpen, toggleRightSidebar, } = useUIStore(
-    useShallow((s) => ({ setActiveView: s.setActiveView, leftListOpen: s.leftListOpen, toggleLeftList: s.toggleLeftList, rightSidebarOpen: s.rightSidebarOpen, toggleRightSidebar: s.toggleRightSidebar }))
-  );
+  const setActiveView = useUIStore((s) => s.setActiveView);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [vaultOpen, setVaultOpen] = useState(false);
   // Selector auf ein Primitiv, nicht auf den Vault-Datensatz: `find` liefert
@@ -55,15 +33,9 @@ export default function LeftSidebarRail() {
       className="left-sidebar-rail rail-divider flex flex-col items-center h-full flex-shrink-0 border-r"
       style={{ width: RAIL_WIDTH }}
     >
-      {/* Sidebar panel toggles — independent of the nav links below */}
-      <div className="rail-divider w-full flex flex-col items-center gap-0.5 py-2 border-b">
-        <RailButton onClick={toggleLeftList} title={leftListOpen ? t('sidebar.collapseList') : t('sidebar.expandList')}>
-          <PanelToggleIcon active={leftListOpen} size={18} />
-        </RailButton>
-        <RailButton onClick={toggleRightSidebar} title={rightSidebarOpen ? t('sidebar.collapseProperties') : t('sidebar.expandProperties')}>
-          <PanelToggleIcon active={rightSidebarOpen} mirrored size={18} />
-        </RailButton>
-      </div>
+      {/* Die beiden Seitenleisten schaltet das Menü „Ansicht" (TitleBarMenuBar,
+          nativ auf macOS) — eigene Knöpfe hier oben waren eine zweite Stelle
+          für dasselbe. */}
 
       {/* Main nav icons — navigate only, never touch the entry-list panel */}
       <div className="rail-divider w-full flex flex-col items-center gap-0.5 py-2 border-b">
@@ -81,7 +53,7 @@ export default function LeftSidebarRail() {
         ))}
       </div>
 
-      {/* Bottom nav — always visible: Blocks/Tags/Trash grouped, Vault/Settings set apart below a divider */}
+      {/* Bottom nav — always visible: Blocks/Tags/Categories/Trash grouped, Vault/Settings set apart below a divider */}
       <div className="sidebar-bottom-bar w-full flex-1 flex flex-col items-center justify-end py-2">
         <div className="flex flex-col items-center gap-0.5">
           <RailButton onClick={() => setActiveView({ type: 'blocks' })} title={t(AUX_VIEWS.blocks.navLabelKey)}>
@@ -89,6 +61,9 @@ export default function LeftSidebarRail() {
           </RailButton>
           <RailButton onClick={() => setActiveView({ type: 'tags' })} title={t(AUX_VIEWS.tags.navLabelKey)}>
             <AUX_VIEWS.tags.icon size={18} />
+          </RailButton>
+          <RailButton onClick={() => setActiveView({ type: 'categories' })} title={t(AUX_VIEWS.categories.navLabelKey)}>
+            <AUX_VIEWS.categories.icon size={18} />
           </RailButton>
           <RailButton onClick={() => setActiveView({ type: 'trash' })} title={t(AUX_VIEWS.trash.navLabelKey)}>
             <AUX_VIEWS.trash.icon size={18} />

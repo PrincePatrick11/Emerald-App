@@ -1,6 +1,7 @@
 /**
  * Bausteine für Migrationen, die Tabellen neu bauen — geteilt von v33
- * (`normalizeSchema.ts`) und v38 (`mergeCategoryTables.ts`).
+ * (`normalizeSchema.ts`), v38 (`mergeCategoryTables.ts`) und v39
+ * (`nullableCategory.ts`).
  *
  * Warum es überhaupt einen Rebuild braucht und warum er ohne
  * `PRAGMA foreign_keys = OFF` auskommen muss, steht im Kopf von

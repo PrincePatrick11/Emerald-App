@@ -459,7 +459,6 @@ export default function TrashView() {
     <Dashboard<TrashedItem>
       headerLeft={headerLeft}
       headerRight={headerRight}
-      headerClassName="flex items-center justify-between px-6 h-14 border-b border-stone-700/60"
       contentClassName="flex-1 overflow-y-auto p-6"
       view={trashPrefs.view}
       sort={trashPrefs.sort}

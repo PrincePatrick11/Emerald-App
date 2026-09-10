@@ -13,6 +13,7 @@ import { mergeCategoryTables } from './mergeCategoryTables';
 import { backupDatabaseFile, createIndexesIfMissing } from './dbRebuild';
 import { migrateOperationStatusToBlocks } from './migrateOperationStatusToBlocks';
 import { convertLegacySigils, hasLegacySigilRows } from './migrateLegacySigils';
+import { makeCategoryOptional } from './nullableCategory';
 import i18n from '../i18n';
 
 // Per-vault DB cache: SQLite identifier → Database instance
@@ -86,7 +87,7 @@ export async function getDb(): Promise<Database> {
     const db = await Database.load(identifier);
     await runMigrations(db);
     await runPeriodicCleanup(db);
-    // Sigillen-Zeichnungen, die v41 (oder ein Backup-Import) nicht als Datei
+    // Sigillen-Zeichnungen, die v42 (oder ein Backup-Import) nicht als Datei
     // speichern konnte — bei jedem Öffnen ein neuer Versuch. Scheitern darf
     // das Öffnen daran nicht: die Zeilen bleiben einfach, wie sie sind.
     await convertLegacySigils(db, { includeSigilCategory: false })
@@ -143,6 +144,40 @@ async function isEmptyDatabase(db: Database): Promise<boolean> {
   return (rows[0]?.n ?? 0) === 0;
 }
 
+/**
+ * Der Blöcke-Zweig stempelte seine drei Migrationen zuerst als v39–v41; v39
+ * ging danach an `category_optional`. Ein Entwicklungs-Vault mit der alten
+ * Zählung stünde sonst auf „v41 erledigt" und bekäme `category_optional` nie.
+ * Einmalig über den Namen umstempeln (absteigend — `version` ist eindeutig)
+ * und v39 nachholen; für jeden anderen Vault ein leerer Blick in die Tabelle.
+ */
+const RENUMBERED_BLOCK_MIGRATIONS: readonly [string, number][] = [
+  ['sigils_to_blocks', 42],
+  ['operation_status_to_blocks', 41],
+  ['block_definitions', 40],
+];
+
+async function renumberBlockMigrations(db: Database): Promise<void> {
+  const rows = await db.select<{ version: number; name: string }[]>(
+    "SELECT version, name FROM schema_version WHERE name IN ('sigils_to_blocks', 'operation_status_to_blocks', 'block_definitions')"
+  );
+  const target = new Map(RENUMBERED_BLOCK_MIGRATIONS);
+  if (rows.every((r) => r.version === target.get(r.name))) return;
+  for (const [name, version] of RENUMBERED_BLOCK_MIGRATIONS) {
+    await db.execute('UPDATE schema_version SET version = $1 WHERE name = $2', [version, name]);
+  }
+  const done = await db.select<{ n: number }[]>(
+    "SELECT COUNT(*) AS n FROM schema_version WHERE name = 'category_optional' OR (name = 'baseline' AND version >= 39)"
+  );
+  if ((done[0]?.n ?? 0) > 0) return;
+  console.warn('[db] Blöcke-Migrationen umgestempelt, v39 category_optional wird nachgeholt');
+  await makeCategoryOptional(db);
+  await db.execute(
+    'INSERT INTO schema_version (version, name, applied_at) VALUES ($1, $2, $3)',
+    [39, 'category_optional', new Date().toISOString()]
+  );
+}
+
 export async function runMigrations(db: Database): Promise<void> {
   // Use DELETE journal mode — simpler than WAL, survives unclean shutdowns
   await db.execute('PRAGMA journal_mode = DELETE');
@@ -171,6 +206,7 @@ export async function runMigrations(db: Database): Promise<void> {
   }
 
   await db.execute(ddlIfNotExists(TABLE_DDL.schema_version));
+  await renumberBlockMigrations(db);
 
   const versionRows = await db.select<{ version: number | null }[]>(
     'SELECT COALESCE(MAX(version), 0) AS version FROM schema_version'
@@ -1149,11 +1185,23 @@ export const MIGRATIONS: Migration[] = [
     up: mergeCategoryTables,
   },
   {
+    // `category_id` wird nullable — „ohne Kategorie" ist der Normalfall eines
+    // neuen Eintrags statt eines Unfalls —, und `other` verliert seinen
+    // Sonderstatus. Ablauf und Foreign-Key-Falle in `nullableCategory.ts`.
+    //
+    // Achtung beim Lesen von v38 darüber: Beide bauen aus demselben
+    // `TABLE_DDL`. Ein Vault von vor v38 bekommt dort also schon die nullable
+    // Spalte; v39 erkennt das und holt nur noch das `is_builtin` nach.
+    version: 39,
+    name: 'category_optional',
+    up: makeCategoryOptional,
+  },
+  {
     // Die eigenen Blöcke der Blöcke-Ansicht bekommen ihre Tabelle. Rein
     // additiv: Einträge tragen ihre Kopien im `content`, hier steht nur die
     // Vorlage. IF NOT EXISTS, damit ein angelegter, aber nicht gestempelter
     // Lauf beim nächsten Start nicht hängen bleibt.
-    version: 39,
+    version: 40,
     name: 'block_definitions',
     up: async (db) => {
       await db.execute(ddlIfNotExists(TABLE_DDL.block_definitions));
@@ -1165,7 +1213,7 @@ export const MIGRATIONS: Migration[] = [
     // Filter, Listenpunkt und Chips. Sie werden die Kopie eines eigenen
     // Blocks „Status" im Inhalt; die Spalten bleiben und werden geleert.
     // Ablauf in `migrateOperationStatusToBlocks.ts`.
-    version: 40,
+    version: 41,
     name: 'operation_status_to_blocks',
     up: migrateOperationStatusToBlocks,
   },
@@ -1175,10 +1223,10 @@ export const MIGRATIONS: Migration[] = [
     // Zeichnung eine Bilddatei. Vorher eine Sicherung — die Zeichnungen
     // wandern aus der Datenbank in Dateien. Ablauf in `migrateLegacySigils.ts`;
     // was hier am Speichern scheitert, holt `getDb` bei jedem Öffnen nach.
-    version: 41,
+    version: 42,
     name: 'sigils_to_blocks',
     up: async (db) => {
-      if (await hasLegacySigilRows(db)) await backupDatabaseFile(db, 'v41');
+      if (await hasLegacySigilRows(db)) await backupDatabaseFile(db, 'v42');
       await convertLegacySigils(db, { includeSigilCategory: true });
     },
   },

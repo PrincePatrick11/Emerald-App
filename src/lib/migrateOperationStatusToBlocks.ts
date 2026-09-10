@@ -5,7 +5,7 @@ import { definitionById, insertDefinitionRow, nextDefinitionSortOrder } from './
 import { convertLegacyStatusRows, STATUS_DEFINITION_ID } from './blocks/legacyStatus';
 
 /**
- * Migration v40 — Status, Enddatum und Version der Operationen werden ein
+ * Migration v41 — Status, Enddatum und Version der Operationen werden ein
  * Block (siehe `lib/blocks/legacyStatus.ts`).
  *
  * Betroffen ist jede Operation, die davon etwas gesetzt hatte — inaktiv, ein

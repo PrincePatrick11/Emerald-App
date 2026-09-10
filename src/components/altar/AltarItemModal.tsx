@@ -27,7 +27,7 @@ export function AltarItemModal({
   item: AltarItem | null;
   /** Die Volliste — ein Element darf in jede Kategorie, auch eine, die bisher nur das Wiki nutzt. */
   categories: Category[];
-  defaultCategory: string;
+  defaultCategory: string | null;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -36,18 +36,18 @@ export function AltarItemModal({
   );
   const [editName, setEditName] = useState(item?.name ?? '');
   const [editEmoji, setEditEmoji] = useState(item?.emoji ?? '');
-  const [editCategory, setEditCategory] = useState(item?.category_id ?? defaultCategory);
+  const [editCategory, setEditCategory] = useState<string | null>(item?.category_id ?? defaultCategory);
   const [editImageData, setEditImageData] = useState<string | null>(item?.image_data ?? null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  const getCategoryEmoji = (catId: string) => categories.find((c) => c.id === catId)?.emoji ?? '✨';
+  const getCategoryEmoji = (catId: string | null) => (catId ? categories.find((c) => c.id === catId)?.emoji : undefined) ?? '✨';
 
   // Ein selbst gewähltes Emoji überlebt den Kategoriewechsel. Nur wenn das
   // Element bisher das Standard-Emoji seiner Kategorie trug, folgt es der neuen.
-  const changeCategory = (catId: string) => {
+  const changeCategory = (catId: string | null) => {
     if (editEmoji === getCategoryEmoji(editCategory)) setEditEmoji('');
     setEditCategory(catId);
   };
@@ -136,7 +136,6 @@ export function AltarItemModal({
             variant="field"
           />
         </div>
-        {/* Dieselbe Lösch-/Speichern-Reihe wie im CategoryModal daneben. */}
         {item && confirmDelete ? (
           <div className="flex items-center justify-between rounded-lg border border-red-700/40 bg-red-950/20 px-3 py-2">
             <span className="text-xs text-red-300">{t('common.deleteConfirm')}</span>

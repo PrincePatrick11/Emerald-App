@@ -4,7 +4,7 @@ import { decodeHtmlAttr, neutralizeSectionTags, parseBlocks, serializeBlocks } f
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
 /**
- * Die drei Sigillen-Blöcke (seit v41; vorher eine eigene Ansicht mit eigenen
+ * Die drei Sigillen-Blöcke (seit v42; vorher eine eigene Ansicht mit eigenen
  * Spalten an `operations`):
  * - Rechner (`core.sigil.calc`): Absicht, Buchstabenbank, umgesetzte Buchstaben.
  * - Zeichnung (`core.sigil.canvas`): die Zeichnung als gespeichertes Bild —

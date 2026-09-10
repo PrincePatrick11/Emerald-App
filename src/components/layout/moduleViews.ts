@@ -16,6 +16,7 @@ export const VIEW_COMPONENTS: Record<ViewId, LazyExoticComponent<ComponentType>>
   journal: lazy(() => import('../views/JournalView')),
   wiki: lazy(() => import('../views/WikiView')),
   tags: lazy(() => import('../views/TagsView')),
+  categories: lazy(() => import('../views/CategoriesView')),
   trash: lazy(() => import('../views/TrashView')),
   blocks: lazy(() => import('../views/BlocksView')),
   altar: lazy(() => import('../views/AltarView')),

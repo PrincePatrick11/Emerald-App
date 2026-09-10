@@ -12,9 +12,9 @@ import { BLOCK_ATTR, type BlockInstance } from './blocks/types';
 import { SIGIL_CATEGORY_ID } from './schema';
 
 /**
- * Migration v41 — die Sigillen-Operation wird ein Eintrag aus Blöcken.
+ * Migration v42 — die Sigillen-Operation wird ein Eintrag aus Blöcken.
  *
- * Bis v40 hatte eine Operation der Kategorie „Sigillen" eine eigene Ansicht
+ * Bis v41 hatte eine Operation der Kategorie „Sigillen" eine eigene Ansicht
  * und eigene Spalten: Absicht, Buchstabenbank, Zeichnung (Base64), geladen,
  * Zieldatum, Ladetechnik, Notizen. Daraus werden:
  * - Rechner (Absicht, Buchstaben), Zeichnung (als Bilddatei über `saveImage`,
@@ -32,7 +32,7 @@ import { SIGIL_CATEGORY_ID } from './schema';
  * Zeichnung, die gar kein Bild ist (oder übergroß), wird verworfen statt
  * endlos wiederholt. Die leeren Operationen der Kategorie „Sigillen" nimmt
  * nur die Migration selbst mit — und nur, solange ihr Inhalt noch keine
- * Sigillen-Blöcke trägt: ein abgebrochener und neu gestarteter v41-Lauf
+ * Sigillen-Blöcke trägt: ein abgebrochener und neu gestarteter v42-Lauf
  * setzt kein zweites Set davor, und das Nachholen fügt einem Eintrag, dem
  * der Nutzer die Blöcke bewusst genommen hat, sie nicht wieder hinzu.
  *
@@ -99,7 +99,7 @@ async function drawingFile(drawing: string | null): Promise<string | null | unde
   }
 }
 
-/** Gibt es Zeilen, die die Umwandlung anfassen würde? Für die Sicherung vor v41. */
+/** Gibt es Zeilen, die die Umwandlung anfassen würde? Für die Sicherung vor v42. */
 export async function hasLegacySigilRows(db: Database): Promise<boolean> {
   const [row] = await db.select<{ n: number }[]>(
     `SELECT COUNT(*) AS n FROM operations WHERE category_id = $1 OR ${LEGACY_DATA}`,
@@ -110,7 +110,7 @@ export async function hasLegacySigilRows(db: Database): Promise<boolean> {
 
 /**
  * Wandelt Operationszeilen mit Sigillen-Altdaten um. `includeSigilCategory`
- * nimmt auch leere Operationen der Kategorie „Sigillen" mit (nur v41 und der
+ * nimmt auch leere Operationen der Kategorie „Sigillen" mit (nur v42 und der
  * Import alter Backups); `ids` beschränkt auf bestimmte Zeilen (Import).
  */
 export async function convertLegacySigils(

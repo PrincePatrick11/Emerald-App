@@ -28,7 +28,8 @@ export interface WikiArticle {
   title: string;
   slug: string;
   content: string; // HTML, wie TipTaps getHTML() es liefert
-  category_id: string;
+  /** `null` = ohne Kategorie, seit v39 der Normalfall eines neuen Eintrags. */
+  category_id: string | null;
   created_at: string;
   updated_at: string;
   tags: string[];
@@ -56,13 +57,14 @@ export interface Operation {
   id: string;
   title: string;
   content: string; // HTML, wie TipTaps getHTML() es liefert
-  category_id: string;
+  /** `null` = ohne Kategorie, seit v39 der Normalfall eines neuen Eintrags. */
+  category_id: string | null;
   created_at: string;
   updated_at: string;
   tags: string[];
   deleted_at: string | null;
-  // Status/Enddatum/Version (v40, lib/blocks/legacyStatus.ts) und die
-  // Sigillen-Felder samt Notizen (v41, lib/blocks/sigil.ts) sind Blöcke im
+  // Status/Enddatum/Version (v41, lib/blocks/legacyStatus.ts) und die
+  // Sigillen-Felder samt Notizen (v42, lib/blocks/sigil.ts) sind Blöcke im
   // Inhalt; ihre Spalten stehen noch im Schema, die App liest sie nicht mehr.
   entry_number?: number;
   icon?: string;
@@ -140,7 +142,8 @@ export interface AltarItem {
   id: string;
   name: string;
   emoji: string;
-  category_id: string;
+  /** `null` = ohne Kategorie, seit v39 der Normalfall eines neuen Eintrags. */
+  category_id: string | null;
   note: string;
   image_data?: string;
   /** Nur für die Sortierung der Bibliothek — die Spalte gab es in
@@ -156,7 +159,8 @@ export interface AltarPlacement {
   // beim Laden hinzugejoint — sie sind keine Spalten von altar_placements.
   name: string;
   emoji: string;
-  category_id: string;
+  /** `null` = ohne Kategorie, seit v39 der Normalfall eines neuen Eintrags. */
+  category_id: string | null;
   x: number;
   y: number;
   z_index: number;
@@ -182,7 +186,8 @@ export interface Task {
   id: string;
   title: string;
   description: string;
-  category_id: string;
+  /** `null` = ohne Kategorie, seit v39 der Normalfall eines neuen Eintrags. */
+  category_id: string | null;
   priority: TaskPriority;
   due_date: string | null;
   completed: boolean;

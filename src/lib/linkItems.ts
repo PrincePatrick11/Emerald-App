@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next';
 import { MOON_PHASE_SYMBOLS } from './moonPhase';
 import { DEFAULT_ENTRY_EMOJI } from './modules';
-import { categoryLabel } from './categories';
+import { categoryLabel, lookupCategory } from './categories';
 import { isImageIcon } from './helpers';
 import type {
   AltarRecord, Category, ContentType, JournalEntry, MoonPhase, Operation,
@@ -99,7 +99,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
       entry_number: e.entry_number,
     })),
     ...s.tasks.map((task) => {
-      const cat = catById.get(task.category_id);
+      const cat = lookupCategory(catById, task.category_id);
       return {
         id: task.id,
         entryType: 'task' as const,
@@ -111,7 +111,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
       };
     }),
     ...s.operations.map((o) => {
-      const cat = catById.get(o.category_id);
+      const cat = lookupCategory(catById, o.category_id);
       return {
         id: o.id,
         entryType: 'operation' as const,
@@ -124,7 +124,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
       };
     }),
     ...s.articles.map((a) => {
-      const cat = catById.get(a.category_id);
+      const cat = lookupCategory(catById, a.category_id);
       return {
         id: a.id,
         entryType: 'wiki' as const,

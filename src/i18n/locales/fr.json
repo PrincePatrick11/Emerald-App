@@ -22,6 +22,8 @@
     "name": "Nom de catégorie…",
     "uncategorized": "Sans catégorie",
     "nameTaken": "Cette catégorie existe déjà",
+    "dragHint": "Glissez pour réordonner.",
+    "builtinHint": "Intégrée — ne peut être ni renommée ni supprimée.",
     "builtin": {
       "other": "Autre",
       "sigils": "Sigils"
@@ -71,6 +73,7 @@
     "wiki": "Wiki",
     "altar": "Autel",
     "tags": "Étiquettes",
+    "categories": "Catégories",
     "trash": "Corbeille",
     "blocks": "Blocs",
     "operations": "Opérations",
@@ -79,10 +82,6 @@
     "vaults": "Vaults"
   },
   "sidebar": {
-    "collapseList": "Réduire la liste des entrées",
-    "expandList": "Développer la liste des entrées",
-    "collapseProperties": "Réduire les propriétés",
-    "expandProperties": "Développer les propriétés",
     "allEmpty": "Aucune entrée pour le moment"
   },
   "operations": {
@@ -498,7 +497,6 @@
     "remove": "Supprimer"
   },
   "filters": {
-    "toggle": "Filtres",
     "all": "Toutes",
     "display": "Affichage",
     "clearAll": "Tout effacer",

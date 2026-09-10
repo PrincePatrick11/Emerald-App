@@ -15,7 +15,7 @@ interface OperationState {
   operations: Operation[];
 
   fetchAll: () => Promise<void>;
-  createOperation: (categoryId: string) => Promise<Operation>;
+  createOperation: (categoryId?: string | null) => Promise<Operation>;
   duplicateOperation: (id: string) => Promise<Operation | undefined>;
   updateOperation: (id: string, patch: Partial<Operation>) => Promise<void>;
   deleteOperation: (id: string) => Promise<void>;
@@ -25,9 +25,9 @@ interface OperationState {
 }
 
 /**
- * Die Spalten, die die App liest und schreibt. Status/Enddatum/Version (v40)
+ * Die Spalten, die die App liest und schreibt. Status/Enddatum/Version (v41)
  * und alles, was die Sigille ausmachte — Absicht, Buchstaben, Zeichnung,
- * Ladung, Notizen (v41) —, sind Blöcke im Inhalt. Die Spalten stehen noch im
+ * Ladung, Notizen (v42) —, sind Blöcke im Inhalt. Die Spalten stehen noch im
  * Schema, für ältere Backups.
  */
 const OPERATION_COLUMNS = 'id, title, content, category_id, entry_number, icon, cover_image, tags, created_at, updated_at, deleted_at';
@@ -47,7 +47,7 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     set({ operations: await selectAllOperations(db) });
   },
 
-  createOperation: async (categoryId) => {
+  createOperation: async (categoryId = null) => {
     const db = await getDb();
     const now = nowIso();
     const op: Operation = {

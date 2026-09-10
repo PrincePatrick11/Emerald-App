@@ -1,11 +1,15 @@
 import { ChevronDown } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import Dropdown from './Dropdown';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 
+/** Der „ohne Kategorie"-Eintrag. Kein gültiger Wert der Spalte, nur des Menüs. */
+const NONE = '__none__';
+
 interface Props<C extends { id: string; emoji: string }> {
   categories: readonly C[];
-  value: string;
-  onChange: (id: string) => void;
+  value: string | null;
+  onChange: (id: string | null) => void;
   /** Wiki/Ops binden categoryLabel: (c) => categoryLabel(t, 'wiki', c); Tasks: (c) => c.name */
   getLabel: (cat: C) => string;
   /** 'field' = Properties-Panel-Look (volle Breite), 'chip' = Inline-Chip in der TaskRow. */
@@ -13,8 +17,6 @@ interface Props<C extends { id: string; emoji: string }> {
   align?: 'left' | 'right';
   /** Tooltip des Chip-Triggers. */
   title?: string;
-  /** Trigger-Text, wenn value keine bekannte Kategorie trifft. */
-  placeholder?: string;
 }
 
 /**
@@ -23,19 +25,29 @@ interface Props<C extends { id: string; emoji: string }> {
  * und ein OS-Popup neben dem verbleibenden Prioritäts-Menü der TaskRow würde
  * brechen. Vereinheitlicht ist das Popover, der Trigger variiert pro Kontext —
  * dasselbe Muster wie beim EmojiPicker.
+ *
+ * Ganz oben steht „Ohne Kategorie" — seit v39 ein echter Zustand und nicht
+ * mehr bloß der Anzeigetext für eine Kategorie, die es nicht mehr gibt. Er ist
+ * zugleich das, was ein neuer Eintrag mitbringt.
  */
 export default function CategorySelect<C extends { id: string; emoji: string }>({
-  categories, value, onChange, getLabel, variant, align, title, placeholder = '—',
+  categories, value, onChange, getLabel, variant, align, title,
 }: Props<C>) {
-  const current = categories.find((c) => c.id === value);
-  const options = categories.map((c) => ({ value: c.id, label: getLabel(c), emoji: c.emoji }));
-  const triggerText = current ? `${current.emoji} ${getLabel(current)}` : placeholder;
+  const { t } = useTranslation();
+  const current = value ? categories.find((c) => c.id === value) : undefined;
+  const options = [
+    { value: NONE, label: t('categories.uncategorized') },
+    ...categories.map((c) => ({ value: c.id, label: getLabel(c), emoji: c.emoji })),
+  ];
+  // Auch eine Kategorie im Papierkorb landet hier: ihre id löst nicht mehr auf,
+  // der Eintrag ist für den Leser so kategorielos wie einer mit `null`.
+  const triggerText = current ? `${current.emoji} ${getLabel(current)}` : t('categories.uncategorized');
 
   return (
     <Dropdown
-      value={value}
+      value={current ? current.id : NONE}
       options={options}
-      onChange={onChange}
+      onChange={(next) => onChange(next === NONE ? null : next)}
       align={align}
       // Die Panels scrollen (RightSidebar overflow-y-auto) — ohne Portal würde
       // das Menü dort abgeschnitten; das ersetzte native <select> hatte das Problem nie.

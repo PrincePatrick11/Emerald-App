@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
-import { Flame, FolderPlus, Maximize2, Minimize2, PackagePlus } from 'lucide-react';
+import { Flame, Maximize2, Minimize2, PackagePlus } from 'lucide-react';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView, isWideCardView } from '../../lib/viewMode';
@@ -10,10 +10,8 @@ import { useAltarStore } from '../../store/altarStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUIStore, ALTAR_LIBRARY_SORTS } from '../../store/uiStore';
 import { useEditActions } from '../../hooks/useEditActions';
-import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
-import { getAltarBackgroundStyle, DEFAULT_ALTAR_RESOLUTION, parseResolution, isRatioFormat, ALTAR_CATEGORY_DEFAULT_EMOJI } from '../../lib/altarConstants';
-import { FALLBACK_CATEGORY_ID } from '../../lib/schema';
+import { getAltarBackgroundStyle, DEFAULT_ALTAR_RESOLUTION, parseResolution, isRatioFormat } from '../../lib/altarConstants';
 import type { AltarItem, AltarRecord } from '../../types';
 import Dashboard, { GroupDivider } from '../ui/Dashboard';
 import IconToggleGroup from '../ui/IconToggleGroup';
@@ -21,7 +19,6 @@ import { GROUPING_ICONS, SORT_ICONS } from '../ui/ListToolbar';
 import { FilterChipButton } from '../ui/FilterPanel';
 import ContextMenu from '../ui/ContextMenu';
 import Button from '../ui/Button';
-import CategoryModal from '../ui/CategoryModal';
 import { AltarCanvas, captureCurrentAltar } from '../altar/AltarCanvas';
 import { AltarLibraryStrip } from '../altar/AltarLibraryStrip';
 import { AltarItemModal } from '../altar/AltarItemModal';
@@ -71,18 +68,15 @@ export default function AltarView() {
 
   const [search, setSearch] = useState('');
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [filterOpen, setFilterOpen] = useState(false);
   // Wie die Bibliothek darunter: der Abschnitt lässt sich zuklappen, und das
   // bleibt so — dieselbe Vorliebe, derselbe Hook.
   const [altarsCollapsed, toggleAltars] = usePersistedFlag('altar-list-collapsed');
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [title, setTitle] = useState('');
-  // Die Bibliothek im Dashboard: das Element-Modal und der Kategorien-Editor
-  // wohnen hier, weil ihre Knöpfe in der Dashboard-Kopfzeile sitzen — dieselbe
-  // Aufteilung wie im Wiki, wo das View das CategoryModal hält.
-  const [itemModal, setItemModal] = useState<{ item: AltarItem | null; categoryId: string } | null>(null);
-  const catEditor = useCategoryEditor({ defaultEmoji: ALTAR_CATEGORY_DEFAULT_EMOJI });
+  // Die Bibliothek im Dashboard: das Element-Modal wohnt hier, weil sein Knopf
+  // in der Dashboard-Kopfzeile sitzt.
+  const [itemModal, setItemModal] = useState<{ item: AltarItem | null; categoryId: string | null } | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   // ref keeps ResizeObserver callback current without re-observing on fullscreen toggle
   const altarWindowFullscreenRef = useRef(altarWindowFullscreen);
@@ -168,7 +162,7 @@ export default function AltarView() {
   }, [activeAltar?.id, activeAltar?.resolution]);
 
   const openNewElement = (categoryId?: string) =>
-    setItemModal({ item: null, categoryId: categoryId ?? FALLBACK_CATEGORY_ID });
+    setItemModal({ item: null, categoryId: categoryId ?? null });
 
   const handleNew = async () => {
     const altar = await createAltar();
@@ -350,13 +344,12 @@ export default function AltarView() {
       <Dashboard<AltarRecord>
         title={t('nav.altar')}
         primaryAction={{ label: t('altar.newAltar'), onClick: handleNew }}
-        // Auch „Kategorie" steht hier statt in `secondaryAction`: beide gehören
-        // zur Bibliothek unter den Altären, nicht zu den Altären selbst, und
-        // sollen darum in beiden Kopf-Bäumen gleich als Icon danebenstehen —
-        // der beschriftete Platz bleibt dem neuen Altar.
+        // „Element" steht hier statt bei den Aktionen mit Beschriftung: es
+        // gehört zur Bibliothek unter den Altären, nicht zu den Altären selbst,
+        // und steht darum als Icon daneben — der beschriftete Platz bleibt
+        // dem neuen Altar.
         extraActions={[
           { label: t('altar.addElement'), icon: <PackagePlus size={14} />, onClick: () => openNewElement() },
-          { label: t('categories.add'), icon: <FolderPlus size={14} />, onClick: () => catEditor.setAddingCategory(true) },
         ]}
         view={altarPrefs.view}
         sort={altarPrefs.sort}
@@ -367,8 +360,6 @@ export default function AltarView() {
         // Nur ein Anzeige-Schalter, kein Filter: er zählt nicht als aktiver
         // Filter, und es gibt nichts zu „Alle löschen".
         filters={{
-          showFilters: filterOpen,
-          onToggleFilters: () => setFilterOpen((open) => !open),
           activeFilterCount: 0,
           panelProps: {
             displayExtras: (
@@ -403,7 +394,6 @@ export default function AltarView() {
         contentFooter={
           <AltarLibrarySection
             search={search}
-            catEditor={catEditor}
             onNewElement={openNewElement}
             onEditElement={(item) => setItemModal({ item, categoryId: item.category_id })}
           />
@@ -437,10 +427,6 @@ export default function AltarView() {
           onClose={() => setItemModal(null)}
         />
       )}
-      {/* Ohne `editing`: der Bibliotheks-Teil bearbeitet Kategorien inline in
-          der CategoryHeaderRow — wie Wiki, Operations und Tasks. Nur die
-          Leiste im Editor, die keine solche Zeile hat, reicht es durch. */}
-      <CategoryModal editor={catEditor} />
       </>
     );
   }

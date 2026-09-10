@@ -11,7 +11,7 @@ import type { BlockInstance } from './types';
  * Eintragsart). Ein Kategoriewechsel fügt bewusst nichts hinzu: dafür gibt es
  * die Sigillen-Blöcke unter „Block hinzufügen".
  */
-export function defaultBlocksFor(entryType: 'journal' | 'wiki' | 'operation', categoryId?: string): BlockInstance[] {
+export function defaultBlocksFor(entryType: 'journal' | 'wiki' | 'operation', categoryId?: string | null): BlockInstance[] {
   if (entryType === 'operation' && categoryId === SIGIL_CATEGORY_ID) return sigilBlockSet();
   return [];
 }

@@ -5,13 +5,10 @@ import { useTranslation } from 'react-i18next';
 import { Trash2, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
-import CategoryHeaderRow from '../ui/CategoryHeaderRow';
-import CategoryModal from '../ui/CategoryModal';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
-import { categoriesUsedBy, categoryLabel, hasUncategorized } from '../../lib/categories';
-import { FALLBACK_CATEGORY_ID } from '../../lib/schema';
+import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
 import { DEFAULT_ENTRY_EMOJI } from '../../lib/modules';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
@@ -24,7 +21,6 @@ import { useEditActions } from '../../hooks/useEditActions';
 import { useWikiStore } from '../../store/wikiStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
-import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
@@ -50,11 +46,10 @@ export default function WikiView() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [search, setSearch] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
   const { collapsed: collapsedCats, toggle: toggleCatCollapse } = useCollapsedSet('wiki');
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState(FALLBACK_CATEGORY_ID);
+  const [category, setCategory] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [icon, setIcon] = useState<string | null>(null);
@@ -71,11 +66,6 @@ export default function WikiView() {
     // gespeichert) — Cancel setzt nur zurück, was der Editor selbst besitzt.
     buildRestorePatch: (content) => ({ title, content }),
     update: updateArticle,
-  });
-
-  const catEditor = useCategoryEditor({
-    defaultEmoji: '📄',
-    onAdded: (cat) => { setCategory(cat.id); triggerAutoSave(); },
   });
 
   useEffect(() => {
@@ -204,7 +194,7 @@ export default function WikiView() {
     const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
     // Chips und Gruppen zeigen nur, was im Wiki vorkommt (plus Sonstiges);
     // catById bleibt die Volliste, damit fremde Kategorien auflösen.
-    const usedCategories = categoriesUsedBy(categories, articles, [catEditor.lastAddedId]);
+    const usedCategories = categoriesUsedBy(categories, articles);
 
     const searchFiltered = search
       ? articles.filter((a) =>
@@ -216,16 +206,15 @@ export default function WikiView() {
     const catFiltered = filterCatIds.length === 0
       ? searchFiltered
       : searchFiltered.filter((a) =>
-          filterCatIds.includes(a.category_id) ||
+          (!!a.category_id && filterCatIds.includes(a.category_id)) ||
           // Der „Ohne Kategorie"-Chip wählt die Waisen aus — deren category_id
           // (gelöschte Kategorie) steht nie selbst in der Chip-Auswahl.
-          (filterCatIds.includes(UNCATEGORIZED_KEY) && !catById[a.category_id]));
+          (filterCatIds.includes(UNCATEGORIZED_KEY) && !lookupCategory(catById, a.category_id)));
 
     const filtered = catFiltered;
 
-    // Nur die hier benutzten Kategorien (plus Sonstiges und eine gerade
-    // angelegte) — die Liste ist global, die anderen Module sollen hier keine
-    // leeren Chips hinterlassen.
+    // Nur die hier benutzten Kategorien — die Liste ist global, die anderen
+    // Module sollen hier keine leeren Chips hinterlassen.
     // „Ohne Kategorie" nur, wenn es Waisen gibt — oder solange der Chip noch
     // ausgewählt ist: verschwände er unter der aktiven Auswahl, bliebe ein
     // Filter wirksam, den nichts mehr anzeigt.
@@ -244,7 +233,7 @@ export default function WikiView() {
     const timelineGroups = groupByMonth(sortedArticles, (a) => a.created_at);
 
     const renderArticle = (a: typeof articles[0]) => {
-      const cat = catById[a.category_id];
+      const cat = lookupCategory(catById, a.category_id);
       const iconEl = isImageIcon(a.icon) ? <img src={a.icon!} alt="" className="w-5 h-5 object-cover rounded inline" /> : (cat?.emoji ?? '📄');
       // Ohne Fallback auf die rohe category_id: bei gelöschter Kategorie stünde
       // hier sonst deren id als Label (wie in OperationsView entfällt es dann).
@@ -320,7 +309,6 @@ export default function WikiView() {
     const catGroups: DashboardGroup<Article>[] = groupByCategory(
       sortedArticles, visibleCategories, (a) => a.category_id,
       (c) => categoryLabel(t, c), t('categories.uncategorized'),
-      catEditor.lastAddedId,
     );
 
     const renderCategoryHeader = (group: DashboardGroup<Article>) => {
@@ -338,27 +326,23 @@ export default function WikiView() {
       const cat = catById[group.key!];
       if (!cat) return null;
       return (
-        <CategoryHeaderRow
-          category={cat}
+        <CollapsibleGroupHeader
+          emoji={cat.emoji}
           label={categoryLabel(t, cat)}
-          editor={catEditor}
           collapsed={collapsedCats.has(cat.id)}
           onToggleCollapse={() => toggleCatCollapse(cat.id)}
           count={group.items.length}
-          onAdd={() => handleNew(cat.id)}
-          addTitle={t('wiki.newArticle')}
+          add={{ title: t('wiki.newArticle'), onClick: () => handleNew(cat.id) }}
         />
       );
     };
 
     return (
-      <>
       <Dashboard<Article>
         title={t('wiki.title')}
         // Gewrappt, nicht durchgereicht: onClick liefert ein MouseEvent, das
         // sonst als categoryId in handleNew landet.
         primaryAction={{ label: t('wiki.newArticle'), onClick: () => handleNew() }}
-        secondaryAction={{ label: t('categories.add'), onClick: () => catEditor.setAddingCategory(true) }}
         view={view}
         sort={sort}
         onView={(v) => setWikiPrefs({ view: v })}
@@ -367,8 +351,6 @@ export default function WikiView() {
         search={search}
         onSearch={setSearch}
         filters={{
-          showFilters,
-          onToggleFilters: () => setShowFilters((v) => !v),
           activeFilterCount,
           panelProps: {
             chipLabel: t('filters.category'),
@@ -385,9 +367,8 @@ export default function WikiView() {
         isEmpty={articles.length === 0 && categories.length === 0}
         emptyState={{ message: t('wiki.noArticles'), actionLabel: t('wiki.startDocumenting'), onAction: () => handleNew() }}
         // Im gruppierten Modus entscheidet Dashboard selbst: überlebt keine
-        // Gruppe, zeigt es „Keine Ergebnisse" — und ein leerer Kopf (die
-        // gerade angelegte Kategorie) hat dort Vorrang. Dieser Zweig darf ihm
-        // also nicht zuvorkommen.
+        // Gruppe, zeigt es „Keine Ergebnisse". Dieser Zweig darf ihm also
+        // nicht zuvorkommen.
         hasNoResults={filtered.length === 0 && !(grouping === 'grouped' && view !== 'timeline')}
         noResultsMessage={t('search.noResults')}
         grouping={
@@ -416,8 +397,6 @@ export default function WikiView() {
           />
         )}
       />
-      <CategoryModal editor={catEditor} />
-      </>
     );
   }
 

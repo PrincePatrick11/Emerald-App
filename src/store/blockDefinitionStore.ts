@@ -1,6 +1,6 @@
 /**
  * Die eigenen Blöcke der Blöcke-Ansicht (Tabelle `block_definitions`, seit
- * v39). Eine Definition ist nur die Vorlage — eingefügte Blöcke sind Kopien im
+ * v40). Eine Definition ist nur die Vorlage — eingefügte Blöcke sind Kopien im
  * Inhalt ihres Eintrags (siehe `lib/blocks/definitions.ts`). Löschen,
  * Wiederherstellen und Umbenennen berühren deshalb keinen Eintrag; was mit den
  * Kopien geschieht, entscheidet `blockCopies.ts` ausdrücklich.

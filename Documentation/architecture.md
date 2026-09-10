@@ -43,8 +43,8 @@ src/
 │   ├── editor/       RichEditor, InternalLinkExtension,
 │   │                 TagInput, ResizableImageExtension, ExternalDropExtension,
 │   │                 EditorToolbar, LinkPickerModal, SuggestionList
-│   ├── views/        HomeView, JournalView, WikiView, TagsView, AltarView,
-│   │                 OperationsView, TrashView, TasksView, BlocksView
+│   ├── views/        HomeView, JournalView, WikiView, TagsView, CategoriesView,
+│   │                 AltarView, OperationsView, TrashView, TasksView, BlocksView
 │   ├── sidebar/
 │   │   ├── panels/   JournalPropertiesPanel, WikiPropertiesPanel, OperationPropertiesPanel,
 │   │   │             AltarSidebarPanel, RoutinesPanel (currently unrendered), BacklinksPanel
@@ -65,7 +65,7 @@ src/
 │                     vault-setup screen and the menu has to reach that screen's fields too),
 │                     EmojiPicker, Dashboard, EntryListTab, ListToolbar, FilterPanel,
 │                     RailButton, TabIconButton, UndoToast, ImportDestinationModal, Dropdown,
-│                     CategoryHeaderRow, CategoryModal, CategorySelect, EntryDetailFrame — the
+│                     CollapsibleGroupHeader, CategorySelect, EntryDetailFrame — the
 │                     shared component layer; what each one encapsulates and where it can be
 │                     extended is in components.md
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
@@ -76,10 +76,7 @@ src/
 │                                      reload, trash restore/permanent-delete, and the
 │                                      startup/vault-switch/import reload sequence — see
 │                                      Module Registry below)
-├── hooks/            useCategoryEditor (shared add/edit/delete-with-confirm category logic,
-│                                      used by TasksView, WikiView, OperationsView,
-│                                      AltarLibraryStrip, AltarView),
-│                     useEntryEditor (debounced auto-save + save-on-navigate + save-on-unmount,
+├── hooks/            useEntryEditor (debounced auto-save + save-on-navigate + save-on-unmount,
 │                                      used by JournalView, WikiView, OperationsView),
 │                     useEditActions (registers Save/Cancel/Delete into the right sidebar,
 │                                      used by all five entry views),
@@ -94,8 +91,9 @@ src/
 │                     altarDragState.ts, routineDragState.ts (all three are thin named-export
 │                                      adapters over their own createDragChannel() instance),
 │                     moonPhase.ts, export.ts, menuActions.ts,
-│                     platform.ts, categories.ts (categoryLabel, categoriesUsedBy — the one
-│                                      display-name and used-categories rule for all four
+│                     platform.ts, categories.ts (categoryLabel, categoriesUsedBy,
+│                                      categoryUsageCounts — the one display-name,
+│                                      used-categories and usage-count rule for all four
 │                                      categorized modules, see Categories below),
 │                     categoryMerge.ts (categoryKey, mergeCategoryRows — shared by migration v38,
 │                                      the fresh-vault seed, and the backup-import lift),
@@ -146,16 +144,20 @@ modules: Tasks and Altar are link *targets* (`'task'`/`'altar'` in `ContentType`
 lacking an editor of their own, they can never be a link's *source* — `BacklinkEntry.type` in
 `src/lib/links.ts` stays the narrower `'journal' | 'wiki' | 'operation'` for exactly that
 reason. `ENTRY_MODULE_IDS` (`journal`/`tasks`/`operations`/`wiki`/`altar`) is the canonical
-order — it drives the rail's icon order and the entry list's tab order. `MODULES` is the
+order — it drives the rail's icon order, the entry list's tab order and, through the derived
+`CATEGORY_MODULE_IDS` (the same minus `journal`), the order of the per-module usage columns
+in `CategoriesView`. `MODULES` is the
 `Record<EntryModuleId, ModuleMeta>` everything else reads; `MODULE_LIST` is its array form for
-loops. `ViewId` (`EntryModuleId | AuxViewId`, where `AuxViewId` is `home`/`tags`/`trash`) is
+loops. `ViewId` (`EntryModuleId | AuxViewId`, where `AuxViewId` is `home`/`tags`/`categories`/`trash`) is
 what `ActiveView['type']` actually is — replacing an ad-hoc union that, via `ContentType`, used
 to also admit `'operation'` (singular), a value no view ever had. `isViewId()` guards
 persisted tabs at load time, so a localStorage entry from a since-removed view type is dropped
 rather than crashing the router. `TRASH_KINDS`/`TRASH_KIND_ICONS` cover the (larger) set of
 trash-only kinds, including `category` — the one global category list (see
-[Categories](#categories) below) has no `ModuleMeta` of its own, unlike the four per-module
-category kinds it replaced.
+[Categories](#categories) below) is an aux view rather than a module, so it has no
+`ModuleMeta`, unlike the four per-module category kinds it replaced; `AUX_VIEWS.categories`
+deliberately reuses `TRASH_KIND_ICONS.category`'s `FolderOpen` glyph, so a trashed category
+and the view that manages it read as the same thing.
 
 `viewTypeForEntryType(entryType)` lives here too (moved from `lib/tabs.ts`, which now holds
 only tab ids and `isContentView`) — the one place translating the data model's `operation`
@@ -237,9 +239,9 @@ Operations pass `{title, content}`) the moment edit mode is entered, and `restor
 writes that baseline back on Cancel (skipping the write if nothing changed, so a no-op Cancel
 doesn't bump `updated_at`). Deliberately out of scope: Properties-panel fields (category, tags,
 cover, icon) save directly to the store as they're changed and are never part of the baseline
-(an operation's status, end date and version are a block in `content` since v40, so Cancel does
+(an operation's status, end date and version are a block in `content` since v41, so Cancel does
 revert them) — Cancel must not undo something the panel already committed.
-Sigils need no variant of their own any more: since v41 they are blocks in `content`, so the
+Sigils need no variant of their own any more: since v42 they are blocks in `content`, so the
 same `{title, content}` baseline covers intention, letters, drawing and charge.
 
 ### Right Sidebar Action Bar
@@ -256,52 +258,68 @@ Inside the hook, the handlers are kept in a ref that is overwritten on every ren
 
 ### List Header Portal
 
-In list views (every module except Home/Tags), `Dashboard`'s whole header — title row,
-toolbar, and filter panel — can render inside the right sidebar instead of above the list.
-`RightSidebar.tsx` mounts a host `<div>` on its list-view branch (no entry open) and hands
-its DOM node to `uiStore.listHeaderHost` through a ref callback (`setListHeaderHost`);
-`Dashboard` reads the field back and, whenever it is non-null *and* `rightSidebarOpen` is
-true, `createPortal`s a second header tree into it instead of rendering its own inline one.
-Checking `rightSidebarOpen` rather than just the host's existence is what makes closing the
-sidebar fall the header back inline immediately: `AppShell` keeps the sidebar mounted
-(`inert`) for the 200ms collapse animation described above, so the host div would otherwise
-still exist but be unusable for that stretch. Home and Tags render only the existing
-placeholder text in the host, since they have no `Dashboard` to portal.
+In list views (every module, plus Home and Categories — everything but Tags), `Dashboard`'s
+whole header — title row, toolbar, and filter panel — lives **only** in the right sidebar;
+there is no inline fallback above the list. `RightSidebar.tsx` mounts a host `<div>` and
+hands its DOM node to `uiStore.listHeaderHost` through a ref callback (`setListHeaderHost`);
+`Dashboard` reads the field back and, whenever it is non-null, `createPortal`s its header
+tree into it. Closing the right sidebar has nothing to fall back to — the header disappears
+along with the sidebar and the list gets the full height back, deliberately: `AppShell`
+keeps the sidebar mounted (`inert`) for the 200ms collapse animation described above, so the
+header stays visible inside it for that stretch and vanishes once `RightSidebar` actually
+unmounts and its ref callback clears `listHeaderHost`.
+
+`RightSidebar` decides whether to offer the host from `uiStore.dashboardMounted`, not from
+`activeView.id`. `Dashboard` announces itself in a `useLayoutEffect`
+(`setDashboardMounted(true)`/`(false)` on mount/unmount — a layout effect rather than a
+passive one, so opening an entry switches the sidebar over to the action bar before the
+first paint instead of a frame late) and `RightSidebar` renders the host whenever a
+`Dashboard` is mounted. Guessing from `activeView.id` used to get this wrong twice: Tasks
+carries an id even while showing its list (a jump target from the left list or global
+search, not an open entry), and a stale id left behind by a just-deleted Journal/Wiki/
+Operations entry falls back to that module's `Dashboard` too — both used to land on the
+entry action bar instead, complete with a meaningless Edit button. `VIEWS_WITHOUT_ENTRIES`
+(`home`/`tags`/`categories`) and a missing `activeView.id` still offer the host up front too,
+alongside `dashboardMounted`, so it exists before a lazily-loaded list view's chunk has
+finished loading and `Dashboard` has had a chance to mount. Only Tags — the one view in
+`VIEWS_WITHOUT_ENTRIES` with no `Dashboard` at all (`VIEWS_WITHOUT_DASHBOARD`) — renders the
+existing `properties.noEntry` placeholder text into that host instead of waiting on a portal
+that will never come. Home and Categories have no entries of their own either, but go
+through `Dashboard` (`grouping: 'custom'`) precisely so their title and primary action
+portal like everyone else's.
 
 Invariant: exactly one writer (the host div's ref callback) and one reader (`Dashboard`) at
 a time — `MainArea` only ever renders one view, so at most one `Dashboard` ever portals into
-the host. `listHeaderHost` deliberately isn't persisted; it's a DOM node.
+the host, and `dashboardMounted` only ever reflects that one instance. `listHeaderHost`
+deliberately isn't persisted; it's a DOM node.
 
-The inline and sidebar header trees share one `toolbarCommon` prop bag
-(`view`/`sort`/`onView`/`onSort`/`viewOptions`/`groupBy`/`search`/`onSearch`), so a future prop added
-to only one branch is the obvious drift to watch for. `groupBy` (`{ value, onChange, label? }`)
-carries the grouping axis — independent of `sort` since a session change split "group by
-category" out of `SortMode` into its own `GroupingMode`; a module that has nothing to group
-(Altar's altars) simply omits it, and the toolbar then shows only view and sort. `headerRight` replaces the header's
-action slot in **both** trees — inline, the topbar-right slot; portalled into the sidebar,
-the title row's buttons, rendered instead in the scrollable column below it, where a wide
-slot (Trash's bulk-select controls) has room to wrap. `headerClassName` and
-`filters.showFilters`/`onToggleFilters` apply to the inline tree only: the sidebar tree has
-fixed `h-14` chrome and shows its `FilterPanel` permanently rather than behind a toggle.
-`Dashboard`'s `toolbarExtraActions` prop and `FilterPanelProps.extraPanelContent` slot were
-removed in the same pass — Tasks' priority filter moved into `FilterPanel`'s own
-`statusChips`/`statusLabel` instead of a bespoke extra slot.
+`groupBy` (`{ value, onChange, label? }`) carries the grouping axis — independent of `sort`
+since a session change split "group by category" out of `SortMode` into its own
+`GroupingMode`; a module that has nothing to group (Altar's altars) simply omits it, and the
+toolbar then shows only view and sort. `headerRight` replaces the header's action slot,
+rendered in the scrollable column below the title row, where a wide slot (Trash's
+bulk-select controls) has room to wrap. `Dashboard`'s `toolbarExtraActions` prop and
+`FilterPanelProps.extraPanelContent` slot were removed in an earlier pass — Tasks' priority
+filter moved into `FilterPanel`'s own `statusChips`/`statusLabel` instead of a bespoke extra
+slot.
 
-`extraActions` (compact icon buttons rendered in both header trees) and `contentFooter`
-(rendered below the content in both the normal, empty, and no-results states) exist for a
-module's own secondary area rather than another module-wide pattern — so far the Altar
-dashboard's library section is the only user of either, see [Altar UI
+`extraActions` (compact icon buttons right of `primaryAction`, on the same row — the
+labelled button fills that row and they keep their square size beside it) and
+`contentFooter` (rendered below the content in the normal, empty, and no-results states
+alike) exist for a module's own secondary area rather than another module-wide pattern — so
+far the Altar dashboard's library section is the only user of either, see [Altar UI
 Composition](#altar-ui-composition) below.
 
-`ListToolbar` and `FilterPanel` each gained a `vertical` prop for the sidebar-portalled
-header: a column layout without their usual `.list-toolbar`/`.filter-panel` strip chrome
-(those classes carry per-theme background overrides that would repaint the sidebar's own
-surface otherwise), search on its own full-width row, and, for `ListToolbar`, view/sort
-presented as icon-toggle rows (a private `IconToggleGroup`, built on `TabIconButton`'s new
-`compact` size) instead of `Dropdown`s. Both presentations share the same disabled-options
-predicate for Timeline (`sortBlockedInTimeline` in `ListToolbar.tsx`): A→Z, Z→A and Category
-sorting are disabled with an explanatory tooltip, since the timeline already orders its
-entries by date and ignores those modes regardless of what's picked.
+`ListToolbar` and `FilterPanel` now have only this one, sidebar-column presentation — no
+horizontal strip variant and no filter-toggle button; `FilterPanel` stands permanently
+visible under the toolbar instead of behind one. Search sits on its own full-width row, and
+`ListToolbar`'s view/sort/grouping render as icon-toggle rows (a private `IconToggleGroup`,
+built on `TabIconButton`'s `compact` size) instead of `Dropdown`s — `Dropdown` itself is
+unrelated to this header now, used only by `CategorySelect`, `TaskRow`'s priority menu, and
+`HomeView`'s own per-section toolbar. The disabled-options predicate for Timeline
+(`sortBlockedInTimeline` in `ListToolbar.tsx`) is unchanged: A→Z, Z→A and Category sorting
+are disabled with an explanatory tooltip, since the timeline already orders its entries by
+date and ignores those modes regardless of what's picked.
 
 ### Store Selectors
 
@@ -328,15 +346,14 @@ All `useState`, `useEffect`, `useRef`, `useMemo`, and `useCallback` calls must a
 
 ### Categories
 
-Since v38, Wiki, Operations, Tasks, and Altar items share one category list — `useCategoryStore` (`src/store/categoryStore.ts`), backed by the single `categories` table (see [`database.md`](database.md#categories)). Before v38, each of the four modules carried its own store slice with the same five actions duplicated four times; that duplication is gone. Journal is not part of this — it groups by moon phase, not by category. Import rule: `categoryStore` may import the four content stores (it reassigns their in-memory rows when a category is permanently deleted); none of them import it back. All cross-store access goes through `getState()` at call time, never at import time.
+Since v38, Wiki, Operations, Tasks, and Altar items share one category list — `useCategoryStore` (`src/store/categoryStore.ts`), backed by the single `categories` table (see [`database.md`](database.md#categories)). Since v39 an entry's `category_id` may be `NULL`: having no category is the state a new entry starts in, and the one place that state is called something is the "Uncategorized" bucket, which also collects entries whose category has been moved to Trash — for the reader the two are the same thing. `lookupCategory(byId, id)` in `lib/categories.ts` is the one way to resolve a possibly-null id against a map or record; `categoryLabel` already accepted `null`. Before v38, each of the four modules carried its own store slice with the same five actions duplicated four times; that duplication is gone. Journal is not part of this — it groups by moon phase, not by category. Import rule: `categoryStore` may import the four content stores (it reassigns their in-memory rows when a category is permanently deleted); none of them import it back. All cross-store access goes through `getState()` at call time, never at import time.
 
-- **`useCategoryStore`** holds `categories: Category[]` (active only, ordered by `sort_order`) and `fetchCategories`/`addCategory`/`updateCategory`/`deleteCategory` (soft, rejects builtins)/`restoreCategory`/`permanentlyDeleteCategory`/`reorderCategories`/`getCategory`. `addCategory`/`updateCategory` reject a duplicate name via `categoryKey` (trim + lowercase, `src/lib/categoryMerge.ts` — the same comparison the v38 migration and the backup import use) by throwing `CATEGORY_NAME_TAKEN`. `addCategory` inserts new categories immediately before the fallback `other` as long as `other` is still last (the position the migration and the fresh-vault seed leave it in); once the user has moved it, new categories simply go to the end. `restoreCategory` resolves a name collision that appeared while the category was trashed by appending " (2)", " (3)", … (`freeName`), and always restores to the end of the list rather than its old position. `permanentlyDeleteCategory` calls `reassignCategoryContent` (see database.md) then also `reassignCategoriesInMemory` — the same reassignment applied to the four already-loaded content stores' in-memory rows, so a later `update*` on one of them can't try to write back a `category_id` the foreign key would now reject. `trashStore.emptyTrash` calls the same in-memory helper for the same reason.
-- **`useCategoryEditor({ defaultEmoji, onAdded })`** (`src/hooks/useCategoryEditor.ts`) is the add/edit/delete-with-confirm UI state on top of the store — used by `WikiView`, `OperationsView`, `TasksView`, and `AltarLibraryStrip`. It no longer takes a store parameter (there is only one store to take); `defaultEmoji` is still per-caller, since each module's "add category" dialog opens with a different default emoji. Delete-with-confirm pushes an undo entry via `useUndoStore`; a failed builtin-delete is checked separately (`store.deleteCategory` returns `false` rather than throwing) so the UI doesn't show an undo toast for a deletion that never happened.
-- **`CategoryModal`** (`src/components/ui/CategoryModal.tsx`, replacing the old `CategoryAddModal`) is the add/edit dialog, driven entirely by a `useCategoryEditor` return value: passed only `editor`, it is add-mode; passed `editor` plus `editing: Category`, it becomes edit mode with an inline delete-with-confirm row. Wiki, Operations, and Tasks edit inline in their own `CategoryHeaderRow` instead and only ever mount the modal in add mode; the Altar library strip has no header row of its own to edit inline in, so it is the only caller that passes `editing` and uses the modal for both.
-- **`CategoryHeaderRow`** takes a `category: Category` (previously a module-specific category type) and hides its edit/delete controls for builtins (`category.is_builtin`), rather than each module deciding for itself which ids count as builtin.
-- **`lib/categories.ts`**: `categoryLabel(t, cat)` is the one display-name rule for all four modules — a builtin (`other`/`sigils`) is named via `categories.builtin.<id>` in the active locale, everything else via its stored `name`. `categoriesUsedBy(all, items, always)` returns the categories a view should actually render as chips/groups/tabs: every category at least one item points at, plus the fallback, plus whatever ids the caller passes in `always` (typically the just-created category's id — a brand-new category has no items yet and would otherwise render no group to create the first one under). The rest of the file (`legacyCategoryLabel`, `legacyBuiltinLabelKey`, `legacyDisplayName`, `legacyWikiCategoryEmoji`) exists only for migrations v36–v38 and for importing files/backups written before v38, resolving an old per-module builtin id or name back to a display name; nothing in the live UI reads it.
-- Dragging an entry out of the left sidebar's entry list (`setDragItem` in `src/lib/dragState.ts`, read by the drag ghost in `DragGhost.tsx`) carries the source category's **emoji** in its `category` field for every module now. Wiki's drag payload used to carry the raw `category_id` string there instead of resolving it to an emoji first — the drop indicator would have shown an id, not an icon; Tasks and the others already resolved it correctly, and Wiki now goes through the same `catById[...]?.emoji` lookup.
-- **Altar-specific fallout:** `altarStore` no longer carries a `categories` slice or its own five category actions — it reads `useCategoryStore` like every other module now. Whether a placed item should flicker like a candle no longer depends on the builtin Altar category `candle` (that category is an ordinary, renameable/deletable row since v38); `isCandleEmoji(emoji)` in `altarConstants.ts` checks the item's own emoji (`🕯️`, with or without the variation selector) instead. The Altar tab strip's drag-to-reorder writes through `useCategoryStore.getState().reorderCategories(mergeOrder(full, finalOrder))` — `mergeOrder` splices the dragged subset's new order back into the full global list, since the strip only ever shows (and can only reorder) the categories that hold at least one altar item, not the complete list reordering would otherwise clobber.
+- **`useCategoryStore`** holds `categories: Category[]` (active only, ordered by `sort_order`) and `fetchCategories`/`addCategory`/`updateCategory`/`deleteCategory` (soft, rejects builtins)/`restoreCategory`/`permanentlyDeleteCategory`/`reorderCategories`/`getCategory`. `addCategory`/`updateCategory` reject a duplicate name via `categoryKey` (trim + lowercase, `src/lib/categoryMerge.ts` — the same comparison the v38 migration and the backup import use) by throwing `CATEGORY_NAME_TAKEN`. `addCategory` appends new categories to the end. Until v39 it slipped them in before the fallback `other` so that row stayed last; now that `other` is an ordinary category, there is nothing to keep last, and the order belongs to the user anyway (drag in `CategoriesView`). `restoreCategory` resolves a name collision that appeared while the category was trashed by appending " (2)", " (3)", … (`freeName`), and always restores to the end of the list rather than its old position. `permanentlyDeleteCategory` calls `reassignCategoryContent` (see database.md), which sets the affected content's `category_id` to `NULL`, then also `reassignCategoriesInMemory` — the same change applied to the four already-loaded content stores' in-memory rows, so a later `update*` on one of them can't try to write back a `category_id` the foreign key would now reject. `trashStore.emptyTrash` calls the same in-memory helper for the same reason.
+- **`CategoriesView`** (`src/components/views/CategoriesView.tsx`, the `categories` aux view) is the **one** place categories are managed: add, rename, change emoji, delete with confirm plus undo, drag-to-reorder, and a per-module usage count on every row. The four module dashboards only *assign* (`CategorySelect` in the properties panels, the task row, `AltarItemModal`) and group by category; none of them can create, rename or delete one any more. That replaced five scattered surfaces — a "+ Category" button in each of the four dashboards, a pencil and a delete button in every category group header, and the Altar strip's own pencil and "+ Category". Builtins (`other`, `sigils`) render without the edit and delete buttons — their action slot stays reserved, or their count columns would fall out of line with every other row — but stay draggable, since `reorderCategories` accepts any id. The view is hand-built rather than a `Dashboard`: a sort dropdown over a list whose order *is* the user's hand-dragged `sort_order` contradicts itself, the same reason `TagsView` doesn't use one either. Consequence worth knowing: a freshly created category holds nothing, so it appears in no module until an entry points at it — deliberate, and why `categoriesUsedBy` no longer takes a "keep this one anyway" argument.
+- **`CategorySelect`** carries an "Uncategorized" entry at the top of its list — since v39 a real value (`null`), not just the trigger's text for a category that no longer resolves. It is what a new entry shows, and choosing it clears an assignment.
+- **`lib/categories.ts`**: `categoryLabel(t, cat)` is the one display-name rule for all four modules — a builtin (`other`/`sigils`) is named via `categories.builtin.<id>` in the active locale, everything else via its stored `name`. `categoriesUsedBy(all, items)` returns the categories a view should actually render as chips/groups/tabs: every category at least one item points at, plus the fallback. `categoryUsageCounts(sources)` counts in one pass per list how many entries of each module point at each category, and `dominantCategoryModule(usage)` picks the largest — one truth for `CategoriesView`'s count columns and for the module hint the global search puts beside a category hit, so a fifth categorized module cannot make the two disagree. The rest of the file (`legacyCategoryLabel`, `legacyBuiltinLabelKey`, `legacyDisplayName`, `legacyWikiCategoryEmoji`) exists only for migrations v36–v38 and for importing files/backups written before v38, resolving an old per-module builtin id or name back to a display name; nothing in the live UI reads it.
+- Dragging an entry out of the left sidebar's entry list (`setDragItem` in `src/lib/dragState.ts`, read by the editor's drop indicator in `RichEditor.tsx`) carries the source category's **emoji** in its `category` field for every module now. Wiki's drag payload used to carry the raw `category_id` string there instead of resolving it to an emoji first — the drop indicator would have shown an id, not an icon; Tasks and the others already resolved it correctly, and Wiki now goes through the same `catById[...]?.emoji` lookup.
+- **Altar-specific fallout:** `altarStore` no longer carries a `categories` slice or its own five category actions — it reads `useCategoryStore` like every other module now. Whether a placed item should flicker like a candle no longer depends on the builtin Altar category `candle` (that category is an ordinary, renameable/deletable row since v38); `isCandleEmoji(emoji)` in `altarConstants.ts` checks the item's own emoji (`🕯️`, with or without the variation selector) instead. The Altar tab strip keeps its drag-to-reorder and writes through `useCategoryStore.getState().reorderCategories(mergeOrder(full, finalOrder))` — `mergeOrder` splices the dragged subset's new order back into the full global list, since the strip only ever shows (and can only reorder) the categories that hold at least one altar item, not the complete list reordering would otherwise clobber. `CategoriesView` needs no such splice: it shows every category, so it writes the order it renders. Mind the interaction with `addCategory`'s "insert before `other`" rule above — either reorder surface can move `other` off the last position, after which new categories simply land at the end.
 
 ### Content Blocks
 
@@ -443,7 +460,7 @@ block types can contribute their own sidebar sections via `components/blocks/blo
 must never import TipTap: the sidebar is loaded eagerly.
 
 **Sigil blocks (`lib/blocks/sigil.ts`).** Calculator, drawing and charge replace the former
-`OperationSigilView` and its columns (migration v41, `migrateLegacySigils.ts`). The drawing is an
+`OperationSigilView` and its columns (migration v42, `migrateLegacySigils.ts`). The drawing is an
 image file (`saveImage`) referenced by `<img src>` in the canvas block, loaded into the canvas as a
 data URL (`readImageAsBase64`) — an `emerald-img:` URL would taint the canvas and `toDataURL` would
 throw. Saving is asynchronous and may finish after Done; `SigilCanvasBlock` keeps the save in the
@@ -458,7 +475,7 @@ view as `sigil`; lists, sidebar and menu read it from `entryBlockSummary`. Loadi
 are read-mode writes through `onPersist`, like ticking a checklist.
 
 **User-built blocks — copies, not live links.** The Blocks view (`views/BlocksView.tsx`, an aux
-view on the rail) edits rows of `block_definitions` (v39, `blockDefinitionStore`): name, emoji,
+view on the rail) edits rows of `block_definitions` (v40, `blockDefinitionStore`): name, emoji,
 elements, display rules (`readHideEmpty`, `readOnly`, plus `showTitle`, which becomes the
 instance attribute on insert) and a `revision` that rises whenever something a copy inherits
 changes. Inserting one (`createFromPreset('def:<id>')`) writes a `core.fields` block that carries
@@ -500,7 +517,7 @@ full-document serialisation per keystroke) is gone. Switching entries remounts
 the stack via its `key` (`` `${id}:${editorEpoch}` ``), and Cancel bumps
 `editorEpoch` to remount from the last saved content. Since the whole block
 stack serialises into that one `content` string, Cancel's `{title, content}`
-baseline reverts every block change of the session — sigil blocks included, since v41.
+baseline reverts every block change of the session — sigil blocks included, since v42.
 
 Two guards protect these save paths: `ready` (the view's `loadedEntryId`
 gate) arms the navigate/unmount saves only after local state is hydrated,
@@ -548,9 +565,11 @@ The title bar's search field searches every module by title, tag, and body text.
 
 `searchText.ts`'s `htmlToText()` uses `DOMParser` rather than assigning to `innerHTML` on a detached `<div>` — the parsed document is inert, so an `<img onerror>` that arrived through an import never executes when the search re-parses it (see [Security → Search Text Extraction](security.md#search-text-extraction)). `foldTypography()` reverses TipTap's `Typography` extension (curly quotes, en/em dashes) back to keyboard characters, one character for one character, so a search for `don't` finds an entry stored with a curly apostrophe; the query and the result-row highlighting run through the same folding via the shared `comparable()` helper, so the two never disagree about what matched.
 
-`searchCorpus()` itself does not cap anything — it scores the whole corpus and returns every `SearchHit`, best first. Capping is `useGlobalSearch`'s job, split into two memos: one runs `searchCorpus()` again only when the corpus or the query changes, the other slices that result to `limit` and only depends on `limit` itself. Paging ("Show more" in the dropdown, `TitleBarSearch.tsx`) just grows `limit` by its `PAGE_SIZE` (50), which re-slices the already-scored array instead of re-scoring the corpus — the point of splitting the two memos in the first place, given that the search already reruns on every keystroke. A hit's `key` is `${kind}:${id}` — before v38, when the four category tables (Wiki/Operations/Tasks/Altar) still shared built-in ids (`other`, `herb`, `deity`, …), a category hit's module had to be folded into the key to keep it unique; with one `categories` list there is only one id space and the module suffix is gone. A category hit's `module` field (still present on `SearchHit`, now optional) is the module holding most of that category's entries, resolved when the corpus is built — it decides which module a click on the hit opens, and is left unset for a category nothing currently uses, which then can't be opened at all. Routines are not part of the corpus — `RoutinesPanel` is currently unrendered (see [Module Map](#module-map)), so there is no view a routine result could open.
+`searchCorpus()` itself does not cap anything — it scores the whole corpus and returns every `SearchHit`, best first. Capping is `useGlobalSearch`'s job, split into two memos: one runs `searchCorpus()` again only when the corpus or the query changes, the other slices that result to `limit` and only depends on `limit` itself. Paging ("Show more" in the dropdown, `TitleBarSearch.tsx`) just grows `limit` by its `PAGE_SIZE` (50), which re-slices the already-scored array instead of re-scoring the corpus — the point of splitting the two memos in the first place, given that the search already reruns on every keystroke. A hit's `key` is `${kind}:${id}` — before v38, when the four category tables (Wiki/Operations/Tasks/Altar) still shared built-in ids (`other`, `herb`, `deity`, …), a category hit's module had to be folded into the key to keep it unique; with one `categories` list there is only one id space and the module suffix is gone. A category hit's `module` field (still present on `SearchHit`, now optional) is the module holding most of that category's entries, resolved when the corpus is built through the shared `categoryUsageCounts`/`dominantCategoryModule` pair. Since categories got a view of their own it is no longer a destination, only the hint shown beside the hit — and a category nothing uses is now openable like any other, where it used to be a dead result. Routines are not part of the corpus — `RoutinesPanel` is currently unrendered (see [Module Map](#module-map)), so there is no view a routine result could open.
 
-`viewForSearchHit()` maps a hit to an `ActiveView`. Tasks and tags have no page of their own — a task hit opens the Tasks view addressed by the task's id, and `TasksView`/`TagsView` each run an effect keyed on the `activeView` *object* itself (not the id inside it, which stays the same if the same result is opened twice) that clears search/filters/collapsed state and scrolls the matching row into view. A `handledView` ref stops a later store mutation from re-triggering that scroll-and-clear and from overwriting filters the user has since changed themselves.
+`viewForSearchHit()` maps a hit to an `ActiveView`. Tasks, tags and categories have no page per record — the hit opens their view addressed by the record's id, and `TasksView`/`TagsView`/`CategoriesView` each run an effect keyed on the `activeView` *object* itself (not the id inside it, which stays the same if the same result is opened twice) that clears search/filters/collapsed state and scrolls the matching row into view; `CategoriesView` has no selection to set, so it highlights the row for two seconds instead. A `handledView` ref stops a later store mutation from re-triggering that scroll-and-clear and from overwriting filters the user has since changed themselves.
+
+Those three deep links carry an id into a view that has no *entries* — `{ type: 'categories', id }` (or `'tags'`/`'home'`) must never reach the entry action bar and its Edit button, which sets `mode: 'edit'` on a view with no editor. `RightSidebar` avoids that by offering the list-header host whenever `activeView.type` is in `VIEWS_WITHOUT_ENTRIES`, regardless of whether `activeView.id` is set — see [List Header Portal](#list-header-portal) above.
 
 ### Drag and Drop
 
@@ -607,7 +626,7 @@ This means users can keep several entries open while still using back/forward na
 
 The left sidebar is two independent components rendered side by side inside `AppShell`'s `app-sidebar-left` container:
 
-- **`LeftSidebarRail`** (`src/components/layout/LeftSidebarRail.tsx`) — a fixed-width (56px, `RAIL_WIDTH`, defined and exported here and imported by `AppShell`) icon column: the entry-list collapse/expand toggle, the right-sidebar collapse/expand toggle (sharing the `PanelToggleIcon` component via a `mirrored` variant so the two icons read as left/right mirrors), then the six navigation icons (Home/Journal/Tasks/Operations/Wiki/Altar, rendered from a loop over `MODULE_LIST`/`AUX_VIEWS` — see [Module Registry](#module-registry) above), and a bottom nav block: Tags/Trash grouped together, then — below a divider — Vault (opens `VaultModal`) and Settings. The app logo, back/forward and the search shortcut are *not* here; they moved into the title bar (see [Window Chrome](#window-chrome)). The nav icons only call `setActiveView(...)` — they carry no active/selected styling and are intentionally decoupled from `leftListTab` below, since navigating the main view and browsing a different module's entry list are independent actions. Home is the one whose target is not a content view: `isContentView` is false for it, so it overwrites the active tab rather than opening a new one. Note that lucide exports `Home` as an alias of `House`, so its SVG carries the class `.lucide-house`, not `.lucide-home` — relevant to anything selecting the rail icons by class.
+- **`LeftSidebarRail`** (`src/components/layout/LeftSidebarRail.tsx`) — a fixed-width (56px, `RAIL_WIDTH`, defined and exported here and imported by `AppShell`) icon column: the six navigation icons (Home/Journal/Tasks/Operations/Wiki/Altar, rendered from a loop over `MODULE_LIST`/`AUX_VIEWS` — see [Module Registry](#module-registry) above), and a bottom nav block: Tags/Trash grouped together, then — below a divider — Vault (opens `VaultModal`) and Settings. The rail carries no panel-toggle buttons of its own: the entry list and right sidebar are both toggled from the *View* menu (`TitleBarMenuBar.tsx`, native on macOS; `menu.entryList`/`menu.properties`) instead — a pair of rail buttons (`PanelToggleIcon`, mirrored left/right) duplicated that same control and were removed. The app logo, back/forward and the search shortcut are *not* here either; they moved into the title bar (see [Window Chrome](#window-chrome)). The nav icons only call `setActiveView(...)` — they carry no active/selected styling and are intentionally decoupled from `leftListTab` below, since navigating the main view and browsing a different module's entry list are independent actions. Home is the one whose target is not a content view: `isContentView` is false for it, so it overwrites the active tab rather than opening a new one. Note that lucide exports `Home` as an alias of `House`, so its SVG carries the class `.lucide-house`, not `.lucide-home` — relevant to anything selecting the rail icons by class.
 - **`LeftSidebarEntryList`** (`src/components/layout/LeftSidebarEntryList.tsx`) — the adjoining panel, shown only while `uiStore.leftListOpen` is true. Its six tabs (`TabIconButton`) write to `uiStore.leftListTab`; the active tab determines which list renders below: five per-module lists (`JournalList`, `TasksList`, `OperationsList`, `WikiList`, `AltarList`) plus `AllList`, which combines all five into one list sorted by `updated_at` descending. Each per-module list is a one-line `<EntryListTab {...config} />` wrapper around a `use*Config()` hook (`useJournalConfig`, `useTasksConfig`, `useOperationsConfig`, `useWikiConfig`, `useAltarConfig`) returning an `EntryListTabProps<T>` object; `AllList` calls all five hooks and flattens their configs through `toAllRows()` into type-erased `AllRow` objects, so the combined list reuses each module's real handlers (duplicate, delete-with-undo, rename, context menu) rather than reimplementing them. `EntryListTabProps<T>` itself is the shared contract with `EntryListTab<T>` (`src/components/ui/EntryListTab.tsx`), which owns search filtering, inline rename, the "+" quick-create flow, drag-start wiring, and the right-click `ContextMenu`; callers supply accessor functions (`getId`/`getTitle`/`getIcon`/`getDateStr`) and the action list. Tasks is the one caller that needs a materially different row (an independent checkbox toggle) and opts out via the `renderRow` render-prop instead of the accessor props — which also means `renderRow` cannot survive `toAllRows()`'s type erasure, so Tasks fall back to the plain accessor-based row inside `AllList`. `EntryListTab` also takes an optional `canDrag(item)` gate so a mixed list can withhold the grab cursor from rows that aren't drag sources (Tasks, Altar) while still allowing it for the rest.
 
 `AppShell` owns the width/resize logic: the rail is fixed at `RAIL_WIDTH`, and only the entry-list panel's width (`entry-list-width` in `localStorage`, `ENTRY_LIST_MIN` = 180) is user-resizable via the same drag-handle pattern used for the right sidebar. The outer `<aside>` width is computed as `RAIL_WIDTH + (leftListOpen ? entryListWidth : 0)`, and the resize handle only renders while the list is open.
@@ -646,7 +665,7 @@ The schema itself lives in `src/lib/schema.ts`, not in `db.ts`: fresh vaults exe
 
 Two deliberate exceptions to "the store holds the whole row":
 
-- **Sigil drawings are files, not columns.** Until v41 `operations.drawing_data` held every sigil drawing as base64 — by far the widest column — which forced a lazy-loading dance (`ensureDrawingLoaded`, `preserveLoadedDrawings`, a separate `thumbnail_data`). Since v41 the drawing is an image file referenced from the canvas block's `<img src>`, so the operation list query (`OPERATION_COLUMNS`) carries only small columns, and list cards show the image lazily through `imageSrc` (`entryBlockSummary(...).sigil.image`).
+- **Sigil drawings are files, not columns.** Until v42 `operations.drawing_data` held every sigil drawing as base64 — by far the widest column — which forced a lazy-loading dance (`ensureDrawingLoaded`, `preserveLoadedDrawings`, a separate `thumbnail_data`). Since v42 the drawing is an image file referenced from the canvas block's `<img src>`, so the operation list query (`OPERATION_COLUMNS`) carries only small columns, and list cards show the image lazily through `imageSrc` (`entryBlockSummary(...).sigil.image`).
 - **`altar_placements` load in one query.** `fetchAltars` selects the whole table once and groups rows by `altar_id` in JS (`mapPlacementRows` + a `Map` over items); it used to run one query per altar on every startup and every AltarView mount.
 
 ### Store write serialization
@@ -822,12 +841,12 @@ Altar rendering and editing were split into focused components:
 
 - **`src/components/altar/AltarItemVisual.tsx`** — shared visual renderer for altar items (emoji/image and candle animation treatment).
 - **`src/components/altar/AltarCanvas.tsx`** — canvas scene rendering, placement transforms, drag/drop interactions, lock handling, and grid overlay drawing. The internal `_renderAltar(altar, backgroundSrc, placements, nativeW, nativeH, outW)` function owns the off-screen canvas draw pipeline and is shared by two exported helpers: `captureCurrentAltar(): Promise<string | null>` renders at 640 px wide with adaptive JPEG/WebP quality (0.85 → 0.65 → 0.45) capped at 512 KB — used for dashboard thumbnails, safe to call after unmount; `exportCurrentAltarImage(format?: 'jpeg' | 'png' | 'webp'): Promise<string | null>` renders at the full native resolution with no size limit — used by `saveAltarImage()` in `src/lib/altarExport.ts`, which backs the native menu's Export → Export as Image items. The `format` parameter (default `'jpeg'`) controls the output encoding: JPEG at quality 0.97, WebP at quality 0.92, PNG lossless. `captureCurrentAltar` reads altar state from `useAltarStore.getState()` synchronously and is safe to call from a `useEffect` cleanup. The `captureRef` prop mechanism that previously threaded a capture callback through the component tree was removed in favour of these module-level exports. `_renderAltar` draws the grid after the overlay pass (step 3) using the same `resolveResolutionPixels` + `grid_size` → `numCols`/`numRows` arithmetic as the live SVG grid, so captured images and thumbnails are pixel-consistent with the on-screen grid.
-- **`src/components/altar/AltarLibraryStrip.tsx`** — docked library strip under canvas (edit mode), compact tiles, and modal CRUD for altar items. The add/edit item dialog is the standalone `AltarItemModal` (below, extracted from a former strip-local `ItemModal` sub-component so the dashboard section can open the same dialog); category add/edit/delete goes through the shared `ui/CategoryModal` (see [Categories](#categories) above) fed by this view's own `useCategoryEditor()`, rather than a strip-local modal — this was the one caller with an `editing` category to hand it, since it has no header row of its own to edit inline in. `AltarItemModal`'s own category field is the shared `ui/CategorySelect` (`variant="field"`); changing category only resets the emoji when it still equals the previous category's default (`changeCategory`), so a user-picked emoji survives. The strip itself holds only strip-level state (selected tab, library height, drag/reorder state, scroll fade state).
+- **`src/components/altar/AltarLibraryStrip.tsx`** — docked library strip under canvas (edit mode), compact tiles, and modal CRUD for altar items. The add/edit item dialog is the standalone `AltarItemModal` (below, extracted from a former strip-local `ItemModal` sub-component so the dashboard section can open the same dialog). The strip does not manage categories — it only picks and reorders them; that moved to `CategoriesView` (see [Categories](#categories) above), taking its hover pencil and its "+ Category" button with it. `AltarItemModal`'s own category field is the shared `ui/CategorySelect` (`variant="field"`); changing category only resets the emoji when it still equals the previous category's default (`changeCategory`), so a user-picked emoji survives. The strip itself holds only strip-level state (selected tab, library height, drag/reorder state, scroll fade state).
 
-  **Trap:** `AltarItemModal` and `CategoryModal` are portalled to `document.body`, but React still dispatches their synthetic `mousedown` up through the JSX tree — into the strip's own panel, which reads any `mousedown` above its top edge as a resize-start and calls `preventDefault`. `handlePanelMouseDown` therefore first checks `event.currentTarget.contains(event.target as Node)` and bails when the target isn't an actual DOM descendant of the panel, before falling through to the resize-start logic. Without that check, a click inside a portalled child could be swallowed as a resize gesture (this previously blocked focus on `AltarItemModal`'s name field). `LIBRARY_DEFAULT_HEIGHT` and `UNCATEGORIZED_TAB` are module-scope constants. Category tab drag-to-reorder uses Pointer Events (not HTML5 drag API) for Tauri/WKWebView compatibility. The FLIP animation (`applyFlipAndUpdate`) snapshots tab positions before the state update, applies inverse `translateX` transforms after the DOM updates via `flushSync`, then removes them in a `requestAnimationFrame` tick with a `transition: transform 150ms ease` so tabs visually slide to their new positions. `dragCatIdRef`, `tabRefs`, `liveOrderRef`, and `lastHoverIdRef` coordinate drag state without stale closures; the `pointerup` handler reads the final order from `liveOrderRef` and calls `useCategoryStore.getState().reorderCategories(mergeOrder(full, finalOrder))` — `mergeOrder` is needed because the strip only ever shows (and drags) the categories with at least one item, not the complete global list. The category scroll container hides its scrollbar (`scrollbar-none`) and shows left/right gradient fade overlays (`transition-opacity duration-150`) when content overflows in that direction; `checkCatScroll()` is called on `onScroll` and via `useEffect` after `displayCategories` changes. The `+ Category` button is placed outside the scroll container so it remains visible at all scroll positions.
+  **Trap:** `AltarItemModal` is portalled to `document.body`, but React still dispatches its synthetic `mousedown` up through the JSX tree — into the strip's own panel, which reads any `mousedown` above its top edge as a resize-start and calls `preventDefault`. `handlePanelMouseDown` therefore first checks `event.currentTarget.contains(event.target as Node)` and bails when the target isn't an actual DOM descendant of the panel, before falling through to the resize-start logic. Without that check, a click inside a portalled child could be swallowed as a resize gesture (this previously blocked focus on `AltarItemModal`'s name field). `LIBRARY_DEFAULT_HEIGHT` and `UNCATEGORIZED_TAB` are module-scope constants. Category tab drag-to-reorder uses Pointer Events (not HTML5 drag API) for Tauri/WKWebView compatibility. The FLIP animation (`applyFlipAndUpdate`) snapshots tab positions before the state update, applies inverse `translateX` transforms after the DOM updates via `flushSync`, then removes them in a `requestAnimationFrame` tick with a `transition: transform 150ms ease` so tabs visually slide to their new positions. `dragCatIdRef`, `tabRefs`, `liveOrderRef`, and `lastHoverIdRef` coordinate drag state without stale closures; the `pointerup` handler reads the final order from `liveOrderRef` and calls `useCategoryStore.getState().reorderCategories(mergeOrder(full, finalOrder))` — `mergeOrder` is needed because the strip only ever shows (and drags) the categories with at least one item, not the complete global list. The category scroll container hides its scrollbar (`scrollbar-none`) and shows left/right gradient fade overlays (`transition-opacity duration-150`) when content overflows in that direction; `checkCatScroll()` is called on `onScroll` and via `useEffect` after `displayCategories` changes.
 - **`src/components/altar/AltarItemTile.tsx`** — the 70×85px library tile (image or emoji over the name), shared by `AltarLibraryStrip` (`draggable`, sets `altarDragState` on `onPointerDown`, shows an `onEdit` pencil on hover) and `AltarLibrarySection` (below; `onClick` opens the edit modal directly instead, no drag). The div carries `role="button"`/`tabIndex`/`onKeyDown` (Enter/Space) only when `onClick` is passed, and `.altar-item-tile` in the shared per-theme `:focus-visible` selector group (see [`design.md`](design.md#open-points) Open Point 8) gives that clickable variant a ring in both themes.
 - **`src/components/altar/AltarItemModal.tsx`** — the add/edit item dialog, moved out of `AltarLibraryStrip` unchanged so `AltarLibrarySection` can open the same dialog from the dashboard. Takes the full category list and a `defaultCategory` (the strip passes the currently selected tab; the dashboard passes the category whose "+" was clicked, or the fallback category for the header-level "add item" button).
-- **`src/components/altar/AltarLibrarySection.tsx`** — the library section rendered under the altar list in `AltarView`'s dashboard, via `Dashboard`'s `contentFooter` prop (see [`components.md`](components.md)). Sorted and grouped by `uiStore.altarLibraryPrefs` (`{ sort: AltarLibrarySort, grouping: GroupingMode }`, persisted to `localStorage` as `altar-library-sort`/`altar-library-grouping`) — its own axes, separate from `altarPrefs` above it; the controls for both live in `AltarView`'s `libraryControls`, rendered into the dashboard's `filters.panelProps.extraGroups` slot rather than into this component, so they sit in the same header column as the altar list's own View/Sort. `AltarLibrarySort` is a three-value subset of `SortMode` (`alpha_asc`/`alpha_desc`/`date_desc` — no `date_asc`, no plain "category", since grouping already covers that). Grouped mode uses `groupByCategory` and, like the strip, only lists categories that currently hold an item — plus whichever category `useCategoryEditor`'s `lastAddedId` just created, so a freshly added empty category has a header to add its first item under; flat mode renders every matching item in one grid, no category headers. Each category renders `CategoryHeaderRow` (shared with Wiki/Operations/Tasks); an item whose category has been trashed instead gets the non-editable `CollapsibleGroupHeader` under "Uncategorized". The section's own collapsed/expanded state (`altar-library-collapsed` in `localStorage`, via the shared `usePersistedFlag` hook) is separate from the category groups' collapse state, which goes through `useCollapsedSet('altar-library')` and is not persisted, matching every other module's category groups. The section heading reuses `Dashboard`'s exported `GroupDivider` with `count`/`collapsed`/`onToggleCollapse`, the same divider-with-heading the dashboard's own timeline groups use — and, via `Dashboard`'s `contentHeader` slot, the same one the altar list above it now has for its own "Altars" heading (`altar-list-collapsed`, also `usePersistedFlag`). `AltarView` filters the dashboard's shared `search` string against item names for this section (altar names are filtered separately, for the altar list above it) and passes it down as a prop rather than the section reading a store field, since the search input lives in `Dashboard`'s toolbar.
+- **`src/components/altar/AltarLibrarySection.tsx`** — the library section rendered under the altar list in `AltarView`'s dashboard, via `Dashboard`'s `contentFooter` prop (see [`components.md`](components.md)). Sorted and grouped by `uiStore.altarLibraryPrefs` (`{ sort: AltarLibrarySort, grouping: GroupingMode }`, persisted to `localStorage` as `altar-library-sort`/`altar-library-grouping`) — its own axes, separate from `altarPrefs` above it; the controls for both live in `AltarView`'s `libraryControls`, rendered into the dashboard's `filters.panelProps.extraGroups` slot rather than into this component, so they sit in the same header column as the altar list's own View/Sort. `AltarLibrarySort` is a three-value subset of `SortMode` (`alpha_asc`/`alpha_desc`/`date_desc` — no `date_asc`, no plain "category", since grouping already covers that). Grouped mode uses `groupByCategory` and, like the strip, only lists categories that currently hold an item; flat mode renders every matching item in one grid, no category headers. Every group — a real category as much as the "Uncategorized" bucket for an item whose category has been trashed — renders the shared `CollapsibleGroupHeader`; only the real ones get its `onAdd` "+", since there is nothing to create an item in when the category is gone. The section's own collapsed/expanded state (`altar-library-collapsed` in `localStorage`, via the shared `usePersistedFlag` hook) is separate from the category groups' collapse state, which goes through `useCollapsedSet('altar-library')` and is not persisted, matching every other module's category groups. The section heading reuses `Dashboard`'s exported `GroupDivider` with `count`/`collapsed`/`onToggleCollapse`, the same divider-with-heading the dashboard's own timeline groups use — and, via `Dashboard`'s `contentHeader` slot, the same one the altar list above it now has for its own "Altars" heading (`altar-list-collapsed`, also `usePersistedFlag`). `AltarView` filters the dashboard's shared `search` string against item names for this section (altar names are filtered separately, for the altar list above it) and passes it down as a prop rather than the section reading a store field, since the search input lives in `Dashboard`'s toolbar.
 - **`src/components/altar/AltarCard.tsx`** — `AltarCard`, `AltarListRow`, and `buildAltarContextMenuActions` — a plain function (not a component) that returns the action list for the altar dashboard context menu. `AltarCard` and `AltarListRow` render the saved thumbnail (`thumbnail_data`) when it is present and is anything `imageSrc()` resolves; otherwise they fall back to `AltarCardPreview`. The thumbnail area's height cap is one of two constants (`PREVIEW_BASE`: 176px in the regular three-column grid, 380px for the `cards_wide` layout — see `lib/viewMode.ts` under [`components.md`](components.md)), no longer a single fixed `max-h-44`. `uiStore.altarShowPreview` (`localStorage` key `altar-show-preview`, a `FilterPanel.displayExtras` chip in the dashboard) can turn the preview off entirely: `AltarCard`/`AltarListRow` then show the altar's own icon (`FaviconGlyph`, enlarged via its `className` prop) instead, falling back to a `Flame` icon when the altar has none. `resolveResolutionPixels` is used (not `parseResolution`) to derive aspect ratio values from the stored resolution string.
 - **`src/components/altar/AltarCardPreview.tsx`** — preview scene used by the dashboard cards and list rows (background + placed items, both compact and full-size variants).
 - **`src/components/altar/AltarRenameField.tsx`** — inline rename input used by the dashboard cards and list rows.
@@ -919,7 +938,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `ensure_app_storage_dirs()` | Create app data and app config directories if they don't exist. Called before frontend writes vault metadata or opens SQLite. |
 | `export_pdf(html, path, page_size?)` | Render the supplied HTML to a PDF at `path` by driving the app's own webview. The frontend first prompts the user for a save location via the `dialog` plugin and passes the chosen path here. `page_size`, an optional `(width_in, height_in)` tuple in inches, overrides the default Letter/Portrait page with a custom size — used only by the Altar PDF export (see below); Journal/Wiki/Operations export calls it without `page_size` and gets the old default behavior. Per-platform implementations live in `src-tauri/src/pdf_export/{windows,macos,linux}.rs`, all behind the same `pub async fn export_pdf` signature; `mod.rs` does the `#[cfg(target_os = "…")]` re-export so `lib.rs` calls `pdf_export::export_pdf` without knowing which platform it's on. |
 | `update_menu_labels(...)` | Update native menu item labels for i18n (edit, view, export, import submenus and their items, including `show_splash` and the View menu's two `CheckMenuItem`s, which need their own `MenuItemKind::Check` arm). macOS only in effect — see [Window Chrome](#window-chrome). |
-| `set_view_menu_checked(left_list, right_sidebar)` | Mirror the frontend's sidebar visibility onto the View menu's two check items. Called on every change, since the rail's own toggles can flip the same state without the menu being opened. macOS only in effect. |
+| `set_view_menu_checked(left_list, right_sidebar)` | Mirror the frontend's sidebar visibility onto the View menu's two check items. Called on every change, since other actions besides the menu itself can flip the same state (e.g. `setActiveView` opening the right sidebar for edit mode). macOS only in effect. |
 | `set_export_menu_enabled(entry, pdf, emerald)` | Enable/disable the native "Export as …" items for the current view. Driven by `computeMenuEnabledState`; macOS only in effect. |
 | `set_altar_export_menu_enabled(enabled)` | Enable/disable the native "Export as Image" submenu. macOS only in effect. |
 

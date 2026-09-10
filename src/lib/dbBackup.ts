@@ -30,7 +30,7 @@ import { convertLegacyStatusRows, STATUS_DEFINITION_ID } from './blocks/legacySt
 import { definitionById, nextDefinitionSortOrder } from './blockDefinitionRows';
 import { fromRow } from './row';
 import { convertLegacySigils } from './migrateLegacySigils';
-import { FALLBACK_CATEGORY_ID, IMAGE_FIELDS, imageColumns } from './schema';
+import { IMAGE_FIELDS, imageColumns } from './schema';
 import { categoryKey, mergeCategoryRows, type CategorySource } from './categoryMerge';
 import { legacyDisplayName, type LegacyCategoryTable } from './categories';
 import i18n from '../i18n';
@@ -111,11 +111,19 @@ type Row = Record<string, any>;
  * Bilder als Dateiname statt als absoluter Pfad referenziert werden, '4' =
  * seit v38 eine Tabelle `categories` die vier Modul-Tabellen ersetzt
  * (`data.categories` statt `wikiCategories`/`operationCategories`/
- * `taskCategories`/`altarCategories`), '5' = seit v39 die eigenen Blöcke als
- * `data.blockDefinitions` mitreisen, '6' = seit v41 tragen Operationen ihre
- * Sigille als Blöcke im Inhalt statt in eigenen Spalten.
+ * `taskCategories`/`altarCategories`), '5' = seit v39 `category_id` NULL sein
+ * darf, '6' = seit v40 reisen die eigenen Blöcke als `data.blockDefinitions`
+ * mit, '7' = seit v42 tragen Operationen ihre Sigille als Blöcke im Inhalt
+ * statt in eigenen Spalten.
+ *
+ * Die '5' ist kein Formalismus: Eine so geschriebene Datei enthält Einträge
+ * ohne Kategorie, und ein Build von vor v39 hat dort noch eine NOT-NULL-Spalte.
+ * Ohne die Erhöhung liefe er in einen Constraint-Fehler mitten im Import —
+ * nach den Löschungen des Replace-Modus, ohne Transaktion. Mit ihr weist die
+ * Prüfung „neuer als ich" (`backup.version > BACKUP_VERSION`) die Datei ehrlich
+ * ab, bevor irgendetwas passiert.
  */
-const BACKUP_VERSION = '6' as const;
+const BACKUP_VERSION = '7' as const;
 
 /** Die vier Kategorie-Arrays von Sicherungen bis Version 3. */
 interface LegacyCategoryArrays {
@@ -169,7 +177,10 @@ function mergeLegacyCategoryArrays(data: BackupFile['data'] & LegacyCategoryArra
 
   const remap = (rows: Row[] | undefined, table: LegacyCategoryTable) => {
     for (const row of rows ?? []) {
-      row.category_id = merged.idMap.get(`${table}:${String(row.category_id)}`) ?? FALLBACK_CATEGORY_ID;
+      // Ohne Treffer bleibt der Eintrag kategorielos. Bis v38 fiel er aufs
+      // Sammelbecken — das gibt es als Sonderfall nicht mehr, und „ohne" ist
+      // ehrlicher als eine Kategorie, die der Nutzer nie gewählt hat.
+      row.category_id = merged.idMap.get(`${table}:${String(row.category_id)}`) ?? null;
     }
   };
   remap(data.wikiArticles, 'wiki_categories');
@@ -215,7 +226,9 @@ export function migrateBackupPayload(backup: BackupFile): void {
     for (const row of data.altarItems ?? []) {
       if (row.category_id === undefined) {
         const raw = row.category === undefined ? '' : String(row.category);
-        row.category_id = byId.has(raw) ? raw : (byName.get(raw) ?? 'other');
+        // Ohne Treffer bleibt das Element kategorielos statt aufs Sammelbecken
+        // zu fallen — dasselbe, was `mergeLegacyCategoryArrays` unten tut.
+        row.category_id = byId.has(raw) ? raw : (byName.get(raw) ?? null);
       }
       delete row.category;
     }
@@ -230,22 +243,28 @@ export function migrateBackupPayload(backup: BackupFile): void {
   // Dateiname statt als absoluter Pfad referenziert werden, und `restoreImages`
   // uebersetzt die Schluessel der Datei so oder so.
 
-  // v3 → v4: vier Kategorie-Arrays werden eines.
+  // v3 → v4: vier Kategorie-Arrays werden eines. Der Vergleich ist geordnet,
+  // nicht „ungleich 4": eine neuere Datei hat die eine Tabelle längst und
+  // liefe sonst ein zweites Mal durch das Zusammenlegen.
   if (version < 4) {
     mergeLegacyCategoryArrays(data);
   }
 
-  // v4 → v5 braucht keinen Schritt: neu ist nur das Array `blockDefinitions`,
+  // v4 → v5 braucht keinen Schritt: `category_id` darf jetzt NULL sein, und
+  // eine ältere Datei hat dort überall einen Wert. Andersherum greift die
+  // Prüfung oben.
+
+  // v5 → v6 braucht keinen Schritt: neu ist nur das Array `blockDefinitions`,
   // und eine Datei ohne es bringt schlicht keine eigenen Blöcke mit.
 
-  // v5 → v6 braucht keinen Schritt an der Datei: Sigillen-Spalten alter
+  // v6 → v7 braucht keinen Schritt an der Datei: Sigillen-Spalten alter
   // Operationen wandelt der Import nach dem Einfügen um (`convertLegacySigils`).
   backup.sourceVersion = version;
   backup.version = BACKUP_VERSION;
 }
 
 interface BackupFile {
-  version: '1' | '2' | '3' | '4' | '5' | '6';
+  version: '1' | '2' | '3' | '4' | '5' | '6' | '7';
   /** Die Version, mit der die Datei geschrieben wurde — `migrateBackupPayload` setzt `version` auf die aktuelle. */
   sourceVersion?: number;
   type: 'backup';
@@ -667,10 +686,10 @@ async function insertBlockDefinitions(
 }
 
 /**
- * Sigillen-Spalten importierter Operationen (Sicherungen von vor v41) in
- * Blöcke umwandeln — derselbe Weg wie Migration v41, nur für die gerade
+ * Sigillen-Spalten importierter Operationen (Sicherungen von vor v42) in
+ * Blöcke umwandeln — derselbe Weg wie Migration v42, nur für die gerade
  * eingefügten Zeilen. Leere Operationen der Kategorie „Sigillen" bekommen das
- * Sigillen-Set nur aus Dateien vor Version 6: in einer neueren hat der Nutzer
+ * Sigillen-Set nur aus Dateien vor Version 7: in einer neueren hat der Nutzer
  * die Blöcke womöglich bewusst entfernt. Eine Zeichnung, die sich nicht
  * speichern lässt, holt `getDb` beim nächsten Öffnen nach.
  */
@@ -681,7 +700,7 @@ async function convertImportedSigils(
 ): Promise<void> {
   if (!operations.length) return;
   await convertLegacySigils(db, {
-    includeSigilCategory: (backup.sourceVersion ?? Number(BACKUP_VERSION)) < 6,
+    includeSigilCategory: (backup.sourceVersion ?? Number(BACKUP_VERSION)) < 7,
     ids: new Set(operations.map((r) => String(r.id))),
   });
 }
@@ -689,7 +708,7 @@ async function convertImportedSigils(
 /**
  * Die „Status"-Definition, nach der alte Operationszeilen umgeschrieben
  * werden: die des Vaults (auch im Papierkorb), sonst die der Datei — wie in
- * Migration v40. Sonst passten die neuen Kopien nicht zu dem „Status", den es
+ * Migration v41. Sonst passten die neuen Kopien nicht zu dem „Status", den es
  * danach im Vault gibt, und zeigten sofort „Neuere Version".
  */
 async function statusDefinitionForImport(
@@ -837,7 +856,14 @@ async function resolveImportedCategories(
   const map = new Map<string, string>();
   for (const row of rows) {
     const id = String(row.id);
-    const name = String(row.name ?? '');
+    // Eine eingebaute Kategorie trägt in der Spalte nur ihren englischen Seed
+    // („Other", „Sigils"); angezeigt wurde sie über ihren Locale-Key. Aus einer
+    // v4-Sicherung käme sie sonst als „Other" neben dem lokalen „Sonstiges" an,
+    // statt darin aufzugehen — dieselbe Auflösung, die `mergeCategoryRows` über
+    // `builtinName` vornimmt.
+    const name = row.is_builtin
+      ? i18n.t(`categories.builtin.${id}`, { defaultValue: String(row.name ?? '') })
+      : String(row.name ?? '');
     const key = categoryKey(name);
     const match = (row.is_builtin ? localById.get(id) : undefined) ?? localByKey.get(key);
     if (match) {
@@ -874,6 +900,7 @@ async function resolveImportedCategories(
 function usedCategoryRows(d: BackupFile['data']): Row[] {
   const used = new Set(
     [...(d.wikiArticles ?? []), ...(d.operations ?? []), ...(d.tasks ?? []), ...(d.altarItems ?? [])]
+      .filter((r) => r.category_id != null)
       .map((r) => String(r.category_id))
   );
   return (d.categories ?? []).filter((c) => used.has(String(c.id)));
@@ -896,7 +923,7 @@ function remapCategoryIds(rows: Row[], map: Map<string, string>): Row[] {
  * unauflösbaren Kategorie erst beim INSERT am Foreign Key scheitern — mit
  * bereits geleertem Vault und ohne Weg zurück.
  */
-async function assertPayloadReferencesResolve(
+export async function assertPayloadReferencesResolve(
   db: Awaited<ReturnType<typeof getDb>>,
   d: BackupFile['data'],
 ): Promise<void> {
@@ -917,7 +944,12 @@ async function assertPayloadReferencesResolve(
   for (const [rowsKey, label] of checks) {
     const missing = new Set<string>();
     for (const row of d[rowsKey] ?? []) {
-      const id = row.category_id == null ? '' : String(row.category_id);
+      // Seit v39 ist „ohne Kategorie" ein gültiger Zustand — und der, mit dem
+      // jeder neue Eintrag anfängt. Ihn als unauflösbare Referenz zu lesen
+      // ließ jede Sicherung scheitern, in der auch nur ein Eintrag keine
+      // Kategorie hatte. Ein leerer *String* bleibt ein Treffer ins Leere.
+      if (row.category_id == null) continue;
+      const id = String(row.category_id);
       if (!known.has(id)) missing.add(id || '(leer)');
     }
     if (missing.size) {
@@ -949,7 +981,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
 
   const journalEntries = (d.journalEntries ?? []).map((r) => remapRow(r, IMAGE_FIELDS_JOURNAL, pathMap));
   const wikiArticles = remapCategoryIds((d.wikiArticles ?? []).map((r) => remapRow(r, IMAGE_FIELDS_WIKI, pathMap)), catMap);
-  // Sicherungen bis v39 tragen Status/Enddatum/Version noch in den Spalten.
+  // Sicherungen bis v40 tragen Status/Enddatum/Version noch in den Spalten.
   const replaceStatus = await statusDefinitionForImport(db, d.blockDefinitions);
   const replaceOps = convertLegacyStatusRows(
     remapCategoryIds((d.operations ?? []).map((r) => remapRow(r, IMAGE_FIELDS_OP, pathMap)), catMap),

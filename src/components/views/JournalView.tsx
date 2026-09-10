@@ -42,7 +42,6 @@ export default function JournalView() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [search, setSearch] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
   const [filterPhases, setFilterPhases] = useState<string[]>([]);
   const { collapsed: collapsedPhases, toggle: togglePhaseCollapse } = useCollapsedSet('journal');
   const [title, setTitle] = useState('');
@@ -300,8 +299,6 @@ export default function JournalView() {
         search={search}
         onSearch={setSearch}
         filters={{
-          showFilters,
-          onToggleFilters: () => setShowFilters((v) => !v),
           activeFilterCount,
           panelProps: {
             chipLabel: t('filters.moonPhase'),

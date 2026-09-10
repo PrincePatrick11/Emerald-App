@@ -22,6 +22,8 @@
     "name": "Nombre de categoría…",
     "uncategorized": "Sin categoría",
     "nameTaken": "Esta categoría ya existe",
+    "dragHint": "Arrastra para reordenar.",
+    "builtinHint": "Integrada — no se puede renombrar ni eliminar.",
     "builtin": {
       "other": "Otro",
       "sigils": "Sigilos"
@@ -71,6 +73,7 @@
     "wiki": "Wiki",
     "altar": "Altar",
     "tags": "Etiquetas",
+    "categories": "Categorías",
     "trash": "Papelera",
     "blocks": "Bloques",
     "operations": "Operaciones",
@@ -79,10 +82,6 @@
     "vaults": "Vaults"
   },
   "sidebar": {
-    "collapseList": "Contraer lista de entradas",
-    "expandList": "Expandir lista de entradas",
-    "collapseProperties": "Contraer propiedades",
-    "expandProperties": "Expandir propiedades",
     "allEmpty": "Aún no hay entradas"
   },
   "operations": {
@@ -498,7 +497,6 @@
     "remove": "Eliminar"
   },
   "filters": {
-    "toggle": "Filtros",
     "all": "Todas",
     "display": "Visualización",
     "clearAll": "Borrar todo",

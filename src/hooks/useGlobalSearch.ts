@@ -8,8 +8,7 @@ import { useTagStore } from '../store/tagStore';
 import { useTaskStore } from '../store/taskStore';
 import { useWikiStore } from '../store/wikiStore';
 import { searchCorpus, type SearchCategory, type SearchCorpus, type SearchResults } from '../lib/globalSearch';
-import { categoryLabel } from '../lib/categories';
-import type { CategoryModuleId } from '../lib/modules';
+import { categoryLabel, categoryUsageCounts, dominantCategoryModule } from '../lib/categories';
 
 /**
  * The store side of the global search: it assembles the corpus and hands it to
@@ -32,31 +31,16 @@ function useSearchCorpus(): SearchCorpus {
   const allCategories = useCategoryStore((s) => s.categories);
   const tags = useTagStore((s) => s.tags);
 
-  // Eine Kategorie hat keine eigene Seite; ein Treffer öffnet das Modul, das
-  // sie am meisten benutzt. Nutzt sie niemand, ist der Treffer nicht navigierbar.
+  // Der Treffer öffnet die Kategorien-Ansicht; `module` beschriftet ihn bloß
+  // noch mit dem Modul, das die Kategorie am meisten benutzt. Dieselbe Zählung
+  // wie die Zahlenspalten dort — ein Helfer für beide.
   const categories = useMemo<SearchCategory[]>(() => {
-    const counts = new Map<string, Record<CategoryModuleId, number>>();
-    const bump = (module: CategoryModuleId, list: readonly { category_id: string }[]) => {
-      for (const item of list) {
-        const c = counts.get(item.category_id) ?? { wiki: 0, operations: 0, tasks: 0, altar: 0 };
-        c[module] += 1;
-        counts.set(item.category_id, c);
-      }
-    };
-    bump('wiki', wiki);
-    bump('operations', operations);
-    bump('tasks', tasks);
-    bump('altar', altarItems);
-
-    return allCategories.map((c) => {
-      const perModule = counts.get(c.id);
-      let module: CategoryModuleId | undefined;
-      if (perModule) {
-        module = (Object.entries(perModule) as [CategoryModuleId, number][])
-          .reduce((best, entry) => (entry[1] > best[1] ? entry : best))[0];
-      }
-      return { id: c.id, name: categoryLabel(t, c), module };
-    });
+    const counts = categoryUsageCounts({ wiki, operations, tasks, altar: altarItems });
+    return allCategories.map((c) => ({
+      id: c.id,
+      name: categoryLabel(t, c),
+      module: dominantCategoryModule(counts.get(c.id)),
+    }));
   }, [allCategories, wiki, operations, tasks, altarItems, t]);
 
   return useMemo(

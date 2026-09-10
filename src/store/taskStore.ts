@@ -26,7 +26,7 @@ interface TaskState {
   links: TaskLink[];
 
   fetchAll: () => Promise<void>;
-  createTask: (categoryId: string, parentTaskId?: string | null) => Promise<Task>;
+  createTask: (categoryId?: string | null, parentTaskId?: string | null) => Promise<Task>;
   updateTask: (id: string, patch: Partial<Task>) => Promise<void>;
   toggleComplete: (id: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
@@ -62,7 +62,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     });
   },
 
-  createTask: async (categoryId: string, parentTaskId: string | null = null) => {
+  createTask: async (categoryId: string | null = null, parentTaskId: string | null = null) => {
     const db = await getDb();
     const id = generateId();
     const now = nowIso();

@@ -15,7 +15,6 @@ import { reloadModules } from '../store/moduleWiring';
 import { useImportStore } from '../store/importStore';
 import { useTaskStore } from '../store/taskStore';
 import { getDb } from './db';
-import { FALLBACK_CATEGORY_ID } from './schema';
 import { LEGACY_WIKI_CATEGORIES } from './schemaV37';
 import { categoryKey } from './categoryMerge';
 import { categoryLabel } from './categories';
@@ -248,7 +247,7 @@ interface EmeraldMeta {
   wikiCategoryId?: string;
   wikiCategoryName?: string;
   opCategoryName?: string;
-  // Altbestand bis v39 (Operationen): wird beim Import zum Status-Block
+  // Altbestand bis v40 (Operationen): wird beim Import zum Status-Block
   // (lib/blocks/legacyStatus.ts), geschrieben wird es nicht mehr.
   isActive?: boolean;
   endDate?: string | null;
@@ -397,7 +396,7 @@ export async function exportAsEmerald(): Promise<void> {
     const cat = categories.find(c => c.id === article.category_id);
     meta.categoryName     = categoryLabel(i18n.t, cat) || undefined;
     meta.categoryEmoji    = cat?.emoji;
-    meta.wikiCategoryId   = article.category_id;
+    meta.wikiCategoryId   = article.category_id ?? undefined;
     // Kein Rückfall auf die rohe ID: eine Kategorie im Papierkorb ist hier
     // nicht geladen, und der Import würde aus der UUID einen Namen machen.
     meta.wikiCategoryName = cat?.name;
@@ -475,7 +474,8 @@ async function exportAltarAsEmerald(): Promise<void> {
   const altarItems = items.filter(i => placedItemIds.has(i.id));
   const usedCategoryIds = new Set(altarItems.map(i => i.category_id));
   const usedCategories = categories.filter(c => usedCategoryIds.has(c.id));
-  // Übersetzte Namen, damit ein deutsches „Sonstiges" im Ziel-Vault wieder das Sammelbecken trifft.
+  // Übersetzte Namen, damit ein deutsches „Sigillen" im Ziel-Vault wieder die
+  // eingebaute Kategorie trifft statt eine zweite anzulegen.
   const categoryNameById = new Map(categories.map(c => [c.id, categoryLabel(i18n.t, c)]));
 
   const meta: EmeraldMeta = {
@@ -497,9 +497,10 @@ async function exportAltarAsEmerald(): Promise<void> {
     altarCategories: usedCategories.map(c => ({ name: categoryLabel(i18n.t, c), emoji: c.emoji })),
     altarItems: altarItems.map(i => ({
       id: i.id, name: i.name, emoji: i.emoji,
-      // Leer, wenn die Kategorie im Papierkorb liegt — der Import nimmt dann
-      // das Sammelbecken, statt ein englisches „Other" neben „Sonstiges" anzulegen.
-      category: categoryNameById.get(i.category_id) ?? '', note: i.note,
+      // Leer, wenn das Element keine Kategorie hat oder seine im Papierkorb
+      // liegt — der Import lässt es dann ebenfalls ohne, statt ein englisches
+      // „Other" neben „Sonstiges" anzulegen.
+      category: (i.category_id && categoryNameById.get(i.category_id)) || '', note: i.note,
       imageData: i.image_data ?? undefined,
       createdAt: i.created_at,
     })),
@@ -553,8 +554,8 @@ async function importBlockDefinitions(raw: EmeraldMeta['blockDefinitions']): Pro
 }
 
 /**
- * Status/Enddatum/Version aus einer Datei von vor v40 als Status-Block vor den
- * Inhalt — wie Migration v40, nach derselben Definition: der vorhandenen
+ * Status/Enddatum/Version aus einer Datei von vor v41 als Status-Block vor den
+ * Inhalt — wie Migration v41, nach derselben Definition: der vorhandenen
  * (auch aus dem Papierkorb), sonst einer neuen.
  */
 async function withImportedStatus(content: string, status: LegacyStatus): Promise<string> {
@@ -646,7 +647,7 @@ export async function importFromEmerald(): Promise<void> {
   // geht, nicht mehr das, was er geprüft hat. Der Remap selbst liest nur
   // data-Attribute und ersetzt Knoten, braucht also keinen sauberen Input.
   const relinked = remapImportedLinks(remapped, file.meta.contentLinks, items);
-  // Status/Enddatum/Version einer Operation von vor v40 als Block — ebenfalls
+  // Status/Enddatum/Version einer Operation von vor v41 als Block — ebenfalls
   // VOR dem Sanitizer, aus demselben Grund wie der Remap. Die Werte stammen
   // aus der Datei und werden geprüft wie eine Backup-Zeile.
   const withStatus = file.type === 'operations'
@@ -745,12 +746,15 @@ async function importJournalEntry(
 /**
  * Die eine Kategorie-Auflösung des Imports, für alle vier Module: die lokale
  * Kategorie mit diesem Namen (ohne Groß/Klein, Builtins auch über ihren
- * übersetzten Namen), sonst neu angelegt; ohne Namen das Sammelbecken.
+ * übersetzten Namen), sonst neu angelegt; ohne Namen bleibt der Eintrag
+ * kategorielos.
  * Vorher hatten Wiki, Operationen und Altar je eine eigene Strategie.
  */
-async function ensureCategoryByName(name: string | null | undefined, emoji = '📁'): Promise<string> {
+async function ensureCategoryByName(name: string | null | undefined, emoji = '📁'): Promise<string | null> {
   const trimmed = name?.trim();
-  if (!trimmed) return FALLBACK_CATEGORY_ID;
+  // Ohne Namen bleibt der Eintrag kategorielos — bis v38 fiel er aufs
+  // Sammelbecken, das es als Sonderfall nicht mehr gibt.
+  if (!trimmed) return null;
   const key = categoryKey(trimmed);
   const matches = (c: Category) =>
     categoryKey(c.name) === key || (c.is_builtin && categoryKey(categoryLabel(i18n.t, c)) === key);
@@ -775,7 +779,7 @@ async function ensureCategoryByName(name: string | null | undefined, emoji = '�
     return (await store.addCategory(trimmed, emoji || '📁')).id;
   } catch {
     // Namenskonflikt aus einem parallelen Anlegen — dann gibt es sie jetzt.
-    return useCategoryStore.getState().categories.find(matches)?.id ?? FALLBACK_CATEGORY_ID;
+    return useCategoryStore.getState().categories.find(matches)?.id ?? null;
   }
 }
 
@@ -1169,7 +1173,7 @@ async function importOperationFromMarkdown(
   const categoryName = meta['category'] ? stripIconPrefix(meta['category']) : null;
   const categoryId = await ensureCategoryByName(categoryName, '⚡');
 
-  // „Status"/„End Date"/„Version" im Kopf stammen aus Exporten bis v39. Vor
+  // „Status"/„End Date"/„Version" im Kopf stammen aus Exporten bis v40. Vor
   // dem Anlegen: scheitert die Umwandlung, bleibt keine leere Operation zurück.
   const content = await withImportedStatus(html, {
     isActive: meta['status'] ? meta['status'].toLowerCase() === 'active' : true,

@@ -5,8 +5,8 @@ import { instantiateDefinition, type BlockDefinition } from './definitions';
 import { parseFields, serializeFields } from './fields';
 
 /**
- * Status, Enddatum und Version der Operationen waren bis v39 feste Spalten
- * mit eigenem Filter, Punkt in der Liste und Chips unter dem Titel. Seit v40
+ * Status, Enddatum und Version der Operationen waren bis v40 feste Spalten
+ * mit eigenem Filter, Punkt in der Liste und Chips unter dem Titel. Seit v41
  * sind sie ein Block: die Kopie des eigenen Blocks „Status" (Aktiv — Ja/Nein,
  * Enddatum, Version), ganz oben im Inhalt. Der Block entsteht nur bei
  * Operationen, die davon etwas gesetzt hatten; die Definition nur, wenn es
@@ -14,7 +14,7 @@ import { parseFields, serializeFields } from './fields';
  * andere, umbenenn-, änderbar und löschbar.
  *
  * Ein Konverter für alle Wege, auf denen Altbestand hereinkommt: Migration
- * v40, Backup-Import (`.emeralddb` bis Version 5), `.emerald`- und
+ * v41, Backup-Import (`.emeralddb` bis Version 6), `.emerald`- und
  * Markdown-Import. Rein und DOM-frei — die Migration läuft ohne Browser.
  */
 

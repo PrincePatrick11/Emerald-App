@@ -56,7 +56,7 @@ export interface ExportData {
   tagNames?: string[];
 }
 
-function wikiIcon(article: { icon?: string; category_id: string }, cats: Category[]): string {
+function wikiIcon(article: { icon?: string; category_id: string | null }, cats: Category[]): string {
   if (article.icon?.startsWith('data:')) return article.icon;
   const cat = cats.find(c => c.id === article.category_id);
   return cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
