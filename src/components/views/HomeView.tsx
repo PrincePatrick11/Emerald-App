@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, Library, Plus, Wand2, Copy, Pencil, Trash2 } from 'lucide-react';
+import { BookOpen, Library, Wand2, Copy, Pencil, Trash2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
@@ -9,7 +9,7 @@ import { useOperationStore } from '../../store/operationStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import ContextMenu from '../ui/ContextMenu';
-import Button from '../ui/Button';
+import Dashboard from '../ui/Dashboard';
 import Dropdown from '../ui/Dropdown';
 import { getMoonPhase, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId, isImageIcon } from '../../lib/helpers';
@@ -144,252 +144,29 @@ export default function HomeView() {
   const opsItems     = applyCount(sortItems(operations, homeOpsPrefs.sort, { date: (o) => o.updated_at }), homeOpsPrefs.count);
   const wikiItems    = applyCount(sortItems(articles, homeWikiPrefs.sort, { date: (a) => a.updated_at }), homeWikiPrefs.count);
 
+  // Datum und Mondphase als Titel — zweizeilig, passt in die h-14-Kopfzeile
+  // beider Kopf-Bäume. Über `Dashboard`, damit der Kopf wie in den Modulen in
+  // die rechte Seitenleiste wandert; Toolbar gibt es keine, jede Sektion
+  // bringt ihre eigene mit.
+  const headerLeft = (
+    <div className="min-w-0">
+      <h1 className="text-lg font-semibold text-stone-100 leading-tight truncate">
+        {formatDayHeading(today)}
+      </h1>
+      <p className="text-xs text-stone-500 truncate">
+        {MOON_PHASE_SYMBOLS[moonPhase]}{' '}{t(`moonPhase.${moonPhase}`)}
+      </p>
+    </div>
+  );
+
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-8 py-10">
-
-        {/* Header */}
-        <div className="mb-10">
-          <div className="flex items-start justify-between mb-1">
-            <div>
-              <h1 className="text-2xl font-semibold text-stone-100 mb-1">
-                {formatDayHeading(today)}
-              </h1>
-              <p className="text-stone-500 text-sm">
-                {MOON_PHASE_SYMBOLS[moonPhase]}{' '}{t(`moonPhase.${moonPhase}`)}
-              </p>
-            </div>
-            <Button
-              onClick={handleNewEntry}
-              variant="primary"
-              className="px-4 py-2 text-sm flex-shrink-0"
-            >
-              <Plus size={15} />
-              {t('journal.newEntry')}
-            </Button>
-          </div>
-        </div>
-
-        {/* ── Journal ── */}
-        <section className="mb-8">
-          <div className="flex items-center gap-2 mb-3">
-            <button onClick={() => setActiveView({ type: 'journal' })} className="flex items-center gap-2 group flex-shrink-0">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500 group-hover:text-stone-400 flex items-center gap-2 transition-colors">
-                <BookOpen size={12} />
-                {t('nav.journal')}
-              </h2>
-              <span className="text-xs text-stone-600 group-hover:text-stone-400 transition-colors">{t('home.viewAll')}</span>
-            </button>
-            <div className="ml-auto flex-shrink-0">
-              <SectionToolbar prefs={homeJournalPrefs} setPrefs={setHomeJournalPrefs} />
-            </div>
-          </div>
-          {entries.length === 0 ? (
-            <div className="panel px-4 py-6 text-center">
-              <p className="text-stone-600 text-sm">{t('journal.noEntries')}</p>
-              <p className="text-stone-700 text-xs mt-1">{t('journal.startWriting')}</p>
-            </div>
-          ) : homeJournalPrefs.view === 'list' ? (
-            <div className="space-y-2">
-              {journalItems.map((entry) => (
-                <button
-                  key={entry.id}
-                  onClick={() => setActiveView({ type: 'journal', id: entry.id, mode: 'view' })}
-                  onContextMenu={(e) => openCtx(e, { kind: 'journal', id: entry.id })}
-                  className="panel-interactive w-full text-left px-4 py-3 group"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="home-item-title text-sm font-medium truncate">
-                        {entry.title}
-                      </div>
-                      <div className="home-item-meta text-xs mt-0.5">
-                        {formatEntryDate(entry.created_at)}
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-2">
-              {journalItems.map((entry) => (
-                <button
-                  key={entry.id}
-                  onClick={() => setActiveView({ type: 'journal', id: entry.id, mode: 'view' })}
-                  onContextMenu={(e) => openCtx(e, { kind: 'journal', id: entry.id })}
-                  className="panel-interactive px-3 py-3 text-left"
-                >
-                  <div className="text-lg mb-1">{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</div>
-                  <div className="home-item-title text-sm font-medium truncate">{entry.title}</div>
-                  <div className="home-item-meta text-xs mt-0.5">
-                    {formatEntryDate(entry.created_at)}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* ── Operations ── */}
-        <section className="mb-8">
-          <div className="flex items-center gap-2 mb-3">
-            <button onClick={() => setActiveView({ type: 'operations' })} className="flex items-center gap-2 group flex-shrink-0">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500 group-hover:text-stone-400 flex items-center gap-2 transition-colors">
-                <Wand2 size={12} />
-                {t('nav.operations')}
-              </h2>
-              <span className="text-xs text-stone-600 group-hover:text-stone-400 transition-colors">{t('home.viewAll')}</span>
-            </button>
-            <div className="ml-auto flex-shrink-0">
-              <SectionToolbar prefs={homeOpsPrefs} setPrefs={setHomeOpsPrefs} />
-            </div>
-          </div>
-          {operations.length === 0 ? (
-            <div className="panel px-4 py-6 text-center">
-              <p className="text-stone-600 text-sm">{t('operations.none')}</p>
-            </div>
-          ) : homeOpsPrefs.view === 'list' ? (
-            <div className="space-y-2">
-              {opsItems.map((op) => {
-                const cat = categories.find((c) => c.id === op.category_id);
-                const icon = op.icon || cat?.emoji || '⚡';
-                return (
-                  <button
-                    key={op.id}
-                    onClick={() => setActiveView({ type: 'operations', id: op.id, mode: 'view' })}
-                    onContextMenu={(e) => openCtx(e, { kind: 'operation', id: op.id })}
-                    className="panel-interactive w-full text-left px-4 py-3 group"
-                  >
-                    <div className="flex items-center gap-3">
-                      {isImageIcon(icon)
-                        ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded flex-shrink-0" />
-                        : <span className="text-xl">{icon}</span>
-                      }
-                      <div className="flex-1 min-w-0">
-                        <div className="home-item-title text-sm font-medium truncate">
-                          {op.title}
-                        </div>
-                        <div className="home-item-meta text-xs mt-0.5">
-                          {categoryLabel(t, cat)} · {formatEntryDate(op.updated_at)}
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-2">
-              {opsItems.map((op) => {
-                const cat = categories.find((c) => c.id === op.category_id);
-                const icon = op.icon || cat?.emoji || '⚡';
-                return (
-                  <button
-                    key={op.id}
-                    onClick={() => setActiveView({ type: 'operations', id: op.id, mode: 'view' })}
-                    onContextMenu={(e) => openCtx(e, { kind: 'operation', id: op.id })}
-                    className="panel-interactive px-3 py-3 text-left"
-                  >
-                    {isImageIcon(icon)
-                      ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded mb-1" />
-                      : <div className="text-lg mb-1">{icon}</div>
-                    }
-                    <div className="home-item-title text-sm font-medium truncate">{op.title}</div>
-                    <div className="home-item-meta text-xs mt-0.5">
-                      {categoryLabel(t, cat)} · {formatEntryDate(op.updated_at)}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        {/* ── Wiki ── */}
-        <section>
-          <div className="flex items-center gap-2 mb-3">
-            <button onClick={() => setActiveView({ type: 'wiki' })} className="flex items-center gap-2 group flex-shrink-0">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500 group-hover:text-stone-400 flex items-center gap-2 transition-colors">
-                <Library size={12} />
-                {t('nav.wiki')}
-              </h2>
-              <span className="text-xs text-stone-600 group-hover:text-stone-400 transition-colors">{t('home.viewAll')}</span>
-            </button>
-            <div className="ml-auto flex-shrink-0">
-              <SectionToolbar prefs={homeWikiPrefs} setPrefs={setHomeWikiPrefs} />
-            </div>
-          </div>
-          {articles.length === 0 ? (
-            <div className="panel px-4 py-6 text-center">
-              <p className="text-stone-600 text-sm">{t('wiki.noArticles')}</p>
-              <p className="text-stone-700 text-xs mt-1">{t('wiki.startDocumenting')}</p>
-            </div>
-          ) : homeWikiPrefs.view === 'list' ? (
-            <div className="space-y-2">
-              {wikiItems.map((article) => {
-                const cat = categories.find((c) => c.id === article.category_id);
-                const icon = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
-                // Kein Fallback auf die rohe category_id — bei gelöschter
-                // Kategorie entfällt das Label.
-                const catLabel = categoryLabel(t, cat);
-                return (
-                  <button
-                    key={article.id}
-                    onClick={() => setActiveView({ type: 'wiki', id: article.id, mode: 'view' })}
-                    onContextMenu={(e) => openCtx(e, { kind: 'wiki', id: article.id })}
-                    className="panel-interactive w-full text-left px-4 py-3 group"
-                  >
-                    <div className="flex items-center gap-3">
-                      {isImageIcon(article.icon)
-                        ? <img src={article.icon!} alt="" className="w-6 h-6 object-cover rounded flex-shrink-0" />
-                        : <span className="text-xl flex-shrink-0">{icon}</span>
-                      }
-                      <div className="flex-1 min-w-0">
-                        <div className="home-item-title text-sm font-medium truncate">
-                          {article.title}
-                        </div>
-                        <div className="home-item-meta text-xs capitalize mt-0.5">
-                          {catLabel ? `${catLabel} · ` : ''}{formatEntryDate(article.updated_at)}
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              {wikiItems.map((article) => {
-                const cat = categories.find((c) => c.id === article.category_id);
-                const icon = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
-                const catLabel = categoryLabel(t, cat);
-                return (
-                  <button
-                    key={article.id}
-                    onClick={() => setActiveView({ type: 'wiki', id: article.id, mode: 'view' })}
-                    onContextMenu={(e) => openCtx(e, { kind: 'wiki', id: article.id })}
-                    className="panel-interactive px-3 py-3 text-left"
-                  >
-                    {isImageIcon(article.icon)
-                      ? <img src={article.icon!} alt="" className="w-6 h-6 object-cover rounded mb-1" />
-                      : <div className="text-lg mb-1">{icon}</div>
-                    }
-                    <div className="home-item-title text-sm font-medium truncate">{article.title}</div>
-                    <div className="home-item-meta text-xs capitalize mt-0.5">
-                      {catLabel ? `${catLabel} · ` : ''}{formatEntryDate(article.updated_at)}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-      </div>
-
-      {ctxMenu && (
+    <Dashboard<never>
+      headerLeft={headerLeft}
+      primaryAction={{ label: t('journal.newEntry'), onClick: handleNewEntry }}
+      items={[]}
+      itemKey={() => ''}
+      contentClassName="flex-1 overflow-y-auto"
+      contextMenuSlot={ctxMenu && (
         <ContextMenu
           x={ctxMenu.x}
           y={ctxMenu.y}
@@ -397,6 +174,228 @@ export default function HomeView() {
           onClose={() => setCtxMenu(null)}
         />
       )}
-    </div>
+      grouping={{ mode: 'custom', render: () => (
+          <div className="max-w-3xl mx-auto px-8 py-10">
+
+            {/* ── Journal ── */}
+            <section className="mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <button onClick={() => setActiveView({ type: 'journal' })} className="flex items-center gap-2 group flex-shrink-0">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500 group-hover:text-stone-400 flex items-center gap-2 transition-colors">
+                    <BookOpen size={12} />
+                    {t('nav.journal')}
+                  </h2>
+                  <span className="text-xs text-stone-600 group-hover:text-stone-400 transition-colors">{t('home.viewAll')}</span>
+                </button>
+                <div className="ml-auto flex-shrink-0">
+                  <SectionToolbar prefs={homeJournalPrefs} setPrefs={setHomeJournalPrefs} />
+                </div>
+              </div>
+              {entries.length === 0 ? (
+                <div className="panel px-4 py-6 text-center">
+                  <p className="text-stone-600 text-sm">{t('journal.noEntries')}</p>
+                  <p className="text-stone-700 text-xs mt-1">{t('journal.startWriting')}</p>
+                </div>
+              ) : homeJournalPrefs.view === 'list' ? (
+                <div className="space-y-2">
+                  {journalItems.map((entry) => (
+                    <button
+                      key={entry.id}
+                      onClick={() => setActiveView({ type: 'journal', id: entry.id, mode: 'view' })}
+                      onContextMenu={(e) => openCtx(e, { kind: 'journal', id: entry.id })}
+                      className="panel-interactive w-full text-left px-4 py-3 group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="home-item-title text-sm font-medium truncate">
+                            {entry.title}
+                          </div>
+                          <div className="home-item-meta text-xs mt-0.5">
+                            {formatEntryDate(entry.created_at)}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {journalItems.map((entry) => (
+                    <button
+                      key={entry.id}
+                      onClick={() => setActiveView({ type: 'journal', id: entry.id, mode: 'view' })}
+                      onContextMenu={(e) => openCtx(e, { kind: 'journal', id: entry.id })}
+                      className="panel-interactive px-3 py-3 text-left"
+                    >
+                      <div className="text-lg mb-1">{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</div>
+                      <div className="home-item-title text-sm font-medium truncate">{entry.title}</div>
+                      <div className="home-item-meta text-xs mt-0.5">
+                        {formatEntryDate(entry.created_at)}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* ── Operations ── */}
+            <section className="mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <button onClick={() => setActiveView({ type: 'operations' })} className="flex items-center gap-2 group flex-shrink-0">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500 group-hover:text-stone-400 flex items-center gap-2 transition-colors">
+                    <Wand2 size={12} />
+                    {t('nav.operations')}
+                  </h2>
+                  <span className="text-xs text-stone-600 group-hover:text-stone-400 transition-colors">{t('home.viewAll')}</span>
+                </button>
+                <div className="ml-auto flex-shrink-0">
+                  <SectionToolbar prefs={homeOpsPrefs} setPrefs={setHomeOpsPrefs} />
+                </div>
+              </div>
+              {operations.length === 0 ? (
+                <div className="panel px-4 py-6 text-center">
+                  <p className="text-stone-600 text-sm">{t('operations.none')}</p>
+                </div>
+              ) : homeOpsPrefs.view === 'list' ? (
+                <div className="space-y-2">
+                  {opsItems.map((op) => {
+                    const cat = categories.find((c) => c.id === op.category_id);
+                    const icon = op.icon || cat?.emoji || '⚡';
+                    return (
+                      <button
+                        key={op.id}
+                        onClick={() => setActiveView({ type: 'operations', id: op.id, mode: 'view' })}
+                        onContextMenu={(e) => openCtx(e, { kind: 'operation', id: op.id })}
+                        className="panel-interactive w-full text-left px-4 py-3 group"
+                      >
+                        <div className="flex items-center gap-3">
+                          {isImageIcon(icon)
+                            ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded flex-shrink-0" />
+                            : <span className="text-xl">{icon}</span>
+                          }
+                          <div className="flex-1 min-w-0">
+                            <div className="home-item-title text-sm font-medium truncate">
+                              {op.title}
+                            </div>
+                            <div className="home-item-meta text-xs mt-0.5">
+                              {categoryLabel(t, cat)} · {formatEntryDate(op.updated_at)}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {opsItems.map((op) => {
+                    const cat = categories.find((c) => c.id === op.category_id);
+                    const icon = op.icon || cat?.emoji || '⚡';
+                    return (
+                      <button
+                        key={op.id}
+                        onClick={() => setActiveView({ type: 'operations', id: op.id, mode: 'view' })}
+                        onContextMenu={(e) => openCtx(e, { kind: 'operation', id: op.id })}
+                        className="panel-interactive px-3 py-3 text-left"
+                      >
+                        {isImageIcon(icon)
+                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded mb-1" />
+                          : <div className="text-lg mb-1">{icon}</div>
+                        }
+                        <div className="home-item-title text-sm font-medium truncate">{op.title}</div>
+                        <div className="home-item-meta text-xs mt-0.5">
+                          {categoryLabel(t, cat)} · {formatEntryDate(op.updated_at)}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            {/* ── Wiki ── */}
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <button onClick={() => setActiveView({ type: 'wiki' })} className="flex items-center gap-2 group flex-shrink-0">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500 group-hover:text-stone-400 flex items-center gap-2 transition-colors">
+                    <Library size={12} />
+                    {t('nav.wiki')}
+                  </h2>
+                  <span className="text-xs text-stone-600 group-hover:text-stone-400 transition-colors">{t('home.viewAll')}</span>
+                </button>
+                <div className="ml-auto flex-shrink-0">
+                  <SectionToolbar prefs={homeWikiPrefs} setPrefs={setHomeWikiPrefs} />
+                </div>
+              </div>
+              {articles.length === 0 ? (
+                <div className="panel px-4 py-6 text-center">
+                  <p className="text-stone-600 text-sm">{t('wiki.noArticles')}</p>
+                  <p className="text-stone-700 text-xs mt-1">{t('wiki.startDocumenting')}</p>
+                </div>
+              ) : homeWikiPrefs.view === 'list' ? (
+                <div className="space-y-2">
+                  {wikiItems.map((article) => {
+                    const cat = categories.find((c) => c.id === article.category_id);
+                    const icon = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
+                    // Kein Fallback auf die rohe category_id — bei gelöschter
+                    // Kategorie entfällt das Label.
+                    const catLabel = categoryLabel(t, cat);
+                    return (
+                      <button
+                        key={article.id}
+                        onClick={() => setActiveView({ type: 'wiki', id: article.id, mode: 'view' })}
+                        onContextMenu={(e) => openCtx(e, { kind: 'wiki', id: article.id })}
+                        className="panel-interactive w-full text-left px-4 py-3 group"
+                      >
+                        <div className="flex items-center gap-3">
+                          {isImageIcon(article.icon)
+                            ? <img src={article.icon!} alt="" className="w-6 h-6 object-cover rounded flex-shrink-0" />
+                            : <span className="text-xl flex-shrink-0">{icon}</span>
+                          }
+                          <div className="flex-1 min-w-0">
+                            <div className="home-item-title text-sm font-medium truncate">
+                              {article.title}
+                            </div>
+                            <div className="home-item-meta text-xs capitalize mt-0.5">
+                              {catLabel ? `${catLabel} · ` : ''}{formatEntryDate(article.updated_at)}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {wikiItems.map((article) => {
+                    const cat = categories.find((c) => c.id === article.category_id);
+                    const icon = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
+                    const catLabel = categoryLabel(t, cat);
+                    return (
+                      <button
+                        key={article.id}
+                        onClick={() => setActiveView({ type: 'wiki', id: article.id, mode: 'view' })}
+                        onContextMenu={(e) => openCtx(e, { kind: 'wiki', id: article.id })}
+                        className="panel-interactive px-3 py-3 text-left"
+                      >
+                        {isImageIcon(article.icon)
+                          ? <img src={article.icon!} alt="" className="w-6 h-6 object-cover rounded mb-1" />
+                          : <div className="text-lg mb-1">{icon}</div>
+                        }
+                        <div className="home-item-title text-sm font-medium truncate">{article.title}</div>
+                        <div className="home-item-meta text-xs capitalize mt-0.5">
+                          {catLabel ? `${catLabel} · ` : ''}{formatEntryDate(article.updated_at)}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+          </div>
+      )}}
+    />
   );
 }

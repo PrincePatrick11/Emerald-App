@@ -201,9 +201,10 @@ export default function TitleBarSearchResults({
                 {hit.module && (
                   <>
                     <span aria-hidden="true">·</span>
-                    {/* Kategorien tragen zusaetzlich ihr Modul: die vier Kategorie-
-                        Tabellen teilen sich Built-in-Ids, ohne Modul waeren `Herb`
-                        (Wiki) und `Herb` (Altar) nicht zu unterscheiden. */}
+                    {/* Nur Kategorien: das Modul, in dem sie am meisten benutzt
+                        wird. Kein Sprungziel — der Treffer oeffnet seit der
+                        eigenen Ansicht immer diese —, sondern der Hinweis,
+                        welche der gleichnamig wirkenden Kategorien gemeint ist. */}
                     <span>{t(MODULES[hit.module].navLabelKey)}</span>
                   </>
                 )}

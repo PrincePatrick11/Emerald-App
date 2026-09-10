@@ -31,26 +31,27 @@ export const UNCATEGORIZED_KEY = '__uncategorized__';
  * Papierkorb liegt. Kategorien behalten ihre Reihenfolge, die Einträge die der
  * übergebenen (vorsortierten) Liste.
  *
- * Leere Gruppen entstehen hier weiterhin; das Dashboard wirft sie beim Rendern
- * weg — bis auf die, die `keepEmptyId` nennt. Das ist die gerade angelegte
- * Kategorie: sie hat naturgemäß noch nichts und braucht trotzdem ihren Kopf,
- * unter dem man den ersten Eintrag anlegt.
+ * Leere Gruppen entstehen hier weiterhin; das Dashboard wirft sie beim
+ * Rendern weg.
  */
 export function groupByCategory<T, C extends { id: string }>(
   items: readonly T[],
   categories: readonly C[],
-  categoryId: (item: T) => string,
+  categoryId: (item: T) => string | null,
   label: (cat: C) => string,
   uncategorizedLabel: string,
-  keepEmptyId?: string | null,
 ): DashboardGroup<T>[] {
   const groups: DashboardGroup<T>[] = categories.map((cat) => ({
     key: cat.id,
     label: label(cat),
     items: items.filter((item) => categoryId(item) === cat.id),
-    keepWhenEmpty: !!keepEmptyId && cat.id === keepEmptyId,
   }));
-  const orphans = items.filter((item) => !categories.some((c) => c.id === categoryId(item)));
+  // Ohne Kategorie (null) oder mit einer, die im Papierkorb liegt — beides
+  // landet im selben Bucket, weil es für den Leser dasselbe ist.
+  const orphans = items.filter((item) => {
+    const id = categoryId(item);
+    return !id || !categories.some((c) => c.id === id);
+  });
   if (orphans.length > 0) {
     groups.push({ key: UNCATEGORIZED_KEY, label: uncategorizedLabel, items: orphans });
   }

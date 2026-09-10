@@ -81,11 +81,14 @@ export default function LeftSidebarRail() {
         ))}
       </div>
 
-      {/* Bottom nav — always visible: Tags/Trash grouped, Vault/Settings set apart below a divider */}
+      {/* Bottom nav — always visible: Tags/Categories/Trash grouped, Vault/Settings set apart below a divider */}
       <div className="sidebar-bottom-bar w-full flex-1 flex flex-col items-center justify-end py-2">
         <div className="flex flex-col items-center gap-0.5">
           <RailButton onClick={() => setActiveView({ type: 'tags' })} title={t(AUX_VIEWS.tags.navLabelKey)}>
             <AUX_VIEWS.tags.icon size={18} />
+          </RailButton>
+          <RailButton onClick={() => setActiveView({ type: 'categories' })} title={t(AUX_VIEWS.categories.navLabelKey)}>
+            <AUX_VIEWS.categories.icon size={18} />
           </RailButton>
           <RailButton onClick={() => setActiveView({ type: 'trash' })} title={t(AUX_VIEWS.trash.navLabelKey)}>
             <AUX_VIEWS.trash.icon size={18} />

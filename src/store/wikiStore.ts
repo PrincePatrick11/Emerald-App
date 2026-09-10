@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import type Database from '@tauri-apps/plugin-sql';
 import { getDb, nextEntryNumber } from '../lib/db';
-import { FALLBACK_CATEGORY_ID } from '../lib/schema';
 import { syncLinks } from '../lib/links';
 import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
@@ -39,7 +38,7 @@ interface WikiState {
   loading: boolean;
 
   fetchArticles: () => Promise<void>;
-  createArticle: (categoryId?: string) => Promise<WikiArticle>;
+  createArticle: (categoryId?: string | null) => Promise<WikiArticle>;
   duplicateArticle: (id: string) => Promise<WikiArticle | undefined>;
   updateArticle: (id: string, patch: Partial<WikiArticle>) => Promise<void>;
   deleteArticle: (id: string) => Promise<void>;
@@ -70,7 +69,7 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     }
   },
 
-  createArticle: async (categoryId = FALLBACK_CATEGORY_ID) => {
+  createArticle: async (categoryId: string | null = null) => {
     const db = await getDb();
     const now = nowIso();
     const id = generateId();

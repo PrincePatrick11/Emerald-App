@@ -22,6 +22,8 @@
     "name": "Category name…",
     "uncategorized": "Uncategorized",
     "nameTaken": "This category already exists",
+    "dragHint": "Drag to reorder.",
+    "builtinHint": "Built-in — cannot be renamed or deleted.",
     "builtin": {
       "other": "Other",
       "sigils": "Sigils"
@@ -70,6 +72,7 @@
     "wiki": "Wiki",
     "altar": "Altar",
     "tags": "Tags",
+    "categories": "Categories",
     "trash": "Trash",
     "operations": "Operations",
     "tasks": "Tasks",

@@ -4,14 +4,12 @@ import { useAltarStore } from '../../store/altarStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUIStore } from '../../store/uiStore';
 import { categoryLabel } from '../../lib/categories';
-import { ALTAR_CATEGORY_DEFAULT_EMOJI } from '../../lib/altarConstants';
+import { ALTAR_UNCATEGORIZED_EMOJI } from '../../lib/altarConstants';
 import { groupByCategory, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import { sortItems } from '../../lib/sortItems';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
-import type { CategoryEditorApi } from '../../hooks/useCategoryEditor';
 import type { AltarItem } from '../../types';
-import CategoryHeaderRow from '../ui/CategoryHeaderRow';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { GroupDivider } from '../ui/Dashboard';
 import { AltarItemTile } from './AltarItemTile';
@@ -23,8 +21,6 @@ const SECTION_COLLAPSED_KEY = 'altar-library-collapsed';
 interface Props {
   /** Das Suchfeld des Dashboards — trifft hier den Elementnamen. */
   search: string;
-  /** Derselbe Editor, den das View für CategoryModal und die Kopfzeile hält. */
-  catEditor: CategoryEditorApi;
   onNewElement: (categoryId?: string) => void;
   onEditElement: (item: AltarItem) => void;
 }
@@ -35,7 +31,7 @@ interface Props {
  * Bearbeiten. Sortierung und Gruppierung kommen aus dem Store, ihre Regler
  * stehen im Dashboard-Kopf.
  */
-export function AltarLibrarySection({ search, catEditor, onNewElement, onEditElement }: Props) {
+export function AltarLibrarySection({ search, onNewElement, onEditElement }: Props) {
   const { t } = useTranslation();
   const items = useAltarStore((s) => s.items);
   const allCategories = useCategoryStore((s) => s.categories);
@@ -50,17 +46,13 @@ export function AltarLibrarySection({ search, catEditor, onNewElement, onEditEle
     return sortItems(matched, sort, { date: (item) => item.created_at, title: (item) => item.name });
   }, [items, query, sort]);
 
-  // Nur Kategorien, in denen wirklich etwas liegt — plus die gerade angelegte,
-  // die sonst keinen Kopf hätte, unter dem man ihr erstes Element anlegt.
-  // Bewusst nicht `categoriesUsedBy`: der Helper nimmt das Sammelbecken immer
-  // mit auf (die Tab-Leiste braucht es als Ziel), hier stünde „Sonstiges"
-  // dadurch als leere Überschrift zwischen den gefüllten Gruppen.
-  const lastAddedId = catEditor.lastAddedId;
+  // Nur Kategorien, in denen wirklich etwas liegt. `categoriesUsedBy` täte
+  // seit v39 dasselbe — es nimmt das Sammelbecken nicht mehr immer mit auf —,
+  // filtert aber gegen die Volliste statt gegen die schon gesuchte.
   const categories = useMemo(() => {
     const used = new Set(filtered.map((item) => item.category_id));
-    if (lastAddedId) used.add(lastAddedId);
     return allCategories.filter((cat) => used.has(cat.id));
-  }, [allCategories, filtered, lastAddedId]);
+  }, [allCategories, filtered]);
 
   const groups = groupByCategory(
     filtered, categories, (item) => item.category_id,
@@ -97,23 +89,21 @@ export function AltarLibrarySection({ search, catEditor, onNewElement, onEditEle
           return (
             <div key={group.key}>
               {cat ? (
-                <CategoryHeaderRow
-                  category={cat}
+                <CollapsibleGroupHeader
+                  emoji={cat.emoji}
                   label={categoryLabel(t, cat)}
-                  editor={catEditor}
                   collapsed={isCollapsed}
                   onToggleCollapse={() => toggle(cat.id)}
                   count={group.items.length}
-                  onAdd={() => onNewElement(cat.id)}
-                  addTitle={t('altar.addElement')}
+                  add={{ title: t('altar.addElement'), onClick: () => onNewElement(cat.id) }}
                 />
               ) : (
-                // Waisen: ihre Kategorie liegt im Papierkorb — es gibt keine
-                // Zeile zum Umbenennen und nichts, worin man anlegen könnte.
+                // Waisen: ihre Kategorie liegt im Papierkorb — es gibt
+                // nichts, worin man ein Element anlegen könnte.
                 <CollapsibleGroupHeader
                   collapsed={isCollapsed}
                   onToggleCollapse={() => toggle(UNCATEGORIZED_KEY)}
-                  emoji={ALTAR_CATEGORY_DEFAULT_EMOJI}
+                  emoji={ALTAR_UNCATEGORIZED_EMOJI}
                   label={group.label}
                   count={group.items.length}
                 />

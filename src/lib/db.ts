@@ -7,6 +7,7 @@ import { adoptLegacyImages, rewriteImageRefs } from './images';
 import { migrateLinkedIdsToContent } from './migrateLinkedIdsToContent';
 import { migrateJournalFieldsToContent } from './migrateJournalFieldsToContent';
 import { mergeCategoryTables } from './mergeCategoryTables';
+import { makeCategoryOptional } from './nullableCategory';
 import i18n from '../i18n';
 
 // Per-vault DB cache: SQLite identifier → Database instance
@@ -1134,5 +1135,17 @@ export const MIGRATIONS: Migration[] = [
     version: 38,
     name: 'merge_category_tables',
     up: mergeCategoryTables,
+  },
+  {
+    // `category_id` wird nullable — „ohne Kategorie" ist der Normalfall eines
+    // neuen Eintrags statt eines Unfalls —, und `other` verliert seinen
+    // Sonderstatus. Ablauf und Foreign-Key-Falle in `nullableCategory.ts`.
+    //
+    // Achtung beim Lesen von v38 darüber: Beide bauen aus demselben
+    // `TABLE_DDL`. Ein Vault von vor v38 bekommt dort also schon die nullable
+    // Spalte; v39 erkennt das und holt nur noch das `is_builtin` nach.
+    version: 39,
+    name: 'category_optional',
+    up: makeCategoryOptional,
   },
 ];

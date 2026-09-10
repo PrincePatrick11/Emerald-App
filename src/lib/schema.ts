@@ -20,7 +20,7 @@ import type Database from '@tauri-apps/plugin-sql';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 38;
+export const BASELINE_VERSION = 39;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
@@ -105,10 +105,9 @@ export const TABLE_DDL: Record<TableName, string> = {
     )`,
 
   // Eine Liste für Wiki, Operationen, Aufgaben und Altar-Elemente (seit v38;
-  // vorher vier gleich gebaute Tabellen je Modul). Eingebaut sind nur `other`
-  // — das Sammelbecken, auf das Inhalte gelöschter Kategorien umgehängt
-  // werden — und `sigils`, an der der Sigil-Editor für Operationen hängt.
-  // Alles andere legt der Nutzer an; Eindeutigkeit der Namen prüft der Store
+  // vorher vier gleich gebaute Tabellen je Modul). Eingebaut ist seit v39 nur
+  // noch `sigils`, an der der Sigil-Editor für Operationen hängt. Alles
+  // andere legt der Nutzer an; Eindeutigkeit der Namen prüft der Store
   // (categoryKey), nicht die Datenbank — ein UNIQUE-Index würde das
   // Wiederherstellen aus dem Papierkorb blockieren, sobald eine aktive
   // gleichnamige Kategorie existiert.
@@ -177,7 +176,7 @@ export const TABLE_DDL: Record<TableName, string> = {
       title TEXT NOT NULL DEFAULT 'Untitled Article',
       slug TEXT NOT NULL UNIQUE,
       content TEXT NOT NULL DEFAULT '',
-      category_id TEXT NOT NULL DEFAULT 'other' REFERENCES categories(id) ON DELETE RESTRICT,
+      category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
       entry_number INTEGER,
       cover_image TEXT,
       icon TEXT,
@@ -192,7 +191,7 @@ export const TABLE_DDL: Record<TableName, string> = {
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL DEFAULT 'Untitled Operation',
       content TEXT NOT NULL DEFAULT '',
-      category_id TEXT NOT NULL DEFAULT 'other' REFERENCES categories(id) ON DELETE RESTRICT,
+      category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
       entry_number INTEGER,
       description TEXT NOT NULL DEFAULT '',
       icon TEXT,
@@ -225,7 +224,7 @@ export const TABLE_DDL: Record<TableName, string> = {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       emoji TEXT NOT NULL DEFAULT '✨',
-      category_id TEXT NOT NULL DEFAULT 'other' REFERENCES categories(id) ON DELETE RESTRICT,
+      category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
       note TEXT NOT NULL DEFAULT '',
       image_data TEXT,
       created_at TEXT NOT NULL
@@ -236,7 +235,7 @@ export const TABLE_DDL: Record<TableName, string> = {
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL DEFAULT 'Untitled Task',
       description TEXT NOT NULL DEFAULT '',
-      category_id TEXT NOT NULL DEFAULT 'other' REFERENCES categories(id) ON DELETE RESTRICT,
+      category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
       parent_task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
       priority TEXT NOT NULL DEFAULT 'medium',
       due_date TEXT,
@@ -297,22 +296,28 @@ export const INDEX_DDL: string[] = [
 ];
 
 /**
- * Das Sammelbecken: Inhalte einer gelöschten Kategorie landen hier. Eingebaut
- * und nicht löschbar.
+ * Das frühere Sammelbecken. Seit v39 ist es keins mehr: `category_id` darf
+ * NULL sein, ein Eintrag ohne Kategorie ist der Normalfall, und `other` ist
+ * eine gewöhnliche Kategorie wie jede andere — umbenenn- und löschbar, in
+ * frischen Vaults gar nicht erst angelegt. Die Konstante bleibt für die
+ * Migrationen v36–v39 und das Heben alter Sicherungen, die den alten
+ * Sonderstatus noch kennen.
  */
 export const FALLBACK_CATEGORY_ID = 'other';
 
 /**
- * Die eine Kategorie mit Verhalten: Eine Operation darin ist ein Sigill und
- * öffnet den Sigil-Editor. Für Artikel, Aufgaben und Altar-Elemente ist sie
- * eine Kategorie wie jede andere.
+ * Die eine Kategorie mit Verhalten — und seit v39 die einzige eingebaute:
+ * Eine Operation darin ist ein Sigill und öffnet den Sigil-Editor. Für
+ * Artikel, Aufgaben und Altar-Elemente ist sie eine Kategorie wie jede andere.
  */
 export const SIGIL_CATEGORY_ID = 'sigils';
 
-/** [id, Name (nur Datenbank — angezeigt wird `categories.builtin.<id>`), Emoji]. */
+/**
+ * [id, Name (nur Datenbank — angezeigt wird `categories.builtin.<id>`), Emoji].
+ * Seit v39 nur noch eine: `other` hat seinen Sonderstatus verloren.
+ */
 export const BUILTIN_CATEGORIES: readonly [string, string, string][] = [
   [SIGIL_CATEGORY_ID, 'Sigils', '🔯'],
-  [FALLBACK_CATEGORY_ID, 'Other', '📦'],
 ];
 
 /**
@@ -391,16 +396,13 @@ export async function seedBuiltins(
       id: key, name: starterName(key), emoji, is_builtin: false,
     })),
   ].map((row, i) => ({ ...row, sort_order: i, deleted_at: null }));
-  // Sonstiges ans Ende, wie es auch die Migration und der Store halten.
-  const other = rows.find((r) => r.id === FALLBACK_CATEGORY_ID)!;
-  const ordered = [...rows.filter((r) => r !== other), other].map((r, i) => ({ ...r, sort_order: i }));
-  await insertCategoryRows(db, ordered);
+  await insertCategoryRows(db, rows);
 }
 
 /**
- * Haengt alle Inhalte einer Kategorie — in allen vier Modulen — auf das
- * Sammelbecken um und meldet, wie viele es waren. **Vor** jedem endgültigen
- * Löschen einer Kategorie aufzurufen.
+ * Löst die Kategorie von allen ihren Inhalten — in allen vier Modulen — und
+ * meldet, wie viele es waren. **Vor** jedem endgültigen Löschen einer
+ * Kategorie aufzurufen.
  *
  * Vorher hat das niemand getan: `runPeriodicCleanup` und `emptyTrash` haben
  * Kategoriezeilen hart gelöscht und die Inhalte unangetastet gelassen, die
@@ -409,15 +411,17 @@ export async function seedBuiltins(
  * statt still Muell zu hinterlassen. Dieser Helfer ist die Gegenseite davon:
  * Er sorgt dafuer, dass das Löschen erlaubt ist, ohne dass ein Inhalt
  * verschwindet.
+ *
+ * Bis v38 landeten die Inhalte auf dem Sammelbecken `other`. Seit `category_id`
+ * NULL sein darf, werden sie schlicht kategorielos — dasselbe, was ein neuer
+ * Eintrag ohnehin ist.
  */
 export async function reassignCategoryContent(db: Database, categoryId: string): Promise<number> {
-  // Das Sammelbecken selbst ist eingebaut und wird nie gelöscht.
-  if (categoryId === FALLBACK_CATEGORY_ID) return 0;
   let moved = 0;
   for (const table of CATEGORIZED_TABLES) {
     const result = await db.execute(
-      `UPDATE ${table} SET category_id = $1 WHERE category_id = $2`,
-      [FALLBACK_CATEGORY_ID, categoryId]
+      `UPDATE ${table} SET category_id = NULL WHERE category_id = $1`,
+      [categoryId]
     );
     moved += result.rowsAffected ?? 0;
   }

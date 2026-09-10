@@ -12,7 +12,7 @@ interface OperationState {
   operations: Operation[];
 
   fetchAll: () => Promise<void>;
-  createOperation: (categoryId: string) => Promise<Operation>;
+  createOperation: (categoryId?: string | null) => Promise<Operation>;
   duplicateOperation: (id: string) => Promise<Operation | undefined>;
   updateOperation: (id: string, patch: Partial<Operation>) => Promise<void>;
   deleteOperation: (id: string) => Promise<void>;
@@ -63,7 +63,7 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     set((s) => ({ operations: preserveLoadedDrawings(s.operations, fresh) }));
   },
 
-  createOperation: async (categoryId) => {
+  createOperation: async (categoryId = null) => {
     const db = await getDb();
     const now = nowIso();
     const op: Operation = {

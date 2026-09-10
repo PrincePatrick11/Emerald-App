@@ -5,7 +5,6 @@ import { ALTAR_RATIOS, DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAU
 import { generateId, isValidHexColor, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
 import { bool, fromRow, toInt, type DbRow } from '../lib/row';
-import { FALLBACK_CATEGORY_ID } from '../lib/schema';
 import type { AltarItem, AltarPlacement, AltarRecord } from '../types';
 import i18n from '../i18n';
 
@@ -52,7 +51,7 @@ function mapPlacementRows(rows: DbRow[], items: AltarItem[]): AltarPlacement[] {
       item_id: String(r.item_id),
       name: item?.name ?? '?',
       emoji: item?.emoji ?? '✨',
-      category_id: item?.category_id ?? FALLBACK_CATEGORY_ID,
+      category_id: item?.category_id ?? null,
       x: Number(r.x),
       y: Number(r.y),
       z_index: Number(r.z_index),
@@ -130,7 +129,7 @@ interface AltarState {
 
   /** `createdAt` nur für den Import, der das Datum der Datei übernimmt;
    *  sonst jetzt. */
-  addItem: (name: string, emoji: string, categoryId: string, note?: string, imageData?: string, createdAt?: string) => Promise<AltarItem>;
+  addItem: (name: string, emoji: string, categoryId: string | null, note?: string, imageData?: string, createdAt?: string) => Promise<AltarItem>;
   updateItem: (id: string, patch: Partial<Pick<AltarItem, 'name' | 'emoji' | 'category_id' | 'note' | 'image_data'>>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   placeItem: (item: AltarItem, x: number, y: number) => Promise<void>;

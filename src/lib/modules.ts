@@ -44,11 +44,17 @@ export const DEFAULT_ENTRY_EMOJI: Record<ContentType, string> = {
   altar: '🔥',
 };
 
-/** Reihenfolge = Rail- und Eintragslisten-Tab-Reihenfolge. */
+/**
+ * Reihenfolge = Rail- und Eintragslisten-Tab-Reihenfolge. Über
+ * `CATEGORY_MODULE_IDS` hängen zwei weitere Dinge daran: die Spaltenfolge der
+ * Verwendungszähler in `CategoriesView` und, bei Gleichstand, welches Modul
+ * `dominantCategoryModule` als Hinweis zu einem Suchtreffer nennt. Ein Umbau
+ * hier benennt also auch Suchtreffer um.
+ */
 export const ENTRY_MODULE_IDS = ['journal', 'tasks', 'operations', 'wiki', 'altar'] as const;
 export type EntryModuleId = (typeof ENTRY_MODULE_IDS)[number];
 
-export const AUX_VIEW_IDS = ['home', 'tags', 'trash'] as const;
+export const AUX_VIEW_IDS = ['home', 'tags', 'categories', 'trash'] as const;
 export type AuxViewId = (typeof AUX_VIEW_IDS)[number];
 
 /** Alles, was `ActiveView.type` sein kann. */
@@ -57,7 +63,10 @@ export type ViewId = EntryModuleId | AuxViewId;
 export type LeftListTabId = 'all' | EntryModuleId;
 
 /** Module, deren Einträge eine Kategorie tragen — alle außer Journal. */
-export type CategoryModuleId = Exclude<EntryModuleId, 'journal'>;
+export const CATEGORY_MODULE_IDS: readonly Exclude<EntryModuleId, 'journal'>[] = ENTRY_MODULE_IDS.filter(
+  (id): id is Exclude<EntryModuleId, 'journal'> => id !== 'journal',
+);
+export type CategoryModuleId = (typeof CATEGORY_MODULE_IDS)[number];
 
 export interface ModuleMeta {
   id: EntryModuleId;
@@ -86,6 +95,9 @@ export const MODULE_LIST: readonly ModuleMeta[] = ENTRY_MODULE_IDS.map((id) => M
 export const AUX_VIEWS: Record<AuxViewId, { icon: LucideIcon; navLabelKey: string }> = {
   home: { icon: Home, navLabelKey: 'nav.home' },
   tags: { icon: Tag, navLabelKey: 'nav.tags' },
+  // Dieselbe Glyphe wie `TRASH_KIND_ICONS.category`: eine gelöschte Kategorie
+  // im Papierkorb und ihre Verwaltung sollen als dasselbe Ding lesbar sein.
+  categories: { icon: FolderOpen, navLabelKey: 'nav.categories' },
   trash: { icon: Trash2, navLabelKey: 'nav.trash' },
 };
 
@@ -96,7 +108,7 @@ export function isViewId(value: unknown): value is ViewId {
   return typeof value === 'string' && VIEW_ID_SET.has(value);
 }
 
-/** ModuleMeta zu einem View-Typ — null für home/tags/trash. */
+/** ModuleMeta zu einem View-Typ — null für home/tags/categories/trash. */
 export function moduleMeta(viewType: string): ModuleMeta | null {
   return (MODULES as Record<string, ModuleMeta | undefined>)[viewType] ?? null;
 }

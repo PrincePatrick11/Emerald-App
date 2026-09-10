@@ -4,13 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { Trash2, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
-import CategoryHeaderRow from '../ui/CategoryHeaderRow';
-import CategoryModal from '../ui/CategoryModal';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
-import { categoriesUsedBy, categoryLabel, hasUncategorized } from '../../lib/categories';
-import { FALLBACK_CATEGORY_ID, SIGIL_CATEGORY_ID } from '../../lib/schema';
+import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
+import { SIGIL_CATEGORY_ID } from '../../lib/schema';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView, isWideCardView } from '../../lib/viewMode';
@@ -19,7 +17,6 @@ import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
-import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEditActions } from '../../hooks/useEditActions';
@@ -62,7 +59,7 @@ export default function OperationsView() {
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
   const { collapsed: collapsedCats, toggle: toggleCatCollapse } = useCollapsedSet('operations');
   const [title, setTitle] = useState('');
-  const [categoryId, setCategoryId] = useState('');
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [loadedOperationId, setLoadedOperationId] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(true);
@@ -80,11 +77,6 @@ export default function OperationsView() {
     // (sofort gespeichert) — Cancel setzt nur zurück, was der Editor besitzt.
     buildRestorePatch: (content) => ({ title, content }),
     update: updateOperation,
-  });
-
-  const catEditor = useCategoryEditor({
-    defaultEmoji: '⚡',
-    onAdded: (cat) => { setCategoryId(cat.id); triggerAutoSave(); },
   });
 
   useEffect(() => {
@@ -135,7 +127,7 @@ export default function OperationsView() {
   }, [isEditing, operation?.id, triggerAutoSave]);
 
   const handleNew = async () => {
-    const op = await createOperation(FALLBACK_CATEGORY_ID);
+    const op = await createOperation();
     setActiveView({ type: 'operations', id: op.id, mode: 'edit', isNew: true });
   };
 
@@ -216,7 +208,7 @@ export default function OperationsView() {
   // Sigil operations delegate rendering (and editActions registration) to OperationSigilView.
   useEditActions(isEditing && !isSigilOperation, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
 
-  const getCatById = (id: string) => categories.find((c) => c.id === id);
+  const getCatById = (id: string | null) => (id ? categories.find((c) => c.id === id) : undefined);
 
   // List view
   if (!operation) {
@@ -224,7 +216,7 @@ export default function OperationsView() {
     const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
     // Chips und Gruppen zeigen nur, was bei den Operationen vorkommt (plus
     // Sonstiges); catById bleibt die Volliste, damit fremde Kategorien auflösen.
-    const usedCategories = categoriesUsedBy(categories, operations, [catEditor.lastAddedId]);
+    const usedCategories = categoriesUsedBy(categories, operations);
 
     const searchFiltered = search
       ? operations.filter((o) =>
@@ -236,10 +228,10 @@ export default function OperationsView() {
     const catFiltered = filterCatIds.length === 0
       ? searchFiltered
       : searchFiltered.filter((o) =>
-          filterCatIds.includes(o.category_id) ||
+          (!!o.category_id && filterCatIds.includes(o.category_id)) ||
           // Der „Ohne Kategorie"-Chip wählt die Waisen aus — deren category_id
           // (gelöschte Kategorie) steht nie selbst in der Chip-Auswahl.
-          (filterCatIds.includes(UNCATEGORIZED_KEY) && !catById[o.category_id]));
+          (filterCatIds.includes(UNCATEGORIZED_KEY) && !lookupCategory(catById, o.category_id)));
 
     const statusFiltered = filterStatus.length === 0
       ? catFiltered
@@ -279,7 +271,7 @@ export default function OperationsView() {
     const timelineGroups = groupByMonth(sortedOps, (o) => o.updated_at);
 
     const renderOp = (op: typeof operations[0]) => {
-      const cat = catById[op.category_id];
+      const cat = lookupCategory(catById, op.category_id);
       const iconValue = op.icon || cat?.emoji || '⚡';
       const catDisplayName = cat ? catName(cat) : '';
       const isSigil = op.category_id === SIGIL_CATEGORY_ID;
@@ -415,7 +407,6 @@ export default function OperationsView() {
     const catGroups: DashboardGroup<Operation>[] = groupByCategory(
       sortedOps, visibleCategories, (o) => o.category_id,
       catName, t('categories.uncategorized'),
-      catEditor.lastAddedId,
     );
 
     const renderCategoryHeader = (group: DashboardGroup<Operation>) => {
@@ -433,25 +424,21 @@ export default function OperationsView() {
       const cat = catById[group.key!];
       if (!cat) return null;
       return (
-        <CategoryHeaderRow
-          category={cat}
+        <CollapsibleGroupHeader
+          emoji={cat.emoji}
           label={categoryLabel(t, cat)}
-          editor={catEditor}
           collapsed={collapsedCats.has(cat.id)}
           onToggleCollapse={() => toggleCatCollapse(cat.id)}
           count={group.items.length}
-          onAdd={() => handleNewInCategory(cat.id)}
-          addTitle={t('operations.new')}
+          add={{ title: t('operations.new'), onClick: () => handleNewInCategory(cat.id) }}
         />
       );
     };
 
     return (
-      <>
       <Dashboard<Operation>
         title={t('nav.operations')}
         primaryAction={{ label: t('operations.new'), onClick: handleNew }}
-        secondaryAction={{ label: t('categories.add'), onClick: () => catEditor.setAddingCategory(true) }}
         view={view}
         sort={sort}
         onView={(v) => setOperationsPrefs({ view: v })}
@@ -481,9 +468,8 @@ export default function OperationsView() {
         isEmpty={operations.length === 0 && categories.length === 0}
         emptyState={{ message: t('operations.none'), actionLabel: t('operations.start'), onAction: handleNew }}
         // Im gruppierten Modus entscheidet Dashboard selbst: überlebt keine
-        // Gruppe, zeigt es „Keine Ergebnisse" — und ein leerer Kopf (die
-        // gerade angelegte Kategorie) hat dort Vorrang. Dieser Zweig darf ihm
-        // also nicht zuvorkommen.
+        // Gruppe, zeigt es „Keine Ergebnisse". Dieser Zweig darf ihm also
+        // nicht zuvorkommen.
         hasNoResults={filtered.length === 0 && !(grouping === 'grouped' && view !== 'timeline')}
         noResultsMessage={t('search.noResults')}
         grouping={
@@ -515,8 +501,6 @@ export default function OperationsView() {
           />
         )}
       />
-      <CategoryModal editor={catEditor} />
-      </>
     );
   }
 

@@ -2,7 +2,7 @@ import type { ComponentType, ReactNode } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { formatEntryDate } from '../../lib/formatDate';
-import { categoryLabel } from '../../lib/categories';
+import { categoryLabel, lookupCategory } from '../../lib/categories';
 import { DEFAULT_ENTRY_EMOJI, MODULE_LIST, type LeftListTabId } from '../../lib/modules';
 import { Flame, CheckSquare, Square, Copy, Pencil, Trash2, PanelTopOpen, LayoutList, type LucideIcon } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
@@ -14,7 +14,6 @@ import { useAltarStore } from '../../store/altarStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import { setDragItem } from '../../lib/dragState';
-import { FALLBACK_CATEGORY_ID } from '../../lib/schema';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import type { AltarRecord, JournalEntry, MoonPhase, Operation, Task, WikiArticle } from '../../types';
@@ -247,7 +246,7 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
   const catName = (c: (typeof categories)[number]) => categoryLabel(t, c);
 
   const handleNewOperation = async () => {
-    const op = await createOperation(FALLBACK_CATEGORY_ID);
+    const op = await createOperation();
     setActiveView({ type: 'operations', id: op.id, mode: 'edit', isNew: true });
   };
 
@@ -269,12 +268,12 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
     getId: (op) => op.id,
     getTitle: (op) => op.title,
     getDateStr: (op) => {
-      const cat = catById[op.category_id];
+      const cat = lookupCategory(catById, op.category_id);
       const catDisplayName = cat ? catName(cat) : '';
       return `${catDisplayName}${catDisplayName ? ' · ' : ''}${formatEntryDate(op.updated_at)}`;
     },
     getIcon: (op) => {
-      const cat = catById[op.category_id];
+      const cat = lookupCategory(catById, op.category_id);
       const iconValue = op.icon || cat?.emoji || '⚡';
       return isImageIcon(iconValue)
         ? <img src={iconValue} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
@@ -283,7 +282,7 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
     isActive: (op) => activeView.id === op.id,
     onOpen: (op) => setActiveView({ type: 'operations', id: op.id, mode: 'view' }),
     onOpenNewTab: (op) => openViewInNewTab({ type: 'operations', id: op.id, mode: 'view' }),
-    onDragStart: (op) => setDragItem({ id: op.id, entryType: 'operation', label: op.title, category: catById[op.category_id]?.emoji }),
+    onDragStart: (op) => setDragItem({ id: op.id, entryType: 'operation', label: op.title, category: lookupCategory(catById, op.category_id)?.emoji }),
     onRename: (op, title) => updateOperation(op.id, { title }),
     contextMenuActions: (op, startRename) => [
       { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'operations', id: op.id, mode: 'view' }) },
@@ -338,14 +337,14 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
     getId: (a) => a.id,
     getTitle: (a) => a.title,
     getDateStr: (a) => {
-      const cat = catById[a.category_id];
+      const cat = lookupCategory(catById, a.category_id);
       // Kein Fallback auf die rohe category_id — bei gelöschter Kategorie
       // entfällt das Label, wie eine Zeile höher bei den Operationen.
       const catLabel = categoryLabel(t, cat);
       return `${catLabel}${catLabel ? ' · ' : ''}${formatEntryDate(a.updated_at)}`;
     },
     getIcon: (a) => {
-      const cat = catById[a.category_id];
+      const cat = lookupCategory(catById, a.category_id);
       return isImageIcon(a.icon)
         ? <img src={a.icon} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
         : <span className="text-base leading-none flex-shrink-0">{cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki}</span>;
@@ -353,7 +352,7 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
     isActive: (a) => activeView.id === a.id,
     onOpen: (a) => setActiveView({ type: 'wiki', id: a.id, mode: 'view' }),
     onOpenNewTab: (a) => openViewInNewTab({ type: 'wiki', id: a.id, mode: 'view' }),
-    onDragStart: (a) => setDragItem({ id: a.id, entryType: 'wiki', label: a.title, category: catById[a.category_id]?.emoji }),
+    onDragStart: (a) => setDragItem({ id: a.id, entryType: 'wiki', label: a.title, category: lookupCategory(catById, a.category_id)?.emoji }),
     onRename: (a, title) => updateArticle(a.id, { title }),
     contextMenuActions: (a, startRename) => [
       { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'wiki', id: a.id, mode: 'view' }) },
@@ -436,10 +435,10 @@ function useTasksConfig(): EntryListTabProps<Task> {
   // Eine Payload für beide Drag-Stellen (Standard-Config fürs „Alle"-Tab und
   // der Hand-Griff im renderRow unten), damit sie nicht auseinanderdriften.
   const taskDragItem = (task: Task) =>
-    setDragItem({ id: task.id, entryType: 'task', label: task.title, category: catById[task.category_id]?.emoji });
+    setDragItem({ id: task.id, entryType: 'task', label: task.title, category: lookupCategory(catById, task.category_id)?.emoji });
 
   const handleNewTask = async () => {
-    const task = await createTask(FALLBACK_CATEGORY_ID);
+    const task = await createTask();
     openTask(task.id);
     return task;
   };
@@ -450,7 +449,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
   };
 
   const dateStrFor = (task: (typeof tasks)[number]) => {
-    const cat = catById[task.category_id];
+    const cat = lookupCategory(catById, task.category_id);
     return `${cat?.name ?? ''}${cat?.name && task.due_date ? ' · ' : ''}${task.due_date ? formatEntryDate(task.due_date) : ''}`;
   };
 

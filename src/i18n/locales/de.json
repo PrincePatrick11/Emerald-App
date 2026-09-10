@@ -22,6 +22,8 @@
     "name": "Kategoriename…",
     "uncategorized": "Ohne Kategorie",
     "nameTaken": "Diese Kategorie gibt es schon",
+    "dragHint": "Zum Sortieren ziehen.",
+    "builtinHint": "Eingebaut — nicht umbenenn- oder löschbar.",
     "builtin": {
       "other": "Sonstiges",
       "sigils": "Sigillen"
@@ -70,6 +72,7 @@
     "wiki": "Wiki",
     "altar": "Altar",
     "tags": "Tags",
+    "categories": "Kategorien",
     "trash": "Papierkorb",
     "operations": "Operationen",
     "tasks": "Aufgaben",

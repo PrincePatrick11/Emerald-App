@@ -40,10 +40,13 @@ export const GROUPING_ICONS: Record<GroupingMode, LucideIcon> = {
 };
 
 interface Props {
-  view: ViewMode;
-  sort: SortMode;
-  onView: (v: ViewMode) => void;
-  onSort: (s: SortMode) => void;
+  /** Ansicht und Sortierung sind Achsen wie `groupBy`: fehlt der Handler,
+   *  entfällt die Reihe. Die Kategorien-Ansicht hat weder das eine noch das
+   *  andere — ihre Ordnung ist die von Hand gezogene — und bringt nur Suche. */
+  view?: ViewMode;
+  sort?: SortMode;
+  onView?: (v: ViewMode) => void;
+  onSort?: (s: SortMode) => void;
   viewOptions?: { value: ViewMode; label: string }[];
   /** Die Gruppierungs-Achse; fehlt sie, zeigt die Leiste nur Ansicht und
    *  Sortierung. Siehe DashboardGroupBy. */
@@ -85,6 +88,8 @@ export default function ListToolbar({ view, sort, onView, onSort, viewOptions: v
   const sortOptions = ALL_SORT_MODES.map((value) => ({ value, label: sortLabels[value] }));
 
   const sortDisabled = view === 'timeline' ? sortBlockedInTimeline : undefined;
+  const showView = view !== undefined && onView !== undefined && viewOptions.length > 1;
+  const showSort = sort !== undefined && onSort !== undefined;
 
   // Im Zeitstrahl gruppieren die Monate; die Achse hat dort keine Wirkung und
   // wird komplett ausgegraut — dieselbe Behandlung wie die gesperrten
@@ -133,18 +138,20 @@ export default function ListToolbar({ view, sort, onView, onSort, viewOptions: v
           {/* Suche zuerst (basis-full = eigene volle Zeile), die beiden
               Segment-Gruppen teilen sich die Zeile darunter. */}
           {searchField}
-          {viewOptions.length > 1 && (
-            <IconToggleGroup label={t('listView.view')} options={viewOptions} icons={VIEW_ICONS} value={view} onChange={onView} />
+          {showView && (
+            <IconToggleGroup label={t('listView.view')} options={viewOptions} icons={VIEW_ICONS} value={view!} onChange={onView!} />
           )}
-          <IconToggleGroup
-            label={t('listView.sort')}
-            options={sortOptions}
-            icons={SORT_ICONS}
-            value={sort}
-            onChange={onSort}
-            isDisabled={sortDisabled}
-            disabledHint={t('listView.notAvailableInTimeline')}
-          />
+          {showSort && (
+            <IconToggleGroup
+              label={t('listView.sort')}
+              options={sortOptions}
+              icons={SORT_ICONS}
+              value={sort!}
+              onChange={onSort!}
+              isDisabled={sortDisabled}
+              disabledHint={t('listView.notAvailableInTimeline')}
+            />
+          )}
           {groupBy && (
             <IconToggleGroup
               label={t('listView.grouping')}
@@ -159,17 +166,19 @@ export default function ListToolbar({ view, sort, onView, onSort, viewOptions: v
         </>
       ) : (
         <>
-          {viewOptions.length > 1 && (
-            <Dropdown label={t('listView.view') + ': '} value={view} options={viewOptions} onChange={onView} />
+          {showView && (
+            <Dropdown label={t('listView.view') + ': '} value={view!} options={viewOptions} onChange={onView!} />
           )}
-          <Dropdown
-            label={t('listView.sort') + ': '}
-            value={sort}
-            options={sortOptions.map((o) => sortDisabled?.(o.value)
-              ? { ...o, disabled: true, title: t('listView.notAvailableInTimeline') }
-              : o)}
-            onChange={onSort}
-          />
+          {showSort && (
+            <Dropdown
+              label={t('listView.sort') + ': '}
+              value={sort!}
+              options={sortOptions.map((o) => sortDisabled?.(o.value)
+                ? { ...o, disabled: true, title: t('listView.notAvailableInTimeline') }
+                : o)}
+              onChange={onSort!}
+            />
+          )}
           {groupBy && (
             <Dropdown
               label={t('listView.grouping') + ': '}

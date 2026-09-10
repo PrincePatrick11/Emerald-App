@@ -2,17 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { listen } from '@tauri-apps/api/event';
 import { useTranslation } from 'react-i18next';
-import { Pencil, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import { useCategoryStore } from '../../store/categoryStore';
-import { FALLBACK_CATEGORY_ID } from '../../lib/schema';
 import { categoriesUsedBy, categoryLabel } from '../../lib/categories';
-import { ALTAR_CATEGORY_DEFAULT_EMOJI } from '../../lib/altarConstants';
 import { UNCATEGORIZED_KEY } from '../../lib/groupBy';
-import { useCategoryEditor } from '../../hooks/useCategoryEditor';
 import type { AltarItem, Category } from '../../types';
 import Button from '../ui/Button';
-import CategoryModal from '../ui/CategoryModal';
 import { AltarItemModal } from './AltarItemModal';
 import { AltarItemTile } from './AltarItemTile';
 
@@ -64,23 +60,13 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AltarItem | null>(null);
 
-  // Kategorien laufen über denselben Editor wie Wiki, Operations und Tasks —
-  // nur dass hier auch das Bearbeiten im Modal statt in einer Kopfzeile passiert.
-  const catEditor = useCategoryEditor({
-    defaultEmoji: ALTAR_CATEGORY_DEFAULT_EMOJI,
-    onAdded: (cat) => setActiveCategoryTab(cat.id),
-  });
-  const editingCategory = catEditor.editingCatId
-    ? allCategories.find((c) => c.id === catEditor.editingCatId) ?? null
-    : null;
-  // Die Tabs zeigen nur, was in der Bibliothek vorkommt (plus Sonstiges und
-  // eine gerade angelegte) — die Volliste gilt nur beim Zuweisen im ItemModal.
-  // Memoisiert, weil zwei Effekte unten an der Referenz hängen: ein frisches
-  // Array pro Render ließe checkCatScroll endlos setState aufrufen.
-  const lastAddedId = catEditor.lastAddedId;
+  // Die Tabs zeigen nur, was in der Bibliothek vorkommt (plus Sonstiges) —
+  // die Volliste gilt nur beim Zuweisen im ItemModal. Memoisiert, weil zwei
+  // Effekte unten an der Referenz hängen: ein frisches Array pro Render ließe
+  // checkCatScroll endlos setState aufrufen.
   const categories = useMemo(
-    () => categoriesUsedBy(allCategories, items, [lastAddedId]),
-    [allCategories, items, lastAddedId],
+    () => categoriesUsedBy(allCategories, items),
+    [allCategories, items],
   );
 
   const hasUncategorized = items.some((i) => !allCategories.find((c) => c.id === i.category_id));
@@ -248,10 +234,11 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
 
   useEffect(() => { checkCatScroll(); }, [displayCategories, checkCatScroll]);
 
-  // Neue Elemente landen in der gerade gewählten Kategorie, sonst im Sammelbecken.
+  // Neue Elemente landen in der gerade gewählten Kategorie — steht die Leiste
+  // auf „Alle" oder „Ohne Kategorie", bleiben sie ohne.
   const defaultCategory = activeCategoryTab !== 'all' && activeCategoryTab !== UNCATEGORIZED_KEY
     ? activeCategoryTab
-    : FALLBACK_CATEGORY_ID;
+    : null;
 
   const filteredItems = activeCategoryTab === 'all'
     ? items
@@ -291,9 +278,6 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
                 className={`group relative flex items-center select-none ${dragCatId === cat.id ? 'opacity-40' : 'opacity-100'}`}
               >
                 <button onClick={() => setActiveCategoryTab(cat.id)} className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap cursor-grab ${activeCategoryTab === cat.id ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{cat.emoji} {categoryLabel(t, cat)}</button>
-                {!cat.is_builtin && (
-                  <button onClick={(e) => { e.stopPropagation(); catEditor.startEditCat(cat); }} className="absolute -right-1 -top-1 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-stone-700 text-stone-400 hover:text-stone-200 transition-colors" title={t('editor.edit')}><Pencil size={8} /></button>
-                )}
               </div>
             ))}
             {hasUncategorized && (
@@ -306,7 +290,6 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
             )}
           </div>
         </div>
-        <Button onClick={() => catEditor.setAddingCategory(true)} variant="ghost" className="flex-shrink-0 flex items-center gap-1 text-xs" title={t('categories.add')}><Plus size={12} />{t('categories.add')}</Button>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto pr-1">
         {filteredItems.length === 0 && <p className="text-xs text-stone-700 px-2 py-3">{t('altar.noElements')}</p>}
@@ -331,8 +314,6 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
           onClose={() => setIsItemModalOpen(false)}
         />
       )}
-
-      <CategoryModal editor={catEditor} editing={editingCategory} />
     </div>
   );
 }

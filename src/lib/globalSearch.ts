@@ -43,9 +43,9 @@ export interface SearchHit {
   matchedIn: 'title' | 'tag' | 'content';
   /** Only ever set for `matchedIn: 'content'`. */
   snippet?: SearchSnippet;
-  /** Only for `kind: 'category'`: the module holding most of its entries — unset when nothing uses it. */
+  /** Only for `kind: 'category'`: the module holding most of its entries, shown as a hint — unset when nothing uses it. */
   module?: CategoryModuleId;
-  categoryId?: string;
+  categoryId?: string | null;
   entryNumber?: number;
   /** Sort tie-break. Tags and categories have no timestamp and pass `''`. */
   updatedAt: string;
@@ -56,7 +56,7 @@ export interface SearchCategory {
   id: string;
   /** Already translated: built-in categories are named by a locale key. */
   name: string;
-  /** Where a hit on this category opens — the module with most of its entries, none if unused. */
+  /** The module holding most of its entries, shown as a hint beside the hit — unset when nothing uses it. */
   module?: CategoryModuleId;
 }
 
@@ -261,10 +261,9 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
  * Where a hit opens.
  *
  * Not every kind has a page of its own: an altar item lives inside the altar
- * module's library and a category is only ever a grouping, so both land on
- * a module rather than on themselves — a category on the module that uses it
- * most, and nowhere at all if nothing does. That is the honest ceiling of what
- * the app can address today, not a shortcut.
+ * module's library and lands on that module rather than on itself. A category
+ * does have one since `CategoriesView` — which is also why an *unused*
+ * category is addressable at all, where it used to resolve to nothing.
  */
 export function viewForSearchHit(hit: Pick<SearchHit, 'kind' | 'id' | 'module'>): ActiveView | null {
   switch (hit.kind) {
@@ -282,6 +281,7 @@ export function viewForSearchHit(hit: Pick<SearchHit, 'kind' | 'id' | 'module'>)
       // With the id, `TagsView` selects the tag rather than merely opening.
       return { type: 'tags', id: hit.id };
     case 'category':
-      return hit.module ? { type: hit.module } : null;
+      // With the id, `CategoriesView` scrolls to the row rather than merely opening.
+      return { type: 'categories', id: hit.id };
   }
 }

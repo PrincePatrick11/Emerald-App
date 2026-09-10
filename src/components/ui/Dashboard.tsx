@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { FolderPlus, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import Button from './Button';
 import CollapseChevron from './CollapseChevron';
 import ListToolbar from './ListToolbar';
@@ -14,9 +14,6 @@ export interface DashboardGroup<T> {
   /** Empty string renders no header/divider (e.g. a flat, ungrouped bucket). */
   label: string;
   items: T[];
-  /** Überlebt die Leer-Filterung im Kategorie-Modus — die gerade angelegte
-   *  Kategorie braucht ihren Kopf, um den ersten Eintrag aufzunehmen. */
-  keepWhenEmpty?: boolean;
 }
 
 type DashboardGrouping<T> =
@@ -29,7 +26,7 @@ type DashboardGrouping<T> =
       /** Shown instead of the item list when a group has zero items (default: a muted em-dash). */
       renderEmptyGroup?: (group: DashboardGroup<T>) => ReactNode;
       /** Collapsed groups render only their header — the chevron lives in the
-       *  caller's renderGroupHeader (CategoryHeaderRow's onToggleCollapse). */
+       *  caller's renderGroupHeader (CollapsibleGroupHeader's onToggleCollapse). */
       isGroupCollapsed?: (group: DashboardGroup<T>) => boolean;
     }
   | { mode: 'custom'; render: () => ReactNode };
@@ -66,14 +63,13 @@ interface DashboardBaseProps<T> {
   /** Fully replaces the topbar-left slot (icon + title + badge + selection controls). */
   headerLeft?: ReactNode;
   titleClassName?: string;
-  /** Inline als beschrifteter Button, im Seitenleisten-Kopf als kompakter
-   *  Jade-Icon-Button (Label wird title/aria-label). */
+  /** Beschrifteter Jade-Knopf, in beiden Kopf-Bäumen gleich. In der
+   *  Seitenleiste darf dafür der Titel daneben abschneiden: die Aktion ist
+   *  das, wofür man den Kopf aufsucht, der Titel steht auch im Tab. */
   primaryAction?: { label: string; onClick: () => void };
-  /** Links vom Primär-Knopf, z. B. „Kategorie hinzufügen". */
-  secondaryAction?: { label: string; onClick: () => void };
-  /** Kompakte Icon-Knöpfe ganz links in der Aktionsreihe — in beiden
-   *  Kopf-Bäumen gleich, weil ihr Label ohnehin nur im Tooltip steht.
-   *  Für Nebenschauplätze des Moduls (Altar: die Bibliothek unter den Altären). */
+  /** Kompakte Icon-Knöpfe rechts neben der Primäraktion, in derselben Reihe —
+   *  in beiden Kopf-Bäumen gleich, ihr Label steht nur im Tooltip. Für
+   *  Nebenschauplätze des Moduls (Altar: die Bibliothek unter den Altären). */
   extraActions?: { label: string; icon: ReactNode; onClick: () => void }[];
   /** Fully replaces the action slot — in BOTH header trees: inline the
    *  topbar-right, im Seitenleisten-Modus die Titelzeilen-Buttons (gerendert
@@ -82,11 +78,12 @@ interface DashboardBaseProps<T> {
   /** Nur Inline-Kopf; die Seitenleisten-Titelzeile hat festes Chrome. */
   headerClassName?: string;
 
-  // ListToolbar passthrough
-  view: ViewMode;
-  sort: SortMode;
-  onView: (v: ViewMode) => void;
-  onSort: (s: SortMode) => void;
+  // ListToolbar passthrough. Ansicht und Sortierung sind optional wie
+  // `groupBy`: ohne Handler entfällt die jeweilige Reihe.
+  view?: ViewMode;
+  sort?: SortMode;
+  onView?: (v: ViewMode) => void;
+  onSort?: (s: SortMode) => void;
   viewOptions?: { value: ViewMode; label: string }[];
   /** Die Gruppierungs-Achse der Toolbar — als ein Objekt, damit Wert und
    *  Handler nicht einzeln fehlen können und der Name sich nicht mit
@@ -195,7 +192,6 @@ export default function Dashboard<T>({
   headerLeft,
   titleClassName = DEFAULT_TITLE_CLASSNAME,
   primaryAction,
-  secondaryAction,
   extraActions,
   headerRight,
   headerClassName = DEFAULT_HEADER_CLASSNAME,
@@ -225,8 +221,10 @@ export default function Dashboard<T>({
   contentClassName = DEFAULT_CONTENT_CLASSNAME,
   contextMenuSlot,
 }: DashboardProps<T>) {
+  // Ohne Ansichts-Achse gibt es nur die Liste — Karten sind eine Wahl, die
+  // eine solche View nicht anbietet.
   const renderItems = (subset: T[]) =>
-    isCardView(view) ? (
+    view !== undefined && isCardView(view) ? (
       <div className={isWideCardView(view) ? wideCardsClassName : cardsClassName}>
         {subset.map((item) => <Fragment key={itemKey(item)}>{renderItem!(item)}</Fragment>)}
       </div>
@@ -278,13 +276,13 @@ export default function Dashboard<T>({
 
     // mode === 'category'
     // Leere Gruppen fallen hier zentral weg: die Kategorienliste ist global,
-    // eine im Wiki angelegte Kategorie stünde sonst als leerer Kopf auch in
-    // den Operationen. Ausnahme ist die gerade angelegte (keepWhenEmpty).
-    // Bleibt danach keine Gruppe übrig, greift der „Keine Ergebnisse"-Hinweis,
+    // eine für das Wiki angelegte Kategorie stünde sonst als leerer Kopf auch
+    // in den Operationen.
+    // Bleibt keine Gruppe übrig, greift der „Keine Ergebnisse"-Hinweis,
     // den sonst hasNoResults liefert.
     // Nicht die einzige Stelle: Tasks rendert im custom-Modus und führt
     // dieselbe Regel selbst (TasksView, `visibleCategories`).
-    const groups = grouping.groups.filter((group) => group.items.length > 0 || group.keepWhenEmpty);
+    const groups = grouping.groups.filter((group) => group.items.length > 0);
     return (
       <div className="space-y-6">
         {groups.length === 0 && <p className={noResultsClassName}>{noResultsMessage}</p>}
@@ -317,7 +315,7 @@ export default function Dashboard<T>({
   const toolbarCommon = { view, sort, onView, onSort, viewOptions, groupBy, search, onSearch };
 
   // Einmal gebaut, in beide Kopf-Bäume gehängt: kompakt sind diese Knöpfe
-  // ohnehin in beiden, ihr Label steht so oder so nur im Tooltip.
+  // in beiden, ihr Label steht so oder so nur im Tooltip.
   const extraActionButtons = extraActions?.map((action) => (
     <Button
       key={action.label}
@@ -337,17 +335,12 @@ export default function Dashboard<T>({
         {headerLeft ?? <h1 className={titleClassName}>{title}</h1>}
         {headerRight ?? (
           <div className="flex items-center gap-2">
-            {extraActionButtons}
-            {secondaryAction && (
-              <Button onClick={secondaryAction.onClick} variant="secondary">
-                <Plus size={14} />{secondaryAction.label}
-              </Button>
-            )}
             {primaryAction && (
               <Button onClick={primaryAction.onClick} variant="primary">
                 <Plus size={14} />{primaryAction.label}
               </Button>
             )}
+            {extraActionButtons}
           </div>
         )}
       </div>
@@ -368,48 +361,35 @@ export default function Dashboard<T>({
   const sidebarHeader = (
     <div className="flex flex-col flex-1 min-h-0">
       {/* h-14 + px-3 wie die Aktionsleiste der Detailansichten, damit die
-          Trennlinie mit der Tab-Leiste der Eintragsliste fluchtet. Die
-          Aktionen sitzen als kompakte tone-Buttons rechts im Titel, ihr Label
-          wandert in title/aria-label. `headerRight` ersetzt sie — derselbe
-          Vertrag wie inline —, wohnt aber in der Scroll-Spalte darunter, wo
-          eine breite Slot-Zeile (Trash-Bulk-Aktionen) umbrechen kann. */}
+          Trennlinie mit der Tab-Leiste der Eintragsliste fluchtet. Die Zeile
+          gehört allein dem Titel: die Aktionen bekommen darunter eine eigene
+          volle Zeile in der Scroll-Spalte — neben dem Titel bliebe von einer
+          beschrifteten Primäraktion in dieser schmalen Spalte nichts
+          Lesbares übrig. `headerRight` ersetzt sie — derselbe Vertrag wie
+          inline —, dort kann eine breite Slot-Zeile (Trash-Bulk-Aktionen)
+          umbrechen. */}
       <div className="flex items-center gap-2 px-3 h-14 border-b border-stone-700/60 flex-shrink-0 min-w-0">
         {headerLeft ?? <h1 className={`${titleClassName} truncate`}>{title}</h1>}
-        {!headerRight && (primaryAction || secondaryAction || extraActions?.length) && (
-          <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
-            {extraActionButtons}
-            {secondaryAction && (
-              // FolderPlus statt Plus: neben dem Jade-Plus für den neuen
-              // Eintrag wären zwei identische Pluszeichen nicht unterscheidbar.
-              <Button
-                tone="neutral"
-                compact
-                onClick={secondaryAction.onClick}
-                title={secondaryAction.label}
-                aria-label={secondaryAction.label}
-              >
-                <FolderPlus size={14} />
-              </Button>
-            )}
-            {primaryAction && (
-              <Button
-                tone="jade"
-                compact
-                onClick={primaryAction.onClick}
-                title={primaryAction.label}
-                aria-label={primaryAction.label}
-              >
-                <Plus size={14} />
-              </Button>
-            )}
-          </div>
-        )}
       </div>
       {/* Eine Einzugsquelle pro Spalte (design.md): dieselbe p-3-Spalte wie der
           Properties-Container in RightSidebar — Toolbar und FilterPanel bringen
           im vertikalen Modus kein eigenes Streifen-Chrome mit. */}
       <div className="flex-1 overflow-y-auto p-3 space-y-4">
         {headerRight && <div className="flex flex-col gap-1.5">{headerRight}</div>}
+
+        {/* Die Primäraktion füllt die Zeile, die Nebenaktionen bleiben daneben
+            kompakt — dieselbe Reihenfolge wie inline. */}
+        {!headerRight && (primaryAction || !!extraActions?.length) && (
+          <div className="flex items-center gap-1.5">
+            {primaryAction && (
+              <Button variant="primary" onClick={primaryAction.onClick} className="flex-1 min-w-0 justify-center">
+                <Plus size={14} className="flex-shrink-0" />
+                <span className="truncate">{primaryAction.label}</span>
+              </Button>
+            )}
+            {extraActionButtons}
+          </div>
+        )}
 
         <ListToolbar vertical {...toolbarCommon} />
 

@@ -10,7 +10,7 @@
  */
 import { create } from 'zustand';
 import { getDb } from '../lib/db';
-import { FALLBACK_CATEGORY_ID, reassignCategoryContent } from '../lib/schema';
+import { reassignCategoryContent } from '../lib/schema';
 import { categoryKey } from '../lib/categoryMerge';
 import { generateId, nowIso } from '../lib/helpers';
 import { fromRow, type DbRow } from '../lib/row';
@@ -61,14 +61,14 @@ function freeName(categories: Category[], name: string, exceptId: string): strin
 }
 
 /**
- * Hängt Inhalte, die auf eine der `ids` zeigen, in den geladenen Stores aufs
- * Sammelbecken um — das Gegenstück zu `reassignCategoryContent` für den
+ * Löst die Kategorie von Inhalten, die auf eine der `ids` zeigen, in den
+ * geladenen Stores — das Gegenstück zu `reassignCategoryContent` für den
  * Speicher. Auch vom Papierkorb-Leeren benutzt; die vier Store-Formen sollen
  * nur an einer Stelle stehen.
  */
 export function reassignCategoriesInMemory(ids: ReadonlySet<string>): void {
-  const move = <T extends { category_id: string }>(x: T): T =>
-    ids.has(x.category_id) ? { ...x, category_id: FALLBACK_CATEGORY_ID } : x;
+  const move = <T extends { category_id: string | null }>(x: T): T =>
+    x.category_id && ids.has(x.category_id) ? { ...x, category_id: null } : x;
   useWikiStore.setState((s) => ({ articles: s.articles.map(move) }));
   useOperationStore.setState((s) => ({ operations: s.operations.map(move) }));
   useTaskStore.setState((s) => ({ tasks: s.tasks.map(move) }));
@@ -94,17 +94,14 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const current = get().categories;
     if (nameTaken(current, trimmed)) throw new Error(CATEGORY_NAME_TAKEN);
 
-    // Vor dem Sammelbecken einsortieren, solange es am Ende steht — dort hält
-    // es die Migration, und dort erwartet man es. Hat der Nutzer es verschoben,
-    // kommt Neues schlicht ans Ende.
+    // Ans Ende. Bis v39 schob sich Neues vor das Sammelbecken `other`, damit
+    // das immer letztes blieb — seit es eine gewöhnliche Kategorie ist, gibt
+    // es dafür keinen Grund mehr, und die Reihenfolge gehört ohnehin dem
+    // Nutzer (Ziehen in der Kategorien-Ansicht).
     const last = current[current.length - 1];
-    const fallbackIsLast = last?.id === FALLBACK_CATEGORY_ID;
-    const sortOrder = fallbackIsLast ? last.sort_order : (last?.sort_order ?? -1) + 1;
+    const sortOrder = (last?.sort_order ?? -1) + 1;
 
     const db = await getDb();
-    if (fallbackIsLast) {
-      await db.execute('UPDATE categories SET sort_order=$1 WHERE id=$2', [sortOrder + 1, FALLBACK_CATEGORY_ID]);
-    }
     const cat: Category = {
       id: generateId(), name: trimmed, emoji, sort_order: sortOrder, is_builtin: false, deleted_at: null,
     };
@@ -112,12 +109,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       'INSERT INTO categories (id, name, emoji, sort_order, is_builtin) VALUES ($1,$2,$3,$4,0)',
       [cat.id, cat.name, cat.emoji, cat.sort_order]
     );
-    set((s) => ({
-      categories: [
-        ...s.categories.map((c) => (fallbackIsLast && c.id === FALLBACK_CATEGORY_ID ? { ...c, sort_order: sortOrder + 1 } : c)),
-        cat,
-      ].sort((a, b) => a.sort_order - b.sort_order),
-    }));
+    set((s) => ({ categories: [...s.categories, cat] }));
     return cat;
   },
 
@@ -166,7 +158,6 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   },
 
   permanentlyDeleteCategory: async (id) => {
-    if (id === FALLBACK_CATEGORY_ID) return;
     const db = await getDb();
     // Erst umhängen, dann löschen: die Zeile endgültig zu entfernen, während
     // Inhalte darauf zeigen, verbietet der Foreign Key.

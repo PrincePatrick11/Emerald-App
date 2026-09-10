@@ -22,6 +22,8 @@
     "name": "Nombre de categoría…",
     "uncategorized": "Sin categoría",
     "nameTaken": "Esta categoría ya existe",
+    "dragHint": "Arrastra para reordenar.",
+    "builtinHint": "Integrada — no se puede renombrar ni eliminar.",
     "builtin": {
       "other": "Otro",
       "sigils": "Sigilos"
@@ -70,6 +72,7 @@
     "wiki": "Wiki",
     "altar": "Altar",
     "tags": "Etiquetas",
+    "categories": "Categorías",
     "trash": "Papelera",
     "operations": "Operaciones",
     "tasks": "Tareas",

@@ -22,6 +22,21 @@ const PROPERTIES_PANELS: Partial<Record<ViewId, ComponentType>> = {
   altar: AltarSidebarPanel,
 };
 
+/**
+ * Views ohne Einträge. Die Abfrage steht *vor* der auf `activeView.id`: ein
+ * Tiefenlink aus der Suche (`{ type: 'tags' | 'categories', id }`) trägt eine
+ * id, bekäme sonst die Eintrags-Aktionsleiste und darin einen
+ * „Bearbeiten"-Knopf, der `mode: 'edit'` auf eine Ansicht ohne Editor setzt.
+ */
+const VIEWS_WITHOUT_ENTRIES: ReadonlySet<ViewId> = new Set<ViewId>(['home', 'tags', 'categories']);
+
+/**
+ * Davon die, die auch keinen Dashboard-Kopf hierher portalen — nur für die
+ * steht der Platzhalter. Home und Kategorien sind bewusst nicht dabei: keine
+ * Einträge, aber ein Dashboard.
+ */
+const VIEWS_WITHOUT_DASHBOARD: ReadonlySet<ViewId> = new Set<ViewId>(['tags']);
+
 /* Mirrors the entry-list tab bar in LeftSidebarEntryList so both sidebars put their
    bottom border on the same line. Keep the two in sync — with one known
    exception: that bar is `min-h-14` and wraps into a second row once the entry
@@ -125,20 +140,23 @@ export default function RightSidebar() {
   // Experiment „Kopfzeile in der Seitenleiste": In Listenansichten (kein
   // geöffneter Eintrag) gehört die Leiste dem Dashboard-Kopf — Titel,
   // Aktions-Buttons, Toolbar und Filter portalt Dashboard hierher. Der
-  // Platzhalter erscheint nur in Views ohne Dashboard (Home/Tags) — an einen
-  // leeren Host geknüpft (`only:`-Trick) blitzte er stattdessen in jeder
-  // Lücke auf, in der der Portal-Inhalt legitim fehlt: während der
+  // Platzhalter erscheint nur in Views ohne Dashboard (Tags) —
+  // an einen leeren Host geknüpft (`only:`-Trick) blitzte er stattdessen in
+  // jeder Lücke auf, in der der Portal-Inhalt legitim fehlt: während der
   // 200ms-Zuklapp-Animation und solange der Chunk einer lazy geladenen
   // Listenansicht noch lädt.
-  if (!activeView.id) {
-    const hasDashboard = activeView.type !== 'home' && activeView.type !== 'tags';
+  if (VIEWS_WITHOUT_ENTRIES.has(activeView.type)) {
     return (
       <div ref={setListHeaderHost} className="flex flex-col h-full">
-        {!hasDashboard && (
+        {VIEWS_WITHOUT_DASHBOARD.has(activeView.type) && (
           <p className="text-xs text-stone-600 px-2 py-3">{t('properties.noEntry')}</p>
         )}
       </div>
     );
+  }
+
+  if (!activeView.id) {
+    return <div ref={setListHeaderHost} className="flex flex-col h-full" />;
   }
 
   return (
