@@ -342,9 +342,9 @@ Since v38, Wiki, Operations, Tasks, and Altar items share one category list — 
 
 Journal, Wiki and Operations entries (except the Sigil view, for now) render their body as a
 vertical stack of blocks — `BlockStack` (`src/components/blocks/BlockStack.tsx`) inside
-`EntryDetailFrame`'s `body="scroll"`. The only block type so far is text (`core.text`, one
-`RichEditor` per block); the machinery is the foundation for functional blocks (fields, sigil
-tools, user-built blocks) arriving in later phases.
+`EntryDetailFrame`'s `body="scroll"`. The block types so far are text (`core.text`, one
+`RichEditor` per block) and fields (`core.fields`, below), which also carries the user-built
+blocks of the Blocks view; sigil tools arrive in a later phase.
 
 **Stored format.** Blocks live in the existing `content` column, not in a side table — every
 pipeline that already reads `content` (search, `syncLinks`, image cleanup, merge-import link
@@ -441,6 +441,29 @@ read mode an outline whose rows jump to their block, only when there is more tha
 block types can contribute their own sidebar sections via `components/blocks/blockSidebarViews.ts`
 (read/edit variant each; empty so far — the text block has nothing of its own to set). That file
 must never import TipTap: the sidebar is loaded eagerly.
+
+**User-built blocks — copies, not live links.** The Blocks view (`views/BlocksView.tsx`, an aux
+view on the rail) edits rows of `block_definitions` (v39, `blockDefinitionStore`): name, emoji,
+elements, display rules (`readHideEmpty`, `readOnly`, plus `showTitle`, which becomes the
+instance attribute on insert) and a `revision` that rises whenever something a copy inherits
+changes. Inserting one (`createFromPreset('def:<id>')`) writes a `core.fields` block that carries
+everything itself — elements, display rules, name and icon in `data-block-config` — plus
+`data-block-origin` and `data-block-rev` (`lib/blocks/definitions.ts`). It always renders from its
+own copy, so editing or deleting the definition changes no entry, and a copy whose definition is
+missing (trash, another vault) works unchanged. Element ids are shared by the definition and all
+its copies, so values survive renames and updates and a later list filter can find them in every
+copy (`entrySummary.ts` already collects them as `"<definition>:<element>"`). A copy with a lower
+`rev` is outdated: `BlockFrame` shows a "Newer version" pill, and the block's menu runs
+`updateInstanceToDefinition` through the stack like any edit (so Cancel reverts it). The merge
+keeps values by id, adds new elements empty, archives elements the definition no longer shows
+(`ElementDef.archived` — invisible everywhere, value kept, back when the element returns), takes
+labels, options, display rules, name and icon from the definition, and leaves the instance's own
+attributes (title, eye, read-mode title) alone. "Update all" and "also remove from entries" live
+in `store/blockCopies.ts`: they rewrite content through the three stores' `update*` and skip the
+entry open in edit mode, whose editor would write its old state back. An entry open in read mode
+picks the change up itself — `BlockStack` resets when its `initialContent` prop changes to
+something other than its own serialisation while not editing, and reports the new content to the
+view's mirror, so a later Done can't restore the old one.
 
 ### Auto-Save (the `useEntryEditor` hook)
 

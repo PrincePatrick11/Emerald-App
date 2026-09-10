@@ -60,6 +60,12 @@ export interface ElementDef {
   options?: SelectOption[];
   /** Überschreibt `display.readHideEmpty` für dieses Element. */
   hideWhenEmpty?: boolean;
+  /**
+   * Entfernt, aber nicht vergessen: in der Definition gelöscht oder bei einer
+   * Aktualisierung weggefallen. Unsichtbar in Lesen, Bearbeiten und Fallback —
+   * der Wert bleibt stehen und kommt zurück, wenn das Element es tut.
+   */
+  archived?: boolean;
 }
 
 export interface DisplayRules {
@@ -98,6 +104,9 @@ export interface FieldsModel {
   orphans: Record<string, unknown>;
   /** Element-ID → inneres HTML seines Slots (Link-Chip oder `<img>`), auch ohne bekanntes Element. */
   slots: Record<string, string>;
+  /** Name und Icon (Emoji) der eigenen Block-Definition, aus der der Block kopiert wurde — leer bei einzelnen Feldern. */
+  name: string;
+  icon: string;
 }
 
 /* ---------------- Lesen ---------------- */
@@ -148,7 +157,33 @@ function parseElement(raw: unknown): ElementDef | null {
       .map((o) => ({ id: o.id as string, label: typeof o.label === 'string' ? o.label : '' }));
   }
   if (typeof raw.hideWhenEmpty === 'boolean') element.hideWhenEmpty = raw.hideWhenEmpty;
+  if (raw.archived === true) element.archived = true;
   return element;
+}
+
+/** Eine Elementliste aus unsicherer Quelle (Inhalt, Import, Datenbank): Ungültiges und doppelte IDs fallen weg. */
+export function parseElements(raw: unknown): ElementDef[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  return raw.map(parseElement).filter((e): e is ElementDef => {
+    if (!e || seen.has(e.id)) return false;
+    seen.add(e.id);
+    return true;
+  });
+}
+
+/** Anzeigeregeln aus unsicherer Quelle; Fehlendes nach `DEFAULT_DISPLAY`. */
+export function parseDisplay(raw: unknown): DisplayRules {
+  const rules = isRecord(raw) ? raw : {};
+  return {
+    readHideEmpty: typeof rules.readHideEmpty === 'boolean' ? rules.readHideEmpty : DEFAULT_DISPLAY.readHideEmpty,
+    readOnly: typeof rules.readOnly === 'boolean' ? rules.readOnly : DEFAULT_DISPLAY.readOnly,
+  };
+}
+
+/** Die Elemente, die der Block zeigt — ohne die archivierten. */
+export function activeElements(model: FieldsModel): ElementDef[] {
+  return model.elements.filter((e) => !e.archived);
 }
 
 function parseValue(kind: ElementKind, raw: unknown): FieldValue | undefined {
@@ -194,14 +229,8 @@ export function parseFields(block: BlockInstance): FieldsModel {
       || (data.value.values !== undefined && !isRecord(data.value.values))));
 
   const cfg = isRecord(config.value) ? config.value : {};
-  const elements = Array.isArray(cfg.elements)
-    ? cfg.elements.map(parseElement).filter((e): e is ElementDef => e !== null)
-    : [];
-  const rawDisplay = isRecord(cfg.display) ? cfg.display : {};
-  const display: DisplayRules = {
-    readHideEmpty: typeof rawDisplay.readHideEmpty === 'boolean' ? rawDisplay.readHideEmpty : DEFAULT_DISPLAY.readHideEmpty,
-    readOnly: typeof rawDisplay.readOnly === 'boolean' ? rawDisplay.readOnly : DEFAULT_DISPLAY.readOnly,
-  };
+  const elements = parseElements(cfg.elements);
+  const display = parseDisplay(cfg.display);
 
   const rawValues = isRecord(data.value) && isRecord(data.value.values) ? data.value.values : {};
   const values = bareRecord<FieldValue>();
@@ -224,7 +253,11 @@ export function parseFields(block: BlockInstance): FieldsModel {
     if (isSafeElementId(id) && m[2].trim()) slots[id] = m[2];
   }
 
-  const model: FieldsModel = { broken, elements, display, values, orphans, slots };
+  const model: FieldsModel = {
+    broken, elements, display, values, orphans, slots,
+    name: typeof cfg.name === 'string' ? cfg.name : '',
+    icon: typeof cfg.icon === 'string' ? cfg.icon : '',
+  };
   modelCache.set(block, model);
   return model;
 }
@@ -272,9 +305,10 @@ export function isElementEmpty(element: ElementDef, model: FieldsModel): boolean
   }
 }
 
-/** Blendet der Lesemodus dieses Element aus? Leer UND (Element- oder Blockregel). */
+/** Blendet der Lesemodus dieses Element aus? Archiviert, oder leer UND (Element- oder Blockregel). */
 export function isHiddenInRead(element: ElementDef, model: FieldsModel): boolean {
-  return isElementEmpty(element, model) && (element.hideWhenEmpty ?? model.display.readHideEmpty);
+  return !!element.archived
+    || (isElementEmpty(element, model) && (element.hideWhenEmpty ?? model.display.readHideEmpty));
 }
 
 /* ---------------- Schreiben ---------------- */
@@ -327,8 +361,11 @@ export function serializeFields(block: BlockInstance, model: FieldsModel, text: 
     const dt = `<dt>${escapeHtml(text.label(element))}</dt>`;
     if (isSlotKind(element.kind)) {
       const slot = model.slots[element.id];
-      return slot ? `${dt}${slotRow(element.id, slot)}` : '';
+      // Archiviert: ohne Beschriftung, aber der Slot bleibt — mit ihm Link und Bild.
+      if (!slot) return '';
+      return element.archived ? slotRow(element.id, slot) : `${dt}${slotRow(element.id, slot)}`;
     }
+    if (element.archived) return '';
     const html = valueHtml(element, model, text);
     return html === null ? '' : `${dt}<dd>${html}</dd>`;
   });
@@ -341,7 +378,12 @@ export function serializeFields(block: BlockInstance, model: FieldsModel, text: 
 
   const attrs: Record<string, string> = {
     ...block.attrs,
-    [BLOCK_ATTR.config]: JSON.stringify({ elements: model.elements, display: model.display }),
+    [BLOCK_ATTR.config]: JSON.stringify({
+      elements: model.elements,
+      display: model.display,
+      ...(model.name ? { name: model.name } : {}),
+      ...(model.icon ? { icon: model.icon } : {}),
+    }),
   };
   const values = { ...model.orphans, ...model.values };
   if (Object.keys(values).length > 0) attrs[BLOCK_ATTR.data] = JSON.stringify({ values });

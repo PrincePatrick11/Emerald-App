@@ -28,6 +28,9 @@ import type {
   TaskLink,
   WikiArticle,
 } from '../types';
+import {
+  DEFAULT_DEFINITION_ICON, parseDefinitionDisplay, parseDefinitionElements, type BlockDefinition,
+} from './blocks/definitions';
 
 /** Eine rohe Zeile, wie sie aus `db.select` kommt. */
 export type DbRow = Record<string, unknown>;
@@ -187,6 +190,23 @@ export const fromRow = {
       emoji: str(r.emoji),
       sort_order: num(r.sort_order, 0),
       is_builtin: bool(r.is_builtin),
+      deleted_at: nullableStr(r.deleted_at),
+    };
+  },
+
+  /** `elements`/`display` laufen durch dieselbe Prüfung wie die Kopie im Inhalt — die Zeile kann aus einem Import stammen. */
+  blockDefinition(r: DbRow): BlockDefinition {
+    return {
+      id: str(r.id),
+      name: str(r.name),
+      icon: str(r.icon) || DEFAULT_DEFINITION_ICON,
+      description: str(r.description),
+      elements: parseDefinitionElements(r.elements),
+      display: parseDefinitionDisplay(r.display),
+      revision: Math.max(1, Math.trunc(num(r.revision, 1))),
+      sort_order: num(r.sort_order, 0),
+      created_at: str(r.created_at),
+      updated_at: str(r.updated_at),
       deleted_at: nullableStr(r.deleted_at),
     };
   },

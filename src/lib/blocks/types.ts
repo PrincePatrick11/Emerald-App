@@ -35,6 +35,10 @@ export const BLOCK_ATTR = {
   config: 'data-block-config',
   /** JSON: skalare Werte des Blocks. Verweise und Bilder stehen im Markup (Slots). */
   data: 'data-block-data',
+  /** ID der eigenen Block-Definition, aus der dieser Block kopiert wurde. */
+  origin: 'data-block-origin',
+  /** Revision der Definition zum Zeitpunkt der Kopie — kleiner als ihre aktuelle heißt „ältere Version". */
+  rev: 'data-block-rev',
 } as const;
 
 /**

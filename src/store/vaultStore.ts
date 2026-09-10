@@ -12,6 +12,7 @@ import {
 } from '../lib/vaultManager';
 import { resetDbCache, getDb, withDbClosed } from '../lib/db';
 import { clearSearchTextCache } from '../lib/searchText';
+import { clearEntrySummaryCache } from '../lib/blocks/entrySummary';
 import { drainSerialized } from '../lib/serialize';
 import { reloadAllStores } from './moduleWiring';
 import { useUIStore } from './uiStore';
@@ -66,6 +67,7 @@ async function openActiveVault(): Promise<void> {
   // Die ids des eben geschlossenen Vaults werden nie wieder erfragt, also
   // waere ihr Text ein Leck, das mit jedem Wechsel weiterwaechst.
   clearSearchTextCache();
+  clearEntrySummaryCache();
   await reloadAllStores();
 }
 

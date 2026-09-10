@@ -3,16 +3,18 @@ import {
 } from 'lucide-react';
 import { createTextBlock } from './blockHtml';
 import {
-  createFieldsBlock, ELEMENT_KINDS, elementKindLabelKey, FIELDS_BLOCK_TYPE, parseFields, type ElementKind,
+  activeElements, createFieldsBlock, ELEMENT_KINDS, elementKindLabelKey, FIELDS_BLOCK_TYPE, parseFields, type ElementKind,
 } from './fields';
+import { instantiateDefinition, type BlockDefinition } from './definitions';
 import type { BlockGroup, BlockTypeMeta } from './blockTypes';
 import type { BlockInstance } from './types';
 
 /**
  * Was „Block hinzufügen" anbietet. Ein Eintrag ist nicht dasselbe wie ein
  * Blocktyp: jede Feldart ist ein eigener Eintrag, legt aber einen `core.fields`
- * mit einem Element an. Später kommen hier die eigenen Blöcke aus der
- * Blöcke-Ansicht dazu.
+ * mit einem Element an. Dahinter stehen die eigenen Blöcke aus der
+ * Blöcke-Ansicht (`def:<id>`) — die liest der Aufrufer aus dem Store und
+ * reicht sie herein, weil `lib/blocks` keine Stores kennt.
  */
 export interface BlockPreset {
   id: string;
@@ -21,6 +23,9 @@ export interface BlockPreset {
   group: BlockGroup;
   create: () => BlockInstance;
 }
+
+/** Das Zeichen eines Blocks: ein lucide-Icon, oder das Emoji eines eigenen Blocks. */
+export type GlyphSource = LucideIcon | string;
 
 export const ELEMENT_KIND_ICONS: Record<ElementKind, LucideIcon> = {
   shorttext: TextCursorInput,
@@ -47,10 +52,31 @@ export const BLOCK_PRESETS: readonly BlockPreset[] = [
   })),
 ];
 
-/** Das Icon eines Blocks: ein Feldblock mit genau einem Element trägt das seiner Art. */
-export function blockIcon(block: BlockInstance, meta: BlockTypeMeta | undefined): LucideIcon | undefined {
+const DEFINITION_PRESET_PREFIX = 'def:';
+
+/** Die Voreinstellungs-ID eines eigenen Blocks. */
+export function definitionPresetId(defId: string): string {
+  return `${DEFINITION_PRESET_PREFIX}${defId}`;
+}
+
+/** Ein neuer Block aus einer Voreinstellung — `null`, wenn es sie (nicht mehr) gibt. */
+export function createFromPreset(presetId: string, definitions: readonly BlockDefinition[]): BlockInstance | null {
+  if (presetId.startsWith(DEFINITION_PRESET_PREFIX)) {
+    const def = definitions.find((d) => d.id === presetId.slice(DEFINITION_PRESET_PREFIX.length));
+    return def ? instantiateDefinition(def) : null;
+  }
+  return BLOCK_PRESETS.find((p) => p.id === presetId)?.create() ?? null;
+}
+
+/**
+ * Das Zeichen eines Blocks: eine Kopie eines eigenen Blocks trägt dessen
+ * Emoji, ein Feldblock mit genau einem Element das Icon seiner Art.
+ */
+export function blockIcon(block: BlockInstance, meta: BlockTypeMeta | undefined): GlyphSource | undefined {
   if (meta?.id === FIELDS_BLOCK_TYPE) {
-    const { elements } = parseFields(block);
+    const model = parseFields(block);
+    if (model.icon) return model.icon;
+    const elements = activeElements(model);
     if (elements.length === 1) return ELEMENT_KIND_ICONS[elements[0].kind];
   }
   return meta?.icon;

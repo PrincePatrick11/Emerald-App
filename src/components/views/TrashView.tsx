@@ -265,6 +265,7 @@ export default function TrashView() {
     const tags       = sorted.filter((i) => i.type === 'tag');
     const tasks      = sorted.filter((i) => i.type === 'task');
     const cats       = sorted.filter((i) => i.type === 'category');
+    const blockDefs  = sorted.filter((i) => i.type === 'blockDefinition');
 
     const renderItems = (subset: TrashedItem[]) =>
       viewMode === 'list'
@@ -329,6 +330,12 @@ export default function TrashView() {
           <>
             <SectionHeader label={t('trash.categories')} count={cats.length} />
             {renderItems(cats)}
+          </>
+        )}
+        {blockDefs.length > 0 && (
+          <>
+            <SectionHeader label={t('trash.blockDefinitions')} count={blockDefs.length} />
+            {renderItems(blockDefs)}
           </>
         )}
       </div>

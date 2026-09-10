@@ -1,17 +1,20 @@
 import type { PointerEvent, MouseEvent, ReactNode } from 'react';
-import type { LucideIcon } from 'lucide-react';
-import { EyeOff, GripVertical, MoreHorizontal } from 'lucide-react';
+import { EyeOff, GripVertical, MoreHorizontal, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import type { GlyphSource } from '../../lib/blocks/presets';
+import BlockGlyph from './BlockGlyph';
 
 interface BlockFrameProps {
   isEditing: boolean;
-  icon: LucideIcon;
+  icon: GlyphSource;
   /** Eigener Titel der Instanz oder der Typname. */
   label: string;
   /** Ausgeblendet: im Lesemodus weg, im Bearbeitungsmodus ausgegraut. */
   hidden: boolean;
   /** Titel im Lesemodus zeigen (Anzeigeregel des Blocks). */
   showReadTitle: boolean;
+  /** Kopie eines eigenen Blocks, dessen Definition inzwischen weiter ist — das Menü bietet „Block aktualisieren". */
+  outdated?: boolean;
   onGripPointerDown: (e: PointerEvent) => void;
   onOpenMenu: (e: MouseEvent) => void;
   children: ReactNode;
@@ -29,7 +32,7 @@ interface BlockFrameProps {
  * weggelassen.
  */
 export default function BlockFrame({
-  isEditing, icon: Icon, label, hidden, showReadTitle, onGripPointerDown, onOpenMenu, children,
+  isEditing, icon, label, hidden, showReadTitle, outdated = false, onGripPointerDown, onOpenMenu, children,
 }: BlockFrameProps) {
   const { t } = useTranslation();
   const className = [
@@ -51,8 +54,14 @@ export default function BlockFrame({
           >
             <GripVertical size={14} />
           </button>
-          <Icon size={12} className="flex-shrink-0" />
+          <BlockGlyph icon={icon} />
           <span className="block-frame-label">{label}</span>
+          {outdated && (
+            <button type="button" className="block-frame-outdated" onClick={onOpenMenu} title={t('blocks.outdatedHint')}>
+              <RefreshCw size={12} />
+              <span>{t('blocks.outdated')}</span>
+            </button>
+          )}
           {hidden && (
             <span className="block-frame-hidden-mark" title={t('blocks.hiddenHint')}>
               <EyeOff size={12} />

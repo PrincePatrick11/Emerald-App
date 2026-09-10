@@ -37,7 +37,8 @@
  */
 import type Database from '@tauri-apps/plugin-sql';
 import i18n from '../i18n';
-import { TABLE_DDL, INDEX_DDL, FALLBACK_CATEGORY_ID, insertCategoryRows } from './schema';
+// INDEX_DDL_V38, nicht INDEX_DDL: in der Kette fehlen hier noch die Tabellen späterer Migrationen.
+import { TABLE_DDL, INDEX_DDL_V38, FALLBACK_CATEGORY_ID, insertCategoryRows } from './schema';
 import { mergeCategoryRows, type CategorySource } from './categoryMerge';
 import { legacyDisplayName, type LegacyCategoryTable } from './categories';
 import {
@@ -199,7 +200,7 @@ export async function mergeCategoryTables(db: Database): Promise<void> {
   if (await contentRebuilt(db)) {
     console.info('[db] v38: Rebuild lag bereits vor, nur Aufräumen und Prüfung werden nachgeholt');
     await dropOldTables(db);
-    await createIndexesIfMissing(db, INDEX_DDL);
+    await createIndexesIfMissing(db, INDEX_DDL_V38);
     await assertForeignKeysIntact(db, 'v38');
     return;
   }
@@ -210,6 +211,6 @@ export async function mergeCategoryTables(db: Database): Promise<void> {
   await renameOldTables(db);
   await rebuildContentTables(db);
   await dropOldTables(db);
-  await createIndexesIfMissing(db, INDEX_DDL);
+  await createIndexesIfMissing(db, INDEX_DDL_V38);
   await assertForeignKeysIntact(db, 'v38');
 }

@@ -7,7 +7,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useLinkItems } from '../../hooks/useLinkItems';
 import { elementLabel } from '../../lib/blocks/blockAttrs';
 import {
-  imageFromSlot, isElementEmpty, isHiddenInRead, linkFromSlot, parseFields, serializeFields,
+  activeElements, imageFromSlot, isElementEmpty, isHiddenInRead, linkFromSlot, parseFields, serializeFields,
   type ChecklistItem, type ElementDef, type FieldValue, type FieldsModel,
 } from '../../lib/blocks/fields';
 import { formatEntryDateLong } from '../../lib/formatDate';
@@ -68,7 +68,7 @@ export default function FieldsBlock({ block, isEditing, onBlockChange, onPersist
     write({ ...model, slots });
   };
 
-  const elements = isEditing ? model.elements : model.elements.filter((el) => !isHiddenInRead(el, model));
+  const elements = isEditing ? activeElements(model) : model.elements.filter((el) => !isHiddenInRead(el, model));
   if (elements.length === 0) return null;
 
   return (

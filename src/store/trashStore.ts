@@ -3,6 +3,8 @@ import { getDb, sweepDanglingLinks } from '../lib/db';
 import { reassignCategoryContent } from '../lib/schema';
 import { trashWiring } from './moduleWiring';
 import { reassignCategoriesInMemory } from './categoryStore';
+import { definitionLabel } from '../lib/blocks/blockAttrs';
+import i18n from '../i18n';
 import type { TrashedItem } from '../types';
 
 interface TrashState {
@@ -41,6 +43,9 @@ export const useTrashStore = create<TrashState>((set) => ({
       const tasks = await db.select<{ id: string; title: string; deleted_at: string }[]>(
         `SELECT id, title, deleted_at FROM tasks WHERE deleted_at IS NOT NULL`
       );
+      const blockDefinitions = await db.select<{ id: string; name: string; icon: string; deleted_at: string }[]>(
+        `SELECT id, name, icon, deleted_at FROM block_definitions WHERE deleted_at IS NOT NULL`
+      );
       const items: TrashedItem[] = [
         ...journal.map((r) => ({ ...r, type: 'journal' as const })),
         ...wiki.map((r) => ({ id: r.id, title: r.title, deleted_at: r.deleted_at, type: 'wiki' as const, category: r.category ?? undefined })),
@@ -48,6 +53,9 @@ export const useTrashStore = create<TrashState>((set) => ({
         ...operations.map((r) => ({ ...r, type: 'operation' as const, category: r.category ?? undefined })),
         ...categories.map((r) => ({ id: r.id, title: `${r.emoji} ${r.name}`, deleted_at: r.deleted_at, type: 'category' as const })),
         ...tasks.map((r) => ({ ...r, type: 'task' as const })),
+        ...blockDefinitions.map((r) => ({
+          id: r.id, title: `${r.icon} ${definitionLabel(i18n.t, r)}`, deleted_at: r.deleted_at, type: 'blockDefinition' as const,
+        })),
       ].sort((a, b) => b.deleted_at.localeCompare(a.deleted_at));
       set({ items });
     } finally {
@@ -73,6 +81,8 @@ export const useTrashStore = create<TrashState>((set) => ({
     await db.execute(`DELETE FROM operations WHERE deleted_at IS NOT NULL`);
     await db.execute(`DELETE FROM task_links WHERE task_id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL)`);
     await db.execute(`DELETE FROM tasks WHERE deleted_at IS NOT NULL`);
+    // Kopien in Einträgen kommen ohne ihre Definition aus — nichts nachzuziehen.
+    await db.execute(`DELETE FROM block_definitions WHERE deleted_at IS NOT NULL`);
 
     // Kategorien zuletzt, und erst nachdem ihre verbliebenen Inhalte umgehängt
     // sind. Früher wurden die Zeilen einfach gelöscht und alles, was noch auf

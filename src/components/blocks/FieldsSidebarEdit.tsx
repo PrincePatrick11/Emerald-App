@@ -1,12 +1,12 @@
 import { useTranslation } from 'react-i18next';
-import { Plus, X } from 'lucide-react';
 import { elementLabel } from '../../lib/blocks/blockAttrs';
 import {
-  elementKindLabelKey, parseFields, serializeFields, type ElementDef, type FieldsModel,
+  activeElements, elementKindLabelKey, parseFields, serializeFields, type ElementDef, type FieldsModel,
 } from '../../lib/blocks/fields';
-import { generateId } from '../../lib/helpers';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import { useFieldFallbackText } from './useFieldFallbackText';
+import OptionsEditor from './OptionsEditor';
+import BlockCheckbox from './BlockCheckbox';
 import type { BlockSidebarEditProps } from './blockSidebarViews';
 
 /**
@@ -26,14 +26,18 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
   const write = (next: FieldsModel) => update(serializeFields(block, next, text));
   const patchElement = (id: string, patch: Partial<ElementDef>) =>
     write({ ...model, elements: model.elements.map((el) => (el.id === id ? { ...el, ...patch } : el)) });
+  const elements = activeElements(model);
 
   return (
     <div className="space-y-4">
-      {model.elements.map((element) => {
+      {/* Die Kopie eines eigenen Blocks: was hier geändert wird, bleibt in diesem Eintrag. */}
+      {model.name && <p className="block-field-hint">{t('blocks.fields.copyHint', { name: model.name })}</p>}
+
+      {elements.map((element) => {
         const hides = element.hideWhenEmpty ?? model.display.readHideEmpty;
         return (
           <div key={element.id} className="space-y-2">
-            {model.elements.length > 1 && <p className="text-[10px] uppercase tracking-wider text-stone-500">{elementLabel(t, element)}</p>}
+            {elements.length > 1 && <p className="text-[10px] uppercase tracking-wider text-stone-500">{elementLabel(t, element)}</p>}
             <div className="space-y-1">
               <p className="label-xs">{t('blocks.fields.label')}</p>
               <input
@@ -45,74 +49,27 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
             </div>
 
             {element.kind === 'select' && (
-              <OptionsEditor element={element} onChange={(options) => patchElement(element.id, { options })} />
+              <OptionsEditor options={element.options ?? []} onChange={(options) => patchElement(element.id, { options })} />
             )}
 
-            <label className="flex items-center gap-2 text-xs text-stone-400 cursor-pointer">
-              <input
-                type="checkbox"
-                className="block-checkbox"
-                checked={hides}
-                onChange={(e) => patchElement(element.id, {
-                  // Gleich der Blockregel: kein eigener Wert — die Regel des Blocks gilt.
-                  hideWhenEmpty: e.target.checked === model.display.readHideEmpty ? undefined : e.target.checked,
-                })}
-              />
-              {t('blocks.fields.hideEmpty')}
-            </label>
+            <BlockCheckbox
+              checked={hides}
+              label={t('blocks.fields.hideEmpty')}
+              onChange={(checked) => patchElement(element.id, {
+                // Gleich der Blockregel: kein eigener Wert — die Regel des Blocks gilt.
+                hideWhenEmpty: checked === model.display.readHideEmpty ? undefined : checked,
+              })}
+            />
           </div>
         );
       })}
 
-      <label className="flex items-start gap-2 text-xs text-stone-400 cursor-pointer">
-        <input
-          type="checkbox"
-          className="block-checkbox mt-0.5"
-          checked={model.display.readOnly}
-          onChange={(e) => write({ ...model, display: { ...model.display, readOnly: e.target.checked } })}
-        />
-        <span>
-          {t('blocks.fields.readOnly')}
-          <span className="block text-[10px] text-stone-600">{t('blocks.fields.readOnlyHint')}</span>
-        </span>
-      </label>
-    </div>
-  );
-}
-
-function OptionsEditor({ element, onChange }: { element: ElementDef; onChange: (options: NonNullable<ElementDef['options']>) => void }) {
-  const { t } = useTranslation();
-  const options = element.options ?? [];
-  return (
-    <div className="space-y-1">
-      <p className="label-xs">{t('blocks.fields.options')}</p>
-      {options.map((option) => (
-        <div key={option.id} className="flex items-center gap-1.5">
-          <input
-            className={OP_PROP_SELECT_CLASSES}
-            value={option.label}
-            placeholder={t('blocks.fields.optionPlaceholder')}
-            onChange={(e) => onChange(options.map((o) => (o.id === option.id ? { ...o, label: e.target.value } : o)))}
-          />
-          <button
-            type="button"
-            className="block-row-action"
-            onClick={() => onChange(options.filter((o) => o.id !== option.id))}
-            title={t('blocks.fields.removeOption')}
-            aria-label={t('blocks.fields.removeOption')}
-          >
-            <X size={12} />
-          </button>
-        </div>
-      ))}
-      <button
-        type="button"
-        className="block-insert-btn"
-        onClick={() => onChange([...options, { id: generateId(), label: '' }])}
-      >
-        <Plus size={12} />
-        <span>{t('blocks.fields.addOption')}</span>
-      </button>
+      <BlockCheckbox
+        checked={model.display.readOnly}
+        label={t('blocks.fields.readOnly')}
+        hint={t('blocks.fields.readOnlyHint')}
+        onChange={(readOnly) => write({ ...model, display: { ...model.display, readOnly } })}
+      />
     </div>
   );
 }

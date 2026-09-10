@@ -19,8 +19,11 @@ import { LEGACY_WIKI_CATEGORIES } from './schemaV37';
 import { categoryKey } from './categoryMerge';
 import { categoryLabel } from './categories';
 import { useCategoryStore } from '../store/categoryStore';
-import { toInt } from './row';
-import { generateId } from './helpers';
+import { useBlockDefinitionStore } from '../store/blockDefinitionStore';
+import { fromRow, toInt } from './row';
+import { isDefinitionId } from './blocks/definitions';
+import { entryBlockSummary } from './blocks/entrySummary';
+import { generateId, nowIso } from './helpers';
 import i18n from '../i18n';
 import { buildLinkItems, linkItemKey, linkItemsByKey } from './linkItems';
 import {
@@ -191,8 +194,15 @@ function legacyFieldTargets(fields: Array<{
 
 // ── File format ──────────────────────────────────────────────────────────────
 
+/**
+ * '1' = bis v38; '2' = die Datei trägt `meta.blockDefinitions`. Nur dann —
+ * ein Eintrag ohne eigene Blöcke (und jeder Altar) bleibt '1', damit eine
+ * ältere App ihn weiterhin annimmt.
+ */
+type EmeraldVersion = '1' | '2';
+
 interface EmeraldFile {
-  version: '1';
+  version: EmeraldVersion;
   type: 'journal' | 'wiki' | 'operations' | 'altar';
   title: string;
   createdAt: string;
@@ -249,6 +259,13 @@ interface EmeraldMeta {
    * Modul-Typen ab, nicht nur Operationen und Wiki-Artikel.
    */
   contentLinks?: Array<{ id: string; entryType: string; title: string }>;
+  /**
+   * Die eigenen Blöcke, von denen der Inhalt Kopien trägt (seit '2'). Die
+   * Kopien kommen ohne sie aus — gerendert wird aus der Kopie. Mit ihnen
+   * erkennt der Ziel-Vault die Herkunft wieder und bietet „Aktualisieren" an.
+   * Beim Import nach ID angelegt, wenn es sie dort nicht gibt.
+   */
+  blockDefinitions?: Array<Record<string, unknown>>;
   // altar — background_image_data is a stored image filename, so it's routed
   // through `images` like content images. icon_data, thumbnail_data, and item
   // images are already data: URLs (or a plain emoji, for icon) in the DB, so
@@ -402,6 +419,8 @@ export async function exportAsEmerald(): Promise<void> {
   // Titel zu jedem Link-Chip im Inhalt — gilt für alle drei Typen, denn
   // Journal, Wiki und Operationen können gleichermaßen verlinken.
   meta.contentLinks = collectContentLinks(content);
+  const blockDefinitions = definitionsUsedIn(view.id, content);
+  if (blockDefinitions.length) meta.blockDefinitions = blockDefinitions;
 
   // Embed all local images from content as base64
   const images: Record<string, string> = {};
@@ -411,7 +430,9 @@ export async function exportAsEmerald(): Promise<void> {
     } catch { /* skip missing files */ }
   }
 
-  const file: EmeraldFile = { version: '1', type, title, createdAt, content, images, meta };
+  const file: EmeraldFile = {
+    version: meta.blockDefinitions ? '2' : '1', type, title, createdAt, content, images, meta,
+  };
 
   const savePath = await save({
     defaultPath: exportFilename(title, createdAt, 'emerald'),
@@ -497,6 +518,31 @@ async function exportAltarAsEmerald(): Promise<void> {
   await invoke('write_file', { path: savePath, content: JSON.stringify(file, null, 2) });
 }
 
+/** Die aktiven eigenen Blöcke, von denen der Inhalt Kopien trägt — für `meta.blockDefinitions`. */
+function definitionsUsedIn(entryId: string, content: string): NonNullable<EmeraldMeta['blockDefinitions']> {
+  const ids = new Set(entryBlockSummary(entryId, content).origins.map((o) => o.id));
+  if (!ids.size) return [];
+  return useBlockDefinitionStore.getState().definitions
+    .filter((d) => ids.has(d.id))
+    .map(({ id, name, icon, description, elements, display, revision }) => ({
+      id, name, icon, description, elements, display, revision,
+    }));
+}
+
+/**
+ * Die mitgebrachten eigenen Blöcke anlegen, soweit es sie hier nicht gibt.
+ * Die Datei ist fremd: jede Definition läuft durch dieselbe Prüfung wie eine
+ * Datenbankzeile, eine ohne brauchbare ID fällt weg.
+ */
+async function importBlockDefinitions(raw: EmeraldMeta['blockDefinitions']): Promise<void> {
+  if (!Array.isArray(raw) || !raw.length) return;
+  const now = nowIso();
+  const defs = raw
+    .filter((r): r is Record<string, unknown> => typeof r === 'object' && r !== null && isDefinitionId(r.id))
+    .map((r) => fromRow.blockDefinition({ ...r, created_at: now, updated_at: now, deleted_at: null }));
+  await useBlockDefinitionStore.getState().importDefinitions(defs);
+}
+
 // ── Import helpers ───────────────────────────────────────────────────────────
 
 /** Ensures each tag name exists in the tags table, then returns the names unchanged.
@@ -544,7 +590,7 @@ export async function importFromEmerald(): Promise<void> {
     return;
   }
 
-  if (file.version !== '1') {
+  if (file.version !== '1' && file.version !== '2') {
     await message('Unsupported Emerald file version.', { title: 'Import', kind: 'error' });
     return;
   }
@@ -595,6 +641,9 @@ export async function importFromEmerald(): Promise<void> {
     } else {
       newId = await importOperationEntry(file, content, tagNames);
     }
+    // Nach dem Eintrag: scheitert der, bleibt keine Definition verwaist
+    // zurück. Die Kopien im Inhalt brauchen sie nicht, um zu funktionieren.
+    await importBlockDefinitions(file.meta.blockDefinitions);
   } catch (e) {
     await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
     return;

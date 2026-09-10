@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
+import {
+  useCallback, useEffect, useMemo, useReducer, useRef, useState,
+  type MouseEvent, type MutableRefObject, type PointerEvent, type ReactNode,
+} from 'react';
 import { Reorder, useDragControls } from 'framer-motion';
 import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, Plus, Puzzle } from 'lucide-react';
+import { Eye, EyeOff, Plus, Puzzle, RefreshCw } from 'lucide-react';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import EditorToolbar from '../editor/EditorToolbar';
 import LinkPickerModal from '../editor/LinkPickerModal';
@@ -28,7 +31,9 @@ import { REORDER_SPRING } from '../../lib/motion';
 import { flashReveal, scrollIntoViewCentered } from '../../lib/reveal';
 import { createTextBlock, neutralizeSectionTags, parseBlocks, serializeBlocks } from '../../lib/blocks/blockHtml';
 import { resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockTypes';
-import { BLOCK_PRESETS, blockIcon } from '../../lib/blocks/presets';
+import { blockIcon, createFromPreset } from '../../lib/blocks/presets';
+import { blockOrigin, isOutdatedCopy, updateInstanceToDefinition, type BlockDefinition } from '../../lib/blocks/definitions';
+import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import { blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
 import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockAttrName, type BlockInstance } from '../../lib/blocks/types';
 import { useBlockSessionStore, type BlockStackApi } from '../../store/blockSessionStore';
@@ -87,10 +92,7 @@ const REVEAL_MS = 1600;
 export default function BlockStack({ entryId, initialContent, isEditing, placeholder, onChange, onReadModeChange }: BlockStackProps) {
   const { t } = useTranslation();
 
-  const [blocks, setBlocks] = useState<BlockInstance[]>(() => {
-    const parsed = parseBlocks(initialContent);
-    return parsed.length > 0 ? parsed : [createTextBlock()];
-  });
+  const [blocks, setBlocks] = useState<BlockInstance[]>(() => blocksFromContent(initialContent));
   const blocksRef = useRef(blocks);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -114,6 +116,16 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
   // den Ref-Stand ziehen. Der Baum bleibt derselbe (siehe BlockFrame) — falls
   // doch einmal etwas neu montiert, sieht es das zuletzt getippte HTML.
   useEffect(() => { setBlocks(blocksRef.current); }, [isEditing]);
+
+  const resetEpoch = useExternalContentReset(initialContent, isEditing, blocksRef, setBlocks, onChangeRef);
+
+  const definitions = useBlockDefinitionStore((s) => s.definitions);
+  /** Die Definition, wenn der Block eine veraltete Kopie von ihr ist — dann gibt es „Block aktualisieren". */
+  const outdatedDefinitionOf = (block: BlockInstance): BlockDefinition | undefined => {
+    const origin = blockOrigin(block);
+    const def = origin ? definitions.find((d) => d.id === origin.id) : undefined;
+    return def && isOutdatedCopy(block, def) ? def : undefined;
+  };
 
   const { registerTextEditor, orderedEditors, targetEditor, toolbarEditor, focusOnMount } =
     useTextEditorRegistry(() => blocksRef.current);
@@ -221,7 +233,7 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
 
   const insertAt = (index: number, presetId: string) => {
-    const block = BLOCK_PRESETS.find((p) => p.id === presetId)?.create();
+    const block = createFromPreset(presetId, definitions);
     if (!block) return;
     if (block.type === TEXT_BLOCK_TYPE) focusOnMount(block.id);
     const next = [...blocksRef.current];
@@ -332,15 +344,24 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
   const openAddMenu = (e: MouseEvent, index: number) => setMenu({
     x: e.clientX,
     y: e.clientY,
-    actions: addBlockActions(t, (presetId) => insertAt(index, presetId)),
+    actions: addBlockActions(t, (presetId) => insertAt(index, presetId), definitions),
   });
 
   const openBlockMenu = (e: MouseEvent, block: BlockInstance, meta: BlockTypeMeta | undefined) => {
     const hidden = isBlockHidden(block);
+    const def = outdatedDefinitionOf(block);
     setMenu({
       x: e.clientX,
       y: e.clientY,
       actions: [
+        // Wie jede Blockänderung über den Editor — Abbrechen dreht sie zurück.
+        ...(def
+          ? [{
+              label: t('blocks.update'),
+              icon: <RefreshCw size={12} />,
+              onClick: () => updateBlock(block.id, updateInstanceToDefinition(block, def, fieldTextRef.current)),
+            }]
+          : []),
         {
           label: hidden ? t('blocks.show') : t('blocks.hide'),
           icon: hidden ? <Eye size={12} /> : <EyeOff size={12} />,
@@ -393,7 +414,7 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
           const meta = resolveBlockType(block);
           const label = blockLabel(t, block, meta);
           return (
-            <StackItem key={block.id} id={block.id}>
+            <StackItem key={`${block.id}:${resetEpoch}`} id={block.id}>
               {(startDrag) => (
                 <>
                   <BlockFrame
@@ -402,6 +423,7 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
                     label={label}
                     hidden={isBlockHidden(block)}
                     showReadTitle={showsTitleInRead(block, meta)}
+                    outdated={isEditing && !!outdatedDefinitionOf(block)}
                     onGripPointerDown={startDrag}
                     onOpenMenu={(e) => openBlockMenu(e, block, meta)}
                   >
@@ -429,6 +451,49 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
       <DragGhost />
     </BlockStackContext.Provider>
   );
+}
+
+/** Die Blöcke eines Inhalts — ein leerer Eintrag bekommt einen leeren Textblock. */
+function blocksFromContent(content: string): BlockInstance[] {
+  const parsed = parseBlocks(content);
+  return parsed.length > 0 ? parsed : [createTextBlock()];
+}
+
+/**
+ * Von außen geänderter Inhalt, während der Eintrag gelesen wird — „Alle
+ * aktualisieren" oder „aus Einträgen entfernen" in der Blöcke-Ansicht. Der
+ * Stapel ist unkontrolliert und sähe es sonst erst nach einem Neuladen;
+ * schlimmer, der Content-Mirror der View behielte den alten Stand, und
+ * „Fertig" nach einem späteren Bearbeiten schriebe ihn zurück.
+ *
+ * Nur eine echte Änderung der Prop zählt, nie der Moduswechsel: nach „Fertig"
+ * hinkt der Store kurz hinterher. Beim Bearbeiten gehört der Inhalt dem
+ * Editor, und was der Stapel selbst geschrieben hat (Lesemodus-Abhaken), ist
+ * schon sein Stand. Liefert eine Epoche für die Keys: ein Textblock liest sein
+ * HTML nur beim Start und muss neu montieren.
+ */
+function useExternalContentReset(
+  initialContent: string,
+  isEditing: boolean,
+  blocksRef: MutableRefObject<BlockInstance[]>,
+  setBlocks: (blocks: BlockInstance[]) => void,
+  onChangeRef: MutableRefObject<(content: string) => void>,
+): number {
+  const [epoch, setEpoch] = useState(0);
+  const seenRef = useRef(initialContent);
+  const isEditingRef = useRef(isEditing);
+  isEditingRef.current = isEditing;
+  useEffect(() => {
+    if (seenRef.current === initialContent) return;
+    seenRef.current = initialContent;
+    if (isEditingRef.current || initialContent === serializeBlocks(blocksRef.current)) return;
+    const next = blocksFromContent(initialContent);
+    blocksRef.current = next;
+    setBlocks(next);
+    setEpoch((n) => n + 1);
+    onChangeRef.current(initialContent);
+  }, [initialContent, blocksRef, setBlocks, onChangeRef]);
+  return epoch;
 }
 
 /** Ein Listenplatz im Stapel. Gezogen wird nur am Griff — sonst ließe sich im

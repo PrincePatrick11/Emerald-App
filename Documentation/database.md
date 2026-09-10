@@ -15,6 +15,8 @@ Two consumers share those strings, and that sharing is the point of the file:
 
 **Migration v33** `normalize_schema` no longer builds from `schema.ts` directly. Since v38 replaced the four per-module category tables with one `categories` table, `schema.ts` and the shape v33 has to produce disagree — running v33 against the live DDL would create `categories` on an old vault and then fail copying `wiki_categories`/`operation_categories`/`task_categories`/`altar_categories`, whose columns no longer exist there. `src/lib/schemaV37.ts` freezes v33's target shape instead: the tables that changed since v37 (the four category tables plus the five content tables that referenced them) as their own DDL, everything else re-exported from `schema.ts`. **Whoever changes one of those tables in a later migration must freeze it there too**, or v33 silently starts building the new shape on old vaults.
 
+Indexes follow the same rule in a smaller way: v38 creates `INDEX_DDL_V38`, not `INDEX_DDL`, because in the chain it runs before the tables of later migrations exist. A table added after v38 brings its own index constant (`BLOCK_DEFINITIONS_INDEX_DDL` for v39), which its migration creates and `INDEX_DDL` appends for fresh vaults.
+
 Because the baseline and both rebuilds ultimately produce the same schema, they cannot drift apart. `npm run check:schema` proves it: it builds a vault each way and compares `sqlite_master`, `PRAGMA table_info`, `PRAGMA foreign_key_list`, and every index, table by table — including a v33 resume-after-crash path and a v38 resume-after-crash path, and a check that a fresh vault seeds the same categories a migrated one ends up with. The script covers more than the schema comparison — it also exercises migration v35's image-reference rewrite, migration v36's journal-link rewrite (below), and the constants that are mirrored between `images.rs` / `schema.ts` / `vault.rs` / `vaultManager.ts` / `tauri.conf.json` (image extensions, vault file names, scheme name). It needs `esbuild`, which is declared in `devDependencies`. Without that coupling and that check, the two paths quietly diverge after a few releases and nobody notices until a user hits an error.
 
 ## Migration Model
@@ -31,7 +33,7 @@ The emptiness check looks at `sqlite_master`, not at `schema_version`: a databas
 
 Afterwards `runPeriodicCleanup(db)` purges trashed rows older than 30 days. It is **not** a migration — idempotent, time-dependent, and run on every vault open.
 
-The current version is **38**, and `BASELINE_VERSION` in `schema.ts` must equal the highest entry in `MIGRATIONS`. `runMigrations` throws at startup if the two disagree, so a new migration cannot be added without updating the baseline.
+The current version is **39**, and `BASELINE_VERSION` in `schema.ts` must equal the highest entry in `MIGRATIONS`. `runMigrations` throws at startup if the two disagree, so a new migration cannot be added without updating the baseline.
 
 Note that **version 24 is genuinely missing** — no entry with that number has existed for some time. The runner tolerates gaps; it only requires each version to be above the last applied one.
 
@@ -167,6 +169,25 @@ Since v38, one list for Wiki, Operations, Tasks, and Altar items — replacing t
 | deleted_at | TEXT | NULL = active |
 
 No `UNIQUE` on `name` — uniqueness is enforced by the store (`categoryKey`: trimmed, case-insensitive), not the database, because a `UNIQUE` index would block restoring a trashed category from the trash the moment an active one shares its name. `other` is the fallback everything reassigns to on delete (`FALLBACK_CATEGORY_ID`); `sigils` is the one category with behaviour — an operation in it is a sigil and opens the sigil editor (`SIGIL_CATEGORY_ID`). A fresh vault also seeds eight ordinary starter categories (`STARTER_CATEGORIES`: paradigm, ritual, meditation, herbs, crystals, candles, deities, tools), named in the app's language at creation time and freely renamable/deletable from then on.
+
+### block_definitions
+
+Since v39: the user-built blocks of the Blocks view. A row is only the template — an inserted block is a **copy** inside the entry's `content` (a `core.fields` section carrying its own elements, display rules, name and icon, plus `data-block-origin="<id>"` and `data-block-rev="<revision>"`). Nothing references this table by foreign key, and deleting a row touches no entry.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | TEXT PK | UUID; copies name it in `data-block-origin`, which is why imports keep it |
+| name | TEXT | NOT NULL |
+| icon | TEXT | emoji, NOT NULL DEFAULT `'🧩'` |
+| description | TEXT | NOT NULL DEFAULT `''`; not passed on to copies |
+| elements | TEXT | JSON array of `ElementDef` (`id`, `kind`, `label`, `options`, `hideWhenEmpty`, `archived`), NOT NULL DEFAULT `'[]'`; read through the same validation as a copy in content |
+| display | TEXT | JSON `{ readHideEmpty, readOnly, showTitle }`, NOT NULL DEFAULT `'{}'` (missing keys fall back to their defaults) |
+| revision | INTEGER | NOT NULL DEFAULT 1; rises with every save that changes name, icon, elements or display — a copy with a lower `data-block-rev` is "an older version" |
+| sort_order | INTEGER | NOT NULL DEFAULT 0 |
+| created_at / updated_at | TEXT | ISO 8601 |
+| deleted_at | TEXT | NULL = active; trashed rows are purged after 30 days like the content tables (`CLEANUP_TABLES`) |
+
+A removed element stays in `elements` with `archived: true`, so it can be restored and copies keep its values. The kind of an element never changes — the builder adds a new element instead.
 
 ### altars
 
@@ -414,7 +435,7 @@ Full vault snapshots are exported and imported via Settings → Backup.
 
 ```json
 {
-  "version": "4",
+  "version": "5",
   "type": "backup",
   "exportedAt": "2026-04-18T...",
   "filters": { "includeJournal": true, "includeWiki": true, "..." : "..." },
@@ -425,15 +446,16 @@ Full vault snapshots are exported and imported via Settings → Backup.
     "altars": [], "altarItems": [], "altarPlacements": [],
     "tasks": [], "taskLinks": [],
     "categories": [],
+    "blockDefinitions": [],
     "links": []
   },
   "images": { "3f2a….png": "data:image/png;base64,..." }
 }
 ```
 
-`version` is `"4"` since v38 replaced the four per-module category arrays (`wikiCategories`/`operationCategories`/`taskCategories`/`altarCategories`) with one `categories` array, exported whenever any of Wiki, Operations, Tasks, or Altars is included. `migrateBackupPayload` lifts a `"1"` file on load: `wiki_articles.category` becomes `category_id`, `altar_items.category` is resolved from a category name to an id against the backup's own categories, and null `linked_*_ids` become `'[]'`. A v2 file needs no row changes, because `restoreImages` maps whatever keys the file carries — absolute paths in v1/v2, filenames in v3+ — onto the filenames of the images it just wrote, and `remapPaths` substitutes those throughout. A file below version `"4"` then runs `mergeLegacyCategoryArrays`: the same merge-by-display-name rule as migration v38 (`mergeCategoryRows`, translating built-in names into the app's current language via `legacyDisplayName`), producing the one `categories` array and remapping every content row's `category_id` onto it. Without that step `insertRows` would silently drop the columns it no longer recognises — its `PRAGMA table_info` filter guards against crafted files and cannot tell malicious apart from merely old — and every article from an older backup would land in the default category.
+`version` is `"5"` since v39 added `blockDefinitions` — the whole `block_definitions` table including trashed rows, exported whenever Journal, Wiki or Operations is included; a `"4"` file needs no conversion, it simply brings no blocks. It was `"4"` since v38 replaced the four per-module category arrays (`wikiCategories`/`operationCategories`/`taskCategories`/`altarCategories`) with one `categories` array, exported whenever any of Wiki, Operations, Tasks, or Altars is included. `migrateBackupPayload` lifts a `"1"` file on load: `wiki_articles.category` becomes `category_id`, `altar_items.category` is resolved from a category name to an id against the backup's own categories, and null `linked_*_ids` become `'[]'`. A v2 file needs no row changes, because `restoreImages` maps whatever keys the file carries — absolute paths in v1/v2, filenames in v3+ — onto the filenames of the images it just wrote, and `remapPaths` substitutes those throughout. A file below version `"4"` then runs `mergeLegacyCategoryArrays`: the same merge-by-display-name rule as migration v38 (`mergeCategoryRows`, translating built-in names into the app's current language via `legacyDisplayName`), producing the one `categories` array and remapping every content row's `category_id` onto it. Without that step `insertRows` would silently drop the columns it no longer recognises — its `PRAGMA table_info` filter guards against crafted files and cannot tell malicious apart from merely old — and every article from an older backup would land in the default category.
 
-**Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Routines / Altars / Tasks / Tags`, `dateFrom`, `dateTo`, `includeDeleted`. All content tables (journal, wiki, operations, routines, altars, tasks) are date-filtered on `created_at`; tags and `categories` are not. `includeDeleted` applies to the soft-deletable content tables — `tags` are always exported with `deleted_at IS NULL`, regardless of the option. `task_links` is scoped to exported task IDs.
+**Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Routines / Altars / Tasks / Tags`, `dateFrom`, `dateTo`, `includeDeleted`. All content tables (journal, wiki, operations, routines, altars, tasks) are date-filtered on `created_at`; tags, `categories` and `block_definitions` are not (block definitions always travel complete, trashed rows included). `includeDeleted` applies to the soft-deletable content tables — `tags` are always exported with `deleted_at IS NULL`, regardless of the option. `task_links` is scoped to exported task IDs.
 
 `altar_items` (the library) is exported in full whenever `includeAltars` is set — every row, regardless of the altar date filter and even when no altar survives it. It is not an appendage of the altars: a library item can sit unplaced, created and edited entirely from the Altar dashboard's library section, without ever touching a canvas. `altar_placements` is the one still scoped to the exported altars (`altar_id IN (...)`), since a placement is meaningless without the altar it sits on. `doReplace` deletes and re-inserts `altar_items`/`altar_placements` together only when the file actually carries altars (`hasAltars`); when it doesn't — a date-filtered or library-only export — the library is inserted with `INSERT OR IGNORE` instead of being deleted first, so it adds to the existing library rather than emptying it (`altar_placements.item_id` is `ON DELETE CASCADE`, and clearing `altar_items` on every restore would tear placements off altars the file never meant to touch). The cost of `OR IGNORE` in that one case: an item that already exists locally keeps its local version rather than being overwritten by the file's.
 
@@ -450,6 +472,8 @@ Categories are exported in full, including soft-deleted ones. Filtering them by 
 | `add-vault` | Creates a new vault DB → `switchVault()` → runs the replace logic on the empty DB. |
 
 **Categories are resolved, never deleted, on either import mode** — `resolveImportedCategories` in `dbBackup.ts`. A category in the payload matches a local one by id (for the two built-ins) or by case-insensitive name (`categoryKey`, same rule as the store and migration v38); a match restores it from the trash if the local row is trashed but the imported one is active. Anything left over is inserted fresh, with a new id if the payload's id is already taken locally. The four content arrays are then remapped onto the resulting local ids before insertion. The rule is deliberate: a category is shared across all four modules since v38, so a partial replace (Wiki only, say) must not delete categories out from under Tasks or Altar items that a full replace would have left alone.
+
+**Block definitions are added, never replaced or deleted**, in both modes — `insertBlockDefinitions`, an `INSERT OR IGNORE` by id without the merge prefix, since the copies in the imported content name their definition by exactly that id. It runs before `doReplace`'s first `DELETE` and normalises every row to the full column set first (ids must pass `isDefinitionId`; rows without one are dropped), so a malformed array in a crafted file can neither abort a replace that has already emptied tables nor slip a partial row past `insertRows`, which takes its column list from the first row. A definition that already exists locally (even in the trash) keeps its local version; the copies render from their own content either way.
 
 Rows are inserted parents-first; foreign keys are active during import and reject anything else. The concrete order is hard-coded per import path (`doReplace` and `doMerge` each have their own) and does *not* follow the order in `TABLES` — e.g. `links` goes last, not third.
 

@@ -20,7 +20,7 @@ import type Database from '@tauri-apps/plugin-sql';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 38;
+export const BASELINE_VERSION = 39;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
@@ -39,6 +39,7 @@ export const TABLES = [
   'links',
   'routines',
   'categories',
+  'block_definitions',
   'altars',
   'journal_entries',
   'wiki_articles',
@@ -51,8 +52,13 @@ export const TABLES = [
 
 export type TableName = (typeof TABLES)[number];
 
-/** Tabellen mit Soft-Delete. Ihre `deleted_at`-Spalte ist indiziert. */
-export const SOFT_DELETE_TABLES = [
+/**
+ * Die Tabellen mit Soft-Delete bis v38 — ihre `deleted_at`-Spalte indiziert
+ * `INDEX_DDL_V38`. Eine spätere Tabelle gehört NICHT hierher: v38 legt diese
+ * Indizes mitten in der Kette an, wo es sie noch nicht gibt. Sie bringt ihren
+ * Index selbst mit (siehe `BLOCK_DEFINITIONS_INDEX_DDL`).
+ */
+export const SOFT_DELETE_TABLES_V38 = [
   'journal_entries',
   'wiki_articles',
   'tags',
@@ -119,6 +125,30 @@ export const TABLE_DDL: Record<TableName, string> = {
       emoji TEXT NOT NULL DEFAULT '📁',
       sort_order INTEGER NOT NULL DEFAULT 0,
       is_builtin INTEGER NOT NULL DEFAULT 0,
+      deleted_at TEXT
+    )`,
+
+  // Die eigenen Blöcke der Blöcke-Ansicht (seit v39). Eine Definition ist die
+  // Vorlage für Kopien: ein eingefügter Block trägt Elemente und Anzeigeregeln
+  // selbst im `content` und merkt sich nur Herkunft und Revision
+  // (`data-block-origin`/`-rev`). Deshalb kein Fremdschlüssel und kein
+  // Aufräumen beim Löschen — die Kopien kommen ohne ihre Definition aus.
+  // `elements`/`display` sind JSON (lib/blocks/definitions.ts); `revision`
+  // steigt mit jeder Änderung, die Kopien betrifft. Der Icon-Default ist
+  // `DEFAULT_DEFINITION_ICON` — hier als Literal, damit das Schema nichts aus
+  // der Blocklogik importiert.
+  block_definitions: `
+    CREATE TABLE block_definitions (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      icon TEXT NOT NULL DEFAULT '🧩',
+      description TEXT NOT NULL DEFAULT '',
+      elements TEXT NOT NULL DEFAULT '[]',
+      display TEXT NOT NULL DEFAULT '{}',
+      revision INTEGER NOT NULL DEFAULT 1,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
       deleted_at TEXT
     )`,
 
@@ -281,7 +311,7 @@ export const TABLE_DDL: Record<TableName, string> = {
  * auf jeder `deleted_at`-Spalte. Letztere, weil `runPeriodicCleanup` bei jedem
  * Öffnen eines Vaults einen Bereichsscan über alle Soft-Delete-Tabellen fährt.
  */
-export const INDEX_DDL: string[] = [
+export const INDEX_DDL_V38: readonly string[] = [
   'CREATE INDEX idx_links_source ON links(source_id)',
   'CREATE INDEX idx_links_target ON links(target_id)',
   'CREATE INDEX idx_task_links_task ON task_links(task_id)',
@@ -293,8 +323,18 @@ export const INDEX_DDL: string[] = [
   'CREATE INDEX idx_altar_items_category ON altar_items(category_id)',
   'CREATE INDEX idx_altar_placements_altar ON altar_placements(altar_id)',
   'CREATE INDEX idx_altar_placements_item ON altar_placements(item_id)',
-  ...SOFT_DELETE_TABLES.map((t) => `CREATE INDEX idx_${t}_deleted ON ${t}(deleted_at)`),
+  ...SOFT_DELETE_TABLES_V38.map((t) => `CREATE INDEX idx_${t}_deleted ON ${t}(deleted_at)`),
 ];
+
+/**
+ * Der Index von `block_definitions` (v39), getrennt von `INDEX_DDL_V38`: v38
+ * (`mergeCategoryTables`) legt seine Liste mitten in der Kette an, wo es die
+ * Tabelle noch nicht gibt. v39 legt ihn an, frische Vaults über `INDEX_DDL`.
+ */
+export const BLOCK_DEFINITIONS_INDEX_DDL = 'CREATE INDEX idx_block_definitions_deleted ON block_definitions(deleted_at)';
+
+/** Alle Indizes des aktuellen Schemas — was ein frischer Vault bekommt. */
+export const INDEX_DDL: readonly string[] = [...INDEX_DDL_V38, BLOCK_DEFINITIONS_INDEX_DDL];
 
 /**
  * Das Sammelbecken: Inhalte einer gelöschten Kategorie landen hier. Eingebaut

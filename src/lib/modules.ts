@@ -14,6 +14,7 @@
  * Zyklus: nicht tun.
  */
 import {
+  Blocks,
   BookOpen,
   CheckSquare,
   Flame,
@@ -48,7 +49,7 @@ export const DEFAULT_ENTRY_EMOJI: Record<ContentType, string> = {
 export const ENTRY_MODULE_IDS = ['journal', 'tasks', 'operations', 'wiki', 'altar'] as const;
 export type EntryModuleId = (typeof ENTRY_MODULE_IDS)[number];
 
-export const AUX_VIEW_IDS = ['home', 'tags', 'trash'] as const;
+export const AUX_VIEW_IDS = ['home', 'tags', 'trash', 'blocks'] as const;
 export type AuxViewId = (typeof AUX_VIEW_IDS)[number];
 
 /** Alles, was `ActiveView.type` sein kann. */
@@ -89,6 +90,7 @@ export const AUX_VIEWS: Record<AuxViewId, { icon: LucideIcon; navLabelKey: strin
   home: { icon: Home, navLabelKey: 'nav.home' },
   tags: { icon: Tag, navLabelKey: 'nav.tags' },
   trash: { icon: Trash2, navLabelKey: 'nav.trash' },
+  blocks: { icon: Blocks, navLabelKey: 'nav.blocks' },
 };
 
 const VIEW_ID_SET: ReadonlySet<string> = new Set<string>([...ENTRY_MODULE_IDS, ...AUX_VIEW_IDS]);
@@ -123,7 +125,7 @@ export function viewTypeForEntryType(entryType: ContentType): EntryModuleId {
 
 /** Alle Papierkorb-Eintragstypen (`TrashedItem['type']`). */
 export const TRASH_KINDS = [
-  'journal', 'wiki', 'tag', 'operation', 'task', 'category',
+  'journal', 'wiki', 'tag', 'operation', 'task', 'category', 'blockDefinition',
 ] as const;
 export type TrashKind = (typeof TRASH_KINDS)[number];
 
@@ -136,4 +138,5 @@ export const TRASH_KIND_ICONS: Record<TrashKind, LucideIcon> = {
   // Liste, nicht die einzelne erledigte Aufgabe.
   task: ListTodo,
   category: FolderOpen,
+  blockDefinition: Blocks,
 };

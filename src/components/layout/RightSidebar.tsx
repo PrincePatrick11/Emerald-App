@@ -132,7 +132,7 @@ export default function RightSidebar() {
   // 200ms-Zuklapp-Animation und solange der Chunk einer lazy geladenen
   // Listenansicht noch lädt.
   if (!activeView.id) {
-    const hasDashboard = activeView.type !== 'home' && activeView.type !== 'tags';
+    const hasDashboard = activeView.type !== 'home' && activeView.type !== 'tags' && activeView.type !== 'blocks';
     return (
       <div ref={setListHeaderHost} className="flex flex-col h-full">
         {!hasDashboard && (

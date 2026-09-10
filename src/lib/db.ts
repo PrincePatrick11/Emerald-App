@@ -1,12 +1,16 @@
 import Database from '@tauri-apps/plugin-sql';
 import { invoke } from '@tauri-apps/api/core';
 import { getActiveDbConnectionString, getActiveVaultId } from './vaultManager';
-import { BASELINE_VERSION, IMAGE_FIELDS, TABLE_DDL, createSchema, ddlIfNotExists, seedBuiltins, storedImageName } from './schema';
+import {
+  BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, IMAGE_FIELDS, TABLE_DDL, createSchema, ddlIfNotExists, seedBuiltins,
+  storedImageName,
+} from './schema';
 import { normalizeSchema } from './normalizeSchema';
 import { adoptLegacyImages, rewriteImageRefs } from './images';
 import { migrateLinkedIdsToContent } from './migrateLinkedIdsToContent';
 import { migrateJournalFieldsToContent } from './migrateJournalFieldsToContent';
 import { mergeCategoryTables } from './mergeCategoryTables';
+import { createIndexesIfMissing } from './dbRebuild';
 import i18n from '../i18n';
 
 // Per-vault DB cache: SQLite identifier → Database instance
@@ -204,6 +208,8 @@ const CLEANUP_TABLES = [
   'tags',
   'operations',
   'tasks',
+  // Ohne Fremdschlüssel und ohne Nachlauf: Einträge tragen ihre Kopien selbst.
+  'block_definitions',
 ] as const;
 
 /**
@@ -1134,5 +1140,17 @@ export const MIGRATIONS: Migration[] = [
     version: 38,
     name: 'merge_category_tables',
     up: mergeCategoryTables,
+  },
+  {
+    // Die eigenen Blöcke der Blöcke-Ansicht bekommen ihre Tabelle. Rein
+    // additiv: Einträge tragen ihre Kopien im `content`, hier steht nur die
+    // Vorlage. IF NOT EXISTS, damit ein angelegter, aber nicht gestempelter
+    // Lauf beim nächsten Start nicht hängen bleibt.
+    version: 39,
+    name: 'block_definitions',
+    up: async (db) => {
+      await db.execute(ddlIfNotExists(TABLE_DDL.block_definitions));
+      await createIndexesIfMissing(db, [BLOCK_DEFINITIONS_INDEX_DDL]);
+    },
   },
 ];

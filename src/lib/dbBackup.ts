@@ -24,11 +24,13 @@ import {
 } from './vaultManager';
 import { imageRefsInHtml, isStoredImage, readImageAsBase64, saveImage } from './images';
 import { clearSearchTextCache } from './searchText';
+import { clearEntrySummaryCache } from './blocks/entrySummary';
+import { DEFAULT_DEFINITION_ICON, isDefinitionId } from './blocks/definitions';
 import { FALLBACK_CATEGORY_ID, IMAGE_FIELDS, imageColumns } from './schema';
 import { categoryKey, mergeCategoryRows, type CategorySource } from './categoryMerge';
 import { legacyDisplayName, type LegacyCategoryTable } from './categories';
 import i18n from '../i18n';
-import { generateId } from './helpers';
+import { generateId, nowIso } from './helpers';
 import { useVaultStore } from '../store/vaultStore';
 import { reloadAllStores } from '../store/moduleWiring';
 import { useUIStore } from '../store/uiStore';
@@ -105,9 +107,10 @@ type Row = Record<string, any>;
  * Bilder als Dateiname statt als absoluter Pfad referenziert werden, '4' =
  * seit v38 eine Tabelle `categories` die vier Modul-Tabellen ersetzt
  * (`data.categories` statt `wikiCategories`/`operationCategories`/
- * `taskCategories`/`altarCategories`).
+ * `taskCategories`/`altarCategories`), '5' = seit v39 die eigenen Blöcke als
+ * `data.blockDefinitions` mitreisen.
  */
-const BACKUP_VERSION = '4' as const;
+const BACKUP_VERSION = '5' as const;
 
 /** Die vier Kategorie-Arrays von Sicherungen bis Version 3. */
 interface LegacyCategoryArrays {
@@ -183,12 +186,14 @@ export function migrateBackupPayload(backup: BackupFile): void {
   // Eine Version, die diese App noch nicht kennt, wird zurückgewiesen statt
   // umgestempelt — sonst liefe eine Datei aus einer neueren Version durch den
   // Import, als wäre sie verstanden worden. `.emerald` hält es ebenso.
-  if (backup.version > BACKUP_VERSION) {
+  // Als Zahl: ein String-Vergleich hielte '10' für älter als '4'.
+  const version = Number(backup.version);
+  if (!Number.isInteger(version) || version < 1 || version > Number(BACKUP_VERSION)) {
     throw new Error(`Unsupported backup version: ${backup.version}`);
   }
   const data = backup.data as BackupFile['data'] & LegacyCategoryArrays;
 
-  if (backup.version === '1') {
+  if (version === 1) {
     for (const row of data.wikiArticles ?? []) {
       if (row.category_id === undefined && row.category !== undefined) {
         row.category_id = row.category;
@@ -221,15 +226,18 @@ export function migrateBackupPayload(backup: BackupFile): void {
   // uebersetzt die Schluessel der Datei so oder so.
 
   // v3 → v4: vier Kategorie-Arrays werden eines.
-  if (backup.version !== '4') {
+  if (version < 4) {
     mergeLegacyCategoryArrays(data);
   }
+
+  // v4 → v5 braucht keinen Schritt: neu ist nur das Array `blockDefinitions`,
+  // und eine Datei ohne es bringt schlicht keine eigenen Blöcke mit.
 
   backup.version = BACKUP_VERSION;
 }
 
 interface BackupFile {
-  version: '1' | '2' | '3' | '4';
+  version: '1' | '2' | '3' | '4' | '5';
   type: 'backup';
   exportedAt: string;
   filters: BackupOptions;
@@ -239,6 +247,8 @@ interface BackupFile {
     operations?: Row[];
     /** Die globale Liste; dabei, sobald eines der vier kategorisierten Module dabei ist. */
     categories?: Row[];
+    /** Die eigenen Blöcke (seit '5'); dabei, sobald Journal, Wiki oder Operationen dabei sind. */
+    blockDefinitions?: Row[];
     tags?: Row[];
     routines?: Row[];
     altars?: Row[];
@@ -459,6 +469,14 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
     data.categories = await db.select<Row[]>(`SELECT * FROM categories`);
   }
 
+  // ── Eigene Blöcke ────────────────────────────────────────────────────────
+  // Die Vorlagen der Kopien im Inhalt. Die Kopien kommen ohne sie aus, aber
+  // ohne Definition gibt es kein „Aktualisieren" mehr. Ganz, samt Papierkorb —
+  // eine Liste, keine Datumsfrage.
+  if (options.includeJournal || options.includeWiki || options.includeOperations) {
+    data.blockDefinitions = await db.select<Row[]>(`SELECT * FROM block_definitions`);
+  }
+
   // ── Embed images ─────────────────────────────────────────────────────────
   const images: Record<string, string> = {};
   for (const path of allImagePaths) {
@@ -601,6 +619,44 @@ async function insertRows(
 }
 
 /**
+ * Die eigenen Blöcke einer Sicherung: nach ID, `INSERT OR IGNORE` — eine
+ * Definition, die es hier schon gibt (auch im Papierkorb), bleibt, wie sie
+ * ist; gelöscht wird keine, auch nicht beim Ersetzen. Die Kopien in den
+ * Einträgen tragen ihre Elemente selbst, eine abweichende Fassung hier ändert
+ * an ihnen nichts. Präparierte `elements`/`display` fängt das Lesen ab
+ * (`fromRow.blockDefinition` prüft wie beim Inhalt).
+ *
+ * Die Datei ist fremd: jede Zeile wird vorher auf die vollständige Spaltenform
+ * gebracht — `insertRows` nimmt die Spalten der ersten Zeile, und eine Zeile
+ * ohne Pflichtspalte bräche das INSERT ab. Was keine brauchbare ID hat, fällt weg.
+ */
+async function insertBlockDefinitions(
+  db: Awaited<ReturnType<typeof getDb>>,
+  rows: unknown,
+): Promise<void> {
+  if (!Array.isArray(rows)) return;
+  const now = nowIso();
+  const text = (v: unknown, fallback: string) => (typeof v === 'string' ? v : fallback);
+  const json = (v: unknown, fallback: string) => (typeof v === 'string' ? v : JSON.stringify(v ?? JSON.parse(fallback)));
+  const normalized = rows
+    .filter((r): r is Row => typeof r === 'object' && r !== null && isDefinitionId((r as Row).id))
+    .map((r) => ({
+      id: r.id as string,
+      name: text(r.name, ''),
+      icon: text(r.icon, '') || DEFAULT_DEFINITION_ICON,
+      description: text(r.description, ''),
+      elements: json(r.elements, '[]'),
+      display: json(r.display, '{}'),
+      revision: Number.isInteger(r.revision) && (r.revision as number) > 0 ? r.revision : 1,
+      sort_order: Number.isFinite(r.sort_order) ? r.sort_order : 0,
+      created_at: text(r.created_at, now),
+      updated_at: text(r.updated_at, now),
+      deleted_at: typeof r.deleted_at === 'string' ? r.deleted_at : null,
+    }));
+  await insertRows(db, 'block_definitions', normalized, true);
+}
+
+/**
  * `tasks.parent_task_id` zeigt auf dieselbe Tabelle. Steht ein Kind in der
  * Sicherung vor seinem Elternteil, schlägt der Foreign Key beim INSERT fehl.
  * Deshalb erst ohne Elternbezug einfügen und ihn danach nachtragen — dann
@@ -639,8 +695,10 @@ function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFi
     ...(f.includeTasks      ? (d.tasks       ?? []).map((r) => r.id as string) : []),
   ]);
   const anyCategorized = f.includeWiki || f.includeOperations || f.includeTasks || f.includeAltars;
+  const anyBlocks = f.includeJournal || f.includeWiki || f.includeOperations;
   return {
     ...d,
+    blockDefinitions:   anyBlocks           ? d.blockDefinitions  : [],
     journalEntries:     f.includeJournal    ? d.journalEntries    : [],
     wikiArticles:       f.includeWiki       ? d.wikiArticles      : [],
     operations:         f.includeOperations ? d.operations        : [],
@@ -832,6 +890,11 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   const altars = (d.altars ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ALTAR, pathMap));
   const altarItems = remapCategoryIds((d.altarItems ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ITEM, pathMap)), catMap);
   const tasks = remapCategoryIds(d.tasks ?? [], catMap);
+
+  // Eigene Blöcke wie Kategorien: nie gelöscht, Fehlendes nach ID ergänzt,
+  // Vorhandenes bleibt. VOR dem ersten DELETE — scheitert hier etwas an einer
+  // präparierten Datei, ist noch nichts verloren (keine Transaktion, s. o.).
+  await insertBlockDefinitions(db, d.blockDefinitions);
 
   // Delete only the content types present in the backup (so a partial backup
   // replacing only Journal data won't wipe wiki/ops).
@@ -1060,6 +1123,8 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   // Kategorien sind schon aufgelöst (resolveImportedCategories oben); Tags:
   // INSERT OR IGNORE (no prefix — shared by name)
   if (d.tags) await insertRows(db, 'tags', d.tags, true);
+  // Ohne Präfix: die Kopien im Inhalt nennen ihre Definition über genau diese ID.
+  await insertBlockDefinitions(db, d.blockDefinitions);
 
   // Content: plain INSERT with prefixed IDs (no conflicts possible)
   await insertRows(db, 'journal_entries', journalEntries);
@@ -1160,6 +1225,7 @@ export async function importDatabase(
   // die ein Paar wiederverwendet und nur den Inhalt aendert, erbte sonst den
   // alten Text — der neue waere bis zum Neustart unauffindbar.
   clearSearchTextCache();
+  clearEntrySummaryCache();
 
   await reloadAllStores();
   } finally {

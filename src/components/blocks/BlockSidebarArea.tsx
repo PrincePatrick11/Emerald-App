@@ -7,6 +7,8 @@ import Button from '../ui/Button';
 import SidebarSectionHeader from '../sidebar/fields/SidebarSectionHeader';
 import { useUIStore } from '../../store/uiStore';
 import { useBlockSessionStore, type BlockSession } from '../../store/blockSessionStore';
+import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
+import BlockGlyph from './BlockGlyph';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { REORDER_SPRING } from '../../lib/motion';
 import { resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockTypes';
@@ -51,11 +53,12 @@ function BlockManager({ session }: { session: BlockSession }) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const { isEditing, api } = session;
   const rows = listedBlocks(session);
+  const definitions = useBlockDefinitionStore((s) => s.definitions);
 
   const openAddMenu = (e: MouseEvent) => setMenu({
     x: e.clientX,
     y: e.clientY,
-    actions: addBlockActions(t, (presetId) => api.insert(session.blocks.length, presetId)),
+    actions: addBlockActions(t, (presetId) => api.insert(session.blocks.length, presetId), definitions),
   });
 
   const openRowMenu = (e: MouseEvent, block: BlockInstance, meta: BlockTypeMeta | undefined) => {
@@ -149,7 +152,7 @@ function ManagerRow({
   const controls = useDragControls();
   const cancelledRef = useRef(false);
   const hidden = isBlockHidden(block);
-  const Icon = blockIcon(block, meta) ?? Puzzle;
+  const glyph = blockIcon(block, meta) ?? Puzzle;
 
   return (
     <Reorder.Item as="div" value={block.id} dragListener={false} dragControls={controls} transition={REORDER_SPRING} style={{ position: 'relative' }}>
@@ -170,7 +173,7 @@ function ManagerRow({
         )}
         {renaming ? (
           <>
-            <Icon size={12} className="flex-shrink-0" />
+            <BlockGlyph icon={glyph} />
             <input
               autoFocus
               defaultValue={customBlockTitle(block) ?? ''}
@@ -186,7 +189,7 @@ function ManagerRow({
           </>
         ) : (
           <button type="button" onClick={onReveal} title={t('blocks.jumpTo')} className="block-row-label">
-            <Icon size={12} className="flex-shrink-0" />
+            <BlockGlyph icon={glyph} />
             <span className="truncate text-[11px] font-medium">{label}</span>
           </button>
         )}

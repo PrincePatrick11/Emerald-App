@@ -2,19 +2,36 @@ import type { TFunction } from 'i18next';
 import { Copy, Trash2 } from 'lucide-react';
 import type { ContextMenuAction } from '../ui/ContextMenu';
 import type { BlockTypeMeta } from '../../lib/blocks/blockTypes';
-import { BLOCK_PRESETS } from '../../lib/blocks/presets';
+import type { BlockDefinition } from '../../lib/blocks/definitions';
+import { definitionLabel } from '../../lib/blocks/blockAttrs';
+import { BLOCK_PRESETS, definitionPresetId } from '../../lib/blocks/presets';
+import BlockGlyph from './BlockGlyph';
 
 /**
  * Menüeinträge, die Stapel (Rahmen-Menü, Einfügelinie) und Block-Verwaltung
  * der Seitenleiste teilen. Jedes Menü ergänzt seine eigenen Einträge davor.
  */
 
-/** „Block hinzufügen": ein Eintrag pro Voreinstellung (Text, jede Feldart). */
-export function addBlockActions(t: TFunction, onPick: (presetId: string) => void): ContextMenuAction[] {
-  return BLOCK_PRESETS.map((preset) => {
-    const Icon = preset.icon;
-    return { label: t(preset.labelKey), icon: <Icon size={12} />, onClick: () => onPick(preset.id) };
-  });
+/**
+ * „Block hinzufügen": ein Eintrag pro Voreinstellung (Text, jede Feldart),
+ * dahinter die eigenen Blöcke aus der Blöcke-Ansicht.
+ */
+export function addBlockActions(
+  t: TFunction,
+  onPick: (presetId: string) => void,
+  definitions: readonly BlockDefinition[] = [],
+): ContextMenuAction[] {
+  return [
+    ...BLOCK_PRESETS.map((preset) => {
+      const Icon = preset.icon;
+      return { label: t(preset.labelKey), icon: <Icon size={12} />, onClick: () => onPick(preset.id) };
+    }),
+    ...definitions.map((def) => ({
+      label: definitionLabel(t, def),
+      icon: <BlockGlyph icon={def.icon} />,
+      onClick: () => onPick(definitionPresetId(def.id)),
+    })),
+  ];
 }
 
 /**

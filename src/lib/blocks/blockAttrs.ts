@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next';
 import { BLOCK_ATTR, type BlockAttrName, type BlockInstance } from './types';
 import type { BlockTypeMeta } from './blockTypes';
-import { elementKindLabelKey, FIELDS_BLOCK_TYPE, parseFields, type ElementDef } from './fields';
+import { activeElements, elementKindLabelKey, FIELDS_BLOCK_TYPE, parseFields, type ElementDef } from './fields';
 
 /**
  * Lesen und Setzen der Instanz-Attribute aus `BLOCK_ATTR` — dieselben Regeln
@@ -30,15 +30,23 @@ export function blockLabel(t: TFunction, block: BlockInstance, meta: BlockTypeMe
 
 /**
  * Der Typname allein — ohne eigenen Titel, etwa als Platzhalter beim
- * Umbenennen. Ein Feldblock mit genau einem Element heißt wie dieses Element.
+ * Umbenennen. Die Kopie eines eigenen Blocks heißt wie dieser, ein Feldblock
+ * mit genau einem Element wie dieses Element.
  */
 export function blockTypeLabel(t: TFunction, block: BlockInstance, meta: BlockTypeMeta | undefined): string {
   if (!meta) return t('blocks.unknown', { type: block.type });
   if (meta.id === FIELDS_BLOCK_TYPE) {
-    const { elements } = parseFields(block);
+    const model = parseFields(block);
+    if (model.name.trim()) return model.name.trim();
+    const elements = activeElements(model);
     if (elements.length === 1) return elementLabel(t, elements[0]);
   }
   return t(meta.labelKey);
+}
+
+/** Wie ein eigener Block (Definition) heißt: sein Name, sonst „Unbenannter Block". */
+export function definitionLabel(t: TFunction, def: { name: string }): string {
+  return def.name.trim() || t('blocks.library.untitled');
 }
 
 /** Die Beschriftung eines Feld-Elements: die eigene, sonst der Name seiner Art. */

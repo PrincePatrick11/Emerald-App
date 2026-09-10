@@ -26,6 +26,8 @@ writeFileSync(
   `export { parseBlocks, serializeBlocks, createTextBlock, blockSectionHtml, neutralizeSectionTags } from '${root}/src/lib/blocks/blockHtml';
    export { TEXT_BLOCK_TYPE, BLOCK_ATTR } from '${root}/src/lib/blocks/types';
    export { parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot } from '${root}/src/lib/blocks/fields';
+   export { instantiateDefinition, updateInstanceToDefinition, isOutdatedCopy, blockOrigin, updateCopiesInContent, removeCopiesFromContent, parseDefinitionElements, parseDefinitionDisplay } from '${root}/src/lib/blocks/definitions';
+   export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';`
 );
@@ -50,6 +52,8 @@ const {
   parseBlocks, serializeBlocks, createTextBlock, neutralizeSectionTags, TEXT_BLOCK_TYPE, BLOCK_ATTR, extractInternalLinks,
   parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot,
   internalLinkChipHtml,
+  instantiateDefinition, updateInstanceToDefinition, isOutdatedCopy, blockOrigin, updateCopiesInContent,
+  removeCopiesFromContent, parseDefinitionElements, parseDefinitionDisplay, entryBlockSummary,
 } = bundle;
 
 const failures = [];
@@ -302,6 +306,90 @@ console.log('\n4c. Feldblock\n');
   const keepEmpty = { ...el, hideWhenEmpty: false };
   check('hideWhenEmpty am Element schlägt die Blockregel',
     !isHiddenInRead(keepEmpty, { ...model, elements: [keepEmpty] }) && isHiddenInRead(el, model));
+}
+
+console.log('\n4d. Eigene Blöcke: Kopien und Aktualisieren\n');
+{
+  const text = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p };
+  const def = {
+    id: 'def-1', name: 'Ritual', icon: '🕯️', description: '', revision: 1, sort_order: 0,
+    created_at: '', updated_at: '', deleted_at: null,
+    display: { readHideEmpty: true, readOnly: false, showTitle: true },
+    elements: [{ id: 'e-date', kind: 'date', label: 'Datum' }, { id: 'e-result', kind: 'shorttext', label: 'Ergebnis' }],
+  };
+
+  const copy = instantiateDefinition(def);
+  const copyModel = parseFields(copy);
+  check('eine Kopie trägt Herkunft, Revision, Name und die Titel-Regel',
+    blockOrigin(copy)?.id === 'def-1' && blockOrigin(copy)?.rev === 1 && copyModel.name === 'Ritual' &&
+      copy.attrs['data-block-show-title'] === '1', copy);
+  check('die Element-IDs der Kopie sind die der Definition',
+    copyModel.elements.map((e) => e.id).join() === 'e-date,e-result');
+
+  const filled = serializeFields(copy, { ...copyModel, values: { 'e-date': '2026-09-10', 'e-result': 'gut' } }, text);
+  check('eine Kopie der aktuellen Revision ist nicht veraltet', !isOutdatedCopy(filled, def));
+
+  const def2 = {
+    ...def, revision: 2,
+    display: { readHideEmpty: false, readOnly: true, showTitle: false },
+    elements: [
+      { id: 'e-result', kind: 'shorttext', label: 'Resultat' },
+      { id: 'e-mood', kind: 'select', label: 'Stimmung', options: [{ id: 'o1', label: 'ruhig' }] },
+      { id: 'e-date', kind: 'date', label: 'Datum', archived: true },
+    ],
+  };
+  check('eine ältere Revision ist veraltet', isOutdatedCopy(filled, def2));
+
+  const titled = { ...filled, attrs: { ...filled.attrs, 'data-block-title': 'Mein Titel' } };
+  const updated = updateInstanceToDefinition(titled, def2, text);
+  const um = parseFields(updated);
+  check('Werte bleiben an ihrer Element-ID', um.values['e-result'] === 'gut' && um.values['e-date'] === '2026-09-10', um.values);
+  check('die Beschriftung kommt aus der Definition', um.elements.find((e) => e.id === 'e-result')?.label === 'Resultat');
+  check('ein neues Feld kommt leer dazu, in der Reihenfolge der Definition',
+    um.elements.filter((e) => !e.archived).map((e) => e.id).join() === 'e-result,e-mood' && um.values['e-mood'] === undefined,
+    um.elements);
+  check('ein entferntes Feld wird archiviert, nicht gelöscht', um.elements.find((e) => e.id === 'e-date')?.archived === true);
+  check('ein archiviertes Feld fehlt im Fallback und im Lesemodus',
+    !updated.html.includes('2026-09-10') && isHiddenInRead(um.elements.find((e) => e.id === 'e-date'), um), updated.html);
+  check('die Anzeigeregeln kommen aus der Definition', um.display.readHideEmpty === false && um.display.readOnly === true);
+  check('der eigene Titel bleibt, die Revision steht auf der neuen',
+    updated.attrs['data-block-title'] === 'Mein Titel' && blockOrigin(updated)?.rev === 2 && !isOutdatedCopy(updated, def2));
+
+  const def3 = {
+    ...def2, revision: 3,
+    elements: [...def2.elements.filter((e) => e.id !== 'e-date'), { id: 'e-date', kind: 'date', label: 'Datum' }],
+  };
+  const back = parseFields(updateInstanceToDefinition(updated, def3, text));
+  check('ein zurückgeholtes Feld bringt seinen Wert mit',
+    !back.elements.find((e) => e.id === 'e-date')?.archived && back.values['e-date'] === '2026-09-10');
+
+  const clash = { ...def2, revision: 4, elements: [{ id: 'e-result', kind: 'number', label: 'X' }] };
+  check('eine andere Art unter derselben ID verwirft den Wert nicht',
+    parseFields(updateInstanceToDefinition(updated, clash, text)).values['e-result'] === 'gut');
+
+  const content = serializeBlocks([createTextBlock('<p>a</p>'), filled, createFieldsBlock('number')]);
+  const updatedContent = updateCopiesInContent(content, def2, text);
+  const updatedBlocks = parseBlocks(updatedContent ?? '');
+  check('updateCopiesInContent aktualisiert nur die Kopie',
+    updatedBlocks.length === 3 && blockOrigin(updatedBlocks[1])?.rev === 2 && updatedBlocks[0].html === '<p>a</p>', updatedBlocks);
+  check('ohne veraltete Kopie liefert es null', updateCopiesInContent(updatedContent, def2, text) === null);
+
+  const removed = removeCopiesFromContent(content, 'def-1');
+  check('removeCopiesFromContent entfernt nur die Kopien dieser Definition',
+    parseBlocks(removed ?? '').length === 2 && removeCopiesFromContent(removed, 'def-1') === null);
+
+  const summary = entryBlockSummary('x', content);
+  check('entryBlockSummary liefert Herkunft und Feldwerte unter Definition:Element',
+    summary.origins.length === 1 && summary.fieldValues['def-1:e-result'] === 'gut', summary);
+  check('ein Inhalt ohne eigene Blöcke hat keine Herkunft', entryBlockSummary('y', '<p>nur Text</p>').origins.length === 0);
+
+  check('Definitionsspalten: kaputtes JSON ergibt die Standardwerte',
+    parseDefinitionElements('{kaputt').length === 0 && parseDefinitionDisplay('nope').showTitle === true &&
+      parseDefinitionDisplay('nope').readHideEmpty === true);
+  check('Definitionsspalten: gefährliche und doppelte IDs fallen weg',
+    parseDefinitionElements(JSON.stringify([
+      { id: '__proto__', kind: 'date', label: '' }, { id: 'ok', kind: 'date', label: '' }, { id: 'ok', kind: 'number', label: '' },
+    ])).map((e) => e.id).join() === 'ok');
 }
 
 console.log('\n5. Was aus dem Inhalt abgeleitet wird, sieht die Blöcke durch\n');
