@@ -400,6 +400,30 @@ they sit on the block, they are part of `content`: Cancel reverts them with the 
 text block whose switches are back at their defaults is stored without a wrapper again
 (`showTitleAttrValue` drops a value that equals the default).
 
+**Fields block (`core.fields`, `lib/blocks/fields.ts`).** A sequence of labelled elements —
+short text, number, date, choice, yes/no, checklist, link, image, moon phase. A single field is a
+fields block with one element; "add block" offers one preset per kind (`lib/blocks/presets.ts`),
+and a one-element block is named and iconed after its element. Where things live follows the
+content convention: `data-block-config` (JSON) holds the elements and display rules
+(`readHideEmpty`, `readOnly`), `data-block-data` (JSON) the scalar values keyed by element id,
+and **links and images are markup, never JSON** — a real internal-link chip or `<img src>` inside
+a `<dd data-block-slot="el:<id>">`. That keeps the links table, backlinks, merge-import remapping
+and image cleanup working with no special case. The inner HTML doubles as the readable fallback
+(a `<dl>` of label and value) for search, export and apps that don't know the type; it is
+rewritten on every change, while the JSON stays the truth for scalars. Values whose element is
+unknown are kept and written back (`orphans`). `FieldsBlock` is controlled: every render reads
+the block, every change writes a new one through `onBlockChange` (a structural commit). In read
+mode, checklist items and yes/no switches can be toggled unless the block is `readOnly`: the
+change goes through `onPersist` → `BlockStack.persistRead`, which also calls `onChange` so the
+view's content mirror (and the next Cancel baseline) know it, and then `onReadModeChange` —
+the views pass `update*(id, { content })`, since `useEntryEditor` only autosaves while editing.
+Element ids come from content and may come from an import: they must match
+`[A-Za-z0-9_-]{1,64}` and must not name an `Object.prototype` property (`constructor`,
+`__proto__`, …), and `values`/`orphans`/`slots` are prototype-less records — otherwise a crafted
+id would read a built-in property as slot HTML and the render would throw. As a second layer,
+`BlockStack` wraps every block in `BlockErrorBoundary`, so a block that throws shows its sanitized
+fallback instead of taking the app down.
+
 **Sidebar block manager.** The right sidebar and the main area are sibling trees, so `BlockStack`
 publishes its structure — on structural changes only, not per keystroke — plus a stable API
 (`insert`/`duplicate`/`remove`/`reorder`/`setAttr`/`reveal`) to `useBlockSessionStore`

@@ -31,6 +31,10 @@ export const BLOCK_ATTR = {
   title: 'data-block-title',
   /** `"1"`/`"0"`: Titel im Lesemodus zeigen — fehlt = Standard des Typs. */
   showTitle: 'data-block-show-title',
+  /** JSON: wie der Block aufgebaut ist (Feldblock: Elemente + Anzeigeregeln). */
+  config: 'data-block-config',
+  /** JSON: skalare Werte des Blocks. Verweise und Bilder stehen im Markup (Slots). */
+  data: 'data-block-data',
 } as const;
 
 /**

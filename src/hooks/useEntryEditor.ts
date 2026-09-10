@@ -75,6 +75,11 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
   }, []);
 
   const triggerAutoSave = useCallback(() => {
+    // Außerhalb des Bearbeitens gibt es nichts aufzuschieben: der Blockstapel
+    // meldet auch Lesemodus-Änderungen (Checkliste abhaken) über
+    // handleContentChange, damit der Content-Mirror sie kennt — gespeichert hat
+    // er sie dann schon selbst.
+    if (!isEditingRef.current) return;
     if (timer.current) clearTimeout(timer.current);
     const id = idRef.current;
     timer.current = setTimeout(() => {

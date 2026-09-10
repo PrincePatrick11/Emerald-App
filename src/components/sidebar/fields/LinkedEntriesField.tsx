@@ -2,16 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
 import { useLinkItems } from '../../../hooks/useLinkItems';
-import LinkedEntryPicker, { LinkedEntryChip } from './LinkedEntryPicker';
+import LinkedEntryPicker, { LinkedEntryChip, LinkItemIcon } from './LinkedEntryPicker';
 import {
   requestEntryLinkAppend, requestEntryLinkRemove, requestEntryLinkReveal,
 } from '../../../lib/links';
 import { extractInternalLinks } from '../../../lib/internalLinkHtml';
 import { viewTypeForEntryType } from '../../../lib/modules';
 import { linkItemKey as itemKey, linkItemsByKey } from '../../../lib/linkItems';
-import { isImageIcon } from '../../../lib/helpers';
 import {
-  DEFAULT_ENTRY_EMOJI,
   ENTRY_TYPE_ICONS,
   ENTRY_TYPE_LABEL_KEYS,
   type SuggestionItem,
@@ -54,13 +52,6 @@ function byCategory(a: SuggestionItem, b: SuggestionItem): number {
   // Ende des Alphabets wäre kürzer, aber die Kollation darf es ignorieren.
   if (!ca !== !cb) return ca ? -1 : 1;
   return ca.localeCompare(cb) || a.label.localeCompare(b.label);
-}
-
-function ItemIcon({ item }: { item: SuggestionItem }) {
-  const icon = item.displayIcon || item.icon || DEFAULT_ENTRY_EMOJI[item.entryType];
-  return isImageIcon(icon)
-    ? <img src={icon} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
-    : <span className="flex-shrink-0">{icon}</span>;
 }
 
 /**
@@ -177,7 +168,7 @@ export default function LinkedEntriesField({ content, legacyIds, editable = fals
             {group.entries.map(({ item, inContent }) => (
               <LinkedEntryChip
                 key={itemKey(item)}
-                icon={<ItemIcon item={item} />}
+                icon={<LinkItemIcon item={item} />}
                 label={item.label}
                 labelMaxWidth="max-w-[140px]"
                 onClick={() => reveal(item)}
@@ -214,7 +205,7 @@ export default function LinkedEntriesField({ content, legacyIds, editable = fals
         const TypeIcon = ENTRY_TYPE_ICONS[item.entryType];
         return (
           <>
-            <ItemIcon item={item} />
+            <LinkItemIcon item={item} />
             <span className="flex-1 truncate">{item.label}</span>
             <TypeIcon size={12} className="text-stone-600 flex-shrink-0" />
             <span className="text-stone-600 flex-shrink-0">{t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}</span>

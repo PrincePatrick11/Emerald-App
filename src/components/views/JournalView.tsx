@@ -13,7 +13,7 @@ import EntryDetailFrame from '../ui/EntryDetailFrame';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
-import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
+import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
 import { formatEntryDate, formatEntryDateLong } from '../../lib/formatDate';
@@ -21,11 +21,6 @@ import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
 import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import type { JournalEntry, MoonPhase } from '../../types';
-
-const MOON_PHASE_ORDER: MoonPhase[] = [
-  'new', 'waxing_crescent', 'first_quarter', 'waxing_gibbous',
-  'full', 'waning_gibbous', 'last_quarter', 'waning_crescent',
-];
 
 export default function JournalView() {
   const { t } = useTranslation();
@@ -382,6 +377,7 @@ export default function JournalView() {
           initialContent={entry.content}
           placeholder={t('journal.placeholder')}
           onChange={handleContentChange}
+          onReadModeChange={(content) => updateEntry(entry.id, { content })}
           isEditing={isEditing}
         />
       )}

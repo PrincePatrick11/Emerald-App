@@ -1,5 +1,7 @@
 import type { ComponentType } from 'react';
 import type { BlockAttrName, BlockInstance } from '../../lib/blocks/types';
+import { FIELDS_BLOCK_TYPE } from '../../lib/blocks/fields';
+import FieldsSidebarEdit from './FieldsSidebarEdit';
 
 /**
  * Abschnitte, die ein Blocktyp in die rechte Seitenleiste mitbringt — je eine
@@ -9,9 +11,9 @@ import type { BlockAttrName, BlockInstance } from '../../lib/blocks/types';
  * aufgelösten Typ (`resolveBlockType`): ein Block mit zu neuem Datenformat
  * bekommt hier so wenig eine Bearbeitungsansicht wie im Stapel.
  *
- * Noch trägt kein Typ etwas ein: der Textblock hat nichts eigenes einzustellen,
- * und Titel und Sichtbarkeit gelten für jeden Block — die stehen in der
- * Verwaltungsliste. Die ersten Einträge kommen mit Feld- und Sigillen-Blöcken.
+ * Der Textblock trägt nichts ein — Titel und Sichtbarkeit gelten für jeden
+ * Block und stehen in der Verwaltungsliste. Der Feldblock bringt seine
+ * Einstellungen mit (Beschriftungen, Optionen, Anzeigeregeln).
  *
  * Importregel: nur `BlockSidebarArea` importiert diese Datei, und sie darf
  * nichts ziehen, was TipTap lädt — die Seitenleiste wird eager geladen.
@@ -23,11 +25,13 @@ export interface BlockSidebarReadProps {
 export interface BlockSidebarEditProps extends BlockSidebarReadProps {
   /**
    * Ein Instanz-Attribut setzen; läuft durch den Stapel, Cancel dreht es
-   * zurück. Nur die Bearbeitungsvariante bekommt es: eine Änderung im
-   * Lesemodus landete in keinem Autosave und würde von der nächsten
+   * zurück. Nur die Bearbeitungsvariante bekommt Schreibzugriff: eine Änderung
+   * im Lesemodus landete in keinem Autosave und würde von der nächsten
    * Cancel-Baseline geschluckt.
    */
   setAttr: (name: BlockAttrName, value: string | null) => void;
+  /** Den ganzen Block ersetzen (Attribute und inneres HTML) — für Typen, deren Fallback mitwandert. */
+  update: (next: BlockInstance) => void;
 }
 
 export interface BlockSidebarViews {
@@ -35,4 +39,6 @@ export interface BlockSidebarViews {
   Edit?: ComponentType<BlockSidebarEditProps>;
 }
 
-export const BLOCK_SIDEBAR_VIEWS: ReadonlyMap<string, BlockSidebarViews> = new Map();
+export const BLOCK_SIDEBAR_VIEWS: ReadonlyMap<string, BlockSidebarViews> = new Map<string, BlockSidebarViews>([
+  [FIELDS_BLOCK_TYPE, { Edit: FieldsSidebarEdit }],
+]);

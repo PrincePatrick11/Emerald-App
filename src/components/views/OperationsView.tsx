@@ -598,6 +598,7 @@ export default function OperationsView() {
           initialContent={operation.content}
           placeholder={t('operations.placeholder')}
           onChange={handleContentChange}
+          onReadModeChange={(content) => updateOperation(operation.id, { content })}
           isEditing={isEditing}
         />
       )}

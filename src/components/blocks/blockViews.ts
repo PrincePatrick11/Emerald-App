@@ -1,6 +1,8 @@
 import type { ComponentType } from 'react';
 import { TEXT_BLOCK_TYPE, type BlockInstance } from '../../lib/blocks/types';
+import { FIELDS_BLOCK_TYPE } from '../../lib/blocks/fields';
 import TextBlock from './TextBlock';
+import FieldsBlock from './FieldsBlock';
 
 /**
  * Welche Komponente einen Blocktyp darstellt — der Komponenten-Teil der
@@ -12,16 +14,25 @@ import TextBlock from './TextBlock';
  */
 export interface BlockViewProps {
   /**
-   * Der Block beim Mount. `block.html` ist ein INITIALWERT: nach dem ersten
-   * Tastendruck steht der lebende Stand nur noch im Ref des Stapels — eine
-   * Block-Komponente liest ihn einmal und verwaltet ihn danach selbst.
+   * Der Block. Beim Textblock ist `block.html` ein INITIALWERT: nach dem ersten
+   * Tastendruck steht der lebende Stand nur noch im Ref des Stapels — der
+   * Editor liest ihn einmal und verwaltet ihn danach selbst. Andere Typen sind
+   * kontrolliert und lesen den Block bei jedem Render.
    */
   block: BlockInstance;
   isEditing: boolean;
-  /** Neues inneres HTML des Blocks — der Stapel serialisiert und speichert. */
+  /** Textblock: neues inneres HTML — nur in den Ref, kein Neu-Rendern pro Tastendruck. */
   onHtmlChange: (html: string) => void;
+  /** Bearbeitungsmodus: den ganzen Block ersetzen (Strukturänderung, rendert neu). */
+  onBlockChange: (next: BlockInstance) => void;
+  /**
+   * Lesemodus: eine erlaubte Änderung (Checkliste abhaken, Ja/Nein) sofort in
+   * den Eintrag schreiben. Fehlt, wenn der Eintrag das nicht erlaubt.
+   */
+  onPersist?: (next: BlockInstance) => void;
 }
 
-export const BLOCK_VIEWS: ReadonlyMap<string, ComponentType<BlockViewProps>> = new Map([
+export const BLOCK_VIEWS: ReadonlyMap<string, ComponentType<BlockViewProps>> = new Map<string, ComponentType<BlockViewProps>>([
   [TEXT_BLOCK_TYPE, TextBlock],
+  [FIELDS_BLOCK_TYPE, FieldsBlock],
 ]);

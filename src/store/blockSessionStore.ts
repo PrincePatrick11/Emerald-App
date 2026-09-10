@@ -14,12 +14,15 @@ import type { BlockAttrName, BlockInstance } from '../lib/blocks/types';
  * Nur im Speicher, nie persistiert — die Wahrheit ist der Inhalt des Eintrags.
  */
 export interface BlockStackApi {
-  insert: (index: number, type: string) => void;
+  /** Einen neuen Block aus einer Voreinstellung (`BLOCK_PRESETS`) an `index` einfügen. */
+  insert: (index: number, presetId: string) => void;
   duplicate: (id: string) => void;
   remove: (id: string) => void;
   reorder: (ids: string[]) => void;
   /** Ein Instanz-Attribut aus `BLOCK_ATTR` setzen; `null` entfernt es. */
   setAttr: (id: string, name: BlockAttrName, value: string | null) => void;
+  /** Den ganzen Block ersetzen — Seitenleisten-Abschnitte, deren Typ Fallback-HTML mitschreibt. */
+  update: (id: string, next: BlockInstance) => void;
   /** Zum Block scrollen und ihn kurz hervorheben. */
   reveal: (id: string) => void;
 }

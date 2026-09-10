@@ -21,10 +21,14 @@ import {
 } from '../../lib/links';
 import { internalLinkBlockHtml, toInternalLinkChip } from '../../lib/internalLinkHtml';
 import { generateId } from '../../lib/helpers';
+import { editorSavesSuspended } from '../../lib/editorLock';
+import { FIELDS_BLOCK_TYPE, linkFromSlot, parseFields, serializeFields } from '../../lib/blocks/fields';
+import { useFieldFallbackText } from './useFieldFallbackText';
 import { REORDER_SPRING } from '../../lib/motion';
 import { flashReveal, scrollIntoViewCentered } from '../../lib/reveal';
 import { createTextBlock, neutralizeSectionTags, parseBlocks, serializeBlocks } from '../../lib/blocks/blockHtml';
 import { resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockTypes';
+import { BLOCK_PRESETS, blockIcon } from '../../lib/blocks/presets';
 import { blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
 import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockAttrName, type BlockInstance } from '../../lib/blocks/types';
 import { useBlockSessionStore, type BlockStackApi } from '../../store/blockSessionStore';
@@ -34,6 +38,7 @@ import { addBlockActions, commonBlockActions } from './blockActions';
 import { useTextEditorRegistry } from './useTextEditorRegistry';
 import BlockFrame from './BlockFrame';
 import UnknownBlock from './UnknownBlock';
+import BlockErrorBoundary from './BlockErrorBoundary';
 
 interface BlockStackProps {
   /** Der Eintrag, dem der Stapel gehört — die Seitenleiste bedient nur die passende Sitzung. */
@@ -49,12 +54,12 @@ interface BlockStackProps {
   placeholder: string;
   /** Der komplette serialisierte Inhalt nach jeder Änderung (→ `useEntryEditor.handleContentChange`). */
   onChange: (content: string) => void;
-}
-
-/** Ein neuer, leerer Block dieses Typs. Bisher gibt es nur Text; weitere
- *  Typen bringen hier ihre Standarddaten mit. */
-function newBlock(type: string): BlockInstance | null {
-  return type === TEXT_BLOCK_TYPE ? createTextBlock() : null;
+  /**
+   * Lesemodus: eine erlaubte Änderung (Checkliste abhaken, Ja/Nein) sofort
+   * speichern — der Autosave von `useEntryEditor` läuft nur beim Bearbeiten.
+   * Fehlt die Prop, bleibt der Lesemodus schreibgeschützt.
+   */
+  onReadModeChange?: (content: string) => void | Promise<unknown>;
 }
 
 const REVEAL_CLASS = 'block-stack-item--revealed';
@@ -79,7 +84,7 @@ const REVEAL_MS = 1600;
  * State ist deshalb nur der Stand beim letzten Strukturwechsel — der lebende
  * Stand steht im Ref (und im Editor).
  */
-export default function BlockStack({ entryId, initialContent, isEditing, placeholder, onChange }: BlockStackProps) {
+export default function BlockStack({ entryId, initialContent, isEditing, placeholder, onChange, onReadModeChange }: BlockStackProps) {
   const { t } = useTranslation();
 
   const [blocks, setBlocks] = useState<BlockInstance[]>(() => {
@@ -152,6 +157,28 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
     appendLink: appendLinkOnce,
   });
 
+  /**
+   * Das Verknüpfungs-Feld eines Feldblocks, das auf `target` zeigt — das
+   * Verlinkungs-Feld der Seitenleiste listet auch diese Links (es liest den
+   * ganzen Inhalt), also müssen Anspringen und Entfernen sie auch finden.
+   */
+  const fieldText = useFieldFallbackText();
+  const fieldTextRef = useRef(fieldText);
+  fieldTextRef.current = fieldText;
+  const findFieldLink = useCallback((target: { id: string; entryType: string }) => {
+    for (const block of blocksRef.current) {
+      if (resolveBlockType(block)?.id !== FIELDS_BLOCK_TYPE) continue;
+      const model = parseFields(block);
+      if (model.broken) continue;
+      const element = model.elements.find((el) => {
+        const link = el.kind === 'link' ? linkFromSlot(model.slots[el.id]) : null;
+        return link?.id === target.id && link.entryType === target.entryType;
+      });
+      if (element) return { block, model, elementId: element.id };
+    }
+    return null;
+  }, []);
+
   // Anhängen und Entfernen aus dem Verlinkungs-Feld — nur im Edit-Modus. Bleibt
   // die Quittung aus, weiß das Feld, dass sein Klick ins Leere ging.
   useEffect(() => {
@@ -161,28 +188,42 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
         appendLinkOnce(item);
         return true;
       }),
-      subscribeEntryLinkRequest(REMOVE_ENTRY_LINK_EVENT, (target) =>
-        orderedEditors().some((ed) => removeEntryLink(ed, target))),
+      subscribeEntryLinkRequest(REMOVE_ENTRY_LINK_EVENT, (target) => {
+        if (orderedEditors().some((ed) => removeEntryLink(ed, target))) return true;
+        const hit = findFieldLink(target);
+        if (!hit) return false;
+        const slots = { ...hit.model.slots };
+        delete slots[hit.elementId];
+        apiRef.current.update(hit.block.id, serializeFields(hit.block, { ...hit.model, slots }, fieldTextRef.current));
+        return true;
+      }),
     ];
     return () => off.forEach((fn) => fn());
-  }, [isEditing, orderedEditors, appendLinkOnce]);
+  }, [isEditing, orderedEditors, appendLinkOnce, findFieldLink]);
 
   // Klick auf einen Chip im Verlinkungs-Feld → zur Stelle springen. Auch im
-  // Lesemodus, dort ist es der Normalfall. Der erste Textblock mit dem Link gewinnt.
+  // Lesemodus, dort ist es der Normalfall. Der erste Textblock mit dem Link
+  // gewinnt; steht er nur in einem Verknüpfungs-Feld, springt es dorthin.
   useEffect(() => subscribeEntryLinkRequest(
     REVEAL_ENTRY_LINK_EVENT,
-    (target) => orderedEditors().some((ed) => revealEntryLink(ed, target)),
-  ), [orderedEditors]);
+    (target) => {
+      if (orderedEditors().some((ed) => revealEntryLink(ed, target))) return true;
+      const hit = findFieldLink(target);
+      if (!hit) return false;
+      apiRef.current.reveal(hit.block.id);
+      return true;
+    },
+  ), [orderedEditors, findFieldLink]);
 
   /* ---------------- Strukturänderungen ---------------- */
 
   const [menu, setMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
 
-  const insertAt = (index: number, type: string) => {
-    const block = newBlock(type);
+  const insertAt = (index: number, presetId: string) => {
+    const block = BLOCK_PRESETS.find((p) => p.id === presetId)?.create();
     if (!block) return;
-    if (type === TEXT_BLOCK_TYPE) focusOnMount(block.id);
+    if (block.type === TEXT_BLOCK_TYPE) focusOnMount(block.id);
     const next = [...blocksRef.current];
     next.splice(index, 0, block);
     commit(next);
@@ -218,6 +259,32 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
     commit(blocksRef.current.map((b) => (b.id === id ? withBlockAttr(b, name, value) : b)));
   };
 
+  /** Den ganzen Block ersetzen (Feldblock, Seitenleisten-Abschnitt). */
+  const updateBlock = (id: string, next: BlockInstance) => {
+    if (next.id !== id) return;
+    commit(blocksRef.current.map((b) => (b.id === id ? next : b)));
+  };
+
+  /**
+   * Lesemodus: eine erlaubte Änderung sofort speichern. `updateBlock` meldet sie
+   * AUCH an `onChange`, damit der Content-Mirror der View sie kennt — sonst
+   * schriebe „Fertig" nach einem späteren Bearbeiten ohne Änderung den Stand von
+   * vor dem Abhaken zurück.
+   *
+   * Wie der Autosave nicht, solange Speichern ausgesetzt ist (Backup-Import
+   * ersetzt gerade den Vault). Die Store-Updates sind pro Eintrag serialisiert:
+   * schnelle Klicks landen in Reihenfolge, der letzte Stand gewinnt.
+   */
+  const onReadModeChangeRef = useRef(onReadModeChange);
+  onReadModeChangeRef.current = onReadModeChange;
+  const persistRead = (id: string, next: BlockInstance) => {
+    const save = onReadModeChangeRef.current;
+    if (!save || editorSavesSuspended()) return;
+    updateBlock(id, next);
+    void Promise.resolve(save(serializeBlocks(blocksRef.current)))
+      .catch((e: unknown) => console.error('[BlockStack] read-mode save failed:', e));
+  };
+
   const reveal = (id: string) => {
     const el = stackRef.current?.querySelector<HTMLElement>(`[data-block-item="${CSS.escape(id)}"]`);
     if (!el) return;
@@ -233,7 +300,7 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
   // Nach dem Abbau reicht es nichts mehr weiter — ein veralteter Aufruf käme
   // sonst über `onChange` im Eintrag an, der jetzt offen ist.
   const apiRef = useRef<BlockStackApi>(null!);
-  apiRef.current = { insert: insertAt, duplicate, remove, reorder, setAttr, reveal };
+  apiRef.current = { insert: insertAt, duplicate, remove, reorder, setAttr, update: updateBlock, reveal };
   const mountedRef = useRef(false);
   const api = useMemo<BlockStackApi>(() => {
     const live = () => (mountedRef.current ? apiRef.current : null);
@@ -243,6 +310,7 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
       remove: (id) => live()?.remove(id),
       reorder: (ids) => live()?.reorder(ids),
       setAttr: (id, name, value) => live()?.setAttr(id, name, value),
+      update: (id, next) => live()?.update(id, next),
       reveal: (id) => live()?.reveal(id),
     };
   }, []);
@@ -264,7 +332,7 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
   const openAddMenu = (e: MouseEvent, index: number) => setMenu({
     x: e.clientX,
     y: e.clientY,
-    actions: addBlockActions(t, (type) => insertAt(index, type)),
+    actions: addBlockActions(t, (presetId) => insertAt(index, presetId)),
   });
 
   const openBlockMenu = (e: MouseEvent, block: BlockInstance, meta: BlockTypeMeta | undefined) => {
@@ -286,7 +354,17 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
   const renderBody = (block: BlockInstance, meta: BlockTypeMeta | undefined) => {
     const View = meta ? BLOCK_VIEWS.get(meta.id) : undefined;
     if (!View) return <UnknownBlock block={block} />;
-    return <View block={block} isEditing={isEditing} onHtmlChange={(html) => updateHtml(block.id, html)} />;
+    return (
+      <BlockErrorBoundary block={block}>
+        <View
+          block={block}
+          isEditing={isEditing}
+          onHtmlChange={(html) => updateHtml(block.id, html)}
+          onBlockChange={(next) => updateBlock(block.id, next)}
+          onPersist={!isEditing && onReadModeChange ? (next) => persistRead(block.id, next) : undefined}
+        />
+      </BlockErrorBoundary>
+    );
   };
 
   const stackClass = [
@@ -320,7 +398,7 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
                 <>
                   <BlockFrame
                     isEditing={isEditing}
-                    icon={meta?.icon ?? Puzzle}
+                    icon={blockIcon(block, meta) ?? Puzzle}
                     label={label}
                     hidden={isBlockHidden(block)}
                     showReadTitle={showsTitleInRead(block, meta)}

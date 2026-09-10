@@ -1,5 +1,6 @@
-import { Type, type LucideIcon } from 'lucide-react';
+import { SlidersHorizontal, Type, type LucideIcon } from 'lucide-react';
 import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockInstance, type BlockTypeId } from './types';
+import { FIELDS_BLOCK_TYPE } from './fields';
 
 /**
  * Die Registry der Blocktypen — der reine Teil (Metadaten). Welche Komponente
@@ -44,10 +45,18 @@ const BLOCK_TYPES = new Map<string, BlockTypeMeta>([
     dataVersion: 1,
     defaultShowTitle: false,
   }],
+  [FIELDS_BLOCK_TYPE, {
+    id: FIELDS_BLOCK_TYPE,
+    origin: 'core',
+    icon: SlidersHorizontal,
+    labelKey: 'blocks.types.fields.label',
+    descriptionKey: 'blocks.types.fields.description',
+    group: 'fields',
+    dataVersion: 1,
+    // Ein einzelnes Feld trägt seine Beschriftung ohnehin in der Zeile.
+    defaultShowTitle: false,
+  }],
 ]);
-
-/** Alle Typen, die man einem Eintrag hinzufügen kann, in Anzeigereihenfolge. */
-export const BLOCK_TYPE_LIST: readonly BlockTypeMeta[] = [...BLOCK_TYPES.values()];
 
 /**
  * Der Typ, mit dem die App diesen Block darstellen kann — oder `undefined` für

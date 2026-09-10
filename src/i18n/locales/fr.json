@@ -296,7 +296,41 @@
         "label": "Texte",
         "description": "Texte mis en forme avec titres, listes, images et liens.",
         "placeholder": "Continuez à écrire…"
+      },
+      "fields": {
+        "label": "Champs",
+        "description": "Valeurs avec libellé : texte, nombre, date, choix, oui/non, liste de contrôle, lien, image, phase lunaire."
       }
+    },
+    "kinds": {
+      "shorttext": "Texte court",
+      "number": "Nombre",
+      "date": "Date",
+      "select": "Choix",
+      "toggle": "Oui/Non",
+      "checklist": "Liste de contrôle",
+      "link": "Lien",
+      "image": "Image",
+      "moon": "Phase lunaire"
+    },
+    "fields": {
+      "yes": "Oui",
+      "no": "Non",
+      "choose": "Choisir…",
+      "noOptions": "Aucune option pour l'instant — ajoutez-en dans le panneau latéral",
+      "addItem": "Ajouter un élément",
+      "itemPlaceholder": "Nouvel élément",
+      "removeItem": "Supprimer l'élément",
+      "chooseImage": "Choisir une image",
+      "imageFailed": "Impossible d'enregistrer l'image",
+      "label": "Libellé",
+      "options": "Options",
+      "addOption": "Ajouter une option",
+      "optionPlaceholder": "Nouvelle option",
+      "removeOption": "Supprimer l'option",
+      "hideEmpty": "Masquer si vide en mode lecture",
+      "readOnly": "Entièrement en lecture seule",
+      "readOnlyHint": "Pas de cochage ni de bascule en mode lecture non plus"
     }
   },
   "editor": {

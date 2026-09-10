@@ -296,7 +296,41 @@
         "label": "Texto",
         "description": "Texto con formato: encabezados, listas, imágenes y enlaces.",
         "placeholder": "Sigue escribiendo…"
+      },
+      "fields": {
+        "label": "Campos",
+        "description": "Valores con etiqueta: texto, número, fecha, selección, sí/no, lista de verificación, enlace, imagen, fase lunar."
       }
+    },
+    "kinds": {
+      "shorttext": "Texto corto",
+      "number": "Número",
+      "date": "Fecha",
+      "select": "Selección",
+      "toggle": "Sí/No",
+      "checklist": "Lista de verificación",
+      "link": "Enlace",
+      "image": "Imagen",
+      "moon": "Fase lunar"
+    },
+    "fields": {
+      "yes": "Sí",
+      "no": "No",
+      "choose": "Elegir…",
+      "noOptions": "Aún no hay opciones — añádelas en la barra lateral",
+      "addItem": "Añadir elemento",
+      "itemPlaceholder": "Nuevo elemento",
+      "removeItem": "Eliminar elemento",
+      "chooseImage": "Elegir imagen",
+      "imageFailed": "No se pudo guardar la imagen",
+      "label": "Etiqueta",
+      "options": "Opciones",
+      "addOption": "Añadir opción",
+      "optionPlaceholder": "Nueva opción",
+      "removeOption": "Eliminar opción",
+      "hideEmpty": "Ocultar vacío en modo lectura",
+      "readOnly": "Totalmente de solo lectura",
+      "readOnlyHint": "Tampoco marcar ni alternar en modo lectura"
     }
   },
   "editor": {

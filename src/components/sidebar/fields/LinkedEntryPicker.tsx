@@ -5,6 +5,17 @@ import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { useOutsideClick } from '../../../hooks/useOutsideClick';
 import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
+import { isImageIcon } from '../../../lib/helpers';
+import { DEFAULT_ENTRY_EMOJI } from '../../../lib/modules';
+import type { SuggestionItem } from '../../../lib/linkItems';
+
+/** Das Icon eines Link-Ziels in Chips und Trefferzeilen: Bild (Altar), Emoji oder der Standard der Art. */
+export function LinkItemIcon({ item }: { item: SuggestionItem }) {
+  const icon = item.displayIcon || item.icon || DEFAULT_ENTRY_EMOJI[item.entryType];
+  return isImageIcon(icon)
+    ? <img src={icon} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
+    : <span className="flex-shrink-0">{icon}</span>;
+}
 
 interface Props<T> {
   /**

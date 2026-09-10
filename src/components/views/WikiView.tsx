@@ -455,6 +455,7 @@ export default function WikiView() {
           initialContent={article.content}
           placeholder={t('wiki.placeholder')}
           onChange={handleContentChange}
+          onReadModeChange={(content) => updateArticle(article.id, { content })}
           isEditing={isEditing}
         />
       )}

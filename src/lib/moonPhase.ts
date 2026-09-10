@@ -23,6 +23,12 @@ export function getMoonPhase(date: Date = new Date()): MoonPhase {
   return 'waning_crescent';
 }
 
+/** Die acht Phasen in Zyklus-Reihenfolge — Journal-Gruppen, Filter-Chips, Mondphasen-Feld. */
+export const MOON_PHASE_ORDER: readonly MoonPhase[] = [
+  'new', 'waxing_crescent', 'first_quarter', 'waxing_gibbous',
+  'full', 'waning_gibbous', 'last_quarter', 'waning_crescent',
+];
+
 export const MOON_PHASE_SYMBOLS: Record<MoonPhase, string> = {
   new: '🌑',
   waxing_crescent: '🌒',

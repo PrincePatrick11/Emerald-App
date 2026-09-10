@@ -1,6 +1,7 @@
 import type { TFunction } from 'i18next';
 import { BLOCK_ATTR, type BlockAttrName, type BlockInstance } from './types';
 import type { BlockTypeMeta } from './blockTypes';
+import { elementKindLabelKey, FIELDS_BLOCK_TYPE, parseFields, type ElementDef } from './fields';
 
 /**
  * Lesen und Setzen der Instanz-Attribute aus `BLOCK_ATTR` — dieselben Regeln
@@ -27,9 +28,22 @@ export function blockLabel(t: TFunction, block: BlockInstance, meta: BlockTypeMe
   return customBlockTitle(block) ?? blockTypeLabel(t, block, meta);
 }
 
-/** Der Typname allein — ohne eigenen Titel, etwa als Platzhalter beim Umbenennen. */
+/**
+ * Der Typname allein — ohne eigenen Titel, etwa als Platzhalter beim
+ * Umbenennen. Ein Feldblock mit genau einem Element heißt wie dieses Element.
+ */
 export function blockTypeLabel(t: TFunction, block: BlockInstance, meta: BlockTypeMeta | undefined): string {
-  return meta ? t(meta.labelKey) : t('blocks.unknown', { type: block.type });
+  if (!meta) return t('blocks.unknown', { type: block.type });
+  if (meta.id === FIELDS_BLOCK_TYPE) {
+    const { elements } = parseFields(block);
+    if (elements.length === 1) return elementLabel(t, elements[0]);
+  }
+  return t(meta.labelKey);
+}
+
+/** Die Beschriftung eines Feld-Elements: die eigene, sonst der Name seiner Art. */
+export function elementLabel(t: TFunction, element: ElementDef): string {
+  return element.label.trim() || t(elementKindLabelKey(element.kind));
 }
 
 /** Der Attributwert für „ausgeblendet: `hidden`". */

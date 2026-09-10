@@ -44,6 +44,11 @@ const NAMED_ENTITIES: Record<string, string> = {
   quot: '"', apos: "'", lt: '<', gt: '>', amp: '&', nbsp: ' ',
 };
 
+/** Entities in einem Attributwert auflösen — wie der Browser, ohne DOM. */
+export function decodeHtmlAttr(value: string): string {
+  return decodeAttr(value);
+}
+
 function decodeAttr(value: string): string {
   return value.replace(ENTITY_RE, (match, entity: string) => {
     const lower = entity.toLowerCase();

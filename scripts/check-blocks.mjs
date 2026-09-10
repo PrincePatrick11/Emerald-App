@@ -24,7 +24,9 @@ const entry = join(workDir, 'entry.ts');
 writeFileSync(
   entry,
   `export { parseBlocks, serializeBlocks, createTextBlock, blockSectionHtml, neutralizeSectionTags } from '${root}/src/lib/blocks/blockHtml';
-   export { TEXT_BLOCK_TYPE } from '${root}/src/lib/blocks/types';
+   export { TEXT_BLOCK_TYPE, BLOCK_ATTR } from '${root}/src/lib/blocks/types';
+   export { parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot } from '${root}/src/lib/blocks/fields';
+   export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';`
 );
 
@@ -44,7 +46,11 @@ try {
   rmSync(workDir, { recursive: true, force: true });
 }
 
-const { parseBlocks, serializeBlocks, createTextBlock, neutralizeSectionTags, TEXT_BLOCK_TYPE, extractInternalLinks } = bundle;
+const {
+  parseBlocks, serializeBlocks, createTextBlock, neutralizeSectionTags, TEXT_BLOCK_TYPE, BLOCK_ATTR, extractInternalLinks,
+  parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot,
+  internalLinkChipHtml,
+} = bundle;
 
 const failures = [];
 function check(label, ok, detail) {
@@ -192,6 +198,110 @@ console.log('\n4b. Täuschungsversuche\n');
     inAttr.length === 2 && inAttr[0].html === '<a href="x</section>y">l</a>' && inAttr[1].html === '<p>danach</p>',
     inAttr
   );
+}
+
+console.log('\n4c. Feldblock\n');
+{
+  const text = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p };
+
+  const fresh = parseFields(createFieldsBlock('shorttext'));
+  check(
+    'ein neuer Feldblock hat ein Element und die Standard-Anzeigeregeln',
+    fresh.elements.length === 1 && fresh.elements[0].kind === 'shorttext' &&
+      fresh.display.readHideEmpty === true && fresh.display.readOnly === false,
+    fresh
+  );
+  check('ein leeres Element ist leer und im Lesemodus ausgeblendet',
+    isElementEmpty(fresh.elements[0], fresh) && isHiddenInRead(fresh.elements[0], fresh));
+
+  const block = createFieldsBlock('shorttext');
+  const model = parseFields(block);
+  const el = model.elements[0];
+  const written = serializeFields(block, { ...model, values: { [el.id]: '<b>fett</b> & so' } }, text);
+  check('der Wert steht im JSON', JSON.parse(written.attrs[BLOCK_ATTR.data]).values[el.id] === '<b>fett</b> & so');
+  check('und escaped im Fallback', written.html.includes('&lt;b&gt;fett&lt;/b&gt; &amp; so') && !written.html.includes('<b>'), written.html);
+
+  const reparsed = parseFields(parseBlocks(serializeBlocks([written]))[0]);
+  check('Round-Trip über das Blockformat', reparsed.values[el.id] === '<b>fett</b> & so', reparsed);
+
+  const linkBlock = createFieldsBlock('link');
+  const linkModel = parseFields(linkBlock);
+  const linkEl = linkModel.elements[0];
+  const chip = internalLinkChipHtml({ id: '22222222-2222-2222-2222-222222222222', entryType: 'wiki', label: 'Ziel "A"' });
+  const withLink = serializeFields(linkBlock, { ...linkModel, slots: { [linkEl.id]: chip } }, text);
+  check('der Link steht als Slot im Markup, nicht im JSON',
+    withLink.html.includes(`data-block-slot="el:${linkEl.id}"`) && !(withLink.attrs[BLOCK_ATTR.data] ?? '').includes('2222'),
+    withLink);
+  const html = serializeBlocks([createTextBlock('<p>x</p>'), withLink]);
+  check('extractInternalLinks findet den Link im Feldblock', extractInternalLinks(html).length === 1);
+  const slotBack = parseFields(parseBlocks(html)[1]).slots[linkEl.id];
+  const target = linkFromSlot(slotBack);
+  check('der Slot liest sich samt Label zurück', target?.id === '22222222-2222-2222-2222-222222222222' && target?.label === 'Ziel "A"', target);
+
+  const imgBlock = createFieldsBlock('image');
+  const imgModel = parseFields(imgBlock);
+  const imgEl = imgModel.elements[0];
+  const name = `${'ab'.repeat(32)}.png`;
+  const withImg = serializeFields(imgBlock, { ...imgModel, slots: { [imgEl.id]: `<img src="${name}">` } }, text);
+  check('das Bild steht als src im Markup (Bild-Aufräumen findet es)', withImg.html.includes(`src="${name}"`) && imageFromSlot(parseFields(withImg).slots[imgEl.id]) === name);
+
+  const broken = parseFields({ id: 'x', type: 'core.fields', html: '', attrs: { [BLOCK_ATTR.config]: '{kaputt', [BLOCK_ATTR.data]: '[1,2' } });
+  check('kaputtes JSON ergibt einen leeren Block statt eines Fehlers', broken.elements.length === 0 && Object.keys(broken.values).length === 0);
+
+  const orphanBlock = { ...block, attrs: { ...block.attrs, [BLOCK_ATTR.data]: JSON.stringify({ values: { weg: 'bleibt', [el.id]: 42 } }) } };
+  const orphanModel = parseFields(orphanBlock);
+  check('ein Wert der falschen Art wird verworfen', orphanModel.values[el.id] === undefined);
+  const orphanOut = serializeFields(orphanBlock, orphanModel, text);
+  check('Werte ohne bekanntes Element bleiben erhalten', JSON.parse(orphanOut.attrs[BLOCK_ATTR.data]).values.weg === 'bleibt');
+
+  const hostile = {
+    id: 'h', type: 'core.fields', html: '',
+    attrs: { [BLOCK_ATTR.config]: JSON.stringify({ elements: [
+      { id: 'constructor', kind: 'link', label: '' },
+      { id: '__proto__', kind: 'link', label: '' },
+      { id: 'toString', kind: 'shorttext', label: '' },
+      { id: 'ok-1', kind: 'shorttext', label: '' },
+    ] }) },
+  };
+  let hostileModel;
+  let threw = false;
+  try {
+    hostileModel = parseFields(hostile);
+    for (const el of hostileModel.elements) {
+      isElementEmpty(el, hostileModel);
+      linkFromSlot(hostileModel.slots[el.id]);
+    }
+    linkFromSlot(hostileModel.slots.constructor);
+    imageFromSlot(hostileModel.slots.constructor);
+  } catch {
+    threw = true;
+  }
+  check('Element-IDs wie constructor/__proto__/toString werden verworfen, nichts wirft',
+    !threw && hostileModel.elements.length === 1 && hostileModel.elements[0].id === 'ok-1', hostileModel?.elements);
+
+  const toggleBlock = createFieldsBlock('toggle');
+  const toggleModel = parseFields(toggleBlock);
+  const toggleEl = toggleModel.elements[0];
+  check('Ja/Nein ist nie leer — ungesetzt heißt Nein',
+    !isElementEmpty(toggleEl, toggleModel) && !isElementEmpty(toggleEl, { ...toggleModel, values: { [toggleEl.id]: false } }));
+
+  const brokenConfig = parseFields({ id: 'b', type: 'core.fields', html: '', attrs: { [BLOCK_ATTR.config]: '{kaputt' } });
+  const brokenData = parseFields({ ...block, attrs: { ...block.attrs, [BLOCK_ATTR.data]: '"nur ein Text"' } });
+  check('unlesbare Config oder Daten setzen broken', brokenConfig.broken && brokenData.broken && !model.broken);
+
+  const orphanSlot = serializeFields(block, { ...model, slots: { weg: chip } }, text);
+  check('ein Slot ohne bekanntes Element übersteht das Schreiben',
+    parseFields(orphanSlot).slots.weg === chip && extractInternalLinks(orphanSlot.html).length === 1, orphanSlot.html);
+
+  const selectBlock = createFieldsBlock('select');
+  const selectModel = parseFields(selectBlock);
+  const selectEl = { ...selectModel.elements[0], options: [{ id: 'o1', label: 'Eins' }] };
+  check('ein Wert mit gelöschter Option gilt als leer',
+    isElementEmpty(selectEl, { ...selectModel, elements: [selectEl], values: { [selectEl.id]: 'o-geloescht' } }));
+
+  const keepEmpty = { ...el, hideWhenEmpty: false };
+  check('hideWhenEmpty am Element schlägt die Blockregel',
+    !isHiddenInRead(keepEmpty, { ...model, elements: [keepEmpty] }) && isHiddenInRead(el, model));
 }
 
 console.log('\n5. Was aus dem Inhalt abgeleitet wird, sieht die Blöcke durch\n');

@@ -296,7 +296,41 @@
         "label": "Text",
         "description": "Formatierter Text mit Überschriften, Listen, Bildern und Verknüpfungen.",
         "placeholder": "Weiterschreiben …"
+      },
+      "fields": {
+        "label": "Felder",
+        "description": "Beschriftete Werte: Text, Zahl, Datum, Auswahl, Ja/Nein, Checkliste, Verknüpfung, Bild, Mondphase."
       }
+    },
+    "kinds": {
+      "shorttext": "Kurztext",
+      "number": "Zahl",
+      "date": "Datum",
+      "select": "Auswahl",
+      "toggle": "Ja/Nein",
+      "checklist": "Checkliste",
+      "link": "Verknüpfung",
+      "image": "Bild",
+      "moon": "Mondphase"
+    },
+    "fields": {
+      "yes": "Ja",
+      "no": "Nein",
+      "choose": "Auswählen …",
+      "noOptions": "Noch keine Optionen — in der Seitenleiste anlegen",
+      "addItem": "Punkt hinzufügen",
+      "itemPlaceholder": "Neuer Punkt",
+      "removeItem": "Punkt entfernen",
+      "chooseImage": "Bild wählen",
+      "imageFailed": "Bild konnte nicht gespeichert werden",
+      "label": "Beschriftung",
+      "options": "Optionen",
+      "addOption": "Option hinzufügen",
+      "optionPlaceholder": "Neue Option",
+      "removeOption": "Option entfernen",
+      "hideEmpty": "Leer im Lesemodus ausblenden",
+      "readOnly": "Komplett schreibgeschützt",
+      "readOnlyHint": "Auch im Lesemodus nichts abhaken oder umschalten"
     }
   },
   "editor": {

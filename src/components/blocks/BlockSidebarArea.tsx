@@ -14,6 +14,7 @@ import {
   blockLabel, blockTypeLabel, customBlockTitle, hiddenAttrValue, isBlockHidden, showsTitleInRead, showTitleAttrValue,
 } from '../../lib/blocks/blockAttrs';
 import { BLOCK_ATTR, type BlockInstance } from '../../lib/blocks/types';
+import { blockIcon } from '../../lib/blocks/presets';
 import { BLOCK_SIDEBAR_VIEWS } from './blockSidebarViews';
 import { addBlockActions, commonBlockActions } from './blockActions';
 
@@ -54,7 +55,7 @@ function BlockManager({ session }: { session: BlockSession }) {
   const openAddMenu = (e: MouseEvent) => setMenu({
     x: e.clientX,
     y: e.clientY,
-    actions: addBlockActions(t, (type) => api.insert(session.blocks.length, type)),
+    actions: addBlockActions(t, (presetId) => api.insert(session.blocks.length, presetId)),
   });
 
   const openRowMenu = (e: MouseEvent, block: BlockInstance, meta: BlockTypeMeta | undefined) => {
@@ -148,7 +149,7 @@ function ManagerRow({
   const controls = useDragControls();
   const cancelledRef = useRef(false);
   const hidden = isBlockHidden(block);
-  const Icon = meta?.icon ?? Puzzle;
+  const Icon = blockIcon(block, meta) ?? Puzzle;
 
   return (
     <Reorder.Item as="div" value={block.id} dragListener={false} dragControls={controls} transition={REORDER_SPRING} style={{ position: 'relative' }}>
@@ -230,7 +231,11 @@ function BlockSections({ session }: { session: BlockSession }) {
           const Edit = views.Edit;
           return (
             <BlockSection key={block.id} type={block.type} label={label}>
-              <Edit block={block} setAttr={(name, value) => api.setAttr(block.id, name, value)} />
+              <Edit
+                block={block}
+                setAttr={(name, value) => api.setAttr(block.id, name, value)}
+                update={(next) => api.update(block.id, next)}
+              />
             </BlockSection>
           );
         }

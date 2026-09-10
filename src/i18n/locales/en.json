@@ -296,7 +296,41 @@
         "label": "Text",
         "description": "Formatted text with headings, lists, images and links.",
         "placeholder": "Keep writing…"
+      },
+      "fields": {
+        "label": "Fields",
+        "description": "Labelled values: text, number, date, choice, yes/no, checklist, link, image, moon phase."
       }
+    },
+    "kinds": {
+      "shorttext": "Short text",
+      "number": "Number",
+      "date": "Date",
+      "select": "Choice",
+      "toggle": "Yes/No",
+      "checklist": "Checklist",
+      "link": "Link",
+      "image": "Image",
+      "moon": "Moon phase"
+    },
+    "fields": {
+      "yes": "Yes",
+      "no": "No",
+      "choose": "Choose…",
+      "noOptions": "No options yet — add them in the sidebar",
+      "addItem": "Add item",
+      "itemPlaceholder": "New item",
+      "removeItem": "Remove item",
+      "chooseImage": "Choose image",
+      "imageFailed": "Couldn't save the image",
+      "label": "Label",
+      "options": "Options",
+      "addOption": "Add option",
+      "optionPlaceholder": "New option",
+      "removeOption": "Remove option",
+      "hideEmpty": "Hide empty in read mode",
+      "readOnly": "Fully read-only",
+      "readOnlyHint": "No ticking or toggling in read mode either"
     }
   },
   "editor": {
