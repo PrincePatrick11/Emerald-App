@@ -366,13 +366,9 @@ export default function TagsView() {
 
   return (
     <Dashboard<TaggedItem>
-      headerLeft={
-        <div className="flex items-center gap-3 min-w-0">
-          <AUX_VIEWS.tags.icon size={18} className="text-stone-500 flex-shrink-0" />
-          <h1 className="text-lg font-semibold text-stone-100 truncate">{t('nav.tags')}</h1>
-          <span className="text-xs text-stone-500 bg-stone-700/50 px-2 py-0.5 rounded-full">{tags.length}</span>
-        </div>
-      }
+      title={t('nav.tags')}
+      titleIcon={AUX_VIEWS.tags.icon}
+      titleCount={tags.length}
       primaryAction={{ label: t('tags.new'), onClick: openAddForm }}
       sort={sort}
       onSort={(s) => { if (isTagsSort(s)) setSort(s); }}

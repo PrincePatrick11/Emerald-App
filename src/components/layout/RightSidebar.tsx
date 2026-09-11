@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { entryBlockSummary } from '../../lib/blocks/entrySummary';
 import type { ComponentType } from 'react';
-import { Pencil, Check, X, Trash2, Maximize2, Minimize2 } from 'lucide-react';
+import { Pencil, Maximize2, Minimize2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useJournalStore } from '../../store/journalStore';
@@ -14,7 +14,7 @@ import WikiPropertiesPanel from '../sidebar/panels/WikiPropertiesPanel';
 import OperationPropertiesPanel from '../sidebar/panels/OperationPropertiesPanel';
 import AltarSidebarPanel from '../sidebar/panels/AltarSidebarPanel';
 import Button from '../ui/Button';
-import { SIDEBAR_ACTION_BAR_CLASSES } from '../../lib/styleClasses';
+import SidebarColumn, { EditActionBar, SidebarActionBar } from '../ui/SidebarColumn';
 
 // Eager, nicht lazy: die Panels hängen ohnehin an Stores, die beim Start
 // geladen sind, und die Seitenleiste ist ab dem ersten Frame sichtbar.
@@ -63,34 +63,7 @@ function RightSidebarActionBar() {
 
   if (isEditing) {
     if (!editActions) return null;
-    return (
-      <div className={SIDEBAR_ACTION_BAR_CLASSES}>
-        <Button tone="jade" fill title={t('editor.done')} aria-label={t('editor.done')} onClick={editActions.onSave}>
-          <Check size={14} />
-          <span className="truncate">{t('editor.done')}</span>
-        </Button>
-        {editActions.onDelete && (
-          <Button
-            tone="danger"
-            compact
-            title={t('editor.delete')}
-            aria-label={t('editor.delete')}
-            onClick={editActions.onDelete}
-          >
-            <Trash2 size={14} />
-          </Button>
-        )}
-        <Button
-          tone="neutral"
-          compact
-          title={t('editor.cancel')}
-          aria-label={t('editor.cancel')}
-          onClick={editActions.onCancel}
-        >
-          <X size={14} />
-        </Button>
-      </div>
-    );
+    return <EditActionBar onDone={editActions.onSave} onDelete={editActions.onDelete} onCancel={editActions.onCancel} />;
   }
 
   // Eine geladene Sigille mit Sperre „ganzer Eintrag" lässt sich nicht
@@ -100,7 +73,7 @@ function RightSidebarActionBar() {
   const isAltar = activeView.type === 'altar';
 
   return (
-    <div className={SIDEBAR_ACTION_BAR_CLASSES}>
+    <SidebarActionBar>
       <Button
         tone="amber"
         fill
@@ -123,7 +96,7 @@ function RightSidebarActionBar() {
           {altarWindowFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </Button>
       )}
-    </div>
+    </SidebarActionBar>
   );
 }
 
@@ -146,16 +119,9 @@ export default function RightSidebar() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <RightSidebarActionBar />
-      {/* The horizontal inset lives here and nowhere else. It matches the
-          action bar's `px-3`, so the summary rows below line up with the
-          Edit button above them; a panel adding its own `px-*` would break
-          that alignment again. */}
-      <div className="flex-1 overflow-y-auto p-3">
-        <PropertiesContent activeView={activeView} />
-        {moduleMeta(activeView.type)?.usesBlocks && <BlockSidebarArea />}
-      </div>
-    </div>
+    <SidebarColumn bar={<RightSidebarActionBar />}>
+      <PropertiesContent activeView={activeView} />
+      {moduleMeta(activeView.type)?.usesBlocks && <BlockSidebarArea />}
+    </SidebarColumn>
   );
 }

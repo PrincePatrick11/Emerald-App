@@ -366,7 +366,7 @@
       "updateAll": "Update all",
       "updateAllConfirm": "Bring {{count}} entry to this version?",
       "updateAllConfirm_other": "Bring {{count}} entries to this version?",
-      "saveFirst": "Save your changes first",
+      "saveFirst": "Save with Done first, then reopen the block",
       "updated": "{{count}} entry updated.",
       "updated_other": "{{count}} entries updated.",
       "removed": "Removed from {{count}} entry.",

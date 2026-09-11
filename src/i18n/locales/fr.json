@@ -366,7 +366,7 @@
       "updateAll": "Tout mettre à jour",
       "updateAllConfirm": "Mettre {{count}} entrée à cette version ?",
       "updateAllConfirm_other": "Mettre {{count}} entrées à cette version ?",
-      "saveFirst": "Enregistrez d'abord vos modifications",
+      "saveFirst": "Enregistrez d’abord avec « Terminé », puis rouvrez le bloc",
       "updated": "{{count}} entrée mise à jour.",
       "updated_other": "{{count}} entrées mises à jour.",
       "removed": "Retiré de {{count}} entrée.",

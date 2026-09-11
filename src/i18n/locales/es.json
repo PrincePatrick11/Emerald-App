@@ -366,7 +366,7 @@
       "updateAll": "Actualizar todas",
       "updateAllConfirm": "¿Llevar {{count}} entrada a esta versión?",
       "updateAllConfirm_other": "¿Llevar {{count}} entradas a esta versión?",
-      "saveFirst": "Guarda primero los cambios",
+      "saveFirst": "Guarda primero con «Listo» y vuelve a abrir el bloque",
       "updated": "{{count}} entrada actualizada.",
       "updated_other": "{{count}} entradas actualizadas.",
       "removed": "Quitado de {{count}} entrada.",

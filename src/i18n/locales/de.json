@@ -366,7 +366,7 @@
       "updateAll": "Alle aktualisieren",
       "updateAllConfirm": "{{count}} Eintrag auf diese Version bringen?",
       "updateAllConfirm_other": "{{count}} Einträge auf diese Version bringen?",
-      "saveFirst": "Erst die Änderungen speichern",
+      "saveFirst": "Erst mit „Fertig“ speichern, dann den Block wieder öffnen",
       "updated": "{{count}} Eintrag aktualisiert.",
       "updated_other": "{{count}} Einträge aktualisiert.",
       "removed": "Aus {{count}} Eintrag entfernt.",

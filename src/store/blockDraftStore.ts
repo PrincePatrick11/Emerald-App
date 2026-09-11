@@ -7,8 +7,16 @@ export type DefinitionDraft = Required<BlockDefinitionPatch>;
 interface BlockDraftState {
   /** Ungespeicherte Entwürfe je Definitions-id. */
   drafts: Readonly<Record<string, DefinitionDraft>>;
-  /** `null` räumt den Entwurf weg (gespeichert, verworfen, gelöscht). */
-  setDraft: (id: string, draft: DefinitionDraft | null) => void;
+  saveDraft: (id: string, draft: DefinitionDraft) => void;
+  /** Erledigt: mit „Fertig" gespeichert, abgebrochen oder der Block gelöscht. */
+  clearDraft: (id: string) => void;
+  /**
+   * Alle weg — beim Vault-Wechsel und beim Ersetzen aus einer Sicherung, wo
+   * auch alle Tabs zugehen. Nach einer Wiederherstellung kommen dieselben ids
+   * zurück; ein alter Entwurf schriebe sonst mit „Fertig" über den
+   * wiederhergestellten Block.
+   */
+  clearAll: () => void;
 }
 
 /**
@@ -20,10 +28,11 @@ interface BlockDraftState {
  */
 export const useBlockDraftStore = create<BlockDraftState>((set) => ({
   drafts: {},
-  setDraft: (id, draft) => set((s) => {
-    if (draft) return { drafts: { ...s.drafts, [id]: draft } };
+  saveDraft: (id, draft) => set((s) => ({ drafts: { ...s.drafts, [id]: draft } })),
+  clearDraft: (id) => set((s) => {
     if (!(id in s.drafts)) return s;
     const { [id]: _removed, ...rest } = s.drafts;
     return { drafts: rest };
   }),
+  clearAll: () => set({ drafts: {} }),
 }));

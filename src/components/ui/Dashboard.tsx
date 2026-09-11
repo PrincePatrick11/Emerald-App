@@ -1,7 +1,8 @@
 import { Fragment, useLayoutEffect, type ReactNode } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, type LucideIcon } from 'lucide-react';
 import Button from './Button';
 import SidebarPortal from './SidebarPortal';
+import SidebarColumn, { SidebarActionBar } from './SidebarColumn';
 import CollapseChevron from './CollapseChevron';
 import ListToolbar from './ListToolbar';
 import FilterPanel, { type FilterPanelProps } from './FilterPanel';
@@ -61,9 +62,13 @@ export interface DashboardFilters {
 interface DashboardBaseProps<T> {
   // Kopf — steht in der rechten Seitenleiste
   title?: string;
-  /** Ersetzt den Inhalt der Titelzeile (Icon + Titel + Badge). */
+  /** Das Icon vor dem Titel — meist das Rail-Icon der Ansicht. */
+  titleIcon?: LucideIcon;
+  /** Die Zahl im Pill hinter dem Titel; weglassen = kein Pill. */
+  titleCount?: number;
+  /** Ersetzt die ganze Titelzeile — für Köpfe mit mehr als Icon, Titel und
+   *  Zahl (Home: zwei Zeilen; Papierkorb: `DashboardTitle` plus „Alle wählen"). */
   headerLeft?: ReactNode;
-  titleClassName?: string;
   /** Beschrifteter Jade-Knopf auf eigener voller Zeile unter dem Titel —
    *  neben dem Titel bliebe von ihm in der schmalen Spalte nichts Lesbares. */
   primaryAction?: { label: string; onClick: () => void };
@@ -151,11 +156,34 @@ const DEFAULT_CONTENT_CLASSNAME = 'flex-1 overflow-y-auto px-8 py-6';
 const DEFAULT_CARDS_CLASSNAME = 'grid grid-cols-3 gap-3';
 const DEFAULT_WIDE_CARDS_CLASSNAME = 'grid grid-cols-1 gap-3';
 const DEFAULT_LIST_CLASSNAME = 'space-y-1.5';
-const DEFAULT_TITLE_CLASSNAME = 'text-lg font-semibold text-stone-100';
 const DEFAULT_EMPTY_WRAPPER_CLASSNAME = 'text-center py-20';
 const DEFAULT_EMPTY_MESSAGE_CLASSNAME = 'text-stone-600 text-sm';
 const DEFAULT_EMPTY_ACTION_CLASSNAME = 'mt-4 text-xs text-stone-500 hover:text-stone-300 underline transition-colors';
 const DEFAULT_NO_RESULTS_CLASSNAME = 'text-center py-20 text-stone-600 text-sm';
+
+/**
+ * Die Titelzeile eines Dashboard-Kopfes: Icon, Titel, Zahl im Pill. Dashboard
+ * rendert sie selbst aus `title`/`titleIcon`/`titleCount`; exportiert für
+ * Köpfe, die hinter ihr noch etwas brauchen (`children`, der Papierkorb sein
+ * „Alle wählen") und sie deshalb als `headerLeft` bauen.
+ */
+export function DashboardTitle({ icon: Icon, title, count, children }: {
+  icon?: LucideIcon;
+  title: string;
+  count?: number;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-3 min-w-0">
+      {Icon && <Icon size={18} className="text-stone-500 flex-shrink-0" />}
+      <h1 className="text-lg font-semibold text-stone-100 truncate">{title}</h1>
+      {count !== undefined && (
+        <span className="text-xs text-stone-500 bg-stone-700/50 px-2 py-0.5 rounded-full">{count}</span>
+      )}
+      {children}
+    </div>
+  );
+}
 
 /**
  * Die Trennlinien-Ueberschrift der Timeline-Gruppen — Label, danach eine Linie
@@ -187,8 +215,9 @@ export function GroupDivider({
 
 export default function Dashboard<T>({
   title,
+  titleIcon,
+  titleCount,
   headerLeft,
-  titleClassName = DEFAULT_TITLE_CLASSNAME,
   primaryAction,
   extraActions,
   headerRight,
@@ -323,57 +352,55 @@ export default function Dashboard<T>({
     </Button>
   ));
 
+  // Die Zeile oben gehört allein dem Titel: die Aktionen bekommen darunter
+  // eine eigene volle Zeile im Körper — neben dem Titel bliebe von einer
+  // beschrifteten Primäraktion in dieser schmalen Spalte nichts Lesbares
+  // übrig. `headerRight` ersetzt sie; dort kann eine breite Slot-Zeile
+  // (Trash-Bulk-Aktionen) umbrechen. Toolbar und FilterPanel bringen kein
+  // eigenes Streifen-Chrome mit — den Einzug stellt `SidebarColumn`.
   const header = (
-    <div className="flex flex-col flex-1 min-h-0">
-      {/* h-14 + px-3 wie die Aktionsleiste der Detailansichten, damit die
-          Trennlinie mit der Tab-Leiste der Eintragsliste fluchtet. Die Zeile
-          gehört allein dem Titel: die Aktionen bekommen darunter eine eigene
-          volle Zeile in der Scroll-Spalte — neben dem Titel bliebe von einer
-          beschrifteten Primäraktion in dieser schmalen Spalte nichts
-          Lesbares übrig. `headerRight` ersetzt sie; dort kann eine breite
-          Slot-Zeile (Trash-Bulk-Aktionen) umbrechen. */}
-      <div className="flex items-center gap-2 px-3 h-14 border-b border-stone-700/60 flex-shrink-0 min-w-0">
-        {headerLeft ?? <h1 className={`${titleClassName} truncate`}>{title}</h1>}
-      </div>
-      {/* Eine Einzugsquelle pro Spalte (design.md): dieselbe p-3-Spalte wie der
-          Properties-Container in RightSidebar — Toolbar und FilterPanel bringen
-          kein eigenes Streifen-Chrome mit. */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-4">
-        {headerRight && <div className="flex flex-col gap-1.5">{headerRight}</div>}
+    <SidebarColumn
+      bar={(
+        <SidebarActionBar>
+          {headerLeft ?? <DashboardTitle icon={titleIcon} title={title ?? ''} count={titleCount} />}
+        </SidebarActionBar>
+      )}
+      bodyClassName="space-y-4"
+    >
+      {headerRight && <div className="flex flex-col gap-1.5">{headerRight}</div>}
 
-        {/* Die Primäraktion füllt die Zeile, die Nebenaktionen bleiben daneben
-            kompakt. */}
-        {!headerRight && (primaryAction || !!extraActions?.length) && (
-          <div className="flex items-center gap-1.5">
-            {primaryAction && (
-              <Button variant="primary" onClick={primaryAction.onClick} className="flex-1 min-w-0 justify-center">
-                <Plus size={14} className="flex-shrink-0" />
-                <span className="truncate">{primaryAction.label}</span>
-              </Button>
-            )}
-            {extraActionButtons}
-          </div>
-        )}
+      {/* Die Primäraktion füllt die Zeile, die Nebenaktionen bleiben daneben
+          kompakt. */}
+      {!headerRight && (primaryAction || !!extraActions?.length) && (
+        <div className="flex items-center gap-1.5">
+          {primaryAction && (
+            <Button variant="primary" onClick={primaryAction.onClick} className="flex-1 min-w-0 justify-center">
+              <Plus size={14} className="flex-shrink-0" />
+              <span className="truncate">{primaryAction.label}</span>
+            </Button>
+          )}
+          {extraActionButtons}
+        </div>
+      )}
 
-        <ListToolbar
-          view={view}
-          sort={sort}
-          onView={onView}
-          onSort={onSort}
-          viewOptions={viewOptions}
-          sortModes={sortModes}
-          groupBy={groupBy}
-          search={search}
-          onSearch={onSearch}
-        />
+      <ListToolbar
+        view={view}
+        sort={sort}
+        onView={onView}
+        onSort={onSort}
+        viewOptions={viewOptions}
+        sortModes={sortModes}
+        groupBy={groupBy}
+        search={search}
+        onSearch={onSearch}
+      />
 
-        {/* In der Seitenleiste ist Platz in der Höhe: das FilterPanel steht
-            dauerhaft, statt hinter einem Auf/Zu-Knopf. */}
-        {filters && (
-          <FilterPanel {...filters.panelProps} activeFilterCount={filters.activeFilterCount} />
-        )}
-      </div>
-    </div>
+      {/* In der Seitenleiste ist Platz in der Höhe: das FilterPanel steht
+          dauerhaft, statt hinter einem Auf/Zu-Knopf. */}
+      {filters && (
+        <FilterPanel {...filters.panelProps} activeFilterCount={filters.activeFilterCount} />
+      )}
+    </SidebarColumn>
   );
 
   return (

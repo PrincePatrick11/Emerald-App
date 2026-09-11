@@ -38,6 +38,7 @@ import { generateId, nowIso } from './helpers';
 import { useVaultStore } from '../store/vaultStore';
 import { reloadAllStores } from '../store/moduleWiring';
 import { useUIStore } from '../store/uiStore';
+import { useBlockDraftStore } from '../store/blockDraftStore';
 import { resumeEditorSaves, suspendEditorSaves } from './editorLock';
 import { drainSerialized } from './serialize';
 
@@ -1325,6 +1326,7 @@ export async function importDatabase(
   // bleiben die Tabs gueltig; add-vault laeuft ueber switchVault und raeumt dort.
   if (mode === 'replace') {
     useUIStore.getState().closeAllTabs();
+    useBlockDraftStore.getState().clearAll();
   }
 
   // Die globale Suche merkt sich den Klartext eines Eintrags unter (id,

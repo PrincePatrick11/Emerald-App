@@ -6,6 +6,8 @@ import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import SidebarPortal from '../ui/SidebarPortal';
+import SidebarColumn, { EditActionBar } from '../ui/SidebarColumn';
+import InlineConfirm from '../ui/InlineConfirm';
 import PropertiesEditView from '../sidebar/fields/PropertiesEditView';
 import Favicon from '../sidebar/fields/Favicon';
 import BlockGlyph from './BlockGlyph';
@@ -21,7 +23,7 @@ import { DEFAULT_DEFINITION_ICON, type BlockDefinition, type DefinitionDisplay }
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { shrinkImageDataUrl } from '../../lib/shrinkImage';
 import { REORDER_SPRING } from '../../lib/motion';
-import { OP_PROP_SELECT_CLASSES, SIDEBAR_ACTION_BAR_CLASSES } from '../../lib/styleClasses';
+import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import { useFieldFallbackText } from './useFieldFallbackText';
 import OptionsEditor from './OptionsEditor';
 import BlockCheckbox from './BlockCheckbox';
@@ -45,7 +47,8 @@ const withArchivedLast = (elements: ElementDef[]): ElementDef[] => [
 interface Props {
   definition: BlockDefinition;
   usage: CopyUsage | undefined;
-  /** Zurück zur Liste — Brotkrume, „Fertig" und „Abbrechen". */
+  /** Zurück zur Liste. Die Brotkrume lässt den Entwurf liegen (die Liste
+   *  zeigt ihn als ungespeichert); „Fertig" und „Abbrechen" erledigen ihn vorher. */
   onClose: () => void;
   /** Öffnet den Löschdialog — den hält die Ansicht, damit seine Abschlussmeldung
    *  die Seite überlebt, die mit der Definition verschwindet. */
@@ -60,11 +63,12 @@ interface Props {
  * Löschen und Abbrechen wie im Bearbeitungsmodus, darunter Icon,
  * Anzeigeregeln und Verwendung.
  *
- * Bearbeitet wird ein Entwurf; erst „Speichern" schreibt ihn und hebt die
+ * Bearbeitet wird ein Entwurf; erst „Fertig" schreibt ihn und hebt die
  * Revision — sonst machte jeder Tastendruck im Namen alle Kopien zu „älteren
  * Versionen". „Fertig" speichert, falls sich etwas geändert hat, „Abbrechen"
- * verwirft den Entwurf; beide führen zurück zur Liste. Ein gespeichertes Feld wird beim Entfernen archiviert statt
- * gelöscht: Kopien können Werte dafür haben, und es lässt sich zurückholen.
+ * verwirft den Entwurf; beide führen zurück zur Liste. Ein gespeichertes Feld
+ * wird beim Entfernen archiviert statt gelöscht: Kopien können Werte dafür
+ * haben, und es lässt sich zurückholen.
  * Ein ungespeicherter Entwurf liegt im `blockDraftStore` und wartet dort, bis
  * die Seite wieder geöffnet wird.
  */
@@ -72,26 +76,27 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
   const { t } = useTranslation();
   const text = useFieldFallbackText();
   const updateDefinition = useBlockDefinitionStore((s) => s.updateDefinition);
-  const storeDraft = useBlockDraftStore((s) => s.setDraft);
+  const saveDraft = useBlockDraftStore((s) => s.saveDraft);
+  const clearDraft = useBlockDraftStore((s) => s.clearDraft);
   const [draft, setDraft] = useState<DefinitionDraft>(
     () => useBlockDraftStore.getState().drafts[definition.id] ?? draftOf(definition),
   );
-  // Ohne Seitenleiste fehlte Speichern ganz — dann stehen Speichern und
-  // Verwerfen oben in der Seite (Anzeige und Verwendung bleiben der Leiste).
+  // Fertig und Abbrechen stehen in der Seitenleiste; ist sie zu, stehen sie
+  // oben in der Seite (Icon, Anzeige und Verwendung bleiben der Leiste).
   const sidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const [menu, setMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
   const [confirmUpdate, setConfirmUpdate] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const dirty = JSON.stringify(draft) !== JSON.stringify(draftOf(definition));
-  // Nach „Fertig"/„Abbrechen" ist der Entwurf erledigt: ein Render auf dem Weg
-  // hinaus (die gespeicherte Definition kommt zurück, der Name noch ungetrimmt)
-  // legte ihn sonst wieder in den Store.
-  const leaving = useRef(false);
+  // Getrimmt verglichen, wie der Store den Namen speichert: ein Leerzeichen am
+  // Ende ist keine Änderung, und nach „Fertig" gleicht der Entwurf dem
+  // Gespeicherten, statt sich auf dem Weg hinaus wieder abzulegen.
+  const dirty = JSON.stringify({ ...draft, name: draft.name.trim() }) !== JSON.stringify(draftOf(definition));
   useEffect(() => {
-    if (!leaving.current) storeDraft(definition.id, dirty ? draft : null);
-  }, [definition.id, draft, dirty, storeDraft]);
+    if (dirty) saveDraft(definition.id, draft);
+    else clearDraft(definition.id);
+  }, [definition.id, draft, dirty, saveDraft, clearDraft]);
 
   const savedIds = new Set(definition.elements.map((e) => e.id));
   const active = draft.elements.filter((e) => !e.archived);
@@ -136,20 +141,33 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
   });
 
   const leave = () => {
-    leaving.current = true;
-    storeDraft(definition.id, null);
+    clearDraft(definition.id);
     onClose();
   };
   const finish = async () => {
-    if (dirty) await updateDefinition(definition.id, draft);
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (dirty) await updateDefinition(definition.id, draft);
+    } catch (err) {
+      // Auf der Seite bleiben: der Entwurf ist nicht gespeichert.
+      console.error('[BlockDefinitionEditor] saving the block failed:', err);
+      setBusy(false);
+      return;
+    }
     leave();
   };
 
   // Ein Bild wird verkleinert, bevor es in den Entwurf kommt; Entfernen heißt
   // zurück zum Standard — ohne Icon stünde der Block in Menüs ohne Zeichen da.
+  // Die letzte Wahl gewinnt: ein Emoji, gewählt während ein Bild noch
+  // verkleinert wird, darf nicht vom späten Bild überschrieben werden.
+  const iconRequest = useRef(0);
   const setIcon = async (value: string) => {
+    const request = ++iconRequest.current;
     try {
-      patch({ icon: isImageIcon(value) ? await shrinkImageDataUrl(value, ICON_MAX_EDGE) : value });
+      const icon = isImageIcon(value) ? await shrinkImageDataUrl(value, ICON_MAX_EDGE) : value;
+      if (request === iconRequest.current) patch({ icon });
     } catch (err) {
       console.error('[BlockDefinitionEditor] reading the icon failed:', err);
     }
@@ -170,78 +188,64 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
 
   // Dieselbe Leiste wie bei einem Eintrag im Bearbeitungsmodus.
   const sidebar = (
-    <div className="flex flex-col flex-1 min-h-0">
-      <div className={SIDEBAR_ACTION_BAR_CLASSES}>
-        <Button tone="jade" fill title={t('editor.done')} aria-label={t('editor.done')} onClick={() => void finish()}>
-          <Check size={14} />
-          <span className="truncate">{t('editor.done')}</span>
-        </Button>
-        <Button tone="danger" compact title={t('common.delete')} aria-label={t('common.delete')} onClick={onDelete}>
-          <Trash2 size={14} />
-        </Button>
-        <Button tone="neutral" compact title={t('editor.cancel')} aria-label={t('editor.cancel')} onClick={leave}>
-          <X size={14} />
-        </Button>
-      </div>
+    <SidebarColumn bar={<EditActionBar onDone={() => void finish()} onDelete={onDelete} onCancel={leave} busy={busy} />}>
+      <PropertiesEditView>
+        <div>
+          <p className="label-xs mb-2">{t('properties.icon')}</p>
+          <Favicon
+            value={draft.icon}
+            onChange={(icon) => void setIcon(icon)}
+            onRemove={() => void setIcon(DEFAULT_DEFINITION_ICON)}
+          />
+        </div>
 
-      {/* Derselbe p-3-Einzug wie die Eigenschaften eines Eintrags. */}
-      <div className="flex-1 overflow-y-auto p-3">
-        <PropertiesEditView>
-          <div>
-            <p className="label-xs mb-2">{t('properties.icon')}</p>
-            <Favicon
-              value={draft.icon}
-              onChange={(icon) => void setIcon(icon)}
-              onRemove={() => patch({ icon: DEFAULT_DEFINITION_ICON })}
-            />
-          </div>
+        <section className="space-y-2">
+          <p className="label-xs">{t('blocks.library.display')}</p>
+          <BlockCheckbox checked={draft.display.readHideEmpty} onChange={(v) => patchDisplay({ readHideEmpty: v })} label={t('blocks.fields.hideEmpty')} />
+          <BlockCheckbox checked={draft.display.showTitle} onChange={(v) => patchDisplay({ showTitle: v })} label={t('blocks.showTitle')} />
+          <BlockCheckbox
+            checked={draft.display.readOnly}
+            onChange={(v) => patchDisplay({ readOnly: v })}
+            label={t('blocks.fields.readOnly')}
+            hint={t('blocks.fields.readOnlyHint')}
+          />
+        </section>
 
-          <section className="space-y-2">
-            <p className="label-xs">{t('blocks.library.display')}</p>
-            <BlockCheckbox checked={draft.display.readHideEmpty} onChange={(v) => patchDisplay({ readHideEmpty: v })} label={t('blocks.fields.hideEmpty')} />
-            <BlockCheckbox checked={draft.display.showTitle} onChange={(v) => patchDisplay({ showTitle: v })} label={t('blocks.showTitle')} />
-            <BlockCheckbox
-              checked={draft.display.readOnly}
-              onChange={(v) => patchDisplay({ readOnly: v })}
-              label={t('blocks.fields.readOnly')}
-              hint={t('blocks.fields.readOnlyHint')}
-            />
-          </section>
-
-          <section className="space-y-2">
-            <p className="label-xs">{t('blocks.library.usage')}</p>
-            <p className="text-xs text-stone-400">
-              {entries > 0 ? t('blocks.library.usedIn', { count: entries }) : t('blocks.library.unused')}
-              {outdated > 0 && <> · {t('blocks.library.outdated', { count: outdated })}</>}
-            </p>
-            <p className="block-field-hint">{t('blocks.library.copiesNote')}</p>
-            {outdated > 0 && (
-              confirmUpdate ? (
-                <div className="space-y-2">
-                  <p className="text-xs text-stone-400">{t('blocks.library.updateAllConfirm', { count: outdated })}</p>
-                  <div className="flex items-center gap-2">
-                    <Button tone="jade" small onClick={() => void runUpdateAll()}>{t('blocks.library.updateAll')}</Button>
-                    <Button tone="neutral" small onClick={() => setConfirmUpdate(false)}>{t('common.cancel')}</Button>
-                  </div>
-                </div>
-              ) : (
-                <Button
-                  tone="jade"
-                  small
-                  disabled={dirty || busy}
-                  title={dirty ? t('blocks.library.saveFirst') : undefined}
-                  onClick={() => setConfirmUpdate(true)}
-                >
-                  <RefreshCw size={12} />
-                  <span>{t('blocks.library.updateAll')}</span>
-                </Button>
-              )
-            )}
-            {notice && <p className="text-xs text-stone-500">{notice}</p>}
-          </section>
-        </PropertiesEditView>
-      </div>
-    </div>
+        <section className="space-y-2">
+          <p className="label-xs">{t('blocks.library.usage')}</p>
+          <p className="text-xs text-stone-400">
+            {entries > 0 ? t('blocks.library.usedIn', { count: entries }) : t('blocks.library.unused')}
+            {outdated > 0 && <> · {t('blocks.library.outdated', { count: outdated })}</>}
+          </p>
+          <p className="block-field-hint">{t('blocks.library.copiesNote')}</p>
+          {outdated > 0 && (
+            confirmUpdate ? (
+              <InlineConfirm
+                tone="jade"
+                small
+                wrap
+                message={t('blocks.library.updateAllConfirm', { count: outdated })}
+                confirmLabel={t('blocks.library.updateAll')}
+                onConfirm={() => void runUpdateAll()}
+                onCancel={() => setConfirmUpdate(false)}
+              />
+            ) : (
+              <Button
+                tone="jade"
+                small
+                disabled={dirty || busy}
+                title={dirty ? t('blocks.library.saveFirst') : undefined}
+                onClick={() => setConfirmUpdate(true)}
+              >
+                <RefreshCw size={12} />
+                <span>{t('blocks.library.updateAll')}</span>
+              </Button>
+            )
+          )}
+          {notice && <p className="text-xs text-stone-500">{notice}</p>}
+        </section>
+      </PropertiesEditView>
+    </SidebarColumn>
   );
 
   return (
@@ -257,7 +261,7 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
         </div>
         {!sidebarOpen && (
           <div className="ml-auto flex items-center gap-1.5">
-            <Button tone="jade" small onClick={() => void finish()}>
+            <Button tone="jade" small disabled={busy} onClick={() => void finish()}>
               <Check size={12} />
               <span>{t('editor.done')}</span>
             </Button>

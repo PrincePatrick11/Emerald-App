@@ -28,7 +28,7 @@ export default function BlocksView() {
   const createDefinition = useBlockDefinitionStore((s) => s.createDefinition);
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
-  const clearDraft = useBlockDraftStore((s) => s.setDraft);
+  const clearDraft = useBlockDraftStore((s) => s.clearDraft);
   const rows = useBlockContentRows();
   /** Schnappschuss statt id: der Dialog zeigt nach dem Löschen noch seine Meldung. */
   const [deleting, setDeleting] = useState<BlockDefinition | null>(null);
@@ -51,7 +51,7 @@ export default function BlocksView() {
       entryCount={usage.get(deleting.id)?.entries ?? 0}
       onClose={() => setDeleting(null)}
       onDeleted={() => {
-        clearDraft(deleting.id, null);
+        clearDraft(deleting.id);
         setDeleting(null);
         if (activeView.id === deleting.id) backToList();
       }}
@@ -131,21 +131,14 @@ function BlockList({ usage, onCreate, onDelete }: {
     );
   };
 
-  const headerLeft = (
-    <div className="flex items-center gap-3 min-w-0">
-      <AUX_VIEWS.blocks.icon size={18} className="text-stone-500 flex-shrink-0" />
-      <h1 className="text-lg font-semibold text-stone-100 truncate">{t('nav.blocks')}</h1>
-      <span className="text-xs text-stone-500 bg-stone-700/50 px-2 py-0.5 rounded-full">
-        {definitions.length}
-      </span>
-    </div>
-  );
 
   const menuDef = ctxMenu && definitions.find((d) => d.id === ctxMenu.id);
 
   return (
     <Dashboard<BlockDefinition>
-      headerLeft={headerLeft}
+      title={t('nav.blocks')}
+      titleIcon={AUX_VIEWS.blocks.icon}
+      titleCount={definitions.length}
       primaryAction={{ label: t('blocks.library.newBlock'), onClick: onCreate }}
       search={search}
       onSearch={setSearch}
