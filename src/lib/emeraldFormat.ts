@@ -583,13 +583,17 @@ async function withImportedStatus(content: string, status: LegacyStatus): Promis
 
 // ── Import helpers ───────────────────────────────────────────────────────────
 
-/** Ensures each tag name exists in the tags table, then returns the names unchanged.
- *  entry.tags stores tag NAMES (not IDs) — ensureTag just keeps the tags table in sync. */
+/** Ensures each tag name exists in the tags table and returns the names as the
+ *  table spells them. entry.tags stores tag NAMES (not IDs), and ensureTag
+ *  matches case-insensitively — an imported "foo" for an existing "Foo" must
+ *  become "Foo", or renaming/deleting that tag would miss this entry. */
 async function ensureTagNames(names: string[]): Promise<string[]> {
+  const result: string[] = [];
   for (const name of names) {
-    await useTagStore.getState().ensureTag(name);
+    const { name: canonical } = await useTagStore.getState().ensureTag(name);
+    if (!result.includes(canonical)) result.push(canonical);
   }
-  return names;
+  return result;
 }
 
 /** Re-saves images into local storage and returns content with updated paths. */

@@ -35,7 +35,7 @@ export function AltarLibrarySection({ search, onNewElement, onEditElement }: Pro
   const { t } = useTranslation();
   const items = useAltarStore((s) => s.items);
   const allCategories = useCategoryStore((s) => s.categories);
-  const { collapsed, toggle } = useCollapsedSet('altar-library');
+  const { isCollapsed: isGroupCollapsed, toggle } = useCollapsedSet('altar-library');
   const [sectionCollapsed, toggleSection] = usePersistedFlag(SECTION_COLLAPSED_KEY);
   // Die Regler dazu stehen im Dashboard-Kopf (AltarView), darum im Store.
   const { sort, grouping } = useUIStore((s) => s.altarLibraryPrefs);
@@ -82,7 +82,7 @@ export function AltarLibrarySection({ search, onNewElement, onEditElement }: Pro
     return (
       <div className="space-y-6">
         {groups.map((group) => {
-          const isCollapsed = collapsed.has(group.key!);
+          const isCollapsed = isGroupCollapsed(group.key!);
           const cat = group.key === UNCATEGORIZED_KEY
             ? null
             : allCategories.find((c) => c.id === group.key);

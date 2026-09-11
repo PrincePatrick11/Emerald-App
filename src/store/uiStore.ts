@@ -5,7 +5,9 @@ import { normalizeEditorFontId, normalizeThemeId, normalizeUIFontId } from '../t
 import type { ActiveView } from '../types';
 
 export type ViewMode = 'list' | 'cards' | 'cards_wide' | 'timeline';
-export type SortMode = 'date_desc' | 'date_asc' | 'alpha_asc' | 'alpha_desc';
+/** `count_desc` = „am häufigsten zuerst" — nur das Tags-Dashboard bietet ihn
+ *  an (`sortModes`), die übrigen Listen haben nichts zu zählen. */
+export type SortMode = 'date_desc' | 'date_asc' | 'alpha_asc' | 'alpha_desc' | 'count_desc';
 /** Gruppierung als eigene Achse neben Ansicht und Sortierung. Früher war
  *  „Kategorie" ein SortMode — was zwei Entscheidungen in einen Knopf legte:
  *  wer nach Kategorien gruppieren wollte, verlor damit seine Sortierung. */
@@ -21,9 +23,14 @@ export type AltarLibrarySort = Extract<SortMode, 'alpha_asc' | 'alpha_desc' | 'd
 export interface AltarLibraryPrefs { sort: AltarLibrarySort; grouping: GroupingMode; }
 export const ALTAR_LIBRARY_SORTS: AltarLibrarySort[] = ['alpha_asc', 'alpha_desc', 'date_desc'];
 
-/** Seit „Kategorie" kein Sortiermodus mehr ist, deckungsgleich mit SortMode.
- *  Als Alias, damit die beiden nicht auseinanderlaufen. */
-export type HomeSort = SortMode;
+/** Die Sortierung des Tags-Dashboards: Tags haben kein Datum, dafür eine
+ *  Häufigkeit. Wie die übrigen Listen-Prefs nicht persistiert. */
+export type TagsSort = Extract<SortMode, 'alpha_asc' | 'alpha_desc' | 'count_desc'>;
+export const TAGS_SORTS: TagsSort[] = ['alpha_asc', 'alpha_desc', 'count_desc'];
+export const isTagsSort = (s: SortMode): s is TagsSort => (TAGS_SORTS as SortMode[]).includes(s);
+
+/** Die Sortierung der Home-Abschnitte — die Datums- und Alpha-Modi. */
+export type HomeSort = Exclude<SortMode, 'count_desc'>;
 export type HomeView = 'list' | 'cards';
 export interface HomeSectionPrefs { sort: HomeSort; view: HomeView; count: number; } // count 0 = all
 
@@ -47,8 +54,9 @@ interface UIState {
    *  Dashboard portalt seinen kompletten Kopf (Titel, Aktionen, Toolbar,
    *  Filter) hinein; `null` heißt Leiste zu oder Detailansicht — dann hat
    *  Dashboard keinen Kopf. Invariante: genau EIN Schreiber (der Host-Div in
-   *  RightSidebars Listen-Zweig) und genau ein Leser (Dashboard); MainArea
-   *  rendert immer nur eine View, also portalt nie mehr als ein Dashboard.
+   *  RightSidebars Listen-Zweig) und genau ein Leser zur Zeit (`SidebarPortal`
+   *  — aus Dashboard oder der Seite eines eigenen Blocks); MainArea rendert
+   *  immer nur eine View, also portalt nie mehr als eine.
    *  Bewusst nicht persistiert (DOM-Knoten). */
   listHeaderHost: HTMLElement | null;
   /** Ob gerade ein `Dashboard` gemountet ist — es meldet sich selbst an.
@@ -67,6 +75,7 @@ interface UIState {
   tasksPrefs: ListPrefs;
   altarPrefs: ListPrefs;
   trashPrefs: ListPrefs;
+  tagsSort: TagsSort;
   altarWindowFullscreen: boolean;
   /** Altar-Dashboard: Vorschau der Leinwand auf den Karten und in der Liste.
    *  Aus heißt Flammen-Icon statt Vorschau. Anders als die übrigen
@@ -82,14 +91,18 @@ interface UIState {
   theme: ThemeId;
   uiFontId: FontId;
   editorFontId: FontId;
-  /** Zugeklappte Kategorie-Gruppen je Modul (siehe hooks/useCollapsedSet).
+  /** Die vom Standard abweichenden Gruppen je Modul (siehe hooks/useCollapsedSet):
+   *  zugeklappte — bzw. in Scopes, die zugeklappt starten, aufgeklappte.
    *  Im Store statt View-lokal, weil MainArea die Views beim Modulwechsel
    *  unmountet; bewusst nicht persistiert — zugeklappt ist eine Arbeitsgeste. */
   collapsedGroups: Record<string, ReadonlySet<string>>;
 
   setActiveView: (view: ActiveView) => void;
   toggleCollapsedGroup: (scope: string, id: string) => void;
-  expandCollapsedGroups: (scope: string, ids: string[]) => void;
+  /** Nimmt die ids aus dem Set eines Scopes. */
+  removeCollapsedGroups: (scope: string, ids: string[]) => void;
+  /** Legt die ids ins Set eines Scopes — das Gegenstück zu removeCollapsedGroups. */
+  addCollapsedGroups: (scope: string, ids: string[]) => void;
   closeAllTabs: () => void;
   openViewInNewTab: (view: ActiveView) => void;
   addTab: (view?: ActiveView) => void;
@@ -112,6 +125,7 @@ interface UIState {
   setTasksPrefs: (p: Partial<ListPrefs>) => void;
   setAltarPrefs: (p: Partial<ListPrefs>) => void;
   setTrashPrefs: (p: Partial<ListPrefs>) => void;
+  setTagsSort: (sort: TagsSort) => void;
   setAltarWindowFullscreen: (enabled: boolean) => void;
   setAltarShowPreview: (enabled: boolean) => void;
   setAltarLibraryPrefs: (p: Partial<AltarLibraryPrefs>) => void;
@@ -243,6 +257,7 @@ export const useUIStore = create<UIState>((set) => ({
   // Feld steht nur da, weil alle Module dieselbe ListPrefs teilen.
   altarPrefs: { view: 'cards', sort: 'date_desc', grouping: 'flat' },
   trashPrefs: { view: 'list', sort: 'date_desc', grouping: 'flat' },
+  tagsSort: 'alpha_asc',
   altarWindowFullscreen: false,
   altarShowPreview: localStorage.getItem(ALTAR_SHOW_PREVIEW_KEY) !== '0',
   altarLibraryPrefs: loadAltarLibraryPrefs(),
@@ -258,7 +273,7 @@ export const useUIStore = create<UIState>((set) => ({
     return { collapsedGroups: { ...s.collapsedGroups, [scope]: next } };
   }),
 
-  expandCollapsedGroups: (scope, ids) => set((s) => {
+  removeCollapsedGroups: (scope, ids) => set((s) => {
     const prev = s.collapsedGroups[scope];
     if (!prev || !ids.some((id) => prev.has(id))) return s;
     const next = new Set(prev);
@@ -266,10 +281,20 @@ export const useUIStore = create<UIState>((set) => ({
     return { collapsedGroups: { ...s.collapsedGroups, [scope]: next } };
   }),
 
+  addCollapsedGroups: (scope, ids) => set((s) => {
+    const prev = s.collapsedGroups[scope];
+    if (prev && ids.every((id) => prev.has(id))) return s;
+    const next = new Set(prev ?? []);
+    for (const id of ids) next.add(id);
+    return { collapsedGroups: { ...s.collapsedGroups, [scope]: next } };
+  }),
+
   setActiveView: (view) => set((s) => {
     // Save/Cancel/Delete live only in the right sidebar, so edit mode must not start with it closed.
+    // A user-built block's page is always editing and keeps its Save there too.
     const usesEditorSidebar = moduleMeta(view.type)?.usesEditorSidebar ?? false;
-    const openSidebar = view.mode === 'edit' && usesEditorSidebar && !s.rightSidebarOpen
+    const needsSidebar = (view.mode === 'edit' && usesEditorSidebar) || (view.type === 'blocks' && !!view.id);
+    const openSidebar = needsSidebar && !s.rightSidebarOpen
       ? { rightSidebarOpen: true }
       : {};
 
@@ -395,6 +420,7 @@ export const useUIStore = create<UIState>((set) => ({
   setTasksPrefs: (p) => set((s) => ({ tasksPrefs: { ...s.tasksPrefs, ...p } })),
   setAltarPrefs: (p) => set((s) => ({ altarPrefs: { ...s.altarPrefs, ...p } })),
   setTrashPrefs: (p) => set((s) => ({ trashPrefs: { ...s.trashPrefs, ...p } })),
+  setTagsSort: (sort) => set({ tagsSort: sort }),
   setAltarWindowFullscreen: (enabled) => set({ altarWindowFullscreen: enabled }),
   setAltarShowPreview: (enabled) => {
     localStorage.setItem(ALTAR_SHOW_PREVIEW_KEY, enabled ? '1' : '0');

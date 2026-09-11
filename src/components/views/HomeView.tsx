@@ -197,6 +197,11 @@ export default function HomeView() {
                   <p className="text-stone-700 text-xs mt-1">{t('journal.startWriting')}</p>
                 </div>
               ) : homeJournalPrefs.view === 'list' ? (
+                // Die sechs Einträge-Buttons dieser Ansicht sind noch nicht auf
+                // DashboardItem: die Kacheln sind dichter (px-3 py-3) als dessen
+                // `card`, und die Zeilen tragen ihren Inhalt in einem inneren
+                // Flex-Block. Solange fehlt Home der Mittelklick — offen, siehe
+                // components.md → DashboardItem.
                 <div className="space-y-2">
                   {journalItems.map((entry) => (
                     <button

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import {
-  ArrowDownAZ, ArrowDownZA, CalendarArrowDown, CalendarArrowUp, CalendarRange,
+  ArrowDown10, ArrowDownAZ, ArrowDownZA, CalendarArrowDown, CalendarArrowUp, CalendarRange,
   Grid3x3, Layers, LayoutGrid, List, Search, StretchHorizontal, X, type LucideIcon,
 } from 'lucide-react';
 import type { ViewMode, SortMode, GroupingMode } from '../../store/uiStore';
@@ -18,14 +18,16 @@ const VIEW_ICONS: Record<ViewMode, LucideIcon> = {
   cards_wide: StretchHorizontal,
   timeline: CalendarRange,
 };
-/** Reihenfolge der Sortier-Auswahl. */
-const ALL_SORT_MODES: SortMode[] = ['date_desc', 'date_asc', 'alpha_asc', 'alpha_desc'];
+/** Reihenfolge der Sortier-Auswahl, wenn der Aufrufer keine `sortModes`
+ *  vorgibt. `count_desc` fehlt bewusst: nur Tags haben etwas zu zählen. */
+const DEFAULT_SORT_MODES: readonly SortMode[] = ['date_desc', 'date_asc', 'alpha_asc', 'alpha_desc'];
 
 export const SORT_ICONS: Record<SortMode, LucideIcon> = {
   date_desc: CalendarArrowDown,
   date_asc: CalendarArrowUp,
   alpha_asc: ArrowDownAZ,
   alpha_desc: ArrowDownZA,
+  count_desc: ArrowDown10,
 };
 
 /** Auch von der Altar-Bibliothek benutzt, die im selben Kopf ihre eigene
@@ -45,6 +47,8 @@ interface Props {
   onView?: (v: ViewMode) => void;
   onSort?: (s: SortMode) => void;
   viewOptions?: { value: ViewMode; label: string }[];
+  /** Welche Sortiermodi zur Wahl stehen, in dieser Reihenfolge. */
+  sortModes?: readonly SortMode[];
   /** Die Gruppierungs-Achse; fehlt sie, zeigt die Leiste nur Ansicht und
    *  Sortierung. Siehe DashboardGroupBy. */
   groupBy?: DashboardGroupBy;
@@ -64,7 +68,9 @@ const sortBlockedInTimeline = (v: SortMode) => v !== 'date_desc' && v !== 'date_
  * rechten Seitenleiste (Dashboard-Portal): Suche auf eigener voller Zeile,
  * darunter die Icon-Reihen mit Umbruch.
  */
-export default function ListToolbar({ view, sort, onView, onSort, viewOptions: viewOptionsProp, groupBy, search, onSearch }: Props) {
+export default function ListToolbar({
+  view, sort, onView, onSort, viewOptions: viewOptionsProp, sortModes = DEFAULT_SORT_MODES, groupBy, search, onSearch,
+}: Props) {
   const { t } = useTranslation();
 
   const viewOptions = viewOptionsProp ?? [
@@ -79,8 +85,9 @@ export default function ListToolbar({ view, sort, onView, onSort, viewOptions: v
     date_asc: t('listView.dateAsc'),
     alpha_asc: t('listView.alphaAsc'),
     alpha_desc: t('listView.alphaDesc'),
+    count_desc: t('listView.countDesc'),
   };
-  const sortOptions = ALL_SORT_MODES.map((value) => ({ value, label: sortLabels[value] }));
+  const sortOptions = sortModes.map((value) => ({ value, label: sortLabels[value] }));
 
   const sortDisabled = view === 'timeline' ? sortBlockedInTimeline : undefined;
   const showView = view !== undefined && onView !== undefined && viewOptions.length > 1;

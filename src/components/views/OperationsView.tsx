@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { Trash2, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
+import DashboardItem from '../ui/DashboardItem';
+import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
@@ -47,7 +49,7 @@ export default function OperationsView() {
   const [renameValue, setRenameValue] = useState('');
   const [search, setSearch] = useState('');
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
-  const { collapsed: collapsedCats, toggle: toggleCatCollapse } = useCollapsedSet('operations');
+  const { isCollapsed: isCatCollapsed, toggle: toggleCatCollapse } = useCollapsedSet('operations');
   const [title, setTitle] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
@@ -240,50 +242,17 @@ export default function OperationsView() {
       const isSigil = !!sigil;
       const dateStr = `${catDisplayName}${catDisplayName ? ' · ' : ''}${formatEntryDate(op.updated_at)}`;
       const createdDate = formatEntryDate(op.created_at);
-      if (renamingId === op.id) return (
-        <div key={op.id} className={isCardView(view) ? 'panel-interactive px-4 py-4 text-left' : 'panel-interactive w-full flex items-center gap-3 px-4 py-3'}>
-          {isCardView(view) ? (
-            <>
-              {isImageIcon(iconValue)
-                ? <img src={iconValue} alt="" className="w-6 h-6 object-cover rounded mb-2" />
-                : <div className="text-xl mb-2">{iconValue}</div>
-              }
-              <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
-                onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
-                className="text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1" />
-              <div className="mt-1">
-                <span className="text-xs text-parchment-500/70">{dateStr}</span>
-              </div>
-            </>
-          ) : (
-            <>
-              {isImageIcon(iconValue)
-                ? <img src={iconValue} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
-                : <span className="text-base flex-shrink-0">{iconValue}</span>
-              }
-              <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
-                onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
-                className="flex-1 bg-transparent text-sm text-stone-300 outline-none selectable" />
-              <span className="text-xs text-parchment-500/70 flex-shrink-0">{dateStr}</span>
-            </>
-          )}
-        </div>
+      const renaming = renamingId === op.id;
+      const renameInput = (className: string) => (
+        <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename}
+          onCancel={() => setRenamingId(null)} className={className} />
       );
       return (
-        <button
-          key={op.id}
-          onClick={() => setActiveView({ type: 'operations', id: op.id, mode: 'view' })}
-          onAuxClick={(e) => {
-            if (e.button === 1) {
-              e.preventDefault();
-              openViewInNewTab({ type: 'operations', id: op.id, mode: 'view' });
-            }
-          }}
+        <DashboardItem
+          view={{ type: 'operations', id: op.id, mode: 'view' }}
+          layout={isCardView(view) ? 'card' : 'row'}
+          editing={renaming}
           onContextMenu={(e) => openCtxMenu(e, op.id)}
-          className={isCardView(view)
-            ? 'panel-interactive px-4 py-4 text-left'
-            : 'panel-interactive w-full text-left flex items-center gap-3 px-4 py-3 group'
-          }
         >
           {isCardView(view) ? (
             <>
@@ -306,7 +275,9 @@ export default function OperationsView() {
                   ? <img src={iconValue} alt="" className="w-6 h-6 object-cover rounded mb-2" />
                   : <div className="text-xl mb-2">{iconValue}</div>
               )}
-              <div className="text-sm font-medium text-stone-200 truncate mb-1">{op.title}</div>
+              {renaming
+                ? renameInput('text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1')
+                : <div className="text-sm font-medium text-stone-200 truncate mb-1">{op.title}</div>}
               {isSigil ? (
                 <>
                   <div className="mt-1 flex flex-wrap gap-2 text-xs">
@@ -337,7 +308,9 @@ export default function OperationsView() {
                 ? <img src={iconValue} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
                 : <span className="text-base flex-shrink-0">{iconValue}</span>
               }
-              <span className="flex-1 text-sm text-stone-300 truncate">{op.title}</span>
+              {renaming
+                ? renameInput('flex-1 bg-transparent text-sm text-stone-300 outline-none selectable')
+                : <span className="flex-1 text-sm text-stone-300 truncate">{op.title}</span>}
               {isSigil ? (
                 <span className="text-xs text-parchment-500/70 flex-shrink-0">
                   {sigil?.revealDate ? `${t('creation.targetDate')}: ${formatEntryDate(sigil.revealDate)}` : createdDate}
@@ -347,7 +320,7 @@ export default function OperationsView() {
               )}
             </>
           )}
-        </button>
+        </DashboardItem>
       );
     };
 
@@ -369,7 +342,7 @@ export default function OperationsView() {
       if (group.key === UNCATEGORIZED_KEY) {
         return (
           <CollapsibleGroupHeader
-            collapsed={collapsedCats.has(UNCATEGORIZED_KEY)}
+            collapsed={isCatCollapsed(UNCATEGORIZED_KEY)}
             onToggleCollapse={() => toggleCatCollapse(UNCATEGORIZED_KEY)}
             emoji="📄"
             label={group.label}
@@ -383,7 +356,7 @@ export default function OperationsView() {
         <CollapsibleGroupHeader
           emoji={cat.emoji}
           label={categoryLabel(t, cat)}
-          collapsed={collapsedCats.has(cat.id)}
+          collapsed={isCatCollapsed(cat.id)}
           onToggleCollapse={() => toggleCatCollapse(cat.id)}
           count={group.items.length}
           add={{ title: t('operations.new'), onClick: () => handleNewInCategory(cat.id) }}
@@ -431,8 +404,7 @@ export default function OperationsView() {
                   mode: 'category',
                   groups: catGroups,
                   renderGroupHeader: renderCategoryHeader,
-                  renderEmptyGroup: () => <p className="text-xs text-stone-700 px-1 py-1">{t('operations.none')}</p>,
-                  isGroupCollapsed: (g) => collapsedCats.has(g.key!),
+                  isGroupCollapsed: (g) => isCatCollapsed(g.key!),
                 }
               : { mode: 'flat' }
         }

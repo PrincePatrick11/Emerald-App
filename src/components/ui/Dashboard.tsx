@@ -1,7 +1,8 @@
 import { Fragment, useLayoutEffect, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
-import { Plus } from 'lucide-react';
+import { Plus, type LucideIcon } from 'lucide-react';
 import Button from './Button';
+import SidebarPortal from './SidebarPortal';
+import SidebarColumn, { SidebarActionBar } from './SidebarColumn';
 import CollapseChevron from './CollapseChevron';
 import ListToolbar from './ListToolbar';
 import FilterPanel, { type FilterPanelProps } from './FilterPanel';
@@ -23,11 +24,16 @@ type DashboardGrouping<T> =
       mode: 'category';
       groups: DashboardGroup<T>[];
       renderGroupHeader?: (group: DashboardGroup<T>) => ReactNode;
-      /** Shown instead of the item list when a group has zero items (default: a muted em-dash). */
+      /** Shown instead of the item list when a group has zero items (default: a muted em-dash).
+       *  Only reachable with `keepEmptyGroups` — otherwise empty groups are dropped first. */
       renderEmptyGroup?: (group: DashboardGroup<T>) => ReactNode;
       /** Collapsed groups render only their header — the chevron lives in the
        *  caller's renderGroupHeader (CollapsibleGroupHeader's onToggleCollapse). */
       isGroupCollapsed?: (group: DashboardGroup<T>) => boolean;
+      /** Leere Gruppen stehen lassen statt sie zentral wegzufiltern — für
+       *  Gruppen, die für sich etwas sind (Tags: ein unbenutzter Tag bleibt
+       *  sichtbar und verwaltbar). */
+      keepEmptyGroups?: boolean;
     }
   | { mode: 'custom'; render: () => ReactNode };
 
@@ -56,9 +62,13 @@ export interface DashboardFilters {
 interface DashboardBaseProps<T> {
   // Kopf — steht in der rechten Seitenleiste
   title?: string;
-  /** Ersetzt den Inhalt der Titelzeile (Icon + Titel + Badge). */
+  /** Das Icon vor dem Titel — meist das Rail-Icon der Ansicht. */
+  titleIcon?: LucideIcon;
+  /** Die Zahl im Pill hinter dem Titel; weglassen = kein Pill. */
+  titleCount?: number;
+  /** Ersetzt die ganze Titelzeile — für Köpfe mit mehr als Icon, Titel und
+   *  Zahl (Home: zwei Zeilen; Papierkorb: `DashboardTitle` plus „Alle wählen"). */
   headerLeft?: ReactNode;
-  titleClassName?: string;
   /** Beschrifteter Jade-Knopf auf eigener voller Zeile unter dem Titel —
    *  neben dem Titel bliebe von ihm in der schmalen Spalte nichts Lesbares. */
   primaryAction?: { label: string; onClick: () => void };
@@ -77,6 +87,8 @@ interface DashboardBaseProps<T> {
   onView?: (v: ViewMode) => void;
   onSort?: (s: SortMode) => void;
   viewOptions?: { value: ViewMode; label: string }[];
+  /** Welche Sortiermodi zur Wahl stehen — Default: die vier Datums-/Alpha-Modi. */
+  sortModes?: readonly SortMode[];
   /** Die Gruppierungs-Achse der Toolbar — als ein Objekt, damit Wert und
    *  Handler nicht einzeln fehlen können und der Name sich nicht mit
    *  `grouping` unten verwechselt, das die Struktur des Inhalts beschreibt.
@@ -144,11 +156,34 @@ const DEFAULT_CONTENT_CLASSNAME = 'flex-1 overflow-y-auto px-8 py-6';
 const DEFAULT_CARDS_CLASSNAME = 'grid grid-cols-3 gap-3';
 const DEFAULT_WIDE_CARDS_CLASSNAME = 'grid grid-cols-1 gap-3';
 const DEFAULT_LIST_CLASSNAME = 'space-y-1.5';
-const DEFAULT_TITLE_CLASSNAME = 'text-lg font-semibold text-stone-100';
 const DEFAULT_EMPTY_WRAPPER_CLASSNAME = 'text-center py-20';
 const DEFAULT_EMPTY_MESSAGE_CLASSNAME = 'text-stone-600 text-sm';
 const DEFAULT_EMPTY_ACTION_CLASSNAME = 'mt-4 text-xs text-stone-500 hover:text-stone-300 underline transition-colors';
 const DEFAULT_NO_RESULTS_CLASSNAME = 'text-center py-20 text-stone-600 text-sm';
+
+/**
+ * Die Titelzeile eines Dashboard-Kopfes: Icon, Titel, Zahl im Pill. Dashboard
+ * rendert sie selbst aus `title`/`titleIcon`/`titleCount`; exportiert für
+ * Köpfe, die hinter ihr noch etwas brauchen (`children`, der Papierkorb sein
+ * „Alle wählen") und sie deshalb als `headerLeft` bauen.
+ */
+export function DashboardTitle({ icon: Icon, title, count, children }: {
+  icon?: LucideIcon;
+  title: string;
+  count?: number;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-3 min-w-0">
+      {Icon && <Icon size={18} className="text-stone-500 flex-shrink-0" />}
+      <h1 className="text-lg font-semibold text-stone-100 truncate">{title}</h1>
+      {count !== undefined && (
+        <span className="text-xs text-stone-500 bg-stone-700/50 px-2 py-0.5 rounded-full">{count}</span>
+      )}
+      {children}
+    </div>
+  );
+}
 
 /**
  * Die Trennlinien-Ueberschrift der Timeline-Gruppen — Label, danach eine Linie
@@ -180,8 +215,9 @@ export function GroupDivider({
 
 export default function Dashboard<T>({
   title,
+  titleIcon,
+  titleCount,
   headerLeft,
-  titleClassName = DEFAULT_TITLE_CLASSNAME,
   primaryAction,
   extraActions,
   headerRight,
@@ -190,6 +226,7 @@ export default function Dashboard<T>({
   onView,
   onSort,
   viewOptions,
+  sortModes,
   groupBy,
   search,
   onSearch,
@@ -265,14 +302,16 @@ export default function Dashboard<T>({
     }
 
     // mode === 'category'
-    // Leere Gruppen fallen hier zentral weg: die Kategorienliste ist global,
+    // Leere Gruppen fallen hier zentral weg (außer mit `keepEmptyGroups`): die Kategorienliste ist global,
     // eine für das Wiki angelegte Kategorie stünde sonst als leerer Kopf auch
     // in den Operationen.
     // Bleibt keine Gruppe übrig, greift der „Keine Ergebnisse"-Hinweis,
     // den sonst hasNoResults liefert.
     // Nicht die einzige Stelle: Tasks rendert im custom-Modus und führt
     // dieselbe Regel selbst (TasksView, `visibleCategories`).
-    const groups = grouping.groups.filter((group) => group.items.length > 0);
+    const groups = grouping.keepEmptyGroups
+      ? grouping.groups
+      : grouping.groups.filter((group) => group.items.length > 0);
     return (
       <div className="space-y-6">
         {groups.length === 0 && <p className={noResultsClassName}>{noResultsMessage}</p>}
@@ -289,14 +328,6 @@ export default function Dashboard<T>({
       </div>
     );
   };
-
-  // Der Kopf wohnt ausschließlich in der rechten Seitenleiste: Sie stellt in
-  // Listenansichten ein Portal-Ziel (RightSidebar → setListHeaderHost). Ist
-  // sie zu, gibt es keinen Kopf — bewusst, die Liste bekommt dann die ganze
-  // Höhe. Beim Zuklappen hält AppShell die Leiste für die 200ms-Animation
-  // noch gemountet (inert); der Kopf fährt mit ihr hinaus und verschwindet,
-  // wenn der Host abgemeldet wird.
-  const listHeaderHost = useUIStore((s) => s.listHeaderHost);
 
   // Anmelden, damit RightSidebar das Portal-Ziel stellt (siehe
   // `uiStore.dashboardMounted`). Layout- statt Passiv-Effekt: Oeffnet ein
@@ -321,61 +352,66 @@ export default function Dashboard<T>({
     </Button>
   ));
 
+  // Die Zeile oben gehört allein dem Titel: die Aktionen bekommen darunter
+  // eine eigene volle Zeile im Körper — neben dem Titel bliebe von einer
+  // beschrifteten Primäraktion in dieser schmalen Spalte nichts Lesbares
+  // übrig. `headerRight` ersetzt sie; dort kann eine breite Slot-Zeile
+  // (Trash-Bulk-Aktionen) umbrechen. Toolbar und FilterPanel bringen kein
+  // eigenes Streifen-Chrome mit — den Einzug stellt `SidebarColumn`.
   const header = (
-    <div className="flex flex-col flex-1 min-h-0">
-      {/* h-14 + px-3 wie die Aktionsleiste der Detailansichten, damit die
-          Trennlinie mit der Tab-Leiste der Eintragsliste fluchtet. Die Zeile
-          gehört allein dem Titel: die Aktionen bekommen darunter eine eigene
-          volle Zeile in der Scroll-Spalte — neben dem Titel bliebe von einer
-          beschrifteten Primäraktion in dieser schmalen Spalte nichts
-          Lesbares übrig. `headerRight` ersetzt sie; dort kann eine breite
-          Slot-Zeile (Trash-Bulk-Aktionen) umbrechen. */}
-      <div className="flex items-center gap-2 px-3 h-14 border-b border-stone-700/60 flex-shrink-0 min-w-0">
-        {headerLeft ?? <h1 className={`${titleClassName} truncate`}>{title}</h1>}
-      </div>
-      {/* Eine Einzugsquelle pro Spalte (design.md): dieselbe p-3-Spalte wie der
-          Properties-Container in RightSidebar — Toolbar und FilterPanel bringen
-          kein eigenes Streifen-Chrome mit. */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-4">
-        {headerRight && <div className="flex flex-col gap-1.5">{headerRight}</div>}
+    <SidebarColumn
+      bar={(
+        <SidebarActionBar>
+          {headerLeft ?? <DashboardTitle icon={titleIcon} title={title ?? ''} count={titleCount} />}
+        </SidebarActionBar>
+      )}
+      bodyClassName="space-y-4"
+    >
+      {headerRight && <div className="flex flex-col gap-1.5">{headerRight}</div>}
 
-        {/* Die Primäraktion füllt die Zeile, die Nebenaktionen bleiben daneben
-            kompakt. */}
-        {!headerRight && (primaryAction || !!extraActions?.length) && (
-          <div className="flex items-center gap-1.5">
-            {primaryAction && (
-              <Button variant="primary" onClick={primaryAction.onClick} className="flex-1 min-w-0 justify-center">
-                <Plus size={14} className="flex-shrink-0" />
-                <span className="truncate">{primaryAction.label}</span>
-              </Button>
-            )}
-            {extraActionButtons}
-          </div>
-        )}
+      {/* Die Primäraktion füllt die Zeile, die Nebenaktionen bleiben daneben
+          kompakt. */}
+      {!headerRight && (primaryAction || !!extraActions?.length) && (
+        <div className="flex items-center gap-1.5">
+          {primaryAction && (
+            <Button variant="primary" onClick={primaryAction.onClick} className="flex-1 min-w-0 justify-center">
+              <Plus size={14} className="flex-shrink-0" />
+              <span className="truncate">{primaryAction.label}</span>
+            </Button>
+          )}
+          {extraActionButtons}
+        </div>
+      )}
 
-        <ListToolbar
-          view={view}
-          sort={sort}
-          onView={onView}
-          onSort={onSort}
-          viewOptions={viewOptions}
-          groupBy={groupBy}
-          search={search}
-          onSearch={onSearch}
-        />
+      <ListToolbar
+        view={view}
+        sort={sort}
+        onView={onView}
+        onSort={onSort}
+        viewOptions={viewOptions}
+        sortModes={sortModes}
+        groupBy={groupBy}
+        search={search}
+        onSearch={onSearch}
+      />
 
-        {/* In der Seitenleiste ist Platz in der Höhe: das FilterPanel steht
-            dauerhaft, statt hinter einem Auf/Zu-Knopf. */}
-        {filters && (
-          <FilterPanel {...filters.panelProps} activeFilterCount={filters.activeFilterCount} />
-        )}
-      </div>
-    </div>
+      {/* In der Seitenleiste ist Platz in der Höhe: das FilterPanel steht
+          dauerhaft, statt hinter einem Auf/Zu-Knopf. */}
+      {filters && (
+        <FilterPanel {...filters.panelProps} activeFilterCount={filters.activeFilterCount} />
+      )}
+    </SidebarColumn>
   );
 
   return (
     <div className="h-full flex flex-col">
-      {listHeaderHost && createPortal(header, listHeaderHost)}
+      {/* Der Kopf wohnt ausschließlich in der rechten Seitenleiste: Sie stellt
+          in Listenansichten ein Portal-Ziel (RightSidebar → setListHeaderHost).
+          Ist sie zu, gibt es keinen Kopf — bewusst, die Liste bekommt dann die
+          ganze Höhe. Beim Zuklappen hält AppShell die Leiste für die
+          200ms-Animation noch gemountet (inert); der Kopf fährt mit ihr hinaus
+          und verschwindet, wenn der Host abgemeldet wird. */}
+      <SidebarPortal>{header}</SidebarPortal>
 
       <div className={contentClassName}>
         {contentHeader}

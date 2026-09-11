@@ -178,8 +178,8 @@ exist.
 
 **6. Radius-rule violations.** `UndoToast` carries `rounded-xl` (a floating overlay on the
 surface step); `.sidebar-item` in `index.css` and `PropertySummaryRow` are list rows on
-`rounded-lg` instead of `rounded-md`, as is the Tags view's search field. *Cost: one line
-each.*
+`rounded-lg` instead of `rounded-md`. *Cost: one line each.* (The Tags view's own search
+field is gone — Tags uses `Dashboard`'s `ListToolbar` search now.)
 
 **7. `JetBrains Mono` is dead config.** Declared as `font-mono` in `tailwind.config.js:46`
 but never loaded via a `<link>`. Every site using `font-mono` falls back to the system
@@ -429,9 +429,9 @@ The measurements sit in unusual places, each for a concrete reason:
 
 ### Known Fault Line: `bg-stone-700/40` on the Search Fields
 
-Three search pills (title bar, entry list, and the Tags view) carry a raw
+Two search pills (title bar and entry list) carry a raw
 `bg-stone-700/40` on top of their shared class. In Emerald Parchment the theme override for that utility
 class beats the class rule — so `--search-bg` does not apply there, the override value
 does. Both fields still look the same, but the claim "runs on `--search-bg`" does not hold
-in Parchment. Resolving it cleanly would mean removing `bg-stone-700/40` from all three places
-**together**.
+in Parchment. Resolving it cleanly would mean removing `bg-stone-700/40` from both places
+**together**. (The Tags view had a third such pill until it moved onto `Dashboard`.)

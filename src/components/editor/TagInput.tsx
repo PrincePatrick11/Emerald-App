@@ -29,8 +29,10 @@ export default function TagInput({ tags, onChange, readOnly = false }: TagInputP
   const addTag = async (name: string) => {
     const trimmed = name.trim();
     if (!trimmed || tags.includes(trimmed)) { setInput(''); return; }
-    await ensureTag(trimmed);
-    onChange([...tags, trimmed]);
+    // Die Schreibweise des Tags, nicht die getippte: ensureTag findet „foo"
+    // auch als „Foo", und Umbenennen/Löschen suchen den Namen exakt.
+    const { name: canonical } = await ensureTag(trimmed);
+    if (!tags.includes(canonical)) onChange([...tags, canonical]);
     setInput('');
     setOpen(false);
   };

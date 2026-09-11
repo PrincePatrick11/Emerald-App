@@ -9,6 +9,8 @@ interface Props {
   collapsed?: boolean;
   /** Feste w-5-Spalte wie in jeder Kategoriezeile — hält die Labels einer Liste bündig. */
   emoji?: string;
+  /** Statt des Emojis, in derselben w-5-Spalte (Tags: der Farbpunkt). */
+  leading?: ReactNode;
   label: string;
   /** Der „(n)"-Zähler rechts vom Label — die eine Stelle für seine Klassenkette. */
   count?: number;
@@ -24,16 +26,19 @@ interface Props {
 /**
  * Der Kopf einer auf-/zuklappbaren Gruppe — Kategorien in Wiki, Operations,
  * Tasks und Altar ebenso wie die „Ohne Kategorie"-Buckets daneben, hinter
- * denen keine Kategorie steht. Verwaltet wird hier nichts: Umbenennen, Emoji
- * und Löschen leben in der eigenen Ansicht `CategoriesView`.
+ * denen keine Kategorie steht, und die Tags. Verwaltet wird hier selbst
+ * nichts: Kategorien verwaltet `CategoriesView`; die Tags-Ansicht, die ihre
+ * eigene Verwaltung ist, reicht ihre Knöpfe über `leading`/`actions` herein.
  */
 export default function CollapsibleGroupHeader({
-  onToggleCollapse, collapsed = false, emoji, label, count, meta, add, actions,
+  onToggleCollapse, collapsed = false, emoji, leading, label, count, meta, add, actions,
 }: Props) {
   return (
     <div className="flex items-center gap-2 mb-2">
       {onToggleCollapse && <CollapseChevron collapsed={collapsed} onToggle={onToggleCollapse} />}
-      {emoji && <span className="w-5 text-center flex-shrink-0 text-base">{emoji}</span>}
+      {leading
+        ? <span className="w-5 flex items-center justify-center flex-shrink-0">{leading}</span>
+        : emoji && <span className="w-5 text-center flex-shrink-0 text-base">{emoji}</span>}
       <p className="text-xs text-stone-600 font-semibold uppercase tracking-wider flex-1">{label}</p>
       {count != null && <span className="text-xs text-stone-500">({count})</span>}
       {meta}

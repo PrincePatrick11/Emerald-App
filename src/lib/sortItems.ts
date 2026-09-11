@@ -5,6 +5,8 @@ interface BaseSortOptions<T> {
   date: (item: T) => string;
   /** Nachrangiges Kriterium bei Gleichstand (Tasks: sort_order). */
   tiebreak?: (a: T, b: T) => number;
+  /** Für `count_desc` (Tags: Anzahl Verwendungen). Fehlt er, zählt jedes Item 0. */
+  count?: (item: T) => number;
 }
 
 /**
@@ -33,6 +35,7 @@ export function sortItems<T extends object>(
     if (sort === 'alpha_asc') return title(a).localeCompare(title(b));
     if (sort === 'alpha_desc') return title(b).localeCompare(title(a));
     if (sort === 'date_asc') return compareIso(opts.date(a), opts.date(b));
+    if (sort === 'count_desc') return (opts.count?.(b) ?? 0) - (opts.count?.(a) ?? 0);
     return compareIso(opts.date(b), opts.date(a)); // date_desc
   };
   const { tiebreak } = opts;

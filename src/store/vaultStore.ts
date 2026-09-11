@@ -16,6 +16,7 @@ import { clearEntrySummaryCache } from '../lib/blocks/entrySummary';
 import { drainSerialized } from '../lib/serialize';
 import { reloadAllStores } from './moduleWiring';
 import { useUIStore } from './uiStore';
+import { useBlockDraftStore } from './blockDraftStore';
 import { useUndoStore } from './undoStore';
 
 interface VaultStore {
@@ -61,6 +62,7 @@ async function openActiveVault(): Promise<void> {
   // Tabs und History zeigen per Eintrags-ID in den alten Vault — alles zu,
   // nicht nur der aktive Tab auf Home.
   useUIStore.getState().closeAllTabs();
+  useBlockDraftStore.getState().clearAll();
   // Undo entries reference rows of the old vault by id — drop them
   useUndoStore.getState().clear();
   // Die globale Suche haelt den Klartext jedes Eintrags unter dessen id fest.

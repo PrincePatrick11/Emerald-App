@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { entryBlockSummary } from '../../lib/blocks/entrySummary';
 import type { ComponentType } from 'react';
-import { Pencil, Check, X, Trash2, Maximize2, Minimize2 } from 'lucide-react';
+import { Pencil, Maximize2, Minimize2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useJournalStore } from '../../store/journalStore';
@@ -14,6 +14,7 @@ import WikiPropertiesPanel from '../sidebar/panels/WikiPropertiesPanel';
 import OperationPropertiesPanel from '../sidebar/panels/OperationPropertiesPanel';
 import AltarSidebarPanel from '../sidebar/panels/AltarSidebarPanel';
 import Button from '../ui/Button';
+import SidebarColumn, { EditActionBar, SidebarActionBar } from '../ui/SidebarColumn';
 
 // Eager, nicht lazy: die Panels hängen ohnehin an Stores, die beim Start
 // geladen sind, und die Seitenleiste ist ab dem ersten Frame sichtbar.
@@ -30,22 +31,11 @@ const PROPERTIES_PANELS: Partial<Record<ViewId, ComponentType>> = {
  * Tiefenlink aus der Suche (`{ type: 'tags' | 'categories', id }`) trägt eine
  * id, bekäme sonst die Eintrags-Aktionsleiste und darin einen
  * „Bearbeiten"-Knopf, der `mode: 'edit'` auf eine Ansicht ohne Editor setzt.
+ * Die Seite eines eigenen Blocks (`{ type: 'blocks', id }`) bringt ihre
+ * Leiste selbst mit und portalt sie in denselben Host wie ein Dashboard.
  */
 const VIEWS_WITHOUT_ENTRIES: ReadonlySet<ViewId> = new Set<ViewId>(['home', 'tags', 'categories', 'blocks']);
 
-/**
- * Davon die ohne Dashboard — nur für die steht der Platzhalter. Home und
- * Kategorien sind bewusst nicht dabei: keine Einträge, aber ein Dashboard.
- */
-const VIEWS_WITHOUT_DASHBOARD: ReadonlySet<ViewId> = new Set<ViewId>(['tags', 'blocks']);
-
-/* Mirrors the entry-list tab bar in LeftSidebarEntryList so both sidebars put their
-   bottom border on the same line. Keep the two in sync — with one known
-   exception: that bar is `min-h-14` and wraps into a second row once the entry
-   list is dragged narrower than its six tabs, and the two borders then sit at
-   different heights. Matching that here would mean growing this bar for a
-   reason that has nothing to do with its own contents, so it stays 56px. */
-const ACTION_BAR_CLASSES = 'flex items-center gap-0.5 px-3 h-14 border-b border-stone-700/60 flex-shrink-0';
 
 function PropertiesContent({ activeView }: { activeView: ActiveView }) {
   const { t } = useTranslation();
@@ -73,34 +63,7 @@ function RightSidebarActionBar() {
 
   if (isEditing) {
     if (!editActions) return null;
-    return (
-      <div className={ACTION_BAR_CLASSES}>
-        <Button tone="jade" fill title={t('editor.done')} aria-label={t('editor.done')} onClick={editActions.onSave}>
-          <Check size={14} />
-          <span className="truncate">{t('editor.done')}</span>
-        </Button>
-        {editActions.onDelete && (
-          <Button
-            tone="danger"
-            compact
-            title={t('editor.delete')}
-            aria-label={t('editor.delete')}
-            onClick={editActions.onDelete}
-          >
-            <Trash2 size={14} />
-          </Button>
-        )}
-        <Button
-          tone="neutral"
-          compact
-          title={t('editor.cancel')}
-          aria-label={t('editor.cancel')}
-          onClick={editActions.onCancel}
-        >
-          <X size={14} />
-        </Button>
-      </div>
-    );
+    return <EditActionBar onDone={editActions.onSave} onDelete={editActions.onDelete} onCancel={editActions.onCancel} />;
   }
 
   // Eine geladene Sigille mit Sperre „ganzer Eintrag" lässt sich nicht
@@ -110,7 +73,7 @@ function RightSidebarActionBar() {
   const isAltar = activeView.type === 'altar';
 
   return (
-    <div className={ACTION_BAR_CLASSES}>
+    <SidebarActionBar>
       <Button
         tone="amber"
         fill
@@ -133,12 +96,11 @@ function RightSidebarActionBar() {
           {altarWindowFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </Button>
       )}
-    </div>
+    </SidebarActionBar>
   );
 }
 
 export default function RightSidebar() {
-  const { t } = useTranslation();
   const activeView = useUIStore((s) => s.activeView);
   const setListHeaderHost = useUIStore((s) => s.setListHeaderHost);
   const dashboardMounted = useUIStore((s) => s.dashboardMounted);
@@ -150,30 +112,16 @@ export default function RightSidebar() {
   // gelöschten Eintrags fällt ebenfalls aufs Dashboard zurück.
   // Views ohne Einträge und Listenansichten ohne id bekommen den Host auch
   // vor der Anmeldung, damit er bereitsteht, solange der Chunk einer lazy
-  // geladenen Ansicht noch lädt. Der Platzhalter erscheint nur in Views ohne
-  // Dashboard (Tags, Blöcke) — an einen leeren Host geknüpft (`only:`-Trick) blitzte
-  // er stattdessen genau in dieser Ladelücke auf.
+  // geladenen Ansicht noch lädt. Einen Platzhalter braucht es nicht mehr:
+  // jede View ohne Einträge hat ein Dashboard (die Blöcke dazu ihre Seite).
   if (dashboardMounted || VIEWS_WITHOUT_ENTRIES.has(activeView.type) || !activeView.id) {
-    return (
-      <div ref={setListHeaderHost} className="flex flex-col h-full">
-        {VIEWS_WITHOUT_DASHBOARD.has(activeView.type) && (
-          <p className="text-xs text-stone-600 px-2 py-3">{t('properties.noEntry')}</p>
-        )}
-      </div>
-    );
+    return <div ref={setListHeaderHost} className="flex flex-col h-full" />;
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <RightSidebarActionBar />
-      {/* The horizontal inset lives here and nowhere else. It matches the
-          action bar's `px-3`, so the summary rows below line up with the
-          Edit button above them; a panel adding its own `px-*` would break
-          that alignment again. */}
-      <div className="flex-1 overflow-y-auto p-3">
-        <PropertiesContent activeView={activeView} />
-        {moduleMeta(activeView.type)?.usesBlocks && <BlockSidebarArea />}
-      </div>
-    </div>
+    <SidebarColumn bar={<RightSidebarActionBar />}>
+      <PropertiesContent activeView={activeView} />
+      {moduleMeta(activeView.type)?.usesBlocks && <BlockSidebarArea />}
+    </SidebarColumn>
   );
 }
