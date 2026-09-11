@@ -187,7 +187,7 @@ Since v40: the user-built blocks of the Blocks view. A row is only the template 
 | name | TEXT | NOT NULL |
 | icon | TEXT | emoji, NOT NULL DEFAULT `'🧩'` |
 | description | TEXT | NOT NULL DEFAULT `''`; not passed on to copies |
-| elements | TEXT | JSON array of `ElementDef` (`id`, `kind`, `label`, `options`, `hideWhenEmpty`, `archived`), NOT NULL DEFAULT `'[]'`; read through the same validation as a copy in content |
+| elements | TEXT | JSON array of `ElementDef` (`id`, `kind`, `label`, `options`, `hideWhenEmpty`, `archived`, `defaultValue`, plus `calcMode` for a `sigilCalc` element and `brushColor`/`brushSize` for a `sigilCanvas` one), NOT NULL DEFAULT `'[]'`; read through the same validation as a copy in content |
 | display | TEXT | JSON `{ readHideEmpty, readOnly, showTitle }`, NOT NULL DEFAULT `'{}'` (missing keys fall back to their defaults) |
 | revision | INTEGER | NOT NULL DEFAULT 1; rises with every save that changes name, icon, elements or display — a copy with a lower `data-block-rev` is "an older version" |
 | sort_order | INTEGER | NOT NULL DEFAULT 0 |
@@ -195,6 +195,8 @@ Since v40: the user-built blocks of the Blocks view. A row is only the template 
 | deleted_at | TEXT | NULL = active; trashed rows are purged after 30 days like the content tables (`CLEANUP_TABLES`) |
 
 A removed element stays in `elements` with `archived: true`, so it can be restored and copies keep its values. The kind of an element never changes — the builder adds a new element instead.
+
+An element's `defaultValue` (the builder's "Prefill") is what a new copy starts with: a scalar (checklist, choice, …) is stored as the value itself; a `link` or `altar` element stores `{id, entryType, label}`, the same shape as the chip it becomes only once a copy exists; an `image` element stores the stored filename. Nothing here is markup — `instantiateDefinition` turns a slot default into a real link chip or `<img>` only inside the copy it creates, so the definition row itself never needs the internal-link or image-cleanup machinery to understand it. `collectUsedImageFilenames` (`schema.ts`) scans `block_definitions.elements` for image-shaped names directly, deliberately outside the `IMAGE_FIELDS` list migration v35 walks — that table doesn't exist until v40, so adding it there would need its own migration to backfill. A `sigilCharge` element's `defaultValue` is `{lock, targets}`, the same shape a real charge stores, with `targets` holding *element* ids (not yet block-qualified — that only happens once a copy's block id exists) or `null` for "all sigils in this block". Merge-import prefixes and re-checks a link default the same way it does a chip; a `.emerald` import resolves it by id or, failing that, by title, and drops the default entirely rather than pointing a fresh copy at nothing.
 
 ### altars
 
@@ -473,6 +475,8 @@ Categories are exported in full, including soft-deleted ones. Filtering them by 
 
 **Block definitions are added, never replaced or deleted**, in both modes — `insertBlockDefinitions`, an `INSERT OR IGNORE` by id without the merge prefix, since the copies in the imported content name their definition by exactly that id. It runs before `doReplace`'s first `DELETE` and normalises every row to the full column set first (ids must pass `isDefinitionId`; rows without one are dropped), so a malformed array in a crafted file can neither abort a replace that has already emptied tables nor slip a partial row past `insertRows`, which takes its column list from the first row. A definition that already exists locally (even in the trash) keeps its local version; the copies render from their own content either way.
 
+A definition's prefills travel with it, but need their own remap since — unlike a copy's content — nothing else in the import path touches `elements` JSON: `remapDefinitionRows`/`remapDefinitionDefaults` rewrite an image default onto the image's local filename (`pathMap`, the same map `restoreImages` produced) and a link/altar default onto the imported vault's matching entry — by the merge prefix's new id in `doMerge`, by id-or-title (`resolveImportedTarget`, shared with the `.emerald` chip resolver) in `.emerald` and add-vault/replace imports. A link default that resolves to nothing is dropped from the row entirely rather than kept pointing at a dead id, so a fresh copy never starts with a chip into the void.
+
 **Operation rows from before v41** — any backup version whose operations still carry `is_active = 0`, an `end_date` or a `version` — go through the same converter as migration v41 (`convertLegacyStatusRows`) in both modes, before the first `DELETE`: the Status block is prepended to `content` and the columns are reset. The copies follow the vault's own "Status" definition if there is one (even in the trash), else the one in the file; only if neither exists is a new one added, at the end of the list.
 
 Rows are inserted parents-first; foreign keys are active during import and reject anything else. The concrete order is hard-coded per import path (`doReplace` and `doMerge` each have their own) and does *not* follow the order in `TABLES` — e.g. `links` goes last, not third.
@@ -488,6 +492,8 @@ Images are restored via `save_image`, which returns the filename they were given
 | `legacy` | the column holds a data-URL | no | yes |
 
 The `legacy` group is why the list has to be complete rather than only naming the rewritable columns: `collectUsedImageFilenames` decides which file the cleanup action may delete, so a column missing from it would be a reference nobody sees. Rewriting them would break their renderers — `Favicon` and `Banner` write `icon` / `cover_image` via `readFileAsDataUrl` and test them with `isImageIcon`, which only accepts `data:` / `blob:` / `/`.
+
+`block_definitions.elements` is a deliberate exception: `collectUsedImageFilenames` scans it for image-shaped filenames directly instead of going through `IMAGE_FIELDS`, since v35 (which the `IMAGE_FIELDS` groups above serve) predates the table by five migrations and has nothing to rewrite there. A prefill's image reference is a bare filename, not markup, so it needs no `html`/`plain` distinction — just counting it as used.
 
 ## Rules for Future Schema Changes
 
