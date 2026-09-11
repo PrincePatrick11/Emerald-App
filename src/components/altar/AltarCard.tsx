@@ -6,7 +6,7 @@ import type { TFunction } from 'i18next';
 import type { AltarPlacement, AltarRecord } from '../../types';
 import { resolveResolutionPixels } from '../../lib/altarConstants';
 import { AltarCardPreview } from './AltarCardPreview';
-import { AltarRenameField } from './AltarRenameField';
+import RenameField from '../ui/RenameField';
 import { imageSrc } from '../../lib/images';
 import { FaviconGlyph } from '../sidebar/fields/Favicon';
 import DashboardItem from '../ui/DashboardItem';
@@ -85,7 +85,7 @@ export const AltarCard = memo(function AltarCard({
   if (isRenaming) {
     return (
       <DashboardItem view={altarView(altar)} layout="card" editing>
-        <AltarRenameField
+        <RenameField
           value={renameValue}
           onChange={onChangeRename}
           onCommit={onCommitRename}
@@ -147,7 +147,7 @@ export const AltarListRow = memo(function AltarListRow({
   if (isRenaming) {
     return (
       <DashboardItem view={altarView(altar)} layout="row" editing>
-        <AltarRenameField
+        <RenameField
           value={renameValue}
           onChange={onChangeRename}
           onCommit={onCommitRename}

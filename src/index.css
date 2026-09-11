@@ -1627,6 +1627,14 @@ html[data-theme='emerald-noctis'] .panel-interactive:hover {
   box-shadow: var(--panel-hover-shadow);
 }
 
+/* Dashboard-Einträge (DashboardItem) sind Buttons — ohne eigenen Ring blieben
+   sie per Tastatur unsichtbar: der box-shadow oben schlägt jede Fokus-Regel
+   aus dem Layer. Nach :hover, damit der Ring beim Überfahren bleibt. */
+html[data-theme='emerald-noctis'] .panel-interactive:focus-visible {
+  outline: none;
+  box-shadow: var(--panel-shadow), 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
 html[data-theme='emerald-noctis'] .tabbar {
   background: var(--tabbar-bg);
 }
@@ -1994,6 +2002,13 @@ html[data-theme='emerald-parchment'] .panel-interactive:hover {
   box-shadow: var(--panel-hover-shadow);
 }
 
+/* Siehe Noctis: der Ring der generischen button:focus-visible-Regel verlöre
+   sonst beim Überfahren gegen den Hover-Schatten. */
+html[data-theme='emerald-parchment'] .panel-interactive:focus-visible {
+  outline: none;
+  box-shadow: var(--panel-shadow), 0 0 0 2px var(--focus-ring);
+}
+
 html[data-theme='emerald-parchment'] .tabbar {
   background: var(--tabbar-bg);
 }
@@ -2307,16 +2322,6 @@ html[data-theme='emerald-parchment'] .bg-jade-500\/20,
 html[data-theme='emerald-parchment'] .bg-jade-500\/10 {
   background: #159165;
   border-color: #127651;
-}
-
-html[data-theme='emerald-parchment'] .trash-restore-btn {
-  color: #0a7a53;
-  font-weight: 600;
-}
-
-html[data-theme='emerald-parchment'] .trash-restore-btn:hover {
-  color: #075c3f;
-  background: rgba(10, 122, 83, 0.1);
 }
 
 html[data-theme='emerald-parchment'] .sigil-canvas-shell {

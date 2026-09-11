@@ -42,7 +42,7 @@ interface ItemSharedProps {
   confirmingId: string | null;
   setConfirmingId: (id: string | null) => void;
   restore: (item: TrashedItem) => Promise<void>;
-  handlePermanentDelete: (item: TrashedItem) => Promise<void>;
+  deleteNow: (item: TrashedItem) => Promise<void>;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,7 +62,7 @@ function SelectCheckbox({ selected, onToggle }: { selected: boolean; onToggle: (
   );
 }
 
-function ItemRow({ item, confirmingId, setConfirmingId, restore, handlePermanentDelete, selectedIds, onToggleSelect, t }: {
+function ItemRow({ item, confirmingId, setConfirmingId, restore, deleteNow, selectedIds, onToggleSelect, t }: {
   item: TrashedItem;
 } & ItemSharedProps) {
   const daysLeft = 30 - differenceInDays(new Date(), new Date(item.deleted_at));
@@ -91,21 +91,15 @@ function ItemRow({ item, confirmingId, setConfirmingId, restore, handlePermanent
       </div>
       <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
         {confirming ? (
-          <InlineConfirm onConfirm={() => handlePermanentDelete(item)} onCancel={() => setConfirmingId(null)} />
+          <InlineConfirm onConfirm={() => deleteNow(item)} onCancel={() => setConfirmingId(null)} />
         ) : (
           <>
-            <button
-              onClick={() => restore(item)}
-              className="trash-restore-btn flex items-center gap-1.5 text-xs text-jade-400 hover:text-jade-300 px-2.5 py-1.5 rounded hover:bg-jade-400/10 transition-colors"
-            >
+            <Button tone="jade" onClick={() => restore(item)}>
               <RotateCcw size={12} />
               {t('trash.restore')}
-            </button>
-            <Button
-              onClick={() => handlePermanentDelete(item)}
-              variant="danger"
-              className="flex items-center gap-1.5 px-2.5 py-1.5"
-            >
+            </Button>
+            <Button tone="danger" compact title={t('trash.deletePermanently')} aria-label={t('trash.deletePermanently')}
+              onClick={() => setConfirmingId(item.id)}>
               <Trash2 size={12} />
             </Button>
           </>
@@ -115,7 +109,7 @@ function ItemRow({ item, confirmingId, setConfirmingId, restore, handlePermanent
   );
 }
 
-function ItemCard({ item, confirmingId, setConfirmingId, restore, handlePermanentDelete, selectedIds, onToggleSelect, t }: {
+function ItemCard({ item, confirmingId, setConfirmingId, restore, deleteNow, selectedIds, onToggleSelect, t }: {
   item: TrashedItem;
 } & ItemSharedProps) {
   const daysLeft = 30 - differenceInDays(new Date(), new Date(item.deleted_at));
@@ -143,14 +137,16 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, handlePermanen
       </div>
       <div className="flex items-center gap-1 pt-1 border-t border-stone-700/40" onClick={(e) => e.stopPropagation()}>
         {confirming ? (
-          <InlineConfirm small onConfirm={() => handlePermanentDelete(item)} onCancel={() => setConfirmingId(null)} />
+          <InlineConfirm small onConfirm={() => deleteNow(item)} onCancel={() => setConfirmingId(null)} />
         ) : (
           <>
-            <button onClick={() => restore(item)} className="trash-restore-btn flex items-center gap-1 text-xs text-jade-400 hover:text-jade-300 px-2 py-1 rounded hover:bg-jade-400/10 transition-colors">
-              <RotateCcw size={11} />{t('trash.restore')}
-            </button>
-            <Button onClick={() => handlePermanentDelete(item)} variant="danger" className="flex items-center gap-1 px-2 py-1" title={t('trash.deletePermanently')}>
-              <Trash2 size={11} />
+            <Button tone="jade" small onClick={() => restore(item)}>
+              <RotateCcw size={12} />
+              {t('trash.restore')}
+            </Button>
+            <Button tone="danger" compact small title={t('trash.deletePermanently')} aria-label={t('trash.deletePermanently')}
+              onClick={() => setConfirmingId(item.id)}>
+              <Trash2 size={12} />
             </Button>
           </>
         )}
@@ -203,20 +199,19 @@ export default function TrashView() {
     setConfirmingBulkDelete(false);
   };
 
-  const handleEmptyTrash = async () => {
-    if (!confirmingEmpty) { setConfirmingEmpty(true); return; }
+  // Die Knöpfe stellen nur die Rückfrage (confirming…); gelöscht wird erst
+  // über InlineConfirms „Ja".
+  const emptyTrashNow = async () => {
     setConfirmingEmpty(false);
     await emptyTrash();
   };
 
-  const handlePermanentDelete = async (item: TrashedItem) => {
-    if (confirmingId !== item.id) { setConfirmingId(item.id); return; }
+  const deleteNow = async (item: TrashedItem) => {
     setConfirmingId(null);
     await permanentlyDelete(item);
   };
 
-  const handleBulkDelete = async () => {
-    if (!confirmingBulkDelete) { setConfirmingBulkDelete(true); return; }
+  const bulkDeleteNow = async () => {
     setConfirmingBulkDelete(false);
     const toDelete = items.filter((i) => selectedIds.has(i.id));
     setSelectedIds(new Set());
@@ -225,7 +220,7 @@ export default function TrashView() {
     }
   };
 
-  const itemProps: ItemSharedProps = { confirmingId, setConfirmingId, restore, handlePermanentDelete, selectedIds, onToggleSelect: toggleSelect, t };
+  const itemProps: ItemSharedProps = { confirmingId, setConfirmingId, restore, deleteNow, selectedIds, onToggleSelect: toggleSelect, t };
 
   const sorted = sortItems(items, trashPrefs.sort, { date: (i) => i.deleted_at });
 
@@ -367,13 +362,12 @@ export default function TrashView() {
       {hasSelection && (
         <>
           {confirmingBulkDelete ? (
-            <InlineConfirm onConfirm={handleBulkDelete} onCancel={() => setConfirmingBulkDelete(false)} />
+            // Die Anzahl steht auf dem Bestätigen — sonst sagte die Rückfrage
+            // nicht mehr, wie viele Einträge gehen.
+            <InlineConfirm wrap confirmLabel={t('trash.deleteSelected', { count: selectedIds.size })}
+              onConfirm={bulkDeleteNow} onCancel={() => setConfirmingBulkDelete(false)} />
           ) : (
-            <Button
-              onClick={handleBulkDelete}
-              variant="danger"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--danger-bg)] border border-[var(--danger-border)] hover:border-[var(--danger-hover-border)]"
-            >
+            <Button tone="danger" onClick={() => setConfirmingBulkDelete(true)}>
               <Trash2 size={12} />
               {t('trash.deleteSelected', { count: selectedIds.size })}
             </Button>
@@ -383,13 +377,9 @@ export default function TrashView() {
       )}
       {items.length > 0 && !hasSelection && (
         confirmingEmpty ? (
-          <InlineConfirm message={t('trash.confirmEmpty')} onConfirm={handleEmptyTrash} onCancel={() => setConfirmingEmpty(false)} />
+          <InlineConfirm wrap message={t('trash.confirmEmpty')} onConfirm={emptyTrashNow} onCancel={() => setConfirmingEmpty(false)} />
         ) : (
-          <Button
-            onClick={handleEmptyTrash}
-            variant="danger"
-            className="text-xs px-3 py-1.5 rounded-md bg-[var(--danger-bg)] border border-[var(--danger-border)] hover:border-[var(--danger-hover-border)]"
-          >
+          <Button tone="danger" onClick={() => setConfirmingEmpty(true)}>
             {t('trash.emptyTrash')}
           </Button>
         )

@@ -5,6 +5,7 @@ import { Trash2, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import DashboardItem from '../ui/DashboardItem';
+import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
@@ -241,38 +242,18 @@ export default function OperationsView() {
       const isSigil = !!sigil;
       const dateStr = `${catDisplayName}${catDisplayName ? ' · ' : ''}${formatEntryDate(op.updated_at)}`;
       const createdDate = formatEntryDate(op.created_at);
-      const opView = { type: 'operations', id: op.id, mode: 'view' } as const;
-      if (renamingId === op.id) return (
-        <DashboardItem view={opView} layout={isCardView(view) ? 'card' : 'row'} editing>
-          {isCardView(view) ? (
-            <>
-              {isImageIcon(iconValue)
-                ? <img src={iconValue} alt="" className="w-6 h-6 object-cover rounded mb-2" />
-                : <div className="text-xl mb-2">{iconValue}</div>
-              }
-              <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
-                onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
-                className="text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1" />
-              <div className="mt-1">
-                <span className="text-xs text-parchment-500/70">{dateStr}</span>
-              </div>
-            </>
-          ) : (
-            <>
-              {isImageIcon(iconValue)
-                ? <img src={iconValue} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
-                : <span className="text-base flex-shrink-0">{iconValue}</span>
-              }
-              <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
-                onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
-                className="flex-1 bg-transparent text-sm text-stone-300 outline-none selectable" />
-              <span className="text-xs text-parchment-500/70 flex-shrink-0">{dateStr}</span>
-            </>
-          )}
-        </DashboardItem>
+      const renaming = renamingId === op.id;
+      const renameInput = (className: string) => (
+        <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename}
+          onCancel={() => setRenamingId(null)} className={className} />
       );
       return (
-        <DashboardItem view={opView} layout={isCardView(view) ? 'card' : 'row'} onContextMenu={(e) => openCtxMenu(e, op.id)}>
+        <DashboardItem
+          view={{ type: 'operations', id: op.id, mode: 'view' }}
+          layout={isCardView(view) ? 'card' : 'row'}
+          editing={renaming}
+          onContextMenu={(e) => openCtxMenu(e, op.id)}
+        >
           {isCardView(view) ? (
             <>
               {isSigil ? (
@@ -294,7 +275,9 @@ export default function OperationsView() {
                   ? <img src={iconValue} alt="" className="w-6 h-6 object-cover rounded mb-2" />
                   : <div className="text-xl mb-2">{iconValue}</div>
               )}
-              <div className="text-sm font-medium text-stone-200 truncate mb-1">{op.title}</div>
+              {renaming
+                ? renameInput('text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1')
+                : <div className="text-sm font-medium text-stone-200 truncate mb-1">{op.title}</div>}
               {isSigil ? (
                 <>
                   <div className="mt-1 flex flex-wrap gap-2 text-xs">
@@ -325,7 +308,9 @@ export default function OperationsView() {
                 ? <img src={iconValue} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
                 : <span className="text-base flex-shrink-0">{iconValue}</span>
               }
-              <span className="flex-1 text-sm text-stone-300 truncate">{op.title}</span>
+              {renaming
+                ? renameInput('flex-1 bg-transparent text-sm text-stone-300 outline-none selectable')
+                : <span className="flex-1 text-sm text-stone-300 truncate">{op.title}</span>}
               {isSigil ? (
                 <span className="text-xs text-parchment-500/70 flex-shrink-0">
                   {sigil?.revealDate ? `${t('creation.targetDate')}: ${formatEntryDate(sigil.revealDate)}` : createdDate}

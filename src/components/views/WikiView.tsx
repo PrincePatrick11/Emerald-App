@@ -6,6 +6,7 @@ import { Trash2, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import DashboardItem from '../ui/DashboardItem';
+import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
@@ -241,6 +242,10 @@ export default function WikiView() {
       const catLabel = categoryLabel(t, cat);
       const dateStr = `${catLabel}${catLabel ? ' · ' : ''}${formatEntryDate(a.updated_at)}`;
       const renaming = renamingId === a.id;
+      const renameInput = (className: string) => (
+        <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename}
+          onCancel={() => setRenamingId(null)} className={className} />
+      );
       return (
         <DashboardItem
           view={{ type: 'wiki', id: a.id, mode: 'view' }}
@@ -253,25 +258,17 @@ export default function WikiView() {
               <div className="flex items-center gap-2 mb-2">
                 {isImageIcon(a.icon) ? <img src={a.icon!} alt="" className="w-6 h-6 object-cover rounded" /> : <span className="text-xl">{cat?.emoji ?? '📄'}</span>}
               </div>
-              {renaming ? (
-                <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
-                  onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
-                  className="text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1" />
-              ) : (
-                <div className="text-sm font-medium text-stone-200 truncate mb-1">{a.title}</div>
-              )}
+              {renaming
+                ? renameInput('text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1')
+                : <div className="text-sm font-medium text-stone-200 truncate mb-1">{a.title}</div>}
               <div className="text-xs text-parchment-500/70">{dateStr}</div>
             </>
           ) : (
             <>
               <span className="text-base flex-shrink-0">{iconEl}</span>
-              {renaming ? (
-                <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
-                  onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
-                  className="flex-1 bg-transparent text-sm text-stone-300 outline-none selectable" />
-              ) : (
-                <span className="flex-1 text-sm text-stone-300 truncate">{a.title}</span>
-              )}
+              {renaming
+                ? renameInput('flex-1 bg-transparent text-sm text-stone-300 outline-none selectable')
+                : <span className="flex-1 text-sm text-stone-300 truncate">{a.title}</span>}
               <span className="text-xs text-parchment-500/70 flex-shrink-0">{dateStr}</span>
             </>
           )}

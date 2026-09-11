@@ -13,6 +13,7 @@ import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import DashboardItem from '../ui/DashboardItem';
+import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
@@ -245,9 +246,8 @@ export default function JournalView() {
       const icon = MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓';
       const renaming = renamingId === e.id;
       const renameInput = (className: string) => (
-        <input autoFocus value={renameValue} onChange={(ev) => setRenameValue(ev.target.value)}
-          onBlur={commitRename} onKeyDown={(ev) => { if (ev.key === 'Enter') commitRename(); if (ev.key === 'Escape') setRenamingId(null); }}
-          className={className} />
+        <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename}
+          onCancel={() => setRenamingId(null)} className={className} />
       );
       return (
         <DashboardItem

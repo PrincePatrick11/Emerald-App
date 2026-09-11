@@ -35,7 +35,7 @@ export default function InlineNameEditor({
         placeholder={placeholder}
         className="input-field flex-1 min-w-0 rounded-md px-2 py-0.5 text-sm outline-none selectable"
       />
-      {error && <span className="text-xs text-[var(--danger-text)] shrink-0">{error}</span>}
+      {error && <span className="text-xs text-danger shrink-0">{error}</span>}
       <Button tone="jade" compact small title={t('common.save')} aria-label={t('common.save')} onClick={onSave}>
         <Check size={12} />
       </Button>

@@ -17,8 +17,8 @@ interface DashboardItemProps {
   layout: DashboardItemLayout;
   onContextMenu?: (event: MouseEvent) => void;
   /** Umbenennen an Ort und Stelle: derselbe Rahmen als schlichtes `div`, ohne
-   *  Klick und Mittelklick — das Eingabefeld darin soll Klicks bekommen, nicht
-   *  die Navigation. */
+   *  Klick, Mittelklick und Kontextmenü — das Eingabefeld darin (`RenameField`)
+   *  soll Klicks bekommen, nicht die Navigation. `view` bleibt dann ungenutzt. */
   editing?: boolean;
   children: ReactNode;
 }

@@ -27,10 +27,10 @@ interface DeepLinkOptions<T extends { id: string }> {
  * ohne dass eine spätere Änderung dem Nutzer seine Filter wegräumt.
  *
  * Gescrollt wird in einem eigenen Effekt einen Frame später, weil die Zeile
- * erst nach dem, was `onOpen` aufräumt, gerendert ist. Den hängt nichts an
- * die aufgeräumten Zustände — sonst würfe jedes spätere Auf- oder Zuklappen
- * den Nutzer zurück. `onOpen` läuft über einen Ref (wie in `useEditActions`),
- * damit der Aufrufer ihn nicht memoisieren muss.
+ * erst nach dem, was `onOpen` aufräumt, gerendert ist. Der Scroll-Effekt hängt
+ * bewusst nicht an den aufgeräumten Zuständen — sonst würfe jedes spätere
+ * Auf- oder Zuklappen den Nutzer zurück. `onOpen` läuft über einen Ref (wie
+ * in `useEditActions`), damit der Aufrufer ihn nicht memoisieren muss.
  *
  * `scrollTo(id)` scrollt ohne Tiefenlink — etwa zu einer gerade angelegten Zeile.
  */

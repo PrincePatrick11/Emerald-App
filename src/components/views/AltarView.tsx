@@ -169,11 +169,6 @@ export default function AltarView() {
     setActiveView({ type: 'altar', id: altar.id, mode: 'edit', isNew: true });
   };
 
-  const openAltar = async (altar: AltarRecord) => {
-    await setActiveAltar(altar.id);
-    setActiveView({ type: 'altar', id: altar.id });
-  };
-
   const startRename = (altar: AltarRecord) => {
     setRenamingId(altar.id);
     setRenameValue(altar.title);
@@ -202,8 +197,8 @@ export default function AltarView() {
 
   const handleDuplicate = async (id: string) => {
     const altar = await duplicateAltar(id);
-    if (!altar) return;
-    await openAltar(altar);
+    // Den Altar lädt der activeView.id-Effekt oben — wie beim Klick auf die Karte.
+    if (altar) setActiveView({ type: 'altar', id: altar.id, mode: 'view' });
   };
 
   const handleDone = async () => {

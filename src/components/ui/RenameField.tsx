@@ -1,4 +1,10 @@
-export function AltarRenameField({ value, onChange, onCommit, onCancel, className }: {
+/**
+ * Das Feld fürs Umbenennen an Ort und Stelle: Enter und Verlassen speichern,
+ * Escape bricht ab. Der Inhalt eines `DashboardItem` mit `editing` — die
+ * Schrift bringt der Aufrufer mit, damit das Feld aussieht wie der Titel,
+ * den es ersetzt.
+ */
+export default function RenameField({ value, onChange, onCommit, onCancel, className }: {
   value: string;
   onChange: (value: string) => void;
   onCommit: () => void;
