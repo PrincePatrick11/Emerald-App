@@ -265,16 +265,19 @@ Inside the hook, the handlers are kept in a ref that is overwritten on every ren
 
 ### List Header Portal
 
-In list views (every module, plus Home, Categories and Tags — everything but Blocks), `Dashboard`'s
-whole header — title row, toolbar, and filter panel — lives **only** in the right sidebar;
-there is no inline fallback above the list. `RightSidebar.tsx` mounts a host `<div>` and
-hands its DOM node to `uiStore.listHeaderHost` through a ref callback (`setListHeaderHost`);
-`Dashboard` reads the field back and, whenever it is non-null, `createPortal`s its header
-tree into it. Closing the right sidebar has nothing to fall back to — the header disappears
-along with the sidebar and the list gets the full height back, deliberately: `AppShell`
-keeps the sidebar mounted (`inert`) for the 200ms collapse animation described above, so the
-header stays visible inside it for that stretch and vanishes once `RightSidebar` actually
-unmounts and its ref callback clears `listHeaderHost`.
+In list views (every module, plus Home, Categories, Tags and Blocks), `Dashboard`'s whole
+header — title row, toolbar, and filter panel — lives **only** in the right sidebar; there
+is no inline fallback above the list. `RightSidebar.tsx` mounts a host `<div>` and hands its
+DOM node to `uiStore.listHeaderHost` through a ref callback (`setListHeaderHost`);
+`SidebarPortal` (`src/components/ui/SidebarPortal.tsx`) reads the field back and, whenever it
+is non-null, `createPortal`s its `children` into it — `Dashboard` renders its header through
+one, and the page of a user-built block (below) renders its own sidebar content through
+another; `MainArea` only ever renders one view, so at most one of the two is ever mounted at
+a time. Closing the right sidebar has nothing to fall back to — the header disappears along
+with the sidebar and the list gets the full height back, deliberately: `AppShell` keeps the
+sidebar mounted (`inert`) for the 200ms collapse animation described above, so the header
+stays visible inside it for that stretch and vanishes once `RightSidebar` actually unmounts
+and its ref callback clears `listHeaderHost`.
 
 `RightSidebar` decides whether to offer the host from `uiStore.dashboardMounted`, not from
 `activeView.id`. `Dashboard` announces itself in a `useLayoutEffect`
@@ -286,20 +289,22 @@ carries an id even while showing its list (a jump target from the left list or g
 search, not an open entry), and a stale id left behind by a just-deleted Journal/Wiki/
 Operations entry falls back to that module's `Dashboard` too — both used to land on the
 entry action bar instead, complete with a meaningless Edit button. `VIEWS_WITHOUT_ENTRIES`
-(`home`/`tags`/`categories`/`blocks`) and a missing `activeView.id` still offer the host up front too,
-alongside `dashboardMounted`, so it exists before a lazily-loaded list view's chunk has
-finished loading and `Dashboard` has had a chance to mount. Only Blocks — the one view in
-`VIEWS_WITHOUT_ENTRIES` with no `Dashboard` at all (`VIEWS_WITHOUT_DASHBOARD`) — renders the
-existing `properties.noEntry` placeholder text into that host instead of waiting on a portal
-that will never come. Home, Categories and Tags have no entries of their own either, but go
-through `Dashboard` precisely so their title and primary action portal like everyone
-else's — Home and Categories through `grouping: 'custom'`, Tags through `category` mode with
-one collapsible group per tag.
+(`home`/`tags`/`categories`/`blocks`) and a missing `activeView.id` still offer the host up
+front too, alongside `dashboardMounted`, so it exists before a lazily-loaded list view's
+chunk has finished loading and `Dashboard` has had a chance to mount. Home, Categories, Tags
+and Blocks have no entries of their own, but all four go through `Dashboard` for their list
+precisely so their title and primary action portal like everyone else's — Home and
+Categories through `grouping: 'custom'`, Tags through `category` mode with one collapsible
+group per tag, Blocks through `flat` mode. There is no placeholder text left for a view
+without a dashboard, because there is no longer a view without one: opening a block (a
+`{ type: 'blocks', id }` view) replaces the list with `BlockDefinitionEditor`, which portals
+its own sidebar content — Done/Delete/Cancel, icon, display rules, usage — into the same
+host the way `Dashboard` does, rather than falling back to a placeholder.
 
-Invariant: exactly one writer (the host div's ref callback) and one reader (`Dashboard`) at
-a time — `MainArea` only ever renders one view, so at most one `Dashboard` ever portals into
-the host, and `dashboardMounted` only ever reflects that one instance. `listHeaderHost`
-deliberately isn't persisted; it's a DOM node.
+Invariant: exactly one writer (the host div's ref callback) and, at a time, one reader
+(`SidebarPortal`, mounted by either `Dashboard` or `BlockDefinitionEditor`) — `MainArea`
+only ever renders one view, so at most one thing ever portals into the host.
+`listHeaderHost` deliberately isn't persisted; it's a DOM node.
 
 `groupBy` (`{ value, onChange, label? }`) carries the grouping axis — independent of `sort`
 since a session change split "group by category" out of `SortMode` into its own
@@ -495,11 +500,33 @@ view as `sigil`; lists, sidebar and menu read it from `entryBlockSummary`. Loadi
 are read-mode writes through `onPersist`, like ticking a checklist.
 
 **User-built blocks — copies, not live links.** The Blocks view (`views/BlocksView.tsx`, an aux
-view on the rail) edits rows of `block_definitions` (v40, `blockDefinitionStore`): name, emoji,
-elements, display rules (`readHideEmpty`, `readOnly`, plus `showTitle`, which becomes the
-instance attribute on insert) and a `revision` that rises whenever something a copy inherits
-changes. Inserting one (`createFromPreset('def:<id>')`) writes a `core.fields` block that carries
-everything itself — elements, display rules, name and icon in `data-block-config` — plus
+view on the rail) is a `Dashboard` list of `block_definitions` rows (v40, `blockDefinitionStore`),
+built like every other module's list rather than the built-in-blocks overview it replaced;
+clicking a row opens `{ type: 'blocks', id }`, which `BlocksView` renders as
+`BlockDefinitionEditor` — a page shaped like an entry in edit mode (breadcrumb, icon and name as
+title, fields below; Done/Delete/Cancel, icon, display rules and usage portalled into the right
+sidebar via `SidebarPortal`, see [List Header Portal](#list-header-portal)) instead of the list.
+A definition's icon is an emoji or an image (`Favicon`, shrunk to 64px edge —
+`shrinkImageDataUrl` re-encodes anything still heavy after that, e.g. a large embedded thumbnail
+or a long GIF animation — via `shrinkImage.ts`, since it travels inside every copy in every
+entry); `BlockGlyph` renders either. What's being edited is a **draft**: `BlockDefinitionEditor`
+keeps it in local state and only calls `updateDefinition` on Done, so a keystroke in the name
+doesn't bump every copy's revision. An unsaved draft is mirrored into `useBlockDraftStore`
+(`src/store/blockDraftStore.ts`) — not the view's own state, since `MainArea` unmounts a view on
+module switch and an open block tab would otherwise lose its edits silently; the list reads the
+same store for its "Unsaved" marker. Drafts are deliberately not persisted (like an entry's own
+edit mode) and are cleared wholesale (`clearAll`) on vault switch and on a replace-mode restore,
+both of which also close every tab — a stale draft would otherwise silently overwrite a freshly
+restored or switched-to block on the next Done. The delete confirmation (`DeleteDefinitionModal`,
+still defined in `BlockDefinitionEditor.tsx`) is instead *hosted* by `BlocksView`, one level up
+from both list and page, so its own closing notice ("N entries left open, skipped") survives the
+navigation back to the list that deleting triggers.
+
+Definition fields: name, icon, elements, display rules (`readHideEmpty`, `readOnly`, plus
+`showTitle`, which becomes the instance attribute on insert) and a `revision` that rises
+whenever something a copy inherits changes. Inserting one (`createFromPreset('def:<id>')`)
+writes a `core.fields` block that carries everything itself — elements, display rules, name
+and icon in `data-block-config` — plus
 `data-block-origin` and `data-block-rev` (`lib/blocks/definitions.ts`). It always renders from its
 own copy, so editing or deleting the definition changes no entry, and a copy whose definition is
 missing (trash, another vault) works unchanged. Element ids are shared by the definition and all
