@@ -14,6 +14,7 @@ import WikiPropertiesPanel from '../sidebar/panels/WikiPropertiesPanel';
 import OperationPropertiesPanel from '../sidebar/panels/OperationPropertiesPanel';
 import AltarSidebarPanel from '../sidebar/panels/AltarSidebarPanel';
 import Button from '../ui/Button';
+import { SIDEBAR_ACTION_BAR_CLASSES } from '../../lib/styleClasses';
 
 // Eager, nicht lazy: die Panels hängen ohnehin an Stores, die beim Start
 // geladen sind, und die Seitenleiste ist ab dem ersten Frame sichtbar.
@@ -30,22 +31,17 @@ const PROPERTIES_PANELS: Partial<Record<ViewId, ComponentType>> = {
  * Tiefenlink aus der Suche (`{ type: 'tags' | 'categories', id }`) trägt eine
  * id, bekäme sonst die Eintrags-Aktionsleiste und darin einen
  * „Bearbeiten"-Knopf, der `mode: 'edit'` auf eine Ansicht ohne Editor setzt.
+ * Die Seite eines eigenen Blocks (`{ type: 'blocks', id }`) bringt ihre
+ * Leiste selbst mit und portalt sie in denselben Host wie ein Dashboard.
  */
 const VIEWS_WITHOUT_ENTRIES: ReadonlySet<ViewId> = new Set<ViewId>(['home', 'tags', 'categories', 'blocks']);
 
 /**
- * Davon die ohne Dashboard — nur für die steht der Platzhalter. Home und
- * Kategorien sind bewusst nicht dabei: keine Einträge, aber ein Dashboard.
+ * Davon die ohne Dashboard — nur für die steht der Platzhalter. Home,
+ * Kategorien und Blöcke sind bewusst nicht dabei: keine Einträge, aber ein
+ * Dashboard (Blöcke: oder die Seite eines Blocks, die ebenfalls portalt).
  */
-const VIEWS_WITHOUT_DASHBOARD: ReadonlySet<ViewId> = new Set<ViewId>(['tags', 'blocks']);
-
-/* Mirrors the entry-list tab bar in LeftSidebarEntryList so both sidebars put their
-   bottom border on the same line. Keep the two in sync — with one known
-   exception: that bar is `min-h-14` and wraps into a second row once the entry
-   list is dragged narrower than its six tabs, and the two borders then sit at
-   different heights. Matching that here would mean growing this bar for a
-   reason that has nothing to do with its own contents, so it stays 56px. */
-const ACTION_BAR_CLASSES = 'flex items-center gap-0.5 px-3 h-14 border-b border-stone-700/60 flex-shrink-0';
+const VIEWS_WITHOUT_DASHBOARD: ReadonlySet<ViewId> = new Set<ViewId>(['tags']);
 
 function PropertiesContent({ activeView }: { activeView: ActiveView }) {
   const { t } = useTranslation();
@@ -74,7 +70,7 @@ function RightSidebarActionBar() {
   if (isEditing) {
     if (!editActions) return null;
     return (
-      <div className={ACTION_BAR_CLASSES}>
+      <div className={SIDEBAR_ACTION_BAR_CLASSES}>
         <Button tone="jade" fill title={t('editor.done')} aria-label={t('editor.done')} onClick={editActions.onSave}>
           <Check size={14} />
           <span className="truncate">{t('editor.done')}</span>
@@ -110,7 +106,7 @@ function RightSidebarActionBar() {
   const isAltar = activeView.type === 'altar';
 
   return (
-    <div className={ACTION_BAR_CLASSES}>
+    <div className={SIDEBAR_ACTION_BAR_CLASSES}>
       <Button
         tone="amber"
         fill
@@ -151,7 +147,7 @@ export default function RightSidebar() {
   // Views ohne Einträge und Listenansichten ohne id bekommen den Host auch
   // vor der Anmeldung, damit er bereitsteht, solange der Chunk einer lazy
   // geladenen Ansicht noch lädt. Der Platzhalter erscheint nur in Views ohne
-  // Dashboard (Tags, Blöcke) — an einen leeren Host geknüpft (`only:`-Trick) blitzte
+  // Dashboard (Tags) — an einen leeren Host geknüpft (`only:`-Trick) blitzte
   // er stattdessen genau in dieser Ladelücke auf.
   if (dashboardMounted || VIEWS_WITHOUT_ENTRIES.has(activeView.type) || !activeView.id) {
     return (

@@ -47,8 +47,9 @@ interface UIState {
    *  Dashboard portalt seinen kompletten Kopf (Titel, Aktionen, Toolbar,
    *  Filter) hinein; `null` heißt Leiste zu oder Detailansicht — dann hat
    *  Dashboard keinen Kopf. Invariante: genau EIN Schreiber (der Host-Div in
-   *  RightSidebars Listen-Zweig) und genau ein Leser (Dashboard); MainArea
-   *  rendert immer nur eine View, also portalt nie mehr als ein Dashboard.
+   *  RightSidebars Listen-Zweig) und genau ein Leser zur Zeit (`SidebarPortal`
+   *  — aus Dashboard oder der Seite eines eigenen Blocks); MainArea rendert
+   *  immer nur eine View, also portalt nie mehr als eine.
    *  Bewusst nicht persistiert (DOM-Knoten). */
   listHeaderHost: HTMLElement | null;
   /** Ob gerade ein `Dashboard` gemountet ist — es meldet sich selbst an.
@@ -268,8 +269,10 @@ export const useUIStore = create<UIState>((set) => ({
 
   setActiveView: (view) => set((s) => {
     // Save/Cancel/Delete live only in the right sidebar, so edit mode must not start with it closed.
+    // A user-built block's page is always editing and keeps its Save there too.
     const usesEditorSidebar = moduleMeta(view.type)?.usesEditorSidebar ?? false;
-    const openSidebar = view.mode === 'edit' && usesEditorSidebar && !s.rightSidebarOpen
+    const needsSidebar = (view.mode === 'edit' && usesEditorSidebar) || (view.type === 'blocks' && !!view.id);
+    const openSidebar = needsSidebar && !s.rightSidebarOpen
       ? { rightSidebarOpen: true }
       : {};
 

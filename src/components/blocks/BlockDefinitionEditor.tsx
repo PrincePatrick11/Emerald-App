@@ -1,31 +1,40 @@
-import { useEffect, useState, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { Reorder, useDragControls } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { ArchiveRestore, GripVertical, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { ArchiveRestore, Check, GripVertical, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
-import EmojiPicker from '../ui/EmojiPicker';
-import { useBlockDefinitionStore, type BlockDefinitionPatch } from '../../store/blockDefinitionStore';
+import SidebarPortal from '../ui/SidebarPortal';
+import PropertiesEditView from '../sidebar/fields/PropertiesEditView';
+import Favicon from '../sidebar/fields/Favicon';
+import BlockGlyph from './BlockGlyph';
+import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
+import { useBlockDraftStore, type DefinitionDraft } from '../../store/blockDraftStore';
+import { useUIStore } from '../../store/uiStore';
 import { useUndoStore } from '../../store/undoStore';
 import { removeAllCopies, updateAllCopies, type CopyRunResult, type CopyUsage } from '../../store/blockCopies';
 import { ELEMENT_KINDS, elementKindLabelKey, type ElementDef, type ElementKind } from '../../lib/blocks/fields';
 import { ELEMENT_KIND_ICONS } from '../../lib/blocks/presets';
 import { definitionLabel, elementLabel } from '../../lib/blocks/blockAttrs';
-import type { BlockDefinition, DefinitionDisplay } from '../../lib/blocks/definitions';
-import { generateId } from '../../lib/helpers';
+import { DEFAULT_DEFINITION_ICON, type BlockDefinition, type DefinitionDisplay } from '../../lib/blocks/definitions';
+import { generateId, isImageIcon } from '../../lib/helpers';
+import { shrinkImageDataUrl } from '../../lib/shrinkImage';
 import { REORDER_SPRING } from '../../lib/motion';
-import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
+import { OP_PROP_SELECT_CLASSES, SIDEBAR_ACTION_BAR_CLASSES } from '../../lib/styleClasses';
 import { useFieldFallbackText } from './useFieldFallbackText';
 import OptionsEditor from './OptionsEditor';
 import BlockCheckbox from './BlockCheckbox';
 
-/** Was der Baukasten bearbeitet — genau das, was `updateDefinition` annimmt. */
-export type DefinitionDraft = Required<BlockDefinitionPatch>;
-
 const draftOf = (d: DefinitionDraft): DefinitionDraft => ({
   name: d.name, icon: d.icon, description: d.description, elements: d.elements, display: d.display,
 });
+
+/**
+ * Kantenlänge eines Bild-Icons. Es steckt in jeder Kopie in jedem Eintrag und
+ * erscheint höchstens 20px groß — 64px reichen auch für hochauflösende Schirme.
+ */
+const ICON_MAX_EDGE = 64;
 
 /** Die sichtbaren Elemente vorn, die archivierten dahinter — die Ordnung, die Definition und Kopie halten. */
 const withArchivedLast = (elements: ElementDef[]): ElementDef[] => [
@@ -36,38 +45,53 @@ const withArchivedLast = (elements: ElementDef[]): ElementDef[] => [
 interface Props {
   definition: BlockDefinition;
   usage: CopyUsage | undefined;
-  /** Ein Entwurf, der beim letzten Wechsel ungespeichert liegen blieb. */
-  savedDraft?: DefinitionDraft;
-  /** Meldet den ungespeicherten Entwurf (`null` = keiner) — die Ansicht hebt ihn auf. */
-  onDraftChange: (draft: DefinitionDraft | null) => void;
-  onDeleted: () => void;
+  /** Zurück zur Liste — Brotkrume, „Fertig" und „Abbrechen". */
+  onClose: () => void;
+  /** Öffnet den Löschdialog — den hält die Ansicht, damit seine Abschlussmeldung
+   *  die Seite überlebt, die mit der Definition verschwindet. */
+  onDelete: () => void;
 }
 
 /**
- * Der Baukasten eines eigenen Blocks: Name, Icon, Beschreibung, die Felder
- * (hinzufügen, benennen, sortieren, entfernen) und die Anzeigeregeln.
+ * Die Seite eines eigenen Blocks, aufgebaut wie die Detailseite eines
+ * Eintrags: Brotkrume, Icon und Name als Titel, darunter Beschreibung und die
+ * Felder (hinzufügen, benennen, sortieren, entfernen). In die rechte
+ * Seitenleiste portalt sie, was dort bei Einträgen steht — oben Fertig,
+ * Löschen und Abbrechen wie im Bearbeitungsmodus, darunter Icon,
+ * Anzeigeregeln und Verwendung.
  *
  * Bearbeitet wird ein Entwurf; erst „Speichern" schreibt ihn und hebt die
  * Revision — sonst machte jeder Tastendruck im Namen alle Kopien zu „älteren
- * Versionen". Ein gespeichertes Feld wird beim Entfernen archiviert statt
+ * Versionen". „Fertig" speichert, falls sich etwas geändert hat, „Abbrechen"
+ * verwirft den Entwurf; beide führen zurück zur Liste. Ein gespeichertes Feld wird beim Entfernen archiviert statt
  * gelöscht: Kopien können Werte dafür haben, und es lässt sich zurückholen.
- *
- * Darunter die Verwendung: in wie vielen Einträgen der Block steckt, wie viele
- * davon eine ältere Version tragen, und „Alle aktualisieren".
+ * Ein ungespeicherter Entwurf liegt im `blockDraftStore` und wartet dort, bis
+ * die Seite wieder geöffnet wird.
  */
-export default function BlockDefinitionEditor({ definition, usage, savedDraft, onDraftChange, onDeleted }: Props) {
+export default function BlockDefinitionEditor({ definition, usage, onClose, onDelete }: Props) {
   const { t } = useTranslation();
   const text = useFieldFallbackText();
   const updateDefinition = useBlockDefinitionStore((s) => s.updateDefinition);
-  const [draft, setDraft] = useState<DefinitionDraft>(() => savedDraft ?? draftOf(definition));
+  const storeDraft = useBlockDraftStore((s) => s.setDraft);
+  const [draft, setDraft] = useState<DefinitionDraft>(
+    () => useBlockDraftStore.getState().drafts[definition.id] ?? draftOf(definition),
+  );
+  // Ohne Seitenleiste fehlte Speichern ganz — dann stehen Speichern und
+  // Verwerfen oben in der Seite (Anzeige und Verwendung bleiben der Leiste).
+  const sidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const [menu, setMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [confirmUpdate, setConfirmUpdate] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(draftOf(definition));
-  useEffect(() => { onDraftChange(dirty ? draft : null); }, [draft, dirty, onDraftChange]);
+  // Nach „Fertig"/„Abbrechen" ist der Entwurf erledigt: ein Render auf dem Weg
+  // hinaus (die gespeicherte Definition kommt zurück, der Name noch ungetrimmt)
+  // legte ihn sonst wieder in den Store.
+  const leaving = useRef(false);
+  useEffect(() => {
+    if (!leaving.current) storeDraft(definition.id, dirty ? draft : null);
+  }, [definition.id, draft, dirty, storeDraft]);
 
   const savedIds = new Set(definition.elements.map((e) => e.id));
   const active = draft.elements.filter((e) => !e.archived);
@@ -111,11 +135,24 @@ export default function BlockDefinitionEditor({ definition, usage, savedDraft, o
     }),
   });
 
-  const save = async () => {
-    setNotice(null);
-    await updateDefinition(definition.id, draft);
-    // Der Store speichert den Namen getrimmt — sonst bliebe der Entwurf „geändert".
-    setDraft((d) => ({ ...d, name: d.name.trim() }));
+  const leave = () => {
+    leaving.current = true;
+    storeDraft(definition.id, null);
+    onClose();
+  };
+  const finish = async () => {
+    if (dirty) await updateDefinition(definition.id, draft);
+    leave();
+  };
+
+  // Ein Bild wird verkleinert, bevor es in den Entwurf kommt; Entfernen heißt
+  // zurück zum Standard — ohne Icon stünde der Block in Menüs ohne Zeichen da.
+  const setIcon = async (value: string) => {
+    try {
+      patch({ icon: isImageIcon(value) ? await shrinkImageDataUrl(value, ICON_MAX_EDGE) : value });
+    } catch (err) {
+      console.error('[BlockDefinitionEditor] reading the icon failed:', err);
+    }
   };
 
   const runUpdateAll = async () => {
@@ -131,146 +168,180 @@ export default function BlockDefinitionEditor({ definition, usage, savedDraft, o
   const entries = usage?.entries ?? 0;
   const outdated = usage?.outdated ?? 0;
 
+  // Dieselbe Leiste wie bei einem Eintrag im Bearbeitungsmodus.
+  const sidebar = (
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className={SIDEBAR_ACTION_BAR_CLASSES}>
+        <Button tone="jade" fill title={t('editor.done')} aria-label={t('editor.done')} onClick={() => void finish()}>
+          <Check size={14} />
+          <span className="truncate">{t('editor.done')}</span>
+        </Button>
+        <Button tone="danger" compact title={t('common.delete')} aria-label={t('common.delete')} onClick={onDelete}>
+          <Trash2 size={14} />
+        </Button>
+        <Button tone="neutral" compact title={t('editor.cancel')} aria-label={t('editor.cancel')} onClick={leave}>
+          <X size={14} />
+        </Button>
+      </div>
+
+      {/* Derselbe p-3-Einzug wie die Eigenschaften eines Eintrags. */}
+      <div className="flex-1 overflow-y-auto p-3">
+        <PropertiesEditView>
+          <div>
+            <p className="label-xs mb-2">{t('properties.icon')}</p>
+            <Favicon
+              value={draft.icon}
+              onChange={(icon) => void setIcon(icon)}
+              onRemove={() => patch({ icon: DEFAULT_DEFINITION_ICON })}
+            />
+          </div>
+
+          <section className="space-y-2">
+            <p className="label-xs">{t('blocks.library.display')}</p>
+            <BlockCheckbox checked={draft.display.readHideEmpty} onChange={(v) => patchDisplay({ readHideEmpty: v })} label={t('blocks.fields.hideEmpty')} />
+            <BlockCheckbox checked={draft.display.showTitle} onChange={(v) => patchDisplay({ showTitle: v })} label={t('blocks.showTitle')} />
+            <BlockCheckbox
+              checked={draft.display.readOnly}
+              onChange={(v) => patchDisplay({ readOnly: v })}
+              label={t('blocks.fields.readOnly')}
+              hint={t('blocks.fields.readOnlyHint')}
+            />
+          </section>
+
+          <section className="space-y-2">
+            <p className="label-xs">{t('blocks.library.usage')}</p>
+            <p className="text-xs text-stone-400">
+              {entries > 0 ? t('blocks.library.usedIn', { count: entries }) : t('blocks.library.unused')}
+              {outdated > 0 && <> · {t('blocks.library.outdated', { count: outdated })}</>}
+            </p>
+            <p className="block-field-hint">{t('blocks.library.copiesNote')}</p>
+            {outdated > 0 && (
+              confirmUpdate ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-stone-400">{t('blocks.library.updateAllConfirm', { count: outdated })}</p>
+                  <div className="flex items-center gap-2">
+                    <Button tone="jade" small onClick={() => void runUpdateAll()}>{t('blocks.library.updateAll')}</Button>
+                    <Button tone="neutral" small onClick={() => setConfirmUpdate(false)}>{t('common.cancel')}</Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  tone="jade"
+                  small
+                  disabled={dirty || busy}
+                  title={dirty ? t('blocks.library.saveFirst') : undefined}
+                  onClick={() => setConfirmUpdate(true)}
+                >
+                  <RefreshCw size={12} />
+                  <span>{t('blocks.library.updateAll')}</span>
+                </Button>
+              )
+            )}
+            {notice && <p className="text-xs text-stone-500">{notice}</p>}
+          </section>
+        </PropertiesEditView>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="max-w-2xl space-y-6">
-      {/* Kopf: Icon, Name, Löschen */}
-      <div className="flex items-center gap-3">
-        <EmojiPicker
-          value={draft.icon}
-          onChange={(icon) => patch({ icon })}
-          size="lg"
-          trigger={({ toggle }) => (
-            <button type="button" className="block-def-icon-btn" onClick={toggle} title={t('blocks.library.icon')} aria-label={t('blocks.library.icon')}>
-              {draft.icon}
-            </button>
-          )}
-        />
+    <div className="h-full flex flex-col">
+      {/* Topbar wie in EntryDetailFrame: die Brotkrume führt zur Liste zurück. */}
+      <div className="flex items-center px-6 h-14 border-b border-stone-700/60 flex-shrink-0">
+        <div className="flex items-center gap-2 text-xs text-stone-600 min-w-0">
+          <button type="button" onClick={onClose} className="text-stone-500 transition-colors hover:text-stone-300">
+            {t('nav.blocks')}
+          </button>
+          <BlockGlyph icon={draft.icon} size={14} />
+          {dirty && <span className="text-stone-700 italic ml-1">{t('blocks.library.unsaved')}</span>}
+        </div>
+        {!sidebarOpen && (
+          <div className="ml-auto flex items-center gap-1.5">
+            <Button tone="jade" small onClick={() => void finish()}>
+              <Check size={12} />
+              <span>{t('editor.done')}</span>
+            </Button>
+            <Button tone="neutral" compact small title={t('editor.cancel')} aria-label={t('editor.cancel')} onClick={leave}>
+              <X size={12} />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Titel wie bei einem Eintrag; das Icon steht in der Brotkrume und wird
+          in der Seitenleiste gesetzt. */}
+      <div className="px-8 pt-6 pb-4 flex-shrink-0">
         <input
-          className="flex-1 min-w-0 bg-transparent text-lg font-semibold text-stone-200 outline-none selectable placeholder-stone-600"
+          className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100 outline-none selectable placeholder-stone-700"
           value={draft.name}
           placeholder={t('blocks.library.namePlaceholder')}
           aria-label={t('blocks.library.name')}
           onChange={(e) => patch({ name: e.target.value })}
         />
-        <Button tone="danger" compact small onClick={() => setDeleting(true)} title={t('blocks.library.delete')} aria-label={t('blocks.library.delete')}>
-          <Trash2 size={12} />
-        </Button>
       </div>
 
-      <textarea
-        className={`${OP_PROP_SELECT_CLASSES} resize-none selectable`}
-        rows={2}
-        value={draft.description}
-        placeholder={t('blocks.library.descriptionPlaceholder')}
-        aria-label={t('blocks.library.description')}
-        onChange={(e) => patch({ description: e.target.value })}
-      />
+      <div className="flex-1 overflow-y-auto px-8 pb-8">
+        <div className="max-w-3xl space-y-6">
+          <textarea
+            className={`${OP_PROP_SELECT_CLASSES} resize-none selectable`}
+            rows={2}
+            value={draft.description}
+            placeholder={t('blocks.library.descriptionPlaceholder')}
+            aria-label={t('blocks.library.description')}
+            onChange={(e) => patch({ description: e.target.value })}
+          />
 
-      {/* Felder */}
-      <section className="space-y-2">
-        <p className="label-xs">{t('blocks.library.fields')}</p>
-        {active.length === 0 && <p className="text-xs text-stone-600">{t('blocks.library.noFields')}</p>}
-        <Reorder.Group as="div" axis="y" values={active.map((e) => e.id)} onReorder={reorderActive} className="space-y-2">
-          {active.map((element) => (
-            <ElementRow
-              key={element.id}
-              element={element}
-              blockHidesEmpty={draft.display.readHideEmpty}
-              onPatch={(p) => patchElement(element.id, p)}
-              onRemove={() => removeElement(element.id)}
-            />
-          ))}
-        </Reorder.Group>
-        <button type="button" className="block-insert-btn" onClick={openAddMenu}>
-          <Plus size={12} />
-          <span>{t('blocks.library.addField')}</span>
-        </button>
+          {/* Felder */}
+          <section className="space-y-2">
+            <p className="label-xs">{t('blocks.library.fields')}</p>
+            {active.length === 0 && <p className="text-xs text-stone-600">{t('blocks.library.noFields')}</p>}
+            <Reorder.Group as="div" axis="y" values={active.map((e) => e.id)} onReorder={reorderActive} className="space-y-2">
+              {active.map((element) => (
+                <ElementRow
+                  key={element.id}
+                  element={element}
+                  blockHidesEmpty={draft.display.readHideEmpty}
+                  onPatch={(p) => patchElement(element.id, p)}
+                  onRemove={() => removeElement(element.id)}
+                />
+              ))}
+            </Reorder.Group>
+            <button type="button" className="block-insert-btn" onClick={openAddMenu}>
+              <Plus size={12} />
+              <span>{t('blocks.library.addField')}</span>
+            </button>
 
-        {archived.length > 0 && (
-          <div className="pt-2 space-y-1">
-            <p className="label-xs">{t('blocks.library.removedFields')}</p>
-            <p className="block-field-hint">{t('blocks.library.removedHint')}</p>
-            {archived.map((element) => {
-              const Icon = ELEMENT_KIND_ICONS[element.kind];
-              return (
-                <div key={element.id} className="flex items-center gap-2 text-xs text-stone-500">
-                  <Icon size={12} className="flex-shrink-0" />
-                  <span className="flex-1 truncate">{elementLabel(t, element)}</span>
-                  <button
-                    type="button"
-                    className="block-row-action"
-                    onClick={() => restoreElement(element.id)}
-                    title={t('blocks.library.restoreField')}
-                    aria-label={t('blocks.library.restoreField')}
-                  >
-                    <ArchiveRestore size={12} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* Anzeige */}
-      <section className="space-y-2">
-        <p className="label-xs">{t('blocks.library.display')}</p>
-        <BlockCheckbox checked={draft.display.readHideEmpty} onChange={(v) => patchDisplay({ readHideEmpty: v })} label={t('blocks.fields.hideEmpty')} />
-        <BlockCheckbox checked={draft.display.showTitle} onChange={(v) => patchDisplay({ showTitle: v })} label={t('blocks.showTitle')} />
-        <BlockCheckbox
-          checked={draft.display.readOnly}
-          onChange={(v) => patchDisplay({ readOnly: v })}
-          label={t('blocks.fields.readOnly')}
-          hint={t('blocks.fields.readOnlyHint')}
-        />
-      </section>
-
-      <div className="flex items-center gap-2">
-        <Button tone="jade" disabled={!dirty} onClick={() => void save()}>{t('common.save')}</Button>
-        <Button tone="neutral" disabled={!dirty} onClick={() => setDraft(draftOf(definition))}>{t('common.cancel')}</Button>
-        {dirty && <span className="text-xs text-stone-500">{t('blocks.library.unsaved')}</span>}
+            {archived.length > 0 && (
+              <div className="pt-2 space-y-1">
+                <p className="label-xs">{t('blocks.library.removedFields')}</p>
+                <p className="block-field-hint">{t('blocks.library.removedHint')}</p>
+                {archived.map((element) => {
+                  const Icon = ELEMENT_KIND_ICONS[element.kind];
+                  return (
+                    <div key={element.id} className="flex items-center gap-2 text-xs text-stone-500">
+                      <Icon size={12} className="flex-shrink-0" />
+                      <span className="flex-1 truncate">{elementLabel(t, element)}</span>
+                      <button
+                        type="button"
+                        className="block-row-action"
+                        onClick={() => restoreElement(element.id)}
+                        title={t('blocks.library.restoreField')}
+                        aria-label={t('blocks.library.restoreField')}
+                      >
+                        <ArchiveRestore size={12} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </div>
       </div>
 
-      {/* Verwendung */}
-      <section className="space-y-2 border-t border-stone-700/60 pt-4">
-        <p className="label-xs">{t('blocks.library.usage')}</p>
-        <p className="text-xs text-stone-400">
-          {entries > 0 ? t('blocks.library.usedIn', { count: entries }) : t('blocks.library.unused')}
-          {outdated > 0 && <> · {t('blocks.library.outdated', { count: outdated })}</>}
-        </p>
-        <p className="block-field-hint">{t('blocks.library.copiesNote')}</p>
-        {outdated > 0 && (
-          confirmUpdate ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-stone-400">{t('blocks.library.updateAllConfirm', { count: outdated })}</span>
-              <Button tone="jade" small onClick={() => void runUpdateAll()}>{t('blocks.library.updateAll')}</Button>
-              <Button tone="neutral" small onClick={() => setConfirmUpdate(false)}>{t('common.cancel')}</Button>
-            </div>
-          ) : (
-            <Button
-              tone="jade"
-              small
-              disabled={dirty || busy}
-              title={dirty ? t('blocks.library.saveFirst') : undefined}
-              onClick={() => setConfirmUpdate(true)}
-            >
-              <RefreshCw size={12} />
-              <span>{t('blocks.library.updateAll')}</span>
-            </Button>
-          )
-        )}
-        {notice && <p className="text-xs text-stone-500">{notice}</p>}
-      </section>
+      <SidebarPortal>{sidebar}</SidebarPortal>
 
       {menu && <ContextMenu x={menu.x} y={menu.y} actions={menu.actions} onClose={() => setMenu(null)} />}
-      {deleting && (
-        <DeleteDefinitionModal
-          definition={definition}
-          entryCount={entries}
-          onClose={() => setDeleting(false)}
-          onDeleted={onDeleted}
-        />
-      )}
     </div>
   );
 }
@@ -352,7 +423,7 @@ function resultNotice(t: ReturnType<typeof useTranslation>['t'], key: 'updated' 
  * wer „auch aus Einträgen entfernen" ankreuzt, bekommt eine zweite Bestätigung
  * — das Entfernen lässt sich nur über ein Backup zurückholen.
  */
-function DeleteDefinitionModal({ definition, entryCount, onClose, onDeleted }: {
+export function DeleteDefinitionModal({ definition, entryCount, onClose, onDeleted }: {
   definition: BlockDefinition;
   entryCount: number;
   onClose: () => void;

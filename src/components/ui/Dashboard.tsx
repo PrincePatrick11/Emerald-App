@@ -1,7 +1,7 @@
 import { Fragment, useLayoutEffect, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
 import { Plus } from 'lucide-react';
 import Button from './Button';
+import SidebarPortal from './SidebarPortal';
 import CollapseChevron from './CollapseChevron';
 import ListToolbar from './ListToolbar';
 import FilterPanel, { type FilterPanelProps } from './FilterPanel';
@@ -290,14 +290,6 @@ export default function Dashboard<T>({
     );
   };
 
-  // Der Kopf wohnt ausschließlich in der rechten Seitenleiste: Sie stellt in
-  // Listenansichten ein Portal-Ziel (RightSidebar → setListHeaderHost). Ist
-  // sie zu, gibt es keinen Kopf — bewusst, die Liste bekommt dann die ganze
-  // Höhe. Beim Zuklappen hält AppShell die Leiste für die 200ms-Animation
-  // noch gemountet (inert); der Kopf fährt mit ihr hinaus und verschwindet,
-  // wenn der Host abgemeldet wird.
-  const listHeaderHost = useUIStore((s) => s.listHeaderHost);
-
   // Anmelden, damit RightSidebar das Portal-Ziel stellt (siehe
   // `uiStore.dashboardMounted`). Layout- statt Passiv-Effekt: Oeffnet ein
   // Klick einen Eintrag, muss die Leiste noch vor dem Zeichnen auf die
@@ -375,7 +367,13 @@ export default function Dashboard<T>({
 
   return (
     <div className="h-full flex flex-col">
-      {listHeaderHost && createPortal(header, listHeaderHost)}
+      {/* Der Kopf wohnt ausschließlich in der rechten Seitenleiste: Sie stellt
+          in Listenansichten ein Portal-Ziel (RightSidebar → setListHeaderHost).
+          Ist sie zu, gibt es keinen Kopf — bewusst, die Liste bekommt dann die
+          ganze Höhe. Beim Zuklappen hält AppShell die Leiste für die
+          200ms-Animation noch gemountet (inert); der Kopf fährt mit ihr hinaus
+          und verschwindet, wenn der Host abgemeldet wird. */}
+      <SidebarPortal>{header}</SidebarPortal>
 
       <div className={contentClassName}>
         {contentHeader}

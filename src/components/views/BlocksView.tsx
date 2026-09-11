@@ -1,164 +1,185 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Blocks, Plus, SlidersHorizontal, Type } from 'lucide-react';
+import { PanelTopOpen, Trash2 } from 'lucide-react';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
-import { copyUsage, useBlockContentRows } from '../../store/blockCopies';
+import { copyUsage, useBlockContentRows, type CopyUsage } from '../../store/blockCopies';
+import { useUIStore } from '../../store/uiStore';
+import { useBlockDraftStore } from '../../store/blockDraftStore';
+import { AUX_VIEWS } from '../../lib/modules';
 import { definitionLabel } from '../../lib/blocks/blockAttrs';
-import { ELEMENT_KINDS, elementKindLabelKey } from '../../lib/blocks/fields';
-import { ELEMENT_KIND_ICONS } from '../../lib/blocks/presets';
-import Button from '../ui/Button';
+import type { BlockDefinition } from '../../lib/blocks/definitions';
+import Dashboard from '../ui/Dashboard';
+import ContextMenu from '../ui/ContextMenu';
 import BlockGlyph from '../blocks/BlockGlyph';
-import BlockDefinitionEditor, { type DefinitionDraft } from '../blocks/BlockDefinitionEditor';
+import BlockDefinitionEditor, { DeleteDefinitionModal } from '../blocks/BlockDefinitionEditor';
 
 /**
- * Die Rail-Ansicht „Blöcke": links die eigenen Blöcke mit ihrer Verwendung,
- * rechts der Baukasten des gewählten — oder, ohne Auswahl, die eingebauten
- * Blöcke im Überblick. Eigene Blöcke entstehen hier ohne Code aus den
- * Feldarten; eingefügt werden sie in jedem Eintrag über „Block hinzufügen".
+ * Die Rail-Ansicht „Blöcke", gebaut wie die übrigen Dashboards: die Liste der
+ * eigenen Blöcke, Kopf (Titel, „Neuer Block", Suche) in der rechten
+ * Seitenleiste. Ein Klick öffnet den Block als eigene Seite
+ * (`{ type: 'blocks', id }`) — wie ein Eintrag, mit Speichern, Anzeige und
+ * Verwendung in der Seitenleiste. Eingefügt werden eigene Blöcke in jedem
+ * Eintrag über „Block hinzufügen".
  */
 export default function BlocksView() {
   const { t } = useTranslation();
   const definitions = useBlockDefinitionStore((s) => s.definitions);
   const createDefinition = useBlockDefinitionStore((s) => s.createDefinition);
+  const activeView = useUIStore((s) => s.activeView);
+  const setActiveView = useUIStore((s) => s.setActiveView);
+  const clearDraft = useBlockDraftStore((s) => s.setDraft);
   const rows = useBlockContentRows();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  /** Schnappschuss statt id: der Dialog zeigt nach dem Löschen noch seine Meldung. */
+  const [deleting, setDeleting] = useState<BlockDefinition | null>(null);
 
   const usage = useMemo(() => copyUsage(rows, definitions), [rows, definitions]);
-  const selected = definitions.find((d) => d.id === selectedId) ?? null;
+  // Eine id ohne Definition (gelöscht, anderer Vault im gemerkten Tab) fällt auf die Liste zurück.
+  const selected = activeView.id ? definitions.find((d) => d.id === activeView.id) ?? null : null;
 
-  // Ungespeicherte Entwürfe je Block: der Baukasten montiert pro Auswahl neu,
-  // und ein Klick auf einen anderen Block soll keine Arbeit verwerfen. Nur
-  // solange die Ansicht offen ist.
-  const drafts = useRef(new Map<string, DefinitionDraft>());
-  const rememberDraft = useCallback((id: string, draft: DefinitionDraft | null) => {
-    if (draft) drafts.current.set(id, draft);
-    else drafts.current.delete(id);
-  }, []);
+  const open = (id: string) => setActiveView({ type: 'blocks', id });
+  const backToList = () => setActiveView({ type: 'blocks' });
 
   const create = async () => {
     const def = await createDefinition(t('blocks.library.defaultName'));
-    setSelectedId(def.id);
+    open(def.id);
   };
 
+  const deleteModal = deleting && (
+    <DeleteDefinitionModal
+      definition={deleting}
+      entryCount={usage.get(deleting.id)?.entries ?? 0}
+      onClose={() => setDeleting(null)}
+      onDeleted={() => {
+        clearDraft(deleting.id, null);
+        setDeleting(null);
+        if (activeView.id === deleting.id) backToList();
+      }}
+    />
+  );
+
+  // Ein Rückgabepfad für Seite und Liste: der Löschdialog muss den Wechsel
+  // von der gelöschten Seite zur Liste mit seinem Zustand überleben.
   return (
-    <div className="flex h-full">
-      <div className="w-64 flex-shrink-0 border-r border-stone-700/60 flex flex-col">
-        <div className="px-4 py-5 border-b border-stone-700/60 space-y-3">
-          <div className="flex items-center gap-2">
-            <Blocks size={16} className="text-stone-500" />
-            <h1 className="text-sm font-semibold text-stone-200">{t('nav.blocks')}</h1>
-          </div>
-          <Button tone="neutral" small className="w-full" onClick={() => void create()}>
-            <Plus size={12} />
-            <span>{t('blocks.library.newBlock')}</span>
-          </Button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto py-2">
-          <button
-            type="button"
-            onClick={() => setSelectedId(null)}
-            className={`sidebar-item w-full ${selected === null ? 'active' : ''}`}
-          >
-            <span className="text-xs">{t('blocks.library.builtIn')}</span>
-          </button>
-
-          <p className="label-xs px-4 pt-4 pb-1">{t('blocks.library.custom')}</p>
-          {definitions.length === 0 && (
-            <p className="text-xs text-stone-600 px-4 py-2">{t('blocks.library.noCustom')}</p>
-          )}
-          {definitions.map((def) => {
-            const u = usage.get(def.id);
-            return (
-              <button
-                type="button"
-                key={def.id}
-                onClick={() => setSelectedId(def.id)}
-                className={`sidebar-item w-full ${selected?.id === def.id ? 'active' : ''}`}
-              >
-                <BlockGlyph icon={def.icon} />
-                <span className="flex-1 truncate text-xs text-left">{definitionLabel(t, def)}</span>
-                {!!u?.outdated && (
-                  <span className="block-library-outdated-dot" title={t('blocks.library.outdated', { count: u.outdated })} />
-                )}
-                <span className="text-stone-700 text-xs" title={t('blocks.library.usedIn', { count: u?.entries ?? 0 })}>
-                  {u?.entries ?? 0}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-6">
-        {selected ? (
-          <BlockDefinitionEditor
-            key={selected.id}
-            definition={selected}
-            usage={usage.get(selected.id)}
-            savedDraft={drafts.current.get(selected.id)}
-            onDraftChange={(draft) => rememberDraft(selected.id, draft)}
-            onDeleted={() => {
-              rememberDraft(selected.id, null);
-              setSelectedId(null);
-            }}
-          />
-        ) : (
-          <BuiltInOverview onCreate={() => void create()} />
-        )}
-      </div>
-    </div>
+    <>
+      {selected ? (
+        <BlockDefinitionEditor
+          key={selected.id}
+          definition={selected}
+          usage={usage.get(selected.id)}
+          onClose={backToList}
+          onDelete={() => setDeleting(selected)}
+        />
+      ) : (
+        <BlockList usage={usage} onOpen={open} onCreate={() => void create()} onDelete={setDeleting} />
+      )}
+      {deleteModal}
+    </>
   );
 }
 
-/** Die eingebauten Blöcke im Überblick — sie gibt es in jedem Eintrag, ohne dass man sie hier anlegt. */
-function BuiltInOverview({ onCreate }: { onCreate: () => void }) {
+/** Die Liste der eigenen Blöcke im gemeinsamen Dashboard-Gerüst. */
+function BlockList({ usage, onOpen, onCreate, onDelete }: {
+  usage: Map<string, CopyUsage>;
+  onOpen: (id: string) => void;
+  onCreate: () => void;
+  onDelete: (def: BlockDefinition) => void;
+}) {
   const { t } = useTranslation();
-  return (
-    <div className="max-w-2xl space-y-4">
-      <div>
-        <h2 className="text-sm font-semibold text-stone-300">{t('blocks.library.builtIn')}</h2>
-        <p className="text-xs text-stone-500 mt-1">{t('blocks.library.builtInHint')}</p>
-      </div>
+  const definitions = useBlockDefinitionStore((s) => s.definitions);
+  // Die Seite legt ungespeicherte Entwürfe im Store ab; hier nur der Hinweis darauf.
+  const drafts = useBlockDraftStore((s) => s.drafts);
+  const openViewInNewTab = useUIStore((s) => s.openViewInNewTab);
+  const [search, setSearch] = useState('');
+  const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
 
-      <div className="panel p-4 space-y-1">
-        <div className="flex items-center gap-2 text-sm text-stone-200">
-          <Type size={14} className="text-stone-500" />
-          {t('blocks.types.text.label')}
-        </div>
-        <p className="text-xs text-stone-500">{t('blocks.types.text.description')}</p>
-      </div>
+  const query = search.trim().toLowerCase();
+  const filtered = query
+    ? definitions.filter((d) => `${definitionLabel(t, d)} ${d.description}`.toLowerCase().includes(query))
+    : definitions;
 
-      <div className="panel p-4 space-y-2">
-        <div className="flex items-center gap-2 text-sm text-stone-200">
-          <SlidersHorizontal size={14} className="text-stone-500" />
-          {t('blocks.types.fields.label')}
-        </div>
-        <p className="text-xs text-stone-500">{t('blocks.types.fields.description')}</p>
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {ELEMENT_KINDS.map((kind) => {
-            const Icon = ELEMENT_KIND_ICONS[kind];
-            return (
-              <span key={kind} className="block-kind-chip">
-                <Icon size={12} />
-                {t(elementKindLabelKey(kind))}
-              </span>
-            );
-          })}
-        </div>
-      </div>
+  const renderRow = (def: BlockDefinition) => {
+    const u = usage.get(def.id);
+    const fieldCount = def.elements.filter((e) => !e.archived).length;
+    return (
+      <button
+        type="button"
+        onClick={() => onOpen(def.id)}
+        onAuxClick={(e) => {
+          if (e.button === 1) {
+            e.preventDefault();
+            openViewInNewTab({ type: 'blocks', id: def.id });
+          }
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setCtxMenu({ id: def.id, x: e.clientX, y: e.clientY });
+        }}
+        className="panel-interactive w-full text-left flex items-center gap-3 px-4 py-3"
+      >
+        <BlockGlyph icon={def.icon} size={14} />
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm text-stone-300 truncate">{definitionLabel(t, def)}</span>
+          {def.description && <span className="block text-xs text-stone-500 truncate">{def.description}</span>}
+        </span>
+        {def.id in drafts && (
+          <span className="text-xs italic text-stone-500 flex-shrink-0">{t('blocks.library.unsaved')}</span>
+        )}
+        {!!u?.outdated && (
+          <span className="block-library-outdated-dot" title={t('blocks.library.outdated', { count: u.outdated })} />
+        )}
+        <span className="text-xs text-stone-500 tabular-nums flex-shrink-0">
+          {t('blocks.library.fieldCount', { count: fieldCount })}
+          {' · '}
+          <span title={u?.entries ? t('blocks.library.usedIn', { count: u.entries }) : t('blocks.library.unused')}>
+            {t('blocks.library.entryCount', { count: u?.entries ?? 0 })}
+          </span>
+        </span>
+      </button>
+    );
+  };
 
-      <div className="panel p-4 space-y-2">
-        <div className="flex items-center gap-2 text-sm text-stone-200">
-          <Blocks size={14} className="text-stone-500" />
-          {t('blocks.library.custom')}
-        </div>
-        <p className="text-xs text-stone-500">{t('blocks.library.customHint')}</p>
-        <Button tone="jade" small onClick={onCreate}>
-          <Plus size={12} />
-          <span>{t('blocks.library.newBlock')}</span>
-        </Button>
-      </div>
+  const headerLeft = (
+    <div className="flex items-center gap-3 min-w-0">
+      <AUX_VIEWS.blocks.icon size={18} className="text-stone-500 flex-shrink-0" />
+      <h1 className="text-lg font-semibold text-stone-100 truncate">{t('nav.blocks')}</h1>
+      <span className="text-xs text-stone-500 bg-stone-700/50 px-2 py-0.5 rounded-full">
+        {definitions.length}
+      </span>
     </div>
+  );
+
+  const menuDef = ctxMenu && definitions.find((d) => d.id === ctxMenu.id);
+
+  return (
+    <Dashboard<BlockDefinition>
+      headerLeft={headerLeft}
+      primaryAction={{ label: t('blocks.library.newBlock'), onClick: onCreate }}
+      search={search}
+      onSearch={setSearch}
+      items={filtered}
+      itemKey={(d) => d.id}
+      renderItem={renderRow}
+      grouping={{ mode: 'flat' }}
+      isEmpty={definitions.length === 0}
+      emptyState={{
+        message: t('blocks.library.customHint'),
+        messageClassName: 'text-stone-600 text-sm max-w-md mx-auto',
+        actionLabel: t('blocks.library.newBlock'),
+        onAction: onCreate,
+      }}
+      hasNoResults={filtered.length === 0}
+      noResultsMessage={t('search.noResults')}
+      contextMenuSlot={ctxMenu && menuDef && (
+        <ContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          onClose={() => setCtxMenu(null)}
+          actions={[
+            { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'blocks', id: menuDef.id }) },
+            { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => onDelete(menuDef), danger: true },
+          ]}
+        />
+      )}
+    />
   );
 }
