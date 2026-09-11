@@ -299,7 +299,7 @@
       },
       "sigilCharge": {
         "label": "Ladung",
-        "description": "Zieldatum, Ladetechnik und das Laden der Sigille. Geladen sperrt sie den Eintrag oder nur die Sigillen-Blöcke."
+        "description": "Zieldatum, Ladetechnik und das Laden der Sigille. Geladen verbirgt sie die gewählten Rechner und Zeichnungen und sperrt den Eintrag oder nur diese Blöcke."
       }
     },
     "kinds": {
@@ -311,7 +311,11 @@
       "checklist": "Checkliste",
       "link": "Verknüpfung",
       "image": "Bild",
-      "moon": "Mondphase"
+      "moon": "Mondphase",
+      "altar": "Altar",
+      "sigilCalc": "Sigillen-Rechner",
+      "sigilCanvas": "Sigillen-Zeichnung",
+      "sigilCharge": "Ladung"
     },
     "fields": {
       "yes": "Ja",
@@ -354,6 +358,19 @@
       "removedFields": "Entfernte Felder",
       "removedHint": "Einträge behalten ihre Werte. Ein zurückgeholtes Feld erscheint wieder.",
       "restoreField": "Feld zurückholen",
+      "prefill": "Vorbefüllen",
+      "prefillHint": "Jede neue Kopie startet mit diesem Wert — bestehende Einträge behalten ihren.",
+      "calcMode": "Buchstabenbank",
+      "calcModes": {
+        "both": "Automatisch und manuell",
+        "auto": "Nur automatisch (aus der Absicht)",
+        "manual": "Nur manuell"
+      },
+      "brushPreset": "Pinsel voreinstellen",
+      "brushPresetHint": "Farbe und Pinselgröße, mit denen das Zeichnen beginnt — beim Zeichnen lässt sich weiter umstellen.",
+      "chargePrefillHint": "Jede neue Kopie startet mit dieser Sperre und diesen verdeckten Teilen — im Eintrag lässt sich beides ändern, solange nicht geladen ist.",
+      "chargeCoversAll": "Alle Sigillen im Eintrag",
+      "chargeNoTools": "Dieser Block hat noch keinen Rechner und keine Zeichnung.",
       "display": "Anzeige",
       "unsaved": "Ungespeicherte Änderungen",
       "usage": "Verwendung",
@@ -373,6 +390,8 @@
       "removed_other": "Aus {{count}} Einträgen entfernt.",
       "skippedEditing": "{{count}} Eintrag ist gerade in Bearbeitung und blieb unverändert.",
       "skippedEditing_other": "{{count}} Einträge sind gerade in Bearbeitung und blieben unverändert.",
+      "skippedLocked": "{{count}} Eintrag hält eine geladene Sigille und blieb unverändert — erst entladen.",
+      "skippedLocked_other": "{{count}} Einträge halten eine geladene Sigille und blieben unverändert — erst entladen.",
       "failed": "{{count}} Eintrag ließ sich nicht ändern.",
       "failed_other": "{{count}} Einträge ließen sich nicht ändern.",
       "delete": "Block löschen",
@@ -398,15 +417,24 @@
       "loaded": "Geladen",
       "notLoaded": "Noch nicht geladen",
       "revealedSince": "enthüllt seit {{date}}",
-      "noRevealDate": "Beim Bearbeiten ein Zieldatum setzen, um die Sigille zu laden",
-      "loadConfirm": "Sigille laden? Rechner und Zeichnung bleiben bis {{date}} verborgen.",
+      "hiddenUntilUnloaded": "verborgen bis zum Entladen",
+      "noRevealDate": "Kein Zieldatum",
+      "loadConfirm": "Sigille laden? Die verdeckten Blöcke bleiben bis {{date}} verborgen.",
+      "loadConfirmNoDate": "Sigille laden? Die verdeckten Blöcke bleiben verborgen, bis du sie entlädst.",
       "unloadConfirm": "Sigille entladen? Sie lässt sich danach sofort wieder bearbeiten.",
       "lockScope": "Geladen sperrt",
       "lockEntry": "den ganzen Eintrag",
-      "lockSigil": "nur Rechner und Zeichnung",
+      "lockSigil": "nur die verdeckten Blöcke",
+      "covers": "Verdeckt",
+      "noTools": "Noch kein Rechner und keine Zeichnung im Eintrag",
       "locked": "Gesperrt, solange die Sigille geladen ist",
       "saveFailed": "Die Zeichnung ließ sich nicht speichern",
       "loadFailed": "Die Zeichnung ließ sich nicht laden — den Eintrag schließen und neu öffnen"
+    },
+    "altar": {
+      "search": "Altar suchen …",
+      "missing": "Der Altar „{{name}}“ ist nicht mehr da",
+      "open": "Altar öffnen"
     }
   },
   "editor": {

@@ -294,7 +294,7 @@ export default function OperationsView() {
                 // die Zeilenhöhe selbst aus, dort darf er die Spalte füllen.
                 <div className={`mb-3 overflow-hidden rounded-lg border border-stone-700/40 bg-stone-900/70 ${isWideCardView(view) ? 'w-16 mx-auto' : ''}`}>
                   <div className="aspect-[4/3] flex items-center justify-center bg-[radial-gradient(circle_at_top,rgba(0,230,153,0.08),transparent_60%)]">
-                    {sigil?.image && !sigil.concealed ? (
+                    {sigil?.image ? (
                       <img src={imageSrc(sigil.image)} alt="" loading="lazy" className="h-full w-full object-contain" />
                     ) : (
                       <span className="text-xl">{iconValue}</span>

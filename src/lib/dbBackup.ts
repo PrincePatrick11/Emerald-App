@@ -25,7 +25,10 @@ import {
 import { imageRefsInHtml, isStoredImage, readImageAsBase64, saveImage } from './images';
 import { clearSearchTextCache } from './searchText';
 import { clearEntrySummaryCache } from './blocks/entrySummary';
-import { DEFAULT_DEFINITION_ICON, definitionToRow, isDefinitionId, type BlockDefinition } from './blocks/definitions';
+import {
+  DEFAULT_DEFINITION_ICON, definitionImageRefs, definitionToRow, isDefinitionId, parseDefinitionElements,
+  remapDefinitionDefaults, type BlockDefinition, type LinkDefaultResolver,
+} from './blocks/definitions';
 import { convertLegacyStatusRows, STATUS_DEFINITION_ID } from './blocks/legacyStatus';
 import { definitionById, nextDefinitionSortOrder } from './blockDefinitionRows';
 import { fromRow } from './row';
@@ -504,6 +507,10 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
   // eine Liste, keine Datumsfrage.
   if (options.includeJournal || options.includeWiki || options.includeOperations) {
     data.blockDefinitions = await db.select<Row[]>(`SELECT * FROM block_definitions`);
+    // Die Bild-Vorgaben reisen mit, auch wenn noch keine Kopie sie benutzt.
+    for (const row of data.blockDefinitions) {
+      definitionImageRefs(parseDefinitionElements(row.elements)).forEach((ref) => allImagePaths.add(ref));
+    }
   }
 
   // ── Embed images ─────────────────────────────────────────────────────────
@@ -609,6 +616,14 @@ function remapPaths(value: unknown, pathMap: Map<string, string>): unknown {
     result = result.split(oldPath).join(newPath);
   }
   return result;
+}
+
+/** Die Vorgaben mitgebrachter Definitionen auf die hier gespeicherten Bilder (und beim Merge die neuen IDs) umschreiben. */
+function remapDefinitionRows(rows: unknown, pathMap: Map<string, string>, link?: LinkDefaultResolver): unknown {
+  if (!Array.isArray(rows)) return rows;
+  return rows.map((r) => (typeof r === 'object' && r !== null
+    ? { ...r, elements: remapDefinitionDefaults((r as Row).elements, (name) => pathMap.get(name) ?? name, link) }
+    : r));
 }
 
 function remapRow(row: Row, fields: string[], pathMap: Map<string, string>): Row {
@@ -995,7 +1010,9 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   // Eigene Blöcke wie Kategorien: nie gelöscht, Fehlendes nach ID ergänzt,
   // Vorhandenes bleibt. VOR dem ersten DELETE — scheitert hier etwas an einer
   // präparierten Datei, ist noch nichts verloren (keine Transaktion, s. o.).
-  await insertBlockDefinitions(db, await withStatusDefinition(db, d.blockDefinitions, replaceOps.definition, replaceStatus));
+  await insertBlockDefinitions(db, await withStatusDefinition(
+    db, remapDefinitionRows(d.blockDefinitions, pathMap), replaceOps.definition, replaceStatus,
+  ));
 
   // Delete only the content types present in the backup (so a partial backup
   // replacing only Journal data won't wipe wiki/ops).
@@ -1229,7 +1246,11 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   // INSERT OR IGNORE (no prefix — shared by name)
   if (d.tags) await insertRows(db, 'tags', d.tags, true);
   // Ohne Präfix: die Kopien im Inhalt nennen ihre Definition über genau diese ID.
-  await insertBlockDefinitions(db, await withStatusDefinition(db, d.blockDefinitions, mergeOps.definition, mergeStatus));
+  // Link-Vorgaben zeigen wie die Chips im Inhalt auf die umbenannten Einträge.
+  await insertBlockDefinitions(db, await withStatusDefinition(
+    db, remapDefinitionRows(d.blockDefinitions, pathMap, (t) => ({ id: String(remapId(t.id)), label: t.label })),
+    mergeOps.definition, mergeStatus,
+  ));
 
   // Content: plain INSERT with prefixed IDs (no conflicts possible)
   await insertRows(db, 'journal_entries', journalEntries);

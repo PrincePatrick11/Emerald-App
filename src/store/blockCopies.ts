@@ -25,7 +25,7 @@ import { useOperationStore } from './operationStore';
 import { useBlockSessionStore } from './blockSessionStore';
 import { editorSavesSuspended } from '../lib/editorLock';
 import { entryBlockSummary } from '../lib/blocks/entrySummary';
-import { removeCopiesFromContent, updateCopiesInContent, type BlockDefinition } from '../lib/blocks/definitions';
+import { hasFrozenCopy, removeCopiesFromContent, updateCopiesInContent, type BlockDefinition } from '../lib/blocks/definitions';
 import type { FallbackText } from '../lib/blocks/fields';
 
 interface ContentRow {
@@ -88,11 +88,13 @@ export interface CopyRunResult {
   changed: number;
   /** Übersprungen, weil gerade im Bearbeitungsmodus. */
   skippedEditing: number;
+  /** Einträge, in denen eine Kopie stehen blieb, weil eine geladene Sigille sie festhält. */
+  skippedLocked: number;
   failed: number;
 }
 
 async function rewriteAll(defId: string, transform: (content: string) => string | null): Promise<CopyRunResult> {
-  const result: CopyRunResult = { changed: 0, skippedEditing: 0, failed: 0 };
+  const result: CopyRunResult = { changed: 0, skippedEditing: 0, skippedLocked: 0, failed: 0 };
   // Ein Backup-Import tauscht gerade den Vault aus.
   if (editorSavesSuspended()) return result;
   const session = useBlockSessionStore.getState().session;
@@ -101,6 +103,7 @@ async function rewriteAll(defId: string, transform: (content: string) => string 
   for (const source of contentSources()) {
     // Billiger Vorfilter: ohne die ID steht auch keine Kopie im Inhalt.
     if (!source.content.includes(defId)) continue;
+    if (hasFrozenCopy(source.content, defId)) result.skippedLocked += 1;
     const next = transform(source.content);
     if (next === null) continue;
     if (source.id === editingId) {

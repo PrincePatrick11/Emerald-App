@@ -21,7 +21,7 @@ import { categoryLabel } from './categories';
 import { useCategoryStore } from '../store/categoryStore';
 import { useBlockDefinitionStore } from '../store/blockDefinitionStore';
 import { fromRow, toInt } from './row';
-import { isDefinitionId } from './blocks/definitions';
+import { definitionImageRefs, isDefinitionId, remapDefinitionDefaults } from './blocks/definitions';
 import {
   hasLegacyStatus, legacyStatusOfRow, statusDefinition, STATUS_DEFINITION_ID, withLegacyStatus, type LegacyStatus,
 } from './blocks/legacyStatus';
@@ -94,17 +94,26 @@ function remapImportedLinks(
 ): string {
   const byKey = linkItemsByKey(items);
   const titleByKey = new Map((manifest ?? []).map((l) => [linkItemKey(l), l.title]));
+  return remapInternalLinks(content, (link) => resolveImportedTarget(link, titleByKey.get(linkItemKey(link)), items, byKey));
+}
 
-  return remapInternalLinks(content, (link) => {
-    const key = linkItemKey(link);
-    const local = byKey.get(key);
-    if (local) return { id: local.id, label: local.label };
-
-    const title = titleByKey.get(key) || link.label;
-    if (!title) return null;
-    const match = items.find((i) => i.entryType === link.entryType && i.label === title);
-    return match ? { id: match.id, label: match.label } : null;
-  });
+/**
+ * Ein Link-Ziel aus einer fremden Datei in diesem Vault: dieselbe ID, sonst
+ * derselbe Titel unter derselben Art — oder `null`. Für Chips im Inhalt und
+ * für die Link-Vorgaben mitgebrachter eigener Blöcke.
+ */
+function resolveImportedTarget(
+  link: { id: string; entryType: string; label: string },
+  manifestTitle: string | undefined,
+  items: SuggestionItem[],
+  byKey = linkItemsByKey(items),
+): { id: string; label: string } | null {
+  const local = byKey.get(linkItemKey({ id: link.id, entryType: link.entryType as SuggestionItem['entryType'] }));
+  if (local) return { id: local.id, label: local.label };
+  const title = manifestTitle || link.label;
+  if (!title) return null;
+  const match = items.find((i) => i.entryType === link.entryType && i.label === title);
+  return match ? { id: match.id, label: match.label } : null;
 }
 
 /** Ein aufgelöstes Ziel aus den abgelösten Spalten, plus optionalem Text
@@ -430,9 +439,12 @@ export async function exportAsEmerald(): Promise<void> {
   const blockDefinitions = definitionsUsedIn(view.id, content);
   if (blockDefinitions.length) meta.blockDefinitions = blockDefinitions;
 
-  // Embed all local images from content as base64
+  // Embed all local images from content as base64 — dazu die Bild-Vorgaben der
+  // mitgeschickten eigenen Blöcke, sonst zeigte eine neue Kopie ein totes Bild.
   const images: Record<string, string> = {};
-  for (const ref of new Set(imageRefsInHtml(content))) {
+  const definitionImages = (meta.blockDefinitions ?? []).flatMap((d) =>
+    definitionImageRefs(Array.isArray(d.elements) ? d.elements : []));
+  for (const ref of new Set([...imageRefsInHtml(content), ...definitionImages])) {
     try {
       images[ref] = await readImageAsBase64(ref);
     } catch { /* skip missing files */ }
@@ -544,11 +556,14 @@ function definitionsUsedIn(entryId: string, content: string): NonNullable<Emeral
  * Die Datei ist fremd: jede Definition läuft durch dieselbe Prüfung wie eine
  * Datenbankzeile, eine ohne brauchbare ID fällt weg.
  */
-async function importBlockDefinitions(raw: EmeraldMeta['blockDefinitions']): Promise<void> {
+async function importBlockDefinitions(raw: EmeraldMeta['blockDefinitions'], items: SuggestionItem[]): Promise<void> {
   if (!Array.isArray(raw) || !raw.length) return;
   const now = nowIso();
+  const byKey = linkItemsByKey(items);
   const defs = raw
     .filter((r): r is Record<string, unknown> => typeof r === 'object' && r !== null && isDefinitionId(r.id))
+    // Link-Vorgaben wie die Chips im Inhalt auf diesen Vault; Bilder heißen nach ihrem Inhalt und bleiben.
+    .map((r) => ({ ...r, elements: remapDefinitionDefaults(r.elements, (name) => name, (t) => resolveImportedTarget(t, undefined, items, byKey)) }))
     .map((r) => fromRow.blockDefinition({ ...r, created_at: now, updated_at: now, deleted_at: null }));
   await useBlockDefinitionStore.getState().importDefinitions(defs);
 }
@@ -674,7 +689,7 @@ export async function importFromEmerald(): Promise<void> {
     }
     // Nach dem Eintrag: scheitert der, bleibt keine Definition verwaist
     // zurück. Die Kopien im Inhalt brauchen sie nicht, um zu funktionieren.
-    await importBlockDefinitions(file.meta.blockDefinitions);
+    await importBlockDefinitions(file.meta.blockDefinitions, items);
   } catch (e) {
     await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
     return;

@@ -34,7 +34,10 @@ import { resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockType
 import { blockIcon, createFromPreset } from '../../lib/blocks/presets';
 import { blockOrigin, isOutdatedCopy, updateInstanceToDefinition, type BlockDefinition } from '../../lib/blocks/definitions';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
-import { SIGIL_CHARGE_TYPE, sigilState, todayIso } from '../../lib/blocks/sigil';
+import {
+  blockHoldsLocked, isSigilFrozen, SIGIL_CHARGE_TYPE, sigilState, sigilUnits, todayIso, withoutConcealedParts,
+  withRenamedPartTargets,
+} from '../../lib/blocks/sigil';
 import { blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
 import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockAttrName, type BlockInstance } from '../../lib/blocks/types';
 import { useBlockSessionStore, type BlockStackApi } from '../../store/blockSessionStore';
@@ -128,7 +131,8 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
   const outdatedDefinitionOf = (block: BlockInstance): BlockDefinition | undefined => {
     const origin = blockOrigin(block);
     const def = origin ? definitions.find((d) => d.id === origin.id) : undefined;
-    return def && isOutdatedCopy(block, def) ? def : undefined;
+    // Eine Kopie, die eine geladene Sigille festhält, wird nicht umgebaut (isSigilFrozen).
+    return def && isOutdatedCopy(block, def) && !isSigilFrozen(block, sigil) ? def : undefined;
   };
 
   const { registerTextEditor, orderedEditors, targetEditor, toolbarEditor, focusOnMount } =
@@ -174,23 +178,33 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
   });
 
   /**
-   * Das Verknüpfungs-Feld eines Feldblocks, das auf `target` zeigt — das
-   * Verlinkungs-Feld der Seitenleiste listet auch diese Links (es liest den
-   * ganzen Inhalt), also müssen Anspringen und Entfernen sie auch finden.
+   * Der Feldblock, dessen Verknüpfungs- oder Altar-Feld auf `target` zeigt,
+   * samt dem Block ohne diesen Verweis. Das Verlinkungs-Feld der Seitenleiste
+   * listet auch diese Links (es liest den ganzen Inhalt), also müssen
+   * Anspringen und Entfernen sie auch finden.
    */
   const fieldText = useFieldFallbackText();
   const fieldTextRef = useRef(fieldText);
   fieldTextRef.current = fieldText;
-  const findFieldLink = useCallback((target: { id: string; entryType: string }) => {
+  const findBlockLink = useCallback((target: { id: string; entryType: string }) => {
+    const matches = (link: { id: string; entryType: string } | null) =>
+      link?.id === target.id && link.entryType === target.entryType;
     for (const block of blocksRef.current) {
       if (resolveBlockType(block)?.id !== FIELDS_BLOCK_TYPE) continue;
       const model = parseFields(block);
       if (model.broken) continue;
-      const element = model.elements.find((el) => {
-        const link = el.kind === 'link' ? linkFromSlot(model.slots[el.id]) : null;
-        return link?.id === target.id && link.entryType === target.entryType;
-      });
-      if (element) return { block, model, elementId: element.id };
+      // Der rohe Chip, auch im Altar-Feld: die Seitenleiste listet jeden Link im Inhalt.
+      const element = model.elements.find((el) =>
+        (el.kind === 'link' || el.kind === 'altar') && matches(linkFromSlot(model.slots[el.id])));
+      if (!element) continue;
+      return {
+        block,
+        withoutLink: () => {
+          const slots = { ...model.slots };
+          delete slots[element.id];
+          return serializeFields(block, { ...model, slots }, fieldTextRef.current);
+        },
+      };
     }
     return null;
   }, []);
@@ -206,30 +220,28 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
       }),
       subscribeEntryLinkRequest(REMOVE_ENTRY_LINK_EVENT, (target) => {
         if (orderedEditors().some((ed) => removeEntryLink(ed, target))) return true;
-        const hit = findFieldLink(target);
+        const hit = findBlockLink(target);
         if (!hit) return false;
-        const slots = { ...hit.model.slots };
-        delete slots[hit.elementId];
-        apiRef.current.update(hit.block.id, serializeFields(hit.block, { ...hit.model, slots }, fieldTextRef.current));
+        apiRef.current.update(hit.block.id, hit.withoutLink());
         return true;
       }),
     ];
     return () => off.forEach((fn) => fn());
-  }, [isEditing, orderedEditors, appendLinkOnce, findFieldLink]);
+  }, [isEditing, orderedEditors, appendLinkOnce, findBlockLink]);
 
   // Klick auf einen Chip im Verlinkungs-Feld → zur Stelle springen. Auch im
   // Lesemodus, dort ist es der Normalfall. Der erste Textblock mit dem Link
-  // gewinnt; steht er nur in einem Verknüpfungs-Feld, springt es dorthin.
+  // gewinnt; steht er nur in einem Verknüpfungs- oder Altar-Feld, springt es dorthin.
   useEffect(() => subscribeEntryLinkRequest(
     REVEAL_ENTRY_LINK_EVENT,
     (target) => {
       if (orderedEditors().some((ed) => revealEntryLink(ed, target))) return true;
-      const hit = findFieldLink(target);
+      const hit = findBlockLink(target);
       if (!hit) return false;
       apiRef.current.reveal(hit.block.id);
       return true;
     },
-  ), [orderedEditors, findFieldLink]);
+  ), [orderedEditors, findBlockLink]);
 
   /* ---------------- Strukturänderungen ---------------- */
 
@@ -237,7 +249,7 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
 
   const insertAt = (index: number, presetId: string) => {
-    const block = createFromPreset(presetId, definitions);
+    const block = createFromPreset(presetId, definitions, fieldTextRef.current);
     if (!block) return;
     if (block.type === TEXT_BLOCK_TYPE) focusOnMount(block.id);
     const next = [...blocksRef.current];
@@ -247,10 +259,14 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
 
   const duplicate = (id: string) => {
     const index = blocksRef.current.findIndex((b) => b.id === id);
-    if (index < 0) return;
+    // Eine Kopie bekäme eine neue ID, die keine Ladung verdeckt — sie zeigte
+    // die verborgene Zeichnung. Auch die Seitenleiste kommt hier vorbei.
+    if (index < 0 || blockHoldsLocked(sigilState(blocksRef.current, todayIso()), id)) return;
     const source = blocksRef.current[index];
     const next = [...blocksRef.current];
-    next.splice(index + 1, 0, { ...source, id: generateId(), attrs: { ...source.attrs } });
+    const id2 = generateId();
+    // Ladung-Teile der Kopie zielen auf die Teile der Kopie.
+    next.splice(index + 1, 0, withRenamedPartTargets({ ...source, id: id2, attrs: { ...source.attrs } }, source.id, id2));
     commit(next);
   };
 
@@ -371,24 +387,31 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
           icon: hidden ? <Eye size={12} /> : <EyeOff size={12} />,
           onClick: () => setAttr(block.id, BLOCK_ATTR.hidden, hiddenAttrValue(!hidden)),
         },
-        ...commonBlockActions(t, meta, { duplicate: () => duplicate(block.id), remove: () => remove(block.id) }),
+        ...commonBlockActions(t, meta, {
+          duplicate: blockHoldsLocked(sigil, block.id) ? undefined : () => duplicate(block.id),
+          remove: () => remove(block.id),
+        }),
       ],
     });
   };
 
   const renderBody = (block: BlockInstance, meta: BlockTypeMeta | undefined) => {
     const View = meta ? BLOCK_VIEWS.get(meta.id) : undefined;
-    if (!View) return <UnknownBlock block={block} />;
+    // Der Fallback zeigt gespeichertes HTML — ohne das, was eine Sigille verbirgt.
+    if (!View) return <UnknownBlock block={withoutConcealedParts(block, sigil.concealed)} />;
     return (
       <BlockErrorBoundary block={block}>
         <View
           block={block}
+          blocks={blocks}
           isEditing={isEditing}
           onHtmlChange={(html) => updateHtml(block.id, html)}
           onBlockChange={(next) => updateBlock(block.id, next)}
           // Gesperrt „ganzer Eintrag": auch aus dem Lesemodus keine Änderung —
           // entladen geht nur über die Ladung selbst (die sperrt sich nie aus).
-          onPersist={!isEditing && onReadModeChange && (!sigil.lockEntry || block.type === SIGIL_CHARGE_TYPE)
+          // Ein eigener Block mit Ladung-Teil darf schreiben; er lässt dann
+          // selbst nur die Ladung zu (FieldsBlock).
+          onPersist={!isEditing && onReadModeChange && (!sigil.lockEntry || holdsCharge(block))
             ? (next) => persistRead(block.id, next)
             : undefined}
           sigil={sigil}
@@ -460,6 +483,11 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
       <DragGhost />
     </BlockStackContext.Provider>
   );
+}
+
+/** Ist der Block eine Ladung — oder ein eigener Block mit einem Ladung-Teil? */
+function holdsCharge(block: BlockInstance): boolean {
+  return block.type === SIGIL_CHARGE_TYPE || sigilUnits([block]).some((u) => u.block.type === SIGIL_CHARGE_TYPE);
 }
 
 /** Die Blöcke eines Inhalts — ein leerer Eintrag bekommt einen leeren Textblock. */

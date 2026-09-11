@@ -171,6 +171,7 @@ export async function convertLegacySigils(
         revealDate: isIsoDate(date) ? date : null,
         lock: 'entry',
         technique: chip,
+        targets: null,
       }));
     }
     if (row.description?.trim()) blocks.push(createTextBlock(textParagraphs(row.description)));

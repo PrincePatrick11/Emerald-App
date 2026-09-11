@@ -9,7 +9,10 @@ import EmojiPicker from '../ui/EmojiPicker';
 import { useBlockDefinitionStore, type BlockDefinitionPatch } from '../../store/blockDefinitionStore';
 import { useUndoStore } from '../../store/undoStore';
 import { removeAllCopies, updateAllCopies, type CopyRunResult, type CopyUsage } from '../../store/blockCopies';
-import { ELEMENT_KINDS, elementKindLabelKey, type ElementDef, type ElementKind } from '../../lib/blocks/fields';
+import {
+  canBeEmpty, defaultFromSlot, ELEMENT_KINDS, elementKindLabelKey, isSigilKind, isSlotKind, slotFromDefault,
+  type ElementDef, type ElementKind, type FieldValue,
+} from '../../lib/blocks/fields';
 import { ELEMENT_KIND_ICONS } from '../../lib/blocks/presets';
 import { definitionLabel, elementLabel } from '../../lib/blocks/blockAttrs';
 import type { BlockDefinition, DefinitionDisplay } from '../../lib/blocks/definitions';
@@ -19,6 +22,9 @@ import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import { useFieldFallbackText } from './useFieldFallbackText';
 import OptionsEditor from './OptionsEditor';
 import BlockCheckbox from './BlockCheckbox';
+import FieldValueEditor from './FieldValueEditor';
+import FieldSlotEditor from './FieldSlotEditor';
+import SigilPartSettings from './SigilPartSettings';
 
 /** Was der Baukasten bearbeitet — genau das, was `updateDefinition` annimmt. */
 export type DefinitionDraft = Required<BlockDefinitionPatch>;
@@ -63,6 +69,8 @@ export default function BlockDefinitionEditor({ definition, usage, savedDraft, o
   const [menu, setMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [confirmUpdate, setConfirmUpdate] = useState(false);
+  // Steigt mit „Abbrechen": die Feldzeilen montieren neu und vergessen ihren eigenen Stand (Vorbefüllen angehakt).
+  const [resetEpoch, setResetEpoch] = useState(0);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -173,8 +181,9 @@ export default function BlockDefinitionEditor({ definition, usage, savedDraft, o
         <Reorder.Group as="div" axis="y" values={active.map((e) => e.id)} onReorder={reorderActive} className="space-y-2">
           {active.map((element) => (
             <ElementRow
-              key={element.id}
+              key={`${element.id}:${resetEpoch}`}
               element={element}
+              siblings={active}
               blockHidesEmpty={draft.display.readHideEmpty}
               onPatch={(p) => patchElement(element.id, p)}
               onRemove={() => removeElement(element.id)}
@@ -227,7 +236,16 @@ export default function BlockDefinitionEditor({ definition, usage, savedDraft, o
 
       <div className="flex items-center gap-2">
         <Button tone="jade" disabled={!dirty} onClick={() => void save()}>{t('common.save')}</Button>
-        <Button tone="neutral" disabled={!dirty} onClick={() => setDraft(draftOf(definition))}>{t('common.cancel')}</Button>
+        <Button
+          tone="neutral"
+          disabled={!dirty}
+          onClick={() => {
+            setDraft(draftOf(definition));
+            setResetEpoch((n) => n + 1);
+          }}
+        >
+          {t('common.cancel')}
+        </Button>
         {dirty && <span className="text-xs text-stone-500">{t('blocks.library.unsaved')}</span>}
       </div>
 
@@ -275,8 +293,10 @@ export default function BlockDefinitionEditor({ definition, usage, savedDraft, o
   );
 }
 
-function ElementRow({ element, blockHidesEmpty, onPatch, onRemove }: {
+function ElementRow({ element, siblings, blockHidesEmpty, onPatch, onRemove }: {
   element: ElementDef;
+  /** Die sichtbaren Elemente des Blocks — die Ladung wählt daraus, was sie verdeckt. */
+  siblings: readonly ElementDef[];
   blockHidesEmpty: boolean;
   onPatch: (p: Partial<ElementDef>) => void;
   onRemove: () => void;
@@ -327,14 +347,55 @@ function ElementRow({ element, blockHidesEmpty, onPatch, onRemove }: {
         {element.kind === 'select' && (
           <OptionsEditor options={element.options ?? []} onChange={(options) => onPatch({ options })} />
         )}
-        <BlockCheckbox
-          checked={hides}
-          // Gleich der Blockregel: kein eigener Wert — die Regel des Blocks gilt.
-          onChange={(v) => onPatch({ hideWhenEmpty: v === blockHidesEmpty ? undefined : v })}
-          label={t('blocks.fields.hideEmpty')}
-        />
+        {canBeEmpty(element.kind) && (
+          <BlockCheckbox
+            checked={hides}
+            // Gleich der Blockregel: kein eigener Wert — die Regel des Blocks gilt.
+            onChange={(v) => onPatch({ hideWhenEmpty: v === blockHidesEmpty ? undefined : v })}
+            label={t('blocks.fields.hideEmpty')}
+          />
+        )}
+        {isSigilKind(element.kind)
+          ? <SigilPartSettings element={element} siblings={siblings} onPatch={onPatch} />
+          : <PrefillEditor element={element} onPatch={onPatch} />}
       </div>
     </Reorder.Item>
+  );
+}
+
+/**
+ * Die Vorgabe eines Felds: angehakt, bekommt jede neue Kopie diesen Wert —
+ * eine Checkliste mit ihren Punkten, Ja/Nein auf „Ja". Ob angehakt, hält der
+ * Baukasten selbst: eine geleerte Eingabe (die Zahl beim Neutippen) soll das
+ * Feld nicht gleich wieder zuklappen.
+ */
+function PrefillEditor({ element, onPatch }: { element: ElementDef; onPatch: (p: Partial<ElementDef>) => void }) {
+  const { t } = useTranslation();
+  // Eine Vorgabe da heißt angehakt; `armed` hält den Haken, solange die Eingabe noch leer ist.
+  const [armed, setArmed] = useState(false);
+  const on = armed || element.defaultValue !== undefined;
+  const toggle = (next: boolean) => {
+    setArmed(next);
+    // Ja/Nein steht ohne Wert schon auf „Nein" — wer vorbelegt, will „Ja".
+    onPatch({ defaultValue: next && element.kind === 'toggle' ? true : undefined });
+  };
+  return (
+    <>
+      <BlockCheckbox checked={on} onChange={toggle} label={t('blocks.library.prefill')} hint={t('blocks.library.prefillHint')} />
+      {on && (isSlotKind(element.kind) ? (
+        <FieldSlotEditor
+          element={element}
+          slot={slotFromDefault(element) ?? undefined}
+          onChange={(html) => onPatch({ defaultValue: defaultFromSlot(element, html) })}
+        />
+      ) : (
+        <FieldValueEditor
+          element={element}
+          value={element.defaultValue as FieldValue | undefined}
+          onChange={(defaultValue) => onPatch({ defaultValue })}
+        />
+      ))}
+    </>
   );
 }
 
@@ -342,6 +403,7 @@ function resultNotice(t: ReturnType<typeof useTranslation>['t'], key: 'updated' 
   return [
     t(`blocks.library.${key}`, { count: result.changed }),
     result.skippedEditing ? t('blocks.library.skippedEditing', { count: result.skippedEditing }) : '',
+    result.skippedLocked ? t('blocks.library.skippedLocked', { count: result.skippedLocked }) : '',
     result.failed ? t('blocks.library.failed', { count: result.failed }) : '',
   ].filter(Boolean).join(' ');
 }
@@ -379,7 +441,7 @@ function DeleteDefinitionModal({ definition, entryCount, onClose, onDeleted }: {
         const result = await removeAllCopies(definition.id);
         await deleteDefinition(definition.id);
         // Wer gerade bearbeitet wird, behält den Block — das muss man erfahren.
-        if (result.skippedEditing || result.failed) {
+        if (result.skippedEditing || result.skippedLocked || result.failed) {
           setNotice(resultNotice(t, 'removed', result));
           setStep('done');
           return;

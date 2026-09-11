@@ -299,7 +299,7 @@
       },
       "sigilCharge": {
         "label": "Charge",
-        "description": "Target date, charging technique and loading the sigil. While loaded it locks the entry or just the sigil blocks."
+        "description": "Target date, charging technique and loading the sigil. Once loaded it hides the chosen calculators and drawings and locks the entry or only those blocks."
       }
     },
     "kinds": {
@@ -311,7 +311,11 @@
       "checklist": "Checklist",
       "link": "Link",
       "image": "Image",
-      "moon": "Moon phase"
+      "moon": "Moon phase",
+      "altar": "Altar",
+      "sigilCalc": "Sigil calculator",
+      "sigilCanvas": "Sigil drawing",
+      "sigilCharge": "Charge"
     },
     "fields": {
       "yes": "Yes",
@@ -354,6 +358,19 @@
       "removedFields": "Removed fields",
       "removedHint": "Entries keep their values. A restored field shows up again.",
       "restoreField": "Restore field",
+      "prefill": "Prefill",
+      "prefillHint": "Every new copy starts with this value — existing entries keep theirs.",
+      "calcMode": "Letter bank",
+      "calcModes": {
+        "both": "Automatic and manual",
+        "auto": "Automatic only (from the intention)",
+        "manual": "Manual only"
+      },
+      "brushPreset": "Preset the brush",
+      "brushPresetHint": "The color and brush size drawing starts with — you can still switch while drawing.",
+      "chargePrefillHint": "Every new copy starts with this lock and these covered parts — both can be changed in the entry while it isn't loaded.",
+      "chargeCoversAll": "All sigils in the entry",
+      "chargeNoTools": "This block has no calculator or drawing yet.",
       "display": "Display",
       "unsaved": "Unsaved changes",
       "usage": "Usage",
@@ -373,6 +390,8 @@
       "removed_other": "Removed from {{count}} entries.",
       "skippedEditing": "{{count}} entry is open for editing and was left as it is.",
       "skippedEditing_other": "{{count}} entries are open for editing and were left as they are.",
+      "skippedLocked": "{{count}} entry holds a loaded sigil and was left as it is — unload it first.",
+      "skippedLocked_other": "{{count}} entries hold a loaded sigil and were left as they are — unload them first.",
       "failed": "{{count}} entry could not be changed.",
       "failed_other": "{{count}} entries could not be changed.",
       "delete": "Delete block",
@@ -398,15 +417,24 @@
       "loaded": "Loaded",
       "notLoaded": "Not loaded yet",
       "revealedSince": "revealed since {{date}}",
-      "noRevealDate": "Set a target date while editing to load the sigil",
-      "loadConfirm": "Load the sigil? Calculator and drawing stay hidden until {{date}}.",
+      "hiddenUntilUnloaded": "hidden until unloaded",
+      "noRevealDate": "No target date",
+      "loadConfirm": "Load the sigil? The covered blocks stay hidden until {{date}}.",
+      "loadConfirmNoDate": "Load the sigil? The covered blocks stay hidden until you unload it.",
       "unloadConfirm": "Unload the sigil? It can be edited again right away.",
       "lockScope": "While loaded, lock",
       "lockEntry": "the whole entry",
-      "lockSigil": "only calculator and drawing",
+      "lockSigil": "only the covered blocks",
+      "covers": "Covers",
+      "noTools": "No calculator or drawing in this entry yet",
       "locked": "Locked while the sigil is loaded",
       "saveFailed": "Couldn't save the drawing",
       "loadFailed": "Couldn't load the drawing — close and reopen the entry to try again"
+    },
+    "altar": {
+      "search": "Search altars…",
+      "missing": "The altar “{{name}}” no longer exists",
+      "open": "Open altar"
     }
   },
   "editor": {

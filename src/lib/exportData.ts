@@ -5,6 +5,7 @@ import { formatIsoDateLong } from './formatDate';
 import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { useCategoryStore } from '../store/categoryStore';
+import { useAltarStore } from '../store/altarStore';
 import { useUIStore } from '../store/uiStore';
 import { MOON_PHASE_SYMBOLS } from './moonPhase';
 import { DEFAULT_ENTRY_EMOJI } from './modules';
@@ -32,6 +33,10 @@ function exportText(): ExportText {
     loaded: t('blocks.sigil.loaded'),
     notLoaded: t('blocks.sigil.notLoaded'),
     drawing: t('blocks.types.sigilCanvas.label'),
+    altar: (id) => {
+      const altar = useAltarStore.getState().altars.find((a) => a.id === id);
+      return altar ? { title: altar.title, image: altar.thumbnail_data ?? null } : null;
+    },
   };
 }
 

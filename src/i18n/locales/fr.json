@@ -299,7 +299,7 @@
       },
       "sigilCharge": {
         "label": "Charge",
-        "description": "Date cible, technique de charge et charger le sigil. Chargé, il verrouille l'entrée ou seulement les blocs du sigil."
+        "description": "Date cible, technique de charge et chargement du sigil. Chargé, il masque les calculateurs et dessins choisis et verrouille l'entrée ou seulement ces blocs."
       }
     },
     "kinds": {
@@ -311,7 +311,11 @@
       "checklist": "Liste de contrôle",
       "link": "Lien",
       "image": "Image",
-      "moon": "Phase lunaire"
+      "moon": "Phase lunaire",
+      "altar": "Autel",
+      "sigilCalc": "Calculateur de sigil",
+      "sigilCanvas": "Dessin du sigil",
+      "sigilCharge": "Charge"
     },
     "fields": {
       "yes": "Oui",
@@ -354,6 +358,19 @@
       "removedFields": "Champs retirés",
       "removedHint": "Les entrées conservent leurs valeurs. Un champ restauré réapparaît.",
       "restoreField": "Restaurer le champ",
+      "prefill": "Pré-remplir",
+      "prefillHint": "Chaque nouvelle copie commence avec cette valeur — les entrées existantes gardent la leur.",
+      "calcMode": "Banque de lettres",
+      "calcModes": {
+        "both": "Automatique et manuel",
+        "auto": "Automatique seulement (depuis l'intention)",
+        "manual": "Manuel seulement"
+      },
+      "brushPreset": "Prérégler le pinceau",
+      "brushPresetHint": "Couleur et taille de pinceau avec lesquelles le dessin commence — modifiables pendant le dessin.",
+      "chargePrefillHint": "Chaque nouvelle copie commence avec ce verrouillage et ces parties couvertes — modifiables dans l'entrée tant qu'elle n'est pas chargée.",
+      "chargeCoversAll": "Tous les sigils de l'entrée",
+      "chargeNoTools": "Ce bloc n'a encore ni calculateur ni dessin.",
       "display": "Affichage",
       "unsaved": "Modifications non enregistrées",
       "usage": "Utilisation",
@@ -373,6 +390,8 @@
       "removed_other": "Retiré de {{count}} entrées.",
       "skippedEditing": "{{count}} entrée est en cours de modification et n'a pas été touchée.",
       "skippedEditing_other": "{{count}} entrées sont en cours de modification et n'ont pas été touchées.",
+      "skippedLocked": "{{count}} entrée contient un sigil chargé et n'a pas été touchée — déchargez-le d'abord.",
+      "skippedLocked_other": "{{count}} entrées contiennent un sigil chargé et n'ont pas été touchées — déchargez-les d'abord.",
       "failed": "{{count}} entrée n'a pas pu être modifiée.",
       "failed_other": "{{count}} entrées n'ont pas pu être modifiées.",
       "delete": "Supprimer le bloc",
@@ -398,15 +417,24 @@
       "loaded": "Chargé",
       "notLoaded": "Pas encore chargé",
       "revealedSince": "révélé depuis le {{date}}",
-      "noRevealDate": "Définissez une date cible en modifiant pour charger le sigil",
-      "loadConfirm": "Charger le sigil ? Le calculateur et le dessin restent masqués jusqu'au {{date}}.",
+      "hiddenUntilUnloaded": "masqué jusqu'au déchargement",
+      "noRevealDate": "Pas de date cible",
+      "loadConfirm": "Charger le sigil ? Les blocs couverts restent masqués jusqu'au {{date}}.",
+      "loadConfirmNoDate": "Charger le sigil ? Les blocs couverts restent masqués jusqu'à ce que vous le déchargiez.",
       "unloadConfirm": "Décharger le sigil ? Il redevient modifiable aussitôt.",
       "lockScope": "Chargé, verrouille",
       "lockEntry": "toute l'entrée",
-      "lockSigil": "seulement le calculateur et le dessin",
+      "lockSigil": "seulement les blocs couverts",
+      "covers": "Couvre",
+      "noTools": "Pas encore de calculateur ni de dessin dans l'entrée",
       "locked": "Verrouillé tant que le sigil est chargé",
       "saveFailed": "Le dessin n'a pas pu être enregistré",
       "loadFailed": "Le dessin n'a pas pu être chargé — fermez puis rouvrez l'entrée"
+    },
+    "altar": {
+      "search": "Rechercher un autel…",
+      "missing": "L'autel « {{name}} » n'existe plus",
+      "open": "Ouvrir l'autel"
     }
   },
   "editor": {

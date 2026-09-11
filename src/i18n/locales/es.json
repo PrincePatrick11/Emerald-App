@@ -299,7 +299,7 @@
       },
       "sigilCharge": {
         "label": "Carga",
-        "description": "Fecha objetivo, técnica de carga y cargar el sigilo. Cargado bloquea la entrada o solo los bloques del sigilo."
+        "description": "Fecha objetivo, técnica de carga y la carga del sigilo. Cargado oculta las calculadoras y dibujos elegidos y bloquea la entrada o solo esos bloques."
       }
     },
     "kinds": {
@@ -311,7 +311,11 @@
       "checklist": "Lista de verificación",
       "link": "Enlace",
       "image": "Imagen",
-      "moon": "Fase lunar"
+      "moon": "Fase lunar",
+      "altar": "Altar",
+      "sigilCalc": "Calculadora de sigilo",
+      "sigilCanvas": "Dibujo del sigilo",
+      "sigilCharge": "Carga"
     },
     "fields": {
       "yes": "Sí",
@@ -354,6 +358,19 @@
       "removedFields": "Campos quitados",
       "removedHint": "Las entradas conservan sus valores. Un campo restaurado vuelve a mostrarse.",
       "restoreField": "Restaurar campo",
+      "prefill": "Rellenar de antemano",
+      "prefillHint": "Cada copia nueva empieza con este valor; las entradas existentes conservan el suyo.",
+      "calcMode": "Banco de letras",
+      "calcModes": {
+        "both": "Automático y manual",
+        "auto": "Solo automático (desde la intención)",
+        "manual": "Solo manual"
+      },
+      "brushPreset": "Preajustar el pincel",
+      "brushPresetHint": "Color y tamaño de pincel con los que empieza el dibujo; al dibujar se pueden cambiar.",
+      "chargePrefillHint": "Cada copia nueva empieza con este bloqueo y estas partes cubiertas; en la entrada se pueden cambiar mientras no esté cargado.",
+      "chargeCoversAll": "Todos los sigilos de la entrada",
+      "chargeNoTools": "Este bloque todavía no tiene calculadora ni dibujo.",
       "display": "Visualización",
       "unsaved": "Cambios sin guardar",
       "usage": "Uso",
@@ -373,6 +390,8 @@
       "removed_other": "Quitado de {{count}} entradas.",
       "skippedEditing": "{{count}} entrada está en edición y no se ha tocado.",
       "skippedEditing_other": "{{count}} entradas están en edición y no se han tocado.",
+      "skippedLocked": "{{count}} entrada tiene un sigilo cargado y no se ha tocado; descárgalo primero.",
+      "skippedLocked_other": "{{count}} entradas tienen un sigilo cargado y no se han tocado; descárgalos primero.",
       "failed": "{{count}} entrada no se pudo cambiar.",
       "failed_other": "{{count}} entradas no se pudieron cambiar.",
       "delete": "Eliminar bloque",
@@ -398,15 +417,24 @@
       "loaded": "Cargado",
       "notLoaded": "Aún no cargado",
       "revealedSince": "revelado desde {{date}}",
-      "noRevealDate": "Pon una fecha objetivo al editar para cargar el sigilo",
-      "loadConfirm": "¿Cargar el sigilo? La calculadora y el dibujo quedan ocultos hasta el {{date}}.",
+      "hiddenUntilUnloaded": "oculto hasta descargarlo",
+      "noRevealDate": "Sin fecha objetivo",
+      "loadConfirm": "¿Cargar el sigilo? Los bloques cubiertos quedan ocultos hasta el {{date}}.",
+      "loadConfirmNoDate": "¿Cargar el sigilo? Los bloques cubiertos quedan ocultos hasta que lo descargues.",
       "unloadConfirm": "¿Descargar el sigilo? Se podrá editar de nuevo enseguida.",
       "lockScope": "Cargado bloquea",
       "lockEntry": "toda la entrada",
-      "lockSigil": "solo calculadora y dibujo",
+      "lockSigil": "solo los bloques cubiertos",
+      "covers": "Cubre",
+      "noTools": "Todavía no hay calculadora ni dibujo en la entrada",
       "locked": "Bloqueado mientras el sigilo está cargado",
       "saveFailed": "No se pudo guardar el dibujo",
       "loadFailed": "No se pudo cargar el dibujo — cierra y vuelve a abrir la entrada"
+    },
+    "altar": {
+      "search": "Buscar altar…",
+      "missing": "El altar «{{name}}» ya no existe",
+      "open": "Abrir altar"
     }
   },
   "editor": {

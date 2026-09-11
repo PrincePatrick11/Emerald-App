@@ -17,6 +17,7 @@ import {
 } from '../../lib/blocks/blockAttrs';
 import { BLOCK_ATTR, type BlockInstance } from '../../lib/blocks/types';
 import { blockIcon } from '../../lib/blocks/presets';
+import { blockHoldsLocked, sigilState, todayIso } from '../../lib/blocks/sigil';
 import { BLOCK_SIDEBAR_VIEWS } from './blockSidebarViews';
 import { addBlockActions, commonBlockActions } from './blockActions';
 
@@ -54,6 +55,8 @@ function BlockManager({ session }: { session: BlockSession }) {
   const { isEditing, api } = session;
   const rows = listedBlocks(session);
   const definitions = useBlockDefinitionStore((s) => s.definitions);
+  // Was eine geladene Sigille sperrt, lässt sich nicht duplizieren (siehe BlockStack.duplicate).
+  const sigil = sigilState(session.blocks, todayIso());
 
   const openAddMenu = (e: MouseEvent) => setMenu({
     x: e.clientX,
@@ -73,7 +76,10 @@ function BlockManager({ session }: { session: BlockSession }) {
           icon: showsTitle ? <Check size={12} /> : <Type size={12} />,
           onClick: () => api.setAttr(block.id, BLOCK_ATTR.showTitle, showTitleAttrValue(!showsTitle, meta)),
         },
-        ...commonBlockActions(t, meta, { duplicate: () => api.duplicate(block.id), remove: () => api.remove(block.id) }),
+        ...commonBlockActions(t, meta, {
+          duplicate: blockHoldsLocked(sigil, block.id) ? undefined : () => api.duplicate(block.id),
+          remove: () => api.remove(block.id),
+        }),
       ],
     });
   };

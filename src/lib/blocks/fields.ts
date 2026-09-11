@@ -1,13 +1,16 @@
-import { escapeHtml, extractInternalLinks } from '../internalLinkHtml';
+import { escapeHtml, extractInternalLinks, internalLinkChipHtml, isValidLinkTarget } from '../internalLinkHtml';
 import { generateId } from '../helpers';
+import { storedImageName } from '../schema';
 import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../moonPhase';
-import type { MoonPhase } from '../../types';
+import type { ContentType, MoonPhase } from '../../types';
 import { decodeHtmlAttr, neutralizeSectionTags } from './blockHtml';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
 /**
  * Der Feldblock (`core.fields`): eine Folge von Elementen — Kurztext, Zahl,
- * Datum, Auswahl, Ja/Nein, Checkliste, Verknüpfung, Bild, Mondphase. Ein
+ * Datum, Auswahl, Ja/Nein, Checkliste, Verknüpfung, Bild, Mondphase, Altar
+ * (eine Verknüpfung auf einen Altar, groß mit seinem Bild gezeigt) und die
+ * drei Sigillen-Teile Rechner, Zeichnung, Ladung (siehe `isSigilKind`). Ein
  * einzelnes Feld ist ein Feldblock mit einem Element; eigene, zusammengesetzte
  * Blöcke (Blöcke-Ansicht) sind Feldblöcke mit mehreren.
  *
@@ -29,16 +32,32 @@ import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 export const FIELDS_BLOCK_TYPE = 'core.fields' satisfies BlockTypeId;
 
 export const ELEMENT_KINDS = [
-  'shorttext', 'number', 'date', 'select', 'toggle', 'checklist', 'link', 'image', 'moon',
+  'shorttext', 'number', 'date', 'select', 'toggle', 'checklist', 'link', 'image', 'moon', 'altar',
+  'sigilCalc', 'sigilCanvas', 'sigilCharge',
 ] as const;
 export type ElementKind = (typeof ELEMENT_KINDS)[number];
 
 const KIND_SET: ReadonlySet<string> = new Set(ELEMENT_KINDS);
 /** Elementarten, deren Wert im Markup steht statt im JSON. */
-const SLOT_KINDS: ReadonlySet<ElementKind> = new Set<ElementKind>(['link', 'image']);
+const SLOT_KINDS: ReadonlySet<ElementKind> = new Set<ElementKind>(['link', 'image', 'altar']);
 
 export function isSlotKind(kind: ElementKind): boolean {
   return SLOT_KINDS.has(kind);
+}
+
+export type SigilElementKind = 'sigilCalc' | 'sigilCanvas' | 'sigilCharge';
+
+/**
+ * Die Sigillen-Teile eines eigenen Blocks: Rechner, Zeichnung, Ladung — was
+ * es sonst als eigene Blöcke gibt (`lib/blocks/sigil.ts`). Ein Teil speichert
+ * genau das, was der Block speichert: sein Daten-JSON als Wert unter der
+ * Element-ID, sein inneres HTML (Lesefassung, Zeichnung als `<img>`,
+ * Ladetechnik als Chip) im Slot. `sigil.ts` behandelt ihn deshalb als
+ * „virtuellen Block" mit der ID `<Block-ID>:<Element-ID>` — Laden, Verdecken
+ * und Sperren gelten für Teile wie für Blöcke.
+ */
+export function isSigilKind(kind: ElementKind): kind is SigilElementKind {
+  return kind === 'sigilCalc' || kind === 'sigilCanvas' || kind === 'sigilCharge';
 }
 
 /** Der i18n-Key für den Namen einer Elementart — Picker, Beschriftung, Platzhalter. */
@@ -66,7 +85,50 @@ export interface ElementDef {
    * der Wert bleibt stehen und kommt zurück, wenn das Element es tut.
    */
   archived?: boolean;
+  /**
+   * Nur in einer eigenen Block-Definition: der Wert, mit dem jede neue Kopie
+   * das Element vorbelegt (Checkliste mit Punkten, Ja/Nein auf „Ja", ein
+   * verknüpfter Eintrag …). Die Kopie trägt ihn als Wert, nicht als Vorgabe.
+   * Verknüpfung und Altar geben ihr Ziel an, Bild seinen Dateinamen — erst die
+   * Kopie schreibt daraus Chip bzw. `<img>` in ihren Slot (`slotFromDefault`).
+   * So steht in der Definition kein Markup, und Merge-Import und Bild-Aufräumen
+   * finden Ziel-ID und Datei.
+   */
+  defaultValue?: ElementDefault;
+  /** Nur Sigillen-Rechner: welche Wege zur Buchstabenbank er anbietet — fehlt = beide. */
+  calcMode?: CalcMode;
+  /** Nur Sigillen-Zeichnung: Farbe und Pinselgröße, mit denen das Zeichnen beginnt. */
+  brushColor?: string;
+  brushSize?: number;
 }
+
+/** Wie der Rechner zur Buchstabenbank kommt: aus der Absicht, von Hand oder beides. */
+export type CalcMode = 'auto' | 'manual' | 'both';
+export const CALC_MODES: readonly CalcMode[] = ['both', 'auto', 'manual'];
+
+/** Die Grenzen des Pinsels — dieselben wie der Regler der Zeichnung. */
+export const BRUSH_SIZE_MIN = 2;
+export const BRUSH_SIZE_MAX = 48;
+
+/**
+ * Die Vorgabe einer Ladung: was „geladen" sperrt und was sie verdeckt — `null`
+ * heißt alle Sigillen im Eintrag, sonst Element-IDs der Rechner und
+ * Zeichnungen desselben Blocks. Erst die Kopie macht daraus Ziele
+ * (`<Block-ID>:<Element-ID>`), denn ihre Block-ID steht vorher nicht fest.
+ */
+export interface ChargeDefault {
+  lock: 'entry' | 'sigil';
+  targets: string[] | null;
+}
+
+/** Die Vorgabe einer Verknüpfung (oder eines Altars): das Ziel samt dem Namen zum Zeitpunkt der Wahl. */
+export interface LinkDefault {
+  id: string;
+  entryType: ContentType;
+  label: string;
+}
+
+export type ElementDefault = FieldValue | LinkDefault | ChargeDefault;
 
 export interface DisplayRules {
   /** Leere Elemente im Lesemodus ausblenden. */
@@ -83,7 +145,10 @@ export interface ChecklistItem {
   checked: boolean;
 }
 
-export type FieldValue = string | number | boolean | ChecklistItem[];
+/** Das Daten-JSON eines Sigillen-Teils — geprüft wird es erst von `sigil.ts`, beim Lesen des virtuellen Blocks. */
+export type SigilData = Record<string, unknown>;
+
+export type FieldValue = string | number | boolean | ChecklistItem[] | SigilData;
 
 export interface FieldsModel {
   /**
@@ -158,6 +223,17 @@ function parseElement(raw: unknown): ElementDef | null {
   }
   if (typeof raw.hideWhenEmpty === 'boolean') element.hideWhenEmpty = raw.hideWhenEmpty;
   if (raw.archived === true) element.archived = true;
+  if (element.kind === 'sigilCalc' && CALC_MODES.includes(raw.calcMode as CalcMode)) element.calcMode = raw.calcMode as CalcMode;
+  if (element.kind === 'sigilCanvas') {
+    if (typeof raw.brushColor === 'string' && /^#[0-9a-f]{6}$/i.test(raw.brushColor)) element.brushColor = raw.brushColor;
+    if (Number.isInteger(raw.brushSize) && (raw.brushSize as number) >= BRUSH_SIZE_MIN && (raw.brushSize as number) <= BRUSH_SIZE_MAX) {
+      element.brushSize = raw.brushSize as number;
+    }
+  }
+  if (raw.defaultValue !== undefined) {
+    const value = parseDefault(element, raw.defaultValue);
+    if (value !== undefined) element.defaultValue = value;
+  }
   return element;
 }
 
@@ -203,6 +279,10 @@ function parseValue(kind: ElementKind, raw: unknown): FieldValue | undefined {
             .filter((i): i is Record<string, unknown> => isRecord(i) && typeof i.id === 'string')
             .map((i) => ({ id: i.id as string, text: typeof i.text === 'string' ? i.text : '', checked: i.checked === true }))
         : undefined;
+    case 'sigilCalc':
+    case 'sigilCanvas':
+    case 'sigilCharge':
+      return isRecord(raw) ? raw : undefined;
     default:
       return undefined;
   }
@@ -279,6 +359,73 @@ export function imageFromSlot(html: string | undefined): string | null {
   return src ? decodeHtmlAttr(src) : null;
 }
 
+/* ---------------- Vorgaben ---------------- */
+
+/**
+ * Eine Vorgabe aus unsicherer Quelle (Datenbank, Backup, `.emerald`), geprüft
+ * nach der Art des Elements — `undefined` für alles, was nicht passt.
+ */
+function parseDefault(element: ElementDef, raw: unknown): ElementDefault | undefined {
+  switch (element.kind) {
+    case 'link':
+    case 'altar': {
+      if (!isRecord(raw) || !isValidLinkTarget(raw)) return undefined;
+      if (element.kind === 'altar' && raw.entryType !== 'altar') return undefined;
+      return {
+        id: raw.id as string,
+        // `isValidLinkTarget` hat die Art gegen die Liste geprüft.
+        entryType: String(raw.entryType).trim() as ContentType,
+        label: typeof raw.label === 'string' ? raw.label : '',
+      };
+    }
+    case 'image':
+      return typeof raw === 'string' ? storedImageName(raw) ?? undefined : undefined;
+    case 'sigilCharge': {
+      if (!isRecord(raw)) return undefined;
+      const targets = Array.isArray(raw.targets)
+        ? [...new Set(raw.targets.filter((id): id is string => typeof id === 'string' && isSafeElementId(id)))].slice(0, 100)
+        : null;
+      return { lock: raw.lock === 'sigil' ? 'sigil' : 'entry', targets };
+    }
+    case 'sigilCalc':
+    case 'sigilCanvas':
+      return undefined; // Rechner und Zeichnung beginnen leer.
+    default: {
+      const value = parseValue(element.kind, raw);
+      // Eine Auswahl-Vorgabe nur auf eine Option, die es noch gibt — sonst bekäme jede Kopie einen toten Wert.
+      const stale = element.kind === 'select' && !element.options?.some((o) => o.id === value);
+      return stale ? undefined : value;
+    }
+  }
+}
+
+function isLinkDefault(value: ElementDefault | undefined): value is LinkDefault {
+  return isRecord(value) && typeof value.id === 'string';
+}
+
+/** Der Slot-Inhalt, den eine Vorgabe in der Kopie ergibt — Chip oder `<img>`; `null` für Nicht-Slot-Arten. */
+export function slotFromDefault(element: ElementDef): string | null {
+  const value = element.defaultValue;
+  if (element.kind === 'image') return typeof value === 'string' ? imageSlotHtml(value) : null;
+  if (!isSlotKind(element.kind) || !isLinkDefault(value)) return null;
+  return internalLinkChipHtml({ id: value.id, entryType: value.entryType, label: value.label });
+}
+
+/**
+ * Umgekehrt: die Vorgabe, die ein Slot-Inhalt ergibt (Baukasten) — `undefined`
+ * für leer oder Unbrauchbares. Durch dieselbe Prüfung wie beim Lesen, damit
+ * nichts gespeichert wird, was `parseElement` später verwürfe.
+ */
+export function defaultFromSlot(element: ElementDef, html: string | null): ElementDefault | undefined {
+  if (!html) return undefined;
+  return parseDefault(element, element.kind === 'image' ? imageFromSlot(html) : linkFromSlot(html));
+}
+
+/** Der Slot eines Bildfelds: ein echtes `<img src>` — so findet das Bild-Aufräumen die Datei. */
+export function imageSlotHtml(filename: string): string {
+  return `<img src="${escapeHtml(filename)}">`;
+}
+
 /* ---------------- Leer / sichtbar ---------------- */
 
 /**
@@ -303,8 +450,20 @@ export function isElementEmpty(element: ElementDef, model: FieldsModel): boolean
       return !MOON_PHASE_ORDER.includes(value as MoonPhase);
     case 'link':
     case 'image':
+    case 'altar':
+    case 'sigilCalc':
       return !model.slots[element.id];
+    case 'sigilCanvas':
+    case 'sigilCharge':
+      // Die Ladung: Laden und Entladen gehören in den Lesemodus. Die Zeichnung:
+      // ihr Speichern überdauert „Fertig" und braucht die montierte Komponente.
+      return false;
   }
+}
+
+/** Kann ein Element dieser Art leer sein? Ja/Nein, Zeichnung und Ladung nie — für sie gibt es kein „leer ausblenden". */
+export function canBeEmpty(kind: ElementKind): boolean {
+  return kind !== 'toggle' && kind !== 'sigilCanvas' && kind !== 'sigilCharge';
 }
 
 /** Blendet der Lesemodus dieses Element aus? Archiviert, oder leer UND (Element- oder Blockregel). */
@@ -362,7 +521,7 @@ export function serializeFields(block: BlockInstance, model: FieldsModel, text: 
   const known = new Set(model.elements.map((e) => e.id));
   const rows = model.elements.map((element) => {
     const dt = `<dt>${escapeHtml(text.label(element))}</dt>`;
-    if (isSlotKind(element.kind)) {
+    if (isSlotKind(element.kind) || isSigilKind(element.kind)) {
       const slot = model.slots[element.id];
       // Archiviert: ohne Beschriftung, aber der Slot bleibt — mit ihm Link und Bild.
       if (!slot) return '';
@@ -393,6 +552,40 @@ export function serializeFields(block: BlockInstance, model: FieldsModel, text: 
   else delete attrs[BLOCK_ATTR.data];
 
   return { ...block, attrs, html: body ? `<dl>${body}</dl>` : '' };
+}
+
+/* ---------------- Ohne Neuschreiben ---------------- */
+
+// Beschriftung und Slot eines Elements im Fallback — dieselben Grenzen wie SLOT_RE.
+const SLOT_ROW_RE = /(?:<dt>[^<]*<\/dt>)?<dd\b[^<>]{0,256}?\bdata-block-slot="el:([^"]{1,200})"[^<>]{0,256}>[\s\S]*?<\/dd>/gi;
+
+/** Das Daten-JSON des Blocks, oder `null`, wenn es fehlt oder unlesbar ist. */
+function readValuesJson(block: BlockInstance): Record<string, unknown> | null {
+  const parsed = parseJson(block.attrs[BLOCK_ATTR.data]);
+  return parsed.ok && isRecord(parsed.value) && isRecord(parsed.value.values) ? parsed.value.values : null;
+}
+
+/**
+ * Der Block ohne Wert und Slot dieser Elemente — für Suche und Export, wenn
+ * eine Sigille Teile verbirgt. Ohne `FallbackText`: nur Daten-JSON und die
+ * Zeilen im Fallback fallen weg, sonst bleibt alles Byte für Byte.
+ */
+export function withoutElementContent(block: BlockInstance, ids: ReadonlySet<string>): BlockInstance {
+  if (ids.size === 0) return block;
+  const values = readValuesJson(block);
+  const attrs = { ...block.attrs };
+  if (values) {
+    const kept = Object.fromEntries(Object.entries(values).filter(([id]) => !ids.has(id)));
+    attrs[BLOCK_ATTR.data] = JSON.stringify({ values: kept });
+  }
+  const html = block.html.replace(SLOT_ROW_RE, (row, id: string) => (ids.has(decodeHtmlAttr(id)) ? '' : row));
+  return { ...block, attrs, html };
+}
+
+/** Der Block mit einem neuen Wert für dieses Element — nur im Daten-JSON, der Fallback bleibt. */
+export function withElementValue(block: BlockInstance, id: string, value: FieldValue): BlockInstance {
+  const values = readValuesJson(block) ?? {};
+  return { ...block, attrs: { ...block.attrs, [BLOCK_ATTR.data]: JSON.stringify({ values: { ...values, [id]: value } }) } };
 }
 
 /** Ein neuer Feldblock mit genau einem Element dieser Art. */

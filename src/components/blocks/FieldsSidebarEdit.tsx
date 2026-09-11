@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { elementLabel } from '../../lib/blocks/blockAttrs';
 import {
-  activeElements, elementKindLabelKey, parseFields, serializeFields, type ElementDef, type FieldsModel,
+  activeElements, canBeEmpty, elementKindLabelKey, parseFields, serializeFields, type ElementDef, type FieldsModel,
 } from '../../lib/blocks/fields';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import { useFieldFallbackText } from './useFieldFallbackText';
@@ -52,14 +52,16 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
               <OptionsEditor options={element.options ?? []} onChange={(options) => patchElement(element.id, { options })} />
             )}
 
-            <BlockCheckbox
-              checked={hides}
-              label={t('blocks.fields.hideEmpty')}
-              onChange={(checked) => patchElement(element.id, {
-                // Gleich der Blockregel: kein eigener Wert — die Regel des Blocks gilt.
-                hideWhenEmpty: checked === model.display.readHideEmpty ? undefined : checked,
-              })}
-            />
+            {canBeEmpty(element.kind) && (
+              <BlockCheckbox
+                checked={hides}
+                label={t('blocks.fields.hideEmpty')}
+                onChange={(checked) => patchElement(element.id, {
+                  // Gleich der Blockregel: kein eigener Wert — die Regel des Blocks gilt.
+                  hideWhenEmpty: checked === model.display.readHideEmpty ? undefined : checked,
+                })}
+              />
+            )}
           </div>
         );
       })}

@@ -196,12 +196,13 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
   };
 
   // Eine geladene, noch verborgene Sigille ist auch für die Suche verborgen —
-  // in jeder Eintragsart. Der Zustand steckt im Cache-Stempel: am Zieldatum
-  // wird neu gelesen.
+  // in jeder Eintragsart. Der Zustand steckt im Cache-Stempel: die Länge des
+  // sichtbaren Inhalts ändert sich, sobald eine von mehreren Ladungen ihr
+  // Zieldatum erreicht — dann wird neu gelesen.
   const today = todayIso();
   const visibleText = (id: string, updatedAt: string, content: string) => {
     const visible = withoutConcealed(content, today);
-    return plainTextFor(id, visible === content ? updatedAt : `${updatedAt}|concealed`, visible);
+    return plainTextFor(id, visible === content ? updatedAt : `${updatedAt}|${visible.length}`, visible);
   };
 
   for (const entry of corpus.journal.filter(notDeleted)) {

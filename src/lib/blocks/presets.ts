@@ -1,11 +1,12 @@
 import {
-  Calendar, ChevronsUpDown, Hash, Image, Link2, ListChecks, Moon, PenTool, Sparkles, TextCursorInput, ToggleLeft, Type, Zap,
+  Calendar, ChevronsUpDown, Flame, Hash, Image, Link2, ListChecks, Moon, PenTool, Sparkles, TextCursorInput, ToggleLeft, Type, Zap,
   type LucideIcon,
 } from 'lucide-react';
 import { createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock } from './sigil';
 import { createTextBlock } from './blockHtml';
 import {
-  activeElements, createFieldsBlock, ELEMENT_KINDS, elementKindLabelKey, FIELDS_BLOCK_TYPE, parseFields, type ElementKind,
+  activeElements, createFieldsBlock, ELEMENT_KINDS, elementKindLabelKey, FIELDS_BLOCK_TYPE, isSigilKind, parseFields,
+  type ElementKind, type FallbackText,
 } from './fields';
 import { instantiateDefinition, type BlockDefinition } from './definitions';
 import type { BlockGroup, BlockTypeMeta } from './blockTypes';
@@ -39,13 +40,20 @@ export const ELEMENT_KIND_ICONS: Record<ElementKind, LucideIcon> = {
   link: Link2,
   image: Image,
   moon: Moon,
+  altar: Flame,
+  sigilCalc: Sparkles,
+  sigilCanvas: PenTool,
+  sigilCharge: Zap,
 };
 
-const KIND_GROUPS: Partial<Record<ElementKind, BlockGroup>> = { link: 'reference', image: 'media', moon: 'moon' };
+const KIND_GROUPS: Partial<Record<ElementKind, BlockGroup>> = { link: 'reference', altar: 'reference', image: 'media', moon: 'moon' };
+
+// Die Sigillen-Teile gibt es nur in eigenen Blöcken — einzeln fügt man die Sigillen-Blöcke ein (unten).
+const FIELD_PRESET_KINDS = ELEMENT_KINDS.filter((kind) => !isSigilKind(kind));
 
 export const BLOCK_PRESETS: readonly BlockPreset[] = [
   { id: 'text', labelKey: 'blocks.types.text.label', icon: Type, group: 'text', create: () => createTextBlock() },
-  ...ELEMENT_KINDS.map((kind): BlockPreset => ({
+  ...FIELD_PRESET_KINDS.map((kind): BlockPreset => ({
     id: `field.${kind}`,
     labelKey: elementKindLabelKey(kind),
     icon: ELEMENT_KIND_ICONS[kind],
@@ -64,11 +72,18 @@ export function definitionPresetId(defId: string): string {
   return `${DEFINITION_PRESET_PREFIX}${defId}`;
 }
 
-/** Ein neuer Block aus einer Voreinstellung — `null`, wenn es sie (nicht mehr) gibt. */
-export function createFromPreset(presetId: string, definitions: readonly BlockDefinition[]): BlockInstance | null {
+/**
+ * Ein neuer Block aus einer Voreinstellung — `null`, wenn es sie (nicht mehr)
+ * gibt. `text` schreibt den Fallback der Vorgaben eines eigenen Blocks.
+ */
+export function createFromPreset(
+  presetId: string,
+  definitions: readonly BlockDefinition[],
+  text: FallbackText,
+): BlockInstance | null {
   if (presetId.startsWith(DEFINITION_PRESET_PREFIX)) {
     const def = definitions.find((d) => d.id === presetId.slice(DEFINITION_PRESET_PREFIX.length));
-    return def ? instantiateDefinition(def) : null;
+    return def ? instantiateDefinition(def, text) : null;
   }
   return BLOCK_PRESETS.find((p) => p.id === presetId)?.create() ?? null;
 }
