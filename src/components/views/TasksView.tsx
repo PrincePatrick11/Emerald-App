@@ -68,7 +68,7 @@ export default function TasksView() {
   const [filterCategory, setFilterCategory] = useState<Set<string>>(new Set());
   const [filterPriority, setFilterPriority] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
-  const { collapsed: collapsedCategories, toggle: toggleCategoryCollapse, expand: expandCategories } = useCollapsedSet('tasks');
+  const { isCollapsed: isCategoryCollapsed, toggle: toggleCategoryCollapse, expand: expandCategories } = useCollapsedSet('tasks');
   const [linkModal, setLinkModal] = useState<{ taskId: string } | null>(null);
 
   // Kein Refetch beim Mount: AppShell laedt die Tasks beim Start und beim
@@ -108,7 +108,7 @@ export default function TasksView() {
     ? sortedTasks.filter((t) => !t.category_id || !getCategory(t.category_id))
     : [];
 
-  const uncatCollapsed = collapsedCategories.has(UNCATEGORIZED_KEY);
+  const uncatCollapsed = isCategoryCollapsed(UNCATEGORIZED_KEY);
 
   // Chips und Gruppen zeigen nur, was bei den Aufgaben vorkommt (plus Sonstiges).
   const usedCategories = categoriesUsedBy(categories, tasks);
@@ -240,7 +240,7 @@ export default function TasksView() {
         {groupedTasks
           ? visibleCategories.map((cat) => {
               const catTasks = groupedTasks[cat.id] || [];
-              const isCollapsed = collapsedCategories.has(cat.id);
+              const isCollapsed = isCategoryCollapsed(cat.id);
               const isEmpty = catTasks.length === 0;
               return (
                 <div key={cat.id} className="mb-6 space-y-1.5">

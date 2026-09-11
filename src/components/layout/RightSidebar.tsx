@@ -34,10 +34,11 @@ const PROPERTIES_PANELS: Partial<Record<ViewId, ComponentType>> = {
 const VIEWS_WITHOUT_ENTRIES: ReadonlySet<ViewId> = new Set<ViewId>(['home', 'tags', 'categories', 'blocks']);
 
 /**
- * Davon die ohne Dashboard — nur für die steht der Platzhalter. Home und
- * Kategorien sind bewusst nicht dabei: keine Einträge, aber ein Dashboard.
+ * Davon die ohne Dashboard — nur für die steht der Platzhalter. Home,
+ * Kategorien und Tags sind bewusst nicht dabei: keine Einträge, aber ein
+ * Dashboard.
  */
-const VIEWS_WITHOUT_DASHBOARD: ReadonlySet<ViewId> = new Set<ViewId>(['tags', 'blocks']);
+const VIEWS_WITHOUT_DASHBOARD: ReadonlySet<ViewId> = new Set<ViewId>(['blocks']);
 
 /* Mirrors the entry-list tab bar in LeftSidebarEntryList so both sidebars put their
    bottom border on the same line. Keep the two in sync — with one known

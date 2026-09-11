@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Check, GripVertical, Pencil, Trash2, X } from 'lucide-react';
-import { AUX_VIEWS, CATEGORY_MODULE_IDS, MODULES } from '../../lib/modules';
+import { AUX_VIEWS, CATEGORY_MODULE_IDS } from '../../lib/modules';
 import { categoryLabel, categoryUsageCounts, emptyCategoryUsage } from '../../lib/categories';
 import { CATEGORY_NAME_TAKEN, useCategoryStore } from '../../store/categoryStore';
 import { useWikiStore } from '../../store/wikiStore';
@@ -15,6 +15,7 @@ import { generateId } from '../../lib/helpers';
 import Button from '../ui/Button';
 import Dashboard from '../ui/Dashboard';
 import EmojiPicker from '../ui/EmojiPicker';
+import ModuleCounts from '../ui/ModuleCounts';
 import type { Category } from '../../types';
 
 /** Vorbelegung beim Anlegen: modulneutral, dieselbe Glyphe wie das Sammelbecken. */
@@ -335,22 +336,7 @@ export default function CategoriesView() {
         <span className="w-5 text-center flex-shrink-0 text-base">{cat.emoji}</span>
         <span className="flex-1 min-w-0 truncate text-sm text-stone-200">{categoryLabel(t, cat)}</span>
 
-        <span className="flex items-center gap-3 flex-shrink-0">
-          {CATEGORY_MODULE_IDS.map((id) => {
-            const Icon = MODULES[id].icon;
-            const count = counts[id];
-            return (
-              <span
-                key={id}
-                title={t(MODULES[id].navLabelKey)}
-                className={`flex items-center gap-1 text-xs tabular-nums ${count ? 'text-stone-400' : 'text-stone-600'}`}
-              >
-                <Icon size={12} />
-                {count}
-              </span>
-            );
-          })}
-        </span>
+        <ModuleCounts modules={CATEGORY_MODULE_IDS} counts={counts} />
 
         {/* Sigillen: nicht löschbar, und ein Umbenennen liefe ins Leere — der
             Name kommt aus der Locale, nicht aus der Zeile. Der Block bleibt

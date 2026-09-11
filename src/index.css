@@ -2234,19 +2234,6 @@ html[data-theme='emerald-parchment'] .emoji-picker-popover {
   border-color: rgba(146, 106, 67, 0.42);
 }
 
-html[data-theme='emerald-parchment'] .tags-search {
-  background: #f1e3cc;
-  border: 1px solid rgba(150, 113, 74, 0.35);
-}
-
-html[data-theme='emerald-parchment'] .tags-search-input {
-  color: #3a2918;
-}
-
-html[data-theme='emerald-parchment'] .tags-search-input::placeholder {
-  color: #8d7154;
-}
-
 html[data-theme='emerald-parchment'] .tag-color-popover {
   background: #f8efdf;
   border-color: rgba(146, 107, 68, 0.42);

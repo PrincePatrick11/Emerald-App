@@ -69,6 +69,15 @@ export const CATEGORY_MODULE_IDS: readonly Exclude<EntryModuleId, 'journal'>[] =
 );
 export type CategoryModuleId = (typeof CATEGORY_MODULE_IDS)[number];
 
+/** Module, deren Einträge im Tags-Dashboard stehen — alle außer Altar. Die
+ *  Routinen der Altar-Bibliothek können aus älteren Daten Tags tragen
+ *  (tagStore zieht sie beim Umbenennen mit), sind aber keine öffnenbaren
+ *  Einträge und haben heute keinen Tag-Editor. */
+export const TAG_MODULE_IDS: readonly Exclude<EntryModuleId, 'altar'>[] = ENTRY_MODULE_IDS.filter(
+  (id): id is Exclude<EntryModuleId, 'altar'> => id !== 'altar',
+);
+export type TagModuleId = (typeof TAG_MODULE_IDS)[number];
+
 export interface ModuleMeta {
   id: EntryModuleId;
   icon: LucideIcon;

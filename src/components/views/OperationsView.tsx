@@ -47,7 +47,7 @@ export default function OperationsView() {
   const [renameValue, setRenameValue] = useState('');
   const [search, setSearch] = useState('');
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
-  const { collapsed: collapsedCats, toggle: toggleCatCollapse } = useCollapsedSet('operations');
+  const { isCollapsed: isCatCollapsed, toggle: toggleCatCollapse } = useCollapsedSet('operations');
   const [title, setTitle] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
@@ -369,7 +369,7 @@ export default function OperationsView() {
       if (group.key === UNCATEGORIZED_KEY) {
         return (
           <CollapsibleGroupHeader
-            collapsed={collapsedCats.has(UNCATEGORIZED_KEY)}
+            collapsed={isCatCollapsed(UNCATEGORIZED_KEY)}
             onToggleCollapse={() => toggleCatCollapse(UNCATEGORIZED_KEY)}
             emoji="📄"
             label={group.label}
@@ -383,7 +383,7 @@ export default function OperationsView() {
         <CollapsibleGroupHeader
           emoji={cat.emoji}
           label={categoryLabel(t, cat)}
-          collapsed={collapsedCats.has(cat.id)}
+          collapsed={isCatCollapsed(cat.id)}
           onToggleCollapse={() => toggleCatCollapse(cat.id)}
           count={group.items.length}
           add={{ title: t('operations.new'), onClick: () => handleNewInCategory(cat.id) }}
@@ -432,7 +432,7 @@ export default function OperationsView() {
                   groups: catGroups,
                   renderGroupHeader: renderCategoryHeader,
                   renderEmptyGroup: () => <p className="text-xs text-stone-700 px-1 py-1">{t('operations.none')}</p>,
-                  isGroupCollapsed: (g) => collapsedCats.has(g.key!),
+                  isGroupCollapsed: (g) => isCatCollapsed(g.key!),
                 }
               : { mode: 'flat' }
         }

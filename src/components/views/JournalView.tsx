@@ -43,7 +43,7 @@ export default function JournalView() {
   const [renameValue, setRenameValue] = useState('');
   const [search, setSearch] = useState('');
   const [filterPhases, setFilterPhases] = useState<string[]>([]);
-  const { collapsed: collapsedPhases, toggle: togglePhaseCollapse } = useCollapsedSet('journal');
+  const { isCollapsed: isPhaseCollapsed, toggle: togglePhaseCollapse } = useCollapsedSet('journal');
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [loadedEntryId, setLoadedEntryId] = useState<string | null>(null);
@@ -232,7 +232,7 @@ export default function JournalView() {
 
     const renderPhaseHeader = (group: DashboardGroup<JournalEntry>) => (
       <CollapsibleGroupHeader
-        collapsed={collapsedPhases.has(group.key!)}
+        collapsed={isPhaseCollapsed(group.key!)}
         onToggleCollapse={() => togglePhaseCollapse(group.key!)}
         emoji={group.key === UNCATEGORIZED_KEY ? '📓' : MOON_PHASE_SYMBOLS[group.key as MoonPhase]}
         label={group.label}
@@ -331,7 +331,7 @@ export default function JournalView() {
                   // Kein renderEmptyGroup: das Journal kennt keine leere
                   // Gruppe mehr — Phasen ohne Einträge fallen weg, und eine
                   // „gerade angelegte" Phase gibt es nicht.
-                  isGroupCollapsed: (g) => collapsedPhases.has(g.key!),
+                  isGroupCollapsed: (g) => isPhaseCollapsed(g.key!),
                 }
               : { mode: 'flat' }
         }

@@ -51,6 +51,7 @@
     "dateAsc": "Más antiguos primero",
     "alphaAsc": "A → Z",
     "alphaDesc": "Z → A",
+    "countDesc": "Más usadas primero",
     "category": "Categoría",
     "ungrouped": "Sin agrupar",
     "type": "Tipo",
@@ -472,13 +473,13 @@
     "contentPlaceholder": "Markdown admitido…"
   },
   "tags": {
-    "none": "Aún no hay etiquetas. Añade etiquetas al editar una entrada.",
-    "search": "Buscar etiquetas…",
-    "all": "Todas las entradas",
-    "results": "entradas",
-    "noResults": "No hay entradas con esta etiqueta.",
-    "selectHint": "Selecciona una etiqueta para filtrar entradas.",
-    "doubleClickEdit": "Doble clic en una etiqueta para renombrarla."
+    "none": "Aún no hay etiquetas. Crea una aquí o añade etiquetas al editar una entrada.",
+    "new": "Nueva etiqueta",
+    "name": "Nombre de la etiqueta…",
+    "nameTaken": "Esta etiqueta ya existe",
+    "color": "Cambiar color",
+    "unused": "sin usar",
+    "unusedHint": "Ninguna entrada lleva esta etiqueta todavía."
   },
   "properties": {
     "noEntry": "Abre una entrada para ver sus propiedades.",
@@ -501,6 +502,7 @@
     "display": "Visualización",
     "clearAll": "Borrar todo",
     "category": "Categoría",
+    "module": "Módulo",
     "moonPhase": "Fase lunar",
     "status": "Estado"
   },

@@ -51,6 +51,7 @@
     "dateAsc": "Plus anciens d'abord",
     "alphaAsc": "A → Z",
     "alphaDesc": "Z → A",
+    "countDesc": "Plus utilisées d’abord",
     "category": "Catégorie",
     "ungrouped": "Non groupé",
     "type": "Type",
@@ -472,13 +473,13 @@
     "contentPlaceholder": "Markdown pris en charge…"
   },
   "tags": {
-    "none": "Pas encore d'étiquettes. Ajoutez des étiquettes lors de la modification d'une entrée.",
-    "search": "Rechercher des étiquettes…",
-    "all": "Toutes les entrées",
-    "results": "entrées",
-    "noResults": "Aucune entrée avec cette étiquette.",
-    "selectHint": "Sélectionnez une étiquette pour filtrer les entrées.",
-    "doubleClickEdit": "Double-cliquez sur une étiquette pour la renommer."
+    "none": "Pas encore d'étiquettes. Créez-en une ici ou ajoutez des étiquettes lors de la modification d'une entrée.",
+    "new": "Nouvelle étiquette",
+    "name": "Nom de l'étiquette…",
+    "nameTaken": "Cette étiquette existe déjà",
+    "color": "Changer la couleur",
+    "unused": "inutilisée",
+    "unusedHint": "Aucune entrée ne porte encore cette étiquette."
   },
   "properties": {
     "noEntry": "Ouvrez une entrée pour voir ses propriétés.",
@@ -501,6 +502,7 @@
     "display": "Affichage",
     "clearAll": "Tout effacer",
     "category": "Catégorie",
+    "module": "Module",
     "moonPhase": "Phase lunaire",
     "status": "Statut"
   },
