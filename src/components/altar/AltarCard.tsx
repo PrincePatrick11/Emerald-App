@@ -6,11 +6,10 @@ import type { TFunction } from 'i18next';
 import type { AltarPlacement, AltarRecord } from '../../types';
 import { resolveResolutionPixels } from '../../lib/altarConstants';
 import { AltarCardPreview } from './AltarCardPreview';
-import { AltarRenameField } from './AltarRenameField';
+import RenameField from '../ui/RenameField';
 import { imageSrc } from '../../lib/images';
 import { FaviconGlyph } from '../sidebar/fields/Favicon';
-
-const baseClass = 'panel-interactive text-left';
+import DashboardItem from '../ui/DashboardItem';
 
 /** Bezugsmaß der Leinwand-Vorschau je Kartenbreite: Höhendeckel für das
  *  Thumbnail, Breitendeckel für die Live-Vorschau (die ein aspect-ratio-Kasten
@@ -61,9 +60,12 @@ type CommonProps = {
   onChangeRename: (value: string) => void;
   onCommitRename: () => void;
   onCancelRename: () => void;
-  onOpen: () => void;
   onContextMenu: (event: React.MouseEvent) => void;
 };
+
+/** Wohin Klick und Mittelklick führen. Den Altar selbst lädt AltarView über
+ *  seinen `activeView.id`-Effekt nach — wie beim Öffnen aus der Seitenleiste. */
+const altarView = (altar: AltarRecord) => ({ type: 'altar', id: altar.id, mode: 'view' } as const);
 
 export const AltarCard = memo(function AltarCard({
   altar,
@@ -75,7 +77,6 @@ export const AltarCard = memo(function AltarCard({
   onChangeRename,
   onCommitRename,
   onCancelRename,
-  onOpen,
   onContextMenu,
 }: AltarCardProps) {
   // Abonniert Sprachwechsel für die Datums-Locale — memo ohne t-Prop würde
@@ -83,8 +84,8 @@ export const AltarCard = memo(function AltarCard({
   useTranslation();
   if (isRenaming) {
     return (
-      <div className={`${baseClass} px-4 py-4`}>
-        <AltarRenameField
+      <DashboardItem view={altarView(altar)} layout="card" editing>
+        <RenameField
           value={renameValue}
           onChange={onChangeRename}
           onCommit={onCommitRename}
@@ -92,7 +93,7 @@ export const AltarCard = memo(function AltarCard({
           className="mb-2 w-full bg-transparent text-sm font-medium text-stone-200 outline-none selectable"
         />
         <p className="text-xs text-stone-600">{formatEntryDate(altar.updated_at)}</p>
-      </div>
+      </DashboardItem>
     );
   }
   const base = wide ? PREVIEW_BASE.wide : PREVIEW_BASE.normal;
@@ -117,7 +118,7 @@ export const AltarCard = memo(function AltarCard({
   }
 
   return (
-    <button onClick={onOpen} onContextMenu={onContextMenu} className={`${baseClass} w-full px-4 py-4`}>
+    <DashboardItem view={altarView(altar)} layout="card" onContextMenu={onContextMenu}>
       <div className="mb-3">{preview}</div>
       <div className="text-sm font-medium text-stone-200 truncate">{altar.title}</div>
       <div className="mt-2 flex flex-wrap gap-2 text-xs">
@@ -126,7 +127,7 @@ export const AltarCard = memo(function AltarCard({
       {altar.intention && (
         <p className="mt-2 max-h-8 overflow-hidden text-xs leading-4 text-stone-500">{altar.intention}</p>
       )}
-    </button>
+    </DashboardItem>
   );
 });
 
@@ -139,15 +140,14 @@ export const AltarListRow = memo(function AltarListRow({
   onChangeRename,
   onCommitRename,
   onCancelRename,
-  onOpen,
   onContextMenu,
 }: CommonProps) {
   // Siehe AltarCard: Subscription für die Datums-Locale.
   useTranslation();
   if (isRenaming) {
     return (
-      <div className={`${baseClass} flex items-center gap-3 px-4 py-3`}>
-        <AltarRenameField
+      <DashboardItem view={altarView(altar)} layout="row" editing>
+        <RenameField
           value={renameValue}
           onChange={onChangeRename}
           onCommit={onCommitRename}
@@ -155,7 +155,7 @@ export const AltarListRow = memo(function AltarListRow({
           className="flex-1 bg-transparent text-sm text-stone-300 outline-none selectable"
         />
         <span className="text-xs text-parchment-500/70">{formatEntryDate(altar.updated_at)}</span>
-      </div>
+      </DashboardItem>
     );
   }
   const { w: resW, h: resH } = resolveResolutionPixels(altar.resolution ?? '1920x1080');
@@ -172,11 +172,11 @@ export const AltarListRow = memo(function AltarListRow({
       : <AltarCardPreview altar={altar} previewItems={previewItems} compact />;
 
   return (
-    <button onClick={onOpen} onContextMenu={onContextMenu} className={`${baseClass} w-full flex items-center gap-3 px-4 py-3`}>
+    <DashboardItem view={altarView(altar)} layout="row" onContextMenu={onContextMenu}>
       <span className="flex-shrink-0">{preview}</span>
       <span className="flex-1 text-sm text-stone-300 truncate">{altar.title}</span>
       <span className="text-xs text-stone-600">{formatEntryDate(altar.updated_at)}</span>
-    </button>
+    </DashboardItem>
   );
 });
 

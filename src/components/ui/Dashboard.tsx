@@ -23,11 +23,16 @@ type DashboardGrouping<T> =
       mode: 'category';
       groups: DashboardGroup<T>[];
       renderGroupHeader?: (group: DashboardGroup<T>) => ReactNode;
-      /** Shown instead of the item list when a group has zero items (default: a muted em-dash). */
+      /** Shown instead of the item list when a group has zero items (default: a muted em-dash).
+       *  Only reachable with `keepEmptyGroups` — otherwise empty groups are dropped first. */
       renderEmptyGroup?: (group: DashboardGroup<T>) => ReactNode;
       /** Collapsed groups render only their header — the chevron lives in the
        *  caller's renderGroupHeader (CollapsibleGroupHeader's onToggleCollapse). */
       isGroupCollapsed?: (group: DashboardGroup<T>) => boolean;
+      /** Leere Gruppen stehen lassen statt sie zentral wegzufiltern — für
+       *  Gruppen, die für sich etwas sind (Tags: ein unbenutzter Tag bleibt
+       *  sichtbar und verwaltbar). */
+      keepEmptyGroups?: boolean;
     }
   | { mode: 'custom'; render: () => ReactNode };
 
@@ -77,6 +82,8 @@ interface DashboardBaseProps<T> {
   onView?: (v: ViewMode) => void;
   onSort?: (s: SortMode) => void;
   viewOptions?: { value: ViewMode; label: string }[];
+  /** Welche Sortiermodi zur Wahl stehen — Default: die vier Datums-/Alpha-Modi. */
+  sortModes?: readonly SortMode[];
   /** Die Gruppierungs-Achse der Toolbar — als ein Objekt, damit Wert und
    *  Handler nicht einzeln fehlen können und der Name sich nicht mit
    *  `grouping` unten verwechselt, das die Struktur des Inhalts beschreibt.
@@ -190,6 +197,7 @@ export default function Dashboard<T>({
   onView,
   onSort,
   viewOptions,
+  sortModes,
   groupBy,
   search,
   onSearch,
@@ -265,14 +273,16 @@ export default function Dashboard<T>({
     }
 
     // mode === 'category'
-    // Leere Gruppen fallen hier zentral weg: die Kategorienliste ist global,
+    // Leere Gruppen fallen hier zentral weg (außer mit `keepEmptyGroups`): die Kategorienliste ist global,
     // eine für das Wiki angelegte Kategorie stünde sonst als leerer Kopf auch
     // in den Operationen.
     // Bleibt keine Gruppe übrig, greift der „Keine Ergebnisse"-Hinweis,
     // den sonst hasNoResults liefert.
     // Nicht die einzige Stelle: Tasks rendert im custom-Modus und führt
     // dieselbe Regel selbst (TasksView, `visibleCategories`).
-    const groups = grouping.groups.filter((group) => group.items.length > 0);
+    const groups = grouping.keepEmptyGroups
+      ? grouping.groups
+      : grouping.groups.filter((group) => group.items.length > 0);
     return (
       <div className="space-y-6">
         {groups.length === 0 && <p className={noResultsClassName}>{noResultsMessage}</p>}
@@ -351,6 +361,7 @@ export default function Dashboard<T>({
           onView={onView}
           onSort={onSort}
           viewOptions={viewOptions}
+          sortModes={sortModes}
           groupBy={groupBy}
           search={search}
           onSearch={onSearch}

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
-import { Check, GripVertical, Pencil, Trash2, X } from 'lucide-react';
-import { AUX_VIEWS, CATEGORY_MODULE_IDS, MODULES } from '../../lib/modules';
+import { GripVertical, Pencil, Trash2 } from 'lucide-react';
+import { AUX_VIEWS, CATEGORY_MODULE_IDS } from '../../lib/modules';
 import { categoryLabel, categoryUsageCounts, emptyCategoryUsage } from '../../lib/categories';
 import { CATEGORY_NAME_TAKEN, useCategoryStore } from '../../store/categoryStore';
 import { useWikiStore } from '../../store/wikiStore';
@@ -10,11 +10,14 @@ import { useOperationStore } from '../../store/operationStore';
 import { useTaskStore } from '../../store/taskStore';
 import { useAltarStore } from '../../store/altarStore';
 import { useUndoStore } from '../../store/undoStore';
-import { useUIStore } from '../../store/uiStore';
+import { useDeepLink } from '../../hooks/useDeepLink';
 import { generateId } from '../../lib/helpers';
 import Button from '../ui/Button';
 import Dashboard from '../ui/Dashboard';
 import EmojiPicker from '../ui/EmojiPicker';
+import InlineConfirm from '../ui/InlineConfirm';
+import InlineNameEditor from '../ui/InlineNameEditor';
+import ModuleCounts from '../ui/ModuleCounts';
 import type { Category } from '../../types';
 
 /** Vorbelegung beim Anlegen: modulneutral, dieselbe Glyphe wie das Sammelbecken. */
@@ -32,9 +35,9 @@ type FormState =
   | { mode: 'edit'; id: string };
 
 /**
- * Emoji-Trigger, Namensfeld, Speichern und Abbrechen — die eine Zeile für
- * Entwurf und Bearbeitung. Als Komponente mit benannten Props: als Helfer mit
- * sechs Stellungsparametern ließen sich Emoji und Name (beide `string`) oder
+ * Emoji-Trigger vor dem Namens-Editor — die eine Zeile für Entwurf und
+ * Bearbeitung. Als Komponente mit benannten Props: als Helfer mit sechs
+ * Stellungsparametern ließen sich Emoji und Name (beide `string`) oder
  * Speichern und Abbrechen (beide `() => void`) lautlos vertauschen.
  */
 function CategoryEditRow({
@@ -66,24 +69,8 @@ function CategoryEditRow({
           </button>
         )}
       />
-      <input
-        autoFocus
-        value={name}
-        onChange={(e) => onName(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') onSave();
-          if (e.key === 'Escape') onCancel();
-        }}
-        placeholder={t('categories.name')}
-        className="input-field flex-1 min-w-0 rounded-md px-2 py-0.5 text-sm outline-none selectable"
-      />
-      {error && <span className="text-xs text-[var(--danger-text)] shrink-0">{error}</span>}
-      <Button tone="jade" compact small title={t('common.save')} aria-label={t('common.save')} onClick={onSave}>
-        <Check size={12} />
-      </Button>
-      <Button tone="neutral" compact small title={t('common.cancel')} aria-label={t('common.cancel')} onClick={onCancel}>
-        <X size={12} />
-      </Button>
+      <InlineNameEditor value={name} onChange={onName} error={error} onSave={onSave} onCancel={onCancel}
+        placeholder={t('categories.name')} />
     </div>
   );
 }
@@ -132,39 +119,25 @@ export default function CategoriesView() {
   const [nameError, setNameError] = useState<string | null>(null);
 
   /**
-   * Der Tiefenlink aus der globalen Suche: `{ type: 'categories', id }`
-   * scrollt zur Zeile und hebt sie kurz hervor — es gibt hier keine Auswahl,
-   * an der ein Treffer sonst hängenbleiben könnte.
-   *
-   * Wie in TagsView hängt der Effekt am `activeView`-Objekt statt an der id
-   * darin: `setActiveView` legt pro Navigation ein frisches an, sodass
-   * derselbe Treffer auch zweimal hintereinander wirkt.
+   * Der Tiefenlink aus der globalen Suche scrollt zur Zeile und hebt sie kurz
+   * hervor — es gibt hier keine Auswahl, an der ein Treffer sonst
+   * hängenbleiben könnte.
    */
-  const activeView = useUIStore((s) => s.activeView);
-  const handledView = useRef<typeof activeView | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  useDeepLink({
+    type: 'categories',
+    items: categories,
+    rowAttribute: 'data-category-id',
+    onOpen: (cat) => setHighlightId(cat.id),
+  });
 
-  useEffect(() => {
-    if (activeView.type !== 'categories' || !activeView.id) return;
-    if (handledView.current === activeView) return;
-    if (!categories.some((c) => c.id === activeView.id)) return;
-    handledView.current = activeView;
-    setHighlightId(activeView.id);
-  }, [activeView, categories]);
-
-  // Scrollen und Ausblenden hängen an `highlightId`, nicht am Effekt oben:
-  // dort räumte jede Kategorienänderung innerhalb der zwei Sekunden den Timer
-  // ab, während der Neulauf vor dem Neusetzen aussteigt — die Hervorhebung
-  // bliebe bis zum Verlassen der Ansicht stehen.
+  // Das Ausblenden hängt an `highlightId`, nicht am Tiefenlink: dort räumte
+  // jede Kategorienänderung innerhalb der zwei Sekunden den Timer ab — die
+  // Hervorhebung bliebe bis zum Verlassen der Ansicht stehen.
   useEffect(() => {
     if (!highlightId) return;
-    const frame = requestAnimationFrame(() => {
-      document
-        .querySelector<HTMLElement>(`[data-category-id="${CSS.escape(highlightId)}"]`)
-        ?.scrollIntoView({ block: 'nearest' });
-    });
     const timer = window.setTimeout(() => setHighlightId(null), HIGHLIGHT_MS);
-    return () => { cancelAnimationFrame(frame); window.clearTimeout(timer); };
+    return () => window.clearTimeout(timer);
   }, [highlightId]);
 
   /**
@@ -335,22 +308,7 @@ export default function CategoriesView() {
         <span className="w-5 text-center flex-shrink-0 text-base">{cat.emoji}</span>
         <span className="flex-1 min-w-0 truncate text-sm text-stone-200">{categoryLabel(t, cat)}</span>
 
-        <span className="flex items-center gap-3 flex-shrink-0">
-          {CATEGORY_MODULE_IDS.map((id) => {
-            const Icon = MODULES[id].icon;
-            const count = counts[id];
-            return (
-              <span
-                key={id}
-                title={t(MODULES[id].navLabelKey)}
-                className={`flex items-center gap-1 text-xs tabular-nums ${count ? 'text-stone-400' : 'text-stone-600'}`}
-              >
-                <Icon size={12} />
-                {count}
-              </span>
-            );
-          })}
-        </span>
+        <ModuleCounts modules={CATEGORY_MODULE_IDS} counts={counts} />
 
         {/* Sigillen: nicht löschbar, und ein Umbenennen liefe ins Leere — der
             Name kommt aus der Locale, nicht aus der Zeile. Der Block bleibt
@@ -359,10 +317,7 @@ export default function CategoriesView() {
         <span className="flex items-center justify-end gap-1.5 flex-shrink-0 min-w-[54px]">
           {cat.is_builtin ? null : (
             confirming ? (
-              <>
-                <Button tone="danger" small onClick={() => handleDelete(cat.id)}>{t('common.confirmYes')}</Button>
-                <Button tone="neutral" small onClick={() => setConfirmDeleteId(null)}>{t('common.confirmNo')}</Button>
-              </>
+              <InlineConfirm small onConfirm={() => handleDelete(cat.id)} onCancel={() => setConfirmDeleteId(null)} />
             ) : (
               <>
                 <Button

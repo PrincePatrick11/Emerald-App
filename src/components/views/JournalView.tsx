@@ -12,6 +12,8 @@ import { useUndoStore } from '../../store/undoStore';
 import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
+import DashboardItem from '../ui/DashboardItem';
+import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
@@ -43,7 +45,7 @@ export default function JournalView() {
   const [renameValue, setRenameValue] = useState('');
   const [search, setSearch] = useState('');
   const [filterPhases, setFilterPhases] = useState<string[]>([]);
-  const { collapsed: collapsedPhases, toggle: togglePhaseCollapse } = useCollapsedSet('journal');
+  const { isCollapsed: isPhaseCollapsed, toggle: togglePhaseCollapse } = useCollapsedSet('journal');
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [loadedEntryId, setLoadedEntryId] = useState<string | null>(null);
@@ -232,7 +234,7 @@ export default function JournalView() {
 
     const renderPhaseHeader = (group: DashboardGroup<JournalEntry>) => (
       <CollapsibleGroupHeader
-        collapsed={collapsedPhases.has(group.key!)}
+        collapsed={isPhaseCollapsed(group.key!)}
         onToggleCollapse={() => togglePhaseCollapse(group.key!)}
         emoji={group.key === UNCATEGORIZED_KEY ? '📓' : MOON_PHASE_SYMBOLS[group.key as MoonPhase]}
         label={group.label}
@@ -240,48 +242,45 @@ export default function JournalView() {
       />
     );
 
-    const go = (e: JournalEntry) => setActiveView({ type: 'journal', id: e.id, mode: 'view' });
-
     const renderEntry = (e: JournalEntry) => {
       const icon = MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓';
-      if (renamingId === e.id) {
-        return isCardView(view) ? (
-          <div className="panel-interactive px-4 py-4 text-left">
-            <div className="text-2xl mb-2">{icon}</div>
-            <input autoFocus value={renameValue} onChange={(ev) => setRenameValue(ev.target.value)}
-              onBlur={commitRename} onKeyDown={(ev) => { if (ev.key === 'Enter') commitRename(); if (ev.key === 'Escape') setRenamingId(null); }}
-              className="text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1" />
-            <div className="text-xs text-parchment-500/70">{formatEntryDate(e.created_at)}</div>
-          </div>
-        ) : (
-          <div className="panel-interactive w-full flex items-center gap-3 px-4 py-3">
-            <span className="text-base flex-shrink-0">{icon}</span>
-            <input autoFocus value={renameValue} onChange={(ev) => setRenameValue(ev.target.value)}
-              onBlur={commitRename} onKeyDown={(ev) => { if (ev.key === 'Enter') commitRename(); if (ev.key === 'Escape') setRenamingId(null); }}
-              className="flex-1 bg-transparent text-sm text-stone-300 outline-none selectable" />
-            <span className="text-xs text-parchment-500/70 flex-shrink-0">{formatEntryDate(e.created_at)}</span>
-          </div>
-        );
-      }
-      return isCardView(view) ? (
-        <button onClick={() => go(e)} onContextMenu={(ev) => openCtxMenu(ev, e.id)} className="panel-interactive px-4 py-4 text-left">
-          <div className="text-2xl mb-2">{icon}</div>
-          <div className="text-sm font-medium text-stone-200 truncate mb-1">{e.title}</div>
-          <div className="text-xs text-parchment-500/70">{formatEntryDate(e.created_at)}</div>
-          {e.tags?.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {e.tags.slice(0, 3).map((tag) => (
-                <span key={tag} className="px-1.5 py-0.5 rounded text-xs bg-stone-700/60 text-stone-500">{tag}</span>
-              ))}
-            </div>
+      const renaming = renamingId === e.id;
+      const renameInput = (className: string) => (
+        <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename}
+          onCancel={() => setRenamingId(null)} className={className} />
+      );
+      return (
+        <DashboardItem
+          view={{ type: 'journal', id: e.id, mode: 'view' }}
+          layout={isCardView(view) ? 'card' : 'row'}
+          editing={renaming}
+          onContextMenu={(ev) => openCtxMenu(ev, e.id)}
+        >
+          {isCardView(view) ? (
+            <>
+              <div className="text-2xl mb-2">{icon}</div>
+              {renaming
+                ? renameInput('text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1')
+                : <div className="text-sm font-medium text-stone-200 truncate mb-1">{e.title}</div>}
+              <div className="text-xs text-parchment-500/70">{formatEntryDate(e.created_at)}</div>
+              {!renaming && e.tags?.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {e.tags.slice(0, 3).map((tag) => (
+                    <span key={tag} className="px-1.5 py-0.5 rounded text-xs bg-stone-700/60 text-stone-500">{tag}</span>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <span className="text-base flex-shrink-0">{icon}</span>
+              {renaming
+                ? renameInput('flex-1 bg-transparent text-sm text-stone-300 outline-none selectable')
+                : <span className="flex-1 text-sm text-stone-300 truncate">{e.title}</span>}
+              <span className="text-xs text-parchment-500/70 flex-shrink-0">{formatEntryDate(e.created_at)}</span>
+            </>
           )}
-        </button>
-      ) : (
-        <button onClick={() => go(e)} onContextMenu={(ev) => openCtxMenu(ev, e.id)} className="panel-interactive w-full text-left flex items-center gap-3 px-4 py-3 group">
-          <span className="text-base flex-shrink-0">{icon}</span>
-          <span className="flex-1 text-sm text-stone-300 truncate">{e.title}</span>
-          <span className="text-xs text-parchment-500/70 flex-shrink-0">{formatEntryDate(e.created_at)}</span>
-        </button>
+        </DashboardItem>
       );
     };
 
@@ -328,10 +327,7 @@ export default function JournalView() {
                   mode: 'category',
                   groups: phaseGroups,
                   renderGroupHeader: renderPhaseHeader,
-                  // Kein renderEmptyGroup: das Journal kennt keine leere
-                  // Gruppe mehr — Phasen ohne Einträge fallen weg, und eine
-                  // „gerade angelegte" Phase gibt es nicht.
-                  isGroupCollapsed: (g) => collapsedPhases.has(g.key!),
+                  isGroupCollapsed: (g) => isPhaseCollapsed(g.key!),
                 }
               : { mode: 'flat' }
         }

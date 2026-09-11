@@ -36,12 +36,6 @@ const PROPERTIES_PANELS: Partial<Record<ViewId, ComponentType>> = {
  */
 const VIEWS_WITHOUT_ENTRIES: ReadonlySet<ViewId> = new Set<ViewId>(['home', 'tags', 'categories', 'blocks']);
 
-/**
- * Davon die ohne Dashboard — nur für die steht der Platzhalter. Home,
- * Kategorien und Blöcke sind bewusst nicht dabei: keine Einträge, aber ein
- * Dashboard (Blöcke: oder die Seite eines Blocks, die ebenfalls portalt).
- */
-const VIEWS_WITHOUT_DASHBOARD: ReadonlySet<ViewId> = new Set<ViewId>(['tags']);
 
 function PropertiesContent({ activeView }: { activeView: ActiveView }) {
   const { t } = useTranslation();
@@ -134,7 +128,6 @@ function RightSidebarActionBar() {
 }
 
 export default function RightSidebar() {
-  const { t } = useTranslation();
   const activeView = useUIStore((s) => s.activeView);
   const setListHeaderHost = useUIStore((s) => s.setListHeaderHost);
   const dashboardMounted = useUIStore((s) => s.dashboardMounted);
@@ -146,17 +139,10 @@ export default function RightSidebar() {
   // gelöschten Eintrags fällt ebenfalls aufs Dashboard zurück.
   // Views ohne Einträge und Listenansichten ohne id bekommen den Host auch
   // vor der Anmeldung, damit er bereitsteht, solange der Chunk einer lazy
-  // geladenen Ansicht noch lädt. Der Platzhalter erscheint nur in Views ohne
-  // Dashboard (Tags) — an einen leeren Host geknüpft (`only:`-Trick) blitzte
-  // er stattdessen genau in dieser Ladelücke auf.
+  // geladenen Ansicht noch lädt. Einen Platzhalter braucht es nicht mehr:
+  // jede View ohne Einträge hat ein Dashboard (die Blöcke dazu ihre Seite).
   if (dashboardMounted || VIEWS_WITHOUT_ENTRIES.has(activeView.type) || !activeView.id) {
-    return (
-      <div ref={setListHeaderHost} className="flex flex-col h-full">
-        {VIEWS_WITHOUT_DASHBOARD.has(activeView.type) && (
-          <p className="text-xs text-stone-600 px-2 py-3">{t('properties.noEntry')}</p>
-        )}
-      </div>
-    );
+    return <div ref={setListHeaderHost} className="flex flex-col h-full" />;
   }
 
   return (

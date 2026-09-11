@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { memo, useState, useCallback, useMemo } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { useTaskStore } from '../../store/taskStore';
@@ -12,6 +12,7 @@ import { useAltarStore } from '../../store/altarStore';
 import { generateId } from '../../lib/helpers';
 import { viewTypeForEntryType } from '../../lib/modules';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
+import { useDeepLink } from '../../hooks/useDeepLink';
 import { categoriesUsedBy, categoryLabel, hasUncategorized } from '../../lib/categories';
 import { sortItems } from '../../lib/sortItems';
 import { UNCATEGORIZED_KEY } from '../../lib/groupBy';
@@ -68,7 +69,7 @@ export default function TasksView() {
   const [filterCategory, setFilterCategory] = useState<Set<string>>(new Set());
   const [filterPriority, setFilterPriority] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
-  const { collapsed: collapsedCategories, toggle: toggleCategoryCollapse, expand: expandCategories } = useCollapsedSet('tasks');
+  const { isCollapsed: isCategoryCollapsed, toggle: toggleCategoryCollapse, expand: expandCategories } = useCollapsedSet('tasks');
   const [linkModal, setLinkModal] = useState<{ taskId: string } | null>(null);
 
   // Kein Refetch beim Mount: AppShell laedt die Tasks beim Start und beim
@@ -108,7 +109,7 @@ export default function TasksView() {
     ? sortedTasks.filter((t) => !t.category_id || !getCategory(t.category_id))
     : [];
 
-  const uncatCollapsed = collapsedCategories.has(UNCATEGORIZED_KEY);
+  const uncatCollapsed = isCategoryCollapsed(UNCATEGORIZED_KEY);
 
   // Chips und Gruppen zeigen nur, was bei den Aufgaben vorkommt (plus Sonstiges).
   const usedCategories = categoriesUsedBy(categories, tasks);
@@ -154,65 +155,34 @@ export default function TasksView() {
 
 
   /**
-   * Der Tiefenlink aus der globalen Suche.
-   *
-   * Ein Aufgaben-Treffer navigiert nach `{ type: 'tasks', id }`. Aufgaben haben
-   * keine eigene Detailseite, die Ansicht holt die Zeile also stattdessen in den
-   * Blick — und räumt vorher weg, was sie verdecken könnte: die Suche dieser
-   * Ansicht, die Filter, ein zugeklapptes Kategoriefach, eingeklappte
-   * Elternzeilen und der ausgeblendete Erledigt-Zustand. Ohne das zeigte der
-   * Treffer auf eine Zeile, die gar nicht gerendert wird.
-   *
-   * Ausgelöst wird das vom `activeView`-*Objekt*, nicht von der id darin:
-   * `setActiveView` legt bei jeder Navigation ein frisches an, die id dagegen
-   * ist ein String und bliebe gleich, wenn man denselben Treffer zweimal
-   * anklickt. `handledView` merkt sich, welches Objekt schon dran war — damit
-   * darf `tasks` in den Abhängigkeiten stehen, ohne dass eine Mutation dem
-   * Nutzer seine Filter unter den Händen wegräumt, und ein Tiefenlink, der
-   * einen noch leeren Store vorfindet, greift beim nächsten Lauf.
+   * Der Tiefenlink aus der globalen Suche. Aufgaben haben keine eigene
+   * Detailseite, die Ansicht holt die Zeile also stattdessen in den Blick — und
+   * räumt vorher weg, was sie verdecken könnte: die Suche dieser Ansicht, die
+   * Filter, ein zugeklapptes Kategoriefach, eingeklappte Elternzeilen und der
+   * ausgeblendete Erledigt-Zustand. Ohne das zeigte der Treffer auf eine Zeile,
+   * die gar nicht gerendert wird.
    */
-  const activeView = useUIStore((s) => s.activeView);
-  const handledView = useRef<typeof activeView | null>(null);
-  const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
+  useDeepLink({
+    type: 'tasks',
+    items: tasks,
+    rowAttribute: 'data-task-id',
+    block: 'center',
+    onOpen: (target) => {
+      setSearchQuery('');
+      setFilterCategory(new Set());
+      setFilterPriority(new Set());
+      if (target.completed) setShowCompleted(true);
+      expandCategories(target.category_id ?? UNCATEGORIZED_KEY, UNCATEGORIZED_KEY);
 
-  useEffect(() => {
-    if (activeView.type !== 'tasks' || !activeView.id) return;
-    if (handledView.current === activeView) return;
-    const target = tasks.find((task) => task.id === activeView.id);
-    if (!target) return;
-    handledView.current = activeView;
-
-    setSearchQuery('');
-    setFilterCategory(new Set());
-    setFilterPriority(new Set());
-    if (target.completed) setShowCompleted(true);
-    expandCategories(target.category_id ?? UNCATEGORIZED_KEY, UNCATEGORIZED_KEY);
-
-    // Eine Unteraufgabe ist nur sichtbar, wenn jede Zeile über ihr offen ist.
-    const ancestors: string[] = [];
-    for (let parentId = target.parent_task_id; parentId; ) {
-      ancestors.push(parentId);
-      parentId = tasks.find((task) => task.id === parentId)?.parent_task_id ?? null;
-    }
-    if (ancestors.length) setExpandedTasks((prev) => new Set([...prev, ...ancestors]));
-
-    setPendingScrollId(target.id);
-  }, [activeView, tasks]);
-
-  // Gescrollt wird genau einmal pro Tiefenlink. Das hängt ausdrücklich an
-  // `pendingScrollId` und nicht an den aufgeräumten Zuständen: die als
-  // Abhängigkeiten zu führen hieße, den Nutzer jedes Mal zurückzuwerfen, wenn
-  // er später selbst eine Kategorie auf- oder zuklappt.
-  useEffect(() => {
-    if (!pendingScrollId) return;
-    const frame = requestAnimationFrame(() => {
-      document
-        .querySelector<HTMLElement>(`[data-task-id="${CSS.escape(pendingScrollId)}"]`)
-        ?.scrollIntoView({ block: 'center' });
-      setPendingScrollId(null);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [pendingScrollId]);
+      // Eine Unteraufgabe ist nur sichtbar, wenn jede Zeile über ihr offen ist.
+      const ancestors: string[] = [];
+      for (let parentId = target.parent_task_id; parentId; ) {
+        ancestors.push(parentId);
+        parentId = tasks.find((task) => task.id === parentId)?.parent_task_id ?? null;
+      }
+      if (ancestors.length) setExpandedTasks((prev) => new Set([...prev, ...ancestors]));
+    },
+  });
 
   const activeFilterCount = filterCategory.size + filterPriority.size;
 
@@ -240,7 +210,7 @@ export default function TasksView() {
         {groupedTasks
           ? visibleCategories.map((cat) => {
               const catTasks = groupedTasks[cat.id] || [];
-              const isCollapsed = collapsedCategories.has(cat.id);
+              const isCollapsed = isCategoryCollapsed(cat.id);
               const isEmpty = catTasks.length === 0;
               return (
                 <div key={cat.id} className="mb-6 space-y-1.5">

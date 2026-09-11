@@ -51,6 +51,7 @@
     "dateAsc": "Oldest first",
     "alphaAsc": "A → Z",
     "alphaDesc": "Z → A",
+    "countDesc": "Most used first",
     "category": "Category",
     "ungrouped": "Ungrouped",
     "type": "Type",
@@ -470,13 +471,13 @@
     "contentPlaceholder": "Markdown supported…"
   },
   "tags": {
-    "none": "No tags yet. Add tags while editing an entry.",
-    "search": "Search tags…",
-    "all": "All entries",
-    "results": "entries",
-    "noResults": "No entries with this tag.",
-    "selectHint": "Select a tag to filter entries.",
-    "doubleClickEdit": "Double-click a tag to rename it."
+    "none": "No tags yet. Create one here or add tags while editing an entry.",
+    "new": "New tag",
+    "name": "Tag name…",
+    "nameTaken": "This tag already exists",
+    "color": "Change color",
+    "unused": "unused",
+    "unusedHint": "No entry carries this tag yet."
   },
   "properties": {
     "noEntry": "Open an entry to see its properties.",
@@ -499,6 +500,7 @@
     "display": "Display",
     "clearAll": "Clear all",
     "category": "Category",
+    "module": "Module",
     "moonPhase": "Moon Phase",
     "status": "Status"
   },

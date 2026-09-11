@@ -9,6 +9,7 @@ import { AUX_VIEWS } from '../../lib/modules';
 import { definitionLabel } from '../../lib/blocks/blockAttrs';
 import type { BlockDefinition } from '../../lib/blocks/definitions';
 import Dashboard from '../ui/Dashboard';
+import DashboardItem from '../ui/DashboardItem';
 import ContextMenu from '../ui/ContextMenu';
 import BlockGlyph from '../blocks/BlockGlyph';
 import BlockDefinitionEditor, { DeleteDefinitionModal } from '../blocks/BlockDefinitionEditor';
@@ -70,7 +71,7 @@ export default function BlocksView() {
           onDelete={() => setDeleting(selected)}
         />
       ) : (
-        <BlockList usage={usage} onOpen={open} onCreate={() => void create()} onDelete={setDeleting} />
+        <BlockList usage={usage} onCreate={() => void create()} onDelete={setDeleting} />
       )}
       {deleteModal}
     </>
@@ -78,9 +79,8 @@ export default function BlocksView() {
 }
 
 /** Die Liste der eigenen Blöcke im gemeinsamen Dashboard-Gerüst. */
-function BlockList({ usage, onOpen, onCreate, onDelete }: {
+function BlockList({ usage, onCreate, onDelete }: {
   usage: Map<string, CopyUsage>;
-  onOpen: (id: string) => void;
   onCreate: () => void;
   onDelete: (def: BlockDefinition) => void;
 }) {
@@ -101,20 +101,13 @@ function BlockList({ usage, onOpen, onCreate, onDelete }: {
     const u = usage.get(def.id);
     const fieldCount = def.elements.filter((e) => !e.archived).length;
     return (
-      <button
-        type="button"
-        onClick={() => onOpen(def.id)}
-        onAuxClick={(e) => {
-          if (e.button === 1) {
-            e.preventDefault();
-            openViewInNewTab({ type: 'blocks', id: def.id });
-          }
-        }}
+      <DashboardItem
+        view={{ type: 'blocks', id: def.id }}
+        layout="row"
         onContextMenu={(e) => {
           e.preventDefault();
           setCtxMenu({ id: def.id, x: e.clientX, y: e.clientY });
         }}
-        className="panel-interactive w-full text-left flex items-center gap-3 px-4 py-3"
       >
         <BlockGlyph icon={def.icon} size={14} />
         <span className="flex-1 min-w-0">
@@ -134,7 +127,7 @@ function BlockList({ usage, onOpen, onCreate, onDelete }: {
             {t('blocks.library.entryCount', { count: u?.entries ?? 0 })}
           </span>
         </span>
-      </button>
+      </DashboardItem>
     );
   };
 

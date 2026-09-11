@@ -51,6 +51,7 @@
     "dateAsc": "Älteste zuerst",
     "alphaAsc": "A → Z",
     "alphaDesc": "Z → A",
+    "countDesc": "Häufigste zuerst",
     "category": "Kategorie",
     "ungrouped": "Ohne Gruppen",
     "type": "Typ",
@@ -470,13 +471,13 @@
     "contentPlaceholder": "Markdown wird unterstützt…"
   },
   "tags": {
-    "none": "Noch keine Tags. Tags beim Bearbeiten eines Eintrags hinzufügen.",
-    "search": "Tags suchen…",
-    "all": "Alle Einträge",
-    "results": "Einträge",
-    "noResults": "Keine Einträge mit diesem Tag.",
-    "selectHint": "Tag auswählen, um Einträge zu filtern.",
-    "doubleClickEdit": "Doppelklick auf einen Tag zum Umbenennen."
+    "none": "Noch keine Tags. Lege hier einen an oder vergib Tags beim Bearbeiten eines Eintrags.",
+    "new": "Neuer Tag",
+    "name": "Tag-Name…",
+    "nameTaken": "Diesen Tag gibt es schon",
+    "color": "Farbe ändern",
+    "unused": "nicht verwendet",
+    "unusedHint": "Noch kein Eintrag trägt diesen Tag."
   },
   "properties": {
     "noEntry": "Öffne einen Eintrag, um seine Eigenschaften zu sehen.",
@@ -499,6 +500,7 @@
     "display": "Anzeige",
     "clearAll": "Alle löschen",
     "category": "Kategorie",
+    "module": "Modul",
     "moonPhase": "Mondphase",
     "status": "Status"
   },
