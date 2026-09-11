@@ -63,11 +63,15 @@ src/
 │                     right-click menu — mounted once in `App.tsx`, alongside `AppShell`
 │                     rather than inside it, since `AppShell` returns early for the first-run
 │                     vault-setup screen and the menu has to reach that screen's fields too),
-│                     EmojiPicker, Dashboard, EntryListTab, ListToolbar, FilterPanel,
-│                     RailButton, TabIconButton, UndoToast, ImportDestinationModal, Dropdown,
-│                     CollapsibleGroupHeader, CategorySelect, EntryDetailFrame — the
-│                     shared component layer; what each one encapsulates and where it can be
-│                     extended is in components.md
+│                     EmojiPicker, Dashboard, DashboardItem (the clickable dashboard-row/card
+│                     frame — click, middle-click, focus ring), EntryListTab, ListToolbar,
+│                     FilterPanel, RailButton, TabIconButton, UndoToast, ImportDestinationModal,
+│                     Dropdown, CollapsibleGroupHeader, CategorySelect, EntryDetailFrame,
+│                     InlineConfirm (the "Sure? Yes/Cancel" row-action confirmation),
+│                     InlineNameEditor (the input/error/Save/Cancel body of a one-line name
+│                     editor), RenameField (the in-place rename input used inside a
+│                     `DashboardItem`) — the shared component layer; what each one
+│                     encapsulates and where it can be extended is in components.md
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, categoryStore (the one Wiki/Operations/Tasks/Altar category
 │                                      list, see Categories below), routineStore, undoStore,
@@ -83,7 +87,10 @@ src/
 │                     useOutsideClick (mousedown-outside(+Escape) dismiss pattern, used by
 │                                      eight menus/popovers),
 │                     useGlobalSearch (assembles the search corpus from the stores and runs it
-│                                      against the query; backs the title bar's search field)
+│                                      against the query; backs the title bar's search field),
+│                     useDeepLink (global search's deep link for a view with no detail page —
+│                                      run onOpen once, then scroll the matching row into view;
+│                                      used by TasksView, CategoriesView, TagsView)
 ├── lib/              db.ts, schema.ts, normalizeSchema.ts, row.ts,
 │                     links.ts, tabs.ts (tab IDs, isContentView), globalSearch.ts, searchText.ts,
 │                     modules.ts (the module registry — see Module Registry below),
