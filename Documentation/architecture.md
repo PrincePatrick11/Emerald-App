@@ -90,7 +90,11 @@ src/
 │                                      against the query; backs the title bar's search field),
 │                     useDeepLink (global search's deep link for a view with no detail page —
 │                                      run onOpen once, then scroll the matching row into view;
-│                                      used by TasksView, CategoriesView, TagsView)
+│                                      used by TasksView, CategoriesView, TagsView),
+│                     useOpenInNewTabAction (the "Open in New Tab" ContextMenuAction for an
+│                                      ActiveView, the menu counterpart to DashboardItem's
+│                                      middle-click; used by HomeView, WikiView, OperationsView
+│                                      and the four LeftSidebarEntryList configs)
 ├── lib/              db.ts, schema.ts, normalizeSchema.ts, row.ts,
 │                     links.ts, tabs.ts (tab IDs, isContentView), globalSearch.ts, searchText.ts,
 │                     modules.ts (the module registry — see Module Registry below),
