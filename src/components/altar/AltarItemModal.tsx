@@ -10,6 +10,7 @@ import type { AltarItem, Category } from '../../types';
 import Modal from '../ui/Modal';
 import EmojiPicker from '../ui/EmojiPicker';
 import Button from '../ui/Button';
+import InlineConfirm from '../ui/InlineConfirm';
 import CategorySelect from '../ui/CategorySelect';
 
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
@@ -137,13 +138,7 @@ export function AltarItemModal({
           />
         </div>
         {item && confirmDelete ? (
-          <div className="flex items-center justify-between rounded-lg border border-red-700/40 bg-red-950/20 px-3 py-2">
-            <span className="text-xs text-red-300">{t('common.deleteConfirm')}</span>
-            <span className="flex items-center gap-2">
-              <Button tone="danger" onClick={doDelete}>{t('common.confirmYes')}</Button>
-              <Button tone="neutral" onClick={() => setConfirmDelete(false)}>{t('common.confirmNo')}</Button>
-            </span>
-          </div>
+          <InlineConfirm variant="banner" message={t('common.deleteConfirm')} onConfirm={doDelete} onCancel={() => setConfirmDelete(false)} />
         ) : (
           <div className="flex items-center justify-between gap-2">
             {item ? (

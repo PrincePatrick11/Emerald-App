@@ -15,6 +15,7 @@ import { groupBy, groupByMonth } from '../../lib/groupBy';
 import { categoryLabel } from '../../lib/categories';
 import Dashboard from '../ui/Dashboard';
 import Button from '../ui/Button';
+import InlineConfirm from '../ui/InlineConfirm';
 import type { TrashedItem } from '../../types';
 
 function typeIcon(type: TrashedItem['type']) {
@@ -90,23 +91,7 @@ function ItemRow({ item, confirmingId, setConfirmingId, restore, handlePermanent
       </div>
       <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
         {confirming ? (
-          <>
-            <span className="text-xs text-stone-400">{t('common.confirmSure')}</span>
-            <Button
-              onClick={() => handlePermanentDelete(item)}
-              variant="danger"
-              className="text-xs px-2.5 py-1.5"
-            >
-              {t('common.confirmYes')}
-            </Button>
-            <Button
-              onClick={() => setConfirmingId(null)}
-              variant="ghost"
-              className="text-xs px-2 py-1.5"
-            >
-              {t('common.confirmNo')}
-            </Button>
-          </>
+          <InlineConfirm onConfirm={() => handlePermanentDelete(item)} onCancel={() => setConfirmingId(null)} />
         ) : (
           <>
             <button
@@ -158,15 +143,7 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, handlePermanen
       </div>
       <div className="flex items-center gap-1 pt-1 border-t border-stone-700/40" onClick={(e) => e.stopPropagation()}>
         {confirming ? (
-          <>
-            <span className="text-xs text-stone-400">{t('common.confirmSure')}</span>
-            <Button onClick={() => handlePermanentDelete(item)} variant="danger" className="text-xs px-2 py-1">
-              {t('common.confirmYes')}
-            </Button>
-            <Button onClick={() => setConfirmingId(null)} variant="ghost" className="text-xs px-2 py-1">
-              {t('common.confirmNo')}
-            </Button>
-          </>
+          <InlineConfirm small onConfirm={() => handlePermanentDelete(item)} onCancel={() => setConfirmingId(null)} />
         ) : (
           <>
             <button onClick={() => restore(item)} className="trash-restore-btn flex items-center gap-1 text-xs text-jade-400 hover:text-jade-300 px-2 py-1 rounded hover:bg-jade-400/10 transition-colors">
@@ -389,45 +366,33 @@ export default function TrashView() {
     <div className="flex items-center gap-2 flex-wrap">
       {hasSelection && (
         <>
-          {confirmingBulkDelete && (
-            <span className="text-xs text-stone-400">{t('common.confirmSure')}</span>
-          )}
-          <Button
-            onClick={handleBulkDelete}
-            variant="danger"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--danger-bg)] border border-[var(--danger-border)] hover:border-[var(--danger-hover-border)]"
-          >
-            <Trash2 size={12} />
-            {confirmingBulkDelete
-              ? t('common.confirmYes')
-              : t('trash.deleteSelected', { count: selectedIds.size })}
-          </Button>
-          {confirmingBulkDelete && (
-            <Button onClick={() => setConfirmingBulkDelete(false)} variant="ghost" className="text-xs px-2 py-1.5 rounded-md">
-              {t('common.confirmNo')}
+          {confirmingBulkDelete ? (
+            <InlineConfirm onConfirm={handleBulkDelete} onCancel={() => setConfirmingBulkDelete(false)} />
+          ) : (
+            <Button
+              onClick={handleBulkDelete}
+              variant="danger"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--danger-bg)] border border-[var(--danger-border)] hover:border-[var(--danger-hover-border)]"
+            >
+              <Trash2 size={12} />
+              {t('trash.deleteSelected', { count: selectedIds.size })}
             </Button>
           )}
           <div className="w-px h-4 bg-stone-700" />
         </>
       )}
       {items.length > 0 && !hasSelection && (
-        <div className="flex items-center gap-2 flex-wrap">
-          {confirmingEmpty && (
-            <span className="text-xs text-stone-400">{t('trash.confirmEmpty')}</span>
-          )}
+        confirmingEmpty ? (
+          <InlineConfirm message={t('trash.confirmEmpty')} onConfirm={handleEmptyTrash} onCancel={() => setConfirmingEmpty(false)} />
+        ) : (
           <Button
             onClick={handleEmptyTrash}
             variant="danger"
             className="text-xs px-3 py-1.5 rounded-md bg-[var(--danger-bg)] border border-[var(--danger-border)] hover:border-[var(--danger-hover-border)]"
           >
-            {confirmingEmpty ? t('common.confirmYes') : t('trash.emptyTrash')}
+            {t('trash.emptyTrash')}
           </Button>
-          {confirmingEmpty && (
-            <Button onClick={() => setConfirmingEmpty(false)} variant="ghost" className="text-xs px-2 py-1.5 rounded-md">
-              {t('common.confirmNo')}
-            </Button>
-          )}
-        </div>
+        )
       )}
     </div>
   );

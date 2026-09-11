@@ -292,7 +292,6 @@ export default function AltarView() {
           onChangeRename={setRenameValue}
           onCommitRename={commitRename}
           onCancelRename={() => setRenamingId(null)}
-          onOpen={() => openAltar(altar)}
           onContextMenu={(event) => { event.preventDefault(); setCtxMenu({ id: altar.id, x: event.clientX, y: event.clientY }); }}
         />
       ) : (
@@ -305,7 +304,6 @@ export default function AltarView() {
           onChangeRename={setRenameValue}
           onCommitRename={commitRename}
           onCancelRename={() => setRenamingId(null)}
-          onOpen={() => openAltar(altar)}
           onContextMenu={(event) => { event.preventDefault(); setCtxMenu({ id: altar.id, x: event.clientX, y: event.clientY }); }}
         />
       );

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Trash2, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
+import DashboardItem from '../ui/DashboardItem';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
@@ -240,8 +241,9 @@ export default function OperationsView() {
       const isSigil = !!sigil;
       const dateStr = `${catDisplayName}${catDisplayName ? ' · ' : ''}${formatEntryDate(op.updated_at)}`;
       const createdDate = formatEntryDate(op.created_at);
+      const opView = { type: 'operations', id: op.id, mode: 'view' } as const;
       if (renamingId === op.id) return (
-        <div key={op.id} className={isCardView(view) ? 'panel-interactive px-4 py-4 text-left' : 'panel-interactive w-full flex items-center gap-3 px-4 py-3'}>
+        <DashboardItem view={opView} layout={isCardView(view) ? 'card' : 'row'} editing>
           {isCardView(view) ? (
             <>
               {isImageIcon(iconValue)
@@ -267,24 +269,10 @@ export default function OperationsView() {
               <span className="text-xs text-parchment-500/70 flex-shrink-0">{dateStr}</span>
             </>
           )}
-        </div>
+        </DashboardItem>
       );
       return (
-        <button
-          key={op.id}
-          onClick={() => setActiveView({ type: 'operations', id: op.id, mode: 'view' })}
-          onAuxClick={(e) => {
-            if (e.button === 1) {
-              e.preventDefault();
-              openViewInNewTab({ type: 'operations', id: op.id, mode: 'view' });
-            }
-          }}
-          onContextMenu={(e) => openCtxMenu(e, op.id)}
-          className={isCardView(view)
-            ? 'panel-interactive px-4 py-4 text-left'
-            : 'panel-interactive w-full text-left flex items-center gap-3 px-4 py-3 group'
-          }
-        >
+        <DashboardItem view={opView} layout={isCardView(view) ? 'card' : 'row'} onContextMenu={(e) => openCtxMenu(e, op.id)}>
           {isCardView(view) ? (
             <>
               {isSigil ? (
@@ -347,7 +335,7 @@ export default function OperationsView() {
               )}
             </>
           )}
-        </button>
+        </DashboardItem>
       );
     };
 
@@ -431,7 +419,6 @@ export default function OperationsView() {
                   mode: 'category',
                   groups: catGroups,
                   renderGroupHeader: renderCategoryHeader,
-                  renderEmptyGroup: () => <p className="text-xs text-stone-700 px-1 py-1">{t('operations.none')}</p>,
                   isGroupCollapsed: (g) => isCatCollapsed(g.key!),
                 }
               : { mode: 'flat' }

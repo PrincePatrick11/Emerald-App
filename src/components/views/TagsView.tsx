@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
-import { Check, Pencil, Trash2, X } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { TAG_COLORS, TAG_NAME_TAKEN, randomTagColor, useTagStore } from '../../store/tagStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
@@ -11,6 +11,7 @@ import { useCategoryStore } from '../../store/categoryStore';
 import { TAGS_SORTS, isTagsSort, useUIStore } from '../../store/uiStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
+import { useDeepLink } from '../../hooks/useDeepLink';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { generateId } from '../../lib/helpers';
 import { categoryLabel } from '../../lib/categories';
@@ -21,6 +22,9 @@ import Button from '../ui/Button';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
+import DashboardItem from '../ui/DashboardItem';
+import InlineConfirm from '../ui/InlineConfirm';
+import InlineNameEditor from '../ui/InlineNameEditor';
 import ModuleCounts from '../ui/ModuleCounts';
 import type { ActiveView, Tag } from '../../types';
 
@@ -84,7 +88,7 @@ function TagColorDot({ color, onPick }: { color: string; onPick?: (color: string
   );
 }
 
-/** Farbpunkt, Namensfeld, Speichern und Abbrechen — für Anlegen wie Umbenennen. */
+/** Farbpunkt vor dem Namens-Editor — für Anlegen wie Umbenennen. */
 function TagEditRow({
   color, onColor, name, onName, error, onSave, onCancel,
 }: {
@@ -105,24 +109,8 @@ function TagEditRow({
       <span className="w-5 flex items-center justify-center flex-shrink-0">
         <TagColorDot color={color} onPick={onColor} />
       </span>
-      <input
-        autoFocus
-        value={name}
-        onChange={(e) => onName(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') onSave();
-          if (e.key === 'Escape') onCancel();
-        }}
-        placeholder={t('tags.name')}
-        className="input-field flex-1 min-w-0 rounded-md px-2 py-0.5 text-sm outline-none selectable"
-      />
-      {error && <span className="text-xs text-[var(--danger-text)] shrink-0">{error}</span>}
-      <Button tone="jade" compact small title={t('common.save')} aria-label={t('common.save')} onClick={onSave}>
-        <Check size={12} />
-      </Button>
-      <Button tone="neutral" compact small title={t('common.cancel')} aria-label={t('common.cancel')} onClick={onCancel}>
-        <X size={12} />
-      </Button>
+      <InlineNameEditor value={name} onChange={onName} error={error} onSave={onSave} onCancel={onCancel}
+        placeholder={t('tags.name')} />
     </div>
   );
 }
@@ -156,8 +144,6 @@ export default function TagsView() {
   const operations = useOperationStore((s) => s.operations);
   const tasks = useTaskStore((s) => s.tasks);
   const categories = useCategoryStore((s) => s.categories);
-  const setActiveView = useUIStore((s) => s.setActiveView);
-  const openViewInNewTab = useUIStore((s) => s.openViewInNewTab);
   const sort = useUIStore((s) => s.tagsSort);
   const setSort = useUIStore((s) => s.setTagsSort);
   const { isCollapsed, toggle, expand } = useCollapsedSet('tags', { defaultCollapsed: true });
@@ -170,43 +156,19 @@ export default function TagsView() {
   const [nameError, setNameError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ tagId: string; x: number; y: number } | null>(null);
-  const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
 
-  /**
-   * Der Tiefenlink aus der globalen Suche: `{ type: 'tags', id }` klappt den
-   * Tag auf und scrollt zu ihm. Suche und Filter werden geleert, sonst stünde
-   * er womöglich gar nicht in der Liste.
-   *
-   * Wie in `TasksView` hängt der Effekt am `activeView`-Objekt statt an der id
-   * darin: `setActiveView` legt pro Navigation ein frisches an, sodass derselbe
-   * Treffer auch zweimal hintereinander wirkt, und `handledView` sorgt dafür,
-   * dass eine spätere Tag-Änderung den Nutzer nicht zurückwirft.
-   */
-  const activeView = useUIStore((s) => s.activeView);
-  const handledView = useRef<typeof activeView | null>(null);
-
-  useEffect(() => {
-    if (activeView.type !== 'tags' || !activeView.id) return;
-    if (handledView.current === activeView) return;
-    if (!tags.some((tag) => tag.id === activeView.id)) return;
-    handledView.current = activeView;
-    setSearch('');
-    setModuleFilter([]);
-    expand(activeView.id);
-    setPendingScrollId(activeView.id);
-  }, [activeView, tags, expand]);
-
-  // Eigener Effekt, weil der Kopf erst nach geleerter Suche dasteht.
-  useEffect(() => {
-    if (!pendingScrollId) return;
-    const frame = requestAnimationFrame(() => {
-      document
-        .querySelector<HTMLElement>(`[data-tag-id="${CSS.escape(pendingScrollId)}"]`)
-        ?.scrollIntoView({ block: 'nearest' });
-      setPendingScrollId(null);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [pendingScrollId]);
+  // Der Tiefenlink aus der globalen Suche klappt den Tag auf; Suche und
+  // Filter werden geleert, sonst stünde er womöglich gar nicht in der Liste.
+  const { scrollTo } = useDeepLink({
+    type: 'tags',
+    items: tags,
+    rowAttribute: 'data-tag-id',
+    onOpen: (tag) => {
+      setSearch('');
+      setModuleFilter([]);
+      expand(tag.id);
+    },
+  });
 
   /** Tag-Name → getaggte Einträge, in Modul-Reihenfolge, darin nach Titel. */
   const itemsByTag = useMemo(() => {
@@ -302,7 +264,7 @@ export default function TagsView() {
         // Suche und Filter könnten den neuen, noch unbenutzten Tag verbergen.
         setSearch('');
         setModuleFilter([]);
-        setPendingScrollId(tag.id);
+        scrollTo(tag.id);
       } else {
         await updateTag(form.id, { name: trimmed, color });
       }
@@ -364,11 +326,7 @@ export default function TagsView() {
             ? <ModuleCounts modules={TAG_MODULE_IDS} counts={usage} />
             : <span className="text-xs text-stone-600">{t('tags.unused')}</span>}
           actions={confirming ? (
-            <span className="flex items-center gap-1.5 flex-shrink-0">
-              <span className="text-xs text-stone-400">{t('common.confirmSure')}</span>
-              <Button tone="danger" small onClick={() => handleDelete(tag)}>{t('common.confirmYes')}</Button>
-              <Button tone="neutral" small onClick={() => setConfirmDeleteId(null)}>{t('common.confirmNo')}</Button>
-            </span>
+            <InlineConfirm small onConfirm={() => handleDelete(tag)} onCancel={() => setConfirmDeleteId(null)} />
           ) : (
             // Dauerhaft sichtbar wie in der Kategorien-Ansicht.
             <span className="flex items-center gap-1.5 flex-shrink-0">
@@ -395,22 +353,12 @@ export default function TagsView() {
       const cat = item.categoryId ? catById.get(item.categoryId) : undefined;
       label = cat ? `${cat.emoji} ${categoryLabel(t, cat)}` : label;
     }
-    const view = itemView(item);
     return (
-      <button
-        onClick={() => setActiveView(view)}
-        onAuxClick={(e) => {
-          if (e.button === 1) {
-            e.preventDefault();
-            openViewInNewTab(view);
-          }
-        }}
-        className="panel-interactive w-full text-left flex items-center gap-3 px-4 py-3"
-      >
+      <DashboardItem view={itemView(item)} layout="row">
         <Icon size={14} className="text-stone-500 flex-shrink-0" />
         <span className="flex-1 text-sm text-stone-300 truncate">{item.title || t(meta.untitledKey)}</span>
         <span className="text-xs text-parchment-500/70 flex-shrink-0">{label} · {formatEntryDate(item.updated_at)}</span>
-      </button>
+      </DashboardItem>
     );
   };
 

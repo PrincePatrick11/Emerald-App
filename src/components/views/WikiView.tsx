@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Trash2, Pencil, Copy, PanelTopOpen } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
+import DashboardItem from '../ui/DashboardItem';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
@@ -239,61 +240,42 @@ export default function WikiView() {
       // hier sonst deren id als Label (wie in OperationsView entfällt es dann).
       const catLabel = categoryLabel(t, cat);
       const dateStr = `${catLabel}${catLabel ? ' · ' : ''}${formatEntryDate(a.updated_at)}`;
-      if (renamingId === a.id) return (
-        <div key={a.id} className={isCardView(view) ? 'panel-interactive px-4 py-4 text-left' : 'panel-interactive w-full flex items-center gap-3 px-4 py-3'}>
-          {isCardView(view) ? (
-            <>
-              <div className="flex items-center gap-2 mb-2">
-                {isImageIcon(a.icon) ? <img src={a.icon!} alt="" className="w-6 h-6 object-cover rounded" /> : <span className="text-xl">{cat?.emoji ?? '📄'}</span>}
-              </div>
-              <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
-                onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
-                className="text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1" />
-              <div className="text-xs text-parchment-500/70">{dateStr}</div>
-            </>
-          ) : (
-            <>
-              <span className="text-base flex-shrink-0">{iconEl}</span>
-              <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
-                onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
-                className="flex-1 bg-transparent text-sm text-stone-300 outline-none selectable" />
-              <span className="text-xs text-parchment-500/70 flex-shrink-0">{dateStr}</span>
-            </>
-          )}
-        </div>
-      );
+      const renaming = renamingId === a.id;
       return (
-        <button
-          key={a.id}
-          onClick={() => setActiveView({ type: 'wiki', id: a.id, mode: 'view' })}
-          onAuxClick={(e) => {
-            if (e.button === 1) {
-              e.preventDefault();
-              openViewInNewTab({ type: 'wiki', id: a.id, mode: 'view' });
-            }
-          }}
+        <DashboardItem
+          view={{ type: 'wiki', id: a.id, mode: 'view' }}
+          layout={isCardView(view) ? 'card' : 'row'}
+          editing={renaming}
           onContextMenu={(e) => openCtxMenu(e, a.id)}
-          className={isCardView(view)
-            ? 'panel-interactive px-4 py-4 text-left'
-            : 'panel-interactive w-full text-left flex items-center gap-3 px-4 py-3 group'
-          }
         >
           {isCardView(view) ? (
             <>
               <div className="flex items-center gap-2 mb-2">
                 {isImageIcon(a.icon) ? <img src={a.icon!} alt="" className="w-6 h-6 object-cover rounded" /> : <span className="text-xl">{cat?.emoji ?? '📄'}</span>}
               </div>
-              <div className="text-sm font-medium text-stone-200 truncate mb-1">{a.title}</div>
+              {renaming ? (
+                <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
+                  onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
+                  className="text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1" />
+              ) : (
+                <div className="text-sm font-medium text-stone-200 truncate mb-1">{a.title}</div>
+              )}
               <div className="text-xs text-parchment-500/70">{dateStr}</div>
             </>
           ) : (
             <>
               <span className="text-base flex-shrink-0">{iconEl}</span>
-              <span className="flex-1 text-sm text-stone-300 truncate">{a.title}</span>
+              {renaming ? (
+                <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
+                  onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
+                  className="flex-1 bg-transparent text-sm text-stone-300 outline-none selectable" />
+              ) : (
+                <span className="flex-1 text-sm text-stone-300 truncate">{a.title}</span>
+              )}
               <span className="text-xs text-parchment-500/70 flex-shrink-0">{dateStr}</span>
             </>
           )}
-        </button>
+        </DashboardItem>
       );
     };
 
@@ -379,7 +361,6 @@ export default function WikiView() {
                   mode: 'category',
                   groups: catGroups,
                   renderGroupHeader: renderCategoryHeader,
-                  renderEmptyGroup: () => <p className="text-xs text-stone-700 px-1 py-1">{t('wiki.noArticles')}</p>,
                   isGroupCollapsed: (g) => isCatCollapsed(g.key!),
                 }
               : { mode: 'flat' }
