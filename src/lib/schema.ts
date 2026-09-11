@@ -688,5 +688,13 @@ export async function collectUsedImageFilenames(db: Database): Promise<Set<strin
     }
   }
 
+  // Bild-Vorgaben eigener Blöcke: das `elements`-JSON nennt die Datei, bevor
+  // eine Kopie sie in einen Inhalt schreibt. Nicht in IMAGE_FIELDS — Migration
+  // v35 läuft über diese Liste, und die Tabelle entsteht erst mit v40.
+  const definitions = await db.select<{ elements: string | null }[]>('SELECT elements FROM block_definitions');
+  for (const { elements } of definitions) {
+    for (const match of (elements ?? '').matchAll(IMAGE_NAME_RE)) used.add(match[0]);
+  }
+
   return used;
 }

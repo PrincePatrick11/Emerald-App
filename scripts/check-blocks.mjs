@@ -26,10 +26,10 @@ writeFileSync(
   `export { parseBlocks, serializeBlocks, createTextBlock, blockSectionHtml, neutralizeSectionTags } from '${root}/src/lib/blocks/blockHtml';
    export { TEXT_BLOCK_TYPE, BLOCK_ATTR } from '${root}/src/lib/blocks/types';
    export { parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot } from '${root}/src/lib/blocks/fields';
-   export { instantiateDefinition, updateInstanceToDefinition, isOutdatedCopy, blockOrigin, updateCopiesInContent, removeCopiesFromContent, parseDefinitionElements, parseDefinitionDisplay } from '${root}/src/lib/blocks/definitions';
+   export { instantiateDefinition, sameShape, updateInstanceToDefinition, isOutdatedCopy, blockOrigin, updateCopiesInContent, removeCopiesFromContent, parseDefinitionElements, parseDefinitionDisplay, remapDefinitionDefaults, definitionImageRefs, hasFrozenCopy } from '${root}/src/lib/blocks/definitions';
    export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
    export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
-   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded, sigilImage, withSigilImage, letterList } from '${root}/src/lib/blocks/sigil';
+   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked, withRenamedPartTargets } from '${root}/src/lib/blocks/sigil';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';`
@@ -55,12 +55,14 @@ const {
   parseBlocks, serializeBlocks, createTextBlock, neutralizeSectionTags, TEXT_BLOCK_TYPE, BLOCK_ATTR, extractInternalLinks,
   parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot,
   internalLinkChipHtml,
-  instantiateDefinition, updateInstanceToDefinition, isOutdatedCopy, blockOrigin, updateCopiesInContent,
+  instantiateDefinition, sameShape, updateInstanceToDefinition, isOutdatedCopy, blockOrigin, updateCopiesInContent,
   removeCopiesFromContent, parseDefinitionElements, parseDefinitionDisplay, entryBlockSummary,
   withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID,
   extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock,
   createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded,
   sigilImage, withSigilImage, letterList, renderBlocksForExport,
+  sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked,
+  remapDefinitionDefaults, definitionImageRefs, hasFrozenCopy, withRenamedPartTargets,
 } = bundle;
 
 const failures = [];
@@ -325,7 +327,7 @@ console.log('\n4d. Eigene Blöcke: Kopien und Aktualisieren\n');
     elements: [{ id: 'e-date', kind: 'date', label: 'Datum' }, { id: 'e-result', kind: 'shorttext', label: 'Ergebnis' }],
   };
 
-  const copy = instantiateDefinition(def);
+  const copy = instantiateDefinition(def, text);
   const copyModel = parseFields(copy);
   check('eine Kopie trägt Herkunft, Revision, Name und die Titel-Regel',
     blockOrigin(copy)?.id === 'def-1' && blockOrigin(copy)?.rev === 1 && copyModel.name === 'Ritual' &&
@@ -397,6 +399,43 @@ console.log('\n4d. Eigene Blöcke: Kopien und Aktualisieren\n');
     parseDefinitionElements(JSON.stringify([
       { id: '__proto__', kind: 'date', label: '' }, { id: 'ok', kind: 'date', label: '' }, { id: 'ok', kind: 'number', label: '' },
     ])).map((e) => e.id).join() === 'ok');
+
+  const [preset] = parseDefinitionElements(JSON.stringify([{
+    id: 'e-list', kind: 'checklist', label: 'Schritte',
+    defaultValue: [{ id: 'i1', text: 'Kerze', checked: false }, { id: 'i2', text: 'Räuchern', checked: true }, 'kaputt'],
+  }]));
+  const prefilledDef = {
+    ...def, revision: 5,
+    elements: [preset, { id: 'e-on', kind: 'toggle', label: 'An', defaultValue: true },
+      { id: 'e-n', kind: 'number', label: 'N', defaultValue: 'drei' }, { id: 'e-pic', kind: 'image', label: 'Bild', defaultValue: 'x.png' }],
+  };
+  const parsedDefaults = parseDefinitionElements(JSON.stringify(prefilledDef.elements));
+  check('Vorgabe: nach Art geprüft, ein Bild nur als gespeicherter Dateiname', parsedDefaults[0].defaultValue.length === 2
+    && parsedDefaults[1].defaultValue === true && parsedDefaults[2].defaultValue === undefined
+    && parsedDefaults[3].defaultValue === undefined, parsedDefaults);
+  const pdef = { ...prefilledDef, elements: parsedDefaults };
+  const prefilled = instantiateDefinition(pdef, text);
+  const pm = parseFields(prefilled);
+  const items = pm.values['e-list'];
+  check('eine neue Kopie startet mit den Vorgaben, samt Fallback',
+    items?.map((i) => `${i.text}:${i.checked}`).join() === 'Kerze:false,Räuchern:true' && pm.values['e-on'] === true
+      && prefilled.html.includes('Kerze') && prefilled.html.includes('<dd>Ja</dd>'), { values: pm.values, html: prefilled.html });
+  check('die Kopie trägt die Vorgabe nicht in ihrer Config, und Punkte bekommen eigene IDs',
+    !prefilled.attrs['data-block-config'].includes('defaultValue') && items.every((i) => i.id !== 'i1' && i.id !== 'i2'),
+    prefilled.attrs['data-block-config']);
+  check('eine andere Vorgabe hebt die Revision nicht',
+    sameShape(pdef, { ...pdef, elements: pdef.elements.map((e) => (e.id === 'e-on' ? { ...e, defaultValue: false } : e)) })
+      && !sameShape(pdef, { ...pdef, elements: pdef.elements.map((e) => (e.id === 'e-on' ? { ...e, label: 'Aus' } : e)) }));
+  const grown = updateInstanceToDefinition(updated, {
+    ...def2, revision: 6,
+    elements: [
+      ...def2.elements.map((e) => (e.id === 'e-result' ? { ...e, defaultValue: 'überschreibt nicht' } : e)),
+      { id: 'e-new', kind: 'toggle', label: 'Neu', defaultValue: true },
+    ],
+  }, text);
+  const gm = parseFields(grown);
+  check('Aktualisieren: ein neues Feld kommt mit seiner Vorgabe, bestehende Werte bleiben',
+    gm.values['e-new'] === true && gm.values['e-result'] === 'gut', gm.values);
 }
 
 console.log('\n4e. Altstatus der Operationen wird ein Block\n');
@@ -458,14 +497,37 @@ console.log('\n4f. Sigillen-Blöcke\n');
   const odd = parseSigilCharge({ ...createSigilChargeBlock(), attrs: { 'data-block-data': JSON.stringify({ loaded: 'ja', revealDate: 'morgen', lock: 'alles' }) } });
   check('Ladung: Unsinn fällt auf sichere Werte zurück', !odd.loaded && odd.revealDate === null && odd.lock === 'entry', odd);
 
-  const charged = serializeSigilCharge(createSigilChargeBlock(), { loaded: true, revealDate: '2030-01-01', lock: 'entry', technique: null });
+  const chargeData = { loaded: true, revealDate: '2030-01-01', lock: 'entry', technique: null, targets: null };
+  const charged = serializeSigilCharge(createSigilChargeBlock(), chargeData);
   const blocks = [calc, canvas, charged];
   const before = sigilState(blocks, '2029-12-31');
   const after = sigilState(blocks, '2030-01-01');
-  check('geladen vor dem Datum: verborgen und ganz gesperrt', before.concealed && before.lockEntry && before.lockSigil, before);
-  check('am Enthüllungstag: sichtbar, aber weiter gesperrt', !after.concealed && after.lockEntry, after);
-  const sigilOnly = sigilState([serializeSigilCharge(createSigilChargeBlock(), { loaded: true, revealDate: '2030-01-01', lock: 'sigil', technique: null })], '2029-01-01');
-  check('Sperre „nur Sigille": Eintrag bearbeitbar, Sigillen-Blöcke nicht', !sigilOnly.lockEntry && sigilOnly.lockSigil);
+  check('geladen vor dem Datum: verborgen und ganz gesperrt',
+    before.concealed.get(calc.id) === '2030-01-01' && before.concealed.has(canvas.id) && before.lockEntry
+      && before.locked.has(calc.id) && before.locked.has(canvas.id), before);
+  check('am Enthüllungstag: sichtbar, aber weiter gesperrt', after.concealed.size === 0 && after.lockEntry && after.locked.has(calc.id), after);
+  const sigilOnly = sigilState([calc, serializeSigilCharge(createSigilChargeBlock(), { ...chargeData, lock: 'sigil' })], '2029-01-01');
+  check('Sperre „nur Sigille": Eintrag bearbeitbar, Sigillen-Blöcke nicht', !sigilOnly.lockEntry && sigilOnly.locked.has(calc.id));
+
+  const noDate = sigilState([calc, serializeSigilCharge(createSigilChargeBlock(), { ...chargeData, revealDate: null })], '2099-01-01');
+  check('ohne Zieldatum geladen: verborgen bis zum Entladen', noDate.concealed.has(calc.id) && noDate.concealed.get(calc.id) === null, noDate);
+
+  const onlyCanvas = serializeSigilCharge(createSigilChargeBlock(), { ...chargeData, lock: 'sigil', targets: [canvas.id] });
+  const picked = sigilState([calc, canvas, onlyCanvas], '2029-12-31');
+  check('Ladung mit Auswahl: verdeckt und sperrt nur die gewählte Zeichnung',
+    picked.concealed.has(canvas.id) && !picked.concealed.has(calc.id) && !picked.locked.has(calc.id) && !picked.lockEntry, picked);
+  const pickedBack = parseSigilCharge(parseBlocks(serializeBlocks([onlyCanvas]))[0]);
+  check('Ladung: die Auswahl übersteht den Round-Trip, ohne Auswahl fehlt sie im JSON',
+    pickedBack.targets?.join() === canvas.id && parseSigilCharge(charged).targets === null
+      && !charged.attrs['data-block-data'].includes('targets'), pickedBack);
+  const oddTargets = parseSigilCharge({ ...createSigilChargeBlock(), attrs: { 'data-block-data': JSON.stringify({ targets: ['ok-1', 'ok-1', '<x>', 3, 'y'.repeat(65)] }) } });
+  check('Ladung: fremde Auswahl — nur harmlose, eindeutige IDs', oddTargets.targets?.join() === 'ok-1', oddTargets);
+  const later = sigilState([calc, serializeSigilCharge(createSigilChargeBlock(), { ...chargeData, targets: [calc.id] }),
+    serializeSigilCharge(createSigilChargeBlock(), { ...chargeData, revealDate: '2031-06-01', targets: [calc.id] })], '2029-12-31');
+  check('zwei Ladungen auf demselben Block: die längere gilt', later.concealed.get(calc.id) === '2031-06-01', later);
+  const partial = withoutConcealed(serializeBlocks([calc, canvas, onlyCanvas]), '2029-12-31');
+  check('Suche ohne die verdeckte Zeichnung, mit dem freien Rechner',
+    partial.includes('core.sigil.calc') && !partial.includes('core.sigil.canvas'), partial);
 
   const content = serializeBlocks([createTextBlock('<p>Notiz</p>'), ...blocks]);
   const hiddenContent = withoutConcealed(content, '2029-12-31');
@@ -474,12 +536,12 @@ console.log('\n4f. Sigillen-Blöcke\n');
   check('enthüllt: alles bleibt', withoutConcealed(content, '2030-02-01') === content);
 
   const unloaded = withChargeUnloaded(content);
-  check('eine Kopie wird entladen', !sigilState(parseBlocks(unloaded), '2029-12-31').loaded && withChargeUnloaded(unloaded) === unloaded);
+  check('eine Kopie wird entladen', sigilState(parseBlocks(unloaded), '2029-12-31').locked.size === 0 && withChargeUnloaded(unloaded) === unloaded);
 
   const secret = { ...createTextBlock('<p>geheim</p>'), attrs: { 'data-block-hidden': '1' } };
   const exportText = {
     title: (b) => `T:${b.type}`, date: (iso) => `D:${iso}`, number: (n) => `N:${n}`, targetDate: 'Ziel', technique: 'Technik',
-    loaded: 'Geladen', notLoaded: 'Offen', drawing: 'Zeichnung',
+    loaded: 'Geladen', notLoaded: 'Offen', drawing: 'Zeichnung', altar: () => null,
     fields: { label: (e) => e.label || e.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p },
   };
   const exportedContent = serializeBlocks([createTextBlock('<p>sichtbar</p>'), secret, ...blocks]);
@@ -522,6 +584,198 @@ console.log('\n4f. Sigillen-Blöcke\n');
   const t0 = Date.now();
   parseSigilCharge({ ...createSigilChargeBlock(), html: '<p '.repeat(50000) });
   check('Ladetechnik-Regex bleibt auf präpariertem Markup schnell', Date.now() - t0 < 500, `${Date.now() - t0} ms`);
+}
+
+console.log('\n4g. Altar-Feld und Vorgaben mit Markup\n');
+{
+  const altarId = 'a1111111-1111-1111-1111-111111111111';
+  const wikiId = 'b1111111-1111-1111-1111-111111111111';
+  const img = `${'cd'.repeat(32)}.png`;
+  const text = {
+    title: (b) => `T:${b.type}`, date: (iso) => iso, number: String, targetDate: '', technique: '', loaded: '', notLoaded: '',
+    drawing: '', fields: { label: (e) => e.label, yes: 'Ja', no: 'Nein', moonName: (p) => p },
+    altar: (id) => (id === altarId ? { title: 'Hausaltar neu', image: 'data:image/png;base64,QUJD' } : null),
+  };
+
+  const elements = parseDefinitionElements(JSON.stringify([
+    { id: 'alt', kind: 'altar', label: 'Altar', defaultValue: { id: altarId, entryType: 'altar', label: 'Hausaltar' } },
+    { id: 'lnk', kind: 'link', label: 'Quelle', defaultValue: { id: wikiId, entryType: 'wiki', label: 'Artikel' } },
+    { id: 'pic', kind: 'image', label: 'Bild', defaultValue: `bilder/${img}` },
+    { id: 'alt2', kind: 'altar', label: 'Falsch', defaultValue: { id: wikiId, entryType: 'wiki', label: 'kein Altar' } },
+    { id: 'lnk2', kind: 'link', label: 'Kaputt', defaultValue: { id: 'nicht-uuid', entryType: 'wiki', label: 'x' } },
+    { id: 'pic2', kind: 'image', label: 'Fremd', defaultValue: 'javascript:alert(1)' },
+  ]));
+  const byId = Object.fromEntries(elements.map((e) => [e.id, e]));
+  check('Vorgaben: Altar, Link und Bild werden gelesen, Bild als reiner Dateiname',
+    byId.alt.defaultValue?.id === altarId && byId.lnk.defaultValue?.entryType === 'wiki' && byId.pic.defaultValue === img, elements);
+  check('Vorgaben: ein Altar-Feld nimmt nur Altäre, Links nur gültige Ziele, Bilder nur gespeicherte Dateien',
+    byId.alt2.defaultValue === undefined && byId.lnk2.defaultValue === undefined && byId.pic2.defaultValue === undefined);
+
+  const def = {
+    id: 'def-slots', name: 'Ritualplatz', icon: '🕯️', description: '', revision: 1, sort_order: 0,
+    created_at: '', updated_at: '', deleted_at: null,
+    display: { readHideEmpty: true, readOnly: false, showTitle: true }, elements,
+  };
+  const copy = instantiateDefinition(def, text.fields);
+  const cm = parseFields(copy);
+  check('eine neue Kopie trägt Chip und Bild in ihren Slots',
+    linkFromSlot(cm.slots.alt)?.id === altarId && linkFromSlot(cm.slots.lnk)?.id === wikiId && imageFromSlot(cm.slots.pic) === img
+      && !cm.slots.alt2 && !cm.slots.lnk2 && !cm.slots.pic2, cm.slots);
+  check('die Links der Kopie stehen im Inhalt (Link-Tabelle, Rückverweise)',
+    extractInternalLinks(serializeBlocks([copy])).length === 2);
+
+  const out = renderBlocksForExport(serializeBlocks([copy]), text);
+  check('Export: das Altar-Feld mit Vorschaubild unter aktuellem Namen und Chip',
+    out.includes('<img src="data:image/png;base64,QUJD" alt="Hausaltar neu" data-export-placeholder="1">')
+      && out.includes('data-entry-type="altar"'), out);
+
+  const remapped = parseDefinitionElements(remapDefinitionDefaults(
+    JSON.stringify(elements), (name) => (name === img ? `${'ef'.repeat(32)}.png` : name),
+    (t) => (t.entryType === 'wiki' ? null : { id: `abcd1234-${t.id}`, label: 'Neu' }),
+  ));
+  const rm = Object.fromEntries(remapped.map((e) => [e.id, e]));
+  check('Import: Bild-Vorgaben folgen den gespeicherten Bildern, Link-Vorgaben den neuen IDs — ohne Ziel fallen sie weg',
+    rm.pic.defaultValue === `${'ef'.repeat(32)}.png` && rm.alt.defaultValue?.id === `abcd1234-${altarId}`
+      && rm.alt.defaultValue?.label === 'Neu' && rm.lnk.defaultValue === undefined, remapped);
+  check('die Bilder der Vorgaben sind bekannt', definitionImageRefs(elements).join() === img);
+}
+
+console.log('\n4h. Sigillen als Teile eigener Blöcke\n');
+{
+  const text = { label: (e) => e.label || e.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p };
+  const def = {
+    id: 'def-sigil', name: 'Sigillen-Ritual', icon: '🕯️', description: '', revision: 1, sort_order: 0,
+    created_at: '', updated_at: '', deleted_at: null,
+    display: { readHideEmpty: true, readOnly: false, showTitle: true },
+    elements: parseDefinitionElements(JSON.stringify([
+      { id: 'ort', kind: 'shorttext', label: 'Ort' },
+      { id: 'calc', kind: 'sigilCalc', label: 'Rechner', defaultValue: { intention: 'nein' } },
+      { id: 'draw', kind: 'sigilCanvas', label: 'Zeichnung' },
+      { id: 'charge', kind: 'sigilCharge', label: 'Ladung' },
+    ])),
+  };
+  check('Sigillen-Teile sind Feldarten, ohne Vorgabe',
+    def.elements.map((e) => e.kind).join() === 'shorttext,sigilCalc,sigilCanvas,sigilCharge'
+      && def.elements[1].defaultValue === undefined, def.elements);
+
+  // Wie die Oberfläche: den Teil als virtuellen Block schreiben, zurück ins Modell.
+  const setPart = (block, elementId, change) => {
+    const model = parseFields(block);
+    const element = model.elements.find((e) => e.id === elementId);
+    const part = change(sigilPartBlock(block, element, model));
+    return serializeFields(block, withSigilPart(model, element, part), text);
+  };
+  let block = instantiateDefinition(def, text);
+  block = setPart(block, 'calc', (p) => serializeSigilCalc(p, { intention: 'Geheime Absicht', letters: ['G', 'H'], implemented: [] }));
+  block = setPart(block, 'draw', (p) => withSigilImage(p, `${'ab'.repeat(32)}.png`));
+  block = setPart(block, 'charge', (p) => serializeSigilCharge(p, {
+    loaded: true, revealDate: '2030-01-01', lock: 'entry', technique: null, targets: null,
+  }));
+  const back = parseBlocks(serializeBlocks([createTextBlock('<p>Notiz</p>'), block]));
+  const units = sigilUnits(back);
+  check('die Teile überstehen den Round-Trip und heißen <Block>:<Element>',
+    units.map((u) => u.block.id).join() === ['calc', 'draw', 'charge'].map((e) => sigilPartId(block.id, e)).join()
+      && parseSigilCalc(units[0].block).intention === 'Geheime Absicht' && sigilImage(units[1].block) === `${'ab'.repeat(32)}.png`,
+    units.map((u) => u.block));
+
+  const before = sigilState(back, '2029-12-31');
+  check('eine geladene Ladung als Teil verbirgt und sperrt die Teile, sperrt den Eintrag',
+    before.concealed.has(sigilPartId(block.id, 'calc')) && before.concealed.has(sigilPartId(block.id, 'draw'))
+      && before.lockEntry && blockHoldsLocked(before, block.id) && before.revealDate === '2030-01-01', before);
+  const content = serializeBlocks(back);
+  const hidden = withoutConcealed(content, '2029-12-31');
+  check('Suche und .emerald sehen verborgene Teile nicht — der Rest des Blocks bleibt',
+    !hidden.includes('Geheime') && !hidden.includes('abab') && hidden.includes('Notiz')
+      && parseBlocks(hidden).length === 2 && sigilUnits(parseBlocks(hidden)).length === 3, hidden);
+  check('nach dem Zieldatum ist alles da', withoutConcealed(content, '2030-01-02') === content);
+
+  const exportText = {
+    title: (b) => `T:${b.type}`, date: (iso) => `D:${iso}`, number: String, targetDate: 'Ziel', technique: 'Technik',
+    loaded: 'Geladen', notLoaded: 'Offen', drawing: 'Zeichnung', altar: () => null, fields: text,
+  };
+  const out = renderBlocksForExport(content, exportText, '2029-12-31');
+  check('Export: verborgene Teile fehlen, die Ladung steht als Teil drin',
+    !out.includes('Geheime') && !out.includes('<img') && out.includes('<dt>Ladung</dt>') && out.includes('Geladen'), out);
+  const revealed = renderBlocksForExport(content, exportText, '2030-02-01');
+  check('Export nach dem Datum: Rechner und Zeichnung als Teile',
+    revealed.includes('Geheime Absicht') && revealed.includes('alt="Zeichnung"'), revealed);
+
+  const unloaded = withChargeUnloaded(content);
+  const afterUnload = sigilState(parseBlocks(unloaded), '2029-12-31');
+  check('eine Kopie des Eintrags entlädt auch die Ladung im Teil',
+    afterUnload.concealed.size === 0 && !afterUnload.lockEntry && withChargeUnloaded(unloaded) === unloaded, afterUnload);
+
+  const standaloneCharge = serializeSigilCharge(createSigilChargeBlock(), {
+    loaded: true, revealDate: null, lock: 'sigil', technique: null, targets: [sigilPartId(block.id, 'draw')],
+  });
+  const mixed = sigilState([...parseBlocks(unloaded), standaloneCharge], '2029-12-31');
+  check('ein Ladung-Block kann gezielt einen Teil verdecken (Ziel <Block>:<Element>)',
+    mixed.concealed.has(sigilPartId(block.id, 'draw')) && !mixed.concealed.has(sigilPartId(block.id, 'calc'))
+      && parseSigilCharge(parseBlocks(serializeBlocks([standaloneCharge]))[0]).targets?.[0] === sigilPartId(block.id, 'draw'), mixed);
+
+  const summary = entryBlockSummary('sigil-part', content, '2029-12-31');
+  check('die Zusammenfassung kennt die Sigille im Teil (Sperre, kein Kartenbild solange verborgen)',
+    summary.sigil?.lockEntry === true && summary.sigil.image === null
+      && entryBlockSummary('sigil-part-2', content, '2030-02-01').sigil?.image === `${'ab'.repeat(32)}.png`, summary.sigil);
+  check('Sigillen-Daten landen nicht in den Feldwerten für Listen',
+    Object.keys(summary.fieldValues).every((k) => !k.endsWith(':calc') && !k.endsWith(':charge')), summary.fieldValues);
+
+  // Eine neue Revision ohne Ladung: fiele sie beim Aktualisieren weg, wäre die Sigille entladen.
+  const rev2 = { ...def, revision: 2, elements: def.elements.filter((e) => e.id !== 'charge') };
+  check('eine Kopie mit geladener Sigille wird weder aktualisiert noch entfernt',
+    updateCopiesInContent(content, rev2, text) === null && removeCopiesFromContent(content, def.id) === null
+      && hasFrozenCopy(content, def.id) && !hasFrozenCopy(unloaded, def.id)
+      && updateCopiesInContent(unloaded, rev2, text) !== null);
+
+  const dupId = 'dup-block';
+  const targeted = setPart(parseBlocks(unloaded)[1], 'charge', (p) => serializeSigilCharge(p, {
+    ...parseSigilCharge(p), targets: [sigilPartId(block.id, 'calc'), 'fremd-block'],
+  }));
+  const dup = withRenamedPartTargets({ ...targeted, id: dupId }, block.id, dupId);
+  const dupCharge = sigilUnits([dup]).find((u) => u.block.type === 'core.sigil.charge');
+  check('ein duplizierter Block zielt mit seiner Ladung auf die eigenen Teile',
+    parseSigilCharge(dupCharge.block).targets.join() === `${dupId}:calc,fremd-block`, parseSigilCharge(dupCharge.block));
+
+  const oddlyEncoded = content.replace(/&quot;/g, '&#34;');
+  check('ein anders kodierter Inhalt verbirgt seine Teile trotzdem',
+    !withoutConcealed(oddlyEncoded, '2029-12-31').includes('Geheime'));
+
+  const emptyDrawing = parseFields(instantiateDefinition(def, text));
+  check('eine leere Zeichnung als Teil bleibt im Lesemodus stehen (ihr Speichern überdauert „Fertig")',
+    !isHiddenInRead(emptyDrawing.elements.find((e) => e.id === 'draw'), emptyDrawing));
+
+  const configured = parseDefinitionElements(JSON.stringify([
+    { id: 'c', kind: 'sigilCalc', label: '', calcMode: 'auto', brushColor: '#ef4444' },
+    { id: 'c2', kind: 'sigilCalc', label: '', calcMode: 'alles' },
+    { id: 'd', kind: 'sigilCanvas', label: '', brushColor: '#ef4444', brushSize: 20, calcMode: 'manual' },
+    { id: 'd2', kind: 'sigilCanvas', label: '', brushColor: 'red; x', brushSize: 999 },
+    { id: 'l', kind: 'sigilCharge', label: '', defaultValue: { lock: 'sigil', targets: ['d', 'd', '__proto__', '<x>', 5] } },
+    { id: 'l2', kind: 'sigilCharge', label: '', defaultValue: { lock: 'alles', targets: 'd' } },
+  ]));
+  const cf = Object.fromEntries(configured.map((e) => [e.id, e]));
+  check('Einstellungen der Teile: nur passend zur Art und gültig',
+    cf.c.calcMode === 'auto' && cf.c.brushColor === undefined && cf.c2.calcMode === undefined
+      && cf.d.brushColor === '#ef4444' && cf.d.brushSize === 20 && cf.d.calcMode === undefined
+      && cf.d2.brushColor === undefined && cf.d2.brushSize === undefined, configured);
+  check('Vorgabe der Ladung: Sperre und eindeutige, harmlose Element-IDs — sonst „alle"',
+    cf.l.defaultValue.lock === 'sigil' && cf.l.defaultValue.targets.join() === 'd'
+      && cf.l2.defaultValue.lock === 'entry' && cf.l2.defaultValue.targets === null, [cf.l.defaultValue, cf.l2.defaultValue]);
+
+  const presetDef = { ...def, id: 'def-preset', elements: configured.filter((e) => ['c', 'd', 'l'].includes(e.id)) };
+  const presetCopy = instantiateDefinition(presetDef, text);
+  const presetCharge = sigilUnits([presetCopy]).find((u) => u.block.type === 'core.sigil.charge');
+  const pc = parseSigilCharge(presetCharge.block);
+  check('eine neue Kopie trägt die Ladung ungeladen, mit Sperre und Zielen auf ihre eigenen Teile',
+    !pc.loaded && pc.lock === 'sigil' && pc.targets.join() === sigilPartId(presetCopy.id, 'd'), pc);
+  const loadedPreset = setPart(presetCopy, 'l', (p) => serializeSigilCharge(p, { ...parseSigilCharge(p), loaded: true }));
+  const presetState = sigilState([loadedPreset], '2029-12-31');
+  check('geladen verdeckt sie genau die vorgegebene Zeichnung, nicht den Rechner',
+    presetState.concealed.has(sigilPartId(presetCopy.id, 'd')) && !presetState.concealed.has(sigilPartId(presetCopy.id, 'c'))
+      && !presetState.lockEntry, presetState);
+  check('der Aufbau (Modus, Pinsel) wandert mit in die Kopie, die Vorgabe nicht',
+    parseFields(presetCopy).elements.find((e) => e.id === 'c').calcMode === 'auto'
+      && parseFields(presetCopy).elements.find((e) => e.id === 'd').brushSize === 20
+      && !presetCopy.attrs['data-block-config'].includes('defaultValue'));
 }
 
 console.log('\n5. Was aus dem Inhalt abgeleitet wird, sieht die Blöcke durch\n');

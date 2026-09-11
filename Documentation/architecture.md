@@ -93,8 +93,8 @@ src/
 │                                      used by TasksView, CategoriesView, TagsView),
 │                     useOpenInNewTabAction (the "Open in New Tab" ContextMenuAction for an
 │                                      ActiveView, the menu counterpart to DashboardItem's
-│                                      middle-click; used by HomeView, WikiView, OperationsView
-│                                      and the four LeftSidebarEntryList configs)
+│                                      middle-click; used by HomeView, WikiView, OperationsView,
+│                                      BlocksView and the four LeftSidebarEntryList configs)
 ├── lib/              db.ts, schema.ts, normalizeSchema.ts, row.ts,
 │                     links.ts, tabs.ts (tab IDs, isContentView), globalSearch.ts, searchText.ts,
 │                     modules.ts (the module registry — see Module Registry below),
@@ -269,16 +269,19 @@ Inside the hook, the handlers are kept in a ref that is overwritten on every ren
 
 ### List Header Portal
 
-In list views (every module, plus Home, Categories and Tags — everything but Blocks), `Dashboard`'s
-whole header — title row, toolbar, and filter panel — lives **only** in the right sidebar;
-there is no inline fallback above the list. `RightSidebar.tsx` mounts a host `<div>` and
-hands its DOM node to `uiStore.listHeaderHost` through a ref callback (`setListHeaderHost`);
-`Dashboard` reads the field back and, whenever it is non-null, `createPortal`s its header
-tree into it. Closing the right sidebar has nothing to fall back to — the header disappears
-along with the sidebar and the list gets the full height back, deliberately: `AppShell`
-keeps the sidebar mounted (`inert`) for the 200ms collapse animation described above, so the
-header stays visible inside it for that stretch and vanishes once `RightSidebar` actually
-unmounts and its ref callback clears `listHeaderHost`.
+In list views (every module, plus Home, Categories, Tags and Blocks), `Dashboard`'s whole
+header — title row, toolbar, and filter panel — lives **only** in the right sidebar; there
+is no inline fallback above the list. `RightSidebar.tsx` mounts a host `<div>` and hands its
+DOM node to `uiStore.listHeaderHost` through a ref callback (`setListHeaderHost`);
+`SidebarPortal` (`src/components/ui/SidebarPortal.tsx`) reads the field back and, whenever it
+is non-null, `createPortal`s its `children` into it — `Dashboard` renders its header through
+one, and the page of a user-built block (below) renders its own sidebar content through
+another; `MainArea` only ever renders one view, so at most one of the two is ever mounted at
+a time. Closing the right sidebar has nothing to fall back to — the header disappears along
+with the sidebar and the list gets the full height back, deliberately: `AppShell` keeps the
+sidebar mounted (`inert`) for the 200ms collapse animation described above, so the header
+stays visible inside it for that stretch and vanishes once `RightSidebar` actually unmounts
+and its ref callback clears `listHeaderHost`.
 
 `RightSidebar` decides whether to offer the host from `uiStore.dashboardMounted`, not from
 `activeView.id`. `Dashboard` announces itself in a `useLayoutEffect`
@@ -290,20 +293,22 @@ carries an id even while showing its list (a jump target from the left list or g
 search, not an open entry), and a stale id left behind by a just-deleted Journal/Wiki/
 Operations entry falls back to that module's `Dashboard` too — both used to land on the
 entry action bar instead, complete with a meaningless Edit button. `VIEWS_WITHOUT_ENTRIES`
-(`home`/`tags`/`categories`/`blocks`) and a missing `activeView.id` still offer the host up front too,
-alongside `dashboardMounted`, so it exists before a lazily-loaded list view's chunk has
-finished loading and `Dashboard` has had a chance to mount. Only Blocks — the one view in
-`VIEWS_WITHOUT_ENTRIES` with no `Dashboard` at all (`VIEWS_WITHOUT_DASHBOARD`) — renders the
-existing `properties.noEntry` placeholder text into that host instead of waiting on a portal
-that will never come. Home, Categories and Tags have no entries of their own either, but go
-through `Dashboard` precisely so their title and primary action portal like everyone
-else's — Home and Categories through `grouping: 'custom'`, Tags through `category` mode with
-one collapsible group per tag.
+(`home`/`tags`/`categories`/`blocks`) and a missing `activeView.id` still offer the host up
+front too, alongside `dashboardMounted`, so it exists before a lazily-loaded list view's
+chunk has finished loading and `Dashboard` has had a chance to mount. Home, Categories, Tags
+and Blocks have no entries of their own, but all four go through `Dashboard` for their list
+precisely so their title and primary action portal like everyone else's — Home and
+Categories through `grouping: 'custom'`, Tags through `category` mode with one collapsible
+group per tag, Blocks through `flat` mode. There is no placeholder text left for a view
+without a dashboard, because there is no longer a view without one: opening a block (a
+`{ type: 'blocks', id }` view) replaces the list with `BlockDefinitionEditor`, which portals
+its own sidebar content — Done/Delete/Cancel, icon, display rules, usage — into the same
+host the way `Dashboard` does, rather than falling back to a placeholder.
 
-Invariant: exactly one writer (the host div's ref callback) and one reader (`Dashboard`) at
-a time — `MainArea` only ever renders one view, so at most one `Dashboard` ever portals into
-the host, and `dashboardMounted` only ever reflects that one instance. `listHeaderHost`
-deliberately isn't persisted; it's a DOM node.
+Invariant: exactly one writer (the host div's ref callback) and, at a time, one reader
+(`SidebarPortal`, mounted by either `Dashboard` or `BlockDefinitionEditor`) — `MainArea`
+only ever renders one view, so at most one thing ever portals into the host.
+`listHeaderHost` deliberately isn't persisted; it's a DOM node.
 
 `groupBy` (`{ value, onChange, label? }`) carries the grouping axis — independent of `sort`
 since a session change split "group by category" out of `SortMode` into its own
@@ -442,28 +447,52 @@ text block whose switches are back at their defaults is stored without a wrapper
 (`showTitleAttrValue` drops a value that equals the default).
 
 **Fields block (`core.fields`, `lib/blocks/fields.ts`).** A sequence of labelled elements —
-short text, number, date, choice, yes/no, checklist, link, image, moon phase. A single field is a
-fields block with one element; "add block" offers one preset per kind (`lib/blocks/presets.ts`),
-and a one-element block is named and iconed after its element. Where things live follows the
-content convention: `data-block-config` (JSON) holds the elements and display rules
-(`readHideEmpty`, `readOnly`), `data-block-data` (JSON) the scalar values keyed by element id,
-and **links and images are markup, never JSON** — a real internal-link chip or `<img src>` inside
-a `<dd data-block-slot="el:<id>">`. That keeps the links table, backlinks, merge-import remapping
-and image cleanup working with no special case. The inner HTML doubles as the readable fallback
-(a `<dl>` of label and value) for search, export and apps that don't know the type; it is
-rewritten on every change, while the JSON stays the truth for scalars. Values whose element is
-unknown are kept and written back (`orphans`). `FieldsBlock` is controlled: every render reads
-the block, every change writes a new one through `onBlockChange` (a structural commit). In read
-mode, checklist items and yes/no switches can be toggled unless the block is `readOnly`: the
-change goes through `onPersist` → `BlockStack.persistRead`, which also calls `onChange` so the
-view's content mirror (and the next Cancel baseline) know it, and then `onReadModeChange` —
-the views pass `update*(id, { content })`, since `useEntryEditor` only autosaves while editing.
-Element ids come from content and may come from an import: they must match
-`[A-Za-z0-9_-]{1,64}` and must not name an `Object.prototype` property (`constructor`,
-`__proto__`, …), and `values`/`orphans`/`slots` are prototype-less records — otherwise a crafted
-id would read a built-in property as slot HTML and the render would throw. As a second layer,
-`BlockStack` wraps every block in `BlockErrorBoundary`, so a block that throws shows its sanitized
-fallback instead of taking the app down.
+short text, number, date, choice, yes/no, checklist, link, image, moon phase, altar (a link
+restricted to altars, rendered full width with the altar's own picture), and the three sigil
+parts `sigilCalc`/`sigilCanvas`/`sigilCharge` (`isSigilKind`, below). A single field is a
+fields block with one element; "add block" offers one preset per kind except the sigil parts,
+which only exist inside a user-built block (`lib/blocks/presets.ts`), and a one-element block is
+named and iconed after its element. Where things live follows the content convention:
+`data-block-config` (JSON) holds the elements and display rules (`readHideEmpty`, `readOnly`),
+`data-block-data` (JSON) the scalar values keyed by element id (a sigil part's whole data JSON
+counts as its "value" here), and **links, images and altars are markup, never JSON** — a real
+internal-link chip or `<img src>` inside a `<dd data-block-slot="el:<id>">` (`isSlotKind`). That
+keeps the links table, backlinks, merge-import remapping and image cleanup working with no
+special case. The inner HTML doubles as the readable fallback (a `<dl>` of label and value) for
+search, export and apps that don't know the type; it is rewritten on every change, while the JSON
+stays the truth for scalars. Values whose element is unknown are kept and written back
+(`orphans`). `canBeEmpty(kind)` says which kinds even have an "empty" state to hide — yes/no,
+drawing and charge never do, so the sidebar and the Blocks builder skip the "hide when empty"
+checkbox for them. `FieldsBlock` is controlled: every render reads the block, every change writes
+a new one through `onBlockChange` (a structural commit). In read mode, checklist items and yes/no
+switches can be toggled unless the block is `readOnly`: the change goes through `onPersist` →
+`BlockStack.persistRead`, which also calls `onChange` so the view's content mirror (and the next
+Cancel baseline) know it, and then `onReadModeChange` — the views pass `update*(id, { content })`,
+since `useEntryEditor` only autosaves while editing. Element ids come from content and may come
+from an import: they must match `[A-Za-z0-9_-]{1,64}` and must not name an `Object.prototype`
+property (`constructor`, `__proto__`, …), and `values`/`orphans`/`slots` are prototype-less
+records — otherwise a crafted id would read a built-in property as slot HTML and the render would
+throw. As a second layer, `BlockStack` wraps every block in `BlockErrorBoundary`, so a block that
+throws shows its sanitized fallback instead of taking the app down.
+
+**Prefilling an element (`ElementDef.defaultValue`).** Only meaningful on a block definition
+(below): the value every *new* copy starts with. A scalar kind stores the value itself; `link`
+and `altar` store `{id, entryType, label}` (`LinkDefault`) rather than a chip, and `image` stores
+the stored filename rather than an `<img>` — none of it is markup yet, so a definition row needs
+no internal-link or image-cleanup special-casing. `slotFromDefault`/`defaultFromSlot` convert
+between that shape and the slot HTML a copy actually needs, only at the point a copy is created
+or the builder reads one back. `sigilCharge`'s default is `ChargeDefault {lock, targets}`, with
+`targets` holding *element* ids — a definition doesn't know its future copies' block ids, so
+`defaultsOf` (`definitions.ts`) qualifies them into `<blockId>:<elementId>` only once a concrete
+copy's block id exists. `sigilCalc`/`sigilCanvas` prefill their *builder settings* instead
+(`calcMode`, `brushColor`/`brushSize` on the element itself, not `defaultValue`) — a calculator or
+drawing always starts empty. A `select` default that names an option the definition no longer has
+is dropped on read (`parseDefault`), so a stale prefill can't hand a copy a dead choice.
+
+**`withoutElementContent`/`withElementValue`** rewrite a fields block's value and/or slot for one
+or more element ids without touching anything else — used to blank out a concealed sigil part's
+content (search, export, the `UnknownBlock` fallback) and to write back a charge part's new
+"loaded" state on unload, respectively.
 
 **Sidebar block manager.** The right sidebar and the main area are sibling trees, so `BlockStack`
 publishes its structure — on structural changes only, not per keystroke — plus a stable API
@@ -489,37 +518,124 @@ image file (`saveImage`) referenced by `<img src>` in the canvas block, loaded i
 data URL (`readImageAsBase64`) — an `emerald-img:` URL would taint the canvas and `toDataURL` would
 throw. Saving is asynchronous and may finish after Done; `SigilCanvasBlock` keeps the save in the
 part that stays mounted across modes and writes through `onPersist` if editing has ended, and drops
-the result if the stack was unmounted (another entry may own it now). The entry's state comes from
-the first readable charge block: `sigilState(blocks, today)` → `concealed` (charged, before the
-reveal date: calculator and drawing hidden in both modes; `withoutConcealed` keeps them out of search
-and `.emerald`, `renderBlocksForExport` out of PDF/Markdown), `lockEntry` (hides Edit in `RightSidebar`
-and keeps Journal/Wiki/Operations views out of edit mode — sigil blocks can sit in any entry) and `lockSigil` (the two tool
-blocks read-only while editing). `BlockStack` computes it once per structure and passes it to every
-view as `sigil`; lists, sidebar and menu read it from `entryBlockSummary`. Loading and unloading
-are read-mode writes through `onPersist`, like ticking a checklist.
+the result if the stack was unmounted (another entry may own it now).
+
+A charge (`SigilCharge`) now also carries **`targets`**: the block ids of the calculators and
+drawings it covers, or `null` for every one currently in the entry, including ones added later —
+how every charge behaved before targeting existed, and still the default. `chargeCovers(charge,
+blockId)` is the one check; `chargeConceals(charge, today)` says whether a *loaded* charge is
+still hiding what it covers right now — true for as long as there's no `revealDate` at all, which
+is how a charge loaded without a target date stays hidden until it is explicitly unloaded, rather
+than showing an unset date as already past. `sigilState(blocks, today)` folds every readable,
+loaded charge together into one `SigilState`: `concealed` (a `Map<blockId, revealDate | null>` —
+several charges can each hide their own blocks, and where two charges cover the same block the
+later `revealDate` wins, `null` meaning "until unload" beating any date), `locked` (the `Set` of
+block ids *any* loaded charge covers, concealed or not — read-only while editing), and `lockEntry`
+(true if any loaded charge locks the whole entry). `revealDate` on the state itself is only what a
+card or list shows, from the first loaded charge, or the first charge at all if none is loaded.
+
+**Parts of a user-built block.** The same three kinds exist as fields-block elements
+(`sigilCalc`/`sigilCanvas`/`sigilCharge`, `isSigilKind` in `fields.ts`) — a block you assemble in
+the Blocks view can hold a calculator, a drawing and a charge next to its other fields. A part
+is treated as a **virtual block** with id `<blockId>:<elementId>` (`sigilPartId`): `sigilPartBlock`
+builds one from the fields block's model (the element's JSON value as `data-block`, its slot HTML
+as the block's own `html`), and `withSigilPart` writes a changed virtual block back into the
+model. `sigilUnits(blocks)` walks every real sigil block *and* every sigil part of every fields
+block in one pass, returning `SigilUnit[]` (`{ block, part? }`) — everything downstream that used
+to scan for `core.sigil.*` types (`sigilState`, `entrySummary`, `withoutConcealed`,
+`withChargeUnloaded`, PDF/Markdown export) now goes through it, so a charge or a hidden calculator
+behaves identically whether it's a standalone block or a part. `mayHoldSigil`/`mayHoldCharge` are
+the cheap string pre-filters (looking for `core.sigil.` *or* the bare kind names `sigilCalc` etc.,
+since an imported part's JSON may quote them differently) that let most content skip parsing
+entirely, replacing the old single-marker check.
+
+**Freezing a copy that holds a loaded sigil.** `blockHoldsLocked(state, blockId)` says whether a
+block itself or any part of it (`<blockId>:*`) is in `state.locked`; `isSigilFrozen(block, state)`
+adds "or the block *is* a loaded charge" — the two callers that need to know are duplication (a
+copy would get a fresh id no charge covers, defeating the concealment it's supposed to have) and a
+user-built block's own update/removal (below), where rebuilding the block would silently drop the
+charge that's currently hiding something. `BlockStack.duplicate` and the block menu's "Duplicate"
+action check `blockHoldsLocked` and simply don't offer it. Duplicating a fields block that *isn't*
+frozen still needs one adjustment: `withRenamedPartTargets` retargets any charge part inside the
+copy from the original block's id to the copy's own, so the copy's charge covers the copy's own
+parts instead of reaching back into the original.
+
+The entry's sigil state is computed once per structure by `BlockStack` and passed to every view as
+`sigil`; lists, sidebar and menu read it from `entryBlockSummary` (which now also finds the first
+visible, non-concealed drawing among parts, not just top-level canvas blocks). Loading and
+unloading are read-mode writes through `onPersist`, like ticking a checklist — `onPersist` on a
+locked-entry block is still allowed for the charge itself (or a fields block that contains one,
+`holdsCharge` in `BlockStack`), since unloading is the one write a full-entry lock must still
+permit.
 
 **User-built blocks — copies, not live links.** The Blocks view (`views/BlocksView.tsx`, an aux
-view on the rail) edits rows of `block_definitions` (v40, `blockDefinitionStore`): name, emoji,
-elements, display rules (`readHideEmpty`, `readOnly`, plus `showTitle`, which becomes the
-instance attribute on insert) and a `revision` that rises whenever something a copy inherits
-changes. Inserting one (`createFromPreset('def:<id>')`) writes a `core.fields` block that carries
-everything itself — elements, display rules, name and icon in `data-block-config` — plus
-`data-block-origin` and `data-block-rev` (`lib/blocks/definitions.ts`). It always renders from its
-own copy, so editing or deleting the definition changes no entry, and a copy whose definition is
+view on the rail) is a `Dashboard` list of `block_definitions` rows (v40, `blockDefinitionStore`),
+built like every other module's list rather than the built-in-blocks overview it replaced;
+clicking a row opens `{ type: 'blocks', id }`, which `BlocksView` renders as
+`BlockDefinitionEditor` — a page shaped like an entry in edit mode (breadcrumb, icon and name as
+title, fields below; Done/Delete/Cancel, icon, display rules and usage portalled into the right
+sidebar via `SidebarPortal`, see [List Header Portal](#list-header-portal)) instead of the list.
+A definition's icon is an emoji or an image (`Favicon`, shrunk to 64px edge —
+`shrinkImageDataUrl` re-encodes anything still heavy after that, e.g. a large embedded thumbnail
+or a long GIF animation — via `shrinkImage.ts`, since it travels inside every copy in every
+entry); `BlockGlyph` renders either. What's being edited is a **draft**: `BlockDefinitionEditor`
+keeps it in local state and only calls `updateDefinition` on Done, so a keystroke in the name
+doesn't bump every copy's revision. An unsaved draft is mirrored into `useBlockDraftStore`
+(`src/store/blockDraftStore.ts`) — not the view's own state, since `MainArea` unmounts a view on
+module switch and an open block tab would otherwise lose its edits silently; the list reads the
+same store for its "Unsaved" marker. Drafts are deliberately not persisted (like an entry's own
+edit mode) and are cleared wholesale (`clearAll`) on vault switch and on a replace-mode restore,
+both of which also close every tab — a stale draft would otherwise silently overwrite a freshly
+restored or switched-to block on the next Done. The delete confirmation (`DeleteDefinitionModal`,
+still defined in `BlockDefinitionEditor.tsx`) is instead *hosted* by `BlocksView`, one level up
+from both list and page, so its own closing notice ("N entries left open, skipped") survives the
+navigation back to the list that deleting triggers.
+
+Definition fields: name, icon, elements, display rules (`readHideEmpty`, `readOnly`, plus
+`showTitle`, which becomes the instance attribute on insert) and a `revision` that rises
+whenever something a copy inherits changes — an element's `defaultValue`/`calcMode`/
+`brushColor`/`brushSize` does *not* count (`elementForCopy` strips them before `sameShape`
+compares), since a prefill only affects copies not yet created; an existing copy has nothing to
+update to. Inserting one (`createFromPreset('def:<id>', definitions, text)`) writes a
+`core.fields` block that carries everything itself — elements (without their `defaultValue`,
+already turned into the copy's own values/slots) and display rules, name and icon in
+`data-block-config` — plus `data-block-origin` and `data-block-rev`
+(`lib/blocks/definitions.ts`). `instantiateDefinition`/`updateInstanceToDefinition` now take a
+`text: FallbackText` because writing a prefill means calling `serializeFields`, which needs it to
+render the readable fallback; `defaultsOf(elements, blockId)` is the one place that turns an
+element's `defaultValue` into a value or slot for a *specific* block id — a `sigilCharge`
+default's `targets` (bare element ids) become `<blockId>:<elementId>` here, and a checklist
+default gets fresh item ids per copy so two copies never share one. On update, only elements the
+copy never held in any form — not even as an archived element or an orphaned value/slot — pick up
+their default; anything the copy already has keeps what's there. It always renders from its own
+copy, so editing or deleting the definition changes no entry, and a copy whose definition is
 missing (trash, another vault) works unchanged. Element ids are shared by the definition and all
 its copies, so values survive renames and updates and a later list filter can find them in every
 copy (`entrySummary.ts` already collects them as `"<definition>:<element>"`). A copy with a lower
 `rev` is outdated: `BlockFrame` shows a "Newer version" pill, and the block's menu runs
-`updateInstanceToDefinition` through the stack like any edit (so Cancel reverts it). The merge
-keeps values by id, adds new elements empty, archives elements the definition no longer shows
-(`ElementDef.archived` — invisible everywhere, value kept, back when the element returns), takes
-labels, options, display rules, name and icon from the definition, and leaves the instance's own
-attributes (title, eye, read-mode title) alone. "Update all" and "also remove from entries" live
-in `store/blockCopies.ts`: they rewrite content through the three stores' `update*` and skip the
-entry open in edit mode, whose editor would write its old state back. An entry open in read mode
-picks the change up itself — `BlockStack` resets when its `initialContent` prop changes to
-something other than its own serialisation while not editing, and reports the new content to the
-view's mirror, so a later Done can't restore the old one.
+`updateInstanceToDefinition` through the stack like any edit (so Cancel reverts it) — unless
+`isSigilFrozen` says the copy holds a loaded sigil, in which case it's left alone entirely (see
+above). The merge keeps values by id, adds new elements with their prefill (else empty), archives
+elements the definition no longer shows (`ElementDef.archived` — invisible everywhere, value kept,
+back when the element returns), takes labels, options, display rules, name and icon from the
+definition, and leaves the instance's own attributes (title, eye, read-mode title) alone. "Update
+all" and "also remove from entries" live in `store/blockCopies.ts`: they rewrite content through
+the three stores' `update*` and skip the entry open in edit mode, whose editor would write its old
+state back, and — per source, via `hasFrozenCopy` — any entry holding a frozen copy, counted
+separately as `CopyRunResult.skippedLocked` and reported in the builder's notice alongside
+`skippedEditing`. An entry open in read mode picks a real change up itself — `BlockStack` resets
+when its `initialContent` prop changes to something other than its own serialisation while not
+editing, and reports the new content to the view's mirror, so a later Done can't restore the old
+one.
+
+**Prefills across backup and `.emerald`.** A definition's `elements` JSON is the only place a
+prefill's image filename or link/altar target lives before any copy exists, so it needs its own
+remap wherever a copy's *content* would normally be remapped: `definitionImageRefs` feeds the
+image list `exportDatabase`/`exportAsEmerald` embed and `collectUsedImageFilenames` protects (see
+[`database.md`](database.md#block_definitions)); `remapDefinitionDefaults` (with an
+`image`/`link` callback) rewrites a definition row's defaults during backup merge/replace and
+`.emerald` import — a link default that resolves to nothing is dropped from the element instead
+of being kept dangling, since a fresh copy would otherwise start with a chip into the void.
 
 ### Auto-Save (the `useEntryEditor` hook)
 

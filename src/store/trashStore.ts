@@ -4,6 +4,7 @@ import { reassignCategoryContent } from '../lib/schema';
 import { trashWiring } from './moduleWiring';
 import { reassignCategoriesInMemory } from './categoryStore';
 import { definitionLabel } from '../lib/blocks/blockAttrs';
+import { isImageIcon } from '../lib/helpers';
 import i18n from '../i18n';
 import type { TrashedItem } from '../types';
 
@@ -54,7 +55,12 @@ export const useTrashStore = create<TrashState>((set) => ({
         ...categories.map((r) => ({ id: r.id, title: `${r.emoji} ${r.name}`, deleted_at: r.deleted_at, type: 'category' as const })),
         ...tasks.map((r) => ({ ...r, type: 'task' as const })),
         ...blockDefinitions.map((r) => ({
-          id: r.id, title: `${r.icon} ${definitionLabel(i18n.t, r)}`, deleted_at: r.deleted_at, type: 'blockDefinition' as const,
+          // Ein Bild-Icon ist eine Data-URL — als Text vor dem Namen stünde
+          // Base64. Das Block-Symbol der Zeile genügt dann.
+          id: r.id,
+          title: isImageIcon(r.icon) ? definitionLabel(i18n.t, r) : `${r.icon} ${definitionLabel(i18n.t, r)}`,
+          deleted_at: r.deleted_at,
+          type: 'blockDefinition' as const,
         })),
       ].sort((a, b) => b.deleted_at.localeCompare(a.deleted_at));
       set({ items });

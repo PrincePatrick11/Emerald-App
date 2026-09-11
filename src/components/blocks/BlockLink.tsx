@@ -20,8 +20,16 @@ import type { ContentType } from '../../types';
 /** So viele Vorschläge zeigt die Suche — wie das Verlinkungs-Feld der Seitenleiste. */
 const LINK_RESULT_LIMIT = 50;
 
-/** Bearbeiten: der gewählte Eintrag mit „×", sonst die Suche. `onChange(null)` entfernt ihn. */
-export function LinkEditor({ slot, onChange }: { slot: string | undefined; onChange: (html: string | null) => void }) {
+/**
+ * Bearbeiten: der gewählte Eintrag mit „×", sonst die Suche. `onChange(null)`
+ * entfernt ihn. `entryType` beschränkt die Suche auf eine Art (das Altar-Feld).
+ */
+export function LinkEditor({ slot, onChange, entryType, placeholder }: {
+  slot: string | undefined;
+  onChange: (html: string | null) => void;
+  entryType?: ContentType;
+  placeholder?: string;
+}) {
   const { t } = useTranslation();
   const items = useLinkItems();
   const [query, setQuery] = useState('');
@@ -30,10 +38,10 @@ export function LinkEditor({ slot, onChange }: { slot: string | undefined; onCha
   const results = useMemo(() => {
     const q = query.toLowerCase();
     return items
-      .filter((i) => i.label.toLowerCase().includes(q))
+      .filter((i) => (!entryType || i.entryType === entryType) && i.label.toLowerCase().includes(q))
       .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
       .slice(0, LINK_RESULT_LIMIT);
-  }, [items, query]);
+  }, [items, query, entryType]);
 
   if (current) return <LinkTarget target={current} onRemove={() => onChange(null)} />;
   return (
@@ -43,7 +51,7 @@ export function LinkEditor({ slot, onChange }: { slot: string | undefined; onCha
       onSelect={(item) => onChange(internalLinkChipHtml(toInternalLinkChip(item)))}
       query={query}
       onQueryChange={setQuery}
-      placeholder={t('linkPicker.searchPlaceholder')}
+      placeholder={placeholder ?? t('linkPicker.searchPlaceholder')}
       renderResult={(item) => (
         <>
           <LinkItemIcon item={item} />

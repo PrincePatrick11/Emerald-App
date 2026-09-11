@@ -6,6 +6,7 @@ import { imageSrc, readImageAsBase64, saveImage } from '../../lib/images';
 import { sigilImage, withSigilImage } from '../../lib/blocks/sigil';
 import SigilDrawingCanvas, { SIGIL_COLORS, type DrawMode } from './SigilDrawingCanvas';
 import SigilConcealed from './SigilConcealed';
+import { DEFAULT_BRUSH_SIZE, SigilBrushSize, SigilColorSwatches } from './SigilBrushControls';
 import type { BlockViewProps } from './blockViews';
 
 /**
@@ -23,7 +24,7 @@ import type { BlockViewProps } from './blockViews';
  *   zählt (`seq`), sonst überschriebe ein spät fertiges älteres den neueren.
  * - Nach dem Abbau (anderer Eintrag, Abbrechen) wird nichts mehr geschrieben.
  */
-export default function SigilCanvasBlock({ block, isEditing, onBlockChange, onPersist, sigil }: BlockViewProps) {
+export default function SigilCanvasBlock({ block, isEditing, onBlockChange, onPersist, sigil, part }: BlockViewProps) {
   const { t } = useTranslation();
   const filename = sigilImage(block);
   const [saveFailed, setSaveFailed] = useState(false);
@@ -60,8 +61,8 @@ export default function SigilCanvasBlock({ block, isEditing, onBlockChange, onPe
   }, []);
 
   // Verborgen auch beim Bearbeiten — bei Sperre „nur Sigille" ist Bearbeiten erlaubt.
-  if (sigil.concealed) return <SigilConcealed revealDate={sigil.revealDate} />;
-  if (!isEditing || sigil.lockSigil) {
+  if (sigil.concealed.has(block.id)) return <SigilConcealed revealDate={sigil.concealed.get(block.id) ?? null} />;
+  if (!isEditing || sigil.locked.has(block.id)) {
     return (
       <div className="space-y-2">
         {isEditing && <p className="block-field-hint">{t('blocks.sigil.locked')}</p>}
@@ -73,7 +74,12 @@ export default function SigilCanvasBlock({ block, isEditing, onBlockChange, onPe
   }
   return (
     <div className="space-y-2">
-      <CanvasEditor filename={filename} onDrawn={(dataUrl) => void store(dataUrl)} />
+      <CanvasEditor
+        filename={filename}
+        startColor={part?.brushColor ?? SIGIL_COLORS[0]}
+        startSize={part?.brushSize ?? DEFAULT_BRUSH_SIZE}
+        onDrawn={(dataUrl) => void store(dataUrl)}
+      />
       {saveFailed && <p className="block-field-error">{t('blocks.sigil.saveFailed')}</p>}
     </div>
   );
@@ -84,15 +90,21 @@ interface History {
   index: number;
 }
 
-function CanvasEditor({ filename, onDrawn }: { filename: string | null; onDrawn: (dataUrl: string | null) => void }) {
+/** `startColor`/`startSize`: womit gezeichnet wird, bis man umstellt — ein eigener Block kann es vorgeben. */
+function CanvasEditor({ filename, startColor, startSize, onDrawn }: {
+  filename: string | null;
+  startColor: string;
+  startSize: number;
+  onDrawn: (dataUrl: string | null) => void;
+}) {
   const { t } = useTranslation();
   // Die Zeichnung, mit der geöffnet wurde — danach ist die Fläche selbst die Wahrheit.
   const [openedWith] = useState(filename);
   const [initial, setInitial] = useState<string | null>(null);
   const [load, setLoad] = useState<'loading' | 'ready' | 'failed'>(openedWith ? 'loading' : 'ready');
   const [mode, setMode] = useState<DrawMode>('draw');
-  const [color, setColor] = useState(SIGIL_COLORS[0]);
-  const [size, setSize] = useState(8);
+  const [color, setColor] = useState(startColor);
+  const [size, setSize] = useState(startSize);
   const [clearVersion, setClearVersion] = useState(0);
   const [history, setHistory] = useState<History>({ steps: [null], index: 0 });
 
@@ -167,18 +179,7 @@ function CanvasEditor({ filename, onDrawn }: { filename: string | null; onDrawn:
             );
           })}
         </div>
-        <label className="sigil-brush-controls flex items-center gap-2 text-xs text-stone-400">
-          <span>{t('creation.brushSize')}</span>
-          <input
-            type="range"
-            min={2}
-            max={48}
-            value={size}
-            onChange={(e) => setSize(Number(e.target.value))}
-            className="sigil-brush-slider accent-jade-400"
-          />
-          <span className="w-7 text-right text-stone-500">{size}</span>
-        </label>
+        <SigilBrushSize value={size} onChange={setSize} />
         <Button tone="neutral" small disabled={history.index <= 0} onClick={() => step(history.index - 1)}>
           <Undo2 size={12} />
           <span>{t('creation.undo')}</span>
@@ -192,19 +193,7 @@ function CanvasEditor({ filename, onDrawn }: { filename: string | null; onDrawn:
           <span>{t('creation.clear')}</span>
         </Button>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {SIGIL_COLORS.map((c) => (
-          <button
-            key={c}
-            type="button"
-            onClick={() => setColor(c)}
-            className={`h-7 w-7 rounded-full border-2 transition-transform ${color === c ? 'scale-105 border-stone-200' : 'border-stone-700 hover:border-stone-500'}`}
-            style={{ backgroundColor: c }}
-            aria-label={c}
-            aria-pressed={color === c}
-          />
-        ))}
-      </div>
+      <SigilColorSwatches value={color} onChange={setColor} />
     </div>
   );
 }

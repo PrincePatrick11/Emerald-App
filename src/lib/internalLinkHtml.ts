@@ -108,6 +108,25 @@ export function remapInternalLinks(
   return doc.body.innerHTML;
 }
 
+const VALID_ENTRY_TYPES: readonly string[] = ['journal', 'wiki', 'operation', 'task', 'altar'];
+/** Standard-UUIDs und die beim Merge-Import vorangestellte 8-Zeichen-Kennung. */
+const LINK_ID_RE = /^([0-9a-z]{8}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Ist das ein plausibles Link-Ziel? Die Link-Events reisen über
+ * `document` und sind damit für jedes Skript im WebView erreichbar; die
+ * Handler prüfen deshalb, was sie bekommen, bevor sie navigieren oder gar in
+ * den Eintrag schreiben. Eine Prüfung für alle drei Events (Navigieren,
+ * Anhängen, Anzeigen) — vorher hatte nur das Navigieren eine, als Kopie.
+ * Dieselbe Prüfung gilt für die Link-Vorgaben eigener Blöcke.
+ */
+export function isValidLinkTarget(target: { id?: unknown; entryType?: unknown } | null | undefined): boolean {
+  if (!target) return false;
+  return typeof target.id === 'string'
+    && LINK_ID_RE.test(target.id)
+    && VALID_ENTRY_TYPES.includes(String(target.entryType).trim());
+}
+
 export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')

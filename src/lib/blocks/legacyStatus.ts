@@ -75,12 +75,14 @@ function isoDate(raw: string): string {
 
 /** Der Inhalt mit dem Status-Block davor — dort, wo die Chips unter dem Titel standen. */
 export function withLegacyStatus(content: string, status: LegacyStatus, def: BlockDefinition, t: TFunction): string {
-  const block = instantiateDefinition(def);
+  const text = fieldFallbackText(t);
+  const block = instantiateDefinition(def, text);
   const model = parseFields(block);
   const values: Record<string, string | boolean> = { active: status.isActive };
   if (status.endDate?.trim()) values['end-date'] = isoDate(status.endDate);
   if (status.version?.trim()) values.version = status.version.trim();
-  const filled = serializeFields(block, { ...model, values }, fieldFallbackText(t));
+  // Über die Vorgaben der Definition: ein Feld, das jemand zum Status hinzugefügt hat, behält seine.
+  const filled = serializeFields(block, { ...model, values: { ...model.values, ...values } }, text);
   return serializeBlocks([filled, ...parseBlocks(content)]);
 }
 

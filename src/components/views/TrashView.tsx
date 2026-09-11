@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Trash2, RotateCcw, CheckSquare, Square } from 'lucide-react';
-import { TRASH_KIND_ICONS } from '../../lib/modules';
+import { AUX_VIEWS, TRASH_KIND_ICONS } from '../../lib/modules';
 import { useTrashStore } from '../../store/trashStore';
 import { useUIStore, type ViewMode } from '../../store/uiStore';
 import { useCategoryStore } from '../../store/categoryStore';
@@ -13,7 +13,7 @@ import { sortItems } from '../../lib/sortItems';
 import { isCardView, isWideCardView } from '../../lib/viewMode';
 import { groupBy, groupByMonth } from '../../lib/groupBy';
 import { categoryLabel } from '../../lib/categories';
-import Dashboard from '../ui/Dashboard';
+import Dashboard, { DashboardTitle } from '../ui/Dashboard';
 import Button from '../ui/Button';
 import InlineConfirm from '../ui/InlineConfirm';
 import type { TrashedItem } from '../../types';
@@ -337,15 +337,10 @@ export default function TrashView() {
   // min-w-0/truncate und flex-wrap: die beiden Slots landen im Seitenleisten-
   // Experiment in einer schmalen Spalte (Dashboard portalt den Kopf dorthin)
   // und müssen dort umbrechen statt überzulaufen.
+  // Der leere Papierkorb zeigt keine Null — anders als die Listen, deren
+  // Null etwas sagt („noch keine Tags").
   const headerLeft = (
-    <div className="flex items-center gap-3 min-w-0">
-      <Trash2 size={18} className="text-stone-500 flex-shrink-0" />
-      <h1 className="text-lg font-semibold text-stone-200 truncate">{t('trash.title')}</h1>
-      {items.length > 0 && (
-        <span className="text-xs text-stone-500 bg-stone-700/50 px-2 py-0.5 rounded-full">
-          {items.length}
-        </span>
-      )}
+    <DashboardTitle icon={AUX_VIEWS.trash.icon} title={t('trash.title')} count={items.length > 0 ? items.length : undefined}>
       {items.length > 0 && (
         <button
           onClick={allSelected ? deselectAll : selectAll}
@@ -354,7 +349,7 @@ export default function TrashView() {
           {allSelected ? t('trash.deselectAll') : t('trash.selectAll')}
         </button>
       )}
-    </div>
+    </DashboardTitle>
   );
 
   const headerRight = (

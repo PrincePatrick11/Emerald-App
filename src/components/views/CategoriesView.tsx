@@ -338,19 +338,12 @@ export default function CategoriesView() {
     );
   };
 
-  const headerLeft = (
-    <div className="flex items-center gap-3 min-w-0">
-      <AUX_VIEWS.categories.icon size={18} className="text-stone-500 flex-shrink-0" />
-      <h1 className="text-lg font-semibold text-stone-100 truncate">{t('nav.categories')}</h1>
-      <span className="text-xs text-stone-500 bg-stone-700/50 px-2 py-0.5 rounded-full">
-        {categories.length}
-      </span>
-    </div>
-  );
 
   return (
     <Dashboard<Category>
-      headerLeft={headerLeft}
+      title={t('nav.categories')}
+      titleIcon={AUX_VIEWS.categories.icon}
+      titleCount={categories.length}
       primaryAction={{ label: t('categories.add'), onClick: () => openForm({ mode: 'add' }, '', DEFAULT_EMOJI) }}
       search={search}
       onSearch={setSearch}

@@ -1,8 +1,8 @@
 import { parseBlocks } from './blockHtml';
 import { isBlockHidden } from './blockAttrs';
 import { blockOrigin } from './definitions';
-import { activeElements, isElementEmpty, isSlotKind, parseFields, type FieldValue } from './fields';
-import { SIGIL_BLOCK_MARKER, SIGIL_CANVAS_TYPE, sigilImage, sigilState, todayIso, type SigilState } from './sigil';
+import { activeElements, isElementEmpty, isSigilKind, isSlotKind, parseFields, type FieldValue } from './fields';
+import { mayHoldSigil, SIGIL_CANVAS_TYPE, sigilImage, sigilState, sigilUnits, todayIso, type SigilState } from './sigil';
 import { BLOCK_ATTR } from './types';
 
 /**
@@ -20,7 +20,7 @@ export interface EntryBlockSummary {
    * Filter jede Kopie, egal welcher Version.
    */
   fieldValues: Record<string, FieldValue>;
-  /** Sigille des Eintrags samt Dateiname der ersten sichtbaren Zeichnung (Karten) — `null` ohne Sigillen-Blöcke. */
+  /** Sigille des Eintrags samt Dateiname der ersten sichtbaren, nicht verborgenen Zeichnung (Karten) — `null` ohne Sigillen-Blöcke. */
   sigil: (SigilState & { image: string | null }) | null;
 }
 
@@ -30,7 +30,7 @@ const cache = new Map<string, { content: string; day: string; summary: EntryBloc
 
 function summarize(content: string, today: string): EntryBlockSummary {
   const hasOrigins = content.includes(BLOCK_ATTR.origin);
-  const hasSigil = content.includes(SIGIL_BLOCK_MARKER);
+  const hasSigil = mayHoldSigil(content);
   // Die allermeisten Einträge haben weder eigene noch Sigillen-Blöcke — dann gar nicht parsen.
   if (!hasOrigins && !hasSigil) return EMPTY;
   const blocks = parseBlocks(content);
@@ -45,7 +45,7 @@ function summarize(content: string, today: string): EntryBlockSummary {
       const model = parseFields(block);
       if (model.broken) continue;
       for (const element of activeElements(model)) {
-        if (isSlotKind(element.kind) || isElementEmpty(element, model)) continue;
+        if (isSlotKind(element.kind) || isSigilKind(element.kind) || isElementEmpty(element, model)) continue;
         const key = `${origin.id}:${element.id}`;
         if (!(key in fieldValues)) fieldValues[key] = model.values[element.id];
       }
@@ -54,8 +54,15 @@ function summarize(content: string, today: string): EntryBlockSummary {
 
   let sigil: EntryBlockSummary['sigil'] = null;
   if (hasSigil) {
-    const canvas = blocks.find((b) => b.type === SIGIL_CANVAS_TYPE && !isBlockHidden(b) && sigilImage(b));
-    sigil = { ...sigilState(blocks, today), image: canvas ? sigilImage(canvas) : null };
+    const units = sigilUnits(blocks);
+    if (units.length > 0) {
+      const state = sigilState(blocks, today);
+      // Die erste sichtbare Zeichnung, Block oder Teil — ein Teil gilt als sichtbar, wenn sein Block es ist.
+      const canvas = units.find(({ block, part }) =>
+        block.type === SIGIL_CANVAS_TYPE && !isBlockHidden(part?.parent ?? block) && !part?.element.archived
+          && !state.concealed.has(block.id) && sigilImage(block));
+      sigil = { ...state, image: canvas ? sigilImage(canvas.block) : null };
+    }
   }
   return { origins, fieldValues, sigil };
 }
