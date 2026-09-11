@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { entryBlockSummary } from '../../lib/blocks/entrySummary';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
-import { Trash2, Pencil, Copy, PanelTopOpen } from 'lucide-react';
+import { Trash2, Pencil, Copy } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
+import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import DashboardItem from '../ui/DashboardItem';
 import RenameField from '../ui/RenameField';
@@ -30,9 +31,10 @@ import EntryDetailFrame from '../ui/EntryDetailFrame';
 
 export default function WikiView() {
   const { t } = useTranslation();
-  const { activeView, setActiveView, openViewInNewTab, wikiPrefs, setWikiPrefs } = useUIStore(
-    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab, wikiPrefs: s.wikiPrefs, setWikiPrefs: s.setWikiPrefs }))
+  const { activeView, setActiveView, wikiPrefs, setWikiPrefs } = useUIStore(
+    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, wikiPrefs: s.wikiPrefs, setWikiPrefs: s.setWikiPrefs }))
   );
+  const openInNewTabAction = useOpenInNewTabAction();
   const { articles, createArticle, duplicateArticle, updateArticle, deleteArticle, restoreArticle, permanentlyDeleteArticle, getArticle } = useWikiStore(
     useShallow((s) => ({ articles: s.articles, createArticle: s.createArticle, duplicateArticle: s.duplicateArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle, permanentlyDeleteArticle: s.permanentlyDeleteArticle, getArticle: s.getArticle }))
   );
@@ -367,7 +369,7 @@ export default function WikiView() {
             x={ctxMenu.x} y={ctxMenu.y}
             onClose={() => setCtxMenu(null)}
             actions={[
-              { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'wiki', id: ctxMenu.id, mode: 'view' }) },
+              openInNewTabAction({ type: 'wiki', id: ctxMenu.id, mode: 'view' }),
               { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
               { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
               { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },

@@ -10,7 +10,9 @@ import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard from '../ui/Dashboard';
+import DashboardItem from '../ui/DashboardItem';
 import Dropdown from '../ui/Dropdown';
+import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { getMoonPhase, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { DEFAULT_ENTRY_EMOJI, viewTypeForEntryType } from '../../lib/modules';
@@ -74,6 +76,7 @@ export default function HomeView() {
   const { setActiveView, homeJournalPrefs, setHomeJournalPrefs, homeOpsPrefs, setHomeOpsPrefs, homeWikiPrefs, setHomeWikiPrefs, } = useUIStore(
     useShallow((s) => ({ setActiveView: s.setActiveView, homeJournalPrefs: s.homeJournalPrefs, setHomeJournalPrefs: s.setHomeJournalPrefs, homeOpsPrefs: s.homeOpsPrefs, setHomeOpsPrefs: s.setHomeOpsPrefs, homeWikiPrefs: s.homeWikiPrefs, setHomeWikiPrefs: s.setHomeWikiPrefs }))
   );
+  const openInNewTabAction = useOpenInNewTabAction();
   const { entries, createEntry, duplicateEntry, deleteEntry, restoreEntry } = useJournalStore(
     useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
   );
@@ -133,6 +136,7 @@ export default function HomeView() {
 
   const ctxActions = ctxMenu
     ? [
+        openInNewTabAction({ type: viewTypeForEntryType(ctxMenu.target.kind), id: ctxMenu.target.id, mode: 'view' }),
         { label: t('contextMenu.duplicate'), icon: <Copy size={12} />,   onClick: () => handleDuplicate(ctxMenu.target) },
         { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => handleRename(ctxMenu.target) },
         { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleDelete(ctxMenu.target), danger: true },
@@ -197,48 +201,41 @@ export default function HomeView() {
                   <p className="text-stone-700 text-xs mt-1">{t('journal.startWriting')}</p>
                 </div>
               ) : homeJournalPrefs.view === 'list' ? (
-                // Die sechs Einträge-Buttons dieser Ansicht sind noch nicht auf
-                // DashboardItem: die Kacheln sind dichter (px-3 py-3) als dessen
-                // `card`, und die Zeilen tragen ihren Inhalt in einem inneren
-                // Flex-Block. Solange fehlt Home der Mittelklick — offen, siehe
-                // components.md → DashboardItem.
                 <div className="space-y-2">
                   {journalItems.map((entry) => (
-                    <button
+                    <DashboardItem
                       key={entry.id}
-                      onClick={() => setActiveView({ type: 'journal', id: entry.id, mode: 'view' })}
+                      view={{ type: 'journal', id: entry.id, mode: 'view' }}
+                      layout="row"
                       onContextMenu={(e) => openCtx(e, { kind: 'journal', id: entry.id })}
-                      className="panel-interactive w-full text-left px-4 py-3 group"
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="text-xl">{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="home-item-title text-sm font-medium truncate">
-                            {entry.title}
-                          </div>
-                          <div className="home-item-meta text-xs mt-0.5">
-                            {formatEntryDate(entry.created_at)}
-                          </div>
+                      <span className="text-xl">{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="home-item-title text-sm font-medium truncate">
+                          {entry.title}
+                        </div>
+                        <div className="home-item-meta text-xs mt-0.5">
+                          {formatEntryDate(entry.created_at)}
                         </div>
                       </div>
-                    </button>
+                    </DashboardItem>
                   ))}
                 </div>
               ) : (
                 <div className="grid grid-cols-3 gap-2">
                   {journalItems.map((entry) => (
-                    <button
+                    <DashboardItem
                       key={entry.id}
-                      onClick={() => setActiveView({ type: 'journal', id: entry.id, mode: 'view' })}
+                      view={{ type: 'journal', id: entry.id, mode: 'view' }}
+                      layout="card"
                       onContextMenu={(e) => openCtx(e, { kind: 'journal', id: entry.id })}
-                      className="panel-interactive px-3 py-3 text-left"
                     >
                       <div className="text-lg mb-1">{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</div>
                       <div className="home-item-title text-sm font-medium truncate">{entry.title}</div>
                       <div className="home-item-meta text-xs mt-0.5">
                         {formatEntryDate(entry.created_at)}
                       </div>
-                    </button>
+                    </DashboardItem>
                   ))}
                 </div>
               )}
@@ -268,27 +265,25 @@ export default function HomeView() {
                     const cat = categories.find((c) => c.id === op.category_id);
                     const icon = op.icon || cat?.emoji || '⚡';
                     return (
-                      <button
+                      <DashboardItem
                         key={op.id}
-                        onClick={() => setActiveView({ type: 'operations', id: op.id, mode: 'view' })}
+                        view={{ type: 'operations', id: op.id, mode: 'view' }}
+                        layout="row"
                         onContextMenu={(e) => openCtx(e, { kind: 'operation', id: op.id })}
-                        className="panel-interactive w-full text-left px-4 py-3 group"
                       >
-                        <div className="flex items-center gap-3">
-                          {isImageIcon(icon)
-                            ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded flex-shrink-0" />
-                            : <span className="text-xl">{icon}</span>
-                          }
-                          <div className="flex-1 min-w-0">
-                            <div className="home-item-title text-sm font-medium truncate">
-                              {op.title}
-                            </div>
-                            <div className="home-item-meta text-xs mt-0.5">
-                              {categoryLabel(t, cat)} · {formatEntryDate(op.updated_at)}
-                            </div>
+                        {isImageIcon(icon)
+                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded flex-shrink-0" />
+                          : <span className="text-xl">{icon}</span>
+                        }
+                        <div className="flex-1 min-w-0">
+                          <div className="home-item-title text-sm font-medium truncate">
+                            {op.title}
+                          </div>
+                          <div className="home-item-meta text-xs mt-0.5">
+                            {categoryLabel(t, cat)} · {formatEntryDate(op.updated_at)}
                           </div>
                         </div>
-                      </button>
+                      </DashboardItem>
                     );
                   })}
                 </div>
@@ -298,11 +293,11 @@ export default function HomeView() {
                     const cat = categories.find((c) => c.id === op.category_id);
                     const icon = op.icon || cat?.emoji || '⚡';
                     return (
-                      <button
+                      <DashboardItem
                         key={op.id}
-                        onClick={() => setActiveView({ type: 'operations', id: op.id, mode: 'view' })}
+                        view={{ type: 'operations', id: op.id, mode: 'view' }}
+                        layout="card"
                         onContextMenu={(e) => openCtx(e, { kind: 'operation', id: op.id })}
-                        className="panel-interactive px-3 py-3 text-left"
                       >
                         {isImageIcon(icon)
                           ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded mb-1" />
@@ -312,7 +307,7 @@ export default function HomeView() {
                         <div className="home-item-meta text-xs mt-0.5">
                           {categoryLabel(t, cat)} · {formatEntryDate(op.updated_at)}
                         </div>
-                      </button>
+                      </DashboardItem>
                     );
                   })}
                 </div>
@@ -347,27 +342,25 @@ export default function HomeView() {
                     // Kategorie entfällt das Label.
                     const catLabel = categoryLabel(t, cat);
                     return (
-                      <button
+                      <DashboardItem
                         key={article.id}
-                        onClick={() => setActiveView({ type: 'wiki', id: article.id, mode: 'view' })}
+                        view={{ type: 'wiki', id: article.id, mode: 'view' }}
+                        layout="row"
                         onContextMenu={(e) => openCtx(e, { kind: 'wiki', id: article.id })}
-                        className="panel-interactive w-full text-left px-4 py-3 group"
                       >
-                        <div className="flex items-center gap-3">
-                          {isImageIcon(article.icon)
-                            ? <img src={article.icon!} alt="" className="w-6 h-6 object-cover rounded flex-shrink-0" />
-                            : <span className="text-xl flex-shrink-0">{icon}</span>
-                          }
-                          <div className="flex-1 min-w-0">
-                            <div className="home-item-title text-sm font-medium truncate">
-                              {article.title}
-                            </div>
-                            <div className="home-item-meta text-xs capitalize mt-0.5">
-                              {catLabel ? `${catLabel} · ` : ''}{formatEntryDate(article.updated_at)}
-                            </div>
+                        {isImageIcon(article.icon)
+                          ? <img src={article.icon!} alt="" className="w-6 h-6 object-cover rounded flex-shrink-0" />
+                          : <span className="text-xl flex-shrink-0">{icon}</span>
+                        }
+                        <div className="flex-1 min-w-0">
+                          <div className="home-item-title text-sm font-medium truncate">
+                            {article.title}
+                          </div>
+                          <div className="home-item-meta text-xs capitalize mt-0.5">
+                            {catLabel ? `${catLabel} · ` : ''}{formatEntryDate(article.updated_at)}
                           </div>
                         </div>
-                      </button>
+                      </DashboardItem>
                     );
                   })}
                 </div>
@@ -378,11 +371,11 @@ export default function HomeView() {
                     const icon = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
                     const catLabel = categoryLabel(t, cat);
                     return (
-                      <button
+                      <DashboardItem
                         key={article.id}
-                        onClick={() => setActiveView({ type: 'wiki', id: article.id, mode: 'view' })}
+                        view={{ type: 'wiki', id: article.id, mode: 'view' }}
+                        layout="card"
                         onContextMenu={(e) => openCtx(e, { kind: 'wiki', id: article.id })}
-                        className="panel-interactive px-3 py-3 text-left"
                       >
                         {isImageIcon(article.icon)
                           ? <img src={article.icon!} alt="" className="w-6 h-6 object-cover rounded mb-1" />
@@ -392,7 +385,7 @@ export default function HomeView() {
                         <div className="home-item-meta text-xs capitalize mt-0.5">
                           {catLabel ? `${catLabel} · ` : ''}{formatEntryDate(article.updated_at)}
                         </div>
-                      </button>
+                      </DashboardItem>
                     );
                   })}
                 </div>

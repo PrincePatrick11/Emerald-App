@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
-import { Trash2, Pencil, Copy, PanelTopOpen } from 'lucide-react';
+import { Trash2, Pencil, Copy } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
+import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import DashboardItem from '../ui/DashboardItem';
 import RenameField from '../ui/RenameField';
@@ -29,9 +30,10 @@ import EntryDetailFrame from '../ui/EntryDetailFrame';
 
 export default function OperationsView() {
   const { t } = useTranslation();
-  const { activeView, setActiveView, openViewInNewTab, operationsPrefs, setOperationsPrefs } = useUIStore(
-    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab, operationsPrefs: s.operationsPrefs, setOperationsPrefs: s.setOperationsPrefs }))
+  const { activeView, setActiveView, operationsPrefs, setOperationsPrefs } = useUIStore(
+    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, operationsPrefs: s.operationsPrefs, setOperationsPrefs: s.setOperationsPrefs }))
   );
+  const openInNewTabAction = useOpenInNewTabAction();
   const { operations, createOperation, duplicateOperation, updateOperation, deleteOperation, restoreOperation, permanentlyDeleteOperation, getOperation } = useOperationStore(
     useShallow((s) => ({ operations: s.operations, createOperation: s.createOperation, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation, permanentlyDeleteOperation: s.permanentlyDeleteOperation, getOperation: s.getOperation }))
   );
@@ -413,7 +415,7 @@ export default function OperationsView() {
             x={ctxMenu.x} y={ctxMenu.y}
             onClose={() => setCtxMenu(null)}
             actions={[
-              { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'operations', id: ctxMenu.id, mode: 'view' }) },
+              openInNewTabAction({ type: 'operations', id: ctxMenu.id, mode: 'view' }),
               // Sigil-Operationen waren hier frueher ausgenommen, weil das
               // Duplizieren die Zeichnung verlor. duplicateOperation laedt sie
               // inzwischen nach und entsperrt die Kopie — die Ausnahme ist weg.

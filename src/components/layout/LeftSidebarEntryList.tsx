@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { formatEntryDate } from '../../lib/formatDate';
 import { categoryLabel, lookupCategory } from '../../lib/categories';
 import { DEFAULT_ENTRY_EMOJI, MODULE_LIST, type LeftListTabId } from '../../lib/modules';
-import { Flame, CheckSquare, Square, Copy, Pencil, Trash2, PanelTopOpen, LayoutList, type LucideIcon } from 'lucide-react';
+import { Flame, CheckSquare, Square, Copy, Pencil, Trash2, LayoutList, type LucideIcon } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useOperationStore } from '../../store/operationStore';
@@ -20,6 +20,7 @@ import type { AltarRecord, JournalEntry, MoonPhase, Operation, Task, WikiArticle
 import TabIconButton from '../ui/TabIconButton';
 import EntryListTab, { type EntryListTabProps } from '../ui/EntryListTab';
 import type { ContextMenuAction } from '../ui/ContextMenu';
+import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 
 /** Die Tabs ohne ihre Beschriftungen, die `t()` brauchen und deshalb in der
  *  Komponente bleiben. Auf Modulebene, damit `ENTRY_LIST_TABS_WIDTH` unten
@@ -179,6 +180,7 @@ function AllList() {
 // ── Journal ──────────────────────────────────────────────────────────────────
 function useJournalConfig(): EntryListTabProps<JournalEntry> {
   const { t } = useTranslation();
+  const openInNewTabAction = useOpenInNewTabAction();
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
@@ -215,7 +217,7 @@ function useJournalConfig(): EntryListTabProps<JournalEntry> {
     onDragStart: (e) => setDragItem({ id: e.id, entryType: 'journal', label: e.title }),
     onRename: (e, title) => updateEntry(e.id, { title }),
     contextMenuActions: (e, startRename) => [
-      { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'journal', id: e.id, mode: 'view' }) },
+      openInNewTabAction({ type: 'journal', id: e.id, mode: 'view' }),
       { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(e) },
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
       { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(e), danger: true },
@@ -233,6 +235,7 @@ function JournalList() {
 // ── Operations ───────────────────────────────────────────────────────────────
 function useOperationsConfig(): EntryListTabProps<Operation> {
   const { t } = useTranslation();
+  const openInNewTabAction = useOpenInNewTabAction();
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
@@ -285,7 +288,7 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
     onDragStart: (op) => setDragItem({ id: op.id, entryType: 'operation', label: op.title, category: lookupCategory(catById, op.category_id)?.emoji }),
     onRename: (op, title) => updateOperation(op.id, { title }),
     contextMenuActions: (op, startRename) => [
-      { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'operations', id: op.id, mode: 'view' }) },
+      openInNewTabAction({ type: 'operations', id: op.id, mode: 'view' }),
       { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(op) },
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
       { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(op), danger: true },
@@ -303,6 +306,7 @@ function OperationsList() {
 // ── Wiki ─────────────────────────────────────────────────────────────────────
 function useWikiConfig(): EntryListTabProps<WikiArticle> {
   const { t } = useTranslation();
+  const openInNewTabAction = useOpenInNewTabAction();
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
@@ -355,7 +359,7 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
     onDragStart: (a) => setDragItem({ id: a.id, entryType: 'wiki', label: a.title, category: lookupCategory(catById, a.category_id)?.emoji }),
     onRename: (a, title) => updateArticle(a.id, { title }),
     contextMenuActions: (a, startRename) => [
-      { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'wiki', id: a.id, mode: 'view' }) },
+      openInNewTabAction({ type: 'wiki', id: a.id, mode: 'view' }),
       { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(a) },
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
       { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(a), danger: true },
@@ -373,6 +377,7 @@ function WikiList() {
 // ── Altar ────────────────────────────────────────────────────────────────────
 function useAltarConfig(): EntryListTabProps<AltarRecord> {
   const { t } = useTranslation();
+  const openInNewTabAction = useOpenInNewTabAction();
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
@@ -401,7 +406,7 @@ function useAltarConfig(): EntryListTabProps<AltarRecord> {
     onDragStart: (a) => setDragItem({ id: a.id, entryType: 'altar', label: a.title }),
     onRename: (a, title) => updateAltar(a.id, { title }),
     contextMenuActions: (a, startRename) => [
-      { label: t('contextMenu.openInNewTab'), icon: <PanelTopOpen size={12} />, onClick: () => openViewInNewTab({ type: 'altar', id: a.id, mode: 'view' }) },
+      openInNewTabAction({ type: 'altar', id: a.id, mode: 'view' }),
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
     ],
     emptyMessage: t('altar.none'),
