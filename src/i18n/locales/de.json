@@ -513,11 +513,6 @@
     "showMore": "{{count}} weiteres Ergebnis anzeigen",
     "showMore_other": "{{count}} weitere Ergebnisse anzeigen"
   },
-  "routines": {
-    "newRoutine": "Neue Routine",
-    "namePlaceholder": "Name…",
-    "contentPlaceholder": "Markdown wird unterstützt…"
-  },
   "tags": {
     "none": "Noch keine Tags. Lege hier einen an oder vergib Tags beim Bearbeiten eines Eintrags.",
     "new": "Neuer Tag",
@@ -593,7 +588,7 @@
     "version": "Version",
     "pageGeneral": "Allgemein",
     "tagline": "Der Arbeitsbereich für deine magische Praxis.",
-    "taglineDetail": "Journal, Wiki, Operationen, Routinen, Altäre und Aufgaben an einem Ort — alles lokal auf diesem Rechner, ohne Cloud und ohne Konto.",
+    "taglineDetail": "Journal, Wiki, Operationen, Vorlagen, Altäre und Aufgaben an einem Ort — alles lokal auf diesem Rechner, ohne Cloud und ohne Konto.",
     "author": "Autor",
     "license": "Lizenz",
     "links": "Links",
@@ -609,7 +604,6 @@
     "includeJournal": "Journal",
     "includeWiki": "Wiki",
     "includeOperations": "Operationen",
-    "includeRoutines": "Routinen",
     "includeAltars": "Altäre",
     "includeTasks": "Aufgaben",
     "includeTags": "Tags",

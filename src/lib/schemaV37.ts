@@ -52,6 +52,20 @@ const V37_SOFT_DELETE_TABLES = [
 ] as const;
 
 const FROZEN: Partial<Record<V37TableName, string>> = {
+  // Seit v44 (`routines_to_templates`) gibt es die Tabelle im lebenden Schema nicht mehr.
+  routines: `
+    CREATE TABLE routines (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      emoji TEXT NOT NULL DEFAULT '📋',
+      content TEXT NOT NULL DEFAULT '',
+      tags TEXT NOT NULL DEFAULT '[]',
+      operation_ids TEXT NOT NULL DEFAULT '[]',
+      wiki_ids TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`,
+
   wiki_categories: `
     CREATE TABLE wiki_categories (
       id TEXT PRIMARY KEY,

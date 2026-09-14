@@ -15,6 +15,7 @@ import { migrateOperationStatusToBlocks } from './migrateOperationStatusToBlocks
 import { convertLegacySigils, hasLegacySigilRows } from './migrateLegacySigils';
 import { makeCategoryOptional } from './nullableCategory';
 import { seedSigilTemplate } from './templateRows';
+import { migrateRoutinesToTemplates } from './migrateRoutinesToTemplates';
 import i18n from '../i18n';
 
 // Per-vault DB cache: SQLite identifier → Database instance
@@ -1246,5 +1247,14 @@ export const MIGRATIONS: Migration[] = [
       await createIndexesIfMissing(db, [TEMPLATES_INDEX_DDL]);
       await seedSigilTemplate(db, i18n.t);
     },
+  },
+  {
+    // Die Routinen hatten seit dem Umbau der Seitenleiste keinen Weg mehr in
+    // die Oberfläche; Vorlagen können alles, was sie konnten. Jede wird eine
+    // Vorlage ohne Zuweisung, danach entfällt die Tabelle. Vorher eine
+    // Sicherung, wenn es Routinen gibt. Ablauf in `migrateRoutinesToTemplates.ts`.
+    version: 44,
+    name: 'routines_to_templates',
+    up: (db) => migrateRoutinesToTemplates(db, i18n.t),
   },
 ];

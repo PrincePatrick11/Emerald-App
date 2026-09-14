@@ -114,7 +114,7 @@ writeFileSync(
   `export { runMigrations, MIGRATIONS } from '${process.cwd().replace(/\\/g, '/')}/src/lib/db';
    export { TABLES, TABLE_DDL, ddlIfNotExists, checkIntegrity, reassignCategoryContent, collectUsedImageFilenames } from '${process.cwd().replace(/\\/g, '/')}/src/lib/schema';
    export { copyTable } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbRebuild';
-   export { assertPayloadReferencesResolve } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbBackup';
+   export { assertPayloadReferencesResolve, migrateBackupPayload, withRoutinesAsTemplates } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbBackup';
    export { invalidateVaultCache } from '${process.cwd().replace(/\\/g, '/')}/src/lib/vaultManager';
    export { convertLegacySigils } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLegacySigils';`
 );
@@ -153,7 +153,7 @@ const {
   runMigrations, MIGRATIONS, TABLES, TABLE_DDL,
   ddlIfNotExists, checkIntegrity, reassignCategoryContent,
   collectUsedImageFilenames, invalidateVaultCache, copyTable,
-  assertPayloadReferencesResolve, convertLegacySigils,
+  assertPayloadReferencesResolve, convertLegacySigils, migrateBackupPayload, withRoutinesAsTemplates,
 } = await import(pathToFileURL(bundlePath).href);
 
 /* ------------------------------------------------------------------ *
@@ -583,6 +583,12 @@ async function seedLegacyData(db) {
   await db.execute(
     `INSERT INTO altar_placements (id,item_id,x,y) VALUES ('p1','i1',10,20)`
   );
+  // Routine mit Markdown, rohem HTML, Tag und einer Verknüpfung auf die Operation — wird in v44 eine Vorlage.
+  await db.execute(
+    `INSERT INTO routines (id,name,emoji,content,tags,operation_ids,wiki_ids,created_at,updated_at)
+     VALUES ('r1-routine','Morgenritual','🌅','**Atmen** <script>x</script> [böse](javascript:alert(1)) [gut](https://example.org)','["ritual"]','["o1","fehlt"]','[]',$1,$1)`,
+    [now]
+  );
 }
 
 /* ------------------------------------------------------------------ *
@@ -701,6 +707,55 @@ check(
   JSON.stringify(orphans)
 );
 
+console.log('\n3b. Migration v44: Routinen werden Vorlagen\n');
+
+{
+  const [routineTable] = await seeded.select("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name='routines'");
+  const [tpl] = await seeded.select("SELECT * FROM templates WHERE id='r1-routine'");
+  check('die Tabelle routines ist weg', routineTable.n === 0);
+  check('die Routine ist eine Vorlage mit Name, Emoji, Tags und ohne Zuweisung',
+    tpl && tpl.name === 'Morgenritual' && tpl.icon === '🌅' && tpl.tags === '["ritual"]' && tpl.assignments === '[]',
+    JSON.stringify(tpl));
+  check('Markdown wird formatiert, rohes HTML maskiert',
+    tpl && tpl.content.includes('<strong>Atmen</strong>') && !tpl.content.includes('<script>') && tpl.content.includes('&lt;script&gt;'),
+    tpl?.content);
+  check('nur http(s)-Links bleiben Links, javascript: wird Text',
+    tpl && !tpl.content.includes('javascript:') && tpl.content.includes('href="https://example.org"') && tpl.content.includes('böse'),
+    tpl?.content);
+  check('die verknüpfte Operation wird ein Link-Chip, ein fehlendes Ziel fällt weg',
+    tpl && tpl.content.includes('data-id="o1"') && !tpl.content.includes('fehlt'),
+    tpl?.content);
+  const backups = readdirSync(join(workDir, 'seeded')).filter((f) => f.includes('.pre-v44'));
+  check('v44 hat vorher eine Sicherung angelegt', backups.length === 1, backups.join(', '));
+}
+
+console.log('\n3c. Routinen aus älteren Sicherungen\n');
+
+{
+  // Eine '7'-Datei mit einer Routine: Link auf eine mitgebrachte Operation, auf
+  // eine im Vault (o1 aus dem Seed) und auf eine, die der Filter weggelassen hat.
+  const backup = {
+    version: '7', type: 'backup', exportedAt: now, filters: {}, images: {},
+    data: {
+      operations: [{ id: 'bk-op', title: 'Aus der Datei', icon: null, category_id: null, entry_number: 1, deleted_at: null }],
+      wikiArticles: [], categories: [], templates: [{ id: 'bk-tpl', name: 'Datei-Vorlage', sort_order: 4 }],
+      routines: [{
+        id: 'bk-routine', name: 'Alt', emoji: '🕯', content: 'Text', tags: '[]',
+        operation_ids: '["bk-op","o1","weggefiltert"]', wiki_ids: '[]', created_at: now, updated_at: now,
+      }],
+    },
+  };
+  migrateBackupPayload(backup);
+  check('migrateBackupPayload lässt die Routinen für den Import liegen', backup.data.routines.length === 1 && backup.sourceVersion === 7);
+  const d = await withRoutinesAsTemplates(seeded, backup.data);
+  const converted = d.templates.find((t) => t.id === 'bk-routine');
+  check('Import: Link-Ziele aus Datei und Vault werden Chips, fehlende fallen weg',
+    converted && converted.content.includes('data-id="bk-op"') && converted.content.includes('data-id="o1"') && !converted.content.includes('weggefiltert'),
+    converted?.content);
+  check('Import: die Routine kommt hinter die Vorlagen der Datei, ohne Routinen-Rest',
+    converted && converted.sort_order === 5 && d.routines.length === 0, JSON.stringify(converted));
+}
+
 console.log('\n4. checkIntegrity findet, was Foreign Keys nicht abdecken\n');
 
 {
@@ -715,11 +770,6 @@ console.log('\n4. checkIntegrity findet, was Foreign Keys nicht abdecken\n');
     [now]
   );
   await db.execute(
-    `INSERT INTO routines (id,name,content,created_at,updated_at,operation_ids)
-     VALUES ('r1','Routine','',$1,$1,'["auch-nicht"]')`,
-    [now]
-  );
-  await db.execute(
     `INSERT INTO links (source_id,source_type,target_id,target_type)
      VALUES ('fehlt','journal','fehlt-auch','wiki')`
   );
@@ -728,7 +778,6 @@ console.log('\n4. checkIntegrity findet, was Foreign Keys nicht abdecken\n');
   const hit = (table, column) => found.some((o) => o.table === table && o.column === column);
 
   check('Waise in linked_wiki_ids erkannt', hit('journal_entries', 'linked_wiki_ids'));
-  check('Waise in routines.operation_ids erkannt', hit('routines', 'operation_ids'));
   check('Waise in links erkannt', hit('links', 'source_id') || hit('links', 'target_id'));
   check(
     'PRAGMA foreign_key_check sieht davon nichts',

@@ -20,8 +20,7 @@ export function LinkItemIcon({ item }: { item: SuggestionItem }) {
 interface Props<T> {
   /**
    * Der Block über der Suchzeile, typischerweise `LinkedEntryChip`s. Ihre
-   * Anordnung gehört dem Feld: die beiden ID-Felder legen sie in eine
-   * umbrechende Zeile, das Verlinkungs-Feld gruppiert sie nach Kategorie.
+   * Anordnung gehört dem Feld — das Verlinkungs-Feld gruppiert sie nach Kategorie.
    */
   chips?: ReactNode;
   /** Treffer zur aktuellen Eingabe; das Filtern bleibt beim Aufrufer, der
@@ -39,13 +38,6 @@ interface Props<T> {
 
 /** Höhe des Menüs (`max-h-40`) — ab hier klappt es nach oben. */
 const MENU_MAX_HEIGHT = 160;
-
-/**
- * So viele Treffer zeigen die beiden ID-Felder (`LinkedOpsInput`,
- * `LinkedWikiInput`) — die suchen je in EINEM Modul. Das Verlinkungs-Feld hat
- * alle fünf in einem Topf und setzt seine eigene, höhere Grenze.
- */
-export const LINK_RESULT_LIMIT = 8;
 
 /**
  * Der Chip einer Verknüpfung. `onClick` macht das Label anklickbar (das
@@ -96,7 +88,7 @@ export function LinkedEntryChip({
 /**
  * Die gemeinsame Hülle der Verknüpfungs-Felder: Chip-Zeile, Suchzeile und
  * Ergebnismenü. Zuvor stand dieses Gerüst dreimal fast wortgleich in
- * `LinkedEntriesField`, `LinkedOpsInput` und `LinkedWikiInput`.
+ * `LinkedEntriesField` und zwei inzwischen entfernten ID-Feldern.
  *
  * Das Menü hängt per Portal am `body` und liegt `fixed`, wie `Dropdown` mit
  * `portal` und `ContextMenu`: die Felder sitzen im `overflow-y-auto` der

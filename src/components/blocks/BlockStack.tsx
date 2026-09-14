@@ -90,7 +90,7 @@ const REVEAL_MS = 1600;
  *
  * Er ist auch der eine Ansprechpartner für alles, was von außen in den Eintrag
  * schreibt oder dokumentweit lauscht: Link-Bitten der Seitenleiste, Navigation
- * per Chip-Klick, Drops (Dateien, Einträge aus der linken Liste, Routinen),
+ * per Chip-Klick, Drops (Dateien, Einträge aus der linken Liste),
  * Toolbar und Linkauswahl. Das hing früher am einzelnen RichEditor; mit
  * mehreren Textblöcken würde sonst jede Bitte in jedem Block ausgeführt. Welcher
  * Editor eine Bitte bekommt, entscheidet `useTextEditorRegistry`. Die
@@ -178,14 +178,13 @@ export default function BlockStack({
   }), [registerTextEditor, placeholder, t]);
 
   /**
-   * Einen Link anhängen — außer er steht schon irgendwo im Eintrag. `preferred`
-   * ist der Editor unter dem Zeiger bei einem Routine-Drop; ohne ihn gilt der
-   * Ziel-Editor der Registry. Gibt es gar keinen Textblock, entsteht einer mit
-   * dem Link als Inhalt.
+   * Einen Link anhängen — außer er steht schon irgendwo im Eintrag. Ziel ist
+   * der Editor, den die Registry wählt; gibt es gar keinen Textblock, entsteht
+   * einer mit dem Link als Inhalt.
    */
-  const appendLinkOnce = useCallback((item: EntryLinkRequest, preferred?: Editor | null) => {
+  const appendLinkOnce = useCallback((item: EntryLinkRequest) => {
     if (orderedEditors().some((ed) => findEntryLinkPos(ed.state.doc, item) !== null)) return;
-    const target = preferred ?? targetEditor();
+    const target = targetEditor();
     if (target) {
       appendEntryLink(target, item);
       return;
@@ -203,7 +202,6 @@ export default function BlockStack({
     enabled: isEditing,
     getEditors: orderedEditors,
     getContainer: () => stackRef.current,
-    appendLink: appendLinkOnce,
   });
 
   /**

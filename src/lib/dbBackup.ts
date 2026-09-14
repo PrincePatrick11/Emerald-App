@@ -33,6 +33,9 @@ import { convertLegacyStatusRows, STATUS_DEFINITION_ID } from './blocks/legacySt
 import { definitionById, nextDefinitionSortOrder } from './blockDefinitionRows';
 import { nextTemplateSortOrder } from './templateRows';
 import {
+  routineLinkResolver, routineToTemplate, vaultRoutineLinkSource, type RoutineCategoryRow, type RoutineTargetRow,
+} from './migrateRoutinesToTemplates';
+import {
   assignedCategoryId, assignmentKey, defaultKeys, isTemplateId, parseAssignments, SIGIL_TEMPLATE_ID, templateToRow,
 } from './blocks/templates';
 import { fromRow } from './row';
@@ -57,7 +60,6 @@ export interface BackupOptions {
   includeJournal: boolean;
   includeWiki: boolean;
   includeOperations: boolean;
-  includeRoutines: boolean;
   includeAltars: boolean;
   includeTasks: boolean;
   includeTags: boolean;
@@ -80,7 +82,8 @@ export interface BackupPreview {
   journalCount: number;
   wikiCount: number;
   opsCount: number;
-  routinesCount: number;
+  /** Vorlagen samt der Routinen älterer Dateien, die als Vorlagen ankommen. */
+  templatesCount: number;
   altarsCount: number;
   /** Eigener Zähler: die Bibliothek reist unabhängig von den Altären, eine
    *  Datei kann null Altäre und trotzdem Elemente tragen. */
@@ -95,7 +98,6 @@ export interface ImportTypeFilters {
   includeJournal: boolean;
   includeWiki: boolean;
   includeOperations: boolean;
-  includeRoutines: boolean;
   includeAltars: boolean;
   includeTasks: boolean;
   includeTags: boolean;
@@ -270,6 +272,10 @@ export function migrateBackupPayload(backup: BackupFile): void {
   // Operationen wandelt der Import nach dem Einfügen um (`convertLegacySigils`).
 
   // v7 → v8 braucht keinen Schritt: neu ist nur das Array `templates`.
+
+  // Routinen (Dateien von vor v44) bleiben hier liegen: sie werden erst beim
+  // Import Vorlagen (`withRoutinesAsTemplates`), nach den Filtern — sonst
+  // zeigten ihre Links auf Einträge, die gar nicht mitkommen.
   backup.sourceVersion = version;
   backup.version = BACKUP_VERSION;
 }
@@ -292,6 +298,7 @@ interface BackupFile {
     /** Die Vorlagen (seit '8'); dabei, sobald Journal, Wiki oder Operationen dabei sind. */
     templates?: Row[];
     tags?: Row[];
+    /** Nur in Dateien von vor v44: die Routinen — der Import macht Vorlagen daraus (`withRoutinesAsTemplates`). */
     routines?: Row[];
     altars?: Row[];
     altarItems?: Row[];
@@ -450,14 +457,6 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
     collectImageRefs('operations', data.operations, allImagePaths);
   }
 
-  // ── Routines ─────────────────────────────────────────────────────────────
-  if (options.includeRoutines) {
-    data.routines = await db.select<Row[]>(
-      `SELECT * FROM routines WHERE 1=1 ${dateClause}`,
-      dateParams,
-    );
-  }
-
   // ── Altars ───────────────────────────────────────────────────────────────
   if (options.includeAltars) {
     data.altars = await db.select<Row[]>(
@@ -608,7 +607,7 @@ export async function openBackupFile(): Promise<{ path: string; backup: BackupFi
     journalCount: backup.data.journalEntries?.length ?? 0,
     wikiCount: backup.data.wikiArticles?.length ?? 0,
     opsCount: backup.data.operations?.length ?? 0,
-    routinesCount: backup.data.routines?.length ?? 0,
+    templatesCount: (backup.data.templates?.length ?? 0) + (backup.data.routines?.length ?? 0),
     altarsCount: backup.data.altars?.length ?? 0,
     altarItemsCount: backup.data.altarItems?.length ?? 0,
     taskCount: backup.data.tasks?.length ?? 0,
@@ -879,7 +878,6 @@ function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFi
     ...(f.includeJournal ? (d.journalEntries ?? []).map((r) => r.id as string) : []),
     ...(f.includeWiki    ? (d.wikiArticles   ?? []).map((r) => r.id as string) : []),
     ...(f.includeOperations ? (d.operations ?? []).map((r) => r.id as string) : []),
-    ...(f.includeRoutines   ? (d.routines    ?? []).map((r) => r.id as string) : []),
     ...(f.includeAltars     ? (d.altars      ?? []).map((r) => r.id as string) : []),
     ...(f.includeTasks      ? (d.tasks       ?? []).map((r) => r.id as string) : []),
   ]);
@@ -889,12 +887,12 @@ function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFi
     ...d,
     blockDefinitions:   anyBlocks           ? d.blockDefinitions  : [],
     templates:          anyBlocks           ? d.templates         : [],
+    routines:           anyBlocks           ? d.routines          : [],
     journalEntries:     f.includeJournal    ? d.journalEntries    : [],
     wikiArticles:       f.includeWiki       ? d.wikiArticles      : [],
     operations:         f.includeOperations ? d.operations        : [],
     // Vorlagen (mit `anyBlocks`) brauchen die Kategorien ihrer Zuweisungen; `usedCategoryRows` grenzt ein.
     categories:         anyCategorized || anyBlocks ? d.categories : [],
-    routines:           f.includeRoutines   ? d.routines          : [],
     altars:             f.includeAltars     ? d.altars            : [],
     altarItems:         f.includeAltars     ? d.altarItems        : [],
     altarPlacements:    f.includeAltars     ? d.altarPlacements   : [],
@@ -926,7 +924,6 @@ function applyCategoryFilters(d: BackupFile['data'], filters: ImportCategoryFilt
     ...wikiArticles.map((r) => r.id as string),
     ...operations.map((r) => r.id as string),
     ...(d.journalEntries ?? []).map((r) => r.id as string),
-    ...(d.routines ?? []).map((r) => r.id as string),
     ...(d.altars ?? []).map((r) => r.id as string),
     ...tasks.map((r) => r.id as string),
   ]);
@@ -1083,9 +1080,35 @@ export async function assertPayloadReferencesResolve(
   }
 }
 
+/**
+ * Die Routinen einer älteren Sicherung als Vorlagen — derselbe Weg wie
+ * Migration v44, aber erst jetzt, nach den Typ- und Kategorie-Filtern: ein
+ * Link-Ziel muss mitkommen (aus der Datei) oder schon da sein (im Vault),
+ * sonst fällt der Chip weg. Neue Vorlagen kommen hinter die der Datei. Beim
+ * Merge zieht `insertTemplates` die Chips danach auf die umbenannten IDs.
+ */
+export async function withRoutinesAsTemplates(db: Awaited<ReturnType<typeof getDb>>, d: BackupFile['data']): Promise<BackupFile['data']> {
+  if (!d.routines?.length) return d;
+  const resolve = routineLinkResolver(i18n.t, [
+    {
+      operations: (d.operations ?? []) as RoutineTargetRow[],
+      articles: (d.wikiArticles ?? []) as RoutineTargetRow[],
+      categories: (d.categories ?? []) as RoutineCategoryRow[],
+    },
+    await vaultRoutineLinkSource(db),
+  ]);
+  const now = nowIso();
+  const offset = (d.templates ?? []).reduce((max, r) => Math.max(max, Number(r.sort_order) || 0), -1) + 1;
+  const converted = d.routines
+    .map((routine, i) => routineToTemplate(routine, resolve, offset + i, now))
+    .filter((tpl): tpl is NonNullable<typeof tpl> => tpl !== null)
+    .map(templateToRow);
+  return { ...d, templates: [...(d.templates ?? []), ...converted], routines: [] };
+}
+
 async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile, filters: ImportCategoryFilters): Promise<void> {
   const pathMap = await restoreImages(backup);
-  const d = applyCategoryFilters(backup.data, filters);
+  const d = await withRoutinesAsTemplates(db, applyCategoryFilters(backup.data, filters));
 
   await assertPayloadReferencesResolve(db, d);
 
@@ -1126,10 +1149,9 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   const hasJournal = (d.journalEntries?.length ?? 0) > 0;
   const hasWiki = (d.wikiArticles?.length ?? 0) > 0;
   const hasOps = (d.operations?.length ?? 0) > 0;
-  const hasRoutines = (d.routines?.length ?? 0) > 0;
   const hasAltars = (d.altars?.length ?? 0) > 0;
   const hasTasks = (d.tasks?.length ?? 0) > 0;
-  const hasAny = hasJournal || hasWiki || hasOps || hasTasks || hasRoutines;
+  const hasAny = hasJournal || hasWiki || hasOps || hasTasks;
 
   // Links: delete only for present entry types
   if (hasJournal) {
@@ -1156,7 +1178,6 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
     await db.execute('DELETE FROM task_links');
     await db.execute('DELETE FROM tasks');
   }
-  if (hasRoutines) await db.execute('DELETE FROM routines');
   if (hasOps) await db.execute('DELETE FROM operations');
   if (hasJournal) await db.execute('DELETE FROM journal_entries');
   if (hasWiki) await db.execute('DELETE FROM wiki_articles');
@@ -1167,7 +1188,6 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   await insertRows(db, 'journal_entries', journalEntries);
   await insertRows(db, 'wiki_articles', wikiArticles);
   await insertRows(db, 'operations', operations);
-  if (d.routines) await insertRows(db, 'routines', d.routines);
   await insertRows(db, 'altars', altars);
   // OR IGNORE, wenn oben nicht geleert wurde: die Datei kann eine Bibliothek
   // ohne Altäre tragen (Datumsfilter, oder ein Vault, der nur Elemente hat),
@@ -1196,7 +1216,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
 
 async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile, filters: ImportCategoryFilters): Promise<void> {
   const pathMap = await restoreImages(backup);
-  const d = applyCategoryFilters(backup.data, filters);
+  const d = await withRoutinesAsTemplates(db, applyCategoryFilters(backup.data, filters));
 
   // Merge loescht zwar nichts, bricht aber mitten im Einfuegen ab, wenn eine
   // Kategorie fehlt — und lässt dann halb importierte Daten zurück.
@@ -1212,7 +1232,6 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     ...(d.journalEntries ?? []).map((r: Row) => r.id as string),
     ...(d.wikiArticles ?? []).map((r: Row) => r.id as string),
     ...(d.operations ?? []).map((r: Row) => r.id as string),
-    ...(d.routines ?? []).map((r: Row) => r.id as string),
     ...(d.altars ?? []).map((r: Row) => r.id as string),
     ...(d.altarItems ?? []).map((r: Row) => r.id as string),
     ...(d.tasks ?? []).map((r: Row) => r.id as string),
@@ -1315,9 +1334,6 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     withContentLinks(remapEntry(r, ['content', 'icon', 'cover_image', 'drawing_data', 'thumbnail_data'], ['charging_technique_wiki_id'], [], 'operations'))
   ), catMap), i18n.t, nowIso(), mergeStatus);
   const operations = mergeOps.rows;
-  const routines = (d.routines ?? []).map((r: Row) =>
-    remapEntry(r, [], [], ['operation_ids', 'wiki_ids'])
-  );
   const altars = (d.altars ?? []).map((r: Row) =>
     // Dieselben drei Spalten wie in doReplace. Solange thumbnail_data und
     // icon_data Data-URLs halten, ist der Unterschied folgenlos — aber der
@@ -1366,7 +1382,6 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   await insertRows(db, 'journal_entries', journalEntries);
   await insertRows(db, 'wiki_articles', wikiArticles);
   await insertRows(db, 'operations', operations);
-  await insertRows(db, 'routines', routines);
   await insertRows(db, 'altars', altars);
   await insertRows(db, 'altar_items', altarItems);
   await insertRows(db, 'altar_placements', altarPlacements);
@@ -1387,7 +1402,7 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
 
 const ALL_TYPES_INCLUDED: ImportTypeFilters = {
   includeJournal: true, includeWiki: true, includeOperations: true,
-  includeRoutines: true, includeAltars: true, includeTasks: true, includeTags: true,
+  includeAltars: true, includeTasks: true, includeTags: true,
 };
 
 export async function importDatabase(
@@ -1439,11 +1454,13 @@ export async function importDatabase(
     // 4. Fill the new (empty) vault with the backup data
     const db = await getDb();
     // Der frische Vault hat die Sigillen-Vorlage gerade selbst angelegt. Trägt
-    // die Datei ihre Vorlagen mit (ab '8'), gilt deren Fassung — auch dass die
+    // die Datei ihre Vorlagen mit (ab '8' — Routinen älterer Dateien zählen
+    // nicht, die kennen die Sigillen-Vorlage nicht), gilt deren Fassung — auch dass die
     // Vorlage dort geändert oder gelöscht war. Sonst verdrängte die frische
     // Zeile die mitgebrachte samt ihrem Stern.
     const types = typeFilters ?? ALL_TYPES_INCLUDED;
-    if (Array.isArray(backup.data.templates) && (types.includeJournal || types.includeWiki || types.includeOperations)) {
+    const bringsTemplates = (backup.sourceVersion ?? Number(BACKUP_VERSION)) >= 8 && Array.isArray(backup.data.templates);
+    if (bringsTemplates && (types.includeJournal || types.includeWiki || types.includeOperations)) {
       await db.execute('DELETE FROM templates WHERE id=$1', [SIGIL_TEMPLATE_ID]);
     }
     await doReplace(db, filteredBackup, filters);

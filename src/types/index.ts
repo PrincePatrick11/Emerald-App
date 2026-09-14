@@ -92,19 +92,6 @@ export interface InternalLink {
   target_type: ContentType;
 }
 
-export interface Routine {
-  id: string;
-  name: string;
-  emoji: string;
-  content: string; // plain text; newlines → paragraphs on drop
-  tags: string[];
-  operation_ids: string[];
-  wiki_ids: string[];
-  created_at: string;
-  updated_at: string;
-}
-
-
 export type MoonPhase =
   | 'new'
   | 'waxing_crescent'

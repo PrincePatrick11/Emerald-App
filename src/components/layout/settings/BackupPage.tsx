@@ -29,7 +29,6 @@ const DEFAULT_EXPORT_OPTIONS: BackupOptions = {
   includeJournal: true,
   includeWiki: true,
   includeOperations: true,
-  includeRoutines: true,
   includeAltars: true,
   includeTasks: true,
   includeTags: true,
@@ -68,7 +67,7 @@ export default function BackupPage() {
   const [vaultCustomPath, setVaultCustomPath] = useState<string | null>(null);
   const [importTypeFilters, setImportTypeFilters] = useState<ImportTypeFilters>({
     includeJournal: true, includeWiki: true, includeOperations: true,
-    includeRoutines: true, includeAltars: true, includeTasks: true, includeTags: true,
+    includeAltars: true, includeTasks: true, includeTags: true,
   });
   const [excludedCategoryIds] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
@@ -109,7 +108,7 @@ export default function BackupPage() {
       // klickbar wird, sonst laeuft ein schneller Klick in den Rueckfall
       // `{appDataDir}/vaults/{id}`. Scheitert die Aufloesung, bleibt der.
       setVaultBaseDir(await newVaultBaseDir().catch(() => null));
-      setImportTypeFilters({ includeJournal: true, includeWiki: true, includeOperations: true, includeRoutines: true, includeAltars: true, includeTasks: true, includeTags: true });
+      setImportTypeFilters({ includeJournal: true, includeWiki: true, includeOperations: true, includeAltars: true, includeTasks: true, includeTags: true });
     } catch {
       setImportError(t('settings.importErrorInvalid'));
     }
@@ -175,7 +174,6 @@ export default function BackupPage() {
                   ['includeJournal', 'settings.includeJournal'],
                   ['includeWiki', 'settings.includeWiki'],
                   ['includeOperations', 'settings.includeOperations'],
-                  ['includeRoutines', 'settings.includeRoutines'],
                   ['includeAltars', 'settings.includeAltars'],
                   ['includeTasks', 'settings.includeTasks'],
                   ['includeTags', 'settings.includeTags'],
@@ -276,7 +274,7 @@ export default function BackupPage() {
                   importedFile.preview.journalCount && `${importedFile.preview.journalCount} J`,
                   importedFile.preview.wikiCount && `${importedFile.preview.wikiCount} W`,
                   importedFile.preview.opsCount && `${importedFile.preview.opsCount} O`,
-                  importedFile.preview.routinesCount && `${importedFile.preview.routinesCount} R`,
+                  importedFile.preview.templatesCount && `${importedFile.preview.templatesCount} V`,
                   importedFile.preview.altarsCount && `${importedFile.preview.altarsCount} A`,
                   importedFile.preview.altarItemsCount && `${importedFile.preview.altarItemsCount} E`,
                   importedFile.preview.taskCount && `${importedFile.preview.taskCount} T`,
@@ -295,7 +293,6 @@ export default function BackupPage() {
                     ['includeJournal', 'settings.includeJournal'],
                     ['includeWiki', 'settings.includeWiki'],
                     ['includeOperations', 'settings.includeOperations'],
-                    ['includeRoutines', 'settings.includeRoutines'],
                     ['includeAltars', 'settings.includeAltars'],
                     ['includeTasks', 'settings.includeTasks'],
                     ['includeTags', 'settings.includeTags'],

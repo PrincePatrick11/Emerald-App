@@ -20,7 +20,7 @@ import type Database from '@tauri-apps/plugin-sql';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 43;
+export const BASELINE_VERSION = 44;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
@@ -37,7 +37,6 @@ export const TABLES = [
   'schema_version',
   'tags',
   'links',
-  'routines',
   'categories',
   'block_definitions',
   'templates',
@@ -96,19 +95,6 @@ export const TABLE_DDL: Record<TableName, string> = {
       target_id TEXT NOT NULL,
       target_type TEXT NOT NULL,
       PRIMARY KEY (source_id, target_id)
-    )`,
-
-  routines: `
-    CREATE TABLE routines (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      emoji TEXT NOT NULL DEFAULT '📋',
-      content TEXT NOT NULL DEFAULT '',
-      tags TEXT NOT NULL DEFAULT '[]',
-      operation_ids TEXT NOT NULL DEFAULT '[]',
-      wiki_ids TEXT NOT NULL DEFAULT '[]',
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
     )`,
 
   // Eine Liste für Wiki, Operationen, Aufgaben und Altar-Elemente (seit v38;
@@ -581,8 +567,6 @@ export async function checkIntegrity(db: Database): Promise<Orphan[]> {
   for (const [table, column, target] of [
     ['journal_entries', 'linked_operation_ids', 'operations'],
     ['journal_entries', 'linked_wiki_ids', 'wiki_articles'],
-    ['routines', 'operation_ids', 'operations'],
-    ['routines', 'wiki_ids', 'wiki_articles'],
   ] as const) {
     const rows = await db.select<{ id: string; value: string | null }[]>(
       `SELECT id, ${column} AS value FROM ${table}`

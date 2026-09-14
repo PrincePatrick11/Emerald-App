@@ -89,22 +89,6 @@ export default function JournalView() {
     if (entry) setTitle(entry.title);
   }, [entry?.title]);
 
-  // Apply tags from a dropped routine — die verknüpften Operationen und
-  // Wiki-Artikel der Routine hängt der Editor selbst als Link-Chips an.
-  useEffect(() => {
-    if (!isEditing || !entry) return;
-    const handler = (e: Event) => {
-      const { tags: routineTags } = (e as CustomEvent<{ tags: string[] }>).detail;
-      setTags((prev) => {
-        const nextTags = [...new Set([...prev, ...routineTags])];
-        triggerAutoSave();
-        return nextTags;
-      });
-    };
-    document.addEventListener('routine-drop', handler);
-    return () => document.removeEventListener('routine-drop', handler);
-  }, [isEditing, entry?.id, triggerAutoSave]);
-
   const handleNew = async () => {
     const e = await createEntry();
     setActiveView({ type: 'journal', id: e.id, mode: 'edit', isNew: true });

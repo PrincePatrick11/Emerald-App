@@ -32,9 +32,8 @@ interface Props {
 }
 
 /**
- * So viele Vorschläge zeigt die Liste. Deutlich mehr als bei den beiden
- * ID-Feldern (`LINK_RESULT_LIMIT`), weil hier alle fünf Module in einem Topf
- * liegen: bei acht Treffern bekäme man ohne Suchbegriff nur das erste Modul zu
+ * So viele Vorschläge zeigt die Liste — alle fünf Module liegen in einem Topf:
+ * bei wenigen Treffern bekäme man ohne Suchbegriff nur das erste Modul zu
  * sehen. Das Menü ist auf `max-h-40` begrenzt und scrollt.
  */
 const RESULT_LIMIT = 50;

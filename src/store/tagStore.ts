@@ -5,7 +5,6 @@ import { useJournalStore } from './journalStore';
 import { useWikiStore } from './wikiStore';
 import { useOperationStore } from './operationStore';
 import { useTaskStore } from './taskStore';
-import { useRoutineStore } from './routineStore';
 import { useTemplateStore } from './templateStore';
 import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
@@ -32,7 +31,7 @@ const byName = (a: Tag, b: Tag) => a.name.localeCompare(b.name);
 const renameInList = (tags: string[], from: string, to: string) =>
   [...new Set(tags.map((t) => (t === from ? to : t)))];
 
-type TaggedType = 'journal' | 'wiki' | 'operation' | 'task' | 'routine' | 'template';
+type TaggedType = 'journal' | 'wiki' | 'operation' | 'task' | 'template';
 
 interface AffectedEntry { id: string; type: TaggedType }
 
@@ -41,8 +40,7 @@ interface TaggedRef extends AffectedEntry { tags: string[] }
 /**
  * Alles, was Tag-*Namen* trägt — Einträge speichern Namen, keine ids. Wer einen
  * Tag umbenennt, löscht oder wiederherstellt, muss darum jede dieser Listen
- * anfassen. Routinen (Altar-Bibliothek) haben derzeit keinen Tag-Editor in der
- * Oberfläche, können aber Tags aus älteren Daten tragen.
+ * anfassen.
  */
 function taggedItems(): TaggedRef[] {
   return [
@@ -50,7 +48,6 @@ function taggedItems(): TaggedRef[] {
     ...useWikiStore.getState().articles.map((a) => ({ id: a.id, type: 'wiki' as const, tags: a.tags ?? [] })),
     ...useOperationStore.getState().operations.map((o) => ({ id: o.id, type: 'operation' as const, tags: o.tags ?? [] })),
     ...useTaskStore.getState().tasks.map((t) => ({ id: t.id, type: 'task' as const, tags: t.tags ?? [] })),
-    ...useRoutineStore.getState().routines.map((r) => ({ id: r.id, type: 'routine' as const, tags: r.tags ?? [] })),
     // Vorlagen tragen Tags wie Einträge, die sie beim Einsetzen weitergeben.
     ...useTemplateStore.getState().templates.map((t) => ({ id: t.id, type: 'template' as const, tags: t.tags })),
   ];
@@ -62,7 +59,6 @@ function setItemTags(type: TaggedType, id: string, tags: string[]): Promise<void
     case 'wiki': return useWikiStore.getState().updateArticle(id, { tags });
     case 'operation': return useOperationStore.getState().updateOperation(id, { tags });
     case 'task': return useTaskStore.getState().updateTask(id, { tags });
-    case 'routine': return useRoutineStore.getState().updateRoutine(id, { tags });
     case 'template': return useTemplateStore.getState().updateTemplate(id, { tags }).then(() => undefined);
   }
 }

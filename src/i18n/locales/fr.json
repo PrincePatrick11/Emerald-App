@@ -513,11 +513,6 @@
     "showMore": "Afficher {{count}} autre résultat",
     "showMore_other": "Afficher {{count}} autres résultats"
   },
-  "routines": {
-    "newRoutine": "Nouvelle routine",
-    "namePlaceholder": "Nom…",
-    "contentPlaceholder": "Markdown pris en charge…"
-  },
   "tags": {
     "none": "Pas encore d'étiquettes. Créez-en une ici ou ajoutez des étiquettes lors de la modification d'une entrée.",
     "new": "Nouvelle étiquette",
@@ -601,7 +596,7 @@
     "version": "Version",
     "pageGeneral": "Général",
     "tagline": "L'espace de travail pour votre pratique magique.",
-    "taglineDetail": "Journal, wiki, opérations, routines, autels et tâches au même endroit — le tout en local sur cet ordinateur, sans cloud ni compte.",
+    "taglineDetail": "Journal, wiki, opérations, modèles, autels et tâches au même endroit — le tout en local sur cet ordinateur, sans cloud ni compte.",
     "author": "Auteur",
     "license": "Licence",
     "links": "Liens",
@@ -617,7 +612,6 @@
     "includeJournal": "Journal",
     "includeWiki": "Wiki",
     "includeOperations": "Opérations",
-    "includeRoutines": "Routines",
     "includeAltars": "Autels",
     "includeTasks": "Tâches",
     "includeTags": "Tags",

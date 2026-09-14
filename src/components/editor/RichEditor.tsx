@@ -57,7 +57,7 @@ interface RichEditorProps {
  * Alles, was es pro geöffnetem Eintrag nur EINMAL geben darf, hält der
  * `BlockStack`: Toolbar, Linkauswahl, die Link-Bitten der Seitenleiste, die
  * Navigation per Chip-Klick, Drops (Dateien aus dem Explorer, Einträge aus der
- * linken Liste, Routinen) und das Drag-Schild. Das hing früher hier und damit
+ * linken Liste) und das Drag-Schild. Das hing früher hier und damit
  * pro Editor am `document` — mit mehreren Textblöcken hätte jede Bitte jeden
  * Block getroffen.
  *

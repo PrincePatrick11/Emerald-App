@@ -22,7 +22,6 @@ import type {
   InternalLink,
   JournalEntry,
   Operation,
-  Routine,
   Tag,
   Task,
   TaskLink,
@@ -244,20 +243,6 @@ export const fromRow = {
       note: str(r.note),
       image_data: r.image_data == null ? undefined : String(r.image_data),
       created_at: str(r.created_at),
-    };
-  },
-
-  routine(r: DbRow): Routine {
-    return {
-      id: str(r.id),
-      name: str(r.name),
-      emoji: str(r.emoji),
-      content: str(r.content),
-      tags: jsonArray(r.tags),
-      operation_ids: jsonArray(r.operation_ids),
-      wiki_ids: jsonArray(r.wiki_ids),
-      created_at: str(r.created_at),
-      updated_at: str(r.updated_at),
     };
   },
 

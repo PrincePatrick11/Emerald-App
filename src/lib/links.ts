@@ -28,9 +28,8 @@ export { isValidLinkTarget };
 
 /**
  * Die Seitenleiste kennt den TipTap-Editor nicht — sie bittet ihn per Event,
- * einen Link unten anzuhängen. Dasselbe Muster wie `internal-link-navigate`
- * und `routine-drop`; der Editor der geöffneten Ansicht hört zu, solange er
- * editierbar ist.
+ * einen Link unten anzuhängen. Dasselbe Muster wie `internal-link-navigate`:
+ * der Editor der geöffneten Ansicht hört zu, solange er editierbar ist.
  */
 export const APPEND_ENTRY_LINK_EVENT = 'entry-link-append';
 

@@ -28,7 +28,6 @@ import { useEditActions } from '../../hooks/useEditActions';
 import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
 
-
 export default function OperationsView() {
   const { t } = useTranslation();
   const { activeView, setActiveView, operationsPrefs, setOperationsPrefs } = useUIStore(
@@ -97,21 +96,6 @@ export default function OperationsView() {
   useEffect(() => {
     if (operation) setTitle(operation.title);
   }, [operation?.title]);
-
-  // Apply tags from a dropped routine
-  useEffect(() => {
-    if (!isEditing || !operation) return;
-    const handler = (e: Event) => {
-      const { tags: routineTags } = (e as CustomEvent<{ tags: string[] }>).detail;
-      setTags((prev) => {
-        const nextTags = [...new Set([...prev, ...routineTags])];
-        triggerAutoSave();
-        return nextTags;
-      });
-    };
-    document.addEventListener('routine-drop', handler);
-    return () => document.removeEventListener('routine-drop', handler);
-  }, [isEditing, operation?.id, triggerAutoSave]);
 
   const handleNew = async () => {
     const op = await createOperation();
@@ -233,7 +217,6 @@ export default function OperationsView() {
     const activeFilterCount = filterCatIds.length > 0 ? 1 : 0;
 
     const sortedOps = sortItems(filtered, sort, { date: (o) => o.updated_at });
-
 
     const timelineGroups = groupByMonth(sortedOps, (o) => o.updated_at);
 

@@ -20,7 +20,7 @@ const tails = new Map<string, Promise<void>>();
 
 export function serialKey(
   domain:
-    | 'journal' | 'wiki' | 'operation' | 'task' | 'tag' | 'routine'
+    | 'journal' | 'wiki' | 'operation' | 'task' | 'tag'
     | 'altar' | 'altarItem' | 'placement' | 'links' | 'blockDefinition' | 'template',
   id: string,
 ): string {

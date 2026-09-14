@@ -29,7 +29,6 @@ import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
 
-
 export default function WikiView() {
   const { t } = useTranslation();
   const { activeView, setActiveView, wikiPrefs, setWikiPrefs } = useUIStore(
@@ -103,21 +102,6 @@ export default function WikiView() {
   useEffect(() => {
     if (article) setTitle(article.title);
   }, [article?.title]);
-
-  // Apply tags from a dropped routine
-  useEffect(() => {
-    if (!isEditing || !article) return;
-    const handler = (e: Event) => {
-      const { tags: routineTags } = (e as CustomEvent<{ tags: string[] }>).detail;
-      setTags((prev) => {
-        const nextTags = [...new Set([...prev, ...routineTags])];
-        triggerAutoSave();
-        return nextTags;
-      });
-    };
-    document.addEventListener('routine-drop', handler);
-    return () => document.removeEventListener('routine-drop', handler);
-  }, [isEditing, article?.id, triggerAutoSave]);
 
   const handleDone = async () => {
     if (!article) return;
@@ -233,7 +217,6 @@ export default function WikiView() {
     const activeFilterCount = filterCatIds.length > 0 ? 1 : 0;
 
     const sortedArticles = sortItems(filtered, sort, { date: (a) => a.created_at });
-
 
     // For timeline (by month)
     const timelineGroups = groupByMonth(sortedArticles, (a) => a.created_at);
