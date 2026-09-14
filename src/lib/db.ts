@@ -2,8 +2,8 @@ import Database from '@tauri-apps/plugin-sql';
 import { invoke } from '@tauri-apps/api/core';
 import { getActiveDbConnectionString, getActiveVaultId } from './vaultManager';
 import {
-  BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, IMAGE_FIELDS, TABLE_DDL, createSchema, ddlIfNotExists, seedBuiltins,
-  storedImageName,
+  BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, IMAGE_FIELDS, TABLE_DDL, TEMPLATES_INDEX_DDL, createSchema,
+  ddlIfNotExists, seedBuiltins, storedImageName,
 } from './schema';
 import { normalizeSchema } from './normalizeSchema';
 import { adoptLegacyImages, rewriteImageRefs } from './images';
@@ -14,6 +14,7 @@ import { backupDatabaseFile, createIndexesIfMissing } from './dbRebuild';
 import { migrateOperationStatusToBlocks } from './migrateOperationStatusToBlocks';
 import { convertLegacySigils, hasLegacySigilRows } from './migrateLegacySigils';
 import { makeCategoryOptional } from './nullableCategory';
+import { seedSigilTemplate } from './templateRows';
 import i18n from '../i18n';
 
 // Per-vault DB cache: SQLite identifier → Database instance
@@ -197,6 +198,8 @@ export async function runMigrations(db: Database): Promise<void> {
     // ist — `main.tsx` wartet die gespeicherte Sprache ab, bevor irgendetwas
     // die Datenbank öffnet.
     await seedBuiltins(db, (key) => i18n.t(`categories.starter.${key}`));
+    // Nicht in seedBuiltins: schema.ts importiert keine Blocklogik.
+    await seedSigilTemplate(db, i18n.t);
     const now = new Date().toISOString();
     await db.execute(
       'INSERT INTO schema_version (version, name, applied_at) VALUES ($1, $2, $3)',
@@ -253,6 +256,7 @@ const CLEANUP_TABLES = [
   'tasks',
   // Ohne Fremdschlüssel und ohne Nachlauf: Einträge tragen ihre Kopien selbst.
   'block_definitions',
+  'templates',
 ] as const;
 
 /**
@@ -1228,6 +1232,19 @@ export const MIGRATIONS: Migration[] = [
     up: async (db) => {
       if (await hasLegacySigilRows(db)) await backupDatabaseFile(db, 'v42');
       await convertLegacySigils(db, { includeSigilCategory: true });
+    },
+  },
+  {
+    // Die Vorlagen des Vorlagen-Dashboards bekommen ihre Tabelle. Dazu die
+    // eingebaute Vorlage „Sigille" als Standard für Operation × Sigillen —
+    // bis hierher war das Sigillen-Set neuer Operationen fest verdrahtet
+    // (`lib/blocks/layouts.ts`). Additiv und wiederholbar wie v40.
+    version: 43,
+    name: 'templates',
+    up: async (db) => {
+      await db.execute(ddlIfNotExists(TABLE_DDL.templates));
+      await createIndexesIfMissing(db, [TEMPLATES_INDEX_DDL]);
+      await seedSigilTemplate(db, i18n.t);
     },
   },
 ];

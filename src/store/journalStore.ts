@@ -8,13 +8,15 @@ import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, toInt, type DbRow } from '../lib/row';
 import type { JournalEntry } from '../types';
 import i18n from '../i18n';
+import { startOfNewEntry } from './templateStore';
 
 interface JournalState {
   entries: JournalEntry[];
   loading: boolean;
 
   fetchEntries: () => Promise<void>;
-  createEntry: () => Promise<JournalEntry>;
+  /** Mit dem Journal-Standard (Vorlagen) — außer `blank`. */
+  createEntry: (opts?: { blank?: boolean }) => Promise<JournalEntry>;
   duplicateEntry: (id: string) => Promise<JournalEntry | undefined>;
   updateEntry: (id: string, patch: Partial<JournalEntry>) => Promise<void>;
   deleteEntry: (id: string) => Promise<void>;
@@ -49,19 +51,20 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     }
   },
 
-  createEntry: async () => {
+  createEntry: async ({ blank = false } = {}) => {
     const db = await getDb();
     const now = nowIso();
     const moonPhase = getMoonPhase();
     const entryNumber = await nextEntryNumber(db, 'journal_entries');
+    const start = startOfNewEntry('journal', null, 'Untitled Entry', blank);
     const entry: JournalEntry = {
       entry_number: entryNumber,
       id: generateId(),
-      title: 'Untitled Entry',
-      content: '',
+      title: start.title,
+      content: start.content,
       created_at: now,
       updated_at: now,
-      tags: [],
+      tags: start.tags,
       moon_phase: moonPhase,
       mood: null,
       paradigm_id: null,
@@ -90,6 +93,8 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       ]
     );
     set((s) => ({ entries: [entry, ...s.entries] }));
+    // Eine Vorlage kann Link-Chips mitbringen — wie nach jedem Speichern in die links-Tabelle.
+    if (entry.content) void serialized(serialKey('links', entry.id), () => syncLinks(entry.id, 'journal', entry.content));
     return entry;
   },
 
@@ -102,7 +107,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   duplicateEntry: async (id) => {
     const src = get().entries.find((e) => e.id === id);
     if (!src) return undefined;
-    const copy = await get().createEntry();
+    const copy = await get().createEntry({ blank: true });
     const {
       id: _id,
       created_at: _created,

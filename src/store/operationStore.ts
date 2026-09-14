@@ -5,9 +5,8 @@ import { syncLinks } from '../lib/links';
 import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, type DbRow } from '../lib/row';
-import { serializeBlocks } from '../lib/blocks/blockHtml';
-import { defaultBlocksFor } from '../lib/blocks/layouts';
 import { withChargeUnloaded } from '../lib/blocks/sigil';
+import { startOfNewEntry } from './templateStore';
 import type { Operation } from '../types';
 import i18n from '../i18n';
 
@@ -15,7 +14,8 @@ interface OperationState {
   operations: Operation[];
 
   fetchAll: () => Promise<void>;
-  createOperation: (categoryId?: string | null) => Promise<Operation>;
+  /** Mit dem Standard der Kombination (Vorlagen) — außer `blank`. */
+  createOperation: (categoryId?: string | null, opts?: { blank?: boolean }) => Promise<Operation>;
   duplicateOperation: (id: string) => Promise<Operation | undefined>;
   updateOperation: (id: string, patch: Partial<Operation>) => Promise<void>;
   deleteOperation: (id: string) => Promise<void>;
@@ -47,16 +47,17 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     set({ operations: await selectAllOperations(db) });
   },
 
-  createOperation: async (categoryId = null) => {
+  createOperation: async (categoryId = null, { blank = false } = {}) => {
     const db = await getDb();
     const now = nowIso();
+    // Die Kategorie „Sigillen" beginnt so mit Rechner, Zeichnung und Ladung (Vorlage `core-sigil`).
+    const start = startOfNewEntry('operation', categoryId, 'Untitled Operation', blank);
     const op: Operation = {
       entry_number: await nextEntryNumber(db, 'operations'),
       id: generateId(),
-      title: 'Untitled Operation',
-      // Die Kategorie „Sigillen" beginnt mit Rechner, Zeichnung und Ladung.
-      content: serializeBlocks(defaultBlocksFor('operation', categoryId)),
-      category_id: categoryId, created_at: now, updated_at: now, tags: [], deleted_at: null,
+      title: start.title,
+      content: start.content,
+      category_id: categoryId, created_at: now, updated_at: now, tags: start.tags, deleted_at: null,
     };
     await db.execute(
       `INSERT INTO operations (id, title, content, category_id, created_at, updated_at, tags, entry_number)
@@ -64,6 +65,8 @@ export const useOperationStore = create<OperationState>((set, get) => ({
       [op.id, op.title, op.content, op.category_id, op.created_at, op.updated_at, JSON.stringify(op.tags), op.entry_number ?? null]
     );
     set((s) => ({ operations: [op, ...s.operations] }));
+    // Eine Vorlage kann Link-Chips mitbringen — wie nach jedem Speichern in die links-Tabelle.
+    if (op.content) void serialized(serialKey('links', op.id), () => syncLinks(op.id, 'operation', op.content));
     return op;
   },
 
@@ -75,7 +78,7 @@ export const useOperationStore = create<OperationState>((set, get) => ({
   duplicateOperation: async (id) => {
     const src = get().operations.find((o) => o.id === id);
     if (!src) return undefined;
-    const copy = await get().createOperation(src.category_id);
+    const copy = await get().createOperation(src.category_id, { blank: true });
     const {
       id: _id,
       created_at: _created,

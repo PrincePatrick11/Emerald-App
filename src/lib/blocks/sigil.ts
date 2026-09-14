@@ -343,22 +343,42 @@ export function isSigilFrozen(block: BlockInstance, state: SigilState): boolean 
 }
 
 /**
+ * Die Ziele jeder Ladung im Block umschreiben — ein Ladung-Block selbst oder
+ * die Ladung-Teile eines Feldblocks. `map` bekommt jedes Ziel (Block-ID oder
+ * `<Block-ID>:<Element-ID>`) und gibt das neue zurück; ändert sich keins,
+ * bleibt die Ladung unberührt.
+ */
+export function withMappedChargeTargets(block: BlockInstance, map: (target: string) => string): BlockInstance {
+  const mapped = (charge: SigilCharge): string[] | null => {
+    if (charge.broken || !charge.targets) return null;
+    const targets = charge.targets.map(map);
+    return targets.some((id, i) => id !== charge.targets![i]) ? targets : null;
+  };
+  if (block.type === SIGIL_CHARGE_TYPE) {
+    const charge = parseSigilCharge(block);
+    const targets = mapped(charge);
+    return targets ? serializeSigilCharge(block, { ...charge, targets }) : block;
+  }
+  let result = block;
+  for (const unit of sigilUnits([block])) {
+    if (!unit.part || unit.block.type !== SIGIL_CHARGE_TYPE) continue;
+    const charge = parseSigilCharge(unit.block);
+    const targets = mapped(charge);
+    if (!targets) continue;
+    const next = serializeSigilCharge(unit.block, { ...charge, targets });
+    result = withElementValue(result, unit.part.element.id, JSON.parse(next.attrs[BLOCK_ATTR.data]));
+  }
+  return result;
+}
+
+/**
  * Ein duplizierter Feldblock: die Ladung-Teile der Kopie zielen auf die Teile
  * der Kopie, nicht mehr auf die des Originals — sonst verbärge das Laden der
  * Kopie das Original und ließe die eigenen Teile offen.
  */
 export function withRenamedPartTargets(block: BlockInstance, oldId: string, newId: string): BlockInstance {
   const from = `${oldId}:`;
-  let result = block;
-  for (const unit of sigilUnits([block])) {
-    if (!unit.part || unit.block.type !== SIGIL_CHARGE_TYPE) continue;
-    const charge = parseSigilCharge(unit.block);
-    if (charge.broken || !charge.targets?.some((id) => id.startsWith(from))) continue;
-    const targets = charge.targets.map((id) => (id.startsWith(from) ? `${newId}:${id.slice(from.length)}` : id));
-    const next = serializeSigilCharge(unit.block, { ...charge, targets });
-    result = withElementValue(result, unit.part.element.id, JSON.parse(next.attrs[BLOCK_ATTR.data]));
-  }
-  return result;
+  return withMappedChargeTargets(block, (id) => (id.startsWith(from) ? `${newId}:${id.slice(from.length)}` : id));
 }
 
 const NO_SIGIL: SigilState = { revealDate: null, lockEntry: false, concealed: new Map(), locked: new Set() };

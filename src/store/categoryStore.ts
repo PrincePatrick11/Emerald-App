@@ -3,9 +3,10 @@
  * (Tabelle `categories`, seit v38). Vorher hielt jeder der vier Stores seinen
  * eigenen Slice mit denselben fünf Aktionen.
  *
- * Import-Regel: Dieser Store darf die Inhalts-Stores importieren (er hängt
- * nach dem endgültigen Löschen einer Kategorie deren Inhalte auch im Speicher
- * um); keiner von ihnen importiert zurück. Alle Zugriffe laufen zur Laufzeit
+ * Import-Regel: Dieser Store darf die Inhalts-Stores und den Vorlagen-Store
+ * importieren (er hängt nach dem endgültigen Löschen einer Kategorie deren
+ * Inhalte und Vorlagen-Zuweisungen auch im Speicher um); keiner von ihnen
+ * importiert zurück. Alle Zugriffe laufen zur Laufzeit
  * über `getState()`.
  */
 import { create } from 'zustand';
@@ -19,6 +20,7 @@ import { useWikiStore } from './wikiStore';
 import { useOperationStore } from './operationStore';
 import { useTaskStore } from './taskStore';
 import { useAltarStore } from './altarStore';
+import { dropCategoriesFromTemplatesInMemory } from './templateStore';
 
 /** Fehlermeldung von addCategory/updateCategory, wenn der Name schon vergeben ist. */
 export const CATEGORY_NAME_TAKEN = 'CATEGORY_NAME_TAKEN';
@@ -79,6 +81,7 @@ export function reassignCategoriesInMemory(ids: ReadonlySet<string>): void {
       Object.entries(s.previewPlacements).map(([k, list]) => [k, list.map(move)])
     ),
   }));
+  dropCategoriesFromTemplatesInMemory(ids);
 }
 
 export const useCategoryStore = create<CategoryState>((set, get) => ({

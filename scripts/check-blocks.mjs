@@ -31,6 +31,7 @@ writeFileSync(
    export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
    export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked, withRenamedPartTargets } from '${root}/src/lib/blocks/sigil';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
+   export { parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty, isUnchangedTemplateContent, templateOriginsOf, templateStart, mergeTemplateTags } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';`
 );
@@ -63,6 +64,8 @@ const {
   sigilImage, withSigilImage, letterList, renderBlocksForExport,
   sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked,
   remapDefinitionDefaults, definitionImageRefs, hasFrozenCopy, withRenamedPartTargets,
+  parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty,
+  isUnchangedTemplateContent, templateOriginsOf, templateStart, mergeTemplateTags,
 } = bundle;
 
 const failures = [];
@@ -786,6 +789,97 @@ console.log('\n5. Was aus dem Inhalt abgeleitet wird, sieht die Blöcke durch\n'
   const html = serializeBlocks([createTextBlock('<p>ohne</p>'), createTextBlock(`<p>${chip}</p>`)]);
   const links = extractInternalLinks(html);
   check('extractInternalLinks findet Chips in gewrappten Textblöcken', links.length === 1 && links[0].entryType === 'wiki', links);
+}
+
+console.log('\n6. Vorlagen: Zuweisung, Standard, Einsetzen\n');
+{
+  const assignments = parseAssignments(JSON.stringify([
+    { entryType: 'journal', category: 'ritual', isDefault: true },
+    { entryType: 'wiki', category: 'ritual', isDefault: false },
+    { entryType: 'wiki', category: 'ritual', isDefault: true },
+    { entryType: 'wiki', category: null },
+    { entryType: 'operation', category: '<x>' },
+    { entryType: 'task', category: '*' },
+    'kaputt',
+  ]));
+  check('Zuweisungen: Journal immer „alle", doppelte gehen auf, Fremdes fällt weg',
+    JSON.stringify(assignments) === JSON.stringify([
+      { entryType: 'journal', category: '*', isDefault: true },
+      { entryType: 'wiki', category: 'ritual', isDefault: true },
+      { entryType: 'wiki', category: null, isDefault: false },
+    ]), assignments);
+  check('Zuweisungen: unlesbares JSON ergibt keine', parseAssignments('{kaputt').length === 0);
+
+  const tpl = (id, assignments, content = '') => ({ id, name: id, icon: '', description: '', title: '', content, tags: [], assignments, sort_order: 0, created_at: '', updated_at: '', deleted_at: null });
+  const exact = tpl('exact', [{ entryType: 'wiki', category: 'ritual', isDefault: true }]);
+  const fallback = tpl('fallback', [{ entryType: 'wiki', category: '*', isDefault: true }]);
+  const none = tpl('none', [{ entryType: 'wiki', category: null, isDefault: true }]);
+  const free = tpl('free', []);
+  const other = tpl('other', [{ entryType: 'operation', category: '*', isDefault: false }]);
+  const all = [free, fallback, exact, none, other];
+  check('Standard: die genaue Kombination vor „alle Kategorien"', resolveDefaultTemplate(all, 'wiki', 'ritual')?.id === 'exact');
+  check('Standard: ohne eigenen Standard der Rückfall', resolveDefaultTemplate(all, 'wiki', 'herbs')?.id === 'fallback');
+  check('Standard: „ohne Kategorie" ist eine eigene Kombination', resolveDefaultTemplate(all, 'wiki', null)?.id === 'none');
+  check('Standard: keiner für eine andere Eintragsart', resolveDefaultTemplate(all, 'journal', null) === null);
+  check('Zur Wahl: zugewiesene zuerst, dann ohne Zuweisung, fremde Kombinationen fehlen',
+    templatesFor(all, 'wiki', 'herbs').map((t) => t.id).join() === 'fallback,free', templatesFor(all, 'wiki', 'herbs').map((t) => t.id));
+
+  // Einsetzen: neue IDs, Ladungsziele mit, entladen, Herkunft an jedem Block.
+  const calc = createSigilCalcBlock();
+  const canvas = createSigilCanvasBlock();
+  const charge = serializeSigilCharge(createSigilChargeBlock(), {
+    loaded: true, revealDate: null, lock: 'entry', technique: null, targets: [canvas.id],
+  });
+  const sigilTpl = tpl('sigil-tpl', [], serializeBlocks([createTextBlock('<p>Absicht</p>'), calc, canvas, charge]));
+  const first = instantiateTemplateBlocks(sigilTpl);
+  const second = instantiateTemplateBlocks(sigilTpl);
+  const firstCharge = parseSigilCharge(first[3]);
+  check('Einsetzen: alle Blöcke tragen die Herkunft', first.every((b) => b.attrs['data-template-origin'] === 'sigil-tpl'), first.map((b) => b.attrs));
+  check('Einsetzen: neue Block-IDs, auch beim zweiten Mal andere',
+    first.every((b, i) => b.id !== parseBlocks(sigilTpl.content)[i].id && b.id !== second[i].id));
+  check('Einsetzen: die Ladung zielt auf die neue Zeichnung und ist entladen',
+    !firstCharge.loaded && firstCharge.targets.join() === first[2].id, firstCharge);
+  // Eine Ladung als Teil eines eigenen Blocks zielt auf `<Block-ID>:<Element-ID>` — auch das wandert mit.
+  const partText = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein', moonName: (ph) => ph };
+  const partDef = {
+    id: 'part-def', name: 'Teile', icon: '', description: '', revision: 1, sort_order: 0,
+    created_at: '', updated_at: '', deleted_at: null,
+    display: { readHideEmpty: true, readOnly: false, showTitle: false },
+    elements: parseDefinitionElements(JSON.stringify([
+      { id: 'draw', kind: 'sigilCanvas', label: '' },
+      { id: 'load', kind: 'sigilCharge', label: '', defaultValue: { lock: 'entry', targets: ['draw'] } },
+    ])),
+  };
+  const partCopy = instantiateDefinition(partDef, partText);
+  const [partBlock] = instantiateTemplateBlocks(tpl('part-tpl', [], serializeBlocks([partCopy])));
+  const partCharge = parseSigilCharge(sigilUnits([partBlock]).find((u) => u.block.type === 'core.sigil.charge').block);
+  check('Einsetzen: eine Ladung als Teil zielt auf den Teil im neuen Block',
+    partBlock.id !== partCopy.id && partCharge.targets.join() === sigilPartId(partBlock.id, 'draw'), partCharge);
+
+  check('Herkunft aus den Blöcken lesen', templateOriginsOf([...first, createTextBlock('x')]).join() === 'sigil-tpl');
+
+  const applied = serializeBlocks(first);
+  check('unverändert eingesetzt wird als unverändert erkannt', isUnchangedTemplateContent(applied, sigilTpl));
+  check('eine Änderung im Text hebt das auf',
+    !isUnchangedTemplateContent(applied.replace('Absicht', 'Anders'), sigilTpl));
+  check('ein zusätzlicher Block hebt das auf',
+    !isUnchangedTemplateContent(serializeBlocks([...first, createTextBlock('<p>mehr</p>')]), sigilTpl));
+  check('eine andere Vorlage ist nie „unverändert"', !isUnchangedTemplateContent(applied, { ...sigilTpl, id: 'andere' }));
+
+  check('leer: kein Inhalt', isContentEmpty(''));
+  check('leer: nur leere Absätze', isContentEmpty('<p></p><p style="text-align: center"><br></p>'));
+  check('nicht leer: Text', !isContentEmpty('<p>x</p>'));
+  check('nicht leer: ein Bild', !isContentEmpty(`<p><img src="${'a'.repeat(64)}.png"></p>`));
+  check('nicht leer: ein Feldblock', !isContentEmpty(serializeBlocks([createFieldsBlock('shorttext')])));
+  check('nicht leer: ein leerer Textblock aus einer Vorlage',
+    !isContentEmpty(serializeBlocks([{ ...createTextBlock(''), attrs: { 'data-template-origin': 't' } }])));
+
+  const start = templateStart({ ...sigilTpl, title: '  Ritual ', tags: ['a'] }, 'Untitled Entry');
+  check('Start aus Vorlage: Titel getrimmt, Tags kopiert, Inhalt eingesetzt',
+    start.title === 'Ritual' && start.tags.join() === 'a' && start.content.includes('data-template-origin="sigil-tpl"'), start);
+  check('Start ohne Vorlage: leer mit Standardtitel',
+    JSON.stringify(templateStart(null, 'Untitled Entry')) === JSON.stringify({ title: 'Untitled Entry', content: '', tags: [] }));
+  check('Tags zusammenführen ohne Doppelte (Groß/Klein egal)', mergeTemplateTags(['A', 'b'], ['a', 'c']).join() === 'A,b,c');
 }
 
 console.log('');

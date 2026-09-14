@@ -6,6 +6,7 @@ import { useWikiStore } from './wikiStore';
 import { useOperationStore } from './operationStore';
 import { useTaskStore } from './taskStore';
 import { useRoutineStore } from './routineStore';
+import { useTemplateStore } from './templateStore';
 import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
 import type { Tag } from '../types';
@@ -31,7 +32,7 @@ const byName = (a: Tag, b: Tag) => a.name.localeCompare(b.name);
 const renameInList = (tags: string[], from: string, to: string) =>
   [...new Set(tags.map((t) => (t === from ? to : t)))];
 
-type TaggedType = 'journal' | 'wiki' | 'operation' | 'task' | 'routine';
+type TaggedType = 'journal' | 'wiki' | 'operation' | 'task' | 'routine' | 'template';
 
 interface AffectedEntry { id: string; type: TaggedType }
 
@@ -50,6 +51,8 @@ function taggedItems(): TaggedRef[] {
     ...useOperationStore.getState().operations.map((o) => ({ id: o.id, type: 'operation' as const, tags: o.tags ?? [] })),
     ...useTaskStore.getState().tasks.map((t) => ({ id: t.id, type: 'task' as const, tags: t.tags ?? [] })),
     ...useRoutineStore.getState().routines.map((r) => ({ id: r.id, type: 'routine' as const, tags: r.tags ?? [] })),
+    // Vorlagen tragen Tags wie Einträge, die sie beim Einsetzen weitergeben.
+    ...useTemplateStore.getState().templates.map((t) => ({ id: t.id, type: 'template' as const, tags: t.tags })),
   ];
 }
 
@@ -60,6 +63,7 @@ function setItemTags(type: TaggedType, id: string, tags: string[]): Promise<void
     case 'operation': return useOperationStore.getState().updateOperation(id, { tags });
     case 'task': return useTaskStore.getState().updateTask(id, { tags });
     case 'routine': return useRoutineStore.getState().updateRoutine(id, { tags });
+    case 'template': return useTemplateStore.getState().updateTemplate(id, { tags }).then(() => undefined);
   }
 }
 
@@ -83,7 +87,7 @@ async function purgeTrashedNamesake(name: string) {
 }
 
 /** Die Tabellen, deren Zeilen in den Papierkorb gehen und Tag-Namen tragen. */
-const TRASHABLE_TAGGED_TABLES = ['journal_entries', 'wiki_articles', 'operations', 'tasks'] as const;
+const TRASHABLE_TAGGED_TABLES = ['journal_entries', 'wiki_articles', 'operations', 'tasks', 'templates'] as const;
 
 /**
  * Einträge im Papierkorb stehen in keinem Store. Ihr Tag-Name wird darum

@@ -66,6 +66,11 @@ export function fieldFallbackText(t: TFunction): FallbackText {
   };
 }
 
+/** Wie eine Vorlage heißt: ihr Name, sonst „Unbenannte Vorlage". */
+export function templateLabel(t: TFunction, template: { name: string }): string {
+  return template.name.trim() || t('templates.untitled');
+}
+
 /** Wie ein eigener Block (Definition) heißt: sein Name, sonst „Unbenannter Block". */
 export function definitionLabel(t: TFunction, def: { name: string }): string {
   return def.name.trim() || t('blocks.library.untitled');

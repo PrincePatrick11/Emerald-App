@@ -660,6 +660,7 @@
     "deselectAll": "Tout désélectionner",
     "categories": "Catégories",
     "blockDefinitions": "Blocs",
+    "templates": "Modèles",
     "deleteSelected": "Supprimer la sélection ({{count}})"
   },
   "menu": {
@@ -733,5 +734,11 @@
     "editing": "En cours de modification",
     "closeTab": "Fermer l'onglet",
     "newTab": "Nouvel onglet"
+  },
+  "templates": {
+    "untitled": "Modèle sans titre",
+    "builtin": {
+      "sigil": "Sigil"
+    }
   }
 }

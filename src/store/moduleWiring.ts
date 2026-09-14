@@ -4,7 +4,7 @@
  * bzw. endgültig gelöscht.
  *
  * Import-Regel dieser Datei: nur Content-Stores (journal/wiki/operation/task/
- * altar/tag/routine/category/blockDefinition) — niemals uiStore, vaultStore oder trashStore,
+ * altar/tag/routine/category/blockDefinition/template) — niemals uiStore, vaultStore oder trashStore,
  * die ihrerseits hierher zeigen (dürfen). Alle Zugriffe laufen zur Laufzeit
  * über `getState()`, nicht zur Import-Zeit.
  */
@@ -17,6 +17,7 @@ import { useTagStore } from './tagStore';
 import { useRoutineStore } from './routineStore';
 import { useCategoryStore } from './categoryStore';
 import { useBlockDefinitionStore } from './blockDefinitionStore';
+import { useTemplateStore } from './templateStore';
 import { ENTRY_MODULE_IDS, type EntryModuleId, type TrashKind } from '../lib/modules';
 
 /** Lädt den Inhalt eines Moduls neu aus der aktiven DB. */
@@ -60,6 +61,10 @@ export const trashWiring: Record<TrashKind, {
     restore: (id) => useBlockDefinitionStore.getState().restoreDefinition(id),
     permanentlyDelete: (id) => useBlockDefinitionStore.getState().permanentlyDeleteDefinition(id),
   },
+  template: {
+    restore: (id) => useTemplateStore.getState().restoreTemplate(id),
+    permanentlyDelete: (id) => useTemplateStore.getState().permanentlyDeleteTemplate(id),
+  },
 };
 
 /**
@@ -78,6 +83,7 @@ export async function reloadAllStores(): Promise<void> {
     useTagStore.getState().fetchTags(),
     useCategoryStore.getState().fetchCategories(),
     useBlockDefinitionStore.getState().fetchDefinitions(),
+    useTemplateStore.getState().fetchTemplates(),
   ]);
   await Promise.all([
     ...ENTRY_MODULE_IDS.map((id) => moduleWiring[id].reload()),
@@ -87,14 +93,15 @@ export async function reloadAllStores(): Promise<void> {
 
 /**
  * Gezielter Reload einzelner Module (Emerald-Import): Tags, Kategorien,
- * eigene Blöcke und die genannten Inhalte — die ersten drei immer, weil ein
- * Import neue anlegen kann.
+ * eigene Blöcke, Vorlagen und die genannten Inhalte — die ersten vier immer,
+ * weil ein Import neue anlegen kann.
  */
 export async function reloadModules(ids: readonly EntryModuleId[]): Promise<void> {
   await Promise.all([
     useTagStore.getState().fetchTags(),
     useCategoryStore.getState().fetchCategories(),
     useBlockDefinitionStore.getState().fetchDefinitions(),
+    useTemplateStore.getState().fetchTemplates(),
   ]);
   await Promise.all(ids.map((id) => moduleWiring[id].reload()));
 }

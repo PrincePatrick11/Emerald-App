@@ -20,7 +20,7 @@ import type Database from '@tauri-apps/plugin-sql';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 42;
+export const BASELINE_VERSION = 43;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
@@ -40,6 +40,7 @@ export const TABLES = [
   'routines',
   'categories',
   'block_definitions',
+  'templates',
   'altars',
   'journal_entries',
   'wiki_articles',
@@ -145,6 +146,30 @@ export const TABLE_DDL: Record<TableName, string> = {
       elements TEXT NOT NULL DEFAULT '[]',
       display TEXT NOT NULL DEFAULT '{}',
       revision INTEGER NOT NULL DEFAULT 1,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT
+    )`,
+
+  // Die Vorlagen des Vorlagen-Dashboards (seit v43): Titel, Blockstapel und
+  // Tags, die ein Eintrag beim Anlegen oder Einfügen als Kopie bekommt. Wie
+  // `block_definitions` ohne Fremdschlüssel — Einträge merken sich nur die
+  // Herkunft im `content` (`data-template-origin`). `assignments` ist JSON
+  // (lib/blocks/templates.ts): welche Eintragsart × Kategorie die Vorlage
+  // anbietet und wo sie Standard ist; die Kategorie-IDs darin räumt
+  // `dropCategoryFromTemplates` beim endgültigen Löschen einer Kategorie.
+  // Der Icon-Default ist `DEFAULT_TEMPLATE_ICON`.
+  templates: `
+    CREATE TABLE templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      icon TEXT NOT NULL DEFAULT '📄',
+      description TEXT NOT NULL DEFAULT '',
+      title TEXT NOT NULL DEFAULT '',
+      content TEXT NOT NULL DEFAULT '',
+      tags TEXT NOT NULL DEFAULT '[]',
+      assignments TEXT NOT NULL DEFAULT '[]',
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -333,8 +358,11 @@ export const INDEX_DDL_V38: readonly string[] = [
  */
 export const BLOCK_DEFINITIONS_INDEX_DDL = 'CREATE INDEX idx_block_definitions_deleted ON block_definitions(deleted_at)';
 
+/** Der Index von `templates` (v43) — aus demselben Grund getrennt wie der von `block_definitions`. */
+export const TEMPLATES_INDEX_DDL = 'CREATE INDEX idx_templates_deleted ON templates(deleted_at)';
+
 /** Alle Indizes des aktuellen Schemas — was ein frischer Vault bekommt. */
-export const INDEX_DDL: readonly string[] = [...INDEX_DDL_V38, BLOCK_DEFINITIONS_INDEX_DDL];
+export const INDEX_DDL: readonly string[] = [...INDEX_DDL_V38, BLOCK_DEFINITIONS_INDEX_DDL, TEMPLATES_INDEX_DDL];
 
 /**
  * Das frühere Sammelbecken. Seit v39 ist es keins mehr: `category_id` darf
@@ -347,10 +375,11 @@ export const INDEX_DDL: readonly string[] = [...INDEX_DDL_V38, BLOCK_DEFINITIONS
 export const FALLBACK_CATEGORY_ID = 'other';
 
 /**
- * Die eine Kategorie mit Verhalten — und seit v39 die einzige eingebaute:
- * Eine neue Operation darin beginnt mit den Sigillen-Blöcken
- * (`lib/blocks/layouts.ts`). Für Artikel, Aufgaben und Altar-Elemente ist sie
- * eine Kategorie wie jede andere.
+ * Seit v39 die einzige eingebaute Kategorie. Eine neue Operation darin beginnt
+ * mit den Sigillen-Blöcken — seit v43 nicht mehr fest verdrahtet, sondern über
+ * die eingebaute Vorlage `core-sigil`, die dort Standard ist (und die der
+ * Nutzer ändern oder löschen kann). Für Artikel, Aufgaben und Altar-Elemente
+ * ist sie eine Kategorie wie jede andere.
  */
 export const SIGIL_CATEGORY_ID = 'sigils';
 
@@ -457,6 +486,10 @@ export async function seedBuiltins(
  * Bis v38 landeten die Inhalte auf dem Sammelbecken `other`. Seit `category_id`
  * NULL sein darf, werden sie schlicht kategorielos — dasselbe, was ein neuer
  * Eintrag ohnehin ist.
+ *
+ * Seit v43 nimmt es die Kategorie auch aus den Zuweisungen der Vorlagen
+ * (`dropCategoryFromTemplates`) — beide Aufräumarbeiten gehören zum selben
+ * endgültigen Löschen.
  */
 export async function reassignCategoryContent(db: Database, categoryId: string): Promise<number> {
   let moved = 0;
@@ -467,6 +500,8 @@ export async function reassignCategoryContent(db: Database, categoryId: string):
     );
     moved += result.rowsAffected ?? 0;
   }
+  // Vorlagen zählen nicht mit — sie sind keine Inhalte, verlieren nur die Zuweisung.
+  await dropCategoryFromTemplates(db, categoryId);
   return moved;
 }
 
@@ -569,7 +604,64 @@ export async function checkIntegrity(db: Database): Promise<Orphan[]> {
     }
   }
 
+  // Kategorie-IDs in den Zuweisungen der Vorlagen.
+  const categoryIds = await idsOf('categories');
+  const templates = await db.select<{ id: string; assignments: string | null }[]>('SELECT id, assignments FROM templates');
+  for (const r of templates) {
+    const assignments = rawAssignments(r.assignments);
+    if (!assignments) {
+      orphans.push({ table: 'templates', column: 'assignments', id: r.id, missingTarget: '(kein gültiges JSON)' });
+      continue;
+    }
+    for (const category of assignments.map(assignedCategory)) {
+      if (category !== null && !categoryIds.has(category)) {
+        orphans.push({ table: 'templates', column: 'assignments', id: r.id, missingTarget: `categories.${category}` });
+      }
+    }
+  }
+
   return orphans;
+}
+
+/** Das rohe `assignments`-JSON einer Vorlagenzeile als Liste — `null`, wenn es keine ist. */
+function rawAssignments(json: string | null): unknown[] | null {
+  try {
+    const parsed: unknown = JSON.parse(json ?? '[]');
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Die Kategorie-ID einer rohen Zuweisung — `null` für „alle" (`'*'`) und „ohne
+ * Kategorie". Dieselbe Regel wie `assignedCategoryId` in
+ * `lib/blocks/templates.ts`, das diese Datei nicht importiert.
+ */
+function assignedCategory(a: unknown): string | null {
+  const category = (a as { category?: unknown } | null)?.category;
+  return typeof category === 'string' && category !== '*' ? category : null;
+}
+
+/**
+ * Nimmt eine Kategorie aus den Zuweisungen aller Vorlagen — auch aus dem
+ * Papierkorb. `reassignCategoryContent` ruft es beim endgültigen Löschen einer
+ * Kategorie auf; nicht zusätzlich aufrufen. Vorlagen haben keinen
+ * Fremdschlüssel, der das erzwingen würde, und eine Zuweisung ins Leere böte
+ * die Vorlage in einer Kombination an, die es nicht mehr gibt.
+ */
+export async function dropCategoryFromTemplates(db: Database, categoryId: string): Promise<void> {
+  const rows = await db.select<{ id: string; assignments: string | null }[]>(
+    'SELECT id, assignments FROM templates WHERE instr(assignments, $1) > 0',
+    [categoryId]
+  );
+  for (const row of rows) {
+    const assignments = rawAssignments(row.assignments);
+    if (!assignments) continue;
+    const kept = assignments.filter((a) => assignedCategory(a) !== categoryId);
+    if (kept.length === assignments.length) continue;
+    await db.execute('UPDATE templates SET assignments=$1 WHERE id=$2', [JSON.stringify(kept), row.id]);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -694,6 +786,12 @@ export async function collectUsedImageFilenames(db: Database): Promise<Set<strin
   const definitions = await db.select<{ elements: string | null }[]>('SELECT elements FROM block_definitions');
   for (const { elements } of definitions) {
     for (const match of (elements ?? '').matchAll(IMAGE_NAME_RE)) used.add(match[0]);
+  }
+
+  // Bilder im Blockstapel der Vorlagen (v43) — aus demselben Grund nicht in IMAGE_FIELDS.
+  const templates = await db.select<{ content: string | null }[]>('SELECT content FROM templates');
+  for (const { content } of templates) {
+    for (const match of (content ?? '').matchAll(IMAGE_NAME_RE)) used.add(match[0]);
   }
 
   return used;

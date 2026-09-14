@@ -39,6 +39,8 @@ export const BLOCK_ATTR = {
   origin: 'data-block-origin',
   /** Revision der Definition zum Zeitpunkt der Kopie — kleiner als ihre aktuelle heißt „ältere Version". */
   rev: 'data-block-rev',
+  /** ID der Vorlage, mit der dieser Block in den Eintrag kam — jede Blockart. */
+  template: 'data-template-origin',
 } as const;
 
 /**

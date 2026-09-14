@@ -3,7 +3,7 @@ import { getDb, sweepDanglingLinks } from '../lib/db';
 import { reassignCategoryContent } from '../lib/schema';
 import { trashWiring } from './moduleWiring';
 import { reassignCategoriesInMemory } from './categoryStore';
-import { definitionLabel } from '../lib/blocks/blockAttrs';
+import { definitionLabel, templateLabel } from '../lib/blocks/blockAttrs';
 import { isImageIcon } from '../lib/helpers';
 import i18n from '../i18n';
 import type { TrashedItem } from '../types';
@@ -47,6 +47,9 @@ export const useTrashStore = create<TrashState>((set) => ({
       const blockDefinitions = await db.select<{ id: string; name: string; icon: string; deleted_at: string }[]>(
         `SELECT id, name, icon, deleted_at FROM block_definitions WHERE deleted_at IS NOT NULL`
       );
+      const templates = await db.select<{ id: string; name: string; icon: string; deleted_at: string }[]>(
+        `SELECT id, name, icon, deleted_at FROM templates WHERE deleted_at IS NOT NULL`
+      );
       const items: TrashedItem[] = [
         ...journal.map((r) => ({ ...r, type: 'journal' as const })),
         ...wiki.map((r) => ({ id: r.id, title: r.title, deleted_at: r.deleted_at, type: 'wiki' as const, category: r.category ?? undefined })),
@@ -61,6 +64,12 @@ export const useTrashStore = create<TrashState>((set) => ({
           title: isImageIcon(r.icon) ? definitionLabel(i18n.t, r) : `${r.icon} ${definitionLabel(i18n.t, r)}`,
           deleted_at: r.deleted_at,
           type: 'blockDefinition' as const,
+        })),
+        ...templates.map((r) => ({
+          id: r.id,
+          title: isImageIcon(r.icon) ? templateLabel(i18n.t, r) : `${r.icon} ${templateLabel(i18n.t, r)}`,
+          deleted_at: r.deleted_at,
+          type: 'template' as const,
         })),
       ].sort((a, b) => b.deleted_at.localeCompare(a.deleted_at));
       set({ items });
@@ -89,6 +98,8 @@ export const useTrashStore = create<TrashState>((set) => ({
     await db.execute(`DELETE FROM tasks WHERE deleted_at IS NOT NULL`);
     // Kopien in Einträgen kommen ohne ihre Definition aus — nichts nachzuziehen.
     await db.execute(`DELETE FROM block_definitions WHERE deleted_at IS NOT NULL`);
+    // Ebenso Vorlagen: Einträge tragen nur ihre Herkunft.
+    await db.execute(`DELETE FROM templates WHERE deleted_at IS NOT NULL`);
 
     // Kategorien zuletzt, und erst nachdem ihre verbliebenen Inhalte umgehängt
     // sind. Früher wurden die Zeilen einfach gelöscht und alles, was noch auf

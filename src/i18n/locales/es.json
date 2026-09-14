@@ -660,6 +660,7 @@
     "deselectAll": "Deseleccionar todo",
     "categories": "Categorías",
     "blockDefinitions": "Bloques",
+    "templates": "Plantillas",
     "deleteSelected": "Eliminar seleccionados ({{count}})"
   },
   "menu": {
@@ -733,5 +734,11 @@
     "editing": "Editando",
     "closeTab": "Cerrar pestaña",
     "newTab": "Nueva pestaña"
+  },
+  "templates": {
+    "untitled": "Plantilla sin título",
+    "builtin": {
+      "sigil": "Sigilo"
+    }
   }
 }

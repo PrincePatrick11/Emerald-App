@@ -20,6 +20,7 @@ import {
   Flame,
   FolderOpen,
   Home,
+  LayoutTemplate,
   Library,
   ListTodo,
   Tag,
@@ -146,7 +147,7 @@ export function viewTypeForEntryType(entryType: ContentType): EntryModuleId {
 
 /** Alle Papierkorb-Eintragstypen (`TrashedItem['type']`). */
 export const TRASH_KINDS = [
-  'journal', 'wiki', 'tag', 'operation', 'task', 'category', 'blockDefinition',
+  'journal', 'wiki', 'tag', 'operation', 'task', 'category', 'blockDefinition', 'template',
 ] as const;
 export type TrashKind = (typeof TRASH_KINDS)[number];
 
@@ -160,4 +161,5 @@ export const TRASH_KIND_ICONS: Record<TrashKind, LucideIcon> = {
   task: ListTodo,
   category: FolderOpen,
   blockDefinition: Blocks,
+  template: LayoutTemplate,
 };

@@ -740,7 +740,7 @@ async function importJournalEntry(
   // drei Felder Paradigma/Bannung/Meditation noch im meta statt im Inhalt. Sie
   // werden hier zu Blöcken im Text — in die Spalten geschrieben hätten sie
   // keine Anzeige mehr: kein Chip, kein Rückverweis, kein Suchtreffer.
-  const entry = await createEntry();
+  const entry = await createEntry({ blank: true });
   await updateEntry(entry.id, {
     title: file.title,
     content: appendLegacyLinks(content, items, [
@@ -830,7 +830,7 @@ async function importWikiArticle(file: EmeraldFile, content: string, tagNames: s
     file.meta.categoryEmoji ?? legacy.emoji ?? '📄',
   );
 
-  const article = await createArticle(categoryId);
+  const article = await createArticle(categoryId, { blank: true });
   await updateArticle(article.id, {
     title: file.title,
     content,
@@ -849,7 +849,7 @@ async function importOperationEntry(file: EmeraldFile, content: string, tagNames
     file.meta.categoryEmoji ?? '⚡',
   );
 
-  const op = await createOperation(categoryId);
+  const op = await createOperation(categoryId, { blank: true });
   await updateOperation(op.id, {
     title: file.title,
     content,
@@ -1161,7 +1161,7 @@ async function importJournalFromMarkdown(
     ]),
   ]);
 
-  const entry = await createEntry();
+  const entry = await createEntry({ blank: true });
   await updateEntry(entry.id, {
     title, content, tags: tagNames,
     moon_phase: moonPhase,
@@ -1178,7 +1178,7 @@ async function importWikiFromMarkdown(
   const categoryName = meta['category'] ? stripIconPrefix(meta['category']) : null;
   const categoryId = await ensureCategoryByName(categoryName, '📄');
 
-  const article = await createArticle(categoryId);
+  const article = await createArticle(categoryId, { blank: true });
   await updateArticle(article.id, { title, content: html, category_id: categoryId, tags: tagNames });
   return article.id;
 }
@@ -1199,7 +1199,7 @@ async function importOperationFromMarkdown(
     endDate: meta['end date'] ?? null,
     version: meta['version'] ?? null,
   });
-  const op = await createOperation(categoryId);
+  const op = await createOperation(categoryId, { blank: true });
   await updateOperation(op.id, { title, content, category_id: categoryId, tags: tagNames });
   return op.id;
 }

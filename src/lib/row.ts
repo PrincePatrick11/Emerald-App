@@ -31,6 +31,7 @@ import type {
 import {
   DEFAULT_DEFINITION_ICON, parseDefinitionDisplay, parseDefinitionElements, type BlockDefinition,
 } from './blocks/definitions';
+import { DEFAULT_TEMPLATE_ICON, parseAssignments, type Template } from './blocks/templates';
 
 /** Eine rohe Zeile, wie sie aus `db.select` kommt. */
 export type DbRow = Record<string, unknown>;
@@ -184,6 +185,24 @@ export const fromRow = {
       elements: parseDefinitionElements(r.elements),
       display: parseDefinitionDisplay(r.display),
       revision: Math.max(1, Math.trunc(num(r.revision, 1))),
+      sort_order: num(r.sort_order, 0),
+      created_at: str(r.created_at),
+      updated_at: str(r.updated_at),
+      deleted_at: nullableStr(r.deleted_at),
+    };
+  },
+
+  /** `assignments` läuft durch `parseAssignments` — die Zeile kann aus einem Import stammen. */
+  template(r: DbRow): Template {
+    return {
+      id: str(r.id),
+      name: str(r.name),
+      icon: str(r.icon) || DEFAULT_TEMPLATE_ICON,
+      description: str(r.description),
+      title: str(r.title),
+      content: str(r.content),
+      tags: jsonArray<unknown>(r.tags).filter((t): t is string => typeof t === 'string'),
+      assignments: parseAssignments(r.assignments),
       sort_order: num(r.sort_order, 0),
       created_at: str(r.created_at),
       updated_at: str(r.updated_at),

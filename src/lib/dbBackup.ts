@@ -31,6 +31,10 @@ import {
 } from './blocks/definitions';
 import { convertLegacyStatusRows, STATUS_DEFINITION_ID } from './blocks/legacyStatus';
 import { definitionById, nextDefinitionSortOrder } from './blockDefinitionRows';
+import { nextTemplateSortOrder } from './templateRows';
+import {
+  assignedCategoryId, assignmentKey, defaultKeys, isTemplateId, parseAssignments, SIGIL_TEMPLATE_ID, templateToRow,
+} from './blocks/templates';
 import { fromRow } from './row';
 import { convertLegacySigils } from './migrateLegacySigils';
 import { IMAGE_FIELDS, imageColumns } from './schema';
@@ -118,7 +122,8 @@ type Row = Record<string, any>;
  * `taskCategories`/`altarCategories`), '5' = seit v39 `category_id` NULL sein
  * darf, '6' = seit v40 reisen die eigenen Blöcke als `data.blockDefinitions`
  * mit, '7' = seit v42 tragen Operationen ihre Sigille als Blöcke im Inhalt
- * statt in eigenen Spalten.
+ * statt in eigenen Spalten, '8' = seit v43 reisen die Vorlagen als
+ * `data.templates` mit.
  *
  * Die '5' ist kein Formalismus: Eine so geschriebene Datei enthält Einträge
  * ohne Kategorie, und ein Build von vor v39 hat dort noch eine NOT-NULL-Spalte.
@@ -127,7 +132,7 @@ type Row = Record<string, any>;
  * Prüfung „neuer als ich" (`backup.version > BACKUP_VERSION`) die Datei ehrlich
  * ab, bevor irgendetwas passiert.
  */
-const BACKUP_VERSION = '7' as const;
+const BACKUP_VERSION = '8' as const;
 
 /** Die vier Kategorie-Arrays von Sicherungen bis Version 3. */
 interface LegacyCategoryArrays {
@@ -263,12 +268,14 @@ export function migrateBackupPayload(backup: BackupFile): void {
 
   // v6 → v7 braucht keinen Schritt an der Datei: Sigillen-Spalten alter
   // Operationen wandelt der Import nach dem Einfügen um (`convertLegacySigils`).
+
+  // v7 → v8 braucht keinen Schritt: neu ist nur das Array `templates`.
   backup.sourceVersion = version;
   backup.version = BACKUP_VERSION;
 }
 
 interface BackupFile {
-  version: '1' | '2' | '3' | '4' | '5' | '6' | '7';
+  version: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8';
   /** Die Version, mit der die Datei geschrieben wurde — `migrateBackupPayload` setzt `version` auf die aktuelle. */
   sourceVersion?: number;
   type: 'backup';
@@ -282,6 +289,8 @@ interface BackupFile {
     categories?: Row[];
     /** Die eigenen Blöcke (seit '5'); dabei, sobald Journal, Wiki oder Operationen dabei sind. */
     blockDefinitions?: Row[];
+    /** Die Vorlagen (seit '8'); dabei, sobald Journal, Wiki oder Operationen dabei sind. */
+    templates?: Row[];
     tags?: Row[];
     routines?: Row[];
     altars?: Row[];
@@ -498,7 +507,10 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
   // Die eine Liste, sobald ein kategorisiertes Modul dabei ist. Auch
   // soft-geloeschte Kategorien: ihre Inhalte werden mitexportiert und
   // brauchen ihr Gegenstueck, sonst scheitert der Import am Foreign Key.
-  if (options.includeWiki || options.includeOperations || options.includeTasks || options.includeAltars) {
+  // Auch mit Journal allein: die Vorlagen reisen dann mit, und ihre Zuweisungen brauchen die Kategorien.
+  if (
+    options.includeJournal || options.includeWiki || options.includeOperations || options.includeTasks || options.includeAltars
+  ) {
     data.categories = await db.select<Row[]>(`SELECT * FROM categories`);
   }
 
@@ -511,6 +523,15 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
     // Die Bild-Vorgaben reisen mit, auch wenn noch keine Kopie sie benutzt.
     for (const row of data.blockDefinitions) {
       definitionImageRefs(parseDefinitionElements(row.elements)).forEach((ref) => allImagePaths.add(ref));
+    }
+  }
+
+  // ── Vorlagen ─────────────────────────────────────────────────────────────
+  // Wie die eigenen Blöcke: ganz, samt Papierkorb, mit den Bildern im Blockstapel.
+  if (options.includeJournal || options.includeWiki || options.includeOperations) {
+    data.templates = await db.select<Row[]>(`SELECT * FROM templates`);
+    for (const row of data.templates) {
+      if (typeof row.content === 'string') imageRefsInHtml(row.content).forEach((ref) => allImagePaths.add(ref));
     }
   }
 
@@ -573,11 +594,14 @@ export async function openBackupFile(): Promise<{ path: string; backup: BackupFi
 
   // Only show categories that are actually used by entries in this backup
   const usedCatIds = new Set([
-    ...(backup.data.wikiArticles ?? []),
-    ...(backup.data.operations ?? []),
-    ...(backup.data.tasks ?? []),
-    ...(backup.data.altarItems ?? []),
-  ].map((r) => r.category_id as string));
+    ...[
+      ...(backup.data.wikiArticles ?? []),
+      ...(backup.data.operations ?? []),
+      ...(backup.data.tasks ?? []),
+      ...(backup.data.altarItems ?? []),
+    ].map((r) => r.category_id as string),
+    ...templateCategoryIds(backup.data.templates),
+  ]);
 
   const preview: BackupPreview = {
     exportedAt: backup.exportedAt,
@@ -701,6 +725,73 @@ async function insertBlockDefinitions(
   await insertRows(db, 'block_definitions', normalized, true);
 }
 
+/** Die Kategorie-IDs, denen Vorlagen einer Sicherung zugewiesen sind. */
+function templateCategoryIds(rows: Row[] | undefined): string[] {
+  return (rows ?? []).flatMap((r) => parseAssignments(r.assignments).map(assignedCategoryId))
+    .filter((id): id is string => id !== null);
+}
+
+/**
+ * Die Vorlagen einer Sicherung: nach ID, `INSERT OR IGNORE` wie die eigenen
+ * Blöcke — eine vorhandene Vorlage (auch im Papierkorb, auch die eingebaute
+ * Sigillen-Vorlage) bleibt, wie sie ist, gelöscht wird keine. Neue kommen in
+ * ihrer Reihenfolge ans Ende der Liste.
+ *
+ * Die Datei ist fremd: jede Zeile läuft durch `fromRow.template` wie beim
+ * Lesen. `content` bekommt die hier gespeicherten Bilder (und beim Merge die
+ * umbenannten Link-Ziele), die Zuweisungen die lokalen Kategorie-IDs — was
+ * auf keine Kategorie zeigt, fällt weg. Einen Standard, den hier schon eine
+ * aktive Vorlage hält, verliert eine aktive importierte; eine aus dem
+ * Papierkorb behält ihn wie im Store und klärt das beim Wiederherstellen.
+ */
+async function insertTemplates(
+  db: Awaited<ReturnType<typeof getDb>>,
+  rows: unknown,
+  pathMap: Map<string, string>,
+  catMap: Map<string, string>,
+  remapContent: (content: string) => string = (content) => content,
+): Promise<void> {
+  if (!Array.isArray(rows)) return;
+  const local = (await db.select<Row[]>('SELECT * FROM templates')).map(fromRow.template);
+  const known = new Set(local.map((t) => t.id));
+  const taken = new Set(local.filter((t) => t.deleted_at === null).flatMap((t) => [...defaultKeys(t.assignments)]));
+  const categories = new Set((await db.select<Row[]>('SELECT id FROM categories')).map((r) => String(r.id)));
+
+  const now = nowIso();
+  const fresh = rows
+    .filter((r): r is Row => typeof r === 'object' && r !== null && isTemplateId((r as Row).id))
+    .map((r) => fromRow.template(r))
+    .sort((a, b) => a.sort_order - b.sort_order)
+    // Eine ID, die schon da ist — auch eine zweite Zeile derselben ID in der Datei — kommt nicht hinein.
+    .filter((t) => !known.has(t.id) && !!known.add(t.id));
+  let sortOrder = await nextTemplateSortOrder(db);
+  const normalized = fresh.map((t) => {
+    const active = t.deleted_at === null;
+    const remapped = parseAssignments(t.assignments.flatMap((a) => {
+      const id = assignedCategoryId(a);
+      if (id === null) return [a];
+      const category = catMap.get(id) ?? id;
+      return categories.has(category) ? [{ ...a, category }] : [];
+    }));
+    const assignments = remapped.map((a) => {
+      const key = assignmentKey(a.entryType, a.category);
+      if (!a.isDefault || !active) return a;
+      if (taken.has(key)) return { ...a, isDefault: false };
+      taken.add(key);
+      return a;
+    });
+    return templateToRow({
+      ...t,
+      content: remapContent(String(remapPaths(t.content, pathMap))),
+      assignments,
+      sort_order: sortOrder++,
+      created_at: t.created_at || now,
+      updated_at: t.updated_at || now,
+    });
+  });
+  await insertRows(db, 'templates', normalized, true);
+}
+
 /**
  * Sigillen-Spalten importierter Operationen (Sicherungen von vor v42) in
  * Blöcke umwandeln — derselbe Weg wie Migration v42, nur für die gerade
@@ -797,10 +888,12 @@ function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFi
   return {
     ...d,
     blockDefinitions:   anyBlocks           ? d.blockDefinitions  : [],
+    templates:          anyBlocks           ? d.templates         : [],
     journalEntries:     f.includeJournal    ? d.journalEntries    : [],
     wikiArticles:       f.includeWiki       ? d.wikiArticles      : [],
     operations:         f.includeOperations ? d.operations        : [],
-    categories:         anyCategorized      ? d.categories        : [],
+    // Vorlagen (mit `anyBlocks`) brauchen die Kategorien ihrer Zuweisungen; `usedCategoryRows` grenzt ein.
+    categories:         anyCategorized || anyBlocks ? d.categories : [],
     routines:           f.includeRoutines   ? d.routines          : [],
     altars:             f.includeAltars     ? d.altars            : [],
     altarItems:         f.includeAltars     ? d.altarItems        : [],
@@ -838,8 +931,18 @@ function applyCategoryFilters(d: BackupFile['data'], filters: ImportCategoryFilt
     ...tasks.map((r) => r.id as string),
   ]);
 
+  // Vorlagen bleiben, verlieren aber ihre Zuweisungen an abgewählte Kategorien.
+  const templates = (d.templates ?? []).map((r) => ({
+    ...r,
+    assignments: JSON.stringify(parseAssignments(r.assignments).filter((a) => {
+      const id = assignedCategoryId(a);
+      return id === null || !excluded.has(id);
+    })),
+  }));
+
   return {
     ...d,
+    templates,
     wikiArticles,
     operations,
     tasks,
@@ -919,6 +1022,8 @@ function usedCategoryRows(d: BackupFile['data']): Row[] {
       .filter((r) => r.category_id != null)
       .map((r) => String(r.category_id))
   );
+  // Auch die Kategorien, denen eine Vorlage zugewiesen ist — sonst verlöre sie die Zuweisung.
+  templateCategoryIds(d.templates).forEach((id) => used.add(id));
   return (d.categories ?? []).filter((c) => used.has(String(c.id)));
 }
 
@@ -1014,6 +1119,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   await insertBlockDefinitions(db, await withStatusDefinition(
     db, remapDefinitionRows(d.blockDefinitions, pathMap), replaceOps.definition, replaceStatus,
   ));
+  await insertTemplates(db, d.templates, pathMap, catMap);
 
   // Delete only the content types present in the backup (so a partial backup
   // replacing only Journal data won't wipe wiki/ops).
@@ -1252,6 +1358,9 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     db, remapDefinitionRows(d.blockDefinitions, pathMap, (t) => ({ id: String(remapId(t.id)), label: t.label })),
     mergeOps.definition, mergeStatus,
   ));
+  // Ohne Präfix wie die Definitionen: `data-template-origin` in den Einträgen nennt genau diese ID.
+  await insertTemplates(db, d.templates, pathMap, catMap,
+    (content) => remapInternalLinks(content, (link) => ({ id: String(remapId(link.id)) })));
 
   // Content: plain INSERT with prefixed IDs (no conflicts possible)
   await insertRows(db, 'journal_entries', journalEntries);
@@ -1329,6 +1438,14 @@ export async function importDatabase(
 
     // 4. Fill the new (empty) vault with the backup data
     const db = await getDb();
+    // Der frische Vault hat die Sigillen-Vorlage gerade selbst angelegt. Trägt
+    // die Datei ihre Vorlagen mit (ab '8'), gilt deren Fassung — auch dass die
+    // Vorlage dort geändert oder gelöscht war. Sonst verdrängte die frische
+    // Zeile die mitgebrachte samt ihrem Stern.
+    const types = typeFilters ?? ALL_TYPES_INCLUDED;
+    if (Array.isArray(backup.data.templates) && (types.includeJournal || types.includeWiki || types.includeOperations)) {
+      await db.execute('DELETE FROM templates WHERE id=$1', [SIGIL_TEMPLATE_ID]);
+    }
     await doReplace(db, filteredBackup, filters);
   } else {
     const db = await getDb();

@@ -1477,6 +1477,67 @@ console.log('\n8h. Umstempeln: Blöcke-Migrationen mit alter Zählung (v39–v41
   db.close();
 }
 
+console.log('\n8i. Migration v43: Vorlagen und die Sigillen-Vorlage\n');
+
+{
+  const sigilTemplate = async (db) => (await db.select("SELECT * FROM templates WHERE id='core-sigil'"));
+  for (const [label, db] of [['frischer Vault', baseline], ['Kette', chain]]) {
+    const rows = await sigilTemplate(db);
+    const t = rows[0];
+    check(
+      `${label}: genau eine Sigillen-Vorlage, Standard für Operation × Sigillen`,
+      rows.length === 1 &&
+        JSON.stringify(JSON.parse(t.assignments)) === JSON.stringify([{ entryType: 'operation', category: 'sigils', isDefault: true }]),
+      JSON.stringify(rows)
+    );
+    check(
+      `${label}: mit Rechner, Zeichnung und Ladung (Harness: englischer Name)`,
+      t && t.name === 'Sigil' &&
+        ['core.sigil.calc', 'core.sigil.canvas', 'core.sigil.charge'].every((type) => t.content.includes(`data-block="${type}"`)),
+      t?.content
+    );
+  }
+
+  // Ein zweiter Lauf (angelegt, aber nicht gestempelt) legt nichts doppelt an.
+  const v43 = MIGRATIONS.find((m) => m.version === 43);
+  await v43.up(chain);
+  check('v43 ist wiederholbar', (await sigilTemplate(chain)).length === 1);
+
+  // Zuweisungen: Waisen erkennen, beim endgültigen Löschen einer Kategorie abräumen.
+  const db = freshDb('templates.db');
+  await runMigrations(db);
+  await db.execute(
+    `INSERT INTO categories (id,name,emoji,sort_order,is_builtin) VALUES ('weg','Weg','x',99,0)`
+  );
+  await db.execute(
+    `INSERT INTO templates (id,name,content,assignments,created_at,updated_at)
+     VALUES ('t1','Vorlage','<p><img src="${'d'.repeat(64)}.png"></p>',?1,?2,?2)`,
+    [JSON.stringify([
+      { entryType: 'wiki', category: 'weg', isDefault: true },
+      { entryType: 'wiki', category: '*', isDefault: false },
+      { entryType: 'operation', category: 'fehlt', isDefault: false },
+    ]), now]
+  );
+  const orphans = await checkIntegrity(db);
+  check(
+    'checkIntegrity meldet die Zuweisung an eine fehlende Kategorie, nicht „*"',
+    orphans.length === 1 && orphans[0].table === 'templates' && orphans[0].missingTarget === 'categories.fehlt',
+    JSON.stringify(orphans)
+  );
+  await reassignCategoryContent(db, 'weg');
+  const [t1] = await db.select("SELECT assignments FROM templates WHERE id='t1'");
+  check(
+    'reassignCategoryContent nimmt die Kategorie aus den Zuweisungen',
+    !t1.assignments.includes('"weg"') && t1.assignments.includes('"*"'),
+    t1.assignments
+  );
+  check(
+    'collectUsedImageFilenames kennt Bilder im Blockstapel einer Vorlage',
+    (await collectUsedImageFilenames(db)).has(`${'d'.repeat(64)}.png`)
+  );
+  db.close();
+}
+
 /* ------------------------------------------------------------------ *
  * Konstanten, die es zweimal gibt — einmal in TypeScript, einmal in Rust
  * ------------------------------------------------------------------ */

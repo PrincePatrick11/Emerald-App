@@ -7,6 +7,7 @@ import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, type DbRow } from '../lib/row';
 import type { WikiArticle } from '../types';
 import i18n from '../i18n';
+import { startOfNewEntry } from './templateStore';
 
 function slugify(title: string): string {
   return title
@@ -38,7 +39,8 @@ interface WikiState {
   loading: boolean;
 
   fetchArticles: () => Promise<void>;
-  createArticle: (categoryId?: string | null) => Promise<WikiArticle>;
+  /** Mit dem Standard der Kombination (Vorlagen) — außer `blank`. */
+  createArticle: (categoryId?: string | null, opts?: { blank?: boolean }) => Promise<WikiArticle>;
   duplicateArticle: (id: string) => Promise<WikiArticle | undefined>;
   updateArticle: (id: string, patch: Partial<WikiArticle>) => Promise<void>;
   deleteArticle: (id: string) => Promise<void>;
@@ -69,21 +71,23 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     }
   },
 
-  createArticle: async (categoryId: string | null = null) => {
+  createArticle: async (categoryId: string | null = null, { blank = false } = {}) => {
     const db = await getDb();
     const now = nowIso();
     const id = generateId();
     const entryNumber = await nextEntryNumber(db, 'wiki_articles');
+    const start = startOfNewEntry('wiki', categoryId, 'Untitled Article', blank);
     const article: WikiArticle = {
       id,
       entry_number: entryNumber,
-      title: 'Untitled Article',
+      title: start.title,
+      // Der Slug folgt dem Titel erst beim ersten Umbenennen (updateArticle) — wie bisher.
       slug: `untitled-${id.slice(0, 8)}`,
-      content: '',
+      content: start.content,
       category_id: categoryId,
       created_at: now,
       updated_at: now,
-      tags: [],
+      tags: start.tags,
       deleted_at: null,
       cover_image: undefined,
     };
@@ -103,6 +107,8 @@ export const useWikiStore = create<WikiState>((set, get) => ({
       ]
     );
     set((s) => ({ articles: [...s.articles, article] }));
+    // Eine Vorlage kann Link-Chips mitbringen — wie nach jedem Speichern in die links-Tabelle.
+    if (article.content) void serialized(serialKey('links', id), () => syncLinks(id, 'wiki', article.content));
     return article;
   },
 
@@ -114,7 +120,7 @@ export const useWikiStore = create<WikiState>((set, get) => ({
   duplicateArticle: async (id) => {
     const src = get().articles.find((a) => a.id === id);
     if (!src) return undefined;
-    const copy = await get().createArticle(src.category_id);
+    const copy = await get().createArticle(src.category_id, { blank: true });
     const {
       id: _id,
       slug: _slug,

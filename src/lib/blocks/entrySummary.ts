@@ -3,6 +3,7 @@ import { isBlockHidden } from './blockAttrs';
 import { blockOrigin } from './definitions';
 import { activeElements, isElementEmpty, isSigilKind, isSlotKind, parseFields, type FieldValue } from './fields';
 import { mayHoldSigil, SIGIL_CANVAS_TYPE, sigilImage, sigilState, sigilUnits, todayIso, type SigilState } from './sigil';
+import { templateOriginsOf } from './templates';
 import { BLOCK_ATTR } from './types';
 
 /**
@@ -20,19 +21,22 @@ export interface EntryBlockSummary {
    * Filter jede Kopie, egal welcher Version.
    */
   fieldValues: Record<string, FieldValue>;
+  /** Die Vorlagen, aus denen Blöcke des Eintrags stammen — jede einmal. */
+  templates: string[];
   /** Sigille des Eintrags samt Dateiname der ersten sichtbaren, nicht verborgenen Zeichnung (Karten) — `null` ohne Sigillen-Blöcke. */
   sigil: (SigilState & { image: string | null }) | null;
 }
 
-const EMPTY: EntryBlockSummary = { origins: [], fieldValues: {}, sigil: null };
+const EMPTY: EntryBlockSummary = { origins: [], fieldValues: {}, templates: [], sigil: null };
 
 const cache = new Map<string, { content: string; day: string; summary: EntryBlockSummary }>();
 
 function summarize(content: string, today: string): EntryBlockSummary {
   const hasOrigins = content.includes(BLOCK_ATTR.origin);
   const hasSigil = mayHoldSigil(content);
-  // Die allermeisten Einträge haben weder eigene noch Sigillen-Blöcke — dann gar nicht parsen.
-  if (!hasOrigins && !hasSigil) return EMPTY;
+  const hasTemplates = content.includes(BLOCK_ATTR.template);
+  // Die allermeisten Einträge haben weder eigene noch Sigillen-Blöcke noch eine Vorlage — dann gar nicht parsen.
+  if (!hasOrigins && !hasSigil && !hasTemplates) return EMPTY;
   const blocks = parseBlocks(content);
 
   const origins: EntryBlockSummary['origins'] = [];
@@ -64,7 +68,7 @@ function summarize(content: string, today: string): EntryBlockSummary {
       sigil = { ...state, image: canvas ? sigilImage(canvas.block) : null };
     }
   }
-  return { origins, fieldValues, sigil };
+  return { origins, fieldValues, templates: hasTemplates ? templateOriginsOf(blocks) : [], sigil };
 }
 
 /** Die Zusammenfassung eines Eintrags; derselbe Inhalt wird am selben Tag nicht zweimal geparst. */

@@ -660,6 +660,7 @@
     "deselectAll": "Auswahl aufheben",
     "categories": "Kategorien",
     "blockDefinitions": "Blöcke",
+    "templates": "Vorlagen",
     "deleteSelected": "Ausgewählte löschen ({{count}})"
   },
   "menu": {
@@ -733,5 +734,11 @@
     "editing": "Wird bearbeitet",
     "closeTab": "Tab schließen",
     "newTab": "Neuer Tab"
+  },
+  "templates": {
+    "untitled": "Unbenannte Vorlage",
+    "builtin": {
+      "sigil": "Sigille"
+    }
   }
 }

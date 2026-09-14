@@ -660,6 +660,7 @@
     "deselectAll": "Deselect all",
     "categories": "Categories",
     "blockDefinitions": "Blocks",
+    "templates": "Templates",
     "deleteSelected": "Delete selected ({{count}})"
   },
   "menu": {
@@ -733,5 +734,11 @@
     "editing": "Editing",
     "closeTab": "Close tab",
     "newTab": "New tab"
+  },
+  "templates": {
+    "untitled": "Untitled template",
+    "builtin": {
+      "sigil": "Sigil"
+    }
   }
 }
