@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Copy, Star, Trash2 } from 'lucide-react';
+import { Copy, FileDown, Star, Trash2 } from 'lucide-react';
 import { useTemplateStore } from '../../store/templateStore';
 import { useTemplateDraftStore } from '../../store/draftStore';
 import { templateEntries, useBlockContentRows, type EntryContentRow } from '../../store/blockCopies';
@@ -78,6 +78,17 @@ export default function TemplatesView() {
   ) : (
     <TemplateList entries={entries} onCreate={() => void create()} onDelete={(tpl) => void remove(tpl)} />
   );
+}
+
+/** `.emerald`-Export einer Vorlage — das Format-Modul ist groß und wird erst hier geladen, wie im Menü. */
+async function exportTemplate(id: string): Promise<void> {
+  const { exportErrorMessage } = await import('../../lib/export');
+  try {
+    const { exportTemplateAsEmerald } = await import('../../lib/emeraldFormat');
+    await exportTemplateAsEmerald(id);
+  } catch (e) {
+    await exportErrorMessage(e, 'Emerald export');
+  }
 }
 
 /** Die Liste der Vorlagen im gemeinsamen Dashboard-Gerüst. */
@@ -168,6 +179,7 @@ function TemplateList({ entries, onCreate, onDelete }: {
           actions={[
             openInNewTabAction({ type: 'templates', id: menuTemplate.id }),
             { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => void duplicateTemplate(menuTemplate.id) },
+            { label: t('menu.exportEmerald'), icon: <FileDown size={12} />, onClick: () => void exportTemplate(menuTemplate.id) },
             { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => onDelete(menuTemplate), danger: true },
           ]}
         />

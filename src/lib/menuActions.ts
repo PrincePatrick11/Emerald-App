@@ -164,7 +164,7 @@ export interface MenuEnabledState {
   entryEnabled: boolean;
   /** PDF export — entries, plus an Altar's reading view (exports the rendered altar). */
   pdfEnabled: boolean;
-  /** Emerald export — same availability as PDF. */
+  /** Emerald export — like PDF, plus an open template page. */
   emeraldEnabled: boolean;
   /** "Export as Image" (JPEG/PNG/WebP) — Altar reading view only. */
   altarImageEnabled: boolean;
@@ -185,11 +185,12 @@ export function computeMenuEnabledState(activeView: ActiveView): MenuEnabledStat
     !!activeView.id;
   const isAltarReadingView =
     activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit';
+  const isTemplatePage = activeView.type === 'templates' && !!activeView.id;
 
   return {
     entryEnabled: isEntryView,
     pdfEnabled: isEntryView || isAltarReadingView,
-    emeraldEnabled: isEntryView || isAltarReadingView,
+    emeraldEnabled: isEntryView || isAltarReadingView || isTemplatePage,
     altarImageEnabled: isAltarReadingView,
   };
 }

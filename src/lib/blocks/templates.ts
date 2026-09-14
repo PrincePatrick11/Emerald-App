@@ -88,7 +88,7 @@ export function assignmentKey(entryType: TemplateEntryType, category: string | n
 }
 
 /** Mehr Kombinationen als Eintragsarten × Kategorien gibt es nicht; alles darüber stammt aus einer präparierten Datei. */
-const MAX_ASSIGNMENTS = 500;
+export const MAX_ASSIGNMENTS = 500;
 
 /**
  * Zuweisungen aus JSON (Zeile, Backup, `.emerald`): Unlesbares fällt weg,

@@ -20,6 +20,10 @@ import { categoryKey } from './categoryMerge';
 import { categoryLabel } from './categories';
 import { useCategoryStore } from '../store/categoryStore';
 import { useBlockDefinitionStore } from '../store/blockDefinitionStore';
+import { useTemplateStore } from '../store/templateStore';
+import {
+  ALL_CATEGORIES, assignedCategoryId, MAX_ASSIGNMENTS, parseAssignments, type TemplateAssignment,
+} from './blocks/templates';
 import { fromRow, toInt } from './row';
 import { definitionImageRefs, isDefinitionId, remapDefinitionDefaults } from './blocks/definitions';
 import {
@@ -210,13 +214,15 @@ function legacyFieldTargets(fields: Array<{
 /**
  * '1' = bis v38; '2' = die Datei trägt `meta.blockDefinitions`. Nur dann —
  * ein Eintrag ohne eigene Blöcke (und jeder Altar) bleibt '1', damit eine
- * ältere App ihn weiterhin annimmt.
+ * ältere App ihn weiterhin annimmt. '3' = eine Vorlage (`type: 'template'`,
+ * seit v43): eine ältere App kennt den Typ nicht und hielte die Datei sonst
+ * für eine Operation — mit '3' weist sie sie ab.
  */
-type EmeraldVersion = '1' | '2';
+type EmeraldVersion = '1' | '2' | '3';
 
 interface EmeraldFile {
   version: EmeraldVersion;
-  type: 'journal' | 'wiki' | 'operations' | 'altar';
+  type: 'journal' | 'wiki' | 'operations' | 'altar' | 'template';
   title: string;
   createdAt: string;
   content: string;
@@ -281,6 +287,22 @@ interface EmeraldMeta {
    * Beim Import nach ID angelegt, wenn es sie dort nicht gibt.
    */
   blockDefinitions?: Array<Record<string, unknown>>;
+  /**
+   * Nur Vorlagen (der Name steht in `title`, Icon und Tags in `icon`/`tags`):
+   * ihre Beschreibung, der Titel neuer Einträge und die Zuweisungen —
+   * Kategorien wie beim Eintrag über Namen und Emoji, eingebaute zusätzlich
+   * über ihre ID (ihr Name hängt an der Sprache); `all` für „alle
+   * Kategorien", ohne beides „ohne Kategorie". Sterne reisen nicht mit.
+   */
+  templateDescription?: string;
+  newEntryTitle?: string;
+  templateAssignments?: Array<{
+    entryType: string;
+    all?: boolean;
+    categoryName?: string;
+    categoryEmoji?: string;
+    builtinCategoryId?: string;
+  }>;
   // altar — background_image_data is a stored image filename, so it's routed
   // through `images` like content images. icon_data, thumbnail_data, and item
   // images are already data: URLs (or a plain emoji, for icon) in the DB, so
@@ -332,6 +354,9 @@ interface EmeraldMeta {
   }>;
 }
 
+/** Die Dateitypen, die ein Modul öffnen — alles außer der Vorlage. */
+type EntryFileType = Exclude<EmeraldFile['type'], 'template'>;
+
 function safeFilename(title: string): string {
   return title.replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'export';
 }
@@ -348,6 +373,9 @@ export async function exportAsEmerald(): Promise<void> {
   const view = useUIStore.getState().activeView;
   if (view.type === 'altar') {
     return exportAltarAsEmerald();
+  }
+  if (view.type === 'templates' && view.id) {
+    return exportTemplateAsEmerald(view.id);
   }
   if (!view.id) {
     await message('Please open a journal entry, wiki article, or operation first.', { title: 'Export', kind: 'info' });
@@ -439,27 +467,100 @@ export async function exportAsEmerald(): Promise<void> {
   const blockDefinitions = definitionsUsedIn(view.id, content);
   if (blockDefinitions.length) meta.blockDefinitions = blockDefinitions;
 
-  // Embed all local images from content as base64 — dazu die Bild-Vorgaben der
-  // mitgeschickten eigenen Blöcke, sonst zeigte eine neue Kopie ein totes Bild.
+  const images = await embedImages(content, meta.blockDefinitions);
+  await saveEmeraldFile({
+    version: meta.blockDefinitions ? '2' : '1', type, title, createdAt, content, images, meta,
+  });
+}
+
+/** Speichern-Dialog und Schreiben — der gemeinsame Schluss jedes `.emerald`-Exports. */
+async function saveEmeraldFile(file: EmeraldFile): Promise<void> {
+  const savePath = await save({
+    defaultPath: exportFilename(file.title, file.createdAt, 'emerald'),
+    filters: [{ name: 'Emerald', extensions: ['emerald'] }],
+  });
+  if (!savePath) return;
+  await invoke('write_file', { path: savePath, content: JSON.stringify(file, null, 2) });
+}
+
+/**
+ * Die lokalen Bilder des Inhalts als Base64 — dazu die Bild-Vorgaben der
+ * mitgeschickten eigenen Blöcke, sonst zeigte eine neue Kopie ein totes Bild.
+ * Ein fehlendes Bild fällt weg.
+ */
+async function embedImages(content: string, blockDefinitions: EmeraldMeta['blockDefinitions']): Promise<Record<string, string>> {
   const images: Record<string, string> = {};
-  const definitionImages = (meta.blockDefinitions ?? []).flatMap((d) =>
+  const definitionImages = (blockDefinitions ?? []).flatMap((d) =>
     definitionImageRefs(Array.isArray(d.elements) ? d.elements : []));
   for (const ref of new Set([...imageRefsInHtml(content), ...definitionImages])) {
     try {
       images[ref] = await readImageAsBase64(ref);
     } catch { /* skip missing files */ }
   }
+  return images;
+}
 
-  const file: EmeraldFile = {
-    version: meta.blockDefinitions ? '2' : '1', type, title, createdAt, content, images, meta,
+/**
+ * Eine Vorlage als `.emerald` (Version '3'): Blockstapel, Bilder, Link-Titel
+ * und eigene Blöcke wie beim Eintrag, dazu Icon, Beschreibung, Titel neuer
+ * Einträge, Tags und Zuweisungen. Gespeichert wird der gespeicherte Stand,
+ * nicht ein offener Entwurf.
+ */
+export async function exportTemplateAsEmerald(templateId: string): Promise<void> {
+  const file = await buildTemplateEmeraldFile(templateId);
+  if (!file) {
+    await message('Please open a template first.', { title: 'Export', kind: 'info' });
+    return;
+  }
+  await saveEmeraldFile(file);
+}
+
+/** Die `.emerald`-Datei einer Vorlage — ohne Dialog, damit sie sich auch ohne Dateiauswahl prüfen lässt. */
+export async function buildTemplateEmeraldFile(templateId: string): Promise<EmeraldFile | null> {
+  const template = useTemplateStore.getState().templates.find((tpl) => tpl.id === templateId);
+  if (!template) return null;
+  // Wie beim Eintrag: eine geladene, verborgene Sigille geht nicht hinaus.
+  const content = withoutConcealed(template.content, todayIso());
+  const meta: EmeraldMeta = {
+    icon: template.icon,
+    tags: template.tags,
+    templateDescription: template.description,
+    newEntryTitle: template.title,
+    templateAssignments: await exportedAssignments(template.assignments),
+    contentLinks: collectContentLinks(content),
   };
+  const blockDefinitions = definitionsUsedIn(template.id, content);
+  if (blockDefinitions.length) meta.blockDefinitions = blockDefinitions;
+  // Ein Bild-Icon ist eine Data-URL und steht schon in `meta.icon`.
+  const images = await embedImages(content, blockDefinitions);
+  return { version: '3', type: 'template', title: template.name || 'Template', createdAt: template.created_at, content, images, meta };
+}
 
-  const savePath = await save({
-    defaultPath: exportFilename(title, createdAt, 'emerald'),
-    filters: [{ name: 'Emerald', extensions: ['emerald'] }],
+/**
+ * Die Zuweisungen fürs Dateiformat. Auch Kategorien im Papierkorb reisen mit
+ * (der Import holt sie zurück) — ohne sie stünde die Vorlage im Ziel womöglich
+ * ohne Zuweisung da, also in jedem Eintrag. Deshalb die Kategorien aus der
+ * Datenbank, nicht aus dem Store, der nur die aktiven kennt.
+ */
+async function exportedAssignments(assignments: readonly TemplateAssignment[]): Promise<NonNullable<EmeraldMeta['templateAssignments']>> {
+  if (!assignments.length) return [];
+  const rows = await (await getDb()).select<{ id: string; name: string; emoji: string | null; is_builtin: number }[]>(
+    'SELECT id, name, emoji, is_builtin FROM categories'
+  );
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return assignments.flatMap((a): NonNullable<EmeraldMeta['templateAssignments']> => {
+    const id = assignedCategoryId(a);
+    if (id === null) return [a.category === ALL_CATEGORIES ? { entryType: a.entryType, all: true } : { entryType: a.entryType }];
+    const cat = byId.get(id);
+    if (!cat) return [];
+    const isBuiltin = !!cat.is_builtin;
+    return [{
+      entryType: a.entryType,
+      categoryName: categoryLabel(i18n.t, { id: cat.id, name: cat.name, is_builtin: isBuiltin }),
+      categoryEmoji: cat.emoji ?? undefined,
+      ...(isBuiltin ? { builtinCategoryId: cat.id } : {}),
+    }];
   });
-  if (!savePath) return;
-  await invoke('write_file', { path: savePath, content: JSON.stringify(file, null, 2) });
 }
 
 async function exportAltarAsEmerald(): Promise<void> {
@@ -532,12 +633,7 @@ async function exportAltarAsEmerald(): Promise<void> {
     meta,
   };
 
-  const savePath = await save({
-    defaultPath: exportFilename(file.title, file.createdAt, 'emerald'),
-    filters: [{ name: 'Emerald', extensions: ['emerald'] }],
-  });
-  if (!savePath) return;
-  await invoke('write_file', { path: savePath, content: JSON.stringify(file, null, 2) });
+  await saveEmeraldFile(file);
 }
 
 /** Die aktiven eigenen Blöcke, von denen der Inhalt Kopien trägt — für `meta.blockDefinitions`. */
@@ -609,7 +705,7 @@ async function remapImages(content: string, images: Record<string, string>): Pro
 }
 
 /** Re-reads the relevant store from DB so the UI reflects the imported data. */
-async function refreshAfterImport(type: EmeraldFile['type']): Promise<void> {
+async function refreshAfterImport(type: EntryFileType): Promise<void> {
   await reloadModules([type]);
 }
 
@@ -632,8 +728,26 @@ export async function importFromEmerald(): Promise<void> {
     return;
   }
 
-  if (file.version !== '1' && file.version !== '2') {
+  // Eine Vorlage kommt nur als '3', und '3' ist nur eine Vorlage.
+  const knownVersion = file.version === '1' || file.version === '2' || file.version === '3';
+  if (!knownVersion || (file.version === '3') !== (file.type === 'template')) {
     await message('Unsupported Emerald file version.', { title: 'Import', kind: 'error' });
+    return;
+  }
+  if (typeof file.meta !== 'object' || file.meta === null) file.meta = {};
+
+  if (file.type === 'template') {
+    let templateId: string;
+    try {
+      templateId = await importTemplateFile(file);
+    } catch (e) {
+      await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
+      return;
+    }
+    // Kein Eintragsmodul betroffen — nur Tags, Kategorien, eigene Blöcke und Vorlagen.
+    await reloadModules([]);
+    useUIStore.getState().setActiveView({ type: 'templates', id: templateId });
+    await message('Template imported successfully!', { title: 'Import', kind: 'info' });
     return;
   }
 
@@ -651,36 +765,18 @@ export async function importFromEmerald(): Promise<void> {
     return;
   }
 
-  const remapped = await remapImages(file.content, file.images ?? {});
-  // Sanitize imported HTML — strip scripts and event handlers while preserving
-  // TipTap-specific data-* attributes (internal link chips, image alignment)
-  // and inline styles (image width, text alignment, image margins).
   // Eine Momentaufnahme für den ganzen Import: der Remap und, beim Journal, die
   // Alt-Verknüpfungen brauchen dieselbe Liste, und zwischen beiden ändert sich
   // am Bestand nichts.
   const items = linkItemsSnapshot();
-
-  // Link-Ziele zuerst auf diesen Vault zeigen, DOMPurify danach: der Remap
-  // parst das HTML und serialisiert es wieder, und ein solcher Umlauf darf
-  // niemals NACH dem Sanitizer stehen — sonst ist das, was in die Datenbank
-  // geht, nicht mehr das, was er geprüft hat. Der Remap selbst liest nur
-  // data-Attribute und ersetzt Knoten, braucht also keinen sauberen Input.
-  const relinked = remapImportedLinks(remapped, file.meta.contentLinks, items);
-  // Status/Enddatum/Version einer Operation von vor v41 als Block — ebenfalls
-  // VOR dem Sanitizer, aus demselben Grund wie der Remap. Die Werte stammen
-  // aus der Datei und werden geprüft wie eine Backup-Zeile.
-  const withStatus = file.type === 'operations'
-    ? await withImportedStatus(relinked, legacyStatusOfRow({
+  // Status/Enddatum/Version einer Operation von vor v41 als Block. Die Werte
+  // stammen aus der Datei und werden geprüft wie eine Backup-Zeile.
+  const content = await importedContent(file, items, (html) => file.type === 'operations'
+    ? withImportedStatus(html, legacyStatusOfRow({
         is_active: file.meta.isActive, end_date: file.meta.endDate, version: file.meta.version,
       }))
-    : relinked;
-  const content = DOMPurify.sanitize(withStatus, {
-    ADD_ATTR: [
-      'data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon',
-      'data-entry-number', 'data-align',
-    ],
-  });
-  const tagNames = await ensureTagNames(file.meta.tags ?? []);
+    : html);
+  const tagNames = await importedTags(file.meta);
 
   let newId: string;
   try {
@@ -702,6 +798,108 @@ export async function importFromEmerald(): Promise<void> {
   await refreshAfterImport(file.type);
   useUIStore.getState().setActiveView({ type: file.type, id: newId });
   await message('Entry imported successfully!', { title: 'Import', kind: 'info' });
+}
+
+/**
+ * Der Inhalt einer importierten Datei, bereit zum Speichern: Bilder in diesen
+ * Vault, Link-Ziele auf diesen Vault, `beforeSanitize`, zuletzt DOMPurify.
+ *
+ * Die Reihenfolge ist Absicht: der Remap (und ein `beforeSanitize`, das Blöcke
+ * einfügt) parst das HTML und serialisiert es wieder, und ein solcher Umlauf
+ * darf niemals NACH dem Sanitizer stehen — sonst ist das, was in die Datenbank
+ * geht, nicht mehr das, was er geprüft hat. Der Remap selbst liest nur
+ * data-Attribute und ersetzt Knoten, braucht also keinen sauberen Input.
+ */
+async function importedContent(
+  file: EmeraldFile,
+  items: SuggestionItem[],
+  beforeSanitize: (html: string) => string | Promise<string> = (html) => html,
+): Promise<string> {
+  const remapped = await remapImages(typeof file.content === 'string' ? file.content : '', file.images ?? {});
+  const relinked = remapImportedLinks(remapped, file.meta.contentLinks, items);
+  // Skripte und Event-Handler raus; die TipTap-eigenen data-Attribute
+  // (Link-Chips, Bildausrichtung) und Inline-Styles bleiben.
+  return DOMPurify.sanitize(await beforeSanitize(relinked), {
+    ADD_ATTR: [
+      'data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon',
+      'data-entry-number', 'data-align',
+    ],
+  });
+}
+
+/** Die Tags der Datei, so geschrieben wie in diesem Vault — nur Zeichenketten, die Datei ist fremd. */
+async function importedTags(meta: EmeraldMeta): Promise<string[]> {
+  return ensureTagNames(Array.isArray(meta.tags) ? meta.tags.filter((t): t is string => typeof t === 'string') : []);
+}
+
+/**
+ * Eine `.emerald`-Vorlage einlesen — wie ein Eintrag: Inhalt und Tags, danach
+ * die eigenen Blöcke. Ohne Dialog, damit es sich auch ohne Dateiauswahl
+ * prüfen lässt; die Prüfung von Typ und Version steckt deshalb auch hier.
+ */
+export async function importTemplateFile(file: EmeraldFile): Promise<string> {
+  if (file.type !== 'template' || file.version !== '3') throw new Error('Not a template file.');
+  if (typeof file.meta !== 'object' || file.meta === null) file.meta = {};
+  const items = linkItemsSnapshot();
+  const content = await importedContent(file, items);
+  const id = await createImportedTemplate(file, content, await importedTags(file.meta));
+  // Nach der Vorlage: scheitert die, bleibt keine Definition verwaist zurück.
+  await importBlockDefinitions(file.meta.blockDefinitions, items);
+  return id;
+}
+
+/** So viele verschiedene Kategorien darf eine Vorlagen-Datei anlegen oder zurückholen — der Rest ihrer Zuweisungen fällt weg. */
+const MAX_IMPORTED_CATEGORIES = 20;
+
+/**
+ * Die Vorlage aus der Datei anlegen — immer neu, mit neuer ID, und ohne Stern:
+ * welche Vorlage neue Einträge füllt, entscheidet dieser Vault, nicht eine
+ * fremde Datei. `parseAssignments` prüft Typen, Journal und Doppelte.
+ */
+async function createImportedTemplate(file: EmeraldFile, content: string, tagNames: string[]): Promise<string> {
+  const { meta } = file;
+  const raw = Array.isArray(meta.templateAssignments) ? meta.templateAssignments.slice(0, MAX_ASSIGNMENTS) : [];
+  const resolvedByName = new Map<string, string | null>();
+  const assignments: unknown[] = [];
+  for (const a of raw) {
+    if (typeof a !== 'object' || a === null) continue;
+    const category = await importedAssignmentCategory(a, resolvedByName);
+    if (category !== undefined) assignments.push({ entryType: a.entryType, category, isDefault: false });
+  }
+  const text = (v: unknown) => (typeof v === 'string' ? v : '');
+  const created = await useTemplateStore.getState().createTemplate(text(file.title), {
+    icon: text(meta.icon) || undefined,
+    description: text(meta.templateDescription),
+    title: text(meta.newEntryTitle),
+    content,
+    tags: tagNames,
+    assignments: parseAssignments(assignments),
+  });
+  return created.id;
+}
+
+/**
+ * Die Kategorie einer importierten Zuweisung: `'*'`, `null` („ohne
+ * Kategorie"), eine ID — oder `undefined`, wenn die Zuweisung wegfällt.
+ * Eingebaute Kategorien über ihre ID, sonst über den Namen wie beim Eintrag
+ * (fehlende werden angelegt, höchstens `MAX_IMPORTED_CATEGORIES`).
+ */
+async function importedAssignmentCategory(
+  a: NonNullable<EmeraldMeta['templateAssignments']>[number],
+  resolvedByName: Map<string, string | null>,
+): Promise<string | null | undefined> {
+  if (a.entryType === 'journal' || a.all === true) return ALL_CATEGORIES;
+  const builtin = typeof a.builtinCategoryId === 'string'
+    ? useCategoryStore.getState().categories.find((c) => c.is_builtin && c.id === a.builtinCategoryId)
+    : undefined;
+  if (builtin) return builtin.id;
+  if (typeof a.categoryName !== 'string' || !a.categoryName.trim()) return null;
+  const key = categoryKey(a.categoryName);
+  if (!resolvedByName.has(key)) {
+    if (resolvedByName.size >= MAX_IMPORTED_CATEGORIES) return undefined;
+    resolvedByName.set(key, await ensureCategoryByName(a.categoryName, typeof a.categoryEmoji === 'string' ? a.categoryEmoji : undefined));
+  }
+  return resolvedByName.get(key) ?? undefined;
 }
 
 async function importJournalEntry(
@@ -1070,9 +1268,9 @@ export async function importFromMarkdown(): Promise<void> {
   // instead of silently defaulting to journal.
   const rawType = frontMeta['type'];
   const validTypes = ['journal', 'wiki', 'operations'];
-  let type: EmeraldFile['type'];
+  let type: EntryFileType;
   if (rawType && validTypes.includes(rawType)) {
-    type = rawType as EmeraldFile['type'];
+    type = rawType as EntryFileType;
   } else {
     const chosen = await useImportStore.getState().askDestination(title);
     if (!chosen) return;

@@ -531,7 +531,7 @@ fn install_mouse_nav_monitor(app_handle: tauri::AppHandle) {
 /// PDF, which is also available while an Altar's reading view is open (it
 /// exports the rendered altar image instead of entry content in that case);
 /// `emerald_enabled` covers the shared Emerald export, also available for an
-/// open Altar. Called by the frontend on every view change.
+/// open Altar and an open template page. Called by the frontend on every view change.
 #[tauri::command]
 fn set_export_menu_enabled(app: tauri::AppHandle, entry_enabled: bool, pdf_enabled: bool, emerald_enabled: bool) {
     use tauri::menu::MenuItemKind;
