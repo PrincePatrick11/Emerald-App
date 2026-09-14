@@ -65,7 +65,8 @@
     "taskDeleted": "Tarea eliminada",
     "categoryDeleted": "Categoría eliminada",
     "tagDeleted": "Etiqueta eliminada",
-    "blockDefinitionDeleted": "Bloque eliminado"
+    "blockDefinitionDeleted": "Bloque eliminado",
+    "templateDeleted": "Plantilla eliminada"
   },
   "nav": {
     "home": "Inicio",
@@ -77,6 +78,7 @@
     "categories": "Categorías",
     "trash": "Papelera",
     "blocks": "Bloques",
+    "templates": "Plantillas",
     "operations": "Operaciones",
     "tasks": "Tareas",
     "settings": "Ajustes",
@@ -368,7 +370,6 @@
       "chargeCoversAll": "Todos los sigilos de la entrada",
       "chargeNoTools": "Este bloque todavía no tiene calculadora ni dibujo.",
       "display": "Visualización",
-      "unsaved": "Cambios sin guardar",
       "fieldCount": "{{count}} campo",
       "fieldCount_other": "{{count}} campos",
       "entryCount": "{{count}} entrada",
@@ -402,7 +403,25 @@
       "deleteFromEntriesWarning_other": "El bloque y todo su contenido se quitarán de {{count}} entradas. Solo se puede deshacer con una copia de seguridad.",
       "continue": "Continuar",
       "removeAndDelete": "Quitar de {{count}} entrada y eliminar",
-      "removeAndDelete_other": "Quitar de {{count}} entradas y eliminar"
+      "removeAndDelete_other": "Quitar de {{count}} entradas y eliminar",
+      "inTemplates": "en {{count}} plantilla",
+      "inTemplates_other": "en {{count}} plantillas",
+      "outdatedTemplates": "{{count}} plantilla con una versión anterior",
+      "outdatedTemplates_other": "{{count}} plantillas con una versión anterior",
+      "updateAllConfirmCopies": "¿Llevar {{count}} entrada o plantilla a esta versión?",
+      "updateAllConfirmCopies_other": "¿Llevar {{count}} entradas y plantillas a esta versión?",
+      "updatedTemplates": "{{count}} plantilla actualizada.",
+      "updatedTemplates_other": "{{count}} plantillas actualizadas.",
+      "removedTemplates": "Quitado de {{count}} plantilla.",
+      "removedTemplates_other": "Quitado de {{count}} plantillas.",
+      "skippedDrafts": "{{count}} plantilla está abierta o tiene cambios sin guardar y no se ha tocado.",
+      "skippedDrafts_other": "{{count}} plantillas están abiertas o tienen cambios sin guardar y no se han tocado.",
+      "deleteFromCopies": "Quitarlo también de {{count}} entrada o plantilla",
+      "deleteFromCopies_other": "Quitarlo también de {{count}} entradas y plantillas",
+      "deleteFromCopiesWarning": "El bloque y todo su contenido se quitarán de {{count}} entrada o plantilla. Solo se puede deshacer con una copia de seguridad.",
+      "deleteFromCopiesWarning_other": "El bloque y todo su contenido se quitarán de {{count}} entradas y plantillas. Solo se puede deshacer con una copia de seguridad.",
+      "removeAndDeleteCopies": "Quitar de {{count}} entrada o plantilla y eliminar",
+      "removeAndDeleteCopies_other": "Quitar de {{count}} entradas y plantillas y eliminar"
     },
     "status": {
       "name": "Estado",
@@ -467,7 +486,8 @@
       "undo": "Deshacer",
       "redo": "Rehacer"
     },
-    "addTags": "Añadir etiquetas…"
+    "addTags": "Añadir etiquetas…",
+    "unsaved": "Cambios sin guardar"
   },
   "moonPhase": {
     "new": "Luna nueva",
@@ -739,6 +759,38 @@
     "untitled": "Plantilla sin título",
     "builtin": {
       "sigil": "Sigilo"
-    }
+    },
+    "newTemplate": "Nueva plantilla",
+    "defaultName": "Nueva plantilla",
+    "emptyHint": "Crea una plantilla para entradas que siempre empiezan igual – un registro de ritual con títulos, campos y etiquetas, por ejemplo. Asígnala a Diario, Wiki u Operaciones, o márcala con la estrella como predeterminada para las entradas nuevas.",
+    "name": "Nombre",
+    "namePlaceholder": "Nombre de la plantilla",
+    "description": "Descripción",
+    "descriptionPlaceholder": "¿Para qué sirve esta plantilla? (opcional)",
+    "entryTitle": "Título de las entradas nuevas",
+    "entryTitlePlaceholder": "Déjalo vacío para el título habitual",
+    "content": "Contenido",
+    "contentPlaceholder": "Lo que trae cada entrada creada con esta plantilla …",
+    "assignments": "Asignaciones",
+    "assignmentsHint": "Sin asignación, la plantilla se puede elegir en cualquier entrada. Con estrella es la predeterminada: las entradas nuevas de esa combinación empiezan con ella.",
+    "noAssignments": "Disponible en todas las entradas",
+    "addAssignment": "Añadir asignación",
+    "alreadyAssigned": "Esta combinación ya está asignada",
+    "allCategories": "Todas las categorías",
+    "missingCategory": "Categoría eliminada",
+    "makeDefault": "Hacer predeterminada",
+    "isDefault": "Predeterminada – haz clic para quitar",
+    "removeAssignment": "Quitar asignación",
+    "replacesDefault": "Sustituye a «{{name}}» como predeterminada al pulsar Listo.",
+    "defaultFor": "Predeterminada para: {{list}}",
+    "usage": "Uso",
+    "usedIn": "Usado en {{count}} entrada",
+    "usedIn_other": "Usado en {{count}} entradas",
+    "unused": "Aún no se usa en ninguna entrada",
+    "moreEntries": "y {{count}} más",
+    "moreEntries_other": "y {{count}} más",
+    "copiesNote": "Cada entrada recibe su propia copia. Los cambios en la plantilla valen para las entradas nuevas; las existentes no cambian.",
+    "entryCount": "{{count}} entrada",
+    "entryCount_other": "{{count}} entradas"
   }
 }

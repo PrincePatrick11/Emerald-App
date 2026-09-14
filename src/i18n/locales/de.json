@@ -65,7 +65,8 @@
     "taskDeleted": "Aufgabe gelöscht",
     "categoryDeleted": "Kategorie gelöscht",
     "tagDeleted": "Tag gelöscht",
-    "blockDefinitionDeleted": "Block gelöscht"
+    "blockDefinitionDeleted": "Block gelöscht",
+    "templateDeleted": "Vorlage gelöscht"
   },
   "nav": {
     "home": "Start",
@@ -77,6 +78,7 @@
     "categories": "Kategorien",
     "trash": "Papierkorb",
     "blocks": "Blöcke",
+    "templates": "Vorlagen",
     "operations": "Operationen",
     "tasks": "Aufgaben",
     "settings": "Einstellungen",
@@ -368,7 +370,6 @@
       "chargeCoversAll": "Alle Sigillen im Eintrag",
       "chargeNoTools": "Dieser Block hat noch keinen Rechner und keine Zeichnung.",
       "display": "Anzeige",
-      "unsaved": "Ungespeicherte Änderungen",
       "fieldCount": "{{count}} Feld",
       "fieldCount_other": "{{count}} Felder",
       "entryCount": "{{count}} Eintrag",
@@ -402,7 +403,25 @@
       "deleteFromEntriesWarning_other": "Der Block wird samt Inhalt aus {{count}} Einträgen entfernt. Das lässt sich nur über ein Backup rückgängig machen.",
       "continue": "Weiter",
       "removeAndDelete": "Aus {{count}} Eintrag entfernen und löschen",
-      "removeAndDelete_other": "Aus {{count}} Einträgen entfernen und löschen"
+      "removeAndDelete_other": "Aus {{count}} Einträgen entfernen und löschen",
+      "inTemplates": "in {{count}} Vorlage",
+      "inTemplates_other": "in {{count}} Vorlagen",
+      "outdatedTemplates": "{{count}} Vorlage mit älterer Version",
+      "outdatedTemplates_other": "{{count}} Vorlagen mit älterer Version",
+      "updateAllConfirmCopies": "{{count}} Eintrag oder Vorlage auf diese Version bringen?",
+      "updateAllConfirmCopies_other": "{{count}} Einträge und Vorlagen auf diese Version bringen?",
+      "updatedTemplates": "{{count}} Vorlage aktualisiert.",
+      "updatedTemplates_other": "{{count}} Vorlagen aktualisiert.",
+      "removedTemplates": "Aus {{count}} Vorlage entfernt.",
+      "removedTemplates_other": "Aus {{count}} Vorlagen entfernt.",
+      "skippedDrafts": "{{count}} Vorlage ist gerade offen oder hat ungespeicherte Änderungen und blieb unverändert.",
+      "skippedDrafts_other": "{{count}} Vorlagen sind gerade offen oder haben ungespeicherte Änderungen und blieben unverändert.",
+      "deleteFromCopies": "Auch aus {{count}} Eintrag oder Vorlage entfernen",
+      "deleteFromCopies_other": "Auch aus {{count}} Einträgen und Vorlagen entfernen",
+      "deleteFromCopiesWarning": "Der Block wird samt Inhalt aus {{count}} Eintrag oder Vorlage entfernt. Das lässt sich nur über ein Backup rückgängig machen.",
+      "deleteFromCopiesWarning_other": "Der Block wird samt Inhalt aus {{count}} Einträgen und Vorlagen entfernt. Das lässt sich nur über ein Backup rückgängig machen.",
+      "removeAndDeleteCopies": "Aus {{count}} Eintrag oder Vorlage entfernen und löschen",
+      "removeAndDeleteCopies_other": "Aus {{count}} Einträgen und Vorlagen entfernen und löschen"
     },
     "status": {
       "name": "Status",
@@ -467,7 +486,8 @@
       "undo": "Rückgängig",
       "redo": "Wiederholen"
     },
-    "addTags": "Tags hinzufügen…"
+    "addTags": "Tags hinzufügen…",
+    "unsaved": "Ungespeicherte Änderungen"
   },
   "moonPhase": {
     "new": "Neumond",
@@ -739,6 +759,38 @@
     "untitled": "Unbenannte Vorlage",
     "builtin": {
       "sigil": "Sigille"
-    }
+    },
+    "newTemplate": "Neue Vorlage",
+    "defaultName": "Neue Vorlage",
+    "emptyHint": "Bau dir eine Vorlage für Einträge, die immer gleich beginnen – ein Ritual-Protokoll mit Überschriften, Feldern und Tags etwa. Weise sie Journal, Wiki oder Operationen zu oder mach sie mit dem Stern zum Standard neuer Einträge.",
+    "name": "Name",
+    "namePlaceholder": "Name der Vorlage",
+    "description": "Beschreibung",
+    "descriptionPlaceholder": "Wofür ist diese Vorlage? (optional)",
+    "entryTitle": "Titel neuer Einträge",
+    "entryTitlePlaceholder": "Leer lassen für den üblichen Titel",
+    "content": "Inhalt",
+    "contentPlaceholder": "Was jeder Eintrag aus dieser Vorlage mitbringt …",
+    "assignments": "Zuweisungen",
+    "assignmentsHint": "Ohne Zuweisung steht die Vorlage in jedem Eintrag zur Wahl. Mit Stern ist sie Standard: neue Einträge dieser Kombination beginnen mit ihr.",
+    "noAssignments": "In jedem Eintrag verfügbar",
+    "addAssignment": "Zuweisung hinzufügen",
+    "alreadyAssigned": "Diese Kombination ist schon zugewiesen",
+    "allCategories": "Alle Kategorien",
+    "missingCategory": "Gelöschte Kategorie",
+    "makeDefault": "Als Standard festlegen",
+    "isDefault": "Standard – zum Aufheben klicken",
+    "removeAssignment": "Zuweisung entfernen",
+    "replacesDefault": "Ersetzt „{{name}}“ als Standard, sobald du auf Fertig klickst.",
+    "defaultFor": "Standard für: {{list}}",
+    "usage": "Verwendung",
+    "usedIn": "In {{count}} Eintrag verwendet",
+    "usedIn_other": "In {{count}} Einträgen verwendet",
+    "unused": "Noch in keinem Eintrag verwendet",
+    "moreEntries": "und {{count}} weiterer",
+    "moreEntries_other": "und {{count}} weitere",
+    "copiesNote": "Jeder Eintrag bekommt eine Kopie. Änderungen an der Vorlage gelten für neue Einträge – bestehende bleiben, wie sie sind.",
+    "entryCount": "{{count}} Eintrag",
+    "entryCount_other": "{{count}} Einträge"
   }
 }

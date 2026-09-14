@@ -65,7 +65,8 @@
     "taskDeleted": "Task deleted",
     "categoryDeleted": "Category deleted",
     "tagDeleted": "Tag deleted",
-    "blockDefinitionDeleted": "Block deleted"
+    "blockDefinitionDeleted": "Block deleted",
+    "templateDeleted": "Template deleted"
   },
   "nav": {
     "home": "Home",
@@ -77,6 +78,7 @@
     "categories": "Categories",
     "trash": "Trash",
     "blocks": "Blocks",
+    "templates": "Templates",
     "operations": "Operations",
     "tasks": "Tasks",
     "settings": "Settings",
@@ -368,7 +370,6 @@
       "chargeCoversAll": "All sigils in the entry",
       "chargeNoTools": "This block has no calculator or drawing yet.",
       "display": "Display",
-      "unsaved": "Unsaved changes",
       "fieldCount": "{{count}} field",
       "fieldCount_other": "{{count}} fields",
       "entryCount": "{{count}} entry",
@@ -402,7 +403,25 @@
       "deleteFromEntriesWarning_other": "The block and everything in it will be removed from {{count}} entries. This can only be undone from a backup.",
       "continue": "Continue",
       "removeAndDelete": "Remove from {{count}} entry and delete",
-      "removeAndDelete_other": "Remove from {{count}} entries and delete"
+      "removeAndDelete_other": "Remove from {{count}} entries and delete",
+      "inTemplates": "in {{count}} template",
+      "inTemplates_other": "in {{count}} templates",
+      "outdatedTemplates": "{{count}} template with an older version",
+      "outdatedTemplates_other": "{{count}} templates with an older version",
+      "updateAllConfirmCopies": "Bring {{count}} entry or template to this version?",
+      "updateAllConfirmCopies_other": "Bring {{count}} entries and templates to this version?",
+      "updatedTemplates": "{{count}} template updated.",
+      "updatedTemplates_other": "{{count}} templates updated.",
+      "removedTemplates": "Removed from {{count}} template.",
+      "removedTemplates_other": "Removed from {{count}} templates.",
+      "skippedDrafts": "{{count}} template is open or has unsaved changes and was left as it is.",
+      "skippedDrafts_other": "{{count}} templates are open or have unsaved changes and were left as they are.",
+      "deleteFromCopies": "Also remove it from {{count}} entry or template",
+      "deleteFromCopies_other": "Also remove it from {{count}} entries and templates",
+      "deleteFromCopiesWarning": "The block and everything in it will be removed from {{count}} entry or template. This can only be undone from a backup.",
+      "deleteFromCopiesWarning_other": "The block and everything in it will be removed from {{count}} entries and templates. This can only be undone from a backup.",
+      "removeAndDeleteCopies": "Remove from {{count}} entry or template and delete",
+      "removeAndDeleteCopies_other": "Remove from {{count}} entries and templates and delete"
     },
     "status": {
       "name": "Status",
@@ -467,7 +486,8 @@
       "undo": "Undo",
       "redo": "Redo"
     },
-    "addTags": "Add tags…"
+    "addTags": "Add tags…",
+    "unsaved": "Unsaved changes"
   },
   "moonPhase": {
     "new": "New Moon",
@@ -739,6 +759,38 @@
     "untitled": "Untitled template",
     "builtin": {
       "sigil": "Sigil"
-    }
+    },
+    "newTemplate": "New template",
+    "defaultName": "New template",
+    "emptyHint": "Build a template for entries that always start the same way – a ritual log with headings, fields and tags, say. Assign it to Journal, Wiki or Operations, or star it to make it the default for new entries.",
+    "name": "Name",
+    "namePlaceholder": "Name of the template",
+    "description": "Description",
+    "descriptionPlaceholder": "What is this template for? (optional)",
+    "entryTitle": "Title of new entries",
+    "entryTitlePlaceholder": "Leave empty for the usual title",
+    "content": "Content",
+    "contentPlaceholder": "What every entry from this template starts with …",
+    "assignments": "Assignments",
+    "assignmentsHint": "Without an assignment, the template can be picked in every entry. With a star it is the default: new entries of that combination start with it.",
+    "noAssignments": "Available in every entry",
+    "addAssignment": "Add assignment",
+    "alreadyAssigned": "This combination is already assigned",
+    "allCategories": "All categories",
+    "missingCategory": "Deleted category",
+    "makeDefault": "Make default",
+    "isDefault": "Default – click to unset",
+    "removeAssignment": "Remove assignment",
+    "replacesDefault": "Replaces “{{name}}” as the default once you click Done.",
+    "defaultFor": "Default for: {{list}}",
+    "usage": "Usage",
+    "usedIn": "Used in {{count}} entry",
+    "usedIn_other": "Used in {{count}} entries",
+    "unused": "Not used in any entry yet",
+    "moreEntries": "and {{count}} more",
+    "moreEntries_other": "and {{count}} more",
+    "copiesNote": "Every entry gets its own copy. Changes to the template apply to new entries – existing ones stay as they are.",
+    "entryCount": "{{count}} entry",
+    "entryCount_other": "{{count}} entries"
   }
 }

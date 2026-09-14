@@ -42,7 +42,7 @@ export interface TemplateAssignment {
 export interface Template {
   id: string;
   name: string;
-  /** Emoji. */
+  /** Emoji oder Bild (Data-URL), wie bei eigenen Blöcken. */
   icon: string;
   description: string;
   /** Der Titel, den ein neuer Eintrag bekommt — leer = der Standardtitel des Typs. */

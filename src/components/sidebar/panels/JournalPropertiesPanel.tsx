@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
 import { useJournalStore } from '../../../store/journalStore';
-import TagInput from '../../editor/TagInput';
+import TagsField from '../fields/TagsField';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
 import PropertiesEditView from '../fields/PropertiesEditView';
 import PropertiesReadView from '../fields/PropertiesReadView';
@@ -42,10 +42,7 @@ export default function JournalPropertiesPanel() {
           <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
           <LinkedEntriesField content={entry.content} legacyIds={legacyLinks} />
         </div>
-        <div>
-          <p className="label-xs mb-2">{t('properties.tags')}</p>
-          <TagInput tags={entry.tags ?? []} onChange={() => {}} readOnly />
-        </div>
+        <TagsField tags={entry.tags ?? []} readOnly />
       </PropertiesReadView>
     );
   }
@@ -57,12 +54,7 @@ export default function JournalPropertiesPanel() {
         <LinkedEntriesField content={entry.content} legacyIds={legacyLinks} editable inputCls={inputCls} />
       </div>
 
-      <div>
-        <p className="label-xs mb-2">{t('properties.tags')}</p>
-        <div className="bg-stone-800/40 rounded-md px-3 py-2 border border-stone-700/40">
-          <TagInput tags={entry.tags ?? []} onChange={(tags) => updateEntry(entry.id, { tags })} />
-        </div>
-      </div>
+      <TagsField tags={entry.tags ?? []} onChange={(tags) => updateEntry(entry.id, { tags })} />
     </PropertiesEditView>
   );
 }

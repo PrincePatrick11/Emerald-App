@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createTabId, isContentView, type OpenTab } from '../lib/tabs';
-import { isViewId, moduleMeta, type LeftListTabId } from '../lib/modules';
+import { isLibraryView, isViewId, moduleMeta, type LeftListTabId } from '../lib/modules';
 import { normalizeEditorFontId, normalizeThemeId, normalizeUIFontId } from '../themes/theme';
 import type { ActiveView } from '../types';
 
@@ -291,9 +291,9 @@ export const useUIStore = create<UIState>((set) => ({
 
   setActiveView: (view) => set((s) => {
     // Save/Cancel/Delete live only in the right sidebar, so edit mode must not start with it closed.
-    // A user-built block's page is always editing and keeps its Save there too.
+    // A user-built block's or template's page is always editing and keeps its Save there too.
     const usesEditorSidebar = moduleMeta(view.type)?.usesEditorSidebar ?? false;
-    const needsSidebar = (view.mode === 'edit' && usesEditorSidebar) || (view.type === 'blocks' && !!view.id);
+    const needsSidebar = (view.mode === 'edit' && usesEditorSidebar) || (isLibraryView(view.type) && !!view.id);
     const openSidebar = needsSidebar && !s.rightSidebarOpen
       ? { rightSidebarOpen: true }
       : {};

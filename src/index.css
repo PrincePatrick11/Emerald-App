@@ -1050,6 +1050,14 @@ button.block-altar:hover .block-altar-title {
   background: var(--accent);
 }
 
+/* Vorlagen-Ansicht: der Stern einer Vorlage, die irgendwo Standard ist — im
+   Akzent wie der Punkt oben, in beiden Themes. */
+.template-default-star {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
 .block-def-element {
   padding: 0.5rem;
   border: 1px solid color-mix(in srgb, var(--border-soft) 55%, transparent);

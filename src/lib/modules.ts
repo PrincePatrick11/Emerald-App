@@ -56,8 +56,20 @@ export const DEFAULT_ENTRY_EMOJI: Record<ContentType, string> = {
 export const ENTRY_MODULE_IDS = ['journal', 'tasks', 'operations', 'wiki', 'altar'] as const;
 export type EntryModuleId = (typeof ENTRY_MODULE_IDS)[number];
 
-export const AUX_VIEW_IDS = ['home', 'tags', 'categories', 'blocks', 'trash'] as const;
+export const AUX_VIEW_IDS = ['home', 'tags', 'categories', 'blocks', 'templates', 'trash'] as const;
 export type AuxViewId = (typeof AUX_VIEW_IDS)[number];
+
+/**
+ * Bibliotheken, deren Einträge als eigene Seite aufgehen (`{ type, id }`) und
+ * erst mit „Fertig" speichern: eigene Blöcke und Vorlagen. So eine Seite ist
+ * immer im Bearbeiten, bekommt einen eigenen Tab und braucht die Seitenleiste.
+ */
+export const LIBRARY_VIEW_IDS = ['blocks', 'templates'] as const;
+export type LibraryViewId = (typeof LIBRARY_VIEW_IDS)[number];
+
+export function isLibraryView(viewType: string): viewType is LibraryViewId {
+  return (LIBRARY_VIEW_IDS as readonly string[]).includes(viewType);
+}
 
 /** Alles, was `ActiveView.type` sein kann. */
 export type ViewId = EntryModuleId | AuxViewId;
@@ -113,6 +125,8 @@ export const AUX_VIEWS: Record<AuxViewId, { icon: LucideIcon; navLabelKey: strin
   categories: { icon: FolderOpen, navLabelKey: 'nav.categories' },
   trash: { icon: Trash2, navLabelKey: 'nav.trash' },
   blocks: { icon: Blocks, navLabelKey: 'nav.blocks' },
+  // Dieselbe Glyphe wie `TRASH_KIND_ICONS.template`.
+  templates: { icon: LayoutTemplate, navLabelKey: 'nav.templates' },
 };
 
 const VIEW_ID_SET: ReadonlySet<string> = new Set<string>([...ENTRY_MODULE_IDS, ...AUX_VIEW_IDS]);
@@ -122,7 +136,7 @@ export function isViewId(value: unknown): value is ViewId {
   return typeof value === 'string' && VIEW_ID_SET.has(value);
 }
 
-/** ModuleMeta zu einem View-Typ — null für home/tags/categories/blocks/trash. */
+/** ModuleMeta zu einem View-Typ — null für home/tags/categories/blocks/templates/trash. */
 export function moduleMeta(viewType: string): ModuleMeta | null {
   return (MODULES as Record<string, ModuleMeta | undefined>)[viewType] ?? null;
 }

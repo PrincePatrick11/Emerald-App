@@ -4,6 +4,10 @@ import { useUIStore } from '../../store/uiStore';
 import { MODULES, type EntryModuleId } from '../../lib/modules';
 import TagInput from '../editor/TagInput';
 
+/** Die Titelzeile als Eingabe — Einträge im Bearbeiten und die Seiten der Bibliotheken (`LibraryPageFrame`). */
+export const ENTRY_TITLE_INPUT_CLASSES =
+  'entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100 placeholder-stone-700 outline-none selectable';
+
 interface EntryDetailFrameProps {
   /** Bestimmt Breadcrumb-Ziel/-Label und den Untitled-Platzhalter (Registry). */
   module: EntryModuleId;
@@ -66,8 +70,7 @@ export default function EntryDetailFrame({
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
             placeholder={t(meta.untitledKey)}
-            className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100
-                       placeholder-stone-700 outline-none selectable"
+            className={ENTRY_TITLE_INPUT_CLASSES}
           />
         ) : (
           <h1 className="entry-view-title text-2xl font-semibold text-stone-100">

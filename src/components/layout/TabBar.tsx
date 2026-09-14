@@ -15,7 +15,8 @@ import { useWikiStore } from '../../store/wikiStore';
 import type { ActiveView, MoonPhase } from '../../types';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
-import { definitionLabel } from '../../lib/blocks/blockAttrs';
+import { useTemplateStore } from '../../store/templateStore';
+import { definitionLabel, templateLabel } from '../../lib/blocks/blockAttrs';
 import { imageSrc } from '../../lib/images';
 import { AUX_VIEWS, DEFAULT_ENTRY_EMOJI, moduleMeta, type AuxViewId } from '../../lib/modules';
 
@@ -54,6 +55,7 @@ export default function TabBar() {
   const categories = useCategoryStore((s) => s.categories);
   const altars = useAltarStore((s) => s.altars);
   const blockDefinitions = useBlockDefinitionStore((s) => s.definitions);
+  const templates = useTemplateStore((s) => s.templates);
   const scrollRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
@@ -81,6 +83,10 @@ export default function TabBar() {
     if (view.type === 'blocks') {
       const def = blockDefinitions.find((d) => d.id === view.id);
       return def ? definitionLabel(t, def) : getFallbackTitle(view, t);
+    }
+    if (view.type === 'templates') {
+      const template = templates.find((tpl) => tpl.id === view.id);
+      return template ? templateLabel(t, template) : getFallbackTitle(view, t);
     }
     return getFallbackTitle(view, t);
   };
@@ -110,6 +116,9 @@ export default function TabBar() {
     const Icon = moduleMeta(view.type)?.icon ?? AUX_VIEWS[view.type as AuxViewId]?.icon ?? MoreHorizontal;
     if (view.type === 'blocks' && view.id) {
       return renderIconValue(blockDefinitions.find((d) => d.id === view.id)?.icon, <Icon size={13} />);
+    }
+    if (view.type === 'templates' && view.id) {
+      return renderIconValue(templates.find((tpl) => tpl.id === view.id)?.icon, <Icon size={13} />);
     }
     return <Icon size={13} />;
   };

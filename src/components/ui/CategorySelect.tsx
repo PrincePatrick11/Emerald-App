@@ -1,7 +1,6 @@
-import { ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Dropdown from './Dropdown';
-import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
+import FieldDropdown from './FieldDropdown';
 
 /** Der „ohne Kategorie"-Eintrag. Kein gültiger Wert der Spalte, nur des Menüs. */
 const NONE = '__none__';
@@ -42,38 +41,30 @@ export default function CategorySelect<C extends { id: string; emoji: string }>(
   // Auch eine Kategorie im Papierkorb landet hier: ihre id löst nicht mehr auf,
   // der Eintrag ist für den Leser so kategorielos wie einer mit `null`.
   const triggerText = current ? `${current.emoji} ${getLabel(current)}` : t('categories.uncategorized');
+  const select = (next: string) => onChange(next === NONE ? null : next);
+
+  if (variant === 'field') {
+    return (
+      <FieldDropdown value={current ? current.id : NONE} options={options} onChange={select} triggerText={triggerText} align={align} />
+    );
+  }
 
   return (
     <Dropdown
       value={current ? current.id : NONE}
       options={options}
-      onChange={(next) => onChange(next === NONE ? null : next)}
+      onChange={select}
       align={align}
-      // Die Panels scrollen (RightSidebar overflow-y-auto) — ohne Portal würde
-      // das Menü dort abgeschnitten; das ersetzte native <select> hatte das Problem nie.
-      portal={variant === 'field'}
       trigger={({ open, toggle }) => (
-        variant === 'field' ? (
-          <button
-            onClick={toggle}
-            aria-haspopup="listbox"
-            aria-expanded={open}
-            className={OP_PROP_SELECT_CLASSES + ' cursor-pointer flex items-center justify-between gap-2 text-left'}
-          >
-            <span className="truncate">{triggerText}</span>
-            <ChevronDown size={12} className="flex-shrink-0 opacity-60" />
-          </button>
-        ) : (
-          <button
-            onClick={toggle}
-            aria-haspopup="listbox"
-            aria-expanded={open}
-            className="tasks-category-trigger text-xs text-stone-500 hover:text-stone-300 px-1.5 py-0.5 rounded hover:bg-stone-700/50"
-            title={title}
-          >
-            {triggerText}
-          </button>
-        )
+        <button
+          onClick={toggle}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          className="tasks-category-trigger text-xs text-stone-500 hover:text-stone-300 px-1.5 py-0.5 rounded hover:bg-stone-700/50"
+          title={title}
+        >
+          {triggerText}
+        </button>
       )}
     />
   );

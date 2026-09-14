@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { Trash2 } from 'lucide-react';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import { copyUsage, useBlockContentRows, type CopyUsage } from '../../store/blockCopies';
+import { useTemplateStore } from '../../store/templateStore';
 import { useUIStore } from '../../store/uiStore';
-import { useBlockDraftStore } from '../../store/blockDraftStore';
+import { useBlockDraftStore } from '../../store/draftStore';
 import { AUX_VIEWS } from '../../lib/modules';
 import { definitionLabel } from '../../lib/blocks/blockAttrs';
 import type { BlockDefinition } from '../../lib/blocks/definitions';
@@ -34,7 +35,8 @@ export default function BlocksView() {
   /** Schnappschuss statt id: der Dialog zeigt nach dem Löschen noch seine Meldung. */
   const [deleting, setDeleting] = useState<BlockDefinition | null>(null);
 
-  const usage = useMemo(() => copyUsage(rows, definitions), [rows, definitions]);
+  const templates = useTemplateStore((s) => s.templates);
+  const usage = useMemo(() => copyUsage(rows, templates, definitions), [rows, templates, definitions]);
   // Eine id ohne Definition (gelöscht, anderer Vault im gemerkten Tab) fällt auf die Liste zurück.
   const selected = activeView.id ? definitions.find((d) => d.id === activeView.id) ?? null : null;
 
@@ -49,7 +51,7 @@ export default function BlocksView() {
   const deleteModal = deleting && (
     <DeleteDefinitionModal
       definition={deleting}
-      entryCount={usage.get(deleting.id)?.entries ?? 0}
+      usage={usage.get(deleting.id)}
       onClose={() => setDeleting(null)}
       onDeleted={() => {
         clearDraft(deleting.id);
@@ -116,10 +118,16 @@ function BlockList({ usage, onCreate, onDelete }: {
           {def.description && <span className="block text-xs text-stone-500 truncate">{def.description}</span>}
         </span>
         {def.id in drafts && (
-          <span className="text-xs italic text-stone-500 flex-shrink-0">{t('blocks.library.unsaved')}</span>
+          <span className="text-xs italic text-stone-500 flex-shrink-0">{t('editor.unsaved')}</span>
         )}
-        {!!u?.outdated && (
-          <span className="block-library-outdated-dot" title={t('blocks.library.outdated', { count: u.outdated })} />
+        {!!(u?.outdated || u?.outdatedTemplates) && (
+          <span
+            className="block-library-outdated-dot"
+            title={[
+              u.outdated ? t('blocks.library.outdated', { count: u.outdated }) : '',
+              u.outdatedTemplates ? t('blocks.library.outdatedTemplates', { count: u.outdatedTemplates }) : '',
+            ].filter(Boolean).join(' · ')}
+          />
         )}
         <span className="text-xs text-stone-500 tabular-nums flex-shrink-0">
           {t('blocks.library.fieldCount', { count: fieldCount })}

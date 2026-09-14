@@ -7,7 +7,7 @@ import { useOperationStore } from '../../store/operationStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
 import type { ActiveView } from '../../types';
-import { moduleMeta, type ViewId } from '../../lib/modules';
+import { LIBRARY_VIEW_IDS, moduleMeta, type ViewId } from '../../lib/modules';
 import BlockSidebarArea from '../blocks/BlockSidebarArea';
 import JournalPropertiesPanel from '../sidebar/panels/JournalPropertiesPanel';
 import WikiPropertiesPanel from '../sidebar/panels/WikiPropertiesPanel';
@@ -31,10 +31,11 @@ const PROPERTIES_PANELS: Partial<Record<ViewId, ComponentType>> = {
  * Tiefenlink aus der Suche (`{ type: 'tags' | 'categories', id }`) trägt eine
  * id, bekäme sonst die Eintrags-Aktionsleiste und darin einen
  * „Bearbeiten"-Knopf, der `mode: 'edit'` auf eine Ansicht ohne Editor setzt.
- * Die Seite eines eigenen Blocks (`{ type: 'blocks', id }`) bringt ihre
- * Leiste selbst mit und portalt sie in denselben Host wie ein Dashboard.
+ * Die Seite eines eigenen Blocks oder einer Vorlage (`{ type: 'blocks' |
+ * 'templates', id }`) bringt ihre Leiste selbst mit und portalt sie in
+ * denselben Host wie ein Dashboard.
  */
-const VIEWS_WITHOUT_ENTRIES: ReadonlySet<ViewId> = new Set<ViewId>(['home', 'tags', 'categories', 'blocks']);
+const VIEWS_WITHOUT_ENTRIES: ReadonlySet<ViewId> = new Set<ViewId>(['home', 'tags', 'categories', ...LIBRARY_VIEW_IDS]);
 
 
 function PropertiesContent({ activeView }: { activeView: ActiveView }) {

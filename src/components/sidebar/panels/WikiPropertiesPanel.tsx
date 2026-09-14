@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
 import { useWikiStore } from '../../../store/wikiStore';
 import { useCategoryStore } from '../../../store/categoryStore';
-import TagInput from '../../editor/TagInput';
+import TagsField from '../fields/TagsField';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
 import PropertiesEditView from '../fields/PropertiesEditView';
 import PropertiesReadView from '../fields/PropertiesReadView';
@@ -38,10 +38,7 @@ export default function WikiPropertiesPanel() {
           <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
           <LinkedEntriesField content={article.content} />
         </div>
-        <div>
-          <p className="label-xs mb-2">{t('properties.tags')}</p>
-          <TagInput tags={article.tags ?? []} onChange={() => {}} readOnly />
-        </div>
+        <TagsField tags={article.tags ?? []} readOnly />
       </PropertiesReadView>
     );
   }
@@ -73,12 +70,7 @@ export default function WikiPropertiesPanel() {
         <LinkedEntriesField content={article.content} editable inputCls={OP_PROP_SELECT_CLASSES} />
       </div>
 
-      <div>
-        <p className="label-xs mb-2">{t('properties.tags')}</p>
-        <div className="bg-stone-800/40 rounded-md px-3 py-2 border border-stone-700/40">
-          <TagInput tags={article.tags ?? []} onChange={(tags) => updateArticle(article.id, { tags })} />
-        </div>
-      </div>
+      <TagsField tags={article.tags ?? []} onChange={(tags) => updateArticle(article.id, { tags })} />
     </PropertiesEditView>
   );
 }
