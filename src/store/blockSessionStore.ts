@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import type { BlockAttrName, BlockInstance } from '../lib/blocks/types';
+import type { Template } from '../lib/blocks/templates';
+import type { TemplateApplyOptions } from './templateApply';
 
 /**
  * Die Brücke zwischen dem `BlockStack` im Hauptbereich und der Block-Verwaltung
@@ -25,6 +27,12 @@ export interface BlockStackApi {
   update: (id: string, next: BlockInstance) => void;
   /** Zum Block scrollen und ihn kurz hervorheben. */
   reveal: (id: string) => void;
+  /** Die Blöcke mit dem lebenden HTML der Textblöcke — `blocks` der Sitzung hinkt beim Tippen hinterher. */
+  liveBlocks: () => BlockInstance[];
+  /** Eine Vorlage einsetzen — nur in einem Stapel mit Vorlagen (`BlockSession.templates`). */
+  applyTemplate: (template: Template, options: TemplateApplyOptions) => void;
+  /** Die Vorlagen-Auswahl des Stapels öffnen. */
+  openTemplatePicker: () => void;
 }
 
 export interface BlockSession {
@@ -35,6 +43,8 @@ export interface BlockSession {
   /** Struktur-Stand; `html` darin ist der Stand des letzten Strukturwechsels. */
   blocks: BlockInstance[];
   isEditing: boolean;
+  /** Kann der Stapel Vorlagen einsetzen? Nur Einträge, nicht die Seite einer Vorlage. */
+  templates: boolean;
   /** Nach dem Abbau des Stapels wirkungslos — ein veralteter Aufruf erreicht keinen fremden Eintrag. */
   api: BlockStackApi;
 }

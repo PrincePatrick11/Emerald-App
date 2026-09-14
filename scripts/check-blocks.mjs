@@ -31,7 +31,7 @@ writeFileSync(
    export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
    export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked, withRenamedPartTargets } from '${root}/src/lib/blocks/sigil';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
-   export { parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty, isUnchangedTemplateContent, templateOriginsOf, templateStart, mergeTemplateTags, mergeAssignmentChanges, withDefaultAt, defaultTemplateAt } from '${root}/src/lib/blocks/templates';
+   export { parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty, isUnchangedTemplateContent, templateOriginsOf, templateStart, mergeTemplateTags, mergeAssignmentChanges, withDefaultAt, defaultTemplateAt, contentForTemplate, areBlocksEmpty } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';`
 );
@@ -66,7 +66,7 @@ const {
   remapDefinitionDefaults, definitionImageRefs, hasFrozenCopy, withRenamedPartTargets,
   parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty,
   isUnchangedTemplateContent, templateOriginsOf, templateStart, mergeTemplateTags,
-  mergeAssignmentChanges, withDefaultAt, defaultTemplateAt,
+  mergeAssignmentChanges, withDefaultAt, defaultTemplateAt, contentForTemplate, areBlocksEmpty,
 } = bundle;
 
 const failures = [];
@@ -879,7 +879,7 @@ console.log('\n6. Vorlagen: Zuweisung, Standard, Einsetzen\n');
   check('Start aus Vorlage: Titel getrimmt, Tags kopiert, Inhalt eingesetzt',
     start.title === 'Ritual' && start.tags.join() === 'a' && start.content.includes('data-template-origin="sigil-tpl"'), start);
   check('Start ohne Vorlage: leer mit Standardtitel',
-    JSON.stringify(templateStart(null, 'Untitled Entry')) === JSON.stringify({ title: 'Untitled Entry', content: '', tags: [] }));
+    JSON.stringify(templateStart(null, 'Untitled Entry')) === JSON.stringify({ title: 'Untitled Entry', content: '', tags: [], templateId: null }));
   check('Tags zusammenführen ohne Doppelte (Groß/Klein egal)', mergeTemplateTags(['A', 'b'], ['a', 'c']).join() === 'A,b,c');
 
   // Zuweisungen einer Bearbeitung auf einen inzwischen geänderten Stand legen.
@@ -896,6 +896,11 @@ console.log('\n6. Vorlagen: Zuweisung, Standard, Einsetzen\n');
     mergeAssignmentChanges([w], [{ ...w, isDefault: true }], []).length === 0);
   check('Stern setzen fügt die fehlende Zuweisung an',
     JSON.stringify(withDefaultAt([j], 'wiki', null)) === JSON.stringify([j, { entryType: 'wiki', category: null, isDefault: true }]));
+  const saved = contentForTemplate(serializeBlocks(first));
+  check('Als Vorlage: ohne Herkunft, mit entladener Ladung',
+    !saved.includes('data-template-origin') && parseBlocks(saved).length === 4 && !parseSigilCharge(parseBlocks(saved)[3]).loaded, saved);
+  check('leer: ein Textblock aus einer Vorlage zählt nicht als leer',
+    !areBlocksEmpty([{ ...createTextBlock('<p></p>'), attrs: { 'data-template-origin': 'x' } }]) && areBlocksEmpty([createTextBlock('<p></p>')]));
   check('Standard genau hier, ohne Rückfall',
     defaultTemplateAt(all, 'wiki', 'herbs') === undefined && defaultTemplateAt(all, 'wiki', '*')?.id === 'fallback');
 }

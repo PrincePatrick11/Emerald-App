@@ -10,6 +10,7 @@ import { PropertySummaryRow } from '../fields/PropertySummaryRow';
 import IconCoverField from '../fields/IconCoverField';
 import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
 import { categoryLabel } from '../../../lib/categories';
+import { applyDefaultAfterCategoryChange } from '../../../store/templateApply';
 import CategorySelect from '../../ui/CategorySelect';
 
 /**
@@ -56,7 +57,12 @@ export default function OperationPropertiesPanel() {
         <CategorySelect
           categories={categories}
           value={op.category_id}
-          onChange={(category_id) => updateOperation(op.id, { category_id })}
+          onChange={(category_id) => {
+            const previous = op.category_id;
+            void updateOperation(op.id, { category_id })
+              .then(() => applyDefaultAfterCategoryChange('operation', op.id, previous, category_id))
+              .catch((e: unknown) => console.error('[OperationPropertiesPanel] category change failed:', e));
+          }}
           getLabel={(c) => categoryLabel(t, c)}
           variant="field"
         />

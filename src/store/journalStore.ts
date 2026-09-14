@@ -8,7 +8,8 @@ import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, toInt, type DbRow } from '../lib/row';
 import type { JournalEntry } from '../types';
 import i18n from '../i18n';
-import { startOfNewEntry } from './templateStore';
+import { startOfNewEntry, useTemplateNoticeStore } from './templateStore';
+import { UNTITLED_TITLES } from '../lib/blocks/templates';
 
 interface JournalState {
   entries: JournalEntry[];
@@ -56,7 +57,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     const now = nowIso();
     const moonPhase = getMoonPhase();
     const entryNumber = await nextEntryNumber(db, 'journal_entries');
-    const start = startOfNewEntry('journal', null, 'Untitled Entry', blank);
+    const start = startOfNewEntry('journal', null, UNTITLED_TITLES.journal, blank);
     const entry: JournalEntry = {
       entry_number: entryNumber,
       id: generateId(),
@@ -93,6 +94,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       ]
     );
     set((s) => ({ entries: [entry, ...s.entries] }));
+    if (start.templateId) useTemplateNoticeStore.getState().show({ entryId: entry.id, templateId: start.templateId });
     // Eine Vorlage kann Link-Chips mitbringen — wie nach jedem Speichern in die links-Tabelle.
     if (entry.content) void serialized(serialKey('links', entry.id), () => syncLinks(entry.id, 'journal', entry.content));
     return entry;

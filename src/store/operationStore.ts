@@ -6,7 +6,8 @@ import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, type DbRow } from '../lib/row';
 import { withChargeUnloaded } from '../lib/blocks/sigil';
-import { startOfNewEntry } from './templateStore';
+import { startOfNewEntry, useTemplateNoticeStore } from './templateStore';
+import { UNTITLED_TITLES } from '../lib/blocks/templates';
 import type { Operation } from '../types';
 import i18n from '../i18n';
 
@@ -51,7 +52,7 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     const db = await getDb();
     const now = nowIso();
     // Die Kategorie „Sigillen" beginnt so mit Rechner, Zeichnung und Ladung (Vorlage `core-sigil`).
-    const start = startOfNewEntry('operation', categoryId, 'Untitled Operation', blank);
+    const start = startOfNewEntry('operation', categoryId, UNTITLED_TITLES.operation, blank);
     const op: Operation = {
       entry_number: await nextEntryNumber(db, 'operations'),
       id: generateId(),
@@ -65,6 +66,7 @@ export const useOperationStore = create<OperationState>((set, get) => ({
       [op.id, op.title, op.content, op.category_id, op.created_at, op.updated_at, JSON.stringify(op.tags), op.entry_number ?? null]
     );
     set((s) => ({ operations: [op, ...s.operations] }));
+    if (start.templateId) useTemplateNoticeStore.getState().show({ entryId: op.id, templateId: start.templateId });
     // Eine Vorlage kann Link-Chips mitbringen — wie nach jedem Speichern in die links-Tabelle.
     if (op.content) void serialized(serialKey('links', op.id), () => syncLinks(op.id, 'operation', op.content));
     return op;

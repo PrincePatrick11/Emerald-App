@@ -8,6 +8,7 @@ import PropertiesEditView from '../fields/PropertiesEditView';
 import PropertiesReadView from '../fields/PropertiesReadView';
 import { PropertySummaryRow } from '../fields/PropertySummaryRow';
 import IconCoverField from '../fields/IconCoverField';
+import { applyDefaultAfterCategoryChange } from '../../../store/templateApply';
 import CategorySelect from '../../ui/CategorySelect';
 import { categoryLabel } from '../../../lib/categories';
 import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
@@ -50,7 +51,12 @@ export default function WikiPropertiesPanel() {
         <CategorySelect
           categories={categories}
           value={article.category_id}
-          onChange={(category_id) => updateArticle(article.id, { category_id })}
+          onChange={(category_id) => {
+            const previous = article.category_id;
+            void updateArticle(article.id, { category_id })
+              .then(() => applyDefaultAfterCategoryChange('wiki', article.id, previous, category_id))
+              .catch((e: unknown) => console.error('[WikiPropertiesPanel] category change failed:', e));
+          }}
           getLabel={(c) => categoryLabel(t, c)}
           variant="field"
         />

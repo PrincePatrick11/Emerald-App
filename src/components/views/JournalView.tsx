@@ -24,9 +24,11 @@ import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
 import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import type { JournalEntry, MoonPhase } from '../../types';
+import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 
 export default function JournalView() {
   const { t } = useTranslation();
+  const saveAsTemplateAction = useSaveAsTemplateAction();
   const { activeView, setActiveView, journalPrefs, setJournalPrefs } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, journalPrefs: s.journalPrefs, setJournalPrefs: s.setJournalPrefs }))
   );
@@ -54,7 +56,7 @@ export default function JournalView() {
   // ueber den Key frisch vom letzten gespeicherten Stand mountet.
   const [editorEpoch, setEditorEpoch] = useState(0);
 
-  const { triggerAutoSave, cancelAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
+  const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
     entityId: entry?.id,
     isEditing,
     ready: !!entry && loadedEntryId === entry.id,
@@ -337,6 +339,7 @@ export default function JournalView() {
             onClose={() => setCtxMenu(null)}
             actions={[
               { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
+              saveAsTemplateAction('journal', ctxMenu.id),
               { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
               { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },
             ]}
@@ -375,6 +378,7 @@ export default function JournalView() {
           onChange={handleContentChange}
           onReadModeChange={(content) => updateEntry(entry.id, { content })}
           isEditing={isEditing}
+          templateTarget={{ entryType: 'journal', categoryId: null, flush: flushAutoSave }}
         />
       )}
     </EntryDetailFrame>

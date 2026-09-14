@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Trash2, Pencil, Copy } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
+import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import DashboardItem from '../ui/DashboardItem';
 import RenameField from '../ui/RenameField';
@@ -35,6 +36,7 @@ export default function WikiView() {
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, wikiPrefs: s.wikiPrefs, setWikiPrefs: s.setWikiPrefs }))
   );
   const openInNewTabAction = useOpenInNewTabAction();
+  const saveAsTemplateAction = useSaveAsTemplateAction();
   const { articles, createArticle, duplicateArticle, updateArticle, deleteArticle, restoreArticle, permanentlyDeleteArticle, getArticle } = useWikiStore(
     useShallow((s) => ({ articles: s.articles, createArticle: s.createArticle, duplicateArticle: s.duplicateArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle, permanentlyDeleteArticle: s.permanentlyDeleteArticle, getArticle: s.getArticle }))
   );
@@ -61,7 +63,7 @@ export default function WikiView() {
 
   const [editorEpoch, setEditorEpoch] = useState(0);
 
-  const { triggerAutoSave, cancelAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
+  const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
     entityId: article?.id,
     isEditing,
     ready: !!article && loadedArticleId === article.id,
@@ -371,6 +373,7 @@ export default function WikiView() {
             actions={[
               openInNewTabAction({ type: 'wiki', id: ctxMenu.id, mode: 'view' }),
               { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
+              saveAsTemplateAction('wiki', ctxMenu.id),
               { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
               { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },
             ]}
@@ -419,6 +422,7 @@ export default function WikiView() {
           onChange={handleContentChange}
           onReadModeChange={(content) => updateArticle(article.id, { content })}
           isEditing={isEditing}
+          templateTarget={{ entryType: 'wiki', categoryId: article.category_id, flush: flushAutoSave }}
         />
       )}
     </EntryDetailFrame>

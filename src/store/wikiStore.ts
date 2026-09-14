@@ -7,7 +7,8 @@ import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, type DbRow } from '../lib/row';
 import type { WikiArticle } from '../types';
 import i18n from '../i18n';
-import { startOfNewEntry } from './templateStore';
+import { startOfNewEntry, useTemplateNoticeStore } from './templateStore';
+import { UNTITLED_TITLES } from '../lib/blocks/templates';
 
 function slugify(title: string): string {
   return title
@@ -76,7 +77,7 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     const now = nowIso();
     const id = generateId();
     const entryNumber = await nextEntryNumber(db, 'wiki_articles');
-    const start = startOfNewEntry('wiki', categoryId, 'Untitled Article', blank);
+    const start = startOfNewEntry('wiki', categoryId, UNTITLED_TITLES.wiki, blank);
     const article: WikiArticle = {
       id,
       entry_number: entryNumber,
@@ -107,6 +108,7 @@ export const useWikiStore = create<WikiState>((set, get) => ({
       ]
     );
     set((s) => ({ articles: [...s.articles, article] }));
+    if (start.templateId) useTemplateNoticeStore.getState().show({ entryId: id, templateId: start.templateId });
     // Eine Vorlage kann Link-Chips mitbringen — wie nach jedem Speichern in die links-Tabelle.
     if (article.content) void serialized(serialKey('links', id), () => syncLinks(id, 'wiki', article.content));
     return article;

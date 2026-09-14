@@ -219,6 +219,33 @@ export function startOfNewEntry(
   return templateStart(template, fallbackTitle);
 }
 
+/** Eine gerade automatisch eingesetzte Vorlage — der Blockstapel des Eintrags zeigt dazu Rückgängig und „Andere Vorlage". */
+export interface AppliedTemplateNotice {
+  entryId: string;
+  templateId: string;
+}
+
+interface TemplateNoticeState {
+  notice: AppliedTemplateNotice | null;
+  show: (notice: AppliedTemplateNotice) => void;
+  /** Nur, wenn der Hinweis noch diesem Eintrag gehört. */
+  dismiss: (entryId: string) => void;
+}
+
+/**
+ * Der eine Hinweis „Vorlage angewendet". Hier statt beim Blockstapel, weil die
+ * Inhalts-Stores ihn beim Anlegen setzen und keine Komponente importieren
+ * dürfen. Ein neuer Hinweis ersetzt den alten — es gibt immer nur einen
+ * frisch angelegten Eintrag.
+ */
+export const useTemplateNoticeStore = create<TemplateNoticeState>((set, get) => ({
+  notice: null,
+  show: (notice) => set({ notice }),
+  dismiss: (entryId) => {
+    if (get().notice?.entryId === entryId) set({ notice: null });
+  },
+}));
+
 /**
  * Nimmt endgültig gelöschte Kategorien aus den Zuweisungen im Speicher — das
  * Gegenstück zu `dropCategoryFromTemplates` in der Datenbank.

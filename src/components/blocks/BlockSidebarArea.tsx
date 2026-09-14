@@ -1,7 +1,7 @@
 import { useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { Reorder, useDragControls } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { Check, Eye, EyeOff, GripVertical, MoreHorizontal, Pencil, Plus, Puzzle, Type } from 'lucide-react';
+import { Check, Eye, EyeOff, GripVertical, LayoutTemplate, MoreHorizontal, Pencil, Plus, Puzzle, Type } from 'lucide-react';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import Button from '../ui/Button';
 import SidebarSectionHeader from '../sidebar/fields/SidebarSectionHeader';
@@ -116,10 +116,18 @@ function BlockManager({ session }: { session: BlockSession }) {
             })}
           </Reorder.Group>
           {isEditing && (
-            <Button tone="neutral" small className="mt-2" onClick={openAddMenu}>
-              <Plus size={12} />
-              <span>{t('blocks.add')}</span>
-            </Button>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <Button tone="neutral" small onClick={openAddMenu}>
+                <Plus size={12} />
+                <span>{t('blocks.add')}</span>
+              </Button>
+              {session.templates && (
+                <Button tone="neutral" small onClick={api.openTemplatePicker}>
+                  <LayoutTemplate size={12} />
+                  <span>{t('templates.insert.button')}</span>
+                </Button>
+              )}
+            </div>
           )}
         </>
       )}

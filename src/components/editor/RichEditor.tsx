@@ -246,8 +246,10 @@ export default function RichEditor({
     };
   }, [editor, editable, updateLinkPopup]);
 
+  // Ohne `update`-Ereignis: das Umschalten ändert keinen Inhalt, und ein
+  // Ereignis hier landete als vermeintliche Änderung beim Blockstapel.
   useEffect(() => {
-    editor?.setEditable(editable);
+    editor?.setEditable(editable, false);
   }, [editable, editor]);
 
   // Open external links in browser (read mode only)

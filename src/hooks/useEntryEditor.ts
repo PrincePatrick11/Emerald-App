@@ -183,5 +183,18 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
     };
   }, [cancelAutoSave]);
 
-  return { triggerAutoSave, cancelAutoSave, restoreOnCancel, contentRef, handleContentChange };
+  /**
+   * Einen aufgeschobenen Autosave sofort schreiben und darauf warten — für
+   * Aktionen, die gleich danach den Store lesen (eine Vorlage einsetzen).
+   * Ohne ausstehenden Save ein No-op.
+   */
+  const flushAutoSave = useCallback(async () => {
+    if (timer.current === null) return;
+    cancelAutoSave();
+    const id = idRef.current;
+    if (!isEditingRef.current || !id || editorSavesSuspended()) return;
+    await updateRef.current(id, buildPatchRef.current(contentRef.current));
+  }, [cancelAutoSave]);
+
+  return { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, contentRef, handleContentChange };
 }

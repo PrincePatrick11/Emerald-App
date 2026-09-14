@@ -798,6 +798,29 @@
       "none": "No default",
       "fallback": "Otherwise: {{name}} (all categories)",
       "everyEntry": "Every new entry"
+    },
+    "saveAsTemplate": "Save as template",
+    "insert": {
+      "button": "Insert template",
+      "pickerTitle": "Insert template",
+      "searchPlaceholder": "Search templates…",
+      "noTemplates": "No templates found",
+      "suggestionsLabel": "Start from a template",
+      "allTemplates": "All templates…",
+      "applyTitle": "Insert “{{name}}”",
+      "modeLabel": "Where the blocks go",
+      "append": "Append",
+      "replace": "Replace",
+      "appendHint": "The template’s blocks go below the existing content.",
+      "replaceHint": "The template replaces all content. Cancel in the entry restores content and title; added tags stay.",
+      "takeTitle": "Use its title: “{{title}}”",
+      "noTitle": "The template has no title",
+      "addTags": "Add its tags: {{tags}}",
+      "noTags": "The template has no tags",
+      "apply": "Insert",
+      "noticeApplied": "Template “{{name}}” applied",
+      "other": "Other template",
+      "dismiss": "Dismiss"
     }
   }
 }

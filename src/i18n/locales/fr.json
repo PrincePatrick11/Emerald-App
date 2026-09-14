@@ -798,6 +798,29 @@
       "none": "Aucun modèle par défaut",
       "fallback": "Sinon : {{name}} (toutes les catégories)",
       "everyEntry": "Chaque nouvelle entrée"
+    },
+    "saveAsTemplate": "Enregistrer comme modèle",
+    "insert": {
+      "button": "Insérer un modèle",
+      "pickerTitle": "Insérer un modèle",
+      "searchPlaceholder": "Rechercher des modèles…",
+      "noTemplates": "Aucun modèle trouvé",
+      "suggestionsLabel": "Commencer avec un modèle",
+      "allTemplates": "Tous les modèles…",
+      "applyTitle": "Insérer « {{name}} »",
+      "modeLabel": "Où vont les blocs",
+      "append": "Ajouter à la fin",
+      "replace": "Remplacer",
+      "appendHint": "Les blocs du modèle vont sous le contenu existant.",
+      "replaceHint": "Le modèle remplace tout le contenu. Annuler dans l’entrée rétablit le contenu et le titre ; les étiquettes ajoutées restent.",
+      "takeTitle": "Reprendre son titre : « {{title}} »",
+      "noTitle": "Le modèle n’a pas de titre",
+      "addTags": "Ajouter ses étiquettes : {{tags}}",
+      "noTags": "Le modèle n’a pas d’étiquettes",
+      "apply": "Insérer",
+      "noticeApplied": "Modèle « {{name}} » appliqué",
+      "other": "Autre modèle",
+      "dismiss": "Fermer"
     }
   }
 }

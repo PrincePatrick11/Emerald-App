@@ -21,6 +21,7 @@ import TabIconButton from '../ui/TabIconButton';
 import EntryListTab, { type EntryListTabProps } from '../ui/EntryListTab';
 import type { ContextMenuAction } from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
+import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 
 /** Die Tabs ohne ihre Beschriftungen, die `t()` brauchen und deshalb in der
  *  Komponente bleiben. Auf Modulebene, damit `ENTRY_LIST_TABS_WIDTH` unten
@@ -181,6 +182,7 @@ function AllList() {
 function useJournalConfig(): EntryListTabProps<JournalEntry> {
   const { t } = useTranslation();
   const openInNewTabAction = useOpenInNewTabAction();
+  const saveAsTemplateAction = useSaveAsTemplateAction();
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
@@ -219,6 +221,7 @@ function useJournalConfig(): EntryListTabProps<JournalEntry> {
     contextMenuActions: (e, startRename) => [
       openInNewTabAction({ type: 'journal', id: e.id, mode: 'view' }),
       { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(e) },
+      saveAsTemplateAction('journal', e.id),
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
       { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(e), danger: true },
     ],
@@ -236,6 +239,7 @@ function JournalList() {
 function useOperationsConfig(): EntryListTabProps<Operation> {
   const { t } = useTranslation();
   const openInNewTabAction = useOpenInNewTabAction();
+  const saveAsTemplateAction = useSaveAsTemplateAction();
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
@@ -290,6 +294,7 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
     contextMenuActions: (op, startRename) => [
       openInNewTabAction({ type: 'operations', id: op.id, mode: 'view' }),
       { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(op) },
+      saveAsTemplateAction('operation', op.id),
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
       { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(op), danger: true },
     ],
@@ -307,6 +312,7 @@ function OperationsList() {
 function useWikiConfig(): EntryListTabProps<WikiArticle> {
   const { t } = useTranslation();
   const openInNewTabAction = useOpenInNewTabAction();
+  const saveAsTemplateAction = useSaveAsTemplateAction();
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
@@ -361,6 +367,7 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
     contextMenuActions: (a, startRename) => [
       openInNewTabAction({ type: 'wiki', id: a.id, mode: 'view' }),
       { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(a) },
+      saveAsTemplateAction('wiki', a.id),
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
       { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(a), danger: true },
     ],

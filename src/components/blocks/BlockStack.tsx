@@ -41,6 +41,10 @@ import {
 import { blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
 import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockAttrName, type BlockInstance } from '../../lib/blocks/types';
 import { useBlockSessionStore, type BlockStackApi } from '../../store/blockSessionStore';
+import { useTemplateNoticeStore } from '../../store/templateStore';
+import { applyTemplateFields, undoTemplateFields, type TemplateApplyOptions } from '../../store/templateApply';
+import { areBlocksEmpty, instantiateTemplateBlocks, type Template } from '../../lib/blocks/templates';
+import TemplateInsertion, { type TemplateTarget } from '../templates/TemplateInsertion';
 import { BLOCK_VIEWS } from './blockViews';
 import { BlockStackContext, type BlockStackContextValue } from './blockStackContext';
 import { addBlockActions, commonBlockActions } from './blockActions';
@@ -69,6 +73,12 @@ interface BlockStackProps {
    * Fehlt die Prop, bleibt der Lesemodus schreibgeschützt.
    */
   onReadModeChange?: (content: string) => void | Promise<unknown>;
+  /**
+   * Eintragsart und Kategorie — mit ihnen bietet der Stapel im Bearbeiten
+   * Vorlagen an (Auswahl, Vorschläge im leeren Eintrag, Hinweis nach dem
+   * automatischen Standard). Die Seite einer Vorlage lässt es weg.
+   */
+  templateTarget?: TemplateTarget;
 }
 
 const REVEAL_CLASS = 'block-stack-item--revealed';
@@ -93,7 +103,9 @@ const REVEAL_MS = 1600;
  * State ist deshalb nur der Stand beim letzten Strukturwechsel — der lebende
  * Stand steht im Ref (und im Editor).
  */
-export default function BlockStack({ entryId, initialContent, isEditing, placeholder, onChange, onReadModeChange }: BlockStackProps) {
+export default function BlockStack({
+  entryId, initialContent, isEditing, placeholder, onChange, onReadModeChange, templateTarget,
+}: BlockStackProps) {
   const { t } = useTranslation();
 
   const [blocks, setBlocks] = useState<BlockInstance[]>(() => blocksFromContent(initialContent));
@@ -101,8 +113,17 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const stackRef = useRef<HTMLDivElement>(null);
+  // Leer im Sinne der Vorlagen: dann stehen die Vorschläge da. Nur umgeschaltet,
+  // wenn es sich ändert — ein Tastendruck rendert den Stapel sonst nicht neu.
+  const [empty, setEmpty] = useState(() => areBlocksEmpty(blocks));
 
-  const emit = useCallback(() => onChangeRef.current(serializeBlocks(blocksRef.current)), []);
+  // Jede Änderung erledigt den Hinweis „Vorlage angewendet" — Rückgängig leerte
+  // sonst auch, was danach entstand. Wer eine Vorlage einsetzt, zeigt ihn danach neu.
+  const emit = useCallback(() => {
+    setEmpty(areBlocksEmpty(blocksRef.current));
+    useTemplateNoticeStore.getState().dismiss(entryId);
+    onChangeRef.current(serializeBlocks(blocksRef.current));
+  }, [entryId]);
 
   const commit = useCallback((next: BlockInstance[]) => {
     blocksRef.current = next;
@@ -112,6 +133,10 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
 
   const updateHtml = useCallback((id: string, rawHtml: string) => {
     const html = neutralizeSectionTags(rawHtml);
+    const current = blocksRef.current.find((b) => b.id === id);
+    // Derselbe Stand ist keine Änderung (etwa ein Umschalten zwischen Lesen und
+    // Bearbeiten) — er soll weder speichern noch den Vorlagen-Hinweis schließen.
+    if (current?.html === html) return;
     blocksRef.current = blocksRef.current.map((b) => (b.id === id ? { ...b, html } : b));
     emit();
   }, [emit]);
@@ -119,7 +144,11 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
   // Absicherung, auf die sich nichts verlässt: beim Moduswechsel den State auf
   // den Ref-Stand ziehen. Der Baum bleibt derselbe (siehe BlockFrame) — falls
   // doch einmal etwas neu montiert, sieht es das zuletzt getippte HTML.
-  useEffect(() => { setBlocks(blocksRef.current); }, [isEditing]);
+  useEffect(() => {
+    setBlocks(blocksRef.current);
+    // Im Lesemodus kann sich der Inhalt von außen geändert haben (useExternalContentReset).
+    setEmpty(areBlocksEmpty(blocksRef.current));
+  }, [isEditing]);
 
   const resetEpoch = useExternalContentReset(initialContent, isEditing, blocksRef, setBlocks, onChangeRef);
 
@@ -324,6 +353,55 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
     flashReveal(el, REVEAL_CLASS, REVEAL_MS);
   };
 
+  /* ---------------- Vorlagen ---------------- */
+
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+
+  /**
+   * Eine Vorlage einsetzen: ihre Blöcke anhängen oder den Inhalt ersetzen (ein
+   * leerer Stapel wird immer ersetzt) — wie jede Blockänderung über den
+   * Editor; Abbrechen dreht Blöcke und Titel zurück. Titel und Tags gehen über
+   * den Store des Eintrags, wie aus der Eigenschaften-Seitenleiste — Tags
+   * bleiben deshalb nach Abbrechen stehen, wie dort.
+   */
+  const applyTemplate = (template: Template, options: TemplateApplyOptions) => {
+    if (!templateTarget || !isEditing) return;
+    const added = instantiateTemplateBlocks(template);
+    const next = options.mode === 'replace' || areBlocksEmpty(blocksRef.current)
+      ? added
+      : [...blocksRef.current, ...added];
+    commit(next.length > 0 ? next : [createTextBlock()]);
+    if (options.notice) useTemplateNoticeStore.getState().show({ entryId, templateId: template.id });
+    const { entryType, flush } = templateTarget;
+    // Erst die aufgeschobene Eingabe speichern: Titel und Tags werden gegen den Store geprüft.
+    void (async () => {
+      await flush();
+      if (options.replaces) await undoTemplateFields(entryType, entryId, options.replaces);
+      await applyTemplateFields(entryType, entryId, template, options);
+    })().catch((e: unknown) => console.error('[BlockStack] applying template fields failed:', e));
+  };
+
+  /** Rückgängig nach dem automatischen Einsetzen: leerer Stapel, Titel und Tags der Vorlage zurück. */
+  const undoTemplate = (template: Template) => {
+    if (!templateTarget) return;
+    commit([createTextBlock()]);
+    const { entryType, flush } = templateTarget;
+    void flush()
+      .then(() => undoTemplateFields(entryType, entryId, template))
+      .catch((e: unknown) => console.error('[BlockStack] undoing template fields failed:', e));
+  };
+
+  // Der Hinweis gehört zum Bearbeiten, in dem die Vorlage kam — „Fertig" oder
+  // Abbrechen erledigen ihn. Einer, der einem anderen Eintrag gehört, ist dort
+  // liegen geblieben (weggewechselt im Bearbeiten) und verfällt, sobald ein
+  // anderer Eintrag bearbeitet wird; beim Abbau zu räumen ginge nicht — der
+  // StrictMode-Doppelmount nähme ihn dem frisch angelegten Eintrag gleich wieder.
+  useEffect(() => {
+    const notices = useTemplateNoticeStore.getState();
+    if (!isEditing) notices.dismiss(entryId);
+    else if (templateTarget && notices.notice && notices.notice.entryId !== entryId) notices.dismiss(notices.notice.entryId);
+  }, [isEditing, entryId, templateTarget]);
+
   /* ---------------- Sitzung für die Seitenleiste ---------------- */
 
   // Die Handgriffe ändern sich pro Render (sie lesen die aktuelle Closure); die
@@ -332,7 +410,12 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
   // Nach dem Abbau reicht es nichts mehr weiter — ein veralteter Aufruf käme
   // sonst über `onChange` im Eintrag an, der jetzt offen ist.
   const apiRef = useRef<BlockStackApi>(null!);
-  apiRef.current = { insert: insertAt, duplicate, remove, reorder, setAttr, update: updateBlock, reveal };
+  apiRef.current = {
+    insert: insertAt, duplicate, remove, reorder, setAttr, update: updateBlock, reveal,
+    liveBlocks: () => blocksRef.current,
+    applyTemplate,
+    openTemplatePicker: () => setTemplatePickerOpen(true),
+  };
   const mountedRef = useRef(false);
   const api = useMemo<BlockStackApi>(() => {
     const live = () => (mountedRef.current ? apiRef.current : null);
@@ -344,13 +427,18 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
       setAttr: (id, name, value) => live()?.setAttr(id, name, value),
       update: (id, next) => live()?.update(id, next),
       reveal: (id) => live()?.reveal(id),
+      liveBlocks: () => live()?.liveBlocks() ?? [],
+      applyTemplate: (template, options) => live()?.applyTemplate(template, options),
+      openTemplatePicker: () => live()?.openTemplatePicker(),
     };
   }, []);
   const [sessionId] = useState(generateId);
+  // Die Views reichen `templateTarget` pro Render als neues Objekt — die Sitzung braucht nur „ja/nein".
+  const offersTemplates = !!templateTarget;
 
   useEffect(() => {
-    useBlockSessionStore.getState().publish({ sessionId, entryId, blocks, isEditing, api });
-  }, [sessionId, entryId, blocks, isEditing, api]);
+    useBlockSessionStore.getState().publish({ sessionId, entryId, blocks, isEditing, templates: offersTemplates, api });
+  }, [sessionId, entryId, blocks, isEditing, offersTemplates, api]);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -430,6 +518,18 @@ export default function BlockStack({ entryId, initialContent, isEditing, placeho
     <BlockStackContext.Provider value={context}>
       {isEditing && toolbarEditor && (
         <StackToolbar editor={toolbarEditor} onOpenLinkPicker={() => setLinkPickerOpen(true)} />
+      )}
+
+      {isEditing && templateTarget && (
+        <TemplateInsertion
+          entryId={entryId}
+          target={templateTarget}
+          empty={empty}
+          pickerOpen={templatePickerOpen}
+          onPickerOpenChange={setTemplatePickerOpen}
+          apply={applyTemplate}
+          undo={undoTemplate}
+        />
       )}
 
       {/* Lese- und Bearbeitungsmodus teilen denselben Baum: Reorder.Group ist

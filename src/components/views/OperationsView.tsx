@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Trash2, Pencil, Copy } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
+import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import DashboardItem from '../ui/DashboardItem';
 import RenameField from '../ui/RenameField';
@@ -34,6 +35,7 @@ export default function OperationsView() {
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, operationsPrefs: s.operationsPrefs, setOperationsPrefs: s.setOperationsPrefs }))
   );
   const openInNewTabAction = useOpenInNewTabAction();
+  const saveAsTemplateAction = useSaveAsTemplateAction();
   const { operations, createOperation, duplicateOperation, updateOperation, deleteOperation, restoreOperation, permanentlyDeleteOperation, getOperation } = useOperationStore(
     useShallow((s) => ({ operations: s.operations, createOperation: s.createOperation, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation, permanentlyDeleteOperation: s.permanentlyDeleteOperation, getOperation: s.getOperation }))
   );
@@ -59,7 +61,7 @@ export default function OperationsView() {
 
   const [editorEpoch, setEditorEpoch] = useState(0);
 
-  const { triggerAutoSave, cancelAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
+  const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
     entityId: operation?.id,
     isEditing,
     ready: !!operation && loadedOperationId === operation.id,
@@ -420,6 +422,7 @@ export default function OperationsView() {
               // Duplizieren die Zeichnung verlor. duplicateOperation laedt sie
               // inzwischen nach und entsperrt die Kopie — die Ausnahme ist weg.
               { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
+              saveAsTemplateAction('operation', ctxMenu.id),
               { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
               { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },
             ]}
@@ -466,6 +469,7 @@ export default function OperationsView() {
           onChange={handleContentChange}
           onReadModeChange={(content) => updateOperation(operation.id, { content })}
           isEditing={isEditing}
+          templateTarget={{ entryType: 'operation', categoryId: operation.category_id, flush: flushAutoSave }}
         />
       )}
     </EntryDetailFrame>

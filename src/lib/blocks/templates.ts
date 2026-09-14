@@ -59,6 +59,17 @@ export interface Template {
 
 export const DEFAULT_TEMPLATE_ICON = '📄';
 
+/**
+ * Der Titel, mit dem ein Eintrag ohne eigenen (und ohne Titel aus einer
+ * Vorlage) angelegt wird — die Inhalts-Stores schreiben ihn, das Einsetzen und
+ * Rückgängigmachen von Vorlagen erkennt ihn wieder.
+ */
+export const UNTITLED_TITLES: Record<TemplateEntryType, string> = {
+  journal: 'Untitled Entry',
+  wiki: 'Untitled Article',
+  operation: 'Untitled Operation',
+};
+
 /** Die eingebaute Sigillen-Vorlage: Standard für Operation × Sigillen. Bearbeit- und löschbar; die feste ID lässt Migration und Import sie wiedererkennen. */
 export const SIGIL_TEMPLATE_ID = 'core-sigil';
 
@@ -245,11 +256,12 @@ export function instantiateTemplateBlocks(template: Pick<Template, 'id' | 'conte
   }, (target) => remapTarget(target, ids)));
 }
 
-/** Titel, Inhalt und Tags, mit denen ein neuer Eintrag beginnt. */
+/** Titel, Inhalt und Tags, mit denen ein neuer Eintrag beginnt — und die Vorlage, aus der sie kamen. */
 export interface EntryStart {
   title: string;
   content: string;
   tags: string[];
+  templateId: string | null;
 }
 
 /** Womit ein neuer Eintrag aus der Vorlage beginnt — ohne Vorlage leer, mit dem Standardtitel des Typs. */
@@ -257,11 +269,12 @@ export function templateStart(
   template: Pick<Template, 'id' | 'title' | 'content' | 'tags'> | null,
   fallbackTitle: string,
 ): EntryStart {
-  if (!template) return { title: fallbackTitle, content: '', tags: [] };
+  if (!template) return { title: fallbackTitle, content: '', tags: [], templateId: null };
   return {
     title: template.title.trim() || fallbackTitle,
     content: serializeBlocks(instantiateTemplateBlocks(template)),
     tags: [...template.tags],
+    templateId: template.id,
   };
 }
 
@@ -269,12 +282,31 @@ export function templateStart(
 const EMPTY_TEXT_RE = /^(?:\s|&nbsp;|<p>|<\/p>|<p\s[^<>]*>|<br\s*\/?>)*$/i;
 
 /**
- * Ist der Inhalt leer — keine Blöcke oder nur leere, gewöhnliche Textblöcke?
- * Dann gilt ein Eintrag als unberührt, und ein Standard darf ihn füllen.
+ * Sind die Blöcke leer — keine oder nur leere, gewöhnliche Textblöcke? Dann
+ * gilt ein Eintrag als unberührt, und ein Standard darf ihn füllen.
  */
-export function isContentEmpty(content: string): boolean {
-  return parseBlocks(content).every((block) =>
+export function areBlocksEmpty(blocks: readonly BlockInstance[]): boolean {
+  return blocks.every((block) =>
     block.type === TEXT_BLOCK_TYPE && !block.attrs[BLOCK_ATTR.template] && EMPTY_TEXT_RE.test(block.html));
+}
+
+/** `areBlocksEmpty` für einen gespeicherten Inhalt. */
+export function isContentEmpty(content: string): boolean {
+  return areBlocksEmpty(parseBlocks(content));
+}
+
+/**
+ * Der Inhalt eines Eintrags als Vorlage: ohne die Herkunft aus anderen
+ * Vorlagen (beim Einsetzen bekommt jeder Block ohnehin die neue) und mit
+ * entladener Sigille.
+ */
+export function contentForTemplate(content: string): string {
+  const blocks = parseBlocks(withChargeUnloaded(content));
+  if (!blocks.some((b) => b.attrs[BLOCK_ATTR.template])) return serializeBlocks(blocks);
+  return serializeBlocks(blocks.map((b) => {
+    const { [BLOCK_ATTR.template]: _origin, ...attrs } = b.attrs;
+    return { ...b, attrs };
+  }));
 }
 
 /**

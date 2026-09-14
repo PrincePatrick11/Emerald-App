@@ -13,6 +13,7 @@ import Dashboard from '../ui/Dashboard';
 import DashboardItem from '../ui/DashboardItem';
 import Dropdown from '../ui/Dropdown';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
+import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import { getMoonPhase, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { DEFAULT_ENTRY_EMOJI, viewTypeForEntryType } from '../../lib/modules';
@@ -77,6 +78,7 @@ export default function HomeView() {
     useShallow((s) => ({ setActiveView: s.setActiveView, homeJournalPrefs: s.homeJournalPrefs, setHomeJournalPrefs: s.setHomeJournalPrefs, homeOpsPrefs: s.homeOpsPrefs, setHomeOpsPrefs: s.setHomeOpsPrefs, homeWikiPrefs: s.homeWikiPrefs, setHomeWikiPrefs: s.setHomeWikiPrefs }))
   );
   const openInNewTabAction = useOpenInNewTabAction();
+  const saveAsTemplateAction = useSaveAsTemplateAction();
   const { entries, createEntry, duplicateEntry, deleteEntry, restoreEntry } = useJournalStore(
     useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
   );
@@ -138,6 +140,7 @@ export default function HomeView() {
     ? [
         openInNewTabAction({ type: viewTypeForEntryType(ctxMenu.target.kind), id: ctxMenu.target.id, mode: 'view' }),
         { label: t('contextMenu.duplicate'), icon: <Copy size={12} />,   onClick: () => handleDuplicate(ctxMenu.target) },
+        saveAsTemplateAction(ctxMenu.target.kind, ctxMenu.target.id),
         { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => handleRename(ctxMenu.target) },
         { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleDelete(ctxMenu.target), danger: true },
       ]

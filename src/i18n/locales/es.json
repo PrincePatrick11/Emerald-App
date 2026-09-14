@@ -798,6 +798,29 @@
       "none": "Sin plantilla predeterminada",
       "fallback": "Si no: {{name}} (todas las categorías)",
       "everyEntry": "Cada entrada nueva"
+    },
+    "saveAsTemplate": "Guardar como plantilla",
+    "insert": {
+      "button": "Insertar plantilla",
+      "pickerTitle": "Insertar plantilla",
+      "searchPlaceholder": "Buscar plantillas…",
+      "noTemplates": "No se encontraron plantillas",
+      "suggestionsLabel": "Empezar con una plantilla",
+      "allTemplates": "Todas las plantillas…",
+      "applyTitle": "Insertar «{{name}}»",
+      "modeLabel": "Dónde van los bloques",
+      "append": "Añadir al final",
+      "replace": "Reemplazar",
+      "appendHint": "Los bloques de la plantilla van debajo del contenido existente.",
+      "replaceHint": "La plantilla reemplaza todo el contenido. Cancelar en la entrada restaura el contenido y el título; las etiquetas añadidas se quedan.",
+      "takeTitle": "Usar su título: «{{title}}»",
+      "noTitle": "La plantilla no tiene título",
+      "addTags": "Añadir sus etiquetas: {{tags}}",
+      "noTags": "La plantilla no tiene etiquetas",
+      "apply": "Insertar",
+      "noticeApplied": "Plantilla «{{name}}» aplicada",
+      "other": "Otra plantilla",
+      "dismiss": "Cerrar aviso"
     }
   }
 }

@@ -798,6 +798,29 @@
       "none": "Kein Standard",
       "fallback": "Sonst: {{name}} (alle Kategorien)",
       "everyEntry": "Jeder neue Eintrag"
+    },
+    "saveAsTemplate": "Als Vorlage speichern",
+    "insert": {
+      "button": "Vorlage einfügen",
+      "pickerTitle": "Vorlage einfügen",
+      "searchPlaceholder": "Vorlagen suchen …",
+      "noTemplates": "Keine Vorlagen gefunden",
+      "suggestionsLabel": "Mit einer Vorlage beginnen",
+      "allTemplates": "Alle Vorlagen …",
+      "applyTitle": "„{{name}}“ einfügen",
+      "modeLabel": "Wohin die Blöcke kommen",
+      "append": "Anhängen",
+      "replace": "Ersetzen",
+      "appendHint": "Die Blöcke der Vorlage kommen unter den vorhandenen Inhalt.",
+      "replaceHint": "Die Vorlage ersetzt den ganzen Inhalt. Abbrechen im Eintrag stellt Inhalt und Titel wieder her; ergänzte Tags bleiben.",
+      "takeTitle": "Titel übernehmen: „{{title}}“",
+      "noTitle": "Die Vorlage hat keinen Titel",
+      "addTags": "Tags ergänzen: {{tags}}",
+      "noTags": "Die Vorlage hat keine Tags",
+      "apply": "Einfügen",
+      "noticeApplied": "Vorlage „{{name}}“ angewendet",
+      "other": "Andere Vorlage",
+      "dismiss": "Hinweis schließen"
     }
   }
 }
