@@ -10,7 +10,7 @@ import { categoryLabel } from '../../lib/categories';
 import { MODULES, viewTypeForEntryType } from '../../lib/modules';
 import { templateLabel } from '../../lib/blocks/blockAttrs';
 import {
-  ALL_CATEGORIES, assignmentKey, TEMPLATE_ENTRY_TYPES,
+  ALL_CATEGORIES, assignmentKey, defaultTemplateAt, TEMPLATE_ENTRY_TYPES,
   type TemplateAssignment, type TemplateEntryType,
 } from '../../lib/blocks/templates';
 import { useAssignmentLabel } from './useAssignmentLabel';
@@ -48,8 +48,8 @@ export default function TemplateAssignments({ templateId, assignments, onChange 
   const canAdd = !taken.has(assignmentKey(entryType, chosenCategory));
 
   /** Die andere aktive Vorlage, die diese Kombination als Standard hält. */
-  const holder = (a: TemplateAssignment) => templates.find((tpl) => tpl.id !== templateId
-    && tpl.assignments.some((b) => b.isDefault && b.entryType === a.entryType && b.category === a.category));
+  const holder = (a: TemplateAssignment) =>
+    defaultTemplateAt(templates.filter((tpl) => tpl.id !== templateId), a.entryType, a.category);
 
   const typeOptions: DropdownOption<TemplateEntryType>[] = TEMPLATE_ENTRY_TYPES.map((type) => ({
     value: type,
@@ -84,7 +84,7 @@ export default function TemplateAssignments({ templateId, assignments, onChange 
             return (
               <li key={assignmentKey(a.entryType, a.category)}>
                 <div className="flex items-center gap-2">
-                  <span className="flex-1 min-w-0 truncate text-xs text-stone-300">{label(a.entryType, a.category)}</span>
+                  <span className="flex-1 min-w-0 truncate text-xs text-[var(--text-secondary)]">{label(a.entryType, a.category)}</span>
                   <button
                     type="button"
                     className={`block-row-action${a.isDefault ? ' block-row-action--on' : ''}`}

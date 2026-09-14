@@ -791,6 +791,13 @@
     "moreEntries_other": "and {{count}} more",
     "copiesNote": "Every entry gets its own copy. Changes to the template apply to new entries – existing ones stay as they are.",
     "entryCount": "{{count}} entry",
-    "entryCount_other": "{{count}} entries"
+    "entryCount_other": "{{count}} entries",
+    "overview": {
+      "title": "Defaults",
+      "hint": "What new entries start with. A category without its own default uses the one for “All categories”.",
+      "none": "No default",
+      "fallback": "Otherwise: {{name}} (all categories)",
+      "everyEntry": "Every new entry"
+    }
   }
 }

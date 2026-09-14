@@ -791,6 +791,13 @@
     "moreEntries_other": "y {{count}} más",
     "copiesNote": "Cada entrada recibe su propia copia. Los cambios en la plantilla valen para las entradas nuevas; las existentes no cambian.",
     "entryCount": "{{count}} entrada",
-    "entryCount_other": "{{count}} entradas"
+    "entryCount_other": "{{count}} entradas",
+    "overview": {
+      "title": "Plantillas predeterminadas",
+      "hint": "Con qué empiezan las entradas nuevas. Una categoría sin predeterminada propia usa la de «Todas las categorías».",
+      "none": "Sin plantilla predeterminada",
+      "fallback": "Si no: {{name}} (todas las categorías)",
+      "everyEntry": "Cada entrada nueva"
+    }
   }
 }

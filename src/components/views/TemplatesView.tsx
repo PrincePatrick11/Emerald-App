@@ -17,11 +17,13 @@ import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import BlockGlyph from '../blocks/BlockGlyph';
 import TemplateEditor from '../templates/TemplateEditor';
 import { useAssignmentLabel } from '../templates/useAssignmentLabel';
+import TemplateDefaultsOverview from '../templates/TemplateDefaultsOverview';
 
 /**
  * Die Rail-Ansicht „Vorlagen", gebaut wie „Blöcke": die Liste der Vorlagen im
  * gemeinsamen Dashboard-Gerüst, ein Klick öffnet die Vorlage als eigene Seite
- * (`{ type: 'templates', id }`). Löschen legt sie in den Papierkorb (mit
+ * (`{ type: 'templates', id }`). Darunter die Gesamtübersicht der Standards
+ * je Kombination. Löschen legt eine Vorlage in den Papierkorb (mit
  * Rückgängig) — Einträge aus ihr bleiben, wie sie sind.
  */
 export default function TemplatesView() {
@@ -157,6 +159,7 @@ function TemplateList({ entries, onCreate, onDelete }: {
       }}
       hasNoResults={filtered.length === 0}
       noResultsMessage={t('search.noResults')}
+      contentFooter={<TemplateDefaultsOverview />}
       contextMenuSlot={ctxMenu && menuTemplate && (
         <ContextMenu
           x={ctxMenu.x}

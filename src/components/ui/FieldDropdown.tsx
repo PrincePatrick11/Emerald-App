@@ -15,7 +15,8 @@ interface Props<T extends string> {
  * Ein Auswahlmenü im Look der Eigenschaftsfelder: volle Breite, Feldrahmen,
  * Chevron. Das Menü wird geportalt — die Seitenleisten scrollen, ein absolut
  * positioniertes Menü würde dort abgeschnitten. Nutzer: `CategorySelect`
- * (`variant="field"`) und die Zuweisungen einer Vorlage.
+ * (`variant="field"`), die Zuweisungen einer Vorlage und die Übersicht der
+ * Standardvorlagen.
  */
 export default function FieldDropdown<T extends string>({ value, options, onChange, triggerText, align }: Props<T>) {
   const current = options.find((o) => o.value === value);

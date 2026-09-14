@@ -131,6 +131,58 @@ export function withoutDefaultsFor(assignments: readonly TemplateAssignment[], k
   return assignments.map((a) => (a.isDefault && keys.has(assignmentKey(a.entryType, a.category)) ? { ...a, isDefault: false } : a));
 }
 
+/** Die Zuweisungen mit Stern für diese Kombination — die Zuweisung kommt dazu, wenn sie fehlt. */
+export function withDefaultAt(
+  assignments: readonly TemplateAssignment[],
+  entryType: TemplateEntryType,
+  category: string | null,
+): TemplateAssignment[] {
+  const key = assignmentKey(entryType, category);
+  const has = assignments.some((a) => assignmentKey(a.entryType, a.category) === key);
+  return has
+    ? assignments.map((a) => (assignmentKey(a.entryType, a.category) === key ? { ...a, isDefault: true } : a))
+    : [...assignments, { entryType, category, isDefault: true }];
+}
+
+/**
+ * Die Änderungen einer Bearbeitung (`base` → `draft`) auf den aktuellen Stand
+ * gelegt: hinzugefügte und entfernte Kombinationen, gesetzte und genommene
+ * Sterne. Was inzwischen anderswo geschah — ein Stern aus der Übersicht, eine
+ * gelöschte Kategorie —, bleibt, soweit die Bearbeitung es nicht selbst
+ * angefasst hat.
+ */
+export function mergeAssignmentChanges(
+  base: readonly TemplateAssignment[],
+  draft: readonly TemplateAssignment[],
+  current: readonly TemplateAssignment[],
+): TemplateAssignment[] {
+  const keyOf = (a: TemplateAssignment) => assignmentKey(a.entryType, a.category);
+  const baseByKey = new Map(base.map((a) => [keyOf(a), a]));
+  const draftByKey = new Map(draft.map((a) => [keyOf(a), a]));
+  const result = new Map(current.map((a) => [keyOf(a), a]));
+  for (const key of baseByKey.keys()) {
+    if (!draftByKey.has(key)) result.delete(key);
+  }
+  for (const [key, a] of draftByKey) {
+    const before = baseByKey.get(key);
+    if (!before) {
+      result.set(key, a);
+    } else if (before.isDefault !== a.isDefault && result.has(key)) {
+      result.set(key, { ...result.get(key)!, isDefault: a.isDefault });
+    }
+  }
+  return [...result.values()];
+}
+
+/** Die Vorlage, die genau diese Kombination als Standard hält — ohne Rückfall. */
+export function defaultTemplateAt(
+  templates: readonly Template[],
+  entryType: TemplateEntryType,
+  category: string | null,
+): Template | undefined {
+  return templates.find((t) => t.assignments.some((a) => a.isDefault && matches(a, entryType, category)));
+}
+
 function matches(a: TemplateAssignment, entryType: TemplateEntryType, category: string | null): boolean {
   return a.entryType === entryType && a.category === category;
 }
@@ -148,7 +200,7 @@ export function resolveDefaultTemplate(
 ): Template | null {
   const levels = entryType === 'journal' ? [ALL_CATEGORIES] : [categoryId, ALL_CATEGORIES];
   for (const category of levels) {
-    const hit = templates.find((t) => t.assignments.some((a) => a.isDefault && matches(a, entryType, category)));
+    const hit = defaultTemplateAt(templates, entryType, category);
     if (hit) return hit;
   }
   return null;

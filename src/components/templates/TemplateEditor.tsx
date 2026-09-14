@@ -15,7 +15,7 @@ import type { EntryContentRow } from '../../store/blockCopies';
 import { useDraftPage } from '../../hooks/useDraftPage';
 import { useShrunkIcon } from '../../hooks/useShrunkIcon';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
-import { DEFAULT_TEMPLATE_ICON, type Template } from '../../lib/blocks/templates';
+import { DEFAULT_TEMPLATE_ICON, mergeAssignmentChanges, type Template } from '../../lib/blocks/templates';
 
 const draftOf = (d: TemplateDraft): TemplateDraft => ({
   name: d.name, icon: d.icon, description: d.description, title: d.title,
@@ -48,7 +48,10 @@ export default function TemplateEditor({ template, entries, onClose, onDelete }:
     store: useTemplateDraftStore,
     id: template.id,
     saved: draftOf(template),
-    save: updateTemplate,
+    // Zuweisungen als Änderung auf den aktuellen Stand — die Übersicht kann inzwischen Sterne gesetzt haben.
+    save: (id, patch, base) => updateTemplate(id, patch.assignments
+      ? { ...patch, assignments: mergeAssignmentChanges(base.assignments, patch.assignments, useTemplateStore.getState().templates.find((t) => t.id === id)?.assignments ?? []) }
+      : patch),
     onClose,
     logTag: 'TemplateEditor',
   });

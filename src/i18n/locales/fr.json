@@ -791,6 +791,13 @@
     "moreEntries_other": "et {{count}} autres",
     "copiesNote": "Chaque entrée reçoit sa propre copie. Les modifications du modèle valent pour les nouvelles entrées – les existantes restent telles quelles.",
     "entryCount": "{{count}} entrée",
-    "entryCount_other": "{{count}} entrées"
+    "entryCount_other": "{{count}} entrées",
+    "overview": {
+      "title": "Modèles par défaut",
+      "hint": "Ce avec quoi commencent les nouvelles entrées. Une catégorie sans modèle par défaut propre utilise celui de « Toutes les catégories ».",
+      "none": "Aucun modèle par défaut",
+      "fallback": "Sinon : {{name}} (toutes les catégories)",
+      "everyEntry": "Chaque nouvelle entrée"
+    }
   }
 }

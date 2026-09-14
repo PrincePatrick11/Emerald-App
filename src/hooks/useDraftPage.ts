@@ -6,8 +6,8 @@ interface Options<T extends { name: string }> {
   id: string;
   /** Der gespeicherte Stand, auf die Felder des Entwurfs gebracht. */
   saved: T;
-  /** Speichert die geänderten Felder — genau die, sonst nichts. */
-  save: (id: string, patch: Partial<T>) => Promise<unknown>;
+  /** Speichert die geänderten Felder — genau die, sonst nichts. `base` ist der Stand beim Öffnen. */
+  save: (id: string, patch: Partial<T>, base: T) => Promise<unknown>;
   /** Zurück zur Liste. */
   onClose: () => void;
   logTag: string;
@@ -56,7 +56,7 @@ export function useDraftPage<T extends { name: string }>({ store, id, saved, sav
       if (dirty) {
         const changes: Partial<T> = {};
         for (const key of changed) changes[key] = draft[key];
-        await save(id, changes);
+        await save(id, changes, base);
       }
     } catch (err) {
       // Auf der Seite bleiben: der Entwurf ist nicht gespeichert.

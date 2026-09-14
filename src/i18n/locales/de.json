@@ -791,6 +791,13 @@
     "moreEntries_other": "und {{count}} weitere",
     "copiesNote": "Jeder Eintrag bekommt eine Kopie. Änderungen an der Vorlage gelten für neue Einträge – bestehende bleiben, wie sie sind.",
     "entryCount": "{{count}} Eintrag",
-    "entryCount_other": "{{count}} Einträge"
+    "entryCount_other": "{{count}} Einträge",
+    "overview": {
+      "title": "Standardvorlagen",
+      "hint": "Womit neue Einträge beginnen. Hat eine Kategorie keinen eigenen Standard, greift der für „Alle Kategorien“.",
+      "none": "Kein Standard",
+      "fallback": "Sonst: {{name}} (alle Kategorien)",
+      "everyEntry": "Jeder neue Eintrag"
+    }
   }
 }
