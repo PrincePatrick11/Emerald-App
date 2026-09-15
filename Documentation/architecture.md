@@ -962,7 +962,7 @@ The schema itself lives in `src/lib/schema.ts`, not in `db.ts`: fresh vaults exe
 
 Two deliberate exceptions to "the store holds the whole row":
 
-- **Sigil drawings are files, not columns.** Until v42 `operations.drawing_data` held every sigil drawing as base64 — by far the widest column — which forced a lazy-loading dance (`ensureDrawingLoaded`, `preserveLoadedDrawings`, a separate `thumbnail_data`). Since v42 the drawing is an image file referenced from the canvas block's `<img src>`, so the operation list query (`OPERATION_COLUMNS`) carries only small columns, and list cards show the image lazily through `imageSrc` (`entryBlockSummary(...).sigil.image`).
+- **Sigil drawings are files, not columns.** Until v42 `operations.drawing_data` held every sigil drawing as base64 — by far the widest column — which forced a lazy-loading dance (`ensureDrawingLoaded`, `preserveLoadedDrawings`, a separate `thumbnail_data`). Since v42 the drawing is an image file referenced from the canvas block's `<img src>`, so the operation list query (`OPERATION_COLUMNS`) carries only small columns. `entryBlockSummary(...).sigil.image` still resolves the filename of the first visible, unconcealed drawing, but the Operations dashboard's cards no longer render it — a sigil operation's card looks like any other operation's card now (icon, title, "Category · date"); only the list (row) layout still reads `.sigil` off the summary, for the target date shown there.
 - **`altar_placements` load in one query.** `fetchAltars` selects the whole table once and groups rows by `altar_id` in JS (`mapPlacementRows` + a `Map` over items); it used to run one query per altar on every startup and every AltarView mount.
 
 ### Store write serialization
