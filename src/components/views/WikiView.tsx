@@ -54,10 +54,8 @@ export default function WikiView() {
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
   const { isCollapsed: isCatCollapsed, toggle: toggleCatCollapse } = useCollapsedSet('wiki');
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [coverImage, setCoverImage] = useState<string | null>(null);
-  const [icon, setIcon] = useState<string | null>(null);
   const [loadedArticleId, setLoadedArticleId] = useState<string | null>(null);
 
   const [editorEpoch, setEditorEpoch] = useState(0);
@@ -66,9 +64,12 @@ export default function WikiView() {
     entityId: article?.id,
     isEditing,
     ready: !!article && loadedArticleId === article.id,
-    buildPatch: (content) => ({ title, content, category_id: category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined }),
-    // Kategorie, Tags, Cover, Icon gehören dem Properties-Panel (sofort
-    // gespeichert) — Cancel setzt nur zurück, was der Editor selbst besitzt.
+    // Kategorie, Cover und Icon gehören dem Properties-Panel (sofort
+    // gespeichert) und stehen deshalb nicht im Patch: ein Autosave direkt nach
+    // einer Panel-Änderung (etwa die Standardvorlage der neuen Kategorie)
+    // schriebe sonst den lokalen Stand zurück, bevor der Sync-Effekt lief.
+    buildPatch: (content) => ({ title, content, tags }),
+    // Cancel setzt nur zurück, was der Editor selbst besitzt.
     buildRestorePatch: (content) => ({ title, content }),
     update: updateArticle,
   });
@@ -77,10 +78,8 @@ export default function WikiView() {
     if (article) {
       setTitle(article.title);
       contentRef.current = article.content;
-      setCategory(article.category_id);
       setTags(article.tags ?? []);
       setCoverImage(article.cover_image ?? null);
-      setIcon(article.icon ?? null);
       setLoadedArticleId(article.id);
     } else {
       setLoadedArticleId(null);
@@ -91,11 +90,9 @@ export default function WikiView() {
   useEffect(() => {
     if (article) {
       setTags(article.tags ?? []);
-      setCategory(article.category_id);
       setCoverImage(article.cover_image ?? null);
-      setIcon(article.icon ?? null);
     }
-  }, [article?.tags, article?.category_id, article?.cover_image, article?.icon]);
+  }, [article?.tags, article?.cover_image]);
 
   // Titel ebenso: ein Rename aus der Sidebar bei offenem Edit-Modus wuerde
   // sonst vom naechsten Autosave zurueckgedreht.
@@ -106,7 +103,7 @@ export default function WikiView() {
   const handleDone = async () => {
     if (!article) return;
     cancelAutoSave();
-    await updateArticle(article.id, { title, content: contentRef.current, category_id: category, tags, cover_image: coverImage ?? undefined, icon: icon ?? undefined });
+    await updateArticle(article.id, { title, content: contentRef.current, tags });
     setActiveView({ type: 'wiki', id: article.id, mode: 'view' });
   };
 
@@ -125,10 +122,8 @@ export default function WikiView() {
       // Sync-Effekte laufen nicht). Panel-Felder bleiben Store-Wahrheit.
       const from = (await restoreOnCancel()) ?? { title: article.title, content: article.content };
       setTitle(from.title);
-      setCategory(article.category_id);
       setTags(article.tags ?? []);
       setCoverImage(article.cover_image ?? null);
-      setIcon(article.icon ?? null);
       contentRef.current = from.content;
       setEditorEpoch((e) => e + 1);
     }
@@ -366,7 +361,7 @@ export default function WikiView() {
     );
   }
 
-  const currentCat = categories.find((c) => c.id === (isEditing ? category : article.category_id));
+  const currentCat = categories.find((c) => c.id === article.category_id);
 
   return (
     <EntryDetailFrame

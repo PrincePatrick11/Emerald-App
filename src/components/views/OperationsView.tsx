@@ -54,7 +54,6 @@ export default function OperationsView() {
   const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
   const { isCollapsed: isCatCollapsed, toggle: toggleCatCollapse } = useCollapsedSet('operations');
   const [title, setTitle] = useState('');
-  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [loadedOperationId, setLoadedOperationId] = useState<string | null>(null);
 
@@ -64,9 +63,11 @@ export default function OperationsView() {
     entityId: operation?.id,
     isEditing,
     ready: !!operation && loadedOperationId === operation.id,
-    buildPatch: (content) => ({ title, content, category_id: categoryId, tags }),
-    // Kategorie und Tags gehören dem Properties-Panel
-    // (sofort gespeichert) — Cancel setzt nur zurück, was der Editor besitzt.
+    // Die Kategorie gehört dem Properties-Panel (sofort gespeichert) und steht
+    // deshalb nicht im Patch: ein Autosave direkt nach dem Wechsel (etwa die
+    // Standardvorlage der neuen Kategorie) schriebe sonst den alten Stand zurück.
+    buildPatch: (content) => ({ title, content, tags }),
+    // Cancel setzt nur zurück, was der Editor besitzt.
     buildRestorePatch: (content) => ({ title, content }),
     update: updateOperation,
   });
@@ -75,7 +76,6 @@ export default function OperationsView() {
     if (operation) {
       setTitle(operation.title);
       contentRef.current = operation.content;
-      setCategoryId(operation.category_id);
       setTags(operation.tags ?? []);
       setLoadedOperationId(operation.id);
     } else {
@@ -87,9 +87,8 @@ export default function OperationsView() {
   useEffect(() => {
     if (operation) {
       setTags(operation.tags ?? []);
-      setCategoryId(operation.category_id);
     }
-  }, [operation?.tags, operation?.category_id]);
+  }, [operation?.tags]);
 
   // Titel ebenso: ein Rename aus der Sidebar bei offenem Edit-Modus wuerde
   // sonst vom naechsten Autosave zurueckgedreht.
@@ -137,7 +136,7 @@ export default function OperationsView() {
   const handleDone = async () => {
     if (!operation) return;
     cancelAutoSave();
-    await updateOperation(operation.id, { title, content: contentRef.current, category_id: categoryId, tags });
+    await updateOperation(operation.id, { title, content: contentRef.current, tags });
     setActiveView({ type: 'operations', id: operation.id, mode: 'view' });
   };
 
@@ -156,7 +155,6 @@ export default function OperationsView() {
       // Sync-Effekte laufen nicht). Panel-Felder bleiben Store-Wahrheit.
       const from = (await restoreOnCancel()) ?? { title: operation.title, content: operation.content };
       setTitle(from.title);
-      setCategoryId(operation.category_id);
       setTags(operation.tags ?? []);
       contentRef.current = from.content;
       setEditorEpoch((e) => e + 1);
@@ -415,7 +413,7 @@ export default function OperationsView() {
     );
   }
 
-  const currentCat = getCatById(isEditing ? categoryId : operation.category_id);
+  const currentCat = getCatById(operation.category_id);
   const operationIcon = operation.icon || currentCat?.emoji || '⚡';
 
   return (
