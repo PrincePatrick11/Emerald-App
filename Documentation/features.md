@@ -206,6 +206,7 @@ You can:
 - Close a tab with middle-click on the tab itself.
 - Create a new empty tab from the tab bar.
 - Reopen the app and continue with the previously open tabs in the same order.
+- Use Back/Forward independently in each tab — every tab keeps its own navigation history, not one shared history for the whole window.
 
 Tab reordering uses Framer Motion's `Reorder.Group` / `Reorder.Item` for drag interactions and animated layout transitions. The resulting order is persisted in `localStorage` as part of the `open-tabs` payload.
 

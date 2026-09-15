@@ -266,11 +266,12 @@ Unlike earlier versions, the Properties panel itself is now gated by the entry's
 `ActiveView.isNew` marks an entry that was just created by a "New" action (Journal, Wiki,
 Operations, Altar — every handler that calls `setActiveView({ ..., mode: 'edit' })` for a
 freshly created row sets it) and never confirmed with Done. It is a session-only flag,
-deliberately kept out of persisted state: `uiStore`'s `normalizeSavedTab` strips it when
-restoring tabs from localStorage, and `withNavigationState` strips it before pushing onto the
-back/forward history — both for the same reason, so that returning to the entry later (a
-restart, or Back) can never make Cancel treat an entry that has lived past its creation
-session as still-discardable. When Cancel fires on a still-`isNew` entry, `discardNewEntry`
+deliberately kept out of persisted state: `stripSessionFlags` (`src/lib/tabs.ts`) drops it
+before a view is written into any history — `normalizeSavedTab` uses it when restoring tabs
+from localStorage, and `pushHistory`/`normalizeSavedHistory` use it whenever a view is pushed
+onto a tab's own back/forward history (see [Navigation History](#navigation-history) below) —
+all for the same reason, so that returning to the entry later (a restart, or Back) can never
+make Cancel treat an entry that has lived past its creation session as still-discardable. When Cancel fires on a still-`isNew` entry, `discardNewEntry`
 (`src/lib/discardNewEntry.ts`) soft-deletes then immediately hard-deletes it — no trash, no
 undo, since from the user's perspective the entry was never created. Altar has no soft-delete
 of its own, so `AltarView`'s Cancel path calls `deleteAltar` directly instead of going through
@@ -874,7 +875,8 @@ Emerald uses browser-like tabs to keep multiple pieces of content open at the sa
 - `activeTabId` stores which tab is currently selected.
 - Each tab contains an `ActiveView`, so a tab can represent a journal entry, wiki article, operation, altar, or a top-level view.
 
-Tab IDs and `isContentView` live in `src/lib/tabs.ts`. `viewTypeForEntryType()` — the one place that translates the data model's `operation` (singular — what `links.target_type`, the drag payload, and the internal-link mark all carry) into `ActiveView`'s `operations` (plural, named after the module rather than the record) — now lives in `src/lib/modules.ts` as part of the module registry (see [Module Registry](#module-registry) above), a reverse lookup over `MODULES` rather than its own mapping. The mapping used to be copied at each call site; `RichEditor.tsx`, `BacklinksPanel.tsx`, `HomeView.tsx`, `TasksView.tsx`, and `globalSearch.ts` (see [Global Search](#global-search) below) now call the shared function instead.
+Tab IDs, `isContentView`, and the per-tab navigation-history helpers (see [Navigation
+History](#navigation-history) below) live in `src/lib/tabs.ts`. `viewTypeForEntryType()` — the one place that translates the data model's `operation` (singular — what `links.target_type`, the drag payload, and the internal-link mark all carry) into `ActiveView`'s `operations` (plural, named after the module rather than the record) — now lives in `src/lib/modules.ts` as part of the module registry (see [Module Registry](#module-registry) above), a reverse lookup over `MODULES` rather than its own mapping. The mapping used to be copied at each call site; `RichEditor.tsx`, `BacklinksPanel.tsx`, `HomeView.tsx`, `TasksView.tsx`, and `globalSearch.ts` (see [Global Search](#global-search) below) now call the shared function instead.
 
 Tabs are persisted in `localStorage` using:
 
@@ -883,7 +885,9 @@ Tabs are persisted in `localStorage` using:
 
 This keeps the user's workspace available after restarting the app without adding database tables or migrations.
 
-**Vault switches and a Replace-mode `.emeralddb` import reset the whole workspace, not just the active tab.** `closeAllTabs()` in `uiStore` clears `tabs`, `activeTabId`, `history`, and `historyIndex` back to a single Home entry and persists the empty tab list (`saveTabs([], null)`) — every open tab and both directions of history carry row ids from the vault (or the pre-import data) that no longer exists. A Merge import does not call it: merge only adds rows, so the ids behind existing tabs stay valid. Tabs are closed rather than remembered per vault — nothing keeps a vault's own tab set around to restore when switching back to it. `openActiveVault()` in `vaultStore.ts` calls `closeAllTabs()` on `switchVault` and when the active vault is deleted, but not on the app's own startup path, so restoring the previous session's tabs on relaunch (above) is unaffected.
+**Vault switches and a Replace-mode `.emeralddb` import reset the whole workspace, not just the active tab.** `closeAllTabs()` in `uiStore` clears `tabs` and `activeTabId`, and resets `tablessHistory` to a fresh Home history, persisting the empty tab list (`saveTabs([], null)`) — every open tab (and, with it, its own back/forward history) carries row ids from the vault (or the pre-import data) that no longer exists. A Merge import does not call it: merge only adds rows, so the ids behind existing tabs stay valid. Tabs are closed rather than remembered per vault — nothing keeps a vault's own tab set around to restore when switching back to it. `openActiveVault()` in `vaultStore.ts` calls `closeAllTabs()` on `switchVault` and when the active vault is deleted, but not on the app's own startup path, so restoring the previous session's tabs on relaunch (above) is unaffected.
+
+Each tab's title and icon are rendered by a per-tab `TabButton` (`TabBar.tsx`) that selects its own entity directly out of the relevant store (`s.entries.find((e) => e.id === id)`, and so on for articles/operations/tasks/altars/block definitions/templates) rather than through a store's stable getter function (`getEntry`, `getArticle`, …). A stable getter's own identity never changes, so subscribing to it alone doesn't cause a re-render when the entry it reads changes — a rename only reached the tab bar once something else forced the whole bar to re-render. Selecting the object itself re-renders only that `TabButton` when its entity changes, so a rename shows up in the tab immediately.
 
 Tab reordering is implemented in `src/components/layout/TabBar.tsx` with Framer Motion (`LazyMotion`, `Reorder.Group`, `Reorder.Item`). `Reorder.Group` emits the reordered tab ID list via `onReorder`, and `uiStore.setTabsOrder(ids)` validates the payload (length and uniqueness) before rebuilding the tab array and saving it through `saveTabs(...)`. Because `saveTabs` writes the full `tabs` array to `open-tabs`, tab order persists across restarts.
 
@@ -902,7 +906,16 @@ This means users can keep several entries open while still using back/forward na
 
 ### Navigation History
 
-`uiStore` maintains a `history` array and `historyIndex`. `setActiveView` pushes a new entry only when the type or id changes — switching between read and edit mode for the same entry is not recorded as a new step. Mouse back/forward buttons are handled by a macOS NSEvent local monitor in `lib.rs` that emits `navigate-back` and `navigate-forward` Tauri events; `AppShell` listens for these and calls `uiStore.navigateBack()` / `navigateForward()`.
+Each tab carries its own back/forward history — there is no single history for the whole window. `OpenTab.history` (`NavHistory`, `src/lib/tabs.ts`) is `{ views, index }`; the helpers that build and update it live there too:
+
+- `pushHistory(history, view)` appends `view` past the current index and truncates whatever was ahead of it (a step taken after going Back drops the old "future"), capped at `MAX_HISTORY_LENGTH` (50) steps. Pushing the same page — same `type` and `id`, e.g. switching a tab between read and edit mode — is not recorded as a new step.
+- `stripSessionFlags(view)` drops `isNew` (see [Cancel](#cancel-discarding-new-entries-and-reverting-autosaved-edits) above) before a view enters any history.
+- `freshHistory(view)` starts a new one-entry history at `view` — used for a brand-new tab (`addTab`, `openViewInNewTab`) and whenever a tab's history can no longer be trusted (vault switch, invalid saved data).
+- `normalizeSavedHistory(raw, view)` restores a tab's history from `localStorage`; a missing/malformed shape, a view type no longer recognized (`isViewId`), or an index that ends up out of range after filtering falls back to `freshHistory` ending at the tab's current view.
+
+`uiStore.tablessHistory` holds the history used while no tab is open (e.g. before anything has been opened yet); `selectActiveHistory(state)` returns the active tab's `history`, or `tablessHistory` when `activeTabId` is null — every place that reads "the current history" (`TitleBar`'s Back/Forward buttons, `navigateBack`/`navigateForward`) goes through this selector rather than reading a field directly. `setActiveView` pushes onto whichever history is active via `pushHistory`; selecting a different tab is *not* a navigation step, since it only changes which tab's history is active, not the history itself. The tab that gets auto-created when a content view opens with no tabs yet inherits `tablessHistory` (via `pushHistory`) rather than starting fresh, so Back from it returns to wherever the view was opened from; `tablessHistory` itself then resets to a fresh Home history. Closing a tab drops its history with it (see above); closing the last tab, `closeAllTabs()`, and a vault switch all reset `tablessHistory` to fresh Home.
+
+`navigateBack`/`navigateForward` both go through `stepHistory(state, delta)`, which moves the active history's index, and — when a tab is active — writes the stepped view back into that tab and persists it via `saveTabs`. Mouse back/forward buttons are handled by a macOS NSEvent local monitor in `lib.rs` that emits `navigate-back` and `navigate-forward` Tauri events; `AppShell` listens for these and calls `uiStore.navigateBack()` / `navigateForward()`. History is persisted together with the tabs (`open-tabs` in `localStorage`), so it survives a restart.
 
 ### Left Sidebar (Rail + Entry List)
 
