@@ -756,6 +756,7 @@ pub fn run() {
             vault::legacy_default_db_exists,
             vault::migrate_vault_layout,
             vault::delete_vault_files,
+            vault::discard_import_staging,
             export_image,
             write_file,
             read_file,

@@ -51,6 +51,7 @@ import { useUIStore } from '../store/uiStore';
 import { clearAllDrafts } from '../store/draftStore';
 import { resumeEditorSaves, suspendEditorSaves } from './editorLock';
 import { drainSerialized } from './serialize';
+import { importViaStaging } from './importStaging';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public types
@@ -1035,11 +1036,10 @@ function remapCategoryIds(rows: Row[], map: Map<string, string>): Row[] {
  * Prüft, ob jede Kategorie-Referenz der Nutzlast auflösbar ist — entweder aus
  * der Sicherung selbst oder aus dem Bestand des Ziel-Vaults.
  *
- * Muss **vor** dem ersten DELETE laufen. `doReplace` leert den Vault, bevor es
- * einfügt, und eine Transaktion steht hier nicht zur Verfügung (siehe
- * `normalizeSchema.ts`). Ohne diese Vorprüfung würde eine Sicherung mit einer
- * unauflösbaren Kategorie erst beim INSERT am Foreign Key scheitern — mit
- * bereits geleertem Vault und ohne Weg zurück.
+ * Läuft **vor** dem ersten DELETE. Ohne diese Vorprüfung würde eine Sicherung
+ * mit einer unauflösbaren Kategorie erst beim INSERT am Foreign Key scheitern —
+ * der Vault bliebe dank der Arbeitskopie (`importStaging.ts`) zwar unberührt,
+ * aber die Meldung sagte nicht, welche Kategorie fehlt.
  */
 export async function assertPayloadReferencesResolve(
   db: Awaited<ReturnType<typeof getDb>>,
@@ -1137,8 +1137,8 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   const tasks = remapCategoryIds(d.tasks ?? [], catMap);
 
   // Eigene Blöcke wie Kategorien: nie gelöscht, Fehlendes nach ID ergänzt,
-  // Vorhandenes bleibt. VOR dem ersten DELETE — scheitert hier etwas an einer
-  // präparierten Datei, ist noch nichts verloren (keine Transaktion, s. o.).
+  // Vorhandenes bleibt. `db` ist hier die Arbeitskopie (`importViaStaging`):
+  // scheitert irgendetwas bis zum Ende, bleibt der Vault, wie er war.
   await insertBlockDefinitions(db, await withStatusDefinition(
     db, remapDefinitionRows(d.blockDefinitions, pathMap), replaceOps.definition, replaceStatus,
   ));
@@ -1191,10 +1191,10 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   await insertRows(db, 'altars', altars);
   // OR IGNORE, wenn oben nicht geleert wurde: die Datei kann eine Bibliothek
   // ohne Altäre tragen (Datumsfilter, oder ein Vault, der nur Elemente hat),
-  // und ein blanker INSERT liefe dann in den Primärschlüssel — mitten in
-  // einem Restore, der schon gelöscht hat und keine Transaktion kennt. Der
-  // Preis: eine in der Datei geänderte Fassung eines vorhandenen Elements
-  // bleibt in diesem einen Fall außen vor.
+  // und ein blanker INSERT liefe dann in den Primärschlüssel — und damit
+  // brächte jede solche Datei den ganzen Restore zum Scheitern. Der Preis:
+  // eine in der Datei geänderte Fassung eines vorhandenen Elements bleibt in
+  // diesem einen Fall außen vor.
   const keepExistingLibrary = !hasAltars;
   await insertRows(db, 'altar_items', altarItems, keepExistingLibrary);
   if (d.altarPlacements) await insertRows(db, 'altar_placements', d.altarPlacements);
@@ -1219,7 +1219,7 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   const d = await withRoutinesAsTemplates(db, applyCategoryFilters(backup.data, filters));
 
   // Merge loescht zwar nichts, bricht aber mitten im Einfuegen ab, wenn eine
-  // Kategorie fehlt — und lässt dann halb importierte Daten zurück.
+  // Kategorie fehlt — vorher pruefen, damit die Meldung sagt, welche.
   await assertPayloadReferencesResolve(db, d);
   const catMap = await resolveImportedCategories(db, usedCategoryRows(d));
 
@@ -1417,18 +1417,18 @@ export async function importDatabase(
 ): Promise<void> {
   const filters: ImportCategoryFilters = categoryFilters ?? { excludedCategoryIds: new Set<string>() };
 
-  // replace behaelt die Original-IDs und add-vault wechselt den Vault: ein
-  // offener Editor, den die Navigation dabei unmountet, wuerde seinen
-  // VOR-Import-Stand ueber die frisch importierten Zeilen speichern. Fuer die
-  // Dauer des Imports sind die automatischen Editor-Saves deshalb gesperrt;
-  // merge vergibt neue IDs und braucht das nicht.
-  const suspendSaves = mode !== 'merge';
-  if (suspendSaves) suspendEditorSaves();
+  // Fuer die Dauer des Imports sind die automatischen Editor-Saves gesperrt,
+  // in allen drei Modi. replace behaelt die Original-IDs und add-vault wechselt
+  // den Vault: ein offener Editor, den die Navigation dabei unmountet, wuerde
+  // seinen VOR-Import-Stand ueber die frisch importierten Zeilen speichern.
+  // Und jeder Modus tauscht am Ende die Arbeitskopie ein (`importStaging.ts`) —
+  // was zwischen Kopie und Austausch im Vault gespeichert wird, ginge verloren.
+  suspendEditorSaves();
   try {
 
   // Die Sperre stoppt nur künftige Saves — bereits eingereihte Store-Writes
-  // erst zu Ende laufen lassen, bevor replace/add-vault die Zeilen austauscht.
-  if (suspendSaves) await drainSerialized();
+  // erst zu Ende laufen lassen, bevor die Arbeitskopie gezogen wird.
+  await drainSerialized();
 
   // Apply type-level filtering first, then subcategory filtering
   const filteredBackup: BackupFile = {
@@ -1460,17 +1460,18 @@ export async function importDatabase(
     // Zeile die mitgebrachte samt ihrem Stern.
     const types = typeFilters ?? ALL_TYPES_INCLUDED;
     const bringsTemplates = (backup.sourceVersion ?? Number(BACKUP_VERSION)) >= 8 && Array.isArray(backup.data.templates);
-    if (bringsTemplates && (types.includeJournal || types.includeWiki || types.includeOperations)) {
-      await db.execute('DELETE FROM templates WHERE id=$1', [SIGIL_TEMPLATE_ID]);
-    }
-    await doReplace(db, filteredBackup, filters);
+    // Über die Arbeitskopie wie beim Ersetzen: ein Abbruch lässt den neuen Vault leer statt halb gefüllt.
+    await importViaStaging(db, async (staging) => {
+      if (bringsTemplates && (types.includeJournal || types.includeWiki || types.includeOperations)) {
+        await staging.execute('DELETE FROM templates WHERE id=$1', [SIGIL_TEMPLATE_ID]);
+      }
+      await doReplace(staging, filteredBackup, filters);
+    });
   } else {
-    const db = await getDb();
-    if (mode === 'replace') {
-      await doReplace(db, filteredBackup, filters);
-    } else {
-      await doMerge(db, filteredBackup, filters);
-    }
+    // Nie direkt gegen den Vault: `doReplace` löscht, bevor es einfügt, und
+    // ein abgebrochener Merge ließe halb importierte Daten zurück (siehe `importStaging.ts`).
+    const run = mode === 'replace' ? doReplace : doMerge;
+    await importViaStaging(await getDb(), (staging) => run(staging, filteredBackup, filters));
   }
 
   // Reload all store data from the (now modified) active vault
@@ -1493,7 +1494,7 @@ export async function importDatabase(
 
   await reloadAllStores();
   } finally {
-    if (suspendSaves) resumeEditorSaves();
+    resumeEditorSaves();
   }
 }
 

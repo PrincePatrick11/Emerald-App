@@ -22,6 +22,8 @@ use std::sync::Mutex;
 use tauri::Manager;
 
 pub const DB_FILE: &str = "emerald.db";
+/// The copy a backup import fills before it swaps it in, next to [`DB_FILE`].
+pub const IMPORT_STAGING_FILE: &str = "emerald.db.import";
 pub const IMAGES_SUBDIR: &str = "images";
 /// Where a vault migrated from the pre-0.2.1 layout lives: `{appDataDir}/vaults/`.
 pub const VAULTS_SUBDIR: &str = "vaults";
@@ -798,6 +800,27 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
     std::fs::remove_dir(dir.join(BACKUP_SUBDIR)).ok();
 
     Ok(std::fs::remove_dir(&dir).is_ok())
+}
+
+/// Entfernt die Arbeitskopie eines Backup-Imports (`importStaging.ts`) samt
+/// Journal. Fehlt sie, ist das kein Fehler — vor jedem Import wird aufgeräumt,
+/// was ein abgestürzter Lauf liegen ließ, und meist liegt da nichts.
+///
+/// Der Dateiname ist fest: der Befehl kann nichts anderes löschen als diese
+/// Kopie im registrierten Vault-Ordner.
+#[tauri::command]
+pub fn discard_import_staging(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
+    let dir = vault_dir(&app, &vault_id)?;
+    for suffix in ["", "-journal", "-wal", "-shm"] {
+        let file = dir.join(format!("{IMPORT_STAGING_FILE}{suffix}"));
+        match std::fs::remove_file(&file) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+                return Err(format!("remove {}: {e}", file.display()));
+            }
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

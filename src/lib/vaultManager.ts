@@ -33,6 +33,8 @@ interface LegacyVault {
 
 /** Mirrors `DB_FILE` in `src-tauri/src/vault.rs`. */
 export const DB_FILE = 'emerald.db';
+/** Mirrors `IMPORT_STAGING_FILE` in `src-tauri/src/vault.rs`. */
+export const IMPORT_STAGING_FILE = 'emerald.db.import';
 
 export interface VaultProbe {
   exists: boolean;
@@ -329,10 +331,19 @@ export async function getActiveDbFile(): Promise<string> {
  * Kodiert wird deshalb hier, dekodiert von sqlx.
  */
 export async function getActiveDbConnectionString(): Promise<string> {
-  const file = await getActiveDbFile();
+  return sqliteConnectionString(await getActiveDbFile());
+}
+
+/** Ein beliebiger Datenbankpfad als `sqlite:`-Connection-String, kodiert wie oben. */
+export function sqliteConnectionString(file: string): string {
   // `%` zuerst, sonst kodiert der naechste Schritt die eigene Kodierung mit.
   const encoded = file.replace(/%/g, '%25').replace(/\?/g, '%3F').replace(/#/g, '%23');
   return `sqlite:${encoded}`;
+}
+
+/** Die Arbeitskopie eines Backup-Imports im aktiven Vault (`importStaging.ts`). */
+export async function getActiveImportStagingFile(): Promise<string> {
+  return joinPath(await getActiveVaultPath(), IMPORT_STAGING_FILE);
 }
 
 export async function getActiveVaultId(): Promise<string> {
