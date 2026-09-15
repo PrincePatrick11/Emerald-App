@@ -4,6 +4,7 @@ import { useWikiStore } from '../../../store/wikiStore';
 import { useCategoryStore } from '../../../store/categoryStore';
 import TagsField from '../fields/TagsField';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
+import EntryTypeField from '../fields/EntryTypeField';
 import PropertiesEditView from '../fields/PropertiesEditView';
 import PropertiesReadView from '../fields/PropertiesReadView';
 import { PropertySummaryRow } from '../fields/PropertySummaryRow';
@@ -46,6 +47,8 @@ export default function WikiPropertiesPanel() {
 
   return (
     <PropertiesEditView>
+      <EntryTypeField id={article.id} type="wiki" properties={article} />
+
       <div>
         <p className="label-xs mb-2">{t('properties.category')}</p>
         <CategorySelect

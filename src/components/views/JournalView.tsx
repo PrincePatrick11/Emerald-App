@@ -158,7 +158,7 @@ export default function JournalView() {
     setActiveView({ type: 'journal' });
   };
 
-  useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
+  useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete, flush: flushAutoSave });
 
   // List view
   if (!entry) {

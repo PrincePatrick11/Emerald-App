@@ -3,7 +3,7 @@ import {
   createTabId, freshHistory, isContentView, normalizeSavedHistory, pushHistory, stripSessionFlags,
   type NavHistory, type OpenTab,
 } from '../lib/tabs';
-import { isLibraryView, isViewId, moduleMeta, type LeftListTabId } from '../lib/modules';
+import { isLibraryView, isViewId, moduleMeta, type EntryModuleId, type LeftListTabId } from '../lib/modules';
 import { normalizeEditorFontId, normalizeThemeId, normalizeUIFontId } from '../themes/theme';
 import type { ActiveView } from '../types';
 
@@ -44,6 +44,9 @@ export interface EditActions {
   onSave: () => void;
   onCancel: () => void;
   onDelete?: () => void;
+  /** Den aufgeschobenen Autosave sofort schreiben — für Aktionen der
+   *  Seitenleiste, die danach den Store-Stand des Eintrags lesen (Typwechsel). */
+  flush?: () => Promise<void>;
 }
 
 interface UIState {
@@ -113,6 +116,9 @@ interface UIState {
   /** Legt die ids ins Set eines Scopes — das Gegenstück zu removeCollapsedGroups. */
   addCollapsedGroups: (scope: string, ids: string[]) => void;
   closeAllTabs: () => void;
+  /** Ein Eintrag hat den Typ gewechselt: jeder Tab und jeder Verlauf, der ihn
+   *  unter `from` öffnet, öffnet ihn jetzt unter `to` — dieselbe id. */
+  retypeEntryViews: (id: string, from: EntryModuleId, to: EntryModuleId) => void;
   openViewInNewTab: (view: ActiveView) => void;
   addTab: (view?: ActiveView) => void;
   selectTab: (id: string) => void;
@@ -369,6 +375,14 @@ export const useUIStore = create<UIState>((set) => ({
       // Die Klapp-Zustände zeigen per Kategorie-id in den alten Vault.
       collapsedGroups: {},
     };
+  }),
+
+  retypeEntryViews: (id, from, to) => set((s) => {
+    const retype = (view: ActiveView): ActiveView => (view.type === from && view.id === id ? { ...view, type: to } : view);
+    const retypeHistory = (history: NavHistory): NavHistory => ({ ...history, views: history.views.map(retype) });
+    const tabs = s.tabs.map((tab) => ({ ...tab, view: retype(tab.view), history: retypeHistory(tab.history) }));
+    saveTabs(tabs, s.activeTabId);
+    return { tabs, activeView: retype(s.activeView), tablessHistory: retypeHistory(s.tablessHistory) };
   }),
 
   // Ein neuer Tab beginnt mit einem frischen Verlauf.

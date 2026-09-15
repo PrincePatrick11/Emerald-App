@@ -4,6 +4,7 @@ import { useOperationStore } from '../../../store/operationStore';
 import { useCategoryStore } from '../../../store/categoryStore';
 import TagsField from '../fields/TagsField';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
+import EntryTypeField from '../fields/EntryTypeField';
 import PropertiesEditView from '../fields/PropertiesEditView';
 import PropertiesReadView from '../fields/PropertiesReadView';
 import { PropertySummaryRow } from '../fields/PropertySummaryRow';
@@ -52,6 +53,8 @@ export default function OperationPropertiesPanel() {
 
   return (
     <PropertiesEditView>
+      <EntryTypeField id={op.id} type="operation" properties={op} />
+
       <div>
         <p className="label-xs mb-2">{t('properties.category')}</p>
         <CategorySelect

@@ -170,7 +170,7 @@ export default function OperationsView() {
     setActiveView({ type: 'operations' });
   };
 
-  useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
+  useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete, flush: flushAutoSave });
 
   const getCatById = (id: string | null) => (id ? categories.find((c) => c.id === id) : undefined);
 

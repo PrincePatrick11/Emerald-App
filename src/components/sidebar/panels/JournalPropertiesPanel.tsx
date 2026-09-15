@@ -4,6 +4,7 @@ import { useUIStore } from '../../../store/uiStore';
 import { useJournalStore } from '../../../store/journalStore';
 import TagsField from '../fields/TagsField';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
+import EntryTypeField from '../fields/EntryTypeField';
 import PropertiesEditView from '../fields/PropertiesEditView';
 import PropertiesReadView from '../fields/PropertiesReadView';
 import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
@@ -49,6 +50,8 @@ export default function JournalPropertiesPanel() {
 
   return (
     <PropertiesEditView>
+      <EntryTypeField id={entry.id} type="journal" />
+
       <div>
         <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
         <LinkedEntriesField content={entry.content} legacyIds={legacyLinks} editable inputCls={inputCls} />

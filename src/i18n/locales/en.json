@@ -524,6 +524,9 @@
   },
   "properties": {
     "noEntry": "Open an entry to see its properties.",
+    "type": "Type",
+    "typeDropsProperties": "Journal entries have no category, icon or cover image — they will be removed.",
+    "changeType": "Convert",
     "category": "Category",
     "tags": "Tags",
     "none": "— None —",

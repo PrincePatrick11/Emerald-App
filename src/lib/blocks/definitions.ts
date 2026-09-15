@@ -122,7 +122,7 @@ export function definitionImageRefs(elements: readonly ElementDef[]): string[] {
 }
 
 /** Ein Link-Ziel, wie der Import es auflöst — `null` heißt: gibt es hier nicht. */
-export type LinkDefaultResolver = (target: { id: string; entryType: string; label: string }) => { id: string; label: string } | null;
+export type LinkDefaultResolver = (target: { id: string; entryType: string; label: string }) => { id: string; label: string; entryType?: string } | null;
 
 /**
  * Die `elements` einer Definitionszeile aus fremder Quelle mit umgeschriebenen
@@ -153,7 +153,7 @@ export function remapDefinitionDefaults(
         const { defaultValue: _dropped, ...rest } = el as Record<string, unknown>;
         return rest;
       }
-      return { ...el, defaultValue: { ...raw, id: target.id, label: target.label } };
+      return { ...el, defaultValue: { ...raw, id: target.id, label: target.label, ...(target.entryType ? { entryType: target.entryType } : {}) } };
     }
     return el;
   });

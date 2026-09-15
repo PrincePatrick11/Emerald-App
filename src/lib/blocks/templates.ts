@@ -357,3 +357,83 @@ export function mergeTemplateTags(tags: readonly string[], added: readonly strin
   }
   return out;
 }
+
+/** Titel und Tags eines Eintrags — was eine Vorlage außer den Blöcken berührt. */
+export interface TemplateFields {
+  title: string;
+  tags: string[];
+}
+
+/**
+ * Darf eine Vorlage den Titel setzen, ohne einen eigenen zu überschreiben?
+ * Ja, solange der Eintrag leer oder mit dem Standardtitel seiner Art heißt —
+ * oder noch den Titel der Vorlage trägt, die gerade abgelöst wird.
+ */
+export function mayTakeTemplateTitle(title: string, entryType: TemplateEntryType, replaces?: Pick<Template, 'title'>): boolean {
+  const current = title.trim();
+  return !current || current === UNTITLED_TITLES[entryType] || (!!replaces?.title.trim() && current === replaces.title.trim());
+}
+
+/**
+ * Titel und Tags mit der Vorlage: `title` setzt ihren Titel (`'ifUntitled'`
+ * nur, solange `mayTakeTemplateTitle`), `tags` ergänzt ihre Tags.
+ */
+export function fieldsWithTemplate(
+  fields: TemplateFields,
+  entryType: TemplateEntryType,
+  template: Pick<Template, 'title' | 'tags'>,
+  options: { title: boolean | 'ifUntitled'; tags: boolean; replaces?: Pick<Template, 'title'> },
+): TemplateFields {
+  const takeTitle = options.title === 'ifUntitled' ? mayTakeTemplateTitle(fields.title, entryType, options.replaces) : options.title;
+  return {
+    title: takeTitle && template.title.trim() ? template.title.trim() : fields.title,
+    tags: options.tags ? mergeTemplateTags(fields.tags, template.tags) : fields.tags,
+  };
+}
+
+/**
+ * Titel und Tags ohne die Vorlage: der Titel geht zurück auf den Standardtitel,
+ * wenn er noch der der Vorlage ist; ihre Tags fallen weg — auch einer, den der
+ * Eintrag schon vorher trug.
+ */
+export function fieldsWithoutTemplate(
+  fields: TemplateFields,
+  entryType: TemplateEntryType,
+  template: Pick<Template, 'title' | 'tags'>,
+): TemplateFields {
+  const removed = new Set(template.tags.map((tag) => tag.toLowerCase()));
+  return {
+    title: template.title.trim() && fields.title === template.title.trim() ? UNTITLED_TITLES[entryType] : fields.title,
+    tags: fields.tags.filter((tag) => !removed.has(tag.toLowerCase())),
+  };
+}
+
+/** Art und Kategorie eines Eintrags — wonach sich sein Standard richtet. */
+export interface TemplateCombination {
+  entryType: TemplateEntryType;
+  categoryId: string | null;
+}
+
+/**
+ * Wechselt ein Eintrag seine Kombination (Kategorie oder Typ): der Standard der
+ * neuen, der jetzt den Inhalt ersetzen darf — oder `null`. Er darf, wenn die
+ * Blöcke leer sind oder noch unverändert der Standard der bisherigen
+ * Kombination drinsteht (meist der Rückfall „alle Kategorien"); den liefert
+ * `replaces` mit, damit sein Titel und seine Tags weichen. Eine von Hand
+ * gewählte Vorlage oder eigene Arbeit bleibt.
+ */
+export function defaultTemplateSwap(
+  templates: readonly Template[],
+  blocks: readonly BlockInstance[],
+  from: TemplateCombination,
+  to: TemplateCombination,
+): { template: Template; replaces?: Template } | null {
+  const template = resolveDefaultTemplate(templates, to.entryType, to.categoryId);
+  if (!template) return null;
+  if (areBlocksEmpty(blocks)) return { template };
+  const replaces = resolveDefaultTemplate(templates, from.entryType, from.categoryId);
+  const origins = templateOriginsOf(blocks);
+  if (!replaces || replaces.id === template.id || origins.length !== 1 || origins[0] !== replaces.id) return null;
+  if (!isUnchangedTemplateContent(serializeBlocks([...blocks]), replaces)) return null;
+  return { template, replaces };
+}

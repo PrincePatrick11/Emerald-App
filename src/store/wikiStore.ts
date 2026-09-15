@@ -22,7 +22,7 @@ function slugify(title: string): string {
  *  the in-memory (non-deleted) article list, or a title matching a
  *  soft-deleted article's slug would still fail the UPDATE. Appends
  *  -2, -3, ... until free. */
-async function uniqueSlugify(db: Database, title: string, excludeId: string): Promise<string> {
+export async function uniqueSlugify(db: Database, title: string, excludeId: string): Promise<string> {
   const base = slugify(title);
   const rows = await db.select<{ slug: string }[]>(
     'SELECT slug FROM wiki_articles WHERE id != $1 AND (slug = $2 OR slug LIKE $3)',

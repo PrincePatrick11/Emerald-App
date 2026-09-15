@@ -43,6 +43,27 @@ export function extractInternalLinks(
   return out;
 }
 
+const ENTRY_TYPE_ATTR_RE = /\bdata-entry-type=("[^"]*"|'[^']*')/i;
+
+/**
+ * Setzt die Art aller Chips, die auf `id` zeigen, auf `entryType` — für einen
+ * Eintrag, der seinen Typ gewechselt hat (`lib/entryTypeChange.ts`). Die ID
+ * bleibt dabei dieselbe, also genügt das eine Attribut.
+ *
+ * Bewusst über den Start-Tag wie `extractInternalLinks` statt über
+ * `remapInternalLinks`: das hier läuft über gespeicherte Inhalte des ganzen
+ * Vaults, und ein DOM-Durchlauf serialisierte jeden davon neu — hier ändert
+ * sich nur das eine Attribut, alles andere bleibt Byte für Byte stehen.
+ */
+export function retypeInternalLinks(html: string, id: string, entryType: string): string {
+  if (!html || !html.includes(id)) return html;
+  return html.replace(SPAN_TAG_RE, (tag) => {
+    if (tagAttr(tag, 'data-type') !== 'internalLink' || tagAttr(tag, 'data-id') !== id) return tag;
+    const attr = `data-entry-type="${entryType}"`;
+    return ENTRY_TYPE_ATTR_RE.test(tag) ? tag.replace(ENTRY_TYPE_ATTR_RE, attr) : tag.replace(/^<span\b/i, `<span ${attr}`);
+  });
+}
+
 /**
  * Trägt das gespeicherte HTML sichtbaren Inhalt? Ein frischer Eintrag ist
  * `<p></p>` — vor den ersten Verlinkungs-Block gehört dort keine Trennlinie,

@@ -139,7 +139,7 @@ export default function WikiView() {
     setActiveView({ type: 'wiki' });
   };
 
-  useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
+  useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete, flush: flushAutoSave });
 
   // Ohne Argument fällt createArticle auf „other" zurück; der „+"-Knopf am
   // Kategorienkopf gibt seine Kategorie mit — wie handleCreateTask(cat.id).

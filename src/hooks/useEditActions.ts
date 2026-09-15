@@ -21,6 +21,7 @@ export function useEditActions(active: boolean, handlers: EditActions): void {
       onSave: () => handlersRef.current.onSave(),
       onCancel: () => handlersRef.current.onCancel(),
       onDelete: handlersRef.current.onDelete ? () => handlersRef.current.onDelete?.() : undefined,
+      flush: handlersRef.current.flush ? async () => { await handlersRef.current.flush?.(); } : undefined,
     });
     return () => setEditActions(null);
   }, [active, setEditActions]);

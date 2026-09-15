@@ -524,6 +524,9 @@
   },
   "properties": {
     "noEntry": "Ouvrez une entrée pour voir ses propriétés.",
+    "type": "Type",
+    "typeDropsProperties": "Les entrées du journal n’ont ni catégorie, ni icône, ni image de couverture ; elles seront supprimées.",
+    "changeType": "Convertir",
     "category": "Catégorie",
     "tags": "Étiquettes",
     "none": "— Aucun —",

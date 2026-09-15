@@ -16,8 +16,8 @@ import { useTemplateStore } from './templateStore';
 import { useBlockSessionStore } from './blockSessionStore';
 import { serializeBlocks } from '../lib/blocks/blockHtml';
 import {
-  areBlocksEmpty, contentForTemplate, isUnchangedTemplateContent, mergeTemplateTags, resolveDefaultTemplate,
-  templateOriginsOf, UNTITLED_TITLES, type Template, type TemplateEntryType,
+  contentForTemplate, defaultTemplateSwap, fieldsWithoutTemplate, fieldsWithTemplate,
+  type Template, type TemplateEntryType, type TemplateFields,
 } from '../lib/blocks/templates';
 
 /** Was außer den Blöcken übernommen wird. */
@@ -42,12 +42,7 @@ export interface TemplateApplyOptions extends TemplateFieldOptions {
   notice?: boolean;
 }
 
-interface EntryFields {
-  title: string;
-  tags: string[];
-}
-
-function entryFields(entryType: TemplateEntryType, id: string): (EntryFields & { content: string }) | undefined {
+function entryFields(entryType: TemplateEntryType, id: string): (TemplateFields & { content: string }) | undefined {
   switch (entryType) {
     case 'journal': return useJournalStore.getState().entries.find((e) => e.id === id);
     case 'wiki': return useWikiStore.getState().articles.find((a) => a.id === id);
@@ -55,7 +50,7 @@ function entryFields(entryType: TemplateEntryType, id: string): (EntryFields & {
   }
 }
 
-function updateFields(entryType: TemplateEntryType, id: string, patch: Partial<EntryFields>): Promise<void> {
+function updateFields(entryType: TemplateEntryType, id: string, patch: Partial<TemplateFields>): Promise<void> {
   switch (entryType) {
     case 'journal': return useJournalStore.getState().updateEntry(id, patch);
     case 'wiki': return useWikiStore.getState().updateArticle(id, patch);
@@ -63,20 +58,19 @@ function updateFields(entryType: TemplateEntryType, id: string, patch: Partial<E
   }
 }
 
-/**
- * Darf eine Vorlage den Titel setzen, ohne einen eigenen zu überschreiben?
- * Ja, solange der Eintrag leer oder mit dem Standardtitel seiner Art heißt —
- * oder noch den Titel der Vorlage trägt, die gerade abgelöst wird.
- */
-export function mayTakeTemplateTitle(entryType: TemplateEntryType, id: string, replaces?: Pick<Template, 'title'>): boolean {
-  const title = entryFields(entryType, id)?.title.trim() ?? '';
-  return !title || title === UNTITLED_TITLES[entryType] || (!!replaces?.title.trim() && title === replaces.title.trim());
+/** Schreibt nur, was sich an Titel oder Tags geändert hat. */
+async function writeChangedFields(entryType: TemplateEntryType, id: string, before: TemplateFields, after: TemplateFields): Promise<void> {
+  const patch: Partial<TemplateFields> = {};
+  if (after.title !== before.title) patch.title = after.title;
+  if (after.tags.length !== before.tags.length) patch.tags = after.tags;
+  if (Object.keys(patch).length) await updateFields(entryType, id, patch);
 }
 
 /**
- * Titel und Tags der Vorlage in den Eintrag. Der Aufrufer speichert vorher,
- * was im Editor noch nicht gespeichert ist — sonst läse das hier einen
- * älteren Titel, und der Sync der View überschriebe die laufende Eingabe.
+ * Titel und Tags der Vorlage in den Eintrag (`fieldsWithTemplate`). Der
+ * Aufrufer speichert vorher, was im Editor noch nicht gespeichert ist — sonst
+ * läse das hier einen älteren Titel, und der Sync der View überschriebe die
+ * laufende Eingabe.
  */
 export async function applyTemplateFields(
   entryType: TemplateEntryType,
@@ -86,21 +80,13 @@ export async function applyTemplateFields(
 ): Promise<void> {
   const fields = entryFields(entryType, id);
   if (!fields) return;
-  const patch: Partial<EntryFields> = {};
-  const takeTitle = options.title === 'ifUntitled' ? mayTakeTemplateTitle(entryType, id, options.replaces) : options.title;
-  if (takeTitle && template.title.trim()) patch.title = template.title.trim();
-  if (options.tags) {
-    const tags = mergeTemplateTags(fields.tags, template.tags);
-    if (tags.length !== fields.tags.length) patch.tags = tags;
-  }
-  if (Object.keys(patch).length) await updateFields(entryType, id, patch);
+  await writeChangedFields(entryType, id, fields, fieldsWithTemplate(fields, entryType, template, options));
 }
 
 /**
- * Rückgängig nach einer automatisch eingesetzten Vorlage: der Titel geht
- * zurück auf den Standardtitel, wenn er noch der der Vorlage ist; ihre Tags
- * fallen weg — auch einer, den der Eintrag schon vorher trug (bei einem
- * frisch angelegten Eintrag kommt das nicht vor). Die Blöcke leert der Stapel.
+ * Rückgängig nach einer automatisch eingesetzten Vorlage (`fieldsWithoutTemplate`)
+ * — bei einem frisch angelegten Eintrag trug er keinen ihrer Tags schon vorher.
+ * Die Blöcke leert der Stapel.
  */
 export async function undoTemplateFields(
   entryType: TemplateEntryType,
@@ -109,20 +95,14 @@ export async function undoTemplateFields(
 ): Promise<void> {
   const fields = entryFields(entryType, id);
   if (!fields) return;
-  const patch: Partial<EntryFields> = {};
-  if (template.title.trim() && fields.title === template.title.trim()) patch.title = UNTITLED_TITLES[entryType];
-  const removed = new Set(template.tags.map((tag) => tag.toLowerCase()));
-  const tags = fields.tags.filter((tag) => !removed.has(tag.toLowerCase()));
-  if (tags.length !== fields.tags.length) patch.tags = tags;
-  if (Object.keys(patch).length) await updateFields(entryType, id, patch);
+  await writeChangedFields(entryType, id, fields, fieldsWithoutTemplate(fields, entryType, template));
 }
 
 /**
  * Nach einer nachträglich gesetzten Kategorie: den Standard der neuen
- * Kombination einsetzen — wenn der Inhalt leer ist oder noch unverändert der
- * Standard der bisherigen Kategorie drinsteht (meist der Rückfall „alle
- * Kategorien"). Eine von Hand gewählte Vorlage bleibt. Nur, solange der
- * Eintrag im Bearbeiten offen ist: dann hält sein Stapel den lebenden Inhalt.
+ * Kombination einsetzen, wenn `defaultTemplateSwap` es erlaubt. Nur, solange
+ * der Eintrag im Bearbeiten offen ist: dann hält sein Stapel den lebenden
+ * Inhalt. Den Typwechsel erledigt `lib/entryTypeChange.ts` nach derselben Regel.
  */
 export function applyDefaultAfterCategoryChange(
   entryType: TemplateEntryType,
@@ -132,18 +112,14 @@ export function applyDefaultAfterCategoryChange(
 ): void {
   const session = useBlockSessionStore.getState().session;
   if (!session || session.entryId !== id || !session.isEditing || !session.templates) return;
-  const templates = useTemplateStore.getState().templates;
-  const next = resolveDefaultTemplate(templates, entryType, categoryId);
-  if (!next) return;
-  const blocks = session.api.liveBlocks();
-  let previous: Template | undefined;
-  if (!areBlocksEmpty(blocks)) {
-    previous = resolveDefaultTemplate(templates, entryType, previousCategoryId) ?? undefined;
-    const origins = templateOriginsOf(blocks);
-    if (!previous || previous.id === next.id || origins.length !== 1 || origins[0] !== previous.id) return;
-    if (!isUnchangedTemplateContent(serializeBlocks(blocks), previous)) return;
-  }
-  session.api.applyTemplate(next, { mode: 'replace', title: 'ifUntitled', tags: true, replaces: previous, notice: true });
+  const swap = defaultTemplateSwap(
+    useTemplateStore.getState().templates,
+    session.api.liveBlocks(),
+    { entryType, categoryId: previousCategoryId },
+    { entryType, categoryId },
+  );
+  if (!swap) return;
+  session.api.applyTemplate(swap.template, { mode: 'replace', title: 'ifUntitled', tags: true, replaces: swap.replaces, notice: true });
 }
 
 /**

@@ -524,6 +524,9 @@
   },
   "properties": {
     "noEntry": "Öffne einen Eintrag, um seine Eigenschaften zu sehen.",
+    "type": "Typ",
+    "typeDropsProperties": "Im Journal fallen Kategorie, Icon und Titelbild weg.",
+    "changeType": "Umwandeln",
     "category": "Kategorie",
     "tags": "Tags",
     "none": "— Keine —",

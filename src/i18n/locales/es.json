@@ -524,6 +524,9 @@
   },
   "properties": {
     "noEntry": "Abre una entrada para ver sus propiedades.",
+    "type": "Tipo",
+    "typeDropsProperties": "Las entradas del diario no tienen categoría, icono ni imagen de portada; se eliminarán.",
+    "changeType": "Convertir",
     "category": "Categoría",
     "tags": "Etiquetas",
     "none": "— Ninguno —",
