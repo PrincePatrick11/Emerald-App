@@ -54,7 +54,9 @@ src/
 │   │                 PropertySummaryRow, Favicon, Banner, SelectField (shared category-field
 │   │                 native select for Journal/Operations properties panels), TagsField (the
 │   │                 tags field's label + TagInput, shared by Journal/Wiki/Operations and the
-│   │                 template page), AltarReadingSummary, PlacedElementRow
+│   │                 template page), EntryTypeField (the Journal/Operations/Wiki type toggle
+│   │                 above Category, see Edit Mode Architecture below), AltarReadingSummary,
+│   │                 PlacedElementRow
 │   ├── templates/    TemplateEditor (a template's own page, built on LibraryPageFrame),
 │   │                 TemplateAssignments (a template's per-combination assignments + default
 │   │                 star, in its sidebar), TemplateDefaultsOverview (the dashboard's
@@ -122,6 +124,9 @@ src/
 │                                      BlocksView, TemplatesView and the four
 │                                      LeftSidebarEntryList configs)
 ├── lib/              db.ts, schema.ts, normalizeSchema.ts, row.ts,
+│                     entryTypeChange.ts (moves a Journal/Wiki/Operation entry into another of
+│                                      the three under the same id, see Edit Mode Architecture
+│                                      below),
 │                     links.ts, tabs.ts (tab IDs, isContentView), globalSearch.ts, searchText.ts,
 │                     modules.ts (the module registry — see Module Registry below),
 │                     dragChannel.ts (generic set/get/subscribe factory), dragState.ts,
@@ -290,6 +295,48 @@ cover, icon) save directly to the store as they're changed and are never part of
 revert them) — Cancel must not undo something the panel already committed.
 Sigils need no variant of their own any more: since v42 they are blocks in `content`, so the
 same `{title, content}` baseline covers intention, letters, drawing and charge.
+The type toggle below is the same kind of out-of-scope commit: it writes through
+`changeEntryType` the moment it's picked, not through the baseline, so Cancel afterwards
+reverts title/content but leaves the entry under its new type.
+
+### Changing an entry's type
+
+`EntryTypeField` (Journal/Wiki/Operation Properties panels, above Category — at the top for
+Journal, which has none) renders the three module icons from `MODULE_LIST` filtered by
+`usesBlocks` as an `IconToggleGroup`; picking one calls `changeEntryType(id, from, to)`
+(`src/lib/entryTypeChange.ts`). Tasks and Altar have a different data model and aren't
+convertible, so they get no field and no entry in `ConvertibleEntryType`.
+
+The entry keeps its id and moves row: `changeEntryType` first flushes the source view's
+pending autosave (the new optional `EditActions.flush`, set via `useEditActions`'s
+`flushAutoSave` — see Right Sidebar Action Bar below, needed since the store may still hold
+stale content at the moment the toggle is clicked), then, serialized under the source's own
+write key, inserts a row into the target table with the same id (a fresh `entry_number` from
+the target table, a wiki slug via the now-exported `uniqueSlugify`, a journal `moon_phase`
+recomputed from `created_at`, and an untitled title remapped to the target type's own untitled
+title), rewrites every chip pointing at the id to the new `data-entry-type` across all three
+content tables — trashed rows included, so a restored entry doesn't come back with a stale
+chip — and templates (`retypeInternalLinks`, see Internal Links below), remaps the id inside
+any `block_definitions` link default that targeted it (`remapDefinitionDefaults`'s resolver may
+now hand back an `entryType` alongside `id`/`label`), and updates `links.target_type` and
+`task_links.target_type`. Only then does it delete the source row. There is no transaction
+available (see [`database.md`](database.md#foreign-keys)), so the order is deliberate: if
+something fails partway, the entry survives twice at worst, never zero times. Wiki and
+Operation keep category, icon and cover image across the move; converting either to Journal
+drops them, and `typeChangeDropsProperties` tells the field to ask first via `InlineConfirm`
+when any of the three is actually set.
+
+The move also runs the same defaulting rule a category change uses (see
+[Templates](#templates)): `defaultTemplateSwap` — pulled out of `templateApply.ts` into
+`lib/blocks/templates.ts` as `defaultTemplateSwap`/`fieldsWithTemplate`/`fieldsWithoutTemplate`
+so both call sites share it — swaps in the new combination's default template when the content
+is empty or still exactly the old combination's unchanged default, and the same "template
+applied" notice (Undo / "Other template") appears. Once the row exists under the new type,
+`uiStore.retypeEntryViews(id, from, to)` rewrites every tab's `view`, every tab's history, and
+the tabless history in one `set()` — no open tab is ever left pointing at a type/id pair that
+briefly doesn't exist, since the new row is written and the stores swapped before the old row's
+delete resolves. Outgoing links are re-synced last, under the new source type and behind any
+`syncLinks` call already queued for the old one (both go through the same `serialized` key).
 
 ### Right Sidebar Action Bar
 
@@ -302,6 +349,8 @@ useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete
 ```
 
 Inside the hook, the handlers are kept in a ref that is overwritten on every render, and the effect itself only depends on `active`: `setEditActions` only needs to run when edit mode flips, not on every keystroke, but the handlers it registers must still see the latest `title`/`content`/etc. at call time. An earlier, pre-hook version of this effect had no dependency array and called `setEditActions` unconditionally on every render, which combined with a whole-store `useUIStore()` subscription in the same component to produce an infinite render loop (each `setEditActions` call re-rendered the subscriber, which re-ran the effect, which called `setEditActions` again) and a blank screen on startup. Keep sidebar-consuming components on per-field selectors (see Store Selectors above) to avoid reintroducing it — the hook itself already scopes its effect to `[active]`.
+
+`EditActions` gained an optional fourth handler, `flush`, alongside `onSave`/`onCancel`/`onDelete` — Journal/Wiki/Operations pass their `flushAutoSave` from `useEntryEditor`. It exists for a sidebar action that needs the *current* store row before it acts rather than whatever the last debounced autosave already wrote: `changeEntryType` (see above) calls `useUIStore.getState().editActions?.flush?.()` before reading the entry out of its store.
 
 ### List Header Portal
 
@@ -722,7 +771,13 @@ combination: `isContentEmpty`/`areBlocksEmpty` decide "still empty" (no blocks, 
 plain-text ones with no template origin), and `isUnchangedTemplateContent` decides whether the
 current content is still exactly what the *previous* default would produce — if so, a changed
 category swaps it for the new default instead of leaving the old one stranded; content the user
-touched, or that a since-edited template would no longer reproduce, is left alone.
+touched, or that a since-edited template would no longer reproduce, is left alone. This rule is
+now factored out of `templateApply.ts` as `defaultTemplateSwap`/`fieldsWithTemplate`/
+`fieldsWithoutTemplate`/`mayTakeTemplateTitle` (`lib/blocks/templates.ts`, pure — no store
+reads), since `entryTypeChange.ts`'s type change needed the same swap for a change of
+*`entryType`*, not just category (see [Edit Mode Architecture](#edit-mode-architecture) above);
+`templateApply.ts`'s `applyDefaultAfterCategoryChange` is now a thin wrapper around
+`defaultTemplateSwap` over one `TemplateCombination`, the category held fixed.
 
 **Manual insertion, from the editor.** `TemplateInsertion` (blocks sidebar) offers
 `TemplatePickerModal` (search over name/description, ordered by `templatesFor` — assigned to
@@ -829,6 +884,8 @@ Appending a link (from the field, from `[[`-picker selection, or from a routine 
 If the entry was completely empty (`<p></p>`), the block goes in without its leading horizontal rule — a rule separates the link from the text above it, and there is no text yet. `isBlankContent` (`src/lib/internalLinkHtml.ts`) decides this the same way `extractInternalLinks` decides what's a link: regex over the HTML, no `DOMParser`, since migrations v36/v37 and the schema-check Node harness need to ask the same question outside a browser. `internalLinkBlockHtml` takes a `separator` option for this, and `plainBlockHtml` renders the same shape without a chip, for a legacy value that no longer resolves to anything in this vault (see the v37 note below) — text alone rather than a dead link.
 
 **Cross-vault import.** A link chip's `data-id` is only meaningful inside the vault it was written in. `.emerald` export now carries `meta.contentLinks` — id, entry type, and title for every chip in the exported content — so importing into a *different* vault can re-resolve each chip: by id first (same vault, or an id that happens to already match), then by the title recorded in `contentLinks`, then by the chip's own embedded `data-label` for files exported before this field existed. A chip that resolves to nothing becomes its own display text rather than a dead link (`remapInternalLinks`'s `null` case). This remap must run *before* DOMPurify, not after — it parses and re-serialises the HTML, and that round-trip is not allowed to happen on content DOMPurify has already cleared.
+
+**A chip's own type, rewritten in place.** `retypeInternalLinks(html, id, entryType)` (`src/lib/internalLinkHtml.ts`) sets `data-entry-type` on every chip pointing at `id` to a new value, for an entry that changed which of Journal/Wiki/Operation it is (see Edit Mode Architecture below) — the id stays the same, so only that one attribute needs to change. Like `extractInternalLinks`/`isBlankContent`, it stays regex-over-the-tag rather than `DOMParser`-based: `entryTypeChange.ts` runs it over every stored row across all three content tables plus `templates`, and a full parse-and-reserialise of each would rewrite content nobody actually touched.
 
 **Pre-v36 legacy bridge.** Journal entries used to carry two dedicated columns, `linked_operation_ids`/`linked_wiki_ids`, shown as their own chip rows under the title. Migration v36 rewrites them into content blocks the same way described above and empties the columns (see [`database.md`](database.md#journal_entries)); `.emerald`/Markdown import of a file written before that migration append the same blocks instead of writing to the columns. The columns themselves stay in the schema only for round-tripping an older `.emeralddb` backup — `LinkedEntriesField`'s `legacyIds` prop is the read-only bridge that still lists them if a restore ever repopulates them, but nothing writes to them going forward.
 
