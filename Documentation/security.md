@@ -37,7 +37,7 @@ PDF export runs in a hidden window built and torn down by the per-platform `expo
 
 ## Command Surface
 
-`src-tauri/src/lib.rs` registers **24 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
+`src-tauri/src/lib.rs` registers **25 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
 
 | Command | Defined in | Notes |
 |---|---|---|
@@ -48,7 +48,7 @@ PDF export runs in a hidden window built and torn down by the per-platform `expo
 | `copy_image_file`, `read_image_as_base64` | `images.rs` | see [Path Confinement](#path-confinement) |
 | `list_image_files`, `adopt_legacy_images` | `images.rs` | enumerate / migrate files inside the vault's `images/` only |
 | `delete_image_files` | `images.rs` | **a delete primitive** — takes a list of filenames, each validated with `is_valid_image_name`, resolved only against the vault's `images/` dir. Used by Settings → Storage cleanup and bounded by that validation |
-| `register_vaults`, `ensure_vault_dirs`, `create_vault_dirs`, `ensure_backup_dir`, `probe_vault_dir`, `delete_vault_files` | `vault.rs` | see [Vault Directories as a Trust Boundary](#vault-directories-as-a-trust-boundary) |
+| `register_vaults`, `ensure_vault_dirs`, `create_vault_dirs`, `ensure_backup_dir`, `probe_vault_dir`, `delete_vault_files`, `discard_import_staging` | `vault.rs` | see [Vault Directories as a Trust Boundary](#vault-directories-as-a-trust-boundary) |
 | `default_vault_dir`, `new_vault_base_dir`, `legacy_default_db_exists` | `vault.rs` | pure path/existence oracles for the vault modal and the settings backup import (add-vault mode); return strings, take no path |
 | `migrate_vault_layout` | `vault.rs` | one-time move of a pre-multi-vault `.db` into the vault layout; the legacy name is validated with `is_valid_legacy_db_name` |
 | `update_menu_labels`, `set_export_menu_enabled`, `set_altar_export_menu_enabled`, `set_view_menu_checked` | `lib.rs` | native-menu state sync; no-ops on Windows/Linux where no native menu is installed |
@@ -68,6 +68,8 @@ Vault storage does not need those roots. **No storage command accepts a path.** 
 What that costs is one thing: `write_file` / `read_file` / `export_image` / `copy_image_file` stay confined to the fixed user directories, so a backup file or a Markdown export cannot be written into — or read out of — a vault folder that lives outside them. Opening, using and deleting such a vault works in full.
 
 `delete_vault_files` removes only the vault's own artefacts **by name**: `emerald.db`, its journal, and files in `images/` whose names pass `is_valid_image_name` — database first, then the images. It is not `remove_dir_all` anywhere in that path: the app puts that database into whatever folder the user chose, so a vault created straight in Documents would have taken Documents with it. The directories go last with plain `remove_dir`, which fails while anything else is still inside — and that failure is the *answer*, not an error: a folder that also holds an exported backup in `backup/` or a stray `desktop.ini` keeps standing, only the vault files are gone (an *empty* `backup/` counts as the vault's own and goes too), and the command reports `false` so the UI can say so. A half-deleted vault cannot resurrect as an empty one: the caller drops it from `vaults.json` after every `Ok`, and an `Err` only falls while the database itself could not be removed. The "the folder contains an `emerald.db`" check still runs first (`vault.rs` refuses with `not a vault directory: no database found`).
+
+`discard_import_staging` follows the same by-name rule for a different fixed target: `emerald.db.import` (plus `-journal`/`-wal`/`-shm`), the working copy a backup import fills and swaps in before removing (see [DB Backup / Restore](database.md#db-backup--restore-emeralddb) in `database.md`). It resolves the vault id through the same registry as every other storage command, can delete nothing else, and a missing file is not an error — it runs before every import to clear whatever a crashed one left behind, and after every import whether it succeeded or failed.
 
 `ensure_vault_dirs` deliberately does **not** create the vault directory — the rule lives in `images_dir()`, so it holds for every command that touches vault storage. SQLite would put a fresh, empty database into a recreated folder, so a vault on an unplugged drive would silently come back as an empty vault. Creating is `create_vault_dirs`, called once when a vault enters the list.
 

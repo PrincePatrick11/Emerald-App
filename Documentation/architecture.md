@@ -1054,7 +1054,7 @@ Images are content-addressed, stored outside SQLite, and belong to one vault.
 
 ## Vault Layout
 
-A vault is a directory: `emerald.db`, `images/`, and `backup/` inside it, nothing else. The user picks where it lives, so a vault can sit in Documents, in a synced folder, or on another drive.
+A vault is a directory: `emerald.db`, `images/`, and `backup/` inside it, nothing else — with one deliberately transient exception: a backup import briefly `VACUUM INTO`s a working copy to `emerald.db.import` next to `emerald.db` while it fills and checks it, then removes it again once the import succeeds or fails. A copy left behind by a crash is cleared before the next import runs (`discard_import_staging`, see [DB Backup / Restore](database.md#db-backup--restore-emeralddb) in `database.md`). The user picks where the vault lives, so a vault can sit in Documents, in a synced folder, or on another drive.
 
 `{appDataDir}/vaults.json` maps ids to directories:
 
@@ -1285,6 +1285,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `legacy_default_db_exists()` | Whether an `emerald.db` from before `vaults.json` existed is sitting in `app_config_dir`, `app_data_dir`, or the migration target — the difference between a genuine first start and an installation whose journal is already on disk. |
 | `migrate_vault_layout(vault_id, legacy_db_name)` | Move a pre-per-vault flat database into its own directory. Returns that directory. |
 | `delete_vault_files(vault_id)` | Removes only the vault's own artefacts by name — database, journal, recognised images, an *empty* `backup/` — never `remove_dir_all`. The directories go with plain `remove_dir`, which fails while anything else (a backup, a `desktop.ini`) is still inside; that failure is the answer, not an error. Returns whether the vault folder itself is gone, so the UI can say "the folder stayed". |
+| `discard_import_staging(vault_id)` | Removes a backup import's staging copy — the fixed filename `emerald.db.import`, plus `-journal`/`-wal`/`-shm` — from a vault's own directory. Run before every import (clears whatever a crashed one left behind) and after (success or failure alike). A missing file is not an error. See [DB Backup / Restore](database.md#db-backup--restore-emeralddb) in `database.md`. |
 | `ensure_backup_dir(vault_id)` | The vault's `backup/` folder — the database export dialog's default destination. Created with the vault by `create_vault_dirs`, recreated here on demand; refused for a vault outside the allowed storage roots, where `write_file` could not write anyway. A non-empty `backup/` is deliberately not part of what `delete_vault_files` removes: a backup should outlive the vault it was taken from. |
 | `export_image(path, data_url)` | Decode a base64 data-URL and write the binary image bytes to a user-chosen path. Permitted extensions: `.png`, `.jpg`, `.jpeg`, `.webp`. Same symlink rejection, allowed-roots confinement, and `canonicalize`-before-write checks as `write_file`. |
 | `write_file(path, content)` | Write UTF-8 text to a user-selected path. Permitted extensions: `.md`, `.emerald`, `.emeralddb`, `.json`, `.txt`. Path must resolve within allowed storage roots. |
