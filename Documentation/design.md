@@ -362,25 +362,28 @@ gap, flush into the window corner — the Windows Fluent geometry. The glyphs ar
 on a 10×10 grid with a 1px stroke rather than lucide icons, because lucide has no correct
 "restore" symbol (two offset squares, the rear one clipped).
 
-**Left sidebar**: `LeftSidebarRail.tsx` (fixed 56px icon strip, its own `--shell-bg`
+**Left sidebar**: `LeftSidebarRail.tsx` (56px icon strip when shown, its own `--shell-bg`
 background, setting it apart from the entry list panel on `--sidebar-bg`) plus
 `LeftSidebarEntryList.tsx` beside it. `RAIL_WIDTH` is exported by the rail and consumed by
 `AppShell` instead of appearing a second time as `w-14` — the right sidebar's default width
 derives from it, so a mismatch would produce a clipped rail *and* a wrong width on the
-right.
+right. The rail itself can be hidden from the View menu like the other two sidebars (see
+below); hidden, it still occupies no width rather than a collapsed sliver.
 
 `TabIconButton` carries `border border-transparent` in its base state, because the theme
 rules give the active tab a 1px border: without the placeholder the active tab is 32px wide
 and the inactive ones 30, the row jumps by 2px on every tab change, and the six tabs no
 longer fit the entry list's default width derived from them.
 
-**Showing and hiding either sidebar is animated** (200ms width transition). The content
-keeps its pixel width and is clipped by the `<aside>` rather than shrinking along — otherwise
-it would visibly squeeze together and the tab strip would wrap mid-transition. During a
-resize drag `AppShell` removes the `.app-sidebar-animated` class, otherwise the edge lags
-behind the pointer. The transition lives as a class in `index.css` (line 268), not as an
-inline style: an inline style would beat the `prefers-reduced-motion` opt-out directly
-below it (line 276), which wins on order at equal specificity.
+**Showing and hiding any of the three sidebars is animated** (200ms width transition; the
+rail also animates a `margin-left` on the container it shares with the entry list, sliding
+out to the left so the list ends up flush with the window edge). The content keeps its pixel
+width and is clipped by the `<aside>` rather than shrinking along — otherwise it would
+visibly squeeze together and the tab strip would wrap mid-transition. During a resize drag
+`AppShell` removes the `.app-sidebar-animated` class, otherwise the edge lags behind the
+pointer. The transition lives as a class in `index.css`, not as an inline style: an inline
+style would beat the `prefers-reduced-motion` opt-out directly below it, which wins on order
+at equal specificity.
 
 **A non-dismissible modal leaves the title bar clear.** The backdrop is
 `fixed inset-x-0 bottom-0` and starts at `top-10` instead of `top-0` as soon as
