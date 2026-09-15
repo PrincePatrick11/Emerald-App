@@ -44,15 +44,25 @@ src/
 │   │                 TagInput, ResizableImageExtension, ExternalDropExtension,
 │   │                 EditorToolbar, LinkPickerModal, SuggestionList
 │   ├── views/        HomeView, JournalView, WikiView, TagsView, CategoriesView,
-│   │                 AltarView, OperationsView, TrashView, TasksView, BlocksView
+│   │                 AltarView, OperationsView, TrashView, TasksView, BlocksView, TemplatesView
 │   ├── sidebar/
 │   │   ├── panels/   JournalPropertiesPanel, WikiPropertiesPanel, OperationPropertiesPanel,
-│   │   │             AltarSidebarPanel, RoutinesPanel (currently unrendered), BacklinksPanel
-│   │   │             (currently unrendered)
+│   │   │             AltarSidebarPanel, BacklinksPanel (currently unrendered — RoutinesPanel,
+│   │   │             its neighbour, was removed outright along with routines, see
+│   │   │             Templates below)
 │   │   └── fields/   PropertiesReadView / PropertiesEditView (read vs. edit layout shell),
 │   │                 PropertySummaryRow, Favicon, Banner, SelectField (shared category-field
-│   │                 native select for Journal/Operations properties panels),
-│   │                 AltarReadingSummary, LinkedOpsInput, LinkedWikiInput, PlacedElementRow
+│   │                 native select for Journal/Operations properties panels), TagsField (the
+│   │                 tags field's label + TagInput, shared by Journal/Wiki/Operations and the
+│   │                 template page), AltarReadingSummary, PlacedElementRow
+│   ├── templates/    TemplateEditor (a template's own page, built on LibraryPageFrame),
+│   │                 TemplateAssignments (a template's per-combination assignments + default
+│   │                 star, in its sidebar), TemplateDefaultsOverview (the dashboard's
+│   │                 collapsible per-combination default picker), TemplateUsage (the entries
+│   │                 using a template, in its sidebar), TemplateInsertion (the editor's
+│   │                 "Insert template" button, empty-entry suggestions, and the
+│   │                 applied-template notice), TemplatePickerModal, TemplateApplyDialog
+│   │                 (append/replace + title/tags checkboxes), useAssignmentLabel
 │   ├── altar/        AltarCanvas, AltarCard, AltarCardPreview, AltarItemVisual,
 │   │                 AltarLibraryStrip, AltarItemTile (the 70×85px
 │   │                 library tile, shared by the strip and the dashboard section below),
@@ -66,7 +76,12 @@ src/
 │                     EmojiPicker, Dashboard, DashboardItem (the clickable dashboard-row/card
 │                     frame — click, middle-click, focus ring), EntryListTab, ListToolbar,
 │                     FilterPanel, RailButton, TabIconButton, UndoToast, ImportDestinationModal,
-│                     Dropdown, CollapsibleGroupHeader, CategorySelect, EntryDetailFrame,
+│                     Dropdown, FieldDropdown (a properties-panel-styled, portalled Dropdown —
+│                     CategorySelect, template assignments, the defaults overview),
+│                     CollapsibleGroupHeader, CategorySelect, EntryDetailFrame,
+│                     LibraryPageFrame (the "Done"-to-save page frame shared by a block's own
+│                     page and a template's — breadcrumb, icon, "Unsaved", name-as-title,
+│                     scrolling body, EditActionBar in the sidebar),
 │                     InlineConfirm (the "Sure? Yes/Cancel" row-action confirmation),
 │                     InlineNameEditor (the input/error/Save/Cancel body of a one-line name
 │                     editor), RenameField (the in-place rename input used inside a
@@ -74,7 +89,11 @@ src/
 │                     encapsulates and where it can be extended is in components.md
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, categoryStore (the one Wiki/Operations/Tasks/Altar category
-│                                      list, see Categories below), routineStore, undoStore,
+│                                      list, see Categories below), templateStore (the templates
+│                                      dashboard, see Templates below), draftStore.ts (the
+│                                      unsaved-draft stores behind a block's and a template's
+│                                      own page — see useDraftPage below; formerly
+│                                      blockDraftStore.ts, one store only), undoStore,
 │                     trashStore, vaultStore, importStore,
 │                     moduleWiring.ts (store-layer half of the module registry: per-module
 │                                      reload, trash restore/permanent-delete, and the
@@ -84,6 +103,12 @@ src/
 │                                      used by JournalView, WikiView, OperationsView),
 │                     useEditActions (registers Save/Cancel/Delete into the right sidebar,
 │                                      used by all five entry views),
+│                     useDraftPage (the "Fertig speichert nur Geändertes" draft lifecycle behind
+│                                      a block's and a template's own page, over a draftStore.ts
+│                                      instance), useShrunkIcon (shrinks an image icon to 64px
+│                                      before it lands in a block/template draft), 
+│                     useSaveAsTemplateAction ("Save as template" context-menu entry, shared by
+│                                      every entry with a block stack),
 │                     useOutsideClick (mousedown-outside(+Escape) dismiss pattern, used by
 │                                      eight menus/popovers),
 │                     useGlobalSearch (assembles the search corpus from the stores and runs it
@@ -94,13 +119,21 @@ src/
 │                     useOpenInNewTabAction (the "Open in New Tab" ContextMenuAction for an
 │                                      ActiveView, the menu counterpart to DashboardItem's
 │                                      middle-click; used by HomeView, WikiView, OperationsView,
-│                                      BlocksView and the four LeftSidebarEntryList configs)
+│                                      BlocksView, TemplatesView and the four
+│                                      LeftSidebarEntryList configs)
 ├── lib/              db.ts, schema.ts, normalizeSchema.ts, row.ts,
 │                     links.ts, tabs.ts (tab IDs, isContentView), globalSearch.ts, searchText.ts,
 │                     modules.ts (the module registry — see Module Registry below),
 │                     dragChannel.ts (generic set/get/subscribe factory), dragState.ts,
-│                     altarDragState.ts, routineDragState.ts (all three are thin named-export
-│                                      adapters over their own createDragChannel() instance),
+│                     altarDragState.ts (both are thin named-export adapters over their own
+│                                      createDragChannel() instance),
+│                     blocks/templates.ts (a template's shape, its assignments and defaulting
+│                                      rules — see Templates below), templateRows.ts (the raw
+│                                      `templates` row access shared by the store, migration
+│                                      v44, fresh-vault seeding and import — same pattern as
+│                                      blockDefinitionRows.ts), migrateRoutinesToTemplates.ts
+│                                      (routine → template conversion, shared by migration v44
+│                                      and the backup importer),
 │                     moonPhase.ts, export.ts, menuActions.ts,
 │                     platform.ts, categories.ts (categoryLabel, categoriesUsedBy,
 │                                      categoryUsageCounts — the one display-name,
@@ -195,18 +228,20 @@ stays free of both:
 
 - **`src/store/moduleWiring.ts`** — the store-layer half. `moduleWiring` maps each
   `EntryModuleId` to its store's reload function; `trashWiring` maps each `TrashKind` to its
-  restore/permanently-delete pair (`category` now goes to `categoryStore`, see
-  [Categories](#categories) below). `reloadAllStores()` is the canonical startup/vault-switch
-  reload sequence — tags and the one `categories` list in parallel, then every module's content
-  plus routines — replacing three hand-maintained copies of the same list that used to live in
-  `vaultStore`, `dbBackup`, and `AppShell`. The sequencing is deliberate, not a hard data
-  dependency: no fetcher reads another store, but loading tags and categories first means a list
-  never renders a frame with unresolved category or tag names. `reloadModules(ids)` reloads a
-  targeted subset (used by the Emerald-format import, to reload only the modules the import
-  touched) but always refetches `categories` too, since an import can create new ones. Import
-  rule: content stores only (`journal`/`wiki`/`operation`/`task`/`altar`/`tag`/`routine`/
-  `category`) — never `uiStore`, `vaultStore`, or `trashStore`, which point at this module
-  instead.
+  restore/permanently-delete pair (`category` now goes to `categoryStore`, `template` to
+  `templateStore`, see [Categories](#categories) and [Templates](#templates) below).
+  `reloadAllStores()` is the canonical startup/vault-switch reload sequence — tags, categories,
+  and `block_definitions` and `templates` in parallel, then every module's content — replacing
+  three hand-maintained copies of the same list that used to live in `vaultStore`, `dbBackup`,
+  and `AppShell`. The sequencing is deliberate, not a hard data dependency: no fetcher reads
+  another store, but loading tags/categories/blocks/templates first means a list never renders a
+  frame with unresolved category or tag names, and a new entry never starts before its default
+  template could be resolved. `reloadModules(ids)` reloads a targeted subset (used by the
+  Emerald-format import, to reload only the modules the import touched) but always refetches
+  `categories`, `block_definitions` and `templates` too, since an import can create new ones.
+  Import rule: content stores only (`journal`/`wiki`/`operation`/`task`/`altar`/`tag`/
+  `category`/`blockDefinition`/`template`) — never `uiStore`, `vaultStore`, or `trashStore`,
+  which point at this module instead.
 - **`src/components/layout/moduleViews.ts`** — the component-layer half. `VIEW_COMPONENTS` maps
   every `ViewId` to its `React.lazy` view. Import rule: **only `MainArea` may import this
   file** — any other importer risks pulling every view's lazy chunk (including TipTap, via
@@ -355,7 +390,7 @@ const { entries, createEntry } = useJournalStore(
 const store = useJournalStore();
 ```
 
-This prevents unnecessary re-renders when unrelated fields change — a whole-store subscription in a permanently mounted component (sidebar, tab bar) re-renders it on every keystroke that touches the same store. The `useShallow` form (from `zustand/shallow`) is the way to pull several fields in one call; a plain object selector without it would defeat the purpose, since the fresh object fails the identity check every time. The remaining whole-store subscription in the codebase is `RoutinesPanel`, which is currently unrendered.
+This prevents unnecessary re-renders when unrelated fields change — a whole-store subscription in a permanently mounted component (sidebar, tab bar) re-renders it on every keystroke that touches the same store. The `useShallow` form (from `zustand/shallow`) is the way to pull several fields in one call; a plain object selector without it would defeat the purpose, since the fresh object fails the identity check every time. `RoutinesPanel`, the codebase's one remaining whole-store subscription, was removed along with routines rather than fixed.
 
 ### Rules of Hooks
 
@@ -374,7 +409,7 @@ Since v38, Wiki, Operations, Tasks, and Altar items share one category list — 
 
 ### Tags
 
-Entries store tag **names** (`tags: string[]`), not ids; the `tags` table (`useTagStore`, `src/store/tagStore.ts`) holds name and colour. Five lists carry names: journal entries, wiki articles, operations, tasks, and the Altar library's routines (no tag editor in the UI today, but older data can carry tags). `taggedItems()`/`setItemTags()` in the store are the one enumeration of those five, shared by the three actions that have to touch every list:
+Entries store tag **names** (`tags: string[]`), not ids; the `tags` table (`useTagStore`, `src/store/tagStore.ts`) holds name and colour. Five lists carry names: journal entries, wiki articles, operations, tasks, and templates (a template has no tag editor of its own in `TagsView` — see below — but passes its tags on to whatever entry it fills in). `taggedItems()`/`setItemTags()` in the store are the one enumeration of those five, shared by the three actions that have to touch every list:
 
 - **`updateTag`** — a new name is written into every item that carried the old one (deduplicated, in case an item already had both spellings), including entries sitting in Trash (`renameInTrashedRows`, straight in the four soft-delete tables — the stores only hold live rows), so a restored entry doesn't come back with a name that no longer exists. Until this was added a rename only changed the `tags` row, and every entry silently lost the tag. A name another live tag already has (case-insensitive) throws `TAG_NAME_TAKEN` — checked before the `serialized` chain, which would otherwise log the expected rejection as an error.
 - **`deleteTag`** (soft) removes the name from every live item and snapshots the affected `{ id, type }` pairs into `affected_ids`; **`restoreTag`** puts it back from that snapshot. If a live tag of the same name (case-insensitive) appeared in the meantime, `restoreTag` merges into it — the entries get that tag's spelling and the trashed row is dropped — rather than leaving two.
@@ -382,7 +417,7 @@ Entries store tag **names** (`tags: string[]`), not ids; the `tags` table (`useT
 
 Names are compared case-insensitively everywhere, but items must carry the tag's exact spelling, since rename and delete match exactly — `TagInput` and the `.emerald` import (`ensureTagNames`) therefore store the name `ensureTag` returns, not the one typed or imported. `tags.name` is `UNIQUE` across trashed rows as well. Reusing the name of a tag that sits in Trash — by creating, renaming, or `ensureTag` from an editor — therefore hard-deletes the trashed namesake first (`purgeTrashedNamesake`, case-insensitive); before that, `ensureTag`'s `INSERT OR IGNORE` dropped the new tag silently and left a phantom in the store.
 
-**`TagsView`** is a `Dashboard` in `category` mode with one group per tag. The header (title, "New tag", search, sort A→Z/Z→A/most used via `sortModes` and `count_desc`, a module filter) portals into the right sidebar like every module's. Groups start **collapsed** (`useCollapsedSet('tags', { defaultCollapsed: true })`): the list of headers — colour dot, name, `ModuleCounts` per module, or "unused" — is the overview, and expanding one lists its entries from Journal, Tasks, Operations and Wiki (`TAG_MODULE_IDS`; routines are counted by the store but are not openable entries). Tags are managed in their header, like categories in `CategoriesView`: the dot opens the palette, always-visible pencil/trash buttons and the context menu rename (inline `TagEditRow`, whose dot picks the colour too — creating uses the same row, preset to a random colour) and delete (inline confirm, then undo). The title row carries the tag count, as Categories does. Unused tags stay visible via `keepEmptyGroups`, except while a search or module filter narrows the list. A search matching only entry titles shows the tag with just those entries and forces it open. Collapse keys are tag ids, so a renamed tag stays open.
+**`TagsView`** is a `Dashboard` in `category` mode with one group per tag. The header (title, "New tag", search, sort A→Z/Z→A/most used via `sortModes` and `count_desc`, a module filter) portals into the right sidebar like every module's. Groups start **collapsed** (`useCollapsedSet('tags', { defaultCollapsed: true })`): the list of headers — colour dot, name, `ModuleCounts` per module, or "unused" — is the overview, and expanding one lists its entries from Journal, Tasks, Operations and Wiki (`TAG_MODULE_IDS`; templates are counted by `taggedItems()` for rename/delete/restore, above, but are not openable entries here — the same position routines held before they became templates). Tags are managed in their header, like categories in `CategoriesView`: the dot opens the palette, always-visible pencil/trash buttons and the context menu rename (inline `TagEditRow`, whose dot picks the colour too — creating uses the same row, preset to a random colour) and delete (inline confirm, then undo). The title row carries the tag count, as Categories does. Unused tags stay visible via `keepEmptyGroups`, except while a search or module filter narrows the list. A search matching only entry titles shows the tag with just those entries and forces it open. Collapse keys are tag ids, so a renamed tag stays open.
 
 ### Content Blocks
 
@@ -423,8 +458,9 @@ at `document` level now lives once per open entry in `BlockStack`, because with 
 blocks every request would otherwise hit every block: the three `lib/links.ts` link requests
 (append goes to the last-focused text block, else the last one; reveal/remove try each block in
 order), chip-click navigation (`useInternalLinkNavigation`), file drops from the OS
-(`useEditorFileDrop`), pointer drops from the left list and routines (`useEditorPointerDrops`,
-which finds the editor under the pointer and always clears the drag), the drag ghost
+(`useEditorFileDrop`), pointer drops from the left list (`useEditorPointerDrops`, which finds
+the editor under the pointer and always clears the drag — it dropped its routine branch when
+routines were removed, see [Templates](#templates)), the drag ghost
 (`DragGhost`), the one sticky `EditorToolbar` bound to the focused editor, and `LinkPickerModal`.
 `RichEditor` itself is now just a text block's writing surface; the link commands it used to
 keep private live in `src/components/editor/editorCommands.ts`.
@@ -581,15 +617,19 @@ or a long GIF animation — via `shrinkImage.ts`, since it travels inside every 
 entry); `BlockGlyph` renders either. What's being edited is a **draft**: `BlockDefinitionEditor`
 keeps it in local state and only calls `updateDefinition` on Done, so a keystroke in the name
 doesn't bump every copy's revision. An unsaved draft is mirrored into `useBlockDraftStore`
-(`src/store/blockDraftStore.ts`) — not the view's own state, since `MainArea` unmounts a view on
-module switch and an open block tab would otherwise lose its edits silently; the list reads the
-same store for its "Unsaved" marker. Drafts are deliberately not persisted (like an entry's own
-edit mode) and are cleared wholesale (`clearAll`) on vault switch and on a replace-mode restore,
-both of which also close every tab — a stale draft would otherwise silently overwrite a freshly
-restored or switched-to block on the next Done. The delete confirmation (`DeleteDefinitionModal`,
+(`src/store/draftStore.ts`, one `createDraftStore<T>()` instance of two — the other backs
+templates, see [Templates](#templates) below) — not the view's own state, since `MainArea`
+unmounts a view on module switch and an open block tab would otherwise lose its edits silently;
+the list reads the same store for its "Unsaved" marker. Drafts are deliberately not persisted
+(like an entry's own edit mode) and are cleared wholesale (`clearAllDrafts()`, which empties
+every `createDraftStore` instance) on vault switch and on a replace-mode restore, both of which
+also close every tab — a stale draft would otherwise silently overwrite a freshly restored or
+switched-to block on the next Done. The delete confirmation (`DeleteDefinitionModal`,
 still defined in `BlockDefinitionEditor.tsx`) is instead *hosted* by `BlocksView`, one level up
 from both list and page, so its own closing notice ("N entries left open, skipped") survives the
-navigation back to the list that deleting triggers.
+navigation back to the list that deleting triggers. `BlocksView`'s page shell and draft lifecycle
+are shared with the templates dashboard's own page — see [Templates](#templates) for
+`LibraryPageFrame` and `useDraftPage`.
 
 Definition fields: name, icon, elements, display rules (`readHideEmpty`, `readOnly`, plus
 `showTitle`, which becomes the instance attribute on insert) and a `revision` that rises
@@ -637,6 +677,108 @@ image list `exportDatabase`/`exportAsEmerald` embed and `collectUsedImageFilenam
 `.emerald` import — a link default that resolves to nothing is dropped from the element instead
 of being kept dangling, since a fresh copy would otherwise start with a chip into the void.
 
+### Templates
+
+A **template** (`templates` table, v43, `store/templateStore.ts`) is a pre-filled entry: an
+optional title, a block stack in the same `content` format an entry has, tags, and
+**assignments** — JSON `TemplateAssignment[]` (`lib/blocks/templates.ts`) of `{ entryType,
+category, isDefault }`, where `category` is a category id, `null` for "no category", or `'*'`
+for "all categories" (Journal, which has no categories, only ever uses `'*'`). A template with no
+assignments is offered everywhere; at most one active template can be the default for a given
+`(entryType, category)` combination — `templateStore` enforces that invariant itself (not the
+database, the same choice as `block_definitions`), clearing a star from whoever held it before
+handing it to someone else, under one write key (`serialKey('template', '*')`) so a set-default
+touching two rows can't interleave with another write. `resolveDefaultTemplate` falls back from
+the exact category to `'*'` before giving up — one level for Journal, two for Wiki/Operations.
+
+**Insertion is always a copy.** `instantiateTemplateBlocks` gives every block a fresh id (so two
+insertions of the same template in one entry don't collide), remaps any charge's targets to the
+new ids, unloads any sigil, and stamps `data-template-origin` (`BLOCK_ATTR.template`) on each
+block — the same attribute mechanism a user-built block's `data-block-origin` uses, so
+`entryBlockSummary`'s existing per-content scan picks up template origins alongside block-copy
+origins with one more field, `templateEntries()` (`store/blockCopies.ts`) groups an
+`EntryContentRow[]` by origin id for a template page's "Verwendung"/usage list, and
+`copyUsage()` now counts a definition's copies inside templates too (`templates`/
+`outdatedTemplates` on `CopyUsage`, alongside `entries`/`outdated`) — a template is content that
+can go stale exactly like an entry can. Changing a template later never touches entries it
+already filled; `updateAllCopies`/`removeAllCopies` (`blockCopies.ts`) walk templates as a
+second content source next to the three entry stores, skipping a template whose own page is
+open or has an unsaved draft the same way they skip an entry mid-edit (`CopyRunResult` gained
+`changedTemplates`/`skippedDrafts` alongside `skippedEditing`).
+
+**Defaulting on create.** `startOfNewEntry(entryType, categoryId, fallbackTitle, blank)` resolves
+the default for the combination (unless `blank`, used by imports and duplicates, which always
+overwrite content anyway) and returns `{ title, content, tags, templateId }` via `templateStart`;
+the three content stores' `create*` actions call it instead of starting from an empty string.
+Applying a default this way — rather than the old `defaultBlocksFor`/`lib/blocks/layouts.ts`,
+which is gone — is also how the built-in Sigils layout now works: `core-sigil`
+(`SIGIL_TEMPLATE_ID`) is a normal, editable, deletable template seeded as the default for
+Operations × Sigils, not a hard-wired category special case. `useTemplateNoticeStore` holds the
+one "template applied" notice a freshly created entry shows (Undo / "Other template") —
+store-level because the content stores set it on create and may not import a component.
+Changing an *existing*, still-empty entry's category re-resolves the default for the new
+combination: `isContentEmpty`/`areBlocksEmpty` decide "still empty" (no blocks, or only empty
+plain-text ones with no template origin), and `isUnchangedTemplateContent` decides whether the
+current content is still exactly what the *previous* default would produce — if so, a changed
+category swaps it for the new default instead of leaving the old one stranded; content the user
+touched, or that a since-edited template would no longer reproduce, is left alone.
+
+**Manual insertion, from the editor.** `TemplateInsertion` (blocks sidebar) offers
+`TemplatePickerModal` (search over name/description, ordered by `templatesFor` — assigned to
+this combination first) and, once a template is chosen into a non-empty entry,
+`TemplateApplyDialog` (append or replace, plus checkboxes for title/tags — skipped for an empty
+entry, which just inserts). `store/templateApply.ts` is the seam between the block stack (which
+inserts the blocks itself, `BlockStackApi.applyTemplate`) and everything else a template can
+carry: it flushes the editor's pending saves first (so a title typed a moment ago isn't clobbered
+by the template's own title write), then applies title/tags through the entry's own store.
+`useSaveAsTemplateAction` is the reverse direction — "Save as template" on any entry with a block
+stack creates one from its current (live, if being edited) content and opens it.
+
+**The dashboard page.** `TemplatesView` is a `Dashboard` list of active templates (name, icon,
+description, assignments, entry count, a `template-default-star` if it's a default anywhere);
+clicking one opens `{ type: 'templates', id }`, rendered by `TemplateEditor` on
+`LibraryPageFrame` — the same "Done"-saves-only-changed-fields page shell `BlockDefinitionEditor`
+uses (`src/components/ui/LibraryPageFrame.tsx`, factored out once a second page needed it):
+breadcrumb, icon, "Unsaved" marker, name-as-title input, scrolling body, and
+`EditActionBar`/`SidebarColumn` portalled into the right sidebar. `useDraftPage` is the shell's
+shared draft lifecycle (`src/hooks/useDraftPage.ts`, likewise factored out of
+`BlockDefinitionEditor`'s hand-written version): it mirrors an open page's draft into a
+`DraftStore<T>` (`store/draftStore.ts` — `createDraftStore<T>()` is the one factory behind both
+`useBlockDraftStore` and `useTemplateDraftStore`, so a tab's edits survive `MainArea` unmounting
+the view on a module switch) and, on "Done", writes only the fields that actually changed since
+the page opened (comparing trimmed names) rather than the whole draft — a tag renamed or a star
+taken by another template while the page was open is left as it is instead of being silently
+overwritten. `useShrunkIcon` (`src/hooks/useShrunkIcon.ts`) is the shared "shrink an image icon to
+64px, last write wins" logic behind a draft's icon field, used by both pages. `TemplateAssignments`
+is a template's own sidebar editor for its combinations (star toggles a default, `+` adds one);
+`TemplateDefaultsOverview` is the dashboard's collapsible mirror of the same data — every
+combination (Journal once; Wiki/Operations × all-categories/uncategorized/each category) with a
+`FieldDropdown` to change its default directly, naming what a category without its own default
+falls back to. Both write through `templateStore.setDefaultFor`, and a page's own pending
+assignment edits are reconciled against whatever the overview did meanwhile via
+`mergeAssignmentChanges` (base → draft, replayed onto current) rather than one silently clobbering
+the other. `FieldDropdown` (`src/components/ui/FieldDropdown.tsx`) is a portalled,
+properties-panel-styled `Dropdown` wrapper used by the assignments editor, the defaults overview,
+and `CategorySelect`; `TagsField` (`src/components/sidebar/fields/TagsField.tsx`) is the tags
+field's label-plus-`TagInput` shell, shared by Journal/Wiki/Operations' properties panels and the
+template page.
+
+**Routines became templates, then were removed.** Routines had no UI path since `RoutinesPanel`
+stopped being rendered (see [Module Map](#module-map)) — the store, table and drag channel
+(`routineStore.ts`, `routineDragState.ts`, the `LinkedOpsInput`/`LinkedWikiInput` id-array fields
+that only the panel used) stayed dead code until this cycle removed them outright. Migration v44
+(`migrateRoutinesToTemplates`) turns every row in `routines` into an unassigned template with the
+same id — its Markdown content parsed with raw HTML escaped and only `http(s)`/`mailto` links
+kept (a dedicated `Marked` renderer, not the trusted insertion path routines used to go through),
+its `operation_ids`/`wiki_ids` resolved into the same link-chip blocks `internalLinkBlockHtml`
+produces elsewhere, tags carried as-is — then drops the table; a database backup is written first
+if there was anything to convert. An older `.emeralddb` (backup version below `'8'`) that still
+carries `routines` goes through the same conversion at import time
+(`withRoutinesAsTemplates`), but only *after* the type/category filters run, since a routine's
+link target has to either be in the file or already in the target vault to survive; add-vault
+import keeps the fresh vault's own `core-sigil` template rather than letting an old file's
+version of it (or lack of one) override it.
+
 ### Auto-Save (the `useEntryEditor` hook)
 
 Debounced auto-save (1.5s), save-on-navigate and save-on-unmount live in
@@ -681,7 +823,7 @@ Backlinks are fetched on demand by `fetchBacklinks(targetId)`, which joins the `
 
 The sidebar field has no reference to the TipTap instance of whichever view happens to be open, so it talks to it through three `document`-level custom events defined in `lib/links.ts`: `requestEntryLinkAppend`/`requestEntryLinkReveal`/`requestEntryLinkRemove`, each paired with `subscribeEntryLinkRequest` on the `BlockStack` side, which routes the request to the right text block (see [Content Blocks](#content-blocks)). A request resolves to `true` only when an editable, currently-mounted editor accepted it via `preventDefault()`; the field falls back accordingly — `reveal`, for instance, navigates to the target view instead of jumping to it in text when nothing answered. `isValidLinkTarget` guards all three (and the pre-existing navigate-on-click handler), since the events are reachable by any script in the WebView.
 
-Appending a link (from the field, from `[[`-picker selection, or from a dropped routine's operations/wiki articles) always adds a full block — a horizontal rule, the target's category as an `<h3>`, then the chip — never merges into an existing block; `internalLinkBlockHtml` is the one definition of that shape, shared by the editor's `appendEntryLink`, migrations v36/v37, and `.emerald`/Markdown import's legacy-column bridge (below). Removing a link deletes that whole block if the chip is the sole content of one of these appended blocks (`removeEntryLink` checks for the preceding rule/heading before treating it as one), or just the chip if it sits inline in text the user wrote around it. Appending also jumps to the new block and briefly highlights it via `revealEntryLink`, run a frame later so the chip's node view has actually rendered — the same function the `reveal`-on-click path already used, but with its `caretAtBlockEnd` option set: appending leaves a text selection at the end of the chip's paragraph, ready to keep typing, where clicking an existing chip (`reveal`-on-click, and the field's own "jump to it" navigation) still selects the chip itself as a node, since there "this one" is the point being made. `internalLink` is an inline atom, so its parent is always a textblock — there is no other case to branch on, and the position math no longer pretends there is.
+Appending a link (from the field, from `[[`-picker selection, or from a routine converted to a template, whose linked operations/wiki articles become the same shape — see [Templates](#templates)) always adds a full block — a horizontal rule, the target's category as an `<h3>`, then the chip — never merges into an existing block; `internalLinkBlockHtml` is the one definition of that shape, shared by the editor's `appendEntryLink`, migrations v36/v37, and `.emerald`/Markdown import's legacy-column bridge (below). Removing a link deletes that whole block if the chip is the sole content of one of these appended blocks (`removeEntryLink` checks for the preceding rule/heading before treating it as one), or just the chip if it sits inline in text the user wrote around it. Appending also jumps to the new block and briefly highlights it via `revealEntryLink`, run a frame later so the chip's node view has actually rendered — the same function the `reveal`-on-click path already used, but with its `caretAtBlockEnd` option set: appending leaves a text selection at the end of the chip's paragraph, ready to keep typing, where clicking an existing chip (`reveal`-on-click, and the field's own "jump to it" navigation) still selects the chip itself as a node, since there "this one" is the point being made. `internalLink` is an inline atom, so its parent is always a textblock — there is no other case to branch on, and the position math no longer pretends there is.
 
 If the entry was completely empty (`<p></p>`), the block goes in without its leading horizontal rule — a rule separates the link from the text above it, and there is no text yet. `isBlankContent` (`src/lib/internalLinkHtml.ts`) decides this the same way `extractInternalLinks` decides what's a link: regex over the HTML, no `DOMParser`, since migrations v36/v37 and the schema-check Node harness need to ask the same question outside a browser. `internalLinkBlockHtml` takes a `separator` option for this, and `plainBlockHtml` renders the same shape without a chip, for a legacy value that no longer resolves to anything in this vault (see the v37 note below) — text alone rather than a dead link.
 
@@ -705,7 +847,7 @@ The title bar's search field searches every module by title, tag, and body text.
 
 `searchText.ts`'s `htmlToText()` uses `DOMParser` rather than assigning to `innerHTML` on a detached `<div>` — the parsed document is inert, so an `<img onerror>` that arrived through an import never executes when the search re-parses it (see [Security → Search Text Extraction](security.md#search-text-extraction)). `foldTypography()` reverses TipTap's `Typography` extension (curly quotes, en/em dashes) back to keyboard characters, one character for one character, so a search for `don't` finds an entry stored with a curly apostrophe; the query and the result-row highlighting run through the same folding via the shared `comparable()` helper, so the two never disagree about what matched.
 
-`searchCorpus()` itself does not cap anything — it scores the whole corpus and returns every `SearchHit`, best first. Capping is `useGlobalSearch`'s job, split into two memos: one runs `searchCorpus()` again only when the corpus or the query changes, the other slices that result to `limit` and only depends on `limit` itself. Paging ("Show more" in the dropdown, `TitleBarSearch.tsx`) just grows `limit` by its `PAGE_SIZE` (50), which re-slices the already-scored array instead of re-scoring the corpus — the point of splitting the two memos in the first place, given that the search already reruns on every keystroke. A hit's `key` is `${kind}:${id}` — before v38, when the four category tables (Wiki/Operations/Tasks/Altar) still shared built-in ids (`other`, `herb`, `deity`, …), a category hit's module had to be folded into the key to keep it unique; with one `categories` list there is only one id space and the module suffix is gone. A category hit's `module` field (still present on `SearchHit`, now optional) is the module holding most of that category's entries, resolved when the corpus is built through the shared `categoryUsageCounts`/`dominantCategoryModule` pair. Since categories got a view of their own it is no longer a destination, only the hint shown beside the hit — and a category nothing uses is now openable like any other, where it used to be a dead result. Routines are not part of the corpus — `RoutinesPanel` is currently unrendered (see [Module Map](#module-map)), so there is no view a routine result could open.
+`searchCorpus()` itself does not cap anything — it scores the whole corpus and returns every `SearchHit`, best first. Capping is `useGlobalSearch`'s job, split into two memos: one runs `searchCorpus()` again only when the corpus or the query changes, the other slices that result to `limit` and only depends on `limit` itself. Paging ("Show more" in the dropdown, `TitleBarSearch.tsx`) just grows `limit` by its `PAGE_SIZE` (50), which re-slices the already-scored array instead of re-scoring the corpus — the point of splitting the two memos in the first place, given that the search already reruns on every keystroke. A hit's `key` is `${kind}:${id}` — before v38, when the four category tables (Wiki/Operations/Tasks/Altar) still shared built-in ids (`other`, `herb`, `deity`, …), a category hit's module had to be folded into the key to keep it unique; with one `categories` list there is only one id space and the module suffix is gone. A category hit's `module` field (still present on `SearchHit`, now optional) is the module holding most of that category's entries, resolved when the corpus is built through the shared `categoryUsageCounts`/`dominantCategoryModule` pair. Since categories got a view of their own it is no longer a destination, only the hint shown beside the hit — and a category nothing uses is now openable like any other, where it used to be a dead result. Templates are not part of the corpus — the templates dashboard is a library like Blocks, not a searchable entry type (see [Templates](#templates)).
 
 `viewForSearchHit()` maps a hit to an `ActiveView`. Tasks, tags and categories have no page per record — the hit opens their view addressed by the record's id, and `TasksView`/`TagsView`/`CategoriesView` each run an effect keyed on the `activeView` *object* itself (not the id inside it, which stays the same if the same result is opened twice) that clears search/filters/collapsed state and scrolls the matching row into view; `CategoriesView` has no selection to set, so it highlights the row for two seconds instead. A `handledView` ref stops a later store mutation from re-triggering that scroll-and-clear and from overwriting filters the user has since changed themselves.
 
@@ -810,9 +952,9 @@ Two deliberate exceptions to "the store holds the whole row":
 
 ### Store write serialization
 
-Every content-store update method (`updateEntry`, `updateArticle`, `updateOperation`, `updateTask`/`toggleComplete`, `updateTag`, `updateRoutine`, `updateAltar`/`updateAltarGrid`/`updateAltarResolution`, `updateItem`, `updatePlacement`) follows the same shape: read a snapshot from the store, merge the patch into it, and write the *entire* row back to SQLite. Two overlapping updates to the same entity — an editor autosave firing while the sidebar changes a property, or an altar's automatic thumbnail save overlapping an intention autosave — used to race: whichever finished last won, overwriting the other's fields with a stale snapshot, including content that had just been typed.
+Every content-store update method (`updateEntry`, `updateArticle`, `updateOperation`, `updateTask`/`toggleComplete`, `updateTag`, `updateTemplate`, `updateAltar`/`updateAltarGrid`/`updateAltarResolution`, `updateItem`, `updatePlacement`) follows the same shape: read a snapshot from the store, merge the patch into it, and write the *entire* row back to SQLite. Two overlapping updates to the same entity — an editor autosave firing while the sidebar changes a property, or an altar's automatic thumbnail save overlapping an intention autosave — used to race: whichever finished last won, overwriting the other's fields with a stale snapshot, including content that had just been typed.
 
-`src/lib/serialize.ts` closes that race. `serialized(serialKey(domain, id), task)` chains same-key tasks strictly one after another on a `Map<string, Promise<void>>`, so a merge-and-write always runs against the previous one's result rather than a snapshot taken before it landed. The invariant going forward: **any store method that writes back a whole row from a snapshot must run its write through `serialized()`, keyed per entity id.** `serialKey` types the domains that currently participate (`journal`/`wiki`/`operation`/`task`/`tag`/`routine`/`altar`/`altarItem`/`placement`/`links`). `syncLinks`'s own DELETE+INSERT of a content item's link rows runs under its own `links:<id>` key — fire-and-forgotten from the update method rather than awaited, so a link-sync failure can't block the content save that triggered it. `taskStore.toggleComplete` queues each affected descendant under its own `task:<id>` key rather than one shared key, so a concurrent `updateTask` on a child can't have its `completed` columns rewound by the parent's cascade (or vice versa).
+`src/lib/serialize.ts` closes that race. `serialized(serialKey(domain, id), task)` chains same-key tasks strictly one after another on a `Map<string, Promise<void>>`, so a merge-and-write always runs against the previous one's result rather than a snapshot taken before it landed. The invariant going forward: **any store method that writes back a whole row from a snapshot must run its write through `serialized()`, keyed per entity id.** `serialKey` types the domains that currently participate (`journal`/`wiki`/`operation`/`task`/`tag`/`altar`/`altarItem`/`placement`/`links`/`blockDefinition`/`template`). `syncLinks`'s own DELETE+INSERT of a content item's link rows runs under its own `links:<id>` key — fire-and-forgotten from the update method rather than awaited, so a link-sync failure can't block the content save that triggered it. `taskStore.toggleComplete` queues each affected descendant under its own `task:<id>` key rather than one shared key, so a concurrent `updateTask` on a child can't have its `completed` columns rewound by the parent's cascade (or vice versa).
 
 Deliberately not serialized, each with a comment at its own definition rather than here: `bumpAltarUpdatedAt` (writes only `updated_at`, nothing to race), `swapPlacementZIndex`/`sendPlacementToBack` (write only `z_index` across several placements as one discrete click — holding multiple keys for that isn't worth it, and losing a `z_index` to a racing full-row `updatePlacement` costs a layer order, not content), and the four `updateCategory` variants (write only the columns passed in, no snapshot merge to race against).
 

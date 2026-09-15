@@ -65,7 +65,7 @@ Emerald is the private workspace for your magical practice. A journal, personal 
 
 **Backlinks** — Every journal entry, wiki article, and operation shows all content that references it in a live sidebar panel.
 
-**Routines** — Reusable content templates that drop into any journal entry, automatically merging body text, tags, and linked content.
+**Templates** — Pre-filled starting points for journal entries, wiki articles, and operations: a title, content, and tags, assignable to an entry type and category and optionally set as the default so new entries start with them automatically.
 
 **Export / Import** — Export entries as PDF, Markdown, or the lossless `.emerald` format with embedded images. Import back on any machine. Full database backup and restore via `.emeralddb`.
 
