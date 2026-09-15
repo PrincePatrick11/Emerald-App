@@ -11,6 +11,7 @@ import { useCategoryStore } from '../../store/categoryStore';
 import { useUIStore, ALTAR_LIBRARY_SORTS } from '../../store/uiStore';
 import { useEditActions } from '../../hooks/useEditActions';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
+import { useDisplayedAltar } from '../../hooks/useDisplayedAltar';
 import { getAltarBackgroundStyle, DEFAULT_ALTAR_RESOLUTION, parseResolution, isRatioFormat } from '../../lib/altarConstants';
 import type { AltarItem, AltarRecord } from '../../types';
 import Dashboard, { GroupDivider } from '../ui/Dashboard';
@@ -116,7 +117,10 @@ export default function AltarView() {
     }
   }, [activeView.id, activeAltarId, setActiveAltar, clearActiveAltar]);
 
-  const activeAltar = altars.find((altar) => altar.id === activeAltarId) ?? null;
+  // Ohne den Abgleich mit der Ansicht blitzte beim Öffnen per Link erst das
+  // Dashboard auf — siehe useDisplayedAltar.
+  const activeAltar = useDisplayedAltar();
+  const isAltarLoading = !activeAltar && !!activeView.id && altars.some((altar) => altar.id === activeView.id);
 
   useEffect(() => {
     if (!activeAltar) return;
@@ -262,6 +266,10 @@ export default function AltarView() {
   useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDeleteActive });
 
   const backgroundSrc = imageSrc(activeAltar?.background_image_data);
+
+  // Leerer Rahmen für den einen Ladeschritt — kurz genug, dass nichts
+  // Sichtbares nötig ist, aber eben nicht das Dashboard.
+  if (isAltarLoading) return <div className="h-full" />;
 
   if (!activeAltar) {
     const filtered = search

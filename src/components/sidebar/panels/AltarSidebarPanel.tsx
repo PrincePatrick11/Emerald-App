@@ -23,6 +23,7 @@ import {
 import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../../lib/helpers';
 import Button from '../../ui/Button';
 import { useUIStore } from '../../../store/uiStore';
+import { useDisplayedAltar } from '../../../hooks/useDisplayedAltar';
 import { imageSrc, saveImage } from '../../../lib/images';
 import { PlacedElementRow, PlacedElementInspector } from '../fields/PlacedElementRow';
 import AltarReadingSummary from '../fields/AltarReadingSummary';
@@ -52,7 +53,7 @@ export default function AltarSidebarPanel() {
   const updateAltarResolution = useAltarStore((s) => s.updateAltarResolution);
   const activeView = useUIStore((s) => s.activeView);
   const isEditing = activeView.type === 'altar' && activeView.mode === 'edit';
-  const activeAltar = useAltarStore((s) => s.altars.find((a) => a.id === s.activeAltarId) ?? null);
+  const activeAltar = useDisplayedAltar();
   const gridOpacityPercent = Math.round((activeAltar?.grid_opacity ?? 0) * 100);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
 const noticeTimerRef = useRef<number | null>(null);

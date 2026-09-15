@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAltarStore } from '../../../store/altarStore';
+import { useDisplayedAltar } from '../../../hooks/useDisplayedAltar';
 import {
   ALTAR_BACKGROUND_PRESETS,
   ALTAR_BACKGROUND_STYLES,
@@ -34,7 +35,7 @@ function BackgroundRow({ label, name, style }: { label: string; name: string; st
 
 export default function AltarReadingSummary() {
   const { t } = useTranslation();
-  const activeAltar = useAltarStore((s) => s.altars.find((a) => a.id === s.activeAltarId) ?? null);
+  const activeAltar = useDisplayedAltar();
   const placements = useAltarStore((s) => s.placements);
 
   const customBackgroundPreview = imageSrc(activeAltar?.background_image_data);
