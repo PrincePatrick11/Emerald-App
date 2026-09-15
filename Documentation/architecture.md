@@ -122,7 +122,10 @@ src/
 │                                      ActiveView, the menu counterpart to DashboardItem's
 │                                      middle-click; used by HomeView, WikiView, OperationsView,
 │                                      BlocksView, TemplatesView and the four
-│                                      LeftSidebarEntryList configs)
+│                                      LeftSidebarEntryList configs),
+│                     useDisplayedAltar (the altar the view is actually showing, matched
+│                                      against activeView.id rather than read straight off
+│                                      altarStore — see Altar UI Composition below)
 ├── lib/              db.ts, schema.ts, normalizeSchema.ts, row.ts,
 │                     entryTypeChange.ts (moves a Journal/Wiki/Operation entry into another of
 │                                      the three under the same id, see Edit Mode Architecture
@@ -1192,6 +1195,8 @@ Two modules centralise reusable Tailwind class strings to avoid duplication acro
 ## Altar UI Composition
 
 Altar rendering and editing were split into focused components:
+
+**Which altar is displayed.** `AltarView`, `AltarSidebarPanel`, and `AltarReadingSummary` all read the active altar through `useDisplayedAltar()` (`src/hooks/useDisplayedAltar.ts`) instead of matching `altarStore.activeAltarId` directly. `setActiveAltar` loads an altar's placements asynchronously, so for one tick after `activeView.id` already points at the new altar, the store still holds `null` or the previous altar (and its `placements`). Reading the store directly showed the Altar dashboard, or briefly the old altar, whenever an altar was opened via a link or switched straight to from another altar. `useDisplayedAltar` returns the altar only once `activeAltarId` has caught up to `activeView.id`, `null` otherwise; `AltarView` renders an empty frame for that one tick when the target altar exists but hasn't loaded yet (`isAltarLoading`), and still falls through to the dashboard when `activeView.id` points at an altar that doesn't exist.
 
 - **`src/components/altar/AltarItemVisual.tsx`** — shared visual renderer for altar items (emoji/image and candle animation treatment).
 - **`src/components/altar/AltarCanvas.tsx`** — canvas scene rendering, placement transforms, drag/drop interactions, lock handling, and grid overlay drawing. The internal `_renderAltar(altar, backgroundSrc, placements, nativeW, nativeH, outW)` function owns the off-screen canvas draw pipeline and is shared by two exported helpers: `captureCurrentAltar(): Promise<string | null>` renders at 640 px wide with adaptive JPEG/WebP quality (0.85 → 0.65 → 0.45) capped at 512 KB — used for dashboard thumbnails, safe to call after unmount; `exportCurrentAltarImage(format?: 'jpeg' | 'png' | 'webp'): Promise<string | null>` renders at the full native resolution with no size limit — used by `saveAltarImage()` in `src/lib/altarExport.ts`, which backs the native menu's Export → Export as Image items. The `format` parameter (default `'jpeg'`) controls the output encoding: JPEG at quality 0.97, WebP at quality 0.92, PNG lossless. `captureCurrentAltar` reads altar state from `useAltarStore.getState()` synchronously and is safe to call from a `useEffect` cleanup. The `captureRef` prop mechanism that previously threaded a capture callback through the component tree was removed in favour of these module-level exports. `_renderAltar` draws the grid after the overlay pass (step 3) using the same `resolveResolutionPixels` + `grid_size` → `numCols`/`numRows` arithmetic as the live SVG grid, so captured images and thumbnails are pixel-consistent with the on-screen grid.
