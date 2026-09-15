@@ -9,6 +9,9 @@ import { useBlockDraftStore } from '../../store/draftStore';
 import { AUX_VIEWS } from '../../lib/modules';
 import { definitionLabel } from '../../lib/blocks/blockAttrs';
 import type { BlockDefinition } from '../../lib/blocks/definitions';
+import { BLOCK_PRESETS } from '../../lib/blocks/presets';
+import { usePersistedFlag } from '../../hooks/usePersistedFlag';
+import SidebarSectionHeader from '../sidebar/fields/SidebarSectionHeader';
 import Dashboard from '../ui/Dashboard';
 import DashboardItem from '../ui/DashboardItem';
 import ContextMenu from '../ui/ContextMenu';
@@ -78,6 +81,43 @@ export default function BlocksView() {
       )}
       {deleteModal}
     </>
+  );
+}
+
+/**
+ * Die eingebauten Blöcke in der Seitenleiste unter der Suche — dieselbe Liste
+ * wie „Block hinzufügen" im Eintrag. Nur zum Nachschlagen: anlegen oder
+ * bearbeiten lässt sich an ihnen nichts. Die Suche filtert sie mit.
+ */
+function BuiltInBlocks({ query }: { query: string }) {
+  const { t } = useTranslation();
+  const [open, toggleOpen] = usePersistedFlag('blocks-builtin-open', true);
+  const presets = query
+    ? BLOCK_PRESETS.filter((p) => t(p.labelKey).toLowerCase().includes(query))
+    : BLOCK_PRESETS;
+
+  return (
+    <div className="pt-4 border-t border-stone-700/60">
+      <SidebarSectionHeader label={t('blocks.library.builtIn')} open={open} onToggle={toggleOpen} />
+      {open && (
+        <ul className="mt-2 space-y-0.5">
+          {presets.map((preset) => {
+            const Icon = preset.icon;
+            return (
+              <li
+                key={preset.id}
+                title={preset.descriptionKey ? t(preset.descriptionKey) : undefined}
+                className="flex items-center gap-2 px-2 py-1 text-[11px] text-stone-400"
+              >
+                <Icon size={12} className="flex-shrink-0 text-stone-500" />
+                <span className="truncate">{t(preset.labelKey)}</span>
+              </li>
+            );
+          })}
+          {presets.length === 0 && <li className="px-2 py-1 text-[11px] text-stone-600">{t('search.noResults')}</li>}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -162,6 +202,7 @@ function BlockList({ usage, onCreate, onDelete }: {
         actionLabel: t('blocks.library.newBlock'),
         onAction: onCreate,
       }}
+      sidebarFooter={<BuiltInBlocks query={query} />}
       hasNoResults={filtered.length === 0}
       noResultsMessage={t('search.noResults')}
       contextMenuSlot={ctxMenu && menuDef && (

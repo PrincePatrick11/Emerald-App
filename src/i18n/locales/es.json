@@ -344,6 +344,7 @@
       "defaultName": "Nuevo bloque",
       "untitled": "Bloque sin nombre",
       "newBlock": "Nuevo bloque",
+      "builtIn": "Bloques integrados",
       "customHint": "Arma tu propio bloque a partir de campos — por ejemplo, un registro ritual con fecha, opción y lista de verificación. Una vez guardado, aparece en «Añadir bloque» en cada entrada.",
       "name": "Nombre",
       "namePlaceholder": "Nombre del bloque",

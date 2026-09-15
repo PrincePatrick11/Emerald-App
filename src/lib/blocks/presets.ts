@@ -22,6 +22,8 @@ import type { BlockInstance } from './types';
 export interface BlockPreset {
   id: string;
   labelKey: string;
+  /** Erklärung als Tooltip in der Übersicht der Blöcke-Ansicht — nur wo die Beschriftung nicht reicht. */
+  descriptionKey?: string;
   icon: LucideIcon;
   group: BlockGroup;
   create: () => BlockInstance;
@@ -52,7 +54,7 @@ const KIND_GROUPS: Partial<Record<ElementKind, BlockGroup>> = { link: 'reference
 const FIELD_PRESET_KINDS = ELEMENT_KINDS.filter((kind) => !isSigilKind(kind));
 
 export const BLOCK_PRESETS: readonly BlockPreset[] = [
-  { id: 'text', labelKey: 'blocks.types.text.label', icon: Type, group: 'text', create: () => createTextBlock() },
+  { id: 'text', labelKey: 'blocks.types.text.label', descriptionKey: 'blocks.types.text.description', icon: Type, group: 'text', create: () => createTextBlock() },
   ...FIELD_PRESET_KINDS.map((kind): BlockPreset => ({
     id: `field.${kind}`,
     labelKey: elementKindLabelKey(kind),
@@ -60,9 +62,9 @@ export const BLOCK_PRESETS: readonly BlockPreset[] = [
     group: KIND_GROUPS[kind] ?? 'fields',
     create: () => createFieldsBlock(kind),
   })),
-  { id: 'sigil.calc', labelKey: 'blocks.types.sigilCalc.label', icon: Sparkles, group: 'sigil', create: createSigilCalcBlock },
-  { id: 'sigil.canvas', labelKey: 'blocks.types.sigilCanvas.label', icon: PenTool, group: 'sigil', create: createSigilCanvasBlock },
-  { id: 'sigil.charge', labelKey: 'blocks.types.sigilCharge.label', icon: Zap, group: 'sigil', create: createSigilChargeBlock },
+  { id: 'sigil.calc', labelKey: 'blocks.types.sigilCalc.label', descriptionKey: 'blocks.types.sigilCalc.description', icon: Sparkles, group: 'sigil', create: createSigilCalcBlock },
+  { id: 'sigil.canvas', labelKey: 'blocks.types.sigilCanvas.label', descriptionKey: 'blocks.types.sigilCanvas.description', icon: PenTool, group: 'sigil', create: createSigilCanvasBlock },
+  { id: 'sigil.charge', labelKey: 'blocks.types.sigilCharge.label', descriptionKey: 'blocks.types.sigilCharge.description', icon: Zap, group: 'sigil', create: createSigilChargeBlock },
 ];
 
 const DEFINITION_PRESET_PREFIX = 'def:';

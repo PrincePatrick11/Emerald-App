@@ -344,6 +344,7 @@
       "defaultName": "Nouveau bloc",
       "untitled": "Bloc sans nom",
       "newBlock": "Nouveau bloc",
+      "builtIn": "Blocs intégrés",
       "customHint": "Assemblez votre propre bloc à partir de champs — par exemple un journal de rituel avec date, choix et liste de contrôle. Une fois enregistré, il apparaît sous « Ajouter un bloc » dans chaque entrée.",
       "name": "Nom",
       "namePlaceholder": "Nom du bloc",
