@@ -13,10 +13,9 @@ import { generateId, isImageIcon } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
 import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
 import { entryBlockSummary } from '../../lib/blocks/entrySummary';
-import { imageSrc } from '../../lib/images';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
-import { isCardView, isWideCardView } from '../../lib/viewMode';
+import { isCardView } from '../../lib/viewMode';
 import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import { useUIStore } from '../../store/uiStore';
 import { useOperationStore } from '../../store/operationStore';
@@ -222,7 +221,7 @@ export default function OperationsView() {
       const cat = lookupCategory(catById, op.category_id);
       const iconValue = op.icon || cat?.emoji || '⚡';
       const catDisplayName = cat ? catName(cat) : '';
-      // Eine Operation mit Sigillen-Blöcken bekommt die Sigillen-Karte — egal in welcher Kategorie.
+      // Sigillen-Operationen zeigen in der Zeile das Zieldatum statt Kategorie · Datum.
       const sigil = entryBlockSummary(op.id, op.content).sigil;
       const isSigil = !!sigil;
       const dateStr = `${catDisplayName}${catDisplayName ? ' · ' : ''}${formatEntryDate(op.updated_at)}`;
@@ -241,51 +240,15 @@ export default function OperationsView() {
         >
           {isCardView(view) ? (
             <>
-              {isSigil ? (
-                // In voller Breite gedeckelt: der 4:3-Kasten wäre sonst so
-                // breit wie die Karte und machte die Sigillen-Zeile fünfmal
-                // so hoch wie jede andere. Im Dreier-Raster gleicht das Grid
-                // die Zeilenhöhe selbst aus, dort darf er die Spalte füllen.
-                <div className={`mb-3 overflow-hidden rounded-lg border border-stone-700/40 bg-stone-900/70 ${isWideCardView(view) ? 'w-16 mx-auto' : ''}`}>
-                  <div className="aspect-[4/3] flex items-center justify-center bg-[radial-gradient(circle_at_top,rgba(0,230,153,0.08),transparent_60%)]">
-                    {sigil?.image ? (
-                      <img src={imageSrc(sigil.image)} alt="" loading="lazy" className="h-full w-full object-contain" />
-                    ) : (
-                      <span className="text-xl">{iconValue}</span>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                isImageIcon(iconValue)
-                  ? <img src={iconValue} alt="" className="w-6 h-6 object-cover rounded mb-2" />
-                  : <div className="text-xl mb-2">{iconValue}</div>
-              )}
+              {isImageIcon(iconValue)
+                ? <img src={iconValue} alt="" className="w-6 h-6 object-cover rounded mb-2" />
+                : <div className="text-xl mb-2">{iconValue}</div>}
               {renaming
                 ? renameInput('text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1')
                 : <div className="text-sm font-medium text-stone-200 truncate mb-1">{op.title}</div>}
-              {isSigil ? (
-                <>
-                  <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                    {sigil?.revealDate && (
-                      <span className="text-jade-400/80">{t('creation.targetDate')}: {formatEntryDate(sigil.revealDate)}</span>
-                    )}
-                    <span className="text-parchment-500/70">{createdDate}</span>
-                  </div>
-                  {op.tags.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {op.tags.slice(0, 3).map((tag) => (
-                        <span key={tag} className="rounded bg-stone-700/60 px-1.5 py-0.5 text-xs text-stone-500">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="mt-1">
-                  <span className="text-xs text-parchment-500/70">{dateStr}</span>
-                </div>
-              )}
+              <div className="mt-1">
+                <span className="text-xs text-parchment-500/70">{dateStr}</span>
+              </div>
             </>
           ) : (
             <>
