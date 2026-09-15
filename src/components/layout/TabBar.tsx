@@ -43,19 +43,73 @@ function AltarTabIcon({ iconData }: { iconData: string | null | undefined }) {
   return <span className="text-sm leading-none">{iconData}</span>;
 }
 
+/**
+ * Titel und Icon eines Tabs. Jeder Tab abonniert nur seinen eigenen Eintrag:
+ * die Selektoren liefern das Objekt selbst, das sich nur bei einer Änderung an
+ * genau diesem Eintrag ändert — so zieht eine Umbenennung sofort in den Tab,
+ * ohne dass jeder Autosave eines anderen Eintrags die Leiste neu zeichnet.
+ * (Stabile Getter wie `getEntry` abonnierten nichts: ihre Identität ändert sich nie.)
+ */
+function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: () => void; onClose: () => void }) {
+  const { t } = useTranslation();
+  const { type, id } = view;
+  const entry = useJournalStore((s) => (type === 'journal' && id ? s.entries.find((e) => e.id === id) : undefined));
+  const article = useWikiStore((s) => (type === 'wiki' && id ? s.articles.find((a) => a.id === id) : undefined));
+  const operation = useOperationStore((s) => (type === 'operations' && id ? s.operations.find((o) => o.id === id) : undefined));
+  const task = useTaskStore((s) => (type === 'tasks' && id ? s.tasks.find((task) => task.id === id) : undefined));
+  const altar = useAltarStore((s) => (type === 'altar' && id ? s.altars.find((a) => a.id === id) : undefined));
+  const definition = useBlockDefinitionStore((s) => (type === 'blocks' && id ? s.definitions.find((d) => d.id === id) : undefined));
+  const template = useTemplateStore((s) => (type === 'templates' && id ? s.templates.find((tpl) => tpl.id === id) : undefined));
+  const categoryId = article?.category_id ?? operation?.category_id;
+  const categoryEmoji = useCategoryStore((s) => (categoryId ? s.categories.find((c) => c.id === categoryId)?.emoji : undefined));
+
+  const fallback = getFallbackTitle(view, t);
+  let title = fallback;
+  if (id) {
+    const entityTitle = entry?.title ?? article?.title ?? operation?.title ?? task?.title ?? altar?.title;
+    if (entityTitle) title = entityTitle;
+    else if (definition) title = definitionLabel(t, definition);
+    else if (template) title = templateLabel(t, template);
+  }
+
+  let icon: ReactNode;
+  const Icon = moduleMeta(type)?.icon ?? AUX_VIEWS[type as AuxViewId]?.icon ?? MoreHorizontal;
+  if (type === 'journal' && id) {
+    icon = <span className="text-sm leading-none">{MOON_PHASE_SYMBOLS[entry?.moon_phase as MoonPhase] ?? '📓'}</span>;
+  } else if (type === 'wiki' && id) {
+    icon = renderIconValue(article?.icon, <span className="text-sm leading-none">{categoryEmoji ?? DEFAULT_ENTRY_EMOJI.wiki}</span>);
+  } else if (type === 'operations' && id) {
+    icon = renderIconValue(operation?.icon, <span className="text-sm leading-none">{categoryEmoji ?? '⚡'}</span>);
+  } else if (type === 'altar' && id) {
+    icon = <AltarTabIcon iconData={altar?.icon_data} />;
+  } else if (type === 'blocks' && id) {
+    icon = renderIconValue(definition?.icon, <Icon size={13} />);
+  } else if (type === 'templates' && id) {
+    icon = renderIconValue(template?.icon, <Icon size={13} />);
+  } else {
+    icon = <Icon size={13} />;
+  }
+
+  return (
+    <button
+      onClick={onSelect}
+      onMouseDown={(event) => { if (event.button === 1) event.preventDefault(); }}
+      onAuxClick={(event) => { if (event.button === 1) onClose(); }}
+      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+      title={title}
+    >
+      <span className="flex-shrink-0 text-stone-500">{icon}</span>
+      <span className="truncate">{title}</span>
+      {view.mode === 'edit' && <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-jade-500" title={t('tabBar.editing')} />}
+    </button>
+  );
+}
+
 export default function TabBar() {
   const { t } = useTranslation();
   const { tabs, activeTabId, selectTab, closeTab, addTab, setTabsOrder } = useUIStore(
     useShallow((s) => ({ tabs: s.tabs, activeTabId: s.activeTabId, selectTab: s.selectTab, closeTab: s.closeTab, addTab: s.addTab, setTabsOrder: s.setTabsOrder }))
   );
-  const getEntry = useJournalStore((s) => s.getEntry);
-  const getArticle = useWikiStore((s) => s.getArticle);
-  const getOperation = useOperationStore((s) => s.getOperation);
-  const getTask = useTaskStore((s) => s.getTask);
-  const categories = useCategoryStore((s) => s.categories);
-  const altars = useAltarStore((s) => s.altars);
-  const blockDefinitions = useBlockDefinitionStore((s) => s.definitions);
-  const templates = useTemplateStore((s) => s.templates);
   const scrollRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
@@ -73,56 +127,6 @@ export default function TabBar() {
 
   if (tabs.length === 0) return null;
 
-  const getTitle = (view: ActiveView) => {
-    if (!view.id) return getFallbackTitle(view, t);
-    if (view.type === 'journal') return getEntry(view.id)?.title || getFallbackTitle(view, t);
-    if (view.type === 'wiki') return getArticle(view.id)?.title || getFallbackTitle(view, t);
-    if (view.type === 'operations') return getOperation(view.id)?.title || getFallbackTitle(view, t);
-    if (view.type === 'altar') return altars.find((altar) => altar.id === view.id)?.title || getFallbackTitle(view, t);
-    if (view.type === 'tasks') return getTask(view.id)?.title || getFallbackTitle(view, t);
-    if (view.type === 'blocks') {
-      const def = blockDefinitions.find((d) => d.id === view.id);
-      return def ? definitionLabel(t, def) : getFallbackTitle(view, t);
-    }
-    if (view.type === 'templates') {
-      const template = templates.find((tpl) => tpl.id === view.id);
-      return template ? templateLabel(t, template) : getFallbackTitle(view, t);
-    }
-    return getFallbackTitle(view, t);
-  };
-
-  const getIcon = (view: ActiveView) => {
-    if (view.type === 'journal' && view.id) {
-      const entry = getEntry(view.id);
-      return <span className="text-sm leading-none">{MOON_PHASE_SYMBOLS[entry?.moon_phase as MoonPhase] ?? '📓'}</span>;
-    }
-    if (view.type === 'wiki' && view.id) {
-      const article = getArticle(view.id);
-      const categoryIcon = categories.find((category) => category.id === article?.category_id)?.emoji
-        ?? DEFAULT_ENTRY_EMOJI.wiki;
-      return renderIconValue(article?.icon, <span className="text-sm leading-none">{categoryIcon}</span>);
-    }
-    if (view.type === 'operations' && view.id) {
-      const operation = getOperation(view.id);
-      const categoryIcon = categories.find((category) => category.id === operation?.category_id)?.emoji ?? '⚡';
-      return renderIconValue(operation?.icon, <span className="text-sm leading-none">{categoryIcon}</span>);
-    }
-
-    if (view.type === 'altar' && view.id) {
-      const altar = altars.find((a) => a.id === view.id);
-      return <AltarTabIcon iconData={altar?.icon_data} />;
-    }
-
-    const Icon = moduleMeta(view.type)?.icon ?? AUX_VIEWS[view.type as AuxViewId]?.icon ?? MoreHorizontal;
-    if (view.type === 'blocks' && view.id) {
-      return renderIconValue(blockDefinitions.find((d) => d.id === view.id)?.icon, <Icon size={13} />);
-    }
-    if (view.type === 'templates' && view.id) {
-      return renderIconValue(templates.find((tpl) => tpl.id === view.id)?.icon, <Icon size={13} />);
-    }
-    return <Icon size={13} />;
-  };
-
   return (
     <div className="tabbar relative h-10 flex items-end overflow-hidden px-2 pt-2">
       <LazyMotion features={domAnimation}>
@@ -135,7 +139,6 @@ export default function TabBar() {
         >
           {tabs.map((tab) => {
             const isActive = activeTabId === tab.id;
-            const title = getTitle(tab.view);
             return (
               <Reorder.Item
                 key={tab.id}
@@ -149,17 +152,7 @@ export default function TabBar() {
                     : 'tab-item-idle border-stone-800/60 bg-stone-900/70 text-stone-500 hover:bg-stone-800/60 hover:text-stone-300'
                 }`}
               >
-                <button
-                  onClick={() => selectTab(tab.id)}
-                  onMouseDown={(event) => { if (event.button === 1) event.preventDefault(); }}
-                  onAuxClick={(event) => { if (event.button === 1) closeTab(tab.id); }}
-                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                  title={title}
-                >
-                  <span className="flex-shrink-0 text-stone-500">{getIcon(tab.view)}</span>
-                  <span className="truncate">{title}</span>
-                  {tab.view.mode === 'edit' && <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-jade-500" title={t('tabBar.editing')} />}
-                </button>
+                <TabButton view={tab.view} onSelect={() => selectTab(tab.id)} onClose={() => closeTab(tab.id)} />
                 <button
                   onClick={() => closeTab(tab.id)}
                   className="-mr-1 rounded p-0.5 text-stone-600 opacity-0 transition-colors hover:bg-stone-700 hover:text-stone-200 group-hover:opacity-100"

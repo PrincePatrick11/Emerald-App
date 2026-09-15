@@ -1,5 +1,8 @@
 import { create } from 'zustand';
-import { createTabId, isContentView, type OpenTab } from '../lib/tabs';
+import {
+  createTabId, freshHistory, isContentView, normalizeSavedHistory, pushHistory, stripSessionFlags,
+  type NavHistory, type OpenTab,
+} from '../lib/tabs';
 import { isLibraryView, isViewId, moduleMeta, type LeftListTabId } from '../lib/modules';
 import { normalizeEditorFontId, normalizeThemeId, normalizeUIFontId } from '../themes/theme';
 import type { ActiveView } from '../types';
@@ -47,8 +50,9 @@ interface UIState {
   activeView: ActiveView;
   tabs: OpenTab[];
   activeTabId: string | null;
-  history: ActiveView[];
-  historyIndex: number;
+  /** Der Verlauf, solange kein Tab offen ist. Mit Tabs führt jeder Tab seinen
+   *  eigenen (`OpenTab.history`); `selectActiveHistory` wählt den passenden. */
+  tablessHistory: NavHistory;
   rightSidebarOpen: boolean;
   /** Das Portal-Ziel, das die rechte Seitenleiste in Listenansichten stellt.
    *  Dashboard portalt seinen kompletten Kopf (Titel, Aktionen, Toolbar,
@@ -170,14 +174,18 @@ function loadSavedEditorFontId(): FontId {
 
 function normalizeSavedTab(tab: unknown): OpenTab | null {
   if (!tab || typeof tab !== 'object') return null;
-  const candidate = tab as { id?: string; key?: string; view?: ActiveView };
+  const candidate = tab as { id?: string; key?: string; view?: ActiveView; history?: unknown };
   // isViewId: localStorage kann Tab-Typen aus älteren Versionen tragen —
   // die fallen hier sauber weg, statt als Geister-View zu rendern.
   if (!candidate.view?.type || !isViewId(candidate.view.type)) return null;
   // isNew ist ein Sitzungs-Flag, kein Tab-Zustand: überlebte es den Neustart,
   // würde Cancel einen längst autogespeicherten Eintrag endgültig löschen.
-  const { isNew: _isNew, ...view } = candidate.view;
-  return { id: candidate.id ?? candidate.key ?? createTabId(), view };
+  const view = stripSessionFlags(candidate.view);
+  return {
+    id: candidate.id ?? candidate.key ?? createTabId(),
+    view,
+    history: normalizeSavedHistory(candidate.history, view),
+  };
 }
 
 function loadSavedTabs(): { tabs: OpenTab[]; activeTabId: string | null } {
@@ -208,16 +216,23 @@ export function isAltarFullscreen(s: Pick<UIState, 'activeView' | 'altarWindowFu
   return s.activeView.type === 'altar' && s.activeView.mode !== 'edit' && s.altarWindowFullscreen;
 }
 
-function withNavigationState(s: UIState, view: ActiveView) {
-  const current = s.history[s.historyIndex];
-  const isDifferentPage = !current || current.type !== view.type || current.id !== view.id;
-  if (!isDifferentPage) return { activeView: view };
-  // isNew nicht in die History: käme man per Back auf die frische Edit-View
-  // zurück, würde Cancel einen längst autogespeicherten Eintrag löschen —
-  // gleiche Regel wie beim Tab-Restore in normalizeSavedTab.
-  const { isNew: _isNew, ...historyView } = view;
-  const history = [...s.history.slice(0, s.historyIndex + 1), historyView];
-  return { activeView: view, history, historyIndex: history.length - 1 };
+/** Der Verlauf, durch den Zurück und Vor gerade gehen: der des aktiven Tabs, sonst der tablose. */
+export function selectActiveHistory(s: Pick<UIState, 'tabs' | 'activeTabId' | 'tablessHistory'>): NavHistory {
+  if (!s.activeTabId) return s.tablessHistory;
+  return s.tabs.find((tab) => tab.id === s.activeTabId)?.history ?? s.tablessHistory;
+}
+
+/** Ein Schritt durch den aktiven Verlauf; `{}`, wenn es in die Richtung nicht weitergeht. */
+function stepHistory(s: UIState, delta: -1 | 1): Partial<UIState> {
+  const history = selectActiveHistory(s);
+  const index = history.index + delta;
+  if (index < 0 || index >= history.views.length) return {};
+  const activeView = history.views[index];
+  const next = { ...history, index };
+  if (!s.activeTabId) return { activeView, tablessHistory: next };
+  const tabs = s.tabs.map((tab) => tab.id === s.activeTabId ? { ...tab, view: activeView, history: next } : tab);
+  saveTabs(tabs, s.activeTabId);
+  return { activeView, tabs };
 }
 
 const savedTabs = loadSavedTabs();
@@ -228,8 +243,7 @@ export const useUIStore = create<UIState>((set) => ({
     : { type: 'home' },
   tabs: savedTabs.tabs,
   activeTabId: savedTabs.activeTabId,
-  history: [{ type: 'home' }],
-  historyIndex: 0,
+  tablessHistory: freshHistory({ type: 'home' }),
   rightSidebarOpen: true,
   listHeaderHost: null,
   dashboardMounted: false,
@@ -300,15 +314,21 @@ export const useUIStore = create<UIState>((set) => ({
 
     let tabs = s.tabs;
     let activeTabId = s.activeTabId;
+    let tablessHistory = s.tablessHistory;
     if (activeTabId) {
-      tabs = tabs.map((tab) => tab.id === activeTabId ? { ...tab, view } : tab);
+      tabs = tabs.map((tab) => tab.id === activeTabId ? { ...tab, view, history: pushHistory(tab.history, view) } : tab);
     } else if (isContentView(view)) {
+      // Der automatisch geöffnete Tab setzt den Weg davor fort: Zurück führt
+      // dorthin, von wo aus der Eintrag geöffnet wurde.
       activeTabId = createTabId();
-      tabs = [{ id: activeTabId, view }];
+      tabs = [{ id: activeTabId, view, history: pushHistory(s.tablessHistory, view) }];
+      tablessHistory = freshHistory({ type: 'home' });
+    } else {
+      tablessHistory = pushHistory(s.tablessHistory, view);
     }
     saveTabs(tabs, activeTabId);
 
-    return { ...withNavigationState(s, view), tabs, activeTabId, ...openSidebar };
+    return { activeView: view, tabs, activeTabId, tablessHistory, ...openSidebar };
   }),
 
   // Fuer Vault-Wechsel und Replace-Import: Tabs und History tragen Eintrags-IDs,
@@ -320,32 +340,33 @@ export const useUIStore = create<UIState>((set) => ({
       tabs: [],
       activeTabId: null,
       activeView: { type: 'home' },
-      history: [{ type: 'home' }],
-      historyIndex: 0,
+      tablessHistory: freshHistory({ type: 'home' }),
       // Die Klapp-Zustände zeigen per Kategorie-id in den alten Vault.
       collapsedGroups: {},
     };
   }),
 
+  // Ein neuer Tab beginnt mit einem frischen Verlauf.
   openViewInNewTab: (view) => set((s) => {
     const id = createTabId();
-    const tabs = [...s.tabs, { id, view }];
+    const tabs = [...s.tabs, { id, view, history: freshHistory(view) }];
     saveTabs(tabs, id);
-    return { ...withNavigationState(s, view), tabs, activeTabId: id };
+    return { activeView: view, tabs, activeTabId: id };
   }),
 
   addTab: (view = { type: 'home' }) => set((s) => {
     const id = createTabId();
-    const tabs = [...s.tabs, { id, view }];
+    const tabs = [...s.tabs, { id, view, history: freshHistory(view) }];
     saveTabs(tabs, id);
-    return { ...withNavigationState(s, view), tabs, activeTabId: id };
+    return { activeView: view, tabs, activeTabId: id };
   }),
 
+  // Der Tabwechsel ist kein Schritt im Verlauf — er wechselt nur, welcher Verlauf gilt.
   selectTab: (id) => set((s) => {
     const tab = s.tabs.find((candidate) => candidate.id === id);
     if (!tab) return {};
     saveTabs(s.tabs, id);
-    return { ...withNavigationState(s, tab.view), activeTabId: id };
+    return { activeView: tab.view, activeTabId: id };
   }),
 
   setTabsOrder: (ids) => set((s) => {
@@ -373,10 +394,12 @@ export const useUIStore = create<UIState>((set) => ({
     }
 
     const nextTab = tabs[Math.min(tabIndex, tabs.length - 1)] ?? tabs[tabIndex - 1];
-    const activeTabId = nextTab?.id ?? null;
-    const nextView = nextTab?.view ?? { type: 'home' as const };
-    saveTabs(tabs, activeTabId);
-    return { ...withNavigationState(s, nextView), tabs, activeTabId };
+    saveTabs(tabs, nextTab?.id ?? null);
+    // Der Verlauf des geschlossenen Tabs geht mit ihm; ohne Tab beginnt der tablose frisch.
+    if (!nextTab) {
+      return { tabs, activeTabId: null, activeView: { type: 'home' }, tablessHistory: freshHistory({ type: 'home' }) };
+    }
+    return { tabs, activeTabId: nextTab.id, activeView: nextTab.view };
   }),
 
   closeOtherTabs: (id) => set((s) => {
@@ -384,26 +407,11 @@ export const useUIStore = create<UIState>((set) => ({
     if (!tab) return {};
     const tabs = [tab];
     saveTabs(tabs, tab.id);
-    return { ...withNavigationState(s, tab.view), tabs, activeTabId: tab.id };
+    return { activeView: tab.view, tabs, activeTabId: tab.id };
   }),
 
-  navigateBack: () => set((s) => {
-    if (s.historyIndex <= 0) return {};
-    const historyIndex = s.historyIndex - 1;
-    const activeView = s.history[historyIndex];
-    const tabs = s.activeTabId ? s.tabs.map((tab) => tab.id === s.activeTabId ? { ...tab, view: activeView } : tab) : s.tabs;
-    saveTabs(tabs, s.activeTabId);
-    return { historyIndex, activeView, tabs };
-  }),
-
-  navigateForward: () => set((s) => {
-    if (s.historyIndex >= s.history.length - 1) return {};
-    const historyIndex = s.historyIndex + 1;
-    const activeView = s.history[historyIndex];
-    const tabs = s.activeTabId ? s.tabs.map((tab) => tab.id === s.activeTabId ? { ...tab, view: activeView } : tab) : s.tabs;
-    saveTabs(tabs, s.activeTabId);
-    return { historyIndex, activeView, tabs };
-  }),
+  navigateBack: () => set((s) => stepHistory(s, -1)),
+  navigateForward: () => set((s) => stepHistory(s, 1)),
   toggleRightSidebar: () => set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),
 
   // Als Ref-Callback gedacht: React ruft ihn beim Unmount mit `null` auf,

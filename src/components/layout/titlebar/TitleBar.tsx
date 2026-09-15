@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { isAltarFullscreen, useUIStore } from '../../../store/uiStore';
+import { isAltarFullscreen, selectActiveHistory, useUIStore } from '../../../store/uiStore';
 import { hasActiveVault, useVaultStore } from '../../../store/vaultStore';
 import { usesCustomWindowControls, usesHtmlMenuBar } from '../../../lib/platform';
 import EmeraldMark from '../../ui/EmeraldMark';
@@ -42,8 +42,12 @@ export default function TitleBar() {
   const { t, i18n } = useTranslation();
   const navigateBack = useUIStore((s) => s.navigateBack);
   const navigateForward = useUIStore((s) => s.navigateForward);
-  const history = useUIStore((s) => s.history);
-  const historyIndex = useUIStore((s) => s.historyIndex);
+  // Der Verlauf des aktiven Tabs — jeder Tab führt seinen eigenen.
+  const canGoBack = useUIStore((s) => selectActiveHistory(s).index > 0);
+  const canGoForward = useUIStore((s) => {
+    const history = selectActiveHistory(s);
+    return history.index < history.views.length - 1;
+  });
 
   // The altar's distraction-free mode hides the sidebars and the tab bar. The
   // title bar stays — on Windows and Linux it holds the only way to close,
@@ -137,12 +141,12 @@ export default function TitleBar() {
 
         {!minimal && (
           <div className="flex items-center gap-0.5 flex-shrink-0">
-            <RailButton onClick={navigateBack} disabled={historyIndex <= 0} title={t('titlebar.back')}>
+            <RailButton onClick={navigateBack} disabled={!canGoBack} title={t('titlebar.back')}>
               <ArrowLeft size={14} />
             </RailButton>
             <RailButton
               onClick={navigateForward}
-              disabled={historyIndex >= history.length - 1}
+              disabled={!canGoForward}
               title={t('titlebar.forward')}
             >
               <ArrowRight size={14} />
