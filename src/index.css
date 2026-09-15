@@ -262,11 +262,12 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     background: var(--shell-bg);
   }
 
-  /* Das Ein-/Ausblenden der Seitenleisten (`AppShell`). Die Dauer haengt mit
-     SIDEBAR_ANIM_MS dort zusammen, das den Inhalt so lange gemountet laesst.
+  /* Das Ein-/Ausblenden der Seitenleisten (`AppShell`); `margin-left` schiebt
+     die Rail aus dem Bild. Die Dauer haengt mit SIDEBAR_ANIM_MS dort
+     zusammen, das den Inhalt so lange gemountet laesst.
      Waehrend eines Resize-Drags nimmt `AppShell` die Klasse weg. */
   .app-sidebar-animated {
-    transition: width 200ms ease-out;
+    transition: width 200ms ease-out, margin-left 200ms ease-out;
   }
 
   /* Steht danach und ist gleich spezifisch, gewinnt also ueber die

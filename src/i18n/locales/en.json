@@ -686,6 +686,7 @@
     "view": "View",
     "export": "Export",
     "import": "Import",
+    "rail": "Navigation Rail",
     "entryList": "Entry List",
     "properties": "Properties",
     "resetView": "Reset View",

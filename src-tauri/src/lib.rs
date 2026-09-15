@@ -327,10 +327,19 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
     // "Show …" and "Hide …". `set_view_menu_checked` keeps them in sync with
     // the store, which the rail's own toggles can change just as well.
     //
-    // Both start ticked because `uiStore`'s `leftListOpen` / `rightSidebarOpen`
-    // both default to true. That is a second copy of a frontend default, and
-    // what keeps it honest is `AppShell`'s mount-time `set_view_menu_checked`,
-    // which corrects it on the first render regardless.
+    // All three start ticked because `uiStore`'s `railOpen`, `leftListOpen`
+    // and `rightSidebarOpen` all default to true. That is a second copy of a
+    // frontend default — all three are even restored from localStorage and
+    // can start false — and what keeps it honest is `AppShell`'s mount-time
+    // `set_view_menu_checked`, which corrects it on the first render regardless.
+    let toggle_rail_item = CheckMenuItem::with_id(
+        app,
+        "toggle-rail",
+        "Navigation Rail",
+        true,
+        true,
+        None::<&str>,
+    )?;
     let toggle_left_item = CheckMenuItem::with_id(
         app,
         "toggle-left-list",
@@ -358,6 +367,7 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
         None::<&str>,
     )?;
     let view_submenu = Submenu::with_id_and_items(app, "view-submenu", "View", true, &[
+        &toggle_rail_item,
         &toggle_left_item,
         &toggle_right_item,
         &PredefinedMenuItem::separator(app)?,
@@ -459,6 +469,7 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
         match event.id().as_ref() {
             "reset-sidebar-widths" => { app.emit("reset-sidebar-widths", ()).ok(); }
             "show-splash"          => { app.emit("show-splash", ()).ok(); }
+            "toggle-rail"          => { app.emit("toggle-rail", ()).ok(); }
             "toggle-left-list"     => { app.emit("toggle-left-list", ()).ok(); }
             "toggle-right-sidebar" => { app.emit("toggle-right-sidebar", ()).ok(); }
             "export-pdf"           => { app.emit("export-pdf", ()).ok(); }
@@ -554,11 +565,11 @@ fn set_export_menu_enabled(app: tauri::AppHandle, entry_enabled: bool, pdf_enabl
     }
 }
 
-/// Mirrors the frontend's sidebar visibility onto the View menu's two check
+/// Mirrors the frontend's sidebar visibility onto the View menu's check
 /// items. Called on every change, because the rail's own toggle buttons can
 /// flip the same state without the menu ever being opened.
 #[tauri::command]
-fn set_view_menu_checked(app: tauri::AppHandle, left_list: bool, right_sidebar: bool) {
+fn set_view_menu_checked(app: tauri::AppHandle, rail: bool, left_list: bool, right_sidebar: bool) {
     use tauri::menu::MenuItemKind;
     let Some(menu) = app.menu() else { return };
 
@@ -568,6 +579,7 @@ fn set_view_menu_checked(app: tauri::AppHandle, left_list: bool, right_sidebar: 
             for child in sub.items().unwrap_or_default() {
                 if let MenuItemKind::Check(item) = &child {
                     match item.id().0.as_str() {
+                        "toggle-rail" => { item.set_checked(rail).ok(); }
                         "toggle-left-list" => { item.set_checked(left_list).ok(); }
                         "toggle-right-sidebar" => { item.set_checked(right_sidebar).ok(); }
                         _ => {}
@@ -616,6 +628,7 @@ fn update_menu_labels(
     import: String,
     reset_view: String,
     show_splash: String,
+    rail: String,
     entry_list: String,
     properties: String,
     export_pdf: String,
@@ -647,11 +660,12 @@ fn update_menu_labels(
             }
             // Update items inside this submenu
             for child in sub.items().unwrap_or_default() {
-                // The View menu's two toggles are `Check` items, not plain
+                // The View menu's toggles are `Check` items, not plain
                 // ones — without their own arm they would keep the English
                 // labels they were built with.
                 if let MenuItemKind::Check(item) = &child {
                     let new_check_text = match item.id().0.as_str() {
+                        "toggle-rail" => Some(rail.as_str()),
                         "toggle-left-list" => Some(entry_list.as_str()),
                         "toggle-right-sidebar" => Some(properties.as_str()),
                         _ => None,

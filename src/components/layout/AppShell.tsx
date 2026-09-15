@@ -70,6 +70,7 @@ export default function AppShell() {
   const activeVaultId = useVaultStore((s) => s.activeVaultId);
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const leftListOpen = useUIStore((s) => s.leftListOpen);
+  const railOpen = useUIStore((s) => s.railOpen);
   const activeView = useUIStore((s) => s.activeView);
   const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
   const navigateBack = useUIStore((s) => s.navigateBack);
@@ -128,6 +129,7 @@ export default function AppShell() {
       import:          t('menu.import'),
       resetView:       t('menu.resetView'),
       showSplash:      t('menu.showSplash'),
+      rail:            t('menu.rail'),
       entryList:       t('menu.entryList'),
       properties:      t('menu.properties'),
       exportPdf:       t('menu.exportPdf'),
@@ -157,13 +159,13 @@ export default function AppShell() {
       .catch(() => {/* desktop-only, ignore in browser preview */});
   }, [activeView.type, activeView.id, activeView.mode]);
 
-  // Same idea for the View menu's two check items — this state also changes
+  // Same idea for the View menu's check items — this state also changes
   // without the menu ever being opened (`setActiveView` opens the right
   // sidebar for edit mode).
   useEffect(() => {
-    invoke('set_view_menu_checked', { leftList: leftListOpen, rightSidebar: rightSidebarOpen })
+    invoke('set_view_menu_checked', { rail: railOpen, leftList: leftListOpen, rightSidebar: rightSidebarOpen })
       .catch(() => {/* desktop-only, ignore in browser preview */});
-  }, [leftListOpen, rightSidebarOpen]);
+  }, [railOpen, leftListOpen, rightSidebarOpen]);
 
   useEffect(() => {
     const unlistenBack = listen('navigate-back', () => navigateBack());
@@ -280,15 +282,23 @@ export default function AppShell() {
       >
         {!isAltarWindowFullscreen && (
           <aside
-            // Die Trennlinie darf hier am <aside> bleiben: die Rail klappt nie
-            // weg, die linke Leiste wird also nie schmaler als 56px.
-            className={`app-sidebar app-sidebar-left flex-shrink-0 border-r border-stone-700/60 relative overflow-hidden${
-              resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`
-            }`}
-            style={{ width: RAIL_WIDTH + (leftListOpen ? entryListWidth : 0) }}
+            // Die Trennlinie sitzt am <aside>, faellt aber weg, sobald Rail und
+            // Liste beide zu sind — bei Breite 0 bliebe sonst ein 1px-Strich
+            // am Fensterrand stehen. Die Rail bringt ihre eigene Linie mit.
+            className={`app-sidebar app-sidebar-left flex-shrink-0 relative overflow-hidden${
+              railOpen || leftListOpen ? ' border-r border-stone-700/60' : ''
+            }${resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`}`}
+            style={{ width: (railOpen ? RAIL_WIDTH : 0) + (leftListOpen ? entryListWidth : 0) }}
           >
-            <div className="flex h-full" style={{ width: RAIL_WIDTH + entryListWidth }}>
-              <LeftSidebarRail />
+            {/* Eine ausgeblendete Rail schiebt der negative Rand nach links
+                aus dem Bild, damit die Liste an ihre Stelle rueckt. */}
+            <div
+              className={`flex h-full${resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`}`}
+              style={{ width: RAIL_WIDTH + entryListWidth, marginLeft: railOpen ? 0 : -RAIL_WIDTH }}
+            >
+              <div className="flex-shrink-0 h-full flex" inert={!railOpen} aria-hidden={!railOpen}>
+                <LeftSidebarRail />
+              </div>
               <div
                 className="flex-shrink-0 h-full flex"
                 style={{ width: entryListWidth }}

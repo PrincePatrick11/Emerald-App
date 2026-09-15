@@ -25,6 +25,7 @@ import MenuDropdown, { type MenuNode } from './MenuDropdown';
 export default function TitleBarMenuBar({ compact }: { compact: boolean }) {
   const { t } = useTranslation();
   const activeView = useUIStore((s) => s.activeView);
+  const railOpen = useUIStore((s) => s.railOpen);
   const leftListOpen = useUIStore((s) => s.leftListOpen);
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
@@ -54,6 +55,7 @@ export default function TitleBarMenuBar({ compact }: { compact: boolean }) {
       id: 'view',
       label: t('menu.view'),
       nodes: [
+        { kind: 'item', label: t('menu.rail'), checked: railOpen, onSelect: () => dispatchMenuAction('toggle-rail') },
         { kind: 'item', label: t('menu.entryList'), checked: leftListOpen, onSelect: () => dispatchMenuAction('toggle-left-list') },
         { kind: 'item', label: t('menu.properties'), checked: rightSidebarOpen, onSelect: () => dispatchMenuAction('toggle-right-sidebar') },
         { kind: 'separator' },

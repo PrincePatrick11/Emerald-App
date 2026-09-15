@@ -686,6 +686,7 @@
     "view": "Affichage",
     "export": "Exporter",
     "import": "Importer",
+    "rail": "Barre de navigation",
     "entryList": "Liste des entrées",
     "properties": "Propriétés",
     "resetView": "Réinitialiser la vue",

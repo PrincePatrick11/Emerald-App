@@ -53,6 +53,9 @@ interface UIState {
   /** Der Verlauf, solange kein Tab offen ist. Mit Tabs führt jeder Tab seinen
    *  eigenen (`OpenTab.history`); `selectActiveHistory` wählt den passenden. */
   tablessHistory: NavHistory;
+  /** Wie `railOpen` und `leftListOpen` dauerhaft (localStorage). Gespeichert
+   *  wird nur, was der Nutzer selbst umschaltet — das erzwungene Aufklappen in
+   *  `setActiveView` nicht. */
   rightSidebarOpen: boolean;
   /** Das Portal-Ziel, das die rechte Seitenleiste in Listenansichten stellt.
    *  Dashboard portalt seinen kompletten Kopf (Titel, Aktionen, Toolbar,
@@ -70,6 +73,8 @@ interface UIState {
    *  Wiki und Operationen ebenfalls auf ihr Dashboard zurueckfallen. */
   dashboardMounted: boolean;
   editActions: EditActions | null;
+  /** Die Rail ganz links. Dauerhaft (localStorage), wie `leftListOpen`. */
+  railOpen: boolean;
   leftListOpen: boolean;
   leftListTab: LeftListTabId;
   searchQuery: string;
@@ -120,6 +125,7 @@ interface UIState {
   setListHeaderHost: (el: HTMLElement | null) => void;
   setDashboardMounted: (mounted: boolean) => void;
   setEditActions: (actions: EditActions | null) => void;
+  toggleRail: () => void;
   toggleLeftList: () => void;
   setLeftListTab: (tab: LeftListTabId) => void;
   setSearchQuery: (q: string) => void;
@@ -144,6 +150,18 @@ interface UIState {
 const ALTAR_SHOW_PREVIEW_KEY = 'altar-show-preview';
 const ALTAR_LIBRARY_SORT_KEY = 'altar-library-sort';
 const ALTAR_LIBRARY_GROUPING_KEY = 'altar-library-grouping';
+const RAIL_OPEN_KEY = 'rail-open';
+const LEFT_LIST_OPEN_KEY = 'left-list-open';
+const RIGHT_SIDEBAR_OPEN_KEY = 'right-sidebar-open';
+
+/** Die drei Seitenleisten starten offen, solange nichts anderes gespeichert ist. */
+function loadOpenFlag(key: string): boolean {
+  return localStorage.getItem(key) !== '0';
+}
+
+function saveOpenFlag(key: string, open: boolean) {
+  localStorage.setItem(key, open ? '1' : '0');
+}
 
 function loadAltarLibraryPrefs(): AltarLibraryPrefs {
   // Gespeicherte Werte werden geprüft, nicht geglaubt: der Schlüssel überlebt
@@ -216,6 +234,13 @@ export function isAltarFullscreen(s: Pick<UIState, 'activeView' | 'altarWindowFu
   return s.activeView.type === 'altar' && s.activeView.mode !== 'edit' && s.altarWindowFullscreen;
 }
 
+/** Save/Cancel/Delete live only in the right sidebar, so edit mode must not start with it closed.
+ *  A user-built block's or template's page is always editing and keeps its Save there too. */
+function viewNeedsSidebar(view: ActiveView): boolean {
+  const usesEditorSidebar = moduleMeta(view.type)?.usesEditorSidebar ?? false;
+  return (view.mode === 'edit' && usesEditorSidebar) || (isLibraryView(view.type) && !!view.id);
+}
+
 /** Der Verlauf, durch den Zurück und Vor gerade gehen: der des aktiven Tabs, sonst der tablose. */
 export function selectActiveHistory(s: Pick<UIState, 'tabs' | 'activeTabId' | 'tablessHistory'>): NavHistory {
   if (!s.activeTabId) return s.tablessHistory;
@@ -236,19 +261,23 @@ function stepHistory(s: UIState, delta: -1 | 1): Partial<UIState> {
 }
 
 const savedTabs = loadSavedTabs();
+const initialView: ActiveView = savedTabs.activeTabId
+  ? savedTabs.tabs.find((tab) => tab.id === savedTabs.activeTabId)?.view ?? { type: 'home' }
+  : { type: 'home' };
 
 export const useUIStore = create<UIState>((set) => ({
-  activeView: savedTabs.activeTabId
-    ? savedTabs.tabs.find((tab) => tab.id === savedTabs.activeTabId)?.view ?? { type: 'home' }
-    : { type: 'home' },
+  activeView: initialView,
   tabs: savedTabs.tabs,
   activeTabId: savedTabs.activeTabId,
   tablessHistory: freshHistory({ type: 'home' }),
-  rightSidebarOpen: true,
+  // Ein wiederhergestellter Tab im Bearbeitungsmodus braucht die Leiste, auch
+  // wenn sie zuletzt zugeklappt war — dieselbe Regel wie in `setActiveView`.
+  rightSidebarOpen: loadOpenFlag(RIGHT_SIDEBAR_OPEN_KEY) || viewNeedsSidebar(initialView),
   listHeaderHost: null,
   dashboardMounted: false,
   editActions: null,
-  leftListOpen: true,
+  railOpen: loadOpenFlag(RAIL_OPEN_KEY),
+  leftListOpen: loadOpenFlag(LEFT_LIST_OPEN_KEY),
   leftListTab: 'journal',
   searchQuery: '',
   theme: loadSavedTheme(),
@@ -304,11 +333,7 @@ export const useUIStore = create<UIState>((set) => ({
   }),
 
   setActiveView: (view) => set((s) => {
-    // Save/Cancel/Delete live only in the right sidebar, so edit mode must not start with it closed.
-    // A user-built block's or template's page is always editing and keeps its Save there too.
-    const usesEditorSidebar = moduleMeta(view.type)?.usesEditorSidebar ?? false;
-    const needsSidebar = (view.mode === 'edit' && usesEditorSidebar) || (isLibraryView(view.type) && !!view.id);
-    const openSidebar = needsSidebar && !s.rightSidebarOpen
+    const openSidebar = viewNeedsSidebar(view) && !s.rightSidebarOpen
       ? { rightSidebarOpen: true }
       : {};
 
@@ -412,14 +437,27 @@ export const useUIStore = create<UIState>((set) => ({
 
   navigateBack: () => set((s) => stepHistory(s, -1)),
   navigateForward: () => set((s) => stepHistory(s, 1)),
-  toggleRightSidebar: () => set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),
+  toggleRightSidebar: () => set((s) => {
+    const rightSidebarOpen = !s.rightSidebarOpen;
+    saveOpenFlag(RIGHT_SIDEBAR_OPEN_KEY, rightSidebarOpen);
+    return { rightSidebarOpen };
+  }),
 
   // Als Ref-Callback gedacht: React ruft ihn beim Unmount mit `null` auf,
   // womit der Dashboard-Kopf mit der Leiste verschwindet.
   setListHeaderHost: (el) => set((s) => (s.listHeaderHost === el ? s : { listHeaderHost: el })),
   setDashboardMounted: (mounted) => set((s) => (s.dashboardMounted === mounted ? s : { dashboardMounted: mounted })),
   setEditActions: (actions) => set({ editActions: actions }),
-  toggleLeftList: () => set((s) => ({ leftListOpen: !s.leftListOpen })),
+  toggleRail: () => set((s) => {
+    const railOpen = !s.railOpen;
+    saveOpenFlag(RAIL_OPEN_KEY, railOpen);
+    return { railOpen };
+  }),
+  toggleLeftList: () => set((s) => {
+    const leftListOpen = !s.leftListOpen;
+    saveOpenFlag(LEFT_LIST_OPEN_KEY, leftListOpen);
+    return { leftListOpen };
+  }),
   setLeftListTab: (tab) => set({ leftListTab: tab }),
   setSearchQuery: (q) => set({ searchQuery: q }),
   setJournalPrefs: (p) => set((s) => ({ journalPrefs: { ...s.journalPrefs, ...p } })),

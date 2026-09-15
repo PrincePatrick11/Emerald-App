@@ -15,6 +15,7 @@ import type { ActiveView } from '../types';
  */
 export type MenuActionId =
   | 'reset-sidebar-widths'
+  | 'toggle-rail'
   | 'toggle-left-list'
   | 'toggle-right-sidebar'
   | 'show-splash'
@@ -38,6 +39,7 @@ export type SelfContainedMenuActionId = Exclude<MenuActionId, 'reset-sidebar-wid
 // listing it here is a compile error, not a menu item that silently stops
 // working on macOS.
 const SELF_CONTAINED: Record<SelfContainedMenuActionId, true> = {
+  'toggle-rail': true,
   'toggle-left-list': true,
   'toggle-right-sidebar': true,
   'show-splash': true,
@@ -55,13 +57,16 @@ export const SELF_CONTAINED_MENU_ACTIONS = Object.keys(SELF_CONTAINED) as SelfCo
 
 /** Runs a menu action. Errors surface as native dialogs, matching the previous behaviour. */
 export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void> {
-  // Diese beiden brauchen keinen Vault und stehen deshalb vor der Sperre
+  // Diese drei brauchen keinen Vault und stehen deshalb vor der Sperre
   // unten. Sie muessen es sogar: muda, Tauris Menue-Crate, kippt das Haekchen
   // eines nativen Check-Eintrags selbst, bevor es das Event schickt — ein
   // frueher Rueckkehren liesse auf macOS ein Haekchen ohne Zustand dahinter
   // stehen, das der auf genau diesen Zustand gekeyte Sync-Effekt in
   // `AppShell` nie korrigieren wuerde.
   switch (id) {
+    case 'toggle-rail':
+      useUIStore.getState().toggleRail();
+      return;
     case 'toggle-left-list':
       useUIStore.getState().toggleLeftList();
       return;
@@ -69,7 +74,7 @@ export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void
       useUIStore.getState().toggleRightSidebar();
       return;
     // Zeigt den Ladebildschirm noch einmal an, bis irgendwo hingeklickt wird.
-    // Steht hier oben bei den beiden Toggles, weil er wie sie keinen Vault
+    // Steht hier oben bei den Toggles, weil er wie sie keinen Vault
     // braucht — er soll sich auch waehrend der Vault-Einrichtung ansehen
     // lassen, das ist der Moment, in dem man ihn am ehesten sucht.
     case 'show-splash':
