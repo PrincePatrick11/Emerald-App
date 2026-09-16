@@ -11,8 +11,7 @@ import { definitionLabel } from '../../lib/blocks/blockAttrs';
 import type { BlockDefinition } from '../../lib/blocks/definitions';
 import { BLOCK_PRESETS } from '../../lib/blocks/presets';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
-import SidebarSectionHeader from '../sidebar/fields/SidebarSectionHeader';
-import Dashboard from '../ui/Dashboard';
+import Dashboard, { GroupDivider } from '../ui/Dashboard';
 import DashboardItem from '../ui/DashboardItem';
 import ContextMenu from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
@@ -85,38 +84,45 @@ export default function BlocksView() {
 }
 
 /**
- * Die eingebauten Blöcke in der Seitenleiste unter der Suche — dieselbe Liste
- * wie „Block hinzufügen" im Eintrag. Nur zum Nachschlagen: anlegen oder
- * bearbeiten lässt sich an ihnen nichts. Die Suche filtert sie mit.
+ * Die eingebauten Blöcke unter den eigenen, gebaut wie die Bibliothek unter
+ * den Altären — dieselbe Liste wie „Block hinzufügen" im Eintrag. Nur zum
+ * Nachschlagen: anlegen oder bearbeiten lässt sich an ihnen nichts, darum
+ * schlichte Kacheln statt klickbarer Dashboard-Zeilen. Die Suche filtert mit.
  */
-function BuiltInBlocks({ query }: { query: string }) {
+function BuiltInBlocksSection({ query }: { query: string }) {
   const { t } = useTranslation();
-  const [open, toggleOpen] = usePersistedFlag('blocks-builtin-open', true);
+  const [collapsed, toggleCollapsed] = usePersistedFlag('blocks-builtin-collapsed');
   const presets = query
     ? BLOCK_PRESETS.filter((p) => t(p.labelKey).toLowerCase().includes(query))
     : BLOCK_PRESETS;
 
   return (
-    <div className="pt-4 border-t border-stone-700/60">
-      <SidebarSectionHeader label={t('blocks.library.builtIn')} open={open} onToggle={toggleOpen} />
-      {open && (
-        <ul className="mt-2 space-y-0.5">
-          {presets.map((preset) => {
-            const Icon = preset.icon;
-            return (
-              <li
-                key={preset.id}
-                title={preset.descriptionKey ? t(preset.descriptionKey) : undefined}
-                className="flex items-center gap-2 px-2 py-1 text-[11px] text-stone-400"
-              >
-                <Icon size={12} className="flex-shrink-0 text-stone-500" />
-                <span className="truncate">{t(preset.labelKey)}</span>
-              </li>
-            );
-          })}
-          {presets.length === 0 && <li className="px-2 py-1 text-[11px] text-stone-600">{t('search.noResults')}</li>}
-        </ul>
-      )}
+    <div className="mt-8">
+      <GroupDivider
+        label={t('blocks.library.builtIn')}
+        count={presets.length}
+        collapsed={collapsed}
+        onToggleCollapse={toggleCollapsed}
+      />
+      {!collapsed && (presets.length === 0
+        ? <p className="text-xs text-stone-700 px-1 py-1">{t('search.noResults')}</p>
+        : (
+          <ul className="grid [grid-template-columns:repeat(auto-fill,minmax(11rem,1fr))] gap-1.5">
+            {presets.map((preset) => {
+              const Icon = preset.icon;
+              return (
+                <li
+                  key={preset.id}
+                  title={preset.descriptionKey ? t(preset.descriptionKey) : undefined}
+                  className="panel flex items-center gap-2 px-3 py-2 min-w-0"
+                >
+                  <Icon size={14} className="flex-shrink-0 text-stone-500" />
+                  <span className="text-sm text-stone-300 truncate">{t(preset.labelKey)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        ))}
     </div>
   );
 }
@@ -134,6 +140,7 @@ function BlockList({ usage, onCreate, onDelete }: {
   const openInNewTabAction = useOpenInNewTabAction();
   const [search, setSearch] = useState('');
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [customCollapsed, toggleCustom] = usePersistedFlag('blocks-custom-collapsed');
 
   const query = search.trim().toLowerCase();
   const filtered = query
@@ -191,20 +198,28 @@ function BlockList({ usage, onCreate, onDelete }: {
       primaryAction={{ label: t('blocks.library.newBlock'), onClick: onCreate }}
       search={search}
       onSearch={setSearch}
-      items={filtered}
+      items={customCollapsed ? [] : filtered}
       itemKey={(d) => d.id}
       renderItem={renderRow}
       grouping={{ mode: 'flat' }}
-      isEmpty={definitions.length === 0}
+      isEmpty={!customCollapsed && definitions.length === 0}
       emptyState={{
         message: t('blocks.library.customHint'),
         messageClassName: 'text-stone-600 text-sm max-w-md mx-auto',
         actionLabel: t('blocks.library.newBlock'),
         onAction: onCreate,
       }}
-      sidebarFooter={<BuiltInBlocks query={query} />}
-      hasNoResults={filtered.length === 0}
+      hasNoResults={!customCollapsed && filtered.length === 0}
       noResultsMessage={t('search.noResults')}
+      contentHeader={
+        <GroupDivider
+          label={t('blocks.library.custom')}
+          count={filtered.length}
+          collapsed={customCollapsed}
+          onToggleCollapse={toggleCustom}
+        />
+      }
+      contentFooter={<BuiltInBlocksSection query={query} />}
       contextMenuSlot={ctxMenu && menuDef && (
         <ContextMenu
           x={ctxMenu.x}

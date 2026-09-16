@@ -345,6 +345,7 @@
       "untitled": "Untitled block",
       "newBlock": "New block",
       "builtIn": "Built-in blocks",
+      "custom": "Your blocks",
       "customHint": "Assemble a block of your own from fields — a ritual log with date, choice and checklist, say. Once saved, it appears under “Add block” in every entry.",
       "name": "Name",
       "namePlaceholder": "Name of the block",

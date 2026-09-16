@@ -98,10 +98,6 @@ interface DashboardBaseProps<T> {
   search?: string;
   onSearch?: (v: string) => void;
 
-  /** Unter Toolbar und FilterPanel in der Seitenleiste — ein Nebenbereich des
-   *  Moduls, der nicht in die Liste gehört (Blöcke: die eingebauten). */
-  sidebarFooter?: ReactNode;
-
   // FilterPanel (omit entirely for views with no filter concept)
   filters?: DashboardFilters;
 
@@ -235,7 +231,6 @@ export default function Dashboard<T>({
   search,
   onSearch,
   filters,
-  sidebarFooter,
   items,
   itemKey,
   renderItem,
@@ -405,8 +400,6 @@ export default function Dashboard<T>({
       {filters && (
         <FilterPanel {...filters.panelProps} activeFilterCount={filters.activeFilterCount} />
       )}
-
-      {sidebarFooter}
     </SidebarColumn>
   );
 
