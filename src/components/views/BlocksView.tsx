@@ -104,25 +104,31 @@ function BuiltInBlocksSection({ query }: { query: string }) {
         collapsed={collapsed}
         onToggleCollapse={toggleCollapsed}
       />
-      {!collapsed && (presets.length === 0
-        ? <p className="text-xs text-stone-700 px-1 py-1">{t('search.noResults')}</p>
-        : (
-          <ul className="grid [grid-template-columns:repeat(auto-fill,minmax(11rem,1fr))] gap-1.5">
-            {presets.map((preset) => {
-              const Icon = preset.icon;
-              return (
-                <li
-                  key={preset.id}
-                  title={preset.descriptionKey ? t(preset.descriptionKey) : undefined}
-                  className="panel flex items-center gap-2 px-3 py-2 min-w-0"
-                >
-                  <Icon size={14} className="flex-shrink-0 text-stone-500" />
-                  <span className="text-sm text-stone-300 truncate">{t(preset.labelKey)}</span>
-                </li>
-              );
-            })}
-          </ul>
-        ))}
+      {!collapsed && (
+        <>
+          <p className="text-xs text-stone-500 px-1 mb-2">{t('blocks.library.builtInHint')}</p>
+          {presets.length === 0
+            ? <p className="text-xs text-stone-700 px-1 py-1">{t('search.noResults')}</p>
+            : (
+              // Bewusst ohne Rahmen und Hover: nichts daran sieht klickbar aus.
+              <ul className="grid [grid-template-columns:repeat(auto-fill,minmax(11rem,1fr))] gap-x-4">
+                {presets.map((preset) => {
+                  const Icon = preset.icon;
+                  return (
+                    <li
+                      key={preset.id}
+                      title={preset.descriptionKey ? t(preset.descriptionKey) : undefined}
+                      className="flex items-center gap-2 px-1 py-1.5 min-w-0 text-stone-400"
+                    >
+                      <Icon size={14} className="flex-shrink-0 text-stone-500" />
+                      <span className="text-sm truncate">{t(preset.labelKey)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+        </>
+      )}
     </div>
   );
 }

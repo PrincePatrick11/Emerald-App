@@ -345,6 +345,7 @@
       "untitled": "Unbenannter Block",
       "newBlock": "Neuer Block",
       "builtIn": "Standard-Blöcke",
+      "builtInHint": "Stehen in jedem Eintrag unter „Block hinzufügen“ bereit. Eingebaute Blöcke lassen sich nicht bearbeiten — für eigene Felder baue einen eigenen Block.",
       "custom": "Eigene Blöcke",
       "customHint": "Bau dir aus Feldern einen eigenen Block — etwa ein Ritual-Protokoll mit Datum, Auswahl und Checkliste. Gespeichert steht er in jedem Eintrag unter „Block hinzufügen“.",
       "name": "Name",
