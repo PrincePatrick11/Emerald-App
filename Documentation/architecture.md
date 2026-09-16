@@ -811,9 +811,11 @@ overwritten. `useShrunkIcon` (`src/hooks/useShrunkIcon.ts`) is the shared "shrin
 64px, last write wins" logic behind a draft's icon field, used by both pages. `TemplateAssignments`
 is a template's own sidebar editor for its combinations (star toggles a default, `+` adds one);
 `TemplateDefaultsOverview` is the dashboard's collapsible mirror of the same data — every
-combination (Journal once; Wiki/Operations × all-categories/uncategorized/each category) with a
-`FieldDropdown` to change its default directly, naming what a category without its own default
-falls back to. Both write through `templateStore.setDefaultFor`, and a page's own pending
+combination (Journal once; Wiki/Operations × all-categories/uncategorized/each category) laid out
+as a tile (label above a `FieldDropdown` to change its default directly, naming what a category
+without its own default falls back to), tiles flowing into as many columns as the section is wide
+(CSS grid, `auto-fill`, `minmax(11rem, 1fr)`) rather than one row per combination. Both write
+through `templateStore.setDefaultFor`, and a page's own pending
 assignment edits are reconciled against whatever the overview did meanwhile via
 `mergeAssignmentChanges` (base → draft, replayed onto current) rather than one silently clobbering
 the other. `FieldDropdown` (`src/components/ui/FieldDropdown.tsx`) is a portalled,
