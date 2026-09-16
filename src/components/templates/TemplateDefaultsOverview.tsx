@@ -45,22 +45,24 @@ export default function TemplateDefaultsOverview() {
     })),
   ];
 
-  const row = (entryType: TemplateEntryType, category: string | null, label: string) => {
+  // Eine Kachel je Kombination — Label über dem Menü, die Kacheln fließen in
+  // so viele Spalten, wie die Breite hergibt.
+  const cell = (entryType: TemplateEntryType, category: string | null, label: string) => {
     const current = defaultTemplateAt(templates, entryType, category);
     const fallback = !current && category !== ALL_CATEGORIES ? defaultTemplateAt(templates, entryType, ALL_CATEGORIES) : undefined;
     return (
-      <li key={assignmentKey(entryType, category)} className="flex items-start gap-3">
-        <span className="flex-1 min-w-0 max-w-48 truncate pt-1.5 text-xs text-[var(--text-secondary)]" title={label}>{label}</span>
-        <div className="w-64 max-w-full min-w-0">
-          <FieldDropdown
-            value={current?.id ?? NONE}
-            options={options}
-            onChange={(id) => void setDefaultFor(entryType, category, id === NONE ? null : id)}
-          />
-          {fallback && (
-            <p className="block-field-hint mt-1">{t('templates.overview.fallback', { name: templateLabel(t, fallback) })}</p>
-          )}
-        </div>
+      <li key={assignmentKey(entryType, category)} className="min-w-0 space-y-1">
+        <p className="truncate text-xs text-[var(--text-secondary)]" title={label}>{label}</p>
+        <FieldDropdown
+          value={current?.id ?? NONE}
+          options={options}
+          onChange={(id) => void setDefaultFor(entryType, category, id === NONE ? null : id)}
+        />
+        {fallback && (
+          <p className="block-field-hint truncate" title={t('templates.overview.fallback', { name: templateLabel(t, fallback) })}>
+            {t('templates.overview.fallback', { name: templateLabel(t, fallback) })}
+          </p>
+        )}
       </li>
     );
   };
@@ -79,13 +81,13 @@ export default function TemplateDefaultsOverview() {
                   <meta.icon size={12} />
                   {t(meta.navLabelKey)}
                 </p>
-                <ul className="space-y-2">
+                <ul className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-x-3 gap-y-3 items-start">
                   {entryType === 'journal'
-                    ? row(entryType, ALL_CATEGORIES, t('templates.overview.everyEntry'))
+                    ? cell(entryType, ALL_CATEGORIES, t('templates.overview.everyEntry'))
                     : [
-                        row(entryType, ALL_CATEGORIES, t('templates.allCategories')),
-                        row(entryType, null, t('categories.uncategorized')),
-                        ...categories.map((cat) => row(entryType, cat.id, `${cat.emoji} ${categoryLabel(t, cat)}`)),
+                        cell(entryType, ALL_CATEGORIES, t('templates.allCategories')),
+                        cell(entryType, null, t('categories.uncategorized')),
+                        ...categories.map((cat) => cell(entryType, cat.id, `${cat.emoji} ${categoryLabel(t, cat)}`)),
                       ]}
                 </ul>
               </section>
