@@ -50,6 +50,10 @@ export interface BlockDefinition {
   name: string;
   /** Emoji. */
   icon: string;
+  /**
+   * Nicht mehr bearbeitbar und nirgends angezeigt; gespeichert, exportiert und
+   * importiert wird es weiter, damit ältere Daten nichts verlieren.
+   */
   description: string;
   /** Mit archivierten Elementen: sie bleiben wiederherstellbar. */
   elements: ElementDef[];

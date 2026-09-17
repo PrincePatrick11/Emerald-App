@@ -22,7 +22,7 @@ import {
   APPEND_ENTRY_LINK_EVENT, REMOVE_ENTRY_LINK_EVENT, REVEAL_ENTRY_LINK_EVENT, subscribeEntryLinkRequest,
   type EntryLinkRequest,
 } from '../../lib/links';
-import { internalLinkBlockHtml, toInternalLinkChip } from '../../lib/internalLinkHtml';
+import { extractInternalLinks, internalLinkBlockHtml, remapInternalLinks, toInternalLinkChip } from '../../lib/internalLinkHtml';
 import { generateId } from '../../lib/helpers';
 import { editorSavesSuspended } from '../../lib/editorLock';
 import { FIELDS_BLOCK_TYPE, linkFromSlot, parseFields, serializeFields } from '../../lib/blocks/fields';
@@ -223,12 +223,17 @@ export default function BlockStack({
       // Der rohe Chip, auch im Altar-Feld: die Seitenleiste listet jeden Link im Inhalt.
       const element = model.elements.find((el) =>
         (el.kind === 'link' || el.kind === 'altar') && matches(linkFromSlot(model.slots[el.id])));
-      if (!element) continue;
+      // Ein Text-Element ohne montierten Editor (entfernt, aber mit Inhalt): dort
+      // fällt nur der Chip weg, nicht der ganze Text — sein Wort bleibt stehen.
+      const text = element ? undefined : model.elements.find((el) =>
+        el.kind === 'text' && extractInternalLinks(model.slots[el.id] ?? '').some(matches));
+      if (!element && !text) continue;
       return {
         block,
         withoutLink: () => {
           const slots = { ...model.slots };
-          delete slots[element.id];
+          if (element) delete slots[element.id];
+          else slots[text!.id] = remapInternalLinks(slots[text!.id], (link) => (matches(link) ? null : { id: link.id }));
           return serializeFields(block, { ...model, slots }, fieldTextRef.current);
         },
       };

@@ -127,7 +127,18 @@ export default function ListToolbar({
         </div>
       )}
       {showView && (
-        <IconToggleGroup label={t('listView.view')} options={viewOptions} icons={VIEW_ICONS} value={view!} onChange={onView!} />
+        <IconToggleGroup
+          label={t('listView.view')}
+          options={viewOptions}
+          icons={VIEW_ICONS}
+          value={view!}
+          onChange={(next) => {
+            onView!(next);
+            // Der Zeitstrahl sperrt Name und Anzahl — stehen blieben sie trotzdem
+            // aktiv, und die Monate kämen in Namensreihenfolge durcheinander.
+            if (next === 'timeline' && showSort && sortBlockedInTimeline(sort!)) onSort!('date_desc');
+          }}
+        />
       )}
       {showSort && (
         <IconToggleGroup

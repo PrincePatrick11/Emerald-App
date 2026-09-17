@@ -33,6 +33,7 @@ export interface BlockPreset {
 export type GlyphSource = LucideIcon | string;
 
 export const ELEMENT_KIND_ICONS: Record<ElementKind, LucideIcon> = {
+  text: Type,
   shorttext: TextCursorInput,
   number: Hash,
   date: Calendar,
@@ -50,8 +51,9 @@ export const ELEMENT_KIND_ICONS: Record<ElementKind, LucideIcon> = {
 
 const KIND_GROUPS: Partial<Record<ElementKind, BlockGroup>> = { link: 'reference', altar: 'reference', image: 'media', moon: 'moon' };
 
-// Die Sigillen-Teile gibt es nur in eigenen Blöcken — einzeln fügt man die Sigillen-Blöcke ein (unten).
-const FIELD_PRESET_KINDS = ELEMENT_KINDS.filter((kind) => !isSigilKind(kind));
+// Text und die Sigillen-Teile gibt es nur in eigenen Blöcken — einzeln fügt man
+// den Textblock und die Sigillen-Blöcke ein (oben und unten).
+const FIELD_PRESET_KINDS = ELEMENT_KINDS.filter((kind) => kind !== 'text' && !isSigilKind(kind));
 
 export const BLOCK_PRESETS: readonly BlockPreset[] = [
   { id: 'text', labelKey: 'blocks.types.text.label', descriptionKey: 'blocks.types.text.description', icon: Type, group: 'text', create: () => createTextBlock() },

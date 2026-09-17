@@ -1,4 +1,4 @@
-import { escapeHtml, extractInternalLinks, internalLinkChipHtml, isValidLinkTarget } from '../internalLinkHtml';
+import { escapeHtml, extractInternalLinks, internalLinkChipHtml, isBlankContent, isValidLinkTarget } from '../internalLinkHtml';
 import { generateId } from '../helpers';
 import { storedImageName } from '../schema';
 import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../moonPhase';
@@ -7,7 +7,7 @@ import { decodeHtmlAttr, neutralizeSectionTags } from './blockHtml';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
 /**
- * Der Feldblock (`core.fields`): eine Folge von Elementen — Kurztext, Zahl,
+ * Der Feldblock (`core.fields`): eine Folge von Elementen — Text, Kurztext, Zahl,
  * Datum, Auswahl, Ja/Nein, Checkliste, Verknüpfung, Bild, Mondphase, Altar
  * (eine Verknüpfung auf einen Altar, groß mit seinem Bild gezeigt) und die
  * drei Sigillen-Teile Rechner, Zeichnung, Ladung (siehe `isSigilKind`). Ein
@@ -17,29 +17,31 @@ import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
  * Wo was steht — dieselbe Konvention wie für alle Blöcke:
  * - `data-block-config` (JSON): die Elemente und die Anzeigeregeln.
  * - `data-block-data` (JSON): skalare Werte, unter der ID ihres Elements.
- * - Verweise und Bilder stehen NICHT im JSON, sondern als echter Link-Chip bzw.
- *   `<img src>` im inneren HTML, in einem `<dd data-block-slot="el:<id>">`.
+ * - Verweise, Bilder und Text stehen NICHT im JSON, sondern als echter Link-Chip,
+ *   `<img src>` bzw. das HTML des Texteditors im inneren HTML, in einem
+ *   `<dd data-block-slot="el:<id>">`.
  *   So finden Link-Tabelle, Backlinks, Merge-Import-Remap und Bild-Aufräumen
  *   sie ohne Sonderfall.
  * - Das innere HTML ist zugleich der lesbare Fallback (`<dl>` mit Beschriftung
  *   und Wert) für Suche, Export und eine App, die den Typ nicht kennt. Es wird
  *   bei jeder Änderung neu geschrieben; die Wahrheit für Skalare ist das JSON.
  *
- * Rein und DOM-frei wie der Rest von `lib/blocks`. Slot-Inhalte sind ein Chip
- * oder ein Bild, nie ein `</dd>` — deshalb reicht zum Lesen ein Regex.
+ * Rein und DOM-frei wie der Rest von `lib/blocks`. Slot-Inhalte sind ein Chip,
+ * ein Bild oder TipTap-HTML (dessen Schema kennt keine Definitionslisten), nie
+ * ein `</dd>` — deshalb reicht zum Lesen ein Regex.
  */
 
 export const FIELDS_BLOCK_TYPE = 'core.fields' satisfies BlockTypeId;
 
 export const ELEMENT_KINDS = [
-  'shorttext', 'number', 'date', 'select', 'toggle', 'checklist', 'link', 'image', 'moon', 'altar',
+  'text', 'shorttext', 'number', 'date', 'select', 'toggle', 'checklist', 'link', 'image', 'moon', 'altar',
   'sigilCalc', 'sigilCanvas', 'sigilCharge',
 ] as const;
 export type ElementKind = (typeof ELEMENT_KINDS)[number];
 
 const KIND_SET: ReadonlySet<string> = new Set(ELEMENT_KINDS);
 /** Elementarten, deren Wert im Markup steht statt im JSON. */
-const SLOT_KINDS: ReadonlySet<ElementKind> = new Set<ElementKind>(['link', 'image', 'altar']);
+const SLOT_KINDS: ReadonlySet<ElementKind> = new Set<ElementKind>(['text', 'link', 'image', 'altar']);
 
 export function isSlotKind(kind: ElementKind): boolean {
   return SLOT_KINDS.has(kind);
@@ -387,9 +389,10 @@ function parseDefault(element: ElementDef, raw: unknown): ElementDefault | undef
         : null;
       return { lock: raw.lock === 'sigil' ? 'sigil' : 'entry', targets };
     }
+    case 'text':
     case 'sigilCalc':
     case 'sigilCanvas':
-      return undefined; // Rechner und Zeichnung beginnen leer.
+      return undefined; // Text, Rechner und Zeichnung beginnen leer.
     default: {
       const value = parseValue(element.kind, raw);
       // Eine Auswahl-Vorgabe nur auf eine Option, die es noch gibt — sonst bekäme jede Kopie einen toten Wert.
@@ -417,7 +420,8 @@ export function slotFromDefault(element: ElementDef): string | null {
  * nichts gespeichert wird, was `parseElement` später verwürfe.
  */
 export function defaultFromSlot(element: ElementDef, html: string | null): ElementDefault | undefined {
-  if (!html) return undefined;
+  // Text hat keine Vorgabe (sie wäre Markup in der Definition).
+  if (!html || element.kind === 'text') return undefined;
   return parseDefault(element, element.kind === 'image' ? imageFromSlot(html) : linkFromSlot(html));
 }
 
@@ -448,6 +452,9 @@ export function isElementEmpty(element: ElementDef, model: FieldsModel): boolean
       return !Array.isArray(value) || value.length === 0;
     case 'moon':
       return !MOON_PHASE_ORDER.includes(value as MoonPhase);
+    case 'text':
+      // Sichtbarer Inhalt zählt — eine leere Überschrift oder ein leerer Aufzählungspunkt nicht.
+      return isBlankContent(model.slots[element.id] ?? '');
     case 'link':
     case 'image':
     case 'altar':

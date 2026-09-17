@@ -8,6 +8,7 @@ import type { Editor } from '@tiptap/react';
  * bekommt) und seinen Platzhalter.
  */
 export interface BlockStackContextValue {
+  /** `blockId` — oder `<Block-ID>:<Element-ID>` für das Text-Element eines eigenen Blocks. */
   registerTextEditor: (blockId: string, editor: Editor | null) => void;
   placeholderFor: (blockId: string) => string;
 }

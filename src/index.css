@@ -2812,9 +2812,15 @@ html[data-theme='emerald-parchment'] .hover\:bg-jade-900\/50:hover {
   background: #0f7a54;
 }
 
+html[data-theme='emerald-parchment'] .border-jade-500\/60,
 html[data-theme='emerald-parchment'] .border-jade-600\/60,
 html[data-theme='emerald-parchment'] .border-jade-700\/60 {
   border-color: rgba(0, 138, 87, 0.6);
+}
+
+/* Die gezogene Zeile (platzierte Elemente, Block-Verwaltung): ein Hauch Akzent statt Nachtgrün. */
+html[data-theme='emerald-parchment'] .bg-jade-900\/20 {
+  background-color: rgba(0, 138, 87, 0.1);
 }
 
 html[data-theme='emerald-parchment'] .hover\:border-jade-500\/70:hover {

@@ -6,6 +6,7 @@ import type { AltarPlacement } from '../../../types';
 import { AltarItemVisual } from '../../altar/AltarItemVisual';
 import Button from '../../ui/Button';
 import ContextMenu from '../../ui/ContextMenu';
+import { sidebarRowStateClasses } from '../../../lib/styleClasses';
 
 export const PlacedElementRow = memo(function PlacedElementRow({
   placement,
@@ -46,11 +47,7 @@ export const PlacedElementRow = memo(function PlacedElementRow({
         onClick={onSelect}
         onContextMenu={handleContextMenu}
         className={`w-full flex items-center gap-2 rounded border px-2 py-1.5 text-left transition-all cursor-pointer select-none ${
-          isDragging
-            ? 'border-jade-500/60 bg-jade-900/20 text-stone-300 opacity-50 scale-[0.98]'
-            : isSelected
-              ? 'border-jade-600/70 bg-jade-900/40 text-jade-300'
-              : 'border-stone-700/60 bg-stone-900/45 text-stone-400 hover:border-stone-500/70 hover:text-stone-300'
+          sidebarRowStateClasses({ dragging: isDragging, selected: isSelected })
         }`}
       >
         {isEditing && (

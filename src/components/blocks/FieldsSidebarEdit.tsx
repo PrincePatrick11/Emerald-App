@@ -10,7 +10,7 @@ import BlockCheckbox from './BlockCheckbox';
 import type { BlockSidebarEditProps } from './blockSidebarViews';
 
 /**
- * Der Seitenleisten-Abschnitt eines Feldblocks im Bearbeitungsmodus: je
+ * Die Einstellungen eines Feldblocks, aufgeklappt unter seiner Zeile im Bearbeitungsmodus: je
  * Element Beschriftung, bei einer Auswahl die Optionen, und ob es im
  * Lesemodus leer ausgeblendet wird; für den ganzen Block „komplett
  * schreibgeschützt". Jede Änderung schreibt den Block neu (JSON + Fallback) —
@@ -30,9 +30,6 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
 
   return (
     <div className="space-y-4">
-      {/* Die Kopie eines eigenen Blocks: was hier geändert wird, bleibt in diesem Eintrag. */}
-      {model.name && <p className="block-field-hint">{t('blocks.fields.copyHint', { name: model.name })}</p>}
-
       {elements.map((element) => {
         const hides = element.hideWhenEmpty ?? model.display.readHideEmpty;
         return (
