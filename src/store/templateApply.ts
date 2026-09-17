@@ -14,7 +14,7 @@ import { useWikiStore } from './wikiStore';
 import { useOperationStore } from './operationStore';
 import { useTemplateStore } from './templateStore';
 import { useBlockSessionStore } from './blockSessionStore';
-import { usableTemplateTags } from '../lib/templateTags';
+import { withUsableTags } from '../lib/templateTags';
 import { serializeBlocks } from '../lib/blocks/blockHtml';
 import {
   contentForTemplate, defaultTemplateSwap, fieldsWithoutTemplate, fieldsWithTemplate,
@@ -81,8 +81,7 @@ export async function applyTemplateFields(
 ): Promise<void> {
   const fields = entryFields(entryType, id);
   if (!fields) return;
-  const usable = { ...template, tags: usableTemplateTags(template.tags) };
-  await writeChangedFields(entryType, id, fields, fieldsWithTemplate(fields, entryType, usable, options));
+  await writeChangedFields(entryType, id, fields, fieldsWithTemplate(fields, entryType, withUsableTags(template), options));
 }
 
 /**

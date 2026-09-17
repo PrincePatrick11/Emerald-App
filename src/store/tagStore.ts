@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { setKnownTagNames } from '../lib/templateTags';
+import { registerTagLookup } from '../lib/templateTags';
 import { getDb } from '../lib/db';
 import { fromRow, jsonArray, type DbRow } from '../lib/row';
 import { useJournalStore } from './journalStore';
@@ -264,7 +264,5 @@ export const useTagStore = create<TagState>((set, get) => {
   };
 });
 
-// Vorlagen prüfen ihre Tags gegen diese Liste, ohne den Store zu importieren (siehe lib/templateTags).
-useTagStore.subscribe((state, prev) => {
-  if (state.tags !== prev.tags) setKnownTagNames(state.tags.map((tag) => tag.name));
-});
+// Vorlagen prüfen ihre Tags gegen den Store, ohne ihn zu importieren (siehe lib/templateTags).
+registerTagLookup((name) => useTagStore.getState().getByName(name)?.name);

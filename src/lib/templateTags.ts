@@ -1,25 +1,33 @@
 import { useSettingsStore } from '../store/settingsStore';
 
 /**
- * Die Tag-Namen des Vaults, klein geschrieben → ihre Schreibweise. `tagStore`
- * hält die Liste hier aktuell (`setKnownTagNames`). Ein eigenes Modul statt
- * eines Imports von `tagStore`: der importiert die Inhalts-Stores und den
- * Vorlagen-Store, und die brauchen genau diese Prüfung — ein Zyklus.
+ * Die Schreibweise des Tags zu einem Namen, oder `undefined`, wenn es keinen
+ * gibt. `tagStore` meldet die Suche hier an (`registerTagLookup`) — ein eigenes
+ * Modul statt eines Imports von `tagStore`: der importiert die Inhalts-Stores
+ * und den Vorlagen-Store, und die brauchen genau diese Prüfung, ein Zyklus.
  */
-let known = new Map<string, string>();
+let tagNameOf: (name: string) => string | undefined = () => undefined;
 
-export function setKnownTagNames(names: readonly string[]): void {
-  known = new Map(names.map((name) => [name.toLowerCase(), name]));
+export function registerTagLookup(lookup: (name: string) => string | undefined): void {
+  tagNameOf = lookup;
 }
 
 /**
- * Die Namen, die ein Eintrag aus einer Vorlage übernehmen darf. Darf das
- * Tag-Feld keine Tags anlegen (Einstellung des Vaults), fallen Namen ohne Tag
- * weg — eine Vorlage soll nicht hintenherum schaffen, was die Eingabe nicht
- * darf. Übrig bleibt die Schreibweise des Tags, wie beim Eintippen.
+ * Die Namen, die ein Eintrag aus einer Vorlage übernimmt — in der Schreibweise
+ * des Tags, wie beim Eintippen (Umbenennen und Löschen suchen den Namen exakt).
+ * Darf das Tag-Feld keine Tags anlegen (Einstellung des Vaults), fallen Namen
+ * ohne Tag weg: eine Vorlage soll nicht hintenherum schaffen, was die Eingabe
+ * nicht darf.
  */
 export function usableTemplateTags(names: readonly string[]): string[] {
-  if (useSettingsStore.getState().settings.tags.createInline) return [...names];
-  const usable = names.map((name) => known.get(name.toLowerCase())).filter((name): name is string => !!name);
+  const createInline = useSettingsStore.getState().settings.tags.createInline;
+  const usable = names
+    .map((name) => tagNameOf(name) ?? (createInline ? name : undefined))
+    .filter((name): name is string => !!name);
   return [...new Set(usable)];
+}
+
+/** `template` mit den Tags, die es wirklich übernimmt (`usableTemplateTags`). */
+export function withUsableTags<T extends { tags: readonly string[] }>(template: T): T {
+  return { ...template, tags: usableTemplateTags(template.tags) };
 }
