@@ -350,7 +350,6 @@
       "name": "Name",
       "namePlaceholder": "Name of the block",
       "fields": "Fields",
-      "noFields": "No fields yet — add the first one.",
       "addField": "Add field",
       "removeField": "Remove field",
       "removedFields": "Removed fields",

@@ -350,7 +350,6 @@
       "name": "Nombre",
       "namePlaceholder": "Nombre del bloque",
       "fields": "Campos",
-      "noFields": "Aún no hay campos — añade el primero.",
       "addField": "Añadir campo",
       "removeField": "Quitar campo",
       "removedFields": "Campos quitados",

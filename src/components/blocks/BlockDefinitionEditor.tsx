@@ -220,7 +220,6 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
         {/* Felder */}
         <section className="space-y-2">
           <p className="label-xs">{t('blocks.library.fields')}</p>
-          {active.length === 0 && <p className="text-xs text-stone-600">{t('blocks.library.noFields')}</p>}
           <Reorder.Group as="div" axis="y" values={active.map((e) => e.id)} onReorder={reorderActive} className="space-y-2">
             {active.map((element) => (
               <ElementRow
