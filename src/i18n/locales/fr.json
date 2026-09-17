@@ -655,7 +655,10 @@
     "cleanupDelete": "Supprimer",
     "cleanupDone": "{{size}} libérés",
     "storage": "Stockage",
-    "appliesToVault": "S'applique à {{name}}"
+    "appliesToVault": "S'applique à {{name}}",
+    "includeSettings": "Paramètres",
+    "importSettings": "Appliquer les paramètres de la sauvegarde",
+    "groupAppearance": "Langue et apparence"
   },
   "contextMenu": {
     "openInNewTab": "Ouvrir dans un nouvel onglet",

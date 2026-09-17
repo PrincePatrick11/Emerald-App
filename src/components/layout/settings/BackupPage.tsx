@@ -22,6 +22,7 @@ import {
   openBackupFile,
   importDatabase,
 } from '../../../lib/dbBackup';
+import { SETTINGS_GROUPS, type SettingsGroup } from '../../../lib/vaultSettings';
 import SettingsChoiceButton from './SettingsChoiceButton';
 import SettingsSection from './SettingsSection';
 
@@ -35,6 +36,12 @@ const DEFAULT_EXPORT_OPTIONS: BackupOptions = {
   dateFrom: '',
   dateTo: '',
   includeDeleted: false,
+  includeSettings: true,
+};
+
+/** Record statt Liste: eine neue Einstellungs-Gruppe ohne Beschriftung ist ein Typfehler. */
+const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {
+  appearance: 'settings.groupAppearance',
 };
 
 /**
@@ -70,6 +77,8 @@ export default function BackupPage() {
     includeAltars: true, includeTasks: true, includeTags: true,
   });
   const [excludedCategoryIds] = useState<Set<string>>(new Set());
+  // Beim Zusammenführen bleibt ohne Wahl alles, wie es im Vault eingestellt ist.
+  const [settingsGroups, setSettingsGroups] = useState<SettingsGroup[]>([]);
   const [importing, setImporting] = useState(false);
   const [importDone, setImportDone] = useState(false);
   const [importError, setImportError] = useState('');
@@ -109,6 +118,7 @@ export default function BackupPage() {
       // `{appDataDir}/vaults/{id}`. Scheitert die Aufloesung, bleibt der.
       setVaultBaseDir(await newVaultBaseDir().catch(() => null));
       setImportTypeFilters({ includeJournal: true, includeWiki: true, includeOperations: true, includeAltars: true, includeTasks: true, includeTags: true });
+      setSettingsGroups([]);
     } catch {
       setImportError(t('settings.importErrorInvalid'));
     }
@@ -145,6 +155,7 @@ export default function BackupPage() {
           : undefined,
         categoryFilters,
         importTypeFilters,
+        importMode === 'merge' ? settingsGroups : [],
       );
       setImportDone(true);
       setImportedFile(null);
@@ -177,6 +188,7 @@ export default function BackupPage() {
                   ['includeAltars', 'settings.includeAltars'],
                   ['includeTasks', 'settings.includeTasks'],
                   ['includeTags', 'settings.includeTags'],
+                  ['includeSettings', 'settings.includeSettings'],
                 ] as [keyof BackupOptions, string][]
               ).map(([key, labelKey]) => (
                 <FilterChipButton
@@ -378,6 +390,30 @@ export default function BackupPage() {
                       }}
                       onResetFolder={() => setVaultCustomPath(null)}
                     />
+                  </div>
+                </div>
+              )}
+
+              {/* Nur beim Zusammenführen eine Wahl: Ersetzen und Neuer Vault
+                  übernehmen die Einstellungen der Datei ganz. */}
+              {importMode === 'merge' && importedFile.preview.hasSettings && (
+                <div>
+                  <p className="text-xs text-stone-500 mb-2">{t('settings.importSettings')}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SETTINGS_GROUPS.map((group) => {
+                      const active = settingsGroups.includes(group);
+                      return (
+                        <FilterChipButton
+                          key={group}
+                          active={active}
+                          onClick={() => setSettingsGroups((groups) =>
+                            active ? groups.filter((g) => g !== group) : [...groups, group])}
+                        >
+                          {active && <Check size={12} />}
+                          {t(SETTINGS_GROUP_LABEL_KEYS[group])}
+                        </FilterChipButton>
+                      );
+                    })}
                   </div>
                 </div>
               )}

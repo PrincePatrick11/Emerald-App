@@ -29,6 +29,10 @@ export interface VaultSettings {
 
 export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
 
+/** Jede Gruppe genau einmal — der Record erzwingt, dass eine neue nicht fehlt. */
+const GROUP_SET: Record<SettingsGroup, true> = { appearance: true };
+export const SETTINGS_GROUPS = Object.keys(GROUP_SET) as SettingsGroup[];
+
 export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
   version: 1,
   appearance: {
@@ -70,6 +74,18 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
       editorFont: normalizeEditorFontId(asString(appearance.editorFont)),
     },
   };
+}
+
+/**
+ * `current` mit den gewählten Gruppen aus `incoming` — für das Zusammenführen
+ * eines Backups. `incoming` ist ungeprüft (aus einer Datei) und wird erst hier
+ * normalisiert.
+ */
+export function withSettingsGroups(current: VaultSettings, incoming: unknown, groups: readonly SettingsGroup[]): VaultSettings {
+  const source = normalizeVaultSettings(incoming);
+  const next = { ...current };
+  for (const group of groups) next[group] = source[group];
+  return next;
 }
 
 /** Mirrors `SettingsRead` in `src-tauri/src/vault.rs`. */

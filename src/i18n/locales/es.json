@@ -655,7 +655,10 @@
     "cleanupDelete": "Eliminar",
     "cleanupDone": "{{size}} liberados",
     "storage": "Almacenamiento",
-    "appliesToVault": "Se aplica a {{name}}"
+    "appliesToVault": "Se aplica a {{name}}",
+    "includeSettings": "Ajustes",
+    "importSettings": "Aplicar ajustes de la copia",
+    "groupAppearance": "Idioma y apariencia"
   },
   "contextMenu": {
     "openInNewTab": "Abrir en nueva pestaña",

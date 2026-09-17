@@ -52,6 +52,8 @@ import { clearAllDrafts } from '../store/draftStore';
 import { resumeEditorSaves, suspendEditorSaves } from './editorLock';
 import { drainSerialized } from './serialize';
 import { importViaStaging } from './importStaging';
+import { normalizeVaultSettings, withSettingsGroups, writeVaultSettings, type SettingsGroup } from './vaultSettings';
+import { useSettingsStore } from '../store/settingsStore';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public types
@@ -67,6 +69,8 @@ export interface BackupOptions {
   dateFrom: string;       // ISO date string, '' = no lower bound
   dateTo: string;         // ISO date string, '' = no upper bound
   includeDeleted: boolean;
+  /** Die `settings.json` des Vaults. Fehlt in Dateien von vor den Vault-Einstellungen. */
+  includeSettings?: boolean;
 }
 
 export type ImportMode = 'replace' | 'merge' | 'add-vault';
@@ -92,6 +96,8 @@ export interface BackupPreview {
   taskCount: number;
   /** Nur Kategorien, auf die ein Inhalt der Sicherung zeigt. */
   categories: BackupCategoryEntry[];
+  /** Ob die Datei Vault-Einstellungen mitbringt. */
+  hasSettings: boolean;
 }
 
 /** Which top-level content types to import. */
@@ -309,6 +315,12 @@ interface BackupFile {
     links?: Row[];
   };
   images: Record<string, string>;  // gespeicherter Dateiname → data-URL (in v1/v2: absoluter Pfad)
+  /**
+   * Die Einstellungen des Vaults (`settings.json`), ungeprüft wie alles aus
+   * der Datei — normalisiert wird erst beim Import. Braucht keine neue
+   * Version: ein älterer Build übergeht das Feld einfach.
+   */
+  settings?: unknown;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -552,6 +564,7 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
     filters: options,
     data,
     images,
+    ...(options.includeSettings && { settings: useSettingsStore.getState().settings }),
   };
 
   // Der Dialog oeffnet im `backup/`-Ordner des aktiven Vaults — bei Bedarf
@@ -578,6 +591,10 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
 // ─────────────────────────────────────────────────────────────────────────────
 // Parse + preview
 // ─────────────────────────────────────────────────────────────────────────────
+
+function isSettingsObject(value: unknown): boolean {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
 
 export async function openBackupFile(): Promise<{ path: string; backup: BackupFile; preview: BackupPreview } | null> {
   const selected = await open({
@@ -613,6 +630,7 @@ export async function openBackupFile(): Promise<{ path: string; backup: BackupFi
     altarItemsCount: backup.data.altarItems?.length ?? 0,
     taskCount: backup.data.tasks?.length ?? 0,
     categories: (backup.data.categories ?? []).filter((c) => usedCatIds.has(c.id as string)) as BackupCategoryEntry[],
+    hasSettings: isSettingsObject(backup.settings),
   };
 
   return { path: filePath, backup, preview };
@@ -1414,6 +1432,9 @@ export async function importDatabase(
   newVault?: { name: string; path?: string },
   categoryFilters?: ImportCategoryFilters,
   typeFilters?: ImportTypeFilters,
+  /** Nur für `merge`: welche Einstellungs-Gruppen aus der Datei gelten sollen.
+   *  replace und add-vault übernehmen die Einstellungen der Datei ganz. */
+  settingsGroups: readonly SettingsGroup[] = [],
 ): Promise<void> {
   const filters: ImportCategoryFilters = categoryFilters ?? { excludedCategoryIds: new Set<string>() };
 
@@ -1447,6 +1468,12 @@ export async function importDatabase(
     await addVault(vaultRecord);
     invalidateVaultCache();
 
+    // Vor dem Wechsel in den Ordner: dann öffnet der neue Vault gleich mit
+    // Sprache und Aussehen der Sicherung, statt erst mit den Standards.
+    if (isSettingsObject(backup.settings)) {
+      await writeVaultSettings(vaultId, normalizeVaultSettings(backup.settings));
+    }
+
     // 3. Switch to it (resets DB cache + runs migrations on new empty DB)
     await useVaultStore.getState().loadVaults();
     await useVaultStore.getState().switchVault(vaultId);
@@ -1472,6 +1499,17 @@ export async function importDatabase(
     // ein abgebrochener Merge ließe halb importierte Daten zurück (siehe `importStaging.ts`).
     const run = mode === 'replace' ? doReplace : doMerge;
     await importViaStaging(await getDb(), (staging) => run(staging, filteredBackup, filters));
+
+    // Erst nach geglücktem Austausch: ein abgebrochener Import lässt auch die
+    // Einstellungen, wie sie waren.
+    if (isSettingsObject(backup.settings)) {
+      const settingsStore = useSettingsStore.getState();
+      if (mode === 'replace') {
+        await settingsStore.replaceSettings(normalizeVaultSettings(backup.settings));
+      } else if (settingsGroups.length) {
+        await settingsStore.replaceSettings(withSettingsGroups(settingsStore.settings, backup.settings, settingsGroups));
+      }
+    }
   }
 
   // Reload all store data from the (now modified) active vault

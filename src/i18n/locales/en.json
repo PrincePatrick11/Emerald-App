@@ -647,7 +647,10 @@
     "cleanupDelete": "Remove",
     "cleanupDone": "{{size}} freed",
     "storage": "Storage",
-    "appliesToVault": "Applies to {{name}}"
+    "appliesToVault": "Applies to {{name}}",
+    "includeSettings": "Settings",
+    "importSettings": "Apply settings from the backup",
+    "groupAppearance": "Language & appearance"
   },
   "home": {
     "viewAll": "View all",

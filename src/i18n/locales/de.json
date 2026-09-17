@@ -647,7 +647,10 @@
     "cleanupDelete": "Entfernen",
     "cleanupDone": "{{size}} freigegeben",
     "storage": "Speicher",
-    "appliesToVault": "Gilt für {{name}}"
+    "appliesToVault": "Gilt für {{name}}",
+    "includeSettings": "Einstellungen",
+    "importSettings": "Einstellungen aus dem Backup übernehmen",
+    "groupAppearance": "Sprache & Aussehen"
   },
   "home": {
     "viewAll": "Alle anzeigen",
