@@ -286,8 +286,12 @@ const EMPTY_TEXT_RE = /^(?:\s|&nbsp;|<p>|<\/p>|<p\s[^<>]*>|<br\s*\/?>)*$/i;
  * gilt ein Eintrag als unberührt, und ein Standard darf ihn füllen.
  */
 export function areBlocksEmpty(blocks: readonly BlockInstance[]): boolean {
-  return blocks.every((block) =>
-    block.type === TEXT_BLOCK_TYPE && !block.attrs[BLOCK_ATTR.template] && EMPTY_TEXT_RE.test(block.html));
+  return blocks.every((block) => isTextBlockEmpty(block) && !block.attrs[BLOCK_ATTR.template]);
+}
+
+/** Ein Textblock ohne Inhalt — nur leere Absätze. Im Lesemodus bleibt er unsichtbar. */
+export function isTextBlockEmpty(block: BlockInstance): boolean {
+  return block.type === TEXT_BLOCK_TYPE && EMPTY_TEXT_RE.test(block.html);
 }
 
 /** `areBlocksEmpty` für einen gespeicherten Inhalt. */

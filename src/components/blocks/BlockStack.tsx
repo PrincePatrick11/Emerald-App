@@ -43,7 +43,7 @@ import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockAttrName, type BlockInstance } f
 import { useBlockSessionStore, type BlockStackApi } from '../../store/blockSessionStore';
 import { useTemplateNoticeStore } from '../../store/templateStore';
 import { applyTemplateFields, undoTemplateFields, type TemplateApplyOptions } from '../../store/templateApply';
-import { areBlocksEmpty, instantiateTemplateBlocks, type Template } from '../../lib/blocks/templates';
+import { areBlocksEmpty, instantiateTemplateBlocks, isTextBlockEmpty, type Template } from '../../lib/blocks/templates';
 import TemplateInsertion, { type TemplateTarget } from '../templates/TemplateInsertion';
 import { BLOCK_VIEWS } from './blockViews';
 import { BlockStackContext, type BlockStackContextValue } from './blockStackContext';
@@ -481,6 +481,13 @@ export default function BlockStack({
     });
   };
 
+  /** Ein leerer Textblock verschwindet im Lesemodus, statt Leerzeilen zu zeigen.
+   *  Aus dem Ref: beim Wechsel nach „Fertig" hinkt der State einen Render hinterher. */
+  const isEmptyInRead = (blockId: string) => {
+    const live = blocksRef.current.find((b) => b.id === blockId);
+    return !!live && isTextBlockEmpty(live);
+  };
+
   const renderBody = (block: BlockInstance, meta: BlockTypeMeta | undefined) => {
     const View = meta ? BLOCK_VIEWS.get(meta.id) : undefined;
     // Der Fallback zeigt gespeichertes HTML — ohne das, was eine Sigille verbirgt.
@@ -551,7 +558,7 @@ export default function BlockStack({
                     isEditing={isEditing}
                     icon={blockIcon(block, meta) ?? Puzzle}
                     label={label}
-                    hidden={isBlockHidden(block)}
+                    hidden={isBlockHidden(block) || (!isEditing && isEmptyInRead(block.id))}
                     showReadTitle={showsTitleInRead(block, meta)}
                     outdated={isEditing && !!outdatedDefinitionOf(block)}
                     onGripPointerDown={startDrag}
