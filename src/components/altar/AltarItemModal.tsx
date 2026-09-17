@@ -5,8 +5,7 @@ import { ImagePlus, Trash2 } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import { categoryLabel } from '../../lib/categories';
 import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
-import { dataUrlBytes, ImageTooLargeError, prepareImageDataUrl } from '../../lib/imageLimits';
-import { reportImageError } from '../../store/imageNoticeStore';
+import { ImageTooLargeError, imageSizeLabel, prepareImageDataUrl } from '../../lib/imageLimits';
 import { imageSrc } from '../../lib/images';
 import type { AltarItem, Category } from '../../types';
 import Modal from '../ui/Modal';
@@ -64,21 +63,21 @@ export function AltarItemModal({
       return;
     }
     setImageError(null);
-    // Erst auf die Grenzen des Vaults bringen — ein großes Foto passt verkleinert
-    // oft unter die feste Obergrenze, die danach noch als Deckel gilt.
-    readFileAsDataUrl(file).then(prepareImageDataUrl).then((data) => {
-      if (dataUrlBytes(data) > IMAGE_MAX_BYTES) {
-        setImageError(t('altar.imageTooLarge', { max: '2 MB' }));
-        return;
-      }
+    // Erst verkleinern, dann prüfen: ein großes Foto passt verkleinert oft unter
+    // den festen Deckel. Gemeldet wird in der eigenen Zeile — eine Meldung im
+    // Modal darüber schlösse mit Escape auch diesen Dialog.
+    readFileAsDataUrl(file).then((data) => prepareImageDataUrl(data, { capBytes: IMAGE_MAX_BYTES })).then((data) => {
       setEditImageData(data);
       if (!editName.trim()) {
         setEditName(file.name.replace(/\.[^.]+$/, ''));
         setTimeout(() => nameInputRef.current?.select(), 0);
       }
     }).catch((err) => {
-      if (err instanceof ImageTooLargeError) reportImageError(err, 'altar item');
-      else console.error('[altar] could not read image', err);
+      if (err instanceof ImageTooLargeError) {
+        setImageError(t('altar.imageTooLarge', { max: imageSizeLabel(err.maxBytes, t('common.megabytes')) }));
+      } else {
+        console.error('[altar] could not read image', err);
+      }
     });
     e.target.value = '';
   };

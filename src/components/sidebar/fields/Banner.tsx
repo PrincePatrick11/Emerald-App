@@ -2,8 +2,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImagePlus, X } from 'lucide-react';
 import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, readFileAsDataUrl } from '../../../lib/helpers';
-import { ImageTooLargeError, prepareImageDataUrl } from '../../../lib/imageLimits';
-import { reportImageError } from '../../../store/imageNoticeStore';
+import { ImageTooLargeError, imageSizeLabel, prepareImageDataUrl } from '../../../lib/imageLimits';
 import Button from '../../ui/Button';
 
 interface BannerProps {
@@ -27,20 +26,24 @@ export default function Banner({ value, onChange, onRemove, readOnly = false }: 
   const inputRef = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const showNotice = (message: string) => {
+    setNotice(message);
+    window.setTimeout(() => setNotice(null), 2500);
+  };
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
     if (!isAcceptedImageFile(file)) {
-      setNotice(t('common.unsupportedImageFormat'));
-      window.setTimeout(() => setNotice(null), 2500);
+      showNotice(t('common.unsupportedImageFormat'));
       return;
     }
     try {
       onChange?.(await prepareImageDataUrl(await readFileAsDataUrl(file)));
     } catch (err) {
       if (err instanceof ImageTooLargeError) {
-        reportImageError(err, 'cover');
+        showNotice(t('common.imageTooLargeDetail', { max: imageSizeLabel(err.maxBytes, t('common.megabytes')) }));
         return;
       }
       // Lieber gar nichts setzen als ein leeres Titelbild: ein abgebrochener

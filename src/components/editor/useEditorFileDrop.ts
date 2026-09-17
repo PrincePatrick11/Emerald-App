@@ -2,7 +2,20 @@ import { useEffect, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { copyImageFile, readImageFile, saveImage } from '../../lib/images';
-import { hasImageLimits, prepareImageDataUrl } from '../../lib/imageLimits';
+import { hasImageLimits, ImageTooLargeError, prepareImageDataUrl } from '../../lib/imageLimits';
+
+/** Mirrors `MAX_EXTERNAL_IMAGE_BYTES` in `src-tauri/src/images.rs`. */
+const EXTERNAL_IMAGE_MAX_BYTES = 64 * 1024 * 1024;
+
+/** Liest die Datei ein; die Größengrenze des Rust-Befehls wird zur üblichen Meldung. */
+async function readDroppedImage(path: string): Promise<string> {
+  try {
+    return await readImageFile(path);
+  } catch (err) {
+    if (String(err).includes('image file too large')) throw new ImageTooLargeError(EXTERNAL_IMAGE_MAX_BYTES);
+    throw err;
+  }
+}
 import { reportImageError, useImageNoticeStore } from '../../store/imageNoticeStore';
 
 /**
@@ -42,7 +55,7 @@ export function useEditorFileDrop(enabled: boolean, getTarget: () => Editor | nu
             try {
               // Ohne Grenzen direkt kopieren; mit ihnen erst einlesen, verkleinern und prüfen.
               const src = hasImageLimits()
-                ? await saveImage(await prepareImageDataUrl(await readImageFile(path)))
+                ? await saveImage(await prepareImageDataUrl(await readDroppedImage(path)))
                 : await copyImageFile(path);
               editor.chain().focus().insertContent({ type: 'image', attrs: { src } }).run();
             } catch (e) {

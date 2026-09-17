@@ -1,13 +1,13 @@
 import { AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import Button from '../ui/Button';
-import Modal from '../ui/Modal';
+import Button from './Button';
+import Modal from './Modal';
+import { imageSizeLabel } from '../../lib/imageLimits';
 import { useImageNoticeStore } from '../../store/imageNoticeStore';
 
 /**
- * Warum ein Bild nicht eingefügt wurde — für die Wege ohne eigene Meldezeile:
- * Drop aus dem Datei-Explorer, Einfügen aus der Zwischenablage, die
- * Werkzeugleiste. Einmal in der AppShell, gefüttert über `imageNoticeStore`.
+ * Warum ein Bild nicht eingefügt wurde — für die Wege ohne eigene Meldezeile
+ * (siehe `imageNoticeStore`). Einmal in der AppShell.
  */
 export default function ImageNoticeModal() {
   const { t } = useTranslation();
@@ -17,8 +17,7 @@ export default function ImageNoticeModal() {
 
   const tooLarge = notice.kind === 'tooLarge';
   const detail = tooLarge
-    // Die Grenze ist immer eine der ganzen MB-Stufen der Einstellung.
-    ? t('common.imageTooLargeDetail', { max: `${notice.maxBytes / (1024 * 1024)} ${t('common.megabytes')}` })
+    ? t('common.imageTooLargeDetail', { max: imageSizeLabel(notice.maxBytes, t('common.megabytes')) })
     : 'PNG, JPEG, GIF, WebP, SVG';
 
   return (

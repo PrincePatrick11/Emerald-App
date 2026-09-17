@@ -132,6 +132,17 @@ pub async fn save_image(
     .map_err(|e| e.to_string())?
 }
 
+/// The checks every command that reads an image from an arbitrary location
+/// runs first: a known image extension, and a path inside the allowed roots
+/// that is not a link. Returns the extension and the resolved path.
+fn checked_image_source(app: &tauri::AppHandle, source: &str) -> Result<(String, PathBuf), String> {
+    let ext = crate::ext_for_path(source);
+    if !IMAGE_EXTS.contains(&ext.as_str()) {
+        return Err("unsupported file type".to_string());
+    }
+    Ok((ext, crate::guarded_read_path(app, source)?))
+}
+
 /// Copies a file from an arbitrary location into the vault and returns the
 /// filename it was given. Same deduplication as `save_image`.
 #[tauri::command]
@@ -141,12 +152,7 @@ pub async fn copy_image_file(
     vault_id: String,
 ) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let ext = crate::ext_for_path(&source);
-        if !IMAGE_EXTS.contains(&ext.as_str()) {
-            return Err("unsupported file type".to_string());
-        }
-
-        let canonical_source = crate::guarded_read_path(&app, &source)?;
+        let (ext, canonical_source) = checked_image_source(&app, &source)?;
         let bytes = std::fs::read(&canonical_source).map_err(|e| format!("read {source}: {e}"))?;
         let filename = format!("{}.{}", sha256_hex(&bytes), ext);
         let path = vault::images_dir(&app, &vault_id)?.join(&filename);
@@ -162,7 +168,8 @@ pub async fn copy_image_file(
 
 /// Hard cap for [`read_image_file`]: the bytes cross IPC as base64 and are
 /// decoded on a canvas, so an arbitrarily large file would stall the webview.
-/// The vault's own limit is enforced afterwards in the frontend.
+/// The vault's own limit is enforced afterwards in the frontend. Mirrored in
+/// `useEditorFileDrop.ts`, which also matches the error text below.
 const MAX_EXTERNAL_IMAGE_BYTES: u64 = 64 * 1024 * 1024;
 
 /// Reads an image file from an arbitrary location as a data-URL, without
@@ -172,12 +179,7 @@ const MAX_EXTERNAL_IMAGE_BYTES: u64 = 64 * 1024 * 1024;
 #[tauri::command]
 pub async fn read_image_file(app: tauri::AppHandle, source: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let ext = crate::ext_for_path(&source);
-        if !IMAGE_EXTS.contains(&ext.as_str()) {
-            return Err("unsupported file type".to_string());
-        }
-
-        let canonical_source = crate::guarded_read_path(&app, &source)?;
+        let (ext, canonical_source) = checked_image_source(&app, &source)?;
         let size = std::fs::metadata(&canonical_source)
             .map_err(|e| format!("read {source}: {e}"))?
             .len();

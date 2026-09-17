@@ -21,8 +21,7 @@ import {
   ratioFromResolution,
 } from '../../../lib/altarConstants';
 import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../../lib/helpers';
-import { dataUrlBytes, ImageTooLargeError, prepareImageDataUrl } from '../../../lib/imageLimits';
-import { reportImageError } from '../../../store/imageNoticeStore';
+import { ImageTooLargeError, imageSizeLabel, prepareImageDataUrl } from '../../../lib/imageLimits';
 import Button from '../../ui/Button';
 import { useUIStore } from '../../../store/uiStore';
 import { useDisplayedAltar } from '../../../hooks/useDisplayedAltar';
@@ -34,8 +33,6 @@ import Modal from '../../ui/Modal';
 
 /** Fester Deckel für Hintergründe, nach den Grenzen des Vaults geprüft. */
 const BACKGROUND_MAX_BYTES = 5 * 1024 * 1024;
-
-class BackgroundTooLargeError extends Error {}
 
 export default function AltarSidebarPanel() {
   const { t } = useTranslation();
@@ -196,23 +193,16 @@ const [gridOpen, setGridOpen] = useState(true);
       return;
     }
     readFileAsDataUrl(file)
-      .then(prepareImageDataUrl)
-      .then((data) => {
-        if (dataUrlBytes(data) > BACKGROUND_MAX_BYTES) throw new BackgroundTooLargeError();
-        return saveImage(data);
-      })
+      .then((data) => prepareImageDataUrl(data, { capBytes: BACKGROUND_MAX_BYTES }))
+      .then((data) => saveImage(data))
       .then((filename) => {
         setCustomBackgroundMap((current) => ({ ...current, [activeAltar.id]: filename }));
         return updateAltar(activeAltar.id, { background_preset: 'custom', background_image_data: filename });
       })
       .then(() => showBackgroundNotice(t('altar.backgroundUpdated')))
       .catch((error) => {
-        if (error instanceof BackgroundTooLargeError) {
-          showBackgroundNotice(t('altar.imageTooLarge', { max: '5 MB' }));
-          return;
-        }
         if (error instanceof ImageTooLargeError) {
-          reportImageError(error, 'altar background');
+          showBackgroundNotice(t('altar.imageTooLarge', { max: imageSizeLabel(error.maxBytes, t('common.megabytes')) }));
           return;
         }
         console.error(error);
