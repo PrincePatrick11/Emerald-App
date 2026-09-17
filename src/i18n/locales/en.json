@@ -652,7 +652,8 @@
     "importSettings": "Apply settings from the backup",
     "groupAppearance": "Language & appearance",
     "uiScale": "Interface size",
-    "editorFontSize": "Editor text size"
+    "editorFontSize": "Editor text size",
+    "modeReplaceSettingsWarning": "The settings of this vault are replaced by those from the backup as well."
   },
   "home": {
     "viewAll": "View all",

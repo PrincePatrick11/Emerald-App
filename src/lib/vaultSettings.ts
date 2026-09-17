@@ -49,8 +49,12 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
 
 const LANGUAGES = new Set<string>(LANGUAGE_OPTIONS.map((o) => o.code));
 
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  return isPlainObject(value) ? value : {};
 }
 
 function asString(value: unknown): string | null {
@@ -83,14 +87,28 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
 }
 
 /**
- * `current` mit den gewählten Gruppen aus `incoming` — für das Zusammenführen
- * eines Backups. `incoming` ist ungeprüft (aus einer Datei) und wird erst hier
- * normalisiert.
+ * Die Einstellungen aus einer Sicherung — `null`, wenn sie keine mitbringt.
+ *
+ * Anders als beim Lesen der eigenen `settings.json` fallen hier unbekannte
+ * Schlüssel weg: eine fremde Datei könnte sie beliebig aufblähen, und der
+ * Ballast landete über den Store in jedem späteren Schreiben (und scheiterte
+ * dort an der Größengrenze) und im nächsten Export.
  */
-export function withSettingsGroups(current: VaultSettings, incoming: unknown, groups: readonly SettingsGroup[]): VaultSettings {
-  const source = normalizeVaultSettings(incoming);
+export function importableSettings(raw: unknown): VaultSettings | null {
+  if (!isPlainObject(raw)) return null;
+  const normalized = normalizeVaultSettings(raw);
+  const known = { version: normalized.version } as VaultSettings;
+  for (const group of SETTINGS_GROUPS) {
+    const fields = Object.keys(DEFAULT_VAULT_SETTINGS[group]) as (keyof VaultSettings[typeof group])[];
+    known[group] = Object.fromEntries(fields.map((field) => [field, normalized[group][field]])) as unknown as VaultSettings[typeof group];
+  }
+  return known;
+}
+
+/** `current` mit den gewählten Gruppen aus `incoming` — fürs Zusammenführen einer Sicherung. */
+export function withSettingsGroups(current: VaultSettings, incoming: VaultSettings, groups: readonly SettingsGroup[]): VaultSettings {
   const next = { ...current };
-  for (const group of groups) next[group] = source[group];
+  for (const group of groups) next[group] = incoming[group];
   return next;
 }
 

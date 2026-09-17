@@ -52,7 +52,7 @@ import { clearAllDrafts } from '../store/draftStore';
 import { resumeEditorSaves, suspendEditorSaves } from './editorLock';
 import { drainSerialized } from './serialize';
 import { importViaStaging } from './importStaging';
-import { normalizeVaultSettings, withSettingsGroups, writeVaultSettings, type SettingsGroup } from './vaultSettings';
+import { importableSettings, isPlainObject, withSettingsGroups, writeVaultSettings, type SettingsGroup } from './vaultSettings';
 import { useSettingsStore } from '../store/settingsStore';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -592,10 +592,6 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
 // Parse + preview
 // ─────────────────────────────────────────────────────────────────────────────
 
-function isSettingsObject(value: unknown): boolean {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
-
 export async function openBackupFile(): Promise<{ path: string; backup: BackupFile; preview: BackupPreview } | null> {
   const selected = await open({
     filters: [{ name: 'Emerald Backup', extensions: ['emeralddb'] }],
@@ -630,7 +626,7 @@ export async function openBackupFile(): Promise<{ path: string; backup: BackupFi
     altarItemsCount: backup.data.altarItems?.length ?? 0,
     taskCount: backup.data.tasks?.length ?? 0,
     categories: (backup.data.categories ?? []).filter((c) => usedCatIds.has(c.id as string)) as BackupCategoryEntry[],
-    hasSettings: isSettingsObject(backup.settings),
+    hasSettings: isPlainObject(backup.settings),
   };
 
   return { path: filePath, backup, preview };
@@ -1437,6 +1433,8 @@ export async function importDatabase(
   settingsGroups: readonly SettingsGroup[] = [],
 ): Promise<void> {
   const filters: ImportCategoryFilters = categoryFilters ?? { excludedCategoryIds: new Set<string>() };
+  // Ungeprüft aus der Datei — ab hier nur noch in geprüfter Form.
+  const backupSettings = importableSettings(backup.settings);
 
   // Fuer die Dauer des Imports sind die automatischen Editor-Saves gesperrt,
   // in allen drei Modi. replace behaelt die Original-IDs und add-vault wechselt
@@ -1470,8 +1468,12 @@ export async function importDatabase(
 
     // Vor dem Wechsel in den Ordner: dann öffnet der neue Vault gleich mit
     // Sprache und Aussehen der Sicherung, statt erst mit den Standards.
-    if (isSettingsObject(backup.settings)) {
-      await writeVaultSettings(vaultId, normalizeVaultSettings(backup.settings));
+    if (backupSettings) {
+      // Nur Beiwerk: scheitert das Schreiben, startet der Vault mit den
+      // Standards — der Import selbst soll daran nicht hängen bleiben.
+      await writeVaultSettings(vaultId, backupSettings).catch((err) => {
+        console.warn('[backup] could not write vault settings', err);
+      });
     }
 
     // 3. Switch to it (resets DB cache + runs migrations on new empty DB)
@@ -1502,12 +1504,12 @@ export async function importDatabase(
 
     // Erst nach geglücktem Austausch: ein abgebrochener Import lässt auch die
     // Einstellungen, wie sie waren.
-    if (isSettingsObject(backup.settings)) {
+    if (backupSettings) {
       const settingsStore = useSettingsStore.getState();
       if (mode === 'replace') {
-        await settingsStore.replaceSettings(normalizeVaultSettings(backup.settings));
+        await settingsStore.replaceSettings(backupSettings);
       } else if (settingsGroups.length) {
-        await settingsStore.replaceSettings(withSettingsGroups(settingsStore.settings, backup.settings, settingsGroups));
+        await settingsStore.replaceSettings(withSettingsGroups(settingsStore.settings, backupSettings, settingsGroups));
       }
     }
   }

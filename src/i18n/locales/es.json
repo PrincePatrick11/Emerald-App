@@ -660,7 +660,8 @@
     "importSettings": "Aplicar ajustes de la copia",
     "groupAppearance": "Idioma y apariencia",
     "uiScale": "Tamaño de la interfaz",
-    "editorFontSize": "Tamaño del texto del editor"
+    "editorFontSize": "Tamaño del texto del editor",
+    "modeReplaceSettingsWarning": "Los ajustes de este vault también se sustituyen por los de la copia."
   },
   "contextMenu": {
     "openInNewTab": "Abrir en nueva pestaña",

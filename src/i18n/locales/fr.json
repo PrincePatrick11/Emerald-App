@@ -660,7 +660,8 @@
     "importSettings": "Appliquer les paramètres de la sauvegarde",
     "groupAppearance": "Langue et apparence",
     "uiScale": "Taille de l'interface",
-    "editorFontSize": "Taille du texte de l'éditeur"
+    "editorFontSize": "Taille du texte de l'éditeur",
+    "modeReplaceSettingsWarning": "Les paramètres de ce vault sont eux aussi remplacés par ceux de la sauvegarde."
   },
   "contextMenu": {
     "openInNewTab": "Ouvrir dans un nouvel onglet",

@@ -155,7 +155,7 @@ export default function BackupPage() {
           : undefined,
         categoryFilters,
         importTypeFilters,
-        importMode === 'merge' ? settingsGroups : [],
+        settingsGroups,
       );
       setImportDone(true);
       setImportedFile(null);
@@ -424,7 +424,12 @@ export default function BackupPage() {
               {importMode === 'replace' && (
                 <div className="flex items-start gap-2 text-xs rounded-lg border px-3 py-2 text-[var(--danger-text)] bg-[var(--danger-bg)] border-[var(--danger-border)]">
                   <AlertTriangle size={12} className="shrink-0 mt-0.5" />
-                  <span className="min-w-0">{t('settings.modeReplaceWarning')}</span>
+                  <span className="min-w-0">
+                    {t('settings.modeReplaceWarning')}
+                    {/* Ersetzen ist der eine Modus, in dem Sprache und Aussehen
+                        ohne eigene Wahl umspringen. */}
+                    {importedFile.preview.hasSettings && ` ${t('settings.modeReplaceSettingsWarning')}`}
+                  </span>
                 </div>
               )}
 

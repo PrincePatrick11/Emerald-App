@@ -652,7 +652,8 @@
     "importSettings": "Einstellungen aus dem Backup übernehmen",
     "groupAppearance": "Sprache & Aussehen",
     "uiScale": "Größe der Oberfläche",
-    "editorFontSize": "Textgröße im Editor"
+    "editorFontSize": "Textgröße im Editor",
+    "modeReplaceSettingsWarning": "Auch die Einstellungen dieses Vaults werden durch die aus dem Backup ersetzt."
   },
   "home": {
     "viewAll": "Alle anzeigen",
