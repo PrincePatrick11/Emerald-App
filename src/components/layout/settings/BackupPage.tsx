@@ -43,6 +43,7 @@ const DEFAULT_EXPORT_OPTIONS: BackupOptions = {
 const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {
   appearance: 'settings.groupAppearance',
   trash: 'settings.groupTrash',
+  leftList: 'settings.groupLeftList',
 };
 
 /**

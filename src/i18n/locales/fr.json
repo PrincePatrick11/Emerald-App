@@ -85,7 +85,9 @@
     "vaults": "Vaults"
   },
   "sidebar": {
-    "allEmpty": "Aucune entrée pour le moment"
+    "allEmpty": "Aucune entrée pour le moment",
+    "showMore": "Afficher {{count}} de plus",
+    "showMore_other": "Afficher {{count}} de plus"
   },
   "operations": {
     "new": "Nouvelle opération",
@@ -666,7 +668,12 @@
     "trashRetentionDays": "{{count}} jour",
     "trashRetentionDays_other": "{{count}} jours",
     "trashRetentionNever": "Jamais",
-    "groupTrash": "Corbeille"
+    "groupTrash": "Corbeille",
+    "pageSidebar": "Barre latérale",
+    "sidebarLists": "Listes",
+    "sidebarLimit": "Entrées par liste",
+    "sidebarLimitAll": "Toutes",
+    "groupLeftList": "Barre latérale"
   },
   "contextMenu": {
     "openInNewTab": "Ouvrir dans un nouvel onglet",

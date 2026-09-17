@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Search, Plus } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import ContextMenu, { type ContextMenuAction } from './ContextMenu';
 import Button from './Button';
 
@@ -51,8 +52,14 @@ export default function EntryListTab<T>({
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  // Wie viele Einträge die Einstellung des Vaults zeigt; „Mehr anzeigen" legt
+  // je ein Limit nach. Ein Tab-Wechsel montiert die Liste neu und beginnt von vorn.
+  const limit = useSettingsStore((s) => s.settings.leftList.limit);
+  const [pages, setPages] = useState(1);
 
-  const filtered = items.filter((item) => getTitle(item).toLowerCase().includes(searchQuery.toLowerCase()));
+  const matching = items.filter((item) => getTitle(item).toLowerCase().includes(searchQuery.toLowerCase()));
+  const filtered = limit === null ? matching : matching.slice(0, limit * pages);
+  const hiddenCount = matching.length - filtered.length;
 
   const openCtxMenu = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
@@ -104,7 +111,7 @@ export default function EntryListTab<T>({
       </div>
 
       <nav className="flex-1 overflow-y-auto py-2 px-2">
-        {filtered.length === 0 ? (
+        {matching.length === 0 ? (
           <p className="text-xs text-stone-600 px-2 py-2">{emptyMessage}</p>
         ) : (
           <div className="space-y-0.5">
@@ -179,6 +186,15 @@ export default function EntryListTab<T>({
                 </button>
               );
             })}
+            {hiddenCount > 0 && limit !== null && (
+              <button
+                type="button"
+                onClick={() => setPages((p) => p + 1)}
+                className="w-full px-2 py-1.5 text-left text-xs text-stone-500 hover:text-stone-300 transition-colors"
+              >
+                {t('sidebar.showMore', { count: Math.min(limit, hiddenCount) })}
+              </button>
+            )}
           </div>
         )}
       </nav>

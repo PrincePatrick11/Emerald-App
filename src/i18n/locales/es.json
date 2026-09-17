@@ -85,7 +85,9 @@
     "vaults": "Vaults"
   },
   "sidebar": {
-    "allEmpty": "Aún no hay entradas"
+    "allEmpty": "Aún no hay entradas",
+    "showMore": "Mostrar {{count}} más",
+    "showMore_other": "Mostrar {{count}} más"
   },
   "operations": {
     "new": "Nueva operación",
@@ -666,7 +668,12 @@
     "trashRetentionDays": "{{count}} día",
     "trashRetentionDays_other": "{{count}} días",
     "trashRetentionNever": "Nunca",
-    "groupTrash": "Papelera"
+    "groupTrash": "Papelera",
+    "pageSidebar": "Barra lateral",
+    "sidebarLists": "Listas",
+    "sidebarLimit": "Entradas por lista",
+    "sidebarLimitAll": "Todas",
+    "groupLeftList": "Barra lateral"
   },
   "contextMenu": {
     "openInNewTab": "Abrir en nueva pestaña",

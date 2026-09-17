@@ -75,6 +75,8 @@ export function isLibraryView(viewType: string): viewType is LibraryViewId {
 export type ViewId = EntryModuleId | AuxViewId;
 
 export type LeftListTabId = 'all' | EntryModuleId;
+/** Die Tabs der Eintragsliste in ihrer Reihenfolge — „Alle" zuerst. */
+export const LEFT_LIST_TAB_IDS: readonly LeftListTabId[] = ['all', ...ENTRY_MODULE_IDS];
 
 /** Module, deren Einträge eine Kategorie tragen — alle außer Journal. */
 export const CATEGORY_MODULE_IDS: readonly Exclude<EntryModuleId, 'journal'>[] = ENTRY_MODULE_IDS.filter(

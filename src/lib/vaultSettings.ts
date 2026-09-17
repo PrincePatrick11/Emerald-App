@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { LEFT_LIST_TAB_IDS, type LeftListTabId } from './modules';
 import { LANGUAGE_OPTIONS, LANGUAGE_STORAGE_KEY, type AppLanguage } from '../i18n';
 import {
   DEFAULT_EDITOR_FONT_ID, DEFAULT_EDITOR_FONT_SIZE, DEFAULT_THEME_ID, DEFAULT_UI_FONT_ID, DEFAULT_UI_SCALE,
@@ -30,18 +31,29 @@ export interface TrashSettings {
   retentionDays: TrashRetention;
 }
 
+/** Einträge je Liste in der linken Seitenleiste; `null` = alle. */
+export const LEFT_LIST_LIMIT_OPTIONS = [10, 25, 50, 100, null] as const;
+export type LeftListLimit = (typeof LEFT_LIST_LIMIT_OPTIONS)[number];
+
+export interface LeftListSettings {
+  /** Die sichtbaren Tabs, in der Reihenfolge der Leiste; nie leer. */
+  tabs: LeftListTabId[];
+  limit: LeftListLimit;
+}
+
 export interface VaultSettings {
   /** Nicht gelesen, wie `version` in `vaults.json`: erst eine Form, die eine
    *  Umrechnung braucht, zählt ihn hoch. */
   version: 1;
   appearance: AppearanceSettings;
   trash: TrashSettings;
+  leftList: LeftListSettings;
 }
 
 export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
 
 /** Jede Gruppe genau einmal — der Record erzwingt, dass eine neue nicht fehlt. */
-const GROUP_SET: Record<SettingsGroup, true> = { appearance: true, trash: true };
+const GROUP_SET: Record<SettingsGroup, true> = { appearance: true, trash: true, leftList: true };
 export const SETTINGS_GROUPS = Object.keys(GROUP_SET) as SettingsGroup[];
 
 export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
@@ -56,6 +68,10 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
   },
   trash: {
     retentionDays: 30,
+  },
+  leftList: {
+    tabs: [...LEFT_LIST_TAB_IDS],
+    limit: null,
   },
 };
 
@@ -84,6 +100,8 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const appearance = asRecord(root.appearance);
   const language = asString(appearance.language);
   const trash = asRecord(root.trash);
+  const leftList = asRecord(root.leftList);
+  const tabs = Array.isArray(leftList.tabs) ? LEFT_LIST_TAB_IDS.filter((id) => (leftList.tabs as unknown[]).includes(id)) : [];
   return {
     ...root,
     version: 1,
@@ -101,6 +119,13 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
       retentionDays: (TRASH_RETENTION_OPTIONS as readonly unknown[]).includes(trash.retentionDays)
         ? (trash.retentionDays as TrashRetention)
         : DEFAULT_VAULT_SETTINGS.trash.retentionDays,
+    },
+    leftList: {
+      ...leftList,
+      tabs: tabs.length ? tabs : [...LEFT_LIST_TAB_IDS],
+      limit: (LEFT_LIST_LIMIT_OPTIONS as readonly unknown[]).includes(leftList.limit)
+        ? (leftList.limit as LeftListLimit)
+        : DEFAULT_VAULT_SETTINGS.leftList.limit,
     },
   };
 }

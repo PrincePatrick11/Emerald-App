@@ -85,7 +85,9 @@
     "vaults": "Vaults"
   },
   "sidebar": {
-    "allEmpty": "No entries yet"
+    "allEmpty": "No entries yet",
+    "showMore": "Show {{count}} more",
+    "showMore_other": "Show {{count}} more"
   },
   "operations": {
     "new": "New Operation",
@@ -658,7 +660,12 @@
     "trashRetentionDays": "{{count}} day",
     "trashRetentionDays_other": "{{count}} days",
     "trashRetentionNever": "Never",
-    "groupTrash": "Trash"
+    "groupTrash": "Trash",
+    "pageSidebar": "Sidebar",
+    "sidebarLists": "Lists",
+    "sidebarLimit": "Entries per list",
+    "sidebarLimitAll": "All",
+    "groupLeftList": "Sidebar"
   },
   "home": {
     "viewAll": "View all",
