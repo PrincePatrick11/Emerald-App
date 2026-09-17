@@ -65,6 +65,13 @@ export interface ImageSettings {
   maxSizeMb: ImageMaxSizeMb;
 }
 
+export interface TagSettings {
+  /** Ob das Tag-Feld (Einträge, Vorlagen) unbekannte Namen als neue Tags
+   *  anlegt. Aus: neue Tags nur im Tags-Dashboard, und eine Vorlage bringt
+   *  nur Tags mit, die es gibt. Importe legen fehlende Tags immer an. */
+  createInline: boolean;
+}
+
 export interface VaultSettings {
   /** Nicht gelesen, wie `version` in `vaults.json`: erst eine Form, die eine
    *  Umrechnung braucht, zählt ihn hoch. */
@@ -74,12 +81,15 @@ export interface VaultSettings {
   leftList: LeftListSettings;
   emojis: EmojiSettings;
   images: ImageSettings;
+  tags: TagSettings;
 }
 
 export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
 
 /** Jede Gruppe genau einmal — der Record erzwingt, dass eine neue nicht fehlt. */
-const GROUP_SET: Record<SettingsGroup, true> = { appearance: true, trash: true, leftList: true, emojis: true, images: true };
+const GROUP_SET: Record<SettingsGroup, true> = {
+  appearance: true, trash: true, leftList: true, emojis: true, images: true, tags: true,
+};
 export const SETTINGS_GROUPS = Object.keys(GROUP_SET) as SettingsGroup[];
 
 export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
@@ -105,6 +115,9 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
   images: {
     maxEdge: null,
     maxSizeMb: null,
+  },
+  tags: {
+    createInline: true,
   },
 };
 
@@ -143,6 +156,7 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const leftList = asRecord(root.leftList);
   const emojis = asRecord(root.emojis);
   const images = asRecord(root.images);
+  const tags = asRecord(root.tags);
   const tabs = Array.isArray(leftList.tabs) ? LEFT_LIST_TAB_IDS.filter((id) => (leftList.tabs as unknown[]).includes(id)) : [];
   return {
     ...root,
@@ -173,6 +187,10 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
       ...images,
       maxEdge: oneOf(images.maxEdge, IMAGE_MAX_EDGE_OPTIONS, DEFAULT_VAULT_SETTINGS.images.maxEdge),
       maxSizeMb: oneOf(images.maxSizeMb, IMAGE_MAX_SIZE_MB_OPTIONS, DEFAULT_VAULT_SETTINGS.images.maxSizeMb),
+    },
+    tags: {
+      ...tags,
+      createInline: typeof tags.createInline === 'boolean' ? tags.createInline : DEFAULT_VAULT_SETTINGS.tags.createInline,
     },
   };
 }

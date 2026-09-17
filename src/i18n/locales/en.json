@@ -527,7 +527,9 @@
     "nameTaken": "This tag already exists",
     "color": "Change color",
     "unused": "unused",
-    "unusedHint": "No entry carries this tag yet."
+    "unusedHint": "No entry carries this tag yet.",
+    "createNamed": "+ Create “{{name}}”",
+    "unknownOpenDashboard": "No tag “{{name}}” — create it in the tags dashboard"
   },
   "properties": {
     "noEntry": "Open an entry to see its properties.",
@@ -680,7 +682,11 @@
     "imageMaxEdge": "Longest edge",
     "imageMaxEdgeOriginal": "Original",
     "imageMaxSize": "Largest file size",
-    "imageMaxSizeUnlimited": "Unlimited"
+    "imageMaxSizeUnlimited": "Unlimited",
+    "tagCreation": "New tags",
+    "tagCreateInline": "Also while typing",
+    "tagCreateDashboardOnly": "Only in the tags dashboard",
+    "groupTags": "Tags"
   },
   "home": {
     "viewAll": "View all",

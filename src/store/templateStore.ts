@@ -28,6 +28,7 @@ import {
   type EntryStart, type Template, type TemplateAssignment, type TemplateEntryType,
 } from '../lib/blocks/templates';
 import i18n from '../i18n';
+import { usableTemplateTags } from '../lib/templateTags';
 
 export type TemplatePatch = Partial<Pick<Template, 'name' | 'icon' | 'description' | 'title' | 'content' | 'tags' | 'assignments'>>;
 
@@ -190,7 +191,8 @@ export function startOfNewEntry(
   blank = false,
 ): EntryStart {
   const template = blank ? null : resolveDefaultTemplate(useTemplateStore.getState().templates, entryType, categoryId);
-  return templateStart(template, fallbackTitle);
+  const start = templateStart(template, fallbackTitle);
+  return { ...start, tags: usableTemplateTags(start.tags) };
 }
 
 /** Eine gerade automatisch eingesetzte Vorlage — der Blockstapel des Eintrags zeigt dazu Rückgängig und „Andere Vorlage". */

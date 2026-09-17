@@ -46,6 +46,7 @@ const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {
   leftList: 'settings.groupLeftList',
   emojis: 'settings.groupEmojis',
   images: 'settings.groupImages',
+  tags: 'settings.groupTags',
 };
 
 /**

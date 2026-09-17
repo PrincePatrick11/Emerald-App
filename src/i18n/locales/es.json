@@ -527,7 +527,9 @@
     "nameTaken": "Esta etiqueta ya existe",
     "color": "Cambiar color",
     "unused": "sin usar",
-    "unusedHint": "Ninguna entrada lleva esta etiqueta todavía."
+    "unusedHint": "Ninguna entrada lleva esta etiqueta todavía.",
+    "createNamed": "+ Crear «{{name}}»",
+    "unknownOpenDashboard": "No existe «{{name}}»: créala en el panel de etiquetas"
   },
   "properties": {
     "noEntry": "Abre una entrada para ver sus propiedades.",
@@ -688,7 +690,11 @@
     "imageMaxEdge": "Lado más largo",
     "imageMaxEdgeOriginal": "Original",
     "imageMaxSize": "Tamaño máximo de archivo",
-    "imageMaxSizeUnlimited": "Sin límite"
+    "imageMaxSizeUnlimited": "Sin límite",
+    "tagCreation": "Etiquetas nuevas",
+    "tagCreateInline": "También al escribir",
+    "tagCreateDashboardOnly": "Solo en el panel de etiquetas",
+    "groupTags": "Etiquetas"
   },
   "contextMenu": {
     "openInNewTab": "Abrir en nueva pestaña",

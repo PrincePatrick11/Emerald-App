@@ -527,7 +527,9 @@
     "nameTaken": "Diesen Tag gibt es schon",
     "color": "Farbe ändern",
     "unused": "nicht verwendet",
-    "unusedHint": "Noch kein Eintrag trägt diesen Tag."
+    "unusedHint": "Noch kein Eintrag trägt diesen Tag.",
+    "createNamed": "+ „{{name}}“ anlegen",
+    "unknownOpenDashboard": "Kein Tag „{{name}}“ – im Tags-Dashboard anlegen"
   },
   "properties": {
     "noEntry": "Öffne einen Eintrag, um seine Eigenschaften zu sehen.",
@@ -680,7 +682,11 @@
     "imageMaxEdge": "Längste Kante",
     "imageMaxEdgeOriginal": "Original",
     "imageMaxSize": "Größte Dateigröße",
-    "imageMaxSizeUnlimited": "Unbegrenzt"
+    "imageMaxSizeUnlimited": "Unbegrenzt",
+    "tagCreation": "Neue Tags",
+    "tagCreateInline": "Auch beim Eintippen",
+    "tagCreateDashboardOnly": "Nur im Tags-Dashboard",
+    "groupTags": "Tags"
   },
   "home": {
     "viewAll": "Alle anzeigen",

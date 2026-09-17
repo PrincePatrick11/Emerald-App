@@ -3,6 +3,8 @@ import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { useTagStore } from '../../store/tagStore';
+import { useSettingsStore } from '../../store/settingsStore';
+import { useUIStore } from '../../store/uiStore';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 
 interface TagInputProps {
@@ -16,6 +18,8 @@ export default function TagInput({ tags, onChange, readOnly = false }: TagInputP
   const { tags: allTags, ensureTag, getByName } = useTagStore(
     useShallow((s) => ({ tags: s.tags, ensureTag: s.ensureTag, getByName: s.getByName }))
   );
+  const createInline = useSettingsStore((s) => s.settings.tags.createInline);
+  const setActiveView = useUIStore((s) => s.setActiveView);
   const [input, setInput] = useState('');
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -26,9 +30,15 @@ export default function TagInput({ tags, onChange, readOnly = false }: TagInputP
       !tags.includes(t.name)
   );
 
+  const trimmedInput = input.trim();
+  const inputMatchesTag = !!trimmedInput && !!getByName(trimmedInput);
+
   const addTag = async (name: string) => {
     const trimmed = name.trim();
     if (!trimmed || tags.includes(trimmed)) { setInput(''); return; }
+    // Ohne Anlegen-Erlaubnis nur vorhandene Tags; der Hinweis im Menü darunter
+    // sagt, wo neue entstehen.
+    if (!createInline && !getByName(trimmed)) { setOpen(true); return; }
     // Die Schreibweise des Tags, nicht die getippte: ensureTag findet „foo"
     // auch als „Foo", und Umbenennen/Löschen suchen den Namen exakt.
     const { name: canonical } = await ensureTag(trimmed);
@@ -131,14 +141,21 @@ export default function TagInput({ tags, onChange, readOnly = false }: TagInputP
               {t.name}
             </button>
           ))}
-          {input.trim() && !allTags.find((t) => t.name.toLowerCase() === input.toLowerCase()) && (
+          {trimmedInput && !inputMatchesTag && (createInline ? (
             <button
               onMouseDown={(e) => { e.preventDefault(); addTag(input); }}
               className="w-full text-left px-3 py-1.5 text-xs text-jade-400 hover:bg-stone-700"
             >
-              + Create "{input.trim()}"
+              {t('tags.createNamed', { name: trimmedInput })}
             </button>
-          )}
+          ) : (
+            <button
+              onMouseDown={(e) => { e.preventDefault(); setOpen(false); setActiveView({ type: 'tags' }); }}
+              className="w-full text-left px-3 py-1.5 text-xs text-stone-400 hover:bg-stone-700"
+            >
+              {t('tags.unknownOpenDashboard', { name: trimmedInput })}
+            </button>
+          ))}
         </div>
       )}
     </div>

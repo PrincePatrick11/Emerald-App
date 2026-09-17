@@ -527,7 +527,9 @@
     "nameTaken": "Cette étiquette existe déjà",
     "color": "Changer la couleur",
     "unused": "inutilisée",
-    "unusedHint": "Aucune entrée ne porte encore cette étiquette."
+    "unusedHint": "Aucune entrée ne porte encore cette étiquette.",
+    "createNamed": "+ Créer « {{name}} »",
+    "unknownOpenDashboard": "Aucune étiquette « {{name}} » — la créer dans le tableau des étiquettes"
   },
   "properties": {
     "noEntry": "Ouvrez une entrée pour voir ses propriétés.",
@@ -688,7 +690,11 @@
     "imageMaxEdge": "Plus grand côté",
     "imageMaxEdgeOriginal": "Original",
     "imageMaxSize": "Taille de fichier maximale",
-    "imageMaxSizeUnlimited": "Illimitée"
+    "imageMaxSizeUnlimited": "Illimitée",
+    "tagCreation": "Nouvelles étiquettes",
+    "tagCreateInline": "Aussi pendant la saisie",
+    "tagCreateDashboardOnly": "Uniquement dans le tableau des étiquettes",
+    "groupTags": "Étiquettes"
   },
   "contextMenu": {
     "openInNewTab": "Ouvrir dans un nouvel onglet",
