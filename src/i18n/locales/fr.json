@@ -673,7 +673,14 @@
     "sidebarLists": "Listes",
     "sidebarLimit": "Entrées par liste",
     "sidebarLimitAll": "Toutes",
-    "groupLeftList": "Barre latérale"
+    "groupLeftList": "Barre latérale",
+    "pageEntries": "Entrées",
+    "emojiDefaults": "Emojis par défaut",
+    "emojiItemTitle": "Cliquer pour retirer, glisser pour trier",
+    "emojiRemove": "Retirer {{emoji}}",
+    "emojiAdd": "Ajouter {{emoji}}",
+    "emojiReset": "Réinitialiser",
+    "groupEmojis": "Emojis"
   },
   "contextMenu": {
     "openInNewTab": "Ouvrir dans un nouvel onglet",

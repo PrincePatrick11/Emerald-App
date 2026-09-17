@@ -1,25 +1,15 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { DEFAULT_EMOJI_PICKER_EMOJIS, searchEmojis } from '../../lib/emojiSearch';
+import { useEmojiSearchData } from '../../hooks/useEmojiSearchData';
+import { useSettingsStore } from '../../store/settingsStore';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-
-/** Single shared emoji set used by every emoji picker in the app, so the same choices are offered everywhere. */
-export const DEFAULT_EMOJI_PICKER_EMOJIS = [
-  '✨', '🌟', '⭐', '💫', '🌙', '☀️', '🌑', '🌕', '🌈', '🌀',
-  '🔮', '☯️', '🔯', '🔱', '🪬', '🧿', '⚡', '👁️', '💀', '🎭',
-  '🕯️', '🔥', '🪔', '🕎', '💡', '🔔', '📿', '🫧',
-  '🌿', '🍃', '🌱', '🌾', '🪴', '🍀', '🌺', '🌸', '🦋', '🐉', '🦅', '🐍', '🐾',
-  '⚗️', '🪄', '🗡️', '⚔️', '🛡️', '🔑', '📜', '🏺', '🪵', '🪑', '🧺', '🪟', '🛖', '🪜', '📦',
-  '💎', '💜', '🪨',
-  '📖', '📋', '📄', '📝', '✍️', '🗺️',
-  '💼', '⏰', '🎯', '🧘', '💪', '🃏', '🧲', '🧹', '🧪', '🎵',
-];
 
 // Every picker prefers this many emoji per row, shrinking down to MIN_COLUMNS when the
 // viewport is too narrow, regardless of trigger width or emoji count.
 const COLUMNS = 5;
 const MIN_COLUMNS = 3;
-const MAX_SEARCH_RESULTS = 150;
 
 /** Abstand zwischen Trigger und Popover. */
 const ANCHOR_GAP = 4;
@@ -29,24 +19,10 @@ const VIEWPORT_MARGIN = 12;
 /** Fixed-position coordinates for the portalled popover. */
 type Placement = { left?: number; right?: number; top?: number; bottom?: number };
 
-// [emoji, searchable text] pairs generated from emojibase-data (compact.json per locale),
-// covering the full standard Unicode emoji set (minus skin-tone variants and flag-building
-// components) so search isn't limited to the curated DEFAULT_EMOJI_PICKER_EMOJIS above.
-// Loaded lazily per-locale so the ~100-140KB dataset is only fetched once a picker is opened.
-const SEARCH_DATA_LOADERS: Record<string, () => Promise<{ default: string[][] }>> = {
-  en: () => import('../../lib/emojiSearchData/en.json'),
-  de: () => import('../../lib/emojiSearchData/de.json'),
-  es: () => import('../../lib/emojiSearchData/es.json'),
-  fr: () => import('../../lib/emojiSearchData/fr.json'),
-};
-
-// Module-level cache so re-opening a picker (or opening a second one) doesn't re-fetch.
-const searchDataCache: Record<string, string[][]> = {};
-
 interface EmojiPickerProps {
   value: string;
   onChange: (emoji: string) => void;
-  /** Defaults to the shared app-wide emoji set — pass only to offer a narrower selection. */
+  /** Defaults to the vault's emoji set (Settings → Entries) — pass only to offer a narrower selection. */
   emojis?: string[];
   /** Renders the trigger button; receives the current open state and a toggle handler. */
   trigger: (args: { open: boolean; toggle: () => void }) => React.ReactNode;
@@ -62,41 +38,25 @@ interface EmojiPickerProps {
 export default function EmojiPicker({
   value,
   onChange,
-  emojis = DEFAULT_EMOJI_PICKER_EMOJIS,
+  emojis,
   trigger,
   align = 'left',
   size = 'sm',
   wrapperClassName = 'relative flex-shrink-0',
 }: EmojiPickerProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const vaultEmojis = useSettingsStore((s) => s.settings.emojis.defaults);
+  const offered = emojis ?? vaultEmojis ?? DEFAULT_EMOJI_PICKER_EMOJIS;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [searchData, setSearchData] = useState<string[][] | null>(null);
+  const searchData = useEmojiSearchData(open);
   const ref = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const [placement, setPlacement] = useState<Placement | null>(null);
 
-  const langCode = i18n.language?.slice(0, 2).toLowerCase();
-  const locale = langCode && SEARCH_DATA_LOADERS[langCode] ? langCode : 'en';
-
   useEffect(() => {
-    if (!open) {
-      setQuery('');
-      return;
-    }
-    const cached = searchDataCache[locale];
-    if (cached) {
-      setSearchData(cached);
-      return;
-    }
-    let cancelled = false;
-    SEARCH_DATA_LOADERS[locale]().then((mod) => {
-      if (cancelled) return;
-      searchDataCache[locale] = mod.default;
-      setSearchData(mod.default);
-    });
-    return () => { cancelled = true; };
-  }, [open, locale]);
+    if (!open) setQuery('');
+  }, [open]);
 
   // popoverRef zusätzlich: das Popover haengt im Portal und ist kein Nachfahre
   // des Triggers mehr. `escape: 'capture'`, damit Escape nur den Picker
@@ -182,12 +142,7 @@ export default function EmojiPicker({
 
   const trimmedQuery = query.trim().toLowerCase();
   const isSearchLoading = trimmedQuery !== '' && searchData === null;
-  const displayedEmojis = trimmedQuery
-    ? (searchData ?? [])
-        .filter(([, text]) => text.includes(trimmedQuery))
-        .slice(0, MAX_SEARCH_RESULTS)
-        .map(([emoji]) => emoji)
-    : emojis;
+  const displayedEmojis = trimmedQuery ? searchEmojis(searchData ?? [], trimmedQuery) : offered;
 
   return (
     <div ref={ref} className={wrapperClassName}>

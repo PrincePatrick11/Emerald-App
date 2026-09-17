@@ -653,8 +653,8 @@
     "includeSettings": "Einstellungen",
     "importSettings": "Einstellungen aus dem Backup übernehmen",
     "groupAppearance": "Sprache & Aussehen",
-    "uiScale": "Größe der Oberfläche",
-    "editorFontSize": "Textgröße im Editor",
+    "uiScale": "UI-Größe",
+    "editorFontSize": "Editor-Textgröße",
     "modeReplaceSettingsWarning": "Auch die Einstellungen dieses Vaults werden durch die aus dem Backup ersetzt.",
     "trashRetention": "Papierkorb automatisch leeren nach",
     "trashRetentionDays": "{{count}} Tag",
@@ -665,7 +665,14 @@
     "sidebarLists": "Listen",
     "sidebarLimit": "Einträge pro Liste",
     "sidebarLimitAll": "Alle",
-    "groupLeftList": "Seitenleiste"
+    "groupLeftList": "Seitenleiste",
+    "pageEntries": "Einträge",
+    "emojiDefaults": "Standard-Emojis",
+    "emojiItemTitle": "Klicken zum Entfernen, ziehen zum Sortieren",
+    "emojiRemove": "{{emoji}} entfernen",
+    "emojiAdd": "{{emoji}} hinzufügen",
+    "emojiReset": "Zurücksetzen",
+    "groupEmojis": "Emojis"
   },
   "home": {
     "viewAll": "Alle anzeigen",

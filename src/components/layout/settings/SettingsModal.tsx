@@ -1,20 +1,22 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Archive, HardDrive, Info, PanelLeft, SlidersHorizontal } from 'lucide-react';
+import { Archive, FileText, HardDrive, Info, PanelLeft, SlidersHorizontal } from 'lucide-react';
 import Modal from '../../ui/Modal';
 import { useVaultStore } from '../../../store/vaultStore';
 import { VaultGlyph } from '../VaultModal';
 import GeneralPage from './GeneralPage';
 import SidebarPage from './SidebarPage';
+import EntriesPage from './EntriesPage';
 import BackupPage from './BackupPage';
 import StoragePage from './StoragePage';
 import AboutPage from './AboutPage';
 
-export type SettingsPage = 'general' | 'sidebar' | 'backup' | 'storage' | 'about';
+export type SettingsPage = 'general' | 'sidebar' | 'entries' | 'backup' | 'storage' | 'about';
 
 const PAGES = [
   { id: 'general', labelKey: 'settings.pageGeneral', Icon: SlidersHorizontal },
   { id: 'sidebar', labelKey: 'settings.pageSidebar', Icon: PanelLeft },
+  { id: 'entries', labelKey: 'settings.pageEntries', Icon: FileText },
   { id: 'backup', labelKey: 'settings.backup', Icon: Archive },
   { id: 'storage', labelKey: 'settings.storage', Icon: HardDrive },
   { id: 'about', labelKey: 'settings.about', Icon: Info },
@@ -96,6 +98,7 @@ export default function SettingsModal({ onClose, initialPage = 'general' }: Prop
       >
         {page === 'general' && <GeneralPage />}
         {page === 'sidebar' && <SidebarPage />}
+        {page === 'entries' && <EntriesPage />}
         {page === 'backup' && <BackupPage />}
         {page === 'storage' && <StoragePage />}
         {page === 'about' && <AboutPage />}

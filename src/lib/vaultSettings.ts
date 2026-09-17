@@ -44,6 +44,15 @@ export interface LeftListSettings {
   limit: LeftListLimit;
 }
 
+export interface EmojiSettings {
+  /** Die Emojis, die jeder Picker ohne Suche anbietet; `null` = die eingebaute Auswahl. */
+  defaults: string[] | null;
+}
+
+/** Deckel für eine eigene Liste — gegen aufgeblähte Dateien, nicht für die Oberfläche. */
+const MAX_EMOJI_DEFAULTS = 500;
+const MAX_EMOJI_LENGTH = 32;
+
 export interface VaultSettings {
   /** Nicht gelesen, wie `version` in `vaults.json`: erst eine Form, die eine
    *  Umrechnung braucht, zählt ihn hoch. */
@@ -51,12 +60,13 @@ export interface VaultSettings {
   appearance: AppearanceSettings;
   trash: TrashSettings;
   leftList: LeftListSettings;
+  emojis: EmojiSettings;
 }
 
 export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
 
 /** Jede Gruppe genau einmal — der Record erzwingt, dass eine neue nicht fehlt. */
-const GROUP_SET: Record<SettingsGroup, true> = { appearance: true, trash: true, leftList: true };
+const GROUP_SET: Record<SettingsGroup, true> = { appearance: true, trash: true, leftList: true, emojis: true };
 export const SETTINGS_GROUPS = Object.keys(GROUP_SET) as SettingsGroup[];
 
 export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
@@ -76,6 +86,9 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
     tabs: [...LEFT_LIST_TAB_IDS],
     limit: DEFAULT_LEFT_LIST_LIMIT,
   },
+  emojis: {
+    defaults: null,
+  },
 };
 
 const LANGUAGES = new Set<string>(LANGUAGE_OPTIONS.map((o) => o.code));
@@ -92,6 +105,12 @@ function asString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }
 
+function normalizeEmojiList(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  const valid = raw.filter((e): e is string => typeof e === 'string' && e.length > 0 && e.length <= MAX_EMOJI_LENGTH);
+  return [...new Set(valid)].slice(0, MAX_EMOJI_DEFAULTS);
+}
+
 /**
  * Macht aus beliebigem JSON gültige Einstellungen: jedes Feld wird geprüft,
  * Ungültiges fällt auf den Standard. Schlüssel, die dieser Build nicht kennt,
@@ -104,6 +123,7 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const language = asString(appearance.language);
   const trash = asRecord(root.trash);
   const leftList = asRecord(root.leftList);
+  const emojis = asRecord(root.emojis);
   const tabs = Array.isArray(leftList.tabs) ? LEFT_LIST_TAB_IDS.filter((id) => (leftList.tabs as unknown[]).includes(id)) : [];
   return {
     ...root,
@@ -125,6 +145,10 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
       ...leftList,
       tabs: tabs.length ? tabs : [...LEFT_LIST_TAB_IDS],
       limit: oneOf(leftList.limit, LEFT_LIST_LIMIT_OPTIONS, DEFAULT_LEFT_LIST_LIMIT),
+    },
+    emojis: {
+      ...emojis,
+      defaults: normalizeEmojiList(emojis.defaults),
     },
   };
 }
