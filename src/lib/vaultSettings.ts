@@ -53,6 +53,18 @@ export interface EmojiSettings {
 const MAX_EMOJI_DEFAULTS = 500;
 const MAX_EMOJI_LENGTH = 32;
 
+/** Größte Kantenlänge eingefügter Bilder in px; `null` = Original. */
+export const IMAGE_MAX_EDGE_OPTIONS = [1024, 1920, 2560, 3840, null] as const;
+export type ImageMaxEdge = (typeof IMAGE_MAX_EDGE_OPTIONS)[number];
+/** Größte Dateigröße nach dem Verkleinern in MB; `null` = unbegrenzt. */
+export const IMAGE_MAX_SIZE_MB_OPTIONS = [1, 2, 5, 10, 20, null] as const;
+export type ImageMaxSizeMb = (typeof IMAGE_MAX_SIZE_MB_OPTIONS)[number];
+
+export interface ImageSettings {
+  maxEdge: ImageMaxEdge;
+  maxSizeMb: ImageMaxSizeMb;
+}
+
 export interface VaultSettings {
   /** Nicht gelesen, wie `version` in `vaults.json`: erst eine Form, die eine
    *  Umrechnung braucht, zählt ihn hoch. */
@@ -61,12 +73,13 @@ export interface VaultSettings {
   trash: TrashSettings;
   leftList: LeftListSettings;
   emojis: EmojiSettings;
+  images: ImageSettings;
 }
 
 export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
 
 /** Jede Gruppe genau einmal — der Record erzwingt, dass eine neue nicht fehlt. */
-const GROUP_SET: Record<SettingsGroup, true> = { appearance: true, trash: true, leftList: true, emojis: true };
+const GROUP_SET: Record<SettingsGroup, true> = { appearance: true, trash: true, leftList: true, emojis: true, images: true };
 export const SETTINGS_GROUPS = Object.keys(GROUP_SET) as SettingsGroup[];
 
 export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
@@ -88,6 +101,10 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
   },
   emojis: {
     defaults: null,
+  },
+  images: {
+    maxEdge: null,
+    maxSizeMb: null,
   },
 };
 
@@ -125,6 +142,7 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const trash = asRecord(root.trash);
   const leftList = asRecord(root.leftList);
   const emojis = asRecord(root.emojis);
+  const images = asRecord(root.images);
   const tabs = Array.isArray(leftList.tabs) ? LEFT_LIST_TAB_IDS.filter((id) => (leftList.tabs as unknown[]).includes(id)) : [];
   return {
     ...root,
@@ -150,6 +168,11 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
     emojis: {
       ...emojis,
       defaults: normalizeEmojiList(emojis.defaults),
+    },
+    images: {
+      ...images,
+      maxEdge: oneOf(images.maxEdge, IMAGE_MAX_EDGE_OPTIONS, DEFAULT_VAULT_SETTINGS.images.maxEdge),
+      maxSizeMb: oneOf(images.maxSizeMb, IMAGE_MAX_SIZE_MB_OPTIONS, DEFAULT_VAULT_SETTINGS.images.maxSizeMb),
     },
   };
 }

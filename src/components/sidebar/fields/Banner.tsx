@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImagePlus, X } from 'lucide-react';
 import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, readFileAsDataUrl } from '../../../lib/helpers';
+import { ImageTooLargeError, prepareImageDataUrl } from '../../../lib/imageLimits';
+import { reportImageError } from '../../../store/imageNoticeStore';
 import Button from '../../ui/Button';
 
 interface BannerProps {
@@ -35,8 +37,12 @@ export default function Banner({ value, onChange, onRemove, readOnly = false }: 
       return;
     }
     try {
-      onChange?.(await readFileAsDataUrl(file));
+      onChange?.(await prepareImageDataUrl(await readFileAsDataUrl(file)));
     } catch (err) {
+      if (err instanceof ImageTooLargeError) {
+        reportImageError(err, 'cover');
+        return;
+      }
       // Lieber gar nichts setzen als ein leeres Titelbild: ein abgebrochener
       // Lesevorgang hat kein Ergebnis, und der bisherige Wert ist besser als keiner.
       console.error('Failed to read cover image:', err);

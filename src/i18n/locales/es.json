@@ -15,7 +15,9 @@
     "bytes": "B",
     "kilobytes": "KB",
     "megabytes": "MB",
-    "copySuffix": " (Copia)"
+    "copySuffix": " (Copia)",
+    "imageTooLarge": "Imagen demasiado grande",
+    "imageTooLargeDetail": "Las imágenes de este vault pueden ocupar como máximo {{max}}."
   },
   "categories": {
     "add": "Añadir categoría",
@@ -680,7 +682,13 @@
     "emojiRemove": "Quitar {{emoji}}",
     "emojiAdd": "Añadir {{emoji}}",
     "emojiReset": "Restablecer",
-    "groupEmojis": "Emojis"
+    "groupEmojis": "Emojis",
+    "images": "Imágenes",
+    "groupImages": "Imágenes",
+    "imageMaxEdge": "Lado más largo",
+    "imageMaxEdgeOriginal": "Original",
+    "imageMaxSize": "Tamaño máximo de archivo",
+    "imageMaxSizeUnlimited": "Sin límite"
   },
   "contextMenu": {
     "openInNewTab": "Abrir en nueva pestaña",

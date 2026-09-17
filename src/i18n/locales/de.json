@@ -15,7 +15,9 @@
     "bytes": "B",
     "kilobytes": "KB",
     "megabytes": "MB",
-    "copySuffix": " (Kopie)"
+    "copySuffix": " (Kopie)",
+    "imageTooLarge": "Bild zu groß",
+    "imageTooLargeDetail": "Bilder dürfen in diesem Vault höchstens {{max}} groß sein."
   },
   "categories": {
     "add": "Kategorie hinzufügen",
@@ -672,7 +674,13 @@
     "emojiRemove": "{{emoji}} entfernen",
     "emojiAdd": "{{emoji}} hinzufügen",
     "emojiReset": "Zurücksetzen",
-    "groupEmojis": "Emojis"
+    "groupEmojis": "Emojis",
+    "images": "Bilder",
+    "groupImages": "Bilder",
+    "imageMaxEdge": "Längste Kante",
+    "imageMaxEdgeOriginal": "Original",
+    "imageMaxSize": "Größte Dateigröße",
+    "imageMaxSizeUnlimited": "Unbegrenzt"
   },
   "home": {
     "viewAll": "Alle anzeigen",

@@ -160,6 +160,41 @@ pub async fn copy_image_file(
     .map_err(|e| e.to_string())?
 }
 
+/// Hard cap for [`read_image_file`]: the bytes cross IPC as base64 and are
+/// decoded on a canvas, so an arbitrarily large file would stall the webview.
+/// The vault's own limit is enforced afterwards in the frontend.
+const MAX_EXTERNAL_IMAGE_BYTES: u64 = 64 * 1024 * 1024;
+
+/// Reads an image file from an arbitrary location as a data-URL, without
+/// storing it. For the file drop when the vault limits image size: the
+/// frontend scales and checks it before handing it to [`save_image`]. Same
+/// source checks as [`copy_image_file`].
+#[tauri::command]
+pub async fn read_image_file(app: tauri::AppHandle, source: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let ext = crate::ext_for_path(&source);
+        if !IMAGE_EXTS.contains(&ext.as_str()) {
+            return Err("unsupported file type".to_string());
+        }
+
+        let canonical_source = crate::guarded_read_path(&app, &source)?;
+        let size = std::fs::metadata(&canonical_source)
+            .map_err(|e| format!("read {source}: {e}"))?
+            .len();
+        if size > MAX_EXTERNAL_IMAGE_BYTES {
+            return Err("image file too large".to_string());
+        }
+        let bytes = std::fs::read(&canonical_source).map_err(|e| format!("read {source}: {e}"))?;
+        Ok(format!(
+            "data:{};base64,{}",
+            mime_for_ext(&ext),
+            general_purpose::STANDARD.encode(bytes)
+        ))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// Reads a stored image and returns it as a base64 data-URL.
 ///
 /// Only for the callers that cannot use the `emerald-img` scheme: the PDF

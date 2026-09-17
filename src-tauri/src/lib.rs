@@ -742,6 +742,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             images::save_image,
             images::copy_image_file,
+            images::read_image_file,
             images::read_image_as_base64,
             images::adopt_legacy_images,
             images::list_image_files,

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
-import { copyImageFile } from '../../lib/images';
+import { copyImageFile, readImageFile, saveImage } from '../../lib/images';
+import { hasImageLimits, prepareImageDataUrl } from '../../lib/imageLimits';
+import { reportImageError, useImageNoticeStore } from '../../store/imageNoticeStore';
 
 /**
  * Bilder per Drag & Drop aus dem Datei-Explorer, über Tauris natives
@@ -14,7 +16,6 @@ export function useEditorFileDrop(enabled: boolean, getTarget: () => Editor | nu
   getTargetRef.current = getTarget;
 
   const [fileDragOver, setFileDragOver] = useState(false);
-  const [formatError, setFormatError] = useState(false);
 
   useEffect(() => {
     if (!enabled) return;
@@ -32,17 +33,20 @@ export function useEditorFileDrop(enabled: boolean, getTarget: () => Editor | nu
           setFileDragOver(false);
           const { paths } = event.payload;
           const imagePaths = paths.filter((p) => /\.(png|jpe?g|gif|webp|svg)$/i.test(p));
-          if (!imagePaths.length) { setFormatError(true); return; }
+          if (!imagePaths.length) { useImageNoticeStore.getState().show({ kind: 'format' }); return; }
 
           const editor = getTargetRef.current();
           if (!editor) return;
 
           for (const path of imagePaths) {
             try {
-              const src = await copyImageFile(path);
+              // Ohne Grenzen direkt kopieren; mit ihnen erst einlesen, verkleinern und prüfen.
+              const src = hasImageLimits()
+                ? await saveImage(await prepareImageDataUrl(await readImageFile(path)))
+                : await copyImageFile(path);
               editor.chain().focus().insertContent({ type: 'image', attrs: { src } }).run();
             } catch (e) {
-              console.error('[DnD] failed:', path, e);
+              reportImageError(e, `drop ${path}`);
             }
           }
         }
@@ -59,5 +63,5 @@ export function useEditorFileDrop(enabled: boolean, getTarget: () => Editor | nu
     };
   }, [enabled]);
 
-  return { fileDragOver, formatError, dismissFormatError: () => setFormatError(false) };
+  return { fileDragOver };
 }

@@ -29,6 +29,8 @@ import { useOperationStore } from '../../store/operationStore';
 import { useTaskStore } from '../../store/taskStore';
 import { useAltarStore } from '../../store/altarStore';
 import { isAcceptedImageFile, readFileAsDataUrl } from '../../lib/helpers';
+import { prepareImageDataUrl } from '../../lib/imageLimits';
+import { reportImageError } from '../../store/imageNoticeStore';
 
 interface LinkPopupState {
   href: string;
@@ -180,12 +182,12 @@ export default function RichEditor({
         if (!file || !isAcceptedImageFile(file)) return false;
         void (async () => {
           try {
-            const src = await saveImage(await readFileAsDataUrl(file));
+            const src = await saveImage(await prepareImageDataUrl(await readFileAsDataUrl(file)));
             const nodeType = view.state.schema.nodes['image'];
             if (!nodeType) return;
             view.dispatch(view.state.tr.replaceSelectionWith(nodeType.create({ src })));
           } catch (e) {
-            console.error('Failed to save pasted image:', e);
+            reportImageError(e, 'paste');
           }
         })();
         return true;

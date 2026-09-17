@@ -5,6 +5,8 @@ import { ImagePlus, Trash2 } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import { categoryLabel } from '../../lib/categories';
 import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
+import { dataUrlBytes, ImageTooLargeError, prepareImageDataUrl } from '../../lib/imageLimits';
+import { reportImageError } from '../../store/imageNoticeStore';
 import { imageSrc } from '../../lib/images';
 import type { AltarItem, Category } from '../../types';
 import Modal from '../ui/Modal';
@@ -61,18 +63,22 @@ export function AltarItemModal({
       e.target.value = '';
       return;
     }
-    if (file.size > IMAGE_MAX_BYTES) {
-      setImageError(t('altar.imageTooLarge', { max: '2 MB' }));
-      e.target.value = '';
-      return;
-    }
     setImageError(null);
-    readFileAsDataUrl(file).then((data) => {
+    // Erst auf die Grenzen des Vaults bringen — ein großes Foto passt verkleinert
+    // oft unter die feste Obergrenze, die danach noch als Deckel gilt.
+    readFileAsDataUrl(file).then(prepareImageDataUrl).then((data) => {
+      if (dataUrlBytes(data) > IMAGE_MAX_BYTES) {
+        setImageError(t('altar.imageTooLarge', { max: '2 MB' }));
+        return;
+      }
       setEditImageData(data);
       if (!editName.trim()) {
         setEditName(file.name.replace(/\.[^.]+$/, ''));
         setTimeout(() => nameInputRef.current?.select(), 0);
       }
+    }).catch((err) => {
+      if (err instanceof ImageTooLargeError) reportImageError(err, 'altar item');
+      else console.error('[altar] could not read image', err);
     });
     e.target.value = '';
   };

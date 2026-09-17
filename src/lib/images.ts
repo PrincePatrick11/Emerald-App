@@ -86,6 +86,12 @@ export async function saveImage(dataUrl: string): Promise<string> {
   return invoke<string>('save_image', { dataUrl, vaultId: await getActiveVaultId() });
 }
 
+/** Reads an image file on disk as a data-URL without storing it — for the
+ *  drop path when the vault limits image size (see `imageLimits.ts`). */
+export function readImageFile(source: string): Promise<string> {
+  return invoke<string>('read_image_file', { source });
+}
+
 /** Copies a file on disk into the active vault. Returns the filename. */
 export async function copyImageFile(source: string): Promise<string> {
   return invoke<string>('copy_image_file', { source, vaultId: await getActiveVaultId() });

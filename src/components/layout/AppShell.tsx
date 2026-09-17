@@ -16,6 +16,7 @@ import MainArea from './MainArea';
 import TabBar from './TabBar';
 import VaultModal from './VaultModal';
 import UndoToast from '../ui/UndoToast';
+import ImageNoticeModal from '../editor/ImageNoticeModal';
 import ImportDestinationModal from '../ui/ImportDestinationModal';
 
 const ENTRY_LIST_MIN = 180;
@@ -361,6 +362,7 @@ export default function AppShell() {
       </div>
 
       <UndoToast />
+      <ImageNoticeModal />
       <ImportDestinationModal />
     </div>
   );
