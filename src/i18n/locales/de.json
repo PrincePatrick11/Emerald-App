@@ -691,6 +691,7 @@
     "restore": "Wiederherstellen",
     "deletePermanently": "Endgültig löschen",
     "retentionNote": "Elemente werden nach {{count}} Tag automatisch gelöscht.",
+    "retentionNote_other": "Elemente werden nach {{count}} Tagen automatisch gelöscht.",
     "deletedAgo": "Gelöscht vor {{time}}",
     "daysLeft": "Noch {{count}} Tag",
     "daysLeft_other": "Noch {{count}} Tage",
@@ -701,7 +702,6 @@
     "blockDefinitions": "Blöcke",
     "templates": "Vorlagen",
     "deleteSelected": "Ausgewählte löschen ({{count}})",
-    "retentionNote_other": "Elemente werden nach {{count}} Tagen automatisch gelöscht.",
     "retentionNoteNever": "Elemente bleiben, bis du sie endgültig löschst."
   },
   "menu": {

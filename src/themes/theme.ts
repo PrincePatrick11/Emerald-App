@@ -1,4 +1,6 @@
 import { getCurrentWebview } from '@tauri-apps/api/webview';
+import { isTauri } from '../lib/platform';
+import { oneOf } from '../lib/helpers';
 
 export type ThemeId = 'emerald-noctis' | 'emerald-parchment';
 export type FontId = 'inter' | 'source-sans-3' | 'nunito' | 'ibm-plex-sans' | 'alegreya' | 'cormorant-garamond' | 'lora' | 'merriweather';
@@ -72,21 +74,19 @@ export function applyEditorFont(fontId: FontId) {
   document.documentElement.dataset.editorFont = fontId;
 }
 
-function normalizeNumberOption<T extends number>(raw: unknown, options: readonly T[], fallback: T): T {
-  const value = typeof raw === 'string' ? Number(raw) : raw;
-  return options.includes(value as T) ? (value as T) : fallback;
-}
-
 export function normalizeUIScale(raw: unknown): UIScale {
-  return normalizeNumberOption(raw, UI_SCALE_OPTIONS, DEFAULT_UI_SCALE);
+  // Der Boot-Spiegel liefert Zahlen als Text.
+  return oneOf(typeof raw === 'string' ? Number(raw) : raw, UI_SCALE_OPTIONS, DEFAULT_UI_SCALE);
 }
 
 export function normalizeEditorFontSize(raw: unknown): EditorFontSize {
-  return normalizeNumberOption(raw, EDITOR_FONT_SIZE_OPTIONS, DEFAULT_EDITOR_FONT_SIZE);
+  return oneOf(typeof raw === 'string' ? Number(raw) : raw, EDITOR_FONT_SIZE_OPTIONS, DEFAULT_EDITOR_FONT_SIZE);
 }
 
 export function applyUIScale(scale: UIScale) {
-  // Außerhalb von Tauri (Vite im Browser) gibt es kein WebView zum Zoomen.
+  // Außerhalb von Tauri (Vite im Browser) gibt es kein WebView zum Zoomen —
+  // `getCurrentWebview()` würfe dort schon synchron.
+  if (!isTauri) return;
   getCurrentWebview().setZoom(scale / 100).catch((err: unknown) => {
     console.warn('[theme] could not set webview zoom', err);
   });

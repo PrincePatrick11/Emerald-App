@@ -691,6 +691,7 @@
     "restore": "Restaurer",
     "deletePermanently": "Supprimer définitivement",
     "retentionNote": "Les éléments sont automatiquement supprimés après {{count}} jour.",
+    "retentionNote_other": "Les éléments sont automatiquement supprimés après {{count}} jours.",
     "deletedAgo": "Supprimé il y a {{time}}",
     "daysLeft": "{{count}} jour restant",
     "daysLeft_other": "{{count}} jours restants",
@@ -701,7 +702,6 @@
     "blockDefinitions": "Blocs",
     "templates": "Modèles",
     "deleteSelected": "Supprimer la sélection ({{count}})",
-    "retentionNote_other": "Les éléments sont automatiquement supprimés après {{count}} jours.",
     "retentionNoteNever": "Les éléments restent jusqu'à ce que vous les supprimiez définitivement."
   },
   "menu": {

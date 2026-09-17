@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { LEFT_LIST_TAB_IDS, type LeftListTabId } from './modules';
+import { oneOf } from './helpers';
 import { LANGUAGE_OPTIONS, LANGUAGE_STORAGE_KEY, type AppLanguage } from '../i18n';
 import {
   DEFAULT_EDITOR_FONT_ID, DEFAULT_EDITOR_FONT_SIZE, DEFAULT_THEME_ID, DEFAULT_UI_FONT_ID, DEFAULT_UI_SCALE,
@@ -26,6 +27,7 @@ export interface AppearanceSettings {
 /** Tage bis zum endgültigen Löschen; `null` = nie. */
 export const TRASH_RETENTION_OPTIONS = [7, 14, 30, 60, 90, null] as const;
 export type TrashRetention = (typeof TRASH_RETENTION_OPTIONS)[number];
+export const DEFAULT_TRASH_RETENTION: TrashRetention = 30;
 
 export interface TrashSettings {
   retentionDays: TrashRetention;
@@ -34,6 +36,7 @@ export interface TrashSettings {
 /** Einträge je Liste in der linken Seitenleiste; `null` = alle. */
 export const LEFT_LIST_LIMIT_OPTIONS = [10, 25, 50, 100, null] as const;
 export type LeftListLimit = (typeof LEFT_LIST_LIMIT_OPTIONS)[number];
+export const DEFAULT_LEFT_LIST_LIMIT: LeftListLimit = null;
 
 export interface LeftListSettings {
   /** Die sichtbaren Tabs, in der Reihenfolge der Leiste; nie leer. */
@@ -67,11 +70,11 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
     editorFontSize: DEFAULT_EDITOR_FONT_SIZE,
   },
   trash: {
-    retentionDays: 30,
+    retentionDays: DEFAULT_TRASH_RETENTION,
   },
   leftList: {
     tabs: [...LEFT_LIST_TAB_IDS],
-    limit: null,
+    limit: DEFAULT_LEFT_LIST_LIMIT,
   },
 };
 
@@ -116,16 +119,12 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
     },
     trash: {
       ...trash,
-      retentionDays: (TRASH_RETENTION_OPTIONS as readonly unknown[]).includes(trash.retentionDays)
-        ? (trash.retentionDays as TrashRetention)
-        : DEFAULT_VAULT_SETTINGS.trash.retentionDays,
+      retentionDays: oneOf(trash.retentionDays, TRASH_RETENTION_OPTIONS, DEFAULT_TRASH_RETENTION),
     },
     leftList: {
       ...leftList,
       tabs: tabs.length ? tabs : [...LEFT_LIST_TAB_IDS],
-      limit: (LEFT_LIST_LIMIT_OPTIONS as readonly unknown[]).includes(leftList.limit)
-        ? (leftList.limit as LeftListLimit)
-        : DEFAULT_VAULT_SETTINGS.leftList.limit,
+      limit: oneOf(leftList.limit, LEFT_LIST_LIMIT_OPTIONS, DEFAULT_LEFT_LIST_LIMIT),
     },
   };
 }

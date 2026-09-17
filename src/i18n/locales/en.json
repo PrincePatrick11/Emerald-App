@@ -691,6 +691,7 @@
     "restore": "Restore",
     "deletePermanently": "Delete permanently",
     "retentionNote": "Items are automatically deleted after {{count}} day.",
+    "retentionNote_other": "Items are automatically deleted after {{count}} days.",
     "deletedAgo": "Deleted {{time}} ago",
     "daysLeft": "{{count}} day left",
     "daysLeft_other": "{{count}} days left",
@@ -701,7 +702,6 @@
     "blockDefinitions": "Blocks",
     "templates": "Templates",
     "deleteSelected": "Delete selected ({{count}})",
-    "retentionNote_other": "Items are automatically deleted after {{count}} days.",
     "retentionNoteNever": "Items stay until you delete them permanently."
   },
   "menu": {

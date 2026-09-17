@@ -89,9 +89,7 @@ export async function getDb(): Promise<Database> {
     await invoke('ensure_vault_dirs', { vaultId });
     const db = await Database.load(identifier);
     await runMigrations(db);
-    // Die Frist des Vaults, der gerade geöffnet wird: seine Einstellungen lädt
-    // `openActiveVault` vor `getDb()`.
-    await runPeriodicCleanup(db, useSettingsStore.getState().settings.trash.retentionDays);
+    await runPeriodicCleanup(db, trashRetentionFor(vaultId));
     // Sigillen-Zeichnungen, die v42 (oder ein Backup-Import) nicht als Datei
     // speichern konnte — bei jedem Öffnen ein neuer Versuch. Scheitern darf
     // das Öffnen daran nicht: die Zeilen bleiben einfach, wie sie sind.
@@ -294,6 +292,18 @@ const CONTENT_IDS = `(SELECT id FROM journal_entries
                       UNION ALL SELECT id FROM operations
                       UNION ALL SELECT id FROM tasks
                       UNION ALL SELECT id FROM altars)`;
+
+/**
+ * Die Papierkorb-Frist des Vaults, der gerade geöffnet wird — seine
+ * Einstellungen lädt `openActiveVault` vor `getDb()`. Gehören die geladenen
+ * Einstellungen einem anderen Vault oder springen sie nur für eine unlesbare
+ * Datei ein, wird nicht geleert (`null`): die Standard-Frist könnte einen auf
+ * „nie" gestellten Papierkorb unwiderruflich ausräumen.
+ */
+function trashRetentionFor(vaultId: string): number | null {
+  const { vaultId: settingsVaultId, trusted, settings } = useSettingsStore.getState();
+  return trusted && settingsVaultId === vaultId ? settings.trash.retentionDays : null;
+}
 
 async function runPeriodicCleanup(db: Database, retentionDays: number | null): Promise<void> {
   // Papierkorb-Inhalte älter als die eingestellte Frist endgültig löschen — „nie" überspringt das.

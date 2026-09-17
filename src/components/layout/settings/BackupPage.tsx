@@ -157,7 +157,7 @@ export default function BackupPage() {
           : undefined,
         categoryFilters,
         importTypeFilters,
-        settingsGroups,
+        importMode === 'merge' ? settingsGroups : [],
       );
       setImportDone(true);
       setImportedFile(null);

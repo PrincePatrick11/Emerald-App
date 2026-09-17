@@ -49,22 +49,22 @@ export default function StoragePage() {
 
   return (
     <>
-    <SettingsSection icon={<Trash2 size={14} />} title={t('settings.trashRetention')}>
-      <div className="flex gap-2 flex-wrap">
-        {TRASH_RETENTION_OPTIONS.map((days) => (
-          <SettingsChoiceButton
-            key={days ?? 'never'}
-            active={retentionDays === days}
-            onClick={() => update('trash', { retentionDays: days })}
-            className="px-3 py-1.5 text-sm"
-          >
-            {days === null ? t('settings.trashRetentionNever') : t('settings.trashRetentionDays', { count: days })}
-          </SettingsChoiceButton>
-        ))}
-      </div>
-    </SettingsSection>
+      <SettingsSection icon={<Trash2 size={14} />} title={t('settings.trashRetention')}>
+        <div className="flex gap-2 flex-wrap">
+          {TRASH_RETENTION_OPTIONS.map((days) => (
+            <SettingsChoiceButton
+              key={days ?? 'never'}
+              active={retentionDays === days}
+              onClick={() => update('trash', { retentionDays: days })}
+              className="px-3 py-1.5 text-sm"
+            >
+              {days === null ? t('settings.trashRetentionNever') : t('settings.trashRetentionDays', { count: days })}
+            </SettingsChoiceButton>
+          ))}
+        </div>
+      </SettingsSection>
 
-    <SettingsSection icon={<HardDrive size={14} />} title={t('settings.storage')}>
+      <SettingsSection icon={<HardDrive size={14} />} title={t('settings.storage')}>
         <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-stone-800/60 border border-stone-700/40">
           <span className="flex items-center gap-2 text-sm text-stone-300 min-w-0">
             <Brush size={14} className="shrink-0" />
@@ -94,7 +94,7 @@ export default function StoragePage() {
             </span>
           )}
         </div>
-    </SettingsSection>
+      </SettingsSection>
     </>
   );
 }
