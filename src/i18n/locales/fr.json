@@ -17,7 +17,9 @@
     "megabytes": "Mo",
     "copySuffix": " (Copie)",
     "imageTooLarge": "Image trop volumineuse",
-    "imageTooLargeDetail": "Les images de ce vault ne peuvent pas dépasser {{max}}."
+    "imageTooLargeDetail": "Les images de ce vault ne peuvent pas dépasser {{max}}.",
+    "percentValue": "{{value}} %",
+    "pixelValue": "{{value}} px"
   },
   "categories": {
     "add": "Ajouter une catégorie",

@@ -83,7 +83,7 @@ export default function GeneralPage() {
                   onClick={() => update('appearance', { uiScale: scale })}
                   className="px-3 py-1.5 text-sm tabular-nums"
                 >
-                  {scale} %
+                  {t('common.percentValue', { value: scale })}
                 </SettingsChoiceButton>
               ))}
             </div>
@@ -116,7 +116,7 @@ export default function GeneralPage() {
                   onClick={() => update('appearance', { editorFontSize: size })}
                   className="px-3 py-1.5 text-sm tabular-nums"
                 >
-                  {size} px
+                  {t('common.pixelValue', { value: size })}
                 </SettingsChoiceButton>
               ))}
             </div>

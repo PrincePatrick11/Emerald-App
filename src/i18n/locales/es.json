@@ -17,7 +17,9 @@
     "megabytes": "MB",
     "copySuffix": " (Copia)",
     "imageTooLarge": "Imagen demasiado grande",
-    "imageTooLargeDetail": "Las imágenes de este vault pueden ocupar como máximo {{max}}."
+    "imageTooLargeDetail": "Las imágenes de este vault pueden ocupar como máximo {{max}}.",
+    "percentValue": "{{value}} %",
+    "pixelValue": "{{value}} px"
   },
   "categories": {
     "add": "Añadir categoría",
@@ -529,7 +531,7 @@
     "unused": "sin usar",
     "unusedHint": "Ninguna entrada lleva esta etiqueta todavía.",
     "createNamed": "+ Crear «{{name}}»",
-    "unknownOpenDashboard": "No existe «{{name}}»: créala en el panel de etiquetas"
+    "unknownOpenDashboard": "No existe «{{name}}» — créala en el panel de etiquetas"
   },
   "properties": {
     "noEntry": "Abre una entrada para ver sus propiedades.",

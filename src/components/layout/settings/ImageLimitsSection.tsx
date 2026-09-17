@@ -27,7 +27,7 @@ export default function ImageLimitsSection() {
                 onClick={() => update('images', { maxEdge: edge })}
                 className="px-3 py-1.5 text-sm tabular-nums"
               >
-                {edge === null ? t('settings.imageMaxEdgeOriginal') : `${edge} px`}
+                {edge === null ? t('settings.imageMaxEdgeOriginal') : t('common.pixelValue', { value: edge })}
               </SettingsChoiceButton>
             ))}
           </div>

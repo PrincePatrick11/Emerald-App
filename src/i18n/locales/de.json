@@ -17,7 +17,9 @@
     "megabytes": "MB",
     "copySuffix": " (Kopie)",
     "imageTooLarge": "Bild zu groß",
-    "imageTooLargeDetail": "Bilder dürfen in diesem Vault höchstens {{max}} groß sein."
+    "imageTooLargeDetail": "Bilder dürfen in diesem Vault höchstens {{max}} groß sein.",
+    "percentValue": "{{value}} %",
+    "pixelValue": "{{value}} px"
   },
   "categories": {
     "add": "Kategorie hinzufügen",
@@ -529,7 +531,7 @@
     "unused": "nicht verwendet",
     "unusedHint": "Noch kein Eintrag trägt diesen Tag.",
     "createNamed": "+ „{{name}}“ anlegen",
-    "unknownOpenDashboard": "Kein Tag „{{name}}“ – im Tags-Dashboard anlegen"
+    "unknownOpenDashboard": "Kein Tag „{{name}}“ — im Tags-Dashboard anlegen"
   },
   "properties": {
     "noEntry": "Öffne einen Eintrag, um seine Eigenschaften zu sehen.",
