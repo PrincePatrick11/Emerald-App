@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Search, Plus } from 'lucide-react';
@@ -56,10 +56,12 @@ export default function EntryListTab<T>({
   // je ein Limit nach. Ein Tab-Wechsel montiert die Liste neu und beginnt von vorn.
   const limit = useSettingsStore((s) => s.settings.leftList.limit);
   const [pages, setPages] = useState(1);
+  // Ein neues Limit oder eine neue Suche beginnt wieder bei der ersten Seite.
+  useEffect(() => setPages(1), [limit, searchQuery]);
 
   const matching = items.filter((item) => getTitle(item).toLowerCase().includes(searchQuery.toLowerCase()));
-  const filtered = limit === null ? matching : matching.slice(0, limit * pages);
-  const hiddenCount = matching.length - filtered.length;
+  const visible = limit === null ? matching : matching.slice(0, limit * pages);
+  const hiddenCount = matching.length - visible.length;
 
   const openCtxMenu = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
@@ -115,7 +117,7 @@ export default function EntryListTab<T>({
           <p className="text-xs text-stone-600 px-2 py-2">{emptyMessage}</p>
         ) : (
           <div className="space-y-0.5">
-            {filtered.map((item) => {
+            {visible.map((item) => {
               const id = getId(item);
 
               if (renderRow) {
@@ -186,6 +188,7 @@ export default function EntryListTab<T>({
                 </button>
               );
             })}
+            {/* `limit !== null` folgt schon aus `hiddenCount > 0` — nur TypeScript weiß das nicht. */}
             {hiddenCount > 0 && limit !== null && (
               <button
                 type="button"

@@ -108,7 +108,8 @@ function asString(value: unknown): string | null {
 function normalizeEmojiList(raw: unknown): string[] | null {
   if (!Array.isArray(raw)) return null;
   const valid = raw.filter((e): e is string => typeof e === 'string' && e.length > 0 && e.length <= MAX_EMOJI_LENGTH);
-  return [...new Set(valid)].slice(0, MAX_EMOJI_DEFAULTS);
+  // Leer hieße: jeder Picker öffnet ohne Auswahl. Dann lieber die eingebaute.
+  return valid.length ? [...new Set(valid)].slice(0, MAX_EMOJI_DEFAULTS) : null;
 }
 
 /**

@@ -116,7 +116,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
         () => true,
         (e) => { console.error('[vault] could not restore settings', e); return false; },
       );
-      if (!restored) useSettingsStore.setState({ vaultId: null, trusted: false });
+      if (!restored) useSettingsStore.setState({ vaultId: null });
       throw err;
     }
   },

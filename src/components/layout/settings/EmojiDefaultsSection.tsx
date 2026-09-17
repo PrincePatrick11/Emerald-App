@@ -45,6 +45,8 @@ export default function EmojiDefaultsSection() {
   const results = trimmedQuery && searchData ? searchEmojis(searchData, trimmedQuery) : [];
 
   const save = (defaults: string[]) => update('emojis', { defaults });
+  // Wie bei den Tabs der Seitenleiste bleibt eins stehen.
+  const remove = (index: number) => { if (current.length > 1) save(current.filter((_, i) => i !== index)); };
 
   function onPointerDown(e: React.PointerEvent<HTMLButtonElement>, index: number) {
     if (e.button !== 0) return;
@@ -74,17 +76,20 @@ export default function EmojiDefaultsSection() {
     setDraggingIndex(target);
   }
 
-  function onPointerUp(e: React.PointerEvent<HTMLButtonElement>, index: number) {
+  function onPointerUp(e: React.PointerEvent<HTMLButtonElement>) {
     const state = drag.current;
     if (!state || state.pointerId !== e.pointerId) return;
     drag.current = null;
     setDraggingIndex(null);
     setDraft(null);
+    // Ohne Bewegung ist `state.index` das Emoji, auf dem der Druck begann — nicht
+    // unbedingt das unter dem Loslassen, falls die Capture ausblieb.
     if (state.moved) save(state.order);
-    else save(current.filter((_, i) => i !== index));
+    else remove(state.index);
   }
 
-  function onPointerCancel() {
+  function onPointerCancel(e: React.PointerEvent<HTMLButtonElement>) {
+    if (drag.current?.pointerId !== e.pointerId) return;
     drag.current = null;
     setDraggingIndex(null);
     setDraft(null);
@@ -103,11 +108,11 @@ export default function EmojiDefaultsSection() {
               aria-label={t('settings.emojiRemove', { emoji })}
               onPointerDown={(e) => onPointerDown(e, index)}
               onPointerMove={onPointerMove}
-              onPointerUp={(e) => onPointerUp(e, index)}
+              onPointerUp={onPointerUp}
               onPointerCancel={onPointerCancel}
               // Tastatur: Enter/Leertaste entfernt wie ein Klick. Pointer-Klicks
               // erledigt `onPointerUp`; `detail === 0` heißt ausgelöst per Taste.
-              onClick={(e) => { if (e.detail === 0) save(current.filter((_, i) => i !== index)); }}
+              onClick={(e) => { if (e.detail === 0) remove(index); }}
               className={`emoji-picker-item text-xl w-9 h-9 flex items-center justify-center rounded transition-colors touch-none ${
                 draggingIndex === index ? 'emoji-picker-item-active cursor-grabbing' : 'emoji-picker-item-idle cursor-grab'
               }`}

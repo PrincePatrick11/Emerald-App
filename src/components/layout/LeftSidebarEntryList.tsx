@@ -3,8 +3,8 @@ import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { formatEntryDate } from '../../lib/formatDate';
 import { categoryLabel, lookupCategory } from '../../lib/categories';
-import { DEFAULT_ENTRY_EMOJI, MODULE_LIST, type LeftListTabId } from '../../lib/modules';
-import { Flame, CheckSquare, Square, Copy, Pencil, Trash2, LayoutList, type LucideIcon } from 'lucide-react';
+import { DEFAULT_ENTRY_EMOJI, LEFT_LIST_TABS, type LeftListTabId } from '../../lib/modules';
+import { Flame, CheckSquare, Square, Copy, Pencil, Trash2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useJournalStore } from '../../store/journalStore';
@@ -24,15 +24,6 @@ import type { ContextMenuAction } from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 
-/** Die Tabs ohne ihre Beschriftungen, die `t()` brauchen und deshalb in der
- *  Komponente bleiben. Auf Modulebene, damit `ENTRY_LIST_TABS_WIDTH` unten
- *  ihre Anzahl zaehlen kann, statt sie danebenzuschreiben. Reihenfolge und
- *  Icons kommen aus der Modul-Registry; nur der 'all'-Tab ist eigener Bestand. */
-export const ENTRY_LIST_TABS: Array<{ id: LeftListTabId; icon: LucideIcon }> = [
-  { id: 'all', icon: LayoutList },
-  ...MODULE_LIST.map((mod) => ({ id: mod.id as LeftListTabId, icon: mod.icon })),
-];
-
 /* Die Geometrie der Tab-Leiste, in Zahlen statt nur in Utility-Klassen: die
    Standardbreite der Eintragsliste ist genau die Breite, die ihre Tabs
    brauchen (`AppShell`s ENTRY_LIST_DEFAULT). Die Werte spiegeln die Klassen
@@ -50,7 +41,7 @@ const TAB_SIZE = 32;
 const TAB_GAP = 2;
 const TAB_STRIP_PADDING_X = 12;
 export const ENTRY_LIST_TABS_WIDTH =
-  TAB_STRIP_PADDING_X * 2 + ENTRY_LIST_TABS.length * TAB_SIZE + (ENTRY_LIST_TABS.length - 1) * TAB_GAP;
+  TAB_STRIP_PADDING_X * 2 + LEFT_LIST_TABS.length * TAB_SIZE + (LEFT_LIST_TABS.length - 1) * TAB_GAP;
 
 export default function LeftSidebarEntryList() {
   const { t } = useTranslation();
@@ -60,7 +51,7 @@ export default function LeftSidebarEntryList() {
   const visibleIds = useSettingsStore((s) => s.settings.leftList.tabs);
   // Neu gerendert je Vault: „Mehr anzeigen" beginnt dort wieder beim Limit.
   const vaultId = useSettingsStore((s) => s.vaultId);
-  const tabs = ENTRY_LIST_TABS.filter((tab) => visibleIds.includes(tab.id));
+  const tabs = LEFT_LIST_TABS.filter((tab) => visibleIds.includes(tab.id));
   // Ist der gewählte Tab ausgeblendet, zeigt die Liste den ersten sichtbaren —
   // ohne die Wahl zu überschreiben, damit sie beim Wiedereinblenden zurückkommt.
   const activeTab = tabs.some((tab) => tab.id === leftListTab) ? leftListTab : (tabs[0]?.id ?? 'all');

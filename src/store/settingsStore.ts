@@ -12,10 +12,6 @@ interface SettingsState {
   /** Der Vault, dem `settings` gehört; `null` vor dem ersten Laden. */
   vaultId: string | null;
   settings: VaultSettings;
-  /** `false`, solange `settings` nur Standards sind, die für eine unlesbare
-   *  `settings.json` einspringen. Dann darf nichts Unumkehrbares an ihnen
-   *  hängen — das automatische Leeren des Papierkorbs etwa. */
-  trusted: boolean;
 
   /** Liest die Einstellungen eines Vaults und wendet sie an. Läuft beim Start
    *  und bei jedem Vault-Wechsel VOR dem Öffnen der Datenbank: die Migration
@@ -63,12 +59,16 @@ function persist(vaultId: string, settings: VaultSettings): Promise<void> {
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   vaultId: null,
   settings: DEFAULT_VAULT_SETTINGS,
-  trusted: false,
 
   loadForVault: async (vaultId) => {
     const { settings: stored, corrupt } = await readVaultSettings(vaultId);
-    const settings = stored ?? initialSettingsFor(vaultId);
-    set({ vaultId, settings, trusted: !corrupt });
+    // Für eine unlesbare Datei springen die Standards ein — bis auf die
+    // Papierkorb-Frist: 30 Tage, die niemand gewählt hat, dürften einen auf
+    // „nie" gestellten Papierkorb nicht ausräumen, weder jetzt noch nachdem die
+    // nächste Änderung die Datei samt dieser Werte neu geschrieben hat.
+    const fallback = initialSettingsFor(vaultId);
+    const settings = stored ?? (corrupt ? { ...fallback, trash: { ...fallback.trash, retentionDays: null } } : fallback);
+    set({ vaultId, settings });
     await applyAppearance(settings.appearance);
     // Die Startwerte gleich festhalten: sonst bekäme der Vault beim nächsten
     // Öffnen erneut den Umstiegs-Schnappschuss statt dem, was galt.
@@ -78,7 +78,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   replaceSettings: async (next) => {
     const { vaultId } = get();
     const settings = normalizeVaultSettings(next);
-    set({ settings, trusted: true });
+    set({ settings });
     await applyAppearance(settings.appearance);
     if (vaultId) await persist(vaultId, settings);
   },
@@ -86,8 +86,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   update: (group, patch) => {
     const { vaultId, settings: prev } = get();
     const settings = { ...prev, [group]: { ...prev[group], ...patch } } as VaultSettings;
-    // Wer selbst etwas einstellt, schreibt die Datei neu — ab dann gilt sie.
-    set({ settings, trusted: true });
+    set({ settings });
     if (group === 'appearance') void applyAppearance(settings.appearance);
     if (vaultId) void persist(vaultId, settings);
   },

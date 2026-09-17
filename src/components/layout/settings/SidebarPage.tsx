@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { ListOrdered, PanelLeft } from 'lucide-react';
 import { useSettingsStore } from '../../../store/settingsStore';
 import { LEFT_LIST_LIMIT_OPTIONS } from '../../../lib/vaultSettings';
-import { ENTRY_LIST_TABS } from '../LeftSidebarEntryList';
+import { LEFT_LIST_TABS, type LeftListTabId } from '../../../lib/modules';
 import SettingsChoiceButton from './SettingsChoiceButton';
 import SettingsSection from './SettingsSection';
 
@@ -12,12 +12,12 @@ export default function SidebarPage() {
   const leftList = useSettingsStore((s) => s.settings.leftList);
   const update = useSettingsStore((s) => s.update);
 
-  function toggleTab(id: (typeof ENTRY_LIST_TABS)[number]['id']) {
+  function toggleTab(id: LeftListTabId) {
     const visible = leftList.tabs.includes(id);
     // Die letzte sichtbare Liste bleibt — eine Leiste ohne Tabs hätte nichts zu zeigen.
     if (visible && leftList.tabs.length === 1) return;
     // In der Reihenfolge der Leiste speichern, nicht in der des Anklickens.
-    const tabs = ENTRY_LIST_TABS
+    const tabs = LEFT_LIST_TABS
       .map((tab) => tab.id)
       .filter((tabId) => (tabId === id ? !visible : leftList.tabs.includes(tabId)));
     update('leftList', { tabs });
@@ -27,7 +27,7 @@ export default function SidebarPage() {
     <>
       <SettingsSection icon={<PanelLeft size={14} />} title={t('settings.sidebarLists')}>
         <div className="flex gap-2 flex-wrap">
-          {ENTRY_LIST_TABS.map(({ id, icon: Icon }) => {
+          {LEFT_LIST_TABS.map(({ id, icon: Icon }) => {
             const active = leftList.tabs.includes(id);
             return (
               <SettingsChoiceButton

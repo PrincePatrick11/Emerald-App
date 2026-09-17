@@ -296,13 +296,13 @@ const CONTENT_IDS = `(SELECT id FROM journal_entries
 /**
  * Die Papierkorb-Frist des Vaults, der gerade geöffnet wird — seine
  * Einstellungen lädt `openActiveVault` vor `getDb()`. Gehören die geladenen
- * Einstellungen einem anderen Vault oder springen sie nur für eine unlesbare
- * Datei ein, wird nicht geleert (`null`): die Standard-Frist könnte einen auf
- * „nie" gestellten Papierkorb unwiderruflich ausräumen.
+ * Einstellungen einem anderen Vault, wird nicht geleert (`null`): dessen Frist
+ * könnte einen auf „nie" gestellten Papierkorb unwiderruflich ausräumen. (Für
+ * eine unlesbare `settings.json` setzt `loadForVault` die Frist selbst auf nie.)
  */
 function trashRetentionFor(vaultId: string): number | null {
-  const { vaultId: settingsVaultId, trusted, settings } = useSettingsStore.getState();
-  return trusted && settingsVaultId === vaultId ? settings.trash.retentionDays : null;
+  const { vaultId: settingsVaultId, settings } = useSettingsStore.getState();
+  return settingsVaultId === vaultId ? settings.trash.retentionDays : null;
 }
 
 async function runPeriodicCleanup(db: Database, retentionDays: number | null): Promise<void> {
