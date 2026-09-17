@@ -531,7 +531,7 @@
     "unused": "nicht verwendet",
     "unusedHint": "Noch kein Eintrag trägt diesen Tag.",
     "createNamed": "+ „{{name}}“ anlegen",
-    "unknownOpenDashboard": "Kein Tag „{{name}}“ — im Tags-Dashboard anlegen"
+    "unknownOpenDashboard": "Kein Tag „{{name}}“ — unter Tags anlegen"
   },
   "properties": {
     "noEntry": "Öffne einen Eintrag, um seine Eigenschaften zu sehen.",
@@ -687,7 +687,7 @@
     "imageMaxSizeUnlimited": "Unbegrenzt",
     "tagCreation": "Neue Tags",
     "tagCreateInline": "Auch beim Eintippen",
-    "tagCreateDashboardOnly": "Nur im Tags-Dashboard",
+    "tagCreateDashboardOnly": "Nur unter Tags",
     "groupTags": "Tags"
   },
   "home": {

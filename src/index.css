@@ -225,6 +225,16 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--menu-item-hover-text);
   }
 
+  /* Dasselbe „N weitere anzeigen" unter den Listen der linken Seitenleiste. */
+  .entry-list-more {
+    @apply w-full text-xs text-left px-2 py-1.5 rounded transition-colors duration-150;
+    color: var(--text-subtle);
+  }
+
+  .entry-list-more:hover {
+    color: var(--menu-item-hover-text);
+  }
+
   /* Die Fundstelle im Titel oder im Textausschnitt. Dieselbe Akzentmischung
      wie `.vault-card-active .vault-badge` — die Stelle wird eingefaerbt, nicht
      umrahmt, damit eine Trefferliste nicht zum Flickenteppich wird. */

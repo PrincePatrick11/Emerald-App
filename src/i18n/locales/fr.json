@@ -531,7 +531,7 @@
     "unused": "inutilisée",
     "unusedHint": "Aucune entrée ne porte encore cette étiquette.",
     "createNamed": "+ Créer « {{name}} »",
-    "unknownOpenDashboard": "Aucune étiquette « {{name}} » — la créer dans le tableau des étiquettes"
+    "unknownOpenDashboard": "Aucune étiquette « {{name}} » — la créer dans Étiquettes"
   },
   "properties": {
     "noEntry": "Ouvrez une entrée pour voir ses propriétés.",
@@ -695,7 +695,7 @@
     "imageMaxSizeUnlimited": "Illimitée",
     "tagCreation": "Nouvelles étiquettes",
     "tagCreateInline": "Aussi pendant la saisie",
-    "tagCreateDashboardOnly": "Uniquement dans le tableau des étiquettes",
+    "tagCreateDashboardOnly": "Uniquement dans Étiquettes",
     "groupTags": "Étiquettes"
   },
   "contextMenu": {

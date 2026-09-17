@@ -531,7 +531,7 @@
     "unused": "unused",
     "unusedHint": "No entry carries this tag yet.",
     "createNamed": "+ Create “{{name}}”",
-    "unknownOpenDashboard": "No tag “{{name}}” — create it in the tags dashboard"
+    "unknownOpenDashboard": "No tag “{{name}}” — create it in Tags"
   },
   "properties": {
     "noEntry": "Open an entry to see its properties.",
@@ -687,7 +687,7 @@
     "imageMaxSizeUnlimited": "Unlimited",
     "tagCreation": "New tags",
     "tagCreateInline": "Also while typing",
-    "tagCreateDashboardOnly": "Only in the tags dashboard",
+    "tagCreateDashboardOnly": "Only in Tags",
     "groupTags": "Tags"
   },
   "home": {

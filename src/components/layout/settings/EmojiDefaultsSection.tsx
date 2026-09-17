@@ -139,7 +139,7 @@ export default function EmojiDefaultsSection() {
 
         {trimmedQuery && searchData && (
           results.length === 0 ? (
-            <p className="text-xs text-stone-500 px-1">{t('common.noEmojiResults')}</p>
+            <p className="text-xs px-1" style={{ color: 'var(--text-muted)' }}>{t('common.noEmojiResults')}</p>
           ) : (
             <div className="flex flex-wrap gap-1 max-h-40 overflow-y-auto">
               {results.map((emoji) => {

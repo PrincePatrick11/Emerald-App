@@ -27,7 +27,7 @@ export default function ImageNoticeModal() {
       widthClassName="w-72"
       bodyClassName="px-4 py-3"
     >
-      <div className="flex items-start gap-2 text-red-400 mb-2">
+      <div className="flex items-start gap-2 text-danger mb-2">
         <AlertCircle size={14} className="shrink-0 mt-0.5" />
         <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{detail}</p>
       </div>

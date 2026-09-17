@@ -193,7 +193,7 @@ export default function EntryListTab<T>({
               <button
                 type="button"
                 onClick={() => setPages((p) => p + 1)}
-                className="w-full px-2 py-1.5 text-left text-xs text-stone-500 hover:text-stone-300 transition-colors"
+                className="entry-list-more"
               >
                 {t('sidebar.showMore', { count: Math.min(limit, hiddenCount) })}
               </button>

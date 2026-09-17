@@ -531,7 +531,7 @@
     "unused": "sin usar",
     "unusedHint": "Ninguna entrada lleva esta etiqueta todavía.",
     "createNamed": "+ Crear «{{name}}»",
-    "unknownOpenDashboard": "No existe «{{name}}» — créala en el panel de etiquetas"
+    "unknownOpenDashboard": "No existe «{{name}}» — créala en Etiquetas"
   },
   "properties": {
     "noEntry": "Abre una entrada para ver sus propiedades.",
@@ -695,7 +695,7 @@
     "imageMaxSizeUnlimited": "Sin límite",
     "tagCreation": "Etiquetas nuevas",
     "tagCreateInline": "También al escribir",
-    "tagCreateDashboardOnly": "Solo en el panel de etiquetas",
+    "tagCreateDashboardOnly": "Solo en Etiquetas",
     "groupTags": "Etiquetas"
   },
   "contextMenu": {
