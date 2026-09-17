@@ -7,6 +7,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - Opening an altar from a link, or switching straight from one altar to another, briefly showed the Altar dashboard (or the previous altar) before the target one appeared.
+- An empty text block (only empty paragraphs, whitespace, or line breaks) in a multi-block stack kept its usual minimum height in read mode and showed as two blank lines; it's now hidden entirely there, the same way as a block you've hidden with the eye icon. It stays visible while editing.
 
 ### Security
 - `.emeralddb` backup import/export: IDs read from an imported backup file could reach a *later, unrelated* export unbound — they were concatenated directly into SQL `IN (...)` clauses instead of being passed as parameters. Because sqlx executes each `;`-separated statement in a string, a crafted backup could smuggle in arbitrary SQL that only ran the next time some other data was exported. All such lookups are now parameter-bound. (`src/lib/dbBackup.ts`)

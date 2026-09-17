@@ -535,6 +535,15 @@ they sit on the block, they are part of `content`: Cancel reverts them with the 
 text block whose switches are back at their defaults is stored without a wrapper again
 (`showTitleAttrValue` drops a value that equals the default).
 
+An empty text block gets the same read-mode treatment as a hidden one without carrying
+`data-block-hidden` itself: `BlockStack` applies `block-frame--hidden` whenever
+`!isEditing && isTextBlockEmpty(block)`. `isTextBlockEmpty` (`lib/blocks/templates.ts`) is the
+same `EMPTY_TEXT_RE` check `areBlocksEmpty` already used to decide whether an entry counts as
+still empty for defaulting — `areBlocksEmpty` now just adds the "no template origin" condition
+on top of it. The check reads the live block off `blocksRef` rather than the block passed in
+from the last structural render, since leaving edit mode (e.g. pressing "Done") can otherwise
+render one frame behind the just-cleared text.
+
 **Fields block (`core.fields`, `lib/blocks/fields.ts`).** A sequence of labelled elements —
 short text, number, date, choice, yes/no, checklist, link, image, moon phase, altar (a link
 restricted to altars, rendered full width with the altar's own picture), and the three sigil
