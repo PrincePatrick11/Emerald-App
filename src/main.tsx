@@ -1,12 +1,13 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { changeAppLanguage, savedAppLanguage } from "./i18n";
+import { changeAppLanguage } from "./i18n";
 import "./themes/emerald-noctis.css";
 import "./themes/emerald-parchment.css";
 import "./index.css";
 import "tippy.js/dist/tippy.css";
-import { applyTheme, normalizeThemeId } from "./themes/theme";
+import { applyEditorFont, applyTheme, applyUIFont } from "./themes/theme";
+import { readAppearanceMirror } from "./lib/vaultSettings";
 import { platformName } from "./lib/platform";
 import { initSplash } from "./lib/splash";
 
@@ -19,8 +20,13 @@ _fontLink.rel = 'stylesheet';
 _fontLink.href = 'https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Merriweather:wght@400;500;700&family=Nunito:wght@400;500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap';
 document.head.appendChild(_fontLink);
 
-// Apply theme before first render to avoid flash
-applyTheme(normalizeThemeId(localStorage.getItem('theme-id') ?? localStorage.getItem('theme')));
+// Theme und Schriften des zuletzt geoeffneten Vaults vor dem ersten Render —
+// seine eigenen Einstellungen setzt der settingsStore erst, wenn der Vault
+// geladen ist, und bis dahin soll nichts aufblitzen (auch nicht im Vault-Setup).
+const bootAppearance = readAppearanceMirror();
+applyTheme(bootAppearance.theme);
+applyUIFont(bootAppearance.uiFont);
+applyEditorFont(bootAppearance.editorFont);
 
 // Expose the platform to CSS (html[data-platform='macos'] reserves room for
 // the native traffic lights in the title bar). Set before first render for
@@ -31,7 +37,7 @@ document.documentElement.dataset.platform = platformName;
 // oben, damit die App nicht kurz auf Englisch aufblitzt und dann umspringt.
 // Englisch ist im Bundle; alles andere laedt einen lokalen Chunk nach, das
 // sind einstellige Millisekunden. Schlaegt es fehl, startet die App englisch.
-const savedLanguage = savedAppLanguage();
+const savedLanguage = bootAppearance.language;
 const languageReady =
   savedLanguage === "en" ? Promise.resolve() : changeAppLanguage(savedLanguage).catch(() => {});
 // Sicherheitsnetz: settelt der Locale-Chunk wider Erwarten nie, rendert die

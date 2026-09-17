@@ -4,7 +4,6 @@ import {
   type NavHistory, type OpenTab,
 } from '../lib/tabs';
 import { isLibraryView, isViewId, moduleMeta, type EntryModuleId, type LeftListTabId } from '../lib/modules';
-import { normalizeEditorFontId, normalizeThemeId, normalizeUIFontId } from '../themes/theme';
 import type { ActiveView } from '../types';
 
 export type ViewMode = 'list' | 'cards' | 'cards_wide' | 'timeline';
@@ -36,9 +35,6 @@ export const isTagsSort = (s: SortMode): s is TagsSort => (TAGS_SORTS as SortMod
 export type HomeSort = Exclude<SortMode, 'count_desc'>;
 export type HomeView = 'list' | 'cards';
 export interface HomeSectionPrefs { sort: HomeSort; view: HomeView; count: number; } // count 0 = all
-
-export type ThemeId = 'emerald-noctis' | 'emerald-parchment';
-export type FontId = 'inter' | 'source-sans-3' | 'nunito' | 'ibm-plex-sans' | 'alegreya' | 'cormorant-garamond' | 'lora' | 'merriweather';
 
 export interface EditActions {
   onSave: () => void;
@@ -101,9 +97,6 @@ interface UIState {
   homeJournalPrefs: HomeSectionPrefs;
   homeOpsPrefs: HomeSectionPrefs;
   homeWikiPrefs: HomeSectionPrefs;
-  theme: ThemeId;
-  uiFontId: FontId;
-  editorFontId: FontId;
   /** Die vom Standard abweichenden Gruppen je Modul (siehe hooks/useCollapsedSet):
    *  zugeklappte — bzw. in Scopes, die zugeklappt starten, aufgeklappte.
    *  Im Store statt View-lokal, weil MainArea die Views beim Modulwechsel
@@ -150,9 +143,6 @@ interface UIState {
   setHomeJournalPrefs: (p: Partial<HomeSectionPrefs>) => void;
   setHomeOpsPrefs: (p: Partial<HomeSectionPrefs>) => void;
   setHomeWikiPrefs: (p: Partial<HomeSectionPrefs>) => void;
-  setTheme: (t: ThemeId) => void;
-  setUIFontId: (fontId: FontId) => void;
-  setEditorFontId: (fontId: FontId) => void;
 }
 
 const ALTAR_SHOW_PREVIEW_KEY = 'altar-show-preview';
@@ -181,20 +171,6 @@ function loadAltarLibraryPrefs(): AltarLibraryPrefs {
       : 'alpha_asc',
     grouping: localStorage.getItem(ALTAR_LIBRARY_GROUPING_KEY) === 'flat' ? 'flat' : 'grouped',
   };
-}
-
-function loadSavedTheme(): ThemeId {
-  const rawThemeId = localStorage.getItem('theme-id');
-  if (rawThemeId) return normalizeThemeId(rawThemeId);
-  return normalizeThemeId(localStorage.getItem('theme'));
-}
-
-function loadSavedUIFontId(): FontId {
-  return normalizeUIFontId(localStorage.getItem('ui-font-id'));
-}
-
-function loadSavedEditorFontId(): FontId {
-  return normalizeEditorFontId(localStorage.getItem('editor-font-id'));
 }
 
 
@@ -288,9 +264,6 @@ export const useUIStore = create<UIState>((set) => ({
   leftListOpen: loadOpenFlag(LEFT_LIST_OPEN_KEY),
   leftListTab: 'journal',
   searchQuery: '',
-  theme: loadSavedTheme(),
-  uiFontId: loadSavedUIFontId(),
-  editorFontId: loadSavedEditorFontId(),
   // Wo „Kategorie" bisher der Sortiermodus war (Wiki, Operationen,
   // Aufgaben), steht jetzt `grouping: 'grouped'` — dieselbe Ansicht wie
   // vorher. Innerhalb einer Gruppe verglich der alte Modus nur den
@@ -500,16 +473,4 @@ export const useUIStore = create<UIState>((set) => ({
   setHomeJournalPrefs: (p) => set((s) => ({ homeJournalPrefs: { ...s.homeJournalPrefs, ...p } })),
   setHomeOpsPrefs:     (p) => set((s) => ({ homeOpsPrefs:     { ...s.homeOpsPrefs,     ...p } })),
   setHomeWikiPrefs:    (p) => set((s) => ({ homeWikiPrefs:    { ...s.homeWikiPrefs,    ...p } })),
-  setTheme: (theme) => {
-    localStorage.setItem('theme-id', theme);
-    set({ theme });
-  },
-  setUIFontId: (fontId) => {
-    localStorage.setItem('ui-font-id', fontId);
-    set({ uiFontId: fontId });
-  },
-  setEditorFontId: (fontId) => {
-    localStorage.setItem('editor-font-id', fontId);
-    set({ editorFontId: fontId });
-  },
 }));

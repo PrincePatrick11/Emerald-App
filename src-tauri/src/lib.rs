@@ -757,6 +757,8 @@ pub fn run() {
             vault::migrate_vault_layout,
             vault::delete_vault_files,
             vault::discard_import_staging,
+            vault::read_vault_settings,
+            vault::write_vault_settings,
             export_image,
             write_file,
             read_file,

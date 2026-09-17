@@ -1,21 +1,17 @@
 import { useTranslation } from 'react-i18next';
 import { Globe, Moon, Sun, Type } from 'lucide-react';
-import { LANGUAGE_OPTIONS, changeAppLanguage } from '../../../i18n';
-import { useUIStore } from '../../../store/uiStore';
-import { FONT_OPTIONS, THEME_OPTIONS } from '../../../themes/theme';
+import { LANGUAGE_OPTIONS } from '../../../i18n';
+import { useSettingsStore } from '../../../store/settingsStore';
+import { FONT_OPTIONS, THEME_OPTIONS, type FontId } from '../../../themes/theme';
 import SettingsChoiceButton from './SettingsChoiceButton';
 import SettingsSection from './SettingsSection';
 
-/** Sprache und Aussehen — was die App spricht und wie sie aussieht. */
+/** Sprache und Aussehen — was die App in diesem Vault spricht und wie sie aussieht. */
 export default function GeneralPage() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
 
-  const theme = useUIStore((s) => s.theme);
-  const setTheme = useUIStore((s) => s.setTheme);
-  const uiFontId = useUIStore((s) => s.uiFontId);
-  const editorFontId = useUIStore((s) => s.editorFontId);
-  const setUIFontId = useUIStore((s) => s.setUIFontId);
-  const setEditorFontId = useUIStore((s) => s.setEditorFontId);
+  const appearance = useSettingsStore((s) => s.settings.appearance);
+  const update = useSettingsStore((s) => s.update);
 
   const themeIcons = {
     'emerald-noctis': Moon,
@@ -29,8 +25,8 @@ export default function GeneralPage() {
           {LANGUAGE_OPTIONS.map(({ code, label }) => (
             <SettingsChoiceButton
               key={code}
-              active={i18n.language === code}
-              onClick={() => changeAppLanguage(code)}
+              active={appearance.language === code}
+              onClick={() => update('appearance', { language: code })}
               className="px-3 py-1.5 text-sm"
             >
               {label}
@@ -46,8 +42,8 @@ export default function GeneralPage() {
             return (
             <SettingsChoiceButton
               key={id}
-              active={theme === id}
-              onClick={() => setTheme(id)}
+              active={appearance.theme === id}
+              onClick={() => update('appearance', { theme: id })}
               className="flex items-center gap-2 px-3 py-1.5 text-sm"
             >
               <Icon size={14} />
@@ -63,8 +59,8 @@ export default function GeneralPage() {
               {t('settings.uiFont')}
             </label>
             <select
-              value={uiFontId}
-              onChange={(e) => setUIFontId(e.target.value as typeof uiFontId)}
+              value={appearance.uiFont}
+              onChange={(e) => update('appearance', { uiFont: e.target.value as FontId })}
               className="w-full bg-stone-800/70 border border-stone-700/60 rounded-lg px-3 py-2 text-sm text-stone-200 outline-none focus:border-jade-500/60"
             >
               {FONT_OPTIONS.map((font) => (
@@ -78,8 +74,8 @@ export default function GeneralPage() {
               {t('settings.editorFont')}
             </label>
             <select
-              value={editorFontId}
-              onChange={(e) => setEditorFontId(e.target.value as typeof editorFontId)}
+              value={appearance.editorFont}
+              onChange={(e) => update('appearance', { editorFont: e.target.value as FontId })}
               className="w-full bg-stone-800/70 border border-stone-700/60 rounded-lg px-3 py-2 text-sm text-stone-200 outline-none focus:border-jade-500/60"
             >
               {FONT_OPTIONS.map((font) => (

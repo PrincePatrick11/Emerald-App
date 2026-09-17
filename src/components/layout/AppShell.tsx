@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { isAltarFullscreen, useUIStore } from '../../store/uiStore';
 import { reloadAllStores } from '../../store/moduleWiring';
 import { hasActiveVault, useVaultStore } from '../../store/vaultStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { invoke } from '@tauri-apps/api/core';
 import { computeMenuEnabledState, runMenuAction, SELF_CONTAINED_MENU_ACTIONS } from '../../lib/menuActions';
 import { hideSplash } from '../../lib/splash';
@@ -107,8 +108,10 @@ export default function AppShell() {
       // Erststart: es gibt noch keine Datenbank, aus der sich etwas laden
       // liesse. Der erste Vault wird ueber `switchVault` aktiviert, und das
       // endet in `reloadAllStores()` — dieser Effekt laeuft dafuer nicht erneut.
-      if (!hasActiveVault(useVaultStore.getState())) return;
-      return reloadAllStores();
+      const vaultState = useVaultStore.getState();
+      if (!hasActiveVault(vaultState)) return;
+      // Wie in `openActiveVault`: die Einstellungen vor der Datenbank.
+      return useSettingsStore.getState().loadForVault(vaultState.activeVaultId).then(reloadAllStores);
     })
       // Ohne `catch` bliebe der Fehler eine unbehandelte Rejection in der
       // Konsole — sichtbar nur, wenn jemand hinschaut.

@@ -646,7 +646,8 @@
     "cleanupFound_other": "{{count}} images, {{size}}",
     "cleanupDelete": "Remove",
     "cleanupDone": "{{size}} freed",
-    "storage": "Storage"
+    "storage": "Storage",
+    "appliesToVault": "Applies to {{name}}"
   },
   "home": {
     "viewAll": "View all",

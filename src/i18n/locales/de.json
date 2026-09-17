@@ -646,7 +646,8 @@
     "cleanupFound_other": "{{count}} Bilder, {{size}}",
     "cleanupDelete": "Entfernen",
     "cleanupDone": "{{size}} freigegeben",
-    "storage": "Speicher"
+    "storage": "Speicher",
+    "appliesToVault": "Gilt für {{name}}"
   },
   "home": {
     "viewAll": "Alle anzeigen",

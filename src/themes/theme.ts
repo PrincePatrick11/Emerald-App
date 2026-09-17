@@ -1,4 +1,5 @@
-import type { FontId, ThemeId } from '../store/uiStore';
+export type ThemeId = 'emerald-noctis' | 'emerald-parchment';
+export type FontId = 'inter' | 'source-sans-3' | 'nunito' | 'ibm-plex-sans' | 'alegreya' | 'cormorant-garamond' | 'lora' | 'merriweather';
 
 export const DEFAULT_THEME_ID: ThemeId = 'emerald-noctis';
 

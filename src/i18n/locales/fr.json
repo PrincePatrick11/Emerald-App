@@ -654,7 +654,8 @@
     "cleanupFound_other": "{{count}} images, {{size}}",
     "cleanupDelete": "Supprimer",
     "cleanupDone": "{{size}} libérés",
-    "storage": "Stockage"
+    "storage": "Stockage",
+    "appliesToVault": "S'applique à {{name}}"
   },
   "contextMenu": {
     "openInNewTab": "Ouvrir dans un nouvel onglet",
