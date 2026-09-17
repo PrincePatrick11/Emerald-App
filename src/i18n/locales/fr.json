@@ -661,7 +661,12 @@
     "groupAppearance": "Langue et apparence",
     "uiScale": "Taille de l'interface",
     "editorFontSize": "Taille du texte de l'éditeur",
-    "modeReplaceSettingsWarning": "Les paramètres de ce vault sont eux aussi remplacés par ceux de la sauvegarde."
+    "modeReplaceSettingsWarning": "Les paramètres de ce vault sont eux aussi remplacés par ceux de la sauvegarde.",
+    "trashRetention": "Vider la corbeille automatiquement après",
+    "trashRetentionDays": "{{count}} jour",
+    "trashRetentionDays_other": "{{count}} jours",
+    "trashRetentionNever": "Jamais",
+    "groupTrash": "Corbeille"
   },
   "contextMenu": {
     "openInNewTab": "Ouvrir dans un nouvel onglet",
@@ -678,7 +683,7 @@
     "emptyTrash": "Vider la corbeille",
     "restore": "Restaurer",
     "deletePermanently": "Supprimer définitivement",
-    "retentionNote": "Les éléments sont automatiquement supprimés après 30 jours.",
+    "retentionNote": "Les éléments sont automatiquement supprimés après {{count}} jour.",
     "deletedAgo": "Supprimé il y a {{time}}",
     "daysLeft": "{{count}} jour restant",
     "daysLeft_other": "{{count}} jours restants",
@@ -688,7 +693,9 @@
     "categories": "Catégories",
     "blockDefinitions": "Blocs",
     "templates": "Modèles",
-    "deleteSelected": "Supprimer la sélection ({{count}})"
+    "deleteSelected": "Supprimer la sélection ({{count}})",
+    "retentionNote_other": "Les éléments sont automatiquement supprimés après {{count}} jours.",
+    "retentionNoteNever": "Les éléments restent jusqu'à ce que vous les supprimiez définitivement."
   },
   "menu": {
     "cut": "Couper",

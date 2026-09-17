@@ -22,17 +22,26 @@ export interface AppearanceSettings {
   editorFontSize: EditorFontSize;
 }
 
+/** Tage bis zum endgültigen Löschen; `null` = nie. */
+export const TRASH_RETENTION_OPTIONS = [7, 14, 30, 60, 90, null] as const;
+export type TrashRetention = (typeof TRASH_RETENTION_OPTIONS)[number];
+
+export interface TrashSettings {
+  retentionDays: TrashRetention;
+}
+
 export interface VaultSettings {
   /** Nicht gelesen, wie `version` in `vaults.json`: erst eine Form, die eine
    *  Umrechnung braucht, zählt ihn hoch. */
   version: 1;
   appearance: AppearanceSettings;
+  trash: TrashSettings;
 }
 
 export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
 
 /** Jede Gruppe genau einmal — der Record erzwingt, dass eine neue nicht fehlt. */
-const GROUP_SET: Record<SettingsGroup, true> = { appearance: true };
+const GROUP_SET: Record<SettingsGroup, true> = { appearance: true, trash: true };
 export const SETTINGS_GROUPS = Object.keys(GROUP_SET) as SettingsGroup[];
 
 export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
@@ -44,6 +53,9 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
     editorFont: DEFAULT_EDITOR_FONT_ID,
     uiScale: DEFAULT_UI_SCALE,
     editorFontSize: DEFAULT_EDITOR_FONT_SIZE,
+  },
+  trash: {
+    retentionDays: 30,
   },
 };
 
@@ -71,6 +83,7 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const root = asRecord(raw);
   const appearance = asRecord(root.appearance);
   const language = asString(appearance.language);
+  const trash = asRecord(root.trash);
   return {
     ...root,
     version: 1,
@@ -82,6 +95,12 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
       editorFont: normalizeEditorFontId(asString(appearance.editorFont)),
       uiScale: normalizeUIScale(appearance.uiScale),
       editorFontSize: normalizeEditorFontSize(appearance.editorFontSize),
+    },
+    trash: {
+      ...trash,
+      retentionDays: (TRASH_RETENTION_OPTIONS as readonly unknown[]).includes(trash.retentionDays)
+        ? (trash.retentionDays as TrashRetention)
+        : DEFAULT_VAULT_SETTINGS.trash.retentionDays,
     },
   };
 }
@@ -97,19 +116,19 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
 export function importableSettings(raw: unknown): VaultSettings | null {
   if (!isPlainObject(raw)) return null;
   const normalized = normalizeVaultSettings(raw);
-  const known = { version: normalized.version } as VaultSettings;
+  const known: Record<string, unknown> = { version: normalized.version };
   for (const group of SETTINGS_GROUPS) {
-    const fields = Object.keys(DEFAULT_VAULT_SETTINGS[group]) as (keyof VaultSettings[typeof group])[];
-    known[group] = Object.fromEntries(fields.map((field) => [field, normalized[group][field]])) as unknown as VaultSettings[typeof group];
+    const values = normalized[group] as unknown as Record<string, unknown>;
+    known[group] = Object.fromEntries(Object.keys(DEFAULT_VAULT_SETTINGS[group]).map((field) => [field, values[field]]));
   }
-  return known;
+  return known as unknown as VaultSettings;
 }
 
 /** `current` mit den gewählten Gruppen aus `incoming` — fürs Zusammenführen einer Sicherung. */
 export function withSettingsGroups(current: VaultSettings, incoming: VaultSettings, groups: readonly SettingsGroup[]): VaultSettings {
-  const next = { ...current };
+  const next: Record<string, unknown> = { ...current };
   for (const group of groups) next[group] = incoming[group];
-  return next;
+  return next as unknown as VaultSettings;
 }
 
 /** Mirrors `SettingsRead` in `src-tauri/src/vault.rs`. */

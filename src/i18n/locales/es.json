@@ -661,7 +661,12 @@
     "groupAppearance": "Idioma y apariencia",
     "uiScale": "Tamaño de la interfaz",
     "editorFontSize": "Tamaño del texto del editor",
-    "modeReplaceSettingsWarning": "Los ajustes de este vault también se sustituyen por los de la copia."
+    "modeReplaceSettingsWarning": "Los ajustes de este vault también se sustituyen por los de la copia.",
+    "trashRetention": "Vaciar la papelera automáticamente tras",
+    "trashRetentionDays": "{{count}} día",
+    "trashRetentionDays_other": "{{count}} días",
+    "trashRetentionNever": "Nunca",
+    "groupTrash": "Papelera"
   },
   "contextMenu": {
     "openInNewTab": "Abrir en nueva pestaña",
@@ -678,7 +683,7 @@
     "emptyTrash": "Vaciar papelera",
     "restore": "Restaurar",
     "deletePermanently": "Eliminar definitivamente",
-    "retentionNote": "Los elementos se eliminan automáticamente después de 30 días.",
+    "retentionNote": "Los elementos se eliminan automáticamente después de {{count}} día.",
     "deletedAgo": "Eliminado hace {{time}}",
     "daysLeft": "Queda {{count}} día",
     "daysLeft_other": "Quedan {{count}} días",
@@ -688,7 +693,9 @@
     "categories": "Categorías",
     "blockDefinitions": "Bloques",
     "templates": "Plantillas",
-    "deleteSelected": "Eliminar seleccionados ({{count}})"
+    "deleteSelected": "Eliminar seleccionados ({{count}})",
+    "retentionNote_other": "Los elementos se eliminan automáticamente después de {{count}} días.",
+    "retentionNoteNever": "Los elementos se quedan hasta que los elimines definitivamente."
   },
   "menu": {
     "cut": "Cortar",

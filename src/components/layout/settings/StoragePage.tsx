@@ -1,15 +1,20 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Brush, Check, HardDrive } from 'lucide-react';
+import { Brush, Check, HardDrive, Trash2 } from 'lucide-react';
 import Button from '../../ui/Button';
 import { deleteImageFiles, findUnusedImages, type UnusedImages } from '../../../lib/images';
 import { getDb } from '../../../lib/db';
 import { formatBytes } from '../../../lib/helpers';
+import { TRASH_RETENTION_OPTIONS } from '../../../lib/vaultSettings';
+import { useSettingsStore } from '../../../store/settingsStore';
+import SettingsChoiceButton from './SettingsChoiceButton';
 import SettingsSection from './SettingsSection';
 
 /** Was die App auf der Platte liegen hat, und was davon weg kann. */
 export default function StoragePage() {
   const { t } = useTranslation();
+  const retentionDays = useSettingsStore((s) => s.settings.trash.retentionDays);
+  const update = useSettingsStore((s) => s.update);
 
   // Aufraeumen der Bildablage: erst zaehlen, dann auf Bestaetigung loeschen.
   const [unused, setUnused] = useState<UnusedImages | null>(null);
@@ -43,6 +48,22 @@ export default function StoragePage() {
   }
 
   return (
+    <>
+    <SettingsSection icon={<Trash2 size={14} />} title={t('settings.trashRetention')}>
+      <div className="flex gap-2 flex-wrap">
+        {TRASH_RETENTION_OPTIONS.map((days) => (
+          <SettingsChoiceButton
+            key={days ?? 'never'}
+            active={retentionDays === days}
+            onClick={() => update('trash', { retentionDays: days })}
+            className="px-3 py-1.5 text-sm"
+          >
+            {days === null ? t('settings.trashRetentionNever') : t('settings.trashRetentionDays', { count: days })}
+          </SettingsChoiceButton>
+        ))}
+      </div>
+    </SettingsSection>
+
     <SettingsSection icon={<HardDrive size={14} />} title={t('settings.storage')}>
         <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-stone-800/60 border border-stone-700/40">
           <span className="flex items-center gap-2 text-sm text-stone-300 min-w-0">
@@ -74,5 +95,6 @@ export default function StoragePage() {
           )}
         </div>
     </SettingsSection>
+    </>
   );
 }

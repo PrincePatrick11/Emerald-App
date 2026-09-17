@@ -17,6 +17,7 @@ import { makeCategoryOptional } from './nullableCategory';
 import { seedSigilTemplate } from './templateRows';
 import { migrateRoutinesToTemplates } from './migrateRoutinesToTemplates';
 import i18n from '../i18n';
+import { useSettingsStore } from '../store/settingsStore';
 
 // Per-vault DB cache: SQLite identifier → Database instance
 const _dbCache = new Map<string, Database>();
@@ -88,7 +89,9 @@ export async function getDb(): Promise<Database> {
     await invoke('ensure_vault_dirs', { vaultId });
     const db = await Database.load(identifier);
     await runMigrations(db);
-    await runPeriodicCleanup(db);
+    // Die Frist des Vaults, der gerade geöffnet wird: seine Einstellungen lädt
+    // `openActiveVault` vor `getDb()`.
+    await runPeriodicCleanup(db, useSettingsStore.getState().settings.trash.retentionDays);
     // Sigillen-Zeichnungen, die v42 (oder ein Backup-Import) nicht als Datei
     // speichern konnte — bei jedem Öffnen ein neuer Versuch. Scheitern darf
     // das Öffnen daran nicht: die Zeilen bleiben einfach, wie sie sind.
@@ -292,14 +295,16 @@ const CONTENT_IDS = `(SELECT id FROM journal_entries
                       UNION ALL SELECT id FROM tasks
                       UNION ALL SELECT id FROM altars)`;
 
-async function runPeriodicCleanup(db: Database): Promise<void> {
-  // Auto-purge trash items older than 30 days
-  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  for (const table of CLEANUP_TABLES) {
-    await db.execute(
-      `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
-      [cutoff]
-    );
+async function runPeriodicCleanup(db: Database, retentionDays: number | null): Promise<void> {
+  // Papierkorb-Inhalte älter als die eingestellte Frist endgültig löschen — „nie" überspringt das.
+  if (retentionDays !== null) {
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+    for (const table of CLEANUP_TABLES) {
+      await db.execute(
+        `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
+        [cutoff]
+      );
+    }
   }
 
   await sweepDanglingLinks(db);

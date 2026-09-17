@@ -653,7 +653,12 @@
     "groupAppearance": "Language & appearance",
     "uiScale": "Interface size",
     "editorFontSize": "Editor text size",
-    "modeReplaceSettingsWarning": "The settings of this vault are replaced by those from the backup as well."
+    "modeReplaceSettingsWarning": "The settings of this vault are replaced by those from the backup as well.",
+    "trashRetention": "Empty trash automatically after",
+    "trashRetentionDays": "{{count}} day",
+    "trashRetentionDays_other": "{{count}} days",
+    "trashRetentionNever": "Never",
+    "groupTrash": "Trash"
   },
   "home": {
     "viewAll": "View all",
@@ -678,7 +683,7 @@
     "emptyTrash": "Empty Trash",
     "restore": "Restore",
     "deletePermanently": "Delete permanently",
-    "retentionNote": "Items are automatically deleted after 30 days.",
+    "retentionNote": "Items are automatically deleted after {{count}} day.",
     "deletedAgo": "Deleted {{time}} ago",
     "daysLeft": "{{count}} day left",
     "daysLeft_other": "{{count}} days left",
@@ -688,7 +693,9 @@
     "categories": "Categories",
     "blockDefinitions": "Blocks",
     "templates": "Templates",
-    "deleteSelected": "Delete selected ({{count}})"
+    "deleteSelected": "Delete selected ({{count}})",
+    "retentionNote_other": "Items are automatically deleted after {{count}} days.",
+    "retentionNoteNever": "Items stay until you delete them permanently."
   },
   "menu": {
     "cut": "Cut",

@@ -42,6 +42,7 @@ const DEFAULT_EXPORT_OPTIONS: BackupOptions = {
 /** Record statt Liste: eine neue Einstellungs-Gruppe ohne Beschriftung ist ein Typfehler. */
 const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {
   appearance: 'settings.groupAppearance',
+  trash: 'settings.groupTrash',
 };
 
 /**

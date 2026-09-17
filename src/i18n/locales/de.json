@@ -653,7 +653,12 @@
     "groupAppearance": "Sprache & Aussehen",
     "uiScale": "Größe der Oberfläche",
     "editorFontSize": "Textgröße im Editor",
-    "modeReplaceSettingsWarning": "Auch die Einstellungen dieses Vaults werden durch die aus dem Backup ersetzt."
+    "modeReplaceSettingsWarning": "Auch die Einstellungen dieses Vaults werden durch die aus dem Backup ersetzt.",
+    "trashRetention": "Papierkorb automatisch leeren nach",
+    "trashRetentionDays": "{{count}} Tag",
+    "trashRetentionDays_other": "{{count}} Tagen",
+    "trashRetentionNever": "Nie",
+    "groupTrash": "Papierkorb"
   },
   "home": {
     "viewAll": "Alle anzeigen",
@@ -678,7 +683,7 @@
     "emptyTrash": "Papierkorb leeren",
     "restore": "Wiederherstellen",
     "deletePermanently": "Endgültig löschen",
-    "retentionNote": "Elemente werden nach 30 Tagen automatisch gelöscht.",
+    "retentionNote": "Elemente werden nach {{count}} Tag automatisch gelöscht.",
     "deletedAgo": "Gelöscht vor {{time}}",
     "daysLeft": "Noch {{count}} Tag",
     "daysLeft_other": "Noch {{count}} Tage",
@@ -688,7 +693,9 @@
     "categories": "Kategorien",
     "blockDefinitions": "Blöcke",
     "templates": "Vorlagen",
-    "deleteSelected": "Ausgewählte löschen ({{count}})"
+    "deleteSelected": "Ausgewählte löschen ({{count}})",
+    "retentionNote_other": "Elemente werden nach {{count}} Tagen automatisch gelöscht.",
+    "retentionNoteNever": "Elemente bleiben, bis du sie endgültig löschst."
   },
   "menu": {
     "cut": "Ausschneiden",
