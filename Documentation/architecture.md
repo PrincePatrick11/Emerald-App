@@ -58,10 +58,13 @@ src/
 │   │                 above Category, see Edit Mode Architecture below), AltarReadingSummary,
 │   │                 PlacedElementRow
 │   ├── templates/    TemplateEditor (a template's own page, built on LibraryPageFrame),
-│   │                 TemplateAssignments (a template's per-combination assignments + default
-│   │                 star, in its sidebar), TemplateDefaultsOverview (the dashboard's
-│   │                 collapsible per-combination default picker), TemplateUsage (the entries
-│   │                 using a template, in its sidebar), TemplateInsertion (the editor's
+│   │                 TemplateAssignments (a template's sidebar summary of its assignments and
+│   │                 default, collapsible, with the button that opens TemplateAssignmentsModal),
+│   │                 TemplateAssignmentsModal (the table dialog that sets assignments and
+│   │                 default), TemplateDefaultsOverview (the dashboard's read-only mirror of the
+│   │                 same table), assignmentParts.tsx (AssignmentTable/AssignmentLegend/
+│   │                 EntryTypeHeading, shared by the modal and the overview), TemplateUsage (the
+│   │                 entries using a template, in its sidebar), TemplateInsertion (the editor's
 │   │                 "Insert template" button, empty-entry suggestions, and the
 │   │                 applied-template notice), TemplatePickerModal, TemplateApplyDialog
 │   │                 (append/replace + title/tags checkboxes), useAssignmentLabel
@@ -79,7 +82,8 @@ src/
 │                     frame — click, middle-click, focus ring), EntryListTab, ListToolbar,
 │                     FilterPanel, RailButton, TabIconButton, UndoToast, ImportDestinationModal,
 │                     Dropdown, FieldDropdown (a properties-panel-styled, portalled Dropdown —
-│                     CategorySelect, template assignments, the defaults overview),
+│                     CategorySelect only, now that the templates dashboard sets assignments and
+│                     defaults through IconToggleGroup cells instead of dropdowns),
 │                     CollapsibleGroupHeader, CategorySelect, EntryDetailFrame,
 │                     LibraryPageFrame (the "Done"-to-save page frame shared by a block's own
 │                     page and a template's — breadcrumb, icon, "Unsaved", name-as-title,
@@ -802,9 +806,13 @@ by the template's own title write), then applies title/tags through the entry's 
 `useSaveAsTemplateAction` is the reverse direction — "Save as template" on any entry with a block
 stack creates one from its current (live, if being edited) content and opens it.
 
-**The dashboard page.** `TemplatesView` is a `Dashboard` list of active templates (name, icon,
-description, assignments, entry count, a `template-default-star` if it's a default anywhere);
-clicking one opens `{ type: 'templates', id }`, rendered by `TemplateEditor` on
+**The dashboard page.** `TemplatesView` is a `Dashboard` list of active templates under a
+collapsible "Templates" `GroupDivider` (remembered, like the built-in-blocks section on the Blocks
+dashboard), with its own view (list/cards/wide cards/timeline, grouped by month of `updated_at`)
+and sort (date/alpha) held in `uiStore.templatesPrefs` — one more `ListPrefs` field, not persisted,
+the same as the other modules'. A row or card shows only icon, name, an "Unsaved" marker for an
+open draft, and the entry count — no assignments, no default star, no description; clicking one
+opens `{ type: 'templates', id }`, rendered by `TemplateEditor` on
 `LibraryPageFrame` — the same "Done"-saves-only-changed-fields page shell `BlockDefinitionEditor`
 uses (`src/components/ui/LibraryPageFrame.tsx`, factored out once a second page needed it):
 breadcrumb, icon, "Unsaved" marker, name-as-title input, scrolling body, and
@@ -816,21 +824,45 @@ shared draft lifecycle (`src/hooks/useDraftPage.ts`, likewise factored out of
 the view on a module switch) and, on "Done", writes only the fields that actually changed since
 the page opened (comparing trimmed names) rather than the whole draft — a tag renamed or a star
 taken by another template while the page was open is left as it is instead of being silently
-overwritten. `useShrunkIcon` (`src/hooks/useShrunkIcon.ts`) is the shared "shrink an image icon to
-64px, last write wins" logic behind a draft's icon field, used by both pages. `TemplateAssignments`
-is a template's own sidebar editor for its combinations (star toggles a default, `+` adds one);
-`TemplateDefaultsOverview` is the dashboard's collapsible mirror of the same data — every
-combination (Journal once; Wiki/Operations × all-categories/uncategorized/each category) laid out
-as a tile (label above a `FieldDropdown` to change its default directly, naming what a category
-without its own default falls back to), tiles flowing into as many columns as the section is wide
-(CSS grid, `auto-fill`, `minmax(11rem, 1fr)`) rather than one row per combination. Both write
-through `templateStore.setDefaultFor`, and a page's own pending
-assignment edits are reconciled against whatever the overview did meanwhile via
-`mergeAssignmentChanges` (base → draft, replayed onto current) rather than one silently clobbering
-the other. `FieldDropdown` (`src/components/ui/FieldDropdown.tsx`) is a portalled,
-properties-panel-styled `Dropdown` wrapper used by the assignments editor, the defaults overview,
-and `CategorySelect`; `TagsField` (`src/components/sidebar/fields/TagsField.tsx`) is the tags
-field's label-plus-`TagInput` shell, shared by Journal/Wiki/Operations' properties panels and the
+overwritten. `TemplateDraft` (`store/draftStore.ts`) omits `description` — the page has no field
+for it any more, though the `templates.description` column stays for import/export and duplication,
+and `TemplatePickerModal`'s search and the insertion suggestions now match the name only.
+`useShrunkIcon` (`src/hooks/useShrunkIcon.ts`) is the shared "shrink an image icon to 64px, last
+write wins" logic behind a draft's icon field, used by both pages.
+
+**Assignment and default, as one table.** `assignmentStateAt`/`withAssignmentState`/
+`sameAssignments` (`lib/blocks/templates.ts`, pure) replace the former `withDefaultAt`: a
+combination's `AssignmentState` is `'off' | 'assigned' | 'default'` rather than a boolean star on
+a possibly-missing row, `withAssignmentState` sets a cell to any of the three (removing the
+assignment for `off`, adding or updating it otherwise, keeping its position in the array when it
+already existed) and `sameAssignments` compares two assignment lists ignoring order, so toggling a
+cell off and back on isn't treated as a change. `assignmentParts.tsx` holds what the modal and the
+overview share: `AssignmentTable` (Journal as one row under its own heading, then Wiki/Operations
+as columns with "All categories"/"Uncategorized"/each category as rows — `variant: 'dialog'`
+fixed-width columns, `variant: 'overview'` two flexible columns; an optional `extraColumn` for the
+dialog's "Both"), `AssignmentLegend`, `EntryTypeHeading`, `ASSIGNMENT_STATE_ICONS`
+(`Minus`/`Check`/`Star`) and `useAssignmentStateLabels`. `TemplateAssignmentsModal` edits a copy of
+the template's assignments: each cell is an `IconToggleGroup` over the three states — `Star` when
+another active template already holds the default there, or when this cell's default would
+replace it. `IconToggleGroup.value` now accepts `null`, which the modal's "Both" column uses when
+Wiki and Operations disagree, so the segment row shows no option pressed rather than picking one
+side arbitrarily. `TemplateAssignments` (the sidebar) shows the current assignments read-only —
+sorted the same way the table lists them (`TEMPLATE_ENTRY_TYPES` order, then the categories'
+own order) — with a star and a "replaces X" hint for a default, under a `SidebarSectionHeader`
+(`usePersistedFlag`, collapsed state remembered) and a button that opens the modal; the modal's
+"Apply" only calls `onChange` when `sameAssignments` says something actually changed, so a
+no-op edit leaves the draft untouched. `TemplateDefaultsOverview` is the dashboard's read-only
+mirror of the same `AssignmentTable`: each cell links to the default (accent star) and every
+template offered there (subtle check) by name, opening the template on click, plus the fallback
+("↳ name", `CornerDownRight`, full text in a tooltip) whenever the combination has no default of
+its own — a plain "—" once neither is set. `templateStore.setDefaultFor` is gone along with the
+overview's own dropdown; a default is now only ever set through a template's own
+`TemplateAssignmentsModal`, and a page's pending assignment edits are still reconciled against
+whatever another template's edit did meanwhile via `mergeAssignmentChanges` (base → draft,
+replayed onto current) rather than one silently clobbering the other. `FieldDropdown`
+(`src/components/ui/FieldDropdown.tsx`) is now used only by `CategorySelect`'s `field` variant;
+`TagsField` (`src/components/sidebar/fields/TagsField.tsx`) is the tags field's
+label-plus-`TagInput` shell, shared by Journal/Wiki/Operations' properties panels and the
 template page.
 
 **Routines became templates, then were removed.** Routines had no UI path since `RoutinesPanel`
