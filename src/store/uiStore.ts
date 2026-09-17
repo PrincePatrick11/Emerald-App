@@ -87,6 +87,7 @@ interface UIState {
   tasksPrefs: ListPrefs;
   altarPrefs: ListPrefs;
   trashPrefs: ListPrefs;
+  templatesPrefs: ListPrefs;
   tagsSort: TagsSort;
   altarWindowFullscreen: boolean;
   /** Altar-Dashboard: Vorschau der Leinwand auf den Karten und in der Liste.
@@ -141,6 +142,7 @@ interface UIState {
   setTasksPrefs: (p: Partial<ListPrefs>) => void;
   setAltarPrefs: (p: Partial<ListPrefs>) => void;
   setTrashPrefs: (p: Partial<ListPrefs>) => void;
+  setTemplatesPrefs: (p: Partial<ListPrefs>) => void;
   setTagsSort: (sort: TagsSort) => void;
   setAltarWindowFullscreen: (enabled: boolean) => void;
   setAltarShowPreview: (enabled: boolean) => void;
@@ -306,6 +308,8 @@ export const useUIStore = create<UIState>((set) => ({
   // Feld steht nur da, weil alle Module dieselbe ListPrefs teilen.
   altarPrefs: { view: 'cards', sort: 'date_desc', grouping: 'flat' },
   trashPrefs: { view: 'list', sort: 'date_desc', grouping: 'flat' },
+  // Vorlagen haben nichts zu gruppieren — wie beim Altar steht das Feld nur für die gemeinsame ListPrefs da.
+  templatesPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
   tagsSort: 'alpha_asc',
   altarWindowFullscreen: false,
   altarShowPreview: localStorage.getItem(ALTAR_SHOW_PREVIEW_KEY) !== '0',
@@ -480,6 +484,7 @@ export const useUIStore = create<UIState>((set) => ({
   setTasksPrefs: (p) => set((s) => ({ tasksPrefs: { ...s.tasksPrefs, ...p } })),
   setAltarPrefs: (p) => set((s) => ({ altarPrefs: { ...s.altarPrefs, ...p } })),
   setTrashPrefs: (p) => set((s) => ({ trashPrefs: { ...s.trashPrefs, ...p } })),
+  setTemplatesPrefs: (p) => set((s) => ({ templatesPrefs: { ...s.templatesPrefs, ...p } })),
   setTagsSort: (sort) => set({ tagsSort: sort }),
   setAltarWindowFullscreen: (enabled) => set({ altarWindowFullscreen: enabled }),
   setAltarShowPreview: (enabled) => {

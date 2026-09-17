@@ -23,8 +23,8 @@ import { fromRow, type DbRow } from '../lib/row';
 import { serialized, serialKey } from '../lib/serialize';
 import { insertTemplateRow, nextTemplateSortOrder, templateById } from '../lib/templateRows';
 import {
-  assignmentKey, DEFAULT_TEMPLATE_ICON, defaultKeys, parseAssignments, resolveDefaultTemplate, templateStart, templateToRow,
-  ALL_CATEGORIES, assignedCategoryId, withDefaultAt, withoutDefaultsFor,
+  DEFAULT_TEMPLATE_ICON, defaultKeys, parseAssignments, resolveDefaultTemplate, templateStart, templateToRow,
+  assignedCategoryId, withoutDefaultsFor,
   type EntryStart, type Template, type TemplateAssignment, type TemplateEntryType,
 } from '../lib/blocks/templates';
 import i18n from '../i18n';
@@ -47,12 +47,6 @@ interface TemplateState {
    */
   updateTemplate: (id: string, patch: TemplatePatch) => Promise<Template[]>;
   duplicateTemplate: (id: string) => Promise<Template | undefined>;
-  /**
-   * Der Standard einer Kombination aus der Gesamtübersicht: `templateId`
-   * bekommt den Stern (und die Zuweisung, falls sie fehlt), wer ihn bisher
-   * hielt, verliert ihn — seine Zuweisung bleibt. `null` nimmt den Stern nur weg.
-   */
-  setDefaultFor: (entryType: TemplateEntryType, category: string | null, templateId: string | null) => Promise<void>;
   /** Soft-Delete. Einträge aus dieser Vorlage bleiben, wie sie sind. */
   deleteTemplate: (id: string) => Promise<void>;
   restoreTemplate: (id: string) => Promise<void>;
@@ -154,26 +148,6 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       assignments: source.assignments,
     });
   },
-
-  setDefaultFor: (entryType, category, templateId) => serialized(WRITE_KEY, async () => {
-    // Journal kennt nur „alle Kategorien" — sonst entstünden zwei Journal-Standards.
-    const cat = entryType === 'journal' ? ALL_CATEGORIES : category;
-    const { templates } = get();
-    const target = templateId ? templates.find((t) => t.id === templateId) : undefined;
-    // Inzwischen gelöscht: nichts ändern, statt nur den bisherigen Stern zu nehmen.
-    if (templateId && !target) return;
-    const db = await getDb();
-    const changed = await clearDefaults(db, templates.filter((t) => t !== target), new Set([assignmentKey(entryType, cat)]));
-    if (target) {
-      const assignments = withDefaultAt(target.assignments, entryType, cat);
-      if (JSON.stringify(assignments) !== JSON.stringify(target.assignments)) {
-        await db.execute('UPDATE templates SET assignments=$1 WHERE id=$2', [templateToRow({ ...target, assignments }).assignments, target.id]);
-        changed.push({ ...target, assignments });
-      }
-    }
-    const byId = new Map(changed.map((t) => [t.id, t]));
-    if (byId.size) set((s) => ({ templates: s.templates.map((t) => byId.get(t.id) ?? t) }));
-  }),
 
   deleteTemplate: (id) => serialized(WRITE_KEY, async () => {
     const db = await getDb();

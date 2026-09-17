@@ -103,7 +103,7 @@ export default function TemplateInsertion({ entryId, target, empty, pickerOpen, 
           <p className="label-xs">{t('templates.insert.suggestionsLabel')}</p>
           <div className="flex flex-wrap gap-1.5">
             {available.slice(0, SUGGESTION_LIMIT).map((template) => (
-              <Button key={template.id} tone="neutral" small onClick={() => select(template)} title={template.description || undefined}>
+              <Button key={template.id} tone="neutral" small onClick={() => select(template)}>
                 <BlockGlyph icon={template.icon} size={12} />
                 <span>{templateLabel(t, template)}</span>
               </Button>

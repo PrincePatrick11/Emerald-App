@@ -1075,12 +1075,69 @@ button.block-altar:hover .block-altar-title {
   margin-bottom: 0.75rem;
 }
 
-/* Vorlagen-Ansicht: der Stern einer Vorlage, die irgendwo Standard ist — im
-   Akzent wie der Punkt oben, in beiden Themes. */
+/* Vorlagen: der Stern „Standard" in der Standardvorlagen-Übersicht und in der
+   Seitenleiste einer Vorlage — im Akzent wie der Punkt oben, in beiden Themes. */
 .template-default-star {
   display: flex;
   flex-shrink: 0;
   color: var(--accent);
+}
+
+/* Zuweisungs-Tabelle einer Vorlage (Dialog und Übersicht, `AssignmentTable`):
+   Label links; im Dialog feste Spalten für Wiki, Operationen und „beide" —
+   fest, damit der Hinweis unter einer Zelle kürzt statt die Spalte zu
+   verbreitern. */
+.template-assign-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(3, 6.5rem);
+  column-gap: 0.75rem;
+  align-items: start;
+  padding: 0.25rem 0;
+}
+
+.template-assign-head {
+  align-items: end;
+  padding-bottom: 0.375rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+/* Dieselbe Tabelle im Dashboard: dort nur zwei Spalten, die sich die Breite teilen. */
+.template-assign-row--overview {
+  grid-template-columns: minmax(8rem, 14rem) repeat(2, minmax(0, 1fr));
+  column-gap: 1.5rem;
+  padding: 0.375rem 0;
+}
+
+/* Das Häkchen „zur Wahl" neben einem Vorlagennamen — leiser als der Stern. */
+.template-overview-state {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--text-subtle);
+}
+
+/* „Ersetzt X": der Stern nimmt einer anderen Vorlage etwas weg — im Akzent. */
+.template-assign-replaces {
+  color: var(--accent);
+}
+
+/* Standardvorlagen-Übersicht im Dashboard: der Name einer Vorlage als Link zu ihrer Seite. */
+.template-overview-link {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  transition: color 150ms;
+}
+
+.template-overview-link:hover {
+  color: var(--text-primary);
+}
+
+.template-overview-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .block-def-element {

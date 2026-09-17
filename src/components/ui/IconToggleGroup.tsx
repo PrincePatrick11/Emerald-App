@@ -7,14 +7,17 @@ import TabIconButton from './TabIconButton';
  * erklären sich über ihre Tooltips, das Label bleibt aria-label der Gruppe.
  * Die Darreichungsform der schmalen Seitenleiste — im Hauptbereich wählt man
  * mit `Dropdown`. Geteilt von der ListToolbar (Ansicht und Sortierung im
- * Seitenleisten-Modus) und den Reglern der Altar-Bibliothek, die im selben
- * Kopf darunter stehen und deshalb gleich aussehen müssen.
+ * Seitenleisten-Modus), den Reglern der Altar-Bibliothek, die im selben
+ * Kopf darunter stehen und deshalb gleich aussehen müssen, und den Zellen im
+ * Zuweisungs-Dialog einer Vorlage, wo ein Menü je Zelle zu viel wäre.
  */
 export default function IconToggleGroup<T extends string>({ label, options, icons, value, onChange, isDisabled, disabledHint }: {
   label: string;
   options: { value: T; label: string }[];
   icons: Record<T, LucideIcon>;
-  value: T;
+  /** `null`: keine Option aktiv — ein gemischter Stand, etwa „beide Spalten
+   *  zugleich" in den Zuweisungen einer Vorlage, wenn die Spalten abweichen. */
+  value: T | null;
   onChange: (v: T) => void;
   /** Optionen, die in der aktuellen Kombination nichts bewirken (der
    *  Zeitstrahl verträgt keine Alpha-Sortierung und gruppiert selbst) —

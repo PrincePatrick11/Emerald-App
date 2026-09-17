@@ -31,7 +31,7 @@ writeFileSync(
    export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
    export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked, withRenamedPartTargets } from '${root}/src/lib/blocks/sigil';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
-   export { parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty, isUnchangedTemplateContent, templateOriginsOf, templateStart, mergeTemplateTags, mergeAssignmentChanges, withDefaultAt, defaultTemplateAt, contentForTemplate, areBlocksEmpty, defaultTemplateSwap, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
+   export { parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty, isUnchangedTemplateContent, templateOriginsOf, templateStart, mergeTemplateTags, mergeAssignmentChanges, withAssignmentState, assignmentStateAt, sameAssignments, defaultTemplateAt, contentForTemplate, areBlocksEmpty, defaultTemplateSwap, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';`
 );
@@ -66,7 +66,7 @@ const {
   remapDefinitionDefaults, definitionImageRefs, hasFrozenCopy, withRenamedPartTargets,
   parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty,
   isUnchangedTemplateContent, templateOriginsOf, templateStart, mergeTemplateTags,
-  mergeAssignmentChanges, withDefaultAt, defaultTemplateAt, contentForTemplate, areBlocksEmpty,
+  mergeAssignmentChanges, withAssignmentState, assignmentStateAt, sameAssignments, defaultTemplateAt, contentForTemplate, areBlocksEmpty,
   defaultTemplateSwap, fieldsWithTemplate, fieldsWithoutTemplate,
 } = bundle;
 
@@ -918,14 +918,24 @@ console.log('\n6. Vorlagen: Zuweisung, Standard, Einsetzen\n');
   const o = { entryType: 'operation', category: 'sigils', isDefault: true };
   // Die Seite: Journal bekommt den Stern, Wiki kommt dazu. Anderswo: Operation × Sigillen bekam den Stern.
   const merged = mergeAssignmentChanges([j], [{ ...j, isDefault: true }, w], [j, o]);
-  check('Bearbeitung und Übersicht zusammen: Stern der Seite, neue Zuweisung, Stern von anderswo bleibt',
+  check('Bearbeitung und anderswo gespeicherte Vorlage zusammen: Stern der Seite, neue Zuweisung, Stern von anderswo bleibt',
     JSON.stringify(merged) === JSON.stringify([{ ...j, isDefault: true }, o, w]), merged);
   check('eine auf der Seite entfernte Zuweisung fällt weg, anderswo Hinzugekommenes bleibt',
     JSON.stringify(mergeAssignmentChanges([j, w], [j], [j, w, o])) === JSON.stringify([j, o]));
   check('ein Stern auf eine anderswo schon entfernte Zuweisung bringt sie nicht zurück',
     mergeAssignmentChanges([w], [{ ...w, isDefault: true }], []).length === 0);
-  check('Stern setzen fügt die fehlende Zuweisung an',
-    JSON.stringify(withDefaultAt([j], 'wiki', null)) === JSON.stringify([j, { entryType: 'wiki', category: null, isDefault: true }]));
+  check('Standard setzen fügt die fehlende Zuweisung an',
+    JSON.stringify(withAssignmentState([j], 'wiki', null, 'default')) === JSON.stringify([j, { entryType: 'wiki', category: null, isDefault: true }]));
+  check('zur Wahl nimmt nur den Stern und behält den Platz',
+    JSON.stringify(withAssignmentState([o, j], 'operation', 'sigils', 'assigned')) === JSON.stringify([{ ...o, isDefault: false }, j]));
+  check('aus nimmt die Zuweisung heraus, „ohne Kategorie“ ist nicht „alle“',
+    JSON.stringify(withAssignmentState([w, { ...w, category: null }], 'wiki', 'ritual', 'off')) === JSON.stringify([{ ...w, category: null }]));
+  check('Hin und Her: aus und wieder zur Wahl ist dieselbe Zuweisung, nur weiter hinten',
+    sameAssignments([w, j], withAssignmentState(withAssignmentState([w, j], 'wiki', 'ritual', 'off'), 'wiki', 'ritual', 'assigned')));
+  check('ein anderer Stern ist eine Änderung', !sameAssignments([j], [{ ...j, isDefault: true }]));
+  check('Stand einer Kombination',
+    assignmentStateAt([j, o], 'operation', 'sigils') === 'default' && assignmentStateAt([j, o], 'journal', '*') === 'assigned'
+      && assignmentStateAt([j, o], 'wiki', '*') === 'off');
   const saved = contentForTemplate(serializeBlocks(first));
   check('Als Vorlage: ohne Herkunft, mit entladener Ladung',
     !saved.includes('data-template-origin') && parseBlocks(saved).length === 4 && !parseSigilCharge(parseBlocks(saved)[3]).loaded, saved);

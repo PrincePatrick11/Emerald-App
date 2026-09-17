@@ -5,8 +5,12 @@ import type { TemplatePatch } from './templateStore';
 /** Was die Seite eines eigenen Blocks bearbeitet — genau das, was `updateDefinition` annimmt. */
 export type DefinitionDraft = Required<BlockDefinitionPatch>;
 
-/** Was die Seite einer Vorlage bearbeitet — genau das, was `updateTemplate` annimmt. */
-export type TemplateDraft = Required<TemplatePatch>;
+/**
+ * Was die Seite einer Vorlage bearbeitet — was `updateTemplate` annimmt, ohne
+ * die Beschreibung: dafür hat die Seite kein Feld mehr, die Spalte bleibt für
+ * Import und Export.
+ */
+export type TemplateDraft = Required<Omit<TemplatePatch, 'description'>>;
 
 /**
  * Ein offener Entwurf: der Stand beim Öffnen (`base`) und die Bearbeitung

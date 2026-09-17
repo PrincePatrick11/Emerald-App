@@ -142,24 +142,54 @@ export function withoutDefaultsFor(assignments: readonly TemplateAssignment[], k
   return assignments.map((a) => (a.isDefault && keys.has(assignmentKey(a.entryType, a.category)) ? { ...a, isDefault: false } : a));
 }
 
-/** Die Zuweisungen mit Stern für diese Kombination — die Zuweisung kommt dazu, wenn sie fehlt. */
-export function withDefaultAt(
+/** Wie eine Vorlage zu einer Kombination steht: nicht zugewiesen, zur Wahl oder Standard. */
+export type AssignmentState = 'off' | 'assigned' | 'default';
+
+/** Der Stand einer Kombination in diesen Zuweisungen. */
+export function assignmentStateAt(
   assignments: readonly TemplateAssignment[],
   entryType: TemplateEntryType,
   category: string | null,
+): AssignmentState {
+  const hit = assignments.find((a) => matches(a, entryType, category));
+  return hit ? (hit.isDefault ? 'default' : 'assigned') : 'off';
+}
+
+/**
+ * Die Zuweisungen mit diesem Stand für die Kombination: `off` nimmt sie
+ * heraus, sonst kommt sie dazu (am Ende) oder ändert nur ihren Stern — ihr
+ * Platz in der Liste bleibt.
+ */
+export function withAssignmentState(
+  assignments: readonly TemplateAssignment[],
+  entryType: TemplateEntryType,
+  category: string | null,
+  state: AssignmentState,
 ): TemplateAssignment[] {
-  const key = assignmentKey(entryType, category);
-  const has = assignments.some((a) => assignmentKey(a.entryType, a.category) === key);
-  return has
-    ? assignments.map((a) => (assignmentKey(a.entryType, a.category) === key ? { ...a, isDefault: true } : a))
-    : [...assignments, { entryType, category, isDefault: true }];
+  if (state === 'off') return assignments.filter((a) => !matches(a, entryType, category));
+  const isDefault = state === 'default';
+  return assignments.some((a) => matches(a, entryType, category))
+    ? assignments.map((a) => (matches(a, entryType, category) ? { ...a, isDefault } : a))
+    : [...assignments, { entryType, category, isDefault }];
+}
+
+/**
+ * Dieselben Zuweisungen, gleich welche Reihenfolge? `withAssignmentState`
+ * hängt eine wieder eingeschaltete Kombination hinten an — ohne diesen
+ * Vergleich gälte ein Hin und Her als Änderung.
+ */
+export function sameAssignments(a: readonly TemplateAssignment[], b: readonly TemplateAssignment[]): boolean {
+  if (a.length !== b.length) return false;
+  const keyOf = (x: TemplateAssignment) => `${assignmentKey(x.entryType, x.category)}|${x.isDefault}`;
+  const keys = new Set(a.map(keyOf));
+  return b.every((x) => keys.has(keyOf(x)));
 }
 
 /**
  * Die Änderungen einer Bearbeitung (`base` → `draft`) auf den aktuellen Stand
  * gelegt: hinzugefügte und entfernte Kombinationen, gesetzte und genommene
- * Sterne. Was inzwischen anderswo geschah — ein Stern aus der Übersicht, eine
- * gelöschte Kategorie —, bleibt, soweit die Bearbeitung es nicht selbst
+ * Sterne. Was inzwischen anderswo geschah — ein Stern, den eine andere Vorlage
+ * genommen hat, eine gelöschte Kategorie —, bleibt, soweit die Bearbeitung es nicht selbst
  * angefasst hat.
  */
 export function mergeAssignmentChanges(

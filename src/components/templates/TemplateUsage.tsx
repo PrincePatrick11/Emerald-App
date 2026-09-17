@@ -43,7 +43,6 @@ export default function TemplateUsage({ entries }: { entries: readonly EntryCont
       {entries.length > LIST_LIMIT && (
         <p className="text-xs text-stone-500">{t('templates.moreEntries', { count: entries.length - LIST_LIMIT })}</p>
       )}
-      <p className="block-field-hint">{t('templates.copiesNote')}</p>
     </section>
   );
 }

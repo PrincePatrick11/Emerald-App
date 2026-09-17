@@ -1,69 +1,86 @@
 import { useTranslation } from 'react-i18next';
+import { CornerDownRight } from 'lucide-react';
 import { GroupDivider } from '../ui/Dashboard';
-import FieldDropdown from '../ui/FieldDropdown';
-import type { DropdownOption } from '../ui/Dropdown';
-import { useCategoryStore } from '../../store/categoryStore';
+import BlockGlyph from '../blocks/BlockGlyph';
 import { useTemplateStore } from '../../store/templateStore';
+import { useUIStore } from '../../store/uiStore';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
-import { categoryLabel } from '../../lib/categories';
-import { MODULES, viewTypeForEntryType } from '../../lib/modules';
 import { templateLabel } from '../../lib/blocks/blockAttrs';
-import { isImageIcon } from '../../lib/helpers';
 import {
-  ALL_CATEGORIES, assignmentKey, defaultTemplateAt, TEMPLATE_ENTRY_TYPES, type TemplateEntryType,
+  ALL_CATEGORIES, assignmentStateAt, defaultTemplateAt,
+  type AssignmentState, type Template, type TemplateEntryType,
 } from '../../lib/blocks/templates';
+import {
+  AssignmentLegend, AssignmentTable, ASSIGNMENT_STATE_ICONS, useAssignmentStateLabels,
+} from './assignmentParts';
 
 /** Der Abschnitt als Ganzes ist eine Einstellung — wie die Altar-Bibliothek. */
 const COLLAPSED_KEY = 'templates-defaults-collapsed';
 
-/** Menüwert „kein Standard" — `null` ist kein Dropdown-Wert. */
-const NONE = '__none__';
+/** Was die Übersicht zeigt — „nicht zugewiesen" ist hier einfach eine leere Zelle. */
+const SHOWN_STATES: AssignmentState[] = ['default', 'assigned'];
 
 /**
- * Die Gesamtübersicht unter der Vorlagenliste: je Eintragsart die
- * Kombinationen — Journal einmal, Wiki und Operationen mit „Alle Kategorien",
- * „Ohne Kategorie" und jeder Kategorie — und welche Vorlage dort Standard ist,
- * direkt änderbar. Ohne eigenen Standard nennt eine Kategoriezeile, was
- * stattdessen greift (der Standard für „Alle Kategorien").
+ * Die Gesamtübersicht unter der Vorlagenliste, nur zum Ansehen — dieselbe
+ * Tabelle wie der Zuweisungs-Dialog einer Vorlage: Journal als eine Zeile,
+ * Wiki und Operationen als Spalten mit „Alle Kategorien", „Ohne Kategorie"
+ * und jeder Kategorie. Eine Zelle nennt den Standard (Stern) und die Vorlagen,
+ * die dort zur Wahl stehen; ohne eigenen Standard, was stattdessen greift.
+ * Ein Name öffnet die Vorlage — geändert wird nur dort.
  */
 export default function TemplateDefaultsOverview() {
   const { t } = useTranslation();
   const templates = useTemplateStore((s) => s.templates);
-  const setDefaultFor = useTemplateStore((s) => s.setDefaultFor);
-  const categories = useCategoryStore((s) => s.categories);
+  const setActiveView = useUIStore((s) => s.setActiveView);
+  const stateLabels = useAssignmentStateLabels();
   const [collapsed, toggle] = usePersistedFlag(COLLAPSED_KEY);
 
   if (templates.length === 0) return null;
 
-  const options: DropdownOption<string>[] = [
-    { value: NONE, label: t('templates.overview.none') },
-    ...templates.map((tpl) => ({
-      value: tpl.id,
-      label: templateLabel(t, tpl),
-      // Ein Bild-Icon passt nicht in die Menüzeile; der Name genügt.
-      emoji: isImageIcon(tpl.icon) ? undefined : tpl.icon,
-    })),
-  ];
+  const link = (template: Template, state: AssignmentState) => {
+    const Icon = ASSIGNMENT_STATE_ICONS[state];
+    return (
+      <button
+        key={template.id}
+        type="button"
+        className="template-overview-link text-xs"
+        onClick={() => setActiveView({ type: 'templates', id: template.id })}
+        title={`${templateLabel(t, template)} — ${stateLabels[state]}`}
+      >
+        <span className={state === 'default' ? 'template-default-star' : 'template-overview-state'}>
+          <Icon size={12} fill={state === 'default' ? 'currentColor' : 'none'} />
+        </span>
+        <BlockGlyph icon={template.icon} size={12} />
+        <span className="truncate">{templateLabel(t, template)}</span>
+      </button>
+    );
+  };
 
-  // Eine Kachel je Kombination — Label über dem Menü, die Kacheln fließen in
-  // so viele Spalten, wie die Breite hergibt.
-  const cell = (entryType: TemplateEntryType, category: string | null, label: string) => {
+  /**
+   * Eine Zelle: Standard, dann die Vorlagen zur Wahl. Ohne eigenen Standard
+   * steht darunter, was stattdessen greift — auch neben Vorlagen zur Wahl, die
+   * beim Anlegen nichts einsetzen. Ganz leer bleibt ein Strich.
+   */
+  const cell = (entryType: TemplateEntryType, category: string | null) => {
     const current = defaultTemplateAt(templates, entryType, category);
+    const choices = templates.filter((tpl) => assignmentStateAt(tpl.assignments, entryType, category) === 'assigned');
     const fallback = !current && category !== ALL_CATEGORIES ? defaultTemplateAt(templates, entryType, ALL_CATEGORIES) : undefined;
     return (
-      <li key={assignmentKey(entryType, category)} className="min-w-0 space-y-1">
-        <p className="truncate text-xs text-[var(--text-secondary)]" title={label}>{label}</p>
-        <FieldDropdown
-          value={current?.id ?? NONE}
-          options={options}
-          onChange={(id) => void setDefaultFor(entryType, category, id === NONE ? null : id)}
-        />
-        {fallback && (
-          <p className="block-field-hint truncate" title={t('templates.overview.fallback', { name: templateLabel(t, fallback) })}>
-            {t('templates.overview.fallback', { name: templateLabel(t, fallback) })}
-          </p>
+      <div className="flex min-w-0 flex-col items-start gap-1 pt-0.5">
+        {current && link(current, 'default')}
+        {choices.map((tpl) => link(tpl, 'assigned'))}
+        {fallback ? (
+          <span
+            className="block-field-hint flex max-w-full items-center gap-1.5"
+            title={t('templates.overview.fallback', { name: templateLabel(t, fallback) })}
+          >
+            <CornerDownRight size={12} className="flex-shrink-0" />
+            <span className="truncate">{templateLabel(t, fallback)}</span>
+          </span>
+        ) : !current && choices.length === 0 && (
+          <span className="block-field-hint" title={t('templates.overview.none')}>—</span>
         )}
-      </li>
+      </div>
     );
   };
 
@@ -71,28 +88,10 @@ export default function TemplateDefaultsOverview() {
     <div className="mt-8">
       <GroupDivider label={t('templates.overview.title')} collapsed={collapsed} onToggleCollapse={toggle} />
       {!collapsed && (
-        <div className="space-y-6">
-          <p className="block-field-hint">{t('templates.overview.hint')}</p>
-          {TEMPLATE_ENTRY_TYPES.map((entryType) => {
-            const meta = MODULES[viewTypeForEntryType(entryType)];
-            return (
-              <section key={entryType} className="space-y-2">
-                <p className="label-xs flex items-center gap-1.5">
-                  <meta.icon size={12} />
-                  {t(meta.navLabelKey)}
-                </p>
-                <ul className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-x-3 gap-y-3 items-start">
-                  {entryType === 'journal'
-                    ? cell(entryType, ALL_CATEGORIES, t('templates.overview.everyEntry'))
-                    : [
-                        cell(entryType, ALL_CATEGORIES, t('templates.allCategories')),
-                        cell(entryType, null, t('categories.uncategorized')),
-                        ...categories.map((cat) => cell(entryType, cat.id, `${cat.emoji} ${categoryLabel(t, cat)}`)),
-                      ]}
-                </ul>
-              </section>
-            );
-          })}
+        <div className="space-y-5">
+          <AssignmentTable variant="overview" cell={cell} />
+
+          <AssignmentLegend states={SHOWN_STATES} />
         </div>
       )}
     </div>

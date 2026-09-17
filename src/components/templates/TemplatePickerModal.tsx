@@ -7,9 +7,9 @@ import { templateLabel } from '../../lib/blocks/blockAttrs';
 import type { Template } from '../../lib/blocks/templates';
 
 /**
- * Die Auswahl einer Vorlage für einen Eintrag: Suche über Name und
- * Beschreibung, darunter die Vorlagen in der Reihenfolge von `templatesFor`
- * (zugewiesene zuerst). Ein Klick wählt.
+ * Die Auswahl einer Vorlage für einen Eintrag: Suche über den Namen,
+ * darunter die Vorlagen in der Reihenfolge von `templatesFor` (zugewiesene
+ * zuerst). Ein Klick wählt.
  */
 export default function TemplatePickerModal({ templates, onSelect, onClose }: {
   templates: readonly Template[];
@@ -20,7 +20,7 @@ export default function TemplatePickerModal({ templates, onSelect, onClose }: {
   const [search, setSearch] = useState('');
   const query = search.trim().toLowerCase();
   const shown = query
-    ? templates.filter((tpl) => `${templateLabel(t, tpl)} ${tpl.description}`.toLowerCase().includes(query))
+    ? templates.filter((tpl) => templateLabel(t, tpl).toLowerCase().includes(query))
     : templates;
 
   return (
@@ -45,10 +45,7 @@ export default function TemplatePickerModal({ templates, onSelect, onClose }: {
               {/* `.menu-item`: dieselben Hover- und Fokus-Farben wie die Menüs, in beiden Themes. */}
               <button type="button" className="menu-item rounded-md" onClick={() => onSelect(template)}>
                 <BlockGlyph icon={template.icon} size={14} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate">{templateLabel(t, template)}</span>
-                  {template.description && <span className="block truncate text-[var(--text-muted)]">{template.description}</span>}
-                </span>
+                <span className="min-w-0 flex-1 truncate">{templateLabel(t, template)}</span>
               </button>
             </li>
           ))}

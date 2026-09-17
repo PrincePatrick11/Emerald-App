@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Copy, FileDown, Star, Trash2 } from 'lucide-react';
+import { Copy, FileDown, Trash2 } from 'lucide-react';
 import { useTemplateStore } from '../../store/templateStore';
 import { useTemplateDraftStore } from '../../store/draftStore';
 import { templateEntries, useBlockContentRows, type EntryContentRow } from '../../store/blockCopies';
@@ -8,15 +8,18 @@ import { useUIStore } from '../../store/uiStore';
 import { useUndoStore } from '../../store/undoStore';
 import { AUX_VIEWS } from '../../lib/modules';
 import { generateId } from '../../lib/helpers';
+import { sortItems } from '../../lib/sortItems';
+import { isCardView } from '../../lib/viewMode';
+import { groupByMonth } from '../../lib/groupBy';
+import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { templateLabel } from '../../lib/blocks/blockAttrs';
 import type { Template } from '../../lib/blocks/templates';
-import Dashboard from '../ui/Dashboard';
+import Dashboard, { GroupDivider } from '../ui/Dashboard';
 import DashboardItem from '../ui/DashboardItem';
 import ContextMenu from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import BlockGlyph from '../blocks/BlockGlyph';
 import TemplateEditor from '../templates/TemplateEditor';
-import { useAssignmentLabel } from '../templates/useAssignmentLabel';
 import TemplateDefaultsOverview from '../templates/TemplateDefaultsOverview';
 
 /**
@@ -91,7 +94,11 @@ async function exportTemplate(id: string): Promise<void> {
   }
 }
 
-/** Die Liste der Vorlagen im gemeinsamen Dashboard-Gerüst. */
+/**
+ * Die Liste der Vorlagen im gemeinsamen Dashboard-Gerüst — mit Ansicht und
+ * Sortierung wie die anderen Dashboards, unter einer einklappbaren
+ * Überschrift wie die Standardvorlagen darunter.
+ */
 function TemplateList({ entries, onCreate, onDelete }: {
   entries: Map<string, EntryContentRow[]>;
   onCreate: () => void;
@@ -103,46 +110,54 @@ function TemplateList({ entries, onCreate, onDelete }: {
   // Die Seite legt ungespeicherte Entwürfe im Store ab; hier nur der Hinweis darauf.
   const drafts = useTemplateDraftStore((s) => s.drafts);
   const openInNewTabAction = useOpenInNewTabAction();
-  const assignmentLabel = useAssignmentLabel();
+  const prefs = useUIStore((s) => s.templatesPrefs);
+  const setPrefs = useUIStore((s) => s.setTemplatesPrefs);
+  const [collapsed, toggleCollapsed] = usePersistedFlag('templates-list-collapsed');
   const [search, setSearch] = useState('');
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
 
   const query = search.trim().toLowerCase();
   const filtered = query
-    ? templates.filter((tpl) => `${templateLabel(t, tpl)} ${tpl.description}`.toLowerCase().includes(query))
+    ? templates.filter((tpl) => templateLabel(t, tpl).toLowerCase().includes(query))
     : templates;
+  const sorted = sortItems(filtered, prefs.sort, { date: (tpl) => tpl.updated_at, title: (tpl) => templateLabel(t, tpl) });
 
-  const renderRow = (template: Template) => {
+  const cards = isCardView(prefs.view);
+  const renderItem = (template: Template) => {
     const count = entries.get(template.id)?.length ?? 0;
-    const assigned = template.assignments.map((a) => assignmentLabel(a.entryType, a.category));
-    const defaults = template.assignments.filter((a) => a.isDefault).map((a) => assignmentLabel(a.entryType, a.category));
+    const unsaved = template.id in drafts && (
+      <span className="text-xs italic text-stone-500 flex-shrink-0">{t('editor.unsaved')}</span>
+    );
+    const countLabel = (
+      <span className="text-xs text-stone-500 tabular-nums flex-shrink-0">{t('templates.entryCount', { count })}</span>
+    );
     return (
       <DashboardItem
         view={{ type: 'templates', id: template.id }}
-        layout="row"
+        layout={cards ? 'card' : 'row'}
         onContextMenu={(e) => {
           e.preventDefault();
           setCtxMenu({ id: template.id, x: e.clientX, y: e.clientY });
         }}
       >
-        <BlockGlyph icon={template.icon} size={14} />
-        <span className="flex-1 min-w-0">
-          <span className="block text-sm text-stone-300 truncate">{templateLabel(t, template)}</span>
-          <span className="block text-xs text-stone-500 truncate">
-            {template.description || (assigned.length ? assigned.join(' · ') : t('templates.noAssignments'))}
-          </span>
-        </span>
-        {template.id in drafts && (
-          <span className="text-xs italic text-stone-500 flex-shrink-0">{t('editor.unsaved')}</span>
+        {cards ? (
+          <>
+            <div className="flex items-center gap-2 mb-2">
+              <BlockGlyph icon={template.icon} size={20} />
+              <span className="flex-1" />
+              {unsaved}
+            </div>
+            <div className="text-sm font-medium text-stone-200 truncate mb-1">{templateLabel(t, template)}</div>
+            {countLabel}
+          </>
+        ) : (
+          <>
+            <BlockGlyph icon={template.icon} size={14} />
+            <span className="flex-1 min-w-0 text-sm text-stone-300 truncate">{templateLabel(t, template)}</span>
+            {unsaved}
+            {countLabel}
+          </>
         )}
-        {defaults.length > 0 && (
-          <span className="template-default-star" title={t('templates.defaultFor', { list: defaults.join(', ') })}>
-            <Star size={12} fill="currentColor" />
-          </span>
-        )}
-        <span className="text-xs text-stone-500 tabular-nums flex-shrink-0">
-          {t('templates.entryCount', { count })}
-        </span>
       </DashboardItem>
     );
   };
@@ -155,21 +170,38 @@ function TemplateList({ entries, onCreate, onDelete }: {
       titleIcon={AUX_VIEWS.templates.icon}
       titleCount={templates.length}
       primaryAction={{ label: t('templates.newTemplate'), onClick: onCreate }}
+      view={prefs.view}
+      sort={prefs.sort}
+      onView={(view) => setPrefs({ view })}
+      onSort={(sort) => setPrefs({ sort })}
       search={search}
       onSearch={setSearch}
-      items={filtered}
+      // Zugeklappt eine leere Liste statt eines Sonderzweigs — wie Altar und Blöcke.
+      items={collapsed ? [] : sorted}
       itemKey={(tpl) => tpl.id}
-      renderItem={renderRow}
-      grouping={{ mode: 'flat' }}
-      isEmpty={templates.length === 0}
+      renderItem={renderItem}
+      grouping={
+        prefs.view === 'timeline' && !collapsed
+          ? { mode: 'timeline', groups: groupByMonth(sorted, (tpl) => tpl.updated_at) }
+          : { mode: 'flat' }
+      }
+      isEmpty={!collapsed && templates.length === 0}
       emptyState={{
         message: t('templates.emptyHint'),
         messageClassName: 'text-stone-600 text-sm max-w-md mx-auto',
         actionLabel: t('templates.newTemplate'),
         onAction: onCreate,
       }}
-      hasNoResults={filtered.length === 0}
+      hasNoResults={!collapsed && filtered.length === 0}
       noResultsMessage={t('search.noResults')}
+      contentHeader={
+        <GroupDivider
+          label={t('nav.templates')}
+          count={filtered.length}
+          collapsed={collapsed}
+          onToggleCollapse={toggleCollapsed}
+        />
+      }
       contentFooter={<TemplateDefaultsOverview />}
       contextMenuSlot={ctxMenu && menuTemplate && (
         <ContextMenu

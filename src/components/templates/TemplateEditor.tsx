@@ -12,13 +12,14 @@ import TemplateUsage from './TemplateUsage';
 import { useTemplateStore } from '../../store/templateStore';
 import { useTemplateDraftStore, type TemplateDraft } from '../../store/draftStore';
 import type { EntryContentRow } from '../../store/blockCopies';
+import { templateLabel } from '../../lib/blocks/blockAttrs';
 import { useDraftPage } from '../../hooks/useDraftPage';
 import { useShrunkIcon } from '../../hooks/useShrunkIcon';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import { DEFAULT_TEMPLATE_ICON, mergeAssignmentChanges, type Template } from '../../lib/blocks/templates';
 
 const draftOf = (d: TemplateDraft): TemplateDraft => ({
-  name: d.name, icon: d.icon, description: d.description, title: d.title,
+  name: d.name, icon: d.icon, title: d.title,
   content: d.content, tags: d.tags, assignments: d.assignments,
 });
 
@@ -32,10 +33,11 @@ interface Props {
 
 /**
  * Die Seite einer Vorlage (`LibraryPageFrame`, wie ein eigener Block): Name
- * als Titel, Beschreibung, der Titel neuer Einträge und der Blockstapel —
+ * als Titel, der Titel neuer Einträge und der Blockstapel —
  * derselbe Editor wie im Eintrag, immer im Bearbeiten. In der Seitenleiste
- * Icon, Tags, verlinkte Einträge, Zuweisungen mit Stern, die Block-Verwaltung
- * und die Einträge, die aus der Vorlage entstanden sind.
+ * Icon, verlinkte Einträge, Tags, Zuweisung und Standard (festgelegt im
+ * Dialog), die Block-Verwaltung und die Einträge, die aus der Vorlage
+ * entstanden sind.
  *
  * Bearbeitet wird ein Entwurf (`useDraftPage`); erst „Fertig" speichert die
  * geänderten Felder — und setzt dabei gewählte Sterne, die anderen Vorlagen
@@ -48,7 +50,7 @@ export default function TemplateEditor({ template, entries, onClose, onDelete }:
     store: useTemplateDraftStore,
     id: template.id,
     saved: draftOf(template),
-    // Zuweisungen als Änderung auf den aktuellen Stand — die Übersicht kann inzwischen Sterne gesetzt haben.
+    // Zuweisungen als Änderung auf den aktuellen Stand — eine andere Vorlage kann inzwischen Sterne genommen haben.
     save: (id, patch, base) => updateTemplate(id, patch.assignments
       ? { ...patch, assignments: mergeAssignmentChanges(base.assignments, patch.assignments, useTemplateStore.getState().templates.find((t) => t.id === id)?.assignments ?? []) }
       : patch),
@@ -70,15 +72,16 @@ export default function TemplateEditor({ template, entries, onClose, onDelete }:
         />
       </div>
 
-      <TagsField tags={draft.tags} onChange={(tags) => patch({ tags })} />
-
       <div>
         <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
         <LinkedEntriesField content={draft.content} editable inputCls={OP_PROP_SELECT_CLASSES} />
       </div>
 
+      <TagsField tags={draft.tags} onChange={(tags) => patch({ tags })} />
+
       <TemplateAssignments
         templateId={template.id}
+        name={templateLabel(t, draft)}
         assignments={draft.assignments}
         onChange={(assignments) => patch({ assignments })}
       />
@@ -105,25 +108,15 @@ export default function TemplateEditor({ template, entries, onClose, onDelete }:
       onNameChange={(name) => patch({ name })}
       sidebar={sidebar}
     >
-      <div className="max-w-3xl space-y-6 mb-6">
-        <textarea
-          className={`${OP_PROP_SELECT_CLASSES} resize-none selectable`}
-          rows={2}
-          value={draft.description}
-          placeholder={t('templates.descriptionPlaceholder')}
-          aria-label={t('templates.description')}
-          onChange={(e) => patch({ description: e.target.value })}
+      <div className="max-w-3xl mb-6">
+        <p className="label-xs mb-2">{t('templates.entryTitle')}</p>
+        <input
+          className={`${OP_PROP_SELECT_CLASSES} selectable`}
+          value={draft.title}
+          placeholder={t('templates.entryTitlePlaceholder')}
+          aria-label={t('templates.entryTitle')}
+          onChange={(e) => patch({ title: e.target.value })}
         />
-        <div>
-          <p className="label-xs mb-2">{t('templates.entryTitle')}</p>
-          <input
-            className={`${OP_PROP_SELECT_CLASSES} selectable`}
-            value={draft.title}
-            placeholder={t('templates.entryTitlePlaceholder')}
-            aria-label={t('templates.entryTitle')}
-            onChange={(e) => patch({ title: e.target.value })}
-          />
-        </div>
       </div>
       <p className="label-xs mb-2">{t('templates.content')}</p>
       <BlockStack
