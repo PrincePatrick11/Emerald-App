@@ -87,6 +87,12 @@ export default function AppShell() {
   );
   // State, nicht Ref: das Abschalten der Transition muss neu rendern.
   const [resizing, setResizing] = useState(false);
+  // Der erste Start ist erst durch, wenn auch die Einstellungen des Vaults
+  // geladen sind (oder das gescheitert ist): vorher darf nichts `getDb()`
+  // aufrufen — die Aufräumroutine dort braucht die Papierkorb-Frist, die
+  // Migrationen die Sprache. Ohne dieses Tor öffnete etwa ein wiederhergestellter
+  // Papierkorb-Tab die Datenbank schon mit den Einstellungen von niemandem.
+  const [bootSettled, setBootSettled] = useState(false);
 
   const leftListMounted = useDeferredUnmount(leftListOpen);
   const rightSidebarMounted = useDeferredUnmount(rightSidebarOpen);
@@ -117,6 +123,7 @@ export default function AppShell() {
       // Ohne `catch` bliebe der Fehler eine unbehandelte Rejection in der
       // Konsole — sichtbar nur, wenn jemand hinschaut.
       .catch((err) => console.error('[boot] initial load failed', err))
+      .finally(() => setBootSettled(true))
       // Ab hier steht entweder der geladene Inhalt oder — beim Erststart —
       // das Vault-Setup. Beides ist ein fertiger Bildschirm, also kann der
       // Ladebildschirm weg. Auch im Fehlerfall: eine leere Oberflaeche ist
@@ -255,6 +262,7 @@ export default function AppShell() {
   // noch falsch ist, steht nur noch nicht fest, ob ein Vault da ist — dann darf
   // das Setup-Modal nicht schon aufblitzen.
   if (!vaultsLoaded) return chrome(<main className="app-main flex-1 min-h-0" />);
+  if (!needsVault && !bootSettled) return chrome(<main className="app-main flex-1 min-h-0" />);
   if (needsVault) {
     return chrome(
       <>

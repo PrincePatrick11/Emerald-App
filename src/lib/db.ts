@@ -236,11 +236,11 @@ export async function runMigrations(db: Database): Promise<void> {
 }
 
 /**
- * Tabellen, aus denen der 30-Tage-Purge endgültig löscht. Läuft bei jedem
+ * Tabellen, aus denen das Leeren nach der Papierkorb-Frist des Vaults endgültig löscht. Läuft bei jedem
  * Öffnen eines Vaults, bewusst getrennt vom Migrationssystem — idempotent,
  * zeitabhängig und kein Teil der Schema-Historie.
  *
- * `categories` steht bewusst **nicht** hier. Eine Kategorie nach 30 Tagen hart
+ * `categories` steht bewusst **nicht** hier. Eine Kategorie nach Ablauf der Frist hart
  * zu löschen, während Artikel, Operationen, Tasks oder Altar-Elemente noch
  * darauf zeigen, hinterließ ins Leere zeigende `category_id`-Werte — still und
  * unbemerkt. Seit v33 verhindert ein Foreign Key mit ON DELETE RESTRICT das
@@ -328,7 +328,7 @@ async function runPeriodicCleanup(db: Database, retentionDays: number | null): P
  * Key tragen. Es räumt hier also nichts von selbst auf, und jedes endgültige
  * Löschen von Inhalten hinterlässt Waisen, wenn es nicht ausdrücklich passiert.
  *
- * Wird sowohl vom 30-Tage-Purge als auch vom Leeren des Papierkorbs benutzt,
+ * Wird sowohl vom Leeren nach der Frist als auch vom Leeren des Papierkorbs benutzt,
  * damit beide Wege dasselbe Ergebnis liefern.
  */
 export async function sweepDanglingLinks(db: Database): Promise<void> {

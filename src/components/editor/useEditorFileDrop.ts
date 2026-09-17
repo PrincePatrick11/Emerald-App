@@ -3,6 +3,7 @@ import type { Editor } from '@tiptap/react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { copyImageFile, readImageFile, saveImage } from '../../lib/images';
 import { hasImageLimits, ImageTooLargeError, prepareImageDataUrl } from '../../lib/imageLimits';
+import { reportImageError, useImageNoticeStore } from '../../store/imageNoticeStore';
 
 /** Mirrors `MAX_EXTERNAL_IMAGE_BYTES` in `src-tauri/src/images.rs`. */
 const EXTERNAL_IMAGE_MAX_BYTES = 64 * 1024 * 1024;
@@ -16,7 +17,6 @@ async function readDroppedImage(path: string): Promise<string> {
     throw err;
   }
 }
-import { reportImageError, useImageNoticeStore } from '../../store/imageNoticeStore';
 
 /**
  * Bilder per Drag & Drop aus dem Datei-Explorer, über Tauris natives

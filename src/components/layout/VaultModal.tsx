@@ -5,6 +5,7 @@ import { AlertTriangle, Check, FolderOpen, Loader2, Pencil, Plus, RotateCcw, Tra
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import EmojiPicker from '../ui/EmojiPicker';
+import { DEFAULT_EMOJI_PICKER_EMOJIS } from '../../lib/emojiSearch';
 import { hasActiveVault, useVaultStore } from '../../store/vaultStore';
 import {
   DB_FILE,
@@ -106,9 +107,12 @@ function IconField({ icon, onChange }: { icon?: string; onChange: (icon?: string
   const { t } = useTranslation();
   return (
     <>
+      {/* Die eingebaute Auswahl, nicht die des offenen Vaults: bearbeitet wird
+          hier auch das Icon eines anderen — oder eines, das es noch nicht gibt. */}
       <EmojiPicker
         value={icon ?? ''}
         onChange={onChange}
+        emojis={DEFAULT_EMOJI_PICKER_EMOJIS}
         trigger={({ toggle }) => (
           <button type="button" className="vault-badge vault-badge-interactive" title={t('vault.icon')} onClick={toggle}>
             <VaultGlyph icon={icon} size={16} />

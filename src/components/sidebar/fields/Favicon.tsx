@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { ImagePlus, Smile, X } from 'lucide-react';
 import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, isImageIcon, readFileAsDataUrl } from '../../../lib/helpers';
 import EmojiPicker from '../../ui/EmojiPicker';
+import { prepareImageDataUrl } from '../../../lib/imageLimits';
+import { reportImageError } from '../../../store/imageNoticeStore';
 import Button from '../../ui/Button';
 
 /**
@@ -57,11 +59,13 @@ export default function Favicon({ value, onChange, onRemove, readOnly = false }:
     if (!file) return;
     if (!isAcceptedImageFile(file) || file.type === 'image/svg+xml') return;
     try {
-      onChange?.(await readFileAsDataUrl(file));
+      // Eintrags- und Altar-Icons liegen inline in der Zeile — dieselben Grenzen
+      // wie beim Titelbild daneben.
+      onChange?.(await prepareImageDataUrl(await readFileAsDataUrl(file)));
     } catch (err) {
       // Lieber gar nichts setzen als ein leeres Icon: ein abgebrochener Lesevorgang
       // hat kein Ergebnis, und der bisherige Wert ist besser als keiner.
-      console.error('Failed to read icon:', err);
+      reportImageError(err, 'icon');
     }
   };
 
