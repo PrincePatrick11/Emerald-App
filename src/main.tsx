@@ -6,7 +6,7 @@ import "./themes/emerald-noctis.css";
 import "./themes/emerald-parchment.css";
 import "./index.css";
 import "tippy.js/dist/tippy.css";
-import { applyEditorFont, applyTheme, applyUIFont } from "./themes/theme";
+import { applyEditorFont, applyEditorFontSize, applyTheme, applyUIFont, applyUIScale } from "./themes/theme";
 import { readAppearanceMirror } from "./lib/vaultSettings";
 import { platformName } from "./lib/platform";
 import { initSplash } from "./lib/splash";
@@ -27,6 +27,8 @@ const bootAppearance = readAppearanceMirror();
 applyTheme(bootAppearance.theme);
 applyUIFont(bootAppearance.uiFont);
 applyEditorFont(bootAppearance.editorFont);
+applyUIScale(bootAppearance.uiScale);
+applyEditorFontSize(bootAppearance.editorFontSize);
 
 // Expose the platform to CSS (html[data-platform='macos'] reserves room for
 // the native traffic lights in the title bar). Set before first render for

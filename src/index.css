@@ -7,6 +7,8 @@
     --sidebar-left-width: 240px;
     --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
     --font-editor: 'Lora', Georgia, serif;
+    /* Einstellbar (settingsStore); 17px ist der Standard. */
+    --editor-font-size: 17px;
   }
 
   * {
@@ -578,16 +580,18 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   @apply selectable outline-none min-h-[200px] leading-relaxed;
   font-family: var(--font-editor);
   color: var(--text-secondary);
-  font-size: 1.0625rem; /* 17px — Lora is denser than Cormorant, reads well slightly above base */
+  font-size: var(--editor-font-size);
 }
 
 .tiptap p {
   @apply mb-3;
 }
 
-.tiptap h1 { @apply text-2xl font-semibold mb-3 mt-6; color: var(--text-primary); }
-.tiptap h2 { @apply text-xl font-semibold mb-2 mt-5; color: var(--text-primary); }
-.tiptap h3 { @apply text-lg font-semibold mb-2 mt-4; color: var(--text-secondary); }
+/* Relativ zum Editortext (em) statt zur Wurzel, damit sie mit dessen
+   Einstellung wachsen: 1.5rem, 1.25rem und 1.125rem bei den früheren 17px. */
+.tiptap h1 { @apply font-semibold mb-3 mt-6; font-size: 1.412em; line-height: 1.33; color: var(--text-primary); }
+.tiptap h2 { @apply font-semibold mb-2 mt-5; font-size: 1.176em; line-height: 1.4; color: var(--text-primary); }
+.tiptap h3 { @apply font-semibold mb-2 mt-4; font-size: 1.059em; line-height: 1.55; color: var(--text-secondary); }
 .entry-view-title {
   font-family: var(--font-editor);
 }
@@ -938,7 +942,7 @@ button.block-altar:hover .block-altar-title {
 
 .block-sigil-intention {
   font-family: var(--font-editor);
-  font-size: 1.0625rem;
+  font-size: var(--editor-font-size);
   color: var(--text-secondary);
 }
 
@@ -1269,7 +1273,7 @@ button.block-altar:hover .block-altar-title {
 .block-field-value {
   min-width: 0;
   font-family: var(--font-editor);
-  font-size: 1.0625rem;
+  font-size: var(--editor-font-size);
   color: var(--text-secondary);
 }
 

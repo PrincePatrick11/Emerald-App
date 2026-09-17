@@ -658,7 +658,9 @@
     "appliesToVault": "Se aplica a {{name}}",
     "includeSettings": "Ajustes",
     "importSettings": "Aplicar ajustes de la copia",
-    "groupAppearance": "Idioma y apariencia"
+    "groupAppearance": "Idioma y apariencia",
+    "uiScale": "Tamaño de la interfaz",
+    "editorFontSize": "Tamaño del texto del editor"
   },
   "contextMenu": {
     "openInNewTab": "Abrir en nueva pestaña",

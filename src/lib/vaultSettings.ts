@@ -1,9 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
 import { LANGUAGE_OPTIONS, LANGUAGE_STORAGE_KEY, type AppLanguage } from '../i18n';
 import {
-  DEFAULT_EDITOR_FONT_ID, DEFAULT_THEME_ID, DEFAULT_UI_FONT_ID,
-  normalizeEditorFontId, normalizeThemeId, normalizeUIFontId,
-  type FontId, type ThemeId,
+  DEFAULT_EDITOR_FONT_ID, DEFAULT_EDITOR_FONT_SIZE, DEFAULT_THEME_ID, DEFAULT_UI_FONT_ID, DEFAULT_UI_SCALE,
+  normalizeEditorFontId, normalizeEditorFontSize, normalizeThemeId, normalizeUIFontId, normalizeUIScale,
+  type EditorFontSize, type FontId, type ThemeId, type UIScale,
 } from '../themes/theme';
 
 /**
@@ -18,6 +18,8 @@ export interface AppearanceSettings {
   theme: ThemeId;
   uiFont: FontId;
   editorFont: FontId;
+  uiScale: UIScale;
+  editorFontSize: EditorFontSize;
 }
 
 export interface VaultSettings {
@@ -40,6 +42,8 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
     theme: DEFAULT_THEME_ID,
     uiFont: DEFAULT_UI_FONT_ID,
     editorFont: DEFAULT_EDITOR_FONT_ID,
+    uiScale: DEFAULT_UI_SCALE,
+    editorFontSize: DEFAULT_EDITOR_FONT_SIZE,
   },
 };
 
@@ -72,6 +76,8 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
       theme: normalizeThemeId(asString(appearance.theme)),
       uiFont: normalizeUIFontId(asString(appearance.uiFont)),
       editorFont: normalizeEditorFontId(asString(appearance.editorFont)),
+      uiScale: normalizeUIScale(appearance.uiScale),
+      editorFontSize: normalizeEditorFontSize(appearance.editorFontSize),
     },
   };
 }
@@ -142,6 +148,8 @@ export const APPEARANCE_MIRROR_KEYS = {
   theme: 'theme-id',
   uiFont: 'ui-font-id',
   editorFont: 'editor-font-id',
+  uiScale: 'ui-scale',
+  editorFontSize: 'editor-font-size',
 } as const;
 
 /** Das Aussehen laut Boot-Spiegel, geprüft wie eine Datei. */
@@ -160,6 +168,8 @@ export function readAppearanceMirror(): AppearanceSettings {
       theme: read(APPEARANCE_MIRROR_KEYS.theme) ?? read('theme'),
       uiFont: read(APPEARANCE_MIRROR_KEYS.uiFont),
       editorFont: read(APPEARANCE_MIRROR_KEYS.editorFont),
+      uiScale: read(APPEARANCE_MIRROR_KEYS.uiScale),
+      editorFontSize: read(APPEARANCE_MIRROR_KEYS.editorFontSize),
     },
   }).appearance;
 }

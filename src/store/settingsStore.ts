@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { changeAppLanguage } from '../i18n';
-import { applyEditorFont, applyTheme, applyUIFont } from '../themes/theme';
+import { applyEditorFont, applyEditorFontSize, applyTheme, applyUIFont, applyUIScale } from '../themes/theme';
 import { serialized } from '../lib/serialize';
 import {
   APPEARANCE_MIRROR_KEYS, DEFAULT_VAULT_SETTINGS, initialSettingsFor, normalizeVaultSettings,
@@ -33,10 +33,14 @@ async function applyAppearance(appearance: AppearanceSettings): Promise<void> {
   applyTheme(appearance.theme);
   applyUIFont(appearance.uiFont);
   applyEditorFont(appearance.editorFont);
+  applyUIScale(appearance.uiScale);
+  applyEditorFontSize(appearance.editorFontSize);
   try {
     localStorage.setItem(APPEARANCE_MIRROR_KEYS.theme, appearance.theme);
     localStorage.setItem(APPEARANCE_MIRROR_KEYS.uiFont, appearance.uiFont);
     localStorage.setItem(APPEARANCE_MIRROR_KEYS.editorFont, appearance.editorFont);
+    localStorage.setItem(APPEARANCE_MIRROR_KEYS.uiScale, String(appearance.uiScale));
+    localStorage.setItem(APPEARANCE_MIRROR_KEYS.editorFontSize, String(appearance.editorFontSize));
   } catch {
     // Ohne Spiegel blitzt beim nächsten Start höchstens das Standard-Theme auf.
   }

@@ -650,7 +650,9 @@
     "appliesToVault": "Applies to {{name}}",
     "includeSettings": "Settings",
     "importSettings": "Apply settings from the backup",
-    "groupAppearance": "Language & appearance"
+    "groupAppearance": "Language & appearance",
+    "uiScale": "Interface size",
+    "editorFontSize": "Editor text size"
   },
   "home": {
     "viewAll": "View all",

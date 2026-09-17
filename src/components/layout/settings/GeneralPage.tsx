@@ -1,8 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { Globe, Moon, Sun, Type } from 'lucide-react';
+import { ALargeSmall, Globe, Moon, Sun, Type } from 'lucide-react';
 import { LANGUAGE_OPTIONS } from '../../../i18n';
 import { useSettingsStore } from '../../../store/settingsStore';
-import { FONT_OPTIONS, THEME_OPTIONS, type FontId } from '../../../themes/theme';
+import {
+  EDITOR_FONT_SIZE_OPTIONS, FONT_OPTIONS, THEME_OPTIONS, UI_SCALE_OPTIONS, type FontId,
+} from '../../../themes/theme';
 import SettingsChoiceButton from './SettingsChoiceButton';
 import SettingsSection from './SettingsSection';
 
@@ -69,6 +71,24 @@ export default function GeneralPage() {
             </select>
           </div>
           <div>
+            <p className="label-xs flex items-center gap-2 mb-2">
+              <ALargeSmall size={14} />
+              {t('settings.uiScale')}
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              {UI_SCALE_OPTIONS.map((scale) => (
+                <SettingsChoiceButton
+                  key={scale}
+                  active={appearance.uiScale === scale}
+                  onClick={() => update('appearance', { uiScale: scale })}
+                  className="px-3 py-1.5 text-sm tabular-nums"
+                >
+                  {scale} %
+                </SettingsChoiceButton>
+              ))}
+            </div>
+          </div>
+          <div>
             <label className="label-xs flex items-center gap-2 mb-2">
               <Type size={14} />
               {t('settings.editorFont')}
@@ -82,6 +102,24 @@ export default function GeneralPage() {
                 <option key={font.id} value={font.id}>{font.label}</option>
               ))}
             </select>
+          </div>
+          <div>
+            <p className="label-xs flex items-center gap-2 mb-2">
+              <ALargeSmall size={14} />
+              {t('settings.editorFontSize')}
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              {EDITOR_FONT_SIZE_OPTIONS.map((size) => (
+                <SettingsChoiceButton
+                  key={size}
+                  active={appearance.editorFontSize === size}
+                  onClick={() => update('appearance', { editorFontSize: size })}
+                  className="px-3 py-1.5 text-sm tabular-nums"
+                >
+                  {size} px
+                </SettingsChoiceButton>
+              ))}
+            </div>
           </div>
         </div>
       </SettingsSection>

@@ -1,3 +1,5 @@
+import { getCurrentWebview } from '@tauri-apps/api/webview';
+
 export type ThemeId = 'emerald-noctis' | 'emerald-parchment';
 export type FontId = 'inter' | 'source-sans-3' | 'nunito' | 'ibm-plex-sans' | 'alegreya' | 'cormorant-garamond' | 'lora' | 'merriweather';
 
@@ -25,6 +27,19 @@ export const FONT_OPTIONS: Array<{ id: FontId; label: string }> = [
   { id: 'lora', label: 'Lora' },
   { id: 'merriweather', label: 'Merriweather' },
 ];
+
+/** Größe der Oberfläche in Prozent, als Zoom des WebViews. Ein Wurzel-
+ *  `font-size` reichte nicht: Spalten und Leisten mit fester px-Breite wuchsen
+ *  nicht mit, und der größere Text brach aus ihnen heraus. */
+export const UI_SCALE_OPTIONS = [90, 100, 110, 120] as const;
+export type UIScale = (typeof UI_SCALE_OPTIONS)[number];
+export const DEFAULT_UI_SCALE: UIScale = 100;
+
+/** Textgröße im Editor und in Feldwerten, in px — unabhängig von der
+ *  Oberfläche. 17 war der feste Wert davor. */
+export const EDITOR_FONT_SIZE_OPTIONS = [14, 15, 16, 17, 18, 20, 22] as const;
+export type EditorFontSize = (typeof EDITOR_FONT_SIZE_OPTIONS)[number];
+export const DEFAULT_EDITOR_FONT_SIZE: EditorFontSize = 17;
 
 const VALID_THEME_IDS = new Set<ThemeId>(THEME_OPTIONS.map(({ id }) => id));
 const VALID_FONT_IDS = new Set<FontId>(FONT_OPTIONS.map(({ id }) => id));
@@ -55,4 +70,28 @@ export function applyUIFont(fontId: FontId) {
 
 export function applyEditorFont(fontId: FontId) {
   document.documentElement.dataset.editorFont = fontId;
+}
+
+function normalizeNumberOption<T extends number>(raw: unknown, options: readonly T[], fallback: T): T {
+  const value = typeof raw === 'string' ? Number(raw) : raw;
+  return options.includes(value as T) ? (value as T) : fallback;
+}
+
+export function normalizeUIScale(raw: unknown): UIScale {
+  return normalizeNumberOption(raw, UI_SCALE_OPTIONS, DEFAULT_UI_SCALE);
+}
+
+export function normalizeEditorFontSize(raw: unknown): EditorFontSize {
+  return normalizeNumberOption(raw, EDITOR_FONT_SIZE_OPTIONS, DEFAULT_EDITOR_FONT_SIZE);
+}
+
+export function applyUIScale(scale: UIScale) {
+  // Außerhalb von Tauri (Vite im Browser) gibt es kein WebView zum Zoomen.
+  getCurrentWebview().setZoom(scale / 100).catch((err: unknown) => {
+    console.warn('[theme] could not set webview zoom', err);
+  });
+}
+
+export function applyEditorFontSize(size: EditorFontSize) {
+  document.documentElement.style.setProperty('--editor-font-size', `${size}px`);
 }

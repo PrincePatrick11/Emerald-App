@@ -650,7 +650,9 @@
     "appliesToVault": "Gilt für {{name}}",
     "includeSettings": "Einstellungen",
     "importSettings": "Einstellungen aus dem Backup übernehmen",
-    "groupAppearance": "Sprache & Aussehen"
+    "groupAppearance": "Sprache & Aussehen",
+    "uiScale": "Größe der Oberfläche",
+    "editorFontSize": "Textgröße im Editor"
   },
   "home": {
     "viewAll": "Alle anzeigen",
