@@ -96,7 +96,7 @@ export default function EmojiDefaultsSection() {
   }
 
   return (
-    <SettingsSection icon={<Smile size={14} />} title={t('settings.emojiDefaults')}>
+    <SettingsSection icon={<Smile size={14} />} title={t('settings.emojiDefaults')} description={t('settings.emojiDefaultsHint')}>
       <div className="rounded-lg bg-stone-800/60 border border-stone-700/40 p-2 space-y-2">
         <div className="flex flex-wrap gap-1">
           {list.map((emoji, index) => (

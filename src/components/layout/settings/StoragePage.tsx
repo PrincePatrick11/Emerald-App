@@ -49,7 +49,7 @@ export default function StoragePage() {
 
   return (
     <>
-      <SettingsSection icon={<Trash2 size={14} />} title={t('settings.trashRetention')}>
+      <SettingsSection icon={<Trash2 size={14} />} title={t('settings.trashRetention')} description={t('settings.trashRetentionHint')}>
         <div className="flex gap-2 flex-wrap">
           {TRASH_RETENTION_OPTIONS.map((days) => (
             <SettingsChoiceButton

@@ -11,18 +11,19 @@ export default function TagRulesSection() {
   const update = useSettingsStore((s) => s.update);
 
   const options = [
-    { value: true, label: t('settings.tagCreateInline') },
-    { value: false, label: t('settings.tagCreateDashboardOnly') },
+    { value: true, label: t('settings.tagCreateInline'), hint: t('settings.tagCreateInlineHint') },
+    { value: false, label: t('settings.tagCreateDashboardOnly'), hint: t('settings.tagCreateDashboardOnlyHint') },
   ];
 
   return (
-    <SettingsSection icon={<Tag size={14} />} title={t('settings.tagCreation')}>
+    <SettingsSection icon={<Tag size={14} />} title={t('settings.tagCreation')} description={t('settings.tagCreationHint')}>
       <div className="flex gap-2 flex-wrap">
-        {options.map(({ value, label }) => (
+        {options.map(({ value, label, hint }) => (
           <SettingsChoiceButton
             key={String(value)}
             active={createInline === value}
             onClick={() => update('tags', { createInline: value })}
+            title={hint}
             className="px-3 py-1.5 text-sm"
           >
             {label}

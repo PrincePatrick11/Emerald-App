@@ -2,8 +2,6 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Archive, FileText, HardDrive, Info, PanelLeft, SlidersHorizontal } from 'lucide-react';
 import Modal from '../../ui/Modal';
-import { useVaultStore } from '../../../store/vaultStore';
-import { VaultGlyph } from '../VaultModal';
 import GeneralPage from './GeneralPage';
 import SidebarPage from './SidebarPage';
 import EntriesPage from './EntriesPage';
@@ -33,7 +31,6 @@ interface Props {
 export default function SettingsModal({ onClose, initialPage = 'general' }: Props) {
   const { t } = useTranslation();
   const [page, setPage] = useState<SettingsPage>(initialPage);
-  const vault = useVaultStore((s) => s.vaults.find((v) => v.id === s.activeVaultId));
 
   return (
     <Modal
@@ -53,7 +50,7 @@ export default function SettingsModal({ onClose, initialPage = 'general' }: Prop
       <nav
         role="tablist"
         aria-orientation="vertical"
-        className="w-[168px] shrink-0 border-r px-2 py-3 flex flex-col gap-0.5"
+        className="w-[168px] shrink-0 border-r px-2 py-3 space-y-0.5"
         style={{ borderColor: 'var(--border-soft)' }}
       >
         {PAGES.map(({ id, labelKey, Icon }) => (
@@ -81,14 +78,6 @@ export default function SettingsModal({ onClose, initialPage = 'general' }: Prop
             {t(labelKey)}
           </button>
         ))}
-        {/* Jede Einstellung gehoert dem offenen Vault — unten in der Spalte,
-            damit das beim Umstellen nicht ueberrascht. */}
-        {vault && (
-          <p className="mt-auto flex items-center gap-2 px-2.5 pt-3 text-xs text-stone-500 min-w-0">
-            <span className="shrink-0"><VaultGlyph icon={vault.icon} size={12} /></span>
-            <span className="truncate" title={vault.name}>{t('settings.appliesToVault', { name: vault.name })}</span>
-          </p>
-        )}
       </nav>
 
       <div

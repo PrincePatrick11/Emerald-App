@@ -6,7 +6,7 @@ import {
   EDITOR_FONT_SIZE_OPTIONS, FONT_OPTIONS, THEME_OPTIONS, UI_SCALE_OPTIONS, type FontId,
 } from '../../../themes/theme';
 import SettingsChoiceButton from './SettingsChoiceButton';
-import SettingsSection from './SettingsSection';
+import SettingsSection, { SettingsDescription } from './SettingsSection';
 
 /** Sprache und Aussehen — was die App in diesem Vault spricht und wie sie aussieht. */
 export default function GeneralPage() {
@@ -71,10 +71,11 @@ export default function GeneralPage() {
             </select>
           </div>
           <div>
-            <p className="label-xs flex items-center gap-2 mb-2">
+            <p className="label-xs flex items-center gap-2 mb-1">
               <ALargeSmall size={14} />
               {t('settings.uiScale')}
             </p>
+            <SettingsDescription>{t('settings.uiScaleHint')}</SettingsDescription>
             <div className="flex gap-2 flex-wrap">
               {UI_SCALE_OPTIONS.map((scale) => (
                 <SettingsChoiceButton
@@ -104,10 +105,11 @@ export default function GeneralPage() {
             </select>
           </div>
           <div>
-            <p className="label-xs flex items-center gap-2 mb-2">
+            <p className="label-xs flex items-center gap-2 mb-1">
               <ALargeSmall size={14} />
               {t('settings.editorFontSize')}
             </p>
+            <SettingsDescription>{t('settings.editorFontSizeHint')}</SettingsDescription>
             <div className="flex gap-2 flex-wrap">
               {EDITOR_FONT_SIZE_OPTIONS.map((size) => (
                 <SettingsChoiceButton

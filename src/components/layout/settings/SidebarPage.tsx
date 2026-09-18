@@ -25,7 +25,7 @@ export default function SidebarPage() {
 
   return (
     <>
-      <SettingsSection icon={<PanelLeft size={14} />} title={t('settings.sidebarLists')}>
+      <SettingsSection icon={<PanelLeft size={14} />} title={t('settings.sidebarLists')} description={t('settings.sidebarListsHint')}>
         <div className="flex gap-2 flex-wrap">
           {LEFT_LIST_TABS.map(({ id, icon: Icon }) => {
             const active = leftList.tabs.includes(id);
@@ -36,6 +36,7 @@ export default function SidebarPage() {
                 aria-pressed={active}
                 disabled={active && leftList.tabs.length === 1}
                 onClick={() => toggleTab(id)}
+                title={t('settings.sidebarTabToggle')}
                 className="flex items-center gap-2 px-3 py-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
               >
                 <Icon size={14} />
@@ -46,7 +47,7 @@ export default function SidebarPage() {
         </div>
       </SettingsSection>
 
-      <SettingsSection icon={<ListOrdered size={14} />} title={t('settings.sidebarLimit')}>
+      <SettingsSection icon={<ListOrdered size={14} />} title={t('settings.sidebarLimit')} description={t('settings.sidebarLimitHint')}>
         <div className="flex gap-2 flex-wrap">
           {LEFT_LIST_LIMIT_OPTIONS.map((limit) => (
             <SettingsChoiceButton

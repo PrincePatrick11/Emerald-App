@@ -12,7 +12,7 @@ export default function ImageLimitsSection() {
   const update = useSettingsStore((s) => s.update);
 
   return (
-    <SettingsSection icon={<Image size={14} />} title={t('settings.images')}>
+    <SettingsSection icon={<Image size={14} />} title={t('settings.images')} description={t('settings.imagesHint')}>
       <div className="space-y-3">
         <div>
           <p className="label-xs flex items-center gap-2 mb-2">
@@ -25,6 +25,7 @@ export default function ImageLimitsSection() {
                 key={edge ?? 'original'}
                 active={images.maxEdge === edge}
                 onClick={() => update('images', { maxEdge: edge })}
+                title={edge === null ? t('settings.imageMaxEdgeOriginalHint') : t('settings.imageMaxEdgeOption', { value: edge })}
                 className="px-3 py-1.5 text-sm tabular-nums"
               >
                 {edge === null ? t('settings.imageMaxEdgeOriginal') : t('common.pixelValue', { value: edge })}
@@ -43,6 +44,9 @@ export default function ImageLimitsSection() {
                 key={mb ?? 'unlimited'}
                 active={images.maxSizeMb === mb}
                 onClick={() => update('images', { maxSizeMb: mb })}
+                title={mb === null
+                  ? t('settings.imageMaxSizeUnlimitedHint')
+                  : t('settings.imageMaxSizeOption', { max: `${mb} ${t('common.megabytes')}` })}
                 className="px-3 py-1.5 text-sm tabular-nums"
               >
                 {mb === null ? t('settings.imageMaxSizeUnlimited') : `${mb} ${t('common.megabytes')}`}
