@@ -178,7 +178,7 @@ export default function BackupPage() {
 
   return (
     <>
-      <SettingsSection icon={<Download size={14} />} title={t('settings.exportDb')}>
+      <SettingsSection icon={<Download size={14} />} title={t('settings.exportDb')} description={t('settings.exportDbHint')}>
         <div className="rounded-lg bg-stone-800/60 border border-stone-700/40 px-4 py-3 space-y-3">
           {/* Type chips — dieselben Pillen wie im Filter-Panel, statt
               handgebauter Kaestchen: an/aus liest sich am Chip selbst. */}
@@ -200,6 +200,7 @@ export default function BackupPage() {
                   key={key}
                   active={!!exportOpts[key]}
                   onClick={() => toggleExportOpt(key)}
+                  title={key === 'includeSettings' ? t('settings.includeSettingsHint') : undefined}
                 >
                   {exportOpts[key] && <Check size={12} />}
                   {t(labelKey)}
@@ -270,7 +271,7 @@ export default function BackupPage() {
         </div>
       </SettingsSection>
 
-      <SettingsSection icon={<Upload size={14} />} title={t('settings.importDb')}>
+      <SettingsSection icon={<Upload size={14} />} title={t('settings.importDb')} description={t('settings.importDbHint')}>
         <div className="rounded-lg bg-stone-800/60 border border-stone-700/40 px-4 py-3 space-y-3">
           {/* File picker — die Vorschau auf eigener Zeile: in der
               Button-Zeile hatte sie jeden weiteren Nachbarn auf null
@@ -278,9 +279,6 @@ export default function BackupPage() {
           <div className="space-y-1.5">
             {/* Ohne Datei besteht der Abschnitt nur aus einem Knopf; die Zeile
                 sagt, was danach passiert, statt die Flaeche leer zu lassen. */}
-            {!importedFile && (
-              <p className="text-xs text-stone-500">{t('settings.importHint')}</p>
-            )}
             <Button variant="secondary" onClick={handleBrowse}>
               <FolderOpen size={14} />
               {t('settings.importBrowse')}

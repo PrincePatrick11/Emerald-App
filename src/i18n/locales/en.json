@@ -613,7 +613,6 @@
     "exportInclude": "Include",
     "importDb": "Import Database",
     "importBrowse": "Browse file…",
-    "importHint": "Pick an .emeralddb file — the import options appear here afterwards.",
     "importedVault": "Imported Vault",
     "includeJournal": "Journal",
     "includeWiki": "Wiki",
@@ -702,7 +701,17 @@
     "tagCreationHint": "Where new tags may be created. Imports always create missing tags.",
     "tagCreateInlineHint": "An unknown name typed into the tag field of an entry or template becomes a new tag",
     "tagCreateDashboardOnlyHint": "The tag field only accepts existing tags, and templates only bring existing ones. Create new tags in Tags.",
-    "trashRetentionHint": "How long deleted items stay in the trash. After that they are removed for good when the vault opens."
+    "trashRetentionHint": "How long deleted items stay in the trash. After that they are removed for good when the vault opens.",
+    "languageHint": "The interface language in this vault.",
+    "appearanceHint": "Color scheme, fonts and sizes of this vault.",
+    "themeDarkHint": "Dark color scheme",
+    "themeLightHint": "Light color scheme",
+    "uiFontHint": "Font for menus, lists and labels.",
+    "editorFontHint": "Font for titles and text in entries.",
+    "exportDbHint": "Saves the vault as an .emeralddb file, images included. The choices below decide what goes in.",
+    "includeSettingsHint": "This vault's language, appearance, sidebar, trash, emoji, image and tag settings",
+    "importDbHint": "Brings back an .emeralddb file — as a new vault, alongside the existing entries, or replacing everything. The options appear once a file is picked.",
+    "storageHint": "Images in the vault folder that no entry uses anymore. “Scan” shows how much space they take, “Remove” deletes them for good."
   },
   "home": {
     "viewAll": "View all",

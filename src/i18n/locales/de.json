@@ -613,7 +613,6 @@
     "exportInclude": "Einschließen",
     "importDb": "Datenbank importieren",
     "importBrowse": "Datei auswählen…",
-    "importHint": "Wähle eine .emeralddb-Datei — danach erscheinen hier die Optionen für den Import.",
     "importedVault": "Importierter Vault",
     "includeJournal": "Journal",
     "includeWiki": "Wiki",
@@ -702,7 +701,17 @@
     "tagCreationHint": "Wo neue Tags entstehen dürfen. Importe legen fehlende Tags immer an.",
     "tagCreateInlineHint": "Ein unbekannter Name im Tag-Feld eines Eintrags oder einer Vorlage wird als neuer Tag angelegt",
     "tagCreateDashboardOnlyHint": "Das Tag-Feld übernimmt nur vorhandene Tags, und Vorlagen bringen nur vorhandene mit. Neue Tags legst du unter Tags an.",
-    "trashRetentionHint": "So lange bleibt Gelöschtes im Papierkorb. Danach wird es beim Öffnen des Vaults endgültig gelöscht."
+    "trashRetentionHint": "So lange bleibt Gelöschtes im Papierkorb. Danach wird es beim Öffnen des Vaults endgültig gelöscht.",
+    "languageHint": "Die Sprache der Oberfläche in diesem Vault.",
+    "appearanceHint": "Farbschema, Schriften und Größen dieses Vaults.",
+    "themeDarkHint": "Dunkles Farbschema",
+    "themeLightHint": "Helles Farbschema",
+    "uiFontHint": "Schrift für Menüs, Listen und Beschriftungen.",
+    "editorFontHint": "Schrift für Titel und Text in Einträgen.",
+    "exportDbHint": "Speichert den Vault als .emeralddb-Datei samt Bildern. Die Auswahl darunter bestimmt, was hineinkommt.",
+    "includeSettingsHint": "Sprache, Aussehen, Seitenleiste, Papierkorb, Emojis, Bilder und Tags-Regel dieses Vaults",
+    "importDbHint": "Holt eine .emeralddb-Datei zurück — als neuer Vault, zusätzlich zu den vorhandenen Einträgen oder als Ersatz für alles. Nach der Dateiwahl erscheinen die Optionen.",
+    "storageHint": "Bilder im Vault-Ordner, die kein Eintrag mehr benutzt. „Suchen“ zeigt, wie viel Platz sie belegen, „Entfernen“ löscht sie endgültig."
   },
   "home": {
     "viewAll": "Alle anzeigen",

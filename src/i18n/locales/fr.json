@@ -621,7 +621,6 @@
     "exportInclude": "Inclure",
     "importDb": "Importer la base de données",
     "importBrowse": "Sélectionner un fichier…",
-    "importHint": "Choisissez un fichier .emeralddb — les options d’import apparaîtront ensuite ici.",
     "importedVault": "Vault importé",
     "includeJournal": "Journal",
     "includeWiki": "Wiki",
@@ -710,7 +709,17 @@
     "tagCreationHint": "Où de nouvelles étiquettes peuvent être créées. Les importations créent toujours celles qui manquent.",
     "tagCreateInlineHint": "Un nom inconnu saisi dans le champ d'étiquettes d'une entrée ou d'un modèle devient une nouvelle étiquette",
     "tagCreateDashboardOnlyHint": "Le champ n'accepte que les étiquettes existantes, et les modèles n'apportent que celles-ci. Créez-en de nouvelles dans Étiquettes.",
-    "trashRetentionHint": "Durée pendant laquelle les éléments supprimés restent dans la corbeille. Ensuite, ils sont effacés définitivement à l'ouverture du vault."
+    "trashRetentionHint": "Durée pendant laquelle les éléments supprimés restent dans la corbeille. Ensuite, ils sont effacés définitivement à l'ouverture du vault.",
+    "languageHint": "La langue de l'interface dans ce vault.",
+    "appearanceHint": "Palette de couleurs, polices et tailles de ce vault.",
+    "themeDarkHint": "Palette de couleurs sombre",
+    "themeLightHint": "Palette de couleurs claire",
+    "uiFontHint": "Police des menus, listes et libellés.",
+    "editorFontHint": "Police des titres et du texte des entrées.",
+    "exportDbHint": "Enregistre le vault dans un fichier .emeralddb, images comprises. Les choix ci-dessous décident du contenu.",
+    "includeSettingsHint": "Langue, apparence, barre latérale, corbeille, emojis, images et règle d'étiquettes de ce vault",
+    "importDbHint": "Restaure un fichier .emeralddb — comme nouveau vault, en plus des entrées existantes ou en remplaçant tout. Les options apparaissent une fois le fichier choisi.",
+    "storageHint": "Images du dossier du vault qu'aucune entrée n'utilise plus. « Rechercher » montre la place occupée, « Supprimer » les efface définitivement."
   },
   "contextMenu": {
     "openInNewTab": "Ouvrir dans un nouvel onglet",

@@ -15,6 +15,11 @@ export default function GeneralPage() {
   const appearance = useSettingsStore((s) => s.settings.appearance);
   const update = useSettingsStore((s) => s.update);
 
+  const themeHintKeys = {
+    'emerald-noctis': 'settings.themeDarkHint',
+    'emerald-parchment': 'settings.themeLightHint',
+  } as const;
+
   const themeIcons = {
     'emerald-noctis': Moon,
     'emerald-parchment': Sun,
@@ -22,7 +27,7 @@ export default function GeneralPage() {
 
   return (
     <>
-      <SettingsSection icon={<Globe size={14} />} title={t('settings.language')}>
+      <SettingsSection icon={<Globe size={14} />} title={t('settings.language')} description={t('settings.languageHint')}>
         <div className="flex gap-2 flex-wrap">
           {LANGUAGE_OPTIONS.map(({ code, label }) => (
             <SettingsChoiceButton
@@ -37,7 +42,7 @@ export default function GeneralPage() {
         </div>
       </SettingsSection>
 
-      <SettingsSection icon={<Sun size={14} />} title={t('settings.appearance')}>
+      <SettingsSection icon={<Sun size={14} />} title={t('settings.appearance')} description={t('settings.appearanceHint')}>
         <div className="flex gap-2">
           {THEME_OPTIONS.map(({ id, label }) => {
             const Icon = themeIcons[id];
@@ -46,6 +51,7 @@ export default function GeneralPage() {
               key={id}
               active={appearance.theme === id}
               onClick={() => update('appearance', { theme: id })}
+              title={t(themeHintKeys[id])}
               className="flex items-center gap-2 px-3 py-1.5 text-sm"
             >
               <Icon size={14} />
@@ -56,10 +62,11 @@ export default function GeneralPage() {
         </div>
         <div className="mt-4 space-y-3">
           <div>
-            <label className="label-xs flex items-center gap-2 mb-2">
+            <label className="label-xs flex items-center gap-2 mb-1">
               <Type size={14} />
               {t('settings.uiFont')}
             </label>
+            <SettingsDescription>{t('settings.uiFontHint')}</SettingsDescription>
             <select
               value={appearance.uiFont}
               onChange={(e) => update('appearance', { uiFont: e.target.value as FontId })}
@@ -90,10 +97,11 @@ export default function GeneralPage() {
             </div>
           </div>
           <div>
-            <label className="label-xs flex items-center gap-2 mb-2">
+            <label className="label-xs flex items-center gap-2 mb-1">
               <Type size={14} />
               {t('settings.editorFont')}
             </label>
+            <SettingsDescription>{t('settings.editorFontHint')}</SettingsDescription>
             <select
               value={appearance.editorFont}
               onChange={(e) => update('appearance', { editorFont: e.target.value as FontId })}

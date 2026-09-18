@@ -64,7 +64,7 @@ export default function StoragePage() {
         </div>
       </SettingsSection>
 
-      <SettingsSection icon={<HardDrive size={14} />} title={t('settings.storage')}>
+      <SettingsSection icon={<HardDrive size={14} />} title={t('settings.storage')} description={t('settings.storageHint')}>
         <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-stone-800/60 border border-stone-700/40">
           <span className="flex items-center gap-2 text-sm text-stone-300 min-w-0">
             <Brush size={14} className="shrink-0" />

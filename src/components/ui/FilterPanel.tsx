@@ -15,16 +15,19 @@ export interface FilterChip {
  * Used by the panel's own chips and by the Settings backup include-lists.
  */
 export function FilterChipButton({
-  active, onClick, children,
+  active, onClick, children, title,
 }: {
   active: boolean;
   onClick: () => void;
   children: ReactNode;
+  /** Tooltip, wenn die Beschriftung allein nicht sagt, was der Chip umfasst. */
+  title?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={title}
       className={`filter-chip flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${
         active
           ? 'filter-chip-active bg-jade-900/50 border-jade-800/40 text-jade-400'
