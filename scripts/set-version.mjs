@@ -24,7 +24,13 @@ if (!/^\d+\.\d+\.\d+$/.test(version ?? '')) {
  *  Zeile eine komplett geaenderte Datei — im Runner egal, aber wer das Skript
  *  einmal lokal laufen laesst, saehe einen Diff ueber alles. */
 function writeKeepingEol(path, original, next) {
-  writeFileSync(path, original.includes('\r\n') ? next.replace(/\n/g, '\r\n') : next);
+  // Erst auf LF vereinheitlichen, dann umstellen: `next` kann die Zeilenenden
+  // des Originals schon tragen — bei Cargo.toml wird nur eine Zeile ersetzt,
+  // der Rest bleibt, wie er war. Ohne das Vereinheitlichen wuerde aus jedem
+  // `\r\n` ein `\r\r\n`. Das faellt niemandem auf, dessen Checkout LF benutzt,
+  // und zerlegt auf einem Windows-Runner mit `core.autocrlf` das Cargo.toml.
+  const lf = next.replace(/\r\n/g, '\n');
+  writeFileSync(path, original.includes('\r\n') ? lf.replace(/\n/g, '\r\n') : lf);
 }
 
 function patchJson(path) {
