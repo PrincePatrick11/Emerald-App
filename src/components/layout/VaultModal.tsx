@@ -56,13 +56,10 @@ type Editor =
  * settings modal — same choice, same display, same reset.
  */
 export function VaultLocationRow({
-  target, customPath, dense, onPickFolder, onResetFolder,
+  target, customPath, onPickFolder, onResetFolder,
 }: {
   target: string | null;
   customPath: string | null;
-  /** Flacherer Button (`py-1`) fuer das dichtere Import-Panel der
-   *  Einstellungen, dessen Eingabefelder alle `py-1` haben. */
-  dense?: boolean;
   onPickFolder: () => void;
   onResetFolder: () => void;
 }) {
@@ -75,7 +72,7 @@ export function VaultLocationRow({
   return (
     <div className="space-y-1 min-w-0">
       <div className="flex items-center gap-2">
-        <Button variant="secondary" className={dense ? 'shrink-0 py-1' : 'shrink-0'} onClick={onPickFolder}>
+        <Button variant="secondary" className="shrink-0" onClick={onPickFolder}>
           <FolderOpen size={14} />
           {t('vault.chooseFolder')}
         </Button>

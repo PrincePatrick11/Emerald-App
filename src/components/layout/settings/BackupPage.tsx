@@ -217,6 +217,9 @@ export default function BackupPage() {
               <input
                 type="date"
                 value={exportOpts.dateFrom}
+                // Leer zeigt das Feld seine Schreibweise statt eines Datums — die
+                // soll so blass sein wie ein Platzhalter (siehe index.css).
+                data-empty={exportOpts.dateFrom === '' || undefined}
                 onChange={(e) => setExportOpts((o) => ({ ...o, dateFrom: e.target.value }))}
                 className="input-field w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors"
               />
@@ -226,6 +229,7 @@ export default function BackupPage() {
               <input
                 type="date"
                 value={exportOpts.dateTo}
+                data-empty={exportOpts.dateTo === '' || undefined}
                 onChange={(e) => setExportOpts((o) => ({ ...o, dateTo: e.target.value }))}
                 className="input-field w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors"
               />
@@ -373,7 +377,6 @@ export default function BackupPage() {
                         newVaultName.trim() || t('settings.importedVault'),
                       )}
                       customPath={vaultCustomPath}
-                      dense
                       onPickFolder={async () => {
                         const picked = await openDialog({ directory: true, multiple: false });
                         if (typeof picked !== 'string') return;

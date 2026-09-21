@@ -591,17 +591,40 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     font-family: inherit;
   }
 
-  /* Das Kalendersymbol im Datumsfeld: dieselbe Zurueckhaltung wie die uebrigen
-     Symbole in Feldern, und erst beim Zeigen voll da. `color-scheme` weiter
-     unten faerbt es und das Auswahlfenster passend zum Theme. */
+  /* Ein Datumsfeld ist ein natives Bedienelement: seine Ziffernfelder, das
+     Kalendersymbol und das Auswahlfenster bringt die WebView mit. Was sich
+     davon faerben laesst, faerben wir — der Rest folgt ueber `color-scheme`
+     weiter unten wenigstens hell/dunkel dem Theme.
+
+     Das leere Feld zeigt statt eines Datums seine Schreibweise (TT.MM.JJJJ).
+     Das ist ein Platzhalter und soll so zurueckhaltend sein wie jeder andere;
+     `data-empty` setzt der Aufrufer, CSS sieht den Wert nicht. */
+  .input-field[data-empty]::-webkit-datetime-edit {
+    color: var(--text-muted);
+  }
+
+  /* Das gerade bearbeitete Ziffernfeld — sonst markiert die WebView es in
+     ihrem eigenen Blau. */
+  .input-field::-webkit-datetime-edit-day-field:focus,
+  .input-field::-webkit-datetime-edit-month-field:focus,
+  .input-field::-webkit-datetime-edit-year-field:focus {
+    background-color: color-mix(in srgb, var(--accent) 24%, transparent);
+    color: var(--text-primary);
+    border-radius: 3px;
+    outline: none;
+  }
+
+  /* Das Kalendersymbol: dieselbe Zurueckhaltung wie die uebrigen Symbole in
+     Feldern, und erst beim Zeigen voll da. */
   .input-field::-webkit-calendar-picker-indicator {
-    opacity: 0.55;
+    opacity: 0.5;
     cursor: pointer;
     transition: opacity 150ms;
   }
 
+  .input-field:hover::-webkit-calendar-picker-indicator,
   .input-field::-webkit-calendar-picker-indicator:hover {
-    opacity: 1;
+    opacity: 0.9;
   }
 
   /* Derselbe Fokus wie bei `.emoji-picker-search`, damit jedes Feld der App
