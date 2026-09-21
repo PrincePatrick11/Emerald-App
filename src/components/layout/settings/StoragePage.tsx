@@ -7,7 +7,7 @@ import { getDb } from '../../../lib/db';
 import { formatBytes } from '../../../lib/helpers';
 import { TRASH_RETENTION_OPTIONS } from '../../../lib/vaultSettings';
 import { useSettingsStore } from '../../../store/settingsStore';
-import SettingsChoiceButton from './SettingsChoiceButton';
+import SettingsChoiceButton, { SettingsChoiceRow } from './SettingsChoiceButton';
 import SettingsSection from './SettingsSection';
 
 /** Was die App auf der Platte liegen hat, und was davon weg kann. */
@@ -50,23 +50,22 @@ export default function StoragePage() {
   return (
     <>
       <SettingsSection icon={<Trash2 size={14} />} title={t('settings.trashRetention')} description={t('settings.trashRetentionHint')}>
-        <div className="flex gap-2 flex-wrap">
+        <SettingsChoiceRow>
           {TRASH_RETENTION_OPTIONS.map((days) => (
             <SettingsChoiceButton
               key={days ?? 'never'}
               active={retentionDays === days}
               onClick={() => update('trash', { retentionDays: days })}
-              className="px-3 py-1.5 text-sm"
             >
               {days === null ? t('settings.trashRetentionNever') : t('settings.trashRetentionDays', { count: days })}
             </SettingsChoiceButton>
           ))}
-        </div>
+        </SettingsChoiceRow>
       </SettingsSection>
 
       <SettingsSection icon={<HardDrive size={14} />} title={t('settings.storage')} description={t('settings.storageHint')}>
         <div className="settings-row">
-          <span className="flex items-center gap-2 text-sm min-w-0" style={{ color: 'var(--text-secondary)' }}>
+          <span className="flex items-center gap-2 text-sm min-w-0 text-secondary">
             <Brush size={14} className="shrink-0" />
             <span className="truncate">{t('settings.cleanupImages')}</span>
           </span>
@@ -76,10 +75,10 @@ export default function StoragePage() {
               {scanning ? t('settings.cleanupScanning') : t('settings.cleanupScan')}
             </Button>
           ) : unused.names.length === 0 ? (
-            <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>{t('settings.cleanupNone')}</span>
+            <span className="text-xs shrink-0 text-muted">{t('settings.cleanupNone')}</span>
           ) : (
             <span className="flex items-center gap-2 shrink-0">
-              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              <span className="text-xs text-secondary">
                 {t('settings.cleanupFound', { count: unused.names.length, size: formatBytes(unused.bytes, byteUnits) })}
               </span>
               <Button onClick={removeUnusedImages} variant="danger">

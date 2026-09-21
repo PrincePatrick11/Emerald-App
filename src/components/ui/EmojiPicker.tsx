@@ -178,7 +178,7 @@ export default function EmojiPicker({
               style={gridStyle}
             >
               {isSearchLoading ? null : displayedEmojis.length === 0 ? (
-                <p className="col-span-full py-2 text-center text-xs text-stone-500">{t('common.noEmojiResults')}</p>
+                <p className="col-span-full py-2 text-center text-xs text-muted">{t('common.noEmojiResults')}</p>
               ) : (
                 displayedEmojis.map((emoji) => (
                   <button

@@ -5,7 +5,7 @@ import { useSettingsStore } from '../../../store/settingsStore';
 import {
   EDITOR_FONT_SIZE_OPTIONS, FONT_OPTIONS, THEME_OPTIONS, UI_SCALE_OPTIONS, type FontId,
 } from '../../../themes/theme';
-import SettingsChoiceButton from './SettingsChoiceButton';
+import SettingsChoiceButton, { SettingsChoiceRow } from './SettingsChoiceButton';
 import SettingsSection, { SettingsDescription } from './SettingsSection';
 
 /** Sprache und Aussehen — was die App in diesem Vault spricht und wie sie aussieht. */
@@ -28,18 +28,17 @@ export default function GeneralPage() {
   return (
     <>
       <SettingsSection icon={<Globe size={14} />} title={t('settings.language')} description={t('settings.languageHint')}>
-        <div className="flex gap-2 flex-wrap">
+        <SettingsChoiceRow>
           {LANGUAGE_OPTIONS.map(({ code, label }) => (
             <SettingsChoiceButton
               key={code}
               active={appearance.language === code}
               onClick={() => update('appearance', { language: code })}
-              className="px-3 py-1.5 text-sm"
             >
               {label}
             </SettingsChoiceButton>
           ))}
-        </div>
+        </SettingsChoiceRow>
       </SettingsSection>
 
       <SettingsSection icon={<Sun size={14} />} title={t('settings.appearance')} description={t('settings.appearanceHint')}>
@@ -52,7 +51,7 @@ export default function GeneralPage() {
               active={appearance.theme === id}
               onClick={() => update('appearance', { theme: id })}
               title={t(themeHintKeys[id])}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm"
+              className="flex items-center gap-2"
             >
               <Icon size={14} />
               {label}
@@ -70,7 +69,7 @@ export default function GeneralPage() {
             <select
               value={appearance.uiFont}
               onChange={(e) => update('appearance', { uiFont: e.target.value as FontId })}
-              className="input-field w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors"
+              className="input-field settings-field"
             >
               {FONT_OPTIONS.map((font) => (
                 <option key={font.id} value={font.id}>{font.label}</option>
@@ -83,18 +82,18 @@ export default function GeneralPage() {
               {t('settings.uiScale')}
             </p>
             <SettingsDescription>{t('settings.uiScaleHint')}</SettingsDescription>
-            <div className="flex gap-2 flex-wrap">
+            <SettingsChoiceRow>
               {UI_SCALE_OPTIONS.map((scale) => (
                 <SettingsChoiceButton
                   key={scale}
                   active={appearance.uiScale === scale}
                   onClick={() => update('appearance', { uiScale: scale })}
-                  className="px-3 py-1.5 text-sm tabular-nums"
+                  className="tabular-nums"
                 >
                   {t('common.percentValue', { value: scale })}
                 </SettingsChoiceButton>
               ))}
-            </div>
+            </SettingsChoiceRow>
           </div>
           <div>
             <label className="label-xs flex items-center gap-2 mb-1">
@@ -105,7 +104,7 @@ export default function GeneralPage() {
             <select
               value={appearance.editorFont}
               onChange={(e) => update('appearance', { editorFont: e.target.value as FontId })}
-              className="input-field w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors"
+              className="input-field settings-field"
             >
               {FONT_OPTIONS.map((font) => (
                 <option key={font.id} value={font.id}>{font.label}</option>
@@ -118,18 +117,18 @@ export default function GeneralPage() {
               {t('settings.editorFontSize')}
             </p>
             <SettingsDescription>{t('settings.editorFontSizeHint')}</SettingsDescription>
-            <div className="flex gap-2 flex-wrap">
+            <SettingsChoiceRow>
               {EDITOR_FONT_SIZE_OPTIONS.map((size) => (
                 <SettingsChoiceButton
                   key={size}
                   active={appearance.editorFontSize === size}
                   onClick={() => update('appearance', { editorFontSize: size })}
-                  className="px-3 py-1.5 text-sm tabular-nums"
+                  className="tabular-nums"
                 >
                   {t('common.pixelValue', { value: size })}
                 </SettingsChoiceButton>
               ))}
-            </div>
+            </SettingsChoiceRow>
           </div>
         </div>
       </SettingsSection>

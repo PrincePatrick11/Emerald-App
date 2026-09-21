@@ -202,7 +202,6 @@ export default function BackupPage() {
                   aria-pressed={!!exportOpts[key]}
                   onClick={() => toggleExportOpt(key)}
                   title={key === 'includeSettings' ? t('settings.includeSettingsHint') : undefined}
-                  className="px-3 py-1.5 text-sm"
                 >
                   {t(labelKey)}
                 </SettingsChoiceButton>
@@ -221,7 +220,7 @@ export default function BackupPage() {
                 // soll so blass sein wie ein Platzhalter (siehe index.css).
                 data-empty={exportOpts.dateFrom === '' || undefined}
                 onChange={(e) => setExportOpts((o) => ({ ...o, dateFrom: e.target.value }))}
-                className="input-field w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors"
+                className="input-field settings-field"
               />
             </div>
             <div className="flex-1">
@@ -231,7 +230,7 @@ export default function BackupPage() {
                 value={exportOpts.dateTo}
                 data-empty={exportOpts.dateTo === '' || undefined}
                 onChange={(e) => setExportOpts((o) => ({ ...o, dateTo: e.target.value }))}
-                className="input-field w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors"
+                className="input-field settings-field"
               />
             </div>
           </div>
@@ -280,7 +279,7 @@ export default function BackupPage() {
               {t('settings.importBrowse')}
             </Button>
             {importedFile && (
-              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              <p className="text-xs text-secondary">
                 {t('settings.previewContains')} {[
                   importedFile.preview.journalCount && `${importedFile.preview.journalCount} J`,
                   importedFile.preview.wikiCount && `${importedFile.preview.wikiCount} W`,
@@ -314,7 +313,6 @@ export default function BackupPage() {
                     active={importTypeFilters[key]}
                     aria-pressed={importTypeFilters[key]}
                     onClick={() => setImportTypeFilters((f) => ({ ...f, [key]: !f[key] }))}
-                    className="px-3 py-1.5 text-sm"
                   >
                     {t(labelKey)}
                   </SettingsChoiceButton>
@@ -343,6 +341,7 @@ export default function BackupPage() {
                     key={mode}
                     active={importMode === mode}
                     onClick={() => setImportMode(mode)}
+                    layout="card"
                     className="block w-full text-left px-3 py-2"
                   >
                     {/* Aktiv-Zustand nur ueber die Faerbung — wie bei
@@ -350,7 +349,7 @@ export default function BackupPage() {
                     {/* Farbe kommt vom Knopf selbst (settings-choice-btn), wie bei
                         den uebrigen Auswahlknoepfen des Fensters. */}
                     <span className="block text-xs font-medium">{t(labelKey)}</span>
-                    <span className="block text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{t(descKey)}</span>
+                    <span className="block text-xs mt-0.5 text-muted">{t(descKey)}</span>
                   </SettingsChoiceButton>
                 ))}
               </div>
@@ -365,7 +364,7 @@ export default function BackupPage() {
                       value={newVaultName}
                       onChange={(e) => setNewVaultName(e.target.value)}
                       placeholder={t('vault.namePlaceholder')}
-                      className="input-field w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors"
+                      className="input-field settings-field"
                     />
                   </div>
                   <div>
@@ -406,7 +405,6 @@ export default function BackupPage() {
                           aria-pressed={active}
                           onClick={() => setSettingsGroups((groups) =>
                             active ? groups.filter((g) => g !== group) : [...groups, group])}
-                          className="px-3 py-1.5 text-sm"
                         >
                           {t(SETTINGS_GROUP_LABEL_KEYS[group])}
                         </SettingsChoiceButton>

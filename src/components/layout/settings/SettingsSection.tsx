@@ -34,7 +34,7 @@ export default function SettingsSection({
 /** Der erklärende Satz unter einer Einstellung — unter einem Abschnitt oder einer Zeile darin. */
 export function SettingsDescription({ children, className = 'mb-2' }: { children: ReactNode; className?: string }) {
   return (
-    <p className={`text-xs ${className}`} style={{ color: 'var(--text-muted)' }}>
+    <p className={`text-xs text-muted ${className}`}>
       {children}
     </p>
   );

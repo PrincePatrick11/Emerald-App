@@ -1,4 +1,5 @@
 import { useSettingsStore } from '../store/settingsStore';
+import { scaleToMaxEdge } from './shrinkImage';
 
 /** Ein Bild, das auch nach dem Verkleinern über der Dateigröße des Vaults liegt. */
 export class ImageTooLargeError extends Error {
@@ -35,24 +36,9 @@ export function imageSizeLabel(bytes: number, megabytesUnit: string): string {
 async function scaleDown(dataUrl: string, maxEdge: number): Promise<string> {
   const mime = mimeOf(dataUrl);
   if (NOT_SCALED.has(mime)) return dataUrl;
-  const img = new Image();
-  img.src = dataUrl;
-  await img.decode();
-  const longest = Math.max(img.naturalWidth, img.naturalHeight);
-  // Klein genug: unverändert zurück, statt es verlustbehaftet neu zu kodieren.
-  if (longest <= maxEdge) return dataUrl;
-
-  const scale = maxEdge / longest;
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
-  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('No 2D canvas context');
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   // Das Format bleibt: ein JPEG-Foto als PNG würde größer statt kleiner.
   // WebKit kann kein WebP schreiben und liefert dann PNG — auch das ist ein Bild.
-  return canvas.toDataURL(mime, LOSSY.has(mime) ? LOSSY_QUALITY : undefined);
+  return scaleToMaxEdge(dataUrl, maxEdge, { mime, quality: LOSSY.has(mime) ? LOSSY_QUALITY : undefined });
 }
 
 /**

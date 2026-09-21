@@ -3,7 +3,7 @@ import { ListOrdered, PanelLeft } from 'lucide-react';
 import { useSettingsStore } from '../../../store/settingsStore';
 import { LEFT_LIST_LIMIT_OPTIONS } from '../../../lib/vaultSettings';
 import { LEFT_LIST_TABS, type LeftListTabId } from '../../../lib/modules';
-import SettingsChoiceButton from './SettingsChoiceButton';
+import SettingsChoiceButton, { SettingsChoiceRow } from './SettingsChoiceButton';
 import SettingsSection from './SettingsSection';
 
 /** Was die Eintragsliste links zeigt: welche Listen, und wie viele Einträge davon. */
@@ -26,7 +26,7 @@ export default function SidebarPage() {
   return (
     <>
       <SettingsSection icon={<PanelLeft size={14} />} title={t('settings.sidebarLists')} description={t('settings.sidebarListsHint')}>
-        <div className="flex gap-2 flex-wrap">
+        <SettingsChoiceRow>
           {LEFT_LIST_TABS.map(({ id, icon: Icon }) => {
             const active = leftList.tabs.includes(id);
             return (
@@ -37,29 +37,29 @@ export default function SidebarPage() {
                 disabled={active && leftList.tabs.length === 1}
                 onClick={() => toggleTab(id)}
                 title={t('settings.sidebarTabToggle')}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
+                className="flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
               >
                 <Icon size={14} />
                 {t(`nav.${id}`)}
               </SettingsChoiceButton>
             );
           })}
-        </div>
+        </SettingsChoiceRow>
       </SettingsSection>
 
       <SettingsSection icon={<ListOrdered size={14} />} title={t('settings.sidebarLimit')} description={t('settings.sidebarLimitHint')}>
-        <div className="flex gap-2 flex-wrap">
+        <SettingsChoiceRow>
           {LEFT_LIST_LIMIT_OPTIONS.map((limit) => (
             <SettingsChoiceButton
               key={limit ?? 'all'}
               active={leftList.limit === limit}
               onClick={() => update('leftList', { limit })}
-              className="px-3 py-1.5 text-sm tabular-nums"
+              className="tabular-nums"
             >
               {limit === null ? t('settings.sidebarLimitAll') : limit}
             </SettingsChoiceButton>
           ))}
-        </div>
+        </SettingsChoiceRow>
       </SettingsSection>
     </>
   );

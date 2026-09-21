@@ -360,6 +360,16 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--danger-text);
   }
 
+  /* Die beiden Textfarben, die sonst ueberall als Inline-Style standen —
+     dieselbe Stelle und dieselbe Form wie `.text-danger`. */
+  .text-secondary {
+    color: var(--text-secondary);
+  }
+
+  .text-muted {
+    color: var(--text-muted);
+  }
+
   /* Danger action button — destructive actions (delete, remove, empty trash) */
   .btn-danger {
     @apply rounded-md transition-colors duration-150 cursor-pointer;
@@ -565,6 +575,12 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      Eingabefelder komponieren `.input-field` (Farben) mit ihren Groessen,
      Behaelter nehmen `.panel`; eigene Klassen gibt es nur fuer das, was
      beides nicht abdeckt. */
+  /* Die Groesse der Felder im Einstellungs-Fenster; die Farben bringt
+     `.input-field` mit, mit dem zusammen diese Klasse steht. */
+  .settings-field {
+    @apply w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors;
+  }
+
   .settings-row {
     @apply flex items-center justify-between gap-3 rounded-md border px-3 py-2;
     background-color: color-mix(in srgb, var(--bg-surface-1) 70%, transparent);

@@ -39,8 +39,8 @@ function AboutLink({ icon, label, url }: { icon: ReactNode; label: string; url: 
 function AboutFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between text-sm">
-      <span style={{ color: 'var(--text-muted)' }}>{label}</span>
-      <span style={{ color: 'var(--text-secondary)' }}>{value}</span>
+      <span className="text-muted">{label}</span>
+      <span className="text-secondary">{value}</span>
     </div>
   );
 }
@@ -62,11 +62,11 @@ export default function AboutPage() {
           genug fuer seinen Schliff ist. */}
         <div className="settings-divider-bottom flex items-center gap-2.5 pb-2.5 mb-1">
           <EmeraldMark size={30} />
-          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Emerald App</span>
+          <span className="text-sm text-secondary">Emerald App</span>
         </div>
 
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('settings.tagline')}</p>
-        <p className="settings-divider-bottom text-sm leading-relaxed pb-2.5 mb-1" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-sm text-secondary">{t('settings.tagline')}</p>
+        <p className="settings-divider-bottom text-sm leading-relaxed pb-2.5 mb-1 text-muted">
           {t('settings.taglineDetail')}
         </p>
 
@@ -75,7 +75,7 @@ export default function AboutPage() {
         <AboutFact label={t('settings.license')} value={packageJson.license} />
 
         <div className="settings-divider-top flex justify-between items-center gap-3 text-sm pt-2.5 mt-1">
-          <span className="shrink-0" style={{ color: 'var(--text-muted)' }}>{t('settings.links')}</span>
+          <span className="shrink-0 text-muted">{t('settings.links')}</span>
           <span className="flex items-center gap-3">
             <AboutLink icon={<Globe size={16} />} label={t('settings.website')} url={`${WEBSITE_BASE}/${language}/`} />
             <AboutLink icon={<GithubMark size={16} />} label="GitHub" url={packageJson.homepage} />
