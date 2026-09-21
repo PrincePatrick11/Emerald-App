@@ -72,7 +72,11 @@ jobs:
           workspaces: src-tauri
 
       # Nur im Runner, nie committet: der Arbeitsbaum ist hier ein Wegwerfding.
+      # `shell: bash` ist hier nicht Geschmack: der Windows-Runner faehrt sonst
+      # pwsh, und dort ist `$TEST_VERSION` keine Umgebungsvariable, sondern
+      # eine leere PowerShell-Variable. Der Schritt bekaeme einen leeren String.
       - name: Set the test version
+        shell: bash
         run: node scripts/set-version.mjs "$TEST_VERSION"
 
       - run: npm ci
@@ -120,7 +124,11 @@ jobs:
         with:
           workspaces: src-tauri
 
+      # `shell: bash` ist hier nicht Geschmack: der Windows-Runner faehrt sonst
+      # pwsh, und dort ist `$TEST_VERSION` keine Umgebungsvariable, sondern
+      # eine leere PowerShell-Variable. Der Schritt bekaeme einen leeren String.
       - name: Set the test version
+        shell: bash
         run: node scripts/set-version.mjs "$TEST_VERSION"
 
       - run: npm ci
@@ -179,7 +187,11 @@ jobs:
             patchelf \
             libssl-dev
 
+      # `shell: bash` ist hier nicht Geschmack: der Windows-Runner faehrt sonst
+      # pwsh, und dort ist `$TEST_VERSION` keine Umgebungsvariable, sondern
+      # eine leere PowerShell-Variable. Der Schritt bekaeme einen leeren String.
       - name: Set the test version
+        shell: bash
         run: node scripts/set-version.mjs "$TEST_VERSION"
 
       - run: npm ci
