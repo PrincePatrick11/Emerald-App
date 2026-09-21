@@ -18,6 +18,10 @@ interface SettingsState {
    *  v39 übersetzt einen Kategorienamen in die Sprache des Boot-Spiegels, und
    *  den schreibt erst `changeAppLanguage` hier. */
   loadForVault: (vaultId: string) => Promise<void>;
+  /** Kein Vault mehr offen (gescheiterter Wechsel, letzter Vault entfernt):
+   *  zurück auf die Standards. Sonst liefe die Oberfläche mit den
+   *  Einstellungen eines Vaults weiter, in den nichts mehr geschrieben wird. */
+  clear: () => Promise<void>;
   /** Übernimmt ganze Einstellungen, etwa aus einem Backup, und schreibt sie. */
   replaceSettings: (settings: VaultSettings) => Promise<void>;
   update: <G extends SettingsGroup>(group: G, patch: Partial<VaultSettings[G]>) => void;
@@ -73,6 +77,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     // Die Startwerte gleich festhalten: sonst bekäme der Vault beim nächsten
     // Öffnen erneut den Umstiegs-Schnappschuss statt dem, was galt.
     if (!stored && !corrupt) await persist(vaultId, settings);
+  },
+
+  clear: async () => {
+    const settings = structuredClone(DEFAULT_VAULT_SETTINGS);
+    set({ vaultId: null, settings });
+    await applyAppearance(settings.appearance);
   },
 
   replaceSettings: async (next) => {

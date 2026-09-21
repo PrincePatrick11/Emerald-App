@@ -116,7 +116,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
         () => true,
         (e) => { console.error('[vault] could not restore settings', e); return false; },
       );
-      if (!restored) useSettingsStore.setState({ vaultId: null });
+      if (!restored) await useSettingsStore.getState().clear();
       throw err;
     }
   },
@@ -177,6 +177,8 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     const successor = remaining[Math.min(Math.max(index, 0), remaining.length - 1)];
     if (!successor) {
       set({ vaults: remaining, activeVaultId: '' });
+      // Wie im Fehlerfall oben: ohne Vault gelten wieder die Standards.
+      await useSettingsStore.getState().clear();
       return dirRemoved;
     }
 

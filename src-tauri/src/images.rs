@@ -168,8 +168,8 @@ pub async fn copy_image_file(
 
 /// Hard cap for [`read_image_file`]: the bytes cross IPC as base64 and are
 /// decoded on a canvas, so an arbitrarily large file would stall the webview.
-/// The vault's own limit is enforced afterwards in the frontend. Mirrored in
-/// `useEditorFileDrop.ts`, which also matches the error text below.
+/// The vault's own limit is enforced afterwards in the frontend, which reads
+/// the number out of the error below — so it lives only here.
 const MAX_EXTERNAL_IMAGE_BYTES: u64 = 64 * 1024 * 1024;
 
 /// Reads an image file from an arbitrary location as a data-URL, without
@@ -184,7 +184,7 @@ pub async fn read_image_file(app: tauri::AppHandle, source: String) -> Result<St
             .map_err(|e| format!("read {source}: {e}"))?
             .len();
         if size > MAX_EXTERNAL_IMAGE_BYTES {
-            return Err("image file too large".to_string());
+            return Err(format!("image file too large: {MAX_EXTERNAL_IMAGE_BYTES}"));
         }
         let bytes = std::fs::read(&canonical_source).map_err(|e| format!("read {source}: {e}"))?;
         Ok(format!(

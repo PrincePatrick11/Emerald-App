@@ -33,7 +33,6 @@ export default function SidebarPage() {
               <SettingsChoiceButton
                 key={id}
                 active={active}
-                aria-pressed={active}
                 disabled={active && leftList.tabs.length === 1}
                 onClick={() => toggleTab(id)}
                 title={t('settings.sidebarTabToggle')}

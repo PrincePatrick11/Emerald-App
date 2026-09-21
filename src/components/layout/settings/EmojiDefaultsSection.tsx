@@ -109,6 +109,9 @@ export default function EmojiDefaultsSection() {
               key={emoji}
               type="button"
               data-emoji-index={index}
+              // Das letzte bleibt (wie der letzte Tab der Seitenleiste) — als
+              // sichtbar ausgegraut, statt auf den Klick nur nicht zu reagieren.
+              disabled={list.length === 1}
               title={t('settings.emojiItemTitle')}
               aria-label={t('settings.emojiRemove', { emoji })}
               onPointerDown={(e) => onPointerDown(e, index)}
@@ -118,7 +121,7 @@ export default function EmojiDefaultsSection() {
               // Tastatur: Enter/Leertaste entfernt wie ein Klick. Pointer-Klicks
               // erledigt `onPointerUp`; `detail === 0` heißt ausgelöst per Taste.
               onClick={(e) => { if (e.detail === 0) remove(index); }}
-              className={`emoji-picker-item text-xl w-9 h-9 flex items-center justify-center rounded transition-colors touch-none ${
+              className={`emoji-picker-item text-xl w-9 h-9 flex items-center justify-center rounded transition-colors touch-none disabled:opacity-50 disabled:cursor-default ${
                 draggingIndex === index ? 'emoji-picker-item-active cursor-grabbing' : 'emoji-picker-item-idle cursor-grab'
               }`}
             >

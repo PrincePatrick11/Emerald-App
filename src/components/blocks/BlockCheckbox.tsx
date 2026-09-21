@@ -1,7 +1,9 @@
 /**
- * Ein Häkchen mit Beschriftung und optionalem Hinweis darunter — die
- * Einstellungen der Block-Seitenleiste und des Baukastens in der
- * Blöcke-Ansicht. `.block-checkbox` färbt das Häkchen im Akzent des Themes.
+ * Das Häkchen der App: Block-Seitenleiste, Baukasten der Blöcke-Ansicht,
+ * Vorlagen-Dialog und die Datensicherung in den Einstellungen. Beschriftung
+ * und optionaler Hinweis darunter gehören dazu; gezeichnet wird das Kästchen
+ * in `.block-checkbox` (siehe index.css), aus Theme-Variablen statt als
+ * natives Kästchen.
  */
 export default function BlockCheckbox({ checked, onChange, label, hint, disabled = false }: {
   checked: boolean;

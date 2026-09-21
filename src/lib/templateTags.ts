@@ -5,6 +5,10 @@ import { useSettingsStore } from '../store/settingsStore';
  * gibt. `tagStore` meldet die Suche hier an (`registerTagLookup`) — ein eigenes
  * Modul statt eines Imports von `tagStore`: der importiert die Inhalts-Stores
  * und den Vorlagen-Store, und die brauchen genau diese Prüfung, ein Zyklus.
+ *
+ * Angemeldet wird beim ersten Import von `store/tagStore` — den zieht
+ * `store/moduleWiring` beim Start herein, lange bevor eine Vorlage angewendet
+ * werden kann.
  */
 let tagNameOf: (name: string) => string | undefined = () => undefined;
 

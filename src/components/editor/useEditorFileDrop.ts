@@ -5,15 +5,16 @@ import { copyImageFile, readImageFile, saveImage } from '../../lib/images';
 import { hasImageLimits, ImageTooLargeError, prepareImageDataUrl } from '../../lib/imageLimits';
 import { reportImageError, useImageNoticeStore } from '../../store/imageNoticeStore';
 
-/** Mirrors `MAX_EXTERNAL_IMAGE_BYTES` in `src-tauri/src/images.rs`. */
-const EXTERNAL_IMAGE_MAX_BYTES = 64 * 1024 * 1024;
+/** Die Lesegrenze des Rust-Befehls samt ihrer Zahl (siehe `images.rs`). */
+const TOO_LARGE_TO_READ = /image file too large: (\d+)/;
 
 /** Liest die Datei ein; die Größengrenze des Rust-Befehls wird zur üblichen Meldung. */
 async function readDroppedImage(path: string): Promise<string> {
   try {
     return await readImageFile(path);
   } catch (err) {
-    if (String(err).includes('image file too large')) throw new ImageTooLargeError(EXTERNAL_IMAGE_MAX_BYTES);
+    const limit = TOO_LARGE_TO_READ.exec(String(err));
+    if (limit) throw new ImageTooLargeError(Number(limit[1]));
     throw err;
   }
 }

@@ -12,9 +12,14 @@ export function useEmojiSearchData(enabled: boolean): string[][] | null {
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    loadEmojiSearchData(locale).then((loaded) => {
-      if (!cancelled) setData(loaded);
-    });
+    loadEmojiSearchData(locale).then(
+      (loaded) => { if (!cancelled) setData(loaded); },
+      // Ohne Daten bleibt die Suche leer statt ewig am Laden.
+      (err: unknown) => {
+        console.error('[emoji] could not load search data', err);
+        if (!cancelled) setData([]);
+      },
+    );
     return () => { cancelled = true; };
   }, [enabled, locale]);
 

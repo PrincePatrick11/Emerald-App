@@ -74,8 +74,10 @@ export interface TagSettings {
 
 export interface VaultSettings {
   /** Nicht gelesen, wie `version` in `vaults.json`: erst eine Form, die eine
-   *  Umrechnung braucht, zählt ihn hoch. */
-  version: 1;
+   *  Umrechnung braucht, zählt ihn hoch. Eine höhere Zahl aus einem neueren
+   *  Build bleibt stehen — sonst bekäme der seine eigene Datei als ältere
+   *  zurück, obwohl ihre unbekannten Schlüssel noch drin sind. */
+  version: number;
   appearance: AppearanceSettings;
   trash: TrashSettings;
   leftList: LeftListSettings;
@@ -158,9 +160,12 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const images = asRecord(root.images);
   const tags = asRecord(root.tags);
   const tabs = Array.isArray(leftList.tabs) ? LEFT_LIST_TAB_IDS.filter((id) => (leftList.tabs as unknown[]).includes(id)) : [];
+  const version = typeof root.version === 'number' && Number.isInteger(root.version) && root.version > 1
+    ? root.version
+    : 1;
   return {
     ...root,
-    version: 1,
+    version,
     appearance: {
       ...appearance,
       language: language && LANGUAGES.has(language) ? (language as AppLanguage) : DEFAULT_VAULT_SETTINGS.appearance.language,

@@ -199,7 +199,6 @@ export default function BackupPage() {
                 <SettingsChoiceButton
                   key={key}
                   active={!!exportOpts[key]}
-                  aria-pressed={!!exportOpts[key]}
                   onClick={() => toggleExportOpt(key)}
                   title={key === 'includeSettings' ? t('settings.includeSettingsHint') : undefined}
                 >
@@ -311,7 +310,6 @@ export default function BackupPage() {
                   <SettingsChoiceButton
                     key={key}
                     active={importTypeFilters[key]}
-                    aria-pressed={importTypeFilters[key]}
                     onClick={() => setImportTypeFilters((f) => ({ ...f, [key]: !f[key] }))}
                   >
                     {t(labelKey)}
@@ -402,7 +400,6 @@ export default function BackupPage() {
                         <SettingsChoiceButton
                           key={group}
                           active={active}
-                          aria-pressed={active}
                           onClick={() => setSettingsGroups((groups) =>
                             active ? groups.filter((g) => g !== group) : [...groups, group])}
                         >

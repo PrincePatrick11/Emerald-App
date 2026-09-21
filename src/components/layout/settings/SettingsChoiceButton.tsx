@@ -29,6 +29,9 @@ export default function SettingsChoiceButton({
   return (
     <button
       type={type}
+      // Mehrfachwahl wie die Listen der Seitenleiste braucht es, Einfachwahl
+      // schadet es nicht — und so tragen es alle Knöpfe des Fensters.
+      aria-pressed={active}
       className={`settings-choice-btn rounded-lg border transition-all duration-150 ${
         layout === 'chip' ? 'px-3 py-1.5 text-sm ' : ''
       }${active ? 'settings-choice-btn-active' : 'settings-choice-btn-idle'}${className ? ` ${className}` : ''}`}

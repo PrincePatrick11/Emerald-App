@@ -258,11 +258,11 @@ export default function AppShell() {
   // `getDb()` aus Sidebar, Tableiste oder Hauptbereich liefe in den
   // NO_ACTIVE_VAULT-Fehler aus `getActiveVaultPath()`.
   //
-  // Zwei getrennte Ausgaenge, damit sichtbar bleibt, warum: waehrend `loaded`
+  // Drei getrennte Ausgaenge, damit sichtbar bleibt, warum: waehrend `loaded`
   // noch falsch ist, steht nur noch nicht fest, ob ein Vault da ist — dann darf
-  // das Setup-Modal nicht schon aufblitzen.
+  // das Setup-Modal nicht schon aufblitzen. Und mit Vault, aber vor dem Ende
+  // des Starts, fehlen noch dessen Einstellungen (siehe `bootSettled`).
   if (!vaultsLoaded) return chrome(<main className="app-main flex-1 min-h-0" />);
-  if (!needsVault && !bootSettled) return chrome(<main className="app-main flex-1 min-h-0" />);
   if (needsVault) {
     return chrome(
       <>
@@ -271,6 +271,7 @@ export default function AppShell() {
       </>
     );
   }
+  if (!bootSettled) return chrome(<main className="app-main flex-1 min-h-0" />);
 
   return (
     <div className="app-shell flex flex-col h-screen w-screen overflow-hidden bg-stone-900 relative">

@@ -28,7 +28,9 @@ export function dataUrlBytes(dataUrl: string): number {
 
 const MIB = 1024 * 1024;
 
-/** „5 MB" — die Grenzen sind ganze MB-Stufen, ein Deckel wie 64 MB ebenso. */
+/** „5 MB" — die Grenzen sind ganze MB-Stufen, ein Deckel wie 64 MB ebenso.
+ *  Nicht `formatBytes`: das ginge bei kleinen Grenzen auf KB herunter, und
+ *  „512 KB" neben lauter MB-Stufen läse sich wie eine andere Einstellung. */
 export function imageSizeLabel(bytes: number, megabytesUnit: string): string {
   return `${Math.round((bytes / MIB) * 10) / 10} ${megabytesUnit}`;
 }
