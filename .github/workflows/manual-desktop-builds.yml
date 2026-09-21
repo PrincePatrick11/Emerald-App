@@ -54,6 +54,13 @@ jobs:
         run: npm ci
 
       - name: Build macOS Apple Silicon bundle
+        env:
+          # Seit `createUpdaterArtifacts` in der Config steht, bricht der
+          # Bundler ohne privaten Schluessel ab: "A public key has been found,
+          # but no private key." Die Secrets gehoeren deshalb auch hierher,
+          # nicht nur ins Release.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri build -- --target aarch64-apple-darwin
 
       - name: Upload macOS Apple Silicon artifacts
@@ -90,6 +97,13 @@ jobs:
         run: npm ci
 
       - name: Build Windows bundle
+        env:
+          # Seit `createUpdaterArtifacts` in der Config steht, bricht der
+          # Bundler ohne privaten Schluessel ab: "A public key has been found,
+          # but no private key." Die Secrets gehoeren deshalb auch hierher,
+          # nicht nur ins Release.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri build -- --target x86_64-pc-windows-msvc
 
       - name: Upload Windows artifacts
@@ -137,6 +151,13 @@ jobs:
         run: npm ci
 
       - name: Build Ubuntu bundle
+        env:
+          # Seit `createUpdaterArtifacts` in der Config steht, bricht der
+          # Bundler ohne privaten Schluessel ab: "A public key has been found,
+          # but no private key." Die Secrets gehoeren deshalb auch hierher,
+          # nicht nur ins Release.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri build -- --target x86_64-unknown-linux-gnu --bundles deb,appimage
 
       - name: Upload Ubuntu artifacts

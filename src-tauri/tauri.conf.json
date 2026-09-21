@@ -24,9 +24,19 @@
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: emerald-img: http://emerald-img.localhost; connect-src 'self' ipc://localhost ipc: https://ipc.localhost https://fonts.googleapis.com https://fonts.gstatic.com; font-src 'self' data: https://fonts.gstatic.com; object-src 'none'; frame-src 'none'; form-action 'none'"
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYyNkJBQzBGRDg5RTI5MzQKUldRMEtaN1lENnhyOHVPZHFTc0tSNGhWMXVJaC9jS0phdUlvSlFkdzhGdG1URlVlWjRiaDE2ZFgK",
+      "endpoints": [
+        "https://the-emerald-app.de/updates/stable/latest.json",
+        "https://github.com/PrincePatrick11/Emerald-App/releases/latest/download/latest.json"
+      ]
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "macOS": {
       "minimumSystemVersion": "13.0"
     },

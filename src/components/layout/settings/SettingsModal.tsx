@@ -1,26 +1,27 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Archive, HardDrive, Info, SlidersHorizontal } from 'lucide-react';
+import { Archive, HardDrive, Info, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import Modal from '../../ui/Modal';
 import GeneralPage from './GeneralPage';
 import BackupPage from './BackupPage';
 import StoragePage from './StoragePage';
+import UpdatesPage from './UpdatesPage';
 import AboutPage from './AboutPage';
 
-export type SettingsPage = 'general' | 'backup' | 'storage' | 'about';
+export type SettingsPage = 'general' | 'backup' | 'storage' | 'updates' | 'about';
 
 const PAGES = [
   { id: 'general', labelKey: 'settings.pageGeneral', Icon: SlidersHorizontal },
   { id: 'backup', labelKey: 'settings.backup', Icon: Archive },
   { id: 'storage', labelKey: 'settings.storage', Icon: HardDrive },
+  { id: 'updates', labelKey: 'settings.updates', Icon: RefreshCw },
   { id: 'about', labelKey: 'settings.about', Icon: Info },
 ] as const;
 
 interface Props {
   onClose: () => void;
-  /** Bereich, mit dem das Fenster aufgeht. Heute verlinkt nichts hierher; der
-   *  Prop macht einen spaeteren Direktsprung zu einer Zeile statt zu einem
-   *  Umbau. */
+  /** Bereich, mit dem das Fenster aufgeht. Die Rail springt damit direkt auf
+   *  „Updates", wenn die Pruefung beim Start etwas gefunden hat. */
   initialPage?: SettingsPage;
 }
 
@@ -84,6 +85,7 @@ export default function SettingsModal({ onClose, initialPage = 'general' }: Prop
         {page === 'general' && <GeneralPage />}
         {page === 'backup' && <BackupPage />}
         {page === 'storage' && <StoragePage />}
+        {page === 'updates' && <UpdatesPage />}
         {page === 'about' && <AboutPage />}
       </div>
     </Modal>

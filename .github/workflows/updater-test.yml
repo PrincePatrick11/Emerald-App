@@ -1,0 +1,247 @@
+name: Updater test build
+
+# Baut den aktuellen Stand unter einer erfundenen Versionsnummer, signiert ihn
+# und haengt ihn als PRERELEASE unter dem festen Tag `updater-test` ab. Das ist
+# kein Release: `releases/latest` zeigt weiter auf die letzte echte Version, es
+# taucht nirgends als aktuelle Version auf, und der Tag traegt kein `v`, loest
+# also `release.yml` nicht aus.
+#
+# Damit laesst sich der komplette Update-Weg pruefen, bevor es eine Version
+# gibt, von der man updaten koennte:
+#
+#   1. Diesen Workflow starten (Version z. B. 99.0.0).
+#   2. In der App: Einstellungen → Updates → Update-Quelle auf
+#      https://github.com/PrincePatrick11/Emerald-App/releases/download/updater-test/latest.json
+#   3. "Nach Updates suchen" — Fund, Download, Signaturpruefung, Installation,
+#      Neustart laufen genau wie spaeter im Ernstfall.
+#
+# Danach laeuft auf dem Testrechner eine App mit der erfundenen Version. Zurueck
+# geht es, indem man die richtige Version von Hand installiert; die Vaults
+# bleiben davon unberuehrt.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version des Testbuilds (muss hoeher sein als die installierte)'
+        required: true
+        default: '99.0.0'
+      platform:
+        description: 'Welche Plattform gebaut wird'
+        required: true
+        type: choice
+        default: windows
+        options: [windows, macos, linux, all]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: updater-test
+  cancel-in-progress: false
+
+env:
+  TEST_TAG: updater-test
+
+jobs:
+  build-windows:
+    if: ${{ inputs.platform == 'windows' || inputs.platform == 'all' }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Nur im Runner, nie committet: der Arbeitsbaum ist hier ein Wegwerfding.
+      - name: Set the test version
+        run: node scripts/set-version.mjs "${{ inputs.version }}"
+
+      - run: npm ci
+      - name: Build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri build -- --target x86_64-pc-windows-msvc
+
+      - name: Collect the updater signature
+        run: >
+          node scripts/updater-fragment.mjs
+          --platform windows-x86_64
+          --dir src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: updater-fragment-windows-x86_64
+          path: updater-fragments/*.json
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TEST_TAG }}
+          name: Updater test build — not a release
+          prerelease: true
+          make_latest: false
+          body: Testbuild fuer den In-App-Updater. Nicht installieren, ausser zum Testen.
+          files: |
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.sig
+
+  build-macos:
+    if: ${{ inputs.platform == 'macos' || inputs.platform == 'all' }}
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Set the test version
+        run: node scripts/set-version.mjs "${{ inputs.version }}"
+
+      - run: npm ci
+      - name: Build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri build -- --target aarch64-apple-darwin
+
+      - name: Collect the updater signature
+        run: >
+          node scripts/updater-fragment.mjs
+          --platform darwin-aarch64
+          --dir src-tauri/target/aarch64-apple-darwin/release/bundle/macos
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: updater-fragment-darwin-aarch64
+          path: updater-fragments/*.json
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TEST_TAG }}
+          name: Updater test build — not a release
+          prerelease: true
+          make_latest: false
+          body: Testbuild fuer den In-App-Updater. Nicht installieren, ausser zum Testen.
+          files: |
+            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz.sig
+
+  build-linux:
+    if: ${{ inputs.platform == 'linux' || inputs.platform == 'all' }}
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux dependencies
+        timeout-minutes: 10
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev
+
+      - name: Set the test version
+        run: node scripts/set-version.mjs "${{ inputs.version }}"
+
+      - run: npm ci
+      - name: Build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri build -- --target x86_64-unknown-linux-gnu --bundles appimage
+
+      - name: Collect the updater signature
+        run: >
+          node scripts/updater-fragment.mjs
+          --platform linux-x86_64
+          --dir src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: updater-fragment-linux-x86_64
+          path: updater-fragments/*.json
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TEST_TAG }}
+          name: Updater test build — not a release
+          prerelease: true
+          make_latest: false
+          body: Testbuild fuer den In-App-Updater. Nicht installieren, ausser zum Testen.
+          files: |
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.sig
+
+  # Dasselbe Skript wie im echten Release — genau das ist der Sinn der Uebung:
+  # der Weg, der hier geprueft wird, ist der, der spaeter laeuft.
+  publish-manifest:
+    needs: [build-windows, build-macos, build-linux]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Collect the platform signatures
+        uses: actions/download-artifact@v4
+        with:
+          pattern: updater-fragment-*
+          path: updater-fragments
+          merge-multiple: true
+
+      - name: Read the release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release view "$TEST_TAG" --json assets --jq '[.assets[] | {name, url}]' > assets.json
+
+      - name: Build latest.json
+        run: |
+          printf 'Testbuild %s — kein echtes Release.\n' "${{ inputs.version }}" > release-notes.md
+          node scripts/updater-manifest.mjs \
+            --tag "${{ inputs.version }}" \
+            --assets assets.json \
+            --fragments updater-fragments \
+            --notes release-notes.md \
+            --out latest.json
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TEST_TAG }}
+          prerelease: true
+          make_latest: false
+          files: latest.json
+
+      - name: Print the test source
+        run: |
+          echo "Update-Quelle fuer die App:"
+          echo "https://github.com/${{ github.repository }}/releases/download/$TEST_TAG/latest.json"

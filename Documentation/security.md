@@ -37,7 +37,7 @@ PDF export runs in a hidden window built and torn down by the per-platform `expo
 
 ## Command Surface
 
-`src-tauri/src/lib.rs` registers **25 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
+`src-tauri/src/lib.rs` registers **29 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
 
 | Command | Defined in | Notes |
 |---|---|---|
@@ -52,10 +52,27 @@ PDF export runs in a hidden window built and torn down by the per-platform `expo
 | `default_vault_dir`, `new_vault_base_dir`, `legacy_default_db_exists` | `vault.rs` | pure path/existence oracles for the vault modal and the settings backup import (add-vault mode); return strings, take no path |
 | `migrate_vault_layout` | `vault.rs` | one-time move of a pre-multi-vault `.db` into the vault layout; the legacy name is validated with `is_valid_legacy_db_name` |
 | `update_menu_labels`, `set_export_menu_enabled`, `set_altar_export_menu_enabled`, `set_view_menu_checked` | `lib.rs` | native-menu state sync; no-ops on Windows/Linux where no native menu is installed |
+| `update_settings`, `set_update_settings`, `check_for_update`, `install_update` | `updates.rs` | the only commands that reach the network — see [In-App Updates](#in-app-updates) |
 
 ## External Links
 
 The capability includes `opener:default`, and the editor opens external links through it: clicking a link in read mode calls `openUrl(href)` (`RichEditor.tsx`) with an `href` taken from stored content — content that can arrive via an imported backup. There is no scheme allowlist at the call site; the `opener` plugin's default configuration is the only filter before the URL reaches the system browser. The link's full URL is shown in the link popup before it can be clicked, which is the practical mitigation for look-alike links.
+
+## In-App Updates
+
+`src-tauri/src/updates.rs` is the only part of the app that talks to the network, and the whole design rests on one split: **the update source is variable, the public key is not.**
+
+The key lives in `plugins.updater.pubkey` in `tauri.conf.json` and is compiled into every build. Its private half exists only as a GitHub secret (see [Signing](build.md#signing)). `tauri-plugin-updater` verifies every downloaded bundle against it before touching the installed app, so the worst a wrong, hijacked or user-mistyped source can do is deliver nothing or deliver something whose signature does not verify. Neither installs. Were the key editable alongside the URL, the variable source would stop being a convenience and become a way to install arbitrary code — which is why `update.json` has no field for it.
+
+The source itself is `{appDataDir}/update.json`, next to `vaults.json` and deliberately **not** in the per-vault settings: which server this installation asks for updates belongs to the installation, not to its content. A `.emeralddb` backup travels between machines, and vault-scoped settings travel with it; an imported backup must not be able to point the updater anywhere.
+
+`set_update_settings` validates before writing, and rejects anything that is not a complete **`https`** URL. The signature check would catch a tampered manifest served over `http`, but not an attacker who simply keeps answering with an old manifest — that is enough to pin an installation to a known-vulnerable version indefinitely. An invalid value is refused at the command rather than stored, so a bad URL cannot survive a restart and break every later check.
+
+A user-set source does not replace the compiled-in ones, it precedes them: `check_for_update` builds the endpoint list as `[user, ...configured]`, reading the built-in list out of `app.config()` rather than repeating it in Rust. A source that 404s falls through to the next one.
+
+Everything runs in Rust, including the download. Nothing about updating goes through the WebView, so the [Content Security Policy](#content-security-policy) stays at `connect-src 'self'` — an updater driven from the frontend would have needed the update host added there, widening what any injected script could reach.
+
+`install_update` refuses on an install method the updater cannot replace (a Linux `.deb`, detected by the absence of `APPIMAGE`), and installs only what the last `check_for_update` found and showed the user — the result is held in app state rather than re-fetched, so what gets installed is what was displayed.
 
 ## Vault Directories as a Trust Boundary
 

@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import { Settings } from 'lucide-react';
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { AUX_VIEWS, MODULE_LIST } from '../../lib/modules';
 import { useUIStore } from '../../store/uiStore';
 import { useVaultStore } from '../../store/vaultStore';
+import { asUpdateError, checkForUpdate, updateSettings } from '../../lib/updates';
 import VaultModal, { VaultGlyph } from './VaultModal';
 
 // SettingsModal zieht die komplette Backup-/Restore-Maschinerie (dbBackup)
@@ -27,6 +28,28 @@ export default function LeftSidebarRail() {
   // Selector auf ein Primitiv, nicht auf den Vault-Datensatz: `find` liefert
   // sonst bei jedem Store-Update ein Objekt, das zustand als geaendert liest.
   const activeVaultIcon = useVaultStore((s) => s.vaults.find((v) => v.id === s.activeVaultId)?.icon);
+
+  // Die Pruefung beim Start haengt hier und nicht in App.tsx, weil ihr einziges
+  // sichtbares Ergebnis der Punkt am Zahnrad darunter ist. Gefunden oder nicht:
+  // sie meldet sich nie von selbst — ein Fenster, das ungefragt aufgeht, waere
+  // die Art Unterbrechung, die eine lokale App nicht haben soll.
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      try {
+        if (!(await updateSettings()).auto_check) return;
+        const found = await checkForUpdate();
+        if (!dead && found.available && found.installable) setUpdateVersion(found.version);
+      } catch (e: unknown) {
+        // Kein Netz, keine Quelle, kein Problem: der Punkt bleibt aus. Gesagt
+        // wird es nur der Konsole — beim Start ungefragt eine Fehlermeldung zu
+        // zeigen, waere schlimmer als das ausbleibende Update.
+        console.error('[updates] check on start failed:', asUpdateError(e).detail);
+      }
+    })();
+    return () => { dead = true; };
+  }, []);
 
   return (
     <div
@@ -80,8 +103,18 @@ export default function LeftSidebarRail() {
                 selbst ein lucide-Icon und bleibt bei den 18 seiner Nachbarn. */}
             <VaultGlyph icon={activeVaultIcon} size={activeVaultIcon ? 17 : 18} />
           </RailButton>
-          <RailButton onClick={() => setSettingsOpen(true)} title={t('nav.settings')}>
+          <RailButton
+            onClick={() => setSettingsOpen(true)}
+            title={updateVersion ? t('settings.updateFound', { version: updateVersion }) : t('nav.settings')}
+            className="relative"
+          >
             <Settings size={18} />
+            {updateVersion && (
+              <span
+                aria-hidden
+                className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-jade-400"
+              />
+            )}
           </RailButton>
         </div>
       </div>
@@ -89,7 +122,10 @@ export default function LeftSidebarRail() {
       {vaultOpen && <VaultModal onClose={() => setVaultOpen(false)} />}
       {settingsOpen && (
         <Suspense fallback={null}>
-          <SettingsModal onClose={() => setSettingsOpen(false)} />
+          <SettingsModal
+            onClose={() => setSettingsOpen(false)}
+            initialPage={updateVersion ? 'updates' : 'general'}
+          />
         </Suspense>
       )}
     </div>

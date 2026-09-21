@@ -24,6 +24,8 @@ mod images;
 /// Vault directories and the id → path registry every storage command
 /// resolves against.
 mod vault;
+/// Der In-App-Updater: variable Quelle, Pruefung, Installation.
+mod updates;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -736,7 +738,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_sql::Builder::new().build())
-        .manage(vault::VaultRegistry::default());
+        // Wird nur aus `updates.rs` benutzt, nie aus dem Frontend — deshalb
+        // steht keine `updater:`-Berechtigung in der Capability.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(vault::VaultRegistry::default())
+        .manage(updates::PendingUpdate::default());
 
     images::register(builder)
         .invoke_handler(tauri::generate_handler![
@@ -766,6 +772,10 @@ pub fn run() {
             set_altar_export_menu_enabled,
             set_view_menu_checked,
             update_menu_labels,
+            updates::update_settings,
+            updates::set_update_settings,
+            updates::check_for_update,
+            updates::install_update,
         ])
         .setup(|_app| {
             // Both of these are macOS-only; `_app` keeps the parameter from

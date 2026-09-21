@@ -418,6 +418,16 @@ Right-click any entry in the left sidebar or in any list view (List, Cards, Card
 
 **Text editing context menu.** Right-clicking into any text input, textarea, or other editable field offers Cut, Copy, Paste, and Select all; right-clicking selected read-only text elsewhere offers Copy. This replaces the WebView's own native menu everywhere except the rich-text editor, which keeps the native one — its spell-check suggestions cannot be reproduced from JavaScript. The commands are the same ones the title bar's Edit menu uses.
 
+## Updates
+
+**Settings → Updates** shows the installed version, checks for a new one, and installs it. A check ends in exactly one of three states: a newer version is offered, Emerald is up to date, or the source could not be reached. A source that *answers* without offering anything — including a plain 404, which is what every source says until a release carries a manifest — counts as up to date, not as a failure; only a request that does not get through at all reports as unreachable. The library's own English error text goes to the console, never into the window. Finding an update downloads nothing by itself: the version, its changelog section and a **Download and install** button appear, with a progress bar while the bundle comes down, and the app restarts into the new version afterwards. Vault data is untouched — an update replaces the application, not its content.
+
+With **Check for updates on start** on (the default), the app asks once per launch. The only thing that happens on a find is a small dot on the gear in the left rail; clicking it opens Settings directly on the Updates page. Nothing ever opens on its own, and nothing installs without the button.
+
+**Update source** is a free-text field for the address the app asks. Empty — the normal state — means the addresses built into the app: `the-emerald-app.de` first, the GitHub release manifest as a fallback if the first does not answer. It exists so a moved address can be fixed without waiting for a new build; the signing key is *not* editable, so a wrong address can only fail to deliver, never deliver something else (see [In-App Updates](security.md#in-app-updates)). Only complete `https` addresses are accepted, and a changed source clears the last result, which came from somewhere else.
+
+A `.deb` install cannot replace itself and says so instead of offering a button — there the new version comes from the website. AppImage, the Windows installer and macOS update in place.
+
 ## Language
 
 Settings → General → Language switches the app language between English, German, Spanish, and French. English is the default and fallback language; the other three locale bundles are loaded on demand the first time they are selected (`changeAppLanguage` in `src/i18n/index.ts`). The choice is persisted in `localStorage` under `app-language` — like the theme, it is applied before the first render so the app never flashes English on launch.
