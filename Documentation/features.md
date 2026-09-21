@@ -441,7 +441,7 @@ With **Check for updates on start** on (the default), the app asks once per laun
 
 **Update source** is a free-text field for the address the app asks. Empty — the normal state — means the addresses built into the app: `the-emerald-app.de` first, the GitHub release manifest as a fallback if the first does not answer. It exists so a moved address can be fixed without waiting for a new build; the signing key is *not* editable, so a wrong address can only fail to deliver, never deliver something else (see [In-App Updates](security.md#in-app-updates)). Only complete `https` addresses are accepted, and a changed source clears the last result, which came from somewhere else.
 
-A `.deb` install cannot replace itself and says so instead of offering a button — there the new version comes from the website. AppImage, the Windows installer and macOS update in place.
+A `.deb` install is not offered updates and says so instead of showing a button — there the new version comes from the website. AppImage, the Windows installer and macOS update in place.
 
 ## Language
 

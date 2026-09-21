@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Check, CloudOff, Download, Globe, RefreshCw } from 'lucide-react';
 import Button from '../../ui/Button';
-import SettingsSection from './SettingsSection';
+import BlockCheckbox from '../../blocks/BlockCheckbox';
+import SettingsSection, { SettingsDescription } from './SettingsSection';
 import { formatBytes } from '../../../lib/helpers';
 import {
   asUpdateError, checkForUpdate, installUpdate, onUpdateProgress, setUpdateSettings, updateSettings,
@@ -12,27 +13,43 @@ import packageJson from '../../../../package.json';
 
 type Status = 'idle' | 'checking' | 'done' | 'failed' | 'installing';
 
-/** Welcher Satz zu welchem Code gehoert. Was hier fehlt, faellt auf die
- *  allgemeine Meldung zurueck — ein neuer Code aus Rust bleibt dadurch
+/** Die Meldung zu einem Code aus Prüfung oder Installation. Was hier fehlt,
+ *  fällt auf `updateError` zurück — ein neuer Code aus Rust bleibt dadurch
  *  lesbar, statt eine leere Zeile zu zeigen. */
 const ERROR_KEYS: Record<string, string> = {
   unreachable: 'settings.updateErrorUnreachable',
   'unsupported-target': 'settings.updateErrorTarget',
   'unsupported-install': 'settings.updateUnsupported',
   'nothing-to-install': 'settings.updateErrorStale',
+  'install-failed': 'settings.updateErrorInstall',
+};
+
+/** Die Codes, die beim Speichern der Quelle fallen können — eine eigene
+ *  Zuordnung, weil dieselben Wörter dort etwas anderes heißen. Vorher teilten
+ *  sich beide eine Tabelle, und `invalid-url` fehlte darin *absichtlich*,
+ *  damit der Rückfall greift: eine Lücke, die man nicht sieht. */
+const SOURCE_ERROR_KEYS: Record<string, string> = {
+  'invalid-url': 'settings.updateSourceInvalid',
   'write-failed': 'settings.updateErrorWrite',
 };
 
-/** Zwei dieser Faelle sind kein Defekt: niemand hat geantwortet, oder es gibt
- *  fuer diese Plattform nichts. Die tragen kein Warndreieck. */
+/** Zwei Fälle sind kein Defekt: niemand hat geantwortet, oder es gibt für
+ *  diese Plattform nichts. Die tragen kein Warndreieck. */
 const CALM_CODES = new Set(['unreachable', 'unsupported-target']);
+
+/** Was unter dem Quellenfeld steht — ein Feld statt zweier Flags, die sich
+ *  ohnehin ausschließen. Der Fehler wird als Code gehalten und erst beim
+ *  Rendern übersetzt, sonst bliebe die Meldung nach einem Sprachwechsel in
+ *  der alten Sprache stehen. */
+type SourceFeedback = { kind: 'saved' } | { kind: 'error'; code: string } | null;
 
 /**
  * Updates: suchen, installieren — und die Quelle, falls sie sich einmal ändert.
  *
- * Die Quelle steht hier als Feld, weil sie zur Installation gehört und nicht
- * zum Vault: sie landet in `{appDataDir}/update.json`, nicht in den
- * Vault-Einstellungen. Leer heißt, es gelten die eingebauten Adressen.
+ * Die einzige Einstellungsseite, die nicht pro Vault gilt: welche Quelle diese
+ * Installation fragt, gehört zur Installation, nicht zum Inhalt. Sie landet in
+ * `{appDataDir}/update.json` neben `vaults.json`, nicht in der `settings.json`
+ * des Vaults — sonst könnte ein importiertes Backup sie mitbringen.
  */
 export default function UpdatesPage() {
   const { t } = useTranslation();
@@ -45,8 +62,7 @@ export default function UpdatesPage() {
   const [endpoint, setEndpoint] = useState('');
   const [savedEndpoint, setSavedEndpoint] = useState('');
   const [autoCheck, setAutoCheck] = useState(true);
-  const [sourceError, setSourceError] = useState<string | null>(null);
-  const [sourceSaved, setSourceSaved] = useState(false);
+  const [sourceFeedback, setSourceFeedback] = useState<SourceFeedback>(null);
 
   const byteUnits: [string, string, string] = [
     t('common.bytes'), t('common.kilobytes'), t('common.megabytes'),
@@ -65,17 +81,13 @@ export default function UpdatesPage() {
   // Der Fortschritt kommt als Ereignis aus Rust. Abonniert wird beim Öffnen der
   // Seite, nicht erst beim Klick: `download_and_install` sendet den ersten
   // Brocken u. U. schneller, als ein danach gesetzter Listener steht.
-  const unlistenRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     let dead = false;
+    let unlisten: (() => void) | null = null;
     onUpdateProgress(setProgress)
-      .then((un) => { if (dead) un(); else unlistenRef.current = un; })
+      .then((un) => { if (dead) un(); else unlisten = un; })
       .catch((e: unknown) => console.error('[updates] listen failed:', e));
-    return () => {
-      dead = true;
-      unlistenRef.current?.();
-      unlistenRef.current = null;
-    };
+    return () => { dead = true; unlisten?.(); };
   }, []);
 
   async function check() {
@@ -87,6 +99,10 @@ export default function UpdatesPage() {
     } catch (e: unknown) {
       const err = asUpdateError(e);
       console.error('[updates] check failed:', err.detail);
+      // Auch den alten Fund verwerfen: sonst stünde die Fehlermeldung neben
+      // einem „Version X ist verfügbar" samt Knopf, das die gerade
+      // gescheiterte Prüfung nicht mehr bestätigt.
+      setResult(null);
       setError(err);
       setStatus('failed');
     }
@@ -101,6 +117,9 @@ export default function UpdatesPage() {
     } catch (e: unknown) {
       const err = asUpdateError(e);
       console.error('[updates] install failed:', err.detail);
+      // `result` bleibt hier absichtlich stehen — der Fund gilt weiter, nur
+      // das Installieren ist gescheitert, und ein zweiter Versuch soll nicht
+      // erst neu suchen müssen.
       setError(err);
       setStatus('failed');
       setProgress(null);
@@ -108,14 +127,13 @@ export default function UpdatesPage() {
   }
 
   async function saveSource(nextEndpoint: string, nextAutoCheck: boolean) {
-    setSourceError(null);
-    setSourceSaved(false);
+    setSourceFeedback(null);
     try {
       const saved = await setUpdateSettings(nextEndpoint, nextAutoCheck);
       setEndpoint(saved.endpoint);
       setSavedEndpoint(saved.endpoint);
       setAutoCheck(saved.auto_check);
-      setSourceSaved(true);
+      setSourceFeedback({ kind: 'saved' });
       // Eine geänderte Quelle macht das letzte Ergebnis wertlos — es stammt
       // von woanders her.
       if (saved.endpoint !== savedEndpoint) {
@@ -125,7 +143,7 @@ export default function UpdatesPage() {
     } catch (e: unknown) {
       const err = asUpdateError(e);
       console.error('[updates] saving the source failed:', err.detail);
-      setSourceError(t(ERROR_KEYS[err.code] ?? 'settings.updateSourceInvalid'));
+      setSourceFeedback({ kind: 'error', code: err.code });
     }
   }
 
@@ -136,15 +154,19 @@ export default function UpdatesPage() {
 
   return (
     <>
-      <SettingsSection icon={<RefreshCw size={14} />} title={t('settings.updates')}>
-        <div className="rounded-lg bg-stone-800/60 border border-stone-700/40 px-3 py-2.5 space-y-2.5">
+      <SettingsSection
+        icon={<RefreshCw size={14} />}
+        title={t('settings.updates')}
+        description={t('settings.updatesDesc')}
+      >
+        <div className="panel px-3 py-2.5 space-y-2.5">
           <div className="flex items-center justify-between gap-3">
             <span className="flex items-center gap-2 text-sm text-stone-300 min-w-0">
-              <span className="text-stone-500">{t('settings.version')}</span>
+              <span className="text-muted">{t('settings.version')}</span>
               <span className="truncate">{packageJson.version}</span>
             </span>
             <Button onClick={check} disabled={busy} tone="jade" className="shrink-0">
-              <RefreshCw size={12} className={status === 'checking' ? 'animate-spin' : undefined} />
+              <RefreshCw size={14} className={status === 'checking' ? 'animate-spin' : undefined} />
               {status === 'checking' ? t('settings.updateChecking') : t('settings.updateCheck')}
             </Button>
           </div>
@@ -160,7 +182,7 @@ export default function UpdatesPage() {
             // er ist englisch und nennt Dinge, die niemanden weiterbringen, der
             // nur wissen will, ob es eine neue Version gibt.
             <p className={`text-xs flex items-start gap-1.5 ${
-              CALM_CODES.has(error.code) ? 'text-stone-400' : 'text-amber-400'
+              CALM_CODES.has(error.code) ? 'text-muted' : 'text-danger'
             }`}>
               {CALM_CODES.has(error.code)
                 ? <CloudOff size={12} className="mt-0.5 shrink-0" />
@@ -170,7 +192,7 @@ export default function UpdatesPage() {
           )}
 
           {result?.available && (
-            <div className="space-y-2 pt-2 border-t border-stone-700/40">
+            <div className="space-y-2 pt-2 border-t" style={{ borderColor: 'var(--border-soft)' }}>
               <p className="text-sm text-stone-300">
                 {t('settings.updateFound', { version: result.version })}
               </p>
@@ -178,15 +200,15 @@ export default function UpdatesPage() {
               {result.notes && (
                 <div>
                   <div className="label-xs mb-1">{t('settings.updateNotes')}</div>
-                  <pre className="text-xs text-stone-400 whitespace-pre-wrap font-sans max-h-32 overflow-y-auto">
+                  <pre className="text-xs text-muted whitespace-pre-wrap font-sans max-h-32 overflow-y-auto">
                     {result.notes}
                   </pre>
                 </div>
               )}
 
               {!result.installable ? (
-                <p className="text-xs text-amber-400 flex items-start gap-1.5">
-                  <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                <p className="text-xs text-muted flex items-start gap-1.5">
+                  <CloudOff size={12} className="mt-0.5 shrink-0" />
                   {t('settings.updateUnsupported')}
                 </p>
               ) : (
@@ -197,7 +219,7 @@ export default function UpdatesPage() {
                       {status === 'installing' ? t('settings.updateInstalling') : t('settings.updateInstall')}
                     </Button>
                     {status === 'installing' && (
-                      <span className="text-xs text-stone-500">
+                      <span className="text-xs text-muted">
                         {percent !== null
                           ? `${percent}%`
                           : progress && formatBytes(progress.downloaded, byteUnits)}
@@ -206,17 +228,20 @@ export default function UpdatesPage() {
                   </div>
 
                   {status === 'installing' && (
-                    <div className="h-1 rounded-full bg-stone-700/60 overflow-hidden">
+                    <div
+                      className="h-1 rounded-full overflow-hidden"
+                      style={{ backgroundColor: 'color-mix(in srgb, var(--accent) 18%, transparent)' }}
+                    >
                       {/* Ohne bekannte Gesamtgröße bleibt der Balken leer statt
                           zu lügen — die Byte-Zahl daneben zeigt, dass es läuft. */}
                       <div
-                        className="h-full bg-jade-500/70 transition-[width] duration-200"
-                        style={{ width: `${percent ?? 0}%` }}
+                        className="h-full transition-[width] duration-200"
+                        style={{ width: `${percent ?? 0}%`, backgroundColor: 'var(--accent)' }}
                       />
                     </div>
                   )}
 
-                  <p className="text-xs text-stone-500">{t('settings.updateRestartHint')}</p>
+                  <SettingsDescription className="mb-0">{t('settings.updateRestartHint')}</SettingsDescription>
                 </>
               )}
             </div>
@@ -224,23 +249,29 @@ export default function UpdatesPage() {
         </div>
       </SettingsSection>
 
-      <SettingsSection icon={<Globe size={14} />} title={t('settings.updateSource')}>
+      <SettingsSection
+        icon={<Globe size={14} />}
+        title={t('settings.updateSource')}
+        description={t('settings.updateSourceDesc')}
+      >
         <div className="space-y-2">
-          <p className="text-xs text-stone-500 leading-relaxed">{t('settings.updateSourceDesc')}</p>
-
           <div className="flex gap-2 items-start">
             <div className="flex-1">
               <input
                 type="text"
                 value={endpoint}
-                onChange={(e) => { setEndpoint(e.target.value); setSourceSaved(false); setSourceError(null); }}
+                onChange={(e) => { setEndpoint(e.target.value); setSourceFeedback(null); }}
                 placeholder={t('settings.updateSourcePlaceholder')}
                 spellCheck={false}
                 title={t('settings.updateSourceDesc')}
-                className="w-full bg-stone-800 border border-stone-700/60 rounded px-2 py-1 text-xs text-stone-300 outline-none focus:border-jade-500/60"
+                className="input-field settings-field w-full"
               />
-              {sourceError && <p className="text-xs text-amber-400 mt-1">{sourceError}</p>}
-              {sourceSaved && !sourceError && (
+              {sourceFeedback?.kind === 'error' && (
+                <p className="text-xs text-danger mt-1">
+                  {t(SOURCE_ERROR_KEYS[sourceFeedback.code] ?? 'settings.updateSourceInvalid')}
+                </p>
+              )}
+              {sourceFeedback?.kind === 'saved' && (
                 <p className="text-xs text-jade-400 mt-1 flex items-center gap-1">
                   <Check size={12} /> {t('settings.updateSourceSaved')}
                 </p>
@@ -264,20 +295,14 @@ export default function UpdatesPage() {
             </Button>
           </div>
 
-          <label className="flex items-center gap-2 cursor-pointer group pt-1">
-            <div
-              onClick={() => saveSource(savedEndpoint, !autoCheck)}
-              className={`w-4 h-4 rounded border flex items-center justify-center transition-colors cursor-pointer ${
-                autoCheck ? 'bg-jade-500/30 border-jade-500/60' : 'border-stone-600 hover:border-stone-400'
-              }`}
-            >
-              {autoCheck && <Check size={10} className="text-jade-400" />}
-            </div>
-            <span className="text-xs text-stone-400 group-hover:text-stone-300 transition-colors">
-              {t('settings.updateAutoCheck')}
-            </span>
-          </label>
-          <p className="text-xs text-stone-500 leading-relaxed">{t('settings.updateAutoCheckDesc')}</p>
+          {/* Dasselbe Häkchen wie in der Datensicherung: ein echtes `input`,
+              mit Tastatur erreichbar und in beiden Themes im Akzent. */}
+          <BlockCheckbox
+            checked={autoCheck}
+            onChange={(next) => saveSource(savedEndpoint, next)}
+            label={t('settings.updateAutoCheck')}
+            hint={t('settings.updateAutoCheckDesc')}
+          />
         </div>
       </SettingsSection>
     </>

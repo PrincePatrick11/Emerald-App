@@ -74,9 +74,12 @@ pub struct UpdateCheck {
     current_version: String,
     notes: Option<String>,
     date: Option<String>,
-    /// Falsch auf einer `.deb`-Installation: der Updater kann nur AppImage,
-    /// NSIS/MSI und macOS-Bundles ersetzen. Die UI zeigt dann einen Hinweis
-    /// statt eines Knopfes, statt einen Fehler erst beim Klick zu liefern.
+    /// Falsch auf einer `.deb`-Installation. Nicht, weil das Plugin es nicht
+    /// koennte — es ruft dafuer `pkexec dpkg -i` —, sondern weil das Manifest
+    /// dafuer einen eigenen Schluessel `linux-x86_64-deb` braeuchte und der
+    /// Release-Workflow keinen veroeffentlicht. Die UI zeigt deshalb einen
+    /// Hinweis statt eines Knopfes, statt den Fehler erst beim Klick zu
+    /// liefern.
     installable: bool,
 }
 
@@ -100,10 +103,10 @@ impl UpdateError {
     }
 }
 
-/// Ordnet einen Updater-Fehler einem der drei Faelle zu, die sich fuer einen
+/// Ordnet einen Fehler der PRUEFUNG einem der Faelle zu, die sich fuer einen
 /// Nutzer wirklich unterscheiden: niemand hat geantwortet, diese Plattform
 /// steht nicht im Manifest, oder etwas anderes ist schiefgegangen.
-fn classify(e: tauri_plugin_updater::Error) -> UpdateError {
+fn classify_check(e: tauri_plugin_updater::Error) -> UpdateError {
     use tauri_plugin_updater::Error as E;
     let code = match &e {
         // Die Anfrage kam gar nicht durch: kein Netz, DNS, TLS. Eine Quelle,
@@ -114,6 +117,21 @@ fn classify(e: tauri_plugin_updater::Error) -> UpdateError {
         E::TargetNotFound(_) | E::TargetsNotFound(_) | E::UnsupportedArch | E::UnsupportedOs => {
             "unsupported-target"
         }
+        _ => "failed",
+    };
+    UpdateError::new(code, e)
+}
+
+/// Dasselbe fuer die INSTALLATION — und bewusst nicht dieselbe Funktion.
+/// `Io` heisst hier nicht „niemand hat geantwortet", sondern dass das Bundle
+/// nicht geschrieben oder ersetzt werden konnte. Mit der Zuordnung der
+/// Pruefung haette der Nutzer bei einem Rechteproblem gelesen, die Quelle sei
+/// nicht erreichbar — und an der falschen Stelle gesucht.
+fn classify_install(e: tauri_plugin_updater::Error) -> UpdateError {
+    use tauri_plugin_updater::Error as E;
+    let code = match &e {
+        E::Reqwest(_) => "unreachable",
+        E::Io(_) => "install-failed",
         _ => "failed",
     };
     UpdateError::new(code, e)
@@ -192,13 +210,36 @@ fn configured_endpoints(app: &AppHandle) -> Vec<url::Url> {
         .unwrap_or_default()
 }
 
-/// Auf Linux kann der Updater nur ein AppImage ersetzen, und das erkennt er an
-/// der `APPIMAGE`-Variable, die der AppImage-Runtime setzt. Fehlt sie, laeuft
-/// die App aus einem `.deb` — dann gibt es nichts zu installieren.
+/// Ob sich diese Installation selbst ersetzen kann.
+///
+/// Auf Linux haengt das am AppImage — aber `APPIMAGE` allein zu pruefen waere
+/// falsch, und zwar gefaehrlich falsch: die Variable ist eine ganz normale
+/// Umgebungsvariable und wird an jeden Kindprozess vererbt. Ein aus einem
+/// `.deb` installiertes Emerald, gestartet aus einem Terminal oder Editor, der
+/// selbst ein AppImage ist, sieht dort den Pfad JENES AppImage. Das Plugin
+/// nimmt genau diesen Pfad als Installationsziel (`env.appimage` →
+/// `extract_path`) — im schlechtesten Fall wird also eine fremde Anwendung
+/// ueberschrieben, im besten bricht die Installation nach dem vollstaendigen
+/// Download ab.
+///
+/// Deshalb zusaetzlich die Probe, die `tauri-utils` selbst benutzt (dort
+/// allerdings nur fuer eine Warnung): eine laufende AppImage-Anwendung liegt
+/// im Mountpunkt `{temp}/.mount_…`. Beides zusammen ist die Aussage „dieses
+/// Programm IST ein AppImage", statt „irgendwo hier war mal eines".
+///
+/// Ein von Hand entpacktes AppImage (`--appimage-extract` plus `AppRun`, der
+/// uebliche Weg ohne libfuse2) faellt damit auf „nicht ersetzbar" — richtig so,
+/// dort gibt es keine einzelne Datei zum Austauschen.
 fn install_supported() -> bool {
     #[cfg(target_os = "linux")]
     {
-        std::env::var_os("APPIMAGE").is_some()
+        if std::env::var_os("APPIMAGE").is_none() {
+            return false;
+        }
+        let mount_prefix = format!("{}/.mount_", std::env::temp_dir().display());
+        std::env::current_exe()
+            .map(|exe| exe.display().to_string().starts_with(&mount_prefix))
+            .unwrap_or(false)
     }
     #[cfg(not(target_os = "linux"))]
     {
@@ -249,10 +290,10 @@ pub async fn check_for_update(
             .map_err(|e| UpdateError::new("invalid-url", e))?;
         let mut endpoints = vec![endpoint];
         endpoints.extend(configured_endpoints(&app));
-        builder = builder.endpoints(endpoints).map_err(classify)?;
+        builder = builder.endpoints(endpoints).map_err(classify_check)?;
     }
 
-    let found = match builder.build().map_err(classify)?.check().await {
+    let found = match builder.build().map_err(classify_check)?.check().await {
         Ok(found) => found,
         // Jeder Endpoint hat geantwortet, keiner mit einem brauchbaren
         // Manifest — das Plugin sammelt einen Fehler nur, wenn die Anfrage
@@ -261,7 +302,7 @@ pub async fn check_for_update(
         // es gibt nichts zu holen. Das ist kein Fehler, sondern der Normalfall,
         // solange noch kein Release ein Manifest traegt.
         Err(tauri_plugin_updater::Error::ReleaseNotFound) => None,
-        Err(e) => return Err(classify(e)),
+        Err(e) => return Err(classify_check(e)),
     };
 
     let check = match &found {
@@ -334,7 +375,7 @@ pub async fn install_update(
         if let Ok(mut pending) = state.0.lock() {
             *pending = Some(update);
         }
-        return Err(classify(e));
+        return Err(classify_install(e));
     }
 
     // Auf Windows beendet der NSIS-Installer die App selbst; kommt der Aufruf

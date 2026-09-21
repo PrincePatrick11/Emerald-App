@@ -67,7 +67,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: emerald-macos-apple-silicon
-          path: src-tauri/target/aarch64-apple-darwin/release/bundle/
+          # Nur die Installer. Seit `createUpdaterArtifacts` an ist,
+          # liegen im Bundle-Verzeichnis auch das Updater-Bundle und die
+          # Signaturen — und Workflow-Artefakte kann auf einem oeffentlichen
+          # Repository jeder angemeldete Nutzer herunterladen. Signierte
+          # Bundles beliebiger Zweige gehoeren dort nicht hin.
+          path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
           if-no-files-found: error
 
   build-windows:
@@ -110,7 +115,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: emerald-windows
-          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/
+          # Nur die Installer. Seit `createUpdaterArtifacts` an ist,
+          # liegen im Bundle-Verzeichnis auch das Updater-Bundle und die
+          # Signaturen — und Workflow-Artefakte kann auf einem oeffentlichen
+          # Repository jeder angemeldete Nutzer herunterladen. Signierte
+          # Bundles beliebiger Zweige gehoeren dort nicht hin.
+          path: |
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
           if-no-files-found: error
 
   build-ubuntu:
@@ -164,7 +176,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: emerald-ubuntu
+          # Nur die Installer. Seit `createUpdaterArtifacts` an ist,
+          # liegen im Bundle-Verzeichnis auch das Updater-Bundle und die
+          # Signaturen — und Workflow-Artefakte kann auf einem oeffentlichen
+          # Repository jeder angemeldete Nutzer herunterladen. Signierte
+          # Bundles beliebiger Zweige gehoeren dort nicht hin.
           path: |
-            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/
-            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
           if-no-files-found: error

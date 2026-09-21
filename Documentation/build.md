@@ -1,10 +1,10 @@
 # Build & Release
 
-How Emerald gets from a commit to a downloadable binary. Five GitHub Actions
+How Emerald gets from a commit to a downloadable binary. Four GitHub Actions
 workflows do the work; this file says what each one is for, what it does *not*
 cover, and what has to be true before a tag is pushed.
 
-## The five workflows
+## The four workflows
 
 | Workflow | Trigger | Purpose |
 |---|---|---|
@@ -12,7 +12,6 @@ cover, and what has to be true before a tag is pushed.
 | [`manual-desktop-builds.yml`](../.github/workflows/manual-desktop-builds.yml) | `workflow_dispatch` | Real bundles on demand, as downloadable artifacts. The dress rehearsal before a tag. |
 | [`release.yml`](../.github/workflows/release.yml) | pushing a `v*` tag | Creates the GitHub release and uploads the signed bundles to it. |
 | [`rust-tests.yml`](../.github/workflows/rust-tests.yml) | pushes and pull requests that touch `src-tauri/**` | `cargo test` on all three. Deliberately its own file, not a line in `ci.yml`: what it runs has an expiry date — see [Known gaps](#known-gaps). |
-| [`updater-test.yml`](../.github/workflows/updater-test.yml) | `workflow_dispatch` | A signed build under a made-up version, published as a prerelease, so the in-app updater can be driven end to end without releasing anything. See [Testing the updater](#testing-the-updater). |
 
 ## CI — the smoke detector
 
@@ -84,47 +83,29 @@ environment. `npm run tauri:dev` does not bundle and is unaffected.
 
 The update path has a chicken-and-egg problem: it can only be exercised against
 a real, signed bundle behind an https address, and the first version carrying
-the updater has nothing to update *from*. `updater-test.yml` breaks that without
-publishing a release.
+the updater has nothing to update *from*.
 
-It runs on `workflow_dispatch` with a version (default `99.0.0`) and a platform
-(default Windows — one runner is enough to exercise the path), **and on any push
-to the `UpdaterTest` branch**, where those defaults apply. The push trigger is
-not a convenience: a `workflow_dispatch` workflow only appears in the Actions tab
-once its file is on the default branch, so until this one is merged, pushing to
-that branch is the only way to start it. It also happens to be the natural one —
-the change that should become visible in the test build is what triggers it.
+A `workflow_dispatch` workflow that built a signed bundle under a made-up
+version and published it as a prerelease did that job once, and was removed
+again. It signed with the **production** key and left the result at a fixed
+public address, which is a bad trade for a test convenience: anyone who can get
+a user to paste that address in installs a build that never went through a
+release, under a version number that outranks every real one. The rule it broke
+is worth stating, because it is easy to re-introduce: *the production signing
+key signs releases, nothing else.*
 
-Either way, it:
+What remains for testing an update before shipping one:
 
-1. Rewrites the three version sites **in the runner only**, via
-   `scripts/set-version.mjs`. Nothing is committed.
-2. Builds and signs with the same secrets and the same `updater-fragment.mjs` /
-   `updater-manifest.mjs` scripts the release uses — that is the point: the path
-   under test is the path that will run later.
-3. Publishes to the fixed tag `updater-test` as a **prerelease** with
-   `make_latest: false`. It never becomes `latest`, so no installed app is
-   offered it by accident, and the tag carries no `v`, so `release.yml` does not
-   fire.
-
-Then, in the app: Settings → Updates → Update source →
-
-```
-https://github.com/PrincePatrick11/Emerald-App/releases/download/updater-test/latest.json
-```
-
-— and Check for updates. Fetch, signature check, download, install and restart
-all run exactly as they will in earnest. The address stays the same across runs.
-
-Two things to know. The test build installs over the real one (same identifier),
-so afterwards that machine runs the made-up version until the proper one is
-installed again — vault data is untouched either way. And the whole thing is
-undone with `gh release delete updater-test --cleanup-tag`.
-
-**Worth doing once: the negative test.** Take the published `latest.json`, change
-one character inside a `signature`, serve it anywhere over https, and point the
-update source at it. The install must be refused. Without that, a passing test
-only proves the check never fired.
+- **A prerelease.** Tag a real version, mark the GitHub release as a prerelease
+  so `releases/latest` keeps pointing at the previous one, then set the update
+  source in Settings to that release's own `latest.json` URL. Same path, same
+  key, nothing published to anyone who did not go looking.
+- **The negative test, which is the one worth doing.** Take a published
+  `latest.json`, change the announced `version` while leaving `url` and
+  `signature` alone, serve it over https, and point the update source at it.
+  With `requireSignedVersion` on, the update must be refused. That is the test
+  that proves the guard actually fires — flipping a character in the signature
+  only proves minisign works.
 
 ## Release — what a tag sets off
 
@@ -187,10 +168,14 @@ A running release build is not something to abort halfway.
 updater only offers what the manifest lists, an Intel Mac running under Rosetta
 is never offered an update either.
 
-**A `.deb` install cannot update itself.** The updater replaces an AppImage, an
-NSIS/MSI install and a macOS `.app`, but has no way to drive `dpkg`. The app
-detects this (no `APPIMAGE` in the environment) and shows a "download it from
-the website" note instead of an install button. The MSI is published for people
+**A `.deb` install is not offered updates.** Not because the plugin could not do
+it — it shells out to `pkexec dpkg -i` — but because that path needs its own
+`linux-x86_64-deb` key in the manifest, and the release workflow publishes only
+`linux-x86_64` pointing at the AppImage. Adding it later is a manifest change,
+not an app change. Until then the app detects the case and shows a "download it
+from the website" note instead of an install button; the detection is stricter
+than an `APPIMAGE` check, for the reason given in
+[In-App Updates](security.md#in-app-updates). The MSI is published for people
 who want it but is not the Windows update path; one platform key maps to one
 URL, and that is the NSIS installer.
 
@@ -340,11 +325,18 @@ uses its own minisign key pair, generated once with
 | public | `plugins.updater.pubkey` in `tauri.conf.json`, compiled into every build |
 | private | repository secret `TAURI_SIGNING_PRIVATE_KEY`, with its passphrase in `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` |
 
+**`@tauri-apps/cli` must stay at 2.11.5 or newer.** That release started writing
+the app version into each signature's trusted comment, which is what
+`requireSignedVersion: true` in `tauri.conf.json` then enforces. Downgrading the
+CLI while the flag is on produces signatures without that field, and every
+update fails with `MissingSignedVersion`. The two belong together — see
+[In-App Updates](security.md#in-app-updates) for what the flag buys.
+
 Both secrets are read by the three build jobs; `bundle.createUpdaterArtifacts`
-makes Tauri emit the updater bundle and its `.sig` alongside the normal ones. A
-build with the secrets missing still succeeds and still produces installers —
-it just produces no `.sig`, and `updater-fragment.mjs` then fails the release
-rather than publishing a manifest that cannot be verified.
+makes Tauri emit the updater bundle and its `.sig` alongside the normal ones. A build with the
+secrets missing does **not** quietly skip signing — the bundler aborts with
+*"A public key has been found, but no private key"*. That is why every job that
+bundles carries them, manual builds included.
 
 **The private key is unrecoverable and, once a release has shipped,
 unreplaceable.** Installed apps trust exactly the compiled-in public key. Losing
@@ -384,10 +376,11 @@ Delete this section once that release is out.
 ## Known gaps
 
 - CI proves compilation, not bundling. Only a manual or release build does that.
-- Nothing proves the update path automatically. `updater-test.yml` makes it
-  testable by hand (see [Testing the updater](#testing-the-updater)), but
-  somebody has to run it, install the result and click the button; no CI job
-  reports on it.
+- Nothing proves the update path, by hand or otherwise. Checking it means
+  publishing a prerelease and driving it from an installed build (see
+  [Testing the updater](#testing-the-updater)); no CI job reports on it, and
+  the dedicated workflow that once made this cheap was removed because it
+  signed with the production key.
 - The changelog extraction cannot fail — an empty section yields an empty
   release body silently.
 - Nothing runs clippy, and warnings do not fail a build. (`src-tauri/Cargo.toml`

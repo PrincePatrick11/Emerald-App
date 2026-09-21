@@ -739,7 +739,9 @@
     "exportDbHint": "Enregistre le vault dans un fichier .emeralddb, images comprises. Les choix ci-dessous décident du contenu.",
     "includeSettingsHint": "Langue, apparence, barre latérale, corbeille, emojis, images et règle d'étiquettes de ce vault",
     "importDbHint": "Restaure un fichier .emeralddb — comme nouveau vault, en plus des entrées existantes ou en remplaçant tout. Les options apparaissent une fois le fichier choisi.",
-    "storageHint": "Images du dossier du vault qu'aucune entrée n'utilise plus. « Rechercher » montre la place occupée, « Supprimer » les efface définitivement."
+    "storageHint": "Images du dossier du vault qu'aucune entrée n'utilise plus. « Rechercher » montre la place occupée, « Supprimer » les efface définitivement.",
+    "updatesDesc": "Vérifie s'il existe une version plus récente d'Emerald et l'installe.",
+    "updateErrorInstall": "L'installation a échoué."
   },
   "contextMenu": {
     "openInNewTab": "Ouvrir dans un nouvel onglet",

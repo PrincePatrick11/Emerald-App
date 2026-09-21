@@ -12,6 +12,9 @@ import VaultModal, { VaultGlyph } from './VaultModal';
 // VaultModal bleibt eager: VaultGlyph wird fuer den Rail-Button gebraucht,
 // und AppShell rendert es beim Erststart ohnehin.
 const SettingsModal = lazy(() => import('./settings/SettingsModal'));
+// Nur der Typ — `import type` verschwindet beim Uebersetzen und zieht das
+// Modul nicht in den Haupt-Chunk zurueck.
+import type { SettingsPage } from './settings/SettingsModal';
 import RailButton from '../ui/RailButton';
 
 /** Breite der Rail. `AppShell` rechnet damit die Breite des <aside> und
@@ -24,6 +27,7 @@ export default function LeftSidebarRail() {
   const { t } = useTranslation();
   const setActiveView = useUIStore((s) => s.setActiveView);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsPage, setSettingsPage] = useState<SettingsPage>('general');
   const [vaultOpen, setVaultOpen] = useState(false);
   // Selector auf ein Primitiv, nicht auf den Vault-Datensatz: `find` liefert
   // sonst bei jedem Store-Update ein Objekt, das zustand als geaendert liest.
@@ -104,7 +108,17 @@ export default function LeftSidebarRail() {
             <VaultGlyph icon={activeVaultIcon} size={activeVaultIcon ? 17 : 18} />
           </RailButton>
           <RailButton
-            onClick={() => setSettingsOpen(true)}
+            // Die Zielseite wird hier festgehalten und der Punkt sofort
+            // geloescht: er hat seine Aufgabe erfuellt, sobald das Fenster
+            // aufgeht. Andersherum spraenge das Zahnrad den Rest der Sitzung
+            // auf „Updates" — und ein Loeschen ohne dieses Merken hiesse, dass
+            // das Fenster wieder auf „Allgemein" aufginge, weil beide
+            // Zustandsaenderungen im selben Rendern landen.
+            onClick={() => {
+              setSettingsPage(updateVersion ? 'updates' : 'general');
+              setSettingsOpen(true);
+              setUpdateVersion(null);
+            }}
             title={updateVersion ? t('settings.updateFound', { version: updateVersion }) : t('nav.settings')}
             className="relative"
           >
@@ -112,7 +126,8 @@ export default function LeftSidebarRail() {
             {updateVersion && (
               <span
                 aria-hidden
-                className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-jade-400"
+                className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
+                style={{ backgroundColor: 'var(--accent)' }}
               />
             )}
           </RailButton>
@@ -124,7 +139,7 @@ export default function LeftSidebarRail() {
         <Suspense fallback={null}>
           <SettingsModal
             onClose={() => setSettingsOpen(false)}
-            initialPage={updateVersion ? 'updates' : 'general'}
+            initialPage={settingsPage}
           />
         </Suspense>
       )}
