@@ -33,10 +33,14 @@ src/
 │   │                 module registry: ViewId → lazy view; import-restricted to MainArea only)
 │   │   ├── settings/ SettingsModal (two-pane shell: vertical nav + scrolling content pane,
 │   │   │             fixed `w-[680px]`/`h-[600px]` so switching pages never resizes the
-│   │   │             card), one component per page — GeneralPage, BackupPage, StoragePage,
-│   │   │             AboutPage — plus SettingsSection/SettingsChoiceButton (shared building
-│   │   │             blocks, see components.md) and BrandIcons (GitHub/Patreon/Discord marks
-│   │   │             as inline SVGs — lucide carries no brand icons)
+│   │   │             card), one component per page — GeneralPage, SidebarPage, EntriesPage
+│   │   │             (composing EmojiDefaultsSection/ImageLimitsSection/TagRulesSection),
+│   │   │             BackupPage, StoragePage, AboutPage — plus SettingsSection/
+│   │   │             SettingsChoiceButton/SettingsChoiceRow (shared building blocks, see
+│   │   │             components.md) and BrandIcons (GitHub/Patreon/Discord marks as inline
+│   │   │             SVGs — lucide carries no brand icons). Every page reads and writes the
+│   │   │             open vault's settings through `store/settingsStore.ts` — see
+│   │   │             Vault Settings below — not `uiStore`
 │   │   └── titlebar/ TitleBar (custom window chrome), WindowControls, TitleBarMenuBar,
 │   │                 MenuDropdown, TitleBarSearch (global search field), TitleBarSearchResults
 │   │                 (results dropdown), useIsMaximized, editCommands
@@ -100,6 +104,10 @@ src/
 │                                      unsaved-draft stores behind a block's and a template's
 │                                      own page — see useDraftPage below; formerly
 │                                      blockDraftStore.ts, one store only), undoStore,
+│                     settingsStore (the open vault's settings.json — see Vault Settings below;
+│                                      theme/font/language state moved here from uiStore),
+│                     imageNoticeStore (the one "image not inserted" notice — wrong format or
+│                                      too large — behind ImageNoticeModal, see components.md),
 │                     trashStore, vaultStore, importStore,
 │                     moduleWiring.ts (store-layer half of the module registry: per-module
 │                                      reload, trash restore/permanent-delete, and the
@@ -1110,7 +1118,7 @@ Images are content-addressed, stored outside SQLite, and belong to one vault.
 
 ## Vault Layout
 
-A vault is a directory: `emerald.db`, `images/`, and `backup/` inside it, nothing else — with one deliberately transient exception: a backup import briefly `VACUUM INTO`s a working copy to `emerald.db.import` next to `emerald.db` while it fills and checks it, then removes it again once the import succeeds or fails. A copy left behind by a crash is cleared before the next import runs (`discard_import_staging`, see [DB Backup / Restore](database.md#db-backup--restore-emeralddb) in `database.md`). The user picks where the vault lives, so a vault can sit in Documents, in a synced folder, or on another drive.
+A vault is a directory: `emerald.db`, `images/`, `backup/`, and `settings.json` inside it, nothing else — with one deliberately transient exception: a backup import briefly `VACUUM INTO`s a working copy to `emerald.db.import` next to `emerald.db` while it fills and checks it, then removes it again once the import succeeds or fails. `settings.json` is the vault's own settings (Settings → General/Sidebar/Entries) — see [Vault Settings](#vault-settings) below. A copy left behind by a crash is cleared before the next import runs (`discard_import_staging`, see [DB Backup / Restore](database.md#db-backup--restore-emeralddb) in `database.md`). The user picks where the vault lives, so a vault can sit in Documents, in a synced folder, or on another drive.
 
 `{appDataDir}/vaults.json` maps ids to directories:
 
@@ -1191,14 +1199,14 @@ When adding a new themed component, define component-scoped tokens (e.g. `--my-c
 
 ### Normalization Flow
 
-Theme resolution follows this pipeline in `src/themes/theme.ts`:
+Theme, font, interface size and editor text size are all part of the open vault's **appearance settings** now (`AppearanceSettings` in `src/lib/vaultSettings.ts` — see [Vault Settings](#vault-settings) below), not standalone `uiStore` fields. Each still normalizes the same way `theme.ts` always did:
 
 ```
-localStorage ('theme-id' or legacy 'theme')
+vault's settings.json ('appearance.theme'), or the localStorage boot mirror before a vault is open
     ↓
 normalizeThemeId(raw)
     ├─ raw is a valid ThemeId → return as-is
-    ├─ raw === 'light'        → return 'emerald-parchment'
+    ├─ raw === 'light'        → return 'emerald-parchment' (pre-ThemeId legacy value)
     └─ anything else          → return DEFAULT_THEME_ID ('emerald-noctis')
     ↓
 applyTheme(themeId)
@@ -1206,23 +1214,29 @@ applyTheme(themeId)
 document.documentElement.dataset.theme = themeId
 ```
 
-`uiStore` calls `loadSavedTheme()` at initialization, which reads `localStorage.getItem('theme-id')` first, then falls back to the legacy `'theme'` key. `setTheme()` writes to `theme-id` only — the legacy key is never written to again.
+`normalizeUIFontId`/`normalizeEditorFontId`/`normalizeUIScale`/`normalizeEditorFontSize` follow the same shape, the last two via the shared `oneOf(raw, options, fallback)` helper (`lib/helpers.ts`) rather than a bespoke switch each.
 
-### Theme application
+### Theme and appearance application
 
-`App.tsx` subscribes to `uiStore.theme` and calls `applyTheme(themeId)` on every change:
+`store/settingsStore.ts`'s `applyAppearance(appearance)` — not a `useEffect` subscription in `App.tsx` — applies every appearance field the moment it changes, called from `loadForVault`, `update`, `clear`, and `replaceSettings`:
 
 ```ts
-// App.tsx
-const theme = useUIStore((s) => s.theme);
-useEffect(() => { applyTheme(theme); }, [theme]);
+// store/settingsStore.ts
+async function applyAppearance(appearance: AppearanceSettings) {
+  applyTheme(appearance.theme);
+  applyUIFont(appearance.uiFont);
+  applyEditorFont(appearance.editorFont);
+  applyUIScale(appearance.uiScale);
+  applyEditorFontSize(appearance.editorFontSize);
+  // …mirrors into localStorage, then changeAppLanguage(appearance.language)
+}
 ```
 
-`applyTheme` sets `document.documentElement.dataset.theme = themeId`, which activates the matching `html[data-theme='…']` CSS rules.
+`applyTheme` sets `document.documentElement.dataset.theme = themeId`, which activates the matching `html[data-theme='…']` CSS rules. `applyUIScale` (new) calls `getCurrentWebview().setZoom(scale / 100)` — a no-op outside Tauri, since `getCurrentWebview()` throws synchronously in a plain browser tab (checked via `lib/platform.ts`'s `isTauri`). `applyEditorFontSize` (new) sets `--editor-font-size` on `documentElement.style` directly, the one appearance value with no CSS `data-*` attribute selector — the size is a number, not a small closed set worth branching CSS on.
 
-### Theme selection and persistence
+### Theme, font and size options
 
-`uiStore` stores the current theme as `ThemeId` (`'emerald-noctis' | 'emerald-parchment'`). The Settings modal renders the theme picker from `THEME_OPTIONS` exported by `theme.ts`.
+`ThemeId`/`FontId`/`UIScale`/`EditorFontSize` and their option lists (`THEME_OPTIONS`, `FONT_OPTIONS`, `UI_SCALE_OPTIONS` — 90/100/110/120 — `EDITOR_FONT_SIZE_OPTIONS` — 14/15/16/17/18/20/22) all live in `src/themes/theme.ts`, which no longer imports `ThemeId`/`FontId` from `uiStore` — it defines them itself, since `uiStore` no longer carries theme/font state at all (see [Vault Settings](#vault-settings) below). Settings → General renders every picker from these option lists.
 
 ### Tailwind bridge
 
@@ -1233,7 +1247,7 @@ The Parchment bridge is organised into feature-scoped comment blocks at the end 
 ### Adding a new theme
 
 1. Create `src/themes/emerald-<name>.css` with all required custom properties (copy an existing file as a template).
-2. Add the theme ID to the `ThemeId` union in `src/store/uiStore.ts`.
+2. Add the theme ID to the `ThemeId` union in `src/themes/theme.ts`.
 3. Register it in `THEME_OPTIONS` and add any legacy mapping in `normalizeThemeId` in `src/themes/theme.ts`.
 4. Import the new CSS file from `src/main.tsx` (or add it to `index.html`).
 5. Add Tailwind bridge overrides in `src/index.css` under `html[data-theme='emerald-<name>']` for any hardcoded utility classes the theme needs to override.
@@ -1300,40 +1314,57 @@ Store integration details:
 
 ## Font System
 
-Emerald supports two independent font selections applied via CSS custom properties on `html`:
+Emerald supports two independent font selections, plus an independent editor text size, applied via CSS custom properties on `html`:
 
 ```
 src/themes/theme.ts          # DEFAULT_UI_FONT_ID, DEFAULT_EDITOR_FONT_ID,
                              # FONT_OPTIONS, normalizeUIFontId, normalizeEditorFontId,
-                             # applyUIFont, applyEditorFont
+                             # applyUIFont, applyEditorFont,
+                             # EDITOR_FONT_SIZE_OPTIONS, DEFAULT_EDITOR_FONT_SIZE,
+                             # normalizeEditorFontSize, applyEditorFontSize
 src/index.css                # --font-ui and --font-editor variable definitions,
-                             # html[data-ui-font='…'] and html[data-editor-font='…'] selectors
-src/store/uiStore.ts         # uiFontId, editorFontId state + setters (localStorage: ui-font-id, editor-font-id)
-src/App.tsx                  # Subscribes to uiFontId/editorFontId and calls applyUIFont/applyEditorFont
+                             # html[data-ui-font='…'] and html[data-editor-font='…'] selectors,
+                             # --editor-font-size (set directly, no data-* selector)
+src/lib/vaultSettings.ts     # uiFont, editorFont, editorFontSize fields of AppearanceSettings
+src/store/settingsStore.ts   # applyAppearance() calls applyUIFont/applyEditorFont/applyEditorFontSize
+                             # on loadForVault/update/clear/replaceSettings — see Vault Settings below
 ```
 
-**Application flow.** `App.tsx` subscribes to `uiStore.uiFontId` and `uiStore.editorFontId` and calls `applyUIFont()` / `applyEditorFont()` on every change. These functions set `document.documentElement.dataset.uiFont` and `dataset.editorFont`, which activate the matching CSS rules in `src/index.css`.
+**Application flow.** `settingsStore`'s `applyAppearance()` calls `applyUIFont()` / `applyEditorFont()` / `applyEditorFontSize()` whenever the open vault's appearance settings load or change — not a `useEffect` subscription in `App.tsx` (see [Theme and appearance application](#theme-and-appearance-application) above). `applyUIFont`/`applyEditorFont` set `document.documentElement.dataset.uiFont` and `dataset.editorFont`, which activate the matching CSS rules in `src/index.css`; `applyEditorFontSize` sets `--editor-font-size` on `documentElement.style` directly.
 
 **CSS variable mapping.** Each font ID defines a `--font-<id>` variable with the full font-family stack. The `data-ui-font` selector sets `--font-ui`; the `data-editor-font` selector sets `--font-editor`. Components reference these variables:
 
 - `--font-ui` is applied to the root `body` element (all UI chrome).
 - `--font-editor` is applied to `.tiptap`, `.entry-view-title`, and `.entry-view-body`.
+- `--editor-font-size` is applied wherever editor/field text should track the setting, independent of which font is chosen.
 
 This means the editor font controls the TipTap editor body, entry titles in all detail views (journal, wiki, operations, altar), and the read-mode body text. There is no separate heading font — headings inherit the editor body font.
 
-**Defaults.** UI font defaults to **Inter**; editor body font defaults to **Lora**. Invalid or missing stored values fall back to these defaults via `normalizeUIFontId()` / `normalizeEditorFontId()`.
+**Defaults.** UI font defaults to **Inter**; editor body font defaults to **Lora**; editor text size defaults to **17px** (the previous fixed value). Invalid or missing stored values fall back to these defaults via `normalizeUIFontId()` / `normalizeEditorFontId()` / `normalizeEditorFontSize()`.
+
+## Vault Settings
+
+Settings moved from app-wide `localStorage`/`uiStore` state to a **per-vault** `settings.json` this cycle. The model, the storage round-trip, and the migration off the old app-wide values are documented in full in [`database.md` → Multi-Vault System](database.md#multi-vault-system) (on-disk shape, backup format) and [`components.md`](components.md) (`lib/vaultSettings.ts`, `store/settingsStore.ts` catalogue entries) — summarized here for where it fits in the app's data flow:
+
+- **`lib/vaultSettings.ts`** defines `VaultSettings` as six independent groups (`appearance`, `trash`, `leftList`, `emojis`, `images`, `tags`) and `normalizeVaultSettings()`, the one function that turns arbitrary JSON (a file on disk, a backup import) into a value every reader can trust — unknown keys are kept (so a newer build's settings survive a detour through an older one), invalid ones fall back to their default.
+- **`store/settingsStore.ts`** holds the open vault's settings and is the only writer of `settings.json`. `loadForVault(vaultId)` runs **before** `getDb()` opens the database — migration v39 needs the language the appearance settings (and, before them, the `localStorage` boot mirror) will carry, so the settings load has to win that race. `clear()` resets to defaults whenever no vault is open (first-run setup, every vault removed). Writes are serialized through `lib/serialize.ts` so an update fired while an earlier write is still in flight can't land out of order.
+- **Rust side**: `read_vault_settings`/`write_vault_settings` in `src-tauri/src/vault.rs` move the file's *text* only — the frontend owns the JSON shape entirely. See [`security.md`](security.md) for the write's atomicity (temp file + rename) and symlink handling.
+- **The `localStorage` boot mirror** (`APPEARANCE_MIRROR_KEYS` in `vaultSettings.ts`: `app-language`, `theme-id`, `ui-font-id`, `editor-font-id`, `ui-scale`, `editor-font-size`) still exists and is still what `index.html`'s inline boot script and `main.tsx` read before any vault is open — but it is a starting point now, written *by* `applyAppearance()` as a side effect, not the source of truth once a vault has loaded its own settings.
+- **Backup carries settings too** — a new, independent `settings` field on the `.emeralddb` payload (not gated by `BACKUP_VERSION`, since it isn't a content shape). See [`database.md` → DB Backup / Restore](database.md#db-backup--restore-emeralddb).
 
 ## IPC Command Surface
 
 All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from TypeScript with `invoke()`; over half of them are *defined* in `images.rs` and `vault.rs` and referenced as `images::…` / `vault::…` in the handler list.
 
-**File commands run off the main thread.** `write_file`, `read_file`, `export_image`, `ensure_app_storage_dirs` and all six commands in `images.rs` are `async` and wrap their `std::fs` work in `tauri::async_runtime::spawn_blocking` — a multi-megabyte `.emeralddb` with embedded images used to block the window for the duration of the write. `async fn` alone would not have been enough: without `spawn_blocking`, the blocking call still runs on a runtime worker and can starve the SQL plugin, PDF export and IPC replies on a machine with few cores. The four native-menu commands stay synchronous on purpose — they mutate `NSMenu`, which is main-thread-only on macOS. A static `IMAGE_WRITE_LOCK` mutex in `images.rs` serializes the image folder's writes and deletes, a guarantee that used to be implicit when those commands ran on the main thread one at a time; without it, a storage cleanup could delete a file whose hash a concurrent `save_image` had just judged "already exists" and skipped writing. `resolve_allowed_roots()` caches its result behind a `OnceLock` once every root canonicalizes successfully — it used to re-run six `canonicalize` syscalls on every file command — and falls back to re-resolving on every call if any root fails to canonicalize (a not-yet-existing directory, an unmounted network drive), so a transient failure heals on the next call instead of freezing a wrong answer in for the rest of the session. The `emerald-img` scheme handler likewise moved from one `std::thread::spawn` per image to `spawn_blocking`, reusing the async runtime's blocking pool instead of creating and tearing down an OS thread per request.
+**File commands run off the main thread.** `write_file`, `read_file`, `export_image`, `ensure_app_storage_dirs` and all seven commands in `images.rs` (including `read_image_file`, which reads an arbitrary external image file for the frontend to scale against the vault's image limits before saving it) are `async` and wrap their `std::fs` work in `tauri::async_runtime::spawn_blocking` — a multi-megabyte `.emeralddb` with embedded images used to block the window for the duration of the write. `async fn` alone would not have been enough: without `spawn_blocking`, the blocking call still runs on a runtime worker and can starve the SQL plugin, PDF export and IPC replies on a machine with few cores. The four native-menu commands stay synchronous on purpose — they mutate `NSMenu`, which is main-thread-only on macOS. A static `IMAGE_WRITE_LOCK` mutex in `images.rs` serializes the image folder's writes and deletes, a guarantee that used to be implicit when those commands ran on the main thread one at a time; without it, a storage cleanup could delete a file whose hash a concurrent `save_image` had just judged "already exists" and skipped writing. `resolve_allowed_roots()` caches its result behind a `OnceLock` once every root canonicalizes successfully — it used to re-run six `canonicalize` syscalls on every file command — and falls back to re-resolving on every call if any root fails to canonicalize (a not-yet-existing directory, an unmounted network drive), so a transient failure heals on the next call instead of freezing a wrong answer in for the rest of the session. The `emerald-img` scheme handler likewise moved from one `std::thread::spawn` per image to `spawn_blocking`, reusing the async runtime's blocking pool instead of creating and tearing down an OS thread per request.
 
 | Command | Purpose |
 |---|---|
 | `save_image(data_url, vault_id)` | Decode base64 data-URL, write `{sha256}.{ext}` into the vault's `images/`, skip if it exists. Returns the **filename**. |
 | `copy_image_file(source, vault_id)` | Read a file from an arbitrary path, write it into the vault's `images/` under its SHA-256 name. Accepts png/jpg/jpeg/gif/webp/svg only. Rejects symlinks, canonicalizes the source, and verifies it falls within the allowed storage roots. Returns the filename. |
 | `read_image_as_base64(filename, vault_id)` | Read a stored image and return a data-URL. Only for the two callers that cannot use the `emerald-img` scheme: the PDF export renders in a `file://` webview, and the backup writer embeds bytes in JSON. |
+| `read_image_file(source)` | Read an *external* image file (not yet in any vault) and return a data-URL, without storing it — so the frontend can scale it and check it against the vault's image-size settings before handing the result to `save_image`. Same extension allowlist and root confinement as `copy_image_file` (`checked_image_source`, their shared helper), plus its own 64 MB source-file cap. |
+| `read_vault_settings(vault_id)` / `write_vault_settings(vault_id, contents)` | The vault's `settings.json` — see [Vault Settings](#vault-settings) above and [`security.md`](security.md) for the write's atomicity and symlink handling. |
 | `adopt_legacy_images(vault_id, filenames)` | Copy images out of the pre-per-vault shared pool into a vault's own folder. Migration v35 only. |
 | `list_image_files(vault_id)` / `delete_image_files(vault_id, filenames)` | Back the *Unused images* cleanup. Confined to the vault's own folder; both reject any name that is not 64 hex digits plus a known extension. |
 | `register_vaults(vaults)` | Mirror `vaults.json` into the `id → path` registry every storage command resolves against. |
@@ -1342,7 +1373,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `new_vault_base_dir()` | The folder new vaults are offered in: `{documentDir}/Emerald Vaults`, falling back to `{appDataDir}/vaults` where the platform exposes no documents folder. |
 | `legacy_default_db_exists()` | Whether an `emerald.db` from before `vaults.json` existed is sitting in `app_config_dir`, `app_data_dir`, or the migration target — the difference between a genuine first start and an installation whose journal is already on disk. |
 | `migrate_vault_layout(vault_id, legacy_db_name)` | Move a pre-per-vault flat database into its own directory. Returns that directory. |
-| `delete_vault_files(vault_id)` | Removes only the vault's own artefacts by name — database, journal, recognised images, an *empty* `backup/` — never `remove_dir_all`. The directories go with plain `remove_dir`, which fails while anything else (a backup, a `desktop.ini`) is still inside; that failure is the answer, not an error. Returns whether the vault folder itself is gone, so the UI can say "the folder stayed". |
+| `delete_vault_files(vault_id)` | Removes only the vault's own artefacts by name — database, journal, `settings.json`, recognised images, an *empty* `backup/` — never `remove_dir_all`. The directories go with plain `remove_dir`, which fails while anything else (a backup, a `desktop.ini`) is still inside; that failure is the answer, not an error. Returns whether the vault folder itself is gone, so the UI can say "the folder stayed". |
 | `discard_import_staging(vault_id)` | Removes a backup import's staging copy — the fixed filename `emerald.db.import`, plus `-journal`/`-wal`/`-shm` — from a vault's own directory. Run before every import (clears whatever a crashed one left behind) and after (success or failure alike). A missing file is not an error. See [DB Backup / Restore](database.md#db-backup--restore-emeralddb) in `database.md`. |
 | `ensure_backup_dir(vault_id)` | The vault's `backup/` folder — the database export dialog's default destination. Created with the vault by `create_vault_dirs`, recreated here on demand; refused for a vault outside the allowed storage roots, where `write_file` could not write anyway. A non-empty `backup/` is deliberately not part of what `delete_vault_files` removes: a backup should outlive the vault it was taken from. |
 | `export_image(path, data_url)` | Decode a base64 data-URL and write the binary image bytes to a user-chosen path. Permitted extensions: `.png`, `.jpg`, `.jpeg`, `.webp`. Same symlink rejection, allowed-roots confinement, and `canonicalize`-before-write checks as `write_file`. |
@@ -1396,7 +1427,7 @@ In the Altar's distraction-free full-window mode the title bar stays, minus the 
 
 Dragging the window uses `data-tauri-drag-region`. Tauri reads the attribute off the element directly under the cursor and does **not** walk up the tree, so every non-interactive wrapper in `TitleBar` carries it and no interactive control does. Double-clicking a drag region maximises; Tauri handles that natively via `internal-toggle-maximize`.
 
-Beyond `core:default`, the window controls need four permissions in `src-tauri/capabilities/default.json`: `allow-start-dragging`, `allow-minimize`, `allow-toggle-maximize` and `allow-close`. `allow-is-maximized` and `allow-internal-toggle-maximize` are already in the default set.
+Beyond `core:default`, the window controls need four permissions in `src-tauri/capabilities/default.json`: `allow-start-dragging`, `allow-minimize`, `allow-toggle-maximize` and `allow-close`. `allow-is-maximized` and `allow-internal-toggle-maximize` are already in the default set. `core:webview:allow-set-webview-zoom` is a fifth, unrelated addition backing the interface-size setting (Settings → General) — see [Vault Settings](#vault-settings) above and [`security.md`](security.md).
 
 ### Why the native menu is macOS-only
 
@@ -1416,7 +1447,7 @@ An earlier stage than anything below runs before this: `adopt_previous_identifie
 The loading screen's markup (`#splash` in `index.html`) and its styles (`public/splash.css`, linked from `<head>`) exist outside the React tree on purpose: React only takes over once the bundle has loaded and `main.tsx` has run, and by then a plain white window would already have been visible for however long that takes. A render-blocking `<link>` and inline markup are the only way to have something on screen in the very first frame. `src/lib/splash.ts` owns everything past that point:
 
 - **`initSplash()`** runs at the top level of `main.tsx` — module-eval time, while `#splash` is still guaranteed to be in the DOM — and does two things: it clones `#splash` for later reuse by `showSplash()`, and it arms a 10s fallback timer that calls `hideSplash()` regardless of what the rest of the app is doing.
-- **`hideSplash()`** is called from `AppShell`'s initial-load effect once the vault's data has loaded (or, on a fresh install, once vault setup itself is showing) — success or failure both count, so a failed load still uncovers a usable screen instead of leaving the loading screen up forever. It enforces a roughly 900ms minimum display time so a fast local SQLite read doesn't just flash the screen once, and fades the element out (CSS `transition`) before removing it. It is idempotent, since both the initial-load effect and the fallback timer can call it.
+- **`hideSplash()`** is called from `AppShell`'s initial-load effect once the vault's data has loaded (or, on a fresh install, once vault setup itself is showing) — success or failure both count, so a failed load still uncovers a usable screen instead of leaving the loading screen up forever. It enforces a roughly 900ms minimum display time so a fast local SQLite read doesn't just flash the screen once, and fades the element out (CSS `transition`) before removing it. It is idempotent, since both the initial-load effect and the fallback timer can call it. The initial-load effect itself now loads the active vault's settings (`useSettingsStore.getState().loadForVault(...)`) *before* `reloadAllStores()` — the trash purge needs the vault's retention setting and migration v39 needs its language — and `AppShell` gates its own render on that finishing (`bootSettled`) the same way it already gated on knowing whether a vault exists at all, so nothing can call `getDb()` on a vault whose settings haven't loaded yet (a restored tab pointing straight at Trash, for one).
 - **`showSplash()`** clones the saved template again and shows it as a preview, dismissed by a click or Escape — used by the View menu's **Show Loading Screen** item (`show-splash` in the menu-event table above).
 
 The screen's root carries `data-tauri-drag-region`, but a `.splash-drag` strip across its
