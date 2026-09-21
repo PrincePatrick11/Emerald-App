@@ -586,6 +586,22 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     background-color: color-mix(in srgb, var(--bg-surface-1) 80%, transparent);
     border: 1px solid var(--border-soft);
     color: var(--text-secondary);
+    /* Ohne das nimmt ein `input` die Systemschrift — am deutlichsten an den
+       Datumsfeldern, die neben einem normalen Feld aus der Reihe fielen. */
+    font-family: inherit;
+  }
+
+  /* Das Kalendersymbol im Datumsfeld: dieselbe Zurueckhaltung wie die uebrigen
+     Symbole in Feldern, und erst beim Zeigen voll da. `color-scheme` weiter
+     unten faerbt es und das Auswahlfenster passend zum Theme. */
+  .input-field::-webkit-calendar-picker-indicator {
+    opacity: 0.55;
+    cursor: pointer;
+    transition: opacity 150ms;
+  }
+
+  .input-field::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
   }
 
   /* Derselbe Fokus wie bei `.emoji-picker-search`, damit jedes Feld der App
@@ -1385,12 +1401,48 @@ button.block-altar:hover .block-altar-title {
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-/* Die nativen Checkboxen im Seitenleisten-Abschnitt des Feldblocks. Die
-   Akzentfarbe über die Theme-Variable statt `accent-jade-500`: so braucht
-   Parchment keine eigene Brücke. */
+/* Das Häkchen der App (BlockCheckbox): Blöcke, Vorlagen-Dialog und die
+   Einstellungen. Selbst gezeichnet statt nativ — ein natives Kästchen bringt
+   seine eigenen Farben und Kanten mit und stand neben den Feldern und Knöpfen
+   daneben. Alles kommt aus Theme-Variablen, also braucht Parchment keine
+   eigene Brücke. */
 .block-checkbox {
-  accent-color: var(--accent);
-  border-radius: 3px;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
+  display: inline-grid;
+  place-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background-color: color-mix(in srgb, var(--bg-surface-1) 80%, transparent);
+  cursor: pointer;
+  transition: background-color 150ms, border-color 150ms;
+}
+
+.block-checkbox:hover {
+  border-color: var(--accent);
+}
+
+.block-checkbox:checked {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Der Haken selbst, als Form ausgeschnitten: in der Flaechenfarbe der App,
+   die in beiden Themes den Gegensatz zum Akzent traegt. */
+.block-checkbox:checked::after {
+  content: '';
+  width: 0.5rem;
+  height: 0.5rem;
+  background-color: var(--bg-app);
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+.block-checkbox:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 .block-field-error {
@@ -2648,6 +2700,14 @@ html[data-theme='emerald-parchment'] .op-prop-select {
   background: #f3e6cf;
   border-color: rgba(145, 108, 70, 0.34);
   color: #3a2918;
+}
+
+html[data-theme='emerald-parchment'] .input-field[type="date"] {
+  color-scheme: light;
+}
+
+html[data-theme='emerald-noctis'] .input-field[type="date"] {
+  color-scheme: dark;
 }
 
 html[data-theme='emerald-parchment'] .op-prop-select[type="date"] {
