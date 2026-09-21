@@ -18,11 +18,13 @@ export default function ImageNoticeModal() {
   const tooLarge = notice.kind === 'tooLarge';
   const detail = tooLarge
     ? t('common.imageTooLargeDetail', { max: imageSizeLabel(notice.maxBytes, t('common.megabytes')) })
-    : 'PNG, JPEG, GIF, WebP, SVG';
+    // Die Liste als eigener Schluessel: der Titel nennt nur noch den Grund,
+    // sonst stuenden die Formate zweimal untereinander.
+    : t('common.acceptedImageFormats');
 
   return (
     <Modal
-      title={tooLarge ? t('common.imageTooLarge') : t('common.unsupportedImageFormat')}
+      title={tooLarge ? t('common.imageTooLarge') : t('common.unsupportedImageFormatTitle')}
       onClose={dismiss}
       widthClassName="w-72"
       bodyClassName="px-4 py-3"

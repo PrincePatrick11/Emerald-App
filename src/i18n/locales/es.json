@@ -19,7 +19,9 @@
     "imageTooLarge": "Imagen demasiado grande",
     "imageTooLargeDetail": "Las imágenes de este vault pueden ocupar como máximo {{max}}.",
     "percentValue": "{{value}} %",
-    "pixelValue": "{{value}} px"
+    "pixelValue": "{{value}} px",
+    "unsupportedImageFormatTitle": "Formato no compatible",
+    "acceptedImageFormats": "PNG, JPEG, GIF, WebP, SVG"
   },
   "categories": {
     "add": "Añadir categoría",
