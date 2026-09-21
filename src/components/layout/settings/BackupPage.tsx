@@ -4,6 +4,7 @@ import { AlertTriangle, Check, Download, FolderOpen, Upload } from 'lucide-react
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import Button from '../../ui/Button';
 import { FilterChipButton } from '../../ui/FilterPanel';
+import BlockCheckbox from '../../blocks/BlockCheckbox';
 import { VaultLocationRow } from '../VaultModal';
 import {
   NEW_VAULT_TARGET_ERROR_KEY,
@@ -212,41 +213,32 @@ export default function BackupPage() {
           {/* Date range */}
           <div className="flex gap-3 items-center">
             <div className="flex-1">
-              <label className="label-xs block mb-1">{t('settings.dateFrom')}</label>
+              <label className="label-xs block mb-2">{t('settings.dateFrom')}</label>
               <input
                 type="date"
                 value={exportOpts.dateFrom}
                 onChange={(e) => setExportOpts((o) => ({ ...o, dateFrom: e.target.value }))}
-                className="settings-field"
+                className="input-field w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors"
               />
             </div>
             <div className="flex-1">
-              <label className="label-xs block mb-1">{t('settings.dateTo')}</label>
+              <label className="label-xs block mb-2">{t('settings.dateTo')}</label>
               <input
                 type="date"
                 value={exportOpts.dateTo}
                 onChange={(e) => setExportOpts((o) => ({ ...o, dateTo: e.target.value }))}
-                className="settings-field"
+                className="input-field w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors"
               />
             </div>
           </div>
 
-          {/* Include deleted */}
-          <label className="flex items-center gap-2 cursor-pointer group">
-            <div
-              onClick={() => toggleExportOpt('includeDeleted')}
-              className={`w-4 h-4 rounded border flex items-center justify-center transition-colors cursor-pointer ${
-                exportOpts.includeDeleted
-                  ? 'bg-jade-500/30 border-jade-500/60'
-                  : 'border-stone-600 hover:border-stone-400'
-              }`}
-            >
-              {exportOpts.includeDeleted && <Check size={10} className="text-jade-400" />}
-            </div>
-            <span className="text-xs transition-colors" style={{ color: 'var(--text-secondary)' }}>
-              {t('settings.includeDeleted')}
-            </span>
-          </label>
+          {/* Dasselbe Haekchen wie in den Block-Einstellungen: ein echtes
+              `input`, mit Tastatur erreichbar und in beiden Themes im Akzent. */}
+          <BlockCheckbox
+            checked={exportOpts.includeDeleted}
+            onChange={() => toggleExportOpt('includeDeleted')}
+            label={t('settings.includeDeleted')}
+          />
 
           <div className="flex items-center gap-2">
             <Button
@@ -334,7 +326,7 @@ export default function BackupPage() {
                   nichts Bestehendes anfasst, ist Vorauswahl und erster
                   Griff, Replace steht als destruktivster zuletzt. */}
               <div className="space-y-1.5">
-                <p className="label-xs">{t('settings.importMode')}</p>
+                <p className="label-xs mb-2">{t('settings.importMode')}</p>
                 {(
                   [
                     ['add-vault', 'settings.modeAddVault', 'settings.modeAddVaultDesc'],
@@ -362,17 +354,17 @@ export default function BackupPage() {
               {importMode === 'add-vault' && (
                 <div className="space-y-2">
                   <div>
-                    <label className="label-xs block mb-1">{t('settings.newVaultName')}</label>
+                    <label className="label-xs block mb-2">{t('settings.newVaultName')}</label>
                     <input
                       type="text"
                       value={newVaultName}
                       onChange={(e) => setNewVaultName(e.target.value)}
                       placeholder={t('vault.namePlaceholder')}
-                      className="settings-field"
+                      className="input-field w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors"
                     />
                   </div>
                   <div>
-                    <label className="label-xs block mb-1">{t('settings.newVaultLocation')}</label>
+                    <label className="label-xs block mb-2">{t('settings.newVaultLocation')}</label>
                     <VaultLocationRow
                       target={newVaultTarget(
                         vaultBaseDir,

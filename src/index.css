@@ -561,30 +561,12 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
   /* ── Einstellungs-Fenster ──────────────────────────────────────────────
      Eine Sprache fuer alle Seiten: ein Abschnitt (SettingsSection) traegt
-     Ueberschrift, Beschreibung und seinen Inhalt ohne Karte darum. Karten
-     gibt es nur, wo wirklich etwas zusammengehalten wird (Emoji-Raster,
-     Aufraeum-Zeile, Ueber-Seite) — und dann ueber diese drei Klassen, damit
-     sie in beiden Themes gleich aussehen. */
-  .settings-field {
-    @apply w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors duration-150;
-    background-color: color-mix(in srgb, var(--bg-surface-1) 80%, transparent);
-    border-color: var(--border-soft);
-    color: var(--text-secondary);
-  }
-
-  .settings-field:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px var(--focus-ring);
-  }
-
-  .settings-box {
-    @apply rounded-lg border;
-    background-color: color-mix(in srgb, var(--bg-surface-1) 70%, transparent);
-    border-color: var(--border-soft);
-  }
-
+     Ueberschrift, Beschreibung und seinen Inhalt ohne Karte darum. Die
+     Eingabefelder komponieren `.input-field` (Farben) mit ihren Groessen,
+     Behaelter nehmen `.panel`; eigene Klassen gibt es nur fuer das, was
+     beides nicht abdeckt. */
   .settings-row {
-    @apply flex items-center justify-between gap-3 rounded-lg border px-3 py-2;
+    @apply flex items-center justify-between gap-3 rounded-md border px-3 py-2;
     background-color: color-mix(in srgb, var(--bg-surface-1) 70%, transparent);
     border-color: var(--border-soft);
   }
@@ -604,6 +586,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     background-color: color-mix(in srgb, var(--bg-surface-1) 80%, transparent);
     border: 1px solid var(--border-soft);
     color: var(--text-secondary);
+  }
+
+  /* Derselbe Fokus wie bei `.emoji-picker-search`, damit jedes Feld der App
+     ihn zeigt — bisher brachte ihn jeder Aufrufer selbst mit, oder eben nicht. */
+  .input-field:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--focus-ring);
   }
 
   .home-item-title {

@@ -72,7 +72,7 @@ export default function StoragePage() {
           </span>
 
           {unused === null ? (
-            <Button onClick={scanUnusedImages} disabled={scanning} tone="amber" className="shrink-0">
+            <Button onClick={scanUnusedImages} disabled={scanning} tone="neutral" className="shrink-0">
               {scanning ? t('settings.cleanupScanning') : t('settings.cleanupScan')}
             </Button>
           ) : unused.names.length === 0 ? (

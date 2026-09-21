@@ -70,7 +70,7 @@ export default function GeneralPage() {
             <select
               value={appearance.uiFont}
               onChange={(e) => update('appearance', { uiFont: e.target.value as FontId })}
-              className="settings-field"
+              className="input-field w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors"
             >
               {FONT_OPTIONS.map((font) => (
                 <option key={font.id} value={font.id}>{font.label}</option>
@@ -105,7 +105,7 @@ export default function GeneralPage() {
             <select
               value={appearance.editorFont}
               onChange={(e) => update('appearance', { editorFont: e.target.value as FontId })}
-              className="settings-field"
+              className="input-field w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors"
             >
               {FONT_OPTIONS.map((font) => (
                 <option key={font.id} value={font.id}>{font.label}</option>

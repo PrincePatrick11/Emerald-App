@@ -56,7 +56,7 @@ export default function AboutPage() {
     // Mit Abschnitts-Ueberschrift wie jede andere Seite des Fensters; die
     // Karte darin haelt die Faktenliste zusammen.
     <SettingsSection icon={<Info size={14} />} title={t('settings.about')}>
-      <div className="settings-box px-4 py-3 space-y-1.5">
+      <div className="panel px-4 py-3 space-y-1.5">
       {/* Die Marke steht anstelle einer Zeile "App — Emerald App": sie sagt
           dasselbe und ist die einzige stehende Stelle, an der der Stein gross
           genug fuer seinen Schliff ist. */}
