@@ -87,8 +87,15 @@ a real, signed bundle behind an https address, and the first version carrying
 the updater has nothing to update *from*. `updater-test.yml` breaks that without
 publishing a release.
 
-Started from the Actions tab with a version (default `99.0.0`) and a platform
-(default Windows — one runner is enough to exercise the path), it:
+It runs on `workflow_dispatch` with a version (default `99.0.0`) and a platform
+(default Windows — one runner is enough to exercise the path), **and on any push
+to the `UpdaterTest` branch**, where those defaults apply. The push trigger is
+not a convenience: a `workflow_dispatch` workflow only appears in the Actions tab
+once its file is on the default branch, so until this one is merged, pushing to
+that branch is the only way to start it. It also happens to be the natural one —
+the change that should become visible in the test build is what triggers it.
+
+Either way, it:
 
 1. Rewrites the three version sites **in the runner only**, via
    `scripts/set-version.mjs`. Nothing is committed.

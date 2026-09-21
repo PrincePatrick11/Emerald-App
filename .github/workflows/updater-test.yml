@@ -19,7 +19,14 @@ name: Updater test build
 # geht es, indem man die richtige Version von Hand installiert; die Vaults
 # bleiben davon unberuehrt.
 
+# Zwei Ausloeser, und der erste ist kein Luxus: `workflow_dispatch` taucht in
+# der Actions-Oberflaeche erst auf, wenn die Datei auf dem Standard-Branch
+# liegt. Solange sie das nicht tut, ist ein Push auf `UpdaterTest` der einzige
+# Weg, sie zu starten — und zugleich der bequemste: die Aenderung, die im
+# Testbuild sichtbar werden soll, loest ihn selbst aus.
 on:
+  push:
+    branches: [UpdaterTest]
   workflow_dispatch:
     inputs:
       version:
@@ -42,10 +49,14 @@ concurrency:
 
 env:
   TEST_TAG: updater-test
+  # Beim Push gibt es keine Eingaben — dann gilt dieser Wert. Die Plattform
+  # kann hier nicht danebenstehen: ein `if` auf Job-Ebene liest den env-Kontext
+  # nicht, die Job-Bedingungen pruefen `github.event_name` deshalb selbst.
+  TEST_VERSION: ${{ inputs.version || '99.0.0' }}
 
 jobs:
   build-windows:
-    if: ${{ inputs.platform == 'windows' || inputs.platform == 'all' }}
+    if: ${{ github.event_name == 'push' || inputs.platform == 'windows' || inputs.platform == 'all' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -62,7 +73,7 @@ jobs:
 
       # Nur im Runner, nie committet: der Arbeitsbaum ist hier ein Wegwerfding.
       - name: Set the test version
-        run: node scripts/set-version.mjs "${{ inputs.version }}"
+        run: node scripts/set-version.mjs "$TEST_VERSION"
 
       - run: npm ci
       - name: Build
@@ -110,7 +121,7 @@ jobs:
           workspaces: src-tauri
 
       - name: Set the test version
-        run: node scripts/set-version.mjs "${{ inputs.version }}"
+        run: node scripts/set-version.mjs "$TEST_VERSION"
 
       - run: npm ci
       - name: Build
@@ -169,7 +180,7 @@ jobs:
             libssl-dev
 
       - name: Set the test version
-        run: node scripts/set-version.mjs "${{ inputs.version }}"
+        run: node scripts/set-version.mjs "$TEST_VERSION"
 
       - run: npm ci
       - name: Build
@@ -226,9 +237,9 @@ jobs:
 
       - name: Build latest.json
         run: |
-          printf 'Testbuild %s — kein echtes Release.\n' "${{ inputs.version }}" > release-notes.md
+          printf 'Testbuild %s — kein echtes Release.\n' "$TEST_VERSION" > release-notes.md
           node scripts/updater-manifest.mjs \
-            --tag "${{ inputs.version }}" \
+            --tag "$TEST_VERSION" \
             --assets assets.json \
             --fragments updater-fragments \
             --notes release-notes.md \
