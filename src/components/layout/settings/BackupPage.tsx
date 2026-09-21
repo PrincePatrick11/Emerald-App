@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Check, Download, FolderOpen, Upload } from 'lucide-react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import Button from '../../ui/Button';
-import { FilterChipButton } from '../../ui/FilterPanel';
 import BlockCheckbox from '../../blocks/BlockCheckbox';
 import { VaultLocationRow } from '../VaultModal';
 import {
@@ -181,11 +180,11 @@ export default function BackupPage() {
     <>
       <SettingsSection icon={<Download size={14} />} title={t('settings.exportDb')} description={t('settings.exportDbHint')}>
         <div className="space-y-3">
-          {/* Type chips — dieselben Pillen wie im Filter-Panel, statt
-              handgebauter Kaestchen: an/aus liest sich am Chip selbst. */}
+          {/* Dieselben Auswahlknoepfe wie auf den uebrigen Seiten des
+              Fensters — an/aus nur ueber die Faerbung, ohne Haekchen. */}
           <div>
             <p className="label-xs mb-2">{t('settings.exportInclude')}</p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {(
                 [
                   ['includeJournal', 'settings.includeJournal'],
@@ -197,15 +196,16 @@ export default function BackupPage() {
                   ['includeSettings', 'settings.includeSettings'],
                 ] as [keyof BackupOptions, string][]
               ).map(([key, labelKey]) => (
-                <FilterChipButton
+                <SettingsChoiceButton
                   key={key}
                   active={!!exportOpts[key]}
+                  aria-pressed={!!exportOpts[key]}
                   onClick={() => toggleExportOpt(key)}
                   title={key === 'includeSettings' ? t('settings.includeSettingsHint') : undefined}
+                  className="px-3 py-1.5 text-sm"
                 >
-                  {exportOpts[key] && <Check size={12} />}
                   {t(labelKey)}
-                </FilterChipButton>
+                </SettingsChoiceButton>
               ))}
             </div>
           </div>
@@ -294,7 +294,7 @@ export default function BackupPage() {
           {importedFile && (
             <div>
               <p className="label-xs mb-2">{t('settings.importInclude')}</p>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2">
                 {(
                   [
                     ['includeJournal', 'settings.includeJournal'],
@@ -305,14 +305,15 @@ export default function BackupPage() {
                     ['includeTags', 'settings.includeTags'],
                   ] as [keyof ImportTypeFilters, string][]
                 ).map(([key, labelKey]) => (
-                  <FilterChipButton
+                  <SettingsChoiceButton
                     key={key}
                     active={importTypeFilters[key]}
+                    aria-pressed={importTypeFilters[key]}
                     onClick={() => setImportTypeFilters((f) => ({ ...f, [key]: !f[key] }))}
+                    className="px-3 py-1.5 text-sm"
                   >
-                    {importTypeFilters[key] && <Check size={12} />}
                     {t(labelKey)}
-                  </FilterChipButton>
+                  </SettingsChoiceButton>
                 ))}
               </div>
             </div>
@@ -392,19 +393,20 @@ export default function BackupPage() {
               {importMode === 'merge' && importedFile.preview.hasSettings && (
                 <div>
                   <p className="label-xs mb-2">{t('settings.importSettings')}</p>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-2">
                     {SETTINGS_GROUPS.map((group) => {
                       const active = settingsGroups.includes(group);
                       return (
-                        <FilterChipButton
+                        <SettingsChoiceButton
                           key={group}
                           active={active}
+                          aria-pressed={active}
                           onClick={() => setSettingsGroups((groups) =>
                             active ? groups.filter((g) => g !== group) : [...groups, group])}
+                          className="px-3 py-1.5 text-sm"
                         >
-                          {active && <Check size={12} />}
                           {t(SETTINGS_GROUP_LABEL_KEYS[group])}
-                        </FilterChipButton>
+                        </SettingsChoiceButton>
                       );
                     })}
                   </div>

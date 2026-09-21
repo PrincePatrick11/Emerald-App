@@ -12,22 +12,21 @@ export interface FilterChip {
 
 /**
  * The one filter-pill look — exported so the class chain is not copied around.
- * Used by the panel's own chips and by the Settings backup include-lists.
+ * Used by the panel's own chips and by the two list toolbars (Altar preview,
+ * completed tasks). Settings use `SettingsChoiceButton` instead: its window
+ * carries one kind of toggle, not two.
  */
 export function FilterChipButton({
-  active, onClick, children, title,
+  active, onClick, children,
 }: {
   active: boolean;
   onClick: () => void;
   children: ReactNode;
-  /** Tooltip, wenn die Beschriftung allein nicht sagt, was der Chip umfasst. */
-  title?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      title={title}
       className={`filter-chip flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${
         active
           ? 'filter-chip-active bg-jade-900/50 border-jade-800/40 text-jade-400'

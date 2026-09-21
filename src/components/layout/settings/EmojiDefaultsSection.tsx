@@ -130,7 +130,7 @@ export default function EmojiDefaultsSection() {
             className="emoji-picker-search flex-1 min-w-0 rounded px-2 py-1 text-xs outline-none"
           />
           {stored !== null && (
-            <Button tone="neutral" onClick={() => update('emojis', { defaults: null })} className="shrink-0">
+            <Button variant="secondary" onClick={() => update('emojis', { defaults: null })} className="shrink-0">
               <RotateCcw size={12} />
               {t('settings.emojiReset')}
             </Button>
