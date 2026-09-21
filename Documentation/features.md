@@ -428,8 +428,9 @@ Settings are **per vault** — stored in that vault's own `settings.json`, not s
 - **Sidebar** — which of the left entry list's tabs are visible, and how many entries each one lists before a "Show more" button reveals the rest.
 - **Entries** — per-vault defaults for new content: the emoji picker's own default set, an inserted image's size limits, and whether the tag field may create new tags on the spot.
 - **Backup** — see [Vault Backup](#vault-backup-emeralddb) below.
+- **Storage** — as before.
 - **Updates** — see [Updates](#updates) below. The one page whose settings are *not* per vault: which source this installation asks, and whether it asks on start, belong to the installation rather than to a vault, so they live in the app directory (see [In-App Updates](security.md#in-app-updates)).
-- **Storage** / **About** — as before.
+- **About** — as before.
 
 Each page's sections carry a short description under the heading, and a tooltip where useful. A first launch of this version seeds each existing vault's settings once from whatever the app's shared values used to be, so nothing changes visibly; a vault created from now on starts with the defaults. Language, theme, the two fonts, interface size and editor text size are additionally mirrored into `localStorage`, which is what the boot script and `main.tsx` read before any vault is open — that mirror is only a boot-time starting point, not the source of truth once a vault's own settings have loaded.
 

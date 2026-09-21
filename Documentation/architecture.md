@@ -35,7 +35,9 @@ src/
 │   │   │             fixed `w-[680px]`/`h-[600px]` so switching pages never resizes the
 │   │   │             card), one component per page — GeneralPage, SidebarPage, EntriesPage
 │   │   │             (composing EmojiDefaultsSection/ImageLimitsSection/TagRulesSection),
-│   │   │             BackupPage, StoragePage, AboutPage — plus SettingsSection/
+│   │   │             BackupPage, StoragePage, UpdatesPage (check/install, the update-source
+│   │   │             field — the only settings page that is not per vault, see Vault Settings
+│   │   │             below), AboutPage — plus SettingsSection/
 │   │   │             SettingsChoiceButton/SettingsChoiceRow (shared building blocks, see
 │   │   │             components.md) and BrandIcons (GitHub/Patreon/Discord marks as inline
 │   │   │             SVGs — lucide carries no brand icons). Every page reads and writes the
@@ -176,6 +178,9 @@ src/
 │                     thumbnail.ts (shared thumbnail encoder: WebP quality ladder under the
 │                                      512-KB cap, used by altar cards),
 │                     altarConstants.ts, altarExport.ts, styleClasses.ts,
+│                     updates.ts (the four updater IPC calls plus the progress event —
+│                                      thin wrapper over `updates.rs`, see
+│                                      security.md#in-app-updates),
 │                     emojiSearchData/{en,de,es,fr}.json (localised emoji search datasets,
 │                                      generated from emojibase-data, lazy-loaded per locale)
 ├── themes/           emerald-noctis.css, emerald-parchment.css, theme.ts
@@ -190,6 +195,7 @@ src-tauri/
     ├── lib.rs           command registration, path guards, native menu, mouse nav monitor, setup
     ├── images.rs        image commands (save/copy/read/list/delete/adopt) + emerald-img scheme
     ├── vault.rs         vault registry + vault dir commands (register/probe/create/delete/…)
+    ├── updates.rs       in-app updater: variable source, signature/version verification, install — see security.md#in-app-updates
     └── pdf_export/      Native-webview PDF export (one file per platform, #[cfg(target_os)] dispatch)
         ├── mod.rs           #[cfg(target_os = "…")] re-export of the platform `export_pdf`
         ├── windows.rs       WebView2 + ICoreWebView2_7::PrintToPdf
@@ -1385,6 +1391,8 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `set_view_menu_checked(rail, left_list, right_sidebar)` | Mirror the frontend's sidebar visibility onto the View menu's three check items. Called on every change, since other actions besides the menu itself can flip the same state (e.g. `setActiveView` opening the right sidebar for edit mode). macOS only in effect. |
 | `set_export_menu_enabled(entry, pdf, emerald)` | Enable/disable the native "Export as …" items for the current view. Driven by `computeMenuEnabledState`; macOS only in effect. |
 | `set_altar_export_menu_enabled(enabled)` | Enable/disable the native "Export as Image" submenu. macOS only in effect. |
+| `update_settings()` / `set_update_settings(endpoint, auto_check)` | Read/write `{appDataDir}/update.json` — the one installation-level (not per-vault) setting. `set_update_settings` validates the endpoint as a complete `https` URL before writing. See [`security.md` → In-App Updates](security.md#in-app-updates). |
+| `check_for_update()` / `install_update()` | The only two commands that reach the network — `tauri-plugin-updater` under the app's own signing key, driven entirely from `src-tauri/src/updates.rs` rather than the plugin's JS API, so the WebView's CSP never needs an update host added to `connect-src`. `check_for_update` holds its result in app state; `install_update` installs only that held result and restarts the app. See [`security.md` → In-App Updates](security.md#in-app-updates). |
 
 Tauri menu events (not `invoke`) are emitted by the native menu and received in `AppShell` via `listen()`. On Windows and Linux there is no native menu (see [Window Chrome](#window-chrome) below) — the HTML menu bar calls the same actions directly through `src/lib/menuActions.ts`, so both platforms run one implementation:
 
