@@ -24,6 +24,11 @@ name: Updater test build
 # liegt. Solange sie das nicht tut, ist ein Push auf `UpdaterTest` der einzige
 # Weg, sie zu starten — und zugleich der bequemste: die Aenderung, die im
 # Testbuild sichtbar werden soll, loest ihn selbst aus.
+#
+# Ein Push baut ALLE drei Plattformen, die Auswahl gibt es nur beim manuellen
+# Start. Der Zweig existiert genau zum Pruefen, und die Frage, die nur ein
+# echter Lauf beantwortet — welchen Namen Tauri der AppImage-Signatur gibt —
+# stellt sich nur auf den Plattformen, die man sonst weglaesst.
 on:
   push:
     branches: [UpdaterTest]
@@ -108,7 +113,7 @@ jobs:
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
 
   build-macos:
-    if: ${{ inputs.platform == 'macos' || inputs.platform == 'all' }}
+    if: ${{ github.event_name == 'push' || inputs.platform == 'macos' || inputs.platform == 'all' }}
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
@@ -159,7 +164,7 @@ jobs:
             src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz
 
   build-linux:
-    if: ${{ inputs.platform == 'linux' || inputs.platform == 'all' }}
+    if: ${{ github.event_name == 'push' || inputs.platform == 'linux' || inputs.platform == 'all' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
