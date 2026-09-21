@@ -17,6 +17,7 @@ import { makeCategoryOptional } from './nullableCategory';
 import { seedSigilTemplate } from './templateRows';
 import { migrateRoutinesToTemplates } from './migrateRoutinesToTemplates';
 import i18n from '../i18n';
+import { useSettingsStore } from '../store/settingsStore';
 
 // Per-vault DB cache: SQLite identifier → Database instance
 const _dbCache = new Map<string, Database>();
@@ -88,7 +89,7 @@ export async function getDb(): Promise<Database> {
     await invoke('ensure_vault_dirs', { vaultId });
     const db = await Database.load(identifier);
     await runMigrations(db);
-    await runPeriodicCleanup(db);
+    await runPeriodicCleanup(db, trashRetentionFor(vaultId));
     // Sigillen-Zeichnungen, die v42 (oder ein Backup-Import) nicht als Datei
     // speichern konnte — bei jedem Öffnen ein neuer Versuch. Scheitern darf
     // das Öffnen daran nicht: die Zeilen bleiben einfach, wie sie sind.
@@ -235,11 +236,11 @@ export async function runMigrations(db: Database): Promise<void> {
 }
 
 /**
- * Tabellen, aus denen der 30-Tage-Purge endgültig löscht. Läuft bei jedem
+ * Tabellen, aus denen das Leeren nach der Papierkorb-Frist des Vaults endgültig löscht. Läuft bei jedem
  * Öffnen eines Vaults, bewusst getrennt vom Migrationssystem — idempotent,
  * zeitabhängig und kein Teil der Schema-Historie.
  *
- * `categories` steht bewusst **nicht** hier. Eine Kategorie nach 30 Tagen hart
+ * `categories` steht bewusst **nicht** hier. Eine Kategorie nach Ablauf der Frist hart
  * zu löschen, während Artikel, Operationen, Tasks oder Altar-Elemente noch
  * darauf zeigen, hinterließ ins Leere zeigende `category_id`-Werte — still und
  * unbemerkt. Seit v33 verhindert ein Foreign Key mit ON DELETE RESTRICT das
@@ -292,14 +293,28 @@ const CONTENT_IDS = `(SELECT id FROM journal_entries
                       UNION ALL SELECT id FROM tasks
                       UNION ALL SELECT id FROM altars)`;
 
-async function runPeriodicCleanup(db: Database): Promise<void> {
-  // Auto-purge trash items older than 30 days
-  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  for (const table of CLEANUP_TABLES) {
-    await db.execute(
-      `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
-      [cutoff]
-    );
+/**
+ * Die Papierkorb-Frist des Vaults, der gerade geöffnet wird — seine
+ * Einstellungen lädt `openActiveVault` vor `getDb()`. Gehören die geladenen
+ * Einstellungen einem anderen Vault, wird nicht geleert (`null`): dessen Frist
+ * könnte einen auf „nie" gestellten Papierkorb unwiderruflich ausräumen. (Für
+ * eine unlesbare `settings.json` setzt `loadForVault` die Frist selbst auf nie.)
+ */
+function trashRetentionFor(vaultId: string): number | null {
+  const { vaultId: settingsVaultId, settings } = useSettingsStore.getState();
+  return settingsVaultId === vaultId ? settings.trash.retentionDays : null;
+}
+
+async function runPeriodicCleanup(db: Database, retentionDays: number | null): Promise<void> {
+  // Papierkorb-Inhalte älter als die eingestellte Frist endgültig löschen — „nie" überspringt das.
+  if (retentionDays !== null) {
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+    for (const table of CLEANUP_TABLES) {
+      await db.execute(
+        `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
+        [cutoff]
+      );
+    }
   }
 
   await sweepDanglingLinks(db);
@@ -313,7 +328,7 @@ async function runPeriodicCleanup(db: Database): Promise<void> {
  * Key tragen. Es räumt hier also nichts von selbst auf, und jedes endgültige
  * Löschen von Inhalten hinterlässt Waisen, wenn es nicht ausdrücklich passiert.
  *
- * Wird sowohl vom 30-Tage-Purge als auch vom Leeren des Papierkorbs benutzt,
+ * Wird sowohl vom Leeren nach der Frist als auch vom Leeren des Papierkorbs benutzt,
  * damit beide Wege dasselbe Ergebnis liefern.
  */
 export async function sweepDanglingLinks(db: Database): Promise<void> {

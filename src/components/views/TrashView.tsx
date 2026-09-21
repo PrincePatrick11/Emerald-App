@@ -8,6 +8,7 @@ import { useTrashStore } from '../../store/trashStore';
 import { useUIStore, type ViewMode } from '../../store/uiStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { differenceInDays } from 'date-fns';
+import { useSettingsStore } from '../../store/settingsStore';
 import { formatTimeDistance } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView, isWideCardView } from '../../lib/viewMode';
@@ -62,10 +63,25 @@ function SelectCheckbox({ selected, onToggle }: { selected: boolean; onToggle: (
   );
 }
 
+/** Tage bis zum automatischen Löschen — `null`, wenn der Vault nie automatisch leert. */
+function useDaysLeft(deletedAt: string): number | null {
+  const retentionDays = useSettingsStore((s) => s.settings.trash.retentionDays);
+  if (retentionDays === null) return null;
+  return Math.max(0, retentionDays - differenceInDays(new Date(), new Date(deletedAt)));
+}
+
+function DaysLeft({ days, t }: { days: number; t: ItemSharedProps['t'] }) {
+  return (
+    <span className={days <= 3 ? 'text-red-400' : 'text-stone-600'}>
+      {t('trash.daysLeft', { count: days })}
+    </span>
+  );
+}
+
 function ItemRow({ item, confirmingId, setConfirmingId, restore, deleteNow, selectedIds, onToggleSelect, t }: {
   item: TrashedItem;
 } & ItemSharedProps) {
-  const daysLeft = 30 - differenceInDays(new Date(), new Date(item.deleted_at));
+  const daysLeft = useDaysLeft(item.deleted_at);
   const confirming = confirmingId === item.id;
   const selected = selectedIds.has(item.id);
 
@@ -83,10 +99,12 @@ function ItemRow({ item, confirmingId, setConfirmingId, restore, deleteNow, sele
         <div className="text-sm text-stone-300 truncate">{item.title}</div>
         <div className="text-xs text-stone-600 mt-0.5">
           {t('trash.deletedAgo', { time: formatTimeDistance(item.deleted_at) })}
-          {' '}&middot;{' '}
-          <span className={daysLeft <= 3 ? 'text-red-400' : 'text-stone-600'}>
-            {t('trash.daysLeft', { count: Math.max(0, daysLeft) })}
-          </span>
+          {daysLeft !== null && (
+            <>
+              {' '}&middot;{' '}
+              <DaysLeft days={daysLeft} t={t} />
+            </>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -112,7 +130,7 @@ function ItemRow({ item, confirmingId, setConfirmingId, restore, deleteNow, sele
 function ItemCard({ item, confirmingId, setConfirmingId, restore, deleteNow, selectedIds, onToggleSelect, t }: {
   item: TrashedItem;
 } & ItemSharedProps) {
-  const daysLeft = 30 - differenceInDays(new Date(), new Date(item.deleted_at));
+  const daysLeft = useDaysLeft(item.deleted_at);
   const confirming = confirmingId === item.id;
   const selected = selectedIds.has(item.id);
 
@@ -132,9 +150,11 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, deleteNow, sel
       <div className="text-xs text-stone-600">
         {t('trash.deletedAgo', { time: formatTimeDistance(item.deleted_at) })}
       </div>
-      <div className={`text-xs font-medium ${daysLeft <= 3 ? 'text-red-400' : 'text-stone-600'}`}>
-        {t('trash.daysLeft', { count: Math.max(0, daysLeft) })}
-      </div>
+      {daysLeft !== null && (
+        <div className="text-xs font-medium">
+          <DaysLeft days={daysLeft} t={t} />
+        </div>
+      )}
       <div className="flex items-center gap-1 pt-1 border-t border-stone-700/40" onClick={(e) => e.stopPropagation()}>
         {confirming ? (
           <InlineConfirm small onConfirm={() => deleteNow(item)} onCancel={() => setConfirmingId(null)} />
@@ -157,6 +177,7 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, deleteNow, sel
 
 export default function TrashView() {
   const { t } = useTranslation();
+  const retentionDays = useSettingsStore((s) => s.settings.trash.retentionDays);
   const { items, loading, fetchTrashed, restore, permanentlyDelete, emptyTrash } = useTrashStore(
     useShallow((s) => ({ items: s.items, loading: s.loading, fetchTrashed: s.fetchTrashed, restore: s.restore, permanentlyDelete: s.permanentlyDelete, emptyTrash: s.emptyTrash }))
   );
@@ -402,7 +423,9 @@ export default function TrashView() {
 
       {!loading && items.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs text-stone-600 mb-3">{t('trash.retentionNote')}</p>
+          <p className="text-xs text-stone-600 mb-3">
+            {retentionDays === null ? t('trash.retentionNoteNever') : t('trash.retentionNote', { count: retentionDays })}
+          </p>
           {trashPrefs.grouping === 'grouped' && trashPrefs.view !== 'timeline' && renderGrouped(trashPrefs.view)}
           {trashPrefs.grouping !== 'grouped' && trashPrefs.view === 'list'     && <div className="space-y-1">{sorted.map((item) => <ItemRow key={item.id} item={item} {...itemProps} />)}</div>}
           {trashPrefs.grouping !== 'grouped' && isCardView(trashPrefs.view)  && <div className={cardsGridClass}>{sorted.map((item) => <ItemCard key={item.id} item={item} {...itemProps} />)}</div>}

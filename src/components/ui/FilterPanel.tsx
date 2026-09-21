@@ -12,7 +12,9 @@ export interface FilterChip {
 
 /**
  * The one filter-pill look — exported so the class chain is not copied around.
- * Used by the panel's own chips and by the Settings backup include-lists.
+ * Used by the panel's own chips and by the two list toolbars (Altar preview,
+ * completed tasks). Settings use `SettingsChoiceButton` instead: its window
+ * carries one kind of toggle, not two.
  */
 export function FilterChipButton({
   active, onClick, children,

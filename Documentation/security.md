@@ -15,6 +15,7 @@ Tauri 2 uses a capability file to declare which permissions each window receives
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
+    "core:webview:allow-set-webview-zoom",
     "dialog:allow-save",
     "dialog:allow-open",
     "dialog:allow-message",
@@ -29,6 +30,8 @@ Tauri 2 uses a capability file to declare which permissions each window receives
 
 The four `core:window:allow-*` permissions exist for the custom title bar: on Windows and Linux the window runs undecorated and the HTML window buttons (`WindowControls.tsx`) drive minimize/maximize/close over IPC, and the bar itself starts window dragging. They widen what a compromised frontend could do only marginally (annoyance-level window manipulation, no data access).
 
+`core:webview:allow-set-webview-zoom` backs the interface-size setting (Settings → General): `applyUIScale()` in `src/themes/theme.ts` calls `getCurrentWebview().setZoom(scale / 100)`. It only scales what's rendered — no new data access.
+
 SQLite permissions must be declared explicitly. `sql:default` alone grants read-only access; write access requires `sql:allow-execute` in addition to `sql:allow-select`. Omitting any of these permissions causes silent failures at runtime.
 
 `dialog:allow-message` backs the native success/error confirmation popups shown by `@tauri-apps/plugin-dialog`'s `message()` — used throughout export/import (`src/lib/export.ts`, `src/lib/emeraldFormat.ts`, `src/lib/altarExport.ts`) to report a saved file path or a failure.
@@ -37,7 +40,7 @@ PDF export runs in a hidden window built and torn down by the per-platform `expo
 
 ## Command Surface
 
-`src-tauri/src/lib.rs` registers **29 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
+`src-tauri/src/lib.rs` registers **33 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
 
 | Command | Defined in | Notes |
 |---|---|---|
@@ -45,10 +48,11 @@ PDF export runs in a hidden window built and torn down by the per-platform `expo
 | `export_pdf` | `pdf_export/` | hidden-window PDF render, per-platform |
 | `ensure_app_storage_dirs` | `lib.rs` | creates the app's own fixed storage dirs; takes no path |
 | `save_image` | `images.rs` | accepts a data-URL, decodes it in Rust, writes into the active vault's `images/` under a generated hex name; extension derived from the MIME type with `png` fallback. No backend size cap — the frontend's upload limits are the only bound |
-| `copy_image_file`, `read_image_as_base64` | `images.rs` | see [Path Confinement](#path-confinement) |
+| `copy_image_file`, `read_image_as_base64`, `read_image_file` | `images.rs` | see [Path Confinement](#path-confinement) |
 | `list_image_files`, `adopt_legacy_images` | `images.rs` | enumerate / migrate files inside the vault's `images/` only |
 | `delete_image_files` | `images.rs` | **a delete primitive** — takes a list of filenames, each validated with `is_valid_image_name`, resolved only against the vault's `images/` dir. Used by Settings → Storage cleanup and bounded by that validation |
 | `register_vaults`, `ensure_vault_dirs`, `create_vault_dirs`, `ensure_backup_dir`, `probe_vault_dir`, `delete_vault_files`, `discard_import_staging` | `vault.rs` | see [Vault Directories as a Trust Boundary](#vault-directories-as-a-trust-boundary) |
+| `read_vault_settings`, `write_vault_settings` | `vault.rs` | the vault's `settings.json` — resolved by vault id through the same registry as every other storage command, never by path. `write_vault_settings` refuses anything that doesn't parse as a JSON object and anything over 256 KB (`SETTINGS_MAX_BYTES`, far above what the settings page can produce — a guard against a runaway write, not a format limit); it writes to a `.tmp` file first and `rename`s it over the real one, so a crash mid-write leaves the previous settings rather than a half-written file, and never follows a symlink under either name (`symlink_metadata`, matching `guarded_read_path`'s rule) in either direction. `read_vault_settings` returns a tagged `Missing`/`Found`/`Unreadable` result rather than an error for anything but "the vault directory itself is gone" — a settings file that exists but isn't a plain, readable, size-capped file must not block opening the vault; the frontend falls back to defaults and leaves it alone |
 | `default_vault_dir`, `new_vault_base_dir`, `legacy_default_db_exists` | `vault.rs` | pure path/existence oracles for the vault modal and the settings backup import (add-vault mode); return strings, take no path |
 | `migrate_vault_layout` | `vault.rs` | one-time move of a pre-multi-vault `.db` into the vault layout; the legacy name is validated with `is_valid_legacy_db_name` |
 | `update_menu_labels`, `set_export_menu_enabled`, `set_altar_export_menu_enabled`, `set_view_menu_checked` | `lib.rs` | native-menu state sync; no-ops on Windows/Linux where no native menu is installed |
@@ -84,7 +88,7 @@ Vault storage does not need those roots. **No storage command accepts a path.** 
 
 What that costs is one thing: `write_file` / `read_file` / `export_image` / `copy_image_file` stay confined to the fixed user directories, so a backup file or a Markdown export cannot be written into — or read out of — a vault folder that lives outside them. Opening, using and deleting such a vault works in full.
 
-`delete_vault_files` removes only the vault's own artefacts **by name**: `emerald.db`, its journal, and files in `images/` whose names pass `is_valid_image_name` — database first, then the images. It is not `remove_dir_all` anywhere in that path: the app puts that database into whatever folder the user chose, so a vault created straight in Documents would have taken Documents with it. The directories go last with plain `remove_dir`, which fails while anything else is still inside — and that failure is the *answer*, not an error: a folder that also holds an exported backup in `backup/` or a stray `desktop.ini` keeps standing, only the vault files are gone (an *empty* `backup/` counts as the vault's own and goes too), and the command reports `false` so the UI can say so. A half-deleted vault cannot resurrect as an empty one: the caller drops it from `vaults.json` after every `Ok`, and an `Err` only falls while the database itself could not be removed. The "the folder contains an `emerald.db`" check still runs first (`vault.rs` refuses with `not a vault directory: no database found`).
+`delete_vault_files` removes only the vault's own artefacts **by name**: `emerald.db`, its journal, `settings.json` (and its stray `.tmp` write-companion, if a crash left one behind), and files in `images/` whose names pass `is_valid_image_name` — database first, then settings, then the images. It is not `remove_dir_all` anywhere in that path: the app puts that database into whatever folder the user chose, so a vault created straight in Documents would have taken Documents with it. The directories go last with plain `remove_dir`, which fails while anything else is still inside — and that failure is the *answer*, not an error: a folder that also holds an exported backup in `backup/` or a stray `desktop.ini` keeps standing, only the vault files are gone (an *empty* `backup/` counts as the vault's own and goes too), and the command reports `false` so the UI can say so. A half-deleted vault cannot resurrect as an empty one: the caller drops it from `vaults.json` after every `Ok`, and an `Err` only falls while the database itself could not be removed. The "the folder contains an `emerald.db`" check still runs first (`vault.rs` refuses with `not a vault directory: no database found`).
 
 `discard_import_staging` follows the same by-name rule for a different fixed target: `emerald.db.import` (plus `-journal`/`-wal`/`-shm`), the working copy a backup import fills and swaps in before removing (see [DB Backup / Restore](database.md#db-backup--restore-emeralddb) in `database.md`). It resolves the vault id through the same registry as every other storage command, can delete nothing else, and a missing file is not an error — it runs before every import to clear whatever a crashed one left behind, and after every import whether it succeeded or failed.
 
@@ -138,6 +142,8 @@ Two things the write guard gets right that the four hand-written copies did not:
 1. **Extension allowlist.** Only `png`, `jpg`, `jpeg`, `gif`, `webp`, and `svg` are permitted. Any other extension returns an `"unsupported file type"` error.
 2. **Symlink rejection.** The source path is checked with `symlink_metadata`; if it resolves to a symlink, the command returns `"access denied: symlink targets are not allowed"`.
 3. **Root directory confinement.** The source path is canonicalized and verified through the same shared `guarded_read_path` that `read_file` uses — the fixed roots only (home, documents, downloads, desktop, app data, app config), deliberately *not* the registered vault directories, for the same reason `resolve_allowed_roots` leaves them out (see [Vault Directories as a Trust Boundary](#vault-directories-as-a-trust-boundary) above). If the resolved path escapes these roots, the command returns `"access denied: path outside allowed directories"`.
+
+**`read_image_file`** shares `copy_image_file`'s extension allowlist and root-confinement checks (`checked_image_source`, the two commands' common helper) but never writes anything into a vault — it reads an arbitrary, already-validated external file and returns it as a base64 data-URL, for the frontend to scale and check against the vault's own image limits (Settings → Entries, `src/lib/imageLimits.ts`) *before* handing the result to `save_image`. It adds one guard of its own: a hard **64 MB cap** (`MAX_EXTERNAL_IMAGE_BYTES`) on the source file's size, checked via `fs::metadata` before the file is read — the bytes cross IPC as base64 and are then decoded onto a canvas in the frontend, so an arbitrarily large file would stall the webview well before any vault-configured size limit gets a chance to reject it. The vault's own maximum file size (if smaller) is enforced afterwards in TypeScript, which is why the 64 MB number lives only in Rust.
 
 The *destination* is not a path at all — it is the active vault's `images/` folder, resolved from the vault id.
 

@@ -1,17 +1,21 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Archive, HardDrive, Info, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { Archive, FileText, HardDrive, Info, PanelLeft, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import Modal from '../../ui/Modal';
 import GeneralPage from './GeneralPage';
+import SidebarPage from './SidebarPage';
+import EntriesPage from './EntriesPage';
 import BackupPage from './BackupPage';
 import StoragePage from './StoragePage';
 import UpdatesPage from './UpdatesPage';
 import AboutPage from './AboutPage';
 
-export type SettingsPage = 'general' | 'backup' | 'storage' | 'updates' | 'about';
+export type SettingsPage = 'general' | 'sidebar' | 'entries' | 'backup' | 'storage' | 'updates' | 'about';
 
 const PAGES = [
   { id: 'general', labelKey: 'settings.pageGeneral', Icon: SlidersHorizontal },
+  { id: 'sidebar', labelKey: 'settings.pageSidebar', Icon: PanelLeft },
+  { id: 'entries', labelKey: 'settings.pageEntries', Icon: FileText },
   { id: 'backup', labelKey: 'settings.backup', Icon: Archive },
   { id: 'storage', labelKey: 'settings.storage', Icon: HardDrive },
   { id: 'updates', labelKey: 'settings.updates', Icon: RefreshCw },
@@ -83,6 +87,8 @@ export default function SettingsModal({ onClose, initialPage = 'general' }: Prop
         className="flex-1 overflow-y-auto px-5 py-4 space-y-6"
       >
         {page === 'general' && <GeneralPage />}
+        {page === 'sidebar' && <SidebarPage />}
+        {page === 'entries' && <EntriesPage />}
         {page === 'backup' && <BackupPage />}
         {page === 'storage' && <StoragePage />}
         {page === 'updates' && <UpdatesPage />}

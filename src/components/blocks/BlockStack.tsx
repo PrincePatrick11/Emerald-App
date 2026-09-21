@@ -10,7 +10,6 @@ import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import EditorToolbar from '../editor/EditorToolbar';
 import LinkPickerModal from '../editor/LinkPickerModal';
 import DragGhost from '../editor/DragGhost';
-import ImageFormatErrorModal from '../editor/ImageFormatErrorModal';
 import { useEditorFileDrop } from '../editor/useEditorFileDrop';
 import { useEditorPointerDrops } from '../editor/useEditorPointerDrops';
 import { useInternalLinkNavigation } from '../editor/useInternalLinkNavigation';
@@ -589,7 +588,6 @@ export default function BlockStack({
           onClose={() => setLinkPickerOpen(false)}
         />
       )}
-      {fileDrop.formatError && <ImageFormatErrorModal onClose={fileDrop.dismissFormatError} />}
       <DragGhost />
     </BlockStackContext.Provider>
   );

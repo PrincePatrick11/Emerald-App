@@ -132,6 +132,17 @@ pub async fn save_image(
     .map_err(|e| e.to_string())?
 }
 
+/// The checks every command that reads an image from an arbitrary location
+/// runs first: a known image extension, and a path inside the allowed roots
+/// that is not a link. Returns the extension and the resolved path.
+fn checked_image_source(app: &tauri::AppHandle, source: &str) -> Result<(String, PathBuf), String> {
+    let ext = crate::ext_for_path(source);
+    if !IMAGE_EXTS.contains(&ext.as_str()) {
+        return Err("unsupported file type".to_string());
+    }
+    Ok((ext, crate::guarded_read_path(app, source)?))
+}
+
 /// Copies a file from an arbitrary location into the vault and returns the
 /// filename it was given. Same deduplication as `save_image`.
 #[tauri::command]
@@ -141,12 +152,7 @@ pub async fn copy_image_file(
     vault_id: String,
 ) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let ext = crate::ext_for_path(&source);
-        if !IMAGE_EXTS.contains(&ext.as_str()) {
-            return Err("unsupported file type".to_string());
-        }
-
-        let canonical_source = crate::guarded_read_path(&app, &source)?;
+        let (ext, canonical_source) = checked_image_source(&app, &source)?;
         let bytes = std::fs::read(&canonical_source).map_err(|e| format!("read {source}: {e}"))?;
         let filename = format!("{}.{}", sha256_hex(&bytes), ext);
         let path = vault::images_dir(&app, &vault_id)?.join(&filename);
@@ -155,6 +161,37 @@ pub async fn copy_image_file(
             std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
         }
         Ok(filename)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Hard cap for [`read_image_file`]: the bytes cross IPC as base64 and are
+/// decoded on a canvas, so an arbitrarily large file would stall the webview.
+/// The vault's own limit is enforced afterwards in the frontend, which reads
+/// the number out of the error below — so it lives only here.
+const MAX_EXTERNAL_IMAGE_BYTES: u64 = 64 * 1024 * 1024;
+
+/// Reads an image file from an arbitrary location as a data-URL, without
+/// storing it. For the file drop when the vault limits image size: the
+/// frontend scales and checks it before handing it to [`save_image`]. Same
+/// source checks as [`copy_image_file`].
+#[tauri::command]
+pub async fn read_image_file(app: tauri::AppHandle, source: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let (ext, canonical_source) = checked_image_source(&app, &source)?;
+        let size = std::fs::metadata(&canonical_source)
+            .map_err(|e| format!("read {source}: {e}"))?
+            .len();
+        if size > MAX_EXTERNAL_IMAGE_BYTES {
+            return Err(format!("image file too large: {MAX_EXTERNAL_IMAGE_BYTES}"));
+        }
+        let bytes = std::fs::read(&canonical_source).map_err(|e| format!("read {source}: {e}"))?;
+        Ok(format!(
+            "data:{};base64,{}",
+            mime_for_ext(&ext),
+            general_purpose::STANDARD.encode(bytes)
+        ))
     })
     .await
     .map_err(|e| e.to_string())?

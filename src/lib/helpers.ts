@@ -53,3 +53,9 @@ export function formatBytes(bytes: number, units: [string, string, string]): str
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} ${units[1]}`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} ${units[2]}`;
 }
+
+/** `raw`, wenn es genau einer der `options` ist, sonst `fallback` — für Werte
+ *  aus Dateien und localStorage, die eine feste Auswahl treffen müssen. */
+export function oneOf<T>(raw: unknown, options: readonly T[], fallback: T): T {
+  return options.includes(raw as T) ? (raw as T) : fallback;
+}

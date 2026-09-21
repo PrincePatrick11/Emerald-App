@@ -1,7 +1,7 @@
 //! Vault storage layout.
 //!
 //! A vault is a directory the user picked. Inside it live `emerald.db`, an
-//! `images/` folder, and a `backup/` folder.
+//! `images/` folder, a `backup/` folder, and `settings.json`.
 //! `vaults.json` in the app data directory
 //! maps vault ids to those directories; the frontend owns that file and
 //! mirrors it into [`VaultRegistry`] on every write.
@@ -31,6 +31,14 @@ pub const VAULTS_SUBDIR: &str = "vaults";
 pub const VAULT_HOME_DIR: &str = "Emerald Vaults";
 /// Where the database export offers to write its `.emeralddb`, inside the vault.
 pub const BACKUP_SUBDIR: &str = "backup";
+/// The vault's own settings. The frontend owns its shape; Rust only moves the text.
+pub const SETTINGS_FILE: &str = "settings.json";
+/// Written first and renamed over [`SETTINGS_FILE`], so a crash mid-write
+/// leaves the previous settings rather than half a file.
+const SETTINGS_TEMP_FILE: &str = "settings.json.tmp";
+/// Far above anything the settings page can produce — a guard against a
+/// runaway write, not a format limit.
+const SETTINGS_MAX_BYTES: u64 = 256 * 1024;
 /// The registry the frontend owns, in the app data directory.
 const VAULTS_FILE: &str = "vaults.json";
 
@@ -739,8 +747,9 @@ pub fn migrate_vault_layout(
     Ok(target_dir.to_string_lossy().into_owned())
 }
 
-/// Deletes a vault's files — the database, its journal, and its images. Only
-/// ever reached through the vault modal's opt-in "delete files" checkbox.
+/// Deletes a vault's files — the database, its journal, its images and its
+/// settings. Only ever reached through the vault modal's opt-in "delete files"
+/// checkbox.
 ///
 /// Deliberately **not** `remove_dir_all`. A vault directory is one the user
 /// picked, and the app puts `emerald.db` into whatever they picked — so "it
@@ -793,6 +802,10 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
         std::fs::remove_dir(&images).ok();
     }
 
+    for name in [SETTINGS_FILE, SETTINGS_TEMP_FILE] {
+        std::fs::remove_file(dir.join(name)).ok();
+    }
+
     // Ein *leerer* `backup/` — seit `create_vault_dirs` ihn mit anlegt, der
     // Normalfall ohne Export — soll das Entfernen des Ordners nicht
     // verhindern. `remove_dir` scheitert, sobald ein Backup darin liegt, und
@@ -800,6 +813,92 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
     std::fs::remove_dir(dir.join(BACKUP_SUBDIR)).ok();
 
     Ok(std::fs::remove_dir(&dir).is_ok())
+}
+
+/// What [`read_vault_settings`] found.
+#[derive(serde::Serialize, Debug, PartialEq)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum SettingsRead {
+    Missing,
+    Found { contents: String },
+    /// There is something, but not a file this app wrote: a link, a directory,
+    /// an oversized or unreadable file. The frontend falls back to defaults and
+    /// leaves it alone — a broken settings file must not lock the vault.
+    Unreadable,
+}
+
+/// The vault's `settings.json`.
+///
+/// Fails only when the vault directory itself is gone — same rule as
+/// [`images_dir`]: the caller is about to open that vault and must hear about
+/// it before SQLite creates an empty database in a resurrected folder.
+#[tauri::command]
+pub fn read_vault_settings(app: tauri::AppHandle, vault_id: String) -> Result<SettingsRead, String> {
+    let dir = vault_dir(&app, &vault_id)?;
+    directory_state(&dir)?;
+    Ok(read_settings_in(&dir))
+}
+
+/// Replaces the vault's `settings.json` with `contents`.
+///
+/// Only well-formed JSON objects are written: the file is read back by every
+/// build, and a stray string here would only ever be thrown away there.
+#[tauri::command]
+pub fn write_vault_settings(app: tauri::AppHandle, vault_id: String, contents: String) -> Result<(), String> {
+    let dir = vault_dir(&app, &vault_id)?;
+    directory_state(&dir)?;
+    write_settings_in(&dir, &contents)
+}
+
+fn read_settings_in(dir: &Path) -> SettingsRead {
+    let file = dir.join(SETTINGS_FILE);
+    // `symlink_metadata`, nicht `metadata`: ein Vault-Ordner kann von
+    // anderswo stammen, und ein Link darin soll nicht verfolgt werden — wie
+    // bei `guarded_read_path` in `lib.rs`.
+    match std::fs::symlink_metadata(&file) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => SettingsRead::Missing,
+        Ok(md) if md.is_file() && md.len() <= SETTINGS_MAX_BYTES => match std::fs::read_to_string(&file) {
+            Ok(contents) => SettingsRead::Found { contents },
+            Err(e) => {
+                eprintln!("[vault] read {}: {e}", file.display());
+                SettingsRead::Unreadable
+            }
+        },
+        _ => SettingsRead::Unreadable,
+    }
+}
+
+fn write_settings_in(dir: &Path, contents: &str) -> Result<(), String> {
+    use std::io::Write;
+
+    if contents.len() as u64 > SETTINGS_MAX_BYTES {
+        return Err("settings too large".to_string());
+    }
+    match serde_json::from_str::<serde_json::Value>(contents) {
+        Ok(serde_json::Value::Object(_)) => {}
+        _ => return Err("settings must be a JSON object".to_string()),
+    }
+    // Was unter dem Temp-Namen liegt — Rest eines Absturzes oder ein
+    // untergeschobener Link —, weg damit (ein Link verschwindet, sein Ziel
+    // bleibt). `create_new` scheitert, falls dazwischen wieder etwas auftaucht,
+    // statt einem Link hinterherzuschreiben.
+    let temp = dir.join(SETTINGS_TEMP_FILE);
+    std::fs::remove_file(&temp).ok();
+    let written = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temp)
+        .and_then(|mut file| file.write_all(contents.as_bytes()));
+    if let Err(e) = written {
+        std::fs::remove_file(&temp).ok();
+        return Err(format!("write {}: {e}", temp.display()));
+    }
+    // `rename` ersetzt eine vorhandene Datei auf allen drei Plattformen — auch
+    // einen Link unter dem Zielnamen, ohne ihm zu folgen.
+    std::fs::rename(&temp, dir.join(SETTINGS_FILE)).map_err(|e| {
+        std::fs::remove_file(&temp).ok();
+        format!("replace {SETTINGS_FILE}: {e}")
+    })
 }
 
 /// Entfernt die Arbeitskopie eines Backup-Imports (`importStaging.ts`) samt
@@ -863,6 +962,65 @@ mod tests {
             .iter()
             .map(|v| v["path"].as_str().unwrap().to_string())
             .collect()
+    }
+
+    #[test]
+    fn settings_round_trip_and_a_missing_file_is_missing() {
+        let dir = scratch();
+        assert_eq!(read_settings_in(&dir), SettingsRead::Missing);
+        write_settings_in(&dir, r#"{"version":1}"#).unwrap();
+        write_settings_in(&dir, r#"{"version":2}"#).unwrap();
+        assert_eq!(
+            read_settings_in(&dir),
+            SettingsRead::Found { contents: r#"{"version":2}"#.to_string() }
+        );
+        assert!(!dir.join(SETTINGS_TEMP_FILE).exists());
+    }
+
+    #[test]
+    fn settings_refuse_anything_but_a_json_object() {
+        let dir = scratch();
+        for bad in ["", "[]", "\"x\"", "{", "null"] {
+            assert!(write_settings_in(&dir, bad).is_err(), "accepted {bad:?}");
+        }
+        assert!(!dir.join(SETTINGS_FILE).exists());
+        let huge = format!(r#"{{"x":"{}"}}"#, "a".repeat(SETTINGS_MAX_BYTES as usize));
+        assert!(write_settings_in(&dir, &huge).is_err());
+    }
+
+    #[test]
+    fn a_settings_path_that_is_no_plain_file_is_unreadable_not_an_error() {
+        let dir = scratch();
+        std::fs::create_dir_all(dir.join(SETTINGS_FILE)).unwrap();
+        assert_eq!(read_settings_in(&dir), SettingsRead::Unreadable);
+
+        let big = scratch();
+        write(&big.join(SETTINGS_FILE), &"a".repeat(SETTINGS_MAX_BYTES as usize + 1));
+        assert_eq!(read_settings_in(&big), SettingsRead::Unreadable);
+    }
+
+    #[test]
+    fn a_stale_temp_file_does_not_block_the_write() {
+        let dir = scratch();
+        write(&dir.join(SETTINGS_TEMP_FILE), "leftover");
+        write_settings_in(&dir, "{}").unwrap();
+        assert_eq!(read_settings_in(&dir), SettingsRead::Found { contents: "{}".to_string() });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn settings_never_write_through_or_read_through_a_link() {
+        let dir = scratch();
+        let outside = scratch().join("victim.txt");
+        write(&outside, "keep me");
+        std::os::unix::fs::symlink(&outside, dir.join(SETTINGS_TEMP_FILE)).unwrap();
+        write_settings_in(&dir, "{}").unwrap();
+        assert_eq!(std::fs::read_to_string(&outside).unwrap(), "keep me");
+        assert!(!std::fs::symlink_metadata(dir.join(SETTINGS_FILE)).unwrap().file_type().is_symlink());
+
+        let linked = scratch();
+        std::os::unix::fs::symlink(&outside, linked.join(SETTINGS_FILE)).unwrap();
+        assert_eq!(read_settings_in(&linked), SettingsRead::Unreadable);
     }
 
     #[test]

@@ -1,15 +1,20 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Brush, Check, HardDrive } from 'lucide-react';
+import { Brush, Check, HardDrive, Trash2 } from 'lucide-react';
 import Button from '../../ui/Button';
 import { deleteImageFiles, findUnusedImages, type UnusedImages } from '../../../lib/images';
 import { getDb } from '../../../lib/db';
 import { formatBytes } from '../../../lib/helpers';
+import { TRASH_RETENTION_OPTIONS } from '../../../lib/vaultSettings';
+import { useSettingsStore } from '../../../store/settingsStore';
+import SettingsChoiceButton, { SettingsChoiceRow } from './SettingsChoiceButton';
 import SettingsSection from './SettingsSection';
 
 /** Was die App auf der Platte liegen hat, und was davon weg kann. */
 export default function StoragePage() {
   const { t } = useTranslation();
+  const retentionDays = useSettingsStore((s) => s.settings.trash.retentionDays);
+  const update = useSettingsStore((s) => s.update);
 
   // Aufraeumen der Bildablage: erst zaehlen, dann auf Bestaetigung loeschen.
   const [unused, setUnused] = useState<UnusedImages | null>(null);
@@ -43,25 +48,40 @@ export default function StoragePage() {
   }
 
   return (
-    <SettingsSection icon={<HardDrive size={14} />} title={t('settings.storage')}>
-        <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-stone-800/60 border border-stone-700/40">
-          <span className="flex items-center gap-2 text-sm text-stone-300 min-w-0">
+    <>
+      <SettingsSection icon={<Trash2 size={14} />} title={t('settings.trashRetention')} description={t('settings.trashRetentionHint')}>
+        <SettingsChoiceRow>
+          {TRASH_RETENTION_OPTIONS.map((days) => (
+            <SettingsChoiceButton
+              key={days ?? 'never'}
+              active={retentionDays === days}
+              onClick={() => update('trash', { retentionDays: days })}
+            >
+              {days === null ? t('settings.trashRetentionNever') : t('settings.trashRetentionDays', { count: days })}
+            </SettingsChoiceButton>
+          ))}
+        </SettingsChoiceRow>
+      </SettingsSection>
+
+      <SettingsSection icon={<HardDrive size={14} />} title={t('settings.storage')} description={t('settings.storageHint')}>
+        <div className="settings-row">
+          <span className="flex items-center gap-2 text-sm min-w-0 text-secondary">
             <Brush size={14} className="shrink-0" />
             <span className="truncate">{t('settings.cleanupImages')}</span>
           </span>
 
           {unused === null ? (
-            <Button onClick={scanUnusedImages} disabled={scanning} tone="amber" className="shrink-0">
+            <Button onClick={scanUnusedImages} disabled={scanning} variant="secondary" className="shrink-0">
               {scanning ? t('settings.cleanupScanning') : t('settings.cleanupScan')}
             </Button>
           ) : unused.names.length === 0 ? (
-            <span className="text-xs text-stone-500 shrink-0">{t('settings.cleanupNone')}</span>
+            <span className="text-xs shrink-0 text-muted">{t('settings.cleanupNone')}</span>
           ) : (
             <span className="flex items-center gap-2 shrink-0">
-              <span className="text-xs text-stone-400">
+              <span className="text-xs text-secondary">
                 {t('settings.cleanupFound', { count: unused.names.length, size: formatBytes(unused.bytes, byteUnits) })}
               </span>
-              <Button onClick={removeUnusedImages} tone="danger">
+              <Button onClick={removeUnusedImages} variant="danger">
                 {t('settings.cleanupDelete')}
               </Button>
             </span>
@@ -73,6 +93,7 @@ export default function StoragePage() {
             </span>
           )}
         </div>
-    </SettingsSection>
+      </SettingsSection>
+    </>
   );
 }

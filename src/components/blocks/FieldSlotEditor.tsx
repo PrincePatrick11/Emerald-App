@@ -4,6 +4,8 @@ import { ImagePlus, X } from 'lucide-react';
 import { imageFromSlot, imageSlotHtml, type ElementDef } from '../../lib/blocks/fields';
 import { imageSrc, saveImage } from '../../lib/images';
 import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, readFileAsDataUrl } from '../../lib/helpers';
+import { prepareImageDataUrl } from '../../lib/imageLimits';
+import { reportImageError } from '../../store/imageNoticeStore';
 import { LinkEditor } from './BlockLink';
 import { AltarFieldEditor } from './AltarField';
 
@@ -49,10 +51,9 @@ function ImageEditor({ slot, onChange }: { slot: string | undefined; onChange: (
       return;
     }
     try {
-      onChange(imageSlotHtml(await saveImage(await readFileAsDataUrl(file))));
+      onChange(imageSlotHtml(await saveImage(await prepareImageDataUrl(await readFileAsDataUrl(file)))));
     } catch (e) {
-      console.error('Failed to save image:', e);
-      showError('blocks.fields.imageFailed');
+      if (!reportImageError(e, 'field')) showError('blocks.fields.imageFailed');
     }
   };
 

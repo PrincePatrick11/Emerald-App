@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { registerTagLookup } from '../lib/templateTags';
 import { getDb } from '../lib/db';
 import { fromRow, jsonArray, type DbRow } from '../lib/row';
 import { useJournalStore } from './journalStore';
@@ -262,3 +263,6 @@ export const useTagStore = create<TagState>((set, get) => {
     getByName: (name) => get().tags.find((t) => sameName(t.name, name)),
   };
 });
+
+// Vorlagen prüfen ihre Tags gegen den Store, ohne ihn zu importieren (siehe lib/templateTags).
+registerTagLookup((name) => useTagStore.getState().getByName(name)?.name);

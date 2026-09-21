@@ -45,6 +45,7 @@ import { useTaskStore } from '../store/taskStore';
 import { useTemplateNoticeStore, useTemplateStore } from '../store/templateStore';
 import { useBlockDefinitionStore } from '../store/blockDefinitionStore';
 import { useUIStore } from '../store/uiStore';
+import { withUsableTags } from './templateTags';
 import type { JournalEntry, Operation, WikiArticle } from '../types';
 
 /** Die Typen, zwischen denen ein Eintrag wechseln kann — die Module mit Blockstapel. */
@@ -206,7 +207,10 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
       const cleared = swap.replaces ? fieldsWithoutTemplate(core, to, swap.replaces) : core;
       core = {
         ...core,
-        ...fieldsWithTemplate(cleared, to, swap.template, { title: 'ifUntitled', tags: true, replaces: swap.replaces }),
+        ...fieldsWithTemplate(
+          cleared, to, withUsableTags(swap.template),
+          { title: 'ifUntitled', tags: true, replaces: swap.replaces },
+        ),
         content: serializeBlocks(instantiateTemplateBlocks(swap.template)),
       };
     }

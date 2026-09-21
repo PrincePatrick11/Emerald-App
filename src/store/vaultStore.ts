@@ -18,6 +18,8 @@ import { reloadAllStores } from './moduleWiring';
 import { useUIStore } from './uiStore';
 import { clearAllDrafts } from './draftStore';
 import { useUndoStore } from './undoStore';
+import { useSettingsStore } from './settingsStore';
+import { captureLegacySettings } from '../lib/vaultSettings';
 
 interface VaultStore {
   vaults: Vault[];
@@ -57,6 +59,10 @@ async function openActiveVault(): Promise<void> {
   await drainSerialized();
   // Drop cached connections so getDb() loads the vault that is active now.
   await resetDbCache();
+  // Vor getDb(): die Migrationen beim Öffnen brauchen schon die Sprache des
+  // neuen Vaults (siehe `loadForVault`). Ein fehlender Vault-Ordner scheitert
+  // bereits hier.
+  await useSettingsStore.getState().loadForVault(useVaultStore.getState().activeVaultId);
   // runMigrations is idempotent, so this is also what initialises a fresh vault.
   await getDb();
   // Tabs und History zeigen per Eintrags-ID in den alten Vault — alles zu,
@@ -83,6 +89,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
 
   loadVaults: async () => {
     const data = await loadVaultsFile();
+    captureLegacySettings(data.vaults.map((v) => v.id));
     set({ vaults: data.vaults, activeVaultId: data.activeVaultId, loaded: true });
   },
 
@@ -102,6 +109,14 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       await setActiveVaultId(previous);
       set({ activeVaultId: previous });
       await resetDbCache();
+      // Die Einstellungen des gescheiterten Vaults können schon gegriffen
+      // haben. Lassen sich die alten nicht zurückholen, schreibt der Store
+      // nirgendwohin mehr — sonst landete die nächste Änderung im falschen Vault.
+      const restored = hasActiveVault(get()) && await useSettingsStore.getState().loadForVault(previous).then(
+        () => true,
+        (e) => { console.error('[vault] could not restore settings', e); return false; },
+      );
+      if (!restored) await useSettingsStore.getState().clear();
       throw err;
     }
   },
@@ -162,6 +177,8 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     const successor = remaining[Math.min(Math.max(index, 0), remaining.length - 1)];
     if (!successor) {
       set({ vaults: remaining, activeVaultId: '' });
+      // Wie im Fehlerfall oben: ohne Vault gelten wieder die Standards.
+      await useSettingsStore.getState().clear();
       return dirRemoved;
     }
 

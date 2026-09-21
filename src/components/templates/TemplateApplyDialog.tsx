@@ -6,6 +6,7 @@ import BlockCheckbox from '../blocks/BlockCheckbox';
 import { templateLabel } from '../../lib/blocks/blockAttrs';
 import type { Template } from '../../lib/blocks/templates';
 import type { TemplateApplyOptions } from '../../store/templateApply';
+import { usableTemplateTags } from '../../lib/templateTags';
 
 /**
  * Eine Vorlage in einen Eintrag, der schon Inhalt hat: anhängen oder den
@@ -20,7 +21,9 @@ export default function TemplateApplyDialog({ template, onApply, onClose }: {
   const { t } = useTranslation();
   const [mode, setMode] = useState<TemplateApplyOptions['mode']>('append');
   const hasTitle = !!template.title.trim();
-  const hasTags = template.tags.length > 0;
+  // Nur, was wirklich ankommt — ohne Anlegen-Erlaubnis fallen unbekannte Tags weg.
+  const shownTags = usableTemplateTags(template.tags);
+  const hasTags = shownTags.length > 0;
   const [title, setTitle] = useState(false);
   const [tags, setTags] = useState(hasTags);
 
@@ -54,7 +57,7 @@ export default function TemplateApplyDialog({ template, onApply, onClose }: {
           checked={hasTags && tags}
           disabled={!hasTags}
           onChange={setTags}
-          label={hasTags ? t('templates.insert.addTags', { tags: template.tags.join(', ') }) : t('templates.insert.noTags')}
+          label={hasTags ? t('templates.insert.addTags', { tags: shownTags.join(', ') }) : t('templates.insert.noTags')}
         />
       </div>
 

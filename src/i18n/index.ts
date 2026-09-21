@@ -29,12 +29,12 @@ export type AppLanguage = (typeof LANGUAGE_OPTIONS)[number]['code'];
 
 const SUPPORTED = new Set<string>(LANGUAGE_OPTIONS.map((o) => o.code));
 
-// Gleicher Mechanismus wie 'theme-id' und die Font-Keys: localStorage, damit
-// die Wahl Sessions und Vault-Wechsel uebersteht. Vorher startete die App bei
-// jedem Launch auf Englisch.
-const LANGUAGE_STORAGE_KEY = 'app-language';
+// Die Sprache gehoert zu den Einstellungen des Vaults (settingsStore). Unter
+// diesem Schluessel liegt nur ihr Spiegel — die Sprache des zuletzt geoeffneten
+// Vaults, mit der `main.tsx` startet, bevor ein Vault geladen ist.
+export const LANGUAGE_STORAGE_KEY = 'app-language';
 
-/** Die zuletzt gewaehlte Sprache, gegen LANGUAGE_OPTIONS validiert. */
+/** Die Sprache des zuletzt geoeffneten Vaults, gegen LANGUAGE_OPTIONS validiert. */
 export function savedAppLanguage(): string {
   const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
   return stored && SUPPORTED.has(stored) ? stored : 'en';
@@ -82,6 +82,8 @@ export async function changeAppLanguage(lng: string): Promise<void> {
   await i18n.changeLanguage(lng);
   // Zweite Prüfung: hat ein späterer Wechsel überholt, während changeLanguage
   // lief, dürfen localStorage und <html lang> nicht mehr für den Verlierer schreiben.
+  // Den Spiegel der Sprache schreibt nur diese Stelle (die übrigen setzt
+  // `applyAppearance` im settingsStore) — erst, wenn das Bundle wirklich gilt.
   if (seq !== switchSeq) return;
   localStorage.setItem(LANGUAGE_STORAGE_KEY, lng);
   // Fuer Rechtschreibpruefung und Screenreader — index.html startet mit "en".

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Check, Download, FolderOpen, Upload } from 'lucide-react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import Button from '../../ui/Button';
-import { FilterChipButton } from '../../ui/FilterPanel';
+import BlockCheckbox from '../../blocks/BlockCheckbox';
 import { VaultLocationRow } from '../VaultModal';
 import {
   NEW_VAULT_TARGET_ERROR_KEY,
@@ -22,6 +22,7 @@ import {
   openBackupFile,
   importDatabase,
 } from '../../../lib/dbBackup';
+import { SETTINGS_GROUPS, type SettingsGroup } from '../../../lib/vaultSettings';
 import SettingsChoiceButton from './SettingsChoiceButton';
 import SettingsSection from './SettingsSection';
 
@@ -35,6 +36,17 @@ const DEFAULT_EXPORT_OPTIONS: BackupOptions = {
   dateFrom: '',
   dateTo: '',
   includeDeleted: false,
+  includeSettings: true,
+};
+
+/** Record statt Liste: eine neue Einstellungs-Gruppe ohne Beschriftung ist ein Typfehler. */
+const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {
+  appearance: 'settings.groupAppearance',
+  trash: 'settings.groupTrash',
+  leftList: 'settings.groupLeftList',
+  emojis: 'settings.groupEmojis',
+  images: 'settings.groupImages',
+  tags: 'settings.groupTags',
 };
 
 /**
@@ -70,6 +82,8 @@ export default function BackupPage() {
     includeAltars: true, includeTasks: true, includeTags: true,
   });
   const [excludedCategoryIds] = useState<Set<string>>(new Set());
+  // Beim Zusammenführen bleibt ohne Wahl alles, wie es im Vault eingestellt ist.
+  const [settingsGroups, setSettingsGroups] = useState<SettingsGroup[]>([]);
   const [importing, setImporting] = useState(false);
   const [importDone, setImportDone] = useState(false);
   const [importError, setImportError] = useState('');
@@ -109,6 +123,7 @@ export default function BackupPage() {
       // `{appDataDir}/vaults/{id}`. Scheitert die Aufloesung, bleibt der.
       setVaultBaseDir(await newVaultBaseDir().catch(() => null));
       setImportTypeFilters({ includeJournal: true, includeWiki: true, includeOperations: true, includeAltars: true, includeTasks: true, includeTags: true });
+      setSettingsGroups([]);
     } catch {
       setImportError(t('settings.importErrorInvalid'));
     }
@@ -145,6 +160,7 @@ export default function BackupPage() {
           : undefined,
         categoryFilters,
         importTypeFilters,
+        importMode === 'merge' ? settingsGroups : [],
       );
       setImportDone(true);
       setImportedFile(null);
@@ -162,13 +178,13 @@ export default function BackupPage() {
 
   return (
     <>
-      <SettingsSection icon={<Download size={14} />} title={t('settings.exportDb')}>
-        <div className="rounded-lg bg-stone-800/60 border border-stone-700/40 px-4 py-3 space-y-3">
-          {/* Type chips — dieselben Pillen wie im Filter-Panel, statt
-              handgebauter Kaestchen: an/aus liest sich am Chip selbst. */}
+      <SettingsSection icon={<Download size={14} />} title={t('settings.exportDb')} description={t('settings.exportDbHint')}>
+        <div className="space-y-3">
+          {/* Dieselben Auswahlknoepfe wie auf den uebrigen Seiten des
+              Fensters — an/aus nur ueber die Faerbung, ohne Haekchen. */}
           <div>
-            <p className="text-xs text-stone-500 mb-2">{t('settings.exportInclude')}</p>
-            <div className="flex flex-wrap gap-1.5">
+            <p className="label-xs mb-2">{t('settings.exportInclude')}</p>
+            <div className="flex flex-wrap gap-2">
               {(
                 [
                   ['includeJournal', 'settings.includeJournal'],
@@ -177,16 +193,17 @@ export default function BackupPage() {
                   ['includeAltars', 'settings.includeAltars'],
                   ['includeTasks', 'settings.includeTasks'],
                   ['includeTags', 'settings.includeTags'],
+                  ['includeSettings', 'settings.includeSettings'],
                 ] as [keyof BackupOptions, string][]
               ).map(([key, labelKey]) => (
-                <FilterChipButton
+                <SettingsChoiceButton
                   key={key}
                   active={!!exportOpts[key]}
                   onClick={() => toggleExportOpt(key)}
+                  title={key === 'includeSettings' ? t('settings.includeSettingsHint') : undefined}
                 >
-                  {exportOpts[key] && <Check size={12} />}
                   {t(labelKey)}
-                </FilterChipButton>
+                </SettingsChoiceButton>
               ))}
             </div>
           </div>
@@ -194,41 +211,36 @@ export default function BackupPage() {
           {/* Date range */}
           <div className="flex gap-3 items-center">
             <div className="flex-1">
-              <label className="text-xs text-stone-500 block mb-1">{t('settings.dateFrom')}</label>
+              <label className="label-xs block mb-2">{t('settings.dateFrom')}</label>
               <input
                 type="date"
                 value={exportOpts.dateFrom}
+                // Leer zeigt das Feld seine Schreibweise statt eines Datums — die
+                // soll so blass sein wie ein Platzhalter (siehe index.css).
+                data-empty={exportOpts.dateFrom === '' || undefined}
                 onChange={(e) => setExportOpts((o) => ({ ...o, dateFrom: e.target.value }))}
-                className="w-full bg-stone-800 border border-stone-700/60 rounded px-2 py-1 text-xs text-stone-300 outline-none focus:border-jade-500/60"
+                className="input-field settings-field"
               />
             </div>
             <div className="flex-1">
-              <label className="text-xs text-stone-500 block mb-1">{t('settings.dateTo')}</label>
+              <label className="label-xs block mb-2">{t('settings.dateTo')}</label>
               <input
                 type="date"
                 value={exportOpts.dateTo}
+                data-empty={exportOpts.dateTo === '' || undefined}
                 onChange={(e) => setExportOpts((o) => ({ ...o, dateTo: e.target.value }))}
-                className="w-full bg-stone-800 border border-stone-700/60 rounded px-2 py-1 text-xs text-stone-300 outline-none focus:border-jade-500/60"
+                className="input-field settings-field"
               />
             </div>
           </div>
 
-          {/* Include deleted */}
-          <label className="flex items-center gap-2 cursor-pointer group">
-            <div
-              onClick={() => toggleExportOpt('includeDeleted')}
-              className={`w-4 h-4 rounded border flex items-center justify-center transition-colors cursor-pointer ${
-                exportOpts.includeDeleted
-                  ? 'bg-jade-500/30 border-jade-500/60'
-                  : 'border-stone-600 hover:border-stone-400'
-              }`}
-            >
-              {exportOpts.includeDeleted && <Check size={10} className="text-jade-400" />}
-            </div>
-            <span className="text-xs text-stone-400 group-hover:text-stone-300 transition-colors">
-              {t('settings.includeDeleted')}
-            </span>
-          </label>
+          {/* Dasselbe Haekchen wie in den Block-Einstellungen: ein echtes
+              `input`, mit Tastatur erreichbar und in beiden Themes im Akzent. */}
+          <BlockCheckbox
+            checked={exportOpts.includeDeleted}
+            onChange={() => toggleExportOpt('includeDeleted')}
+            label={t('settings.includeDeleted')}
+          />
 
           <div className="flex items-center gap-2">
             <Button
@@ -245,7 +257,7 @@ export default function BackupPage() {
               </span>
             )}
             {exportError && (
-              <span className="text-xs text-red-400 flex items-center gap-1">
+              <span className="text-xs text-danger flex items-center gap-1">
                 <AlertTriangle size={12} /> {t('settings.exportError')}
               </span>
             )}
@@ -253,23 +265,20 @@ export default function BackupPage() {
         </div>
       </SettingsSection>
 
-      <SettingsSection icon={<Upload size={14} />} title={t('settings.importDb')}>
-        <div className="rounded-lg bg-stone-800/60 border border-stone-700/40 px-4 py-3 space-y-3">
+      <SettingsSection icon={<Upload size={14} />} title={t('settings.importDb')} description={t('settings.importDbHint')}>
+        <div className="space-y-3">
           {/* File picker — die Vorschau auf eigener Zeile: in der
               Button-Zeile hatte sie jeden weiteren Nachbarn auf null
               Breite gequetscht. */}
           <div className="space-y-1.5">
             {/* Ohne Datei besteht der Abschnitt nur aus einem Knopf; die Zeile
                 sagt, was danach passiert, statt die Flaeche leer zu lassen. */}
-            {!importedFile && (
-              <p className="text-xs text-stone-500">{t('settings.importHint')}</p>
-            )}
             <Button variant="secondary" onClick={handleBrowse}>
               <FolderOpen size={14} />
               {t('settings.importBrowse')}
             </Button>
             {importedFile && (
-              <p className="text-xs text-stone-400">
+              <p className="text-xs text-secondary">
                 {t('settings.previewContains')} {[
                   importedFile.preview.journalCount && `${importedFile.preview.journalCount} J`,
                   importedFile.preview.wikiCount && `${importedFile.preview.wikiCount} W`,
@@ -286,8 +295,8 @@ export default function BackupPage() {
           {/* Type filters — dieselben Chips wie beim Export. */}
           {importedFile && (
             <div>
-              <p className="text-xs text-stone-500 mb-2">{t('settings.importInclude')}</p>
-              <div className="flex flex-wrap gap-1.5">
+              <p className="label-xs mb-2">{t('settings.importInclude')}</p>
+              <div className="flex flex-wrap gap-2">
                 {(
                   [
                     ['includeJournal', 'settings.includeJournal'],
@@ -298,14 +307,13 @@ export default function BackupPage() {
                     ['includeTags', 'settings.includeTags'],
                   ] as [keyof ImportTypeFilters, string][]
                 ).map(([key, labelKey]) => (
-                  <FilterChipButton
+                  <SettingsChoiceButton
                     key={key}
                     active={importTypeFilters[key]}
                     onClick={() => setImportTypeFilters((f) => ({ ...f, [key]: !f[key] }))}
                   >
-                    {importTypeFilters[key] && <Check size={12} />}
                     {t(labelKey)}
-                  </FilterChipButton>
+                  </SettingsChoiceButton>
                 ))}
               </div>
             </div>
@@ -319,7 +327,7 @@ export default function BackupPage() {
                   nichts Bestehendes anfasst, ist Vorauswahl und erster
                   Griff, Replace steht als destruktivster zuletzt. */}
               <div className="space-y-1.5">
-                <p className="text-xs text-stone-500">{t('settings.importMode')}</p>
+                <p className="label-xs mb-2">{t('settings.importMode')}</p>
                 {(
                   [
                     ['add-vault', 'settings.modeAddVault', 'settings.modeAddVaultDesc'],
@@ -331,16 +339,15 @@ export default function BackupPage() {
                     key={mode}
                     active={importMode === mode}
                     onClick={() => setImportMode(mode)}
+                    layout="card"
                     className="block w-full text-left px-3 py-2"
                   >
                     {/* Aktiv-Zustand nur ueber die Faerbung — wie bei
                         der Theme- und Sprachwahl oben, kein Haekchen. */}
-                    <span className={`block text-xs font-medium ${
-                      importMode === mode ? 'text-jade-400' : 'text-stone-300'
-                    }`}>
-                      {t(labelKey)}
-                    </span>
-                    <span className="block text-xs text-stone-500 mt-0.5">{t(descKey)}</span>
+                    {/* Farbe kommt vom Knopf selbst (settings-choice-btn), wie bei
+                        den uebrigen Auswahlknoepfen des Fensters. */}
+                    <span className="block text-xs font-medium">{t(labelKey)}</span>
+                    <span className="block text-xs mt-0.5 text-muted">{t(descKey)}</span>
                   </SettingsChoiceButton>
                 ))}
               </div>
@@ -349,17 +356,17 @@ export default function BackupPage() {
               {importMode === 'add-vault' && (
                 <div className="space-y-2">
                   <div>
-                    <label className="text-xs text-stone-500 block mb-1">{t('settings.newVaultName')}</label>
+                    <label className="label-xs block mb-2">{t('settings.newVaultName')}</label>
                     <input
                       type="text"
                       value={newVaultName}
                       onChange={(e) => setNewVaultName(e.target.value)}
                       placeholder={t('vault.namePlaceholder')}
-                      className="w-full bg-stone-800 border border-stone-700/60 rounded px-2 py-1 text-xs text-stone-300 outline-none focus:border-jade-500/60"
+                      className="input-field settings-field"
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-stone-500 block mb-1">{t('settings.newVaultLocation')}</label>
+                    <label className="label-xs block mb-2">{t('settings.newVaultLocation')}</label>
                     <VaultLocationRow
                       target={newVaultTarget(
                         vaultBaseDir,
@@ -367,7 +374,6 @@ export default function BackupPage() {
                         newVaultName.trim() || t('settings.importedVault'),
                       )}
                       customPath={vaultCustomPath}
-                      dense
                       onPickFolder={async () => {
                         const picked = await openDialog({ directory: true, multiple: false });
                         if (typeof picked !== 'string') return;
@@ -382,13 +388,41 @@ export default function BackupPage() {
                 </div>
               )}
 
+              {/* Nur beim Zusammenführen eine Wahl: Ersetzen und Neuer Vault
+                  übernehmen die Einstellungen der Datei ganz. */}
+              {importMode === 'merge' && importedFile.preview.hasSettings && (
+                <div>
+                  <p className="label-xs mb-2">{t('settings.importSettings')}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {SETTINGS_GROUPS.map((group) => {
+                      const active = settingsGroups.includes(group);
+                      return (
+                        <SettingsChoiceButton
+                          key={group}
+                          active={active}
+                          onClick={() => setSettingsGroups((groups) =>
+                            active ? groups.filter((g) => g !== group) : [...groups, group])}
+                        >
+                          {t(SETTINGS_GROUP_LABEL_KEYS[group])}
+                        </SettingsChoiceButton>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Replace warning — die Danger-Tokens, nicht Amber: die
                   Warnung kuendigt endgueltigen Datenverlust an, und Rot
                   heisst destruktiv (design.md), in beiden Themes. */}
               {importMode === 'replace' && (
                 <div className="flex items-start gap-2 text-xs rounded-lg border px-3 py-2 text-[var(--danger-text)] bg-[var(--danger-bg)] border-[var(--danger-border)]">
                   <AlertTriangle size={12} className="shrink-0 mt-0.5" />
-                  <span className="min-w-0">{t('settings.modeReplaceWarning')}</span>
+                  <span className="min-w-0">
+                    {t('settings.modeReplaceWarning')}
+                    {/* Ersetzen ist der eine Modus, in dem Sprache und Aussehen
+                        ohne eigene Wahl umspringen. */}
+                    {importedFile.preview.hasSettings && ` ${t('settings.modeReplaceSettingsWarning')}`}
+                  </span>
                 </div>
               )}
 
@@ -417,7 +451,7 @@ export default function BackupPage() {
               sie beim Import-Button, der sie ausloest, und darf
               umbrechen. */}
           {importError && (
-            <p className="text-xs text-red-400 flex items-start gap-1.5">
+            <p className="text-xs text-danger flex items-start gap-1.5">
               <AlertTriangle size={12} className="shrink-0 mt-0.5" />
               <span className="min-w-0 break-words">{importError}</span>
             </p>

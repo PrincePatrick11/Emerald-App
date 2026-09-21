@@ -21,6 +21,7 @@ import {
   ratioFromResolution,
 } from '../../../lib/altarConstants';
 import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../../lib/helpers';
+import { ImageTooLargeError, imageSizeLabel, prepareImageDataUrl } from '../../../lib/imageLimits';
 import Button from '../../ui/Button';
 import { useUIStore } from '../../../store/uiStore';
 import { useDisplayedAltar } from '../../../hooks/useDisplayedAltar';
@@ -30,6 +31,9 @@ import { PlacedElementRow, PlacedElementInspector } from '../fields/PlacedElemen
 import AltarReadingSummary from '../fields/AltarReadingSummary';
 import Favicon from '../fields/Favicon';
 import Modal from '../../ui/Modal';
+
+/** Fester Deckel für Hintergründe, nach den Grenzen des Vaults geprüft. */
+const BACKGROUND_MAX_BYTES = 5 * 1024 * 1024;
 
 export default function AltarSidebarPanel() {
   const { t } = useTranslation();
@@ -145,11 +149,8 @@ const [gridOpen, setGridOpen] = useState(true);
       showBackgroundNotice(t('common.unsupportedImageFormat'));
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      showBackgroundNotice(t('altar.imageTooLarge', { max: '5 MB' }));
-      return;
-    }
     readFileAsDataUrl(file)
+      .then((data) => prepareImageDataUrl(data, { capBytes: BACKGROUND_MAX_BYTES }))
       .then((data) => saveImage(data))
       .then((filename) => {
         setCustomBackgroundMap((current) => ({ ...current, [activeAltar.id]: filename }));
@@ -157,6 +158,10 @@ const [gridOpen, setGridOpen] = useState(true);
       })
       .then(() => showBackgroundNotice(t('altar.backgroundUpdated')))
       .catch((error) => {
+        if (error instanceof ImageTooLargeError) {
+          showBackgroundNotice(t('altar.imageTooLarge', { max: imageSizeLabel(error.maxBytes, t('common.megabytes')) }));
+          return;
+        }
         console.error(error);
         showBackgroundNotice(t('altar.backgroundUpdateFailed'));
       });

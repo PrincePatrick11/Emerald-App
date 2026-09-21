@@ -1,6 +1,8 @@
 import type { Editor } from '@tiptap/react';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { saveImage } from '../../lib/images';
+import { prepareImageDataUrl } from '../../lib/imageLimits';
+import { reportImageError } from '../../store/imageNoticeStore';
 import { flashReveal, scrollIntoViewCentered } from '../../lib/reveal';
 import { internalLinkBlockHtml, toInternalLinkChip } from '../../lib/internalLinkHtml';
 import type { EntryLinkRequest } from '../../lib/links';
@@ -199,10 +201,10 @@ export function revealEntryLink(
 /** Bild aus der Toolbar: erst in den Vault-Bildordner, dann als Knoten mit dem Dateinamen. */
 export async function insertImageFromDataUrl(editor: Editor, dataUrl: string): Promise<void> {
   try {
-    const src = await saveImage(dataUrl);
+    const src = await saveImage(await prepareImageDataUrl(dataUrl));
     editor.chain().focus().insertContent({ type: 'image', attrs: { src } }).run();
   } catch (e) {
-    console.error('Failed to save image:', e);
+    reportImageError(e, 'toolbar');
   }
 }
 

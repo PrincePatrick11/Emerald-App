@@ -7,6 +7,8 @@
     --sidebar-left-width: 240px;
     --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
     --font-editor: 'Lora', Georgia, serif;
+    /* Einstellbar (settingsStore); 17px ist der Standard. */
+    --editor-font-size: 17px;
   }
 
   * {
@@ -223,6 +225,16 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--menu-item-hover-text);
   }
 
+  /* Dasselbe „N weitere anzeigen" unter den Listen der linken Seitenleiste. */
+  .entry-list-more {
+    @apply w-full text-xs text-left px-2 py-1.5 rounded transition-colors duration-150;
+    color: var(--text-subtle);
+  }
+
+  .entry-list-more:hover {
+    color: var(--menu-item-hover-text);
+  }
+
   /* Die Fundstelle im Titel oder im Textausschnitt. Dieselbe Akzentmischung
      wie `.vault-card-active .vault-badge` — die Stelle wird eingefaerbt, nicht
      umrahmt, damit eine Trefferliste nicht zum Flickenteppich wird. */
@@ -346,6 +358,16 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      Same token as .btn-danger, so the two cannot drift apart across themes. */
   .text-danger {
     color: var(--danger-text);
+  }
+
+  /* Die beiden Textfarben, die sonst ueberall als Inline-Style standen —
+     dieselbe Stelle und dieselbe Form wie `.text-danger`. */
+  .text-secondary {
+    color: var(--text-secondary);
+  }
+
+  .text-muted {
+    color: var(--text-muted);
   }
 
   /* Danger action button — destructive actions (delete, remove, empty trash) */
@@ -547,10 +569,85 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     box-shadow: 0 0 0 2px var(--focus-ring);
   }
 
+  /* ── Einstellungs-Fenster ──────────────────────────────────────────────
+     Eine Sprache fuer alle Seiten: ein Abschnitt (SettingsSection) traegt
+     Ueberschrift, Beschreibung und seinen Inhalt ohne Karte darum. Die
+     Eingabefelder komponieren `.input-field` (Farben) mit ihren Groessen,
+     Behaelter nehmen `.panel`; eigene Klassen gibt es nur fuer das, was
+     beides nicht abdeckt. */
+  /* Die Groesse der Felder im Einstellungs-Fenster; die Farben bringt
+     `.input-field` mit, mit dem zusammen diese Klasse steht. */
+  .settings-field {
+    @apply w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors;
+  }
+
+  .settings-row {
+    @apply flex items-center justify-between gap-3 rounded-md border px-3 py-2;
+    background-color: color-mix(in srgb, var(--bg-surface-1) 70%, transparent);
+    border-color: var(--border-soft);
+  }
+
+  /* Die Trennlinien der Ueber-Seite. */
+  .settings-divider-bottom {
+    @apply border-b;
+    border-color: var(--border-soft);
+  }
+
+  .settings-divider-top {
+    @apply border-t;
+    border-color: var(--border-soft);
+  }
+
   .input-field {
     background-color: color-mix(in srgb, var(--bg-surface-1) 80%, transparent);
     border: 1px solid var(--border-soft);
     color: var(--text-secondary);
+    /* Ohne das nimmt ein `input` die Systemschrift — am deutlichsten an den
+       Datumsfeldern, die neben einem normalen Feld aus der Reihe fielen. */
+    font-family: inherit;
+  }
+
+  /* Ein Datumsfeld ist ein natives Bedienelement: seine Ziffernfelder, das
+     Kalendersymbol und das Auswahlfenster bringt die WebView mit. Was sich
+     davon faerben laesst, faerben wir — der Rest folgt ueber `color-scheme`
+     weiter unten wenigstens hell/dunkel dem Theme.
+
+     Das leere Feld zeigt statt eines Datums seine Schreibweise (TT.MM.JJJJ).
+     Das ist ein Platzhalter und soll so zurueckhaltend sein wie jeder andere;
+     `data-empty` setzt der Aufrufer, CSS sieht den Wert nicht. */
+  .input-field[data-empty]::-webkit-datetime-edit {
+    color: var(--text-muted);
+  }
+
+  /* Das gerade bearbeitete Ziffernfeld — sonst markiert die WebView es in
+     ihrem eigenen Blau. */
+  .input-field::-webkit-datetime-edit-day-field:focus,
+  .input-field::-webkit-datetime-edit-month-field:focus,
+  .input-field::-webkit-datetime-edit-year-field:focus {
+    background-color: color-mix(in srgb, var(--accent) 24%, transparent);
+    color: var(--text-primary);
+    border-radius: 3px;
+    outline: none;
+  }
+
+  /* Das Kalendersymbol: dieselbe Zurueckhaltung wie die uebrigen Symbole in
+     Feldern, und erst beim Zeigen voll da. */
+  .input-field::-webkit-calendar-picker-indicator {
+    opacity: 0.5;
+    cursor: pointer;
+    transition: opacity 150ms;
+  }
+
+  .input-field:hover::-webkit-calendar-picker-indicator,
+  .input-field::-webkit-calendar-picker-indicator:hover {
+    opacity: 0.9;
+  }
+
+  /* Derselbe Fokus wie bei `.emoji-picker-search`, damit jedes Feld der App
+     ihn zeigt — bisher brachte ihn jeder Aufrufer selbst mit, oder eben nicht. */
+  .input-field:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--focus-ring);
   }
 
   .home-item-title {
@@ -578,16 +675,18 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   @apply selectable outline-none min-h-[200px] leading-relaxed;
   font-family: var(--font-editor);
   color: var(--text-secondary);
-  font-size: 1.0625rem; /* 17px — Lora is denser than Cormorant, reads well slightly above base */
+  font-size: var(--editor-font-size);
 }
 
 .tiptap p {
   @apply mb-3;
 }
 
-.tiptap h1 { @apply text-2xl font-semibold mb-3 mt-6; color: var(--text-primary); }
-.tiptap h2 { @apply text-xl font-semibold mb-2 mt-5; color: var(--text-primary); }
-.tiptap h3 { @apply text-lg font-semibold mb-2 mt-4; color: var(--text-secondary); }
+/* Relativ zum Editortext (em) statt zur Wurzel, damit sie mit dessen
+   Einstellung wachsen: 1.5rem, 1.25rem und 1.125rem bei den früheren 17px. */
+.tiptap h1 { @apply font-semibold mb-3 mt-6; font-size: 1.412em; line-height: 1.33; color: var(--text-primary); }
+.tiptap h2 { @apply font-semibold mb-2 mt-5; font-size: 1.176em; line-height: 1.4; color: var(--text-primary); }
+.tiptap h3 { @apply font-semibold mb-2 mt-4; font-size: 1.059em; line-height: 1.55; color: var(--text-secondary); }
 .entry-view-title {
   font-family: var(--font-editor);
 }
@@ -938,7 +1037,7 @@ button.block-altar:hover .block-altar-title {
 
 .block-sigil-intention {
   font-family: var(--font-editor);
-  font-size: 1.0625rem;
+  font-size: var(--editor-font-size);
   color: var(--text-secondary);
 }
 
@@ -1269,7 +1368,7 @@ button.block-altar:hover .block-altar-title {
 .block-field-value {
   min-width: 0;
   font-family: var(--font-editor);
-  font-size: 1.0625rem;
+  font-size: var(--editor-font-size);
   color: var(--text-secondary);
 }
 
@@ -1341,12 +1440,48 @@ button.block-altar:hover .block-altar-title {
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-/* Die nativen Checkboxen im Seitenleisten-Abschnitt des Feldblocks. Die
-   Akzentfarbe über die Theme-Variable statt `accent-jade-500`: so braucht
-   Parchment keine eigene Brücke. */
+/* Das Häkchen der App (BlockCheckbox): Blöcke, Vorlagen-Dialog und die
+   Einstellungen. Selbst gezeichnet statt nativ — ein natives Kästchen bringt
+   seine eigenen Farben und Kanten mit und stand neben den Feldern und Knöpfen
+   daneben. Alles kommt aus Theme-Variablen, also braucht Parchment keine
+   eigene Brücke. */
 .block-checkbox {
-  accent-color: var(--accent);
-  border-radius: 3px;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
+  display: inline-grid;
+  place-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background-color: color-mix(in srgb, var(--bg-surface-1) 80%, transparent);
+  cursor: pointer;
+  transition: background-color 150ms, border-color 150ms;
+}
+
+.block-checkbox:hover {
+  border-color: var(--accent);
+}
+
+.block-checkbox:checked {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Der Haken selbst, als Form ausgeschnitten: in der Flaechenfarbe der App,
+   die in beiden Themes den Gegensatz zum Akzent traegt. */
+.block-checkbox:checked::after {
+  content: '';
+  width: 0.5rem;
+  height: 0.5rem;
+  background-color: var(--bg-app);
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+.block-checkbox:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 .block-field-error {
@@ -2604,6 +2739,14 @@ html[data-theme='emerald-parchment'] .op-prop-select {
   background: #f3e6cf;
   border-color: rgba(145, 108, 70, 0.34);
   color: #3a2918;
+}
+
+html[data-theme='emerald-parchment'] .input-field[type="date"] {
+  color-scheme: light;
+}
+
+html[data-theme='emerald-noctis'] .input-field[type="date"] {
+  color-scheme: dark;
 }
 
 html[data-theme='emerald-parchment'] .op-prop-select[type="date"] {

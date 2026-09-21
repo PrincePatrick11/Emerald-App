@@ -20,6 +20,7 @@ import {
   Flame,
   FolderOpen,
   Home,
+  LayoutList,
   LayoutTemplate,
   Library,
   ListTodo,
@@ -75,6 +76,8 @@ export function isLibraryView(viewType: string): viewType is LibraryViewId {
 export type ViewId = EntryModuleId | AuxViewId;
 
 export type LeftListTabId = 'all' | EntryModuleId;
+/** Die Tabs der Eintragsliste in ihrer Reihenfolge — „Alle" zuerst. */
+export const LEFT_LIST_TAB_IDS: readonly LeftListTabId[] = ['all', ...ENTRY_MODULE_IDS];
 
 /** Module, deren Einträge eine Kategorie tragen — alle außer Journal. */
 export const CATEGORY_MODULE_IDS: readonly Exclude<EntryModuleId, 'journal'>[] = ENTRY_MODULE_IDS.filter(
@@ -113,6 +116,12 @@ export const MODULES: Record<EntryModuleId, ModuleMeta> = {
 };
 
 export const MODULE_LIST: readonly ModuleMeta[] = ENTRY_MODULE_IDS.map((id) => MODULES[id]);
+
+/** Die Tabs der Eintragsliste samt Icon — „Alle" ist der einzige ohne Modul. */
+export const LEFT_LIST_TABS: ReadonlyArray<{ id: LeftListTabId; icon: LucideIcon }> = LEFT_LIST_TAB_IDS.map((id) => ({
+  id,
+  icon: id === 'all' ? LayoutList : MODULES[id].icon,
+}));
 
 export const AUX_VIEWS: Record<AuxViewId, { icon: LucideIcon; navLabelKey: string }> = {
   home: { icon: Home, navLabelKey: 'nav.home' },

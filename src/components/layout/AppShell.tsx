@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { isAltarFullscreen, useUIStore } from '../../store/uiStore';
 import { reloadAllStores } from '../../store/moduleWiring';
 import { hasActiveVault, useVaultStore } from '../../store/vaultStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { invoke } from '@tauri-apps/api/core';
 import { computeMenuEnabledState, runMenuAction, SELF_CONTAINED_MENU_ACTIONS } from '../../lib/menuActions';
 import { hideSplash } from '../../lib/splash';
@@ -15,6 +16,7 @@ import MainArea from './MainArea';
 import TabBar from './TabBar';
 import VaultModal from './VaultModal';
 import UndoToast from '../ui/UndoToast';
+import ImageNoticeModal from '../ui/ImageNoticeModal';
 import ImportDestinationModal from '../ui/ImportDestinationModal';
 
 const ENTRY_LIST_MIN = 180;
@@ -85,6 +87,12 @@ export default function AppShell() {
   );
   // State, nicht Ref: das Abschalten der Transition muss neu rendern.
   const [resizing, setResizing] = useState(false);
+  // Der erste Start ist erst durch, wenn auch die Einstellungen des Vaults
+  // geladen sind (oder das gescheitert ist): vorher darf nichts `getDb()`
+  // aufrufen — die Aufräumroutine dort braucht die Papierkorb-Frist, die
+  // Migrationen die Sprache. Ohne dieses Tor öffnete etwa ein wiederhergestellter
+  // Papierkorb-Tab die Datenbank schon mit den Einstellungen von niemandem.
+  const [bootSettled, setBootSettled] = useState(false);
 
   const leftListMounted = useDeferredUnmount(leftListOpen);
   const rightSidebarMounted = useDeferredUnmount(rightSidebarOpen);
@@ -107,12 +115,15 @@ export default function AppShell() {
       // Erststart: es gibt noch keine Datenbank, aus der sich etwas laden
       // liesse. Der erste Vault wird ueber `switchVault` aktiviert, und das
       // endet in `reloadAllStores()` — dieser Effekt laeuft dafuer nicht erneut.
-      if (!hasActiveVault(useVaultStore.getState())) return;
-      return reloadAllStores();
+      const vaultState = useVaultStore.getState();
+      if (!hasActiveVault(vaultState)) return;
+      // Wie in `openActiveVault`: die Einstellungen vor der Datenbank.
+      return useSettingsStore.getState().loadForVault(vaultState.activeVaultId).then(reloadAllStores);
     })
       // Ohne `catch` bliebe der Fehler eine unbehandelte Rejection in der
       // Konsole — sichtbar nur, wenn jemand hinschaut.
       .catch((err) => console.error('[boot] initial load failed', err))
+      .finally(() => setBootSettled(true))
       // Ab hier steht entweder der geladene Inhalt oder — beim Erststart —
       // das Vault-Setup. Beides ist ein fertiger Bildschirm, also kann der
       // Ladebildschirm weg. Auch im Fehlerfall: eine leere Oberflaeche ist
@@ -247,9 +258,10 @@ export default function AppShell() {
   // `getDb()` aus Sidebar, Tableiste oder Hauptbereich liefe in den
   // NO_ACTIVE_VAULT-Fehler aus `getActiveVaultPath()`.
   //
-  // Zwei getrennte Ausgaenge, damit sichtbar bleibt, warum: waehrend `loaded`
+  // Drei getrennte Ausgaenge, damit sichtbar bleibt, warum: waehrend `loaded`
   // noch falsch ist, steht nur noch nicht fest, ob ein Vault da ist — dann darf
-  // das Setup-Modal nicht schon aufblitzen.
+  // das Setup-Modal nicht schon aufblitzen. Und mit Vault, aber vor dem Ende
+  // des Starts, fehlen noch dessen Einstellungen (siehe `bootSettled`).
   if (!vaultsLoaded) return chrome(<main className="app-main flex-1 min-h-0" />);
   if (needsVault) {
     return chrome(
@@ -259,6 +271,7 @@ export default function AppShell() {
       </>
     );
   }
+  if (!bootSettled) return chrome(<main className="app-main flex-1 min-h-0" />);
 
   return (
     <div className="app-shell flex flex-col h-screen w-screen overflow-hidden bg-stone-900 relative">
@@ -358,6 +371,7 @@ export default function AppShell() {
       </div>
 
       <UndoToast />
+      <ImageNoticeModal />
       <ImportDestinationModal />
     </div>
   );

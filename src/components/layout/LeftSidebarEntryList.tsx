@@ -3,9 +3,10 @@ import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { formatEntryDate } from '../../lib/formatDate';
 import { categoryLabel, lookupCategory } from '../../lib/categories';
-import { DEFAULT_ENTRY_EMOJI, MODULE_LIST, type LeftListTabId } from '../../lib/modules';
-import { Flame, CheckSquare, Square, Copy, Pencil, Trash2, LayoutList, type LucideIcon } from 'lucide-react';
+import { DEFAULT_ENTRY_EMOJI, LEFT_LIST_TABS, type LeftListTabId } from '../../lib/modules';
+import { Flame, CheckSquare, Square, Copy, Pencil, Trash2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useWikiStore } from '../../store/wikiStore';
@@ -23,20 +24,13 @@ import type { ContextMenuAction } from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 
-/** Die Tabs ohne ihre Beschriftungen, die `t()` brauchen und deshalb in der
- *  Komponente bleiben. Auf Modulebene, damit `ENTRY_LIST_TABS_WIDTH` unten
- *  ihre Anzahl zaehlen kann, statt sie danebenzuschreiben. Reihenfolge und
- *  Icons kommen aus der Modul-Registry; nur der 'all'-Tab ist eigener Bestand. */
-const TABS: Array<{ id: LeftListTabId; icon: LucideIcon }> = [
-  { id: 'all', icon: LayoutList },
-  ...MODULE_LIST.map((mod) => ({ id: mod.id as LeftListTabId, icon: mod.icon })),
-];
-
 /* Die Geometrie der Tab-Leiste, in Zahlen statt nur in Utility-Klassen: die
    Standardbreite der Eintragsliste ist genau die Breite, die ihre Tabs
    brauchen (`AppShell`s ENTRY_LIST_DEFAULT). Die Werte spiegeln die Klassen
    der Leiste unten — `px-3` (12), `TabIconButton`s `p-2` + 14px-Icon + 1px
    Rahmen (32), `gap-0.5` (2). Wer eine davon aendert, muss hier mit.
+   Gezaehlt werden alle Tabs, auch die in den Einstellungen ausgeblendeten:
+   die Standardbreite soll nicht springen, wenn jemand einen Tab abwaehlt.
 
    Die Zahlen gelten fuer 16px Grundschrift — die Utilities darunter rechnen
    in rem. Auf WebKitGTK, das seine Grundschrift aus der GTK-Textskalierung
@@ -47,14 +41,20 @@ const TAB_SIZE = 32;
 const TAB_GAP = 2;
 const TAB_STRIP_PADDING_X = 12;
 export const ENTRY_LIST_TABS_WIDTH =
-  TAB_STRIP_PADDING_X * 2 + TABS.length * TAB_SIZE + (TABS.length - 1) * TAB_GAP;
+  TAB_STRIP_PADDING_X * 2 + LEFT_LIST_TABS.length * TAB_SIZE + (LEFT_LIST_TABS.length - 1) * TAB_GAP;
 
 export default function LeftSidebarEntryList() {
   const { t } = useTranslation();
   const { leftListTab, setLeftListTab } = useUIStore(
     useShallow((s) => ({ leftListTab: s.leftListTab, setLeftListTab: s.setLeftListTab }))
   );
-
+  const visibleIds = useSettingsStore((s) => s.settings.leftList.tabs);
+  // Neu gerendert je Vault: „Mehr anzeigen" beginnt dort wieder beim Limit.
+  const vaultId = useSettingsStore((s) => s.vaultId);
+  const tabs = LEFT_LIST_TABS.filter((tab) => visibleIds.includes(tab.id));
+  // Ist der gewählte Tab ausgeblendet, zeigt die Liste den ersten sichtbaren —
+  // ohne die Wahl zu überschreiben, damit sie beim Wiedereinblenden zurückkommt.
+  const activeTab = tabs.some((tab) => tab.id === leftListTab) ? leftListTab : (tabs[0]?.id ?? 'all');
 
   return (
     <div className="flex flex-col h-full flex-1 min-w-0">
@@ -64,14 +64,14 @@ export default function LeftSidebarEntryList() {
           Reihe statt stumm ueber den Rand zu laufen. Flexbox entscheidet das
           selbst — keine Schwelle, kein ResizeObserver, kein Oszillieren. */}
       <div className="flex flex-wrap items-center gap-0.5 px-3 py-2 min-h-14 border-b border-stone-700/60 flex-shrink-0">
-        {TABS.map(({ id, icon: Icon }) => (
-          <TabIconButton key={id} active={leftListTab === id} onClick={() => setLeftListTab(id)} title={t(`nav.${id}`)}>
+        {tabs.map(({ id, icon: Icon }) => (
+          <TabIconButton key={id} active={activeTab === id} onClick={() => setLeftListTab(id)} title={t(`nav.${id}`)}>
             <Icon size={14} />
           </TabIconButton>
         ))}
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
-        <ActiveList tab={leftListTab} />
+        <ActiveList key={vaultId} tab={activeTab} />
       </div>
     </div>
   );

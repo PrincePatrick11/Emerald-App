@@ -748,6 +748,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             images::save_image,
             images::copy_image_file,
+            images::read_image_file,
             images::read_image_as_base64,
             images::adopt_legacy_images,
             images::list_image_files,
@@ -763,6 +764,8 @@ pub fn run() {
             vault::migrate_vault_layout,
             vault::delete_vault_files,
             vault::discard_import_staging,
+            vault::read_vault_settings,
+            vault::write_vault_settings,
             export_image,
             write_file,
             read_file,
