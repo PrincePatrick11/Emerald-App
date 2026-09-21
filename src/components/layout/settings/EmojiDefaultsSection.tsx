@@ -26,6 +26,11 @@ interface DragState {
  * Gezogen wird über Pointer-Events statt HTML5-Drag: unter Windows fängt
  * Tauris Datei-Drop die nativen Drag-Ereignisse ab (dieselbe Lage wie beim
  * Ziehen von Einträgen, siehe `lib/dragState`).
+ *
+ * Nicht über `hooks/usePointerReorder`: der misst die Zielposition an der
+ * Y-Achse und erwartet eine Liste aus Zeilen. Das Raster hier bricht um, ein
+ * Emoji hat also Nachbarn links und rechts — die Zielposition kommt deshalb
+ * aus `elementFromPoint`.
  */
 export default function EmojiDefaultsSection() {
   const { t } = useTranslation();
