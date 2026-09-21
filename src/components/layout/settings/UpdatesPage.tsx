@@ -159,13 +159,15 @@ export default function UpdatesPage() {
         title={t('settings.updates')}
         description={t('settings.updatesDesc')}
       >
-        <div className="panel px-3 py-2.5 space-y-2.5">
-          <div className="flex items-center justify-between gap-3">
-            <span className="flex items-center gap-2 text-sm text-stone-300 min-w-0">
+        {/* Wie die Aufraeum-Zeile im Speicher: eine Zeile mit ihrer Aktion,
+            was daraus folgt steht darunter. */}
+        <div className="space-y-2.5">
+          <div className="settings-row">
+            <span className="flex items-center gap-2 text-sm text-secondary min-w-0">
               <span className="text-muted">{t('settings.version')}</span>
               <span className="truncate">{packageJson.version}</span>
             </span>
-            <Button onClick={check} disabled={busy} tone="jade" className="shrink-0">
+            <Button onClick={check} disabled={busy} variant="secondary" className="shrink-0">
               <RefreshCw size={14} className={status === 'checking' ? 'animate-spin' : undefined} />
               {status === 'checking' ? t('settings.updateChecking') : t('settings.updateCheck')}
             </Button>
@@ -192,8 +194,8 @@ export default function UpdatesPage() {
           )}
 
           {result?.available && (
-            <div className="space-y-2 pt-2 border-t" style={{ borderColor: 'var(--border-soft)' }}>
-              <p className="text-sm text-stone-300">
+            <div className="space-y-2">
+              <p className="text-sm text-secondary">
                 {t('settings.updateFound', { version: result.version })}
               </p>
 
@@ -280,7 +282,7 @@ export default function UpdatesPage() {
             <Button
               onClick={() => saveSource(endpoint, autoCheck)}
               disabled={endpoint.trim() === savedEndpoint}
-              tone="jade"
+              variant="primary"
               className="shrink-0"
             >
               {t('common.save')}
@@ -288,7 +290,7 @@ export default function UpdatesPage() {
             <Button
               onClick={() => saveSource('', autoCheck)}
               disabled={savedEndpoint === '' && endpoint === ''}
-              tone="neutral"
+              variant="secondary"
               className="shrink-0"
             >
               {t('settings.updateSourceReset')}
