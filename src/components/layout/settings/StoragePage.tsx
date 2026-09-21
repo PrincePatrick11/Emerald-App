@@ -65,8 +65,8 @@ export default function StoragePage() {
       </SettingsSection>
 
       <SettingsSection icon={<HardDrive size={14} />} title={t('settings.storage')} description={t('settings.storageHint')}>
-        <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-stone-800/60 border border-stone-700/40">
-          <span className="flex items-center gap-2 text-sm text-stone-300 min-w-0">
+        <div className="settings-row">
+          <span className="flex items-center gap-2 text-sm min-w-0" style={{ color: 'var(--text-secondary)' }}>
             <Brush size={14} className="shrink-0" />
             <span className="truncate">{t('settings.cleanupImages')}</span>
           </span>
@@ -76,10 +76,10 @@ export default function StoragePage() {
               {scanning ? t('settings.cleanupScanning') : t('settings.cleanupScan')}
             </Button>
           ) : unused.names.length === 0 ? (
-            <span className="text-xs text-stone-500 shrink-0">{t('settings.cleanupNone')}</span>
+            <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>{t('settings.cleanupNone')}</span>
           ) : (
             <span className="flex items-center gap-2 shrink-0">
-              <span className="text-xs text-stone-400">
+              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                 {t('settings.cleanupFound', { count: unused.names.length, size: formatBytes(unused.bytes, byteUnits) })}
               </span>
               <Button onClick={removeUnusedImages} tone="danger">

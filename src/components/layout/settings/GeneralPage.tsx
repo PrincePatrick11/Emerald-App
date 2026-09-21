@@ -70,7 +70,7 @@ export default function GeneralPage() {
             <select
               value={appearance.uiFont}
               onChange={(e) => update('appearance', { uiFont: e.target.value as FontId })}
-              className="w-full bg-stone-800/70 border border-stone-700/60 rounded-lg px-3 py-2 text-sm text-stone-200 outline-none focus:border-jade-500/60"
+              className="settings-field"
             >
               {FONT_OPTIONS.map((font) => (
                 <option key={font.id} value={font.id}>{font.label}</option>
@@ -105,7 +105,7 @@ export default function GeneralPage() {
             <select
               value={appearance.editorFont}
               onChange={(e) => update('appearance', { editorFont: e.target.value as FontId })}
-              className="w-full bg-stone-800/70 border border-stone-700/60 rounded-lg px-3 py-2 text-sm text-stone-200 outline-none focus:border-jade-500/60"
+              className="settings-field"
             >
               {FONT_OPTIONS.map((font) => (
                 <option key={font.id} value={font.id}>{font.label}</option>

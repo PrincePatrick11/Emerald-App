@@ -179,11 +179,11 @@ export default function BackupPage() {
   return (
     <>
       <SettingsSection icon={<Download size={14} />} title={t('settings.exportDb')} description={t('settings.exportDbHint')}>
-        <div className="rounded-lg bg-stone-800/60 border border-stone-700/40 px-4 py-3 space-y-3">
+        <div className="space-y-3">
           {/* Type chips — dieselben Pillen wie im Filter-Panel, statt
               handgebauter Kaestchen: an/aus liest sich am Chip selbst. */}
           <div>
-            <p className="text-xs text-stone-500 mb-2">{t('settings.exportInclude')}</p>
+            <p className="label-xs mb-2">{t('settings.exportInclude')}</p>
             <div className="flex flex-wrap gap-1.5">
               {(
                 [
@@ -212,21 +212,21 @@ export default function BackupPage() {
           {/* Date range */}
           <div className="flex gap-3 items-center">
             <div className="flex-1">
-              <label className="text-xs text-stone-500 block mb-1">{t('settings.dateFrom')}</label>
+              <label className="label-xs block mb-1">{t('settings.dateFrom')}</label>
               <input
                 type="date"
                 value={exportOpts.dateFrom}
                 onChange={(e) => setExportOpts((o) => ({ ...o, dateFrom: e.target.value }))}
-                className="w-full bg-stone-800 border border-stone-700/60 rounded px-2 py-1 text-xs text-stone-300 outline-none focus:border-jade-500/60"
+                className="settings-field"
               />
             </div>
             <div className="flex-1">
-              <label className="text-xs text-stone-500 block mb-1">{t('settings.dateTo')}</label>
+              <label className="label-xs block mb-1">{t('settings.dateTo')}</label>
               <input
                 type="date"
                 value={exportOpts.dateTo}
                 onChange={(e) => setExportOpts((o) => ({ ...o, dateTo: e.target.value }))}
-                className="w-full bg-stone-800 border border-stone-700/60 rounded px-2 py-1 text-xs text-stone-300 outline-none focus:border-jade-500/60"
+                className="settings-field"
               />
             </div>
           </div>
@@ -243,7 +243,7 @@ export default function BackupPage() {
             >
               {exportOpts.includeDeleted && <Check size={10} className="text-jade-400" />}
             </div>
-            <span className="text-xs text-stone-400 group-hover:text-stone-300 transition-colors">
+            <span className="text-xs transition-colors" style={{ color: 'var(--text-secondary)' }}>
               {t('settings.includeDeleted')}
             </span>
           </label>
@@ -263,7 +263,7 @@ export default function BackupPage() {
               </span>
             )}
             {exportError && (
-              <span className="text-xs text-red-400 flex items-center gap-1">
+              <span className="text-xs text-danger flex items-center gap-1">
                 <AlertTriangle size={12} /> {t('settings.exportError')}
               </span>
             )}
@@ -272,7 +272,7 @@ export default function BackupPage() {
       </SettingsSection>
 
       <SettingsSection icon={<Upload size={14} />} title={t('settings.importDb')} description={t('settings.importDbHint')}>
-        <div className="rounded-lg bg-stone-800/60 border border-stone-700/40 px-4 py-3 space-y-3">
+        <div className="space-y-3">
           {/* File picker — die Vorschau auf eigener Zeile: in der
               Button-Zeile hatte sie jeden weiteren Nachbarn auf null
               Breite gequetscht. */}
@@ -284,7 +284,7 @@ export default function BackupPage() {
               {t('settings.importBrowse')}
             </Button>
             {importedFile && (
-              <p className="text-xs text-stone-400">
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                 {t('settings.previewContains')} {[
                   importedFile.preview.journalCount && `${importedFile.preview.journalCount} J`,
                   importedFile.preview.wikiCount && `${importedFile.preview.wikiCount} W`,
@@ -301,7 +301,7 @@ export default function BackupPage() {
           {/* Type filters — dieselben Chips wie beim Export. */}
           {importedFile && (
             <div>
-              <p className="text-xs text-stone-500 mb-2">{t('settings.importInclude')}</p>
+              <p className="label-xs mb-2">{t('settings.importInclude')}</p>
               <div className="flex flex-wrap gap-1.5">
                 {(
                   [
@@ -334,7 +334,7 @@ export default function BackupPage() {
                   nichts Bestehendes anfasst, ist Vorauswahl und erster
                   Griff, Replace steht als destruktivster zuletzt. */}
               <div className="space-y-1.5">
-                <p className="text-xs text-stone-500">{t('settings.importMode')}</p>
+                <p className="label-xs">{t('settings.importMode')}</p>
                 {(
                   [
                     ['add-vault', 'settings.modeAddVault', 'settings.modeAddVaultDesc'],
@@ -350,12 +350,10 @@ export default function BackupPage() {
                   >
                     {/* Aktiv-Zustand nur ueber die Faerbung — wie bei
                         der Theme- und Sprachwahl oben, kein Haekchen. */}
-                    <span className={`block text-xs font-medium ${
-                      importMode === mode ? 'text-jade-400' : 'text-stone-300'
-                    }`}>
-                      {t(labelKey)}
-                    </span>
-                    <span className="block text-xs text-stone-500 mt-0.5">{t(descKey)}</span>
+                    {/* Farbe kommt vom Knopf selbst (settings-choice-btn), wie bei
+                        den uebrigen Auswahlknoepfen des Fensters. */}
+                    <span className="block text-xs font-medium">{t(labelKey)}</span>
+                    <span className="block text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{t(descKey)}</span>
                   </SettingsChoiceButton>
                 ))}
               </div>
@@ -364,17 +362,17 @@ export default function BackupPage() {
               {importMode === 'add-vault' && (
                 <div className="space-y-2">
                   <div>
-                    <label className="text-xs text-stone-500 block mb-1">{t('settings.newVaultName')}</label>
+                    <label className="label-xs block mb-1">{t('settings.newVaultName')}</label>
                     <input
                       type="text"
                       value={newVaultName}
                       onChange={(e) => setNewVaultName(e.target.value)}
                       placeholder={t('vault.namePlaceholder')}
-                      className="w-full bg-stone-800 border border-stone-700/60 rounded px-2 py-1 text-xs text-stone-300 outline-none focus:border-jade-500/60"
+                      className="settings-field"
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-stone-500 block mb-1">{t('settings.newVaultLocation')}</label>
+                    <label className="label-xs block mb-1">{t('settings.newVaultLocation')}</label>
                     <VaultLocationRow
                       target={newVaultTarget(
                         vaultBaseDir,
@@ -401,7 +399,7 @@ export default function BackupPage() {
                   übernehmen die Einstellungen der Datei ganz. */}
               {importMode === 'merge' && importedFile.preview.hasSettings && (
                 <div>
-                  <p className="text-xs text-stone-500 mb-2">{t('settings.importSettings')}</p>
+                  <p className="label-xs mb-2">{t('settings.importSettings')}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {SETTINGS_GROUPS.map((group) => {
                       const active = settingsGroups.includes(group);
@@ -461,7 +459,7 @@ export default function BackupPage() {
               sie beim Import-Button, der sie ausloest, und darf
               umbrechen. */}
           {importError && (
-            <p className="text-xs text-red-400 flex items-start gap-1.5">
+            <p className="text-xs text-danger flex items-start gap-1.5">
               <AlertTriangle size={12} className="shrink-0 mt-0.5" />
               <span className="min-w-0 break-words">{importError}</span>
             </p>
