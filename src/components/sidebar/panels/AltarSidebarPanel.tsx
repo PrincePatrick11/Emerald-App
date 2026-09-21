@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
 import { Check, Grid3x3, Image as ImageIcon, Magnet, Pencil, RotateCw, Scaling, Trash2, X } from 'lucide-react';
@@ -25,6 +25,7 @@ import { ImageTooLargeError, imageSizeLabel, prepareImageDataUrl } from '../../.
 import Button from '../../ui/Button';
 import { useUIStore } from '../../../store/uiStore';
 import { useDisplayedAltar } from '../../../hooks/useDisplayedAltar';
+import { usePointerReorder } from '../../../hooks/usePointerReorder';
 import { imageSrc, saveImage } from '../../../lib/images';
 import { PlacedElementRow, PlacedElementInspector } from '../fields/PlacedElementRow';
 import AltarReadingSummary from '../fields/AltarReadingSummary';
@@ -99,10 +100,6 @@ const [gridOpen, setGridOpen] = useState(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backgroundOpen, overlayOpen, gridOpen, faviconOpen, canvasOptionsOpen, placementsOpen]);
 
-  const [dragState, setDragState] = useState<{ fromId: string; overIndex: number } | null>(null);
-  const listRef = useRef<HTMLDivElement>(null);
-  // keeps onUp closure current without re-subscribing drag listeners
-  const visualPlacementsRef = useRef<typeof sortedPlacements>([]);
   // In-memory cache of previously uploaded background paths for the current session.
   // Allows re-activating a custom background after switching to a preset without
   // re-uploading. Not persisted — the active path is authoritative in the DB.
@@ -118,53 +115,13 @@ const [gridOpen, setGridOpen] = useState(true);
     () => sortedPlacements.find((p) => p.id === selectedPlacementId) ?? null,
     [sortedPlacements, selectedPlacementId],
   );
-  const visualPlacements = useMemo(() => {
-    if (!dragState) return sortedPlacements;
-    const list = [...sortedPlacements];
-    const fromIdx = list.findIndex((p) => p.id === dragState.fromId);
-    if (fromIdx < 0) return sortedPlacements;
-    const [item] = list.splice(fromIdx, 1);
-    list.splice(Math.min(dragState.overIndex, list.length), 0, item);
-    return list;
-  }, [dragState, sortedPlacements]);
-  useEffect(() => { visualPlacementsRef.current = visualPlacements; }, [visualPlacements]);
-
-  const startDrag = useCallback((e: React.PointerEvent, fromId: string) => {
-    e.preventDefault();
-    const sorted = sortedPlacements;
-    const fromIndex = sorted.findIndex((p) => p.id === fromId);
-    setDragState({ fromId, overIndex: fromIndex });
-
-    const getOverIndex = (clientY: number): number => {
-      if (!listRef.current) return fromIndex;
-      const wrappers = Array.from(listRef.current.children) as HTMLElement[];
-      let best = 0, bestDist = Infinity;
-      wrappers.forEach((wrapper, i) => {
-        const row = (wrapper.firstElementChild as HTMLElement | null) ?? wrapper;
-        const rect = row.getBoundingClientRect();
-        const dist = Math.abs(clientY - (rect.top + rect.height / 2));
-        if (dist < bestDist) { bestDist = dist; best = i; }
-      });
-      return best;
-    };
-
-    const onMove = (ev: PointerEvent) => {
-      setDragState((prev) => prev ? { ...prev, overIndex: getOverIndex(ev.clientY) } : null);
-    };
-    const onUp = () => {
-      const finalOrder = visualPlacementsRef.current;
-      const maxZ = finalOrder.length - 1;
-      finalOrder.forEach((p, i) => {
-        const newZ = maxZ - i;
-        if (p.z_index !== newZ) updatePlacement(p.id, { z_index: newZ });
-      });
-      setDragState(null);
-      document.removeEventListener('pointermove', onMove);
-      document.removeEventListener('pointerup', onUp);
-    };
-    document.addEventListener('pointermove', onMove);
-    document.addEventListener('pointerup', onUp);
-  }, [sortedPlacements, updatePlacement]);
+  const { listRef, visualItems: visualPlacements, draggingId, startDrag } = usePointerReorder(sortedPlacements, (ordered) => {
+    const maxZ = ordered.length - 1;
+    ordered.forEach((p, i) => {
+      const newZ = maxZ - i;
+      if (p.z_index !== newZ) updatePlacement(p.id, { z_index: newZ });
+    });
+  });
 
   const hasCustomBackground = !!(activeAltar && (activeAltar.background_image_data || customBackgroundMap[activeAltar.id]));
   const backgroundUrl = customBackgroundPreview
@@ -740,7 +697,7 @@ const [gridOpen, setGridOpen] = useState(true);
                   placement={placement}
                   isEditing={isEditing}
                   isSelected={selectedPlacementId === placement.id}
-                  isDragging={dragState?.fromId === placement.id}
+                  isDragging={draggingId === placement.id}
                   onSelect={() => selectPlacement(selectedPlacementId === placement.id ? null : placement.id)}
                   onToggleHidden={() => updatePlacement(placement.id, { hidden: !placement.hidden })}
                   onToggleLocked={() => updatePlacement(placement.id, { locked: !placement.locked })}

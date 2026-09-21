@@ -312,6 +312,7 @@
       }
     },
     "kinds": {
+      "text": "Texte",
       "shorttext": "Texte court",
       "number": "Nombre",
       "date": "Date",
@@ -343,23 +344,18 @@
       "removeOption": "Supprimer l'option",
       "hideEmpty": "Masquer si vide en mode lecture",
       "readOnly": "Entièrement en lecture seule",
-      "readOnlyHint": "Pas de cochage ni de bascule en mode lecture non plus",
-      "copyHint": "Une copie de « {{name}} » — les modifications ici restent dans cette entrée."
+      "readOnlyHint": "Pas de cochage ni de bascule en mode lecture non plus"
     },
     "library": {
       "defaultName": "Nouveau bloc",
       "untitled": "Bloc sans nom",
       "newBlock": "Nouveau bloc",
       "builtIn": "Blocs intégrés",
-      "builtInHint": "Disponibles dans chaque entrée via « Ajouter un bloc ». Les blocs intégrés ne se modifient pas — pour vos propres champs, créez votre propre bloc.",
       "custom": "Vos blocs",
       "customHint": "Assemblez votre propre bloc à partir de champs — par exemple un journal de rituel avec date, choix et liste de contrôle. Une fois enregistré, il apparaît sous « Ajouter un bloc » dans chaque entrée.",
       "name": "Nom",
       "namePlaceholder": "Nom du bloc",
-      "description": "Description",
-      "descriptionPlaceholder": "À quoi sert ce bloc ? (facultatif)",
       "fields": "Champs",
-      "noFields": "Pas encore de champ — ajoutez le premier.",
       "addField": "Ajouter un champ",
       "removeField": "Retirer le champ",
       "removedFields": "Champs retirés",
@@ -389,7 +385,6 @@
       "unused": "Utilisé dans aucune entrée pour l'instant",
       "outdated": "{{count}} entrée avec une version antérieure",
       "outdated_other": "{{count}} entrées avec une version antérieure",
-      "copiesNote": "Chaque entrée possède sa propre copie de ce bloc. Les modifications enregistrées s'appliquent à la prochaine insertion ; les entrées existantes se mettent à jour ici ou depuis le menu du bloc dans l'entrée.",
       "updateAll": "Tout mettre à jour",
       "updateAllConfirm": "Mettre {{count}} entrée à cette version ?",
       "updateAllConfirm_other": "Mettre {{count}} entrées à cette version ?",

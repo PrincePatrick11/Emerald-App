@@ -55,7 +55,7 @@ interface Props {
 
 /**
  * Die Seite eines eigenen Blocks (`LibraryPageFrame`): Name als Titel,
- * darunter Beschreibung und die Felder (hinzufügen, benennen, sortieren,
+ * darunter die Felder (hinzufügen, benennen, sortieren,
  * entfernen); in der Seitenleiste Icon, Anzeigeregeln und Verwendung.
  *
  * Bearbeitet wird ein Entwurf (`useDraftPage`); erst „Fertig" schreibt ihn und
@@ -169,7 +169,6 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
           {(usage?.outdated ?? 0) > 0 && <> · {t('blocks.library.outdated', { count: usage!.outdated })}</>}
           {(usage?.outdatedTemplates ?? 0) > 0 && <> · {t('blocks.library.outdatedTemplates', { count: usage!.outdatedTemplates })}</>}
         </p>
-        <p className="block-field-hint">{t('blocks.library.copiesNote')}</p>
         {outdated > 0 && (
           confirmUpdate ? (
             <InlineConfirm
@@ -218,19 +217,9 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
       sidebar={sidebar}
     >
       <div className="max-w-3xl space-y-6">
-        <textarea
-          className={`${OP_PROP_SELECT_CLASSES} resize-none selectable`}
-          rows={2}
-          value={draft.description}
-          placeholder={t('blocks.library.descriptionPlaceholder')}
-          aria-label={t('blocks.library.description')}
-          onChange={(e) => patch({ description: e.target.value })}
-        />
-
         {/* Felder */}
         <section className="space-y-2">
           <p className="label-xs">{t('blocks.library.fields')}</p>
-          {active.length === 0 && <p className="text-xs text-stone-600">{t('blocks.library.noFields')}</p>}
           <Reorder.Group as="div" axis="y" values={active.map((e) => e.id)} onReorder={reorderActive} className="space-y-2">
             {active.map((element) => (
               <ElementRow
@@ -342,9 +331,10 @@ function ElementRow({ element, siblings, blockHidesEmpty, onPatch, onRemove }: {
             label={t('blocks.fields.hideEmpty')}
           />
         )}
+        {/* Text hat keine Vorgabe: sie wäre Markup in der Definition. */}
         {isSigilKind(element.kind)
           ? <SigilPartSettings element={element} siblings={siblings} onPatch={onPatch} />
-          : <PrefillEditor element={element} onPatch={onPatch} />}
+          : element.kind !== 'text' && <PrefillEditor element={element} onPatch={onPatch} />}
       </div>
     </Reorder.Item>
   );

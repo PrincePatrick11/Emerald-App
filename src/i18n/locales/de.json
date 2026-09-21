@@ -312,6 +312,7 @@
       }
     },
     "kinds": {
+      "text": "Text",
       "shorttext": "Kurztext",
       "number": "Zahl",
       "date": "Datum",
@@ -343,23 +344,18 @@
       "removeOption": "Option entfernen",
       "hideEmpty": "Leer im Lesemodus ausblenden",
       "readOnly": "Komplett schreibgeschützt",
-      "readOnlyHint": "Auch im Lesemodus nichts abhaken oder umschalten",
-      "copyHint": "Eine Kopie von „{{name}}“ — Änderungen hier bleiben in diesem Eintrag."
+      "readOnlyHint": "Auch im Lesemodus nichts abhaken oder umschalten"
     },
     "library": {
       "defaultName": "Neuer Block",
       "untitled": "Unbenannter Block",
       "newBlock": "Neuer Block",
       "builtIn": "Standard-Blöcke",
-      "builtInHint": "Stehen in jedem Eintrag unter „Block hinzufügen“ bereit. Eingebaute Blöcke lassen sich nicht bearbeiten — für eigene Felder baue einen eigenen Block.",
       "custom": "Eigene Blöcke",
       "customHint": "Bau dir aus Feldern einen eigenen Block — etwa ein Ritual-Protokoll mit Datum, Auswahl und Checkliste. Gespeichert steht er in jedem Eintrag unter „Block hinzufügen“.",
       "name": "Name",
       "namePlaceholder": "Name des Blocks",
-      "description": "Beschreibung",
-      "descriptionPlaceholder": "Wofür ist dieser Block? (optional)",
       "fields": "Felder",
-      "noFields": "Noch keine Felder — füge das erste hinzu.",
       "addField": "Feld hinzufügen",
       "removeField": "Feld entfernen",
       "removedFields": "Entfernte Felder",
@@ -389,7 +385,6 @@
       "unused": "Noch in keinem Eintrag verwendet",
       "outdated": "{{count}} Eintrag mit älterer Version",
       "outdated_other": "{{count}} Einträge mit älterer Version",
-      "copiesNote": "Jeder Eintrag hat seine eigene Kopie dieses Blocks. Gespeicherte Änderungen gelten beim nächsten Einfügen; bestehende Einträge aktualisierst du hier oder über das Block-Menü im Eintrag.",
       "updateAll": "Alle aktualisieren",
       "updateAllConfirm": "{{count}} Eintrag auf diese Version bringen?",
       "updateAllConfirm_other": "{{count}} Einträge auf diese Version bringen?",

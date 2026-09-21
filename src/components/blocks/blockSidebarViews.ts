@@ -4,10 +4,10 @@ import { FIELDS_BLOCK_TYPE } from '../../lib/blocks/fields';
 import FieldsSidebarEdit from './FieldsSidebarEdit';
 
 /**
- * Abschnitte, die ein Blocktyp in die rechte Seitenleiste mitbringt — je eine
- * Lese- und eine Bearbeitungsvariante, wie die Eigenschaften-Panels. Die
- * Block-Verwaltung rendert für jeden Block, dessen Typ hier steht, einen
- * einklappbaren Abschnitt unter der Blockliste. Nachgeschlagen wird über den
+ * Einstellungen, die ein Blocktyp in die rechte Seitenleiste mitbringt — je
+ * eine Lese- und eine Bearbeitungsvariante, wie die Eigenschaften-Panels. Die
+ * Block-Verwaltung zeigt sie unter der Zeile eines ausgewählten Blocks, dessen
+ * Typ hier steht. Nachgeschlagen wird über den
  * aufgelösten Typ (`resolveBlockType`): ein Block mit zu neuem Datenformat
  * bekommt hier so wenig eine Bearbeitungsansicht wie im Stapel.
  *

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
+import { activeElements, FIELDS_BLOCK_TYPE, parseFields } from '../../lib/blocks/fields';
 import type { BlockInstance } from '../../lib/blocks/types';
 
 /**
@@ -11,6 +12,10 @@ import type { BlockInstance } from '../../lib/blocks/types';
  * Eine Regel für beides: der zuletzt fokussierte Textblock, und solange noch
  * keiner fokussiert war (oder der fokussierte verschwand), der letzte. Der
  * letzte, weil Angehängtes dort ohnehin landen würde — ans Ende des Eintrags.
+ *
+ * Angemeldet wird unter der Block-ID, ein Text-Element eines eigenen Blocks
+ * unter `<Block-ID>:<Element-ID>` — es zählt wie ein Textblock an der Stelle
+ * seines Blocks.
  */
 export function useTextEditorRegistry(getBlocks: () => BlockInstance[]) {
   const getBlocksRef = useRef(getBlocks);
@@ -21,12 +26,19 @@ export function useTextEditorRegistry(getBlocks: () => BlockInstance[]) {
   const focusOnMountRef = useRef<string | null>(null);
   const [toolbarEditor, setToolbarEditor] = useState<Editor | null>(null);
 
-  /** Die Editoren der Textblöcke in Blockreihenfolge. */
+  /** Die Editoren der Textblöcke (und Text-Elemente) in Blockreihenfolge. */
   const orderedEditors = useCallback((): Editor[] => {
     const out: Editor[] = [];
+    const editors = editorsRef.current;
     for (const block of getBlocksRef.current()) {
-      const entry = editorsRef.current.get(block.id);
-      if (entry) out.push(entry.editor);
+      const own = editors.get(block.id);
+      if (own) out.push(own.editor);
+      if (block.type !== FIELDS_BLOCK_TYPE) continue;
+      // Text-Elemente in der Reihenfolge des Blocks, nicht der Anmeldung.
+      for (const element of activeElements(parseFields(block))) {
+        const part = element.kind === 'text' ? editors.get(`${block.id}:${element.id}`) : undefined;
+        if (part) out.push(part.editor);
+      }
     }
     return out;
   }, []);

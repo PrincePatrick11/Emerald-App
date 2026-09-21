@@ -312,6 +312,7 @@
       }
     },
     "kinds": {
+      "text": "Texto",
       "shorttext": "Texto corto",
       "number": "Número",
       "date": "Fecha",
@@ -343,23 +344,18 @@
       "removeOption": "Eliminar opción",
       "hideEmpty": "Ocultar vacío en modo lectura",
       "readOnly": "Totalmente de solo lectura",
-      "readOnlyHint": "Tampoco marcar ni alternar en modo lectura",
-      "copyHint": "Una copia de «{{name}}» — los cambios aquí se quedan en esta entrada."
+      "readOnlyHint": "Tampoco marcar ni alternar en modo lectura"
     },
     "library": {
       "defaultName": "Nuevo bloque",
       "untitled": "Bloque sin nombre",
       "newBlock": "Nuevo bloque",
       "builtIn": "Bloques integrados",
-      "builtInHint": "Disponibles en cada entrada en «Añadir bloque». Los bloques integrados no se pueden editar: para campos propios, crea tu propio bloque.",
       "custom": "Tus bloques",
       "customHint": "Arma tu propio bloque a partir de campos — por ejemplo, un registro ritual con fecha, opción y lista de verificación. Una vez guardado, aparece en «Añadir bloque» en cada entrada.",
       "name": "Nombre",
       "namePlaceholder": "Nombre del bloque",
-      "description": "Descripción",
-      "descriptionPlaceholder": "¿Para qué es este bloque? (opcional)",
       "fields": "Campos",
-      "noFields": "Aún no hay campos — añade el primero.",
       "addField": "Añadir campo",
       "removeField": "Quitar campo",
       "removedFields": "Campos quitados",
@@ -389,7 +385,6 @@
       "unused": "Aún no se usa en ninguna entrada",
       "outdated": "{{count}} entrada con una versión anterior",
       "outdated_other": "{{count}} entradas con una versión anterior",
-      "copiesNote": "Cada entrada tiene su propia copia de este bloque. Los cambios guardados se aplican la próxima vez que lo insertes; las entradas existentes se actualizan aquí o desde el menú del bloque en la entrada.",
       "updateAll": "Actualizar todas",
       "updateAllConfirm": "¿Llevar {{count}} entrada a esta versión?",
       "updateAllConfirm_other": "¿Llevar {{count}} entradas a esta versión?",

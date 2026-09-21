@@ -312,6 +312,7 @@
       }
     },
     "kinds": {
+      "text": "Text",
       "shorttext": "Short text",
       "number": "Number",
       "date": "Date",
@@ -343,23 +344,18 @@
       "removeOption": "Remove option",
       "hideEmpty": "Hide empty in read mode",
       "readOnly": "Fully read-only",
-      "readOnlyHint": "No ticking or toggling in read mode either",
-      "copyHint": "A copy of “{{name}}” — changes here stay in this entry."
+      "readOnlyHint": "No ticking or toggling in read mode either"
     },
     "library": {
       "defaultName": "New block",
       "untitled": "Untitled block",
       "newBlock": "New block",
       "builtIn": "Built-in blocks",
-      "builtInHint": "Available in every entry under “Add block”. Built-in blocks can’t be edited — for fields of your own, build your own block.",
       "custom": "Your blocks",
       "customHint": "Assemble a block of your own from fields — a ritual log with date, choice and checklist, say. Once saved, it appears under “Add block” in every entry.",
       "name": "Name",
       "namePlaceholder": "Name of the block",
-      "description": "Description",
-      "descriptionPlaceholder": "What is this block for? (optional)",
       "fields": "Fields",
-      "noFields": "No fields yet — add the first one.",
       "addField": "Add field",
       "removeField": "Remove field",
       "removedFields": "Removed fields",
@@ -389,7 +385,6 @@
       "unused": "Not used in any entry yet",
       "outdated": "{{count}} entry with an older version",
       "outdated_other": "{{count}} entries with an older version",
-      "copiesNote": "Every entry holds its own copy of this block. Saved changes apply the next time it is inserted; existing entries are updated here or from the block’s menu in the entry.",
       "updateAll": "Update all",
       "updateAllConfirm": "Bring {{count}} entry to this version?",
       "updateAllConfirm_other": "Bring {{count}} entries to this version?",

@@ -1,5 +1,4 @@
-import { useRef, useState, type MouseEvent, type ReactNode } from 'react';
-import { Reorder, useDragControls } from 'framer-motion';
+import { useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Eye, EyeOff, GripVertical, LayoutTemplate, MoreHorizontal, Pencil, Plus, Puzzle, Type } from 'lucide-react';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
@@ -10,7 +9,8 @@ import { useBlockSessionStore, type BlockSession } from '../../store/blockSessio
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import BlockGlyph from './BlockGlyph';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
-import { REORDER_SPRING } from '../../lib/motion';
+import { usePointerReorder } from '../../hooks/usePointerReorder';
+import { sidebarRowStateClasses } from '../../lib/styleClasses';
 import { resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockTypes';
 import {
   blockLabel, blockTypeLabel, customBlockTitle, hiddenAttrValue, isBlockHidden, showsTitleInRead, showTitleAttrValue,
@@ -31,8 +31,9 @@ function listedBlocks(session: BlockSession): BlockInstance[] {
  * im Bearbeitungsmodus Liste mit Griff, Auge und Menü (Umbenennen, Titel im
  * Lesemodus, Duplizieren, Entfernen) plus „Block hinzufügen"; im Lesemodus
  * eine Gliederung der sichtbaren Blöcke, deren Zeilen zum Block springen —
- * dort nur, wenn es mehr als einen gibt. Darunter die Abschnitte, die
- * Blocktypen mitbringen.
+ * dort nur, wenn es mehr als einen gibt. Bringt ein Blocktyp Einstellungen mit
+ * (`blockSidebarViews.ts`), klappt ein Klick auf seine Zeile sie darunter auf —
+ * wie die platzierten Elemente des Altars.
  *
  * Alles läuft über die API, die der `BlockStack` im `blockSessionStore`
  * veröffentlicht — die Seitenleiste ändert nie selbst am Eintrag.
@@ -52,8 +53,11 @@ function BlockManager({ session }: { session: BlockSession }) {
   const [open, toggleOpen] = usePersistedFlag('blocks-sidebar-open', true);
   const [menu, setMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const { isEditing, api } = session;
   const rows = listedBlocks(session);
+  // Ohne Animation, wie die platzierten Elemente des Altars.
+  const { listRef, visualItems, draggingId, startDrag } = usePointerReorder(rows, (ordered) => api.reorder(ordered.map((b) => b.id)));
   const definitions = useBlockDefinitionStore((s) => s.definitions);
   // Was eine geladene Sigille sperrt, lässt sich nicht duplizieren (siehe BlockStack.duplicate).
   const sigil = sigilState(session.blocks, todayIso());
@@ -90,9 +94,11 @@ function BlockManager({ session }: { session: BlockSession }) {
 
       {open && (
         <>
-          <Reorder.Group as="div" axis="y" values={rows.map((b) => b.id)} onReorder={api.reorder} className="mt-2 space-y-1">
-            {rows.map((block) => {
+          <div ref={listRef} className="mt-2 space-y-1">
+            {visualItems.map((block) => {
               const meta = resolveBlockType(block);
+              const settings = blockSettings(session, block, meta);
+              const selected = selectedId === block.id;
               return (
                 <ManagerRow
                   key={block.id}
@@ -108,13 +114,20 @@ function BlockManager({ session }: { session: BlockSession }) {
                     setRenamingId(null);
                     if (title !== undefined) api.setAttr(block.id, BLOCK_ATTR.title, title.trim() || null);
                   }}
-                  onReveal={() => api.reveal(block.id)}
+                  selected={selected}
+                  isDragging={draggingId === block.id}
+                  onGripPointerDown={(e) => startDrag(e, block.id)}
+                  onActivate={() => {
+                    if (!selected) api.reveal(block.id);
+                    setSelectedId(selected ? null : block.id);
+                  }}
                   onToggleHidden={() => api.setAttr(block.id, BLOCK_ATTR.hidden, hiddenAttrValue(!isBlockHidden(block)))}
                   onOpenMenu={(e) => openRowMenu(e, block, meta)}
+                  settings={settings}
                 />
               );
             })}
-          </Reorder.Group>
+          </div>
           {isEditing && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               <Button tone="neutral" small onClick={openAddMenu}>
@@ -132,8 +145,6 @@ function BlockManager({ session }: { session: BlockSession }) {
         </>
       )}
 
-      <BlockSections session={session} />
-
       {menu && <ContextMenu x={menu.x} y={menu.y} actions={menu.actions} onClose={() => setMenu(null)} />}
     </div>
   );
@@ -148,37 +159,41 @@ interface ManagerRowProps {
   renaming: boolean;
   /** Neuer Titel, oder `undefined` für „abgebrochen". */
   onRenamed: (title: string | undefined) => void;
-  onReveal: () => void;
+  /** Ausgewählt — hat der Block Einstellungen, stehen sie aufgeklappt unter der Zeile. */
+  selected: boolean;
+  isDragging: boolean;
+  onGripPointerDown: (e: PointerEvent) => void;
+  /** Klick auf die Beschriftung: zum Block springen, aus- oder abwählen. */
+  onActivate: () => void;
   onToggleHidden: () => void;
   onOpenMenu: (e: MouseEvent) => void;
+  /** Die Einstellungen des Blocks (`null`: keine) — unter der Zeile, damit sie beim Ziehen mitwandern. */
+  settings: ReactNode;
 }
 
 /**
  * Eine Zeile der Verwaltungsliste — dieselbe Form wie die platzierten Elemente
- * des Altars. Die Zeilenfläche selbst bleibt die Tailwind-Kette von
- * `PlacedElementRow`: die Parchment-Brücke hängt an diesen Klassennamen, eine
- * eigene Klasse per `@apply` verlöre sie.
+ * des Altars, mit denselben Zuständen (`sidebarRowStateClasses`).
  */
 function ManagerRow({
-  block, meta, label, typeLabel, isEditing, renaming, onRenamed, onReveal, onToggleHidden, onOpenMenu,
+  block, meta, label, typeLabel, isEditing, renaming, onRenamed, selected, isDragging, onGripPointerDown, onActivate, onToggleHidden, onOpenMenu, settings,
 }: ManagerRowProps) {
   const { t } = useTranslation();
-  const controls = useDragControls();
   const cancelledRef = useRef(false);
   const hidden = isBlockHidden(block);
   const glyph = blockIcon(block, meta) ?? Puzzle;
 
   return (
-    <Reorder.Item as="div" value={block.id} dragListener={false} dragControls={controls} transition={REORDER_SPRING} style={{ position: 'relative' }}>
+    <div>
       <div
         onContextMenu={isEditing ? (e) => { e.preventDefault(); onOpenMenu(e); } : undefined}
-        className={`w-full flex items-center gap-2 rounded border px-2 py-1.5 transition-all select-none
-                    border-stone-700/60 bg-stone-900/45 text-stone-400 hover:border-stone-500/70 hover:text-stone-300
-                    ${hidden ? 'opacity-50' : ''}`}
+        className={`w-full flex items-center gap-2 rounded border px-2 py-1.5 transition-all select-none ${
+          sidebarRowStateClasses({ dragging: isDragging, selected })
+        } ${hidden ? 'opacity-50' : ''}`}
       >
         {isEditing && (
           <span
-            onPointerDown={(e) => controls.start(e)}
+            onPointerDown={onGripPointerDown}
             className="block-row-action cursor-grab active:cursor-grabbing touch-none"
             title={t('blocks.dragToMove')}
           >
@@ -202,7 +217,7 @@ function ManagerRow({
             />
           </>
         ) : (
-          <button type="button" onClick={onReveal} title={t('blocks.jumpTo')} className="block-row-label">
+          <button type="button" onClick={onActivate} title={t('blocks.jumpTo')} aria-pressed={selected} className="block-row-label">
             <BlockGlyph icon={glyph} />
             <span className="truncate text-[11px] font-medium">{label}</span>
           </button>
@@ -230,52 +245,33 @@ function ManagerRow({
           </>
         )}
       </div>
-    </Reorder.Item>
-  );
-}
-
-/** Die Abschnitte, die Blocktypen in die Seitenleiste mitbringen (`blockSidebarViews.ts`). */
-function BlockSections({ session }: { session: BlockSession }) {
-  const { t } = useTranslation();
-  const { isEditing, api } = session;
-  return (
-    <>
-      {listedBlocks(session).map((block) => {
-        const meta = resolveBlockType(block);
-        const views = meta ? BLOCK_SIDEBAR_VIEWS.get(meta.id) : undefined;
-        const label = blockLabel(t, block, meta);
-        if (isEditing && views?.Edit) {
-          const Edit = views.Edit;
-          return (
-            <BlockSection key={block.id} type={block.type} label={label}>
-              <Edit
-                block={block}
-                setAttr={(name, value) => api.setAttr(block.id, name, value)}
-                update={(next) => api.update(block.id, next)}
-              />
-            </BlockSection>
-          );
-        }
-        if (!isEditing && views?.Read) {
-          const Read = views.Read;
-          return (
-            <BlockSection key={block.id} type={block.type} label={label}>
-              <Read block={block} />
-            </BlockSection>
-          );
-        }
-        return null;
-      })}
-    </>
-  );
-}
-
-function BlockSection({ type, label, children }: { type: string; label: string; children: ReactNode }) {
-  const [open, toggle] = usePersistedFlag(`block-section-open:${type}`, true);
-  return (
-    <div className="mt-4 border-t border-stone-700/60">
-      <SidebarSectionHeader label={label} open={open} onToggle={toggle} className="pt-4" />
-      {open && <div className="mt-2">{children}</div>}
+      {selected && settings !== null && (
+        <div className="mt-1 mb-2 rounded border border-stone-700/50 bg-stone-900/40 px-2 py-2">{settings}</div>
+      )}
     </div>
   );
+}
+
+/**
+ * Die Einstellungen, die ein Blocktyp in die Seitenleiste mitbringt
+ * (`blockSidebarViews.ts`) — `null`, wenn er für diesen Modus keine hat.
+ */
+function blockSettings(session: BlockSession, block: BlockInstance, meta: BlockTypeMeta | undefined): ReactNode {
+  const { isEditing, api } = session;
+  const views = meta ? BLOCK_SIDEBAR_VIEWS.get(meta.id) : undefined;
+  if (isEditing && views?.Edit) {
+    const Edit = views.Edit;
+    return (
+      <Edit
+        block={block}
+        setAttr={(name, value) => api.setAttr(block.id, name, value)}
+        update={(next) => api.update(block.id, next)}
+      />
+    );
+  }
+  if (!isEditing && views?.Read) {
+    const Read = views.Read;
+    return <Read block={block} />;
+  }
+  return null;
 }

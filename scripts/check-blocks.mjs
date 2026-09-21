@@ -263,6 +263,17 @@ console.log('\n4c. Feldblock\n');
   const withImg = serializeFields(imgBlock, { ...imgModel, slots: { [imgEl.id]: `<img src="${name}">` } }, text);
   check('das Bild steht als src im Markup (Bild-Aufräumen findet es)', withImg.html.includes(`src="${name}"`) && imageFromSlot(parseFields(withImg).slots[imgEl.id]) === name);
 
+  const textBlock = createFieldsBlock('text');
+  const textModel = parseFields(textBlock);
+  const textEl = textModel.elements[0];
+  check('ein leeres Text-Element ist leer', isElementEmpty(textEl, { ...textModel, slots: { [textEl.id]: '<h2></h2><ul><li><p></p></li></ul>' } }));
+  const richHtml = `<h2>Titel</h2><ul><li><p>Punkt</p></li></ul><p>mit ${chip}</p>`;
+  const withText = serializeFields(textBlock, { ...textModel, slots: { [textEl.id]: richHtml } }, text);
+  const textBack = parseFields(parseBlocks(serializeBlocks([withText]))[0]);
+  check('ein Text-Element steht als HTML im Slot und liest sich zurück',
+    textBack.slots[textEl.id] === richHtml && !isElementEmpty(textEl, textBack), textBack);
+  check('extractInternalLinks findet den Link im Text-Element', extractInternalLinks(serializeBlocks([withText])).length === 1);
+
   const broken = parseFields({ id: 'x', type: 'core.fields', html: '', attrs: { [BLOCK_ATTR.config]: '{kaputt', [BLOCK_ATTR.data]: '[1,2' } });
   check('kaputtes JSON ergibt einen leeren Block statt eines Fehlers', broken.elements.length === 0 && Object.keys(broken.values).length === 0);
 

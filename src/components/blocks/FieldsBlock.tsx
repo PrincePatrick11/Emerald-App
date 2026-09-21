@@ -1,3 +1,4 @@
+import { useContext, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { elementLabel } from '../../lib/blocks/blockAttrs';
 import {
@@ -5,7 +6,10 @@ import {
   serializeFields,
   type ElementDef, type FieldValue, type FieldsModel,
 } from '../../lib/blocks/fields';
+import { isBlankContent } from '../../lib/internalLinkHtml';
 import { formatIsoDateLong } from '../../lib/formatDate';
+import RichEditor from '../editor/RichEditor';
+import { BlockStackContext } from './blockStackContext';
 import UnknownBlock from './UnknownBlock';
 import { LinkTarget } from './BlockLink';
 import { AltarFieldReader } from './AltarField';
@@ -30,6 +34,9 @@ type Setter = (value: FieldValue | undefined) => void;
  * zurück. Im Lesemodus dürfen Checkliste und Ja/Nein geschaltet werden — das
  * geht über `onPersist` direkt in den Eintrag, außer der Block ist komplett
  * schreibgeschützt oder eine geladene Sigille sperrt den Eintrag.
+ *
+ * Ein Text-Element ist derselbe Editor wie der Textblock (`FieldText`); sein
+ * HTML steht im Slot und wird nur im Bearbeitungsmodus geschrieben.
  *
  * Sigillen-Teile (Rechner, Zeichnung, Ladung) rendert `SigilPart` mit den
  * Komponenten der gleichnamigen Blöcke. Laden und Entladen gehen im
@@ -71,14 +78,29 @@ export default function FieldsBlock({ block, blocks, isEditing, onBlockChange, o
   return (
     <div className={isEditing ? 'block-fields block-fields--edit' : 'block-fields'}>
       {elements.map((element) => (
-        // Altar und Sigille brauchen die volle Breite: Beschriftung darüber statt daneben.
+        // Text, Altar und Sigille brauchen die volle Breite: Beschriftung darüber statt daneben.
         <div
           key={element.id}
-          className={element.kind === 'altar' || isSigilKind(element.kind) ? 'block-field block-field--wide' : 'block-field'}
+          className={element.kind === 'text' || element.kind === 'altar' || isSigilKind(element.kind)
+            ? 'block-field block-field--wide'
+            : 'block-field'}
         >
           <div className="block-field-label">{elementLabel(t, element)}</div>
           <div className="block-field-value">
-            {isSigilKind(element.kind) ? (
+            {element.kind === 'text' ? (
+              // Ein Baum für Lesen und Bearbeiten, wie beim Textblock: der Editor schaltet nur um.
+              <FieldText
+                editorKey={`${block.id}:${element.id}`}
+                initialContent={model.slots[element.id] ?? ''}
+                isEditing={isEditing}
+                // Über den Block, nicht wie der Textblock nur in den Ref: die
+                // Seitenleiste schreibt das ganze Modell aus dem Block, den sie
+                // hält — wäre der veraltet, löschte eine Beschriftung das Getippte.
+                onChange={(html) => {
+                  if (isEditing) setSlot(element)(isBlankContent(html) ? null : html);
+                }}
+              />
+            ) : isSigilKind(element.kind) ? (
               <SigilPart
                 element={{ ...element, kind: element.kind }}
                 block={block}
@@ -100,6 +122,36 @@ export default function FieldsBlock({ block, blocks, isEditing, onBlockChange, o
         </div>
       ))}
     </div>
+  );
+}
+
+/* ---------------- Text ---------------- */
+
+/**
+ * Das Text-Element: der Editor des Textblocks, beim Stapel unter
+ * `<Block-ID>:<Element-ID>` angemeldet — so bekommt er Toolbar, Link-Bitten
+ * und Drops wie ein Textblock. Unkontrolliert wie dort: `initialContent` wird
+ * einmal gelesen; `onChange` läuft über einen Ref, weil der Editor den
+ * Callback seiner ersten Montage behält.
+ */
+function FieldText({ editorKey, initialContent, isEditing, onChange }: {
+  editorKey: string;
+  initialContent: string;
+  isEditing: boolean;
+  onChange: (html: string) => void;
+}) {
+  const { t } = useTranslation();
+  const stack = useContext(BlockStackContext);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  return (
+    <RichEditor
+      initialContent={initialContent}
+      placeholder={t('blocks.types.text.placeholder')}
+      onChange={(html) => onChangeRef.current(html)}
+      editable={isEditing}
+      onEditorReady={(editor) => stack?.registerTextEditor(editorKey, editor)}
+    />
   );
 }
 
@@ -163,6 +215,8 @@ function FieldReader({ element, model, set }: { element: ElementDef; model: Fiel
     }
     case 'altar':
       return <AltarFieldReader slot={model.slots[element.id]} />;
+    case 'text': // FieldText
+      return null;
   }
 }
 

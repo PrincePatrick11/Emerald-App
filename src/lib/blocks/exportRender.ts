@@ -3,7 +3,7 @@ import { isBlockHidden, showsTitleInRead } from './blockAttrs';
 import { parseBlocks } from './blockHtml';
 import { resolveBlockType, type BlockTypeMeta } from './blockTypes';
 import {
-  FIELDS_BLOCK_TYPE, fieldValueHtml, imageFromSlot, isHiddenInRead, isSigilKind, isSlotKind, linkFromSlot, parseFields,
+  FIELDS_BLOCK_TYPE, fieldValueHtml, imageFromSlot, isElementEmpty, isHiddenInRead, isSigilKind, isSlotKind, linkFromSlot, parseFields,
   type ElementDef, type FallbackText, type FieldsModel,
 } from './fields';
 import {
@@ -66,6 +66,8 @@ function fieldValue(element: ElementDef, model: FieldsModel, text: ExportText): 
     }
     case 'link':
       return model.slots[element.id] ?? null;
+    case 'text':
+      return isElementEmpty(element, model) ? null : model.slots[element.id]!;
     case 'altar': {
       const slot = model.slots[element.id];
       if (!slot) return null;
