@@ -160,6 +160,12 @@ implementation:
   Tauri wrote next to the updater bundle and saves it as a workflow artifact. It
   fails loudly on zero or more than one match — a guessed signature would be
   noticed only by a user whose update refuses to install.
+
+  **The `.sig` files are deliberately not published.** A detached signature
+  cannot live inside the file it signs, and it does not need to live beside it
+  either: `updater-manifest.mjs` copies its contents into `latest.json`, which is
+  the only place the updater ever reads a signature from. Uploading the files as
+  well would put three assets on the release page that nothing reads.
 - `scripts/updater-manifest.mjs` combines the fragments into `latest.json`. It
   resolves download URLs from the release's own asset list rather than building
   them: GitHub rewrites special characters in asset names (`Emerald App_0.3.0…`
