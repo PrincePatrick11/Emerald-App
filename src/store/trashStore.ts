@@ -4,7 +4,7 @@ import { reassignCategoryContent } from '../lib/schema';
 import { trashWiring } from './moduleWiring';
 import { reassignCategoriesInMemory } from './categoryStore';
 import { definitionLabel, templateLabel } from '../lib/blocks/blockAttrs';
-import { isImageIcon } from '../lib/helpers';
+import { iconTitle } from '../lib/helpers';
 import i18n from '../i18n';
 import type { TrashedItem } from '../types';
 
@@ -50,6 +50,9 @@ export const useTrashStore = create<TrashState>((set) => ({
       const templates = await db.select<{ id: string; name: string; icon: string; deleted_at: string }[]>(
         `SELECT id, name, icon, deleted_at FROM templates WHERE deleted_at IS NOT NULL`
       );
+      const languages = await db.select<{ id: string; name: string; icon: string; deleted_at: string }[]>(
+        `SELECT id, name, icon, deleted_at FROM languages WHERE deleted_at IS NOT NULL`
+      );
       const items: TrashedItem[] = [
         ...journal.map((r) => ({ ...r, type: 'journal' as const })),
         ...wiki.map((r) => ({ id: r.id, title: r.title, deleted_at: r.deleted_at, type: 'wiki' as const, category: r.category ?? undefined })),
@@ -58,18 +61,22 @@ export const useTrashStore = create<TrashState>((set) => ({
         ...categories.map((r) => ({ id: r.id, title: `${r.emoji} ${r.name}`, deleted_at: r.deleted_at, type: 'category' as const })),
         ...tasks.map((r) => ({ ...r, type: 'task' as const })),
         ...blockDefinitions.map((r) => ({
-          // Ein Bild-Icon ist eine Data-URL — als Text vor dem Namen stünde
-          // Base64. Das Block-Symbol der Zeile genügt dann.
           id: r.id,
-          title: isImageIcon(r.icon) ? definitionLabel(i18n.t, r) : `${r.icon} ${definitionLabel(i18n.t, r)}`,
+          title: iconTitle(r.icon, definitionLabel(i18n.t, r)),
           deleted_at: r.deleted_at,
           type: 'blockDefinition' as const,
         })),
         ...templates.map((r) => ({
           id: r.id,
-          title: isImageIcon(r.icon) ? templateLabel(i18n.t, r) : `${r.icon} ${templateLabel(i18n.t, r)}`,
+          title: iconTitle(r.icon, templateLabel(i18n.t, r)),
           deleted_at: r.deleted_at,
           type: 'template' as const,
+        })),
+        ...languages.map((r) => ({
+          id: r.id,
+          title: iconTitle(r.icon, r.name),
+          deleted_at: r.deleted_at,
+          type: 'language' as const,
         })),
       ].sort((a, b) => b.deleted_at.localeCompare(a.deleted_at));
       set({ items });
@@ -100,6 +107,8 @@ export const useTrashStore = create<TrashState>((set) => ({
     await db.execute(`DELETE FROM block_definitions WHERE deleted_at IS NOT NULL`);
     // Ebenso Vorlagen: Einträge tragen nur ihre Herkunft.
     await db.execute(`DELETE FROM templates WHERE deleted_at IS NOT NULL`);
+    // Die Vokabeln nimmt ON DELETE CASCADE mit — sie haben kein eigenes `deleted_at`.
+    await db.execute(`DELETE FROM languages WHERE deleted_at IS NOT NULL`);
 
     // Kategorien zuletzt, und erst nachdem ihre verbliebenen Inhalte umgehängt
     // sind. Früher wurden die Zeilen einfach gelöscht und alles, was noch auf

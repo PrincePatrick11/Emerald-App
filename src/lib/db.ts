@@ -2,8 +2,8 @@ import Database from '@tauri-apps/plugin-sql';
 import { invoke } from '@tauri-apps/api/core';
 import { getActiveDbConnectionString, getActiveVaultId } from './vaultManager';
 import {
-  BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, IMAGE_FIELDS, TABLE_DDL, TEMPLATES_INDEX_DDL, createSchema,
-  ddlIfNotExists, seedBuiltins, storedImageName,
+  BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, IMAGE_FIELDS, LEXICON_INDEX_DDL, TABLE_DDL,
+  TEMPLATES_INDEX_DDL, createSchema, ddlIfNotExists, seedBuiltins, storedImageName,
 } from './schema';
 import { normalizeSchema } from './normalizeSchema';
 import { adoptLegacyImages, rewriteImageRefs } from './images';
@@ -259,6 +259,8 @@ const CLEANUP_TABLES = [
   // Ohne Fremdschlüssel und ohne Nachlauf: Einträge tragen ihre Kopien selbst.
   'block_definitions',
   'templates',
+  // Ihre Vokabeln nimmt ON DELETE CASCADE mit — sie tragen kein eigenes `deleted_at`.
+  'languages',
 ] as const;
 
 /**
@@ -1271,5 +1273,17 @@ export const MIGRATIONS: Migration[] = [
     version: 44,
     name: 'routines_to_templates',
     up: (db) => migrateRoutinesToTemplates(db, i18n.t),
+  },
+  {
+    // Das Lexikon bekommt seine beiden Tabellen: die Sprachen und ihre
+    // Vokabeln. Rein additiv und wiederholbar wie v40 und v43 — es gibt
+    // nichts umzuschreiben, das Modul ist neu.
+    version: 45,
+    name: 'lexicon',
+    up: async (db) => {
+      await db.execute(ddlIfNotExists(TABLE_DDL.languages));
+      await db.execute(ddlIfNotExists(TABLE_DDL.lexicon_entries));
+      await createIndexesIfMissing(db, LEXICON_INDEX_DDL);
+    },
   },
 ];

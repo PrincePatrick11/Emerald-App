@@ -1,5 +1,5 @@
 import type {
-  ActiveView, AltarItem, AltarRecord, JournalEntry, Operation, Tag, Task, WikiArticle,
+  ActiveView, AltarItem, AltarRecord, JournalEntry, Language, LexiconEntry, Operation, Tag, Task, WikiArticle,
 } from '../types';
 import { foldTypography, plainTextFor } from './searchText';
 import { todayIso, withoutConcealed } from './blocks/sigil';
@@ -21,7 +21,8 @@ import type { CategoryModuleId } from './modules';
 
 export type SearchKind =
   | 'journal' | 'wiki' | 'operation' | 'task'
-  | 'altar' | 'altarItem' | 'tag' | 'category';
+  | 'altar' | 'altarItem' | 'tag' | 'category'
+  | 'language' | 'lexiconEntry';
 
 
 export interface SearchSnippet {
@@ -47,6 +48,8 @@ export interface SearchHit {
   /** Only for `kind: 'category'`: the module holding most of its entries, shown as a hint — unset when nothing uses it. */
   module?: CategoryModuleId;
   categoryId?: string | null;
+  /** Nur für `kind: 'lexiconEntry'`: die Sprache, in der die Vokabel steht — ihr Sprungziel. */
+  languageId?: string;
   entryNumber?: number;
   /** Sort tie-break. Tags and categories have no timestamp and pass `''`. */
   updatedAt: string;
@@ -70,6 +73,9 @@ export interface SearchCorpus {
   altarItems: AltarItem[];
   tags: Tag[];
   categories: SearchCategory[];
+  languages: Language[];
+  /** Die Vokabeln aller Sprachen — der Treffer öffnet die Sprache, zu der eine gehört. */
+  lexiconEntries: LexiconEntry[];
 }
 
 export interface SearchResults {
@@ -179,7 +185,7 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
     id: string,
     title: string,
     match: FieldMatch | null,
-    extra: Partial<Pick<SearchHit, 'updatedAt' | 'module' | 'categoryId' | 'entryNumber'>> = {},
+    extra: Partial<Pick<SearchHit, 'updatedAt' | 'module' | 'categoryId' | 'languageId' | 'entryNumber'>> = {},
   ) => {
     if (!match) return;
     hits.push({
@@ -250,6 +256,26 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
     push('tag', tag.id, tag.name, matchRecord(q, tag.name, null, () => []));
   }
 
+  // Eine Sprache ist ihr Name — mehr Text trägt sie nicht.
+  for (const language of corpus.languages.filter(notDeleted)) {
+    push('language', language.id, language.name,
+      matchRecord(q, language.name, null, () => []),
+      { updatedAt: language.updated_at });
+  }
+
+  // Eine Vokabel steht mit beiden Seiten im Titel: gesucht wird mal nach dem
+  // Wort der Sprache, mal nach dem eigenen, und beide sollen den Treffer
+  // lesbar machen. Die `id` ist die der Vokabel (sie macht den Treffer
+  // eindeutig); gesprungen wird über `languageId`, denn eine eigene Seite hat
+  // ein Wort nicht.
+  for (const entry of corpus.lexiconEntries) {
+    const title = [entry.term, entry.translation].filter(Boolean).join(' – ');
+    if (!title) continue;
+    push('lexiconEntry', entry.id, title,
+      matchRecord(q, title, null, () => [entry.pronunciation, entry.note]),
+      { updatedAt: entry.updated_at, languageId: entry.language_id });
+  }
+
   for (const category of corpus.categories) {
     push('category', category.id, category.name,
       matchRecord(q, category.name, null, () => []),
@@ -268,11 +294,12 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
  * Where a hit opens.
  *
  * Not every kind has a page of its own: an altar item lives inside the altar
- * module's library and lands on that module rather than on itself. A category
- * does have one since `CategoriesView` — which is also why an *unused*
- * category is addressable at all, where it used to resolve to nothing.
+ * module's library and lands on that module rather than on itself, and a
+ * lexicon word opens the language it belongs to. A category does have one
+ * since `CategoriesView` — which is also why an *unused* category is
+ * addressable at all, where it used to resolve to nothing.
  */
-export function viewForSearchHit(hit: Pick<SearchHit, 'kind' | 'id' | 'module'>): ActiveView | null {
+export function viewForSearchHit(hit: Pick<SearchHit, 'kind' | 'id' | 'module' | 'languageId'>): ActiveView | null {
   switch (hit.kind) {
     case 'journal':
     case 'wiki':
@@ -290,5 +317,10 @@ export function viewForSearchHit(hit: Pick<SearchHit, 'kind' | 'id' | 'module'>)
     case 'category':
       // With the id, `CategoriesView` scrolls to the row rather than merely opening.
       return { type: 'categories', id: hit.id };
+    case 'language':
+      return { type: 'lexicon', id: hit.id };
+    case 'lexiconEntry':
+      // A word has no page of its own — it opens the language holding it.
+      return hit.languageId ? { type: 'lexicon', id: hit.languageId } : { type: 'lexicon' };
   }
 }

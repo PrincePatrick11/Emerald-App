@@ -253,7 +253,6 @@ function BlockList({ usage, onCreate, onDelete }: {
       isEmpty={!customCollapsed && definitions.length === 0}
       emptyState={{
         message: t('blocks.library.customHint'),
-        messageClassName: 'text-stone-600 text-sm max-w-md mx-auto',
         actionLabel: t('blocks.library.newBlock'),
         onAction: onCreate,
       }}

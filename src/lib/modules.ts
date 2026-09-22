@@ -20,6 +20,7 @@ import {
   Flame,
   FolderOpen,
   Home,
+  Languages,
   LayoutList,
   LayoutTemplate,
   Library,
@@ -57,15 +58,20 @@ export const DEFAULT_ENTRY_EMOJI: Record<ContentType, string> = {
 export const ENTRY_MODULE_IDS = ['journal', 'tasks', 'operations', 'wiki', 'altar'] as const;
 export type EntryModuleId = (typeof ENTRY_MODULE_IDS)[number];
 
-export const AUX_VIEW_IDS = ['home', 'tags', 'categories', 'blocks', 'templates', 'trash'] as const;
+export const AUX_VIEW_IDS = ['home', 'tags', 'categories', 'blocks', 'templates', 'lexicon', 'trash'] as const;
 export type AuxViewId = (typeof AUX_VIEW_IDS)[number];
 
 /**
- * Bibliotheken, deren Einträge als eigene Seite aufgehen (`{ type, id }`) und
- * erst mit „Fertig" speichern: eigene Blöcke und Vorlagen. So eine Seite ist
- * immer im Bearbeiten, bekommt einen eigenen Tab und braucht die Seitenleiste.
+ * Bibliotheken, deren Einträge als eigene Seite aufgehen (`{ type, id }`).
+ * So eine Seite ist immer im Bearbeiten, bekommt einen eigenen Tab und
+ * braucht die rechte Seitenleiste.
+ *
+ * Zwei davon — eigene Blöcke und Vorlagen — speichern erst mit „Fertig"
+ * (`LibraryPageFrame`, `useDraftPage`). Die Sprachseite des Lexikons nicht:
+ * sie speichert jede Zeile sofort und hat keinen Entwurf. Was diese Liste
+ * regelt, ist nur das Dreierlei oben, und das gilt für alle drei.
  */
-export const LIBRARY_VIEW_IDS = ['blocks', 'templates'] as const;
+export const LIBRARY_VIEW_IDS = ['blocks', 'templates', 'lexicon'] as const;
 export type LibraryViewId = (typeof LIBRARY_VIEW_IDS)[number];
 
 export function isLibraryView(viewType: string): viewType is LibraryViewId {
@@ -133,6 +139,8 @@ export const AUX_VIEWS: Record<AuxViewId, { icon: LucideIcon; navLabelKey: strin
   blocks: { icon: Blocks, navLabelKey: 'nav.blocks' },
   // Dieselbe Glyphe wie `TRASH_KIND_ICONS.template`.
   templates: { icon: LayoutTemplate, navLabelKey: 'nav.templates' },
+  // Dieselbe Glyphe wie `TRASH_KIND_ICONS.language`.
+  lexicon: { icon: Languages, navLabelKey: 'nav.lexicon' },
 };
 
 const VIEW_ID_SET: ReadonlySet<string> = new Set<string>([...ENTRY_MODULE_IDS, ...AUX_VIEW_IDS]);
@@ -167,7 +175,7 @@ export function viewTypeForEntryType(entryType: ContentType): EntryModuleId {
 
 /** Alle Papierkorb-Eintragstypen (`TrashedItem['type']`). */
 export const TRASH_KINDS = [
-  'journal', 'wiki', 'tag', 'operation', 'task', 'category', 'blockDefinition', 'template',
+  'journal', 'wiki', 'tag', 'operation', 'task', 'category', 'blockDefinition', 'template', 'language',
 ] as const;
 export type TrashKind = (typeof TRASH_KINDS)[number];
 
@@ -182,4 +190,5 @@ export const TRASH_KIND_ICONS: Record<TrashKind, LucideIcon> = {
   category: FolderOpen,
   blockDefinition: Blocks,
   template: LayoutTemplate,
+  language: Languages,
 };

@@ -86,6 +86,8 @@ interface UIState {
   templatesPrefs: ListPrefs;
   /** Die eigenen Blöcke in der Blöcke-Ansicht — die eingebauten darunter bleiben unberührt. */
   blocksPrefs: ListPrefs;
+  /** Die Sprachliste des Lexikons — das Übersetzen-Feld darunter bleibt unberührt. */
+  lexiconPrefs: ListPrefs;
   tagsSort: TagsSort;
   altarWindowFullscreen: boolean;
   /** Altar-Dashboard: Vorschau der Leinwand auf den Karten und in der Liste.
@@ -139,6 +141,7 @@ interface UIState {
   setTrashPrefs: (p: Partial<ListPrefs>) => void;
   setTemplatesPrefs: (p: Partial<ListPrefs>) => void;
   setBlocksPrefs: (p: Partial<ListPrefs>) => void;
+  setLexiconPrefs: (p: Partial<ListPrefs>) => void;
   setTagsSort: (sort: TagsSort) => void;
   setAltarWindowFullscreen: (enabled: boolean) => void;
   setAltarShowPreview: (enabled: boolean) => void;
@@ -287,6 +290,8 @@ export const useUIStore = create<UIState>((set) => ({
   // Vorlagen haben nichts zu gruppieren — wie beim Altar steht das Feld nur für die gemeinsame ListPrefs da.
   templatesPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
   blocksPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
+  // Sprachen tragen keine Kategorien — `grouping` steht hier wie beim Altar nur für die gemeinsame ListPrefs.
+  lexiconPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
   tagsSort: 'alpha_asc',
   altarWindowFullscreen: false,
   altarShowPreview: localStorage.getItem(ALTAR_SHOW_PREVIEW_KEY) !== '0',
@@ -463,6 +468,7 @@ export const useUIStore = create<UIState>((set) => ({
   setTrashPrefs: (p) => set((s) => ({ trashPrefs: { ...s.trashPrefs, ...p } })),
   setTemplatesPrefs: (p) => set((s) => ({ templatesPrefs: { ...s.templatesPrefs, ...p } })),
   setBlocksPrefs: (p) => set((s) => ({ blocksPrefs: { ...s.blocksPrefs, ...p } })),
+  setLexiconPrefs: (p) => set((s) => ({ lexiconPrefs: { ...s.lexiconPrefs, ...p } })),
   setTagsSort: (sort) => set({ tagsSort: sort }),
   setAltarWindowFullscreen: (enabled) => set({ altarWindowFullscreen: enabled }),
   setAltarShowPreview: (enabled) => {

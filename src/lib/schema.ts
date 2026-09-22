@@ -20,7 +20,7 @@ import type Database from '@tauri-apps/plugin-sql';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 44;
+export const BASELINE_VERSION = 45;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
@@ -48,6 +48,8 @@ export const TABLES = [
   'tasks',
   'altar_placements',
   'task_links',
+  'languages',
+  'lexicon_entries',
 ] as const;
 
 export type TableName = (typeof TABLES)[number];
@@ -314,7 +316,43 @@ export const TABLE_DDL: Record<TableName, string> = {
       target_type TEXT NOT NULL,
       UNIQUE (task_id, target_id, target_type)
     )`,
+
+  // Die Sprachen des Lexikons (seit v45): je eine Sprache mit ihrem Alphabet,
+  // die Vokabeln stehen in `lexicon_entries`. `alphabet` ist JSON
+  // (lib/lexicon.ts): Paare `{ from, to }`, mit denen das Übersetzen-Feld
+  // Zeichen für Zeichen umschreibt. Ohne Fremdschlüssel nach außen — eine
+  // Sprache hängt an keinem Eintrag und kein Eintrag an ihr.
+  // Der Icon-Default ist `DEFAULT_LANGUAGE_ICON`.
+  languages: `
+    CREATE TABLE languages (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      icon TEXT NOT NULL DEFAULT '🗣️',
+      alphabet TEXT NOT NULL DEFAULT '[]',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT
+    )`,
+
+  // Die Vokabeln einer Sprache (seit v45). Kein eigenes `deleted_at`: eine
+  // gelöschte Vokabel ist sofort weg (mit Rückgängig im Speicher), in den
+  // Papierkorb wandert nur die Sprache als Ganzes. ON DELETE CASCADE räumt
+  // deshalb beim endgültigen Löschen der Sprache mit auf.
+  lexicon_entries: `
+    CREATE TABLE lexicon_entries (
+      id TEXT PRIMARY KEY,
+      language_id TEXT NOT NULL REFERENCES languages(id) ON DELETE CASCADE,
+      term TEXT NOT NULL DEFAULT '',
+      translation TEXT NOT NULL DEFAULT '',
+      pronunciation TEXT NOT NULL DEFAULT '',
+      note TEXT NOT NULL DEFAULT '',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`,
 };
+
 
 /**
  * Indizes auf jeder Foreign-Key-Spalte, auf beiden Seiten der Link-Tabellen und
@@ -347,8 +385,16 @@ export const BLOCK_DEFINITIONS_INDEX_DDL = 'CREATE INDEX idx_block_definitions_d
 /** Der Index von `templates` (v43) — aus demselben Grund getrennt wie der von `block_definitions`. */
 export const TEMPLATES_INDEX_DDL = 'CREATE INDEX idx_templates_deleted ON templates(deleted_at)';
 
+/** Die Indizes des Lexikons (v45) — getrennt wie die beiden darüber. */
+export const LEXICON_INDEX_DDL: readonly string[] = [
+  'CREATE INDEX idx_languages_deleted ON languages(deleted_at)',
+  'CREATE INDEX idx_lexicon_entries_language ON lexicon_entries(language_id)',
+];
+
 /** Alle Indizes des aktuellen Schemas — was ein frischer Vault bekommt. */
-export const INDEX_DDL: readonly string[] = [...INDEX_DDL_V38, BLOCK_DEFINITIONS_INDEX_DDL, TEMPLATES_INDEX_DDL];
+export const INDEX_DDL: readonly string[] = [
+  ...INDEX_DDL_V38, BLOCK_DEFINITIONS_INDEX_DDL, TEMPLATES_INDEX_DDL, ...LEXICON_INDEX_DDL,
+];
 
 /**
  * Das frühere Sammelbecken. Seit v39 ist es keins mehr: `category_id` darf

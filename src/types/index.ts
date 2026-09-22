@@ -187,6 +187,46 @@ export interface Task {
   deleted_at: string | null;
 }
 
+/**
+ * Ein Zeichenpaar des Alphabets einer Sprache: `from` ist das Zeichen (oder
+ * die Zeichenfolge) der eigenen Schrift, `to` das der Sprache. Mehrbuchstabige
+ * Paare sind ausdrücklich erlaubt — „th" → „ᚦ" ist genau der Fall, für den die
+ * Umschrift beim längsten Treffer zuerst schaut (siehe `lib/lexicon.ts`).
+ */
+export interface AlphabetPair {
+  from: string;
+  to: string;
+}
+
+/** Eine Sprache des Lexikons. Ihre Vokabeln stehen als `LexiconEntry` daneben. */
+export interface Language {
+  id: string;
+  name: string;
+  /** Emoji oder Bild-Data-URL, wie bei eigenen Blöcken und Vorlagen. */
+  icon: string;
+  alphabet: AlphabetPair[];
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+/**
+ * Eine Vokabel. `term` steht in der Sprache, `translation` in der eigenen —
+ * das Übersetzen-Feld liest das Paar in beide Richtungen.
+ */
+export interface LexiconEntry {
+  id: string;
+  language_id: string;
+  term: string;
+  translation: string;
+  pronunciation: string;
+  note: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ActiveView {
   // ViewId statt der alten Ad-hoc-Union: die enthielt über ContentType auch
   // 'operation' (singular), das als View-Typ nie gültig war.

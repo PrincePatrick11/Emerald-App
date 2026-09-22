@@ -188,7 +188,6 @@ function TemplateList({ entries, onCreate, onDelete }: {
       isEmpty={!collapsed && templates.length === 0}
       emptyState={{
         message: t('templates.emptyHint'),
-        messageClassName: 'text-stone-600 text-sm max-w-md mx-auto',
         actionLabel: t('templates.newTemplate'),
         onAction: onCreate,
       }}

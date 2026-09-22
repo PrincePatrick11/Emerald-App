@@ -50,7 +50,8 @@ src/
 │   │                 TagInput, ResizableImageExtension, ExternalDropExtension,
 │   │                 EditorToolbar, LinkPickerModal, SuggestionList
 │   ├── views/        HomeView, JournalView, WikiView, TagsView, CategoriesView,
-│   │                 AltarView, OperationsView, TrashView, TasksView, BlocksView, TemplatesView
+│   │                 AltarView, OperationsView, TrashView, TasksView, BlocksView, TemplatesView,
+│   │                 LexiconView
 │   ├── sidebar/
 │   │   ├── panels/   JournalPropertiesPanel, WikiPropertiesPanel, OperationPropertiesPanel,
 │   │   │             AltarSidebarPanel, BacklinksPanel (currently unrendered — RoutinesPanel,
@@ -74,6 +75,11 @@ src/
 │   │                 "Insert template" button, empty-entry suggestions, and the
 │   │                 applied-template notice), TemplatePickerModal, TemplateApplyDialog
 │   │                 (append/replace + title/tags checkboxes), useAssignmentLabel
+│   ├── lexicon/      LanguagePage (a language's own page — its own frame rather than
+│   │                 LibraryPageFrame, since it saves every row straight away instead of
+│   │                 on "Done"), VocabularyTable (the words, each field saved on blur),
+│   │                 AlphabetTable (the transliteration pairs), TranslatePanel (the
+│   │                 translate field under the language list, see Lexicon below)
 │   ├── altar/        AltarCanvas, AltarCard, AltarCardPreview, AltarItemVisual,
 │   │                 AltarLibraryStrip, AltarItemTile (the 70×85px
 │   │                 library tile, shared by the strip and the dashboard section below),
@@ -102,7 +108,9 @@ src/
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, categoryStore (the one Wiki/Operations/Tasks/Altar category
 │                                      list, see Categories below), templateStore (the templates
-│                                      dashboard, see Templates below), draftStore.ts (the
+│                                      dashboard, see Templates below),
+│                     lexiconStore (the Lexicon's languages and their words — one store for
+│                                      both, see Lexicon below), draftStore.ts (the
 │                                      unsaved-draft stores behind a block's and a template's
 │                                      own page — see useDraftPage below; formerly
 │                                      blockDraftStore.ts, one store only), undoStore,
@@ -135,7 +143,7 @@ src/
 │                     useOpenInNewTabAction (the "Open in New Tab" ContextMenuAction for an
 │                                      ActiveView, the menu counterpart to DashboardItem's
 │                                      middle-click; used by HomeView, WikiView, OperationsView,
-│                                      BlocksView, TemplatesView and the four
+│                                      BlocksView, TemplatesView, LexiconView and the four
 │                                      LeftSidebarEntryList configs),
 │                     useDisplayedAltar (the altar the view is actually showing, matched
 │                                      against activeView.id rather than read straight off
@@ -156,6 +164,11 @@ src/
 │                                      blockDefinitionRows.ts), migrateRoutinesToTemplates.ts
 │                                      (routine → template conversion, shared by migration v44
 │                                      and the backup importer),
+│                     lexicon.ts (the Lexicon's rules: the alphabet, looking a word up and
+│                                      translating a text with both — see Lexicon below),
+│                     lexiconRows.ts (the raw `languages`/`lexicon_entries` row access shared
+│                                      by the store and the backup import — same pattern as
+│                                      blockDefinitionRows.ts),
 │                     moonPhase.ts, export.ts, menuActions.ts,
 │                     platform.ts, categories.ts (categoryLabel, categoriesUsedBy,
 │                                      categoryUsageCounts — the one display-name,
@@ -169,7 +182,9 @@ src/
 │                     sortItems.ts (the one SortMode comparator for every dashboard),
 │                     groupBy.ts (groupBy/groupByMonth → DashboardGroup[]),
 │                     exportData.ts, emeraldFormat.ts, vaultManager.ts, dbBackup.ts,
-│                     helpers.ts (incl. isImageIcon, generateId,
+│                     helpers.ts (incl. isImageIcon, iconTitle (icon + name as one
+│                                      trash-row title, falling back to the name alone for an
+│                                      image icon), generateId,
 │                                      hexToRgb, isValidHexColor, readFileAsDataUrl,
 │                                      ACCEPTED_IMAGE_MIME, isAcceptedImageFile),
 │                     images.ts (imageSrc, saveImage, copyImageFile, canvasImageSrc,
@@ -218,7 +233,8 @@ order — it drives the rail's icon order, the entry list's tab order and, throu
 `CATEGORY_MODULE_IDS` (the same minus `journal`), the order of the per-module usage columns
 in `CategoriesView`. `MODULES` is the
 `Record<EntryModuleId, ModuleMeta>` everything else reads; `MODULE_LIST` is its array form for
-loops. `ViewId` (`EntryModuleId | AuxViewId`, where `AuxViewId` is `home`/`tags`/`categories`/`trash`) is
+loops. `ViewId` (`EntryModuleId | AuxViewId`, where `AuxViewId` is `home`/`tags`/`categories`/
+`blocks`/`templates`/`lexicon`/`trash`) is
 what `ActiveView['type']` actually is — replacing an ad-hoc union that, via `ContentType`, used
 to also admit `'operation'` (singular), a value no view ever had. `isViewId()` guards
 persisted tabs at load time, so a localStorage entry from a since-removed view type is dropped
@@ -255,18 +271,20 @@ stays free of both:
 - **`src/store/moduleWiring.ts`** — the store-layer half. `moduleWiring` maps each
   `EntryModuleId` to its store's reload function; `trashWiring` maps each `TrashKind` to its
   restore/permanently-delete pair (`category` now goes to `categoryStore`, `template` to
-  `templateStore`, see [Categories](#categories) and [Templates](#templates) below).
+  `templateStore`, `language` to `lexiconStore`, see [Categories](#categories),
+  [Templates](#templates) and [Lexicon](#lexicon) below).
   `reloadAllStores()` is the canonical startup/vault-switch reload sequence — tags, categories,
-  and `block_definitions` and `templates` in parallel, then every module's content — replacing
+  `block_definitions`, `templates` and the lexicon in parallel, then every module's content — replacing
   three hand-maintained copies of the same list that used to live in `vaultStore`, `dbBackup`,
   and `AppShell`. The sequencing is deliberate, not a hard data dependency: no fetcher reads
   another store, but loading tags/categories/blocks/templates first means a list never renders a
   frame with unresolved category or tag names, and a new entry never starts before its default
   template could be resolved. `reloadModules(ids)` reloads a targeted subset (used by the
   Emerald-format import, to reload only the modules the import touched) but always refetches
-  `categories`, `block_definitions` and `templates` too, since an import can create new ones.
+  `categories`, `block_definitions`, `templates` and the lexicon too, since an import can create
+  new ones.
   Import rule: content stores only (`journal`/`wiki`/`operation`/`task`/`altar`/`tag`/
-  `category`/`blockDefinition`/`template`) — never `uiStore`, `vaultStore`, or `trashStore`,
+  `category`/`blockDefinition`/`template`/`lexicon`) — never `uiStore`, `vaultStore`, or `trashStore`,
   which point at this module instead.
 - **`src/components/layout/moduleViews.ts`** — the component-layer half. `VIEW_COMPONENTS` maps
   every `ViewId` to its `React.lazy` view. Import rule: **only `MainArea` may import this
@@ -905,6 +923,67 @@ link target has to either be in the file or already in the target vault to survi
 import keeps the fresh vault's own `core-sigil` template rather than letting an old file's
 version of it (or lack of one) override it.
 
+### Lexicon
+
+The Lexicon (rail, under Templates) is a module without entries: it holds **languages** you keep
+yourself — Enochian, runes, one you made up — and translates a text with them. It reaches no
+network; the app's one remote dependency stays the font stylesheet (see
+[`security.md`](security.md#content-security-policy)). What a language does not know stays
+untranslated and is marked as such, because a word list cannot guess and pretending otherwise
+would be the worse answer.
+
+**Two tables, one store.** `languages` and `lexicon_entries` (migration v45, see
+[`database.md`](database.md#languages)) are both read by `lexiconStore`: every view needs both at
+once — the dashboard counts the words, the language page lists them, the translate field reads
+them. `lexiconRows.ts` holds the raw row access the store and the backup import share, the same
+split `blockDefinitionRows.ts`/`templateRows.ts` already follow.
+
+**Saving is immediate.** A vocabulary row is a pair of fields, not a draft: every field writes
+when it loses focus, the alphabet the same, the name after a short typing pause. The language
+page therefore has no `useDraftPage` and no "Done" — there is nothing to take back. It does sit
+on the same `LibraryPageFrame` as the block and template pages, which is why that component now
+splits what it owns from what the page brings: the shell (breadcrumb, icon, name as title,
+scrolling body, the sidebar portal) is the frame's, and what stands in the sidebar's top bar is
+the page's. A draft page passes `draft` and gets "Unsaved" plus Done/Delete/Cancel; the language
+page passes its own `bar` — back to the list, and delete. `lexicon` is in `LIBRARY_VIEW_IDS`
+like the other two, since all three things that list actually governs apply: `{ type, id }` is a
+page, it gets its own tab (with the language's own name and icon, like a block's or a
+template's), and it opens the right sidebar.
+
+A language is **not** exportable as a single `.emerald` file the way a template is. That format
+carries a block stack; a language is two tables and an alphabet, and there is nothing in it a
+`.emerald` importer could put anywhere. Backups carry it instead (see
+[`database.md`](database.md#db-backup--restore-emeralddb)).
+
+**Translating** lives in `src/lib/lexicon.ts`, free of stores and i18n like the rest of `lib/`:
+
+- **Words.** The text is split into words and everything between them; both survive into the
+  result, so a translated invocation keeps its shape. Each word is looked up in the direction
+  chosen — `toLanguage` matches `translation` and yields `term`, `fromLanguage` the other way —
+  and a multi-word left-hand side is matched as a phrase, longest first. Only whitespace *within
+  a line* may stand between its words: a phrase replaces everything it spans, so one that reached
+  across a line break would swallow it and the text would come back a line shorter than it went
+  in. The first matching row wins (the one with the lower `sort_order`), and the source word's
+  capitalisation is carried over (ALL CAPS, First letter).
+- **Characters.** `transliterate` rewrites character by character against the language's
+  alphabet, longest run first — which is the whole reason the table is sorted that way: with `t`
+  ahead of `th`, `th` would never be found. Anything not in the table stays as it is. Only a pair
+  with both sides filled takes part (`isUsablePair`); a half-filled one is still *stored*
+  (`isFilledPair`), so a side you mean to add later is not thrown away behind your back.
+- **Both** (the default) is words first, then the alphabet for whatever the word list did not
+  know. A word that comes back unchanged from both is reported as unknown — the result shows it
+  dotted-underlined, and the line below counts them.
+
+**The translate field is not on a language's page** but under the language list
+(`Dashboard`'s `contentFooter`, like the Altar library under the altars): it picks its language
+itself and works with all of them, so it belongs beside the list rather than inside one row.
+
+**Search and trash.** A language and every single word are in the global search (`SearchKind`
+`language`/`lexiconEntry`); a word has no page of its own and its hit opens the language holding
+it, carried in `SearchHit.languageId`. Deleting a language is a soft delete with an undo toast —
+its words stay attached and come back with it; permanently deleting it takes them along through
+`ON DELETE CASCADE`.
+
 ### Auto-Save (the `useEntryEditor` hook)
 
 Debounced auto-save (1.5s), save-on-navigate and save-on-unmount live in
@@ -975,7 +1054,7 @@ The title bar's search field searches every module by title, tag, and body text.
 
 `searchText.ts`'s `htmlToText()` uses `DOMParser` rather than assigning to `innerHTML` on a detached `<div>` — the parsed document is inert, so an `<img onerror>` that arrived through an import never executes when the search re-parses it (see [Security → Search Text Extraction](security.md#search-text-extraction)). `foldTypography()` reverses TipTap's `Typography` extension (curly quotes, en/em dashes) back to keyboard characters, one character for one character, so a search for `don't` finds an entry stored with a curly apostrophe; the query and the result-row highlighting run through the same folding via the shared `comparable()` helper, so the two never disagree about what matched.
 
-`searchCorpus()` itself does not cap anything — it scores the whole corpus and returns every `SearchHit`, best first. Capping is `useGlobalSearch`'s job, split into two memos: one runs `searchCorpus()` again only when the corpus or the query changes, the other slices that result to `limit` and only depends on `limit` itself. Paging ("Show more" in the dropdown, `TitleBarSearch.tsx`) just grows `limit` by its `PAGE_SIZE` (50), which re-slices the already-scored array instead of re-scoring the corpus — the point of splitting the two memos in the first place, given that the search already reruns on every keystroke. A hit's `key` is `${kind}:${id}` — before v38, when the four category tables (Wiki/Operations/Tasks/Altar) still shared built-in ids (`other`, `herb`, `deity`, …), a category hit's module had to be folded into the key to keep it unique; with one `categories` list there is only one id space and the module suffix is gone. A category hit's `module` field (still present on `SearchHit`, now optional) is the module holding most of that category's entries, resolved when the corpus is built through the shared `categoryUsageCounts`/`dominantCategoryModule` pair. Since categories got a view of their own it is no longer a destination, only the hint shown beside the hit — and a category nothing uses is now openable like any other, where it used to be a dead result. Templates are not part of the corpus — the templates dashboard is a library like Blocks, not a searchable entry type (see [Templates](#templates)).
+`searchCorpus()` itself does not cap anything — it scores the whole corpus and returns every `SearchHit`, best first. Capping is `useGlobalSearch`'s job, split into two memos: one runs `searchCorpus()` again only when the corpus or the query changes, the other slices that result to `limit` and only depends on `limit` itself. Paging ("Show more" in the dropdown, `TitleBarSearch.tsx`) just grows `limit` by its `PAGE_SIZE` (50), which re-slices the already-scored array instead of re-scoring the corpus — the point of splitting the two memos in the first place, given that the search already reruns on every keystroke. A hit's `key` is `${kind}:${id}` — before v38, when the four category tables (Wiki/Operations/Tasks/Altar) still shared built-in ids (`other`, `herb`, `deity`, …), a category hit's module had to be folded into the key to keep it unique; with one `categories` list there is only one id space and the module suffix is gone. A category hit's `module` field (still present on `SearchHit`, now optional) is the module holding most of that category's entries, resolved when the corpus is built through the shared `categoryUsageCounts`/`dominantCategoryModule` pair. Since categories got a view of their own it is no longer a destination, only the hint shown beside the hit — and a category nothing uses is now openable like any other, where it used to be a dead result. Templates are not part of the corpus — the templates dashboard is a library like Blocks, not a searchable entry type (see [Templates](#templates)). The Lexicon is the exception among the three libraries: being a library governs its page shell (`LIBRARY_VIEW_IDS`), not whether it's searchable, and a language you keep yourself is closer to Journal/Wiki content than to a block or template definition — so languages and their words are in the corpus (see [Lexicon](#lexicon)).
 
 `viewForSearchHit()` maps a hit to an `ActiveView`. Tasks, tags and categories have no page per record — the hit opens their view addressed by the record's id, and `TasksView`/`TagsView`/`CategoriesView` each run an effect keyed on the `activeView` *object* itself (not the id inside it, which stays the same if the same result is opened twice) that clears search/filters/collapsed state and scrolls the matching row into view; `CategoriesView` has no selection to set, so it highlights the row for two seconds instead. A `handledView` ref stops a later store mutation from re-triggering that scroll-and-clear and from overwriting filters the user has since changed themselves.
 
@@ -1014,7 +1093,7 @@ This keeps the user's workspace available after restarting the app without addin
 
 **Vault switches and a Replace-mode `.emeralddb` import reset the whole workspace, not just the active tab.** `closeAllTabs()` in `uiStore` clears `tabs` and `activeTabId`, and resets `tablessHistory` to a fresh Home history, persisting the empty tab list (`saveTabs([], null)`) — every open tab (and, with it, its own back/forward history) carries row ids from the vault (or the pre-import data) that no longer exists. A Merge import does not call it: merge only adds rows, so the ids behind existing tabs stay valid. Tabs are closed rather than remembered per vault — nothing keeps a vault's own tab set around to restore when switching back to it. `openActiveVault()` in `vaultStore.ts` calls `closeAllTabs()` on `switchVault` and when the active vault is deleted, but not on the app's own startup path, so restoring the previous session's tabs on relaunch (above) is unaffected.
 
-Each tab's title and icon are rendered by a per-tab `TabButton` (`TabBar.tsx`) that selects its own entity directly out of the relevant store (`s.entries.find((e) => e.id === id)`, and so on for articles/operations/tasks/altars/block definitions/templates) rather than through a store's stable getter function (`getEntry`, `getArticle`, …). A stable getter's own identity never changes, so subscribing to it alone doesn't cause a re-render when the entry it reads changes — a rename only reached the tab bar once something else forced the whole bar to re-render. Selecting the object itself re-renders only that `TabButton` when its entity changes, so a rename shows up in the tab immediately.
+Each tab's title and icon are rendered by a per-tab `TabButton` (`TabBar.tsx`) that selects its own entity directly out of the relevant store (`s.entries.find((e) => e.id === id)`, and so on for articles/operations/tasks/altars/block definitions/templates/languages) rather than through a store's stable getter function (`getEntry`, `getArticle`, …). A stable getter's own identity never changes, so subscribing to it alone doesn't cause a re-render when the entry it reads changes — a rename only reached the tab bar once something else forced the whole bar to re-render. Selecting the object itself re-renders only that `TabButton` when its entity changes, so a rename shows up in the tab immediately.
 
 Tab reordering is implemented in `src/components/layout/TabBar.tsx` with Framer Motion (`LazyMotion`, `Reorder.Group`, `Reorder.Item`). `Reorder.Group` emits the reordered tab ID list via `onReorder`, and `uiStore.setTabsOrder(ids)` validates the payload (length and uniqueness) before rebuilding the tab array and saving it through `saveTabs(...)`. Because `saveTabs` writes the full `tabs` array to `open-tabs`, tab order persists across restarts.
 

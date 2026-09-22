@@ -8,7 +8,7 @@ import Modal from '../ui/Modal';
 import LibraryPageFrame from '../ui/LibraryPageFrame';
 import InlineConfirm from '../ui/InlineConfirm';
 import PropertiesEditView from '../sidebar/fields/PropertiesEditView';
-import Favicon from '../sidebar/fields/Favicon';
+import IconField from '../sidebar/fields/IconField';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import { useBlockDraftStore, type DefinitionDraft } from '../../store/draftStore';
 import { useDraftPage } from '../../hooks/useDraftPage';
@@ -139,15 +139,8 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
 
   const sidebar = (
     <PropertiesEditView>
-      <div>
-        <p className="label-xs mb-2">{t('properties.icon')}</p>
-        <Favicon
-          value={draft.icon}
-          onChange={(icon) => void setIcon(icon)}
-          // Zurück zum Standard — ohne Icon stünde der Block in Menüs ohne Zeichen da.
-          onRemove={() => void setIcon(DEFAULT_DEFINITION_ICON)}
-        />
-      </div>
+      {/* Der Rückfall ist das Standard-Icon: ohne eines stünde der Block in Menüs ohne Zeichen da. */}
+      <IconField value={draft.icon} onChange={(icon) => void setIcon(icon)} fallback={DEFAULT_DEFINITION_ICON} />
 
       <section className="space-y-2">
         <p className="label-xs">{t('blocks.library.display')}</p>
@@ -205,11 +198,7 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
       backLabel={t('nav.blocks')}
       onBack={onClose}
       icon={draft.icon}
-      dirty={dirty}
-      busy={busy}
-      onDone={() => void finish()}
-      onCancel={leave}
-      onDelete={onDelete}
+      draft={{ dirty, busy, onDone: () => void finish(), onCancel: leave, onDelete }}
       name={draft.name}
       nameLabel={t('blocks.library.name')}
       namePlaceholder={t('blocks.library.namePlaceholder')}

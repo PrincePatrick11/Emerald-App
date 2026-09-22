@@ -20,6 +20,7 @@ export const VIEW_COMPONENTS: Record<ViewId, LazyExoticComponent<ComponentType>>
   trash: lazy(() => import('../views/TrashView')),
   blocks: lazy(() => import('../views/BlocksView')),
   templates: lazy(() => import('../views/TemplatesView')),
+  lexicon: lazy(() => import('../views/LexiconView')),
   altar: lazy(() => import('../views/AltarView')),
   operations: lazy(() => import('../views/OperationsView')),
   tasks: lazy(() => import('../views/TasksView')),

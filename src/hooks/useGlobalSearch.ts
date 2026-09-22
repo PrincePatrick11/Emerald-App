@@ -7,6 +7,7 @@ import { useOperationStore } from '../store/operationStore';
 import { useTagStore } from '../store/tagStore';
 import { useTaskStore } from '../store/taskStore';
 import { useWikiStore } from '../store/wikiStore';
+import { useLexiconStore } from '../store/lexiconStore';
 import { searchCorpus, type SearchCategory, type SearchCorpus, type SearchResults } from '../lib/globalSearch';
 import { categoryLabel, categoryUsageCounts, dominantCategoryModule } from '../lib/categories';
 
@@ -30,6 +31,8 @@ function useSearchCorpus(): SearchCorpus {
   const altarItems = useAltarStore((s) => s.items);
   const allCategories = useCategoryStore((s) => s.categories);
   const tags = useTagStore((s) => s.tags);
+  const languages = useLexiconStore((s) => s.languages);
+  const lexiconEntries = useLexiconStore((s) => s.entries);
 
   // Der Treffer öffnet die Kategorien-Ansicht; `module` beschriftet ihn bloß
   // noch mit dem Modul, das die Kategorie am meisten benutzt. Dieselbe Zählung
@@ -44,8 +47,8 @@ function useSearchCorpus(): SearchCorpus {
   }, [allCategories, wiki, operations, tasks, altarItems, t]);
 
   return useMemo(
-    () => ({ journal, wiki, operations, tasks, altars, altarItems, tags, categories }),
-    [journal, wiki, operations, tasks, altars, altarItems, tags, categories],
+    () => ({ journal, wiki, operations, tasks, altars, altarItems, tags, categories, languages, lexiconEntries }),
+    [journal, wiki, operations, tasks, altars, altarItems, tags, categories, languages, lexiconEntries],
   );
 }
 

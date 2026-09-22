@@ -16,6 +16,7 @@ import type { ActiveView, MoonPhase } from '../../types';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import { useTemplateStore } from '../../store/templateStore';
+import { useLexiconStore } from '../../store/lexiconStore';
 import { definitionLabel, templateLabel } from '../../lib/blocks/blockAttrs';
 import { imageSrc } from '../../lib/images';
 import { AUX_VIEWS, DEFAULT_ENTRY_EMOJI, moduleMeta, type AuxViewId } from '../../lib/modules';
@@ -60,6 +61,7 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
   const altar = useAltarStore((s) => (type === 'altar' && id ? s.altars.find((a) => a.id === id) : undefined));
   const definition = useBlockDefinitionStore((s) => (type === 'blocks' && id ? s.definitions.find((d) => d.id === id) : undefined));
   const template = useTemplateStore((s) => (type === 'templates' && id ? s.templates.find((tpl) => tpl.id === id) : undefined));
+  const language = useLexiconStore((s) => (type === 'lexicon' && id ? s.languages.find((l) => l.id === id) : undefined));
   const categoryId = article?.category_id ?? operation?.category_id;
   const categoryEmoji = useCategoryStore((s) => (categoryId ? s.categories.find((c) => c.id === categoryId)?.emoji : undefined));
 
@@ -70,6 +72,7 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
     if (entityTitle) title = entityTitle;
     else if (definition) title = definitionLabel(t, definition);
     else if (template) title = templateLabel(t, template);
+    else if (language) title = language.name;
   }
 
   let icon: ReactNode;
@@ -86,6 +89,8 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
     icon = renderIconValue(definition?.icon, <Icon size={13} />);
   } else if (type === 'templates' && id) {
     icon = renderIconValue(template?.icon, <Icon size={13} />);
+  } else if (type === 'lexicon' && id) {
+    icon = renderIconValue(language?.icon, <Icon size={13} />);
   } else {
     icon = <Icon size={13} />;
   }

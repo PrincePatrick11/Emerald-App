@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { Folder, Sparkles, Tag, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { comparable, type SearchHit, type SearchKind, type SearchResults } from '../../../lib/globalSearch';
-import { MODULES } from '../../../lib/modules';
+import { AUX_VIEWS, MODULES } from '../../../lib/modules';
 
 /** Abstand des Panels zur Fensterkante und zum Suchfeld darüber. */
 const VIEWPORT_MARGIN = 8;
@@ -32,6 +32,9 @@ const KIND_META: Record<SearchKind, { icon: LucideIcon; labelKey: string }> = {
   altarItem: { icon: Sparkles, labelKey: 'search.altarElements' },
   tag: { icon: Tag, labelKey: 'nav.tags' },
   category: { icon: Folder, labelKey: 'search.categories' },
+  language: { icon: AUX_VIEWS.lexicon.icon, labelKey: AUX_VIEWS.lexicon.navLabelKey },
+  // Eine Vokabel springt in ihre Sprache und trägt deshalb dasselbe Abzeichen.
+  lexiconEntry: { icon: AUX_VIEWS.lexicon.icon, labelKey: AUX_VIEWS.lexicon.navLabelKey },
 };
 
 function kindIcon(kind: SearchKind): ReactNode {

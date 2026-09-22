@@ -166,7 +166,7 @@ The overlay is applied on top of all background types — colour presets, gradie
 
 **Left sidebar structure.** The left sidebar has two parts side by side:
 
-1. A narrow icon **rail** — six navigation icons — Home (opens the dashboard) above Journal/Tasks/Operations/Wiki/Altar — and, at the bottom, Blocks, Templates, Tags, Categories and Trash grouped together, then Vault and Settings below a divider. Clicking a navigation icon switches the main view; only Home overwrites the active tab rather than opening a new one, since it has no content of its own to keep open. The other icons do not highlight, since they're independent of whichever list tab is open. The Vault button opens vault management — see [Vaults](#vaults) below. The rail carries no toggle buttons of its own: the entry list and the right sidebar are collapsed and expanded from the *View* menu instead, as **Entry List** and **Properties** (each showing a checkmark for its current state), both animating the sidebar's width in and out rather than snapping it.
+1. A narrow icon **rail** — six navigation icons — Home (opens the dashboard) above Journal/Tasks/Operations/Wiki/Altar — and, at the bottom, Blocks, Templates, Lexicon, Tags, Categories and Trash grouped together, then Vault and Settings below a divider. Clicking a navigation icon switches the main view; only Home overwrites the active tab rather than opening a new one, since it has no content of its own to keep open. The other icons do not highlight, since they're independent of whichever list tab is open. The Vault button opens vault management — see [Vaults](#vaults) below. The rail carries no toggle buttons of its own: the entry list and the right sidebar are collapsed and expanded from the *View* menu instead, as **Entry List** and **Properties** (each showing a checkmark for its current state), both animating the sidebar's width in and out rather than snapping it.
 2. A resizable, collapsible **entry list** panel next to the rail, with up to six tabs (**All** / Journal/Tasks/Operations/Wiki/Altar) that switch which items are listed — which of the six show at all, and in what order, is configured in Settings → Sidebar (at least one always stays visible). The All tab lists every module's items together in one list, sorted by last-updated. Each tab has its own search field, a "+" button to quick-create a new item, inline rename (double-click or via the context menu), and a right-click context menu (Open in new tab/Duplicate/Rename/Delete where applicable — Altar offers Open in new tab and Rename here; duplicating an altar lives in the Altar dashboard's card context menu instead. Tasks offers Rename/Delete and shows a completion checkbox on each row instead of an icon, except in the All tab, where a Task row shows a static checkbox icon instead). Every row can also be dragged into the editor to insert an internal link — Journal, Operations, and Wiki entries as before, and now Tasks and Altars too, in every tab including All. Journal, Operations, and Wiki remain the only entries a link can be dragged *from* — a Task or Altar has no editor of its own to drop a link into. The panel can be collapsed entirely via the *View* menu's **Entry List** item, and its width is remembered independently of the main window. Each tab also caps how many entries it lists at once, per the same setting (10/25/50/100, or all); once more entries exist than the cap, a "Show more" row at the bottom reveals the next batch.
 
 **Breadcrumb back links.** When an entry is open in JournalView, WikiView, or OperationsView, the topbar shows a clickable breadcrumb that navigates back to the corresponding list view (e.g. clicking "Journal" returns to the journal entry list without closing the tab).
@@ -274,6 +274,55 @@ A category created here holds nothing yet, so it does not appear in any module u
 
 A category found through the global search opens this view and briefly highlights its row. The module named beside such a search hit is where the category is used most — a hint, not the destination.
 
+## Lexicon
+
+The Lexicon is where you keep **languages** — Enochian, runes, a tongue of your own — and
+translate with them. Everything it knows comes out of your own vault; nothing is sent anywhere.
+
+**Dashboard.** The rail's Lexicon button (under Templates) opens the list of your languages on
+the same dashboard every other module uses — icon, name, and how many words and characters it
+holds — with the usual search, view (List / Cards / Cards in full width / Timeline) and sort in
+the right sidebar. A row's context menu offers Open in new tab, Duplicate (which copies the
+alphabet and every word) and Delete; deleting moves the language to the Trash, with an undo
+toast, and its words travel with it in both directions.
+
+**A language's page.** Clicking a language opens it as its own page: a breadcrumb back to the
+list, its name as the title, and below it two sections.
+
+- **Words** — a table of Term, Translation, Pronunciation and Note. "+ Word" adds a row and puts
+  the cursor in it; every field saves as soon as you leave it (Enter does the same), so a long
+  word list can be typed straight through without a save button per row. A search field above
+  filters the table, and the × removes a row right away, with an undo toast — a single word does
+  not go to the Trash.
+- **Alphabet** — pairs of characters: yours on the left, the language's on the right. Several
+  letters are allowed on either side ("th" → "ᚦ"), and the longest match wins, so a two-letter
+  pair is never missed because of a one-letter one. A pair with an empty left side is not kept.
+
+The right sidebar holds the language's icon (emoji or image) and its size in words and
+characters, next to the button back to the list and the delete button.
+
+**Translating.** Under the language list — not inside a single language — sits the **Translate**
+section: your text on the left, the translation on the right, updating as you type. Above it you
+pick the language, swap the direction (into the language or out of it) and choose what it
+translates from:
+
+- **Words** — the vocabulary only. A word the language does not know stays as it is, dotted and
+  underlined, with "Not in the lexicon" on hover.
+- **Characters** — the alphabet only: the text is rewritten character by character.
+- **Words, then characters** (the default) — every word is looked up first and only what the
+  vocabulary does not know is transliterated.
+
+Multi-word entries are matched as a phrase ("I am" → ZIRDO), and a word's capitalisation carries
+over, so a sentence beginning stays capitalised and an all-caps word stays all-caps. Punctuation
+and line breaks stay where they were. A line under the result counts the words and how many of
+them the language did not know, and a Copy button puts the translation on the clipboard.
+
+**Search.** The global search finds both languages and single words — a word shows as
+"term – translation" and opens the language holding it.
+
+**Backups.** Languages and their words travel in `.emeralddb` backups under their own "Lexicon"
+tick, on export and on import.
+
 ## Trash
 
 Deleting a journal entry, wiki article, or operation moves it to the Trash rather than removing it permanently. Trashed items are retained for a period configurable per vault (Settings → Entries — 7/14/30/60/90 days, or never; 30 days by default, matching the previous fixed behaviour) and then automatically purged at startup. Trash's "time left" note names the vault's own period, or is left out entirely when purging is turned off.
@@ -287,7 +336,7 @@ From the Trash view you can:
 - Select multiple items and delete the selection.
 - Empty the entire trash at once (requires confirmation).
 
-Tags, categories, your own blocks (Blocks view) and templates also support soft-delete and restoration.
+Tags, categories, your own blocks (Blocks view), templates and the Lexicon's languages also support soft-delete and restoration. A language brings its words back with it — and, deleted permanently, takes them along.
 
 ## Vaults
 

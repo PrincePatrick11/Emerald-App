@@ -1587,6 +1587,46 @@ console.log('\n8i. Migration v43: Vorlagen und die Sigillen-Vorlage\n');
   db.close();
 }
 
+console.log('\n8j. Migration v45: das Lexikon\n');
+
+{
+  const db = freshDb('lexicon.db');
+  await runMigrations(db);
+  await db.execute(
+    `INSERT INTO languages (id,name,icon,alphabet,sort_order,created_at,updated_at)
+     VALUES ('l1','Enochisch','L','[{"from":"th","to":"T"}]',0,?1,?1)`,
+    [now]
+  );
+  for (const [id, term] of [['w1', 'MADRIAX'], ['w2', 'ZIRDO']]) {
+    await db.execute(
+      `INSERT INTO lexicon_entries (id,language_id,term,translation,pronunciation,note,sort_order,created_at,updated_at)
+       VALUES (?1,'l1',?2,'x','','',0,?3,?3)`,
+      [id, term, now]
+    );
+  }
+
+  // Der Papierkorb legt die Sprache weg, ihre Vokabeln bleiben an ihr haengen.
+  await db.execute(`UPDATE languages SET deleted_at=?1 WHERE id='l1'`, [now]);
+  check(
+    'die Vokabeln ueberleben den Papierkorb ihrer Sprache',
+    (await db.select('SELECT COUNT(*) AS n FROM lexicon_entries'))[0].n === 2
+  );
+
+  // Endgueltig loeschen nimmt sie mit — darauf verlassen sich CLEANUP_TABLES,
+  // emptyTrash und permanentlyDeleteLanguage, keiner von ihnen raeumt selbst auf.
+  await db.execute(`DELETE FROM languages WHERE deleted_at IS NOT NULL`);
+  check(
+    'ON DELETE CASCADE raeumt die Vokabeln mit der Sprache weg',
+    (await db.select('SELECT COUNT(*) AS n FROM lexicon_entries'))[0].n === 0
+  );
+
+  // Ein zweiter Lauf (angelegt, aber nicht gestempelt) bricht nicht ab.
+  const v45 = MIGRATIONS.find((m) => m.version === 45);
+  await v45.up(db);
+  check('v45 ist wiederholbar', true);
+  db.close();
+}
+
 /* ------------------------------------------------------------------ *
  * Konstanten, die es zweimal gibt — einmal in TypeScript, einmal in Rust
  * ------------------------------------------------------------------ */

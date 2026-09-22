@@ -3,6 +3,15 @@ export function isImageIcon(icon: string | null | undefined): boolean {
   return icon.startsWith('data:image/') || icon.startsWith('blob:') || icon.startsWith('/');
 }
 
+/**
+ * Icon und Name als eine Zeile — für Listen, die beides nebeneinander zeigen
+ * (Papierkorb). Ein Bild-Icon ist eine Data-URL und stünde als Base64 vor dem
+ * Namen; dann trägt die Zeile ihr Symbol ohnehin schon in der eigenen Spalte.
+ */
+export function iconTitle(icon: string, name: string): string {
+  return isImageIcon(icon) ? name : `${icon} ${name}`;
+}
+
 export function generateId(): string {
   return crypto.randomUUID();
 }

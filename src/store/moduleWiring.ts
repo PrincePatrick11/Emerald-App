@@ -4,7 +4,7 @@
  * bzw. endgültig gelöscht.
  *
  * Import-Regel dieser Datei: nur Content-Stores (journal/wiki/operation/task/
- * altar/tag/category/blockDefinition/template) — niemals uiStore, vaultStore oder trashStore,
+ * altar/tag/category/blockDefinition/template/lexicon) — niemals uiStore, vaultStore oder trashStore,
  * die ihrerseits hierher zeigen (dürfen). Alle Zugriffe laufen zur Laufzeit
  * über `getState()`, nicht zur Import-Zeit.
  */
@@ -17,6 +17,7 @@ import { useTagStore } from './tagStore';
 import { useCategoryStore } from './categoryStore';
 import { useBlockDefinitionStore } from './blockDefinitionStore';
 import { useTemplateStore } from './templateStore';
+import { useLexiconStore } from './lexiconStore';
 import { ENTRY_MODULE_IDS, type EntryModuleId, type TrashKind } from '../lib/modules';
 
 /** Lädt den Inhalt eines Moduls neu aus der aktiven DB. */
@@ -64,11 +65,15 @@ export const trashWiring: Record<TrashKind, {
     restore: (id) => useTemplateStore.getState().restoreTemplate(id),
     permanentlyDelete: (id) => useTemplateStore.getState().permanentlyDeleteTemplate(id),
   },
+  language: {
+    restore: (id) => useLexiconStore.getState().restoreLanguage(id),
+    permanentlyDelete: (id) => useLexiconStore.getState().permanentlyDeleteLanguage(id),
+  },
 };
 
 /**
- * Die kanonische Lade-Sequenz: erst Tags, Kategorien, eigene Blöcke und
- * Vorlagen, dann alle Inhalte. Genutzt von AppShell (Erstladung), vaultStore (Vault-Wechsel)
+ * Die kanonische Lade-Sequenz: erst Tags, Kategorien, eigene Blöcke, Vorlagen
+ * und das Lexikon, dann alle Inhalte. Genutzt von AppShell (Erstladung), vaultStore (Vault-Wechsel)
  * und dbBackup (Import) — vorher drei handgepflegte Kopien derselben Liste.
  *
  * Warum sequenziert: keine harte Datenabhängigkeit (kein Fetcher liest einen
@@ -83,14 +88,15 @@ export async function reloadAllStores(): Promise<void> {
     useCategoryStore.getState().fetchCategories(),
     useBlockDefinitionStore.getState().fetchDefinitions(),
     useTemplateStore.getState().fetchTemplates(),
+    useLexiconStore.getState().fetchLexicon(),
   ]);
   await Promise.all(ENTRY_MODULE_IDS.map((id) => moduleWiring[id].reload()));
 }
 
 /**
  * Gezielter Reload einzelner Module (Emerald-Import): Tags, Kategorien,
- * eigene Blöcke, Vorlagen und die genannten Inhalte — die ersten vier immer,
- * weil ein Import neue anlegen kann.
+ * eigene Blöcke, Vorlagen, das Lexikon und die genannten Inhalte — die ersten
+ * fünf immer, weil ein Import neue anlegen kann.
  */
 export async function reloadModules(ids: readonly EntryModuleId[]): Promise<void> {
   await Promise.all([
@@ -98,6 +104,7 @@ export async function reloadModules(ids: readonly EntryModuleId[]): Promise<void
     useCategoryStore.getState().fetchCategories(),
     useBlockDefinitionStore.getState().fetchDefinitions(),
     useTemplateStore.getState().fetchTemplates(),
+    useLexiconStore.getState().fetchLexicon(),
   ]);
   await Promise.all(ids.map((id) => moduleWiring[id].reload()));
 }

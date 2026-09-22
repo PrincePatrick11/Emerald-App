@@ -4,7 +4,7 @@ import LibraryPageFrame from '../ui/LibraryPageFrame';
 import PropertiesEditView from '../sidebar/fields/PropertiesEditView';
 import LinkedEntriesField from '../sidebar/fields/LinkedEntriesField';
 import TagsField from '../sidebar/fields/TagsField';
-import Favicon from '../sidebar/fields/Favicon';
+import IconField from '../sidebar/fields/IconField';
 import BlockStack from '../blocks/BlockStack';
 import BlockSidebarArea from '../blocks/BlockSidebarArea';
 import TemplateAssignments from './TemplateAssignments';
@@ -63,14 +63,7 @@ export default function TemplateEditor({ template, entries, onClose, onDelete }:
 
   const sidebar = (
     <PropertiesEditView>
-      <div>
-        <p className="label-xs mb-2">{t('properties.icon')}</p>
-        <Favicon
-          value={draft.icon}
-          onChange={(icon) => void setIcon(icon)}
-          onRemove={() => void setIcon(DEFAULT_TEMPLATE_ICON)}
-        />
-      </div>
+      <IconField value={draft.icon} onChange={(icon) => void setIcon(icon)} fallback={DEFAULT_TEMPLATE_ICON} />
 
       <div>
         <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
@@ -97,11 +90,7 @@ export default function TemplateEditor({ template, entries, onClose, onDelete }:
       backLabel={t('nav.templates')}
       onBack={onClose}
       icon={draft.icon}
-      dirty={dirty}
-      busy={busy}
-      onDone={() => void finish()}
-      onCancel={leave}
-      onDelete={onDelete}
+      draft={{ dirty, busy, onDone: () => void finish(), onCancel: leave, onDelete }}
       name={draft.name}
       nameLabel={t('templates.name')}
       namePlaceholder={t('templates.namePlaceholder')}

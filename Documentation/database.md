@@ -36,7 +36,7 @@ The emptiness check looks at `sqlite_master`, not at `schema_version`: a databas
 
 Afterwards `runPeriodicCleanup(db)` purges trashed rows older than the vault's own trash retention period (Settings → Entries — 7/14/30/60/90 days or never, default 30; see `src/lib/vaultSettings.ts`'s `trash.retentionDays`, read before this runs). A vault whose settings can't be read falls back to `null` ("never") here specifically, rather than the usual defaults, so a corrupted `settings.json` can't silently purge trash on a retention nobody chose. It is **not** a migration — idempotent, time-dependent, and run on every vault open.
 
-The current version is **44** (v44 `routines_to_templates`, `src/lib/migrateRoutinesToTemplates.ts`: every row in `routines` becomes an unassigned template with the same id, then the table is dropped, see [templates](#templates) and [DB Backup / Restore](#db-backup--restore-emeralddb); v43 `templates`: the `templates` table backing the templates dashboard, seeded with the built-in `core-sigil` template as the default for Operations × Sigils; v42 `sigils_to_blocks`, `src/lib/migrateLegacySigils.ts`: sigils become calculator, drawing and charge blocks, see [Sigil Workflow](#sigil-workflow); v41 `operation_status_to_blocks`, `src/lib/migrateOperationStatusToBlocks.ts`: every operation that was inactive or had an end date or version gets a copy of the "Status" block — created only if some operation needs it — at the top of its content, the columns are reset, `updated_at` stays; v40 `block_definitions`: the table of user-built blocks, see [block_definitions](#block_definitions); v39 `category_optional`, below). The three block migrations were first numbered v39–v41 on their development branch; `runMigrations` restamps such a vault once by migration name (`renumberBlockMigrations`) and catches up on v39, and `BASELINE_VERSION` in `schema.ts` must equal the highest entry in `MIGRATIONS`. `runMigrations` throws at startup if the two disagree, so a new migration cannot be added without updating the baseline.
+The current version is **45** (v45 `lexicon`: purely additive, the `languages` and `lexicon_entries` tables backing the Lexicon, see [languages](#languages) and [lexicon_entries](#lexicon_entries); v44 `routines_to_templates`, `src/lib/migrateRoutinesToTemplates.ts`: every row in `routines` becomes an unassigned template with the same id, then the table is dropped, see [templates](#templates) and [DB Backup / Restore](#db-backup--restore-emeralddb); v43 `templates`: the `templates` table backing the templates dashboard, seeded with the built-in `core-sigil` template as the default for Operations × Sigils; v42 `sigils_to_blocks`, `src/lib/migrateLegacySigils.ts`: sigils become calculator, drawing and charge blocks, see [Sigil Workflow](#sigil-workflow); v41 `operation_status_to_blocks`, `src/lib/migrateOperationStatusToBlocks.ts`: every operation that was inactive or had an end date or version gets a copy of the "Status" block — created only if some operation needs it — at the top of its content, the columns are reset, `updated_at` stays; v40 `block_definitions`: the table of user-built blocks, see [block_definitions](#block_definitions); v39 `category_optional`, below). The three block migrations were first numbered v39–v41 on their development branch; `runMigrations` restamps such a vault once by migration name (`renumberBlockMigrations`) and catches up on v39, and `BASELINE_VERSION` in `schema.ts` must equal the highest entry in `MIGRATIONS`. `runMigrations` throws at startup if the two disagree, so a new migration cannot be added without updating the baseline.
 
 Note that **version 24 is genuinely missing** — no entry with that number has existed for some time. The runner tolerates gaps; it only requires each version to be above the last applied one.
 
@@ -226,6 +226,48 @@ unassigned template with the same id (Markdown rendered with raw HTML escaped, `
 `wiki_ids` resolved into link-chip blocks) and drops the table — see
 [`architecture.md` → Templates](architecture.md#templates) for the conversion and for the older
 `.emeralddb` import path that runs the same conversion at restore time.
+
+### languages
+
+Since v45: the Lexicon's languages — a language you keep yourself (Enochian, runes, a
+constructed one), with its alphabet in `alphabet` and its words in
+[`lexicon_entries`](#lexicon_entries) below. Nothing outside the module references a language
+and a language references nothing, so there is no foreign key in either direction.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | TEXT PK | UUID |
+| name | TEXT | NOT NULL |
+| icon | TEXT | emoji or image, NOT NULL DEFAULT `'🗣️'` (`DEFAULT_LANGUAGE_ICON`) |
+| alphabet | TEXT | JSON array of `{from, to}`, NOT NULL DEFAULT `'[]'` — the transliteration table, read by `parseAlphabet` in `src/lib/lexicon.ts`. `from` may be several characters (`th` → `ᚦ`); the longest match wins |
+| sort_order | INTEGER | NOT NULL DEFAULT 0 |
+| created_at / updated_at | TEXT | ISO 8601 |
+| deleted_at | TEXT | NULL = active; trashed rows are purged after the vault's trash retention period like the content tables (`CLEANUP_TABLES`) |
+
+### lexicon_entries
+
+Since v45: the words of a language. The only table in the module with a real foreign key —
+`ON DELETE CASCADE`, so permanently deleting a language takes its words with it (from the trash
+view, from "Empty trash", and from the retention purge, which lists `languages` and never this
+table). There is no `deleted_at`: deleting a single word is immediate, with an undo toast that
+writes the same row back under its own id (`lexiconStore`'s `deleteEntry`/`restoreEntry`) — a
+single vocabulary row in the trash next to entries and languages would be noise.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | TEXT PK | UUID |
+| language_id | TEXT | **FK → languages.id**, CASCADE |
+| term | TEXT | NOT NULL DEFAULT `''`; the word in the language |
+| translation | TEXT | NOT NULL DEFAULT `''`; what it means in your own tongue |
+| pronunciation | TEXT | NOT NULL DEFAULT `''` |
+| note | TEXT | NOT NULL DEFAULT `''` |
+| sort_order | INTEGER | NOT NULL DEFAULT 0 |
+| created_at / updated_at | TEXT | ISO 8601 |
+
+Both sides of a word are looked up: translating *into* the language matches on `translation`,
+*out of* it on `term`, and a multi-word left-hand side is matched as a phrase (longest first).
+The whole rule lives in `src/lib/lexicon.ts` — see
+[`architecture.md` → Lexicon](architecture.md#lexicon).
 
 ### altars
 
@@ -464,7 +506,7 @@ Full vault snapshots are exported and imported via Settings → Backup.
 
 ```json
 {
-  "version": "8",
+  "version": "9",
   "type": "backup",
   "exportedAt": "2026-04-18T...",
   "filters": { "includeJournal": true, "includeWiki": true, "..." : "..." },
@@ -476,6 +518,7 @@ Full vault snapshots are exported and imported via Settings → Backup.
     "tasks": [], "taskLinks": [],
     "categories": [],
     "blockDefinitions": [],
+    "languages": [], "lexiconEntries": [],
     "links": []
   },
   "images": { "3f2a….png": "data:image/png;base64,..." },
@@ -485,9 +528,9 @@ Full vault snapshots are exported and imported via Settings → Backup.
 
 `settings` is a new, optional top-level field — not part of `data` or gated by `BACKUP_VERSION`, since it travels independently of every date/type filter: export always includes the vault's current settings (`normalizeVaultSettings`'s output), regardless of which content types are checked. Replace and Add Vault import apply it outright (`useSettingsStore.getState().replaceSettings`); Merge import applies only the settings groups the user picked in the import dialog, via `withSettingsGroups(current, incoming, groups)` in `src/lib/vaultSettings.ts` — so merging in a backup from elsewhere doesn't silently overwrite local settings the user never asked to change. A file with no `settings` field (any backup taken before this version) simply leaves the target vault's settings untouched. Reading it back out of an untrusted file goes through `importableSettings()`, which discards any key the current build doesn't recognise, so a crafted or newer-version file can't smuggle an oversized or unknown payload into the settings store or a later write.
 
-`version` is `"8"` since v43 added `templates` — the whole table including trashed rows, exported whenever Journal, Wiki or Operations is included, same rule as `blockDefinitions`. A file below `"8"` carries `routines` instead (if it has any); `migrateBackupPayload` needs no step for the array swap itself — `routines` is simply left standing on an older payload and converted into `templates` at import time (`withRoutinesAsTemplates`, after the type/category filters run, see [`architecture.md` → Templates](architecture.md#templates)), not while lifting the file to the current version. It was `"7"` since v42 moved sigils into content: an older file's operation rows with sigil columns are converted after insertion (`convertLegacySigils`, limited to the inserted ids; empty `sigils` operations get the sigil blocks only from files below `"7"`, since in a newer one the user may have removed them on purpose). It was `"6"` since v40 added `blockDefinitions` (and `"5"` since v39 allowed `category_id: null`, see above) — the whole `block_definitions` table including trashed rows, exported whenever Journal, Wiki or Operations is included; a `"4"` file needs no conversion, it simply brings no blocks. It was `"4"` since v38 replaced the four per-module category arrays (`wikiCategories`/`operationCategories`/`taskCategories`/`altarCategories`) with one `categories` array, exported whenever any of Wiki, Operations, Tasks, or Altars is included. `migrateBackupPayload` lifts a `"1"` file on load: `wiki_articles.category` becomes `category_id`, `altar_items.category` is resolved from a category name to an id against the backup's own categories, and null `linked_*_ids` become `'[]'`. A v2 file needs no row changes, because `restoreImages` maps whatever keys the file carries — absolute paths in v1/v2, filenames in v3+ — onto the filenames of the images it just wrote, and `remapPaths` substitutes those throughout. A file below version `"4"` then runs `mergeLegacyCategoryArrays`: the same merge-by-display-name rule as migration v38 (`mergeCategoryRows`, translating built-in names into the app's current language via `legacyDisplayName`), producing the one `categories` array and remapping every content row's `category_id` onto it. Without that step `insertRows` would silently drop the columns it no longer recognises — its `PRAGMA table_info` filter guards against crafted files and cannot tell malicious apart from merely old — and every article from an older backup would land in the default category.
+`version` is `"9"` since v45 added the Lexicon: `languages` and `lexiconEntries`, both complete (trashed languages included) and both gated by the one `includeLexicon` tick, since a word without its language is nothing. Import inserts them with `INSERT OR IGNORE` by id like `blockDefinitions` and `templates` — an existing language keeps its local version, none is ever deleted, not even by a replace import — and a word is only inserted when its language actually exists in the target vault, since `lexicon_entries.language_id` is a real foreign key. It was `"8"` since v43 added `templates` — the whole table including trashed rows, exported whenever Journal, Wiki or Operations is included, same rule as `blockDefinitions`. A file below `"8"` carries `routines` instead (if it has any); `migrateBackupPayload` needs no step for the array swap itself — `routines` is simply left standing on an older payload and converted into `templates` at import time (`withRoutinesAsTemplates`, after the type/category filters run, see [`architecture.md` → Templates](architecture.md#templates)), not while lifting the file to the current version. It was `"7"` since v42 moved sigils into content: an older file's operation rows with sigil columns are converted after insertion (`convertLegacySigils`, limited to the inserted ids; empty `sigils` operations get the sigil blocks only from files below `"7"`, since in a newer one the user may have removed them on purpose). It was `"6"` since v40 added `blockDefinitions` (and `"5"` since v39 allowed `category_id: null`, see above) — the whole `block_definitions` table including trashed rows, exported whenever Journal, Wiki or Operations is included; a `"4"` file needs no conversion, it simply brings no blocks. It was `"4"` since v38 replaced the four per-module category arrays (`wikiCategories`/`operationCategories`/`taskCategories`/`altarCategories`) with one `categories` array, exported whenever any of Wiki, Operations, Tasks, or Altars is included. `migrateBackupPayload` lifts a `"1"` file on load: `wiki_articles.category` becomes `category_id`, `altar_items.category` is resolved from a category name to an id against the backup's own categories, and null `linked_*_ids` become `'[]'`. A v2 file needs no row changes, because `restoreImages` maps whatever keys the file carries — absolute paths in v1/v2, filenames in v3+ — onto the filenames of the images it just wrote, and `remapPaths` substitutes those throughout. A file below version `"4"` then runs `mergeLegacyCategoryArrays`: the same merge-by-display-name rule as migration v38 (`mergeCategoryRows`, translating built-in names into the app's current language via `legacyDisplayName`), producing the one `categories` array and remapping every content row's `category_id` onto it. Without that step `insertRows` would silently drop the columns it no longer recognises — its `PRAGMA table_info` filter guards against crafted files and cannot tell malicious apart from merely old — and every article from an older backup would land in the default category.
 
-**Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Altars / Tasks / Tags`, `dateFrom`, `dateTo`, `includeDeleted` — there is no `includeRoutines`/`includeTemplates` toggle; `templates` travels automatically whenever Journal, Wiki or Operations is included, the same rule `blockDefinitions` follows, since a template's assignments can reference any of the three. All content tables (journal, wiki, operations, altars, tasks) are date-filtered on `created_at`; tags, `categories`, `block_definitions` and `templates` are not (all three "library" tables always travel complete, trashed rows included). `includeDeleted` applies to the soft-deletable content tables — `tags` are always exported with `deleted_at IS NULL`, regardless of the option. `task_links` is scoped to exported task IDs.
+**Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Altars / Tasks / Tags / Lexicon`, `dateFrom`, `dateTo`, `includeDeleted` — there is no `includeRoutines`/`includeTemplates` toggle. The seven content-type keys and their labels are `CONTENT_TYPES` in `dbBackup.ts`, one array read by both the export page's list and the import page's (`allTypesIncluded()` builds an `ImportTypeFilters` with all of them true), rather than three hand-written copies of the same seven rows; `templates` travels automatically whenever Journal, Wiki or Operations is included, the same rule `blockDefinitions` follows, since a template's assignments can reference any of the three. All content tables (journal, wiki, operations, altars, tasks) are date-filtered on `created_at`; tags, `categories`, `block_definitions`, `templates`, `languages` and `lexicon_entries` are not (the "library" tables always travel complete, trashed rows included). `includeDeleted` applies to the soft-deletable content tables — `tags` are always exported with `deleted_at IS NULL`, regardless of the option. `task_links` is scoped to exported task IDs.
 
 `altar_items` (the library) is exported in full whenever `includeAltars` is set — every row, regardless of the altar date filter and even when no altar survives it. It is not an appendage of the altars: a library item can sit unplaced, created and edited entirely from the Altar dashboard's library section, without ever touching a canvas. `altar_placements` is the one still scoped to the exported altars (`altar_id IN (...)`), since a placement is meaningless without the altar it sits on. `doReplace` deletes and re-inserts `altar_items`/`altar_placements` together only when the file actually carries altars (`hasAltars`); when it doesn't — a date-filtered or library-only export — the library is inserted with `INSERT OR IGNORE` instead of being deleted first, so it adds to the existing library rather than emptying it (`altar_placements.item_id` is `ON DELETE CASCADE`, and clearing `altar_items` on every restore would tear placements off altars the file never meant to touch). The cost of `OR IGNORE` in that one case: an item that already exists locally keeps its local version rather than being overwritten by the file's.
 

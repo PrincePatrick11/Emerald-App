@@ -32,6 +32,9 @@ import {
 import { convertLegacyStatusRows, STATUS_DEFINITION_ID } from './blocks/legacyStatus';
 import { definitionById, nextDefinitionSortOrder } from './blockDefinitionRows';
 import { nextTemplateSortOrder } from './templateRows';
+import { nextEntrySortOrder, nextLanguageSortOrder } from './lexiconRows';
+import { alphabetToJson, DEFAULT_LANGUAGE_ICON } from './lexicon';
+import type { Language } from '../types';
 import {
   routineLinkResolver, routineToTemplate, vaultRoutineLinkSource, type RoutineCategoryRow, type RoutineTargetRow,
 } from './migrateRoutinesToTemplates';
@@ -66,6 +69,8 @@ export interface BackupOptions {
   includeAltars: boolean;
   includeTasks: boolean;
   includeTags: boolean;
+  /** Die Sprachen des Lexikons samt ihren Vokabeln — ganz, ohne Datumsfrage. */
+  includeLexicon: boolean;
   dateFrom: string;       // ISO date string, '' = no lower bound
   dateTo: string;         // ISO date string, '' = no upper bound
   includeDeleted: boolean;
@@ -94,6 +99,8 @@ export interface BackupPreview {
    *  Datei kann null Altäre und trotzdem Elemente tragen. */
   altarItemsCount: number;
   taskCount: number;
+  /** Die Sprachen des Lexikons; ihre Vokabeln reisen mit ihnen. */
+  languagesCount: number;
   /** Nur Kategorien, auf die ein Inhalt der Sicherung zeigt. */
   categories: BackupCategoryEntry[];
   /** Ob die Datei Vault-Einstellungen mitbringt. */
@@ -108,6 +115,7 @@ export interface ImportTypeFilters {
   includeAltars: boolean;
   includeTasks: boolean;
   includeTags: boolean;
+  includeLexicon: boolean;
 }
 
 /** Category IDs (aus der Sicherung) to exclude during import. Empty set = import all. */
@@ -132,7 +140,8 @@ type Row = Record<string, any>;
  * darf, '6' = seit v40 reisen die eigenen Blöcke als `data.blockDefinitions`
  * mit, '7' = seit v42 tragen Operationen ihre Sigille als Blöcke im Inhalt
  * statt in eigenen Spalten, '8' = seit v43 reisen die Vorlagen als
- * `data.templates` mit.
+ * `data.templates` mit, '9' = seit v45 das Lexikon als `data.languages` und
+ * `data.lexiconEntries`.
  *
  * Die '5' ist kein Formalismus: Eine so geschriebene Datei enthält Einträge
  * ohne Kategorie, und ein Build von vor v39 hat dort noch eine NOT-NULL-Spalte.
@@ -141,7 +150,7 @@ type Row = Record<string, any>;
  * Prüfung „neuer als ich" (`backup.version > BACKUP_VERSION`) die Datei ehrlich
  * ab, bevor irgendetwas passiert.
  */
-const BACKUP_VERSION = '8' as const;
+const BACKUP_VERSION = '9' as const;
 
 /** Die vier Kategorie-Arrays von Sicherungen bis Version 3. */
 interface LegacyCategoryArrays {
@@ -279,6 +288,8 @@ export function migrateBackupPayload(backup: BackupFile): void {
   // Operationen wandelt der Import nach dem Einfügen um (`convertLegacySigils`).
 
   // v7 → v8 braucht keinen Schritt: neu ist nur das Array `templates`.
+  // v8 → v9 ebenso wenig: neu sind nur `languages`/`lexiconEntries`, und eine
+  // ältere Datei bringt eben kein Lexikon mit.
 
   // Routinen (Dateien von vor v44) bleiben hier liegen: sie werden erst beim
   // Import Vorlagen (`withRoutinesAsTemplates`), nach den Filtern — sonst
@@ -288,7 +299,7 @@ export function migrateBackupPayload(backup: BackupFile): void {
 }
 
 interface BackupFile {
-  version: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8';
+  version: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
   /** Die Version, mit der die Datei geschrieben wurde — `migrateBackupPayload` setzt `version` auf die aktuelle. */
   sourceVersion?: number;
   type: 'backup';
@@ -313,6 +324,10 @@ interface BackupFile {
     tasks?: Row[];
     taskLinks?: Row[];
     links?: Row[];
+    /** Die Sprachen des Lexikons (seit '9'). */
+    languages?: Row[];
+    /** Ihre Vokabeln (seit '9') — ohne ihre Sprache wertlos, deshalb immer zusammen. */
+    lexiconEntries?: Row[];
   };
   images: Record<string, string>;  // gespeicherter Dateiname → data-URL (in v1/v2: absoluter Pfad)
   /**
@@ -547,6 +562,15 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
     }
   }
 
+  // ── Lexikon ──────────────────────────────────────────────────────────────
+  // Sprachen und Vokabeln reisen zusammen und ganz, samt Papierkorb: es ist
+  // eine Liste, keine Datumsfrage — wie die eigenen Blöcke und die Vorlagen.
+  // Icons liegen als Data-URL in der Zeile, es hängt also keine Bilddatei dran.
+  if (options.includeLexicon) {
+    data.languages = await db.select<Row[]>(`SELECT * FROM languages`);
+    data.lexiconEntries = await db.select<Row[]>(`SELECT * FROM lexicon_entries`);
+  }
+
   // ── Embed images ─────────────────────────────────────────────────────────
   const images: Record<string, string> = {};
   for (const path of allImagePaths) {
@@ -625,6 +649,7 @@ export async function openBackupFile(): Promise<{ path: string; backup: BackupFi
     altarsCount: backup.data.altars?.length ?? 0,
     altarItemsCount: backup.data.altarItems?.length ?? 0,
     taskCount: backup.data.tasks?.length ?? 0,
+    languagesCount: backup.data.languages?.length ?? 0,
     categories: (backup.data.categories ?? []).filter((c) => usedCatIds.has(c.id as string)) as BackupCategoryEntry[],
     hasSettings: isPlainObject(backup.settings),
   };
@@ -807,6 +832,78 @@ async function insertTemplates(
 }
 
 /**
+ * Das Lexikon einer Sicherung: nach ID, `INSERT OR IGNORE` wie die eigenen
+ * Blöcke und die Vorlagen — eine Sprache, die es hier schon gibt (auch im
+ * Papierkorb), bleibt, wie sie ist; gelöscht wird keine, auch nicht beim
+ * Ersetzen. Neue kommen in ihrer Reihenfolge ans Ende der Liste.
+ *
+ * Die Vokabeln danach, und nur die zu einer Sprache, die es hier wirklich
+ * gibt: `lexicon_entries.language_id` trägt einen Fremdschlüssel, eine Vokabel
+ * ohne ihre Sprache brächte den ganzen Import zum Scheitern. Zu einer schon
+ * vorhandenen Sprache **kommen** die mitgebrachten Vokabeln also hinzu; sie
+ * bekommen dabei neue Plätze am Ende ihrer Liste, sonst säßen zwei Wörter auf
+ * derselben `sort_order` und die Reihenfolge wäre Zufall.
+ *
+ * Die Datei ist fremd: jede Zeile läuft durch `fromRow.*` wie beim Lesen, und
+ * was keine ID hat, fällt weg.
+ */
+async function insertLexicon(
+  db: Awaited<ReturnType<typeof getDb>>,
+  languageRows: unknown,
+  entryRows: unknown,
+): Promise<void> {
+  const now = nowIso();
+  const rows = <T,>(value: unknown, read: (row: Row) => T): T[] => (Array.isArray(value) ? value : [])
+    .filter((r): r is Row => typeof r === 'object' && r !== null && typeof r.id === 'string' && !!r.id)
+    .map(read);
+
+  const known = new Set(
+    (await db.select<Row[]>('SELECT id FROM languages')).map((r) => String(r.id)),
+  );
+
+  const fresh: Language[] = [];
+  for (const language of rows(languageRows, fromRow.language).sort((a, b) => a.sort_order - b.sort_order)) {
+    // Eine ID, die schon da ist — auch eine zweite Zeile derselben ID in der Datei — kommt nicht hinein.
+    if (known.has(language.id)) continue;
+    known.add(language.id);
+    fresh.push(language);
+  }
+  let languageOrder = await nextLanguageSortOrder(db);
+  await insertRows(db, 'languages', fresh.map((l) => ({
+    id: l.id,
+    name: l.name,
+    icon: l.icon || DEFAULT_LANGUAGE_ICON,
+    alphabet: alphabetToJson(l.alphabet),
+    sort_order: languageOrder++,
+    created_at: l.created_at || now,
+    updated_at: l.updated_at || now,
+    deleted_at: l.deleted_at,
+  })), true);
+
+  // `known` hält jetzt genau die Sprachen dieses Vaults: die vorgefundenen und
+  // die gerade eingefügten. Ein zweites SELECT bräuchte es dafür nicht.
+  const entryOrder = new Map<string, number>();
+  const entries: Row[] = [];
+  for (const entry of rows(entryRows, fromRow.lexiconEntry).sort((a, b) => a.sort_order - b.sort_order)) {
+    if (!known.has(entry.language_id)) continue;
+    const next = entryOrder.get(entry.language_id) ?? await nextEntrySortOrder(db, entry.language_id);
+    entryOrder.set(entry.language_id, next + 1);
+    entries.push({
+      id: entry.id,
+      language_id: entry.language_id,
+      term: entry.term,
+      translation: entry.translation,
+      pronunciation: entry.pronunciation,
+      note: entry.note,
+      sort_order: next,
+      created_at: entry.created_at || now,
+      updated_at: entry.updated_at || now,
+    });
+  }
+  await insertRows(db, 'lexicon_entries', entries, true);
+}
+
+/**
  * Sigillen-Spalten importierter Operationen (Sicherungen von vor v42) in
  * Blöcke umwandeln — derselbe Weg wie Migration v42, nur für die gerade
  * eingefügten Zeilen. Leere Operationen der Kategorie „Sigillen" bekommen das
@@ -914,6 +1011,8 @@ function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFi
     tasks:              f.includeTasks      ? d.tasks             : [],
     taskLinks:          f.includeTasks      ? d.taskLinks         : [],
     tags:               f.includeTags       ? d.tags              : [],
+    languages:          f.includeLexicon    ? d.languages         : [],
+    lexiconEntries:     f.includeLexicon    ? d.lexiconEntries    : [],
     links:            (d.links ?? []).filter((r) => keptContentIds.has(r.source_id as string)),
   };
 }
@@ -1157,6 +1256,8 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
     db, remapDefinitionRows(d.blockDefinitions, pathMap), replaceOps.definition, replaceStatus,
   ));
   await insertTemplates(db, d.templates, pathMap, catMap);
+  // Wie die eigenen Blöcke und die Vorlagen: nie gelöscht, Fehlendes ergänzt.
+  await insertLexicon(db, d.languages, d.lexiconEntries);
 
   // Delete only the content types present in the backup (so a partial backup
   // replacing only Journal data won't wipe wiki/ops).
@@ -1391,6 +1492,9 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   // Ohne Präfix wie die Definitionen: `data-template-origin` in den Einträgen nennt genau diese ID.
   await insertTemplates(db, d.templates, pathMap, catMap,
     (content) => remapInternalLinks(content, (link) => ({ id: String(remapId(link.id)) })));
+  // Ohne Präfix wie die beiden darüber: eine Sprache ist für sich, ihre ID
+  // taucht in keinem Eintrag auf.
+  await insertLexicon(db, d.languages, d.lexiconEntries);
 
   // Content: plain INSERT with prefixed IDs (no conflicts possible)
   await insertRows(db, 'journal_entries', journalEntries);
@@ -1414,10 +1518,39 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
 // Public import entry point
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ALL_TYPES_INCLUDED: ImportTypeFilters = {
-  includeJournal: true, includeWiki: true, includeOperations: true,
-  includeAltars: true, includeTasks: true, includeTags: true,
+/**
+ * Die Inhaltsarten der Sicherung und ihre Beschriftung. Record statt Liste,
+ * wie bei den Einstellungs-Gruppen im Einstellungs-Fenster: eine neue Art ohne
+ * Beschriftung ist ein Typfehler, kein vergessener Eintrag.
+ *
+ * Eine Wahrheit für vier Stellen, die vorher dieselbe Liste einzeln führten:
+ * die beiden Packlisten im Einstellungs-Fenster (Export und Import), der
+ * Anfangs- und Rückstell-Wert des Import-Filters und `ALL_TYPES_INCLUDED`
+ * darunter. Eine Art, die dort vergessen wurde, war still von jedem
+ * „alles importieren" ausgenommen.
+ */
+const CONTENT_TYPE_LABELS: Record<keyof ImportTypeFilters, string> = {
+  includeJournal: 'settings.includeJournal',
+  includeWiki: 'settings.includeWiki',
+  includeOperations: 'settings.includeOperations',
+  includeAltars: 'settings.includeAltars',
+  includeTasks: 'settings.includeTasks',
+  includeTags: 'settings.includeTags',
+  includeLexicon: 'settings.includeLexicon',
 };
+
+/** Dieselben Arten als Liste — die Reihenfolge der Packlisten. */
+export const CONTENT_TYPES: readonly [keyof ImportTypeFilters, string][] =
+  (Object.keys(CONTENT_TYPE_LABELS) as (keyof ImportTypeFilters)[]).map((key) => [key, CONTENT_TYPE_LABELS[key]]);
+
+/** Alles dabei — der Standard des Import-Filters und sein Rückstell-Wert. */
+export function allTypesIncluded(): ImportTypeFilters {
+  const filters = {} as ImportTypeFilters;
+  for (const [key] of CONTENT_TYPES) filters[key] = true;
+  return filters;
+}
+
+const ALL_TYPES_INCLUDED: ImportTypeFilters = allTypesIncluded();
 
 export async function importDatabase(
   backup: BackupFile,

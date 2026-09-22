@@ -15,6 +15,8 @@ import {
   type BackupOptions,
   type ImportMode,
   type ImportTypeFilters,
+  CONTENT_TYPES,
+  allTypesIncluded,
   type BackupFile,
   type BackupPreview,
   type ImportCategoryFilters,
@@ -33,6 +35,7 @@ const DEFAULT_EXPORT_OPTIONS: BackupOptions = {
   includeAltars: true,
   includeTasks: true,
   includeTags: true,
+  includeLexicon: true,
   dateFrom: '',
   dateTo: '',
   includeDeleted: false,
@@ -82,10 +85,7 @@ export default function BackupPage() {
   // schlaegt sie.
   const [vaultBaseDir, setVaultBaseDir] = useState<string | null>(null);
   const [vaultCustomPath, setVaultCustomPath] = useState<string | null>(null);
-  const [importTypeFilters, setImportTypeFilters] = useState<ImportTypeFilters>({
-    includeJournal: true, includeWiki: true, includeOperations: true,
-    includeAltars: true, includeTasks: true, includeTags: true,
-  });
+  const [importTypeFilters, setImportTypeFilters] = useState<ImportTypeFilters>(allTypesIncluded);
   const [excludedCategoryIds] = useState<Set<string>>(new Set());
   // Beim Zusammenführen bleibt ohne Wahl alles, wie es im Vault eingestellt ist.
   const [settingsGroups, setSettingsGroups] = useState<SettingsGroup[]>([]);
@@ -127,7 +127,7 @@ export default function BackupPage() {
       // klickbar wird, sonst laeuft ein schneller Klick in den Rueckfall
       // `{appDataDir}/vaults/{id}`. Scheitert die Aufloesung, bleibt der.
       setVaultBaseDir(await newVaultBaseDir().catch(() => null));
-      setImportTypeFilters({ includeJournal: true, includeWiki: true, includeOperations: true, includeAltars: true, includeTasks: true, includeTags: true });
+      setImportTypeFilters(allTypesIncluded());
       setSettingsGroups([]);
     } catch {
       setImportError(t('settings.importErrorInvalid'));
@@ -190,15 +190,9 @@ export default function BackupPage() {
               Einstellung der uebrigen Seiten. */}
           <SettingsCheckboxGrid label={t('settings.exportInclude')}>
             {(
-                [
-                  ['includeJournal', 'settings.includeJournal'],
-                  ['includeWiki', 'settings.includeWiki'],
-                  ['includeOperations', 'settings.includeOperations'],
-                  ['includeAltars', 'settings.includeAltars'],
-                  ['includeTasks', 'settings.includeTasks'],
-                  ['includeTags', 'settings.includeTags'],
-                  ['includeSettings', 'settings.includeSettings'],
-            ] as [keyof BackupOptions, string][]
+              // Die Einstellungen stehen nur hier, nicht beim Import: dort
+              // wählt man sie unten gruppenweise aus.
+              [...CONTENT_TYPES, ['includeSettings', 'settings.includeSettings']] as [keyof BackupOptions, string][]
             ).map(([key, labelKey]) => (
               <BlockCheckbox
                 key={key}
@@ -306,6 +300,7 @@ export default function BackupPage() {
                   importedFile.preview.altarsCount && `${importedFile.preview.altarsCount} A`,
                   importedFile.preview.altarItemsCount && `${importedFile.preview.altarItemsCount} E`,
                   importedFile.preview.taskCount && `${importedFile.preview.taskCount} T`,
+                  importedFile.preview.languagesCount && `${importedFile.preview.languagesCount} L`,
                 ].filter(Boolean).join(', ')}
               </p>
             )}
@@ -314,16 +309,7 @@ export default function BackupPage() {
           {/* Type filters — dieselbe Packliste wie beim Export. */}
           {importedFile && (
             <SettingsCheckboxGrid label={t('settings.importInclude')}>
-              {(
-                [
-                  ['includeJournal', 'settings.includeJournal'],
-                  ['includeWiki', 'settings.includeWiki'],
-                  ['includeOperations', 'settings.includeOperations'],
-                  ['includeAltars', 'settings.includeAltars'],
-                  ['includeTasks', 'settings.includeTasks'],
-                  ['includeTags', 'settings.includeTags'],
-                ] as [keyof ImportTypeFilters, string][]
-              ).map(([key, labelKey]) => (
+              {CONTENT_TYPES.map(([key, labelKey]) => (
                 <BlockCheckbox
                   key={key}
                   checked={importTypeFilters[key]}

@@ -157,7 +157,9 @@ const DEFAULT_CARDS_CLASSNAME = 'grid grid-cols-3 gap-3';
 const DEFAULT_WIDE_CARDS_CLASSNAME = 'grid grid-cols-1 gap-3';
 const DEFAULT_LIST_CLASSNAME = 'space-y-1.5';
 const DEFAULT_EMPTY_WRAPPER_CLASSNAME = 'text-center py-20';
-const DEFAULT_EMPTY_MESSAGE_CLASSNAME = 'text-stone-600 text-sm';
+// `max-w-md mx-auto`: ein Leer-Hinweis ist ein Satz, kein Fließtext über die
+// ganze Spaltenbreite — drei Aufrufer haben genau das vorher einzeln gesetzt.
+const DEFAULT_EMPTY_MESSAGE_CLASSNAME = 'text-stone-600 text-sm max-w-md mx-auto';
 const DEFAULT_EMPTY_ACTION_CLASSNAME = 'mt-4 text-xs text-stone-500 hover:text-stone-300 underline transition-colors';
 const DEFAULT_NO_RESULTS_CLASSNAME = 'text-center py-20 text-stone-600 text-sm';
 

@@ -21,7 +21,8 @@ const tails = new Map<string, Promise<void>>();
 export function serialKey(
   domain:
     | 'journal' | 'wiki' | 'operation' | 'task' | 'tag'
-    | 'altar' | 'altarItem' | 'placement' | 'links' | 'blockDefinition' | 'template',
+    | 'altar' | 'altarItem' | 'placement' | 'links' | 'blockDefinition' | 'template'
+    | 'language',
   id: string,
 ): string {
   return `${domain}:${id}`;

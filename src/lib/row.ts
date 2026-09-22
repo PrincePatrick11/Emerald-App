@@ -21,6 +21,8 @@ import type {
   Category,
   InternalLink,
   JournalEntry,
+  Language,
+  LexiconEntry,
   Operation,
   Tag,
   Task,
@@ -31,6 +33,7 @@ import {
   DEFAULT_DEFINITION_ICON, parseDefinitionDisplay, parseDefinitionElements, type BlockDefinition,
 } from './blocks/definitions';
 import { DEFAULT_TEMPLATE_ICON, parseAssignments, type Template } from './blocks/templates';
+import { DEFAULT_LANGUAGE_ICON, parseAlphabet } from './lexicon';
 
 /** Eine rohe Zeile, wie sie aus `db.select` kommt. */
 export type DbRow = Record<string, unknown>;
@@ -206,6 +209,33 @@ export const fromRow = {
       created_at: str(r.created_at),
       updated_at: str(r.updated_at),
       deleted_at: nullableStr(r.deleted_at),
+    };
+  },
+
+  language(r: DbRow): Language {
+    return {
+      id: str(r.id),
+      name: str(r.name),
+      icon: str(r.icon) || DEFAULT_LANGUAGE_ICON,
+      alphabet: parseAlphabet(r.alphabet),
+      sort_order: num(r.sort_order, 0),
+      created_at: str(r.created_at),
+      updated_at: str(r.updated_at),
+      deleted_at: nullableStr(r.deleted_at),
+    };
+  },
+
+  lexiconEntry(r: DbRow): LexiconEntry {
+    return {
+      id: str(r.id),
+      language_id: str(r.language_id),
+      term: str(r.term),
+      translation: str(r.translation),
+      pronunciation: str(r.pronunciation),
+      note: str(r.note),
+      sort_order: num(r.sort_order, 0),
+      created_at: str(r.created_at),
+      updated_at: str(r.updated_at),
     };
   },
 
