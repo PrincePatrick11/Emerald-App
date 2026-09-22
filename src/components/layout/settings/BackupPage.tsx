@@ -180,11 +180,12 @@ export default function BackupPage() {
     <>
       <SettingsSection icon={<Download size={14} />} title={t('settings.exportDb')} description={t('settings.exportDbHint')}>
         <div className="space-y-3">
-          {/* Dieselben Auswahlknoepfe wie auf den uebrigen Seiten des
-              Fensters — an/aus nur ueber die Faerbung, ohne Haekchen. */}
+          {/* Zum Abhaken, nicht als Auswahlknoepfe: die tragen auf den
+              uebrigen Seiten des Fensters je eine Einstellung, und dieselbe
+              Form fuer eine Packliste las sich wie eine davon. */}
           <div>
             <p className="label-xs mb-2">{t('settings.exportInclude')}</p>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
               {(
                 [
                   ['includeJournal', 'settings.includeJournal'],
@@ -196,14 +197,13 @@ export default function BackupPage() {
                   ['includeSettings', 'settings.includeSettings'],
                 ] as [keyof BackupOptions, string][]
               ).map(([key, labelKey]) => (
-                <SettingsChoiceButton
+                <BlockCheckbox
                   key={key}
-                  active={!!exportOpts[key]}
-                  onClick={() => toggleExportOpt(key)}
+                  checked={!!exportOpts[key]}
+                  onChange={() => toggleExportOpt(key)}
+                  label={t(labelKey)}
                   title={key === 'includeSettings' ? t('settings.includeSettingsHint') : undefined}
-                >
-                  {t(labelKey)}
-                </SettingsChoiceButton>
+                />
               ))}
             </div>
           </div>
@@ -292,11 +292,11 @@ export default function BackupPage() {
             )}
           </div>
 
-          {/* Type filters — dieselben Chips wie beim Export. */}
+          {/* Type filters — dieselben Haken wie beim Export. */}
           {importedFile && (
             <div>
               <p className="label-xs mb-2">{t('settings.importInclude')}</p>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                 {(
                   [
                     ['includeJournal', 'settings.includeJournal'],
@@ -307,13 +307,12 @@ export default function BackupPage() {
                     ['includeTags', 'settings.includeTags'],
                   ] as [keyof ImportTypeFilters, string][]
                 ).map(([key, labelKey]) => (
-                  <SettingsChoiceButton
+                  <BlockCheckbox
                     key={key}
-                    active={importTypeFilters[key]}
-                    onClick={() => setImportTypeFilters((f) => ({ ...f, [key]: !f[key] }))}
-                  >
-                    {t(labelKey)}
-                  </SettingsChoiceButton>
+                    checked={importTypeFilters[key]}
+                    onChange={() => setImportTypeFilters((f) => ({ ...f, [key]: !f[key] }))}
+                    label={t(labelKey)}
+                  />
                 ))}
               </div>
             </div>
@@ -393,18 +392,17 @@ export default function BackupPage() {
               {importMode === 'merge' && importedFile.preview.hasSettings && (
                 <div>
                   <p className="label-xs mb-2">{t('settings.importSettings')}</p>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                     {SETTINGS_GROUPS.map((group) => {
                       const active = settingsGroups.includes(group);
                       return (
-                        <SettingsChoiceButton
+                        <BlockCheckbox
                           key={group}
-                          active={active}
-                          onClick={() => setSettingsGroups((groups) =>
+                          checked={active}
+                          onChange={() => setSettingsGroups((groups) =>
                             active ? groups.filter((g) => g !== group) : [...groups, group])}
-                        >
-                          {t(SETTINGS_GROUP_LABEL_KEYS[group])}
-                        </SettingsChoiceButton>
+                          label={t(SETTINGS_GROUP_LABEL_KEYS[group])}
+                        />
                       );
                     })}
                   </div>
