@@ -650,6 +650,17 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     box-shadow: 0 0 0 2px var(--focus-ring);
   }
 
+  /* Abgeschaltet: blass macht es der Aufrufer, den Griff nimmt es sich
+     selbst — das Kalendersymbol lud sonst weiter zum Klicken ein. */
+  .input-field:disabled {
+    cursor: not-allowed;
+  }
+
+  .input-field:disabled::-webkit-calendar-picker-indicator {
+    opacity: 0.25;
+    cursor: not-allowed;
+  }
+
   .home-item-title {
     color: var(--text-secondary);
   }

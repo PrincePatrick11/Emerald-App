@@ -741,7 +741,10 @@
     "importDbHint": "Restaure un fichier .emeralddb — comme nouveau vault, en plus des entrées existantes ou en remplaçant tout. Les options apparaissent une fois le fichier choisi.",
     "storageHint": "Images du dossier du vault qu'aucune entrée n'utilise plus. « Rechercher » montre la place occupée, « Supprimer » les efface définitivement.",
     "updatesDesc": "Vérifie s'il existe une version plus récente d'Emerald et l'installe.",
-    "updateErrorInstall": "L'installation a échoué."
+    "updateErrorInstall": "L'installation a échoué.",
+    "exportAllTime": "Toute la période",
+    "exportAllTimeHint": "Toutes les entrées, quelle que soit leur date. Désactivez-le pour choisir une période.",
+    "exportPeriod": "Période"
   },
   "contextMenu": {
     "openInNewTab": "Ouvrir dans un nouvel onglet",

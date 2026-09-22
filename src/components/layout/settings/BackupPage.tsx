@@ -62,6 +62,9 @@ export default function BackupPage() {
 
   // Export
   const [exportOpts, setExportOpts] = useState<BackupOptions>(DEFAULT_EXPORT_OPTIONS);
+  // Der ganze Bestand ist der Regelfall und darum die Vorauswahl; die
+  // leeren Datumsfelder allein sagten das niemandem.
+  const [allTime, setAllTime] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportDone, setExportDone] = useState(false);
   const [exportError, setExportError] = useState(false);
@@ -208,29 +211,48 @@ export default function BackupPage() {
             </div>
           </div>
 
-          {/* Date range */}
-          <div className="flex gap-3 items-center">
-            <div className="flex-1">
-              <label className="label-xs block mb-2">{t('settings.dateFrom')}</label>
-              <input
-                type="date"
-                value={exportOpts.dateFrom}
-                // Leer zeigt das Feld seine Schreibweise statt eines Datums — die
-                // soll so blass sein wie ein Platzhalter (siehe index.css).
-                data-empty={exportOpts.dateFrom === '' || undefined}
-                onChange={(e) => setExportOpts((o) => ({ ...o, dateFrom: e.target.value }))}
-                className="input-field settings-field"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="label-xs block mb-2">{t('settings.dateTo')}</label>
-              <input
-                type="date"
-                value={exportOpts.dateTo}
-                data-empty={exportOpts.dateTo === '' || undefined}
-                onChange={(e) => setExportOpts((o) => ({ ...o, dateTo: e.target.value }))}
-                className="input-field settings-field"
-              />
+          {/* Zeitraum: der Haken steht ueber den Feldern und schaltet sie ab,
+              statt sie zu verstecken — so ist zu sehen, was die andere Wahl
+              waere. Beim Einschalten raeumt er sie, sonst wirkte ein
+              abgeschaltetes Datum beim Export unsichtbar weiter. */}
+          <div className="space-y-2">
+            {/* Eigene Ueberschrift wie „Inhalt“ darueber: ohne sie las sich der
+                Haken wie ein achter Eintrag der Packliste. */}
+            <p className="label-xs">{t('settings.exportPeriod')}</p>
+            <BlockCheckbox
+              checked={allTime}
+              onChange={(next) => {
+                setAllTime(next);
+                if (next) setExportOpts((o) => ({ ...o, dateFrom: '', dateTo: '' }));
+              }}
+              label={t('settings.exportAllTime')}
+              hint={t('settings.exportAllTimeHint')}
+            />
+            <div className={`flex gap-3 items-center ${allTime ? 'opacity-50' : ''}`}>
+              <div className="flex-1">
+                <label className="label-xs block mb-2">{t('settings.dateFrom')}</label>
+                <input
+                  type="date"
+                  value={exportOpts.dateFrom}
+                  disabled={allTime}
+                  // Leer zeigt das Feld seine Schreibweise statt eines Datums — die
+                  // soll so blass sein wie ein Platzhalter (siehe index.css).
+                  data-empty={exportOpts.dateFrom === '' || undefined}
+                  onChange={(e) => setExportOpts((o) => ({ ...o, dateFrom: e.target.value }))}
+                  className="input-field settings-field"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="label-xs block mb-2">{t('settings.dateTo')}</label>
+                <input
+                  type="date"
+                  value={exportOpts.dateTo}
+                  disabled={allTime}
+                  data-empty={exportOpts.dateTo === '' || undefined}
+                  onChange={(e) => setExportOpts((o) => ({ ...o, dateTo: e.target.value }))}
+                  className="input-field settings-field"
+                />
+              </div>
             </div>
           </div>
 
