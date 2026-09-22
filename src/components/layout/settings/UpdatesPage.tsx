@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, Check, CloudOff, Download, Globe, RefreshCw, RotateCcw } from 'lucide-react';
+import { Download, Globe, RefreshCw, RotateCcw } from 'lucide-react';
 import Button from '../../ui/Button';
 import BlockCheckbox from '../../blocks/BlockCheckbox';
-import SettingsSection, { SettingsDescription } from './SettingsSection';
+import SettingsSection, { SettingsDescription, SettingsStatus } from './SettingsSection';
 import { formatBytes } from '../../../lib/helpers';
 import {
   asUpdateError, checkForUpdate, installUpdate, onUpdateProgress, setUpdateSettings, updateSettings,
@@ -148,6 +148,9 @@ export default function UpdatesPage() {
   }
 
   const busy = status === 'checking' || status === 'installing';
+  // Zwei Stellen fragen danach — der Knopf und der Hinweis, der an seiner
+  // Stelle steht; getrennt geschrieben waere eine davon irgendwann die andere.
+  const installable = result?.available === true && result.installable;
   const percent = progress?.total
     ? Math.min(100, Math.round((progress.downloaded / progress.total) * 100))
     : null;
@@ -174,23 +177,16 @@ export default function UpdatesPage() {
           </div>
 
           {status === 'done' && result && !result.available && (
-            <p className="text-xs text-jade-400 flex items-center gap-1.5">
-              <Check size={12} /> {t('settings.updateNone')}
-            </p>
+            <SettingsStatus tone="success">{t('settings.updateNone')}</SettingsStatus>
           )}
 
           {status === 'failed' && error && (
             // Der Originaltext des Plugins steht in der Konsole, nicht hier:
             // er ist englisch und nennt Dinge, die niemanden weiterbringen, der
             // nur wissen will, ob es eine neue Version gibt.
-            <p className={`text-xs flex items-start gap-1.5 ${
-              CALM_CODES.has(error.code) ? 'text-muted' : 'text-danger'
-            }`}>
-              {CALM_CODES.has(error.code)
-                ? <CloudOff size={12} className="mt-0.5 shrink-0" />
-                : <AlertTriangle size={12} className="mt-0.5 shrink-0" />}
-              <span>{t(ERROR_KEYS[error.code] ?? 'settings.updateError')}</span>
-            </p>
+            <SettingsStatus tone={CALM_CODES.has(error.code) ? 'muted' : 'error'}>
+              {t(ERROR_KEYS[error.code] ?? 'settings.updateError')}
+            </SettingsStatus>
           )}
 
           {result?.available && (
@@ -201,8 +197,11 @@ export default function UpdatesPage() {
                 <span className="text-sm text-secondary min-w-0 truncate">
                   {t('settings.updateFound', { version: result.version })}
                 </span>
-                {result.installable && (
-                  <Button onClick={install} disabled={busy} variant="primary" className="shrink-0">
+                {installable && (
+                  // Derselbe Knopf-Zuschnitt wie „Nach Updates suchen“ darueber:
+                  // in einem Abschnitt eine Familie, sonst stehen zwei Formen
+                  // uebereinander, die dasselbe Gewicht haben sollen.
+                  <Button onClick={install} disabled={busy} tone="jade" className="shrink-0">
                     <Download size={14} />
                     {status === 'installing' ? t('settings.updateInstalling') : t('settings.updateInstall')}
                   </Button>
@@ -220,11 +219,8 @@ export default function UpdatesPage() {
                 </div>
               )}
 
-              {!result.installable ? (
-                <p className="text-xs text-muted flex items-start gap-1.5">
-                  <CloudOff size={12} className="mt-0.5 shrink-0" />
-                  {t('settings.updateUnsupported')}
-                </p>
+              {!installable ? (
+                <SettingsStatus tone="muted">{t('settings.updateUnsupported')}</SettingsStatus>
               ) : (
                 <>
                   {status === 'installing' && (
@@ -294,15 +290,12 @@ export default function UpdatesPage() {
               {t('settings.updateSourceReset')}
             </Button>
             {sourceFeedback?.kind === 'saved' && (
-              <span className="text-xs text-jade-400 flex items-center gap-1">
-                <Check size={12} /> {t('settings.updateSourceSaved')}
-              </span>
+              <SettingsStatus tone="success">{t('settings.updateSourceSaved')}</SettingsStatus>
             )}
             {sourceFeedback?.kind === 'error' && (
-              <span className="text-xs text-danger flex items-center gap-1">
-                <AlertTriangle size={12} />
+              <SettingsStatus tone="error">
                 {t(SOURCE_ERROR_KEYS[sourceFeedback.code] ?? 'settings.updateSourceInvalid')}
-              </span>
+              </SettingsStatus>
             )}
           </div>
 

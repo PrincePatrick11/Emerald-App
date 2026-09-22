@@ -618,6 +618,9 @@
     "includeTasks": "Tasks",
     "includeTags": "Tags",
     "importInclude": "Include",
+    "exportPeriod": "Period",
+    "exportAllTime": "Whole period",
+    "exportAllTimeHint": "Every entry, whatever its date. Switch it off to pick a range.",
     "dateFrom": "From",
     "dateTo": "To",
     "includeDeleted": "Include deleted items",
@@ -733,10 +736,7 @@
     "importDbHint": "Brings back an .emeralddb file — as a new vault, alongside the existing entries, or replacing everything. The options appear once a file is picked.",
     "storageHint": "Images in the vault folder that no entry uses anymore. “Scan” shows how much space they take, “Remove” deletes them for good.",
     "updatesDesc": "Checks whether a newer version of Emerald exists, and installs it.",
-    "updateErrorInstall": "The installation failed.",
-    "exportAllTime": "Whole period",
-    "exportAllTimeHint": "Every entry, whatever its date. Switch it off to pick a range.",
-    "exportPeriod": "Period"
+    "updateErrorInstall": "The installation failed."
   },
   "home": {
     "viewAll": "View all",

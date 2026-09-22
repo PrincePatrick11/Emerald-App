@@ -139,7 +139,7 @@ export default function EmojiDefaultsSection() {
           />
           {stored !== null && (
             <Button variant="secondary" onClick={() => update('emojis', { defaults: null })} className="shrink-0">
-              <RotateCcw size={12} />
+              <RotateCcw size={14} />
               {t('settings.emojiReset')}
             </Button>
           )}

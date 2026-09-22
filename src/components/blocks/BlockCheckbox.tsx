@@ -9,11 +9,11 @@ export default function BlockCheckbox({ checked, onChange, label, hint, title, t
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
+  /** Steht sichtbar unter der Beschriftung. */
   hint?: string;
-  /** Erklaerung beim Zeigen — fuer Haken, deren Folge die Beschriftung nicht fasst. */
+  /** Erscheint beim Zeigen — fuer Haken, deren Folge die Beschriftung nicht fasst. */
   title?: string;
-  /** Faerbt das Kaestchen um: `warning`, wenn der Haken eine Einschraenkung
-   *  aufhebt, `danger`, wenn er Geloeschtes mitnimmt. Ohne ihn der Akzent. */
+  /** Faerbt Fuellung und Rahmen des Kaestchens um, statt des Akzents. */
   tone?: 'warning' | 'danger';
   disabled?: boolean;
 }) {

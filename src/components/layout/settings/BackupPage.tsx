@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, Check, Download, FolderOpen, Upload } from 'lucide-react';
+import { AlertTriangle, Download, FolderOpen, Upload } from 'lucide-react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import Button from '../../ui/Button';
 import BlockCheckbox from '../../blocks/BlockCheckbox';
@@ -24,7 +24,7 @@ import {
 } from '../../../lib/dbBackup';
 import { SETTINGS_GROUPS, type SettingsGroup } from '../../../lib/vaultSettings';
 import SettingsChoiceButton from './SettingsChoiceButton';
-import SettingsSection from './SettingsSection';
+import SettingsSection, { SettingsCheckboxGrid, SettingsStatus } from './SettingsSection';
 
 const DEFAULT_EXPORT_OPTIONS: BackupOptions = {
   includeJournal: true,
@@ -62,8 +62,10 @@ export default function BackupPage() {
 
   // Export
   const [exportOpts, setExportOpts] = useState<BackupOptions>(DEFAULT_EXPORT_OPTIONS);
-  // Der ganze Bestand ist der Regelfall und darum die Vorauswahl; die
-  // leeren Datumsfelder allein sagten das niemandem.
+  // Nur Darstellung: der Export liest allein `dateFrom`/`dateTo`, und leer
+  // heisst dort „keine Grenze“ (siehe lib/dbBackup). An ⇒ beide Felder leer;
+  // aus ⇒ sie duerfen leer bleiben und nehmen dann weiterhin alles mit — der
+  // Haken grenzt nichts ein, er gibt die Felder nur frei.
   const [allTime, setAllTime] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportDone, setExportDone] = useState(false);
@@ -183,13 +185,11 @@ export default function BackupPage() {
     <>
       <SettingsSection icon={<Download size={14} />} title={t('settings.exportDb')} description={t('settings.exportDbHint')}>
         <div className="space-y-3">
-          {/* Zum Abhaken, nicht als Auswahlknoepfe: die tragen auf den
-              uebrigen Seiten des Fensters je eine Einstellung, und dieselbe
-              Form fuer eine Packliste las sich wie eine davon. */}
-          <div>
-            <p className="label-xs mb-2">{t('settings.exportInclude')}</p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-              {(
+          {/* Packliste = Haken, Einzelwahl = Auswahlknopf (unten die drei
+              Import-Modi). Dieselbe Form fuer beides las sich wie eine
+              Einstellung der uebrigen Seiten. */}
+          <SettingsCheckboxGrid label={t('settings.exportInclude')}>
+            {(
                 [
                   ['includeJournal', 'settings.includeJournal'],
                   ['includeWiki', 'settings.includeWiki'],
@@ -198,29 +198,27 @@ export default function BackupPage() {
                   ['includeTasks', 'settings.includeTasks'],
                   ['includeTags', 'settings.includeTags'],
                   ['includeSettings', 'settings.includeSettings'],
-                ] as [keyof BackupOptions, string][]
-              ).map(([key, labelKey]) => (
-                <BlockCheckbox
-                  key={key}
-                  checked={!!exportOpts[key]}
-                  onChange={() => toggleExportOpt(key)}
-                  label={t(labelKey)}
-                  title={key === 'includeSettings' ? t('settings.includeSettingsHint') : undefined}
-                />
-              ))}
-            </div>
-            {/* Auch eine Packliste, aber die eine Zeile, die Weggeworfenes
-                wieder mitnimmt: etwas Abstand und die Warnfarbe halten sie von
-                den sieben darueber auseinander. */}
-            <div className="mt-3">
+            ] as [keyof BackupOptions, string][]
+            ).map(([key, labelKey]) => (
               <BlockCheckbox
-                checked={exportOpts.includeDeleted}
-                onChange={() => toggleExportOpt('includeDeleted')}
-                label={t('settings.includeDeleted')}
-                tone="danger"
+                key={key}
+                checked={!!exportOpts[key]}
+                onChange={() => toggleExportOpt(key)}
+                label={t(labelKey)}
+                title={key === 'includeSettings' ? t('settings.includeSettingsHint') : undefined}
               />
-            </div>
-          </div>
+            ))}
+          </SettingsCheckboxGrid>
+
+          {/* Gehoert zur Packliste, steht aber ausserhalb des Rasters: die eine
+              Zeile, die Weggeworfenes wieder mitnimmt, bekommt die Warnfarbe
+              und eine Zeile fuer sich. */}
+          <BlockCheckbox
+            checked={exportOpts.includeDeleted}
+            onChange={() => toggleExportOpt('includeDeleted')}
+            label={t('settings.includeDeleted')}
+            tone="danger"
+          />
 
           {/* Zeitraum: der Haken steht ueber den Feldern und schaltet sie ab,
               statt sie zu verstecken — so ist zu sehen, was die andere Wahl
@@ -280,16 +278,8 @@ export default function BackupPage() {
               <Download size={14} />
               {exporting ? t('settings.exporting') : t('settings.exportBtn')}
             </Button>
-            {exportDone && (
-              <span className="text-xs text-jade-400 flex items-center gap-1">
-                <Check size={12} /> {t('settings.exportDone')}
-              </span>
-            )}
-            {exportError && (
-              <span className="text-xs text-danger flex items-center gap-1">
-                <AlertTriangle size={12} /> {t('settings.exportError')}
-              </span>
-            )}
+            {exportDone && <SettingsStatus tone="success">{t('settings.exportDone')}</SettingsStatus>}
+            {exportError && <SettingsStatus tone="error">{t('settings.exportError')}</SettingsStatus>}
           </div>
         </div>
       </SettingsSection>
@@ -321,30 +311,27 @@ export default function BackupPage() {
             )}
           </div>
 
-          {/* Type filters — dieselben Haken wie beim Export. */}
+          {/* Type filters — dieselbe Packliste wie beim Export. */}
           {importedFile && (
-            <div>
-              <p className="label-xs mb-2">{t('settings.importInclude')}</p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                {(
-                  [
-                    ['includeJournal', 'settings.includeJournal'],
-                    ['includeWiki', 'settings.includeWiki'],
-                    ['includeOperations', 'settings.includeOperations'],
-                    ['includeAltars', 'settings.includeAltars'],
-                    ['includeTasks', 'settings.includeTasks'],
-                    ['includeTags', 'settings.includeTags'],
-                  ] as [keyof ImportTypeFilters, string][]
-                ).map(([key, labelKey]) => (
-                  <BlockCheckbox
-                    key={key}
-                    checked={importTypeFilters[key]}
-                    onChange={() => setImportTypeFilters((f) => ({ ...f, [key]: !f[key] }))}
-                    label={t(labelKey)}
-                  />
-                ))}
-              </div>
-            </div>
+            <SettingsCheckboxGrid label={t('settings.importInclude')}>
+              {(
+                [
+                  ['includeJournal', 'settings.includeJournal'],
+                  ['includeWiki', 'settings.includeWiki'],
+                  ['includeOperations', 'settings.includeOperations'],
+                  ['includeAltars', 'settings.includeAltars'],
+                  ['includeTasks', 'settings.includeTasks'],
+                  ['includeTags', 'settings.includeTags'],
+                ] as [keyof ImportTypeFilters, string][]
+              ).map(([key, labelKey]) => (
+                <BlockCheckbox
+                  key={key}
+                  checked={importTypeFilters[key]}
+                  onChange={() => setImportTypeFilters((f) => ({ ...f, [key]: !f[key] }))}
+                  label={t(labelKey)}
+                />
+              ))}
+            </SettingsCheckboxGrid>
           )}
 
           {/* Import mode radio */}
@@ -370,10 +357,9 @@ export default function BackupPage() {
                     layout="card"
                     className="block w-full text-left px-3 py-2"
                   >
-                    {/* Aktiv-Zustand nur ueber die Faerbung — wie bei
-                        der Theme- und Sprachwahl oben, kein Haekchen. */}
-                    {/* Farbe kommt vom Knopf selbst (settings-choice-btn), wie bei
-                        den uebrigen Auswahlknoepfen des Fensters. */}
+                    {/* Aktiv nur ueber die Faerbung des Knopfes selbst
+                        (settings-choice-btn), wie bei der Theme- und
+                        Sprachwahl — kein Haekchen. */}
                     <span className="block text-xs font-medium">{t(labelKey)}</span>
                     <span className="block text-xs mt-0.5 text-muted">{t(descKey)}</span>
                   </SettingsChoiceButton>
@@ -419,23 +405,20 @@ export default function BackupPage() {
               {/* Nur beim Zusammenführen eine Wahl: Ersetzen und Neuer Vault
                   übernehmen die Einstellungen der Datei ganz. */}
               {importMode === 'merge' && importedFile.preview.hasSettings && (
-                <div>
-                  <p className="label-xs mb-2">{t('settings.importSettings')}</p>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                    {SETTINGS_GROUPS.map((group) => {
-                      const active = settingsGroups.includes(group);
-                      return (
-                        <BlockCheckbox
-                          key={group}
-                          checked={active}
-                          onChange={() => setSettingsGroups((groups) =>
-                            active ? groups.filter((g) => g !== group) : [...groups, group])}
-                          label={t(SETTINGS_GROUP_LABEL_KEYS[group])}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
+                <SettingsCheckboxGrid label={t('settings.importSettings')}>
+                  {SETTINGS_GROUPS.map((group) => {
+                    const active = settingsGroups.includes(group);
+                    return (
+                      <BlockCheckbox
+                        key={group}
+                        checked={active}
+                        onChange={() => setSettingsGroups((groups) =>
+                          active ? groups.filter((g) => g !== group) : [...groups, group])}
+                        label={t(SETTINGS_GROUP_LABEL_KEYS[group])}
+                      />
+                    );
+                  })}
+                </SettingsCheckboxGrid>
               )}
 
               {/* Replace warning — die Danger-Tokens, nicht Amber: die
@@ -463,11 +446,7 @@ export default function BackupPage() {
                   <Upload size={14} />
                   {importing ? t('settings.importing') : t('settings.importBtn')}
                 </Button>
-                {importDone && (
-                  <span className="text-xs text-jade-400 flex items-center gap-1">
-                    <Check size={12} /> {t('settings.importDone')}
-                  </span>
-                )}
+                {importDone && <SettingsStatus tone="success">{t('settings.importDone')}</SettingsStatus>}
               </div>
             </>
           )}
@@ -477,12 +456,7 @@ export default function BackupPage() {
               Breite gequetscht — gesetzt, aber unsichtbar. Hier steht
               sie beim Import-Button, der sie ausloest, und darf
               umbrechen. */}
-          {importError && (
-            <p className="text-xs text-danger flex items-start gap-1.5">
-              <AlertTriangle size={12} className="shrink-0 mt-0.5" />
-              <span className="min-w-0 break-words">{importError}</span>
-            </p>
-          )}
+          {importError && <SettingsStatus tone="error">{importError}</SettingsStatus>}
         </div>
       </SettingsSection>
     </>

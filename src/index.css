@@ -650,8 +650,9 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     box-shadow: 0 0 0 2px var(--focus-ring);
   }
 
-  /* Abgeschaltet: blass macht es der Aufrufer, den Griff nimmt es sich
-     selbst — das Kalendersymbol lud sonst weiter zum Klicken ein. */
+  /* Abgeschaltet (die Datumsfelder der Datensicherung, solange der ganze
+     Zeitraum gilt): blass macht sie dort der Aufrufer, den Griff nimmt das
+     Feld sich selbst — das Kalendersymbol lud sonst weiter zum Klicken ein. */
   .input-field:disabled {
     cursor: not-allowed;
   }
@@ -1495,24 +1496,25 @@ button.block-altar:hover .block-altar-title {
   opacity: 0.5;
 }
 
-/* Zwei Haken tragen nicht den Akzent: der eine nimmt Geloeschtes mit, der
-   andere hebt die Eingrenzung auf. Die Farbe sagt das, wo ein weiterer Satz
-   daneben nur mehr Text waere. Der Haken selbst bleibt in `--bg-app`, der in
-   beiden Themes den Gegensatz zu jeder dieser Fuellungen traegt. */
-.block-checkbox--warning:hover {
+/* Warn- und Gefahrfuellung statt des Akzents, fuer Haken, deren Folge die
+   Beschriftung allein nicht traegt. Der Haken darin bleibt `--bg-app`, der in
+   beiden Themes den Gegensatz zu jeder dieser Fuellungen traegt. Die Klasse
+   steht doppelt, damit die Regel die Basis nicht nur nach Quelltext-Reihenfolge
+   schlaegt — sonst haengt die Farbe daran, wo im Stylesheet sie landet. */
+.block-checkbox.block-checkbox--warning:hover {
   border-color: var(--warning-text);
 }
 
-.block-checkbox--warning:checked {
+.block-checkbox.block-checkbox--warning:checked {
   background-color: var(--warning-text);
   border-color: var(--warning-text);
 }
 
-.block-checkbox--danger:hover {
+.block-checkbox.block-checkbox--danger:hover {
   border-color: var(--danger-text);
 }
 
-.block-checkbox--danger:checked {
+.block-checkbox.block-checkbox--danger:checked {
   background-color: var(--danger-text);
   border-color: var(--danger-text);
 }

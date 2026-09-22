@@ -626,6 +626,9 @@
     "includeTasks": "Tâches",
     "includeTags": "Tags",
     "importInclude": "Inclure",
+    "exportPeriod": "Période",
+    "exportAllTime": "Toute la période",
+    "exportAllTimeHint": "Toutes les entrées, quelle que soit leur date. Désactivez-le pour choisir une période.",
     "dateFrom": "Du",
     "dateTo": "Au",
     "includeDeleted": "Inclure les éléments supprimés",
@@ -741,10 +744,7 @@
     "importDbHint": "Restaure un fichier .emeralddb — comme nouveau vault, en plus des entrées existantes ou en remplaçant tout. Les options apparaissent une fois le fichier choisi.",
     "storageHint": "Images du dossier du vault qu'aucune entrée n'utilise plus. « Rechercher » montre la place occupée, « Supprimer » les efface définitivement.",
     "updatesDesc": "Vérifie s'il existe une version plus récente d'Emerald et l'installe.",
-    "updateErrorInstall": "L'installation a échoué.",
-    "exportAllTime": "Toute la période",
-    "exportAllTimeHint": "Toutes les entrées, quelle que soit leur date. Désactivez-le pour choisir une période.",
-    "exportPeriod": "Période"
+    "updateErrorInstall": "L'installation a échoué."
   },
   "contextMenu": {
     "openInNewTab": "Ouvrir dans un nouvel onglet",

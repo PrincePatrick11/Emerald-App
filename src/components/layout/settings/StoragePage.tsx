@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Brush, Check, HardDrive, Trash2 } from 'lucide-react';
+import { Brush, HardDrive, Trash2 } from 'lucide-react';
 import Button from '../../ui/Button';
 import { deleteImageFiles, findUnusedImages, type UnusedImages } from '../../../lib/images';
 import { getDb } from '../../../lib/db';
@@ -8,7 +8,7 @@ import { formatBytes } from '../../../lib/helpers';
 import { TRASH_RETENTION_OPTIONS } from '../../../lib/vaultSettings';
 import { useSettingsStore } from '../../../store/settingsStore';
 import SettingsChoiceButton, { SettingsChoiceRow } from './SettingsChoiceButton';
-import SettingsSection from './SettingsSection';
+import SettingsSection, { SettingsStatus } from './SettingsSection';
 
 /** Was die App auf der Platte liegen hat, und was davon weg kann. */
 export default function StoragePage() {
@@ -88,9 +88,9 @@ export default function StoragePage() {
           )}
 
           {cleanupFreed !== null && (
-            <span className="text-xs text-jade-400 flex items-center gap-1 shrink-0">
-              <Check size={12} /> {t('settings.cleanupDone', { size: formatBytes(cleanupFreed, byteUnits) })}
-            </span>
+            <SettingsStatus tone="success" className="shrink-0">
+              {t('settings.cleanupDone', { size: formatBytes(cleanupFreed, byteUnits) })}
+            </SettingsStatus>
           )}
         </div>
       </SettingsSection>

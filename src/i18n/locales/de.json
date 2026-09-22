@@ -618,6 +618,9 @@
     "includeTasks": "Aufgaben",
     "includeTags": "Tags",
     "importInclude": "Einschließen",
+    "exportPeriod": "Zeitraum",
+    "exportAllTime": "Gesamter Zeitraum",
+    "exportAllTimeHint": "Jeder Eintrag, egal von wann. Zum Eingrenzen ausschalten.",
     "dateFrom": "Von",
     "dateTo": "Bis",
     "includeDeleted": "Gelöschte Einträge einschließen",
@@ -733,10 +736,7 @@
     "importDbHint": "Holt eine .emeralddb-Datei zurück — als neuer Vault, zusätzlich zu den vorhandenen Einträgen oder als Ersatz für alles. Nach der Dateiwahl erscheinen die Optionen.",
     "storageHint": "Bilder im Vault-Ordner, die kein Eintrag mehr benutzt. „Suchen“ zeigt, wie viel Platz sie belegen, „Entfernen“ löscht sie endgültig.",
     "updatesDesc": "Prüft, ob eine neuere Version von Emerald vorliegt, und installiert sie.",
-    "updateErrorInstall": "Die Installation ist fehlgeschlagen.",
-    "exportAllTime": "Gesamter Zeitraum",
-    "exportAllTimeHint": "Jeder Eintrag, egal von wann. Zum Eingrenzen ausschalten.",
-    "exportPeriod": "Zeitraum"
+    "updateErrorInstall": "Die Installation ist fehlgeschlagen."
   },
   "home": {
     "viewAll": "Alle anzeigen",
