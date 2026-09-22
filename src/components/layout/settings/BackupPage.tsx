@@ -268,7 +268,10 @@ export default function BackupPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Etwas mehr Luft als zwischen den Gruppen darueber: der Knopf
+              loest aus, was sie zusammen beschreiben, und klebte sonst an den
+              Datumsfeldern. */}
+          <div className="flex items-center gap-2 pt-2">
             <Button
               onClick={handleExport}
               disabled={exporting}
