@@ -22,7 +22,7 @@ For the *components* (which shared building blocks exist, when to use them) see
 
 **Exactly one source: the theme CSS variables.** `--accent`, `--text-*`, `--border-*`,
 `--bg-*`, `--panel-*`, `--menu-*`, `--search-*`. They are fully defined in both themes
-(82 properties each) and are the only thing guaranteed to look right in both.
+(81 properties each) and are the only thing guaranteed to look right in both.
 
 **Raw Tailwind colour utilities are a deviation.** `stone-*`, `jade-*`, `red-*` and
 `amber-*` in a component only theme in Emerald Parchment for as long as someone maintains
@@ -235,7 +235,7 @@ for that yet. The deviation is commented at the definition (`LinkPickerModal.tsx
 | `stone` | Tailwind default, only `950: #0f0e0c` overridden | | | | |
 
 **Theme variables** (`src/themes/emerald-noctis.css`, `emerald-parchment.css`). Both files
-define the same 82 properties. Core values:
+define the same 81 properties. Core values:
 
 | Property | Emerald Noctis (dark) | Emerald Parchment (light) |
 | --- | --- | --- |
@@ -244,6 +244,7 @@ define the same 82 properties. Core values:
 | `--accent` | `#00c47f` | `#008a57` |
 | `--accent-strong` | `#00a066` | `#006941` |
 | `--focus-ring` | `rgba(0, 196, 127, 0.42)` | `rgba(0, 138, 87, 0.34)` |
+| `--warning-text` | `#e2a854` | `#c97229` |
 | `--danger-text` | `#f87171` | `#b63f32` |
 | `--panel-bg` | `rgba(38, 32, 27, 0.78)` | `#f7eddb` |
 | `--menu-shadow` | `0 14px 36px rgba(0,0,0,0.35)` | `0 18px 36px rgba(96,63,30,0.2)` |
