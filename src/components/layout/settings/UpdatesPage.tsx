@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, Check, CloudOff, Download, Globe, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Check, CloudOff, Download, Globe, RefreshCw, RotateCcw } from 'lucide-react';
 import Button from '../../ui/Button';
 import BlockCheckbox from '../../blocks/BlockCheckbox';
 import SettingsSection, { SettingsDescription } from './SettingsSection';
@@ -167,7 +167,7 @@ export default function UpdatesPage() {
               <span className="text-muted">{t('settings.version')}</span>
               <span className="truncate">{packageJson.version}</span>
             </span>
-            <Button onClick={check} disabled={busy} variant="secondary" className="shrink-0">
+            <Button onClick={check} disabled={busy} tone="amber" className="shrink-0">
               <RefreshCw size={14} className={status === 'checking' ? 'animate-spin' : undefined} />
               {status === 'checking' ? t('settings.updateChecking') : t('settings.updateCheck')}
             </Button>
@@ -195,14 +195,26 @@ export default function UpdatesPage() {
 
           {result?.available && (
             <div className="space-y-2">
-              <p className="text-sm text-secondary">
-                {t('settings.updateFound', { version: result.version })}
-              </p>
+              {/* Derselbe Zuschnitt wie die Versionszeile darüber: links, was
+                  ansteht, rechts der Knopf dazu. */}
+              <div className="settings-row">
+                <span className="text-sm text-secondary min-w-0 truncate">
+                  {t('settings.updateFound', { version: result.version })}
+                </span>
+                {result.installable && (
+                  <Button onClick={install} disabled={busy} variant="primary" className="shrink-0">
+                    <Download size={14} />
+                    {status === 'installing' ? t('settings.updateInstalling') : t('settings.updateInstall')}
+                  </Button>
+                )}
+              </div>
 
               {result.notes && (
                 <div>
                   <div className="label-xs mb-1">{t('settings.updateNotes')}</div>
-                  <pre className="text-xs text-muted whitespace-pre-wrap font-sans max-h-32 overflow-y-auto">
+                  {/* Fremder Text bekommt einen Behälter, wie die Emoji-Liste
+                      ihren hat — ohne Rand lief er in die Seite aus. */}
+                  <pre className="panel p-2 text-xs text-muted whitespace-pre-wrap font-sans max-h-32 overflow-y-auto">
                     {result.notes}
                   </pre>
                 </div>
@@ -215,31 +227,24 @@ export default function UpdatesPage() {
                 </p>
               ) : (
                 <>
-                  <div className="flex items-center gap-2">
-                    <Button onClick={install} disabled={busy} variant="primary">
-                      <Download size={14} />
-                      {status === 'installing' ? t('settings.updateInstalling') : t('settings.updateInstall')}
-                    </Button>
-                    {status === 'installing' && (
-                      <span className="text-xs text-muted">
+                  {status === 'installing' && (
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="flex-1 h-1 rounded-full overflow-hidden"
+                        style={{ backgroundColor: 'color-mix(in srgb, var(--accent) 18%, transparent)' }}
+                      >
+                        {/* Ohne bekannte Gesamtgröße bleibt der Balken leer statt
+                            zu lügen — die Byte-Zahl daneben zeigt, dass es läuft. */}
+                        <div
+                          className="h-full transition-[width] duration-200"
+                          style={{ width: `${percent ?? 0}%`, backgroundColor: 'var(--accent)' }}
+                        />
+                      </div>
+                      <span className="text-xs text-muted tabular-nums shrink-0">
                         {percent !== null
                           ? `${percent}%`
                           : progress && formatBytes(progress.downloaded, byteUnits)}
                       </span>
-                    )}
-                  </div>
-
-                  {status === 'installing' && (
-                    <div
-                      className="h-1 rounded-full overflow-hidden"
-                      style={{ backgroundColor: 'color-mix(in srgb, var(--accent) 18%, transparent)' }}
-                    >
-                      {/* Ohne bekannte Gesamtgröße bleibt der Balken leer statt
-                          zu lügen — die Byte-Zahl daneben zeigt, dass es läuft. */}
-                      <div
-                        className="h-full transition-[width] duration-200"
-                        style={{ width: `${percent ?? 0}%`, backgroundColor: 'var(--accent)' }}
-                      />
                     </div>
                   )}
 
@@ -256,34 +261,27 @@ export default function UpdatesPage() {
         title={t('settings.updateSource')}
         description={t('settings.updateSourceDesc')}
       >
-        <div className="space-y-2">
-          <div className="flex gap-2 items-start">
-            <div className="flex-1">
-              <input
-                type="text"
-                value={endpoint}
-                onChange={(e) => { setEndpoint(e.target.value); setSourceFeedback(null); }}
-                placeholder={t('settings.updateSourcePlaceholder')}
-                spellCheck={false}
-                title={t('settings.updateSourceDesc')}
-                className="input-field settings-field w-full"
-              />
-              {sourceFeedback?.kind === 'error' && (
-                <p className="text-xs text-danger mt-1">
-                  {t(SOURCE_ERROR_KEYS[sourceFeedback.code] ?? 'settings.updateSourceInvalid')}
-                </p>
-              )}
-              {sourceFeedback?.kind === 'saved' && (
-                <p className="text-xs text-jade-400 mt-1 flex items-center gap-1">
-                  <Check size={12} /> {t('settings.updateSourceSaved')}
-                </p>
-              )}
-            </div>
+        <div className="space-y-3">
+          {/* Feld über die ganze Breite, die Aktionen darunter — derselbe
+              Zuschnitt wie im Export, wo unter den Feldern eine Knopfzeile mit
+              ihrer Rückmeldung steht. Nebeneinander blieb vom Feld ein Rest,
+              und die Meldung stand unter dem Feld statt bei dem Knopf, der sie
+              ausgelöst hat. */}
+          <input
+            type="text"
+            value={endpoint}
+            onChange={(e) => { setEndpoint(e.target.value); setSourceFeedback(null); }}
+            placeholder={t('settings.updateSourcePlaceholder')}
+            spellCheck={false}
+            title={t('settings.updateSourceDesc')}
+            className="input-field settings-field"
+          />
+
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               onClick={() => saveSource(endpoint, autoCheck)}
               disabled={endpoint.trim() === savedEndpoint}
               variant="primary"
-              className="shrink-0"
             >
               {t('common.save')}
             </Button>
@@ -291,10 +289,21 @@ export default function UpdatesPage() {
               onClick={() => saveSource('', autoCheck)}
               disabled={savedEndpoint === '' && endpoint === ''}
               variant="secondary"
-              className="shrink-0"
             >
+              <RotateCcw size={14} />
               {t('settings.updateSourceReset')}
             </Button>
+            {sourceFeedback?.kind === 'saved' && (
+              <span className="text-xs text-jade-400 flex items-center gap-1">
+                <Check size={12} /> {t('settings.updateSourceSaved')}
+              </span>
+            )}
+            {sourceFeedback?.kind === 'error' && (
+              <span className="text-xs text-danger flex items-center gap-1">
+                <AlertTriangle size={12} />
+                {t(SOURCE_ERROR_KEYS[sourceFeedback.code] ?? 'settings.updateSourceInvalid')}
+              </span>
+            )}
           </div>
 
           {/* Dasselbe Häkchen wie in der Datensicherung: ein echtes `input`,

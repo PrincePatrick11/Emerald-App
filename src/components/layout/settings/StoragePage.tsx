@@ -71,7 +71,7 @@ export default function StoragePage() {
           </span>
 
           {unused === null ? (
-            <Button onClick={scanUnusedImages} disabled={scanning} variant="secondary" className="shrink-0">
+            <Button onClick={scanUnusedImages} disabled={scanning} tone="amber" className="shrink-0">
               {scanning ? t('settings.cleanupScanning') : t('settings.cleanupScan')}
             </Button>
           ) : unused.names.length === 0 ? (
@@ -81,7 +81,7 @@ export default function StoragePage() {
               <span className="text-xs text-secondary">
                 {t('settings.cleanupFound', { count: unused.names.length, size: formatBytes(unused.bytes, byteUnits) })}
               </span>
-              <Button onClick={removeUnusedImages} variant="danger">
+              <Button onClick={removeUnusedImages} tone="danger">
                 {t('settings.cleanupDelete')}
               </Button>
             </span>
