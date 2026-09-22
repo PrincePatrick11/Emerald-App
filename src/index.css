@@ -1495,6 +1495,28 @@ button.block-altar:hover .block-altar-title {
   opacity: 0.5;
 }
 
+/* Zwei Haken tragen nicht den Akzent: der eine nimmt Geloeschtes mit, der
+   andere hebt die Eingrenzung auf. Die Farbe sagt das, wo ein weiterer Satz
+   daneben nur mehr Text waere. Der Haken selbst bleibt in `--bg-app`, der in
+   beiden Themes den Gegensatz zu jeder dieser Fuellungen traegt. */
+.block-checkbox--warning:hover {
+  border-color: var(--warning-text);
+}
+
+.block-checkbox--warning:checked {
+  background-color: var(--warning-text);
+  border-color: var(--warning-text);
+}
+
+.block-checkbox--danger:hover {
+  border-color: var(--danger-text);
+}
+
+.block-checkbox--danger:checked {
+  background-color: var(--danger-text);
+  border-color: var(--danger-text);
+}
+
 .block-field-error {
   font-size: 0.75rem;
   color: var(--danger-text);

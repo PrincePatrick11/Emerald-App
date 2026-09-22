@@ -5,20 +5,23 @@
  * in `.block-checkbox` (siehe index.css), aus Theme-Variablen statt als
  * natives Kästchen.
  */
-export default function BlockCheckbox({ checked, onChange, label, hint, title, disabled = false }: {
+export default function BlockCheckbox({ checked, onChange, label, hint, title, tone, disabled = false }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
   hint?: string;
   /** Erklaerung beim Zeigen — fuer Haken, deren Folge die Beschriftung nicht fasst. */
   title?: string;
+  /** Faerbt das Kaestchen um: `warning`, wenn der Haken eine Einschraenkung
+   *  aufhebt, `danger`, wenn er Geloeschtes mitnimmt. Ohne ihn der Akzent. */
+  tone?: 'warning' | 'danger';
   disabled?: boolean;
 }) {
   return (
     <label title={title} className={`flex items-start gap-2 text-xs text-stone-400 ${disabled ? 'opacity-50' : 'cursor-pointer'}`}>
       <input
         type="checkbox"
-        className="block-checkbox mt-0.5"
+        className={`block-checkbox mt-0.5${tone ? ` block-checkbox--${tone}` : ''}`}
         checked={checked}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}

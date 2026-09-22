@@ -209,6 +209,17 @@ export default function BackupPage() {
                 />
               ))}
             </div>
+            {/* Auch eine Packliste, aber die eine Zeile, die Weggeworfenes
+                wieder mitnimmt: etwas Abstand und die Warnfarbe halten sie von
+                den sieben darueber auseinander. */}
+            <div className="mt-3">
+              <BlockCheckbox
+                checked={exportOpts.includeDeleted}
+                onChange={() => toggleExportOpt('includeDeleted')}
+                label={t('settings.includeDeleted')}
+                tone="danger"
+              />
+            </div>
           </div>
 
           {/* Zeitraum: der Haken steht ueber den Feldern und schaltet sie ab,
@@ -227,6 +238,7 @@ export default function BackupPage() {
               }}
               label={t('settings.exportAllTime')}
               hint={t('settings.exportAllTimeHint')}
+              tone="warning"
             />
             <div className={`flex gap-3 items-center ${allTime ? 'opacity-50' : ''}`}>
               <div className="flex-1">
@@ -255,14 +267,6 @@ export default function BackupPage() {
               </div>
             </div>
           </div>
-
-          {/* Dasselbe Haekchen wie in den Block-Einstellungen: ein echtes
-              `input`, mit Tastatur erreichbar und in beiden Themes im Akzent. */}
-          <BlockCheckbox
-            checked={exportOpts.includeDeleted}
-            onChange={() => toggleExportOpt('includeDeleted')}
-            label={t('settings.includeDeleted')}
-          />
 
           <div className="flex items-center gap-2">
             <Button

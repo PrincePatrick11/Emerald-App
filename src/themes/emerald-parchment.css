@@ -47,6 +47,7 @@ html[data-theme='emerald-parchment'] {
   --linked-chip-bg: #e6d8c2;
   --linked-chip-border: rgba(145, 108, 70, 0.3);
   --linked-chip-text: #5b432d;
+  --warning-text: #c97229;
   --danger-text: #b63f32;
   --danger-bg: rgba(239, 68, 68, 0.08);
   --danger-border: rgba(239, 68, 68, 0.2);

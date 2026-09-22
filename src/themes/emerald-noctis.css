@@ -48,6 +48,7 @@ html[data-theme='emerald-noctis'] {
   --linked-chip-bg: rgba(41, 37, 36, 0.72);
   --linked-chip-border: rgba(87, 83, 78, 0.5);
   --linked-chip-text: #a8a29e;
+  --warning-text: #e2a854;
   --danger-text: #f87171;
   --danger-bg: rgba(239, 68, 68, 0.08);
   --danger-border: rgba(239, 68, 68, 0.2);
