@@ -22,7 +22,7 @@ For the *components* (which shared building blocks exist, when to use them) see
 
 **Exactly one source: the theme CSS variables.** `--accent`, `--text-*`, `--border-*`,
 `--bg-*`, `--panel-*`, `--menu-*`, `--search-*`. They are fully defined in both themes
-(81 properties each) and are the only thing guaranteed to look right in both.
+(79 properties each) and are the only thing guaranteed to look right in both.
 
 **Raw Tailwind colour utilities are a deviation.** `stone-*`, `jade-*`, `red-*` and
 `amber-*` in a component only theme in Emerald Parchment for as long as someone maintains
@@ -109,10 +109,11 @@ feels heavy for that. Because it sits *above* the three-column shell, this does 
 collide with the 56px to its left and right below — the two sidebars must place their
 bottom divider at the same height.
 
-Both theme files define the heights as tokens: `--tab-w` (140px), which `TabBar` uses, plus `--content-bar-h` (56px), `--control-h` (30px) and
-`--control-h-sm` (24px), which mirror `h-14` and the `Button` heights but are not wired
-up yet. Rail buttons (`RailButton`) come out at
-32×32: an 18px icon, `p-1.5` and the 1px frame that holds room for the active accent.
+Both theme files define the height and width tokens: `--tab-w` (140px), which `TabBar`
+uses, plus `--content-bar-h` (56px), `--control-h` (30px) and `--control-h-sm` (24px),
+which mirror `h-14` and the `Button` heights but are not wired up yet. Rail buttons
+(`RailButton`) come out at 32×32: an 18px icon, `p-1.5` and the 1px frame that holds room
+for the active accent.
 
 **Tab bar** (`TabBar.tsx`): the strip sits inside the title bar. The leading group of
 controls grows to the left sidebar's width (`leadWidth` from `AppShell`, animated along
@@ -261,7 +262,7 @@ for that yet. The deviation is commented at the definition (`LinkPickerModal.tsx
 | `stone` | Tailwind default, only `950: #0f0e0c` overridden | | | | |
 
 **Theme variables** (`src/themes/emerald-noctis.css`, `emerald-parchment.css`). Both files
-define the same 81 properties. Core values:
+define the same 79 properties. Core values:
 
 | Property | Emerald Noctis (dark) | Emerald Parchment (light) |
 | --- | --- | --- |
