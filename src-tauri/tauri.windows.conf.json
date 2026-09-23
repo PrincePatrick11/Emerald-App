@@ -8,7 +8,7 @@
         "height": 800,
         "minWidth": 720,
         "minHeight": 600,
-        "backgroundColor": "#15110d",
+        "backgroundColor": "#100d0a",
         "decorations": false,
         "shadow": true
       }

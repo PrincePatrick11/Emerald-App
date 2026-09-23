@@ -54,7 +54,7 @@ not via a per-site red treatment of its own.
   deliberately render-blocking `<link>`: `public/splash.css`, the startup loading
   screen's styles (see [Loading Screen and Boot Order](architecture.md#loading-screen-and-boot-order)
   in `architecture.md`). Its `--splash-bg` / `--splash-gem` / `--splash-text` are hand-kept
-  copies of `--bg-app` / `--accent` / `--text-subtle` from `src/themes/*.css` — change one,
+  copies of `--shell-bg` / `--accent` / `--text-subtle` from `src/themes/*.css` — change one,
   update the other. `--splash-bg` is copied a second time, as the literal `backgroundColor`
   in `src-tauri/tauri.conf.json` and the three `tauri.{windows,macos,linux}.conf.json` (not
   `tauri.dev.conf.json`, which must not gain an `app.windows` key — see the traps in

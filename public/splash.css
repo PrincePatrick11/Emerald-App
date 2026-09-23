@@ -13,8 +13,9 @@
    Frame stehen, vor dem Bundle und vor den Theme-Dateien. Ein `<link>` im
    `<head>` blockiert das Rendern und erfuellt das; das Bundle nicht.
 
-   --splash-bg, --splash-gem und --splash-text sind Kopien von --bg-app,
-   --accent und --text-subtle aus `src/themes/*.css`. Aendern sie sich dort,
+   --splash-bg, --splash-gem und --splash-text sind Kopien von --shell-bg,
+   --accent und --text-subtle aus `src/themes/*.css` — der Ladebildschirm
+   geht so nahtlos in den Rahmen der App ueber. Aendern sie sich dort,
    gehoeren sie hier nachgezogen. --splash-bg steht zusaetzlich als
    `backgroundColor` in `src-tauri/tauri.conf.json` und den drei Plattform-
    Dateien daneben — nicht in `tauri.dev.conf.json`, die darf keinen
@@ -29,7 +30,7 @@
    wer --accent aendert, muss also auch die beiden rgba-Werte anfassen. */
 
 :root {
-  --splash-bg: #15110d;
+  --splash-bg: #100d0a;
   --splash-gem: #00c47f;
   --splash-gem-deep: #007a4d;
   --splash-text: #78716c;
@@ -37,7 +38,7 @@
   --splash-rail-track: rgba(0, 196, 127, 0.18);
 }
 html[data-theme='emerald-parchment'] {
-  --splash-bg: #f7efdf;
+  --splash-bg: #ecdec7;
   --splash-gem: #008a57;
   --splash-gem-deep: #006941;
   --splash-text: #775c41;
@@ -46,7 +47,7 @@ html[data-theme='emerald-parchment'] {
 }
 
 /* Bleibt nach dem Splash stehen und haelt den Grund hinter `body`.
-   Muss deshalb dauerhaft zu --bg-app passen, nicht nur beim Start. */
+   Muss deshalb dauerhaft zu --shell-bg passen, nicht nur beim Start. */
 html {
   background: var(--splash-bg);
 }

@@ -36,9 +36,9 @@ interface Props {
  * drag the window therefore carries it, and no interactive control does.
  *
  * With `tabs` set, the bar also holds the tab strip. The leading group then
- * grows to `leadWidth` — the left sidebar's width — and ends in a divider on
- * the sidebar's edge, so the tabs begin above the main area; they end at the
- * right sidebar's edge (`trailWidth`), only the "+" may reach past it.
+ * grows to `leadWidth` — the left sidebar's width — so the tabs begin flush
+ * with the sheet's left edge below; they end at the right sidebar's edge
+ * (`trailWidth`), only the "+" may reach past it.
  * Without `tabs` (no vault yet, boot still running) the shell content is
  * unmounted and there are no tabs to show.
  */
@@ -82,8 +82,9 @@ export default function TitleBar({ tabs = false, leadWidth = 0, trailWidth = 0, 
       className="titlebar relative flex-shrink-0 flex items-center h-10 select-none"
     >
       {/* Mit Tabs mindestens so breit wie die linke Seitenleiste (border-box,
-          also samt Polsterung) und mit ihr animiert. Ist die Leiste schmaler
-          als die Knoepfe, beginnen die Tabs eben dahinter. */}
+          also samt Polsterung) und mit ihr animiert — die Tabs beginnen so an
+          der linken Kante des Blatts. Ist die Leiste schmaler als die Knoepfe
+          (Rail oder Liste ausgeblendet), beginnen sie eben dahinter. */}
       <div
         data-tauri-drag-region
         className={`flex items-center gap-1 h-full flex-shrink-0 pl-2${
@@ -114,7 +115,7 @@ export default function TitleBar({ tabs = false, leadWidth = 0, trailWidth = 0, 
         {usesHtmlMenuBar && (
           <TitleBarMenuButton
             label={t('titlebar.menu')}
-            icon={<Menu size={14} />}
+            icon={<Menu size={16} />}
             nodes={menus.appMenu}
           />
         )}
@@ -123,18 +124,18 @@ export default function TitleBar({ tabs = false, leadWidth = 0, trailWidth = 0, 
           <div className="flex items-center gap-0.5 flex-shrink-0">
             {vaultOpen && (
               <RailButton onClick={() => setSearchOpen(true)} title={t('titlebar.search')}>
-                <Search size={14} />
+                <Search size={16} />
               </RailButton>
             )}
             <RailButton onClick={navigateBack} disabled={!canGoBack} title={t('titlebar.back')}>
-              <ArrowLeft size={14} />
+              <ArrowLeft size={16} />
             </RailButton>
             <RailButton
               onClick={navigateForward}
               disabled={!canGoForward}
               title={t('titlebar.forward')}
             >
-              <ArrowRight size={14} />
+              <ArrowRight size={16} />
             </RailButton>
           </div>
         )}
@@ -145,17 +146,8 @@ export default function TitleBar({ tabs = false, leadWidth = 0, trailWidth = 0, 
             Import Upload — wie in Settings → Backup. */}
         {usesHtmlMenuBar && (
           <div className="flex items-center gap-0.5 flex-shrink-0">
-            <TitleBarMenuButton label={menus.exportMenu.label} icon={<Download size={14} />} nodes={menus.exportMenu.nodes} />
-            <TitleBarMenuButton label={menus.importMenu.label} icon={<Upload size={14} />} nodes={menus.importMenu.nodes} />
-          </div>
-        )}
-
-        {/* Trennstrich vor den Tabs, ganz rechts im Abschnitt: genau ueber der
-            rechten Kante der Seitenleiste (gleiche Klasse, gleiche Farbe).
-            Der Rand links davon bleibt Ziehflaeche. */}
-        {showTabs && (
-          <div data-tauri-drag-region className="ml-auto flex items-center self-stretch pl-2">
-            <div className="pointer-events-none h-4 border-l border-stone-700/60" />
+            <TitleBarMenuButton label={menus.exportMenu.label} icon={<Download size={16} />} nodes={menus.exportMenu.nodes} />
+            <TitleBarMenuButton label={menus.importMenu.label} icon={<Upload size={16} />} nodes={menus.importMenu.nodes} />
           </div>
         )}
       </div>

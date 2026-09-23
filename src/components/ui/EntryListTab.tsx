@@ -1,11 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
-import { Search, Plus } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import ContextMenu, { type ContextMenuAction } from './ContextMenu';
-import Button from './Button';
 
 export interface RenderRowArgs<T> {
   item: T;
@@ -33,16 +32,13 @@ export interface EntryListTabProps<T> {
   onRename: (item: T, newTitle: string) => void | Promise<void>;
   contextMenuActions: (item: T, startRename: () => void) => ContextMenuAction[];
   emptyMessage: string;
-  /** Return the created item to immediately drop it into rename mode (e.g. Tasks, which has no separate edit view). */
-  onCreate?: () => void | T | Promise<void | T>;
-  createTitle?: string;
   /** Fully custom row content (both normal and renaming state). Overrides getIcon/onOpen/onOpenNewTab/onDragStart for rendering — search, empty-state, and the context menu popup stay centrally handled. `isActive` is not overridden but handed to the row, which decides how to show it. */
   renderRow?: (args: RenderRowArgs<T>) => ReactNode;
 }
 
 export default function EntryListTab<T>({
   items, getId, getTitle, getDateStr, getIcon, isActive, onOpen, onOpenNewTab, onDragStart,
-  onRename, contextMenuActions, emptyMessage, onCreate, createTitle, renderRow,
+  onRename, contextMenuActions, emptyMessage, renderRow,
 }: EntryListTabProps<T>) {
   const { t } = useTranslation();
   const { searchQuery, setSearchQuery } = useUIStore(
@@ -84,8 +80,11 @@ export default function EntryListTab<T>({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="sidebar-search px-2 py-2 border-b border-stone-700/60 flex-shrink-0 flex items-center gap-1.5">
-        <div className="sidebar-search-inner flex-1 flex items-center gap-2 bg-stone-700/40 rounded-md px-2.5 py-1.5 min-w-0">
+      {/* 56px hoch wie die Aktionsleiste rechts (`SidebarActionBar`), ohne
+          Trennlinie: die Liste liegt direkt auf dem Rahmen. Anlegen laeuft
+          ueber die Hauptaktion im rechten Panel, nicht ueber einen Knopf hier. */}
+      <div className="h-14 px-3 flex-shrink-0 flex items-center">
+        <div className="entry-list-search flex-1 flex items-center gap-2 rounded-md px-2.5 h-[30px] min-w-0">
           <Search size={14} className="text-stone-500 flex-shrink-0" />
           <input
             type="text"
@@ -95,21 +94,6 @@ export default function EntryListTab<T>({
             className="sidebar-search-input bg-transparent text-sm text-stone-300 placeholder-stone-600 outline-none w-full selectable"
           />
         </div>
-        {onCreate && (
-          <Button
-            tone="neutral"
-            compact
-            onClick={async () => {
-              const created = await onCreate();
-              if (created) startRename(created);
-            }}
-            title={createTitle}
-            aria-label={createTitle}
-            className="flex-shrink-0"
-          >
-            <Plus size={14} />
-          </Button>
-        )}
       </div>
 
       <nav className="flex-1 overflow-y-auto py-2 px-2">

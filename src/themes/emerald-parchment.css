@@ -60,24 +60,32 @@ html[data-theme='emerald-parchment'] {
   --select-option-text: #3a2918;
   --select-option-active-bg: #d6eee1;
   --select-option-active-text: #075e3d;
-  --shell-bg: #f5ecdc;
-  --sidebar-bg: #f2e6d3;
+  /* Rahmen + Blatt (design.md, Shell Layout): Titelleiste, Rail und linke
+     Seitenleiste sind der Rahmen, Inhalt und rechte Seitenleiste das Blatt darauf. */
+  --shell-bg: #ecdec7;
+  --sheet-bg: #faf3e6;
+  --sheet-border: rgba(145, 108, 70, 0.28);
+  /* Bewusst 10px statt rounded-xl (12): das Blatt ist Fensterflaeche, kein
+     Panel darauf — eine Stufe weicher wuerde die Ecken am Rahmen aufblaehen. */
+  --sheet-radius: 10px;
+  --sheet-inset: 6px;
   --panel-bg: #f7eddb;
   --panel-border: rgba(154, 117, 80, 0.34);
   --panel-shadow: 0 8px 20px rgba(114, 79, 43, 0.07);
   --panel-hover-bg: #f9f1e3;
   --panel-hover-border: rgba(131, 96, 62, 0.48);
   --panel-hover-shadow: 0 10px 24px rgba(114, 79, 43, 0.11);
-  --titlebar-bg: #ecdec7;
   /* Tabs sind Pills auf der Titelleiste: inaktiv ohne Flaeche, aktiv eine leichte. */
-  --tab-active-bg: rgba(130, 87, 44, 0.12);
-  --tab-hover-bg: rgba(130, 87, 44, 0.06);
+  --tab-pill-h: 30px;
+  --tab-pill-active: rgba(130, 87, 44, 0.12);
+  --tab-pill-hover: rgba(130, 87, 44, 0.06);
   --tab-close-hover-bg: rgba(130, 87, 44, 0.14);
   --search-bg: rgba(248, 239, 223, 0.92);
   --search-border: rgba(146, 107, 68, 0.38);
   --search-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  /* Die Suche der Eintragsliste: randlos auf dem Rahmen. */
+  --list-search-bg: rgba(130, 87, 44, 0.08);
   /* Hoehen (design.md, Heights and Spacing). */
-  --tab-w: 140px;
   --content-bar-h: 56px;
   --control-h: 30px;
   --control-h-sm: 24px;

@@ -20,9 +20,9 @@ const PAGE_SIZE = 50;
  * Die globale Suche der App, als Modal hinter der Lupe in der Titelleiste.
  *
  * Sie durchsucht über `lib/globalSearch` Titel, Tags und Inhalte aller Module
- * und listet die Treffer unter dem Feld. Das Feld teilt sich seine Oberfläche
- * mit der Suche der Eintragsliste (`sidebar-search-inner`,
- * `sidebar-search-input`), damit beide Suchen dieselbe Fläche zeigen.
+ * und listet die Treffer unter dem Feld. Die umrandete Pill
+ * (`sidebar-search-inner`) hat es für sich; die Eintragsliste sucht in einem
+ * randlosen Feld auf dem Rahmen und teilt nur noch `sidebar-search-input`.
  *
  * Zusammen mit der Trefferliste bildet es ein Combobox-Muster: der Fokus bleibt
  * im Feld, die Pfeiltasten bewegen eine Auswahl in der Liste darunter, und
@@ -113,11 +113,10 @@ export default function SearchModal({ onClose }: { onClose: () => void }) {
       className="overflow-hidden h-[70vh]"
     >
       <div className="px-4 py-2.5 border-b flex-shrink-0" style={{ borderColor: 'var(--border-soft)' }}>
-        {/* `bg-stone-700/40` bleibt: die Klasse schlaegt in Parchment den
-            `.sidebar-search-inner`-Override, und die Eintragslisten-Suche traegt
-            sie ebenfalls. Sie hier allein zu streichen liesse die beiden
-            Suchfelder in Parchment auseinanderlaufen — sie gehoert an beiden
-            Stellen gemeinsam entfernt oder gar nicht (Documentation/design.md). */}
+        {/* `bg-stone-700/40` schlaegt in Parchment den `.sidebar-search-inner`-
+            Override (Documentation/design.md, Known Fault Line). Die Suche der
+            Eintragsliste traegt die Klasse nicht mehr; hier ist sie der letzte
+            Rest und kann weg, sobald jemand das Feld in Parchment prueft. */}
         <div className="sidebar-search-inner flex items-center gap-2 rounded-md px-2.5 h-8 bg-stone-700/40">
           <Search size={14} className="text-stone-500 flex-shrink-0" />
           <input

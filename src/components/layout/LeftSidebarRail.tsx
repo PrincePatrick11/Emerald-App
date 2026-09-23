@@ -71,14 +71,14 @@ export default function LeftSidebarRail() {
 
   return (
     <div
-      className="left-sidebar-rail rail-divider flex flex-col items-center h-full flex-shrink-0 border-r"
+      // Keine Trennlinie zur Liste: beide sind Teil des Rahmens.
+      className="left-sidebar-rail flex flex-col items-center h-full flex-shrink-0"
       style={{ width: RAIL_WIDTH }}
     >
       {/* Die beiden Seitenleisten schaltet das Menü „Ansicht" (useTitleBarMenus,
           nativ auf macOS) — eigene Knöpfe hier oben waren eine zweite Stelle
           für dasselbe. */}
 
-      {/* Main nav icons — navigate only, never touch the entry-list panel */}
       {/* Main nav icons — navigate only, never touch the entry-list panel */}
       <div className="w-full flex flex-col items-center gap-1 py-2">
         {/* Der Weg zum Dashboard. Er hing vorher am Emerald-Logo in der

@@ -39,8 +39,10 @@ export type LeftListLimit = (typeof LEFT_LIST_LIMIT_OPTIONS)[number];
 export const DEFAULT_LEFT_LIST_LIMIT: LeftListLimit = null;
 
 export interface LeftListSettings {
-  /** Die sichtbaren Tabs, in der Reihenfolge der Leiste; nie leer. */
-  tabs: LeftListTabId[];
+  /** Welche Liste die Eintragsliste zeigt — alle Einträge oder die eines Moduls.
+   *  Ersetzt die frühere Tab-Auswahl `tabs`; ein altes `tabs` bleibt über das
+   *  Spread in `normalizeVaultSettings` in der Datei stehen, für ältere Builds. */
+  list: LeftListTabId;
   limit: LeftListLimit;
 }
 
@@ -108,7 +110,7 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
     retentionDays: DEFAULT_TRASH_RETENTION,
   },
   leftList: {
-    tabs: [...LEFT_LIST_TAB_IDS],
+    list: 'all',
     limit: DEFAULT_LEFT_LIST_LIMIT,
   },
   emojis: {
@@ -159,7 +161,6 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const emojis = asRecord(root.emojis);
   const images = asRecord(root.images);
   const tags = asRecord(root.tags);
-  const tabs = Array.isArray(leftList.tabs) ? LEFT_LIST_TAB_IDS.filter((id) => (leftList.tabs as unknown[]).includes(id)) : [];
   const version = typeof root.version === 'number' && Number.isInteger(root.version) && root.version > 1
     ? root.version
     : 1;
@@ -181,7 +182,7 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
     },
     leftList: {
       ...leftList,
-      tabs: tabs.length ? tabs : [...LEFT_LIST_TAB_IDS],
+      list: oneOf(leftList.list, LEFT_LIST_TAB_IDS, DEFAULT_VAULT_SETTINGS.leftList.list),
       limit: oneOf(leftList.limit, LEFT_LIST_LIMIT_OPTIONS, DEFAULT_LEFT_LIST_LIMIT),
     },
     emojis: {

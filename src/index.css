@@ -73,9 +73,52 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      here; macOS keeps its native traffic lights overlaid on the webview and
      only needs room reserved for them. */
 
-  .titlebar {
-    background: var(--titlebar-bg);
-    border-bottom: 1px solid var(--border-subtle);
+  /* ── Rahmen + Blatt ─────────────────────────────────────────────────────
+     Titelleiste, Rail und Eintragsliste bilden einen durchgehenden Rahmen
+     ohne Trennlinien; Hauptbereich und rechte Seitenleiste liegen als ein
+     abgerundetes Blatt darauf. Die Kante zwischen den beiden Blatthaelften
+     zieht die rechte Leiste (`.app-sheet-side`), nicht der Hauptbereich. */
+  .app-shell,
+  .titlebar,
+  .app-sidebar-left {
+    background: var(--shell-bg);
+  }
+
+  /* Luft nur rechts und unten — links schliesst der Rahmen der Seitenleiste
+     an. Ist links nichts, haelt das Blatt auch dort Abstand. */
+  .app-sheet-frame {
+    padding: 0 var(--sheet-inset) var(--sheet-inset) 0;
+  }
+
+  .app-sheet-frame-free-left {
+    padding-left: var(--sheet-inset);
+  }
+
+  .app-sheet-main,
+  .app-sheet-side {
+    background: var(--sheet-bg);
+    border: 1px solid var(--sheet-border);
+  }
+
+  .app-sheet-main {
+    border-radius: var(--sheet-radius);
+  }
+
+  /* Mit rechter Leiste daneben: rechts gerade und ohne eigenen Rand. */
+  .app-sheet-main-joined {
+    border-right-width: 0;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .app-sheet-side {
+    border-radius: 0 var(--sheet-radius) var(--sheet-radius) 0;
+  }
+
+  /* Icon-Knoepfe der Titelleiste: 30x30, kleiner Radius — `.rail-button`
+     bringt `rounded-lg` und die Polsterung von `.btn-ghost` mit. */
+  .titlebar .rail-button {
+    @apply flex items-center justify-center w-[30px] h-[30px] p-0 rounded-md;
   }
 
   /* Knopfbereich und Tab-Liste fahren die Breiten der Seitenleisten nach —
@@ -87,7 +130,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   /* Traffic lights sit at x:14 and span ~52px (see tauri.macos.conf.json).
      The inset goes on the leading group, not the bar: that group is
      border-box, so with tabs its `min-width` (the left sidebar's width)
-     already includes the inset and the divider stays on the sidebar's edge. */
+     already includes the inset and the tabs still start at the sheet's edge. */
   html[data-platform='macos'] .titlebar > :first-child {
     padding-left: 5rem;
   }
@@ -257,16 +300,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     outline-offset: -1px;
   }
 
-  .left-sidebar-rail {
-    background: var(--shell-bg);
-  }
-
   /* Das Ein-/Ausblenden der Seitenleisten (`AppShell`); `margin-left` schiebt
-     die Rail aus dem Bild. Die Dauer haengt mit SIDEBAR_ANIM_MS dort
+     die Rail aus dem Bild, `padding-left` am Blattrahmen (`.app-sheet-frame`)
+     gibt dem Blatt links Luft, sobald dort nichts mehr steht. Die Dauer haengt mit SIDEBAR_ANIM_MS dort
      zusammen, das den Inhalt so lange gemountet laesst.
      Waehrend eines Resize-Drags nimmt `AppShell` die Klasse weg. */
   .app-sidebar-animated {
-    transition: width 200ms ease-out, margin-left 200ms ease-out;
+    transition: width 200ms ease-out, margin-left 200ms ease-out, padding-left 200ms ease-out;
   }
 
   /* Steht danach und ist gleich spezifisch, gewinnt also ueber die
@@ -278,6 +318,12 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     .titlebar-follow-animated {
       transition: none;
     }
+  }
+
+  /* Die Suche der Eintragsliste: randlos auf dem Rahmen, anders als die
+     umrandete `.sidebar-search-inner`-Pill der globalen Suche. */
+  .entry-list-search {
+    background: var(--list-search-bg);
   }
 
   .sidebar-item {
@@ -1830,39 +1876,29 @@ html[data-theme] .settings-about-link:focus-visible {
   border-color: rgba(74, 222, 128, 0.3);
 }
 
-html[data-theme='emerald-noctis'] .app-shell {
-  background: var(--shell-bg);
-}
-
-html[data-theme='emerald-noctis'] .app-sidebar,
-html[data-theme='emerald-noctis'] .app-main {
+/* Beide Themes: die Seitenleisten und der Hauptbereich sind Geschwister-
+   Stacking-Contexts (design.md, Overlays and Portals). */
+html[data-theme] .app-sidebar,
+html[data-theme] .app-main {
   position: relative;
   z-index: 1;
 }
 
-html[data-theme='emerald-noctis'] .app-main {
-  background: linear-gradient(180deg, rgba(52, 41, 33, 0.16) 0%, rgba(33, 26, 21, 0.08) 100%);
+/* Der Platzhalter-Rahmen von `.rail-button` bleibt unsichtbar — Parchments
+   `* { border-color }` gewaenne sonst ueber die Klasse und rahmte jeden Knopf
+   in Rail und Titelleiste. Die aktive Ansicht faerbt ihn spezifischer ein. */
+html[data-theme] .rail-button {
+  border-color: transparent;
 }
 
-html[data-theme='emerald-noctis'] .app-sidebar {
-  background: var(--sidebar-bg);
-}
-
-html[data-theme='emerald-noctis'] .app-sidebar-left {
-  box-shadow: 12px 0 30px rgba(0, 0, 0, 0.3);
-}
-
-html[data-theme='emerald-noctis'] .app-sidebar-right {
-  box-shadow: -12px 0 30px rgba(0, 0, 0, 0.28);
-}
-
-html[data-theme='emerald-noctis'] .sidebar-search,
-html[data-theme='emerald-noctis'] .rail-divider {
-  border-color: rgba(110, 93, 76, 0.44);
+/* Icon-Knoepfe der Titelleiste: dieselbe neutrale Flaeche in beiden Themes,
+   statt des warmen `.btn-ghost`-Hovers der Theme-Regeln. */
+html[data-theme] .titlebar .rail-button:hover:not(:disabled) {
+  background: var(--interactive-hover);
 }
 
 html[data-theme='emerald-noctis'] .window-control:focus-visible,
-html[data-theme='emerald-noctis'] .titlebar .rail-button:focus-visible,
+html[data-theme='emerald-noctis'] .rail-button:focus-visible,
 html[data-theme='emerald-noctis'] .menu-item:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
@@ -1905,22 +1941,24 @@ html[data-theme='emerald-noctis'] .panel-interactive:focus-visible {
 
 /* Tab-Leiste — beide Themes, die Unterschiede stecken nur in den Tokens.
    `html[data-theme]` haelt die Spezifitaet ueber Parchments generischer
-   button:focus-visible-Regel. Die Tabs sind Pills auf der Flaeche der
-   Titelleiste, deren durchgehende Grundlinie sie nicht unterbrechen: inaktiv
+   button:focus-visible-Regel. Die Tabs sind Pills auf dem Rahmen: inaktiv
    ohne Flaeche, aktiv eine leichte, keine Kanten. */
-html[data-theme] .tab-item,
+html[data-theme] .tab-item {
+  color: var(--text-muted);
+}
+
 html[data-theme] .tab-add {
   color: var(--text-subtle);
 }
 
 html[data-theme] .tab-item-active {
-  background: var(--tab-active-bg);
+  background: var(--tab-pill-active);
   color: var(--text-primary);
 }
 
 html[data-theme] .tab-add:hover,
 html[data-theme] .tab-item-idle:hover {
-  background: var(--tab-hover-bg);
+  background: var(--tab-pill-hover);
   color: var(--text-secondary);
 }
 
@@ -2216,35 +2254,8 @@ html[data-theme='emerald-noctis'] .context-menu-item-default:hover {
 }
 
 /* Light mode redesign: stronger structure and readability */
-html[data-theme='emerald-parchment'] .app-shell {
-  background: var(--shell-bg);
-}
-
-html[data-theme='emerald-parchment'] .app-sidebar,
-html[data-theme='emerald-parchment'] .app-main {
-  position: relative;
-  z-index: 1;
-}
-
-html[data-theme='emerald-parchment'] .app-sidebar {
-  background: var(--sidebar-bg);
-}
-
-html[data-theme='emerald-parchment'] .app-sidebar-left {
-  box-shadow: 10px 0 30px rgba(112, 77, 40, 0.08);
-}
-
-html[data-theme='emerald-parchment'] .app-sidebar-right {
-  box-shadow: -10px 0 30px rgba(112, 77, 40, 0.07);
-}
-
-html[data-theme='emerald-parchment'] .sidebar-search,
-html[data-theme='emerald-parchment'] .rail-divider {
-  border-color: rgba(145, 108, 70, 0.32);
-}
-
 html[data-theme='emerald-parchment'] .window-control:focus-visible,
-html[data-theme='emerald-parchment'] .titlebar .rail-button:focus-visible,
+html[data-theme='emerald-parchment'] .rail-button:focus-visible,
 html[data-theme='emerald-parchment'] .menu-item:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);

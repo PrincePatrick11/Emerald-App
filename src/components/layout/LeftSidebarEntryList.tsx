@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { formatEntryDate } from '../../lib/formatDate';
 import { categoryLabel, lookupCategory } from '../../lib/categories';
-import { DEFAULT_ENTRY_EMOJI, LEFT_LIST_TABS, type LeftListTabId } from '../../lib/modules';
+import { DEFAULT_ENTRY_EMOJI, type LeftListTabId } from '../../lib/modules';
 import { Flame, CheckSquare, Square, Copy, Pencil, Trash2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -18,61 +18,25 @@ import { setDragItem } from '../../lib/dragState';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import type { AltarRecord, JournalEntry, MoonPhase, Operation, Task, WikiArticle } from '../../types';
-import TabIconButton from '../ui/TabIconButton';
 import EntryListTab, { type EntryListTabProps } from '../ui/EntryListTab';
 import type { ContextMenuAction } from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 
-/* Die Geometrie der Tab-Leiste, in Zahlen statt nur in Utility-Klassen: die
-   Standardbreite der Eintragsliste ist genau die Breite, die ihre Tabs
-   brauchen (`AppShell`s ENTRY_LIST_DEFAULT). Die Werte spiegeln die Klassen
-   der Leiste unten — `px-3` (12), `TabIconButton`s `p-2` + 14px-Icon + 1px
-   Rahmen (32), `gap-0.5` (2). Wer eine davon aendert, muss hier mit.
-   Gezaehlt werden alle Tabs, auch die in den Einstellungen ausgeblendeten:
-   die Standardbreite soll nicht springen, wenn jemand einen Tab abwaehlt.
-
-   Die Zahlen gelten fuer 16px Grundschrift — die Utilities darunter rechnen
-   in rem. Auf WebKitGTK, das seine Grundschrift aus der GTK-Textskalierung
-   zieht, kann die Leiste deshalb schon bei Standardbreite umbrechen. Schlimm
-   ist das nicht: der Umbruch ist der behandelte Fall, nicht der Fehlerfall.
-   Falsch laufen kann hier nur die Standardbreite selbst. */
-const TAB_SIZE = 32;
-const TAB_GAP = 2;
-const TAB_STRIP_PADDING_X = 12;
-export const ENTRY_LIST_TABS_WIDTH =
-  TAB_STRIP_PADDING_X * 2 + LEFT_LIST_TABS.length * TAB_SIZE + (LEFT_LIST_TABS.length - 1) * TAB_GAP;
-
+/**
+ * Die Eintragsliste links: oben die Suche, darunter die Liste. Welche Liste —
+ * alle Einträge oder die eines Moduls — legt die Einstellung des Vaults fest
+ * (Einstellungen → Seitenleiste); einen Umschalter in der Leiste gibt es nicht,
+ * die Module wechselt man über die Rail.
+ */
 export default function LeftSidebarEntryList() {
-  const { t } = useTranslation();
-  const { leftListTab, setLeftListTab } = useUIStore(
-    useShallow((s) => ({ leftListTab: s.leftListTab, setLeftListTab: s.setLeftListTab }))
-  );
-  const visibleIds = useSettingsStore((s) => s.settings.leftList.tabs);
+  const list = useSettingsStore((s) => s.settings.leftList.list);
   // Neu gerendert je Vault: „Mehr anzeigen" beginnt dort wieder beim Limit.
   const vaultId = useSettingsStore((s) => s.vaultId);
-  const tabs = LEFT_LIST_TABS.filter((tab) => visibleIds.includes(tab.id));
-  // Ist der gewählte Tab ausgeblendet, zeigt die Liste den ersten sichtbaren —
-  // ohne die Wahl zu überschreiben, damit sie beim Wiedereinblenden zurückkommt.
-  const activeTab = tabs.some((tab) => tab.id === leftListTab) ? leftListTab : (tabs[0]?.id ?? 'all');
 
   return (
     <div className="flex flex-col h-full flex-1 min-w-0">
-      {/* `flex-wrap` + `min-h-14` statt `h-14`: bei voller Breite unveraendert
-          (eine 32px-Reihe, mit `py-2` = 48px unter der Mindesthoehe, weiterhin
-          zentriert), darunter rutschen die ueberzaehligen Tabs in eine zweite
-          Reihe statt stumm ueber den Rand zu laufen. Flexbox entscheidet das
-          selbst — keine Schwelle, kein ResizeObserver, kein Oszillieren. */}
-      <div className="flex flex-wrap items-center gap-0.5 px-3 py-2 min-h-14 border-b border-stone-700/60 flex-shrink-0">
-        {tabs.map(({ id, icon: Icon }) => (
-          <TabIconButton key={id} active={activeTab === id} onClick={() => setLeftListTab(id)} title={t(`nav.${id}`)}>
-            <Icon size={14} />
-          </TabIconButton>
-        ))}
-      </div>
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <ActiveList key={vaultId} tab={activeTab} />
-      </div>
+      <ActiveList key={vaultId} tab={list} />
     </div>
   );
 }
@@ -96,10 +60,10 @@ function ActiveList({ tab }: { tab: LeftListTabId }) {
 // One flat, type-erased row per entry, so the combined list reuses each tab's
 // real handlers (duplicate, delete-with-undo, rename) instead of copying them.
 // EntryListTab<T> is single-typed, so the erasure has to happen somewhere; the
-// closures below are that seam. Four config fields cannot survive it and are
+// closures below are that seam. Two config fields cannot survive it and are
 // dropped on purpose: renderRow (only Tasks has one — in "All" its rows fall
-// back to the plain icon/title layout), plus onCreate, createTitle and
-// emptyMessage, which "All" answers for itself.
+// back to the plain icon/title layout), plus emptyMessage, which "All"
+// answers for itself.
 
 type EntryKind = 'journal' | 'task' | 'operation' | 'wiki' | 'altar';
 
@@ -186,15 +150,10 @@ function useJournalConfig(): EntryListTabProps<JournalEntry> {
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { entries, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useJournalStore(
-    useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
+  const { entries, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useJournalStore(
+    useShallow((s) => ({ entries: s.entries, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
   );
   const pushUndo = useUndoStore((s) => s.push);
-
-  const handleNewJournalEntry = async () => {
-    const entry = await createEntry();
-    setActiveView({ type: 'journal', id: entry.id, mode: 'edit', isNew: true });
-  };
 
   const handleDuplicate = async (entry: (typeof entries)[number]) => {
     const newEntry = await duplicateEntry(entry.id);
@@ -226,8 +185,6 @@ function useJournalConfig(): EntryListTabProps<JournalEntry> {
       { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(e), danger: true },
     ],
     emptyMessage: t('journal.noEntries'),
-    onCreate: handleNewJournalEntry,
-    createTitle: t('journal.newEntry'),
   };
 }
 
@@ -243,19 +200,14 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { operations, createOperation, duplicateOperation, updateOperation, deleteOperation, restoreOperation } = useOperationStore(
-    useShallow((s) => ({ operations: s.operations, createOperation: s.createOperation, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation }))
+  const { operations, duplicateOperation, updateOperation, deleteOperation, restoreOperation } = useOperationStore(
+    useShallow((s) => ({ operations: s.operations, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
 
   const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
   const catName = (c: (typeof categories)[number]) => categoryLabel(t, c);
-
-  const handleNewOperation = async () => {
-    const op = await createOperation();
-    setActiveView({ type: 'operations', id: op.id, mode: 'edit', isNew: true });
-  };
 
   const handleDuplicate = async (op: (typeof operations)[number]) => {
     const newOp = await duplicateOperation(op.id);
@@ -299,8 +251,6 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
       { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(op), danger: true },
     ],
     emptyMessage: t('operations.none'),
-    onCreate: handleNewOperation,
-    createTitle: t('operations.new'),
   };
 }
 
@@ -316,18 +266,13 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { articles, createArticle, duplicateArticle, updateArticle, deleteArticle, restoreArticle } = useWikiStore(
-    useShallow((s) => ({ articles: s.articles, createArticle: s.createArticle, duplicateArticle: s.duplicateArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle }))
+  const { articles, duplicateArticle, updateArticle, deleteArticle, restoreArticle } = useWikiStore(
+    useShallow((s) => ({ articles: s.articles, duplicateArticle: s.duplicateArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
 
   const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
-
-  const handleNewArticle = async () => {
-    const article = await createArticle();
-    setActiveView({ type: 'wiki', id: article.id, mode: 'edit', isNew: true });
-  };
 
   const handleDuplicate = async (article: (typeof articles)[number]) => {
     const newArt = await duplicateArticle(article.id);
@@ -372,8 +317,6 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
       { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(a), danger: true },
     ],
     emptyMessage: t('wiki.noArticles'),
-    onCreate: handleNewArticle,
-    createTitle: t('wiki.newArticle'),
   };
 }
 
@@ -388,14 +331,9 @@ function useAltarConfig(): EntryListTabProps<AltarRecord> {
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { altars, createAltar, updateAltar } = useAltarStore(
-    useShallow((s) => ({ altars: s.altars, createAltar: s.createAltar, updateAltar: s.updateAltar }))
+  const { altars, updateAltar } = useAltarStore(
+    useShallow((s) => ({ altars: s.altars, updateAltar: s.updateAltar }))
   );
-
-  const handleNewAltar = async () => {
-    const altar = await createAltar();
-    setActiveView({ type: 'altar', id: altar.id, mode: 'edit', isNew: true });
-  };
 
   const sorted = altars.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 
@@ -417,8 +355,6 @@ function useAltarConfig(): EntryListTabProps<AltarRecord> {
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
     ],
     emptyMessage: t('altar.none'),
-    onCreate: handleNewAltar,
-    createTitle: t('altar.newAltar'),
   };
 }
 
@@ -432,8 +368,8 @@ function useTasksConfig(): EntryListTabProps<Task> {
   const { activeView, setActiveView } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView }))
   );
-  const { tasks, createTask, updateTask, deleteTask, restoreTask } = useTaskStore(
-    useShallow((s) => ({ tasks: s.tasks, createTask: s.createTask, updateTask: s.updateTask, deleteTask: s.deleteTask, restoreTask: s.restoreTask }))
+  const { tasks, updateTask, deleteTask, restoreTask } = useTaskStore(
+    useShallow((s) => ({ tasks: s.tasks, updateTask: s.updateTask, deleteTask: s.deleteTask, restoreTask: s.restoreTask }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
@@ -449,12 +385,6 @@ function useTasksConfig(): EntryListTabProps<Task> {
   const taskDragItem = (task: Task) =>
     setDragItem({ id: task.id, entryType: 'task', label: task.title, category: lookupCategory(catById, task.category_id)?.emoji });
 
-  const handleNewTask = async () => {
-    const task = await createTask();
-    openTask(task.id);
-    return task;
-  };
-
   const handleDelete = async (task: (typeof tasks)[number]) => {
     await deleteTask(task.id);
     pushUndo({ id: generateId(), description: t('undo.taskDeleted'), undo: () => restoreTask(task.id) });
@@ -468,7 +398,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
   const sorted = tasks.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 
   // The checkbox needs to be clickable independently of the title, so the row
-  // content is custom — search bar, empty-state, "+" and the context menu
+  // content is custom — search bar, empty-state and the context menu
   // popup itself still come from EntryListTab. getIcon/getDateStr/onOpen go
   // unused behind renderRow here, but let the "All" tab render tasks plainly.
   // `isActive` is the exception: EntryListTab hands it to the row, so both tabs
@@ -490,8 +420,6 @@ function useTasksConfig(): EntryListTabProps<Task> {
       { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(task), danger: true },
     ],
     emptyMessage: t('tasks.empty'),
-    onCreate: handleNewTask,
-    createTitle: t('tasks.newTask'),
     renderRow: ({ item: task, isActive, isRenaming, renameValue, setRenameValue, commitRename, cancelRename, openCtxMenu }) => {
       const dateStr = dateStrFor(task);
 

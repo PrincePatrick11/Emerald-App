@@ -110,13 +110,16 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
   );
 }
 
-/* Die Geometrie am rechten Ende, in Zahlen statt nur in Klassen: `gap-1` (4),
+/* Die Geometrie am rechten Ende, in Zahlen statt nur in Klassen: `gap-0.5` (2),
    das „+" (30), die Mindestbreite der Ziehflaeche `min-w-12` (48) und der
-   Abstand zum Trennstrich, wie links `pl-1.5` (6). */
-const TAB_GAP = 4;
+   Abstand zum Trennstrich (6). */
+const TAB_GAP = 2;
 const ADD_SIZE = 30;
 const FILL_MIN = 48;
 const EDGE_GAP = 6;
+/** Wie lange die Layout-Animation nach dem Loslassen eines Tabs noch laeuft —
+ *  reichlich fuer REORDER_SPRING, bis die ausgewichenen Tabs stehen. */
+const REORDER_SETTLE_MS = 500;
 /** Soviel Platz braucht der Streifen ueber der rechten Seitenleiste, damit
  *  Trennstrich, „+" (im ungünstigsten Fall EDGE_GAP dahinter) und Ziehflaeche
  *  hineinpassen. Darunter gibt es keinen Strich, und die Tabs weichen dem „+"
@@ -146,6 +149,27 @@ export default function TabBar({ endInset = 0, animate = true }: TabBarProps) {
   // Wie weit das „+" nach rechts ruecken muss, um nicht auf dem Trennstrich zu
   // sitzen: reicht die Liste bis an ihn heran, springt es dahinter.
   const [addShift, setAddShift] = useState(0);
+  // Layout-Animation der Items nur, solange ein Tab gezogen wird — dort
+  // weichen die anderen ihm aus. Sonst federte jeder Tab hinterher, sobald sich
+  // die Leiste als Ganzes verschiebt (Eintragsliste per Drag breiter,
+  // Seitenleiste ein- oder ausgeblendet), und saesse waehrenddessen nicht
+  // buendig ueber dem Blatt. Nach dem Loslassen bleibt sie noch REORDER_SETTLE_MS
+  // an, damit ein Tab, der gerade erst ausgewichen ist, zu Ende federt statt zu
+  // springen.
+  const [reordering, setReordering] = useState(false);
+  const settleTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const startReorder = () => { clearTimeout(settleTimer.current); setReordering(true); };
+  const endReorder = () => {
+    clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => setReordering(false), REORDER_SETTLE_MS);
+  };
+  // Wird der gezogene Tab mitten im Ziehen geschlossen (Tastenkuerzel), kommt
+  // kein `onDragEnd` mehr — der Schalter faellt dann mit der Tab-Zahl zurueck.
+  useEffect(() => {
+    if (reordering) endReorder();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur bei geaenderter Tab-Zahl
+  }, [tabs.length]);
+  useEffect(() => () => clearTimeout(settleTimer.current), []);
 
   useLayoutEffect(() => {
     const root = rootRef.current;
@@ -199,7 +223,8 @@ export default function TabBar({ endInset = 0, animate = true }: TabBarProps) {
   if (tabs.length === 0) return null;
 
   return (
-    // Sitzt in der Titelleiste; die Tabs sind 30px-Pills darin. Die freien
+    // Sitzt in der Titelleiste und beginnt ohne Polsterung, also buendig mit
+    // der linken Kante des Blatts darunter; die Tabs sind Pills darin. Die freien
     // Raender und das flex-1-Element am Ende bleiben Ziehflaeche fuers Fenster
     // (das Attribut vererbt sich nicht, s. TitleBar). Die Luecken zwischen den
     // Pills nicht: ein Klick dorthin kurz nach einem Tab-Klick zaehlte als
@@ -209,7 +234,7 @@ export default function TabBar({ endInset = 0, animate = true }: TabBarProps) {
     <div
       ref={rootRef}
       data-tauri-drag-region
-      className="tabbar relative flex h-full min-w-0 flex-1 items-center gap-1 overflow-hidden pl-1.5"
+      className="tabbar relative flex h-full min-w-0 flex-1 items-center gap-0.5 overflow-hidden"
     >
       <LazyMotion features={domAnimation}>
         <Reorder.Group
@@ -217,7 +242,7 @@ export default function TabBar({ endInset = 0, animate = true }: TabBarProps) {
           axis="x"
           values={tabs.map((tab) => tab.id)}
           onReorder={setTabsOrder}
-          className={`scrollbar-none flex h-full min-w-0 flex-initial items-center gap-1 overflow-x-auto overflow-y-hidden${
+          className={`scrollbar-none flex h-full min-w-0 flex-initial items-center gap-0.5 overflow-x-auto overflow-y-hidden${
             animate ? ' titlebar-follow-animated' : ''
           }`}
           style={{ maxWidth: `calc(100% - ${hasEdge ? endInset + EDGE_GAP : endInset}px)` }}
@@ -228,17 +253,26 @@ export default function TabBar({ endInset = 0, animate = true }: TabBarProps) {
               <Reorder.Item
                 key={tab.id}
                 value={tab.id}
+                // Reorder.Items Typ kennt nur `true | 'position'`; `false`
+                // reicht es unveraendert an motion.li durch, wo es gilt.
+                layout={reordering as true}
+                onDragStart={startReorder}
+                onDragEnd={endReorder}
                 whileDrag={{ scale: 1.005 }}
                 transition={REORDER_SPRING}
                 style={{ position: 'relative' }}
-                className={`tab-item group flex h-[30px] w-[var(--tab-w)] flex-shrink-0 items-center gap-2 rounded-md pl-2.5 pr-1 text-[13px] transition-colors ${
+                // Schrumpfen von 180 bis 96px, darunter scrollt die Liste.
+                className={`tab-item group flex h-[var(--tab-pill-h)] min-w-[96px] flex-[0_1_180px] items-center gap-2 rounded-md pl-2.5 pr-1 text-[13px] transition-colors ${
                   isActive ? 'tab-item-active font-medium' : 'tab-item-idle'
                 }`}
               >
                 <TabButton view={tab.view} onSelect={() => selectTab(tab.id)} onClose={() => closeTab(tab.id)} />
                 <button
                   onClick={() => closeTab(tab.id)}
-                  className="tab-close flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-md opacity-0 transition-colors group-hover:opacity-100 focus-visible:opacity-100"
+                  // Am aktiven Tab immer da, an den anderen erst beim Ueberfahren.
+                  className={`tab-close flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-md transition-colors${
+                    isActive ? '' : ' opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                  }`}
                   title={t('tabBar.closeTab')}
                 >
                   <X size={14} />
@@ -257,8 +291,8 @@ export default function TabBar({ endInset = 0, animate = true }: TabBarProps) {
         <Plus size={14} />
       </button>
       <div data-tauri-drag-region className="min-w-12 flex-1 self-stretch" />
-      {/* Trennstrich auf der Kante der rechten Seitenleiste — Gegenstueck zu
-          dem in TitleBar ueber der linken, gleiche Klasse, gleiche Farbe. */}
+      {/* Trennstrich ueber der Kante der rechten Seitenleiste, in der Flucht
+          der Linie zwischen den beiden Blatthaelften darunter. */}
       {hasEdge && (
         <div
           className={`pointer-events-none absolute top-1/2 h-4 -translate-y-1/2 border-l border-stone-700/60${

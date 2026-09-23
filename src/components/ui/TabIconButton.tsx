@@ -15,8 +15,7 @@ export default function TabIconButton({ active, compact, className, children, ty
       // `border border-transparent` als Grundzustand, weil die Theme-Regeln fuer
       // `.right-sidebar-tab-active` dem aktiven Tab einen 1px-Rahmen geben. Ohne
       // den Platzhalter ist der aktive Tab 32px breit und die inaktiven 30 —
-      // die Reihe ruckte bei jedem Tabwechsel um 2px, und in der linken
-      // Eintragsliste brach sie dadurch schon bei Standardbreite um.
+      // die Reihe ruckte bei jedem Tabwechsel um 2px.
       // Abweichung von der geteilten :disabled-Regel: bewusst OHNE
       // pointer-events-none, damit der title-Tooltip („… nicht verfügbar")
       // auf deaktivierten Toggles noch erscheint; Klicks blockt das native

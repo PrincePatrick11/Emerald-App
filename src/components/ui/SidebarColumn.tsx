@@ -4,13 +4,11 @@ import { Check, Trash2, X } from 'lucide-react';
 import Button from './Button';
 
 /**
- * Die 56px-Leiste oben in der rechten Seitenleiste. Spiegelt die Tab-Leiste in
- * `LeftSidebarEntryList`, damit beide Seitenleisten ihre Unterkante auf
- * derselben Linie haben — beide synchron halten, mit einer bekannten Ausnahme:
- * jene Leiste ist `min-h-14` und bricht in eine zweite Reihe um, sobald die
- * Eintragsliste schmaler gezogen wird als ihre sechs Tabs. Das hier
- * nachzubilden hieße, diese Leiste aus einem Grund wachsen zu lassen, der mit
- * ihrem Inhalt nichts zu tun hat — sie bleibt 56px.
+ * Die 56px-Leiste oben in der rechten Seitenleiste. Genauso hoch wie die
+ * Suchzeile der Eintragsliste (`EntryListTab`, `h-14`), damit beide
+ * Seitenleisten ihre Oberkante des Inhalts auf derselben Linie haben — beide
+ * synchron halten. Nur diese Leiste zieht eine Linie darunter: sie liegt auf
+ * dem Blatt, die Suchzeile links auf dem Rahmen.
  */
 export function SidebarActionBar({ children }: { children: ReactNode }) {
   return (

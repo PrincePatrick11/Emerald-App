@@ -10,7 +10,7 @@ import { computeMenuEnabledState, runMenuAction, SELF_CONTAINED_MENU_ACTIONS } f
 import { hideSplash } from '../../lib/splash';
 import TitleBar from './titlebar/TitleBar';
 import LeftSidebarRail, { RAIL_WIDTH } from './LeftSidebarRail';
-import LeftSidebarEntryList, { ENTRY_LIST_TABS_WIDTH } from './LeftSidebarEntryList';
+import LeftSidebarEntryList from './LeftSidebarEntryList';
 import RightSidebar from './RightSidebar';
 import MainArea from './MainArea';
 import VaultModal from './VaultModal';
@@ -19,8 +19,12 @@ import ImageNoticeModal from '../ui/ImageNoticeModal';
 import ImportDestinationModal from '../ui/ImportDestinationModal';
 
 const ENTRY_LIST_MIN = 180;
-/** Genau so breit, dass die sechs Tabs der Eintragsliste nebeneinander passen. */
-const ENTRY_LIST_DEFAULT = ENTRY_LIST_TABS_WIDTH;
+/** Zusammen mit der Rail (56) breiter als die Werkzeuggruppe der Titelleiste
+ *  auf Windows/Linux — `pl-2` + Logo + Menue + drei Navigations- und zwei
+ *  Export/Import-Knoepfe samt Abstaenden, rund 226px —, damit die Tabs dort
+ *  buendig ueber dem Blatt beginnen. Die Breite der frueheren Modul-Tabs, damit
+ *  sich bestehende Layouts nicht verschieben. */
+const ENTRY_LIST_DEFAULT = 226;
 const RIGHT_MIN = 180;
 /** So breit wie die linke Seite im Ganzen — Rail plus Eintragsliste. */
 const RIGHT_DEFAULT = RAIL_WIDTH + ENTRY_LIST_DEFAULT;
@@ -32,6 +36,10 @@ const RIGHT_DEFAULT = RAIL_WIDTH + ENTRY_LIST_DEFAULT;
    es steuert nur, wie lange der Inhalt noch gemountet bleibt. */
 const SIDEBAR_ANIM_CLASS = 'app-sidebar-animated';
 const SIDEBAR_ANIM_MS = 200;
+
+/** Der Abstand des Blatts zum Fensterrand, als Zahl fuer die Tab-Geometrie der
+ *  Titelleiste. Muss zu `--sheet-inset` in `src/themes/*.css` passen. */
+const SHEET_INSET = 6;
 
 const ENTRY_LIST_WIDTH_KEY = 'entry-list-width';
 const RIGHT_WIDTH_KEY = 'sidebar-right-width';
@@ -247,7 +255,7 @@ export default function AppShell() {
 
   // Fensterrahmen und Titelleiste — alles, was auch ohne offenen Vault steht.
   const chrome = (children: React.ReactNode) => (
-    <div className="app-shell flex flex-col h-screen w-screen overflow-hidden bg-stone-900 relative">
+    <div className="app-shell flex flex-col h-screen w-screen overflow-hidden relative">
       <TitleBar />
       {children}
     </div>
@@ -273,14 +281,23 @@ export default function AppShell() {
   if (!bootSettled) return chrome(<main className="app-main flex-1 min-h-0" />);
 
   const leftSidebarWidth = (railOpen ? RAIL_WIDTH : 0) + (leftListOpen ? entryListWidth : 0);
+  // Ohne etwas links davon haelt das Blatt auch dort Abstand zum Fensterrand —
+  // es schwebt immer, statt mit gerundeter Ecke am Rand zu kleben.
+  const leftFrameEmpty = isAltarWindowFullscreen || leftSidebarWidth === 0;
+  // Haengt am verzoegerten Unmount statt an `rightSidebarOpen`: beim Zuklappen
+  // bekommt der Hauptbereich seinen rechten Rand erst, wenn die Leiste weg ist,
+  // statt neben ihr einen doppelten Strich zu ziehen.
+  const sheetJoined = rightSidebarMounted && !isAltarWindowFullscreen;
 
   return (
-    <div className="app-shell flex flex-col h-screen w-screen overflow-hidden bg-stone-900 relative">
-      {/* Die Tabs sitzen in der Titelleiste, ueber dem Hauptbereich. */}
+    <div className="app-shell flex flex-col h-screen w-screen overflow-hidden relative">
+      {/* Die Tabs sitzen in der Titelleiste, ueber dem Blatt. Rechts endet das
+          Blatt SHEET_INSET vor dem Fensterrand, die Kante der rechten Leiste
+          liegt also um so viel weiter innen. */}
       <TitleBar
         tabs
         leadWidth={leftSidebarWidth}
-        trailWidth={rightSidebarOpen ? rightWidth : 0}
+        trailWidth={rightSidebarOpen ? rightWidth + SHEET_INSET : 0}
         animate={!resizing}
       />
 
@@ -296,18 +313,19 @@ export default function AppShell() {
           Fokus *und* Vorlesereihenfolge heraus; `inert` allein waere auf
           aelteren WebKit-Versionen wirkungslos. */}
       <div
-        className="flex flex-1 min-h-0 overflow-hidden relative"
+        className={`app-sheet-frame flex flex-1 min-h-0 overflow-hidden relative${
+          leftFrameEmpty ? ' app-sheet-frame-free-left' : ''
+        }${resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`}`}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
       >
         {!isAltarWindowFullscreen && (
           <aside
-            // Die Trennlinie sitzt am <aside>, faellt aber weg, sobald Rail und
-            // Liste beide zu sind — bei Breite 0 bliebe sonst ein 1px-Strich
-            // am Fensterrand stehen. Die Rail bringt ihre eigene Linie mit.
+            // Rahmen, keine Trennlinie: Rail und Liste gehen nahtlos in die
+            // Titelleiste ueber, abgesetzt ist erst das Blatt daneben.
             className={`app-sidebar app-sidebar-left flex-shrink-0 relative overflow-hidden${
-              railOpen || leftListOpen ? ' border-r border-stone-700/60' : ''
-            }${resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`}`}
+              resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`
+            }`}
             style={{ width: leftSidebarWidth }}
           >
             {/* Eine ausgeblendete Rail schiebt der negative Rand nach links
@@ -338,7 +356,13 @@ export default function AppShell() {
         )}
 
         {/* Main Content */}
-        <main className="app-main flex-1 min-w-0 overflow-hidden flex flex-col">
+        {/* Das Blatt, linke Haelfte. Mit rechter Leiste daneben ist es rechts
+            gerade und randlos — die Kante dazwischen zieht die Leiste. */}
+        <main
+          className={`app-main app-sheet-main flex-1 min-w-0 overflow-hidden flex flex-col${
+            sheetJoined ? ' app-sheet-main-joined' : ''
+          }`}
+        >
           <div className="flex-1 min-h-0 overflow-hidden">
             <MainArea />
           </div>
@@ -361,11 +385,12 @@ export default function AppShell() {
                 className="absolute top-0 left-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"
               />
             )}
-            {/* Die Trennlinie sitzt am Inhalt, nicht am <aside>: dort waere sie
-                bei Breite 0 als 1px-Strich am Fensterrand stehengeblieben. So
-                faehrt sie mit dem Inhalt hinaus und wird mit ihm geklippt. */}
+            {/* Das Blatt, rechte Haelfte. Flaeche, Rand und Radius sitzen am
+                Inhalt, nicht am <aside>: dort blieben die Raender bei Breite 0
+                als 2px-Strich stehen. So fahren sie mit dem Inhalt hinaus und
+                werden mit ihm geklippt. */}
             <div
-              className="absolute top-0 right-0 h-full border-l border-stone-700/60"
+              className="app-sheet-side absolute top-0 right-0 h-full"
               style={{ width: rightWidth }}
               inert={!rightSidebarOpen}
               aria-hidden={!rightSidebarOpen}

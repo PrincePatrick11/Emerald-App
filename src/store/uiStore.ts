@@ -3,7 +3,7 @@ import {
   createTabId, freshHistory, isContentView, normalizeSavedHistory, pushHistory, stripSessionFlags,
   type NavHistory, type OpenTab,
 } from '../lib/tabs';
-import { isLibraryView, isViewId, moduleMeta, type EntryModuleId, type LeftListTabId } from '../lib/modules';
+import { isLibraryView, isViewId, moduleMeta, type EntryModuleId } from '../lib/modules';
 import type { ActiveView } from '../types';
 
 export type ViewMode = 'list' | 'cards' | 'cards_wide' | 'timeline';
@@ -75,7 +75,6 @@ interface UIState {
   /** Die Rail ganz links. Dauerhaft (localStorage), wie `leftListOpen`. */
   railOpen: boolean;
   leftListOpen: boolean;
-  leftListTab: LeftListTabId;
   searchQuery: string;
   journalPrefs: ListPrefs;
   wikiPrefs: ListPrefs;
@@ -131,7 +130,6 @@ interface UIState {
   setEditActions: (actions: EditActions | null) => void;
   toggleRail: () => void;
   toggleLeftList: () => void;
-  setLeftListTab: (tab: LeftListTabId) => void;
   setSearchQuery: (q: string) => void;
   setJournalPrefs: (p: Partial<ListPrefs>) => void;
   setWikiPrefs: (p: Partial<ListPrefs>) => void;
@@ -268,7 +266,6 @@ export const useUIStore = create<UIState>((set) => ({
   editActions: null,
   railOpen: loadOpenFlag(RAIL_OPEN_KEY),
   leftListOpen: loadOpenFlag(LEFT_LIST_OPEN_KEY),
-  leftListTab: 'journal',
   searchQuery: '',
   // Wo „Kategorie" bisher der Sortiermodus war (Wiki, Operationen,
   // Aufgaben), steht jetzt `grouping: 'grouped'` — dieselbe Ansicht wie
@@ -458,7 +455,6 @@ export const useUIStore = create<UIState>((set) => ({
     saveOpenFlag(LEFT_LIST_OPEN_KEY, leftListOpen);
     return { leftListOpen };
   }),
-  setLeftListTab: (tab) => set({ leftListTab: tab }),
   setSearchQuery: (q) => set({ searchQuery: q }),
   setJournalPrefs: (p) => set((s) => ({ journalPrefs: { ...s.journalPrefs, ...p } })),
   setWikiPrefs: (p) => set((s) => ({ wikiPrefs: { ...s.wikiPrefs, ...p } })),
