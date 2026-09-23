@@ -101,15 +101,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-primary);
   }
 
-  .titlebar-search {
-    color: var(--text-muted);
-    transition: color 150ms, border-color 150ms;
-  }
-
-  .titlebar-search:hover {
-    color: var(--text-primary);
-  }
-
   /* 46x40 with square corners is the Windows Fluent geometry — matching it is
      what makes these read as real window controls rather than app buttons. */
   .window-control {
@@ -170,11 +161,9 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     background: var(--menu-border);
   }
 
-  /* Die globale Suche unter der Titelleiste. Sie liegt auf `.menu-surface` und
-     borgt sich die Hover-Tokens der Menues daneben, statt die Farben des
-     LinkPickers zu kopieren: das Dropdown ist ein Titelleisten-Popup und soll
-     wie die Menues aussehen, zwischen denen es aufklappt — nicht wie ein
-     Modal, das an einer anderen Stelle der App aufgeht. */
+  /* Die Trefferliste der globalen Suche (`SearchModal`). Sie borgt sich die
+     Hover-Tokens der Menues, damit die Auswahl in beiden Themes dieselbe
+     Markierung zeigt wie ein Menueeintrag. */
   .search-result-row {
     @apply w-full flex items-start gap-2.5 px-3 py-2 text-left transition-colors duration-150;
     color: var(--text-secondary);
@@ -217,7 +206,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   .search-result-more {
     @apply w-full text-xs text-left px-3 py-2 transition-colors duration-150;
     color: var(--text-subtle);
-    border-top: 1px solid var(--menu-border);
+    border-top: 1px solid var(--border-soft);
   }
 
   .search-result-more:hover {
@@ -1874,15 +1863,8 @@ html[data-theme='emerald-noctis'] .rail-divider {
   border-color: rgba(110, 93, 76, 0.44);
 }
 
-html[data-theme='emerald-noctis'] .titlebar-search:hover {
-  border-color: var(--border-strong);
-}
-
 html[data-theme='emerald-noctis'] .window-control:focus-visible,
 html[data-theme='emerald-noctis'] .titlebar-menu-trigger:focus-visible,
-/* Die Such-Pille ist selbst nicht mehr fokussierbar — der Ring gehoert
-   jetzt an das <input> darin, gezeichnet wird er weiterhin am Feld. */
-html[data-theme='emerald-noctis'] .titlebar-search:focus-within,
 html[data-theme='emerald-noctis'] .menu-item:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
@@ -2251,15 +2233,8 @@ html[data-theme='emerald-parchment'] .rail-divider {
   border-color: rgba(145, 108, 70, 0.32);
 }
 
-html[data-theme='emerald-parchment'] .titlebar-search:hover {
-  border-color: var(--border-strong);
-}
-
 html[data-theme='emerald-parchment'] .window-control:focus-visible,
 html[data-theme='emerald-parchment'] .titlebar-menu-trigger:focus-visible,
-/* Die Such-Pille ist selbst nicht mehr fokussierbar — der Ring gehoert
-   jetzt an das <input> darin, gezeichnet wird er weiterhin am Feld. */
-html[data-theme='emerald-parchment'] .titlebar-search:focus-within,
 html[data-theme='emerald-parchment'] .menu-item:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);

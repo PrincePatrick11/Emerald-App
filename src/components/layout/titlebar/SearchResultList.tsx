@@ -1,23 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { useOutsideClick } from '../../../hooks/useOutsideClick';
-import { createPortal } from 'react-dom';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Folder, Sparkles, Tag, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { comparable, type SearchHit, type SearchKind, type SearchResults } from '../../../lib/globalSearch';
 import { AUX_VIEWS, MODULES } from '../../../lib/modules';
-
-/** Abstand des Panels zur Fensterkante und zum Suchfeld darüber. */
-const VIEWPORT_MARGIN = 8;
-const ANCHOR_GAP = 4;
-
-/** Unter dieser Breite liest sich eine Trefferzeile nicht mehr. Das Suchfeld
- *  darf schmaler werden als das Panel — es gibt nur den linken Rand vor.
- *
- *  In rem und nicht in px, weil die Zahl eine Textbreite meint: WebKitGTK zieht
- *  seine Wurzelschrift aus der GTK-Textskalierung, und bei Faktor 1,5 trüge ein
- *  380px-Panel keine zehn Zeichen mehr. Die beiden Werte darüber bleiben px —
- *  ein Abstand zur Fensterkante ist wirklich ein Abstand. */
-const MIN_PANEL_REM = 24;
 
 /** Die Suche spricht Datenmodell-Vokabular ('operation' singular, 'task') —
  *  die Modul-Kinds ziehen Icon und nav-Label aus der Registry, die drei
@@ -66,8 +51,6 @@ function highlight(text: string, query: string): ReactNode {
 }
 
 interface Props {
-  /** Das Suchfeld: gibt die Position vor und darf den Klick nicht schliessen. */
-  anchorRef: RefObject<HTMLElement | null>;
   results: SearchResults;
   /** Die Liste ist eine Anfrage alt, weil `useDeferredValue` noch nachzieht. */
   pending: boolean;
@@ -79,64 +62,16 @@ interface Props {
   onActiveIndexChange: (index: number) => void;
   onSelect: (hit: SearchHit, inNewTab: boolean) => void;
   onShowMore: () => void;
-  onClose: () => void;
 }
 
 /**
- * Die Trefferliste der globalen Suche.
- *
- * Portal nach `document.body` mit `position: fixed`, aus demselben Grund, den
- * `ui/ContextMenu` ausbuchstabiert: `.app-sidebar` und `.app-main` tragen
- * `position: relative; z-index: 1` und sind gleichrangige Stacking-Contexts.
- * Ein Panel, das in der Titelleiste selbst hängt, verliert gegen den spaeter
- * gemalten Hauptbereich — eine hoehere `z-index`-Zahl ändert daran nichts.
+ * Die Trefferliste der globalen Suche, im Körper von `SearchModal`.
  */
-export default function TitleBarSearchResults({
-  anchorRef, results, pending, query, activeIndex, listboxId, onActiveIndexChange, onSelect,
-  onShowMore, onClose,
+export default function SearchResultList({
+  results, pending, query, activeIndex, listboxId, onActiveIndexChange, onSelect, onShowMore,
 }: Props) {
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
-  const [box, setBox] = useState({ left: 0, top: 0, width: 0, maxHeight: 0 });
-
-  // Neu vermessen, wenn sich das Fenster ändert. Die Trefferzahl steht bewusst
-  // nicht in der Liste: Rand, Breite und Höchsthöhe leiten sich allein aus dem
-  // Feld und dem Fenster ab — wie viele Zeilen darunter stehen, ändert keine
-  // der vier Zahlen.
-  useLayoutEffect(() => {
-    const measure = () => {
-      const anchor = anchorRef.current;
-      if (!anchor) return;
-      const rect = anchor.getBoundingClientRect();
-      const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-      const width = Math.min(
-        Math.max(rect.width, MIN_PANEL_REM * rootFontSize),
-        window.innerWidth - 2 * VIEWPORT_MARGIN,
-      );
-      const top = rect.bottom + ANCHOR_GAP;
-      setBox({
-        left: Math.min(Math.max(rect.left, VIEWPORT_MARGIN), window.innerWidth - width - VIEWPORT_MARGIN),
-        top,
-        width,
-        maxHeight: Math.min(window.innerHeight * 0.6, window.innerHeight - top - VIEWPORT_MARGIN),
-      });
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, [anchorRef]);
-
-  // Ein Klick daneben schließt — das Suchfeld selbst ausgenommen, sonst schlüge
-  // sein eigener Fokus-Klick die Liste sofort wieder zu.
-  //
-  // `capture: true`, und das ist keine Feinheit: Tauris `drag.js` hängt
-  // seinen eigenen mousedown-Listener aus einem Init-Skript an `document` —
-  // also vor allem, was die App registriert — und ruft auf einem Element mit
-  // `data-tauri-drag-region` `stopImmediatePropagation()`. Genau so ein Element
-  // ist der Zwischenraum links und rechts des Suchfelds, und das ist die
-  // natürlichste Stelle, um „daneben" zu klicken. In der Bubble-Phase zöge der
-  // Klick dort das Fenster und ließe die Trefferliste offen stehen.
-  useOutsideClick(true, onClose, { refs: [panelRef, anchorRef], capture: true });
 
   // Die Tastaturauswahl in den Blick holen. `block: 'nearest'` scrollt nur,
   // wenn die Zeile wirklich ausserhalb liegt.
@@ -148,12 +83,8 @@ export default function TitleBarSearchResults({
 
   const { hits, total } = results;
 
-  return createPortal(
-    <div
-      ref={panelRef}
-      className="menu-surface fixed z-[9999] flex flex-col overflow-hidden"
-      style={{ left: box.left, top: box.top, width: box.width, maxHeight: box.maxHeight }}
-    >
+  return (
+    <div ref={panelRef} className="flex-1 min-h-0 flex flex-col">
       {hits.length === 0 ? (
         <p className="search-result-meta">{query.trim() ? t('search.noResults') : t('search.hint')}</p>
       ) : (
@@ -233,7 +164,6 @@ export default function TitleBarSearchResults({
           {t('search.showMore', { count: total - hits.length })}
         </button>
       )}
-    </div>,
-    document.body,
+    </div>
   );
 }
