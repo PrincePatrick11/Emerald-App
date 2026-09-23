@@ -31,16 +31,16 @@ function getFallbackTitle(view: ActiveView, t: TFunction) {
 function renderIconValue(icon: string | null | undefined, fallback: ReactNode) {
   if (!icon) return fallback;
   if (icon.startsWith('data:') || icon.startsWith('blob:') || icon.startsWith('http') || icon.startsWith('/')) {
-    return <img src={icon} alt="" className="h-4 w-4 rounded object-cover" />;
+    return <img src={icon} alt="" className="h-3.5 w-3.5 rounded object-cover" />;
   }
   return <span className="text-sm leading-none">{icon}</span>;
 }
 
 function AltarTabIcon({ iconData }: { iconData: string | null | undefined }) {
-  if (!iconData) return <Flame size={13} />;
+  if (!iconData) return <Flame size={14} />;
   // `/`-Pfade sind Presets aus public/ und gehen an imageSrc vorbei.
   const src = iconData.startsWith('/') ? iconData : imageSrc(iconData);
-  if (src) return <img src={src} alt="" className="h-4 w-4 rounded object-cover" />;
+  if (src) return <img src={src} alt="" className="h-3.5 w-3.5 rounded object-cover" />;
   return <span className="text-sm leading-none">{iconData}</span>;
 }
 
@@ -86,13 +86,13 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
   } else if (type === 'altar' && id) {
     icon = <AltarTabIcon iconData={altar?.icon_data} />;
   } else if (type === 'blocks' && id) {
-    icon = renderIconValue(definition?.icon, <Icon size={13} />);
+    icon = renderIconValue(definition?.icon, <Icon size={14} />);
   } else if (type === 'templates' && id) {
-    icon = renderIconValue(template?.icon, <Icon size={13} />);
+    icon = renderIconValue(template?.icon, <Icon size={14} />);
   } else if (type === 'lexicon' && id) {
-    icon = renderIconValue(language?.icon, <Icon size={13} />);
+    icon = renderIconValue(language?.icon, <Icon size={14} />);
   } else {
-    icon = <Icon size={13} />;
+    icon = <Icon size={14} />;
   }
 
   return (
@@ -100,12 +100,12 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
       onClick={onSelect}
       onMouseDown={(event) => { if (event.button === 1) event.preventDefault(); }}
       onAuxClick={(event) => { if (event.button === 1) onClose(); }}
-      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+      className="tab-button flex h-full min-w-0 flex-1 items-center gap-2 text-left"
       title={title}
     >
-      <span className="flex-shrink-0 text-stone-500">{icon}</span>
+      <span className="tab-icon flex-shrink-0">{icon}</span>
       <span className="truncate">{title}</span>
-      {view.mode === 'edit' && <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-jade-500" title={t('tabBar.editing')} />}
+      {view.mode === 'edit' && <span className="tab-edit-dot h-1.5 w-1.5 flex-shrink-0 rounded-full" title={t('tabBar.editing')} />}
     </button>
   );
 }
@@ -133,14 +133,17 @@ export default function TabBar() {
   if (tabs.length === 0) return null;
 
   return (
-    <div className="tabbar relative h-10 flex items-end overflow-hidden px-2 pt-2">
+    // Die Leiste zeichnet keine eigene Grundlinie: jedes Element traegt seine
+    // untere Kante selbst, der aktive Tab laesst sie weg — so ist die Linie
+    // nur unter ihm offen. Das flex-1-Element am Ende zieht sie bis zum Rand.
+    <div className="tabbar flex h-[var(--tabbar-h)] items-stretch overflow-hidden">
       <LazyMotion features={domAnimation}>
         <Reorder.Group
           ref={scrollRef}
           axis="x"
           values={tabs.map((tab) => tab.id)}
           onReorder={setTabsOrder}
-          className="scrollbar-none flex min-w-0 max-w-full flex-initial items-end gap-1 overflow-x-auto overflow-y-hidden"
+          className="scrollbar-none flex min-w-0 max-w-full flex-initial items-stretch overflow-x-auto overflow-y-hidden"
         >
           {tabs.map((tab) => {
             const isActive = activeTabId === tab.id;
@@ -151,19 +154,17 @@ export default function TabBar() {
                 whileDrag={{ scale: 1.005 }}
                 transition={REORDER_SPRING}
                 style={{ position: 'relative' }}
-                className={`tab-item group flex min-w-32 max-w-56 flex-1 items-center gap-2 rounded-t-lg border px-3 py-2 text-xs transition-colors ${
-                  isActive
-                    ? 'tab-item-active border-stone-700/80 bg-stone-800 text-stone-100'
-                    : 'tab-item-idle border-stone-800/60 bg-stone-900/70 text-stone-500 hover:bg-stone-800/60 hover:text-stone-300'
+                className={`tab-item group flex w-[var(--tab-w)] flex-shrink-0 items-center gap-2 pl-3 pr-1.5 text-[13px] transition-colors ${
+                  isActive ? 'tab-item-active font-medium' : 'tab-item-idle'
                 }`}
               >
                 <TabButton view={tab.view} onSelect={() => selectTab(tab.id)} onClose={() => closeTab(tab.id)} />
                 <button
                   onClick={() => closeTab(tab.id)}
-                  className="-mr-1 rounded p-0.5 text-stone-600 opacity-0 transition-colors hover:bg-stone-700 hover:text-stone-200 group-hover:opacity-100"
+                  className="tab-close flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-md opacity-0 transition-colors group-hover:opacity-100 focus-visible:opacity-100"
                   title={t('tabBar.closeTab')}
                 >
-                  <X size={13} />
+                  <X size={14} />
                 </button>
               </Reorder.Item>
             );
@@ -172,11 +173,12 @@ export default function TabBar() {
       </LazyMotion>
       <button
         onClick={() => addTab()}
-        className="tab-add mb-px ml-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-t-lg border border-stone-800/60 bg-stone-900/70 text-stone-500 transition-colors hover:bg-stone-800/60 hover:text-stone-200"
+        className="tab-add flex w-[var(--tabbar-h)] flex-shrink-0 items-center justify-center transition-colors"
         title={t('tabBar.newTab')}
       >
-        <Plus size={15} />
+        <Plus size={16} />
       </button>
+      <div className="tab-fill flex-1" />
     </div>
   );
 }

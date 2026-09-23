@@ -99,15 +99,31 @@ the icon.
 
 ### Heights and Spacing
 
-**Two bar heights, no third:**
+**Bar heights:**
 
-- `h-10` (40px) — window chrome: title bar, tab bar.
+- `h-10` (40px) — window chrome: title bar.
+- 34px (`--tabbar-h`) — the tab strip below it: a row of tabs, not a bar with controls.
 - `h-14` (56px) — content bars: entry list tabs, `RightSidebarActionBar`, dashboard topbar.
 
 The split is deliberate: the title bar is window chrome, not a content header, and 56px
 feels heavy for that. Because it sits *above* the three-column shell, this does not
 collide with the 56px to its left and right below — the two sidebars must place their
 bottom divider at the same height.
+
+Both theme files define the heights as tokens: `--tabbar-h` (34px) and `--tab-w` (140px),
+which `TabBar` uses, plus `--content-bar-h` (56px), `--control-h` (30px) and
+`--control-h-sm` (24px), which mirror `h-14` and the `Button` heights but are not wired
+up yet. Rail buttons (`RailButton`) come out at
+32×32: an 18px icon, `p-1.5` and the 1px frame that holds room for the active accent.
+
+**Tab bar** (`TabBar.tsx`): tabs fill the full 34px, fixed 140px wide, no radius and no
+gap — separated only by a 1px `--border-subtle` edge on the right. Idle tabs sit slightly
+recessed (`--tab-idle-bg`, `--text-subtle`). Every idle element (tabs, the square "+"
+button, a trailing `flex-1` filler) carries its own bottom line; the active tab takes the
+surface of `.app-main` (`--tab-active-bg`) and leaves it out, so the line opens only
+beneath it. No accent edge on the active tab. The "+" button draws its own left edge,
+pulled 1px over the last tab, so it stays separated from a clipped tab while the bar
+scrolls. Focus rings sit *inset*, since the bar clips anything beyond its height.
 
 **Horizontal padding has exactly one source per column.** The column's outer container
 sets it; the panels inside add no `px-*` of their own. In the right sidebar that is the
