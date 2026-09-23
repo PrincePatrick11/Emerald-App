@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Download, Menu, Search, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { isAltarFullscreen, selectActiveHistory, useUIStore } from '../../../store/uiStore';
 import { hasActiveVault, useVaultStore } from '../../../store/vaultStore';
 import { usesCustomWindowControls, usesHtmlMenuBar } from '../../../lib/platform';
 import EmeraldMark from '../../ui/EmeraldMark';
+import TabBar from '../TabBar';
 import RailButton from '../../ui/RailButton';
 import TitleBarMenuButton from './TitleBarMenuButton';
 import { useTitleBarMenus } from './useTitleBarMenus';
@@ -23,8 +24,20 @@ import WindowControls from './WindowControls';
  * `data-tauri-drag-region` is not inherited: Tauri reads the attribute off the
  * element directly under the cursor. Every non-interactive wrapper that should
  * drag the window therefore carries it, and no interactive control does.
+ *
+ * With `tabs` set, the bar also holds the tab strip, right after its leading
+ * controls. Without it (no vault yet, boot still running) the shell content is
+ * unmounted and there are no tabs to show.
  */
-export default function TitleBar() {
+interface Props {
+  tabs?: boolean;
+  /** Meldet die Breite des Knopfbereichs links — daraus leitet `AppShell` die
+   *  Standardbreite der linken Seitenleiste ab, damit sie mit dem ersten Tab
+   *  abschliesst. */
+  onLeadWidth?: (width: number) => void;
+}
+
+export default function TitleBar({ tabs = false, onLeadWidth }: Props) {
   const { t } = useTranslation();
   const navigateBack = useUIStore((s) => s.navigateBack);
   const navigateForward = useUIStore((s) => s.navigateForward);
@@ -52,13 +65,28 @@ export default function TitleBar() {
   // Suche mit, statt beim Zurückkehren von selbst wieder aufzuspringen.
   if (searchOpen && (minimal || !vaultOpen)) setSearchOpen(false);
   const menus = useTitleBarMenus();
+  const showTabs = tabs && !minimal;
+
+  // Nicht im Altar-Vollbild messen: dort fehlt die Navigation, und die
+  // Seitenleisten sind ohnehin weg. Layout-Effekt, damit die Seitenleiste
+  // schon im ersten Bild die gemessene Breite hat.
+  const leadRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = leadRef.current;
+    if (!el || !onLeadWidth || minimal) return;
+    onLeadWidth(el.offsetWidth);
+    const observer = new ResizeObserver(() => onLeadWidth(el.offsetWidth));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [onLeadWidth, minimal]);
 
   return (
     <header
       data-tauri-drag-region
       className="titlebar relative flex-shrink-0 flex items-center h-10 select-none"
     >
-      <div data-tauri-drag-region className="flex items-center gap-1 h-full flex-shrink-0 pl-2">
+      {/* `pr-6` laesst vor den Tabs eine Ziehflaeche fuers Fenster frei. */}
+      <div ref={leadRef} data-tauri-drag-region className="titlebar-edge flex items-center gap-1 h-full flex-shrink-0 pl-2 pr-6">
         {/* Reines Logo, kein Control: der Weg zum Dashboard sitzt jetzt in der
             Rail, und `data-tauri-drag-region` gibt die Fensterecke ans Ziehen
             zurueck, statt sie an einen Klick zu binden.
@@ -119,11 +147,16 @@ export default function TitleBar() {
         )}
       </div>
 
-      {/* Leerer Zwischenraum: haelt die Fenstersteuerung am rechten Rand und
-          bleibt als Ziehflaeche fuer das Fenster frei. */}
-      <div data-tauri-drag-region className="flex-1 min-w-0 h-full" />
+      {/* Ohne Tabs: leerer Zwischenraum, der als Ziehflaeche frei bleibt. */}
+      {showTabs ? (
+        <TabBar />
+      ) : (
+        <div data-tauri-drag-region className="titlebar-edge flex-1 min-w-0 h-full" />
+      )}
 
-      <div data-tauri-drag-region className="flex items-center justify-end h-full flex-shrink-0">
+      {/* `ml-auto` haelt die Fenstersteuerung auch dann am rechten Rand, wenn
+          die Tab-Leiste mangels Tabs nichts rendert. */}
+      <div data-tauri-drag-region className="titlebar-edge ml-auto flex items-center justify-end h-full flex-shrink-0">
         {usesCustomWindowControls && <WindowControls />}
       </div>
 

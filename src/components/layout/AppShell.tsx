@@ -13,18 +13,19 @@ import LeftSidebarRail, { RAIL_WIDTH } from './LeftSidebarRail';
 import LeftSidebarEntryList, { ENTRY_LIST_TABS_WIDTH } from './LeftSidebarEntryList';
 import RightSidebar from './RightSidebar';
 import MainArea from './MainArea';
-import TabBar from './TabBar';
 import VaultModal from './VaultModal';
 import UndoToast from '../ui/UndoToast';
 import ImageNoticeModal from '../ui/ImageNoticeModal';
 import ImportDestinationModal from '../ui/ImportDestinationModal';
 
 const ENTRY_LIST_MIN = 180;
-/** Genau so breit, dass die sechs Tabs der Eintragsliste nebeneinander passen. */
-const ENTRY_LIST_DEFAULT = ENTRY_LIST_TABS_WIDTH;
+/** Genau so breit, dass die sechs Tabs der Eintragsliste nebeneinander passen.
+ *  Nur der Rueckfall, bis die Titelleiste ihren Knopfbereich gemessen hat —
+ *  die eigentliche Standardbreite leitet sich von dort ab (siehe unten). */
+const ENTRY_LIST_FALLBACK = ENTRY_LIST_TABS_WIDTH;
 const RIGHT_MIN = 180;
 /** So breit wie die linke Seite im Ganzen — Rail plus Eintragsliste. */
-const RIGHT_DEFAULT = RAIL_WIDTH + ENTRY_LIST_DEFAULT;
+const RIGHT_DEFAULT = RAIL_WIDTH + ENTRY_LIST_FALLBACK;
 
 /* Die Breiten-Transition der Seitenleisten. Eine Klasse in `index.css`, kein
    `style={{ transition: … }}` aus SIDEBAR_ANIM_MS heraus: ein Inline-Style
@@ -59,9 +60,9 @@ function useDeferredUnmount(open: boolean): boolean {
   return mounted;
 }
 
-function loadSavedWidth(key: string, min: number, fallback: number): number {
+function loadSavedWidth(key: string, min: number): number | null {
   const saved = localStorage.getItem(key);
-  return saved ? Math.max(min, Number(saved)) : fallback;
+  return saved ? Math.max(min, Number(saved)) : null;
 }
 
 export default function AppShell() {
@@ -79,12 +80,22 @@ export default function AppShell() {
   const navigateForward = useUIStore((s) => s.navigateForward);
   const isAltarWindowFullscreen = useUIStore(isAltarFullscreen);
 
-  const [entryListWidth, setEntryListWidth] = useState(() =>
-    loadSavedWidth(ENTRY_LIST_WIDTH_KEY, ENTRY_LIST_MIN, ENTRY_LIST_DEFAULT)
+  // `null` heisst: nie von Hand gezogen, es gilt die Standardbreite.
+  const [savedEntryListWidth, setSavedEntryListWidth] = useState(() =>
+    loadSavedWidth(ENTRY_LIST_WIDTH_KEY, ENTRY_LIST_MIN)
   );
   const [rightWidth, setRightWidth] = useState(() =>
-    loadSavedWidth(RIGHT_WIDTH_KEY, RIGHT_MIN, RIGHT_DEFAULT)
+    loadSavedWidth(RIGHT_WIDTH_KEY, RIGHT_MIN) ?? RIGHT_DEFAULT
   );
+  // Standardmaessig endet die linke Seitenleiste buendig mit dem Knopfbereich
+  // der Titelleiste, also dort, wo der erste Tab beginnt. Das `+ 1` legt ihre
+  // rechte Kante (border-r, innerhalb der Breite) auf die linke Kante des
+  // ersten Tabs statt einen Pixel davor.
+  const [titleBarLeadWidth, setTitleBarLeadWidth] = useState<number | null>(null);
+  const defaultEntryListWidth = titleBarLeadWidth === null
+    ? ENTRY_LIST_FALLBACK
+    : Math.max(ENTRY_LIST_MIN, titleBarLeadWidth + 1 - RAIL_WIDTH);
+  const entryListWidth = savedEntryListWidth ?? defaultEntryListWidth;
   // State, nicht Ref: das Abschalten der Transition muss neu rendern.
   const [resizing, setResizing] = useState(false);
   // Der erste Start ist erst durch, wenn auch die Einstellungen des Vaults
@@ -189,7 +200,7 @@ export default function AppShell() {
 
   useEffect(() => {
     const unlisten = listen('reset-sidebar-widths', () => {
-      setEntryListWidth(ENTRY_LIST_DEFAULT);
+      setSavedEntryListWidth(null);
       setRightWidth(RIGHT_DEFAULT);
       localStorage.removeItem(ENTRY_LIST_WIDTH_KEY);
       localStorage.removeItem(RIGHT_WIDTH_KEY);
@@ -226,7 +237,7 @@ export default function AppShell() {
   const onPointerMove = (e: React.PointerEvent) => {
     if (draggingLeft.current) {
       const delta = e.clientX - startX.current;
-      setEntryListWidth(Math.max(ENTRY_LIST_MIN, startWidth.current + delta));
+      setSavedEntryListWidth(Math.max(ENTRY_LIST_MIN, startWidth.current + delta));
     }
     if (draggingRight.current) {
       const delta = startX.current - e.clientX;
@@ -273,9 +284,23 @@ export default function AppShell() {
   }
   if (!bootSettled) return chrome(<main className="app-main flex-1 min-h-0" />);
 
+  const leftSidebarWidth = isAltarWindowFullscreen
+    ? 0
+    : (railOpen ? RAIL_WIDTH : 0) + (leftListOpen ? entryListWidth : 0);
+  const rightSidebarWidth = !isAltarWindowFullscreen && rightSidebarOpen ? rightWidth : 0;
+
   return (
-    <div className="app-shell flex flex-col h-screen w-screen overflow-hidden bg-stone-900 relative">
-      <TitleBar />
+    // Die Seitenleisten-Breiten braucht die Titelleiste: ueber beiden Leisten
+    // bleibt ihre Grundlinie auch unter dem aktiven Tab stehen (index.css).
+    <div
+      className="app-shell flex flex-col h-screen w-screen overflow-hidden bg-stone-900 relative"
+      data-resizing={resizing || undefined}
+      style={{
+        '--left-sidebar-w': `${leftSidebarWidth}px`,
+        '--right-sidebar-w': `${rightSidebarWidth}px`,
+      } as React.CSSProperties}
+    >
+      <TitleBar tabs onLeadWidth={setTitleBarLeadWidth} />
 
       {/* The sidebar resize handles live in here, so the pointer handlers that
           drive them do too. */}
@@ -301,7 +326,7 @@ export default function AppShell() {
             className={`app-sidebar app-sidebar-left flex-shrink-0 relative overflow-hidden${
               railOpen || leftListOpen ? ' border-r border-stone-700/60' : ''
             }${resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`}`}
-            style={{ width: (railOpen ? RAIL_WIDTH : 0) + (leftListOpen ? entryListWidth : 0) }}
+            style={{ width: leftSidebarWidth }}
           >
             {/* Eine ausgeblendete Rail schiebt der negative Rand nach links
                 aus dem Bild, damit die Liste an ihre Stelle rueckt. */}
@@ -332,7 +357,6 @@ export default function AppShell() {
 
         {/* Main Content */}
         <main className="app-main flex-1 min-w-0 overflow-hidden flex flex-col">
-          {!isAltarWindowFullscreen && <TabBar />}
           <div className="flex-1 min-h-0 overflow-hidden">
             <MainArea />
           </div>
@@ -345,7 +369,7 @@ export default function AppShell() {
             className={`app-sidebar app-sidebar-right flex-shrink-0 relative overflow-hidden${
               resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`
             }`}
-            style={{ width: rightSidebarOpen ? rightWidth : 0 }}
+            style={{ width: rightSidebarWidth }}
           >
             {/* Resize handle — bei geschlossener Leiste saesse er sonst als
                 Streifen am Rand des Hauptbereichs. */}

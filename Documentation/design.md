@@ -101,8 +101,7 @@ the icon.
 
 **Bar heights:**
 
-- `h-10` (40px) — window chrome: title bar.
-- 34px (`--tabbar-h`) — the tab strip below it: a row of tabs, not a bar with controls.
+- `h-10` (40px) — window chrome: title bar, which also holds the tab strip.
 - `h-14` (56px) — content bars: entry list tabs, `RightSidebarActionBar`, dashboard topbar.
 
 The split is deliberate: the title bar is window chrome, not a content header, and 56px
@@ -110,14 +109,20 @@ feels heavy for that. Because it sits *above* the three-column shell, this does 
 collide with the 56px to its left and right below — the two sidebars must place their
 bottom divider at the same height.
 
-Both theme files define the heights as tokens: `--tabbar-h` (34px) and `--tab-w` (140px),
-which `TabBar` uses, plus `--content-bar-h` (56px), `--control-h` (30px) and
+Both theme files define the heights as tokens: `--tab-w` (140px), which `TabBar` uses, plus `--content-bar-h` (56px), `--control-h` (30px) and
 `--control-h-sm` (24px), which mirror `h-14` and the `Button` heights but are not wired
 up yet. Rail buttons (`RailButton`) come out at
 32×32: an 18px icon, `p-1.5` and the 1px frame that holds room for the active accent.
 
-**Tab bar** (`TabBar.tsx`): tabs fill the full 34px, fixed 140px wide, no radius and no
-gap — separated only by a 1px `--border-subtle` edge on the right. Idle tabs sit slightly
+**Tab bar** (`TabBar.tsx`): the strip sits inside the title bar, right after its leading group
+of controls. Both sides keep room to drag the window: `pr-6` on the leading group, and a
+trailing filler of at least 48px (`min-w-12`) that stays even when the tabs overflow.
+The left sidebar's *default* width is derived from that leading group: `TitleBar` reports
+its measured width (`onLeadWidth`), and `AppShell` sizes the entry list so the sidebar's
+right edge lands on the first tab's left edge (never below `ENTRY_LIST_MIN`). A width the
+user dragged is kept instead; "Reset view" returns to the derived default. Tabs fill the full 40px, fixed 140px wide, no radius and no
+gap — separated only by a 1px `--border-subtle` edge on the right; the first tab also draws
+one on its left, against the title bar's controls. Idle tabs sit slightly
 recessed (`--tab-idle-bg`, `--text-subtle`). Every idle element (tabs, the square "+"
 button, a trailing `flex-1` filler) carries its own bottom line; the active tab takes the
 surface of `.app-main` (`--tab-active-bg`) and leaves it out, so the line opens only
@@ -265,10 +270,12 @@ define the same 81 properties. Core values:
 | `--panel-bg` | `rgba(38, 32, 27, 0.78)` | `#f7eddb` |
 | `--menu-shadow` | `0 14px 36px rgba(0,0,0,0.35)` | `0 18px 36px rgba(96,63,30,0.2)` |
 | `--titlebar-bg` | `rgba(24, 20, 16, 0.94)` | `#ecdec7` |
-| `--tabbar-bg` | `rgba(28, 23, 19, 0.86)` | `rgba(240, 225, 201, 0.9)` |
 
-`--titlebar-bg` is deliberately a little darker (respectively warmer) than `--tabbar-bg`,
-so the two strips do not visually merge into one.
+The tab strip has no background of its own — it lies on `--titlebar-bg`. The title bar's
+bottom line is drawn by its segments (`.titlebar-edge`, `--border-subtle`) and by the tabs,
+so it stays open beneath the active tab — but only over the main area: across each
+sidebar's width (`--left-sidebar-w` / `--right-sidebar-w`, set by `AppShell`) a
+`.titlebar::before` / `::after` line sits above the tabs and keeps it closed.
 
 Deliberately **not** tokenised: the Fluent red of the close button (`#c42b1c`, active
 `#b2231a`). It is identical in both themes — a token would only be a second place to

@@ -133,10 +133,13 @@ export default function TabBar() {
   if (tabs.length === 0) return null;
 
   return (
-    // Die Leiste zeichnet keine eigene Grundlinie: jedes Element traegt seine
-    // untere Kante selbst, der aktive Tab laesst sie weg — so ist die Linie
-    // nur unter ihm offen. Das flex-1-Element am Ende zieht sie bis zum Rand.
-    <div className="tabbar flex h-[var(--tabbar-h)] items-stretch overflow-hidden">
+    // Sitzt in der Titelleiste und fuellt deren volle Hoehe. Die Leiste zeichnet
+    // keine eigene Grundlinie: jedes Element traegt seine untere Kante selbst,
+    // der aktive Tab laesst sie weg — so ist die Linie nur unter ihm offen. Das
+    // flex-1-Element am Ende zieht sie bis zu den Fenstersteuerungen und bleibt
+    // Ziehflaeche fuers Fenster (das Attribut vererbt sich nicht, s. TitleBar) —
+    // mit Mindestbreite, damit auch bei vielen Tabs eine zum Greifen bleibt.
+    <div data-tauri-drag-region className="tabbar flex h-full min-w-0 flex-1 items-stretch overflow-hidden">
       <LazyMotion features={domAnimation}>
         <Reorder.Group
           ref={scrollRef}
@@ -173,12 +176,12 @@ export default function TabBar() {
       </LazyMotion>
       <button
         onClick={() => addTab()}
-        className="tab-add flex w-[var(--tabbar-h)] flex-shrink-0 items-center justify-center transition-colors"
+        className="tab-add flex w-10 flex-shrink-0 items-center justify-center transition-colors"
         title={t('tabBar.newTab')}
       >
         <Plus size={16} />
       </button>
-      <div className="tab-fill flex-1" />
+      <div data-tauri-drag-region className="tab-fill min-w-12 flex-1" />
     </div>
   );
 }

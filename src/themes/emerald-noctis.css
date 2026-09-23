@@ -70,7 +70,6 @@ html[data-theme='emerald-noctis'] {
   --panel-hover-border: rgba(119, 101, 85, 0.58);
   --panel-hover-shadow: 0 14px 30px rgba(0, 0, 0, 0.4);
   --titlebar-bg: rgba(24, 20, 16, 0.94);
-  --tabbar-bg: rgba(28, 23, 19, 0.86);
   /* Aktiver Tab: naehert die sichtbare Flaeche von .app-main an (--shell-bg + Verlauf
      in index.css) — mitziehen, wenn sich eins davon aendert. */
   --tab-active-bg: #1a1510;
@@ -81,7 +80,6 @@ html[data-theme='emerald-noctis'] {
   --search-border: rgba(109, 91, 75, 0.5);
   --search-inset: inset 0 1px 0 rgba(255, 241, 223, 0.06);
   /* Hoehen (design.md, Heights and Spacing). */
-  --tabbar-h: 34px;
   --tab-w: 140px;
   --content-bar-h: 56px;
   --control-h: 30px;

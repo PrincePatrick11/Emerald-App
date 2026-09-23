@@ -75,7 +75,43 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
   .titlebar {
     background: var(--titlebar-bg);
-    border-bottom: 1px solid transparent;
+  }
+
+  /* Die Grundlinie der Titelleiste tragen ihre Abschnitte selbst, nicht die
+     Leiste: dazwischen sitzen die Tabs, und der aktive laesst sie offen. Gleiche
+     Farbe wie die Kanten der Tabs, damit die Linie durchlaeuft. */
+  .titlebar-edge {
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  /* Ueber den Seitenleisten bleibt die Grundlinie auch unter dem aktiven Tab
+     geschlossen — offen ist sie nur ueber dem Hauptbereich. Die Breiten setzt
+     AppShell; sie fahren die Animation der Leisten mit, ausser waehrend eines
+     Resize-Drags. Ueber den Tabs (relative, „+" mit z-index 1). */
+  .titlebar::before,
+  .titlebar::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    z-index: 2;
+    height: 1px;
+    background: var(--border-subtle);
+    pointer-events: none;
+  }
+
+  .titlebar::before {
+    left: 0;
+    width: var(--left-sidebar-w, 0px);
+  }
+
+  .titlebar::after {
+    right: 0;
+    width: var(--right-sidebar-w, 0px);
+  }
+
+  .app-shell:not([data-resizing]) .titlebar::before,
+  .app-shell:not([data-resizing]) .titlebar::after {
+    transition: width 200ms ease-out;
   }
 
   /* Traffic lights sit at x:14 and span ~52px (see tauri.macos.conf.json).
@@ -268,7 +304,9 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      `transitionend` und laeuft deshalb auch hier. WebKitGTK vor 2.38 meldet
      immer `no-preference` — dort laesst sich die Animation nicht abbestellen. */
   @media (prefers-reduced-motion: reduce) {
-    .app-sidebar-animated {
+    .app-sidebar-animated,
+    .app-shell:not([data-resizing]) .titlebar::before,
+    .app-shell:not([data-resizing]) .titlebar::after {
       transition: none;
     }
   }
@@ -1849,7 +1887,6 @@ html[data-theme='emerald-noctis'] .app-sidebar-right {
   box-shadow: -12px 0 30px rgba(0, 0, 0, 0.28);
 }
 
-html[data-theme='emerald-noctis'] .titlebar,
 html[data-theme='emerald-noctis'] .sidebar-search,
 html[data-theme='emerald-noctis'] .rail-divider {
   border-color: rgba(110, 93, 76, 0.44);
@@ -1899,17 +1936,20 @@ html[data-theme='emerald-noctis'] .panel-interactive:focus-visible {
 
 /* Tab-Leiste — beide Themes, die Unterschiede stecken nur in den Tokens.
    `html[data-theme]` haelt die Spezifitaet ueber Parchments generischer
-   button:focus-visible-Regel. */
-html[data-theme] .tabbar {
-  background: var(--tabbar-bg);
-}
-
+   button:focus-visible-Regel. Einen eigenen Grund hat die Leiste nicht mehr:
+   sie sitzt in der Titelleiste und liegt auf deren Flaeche. */
 /* Tabs fuellen die volle Hoehe, getrennt nur durch eine 1px-Kante rechts.
    Inaktive Elemente tragen die Grundlinie unten selbst; der aktive Tab hat
    die Flaeche des Inhaltsbereichs und laesst sie weg — keine Akzentkante. */
 html[data-theme] .tab-item {
   border-right: 1px solid var(--border-subtle);
   border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Der erste Tab grenzt an die Knoepfe der Titelleiste, nicht an einen
+   Nachbartab — er braucht links eine eigene Kante. */
+html[data-theme] .tab-item:first-child {
+  border-left: 1px solid var(--border-subtle);
 }
 
 html[data-theme] .tab-fill {
@@ -2259,7 +2299,6 @@ html[data-theme='emerald-parchment'] .app-sidebar-right {
   box-shadow: -10px 0 30px rgba(112, 77, 40, 0.07);
 }
 
-html[data-theme='emerald-parchment'] .titlebar,
 html[data-theme='emerald-parchment'] .sidebar-search,
 html[data-theme='emerald-parchment'] .rail-divider {
   border-color: rgba(145, 108, 70, 0.32);

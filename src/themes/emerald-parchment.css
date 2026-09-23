@@ -69,7 +69,6 @@ html[data-theme='emerald-parchment'] {
   --panel-hover-border: rgba(131, 96, 62, 0.48);
   --panel-hover-shadow: 0 10px 24px rgba(114, 79, 43, 0.11);
   --titlebar-bg: #ecdec7;
-  --tabbar-bg: rgba(240, 225, 201, 0.9);
   /* Aktiver Tab = Flaeche von .app-main (hier ohne eigenen Hintergrund, also die Shell). */
   --tab-active-bg: var(--shell-bg);
   --tab-idle-bg: rgba(130, 87, 44, 0.07);
@@ -79,7 +78,6 @@ html[data-theme='emerald-parchment'] {
   --search-border: rgba(146, 107, 68, 0.38);
   --search-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);
   /* Hoehen (design.md, Heights and Spacing). */
-  --tabbar-h: 34px;
   --tab-w: 140px;
   --content-bar-h: 56px;
   --control-h: 30px;
