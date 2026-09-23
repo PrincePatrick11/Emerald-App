@@ -292,10 +292,12 @@ the decision to keep supporting those engines and have not been backfilled.
 ### Overlays and Portals
 
 **Everything floating hangs off `document.body` via `createPortal`** and positions itself
-with `position: fixed` in viewport coordinates: `Modal`, `ContextMenu`, `EmojiPicker`,
-`TitleBarSearchResults`, and `AltarCanvas`'s floating controls. `MenuDropdown` is the
-deliberate exception: it renders in place with `absolute` + `z-[9999]`, which works because
-the title bar sits above both stacking contexts described below.
+with `position: fixed` in viewport coordinates: `Modal` (which is how global search's
+`SearchModal`/`SearchResultList` get there too — they render inside `Modal`'s body rather
+than portalling separately), `ContextMenu`, `EmojiPicker`, and `AltarCanvas`'s floating
+controls. `MenuDropdown` is the deliberate exception: it renders in place with `absolute` +
+`z-[9999]`, which works because the title bar sits above both stacking contexts described
+below.
 
 The reason is the same for all of them: `.app-sidebar` and `.app-main` carry
 `position: relative; z-index: 1` in both themes and are therefore **sibling stacking
@@ -322,17 +324,17 @@ and it is always already mounted when the picker mounts. Without the interceptio
 Escape inside an open picker would always be won by the modal — closing the whole dialog
 along with the edit in progress instead of just the picker.
 
-**The outside-click listener of the search results list also sits in the capture phase.**
-Tauri's `drag.js` attaches its own `mousedown` listener to `document` ahead of anything the
-app registers, and calls `stopImmediatePropagation()` on every `data-tauri-drag-region`
-element — which is exactly the gap to the left and right of the search field. In the bubble
-phase a click there would have dragged the window and left the list standing open.
+**Global search has no outside-click listener of its own.** It opens as `SearchModal`, a
+plain `Modal`, so dismissal (Escape, backdrop click, the X) is `Modal`'s job; the field and
+result list underneath don't need the capture-phase `mousedown` trick a title-bar popover
+would, since Tauri's `drag.js` has no drag region inside the modal to race against.
 
-**The menu bar carries `role="menubar"` and honours the contract that comes with it:**
-Left/Right move between menus, Down opens and enters, Up/Down move within, Right/Left open
-and close submenus, Escape closes. Only a menu opened by keyboard pulls focus into the
-panel — opened by mouse the focus stays put, otherwise the editor would lose its selection
-and Cut/Copy would have nothing left to act on.
+**Each title-bar menu button owns its own dropdown independently** — there is no shared
+`role="menubar"` walking between them, since the menu bar itself is gone; a click or Down
+opens a button's `MenuDropdown`, Up/Down move within it, Right/Left open and close
+submenus, Escape or an outside click closes it. Only a menu opened by keyboard pulls focus
+into the panel — opened by mouse the focus stays put, otherwise the editor would lose its
+selection and Cut/Copy would have nothing left to act on.
 
 **Search field and results list form a combobox pattern** (`role="combobox"`,
 `aria-expanded`, `aria-controls`, `aria-activedescendant`): focus stays in the field, the
@@ -342,21 +344,18 @@ could look selected at once.
 
 ### Shell Layout
 
-**Title bar** (`TitleBar.tsx`, `h-10`). Flexbox, not a centring grid: the left column
-(logo, menu bar, back/forward) and the right one (window buttons) are `flex-shrink-0`, the
-middle one with the search field is `flex-1 min-w-0` — the only one that gives way.
+**Title bar** (`TitleBar.tsx`, `h-10`). Flexbox, not a centring grid: the left group (logo,
+menu button, magnifier, back/forward, and on Windows/Linux the Export/Import buttons) and
+the right group (window buttons) are `flex-shrink-0`; the space between them is a plain
+drag-only spacer, not a shrinking content column. Every trigger is an icon-only `RailButton`,
+so there is nothing left to fold or measure as the window narrows — no `ResizeObserver`, no
+remembered width, no language-dependent breakpoint. The window's minimum width is 720px.
 
-Once the remaining space drops below 192px (`SEARCH_MIN_PX`), the four menus fold into a
-single button with a menu icon. The switch point is **not a fixed window width** but is
-computed via `ResizeObserver` from the menu bar's actually rendered width: it is 315px wide
-in German against 203px in English, so a constant would serve one of the two languages
-wrong. The expanded width is remembered in a ref and reused while collapsed, otherwise the
-two states oscillate; a language change discards the cache. In altar focus mode the bar
-never collapses — there is no search field to protect there. The window's minimum width is
-720px.
-
-The search pill is `h-8` (32px), not the ~34px of the entry list search: in a 40px bar a
-34px field would nearly fill the bar, while 32px keeps 4px of air above and below.
+Global search opens as `SearchModal` (`w-[560px]`, fixed `h-[70vh]`, matching
+`LinkPickerModal`'s geometry) instead of living in the bar itself. Its search field reuses
+the entry list's own pill (`sidebar-search-inner`/`sidebar-search-input`, `h-8`/32px) so both
+searches present the same surface, rather than the bar carrying a second, narrower field of
+its own.
 
 **Window buttons** (`WindowControls.tsx`, Windows and Linux only): 46×40px, square, no
 gap, flush into the window corner — the Windows Fluent geometry. The glyphs are inline SVG
@@ -421,9 +420,6 @@ The measurements sit in unusual places, each for a concrete reason:
 
 ### Platform Quirks
 
-- **`MIN_PANEL_REM = 24` instead of a px constant** for the minimum width of the search
-  results list: WebKitGTK derives its root font size from the GTK text scaling, so a fixed
-  px number would collapse to fewer than ten characters at a larger system font.
 - **`.modal-card` has no `overflow-hidden` in its base class**, because individual modals
   have popover content that must leave the card bounds (the altar category emoji picker,
   for one). It is opted into per modal via `className`.
@@ -433,7 +429,7 @@ The measurements sit in unusual places, each for a concrete reason:
 
 ### Known Fault Line: `bg-stone-700/40` on the Search Fields
 
-Two search pills (title bar and entry list) carry a raw
+Two search pills (global search's `SearchModal` and the entry list's own search) carry a raw
 `bg-stone-700/40` on top of their shared class. In Emerald Parchment the theme override for that utility
 class beats the class rule — so `--search-bg` does not apply there, the override value
 does. Both fields still look the same, but the claim "runs on `--search-bg`" does not hold

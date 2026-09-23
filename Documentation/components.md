@@ -185,9 +185,9 @@ container in `RightSidebar.tsx`. No panel and no field here adds a `px-*` of its
 | `useDeepLink` | the global search's deep link for a view without a detail page: `{ type, id }` runs the caller's `onOpen(target)` once (clear search/filters, expand groups), then scrolls the row carrying `rowAttribute` into view a frame later. Latches on the `activeView` object (a fresh one per navigation, so the same hit works twice) and remembers the handled one, so `items` can be a dependency — a link that finds an empty store fires once the list arrives — without later mutations resetting the user's filters. `onOpen` is ref-latched like `useEditActions`. Returns `scrollTo(id)` for a scroll without a deep link (Tags' newly created tag). Used by TasksView (`block: 'center'`), CategoriesView (whose 2s highlight stays in the view) and TagsView |
 | `useOpenInNewTabAction` | the "Open in New Tab" `ContextMenuAction` for a given `ActiveView` — label, `PanelTopOpen` icon, `openViewInNewTab`. The menu counterpart to `DashboardItem`'s middle-click. Used by the Home, Wiki, Operations and Blocks dashboards and the four `LeftSidebarEntryList` configs, which each wrote the same literal before. Journal's and Altar's dashboard menus don't offer it yet |
 | `useEmojiSearchData` | the emoji search dataset for `EmojiPicker` — `null` until loaded, and not fetched at all while its `enabled` argument is false (a closed picker). Thin hook wrapper around `lib/emojiSearch.ts`'s locale/cache functions, pulled out of `EmojiPicker` itself so the loading logic isn't tangled with the picker's own open/close and positioning state | `enabled` |
-| `useOutsideClick` | the mousedown-outside(-plus-Escape) dismiss pattern for menus and popovers. Takes the "inside" ref(s) (`refs`, plural — a portalled popover is no longer a DOM descendant of its trigger), `escape` (`true`, or `'capture'` to stop a surrounding `Modal`'s own Escape handler from winning), `capture` (needed where Tauri's `drag.js` calls `stopImmediatePropagation()` on a drag region before bubble listeners ever see the click), and `delay` (skip the opening mousedown itself, e.g. `ContextMenu`'s 50ms). Replaces eight separately written effects: `Dropdown`, `EmojiPicker`, `ContextMenu`, `TitleBarMenuBar`, `TitleBarSearchResults`, `LinkedEntryPicker` (now the one place backing `LinkedEntriesField`), `TagInput` |
+| `useOutsideClick` | the mousedown-outside(-plus-Escape) dismiss pattern for menus and popovers. Takes the "inside" ref(s) (`refs`, plural — a portalled popover is no longer a DOM descendant of its trigger), `escape` (`true`, or `'capture'` to stop a surrounding `Modal`'s own Escape handler from winning), `capture` (needed where Tauri's `drag.js` calls `stopImmediatePropagation()` on a drag region before bubble listeners ever see the click), and `delay` (skip the opening mousedown itself, e.g. `ContextMenu`'s 50ms). Replaces several separately written effects: `Dropdown`, `EmojiPicker`, `ContextMenu`, `TitleBarMenuButton`, `LinkedEntryPicker` (now the one place backing `LinkedEntriesField`), `TagInput` — `SearchModal`'s result list needs no outside-click of its own, since `Modal` already owns dismissal for the whole search |
 | `useLinkItems` | the store-subscribed half of `buildLinkItems` (below) — assembles every linkable entry across all five modules into one memoised list. Backs the `[[` suggestion list, `LinkPickerModal`, and `LinkedEntriesField` |
-| `useGlobalSearch` | assembles the search corpus from the stores and runs the query; backs the title bar's search field |
+| `useGlobalSearch` | assembles the search corpus from the stores and runs the query; backs `SearchModal`, opened from the title bar's magnifier |
 | `usePointerReorder(items, onDrop)` | drag-to-reorder by grip without animation — pointer events on `document`, no HTML5 drag, no package. Returns `listRef` (each direct child is one row wrapper, measured at its first child so expanded content below a row doesn't count), `visualItems` (the list with the dragged row at its current place), `draggingId` and `startDrag(e, id)`; `onDrop(ordered)` only fires when the order changed. Handles `pointercancel`, pointer capture and unmount mid-drag. Used by the Altar's placed elements and the sidebar block manager; `CategoriesView` still has its own copy (it measures whole rows and drags the unfiltered list) |
 | `usePersistedFlag(key, fallback?)` | an on/off flag that survives a restart — raw `'1'`/`'0'` in `localStorage` under `key`, returned as `[value, toggle]`. For preferences (which Altar dashboard section stays collapsed, whether its canvas preview is on), not for session-only working state — that stays on `useCollapsedSet`/`uiStore` deliberately, as those two already were |
 | `useCollapsedSet(scope, { defaultCollapsed? })` | collapse state for a group list — `isCollapsed(id)`, `toggle(id)`, `expand(...ids)` (used to open a group for the global search's deep-link navigation). `defaultCollapsed` makes every group start closed (Tags, where the list of headers is the overview); the stored set then holds the *opened* ids, which `isCollapsed`/`expand` hide. Lives in `uiStore.collapsedGroups`, keyed by `scope: 'journal' \| 'wiki' \| 'operations' \| 'tasks' \| 'altar-library' \| 'tags'`, rather than view-local state — `MainArea` unmounts the views on module switch, so a `useState` reopened every group on the way back. Still deliberately not persisted (a restart reopens everything); `closeAllTabs` resets it too, since a vault switch leaves category ids pointing at the old vault. Backs the category groups in Wiki, Operations and Tasks, Journal's moon-phase groups, and the category groups inside the Altar dashboard's library section (`'altar-library'` — distinct from the section's own collapse state, which *is* persisted; see [`architecture.md` → Altar UI Composition](architecture.md#altar-ui-composition)) |
@@ -237,7 +237,7 @@ right move as soon as the same chain shows up for the third time.
 | `.btn-primary` / `-secondary` / `-ghost` / `-danger` | buttons — normally through `Button`, not directly |
 | `.panel` / `.panel-interactive` | content-carrying cards and tiles |
 | `.modal-card` | the dialog surface itself (through `Modal`) |
-| `.menu-surface` / `.menu-item` / `.menu-separator` | menu bar dropdowns |
+| `.menu-surface` / `.menu-item` / `.menu-separator` | title-bar menu dropdowns |
 | `.context-menu*` | context menu (its own class set, see [Known Duplication](#known-duplication)) |
 | `.input-field` | small text inputs |
 | `.input-field:disabled` | a disabled text/date input (the backup export's From/To fields while "Whole period" is on) — `cursor: not-allowed`, plus a dimmed `::-webkit-calendar-picker-indicator` so the calendar icon stops inviting a click |
@@ -270,8 +270,8 @@ existing `.panel` card, not just the vault picker.
 
 **`MenuDropdown` alongside `ContextMenu`.** Two dropdown implementations, on purpose.
 `ContextMenu` positions itself at a cursor coordinate, has a timing trick to survive the
-right-click that opened it, and knows disabled entries but no submenus. The menu bar needs
-submenus too, plus `role="menubar"` with its full keyboard contract.
+right-click that opened it, and knows disabled entries but no submenus. The title bar's menu
+buttons need submenus too.
 
 **The `EmojiPicker`'s trigger stays free.** A large image/emoji button with a label in the
 altar item dialog and a bare emoji glyph in a category row have nothing in common but their
@@ -286,7 +286,8 @@ almost the same". What the three cases above have in common is that the shared v
 Open, deliberately recorded, and not an excuse for further copies.
 
 1. **Two surface class sets for dropdowns.** `.menu-surface`/`.menu-item`/
-   `.menu-separator` for the menu bar, `.context-menu*` for the context menu. They are
+   `.menu-separator` for the title bar's menu dropdowns, `.context-menu*` for the context
+   menu. They are
    unified in colour — `.menu-item` sits in the same selector groups as
    `.context-menu-item-default` in both themes — and the row height matches. The structural
    classes are still doubled.
