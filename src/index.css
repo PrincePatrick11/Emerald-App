@@ -75,43 +75,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
   .titlebar {
     background: var(--titlebar-bg);
-  }
-
-  /* Die Grundlinie der Titelleiste tragen ihre Abschnitte selbst, nicht die
-     Leiste: dazwischen sitzen die Tabs, und der aktive laesst sie offen. Gleiche
-     Farbe wie die Kanten der Tabs, damit die Linie durchlaeuft. */
-  .titlebar-edge {
     border-bottom: 1px solid var(--border-subtle);
   }
 
-  /* Ueber den Seitenleisten bleibt die Grundlinie auch unter dem aktiven Tab
-     geschlossen — offen ist sie nur ueber dem Hauptbereich. Die Breiten setzt
-     AppShell; sie fahren die Animation der Leisten mit, ausser waehrend eines
-     Resize-Drags. Ueber den Tabs (relative, „+" mit z-index 1). */
-  .titlebar::before,
-  .titlebar::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    z-index: 2;
-    height: 1px;
-    background: var(--border-subtle);
-    pointer-events: none;
-  }
-
-  .titlebar::before {
-    left: 0;
-    width: var(--left-sidebar-w, 0px);
-  }
-
-  .titlebar::after {
-    right: 0;
-    width: var(--right-sidebar-w, 0px);
-  }
-
-  .app-shell:not([data-resizing]) .titlebar::before,
-  .app-shell:not([data-resizing]) .titlebar::after {
-    transition: width 200ms ease-out;
+  /* Knopfbereich und Tab-Liste fahren die Breiten der Seitenleisten nach —
+     gleiche Dauer wie .app-sidebar-animated. */
+  .titlebar-follow-animated {
+    transition: min-width 200ms ease-out, max-width 200ms ease-out, right 200ms ease-out;
   }
 
   /* Traffic lights sit at x:14 and span ~52px (see tauri.macos.conf.json).
@@ -305,8 +275,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      immer `no-preference` — dort laesst sich die Animation nicht abbestellen. */
   @media (prefers-reduced-motion: reduce) {
     .app-sidebar-animated,
-    .app-shell:not([data-resizing]) .titlebar::before,
-    .app-shell:not([data-resizing]) .titlebar::after {
+    .titlebar-follow-animated {
       transition: none;
     }
   }
@@ -1936,47 +1905,17 @@ html[data-theme='emerald-noctis'] .panel-interactive:focus-visible {
 
 /* Tab-Leiste — beide Themes, die Unterschiede stecken nur in den Tokens.
    `html[data-theme]` haelt die Spezifitaet ueber Parchments generischer
-   button:focus-visible-Regel. Einen eigenen Grund hat die Leiste nicht mehr:
-   sie sitzt in der Titelleiste und liegt auf deren Flaeche. */
-/* Tabs fuellen die volle Hoehe, getrennt nur durch eine 1px-Kante rechts.
-   Inaktive Elemente tragen die Grundlinie unten selbst; der aktive Tab hat
-   die Flaeche des Inhaltsbereichs und laesst sie weg — keine Akzentkante. */
-html[data-theme] .tab-item {
-  border-right: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-/* Der erste Tab grenzt an die Knoepfe der Titelleiste, nicht an einen
-   Nachbartab — er braucht links eine eigene Kante. */
-html[data-theme] .tab-item:first-child {
-  border-left: 1px solid var(--border-subtle);
-}
-
-html[data-theme] .tab-fill {
-  border-bottom: 1px solid var(--border-subtle);
+   button:focus-visible-Regel. Die Tabs sind Pills auf der Flaeche der
+   Titelleiste, deren durchgehende Grundlinie sie nicht unterbrechen: inaktiv
+   ohne Flaeche, aktiv eine leichte, keine Kanten. */
+html[data-theme] .tab-item,
+html[data-theme] .tab-add {
+  color: var(--text-subtle);
 }
 
 html[data-theme] .tab-item-active {
   background: var(--tab-active-bg);
   color: var(--text-primary);
-  border-bottom-color: transparent;
-}
-
-html[data-theme] .tab-item-idle {
-  background: var(--tab-idle-bg);
-  color: var(--text-subtle);
-}
-
-/* Eigene linke Kante, um 1px ueber die rechte Kante des letzten Tabs gezogen:
-   ohne Ueberlauf decken sich beide, beim Scrollen trennt sie das „+" vom
-   abgeschnittenen Tab darunter. */
-html[data-theme] .tab-add {
-  position: relative;
-  z-index: 1;
-  margin-left: -1px;
-  border-left: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
-  color: var(--text-subtle);
 }
 
 html[data-theme] .tab-add:hover,
@@ -2002,9 +1941,9 @@ html[data-theme] .tab-close:hover {
   color: var(--text-primary);
 }
 
-/* Der Ring sitzt innen: die Leiste schneidet mit overflow-hidden alles ab,
-   was ueber ihre Hoehe hinausragt. Den Ring des Titel-Buttons (Parchments
-   generische Regel) zeichnet stattdessen der ganze Tab. */
+/* Der Ring sitzt innen: die scrollende Liste schneidet ab, was ueber die
+   Pill hinausragt. Den Ring des Titel-Buttons (Parchments generische Regel)
+   zeichnet stattdessen die ganze Pill. */
 html[data-theme] .tab-button:focus-visible {
   outline: none;
   box-shadow: none;

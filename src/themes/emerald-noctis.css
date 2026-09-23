@@ -70,12 +70,10 @@ html[data-theme='emerald-noctis'] {
   --panel-hover-border: rgba(119, 101, 85, 0.58);
   --panel-hover-shadow: 0 14px 30px rgba(0, 0, 0, 0.4);
   --titlebar-bg: rgba(24, 20, 16, 0.94);
-  /* Aktiver Tab: naehert die sichtbare Flaeche von .app-main an (--shell-bg + Verlauf
-     in index.css) — mitziehen, wenn sich eins davon aendert. */
-  --tab-active-bg: #1a1510;
-  --tab-idle-bg: rgba(0, 0, 0, 0.14);
+  /* Tabs sind Pills auf der Titelleiste: inaktiv ohne Flaeche, aktiv eine leichte. */
+  --tab-active-bg: rgba(245, 245, 244, 0.08);
   --tab-hover-bg: rgba(245, 245, 244, 0.04);
-  --tab-close-hover-bg: rgba(245, 245, 244, 0.08);
+  --tab-close-hover-bg: rgba(245, 245, 244, 0.1);
   --search-bg: rgba(34, 28, 24, 0.9);
   --search-border: rgba(109, 91, 75, 0.5);
   --search-inset: inset 0 1px 0 rgba(255, 241, 223, 0.06);

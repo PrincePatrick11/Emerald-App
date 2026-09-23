@@ -69,11 +69,10 @@ html[data-theme='emerald-parchment'] {
   --panel-hover-border: rgba(131, 96, 62, 0.48);
   --panel-hover-shadow: 0 10px 24px rgba(114, 79, 43, 0.11);
   --titlebar-bg: #ecdec7;
-  /* Aktiver Tab = Flaeche von .app-main (hier ohne eigenen Hintergrund, also die Shell). */
-  --tab-active-bg: var(--shell-bg);
-  --tab-idle-bg: rgba(130, 87, 44, 0.07);
-  --tab-hover-bg: rgba(130, 87, 44, 0.03);
-  --tab-close-hover-bg: rgba(130, 87, 44, 0.12);
+  /* Tabs sind Pills auf der Titelleiste: inaktiv ohne Flaeche, aktiv eine leichte. */
+  --tab-active-bg: rgba(130, 87, 44, 0.12);
+  --tab-hover-bg: rgba(130, 87, 44, 0.06);
+  --tab-close-hover-bg: rgba(130, 87, 44, 0.14);
   --search-bg: rgba(248, 239, 223, 0.92);
   --search-border: rgba(146, 107, 68, 0.38);
   --search-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);

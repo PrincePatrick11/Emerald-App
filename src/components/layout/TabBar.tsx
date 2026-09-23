@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { LazyMotion, Reorder, domAnimation } from 'framer-motion';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { REORDER_SPRING } from '../../lib/motion';
 import { useAltarStore } from '../../store/altarStore';
@@ -110,12 +110,74 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
   );
 }
 
-export default function TabBar() {
+/* Die Geometrie am rechten Ende, in Zahlen statt nur in Klassen: `gap-1` (4),
+   das „+" (30), die Mindestbreite der Ziehflaeche `min-w-12` (48) und der
+   Abstand zum Trennstrich, wie links `pl-1.5` (6). */
+const TAB_GAP = 4;
+const ADD_SIZE = 30;
+const FILL_MIN = 48;
+const EDGE_GAP = 6;
+/** Soviel Platz braucht der Streifen ueber der rechten Seitenleiste, damit
+ *  Trennstrich, „+" und Ziehflaeche hineinpassen. Darunter gibt es keinen
+ *  Strich, und die Tabs weichen dem „+" wie ohne Seitenleiste aus. */
+const EDGE_ROOM = 2 * EDGE_GAP + 1 + ADD_SIZE + TAB_GAP + FILL_MIN;
+
+interface TabBarProps {
+  /** Abstand, den die Tabs selbst zum rechten Rand halten — die Breite der
+   *  rechten Seitenleiste, soweit sie nicht unter den Fensterknoepfen liegt.
+   *  Das „+" darf in diesen Streifen hinein, die Tabs nicht. */
+  endInset?: number;
+  /** Aus, solange eine Seitenleiste per Drag in der Breite gezogen wird. */
+  animate?: boolean;
+}
+
+export default function TabBar({ endInset = 0, animate = true }: TabBarProps) {
   const { t } = useTranslation();
   const { tabs, activeTabId, selectTab, closeTab, addTab, setTabsOrder } = useUIStore(
     useShallow((s) => ({ tabs: s.tabs, activeTabId: s.activeTabId, selectTab: s.selectTab, closeTab: s.closeTab, addTab: s.addTab, setTabsOrder: s.setTabsOrder }))
   );
   const scrollRef = useRef<HTMLUListElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const hasEdge = endInset >= EDGE_ROOM;
+  // Wie weit das „+" nach rechts ruecken muss, um nicht auf dem Trennstrich zu
+  // sitzen: reicht die Liste bis an ihn heran, springt es dahinter.
+  const [addShift, setAddShift] = useState(0);
+
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    const list = scrollRef.current;
+    if (!root || !list || !hasEdge) { setAddShift(0); return; }
+    const update = () => {
+      // Die Kante der rechten Seitenleiste; der Strich belegt ihr erstes Pixel.
+      const edge = root.getBoundingClientRect().right - endInset;
+      const addLeft = list.getBoundingClientRect().right + TAB_GAP;
+      const clear = edge + 1 + EDGE_GAP;
+      const collides = addLeft + ADD_SIZE > edge - EDGE_GAP && addLeft < clear;
+      setAddShift(collides ? clear - addLeft : 0);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(root);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [endInset, hasEdge]);
+
+  // Der aktive Tab bleibt sichtbar — ein neuer per „+" ebenso wie einer, der
+  // von anderswo geoeffnet oder gewaehlt wurde. Von Hand gerechnet statt
+  // `scrollIntoView`: das scrollte auch die Vorfahren, die nur abschneiden.
+  useEffect(() => {
+    const list = scrollRef.current;
+    const item = list?.querySelector<HTMLElement>('.tab-item-active');
+    if (!list || !item) return;
+    const listBox = list.getBoundingClientRect();
+    const itemBox = item.getBoundingClientRect();
+    let delta = 0;
+    if (itemBox.left < listBox.left) delta = itemBox.left - listBox.left;
+    else if (itemBox.right > listBox.right) delta = itemBox.right - listBox.right;
+    if (delta === 0) return;
+    const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    list.scrollBy({ left: delta, behavior: smooth ? 'smooth' : 'auto' });
+  }, [activeTabId, tabs.length]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -133,20 +195,27 @@ export default function TabBar() {
   if (tabs.length === 0) return null;
 
   return (
-    // Sitzt in der Titelleiste und fuellt deren volle Hoehe. Die Leiste zeichnet
-    // keine eigene Grundlinie: jedes Element traegt seine untere Kante selbst,
-    // der aktive Tab laesst sie weg — so ist die Linie nur unter ihm offen. Das
-    // flex-1-Element am Ende zieht sie bis zu den Fenstersteuerungen und bleibt
-    // Ziehflaeche fuers Fenster (das Attribut vererbt sich nicht, s. TitleBar) —
-    // mit Mindestbreite, damit auch bei vielen Tabs eine zum Greifen bleibt.
-    <div data-tauri-drag-region className="tabbar flex h-full min-w-0 flex-1 items-stretch overflow-hidden">
+    // Sitzt in der Titelleiste; die Tabs sind 30px-Pills darin. Freie Flaechen —
+    // die Luecken zwischen den Pills, das flex-1-Element am Ende — bleiben
+    // Ziehflaeche fuers Fenster (das Attribut vererbt sich nicht, s. TitleBar).
+    // Das Endelement hat eine Mindestbreite, damit auch bei vielen Tabs eine
+    // zum Greifen bleibt.
+    <div
+      ref={rootRef}
+      data-tauri-drag-region
+      className="tabbar relative flex h-full min-w-0 flex-1 items-center gap-1 overflow-hidden pl-1.5"
+    >
       <LazyMotion features={domAnimation}>
         <Reorder.Group
           ref={scrollRef}
+          data-tauri-drag-region
           axis="x"
           values={tabs.map((tab) => tab.id)}
           onReorder={setTabsOrder}
-          className="scrollbar-none flex min-w-0 max-w-full flex-initial items-stretch overflow-x-auto overflow-y-hidden"
+          className={`scrollbar-none flex h-full min-w-0 flex-initial items-center gap-1 overflow-x-auto overflow-y-hidden${
+            animate ? ' titlebar-follow-animated' : ''
+          }`}
+          style={{ maxWidth: `calc(100% - ${hasEdge ? endInset + EDGE_GAP : endInset}px)` }}
         >
           {tabs.map((tab) => {
             const isActive = activeTabId === tab.id;
@@ -157,14 +226,14 @@ export default function TabBar() {
                 whileDrag={{ scale: 1.005 }}
                 transition={REORDER_SPRING}
                 style={{ position: 'relative' }}
-                className={`tab-item group flex w-[var(--tab-w)] flex-shrink-0 items-center gap-2 pl-3 pr-1.5 text-[13px] transition-colors ${
+                className={`tab-item group flex h-[30px] w-[var(--tab-w)] flex-shrink-0 items-center gap-2 rounded-md pl-2.5 pr-1 text-[13px] transition-colors ${
                   isActive ? 'tab-item-active font-medium' : 'tab-item-idle'
                 }`}
               >
                 <TabButton view={tab.view} onSelect={() => selectTab(tab.id)} onClose={() => closeTab(tab.id)} />
                 <button
                   onClick={() => closeTab(tab.id)}
-                  className="tab-close flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-md opacity-0 transition-colors group-hover:opacity-100 focus-visible:opacity-100"
+                  className="tab-close flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded opacity-0 transition-colors group-hover:opacity-100 focus-visible:opacity-100"
                   title={t('tabBar.closeTab')}
                 >
                   <X size={14} />
@@ -176,12 +245,23 @@ export default function TabBar() {
       </LazyMotion>
       <button
         onClick={() => addTab()}
-        className="tab-add flex w-10 flex-shrink-0 items-center justify-center transition-colors"
+        className="tab-add flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-md transition-colors"
+        style={addShift ? { marginLeft: addShift } : undefined}
         title={t('tabBar.newTab')}
       >
-        <Plus size={16} />
+        <Plus size={14} />
       </button>
-      <div data-tauri-drag-region className="tab-fill min-w-12 flex-1" />
+      <div data-tauri-drag-region className="min-w-12 flex-1 self-stretch" />
+      {/* Trennstrich auf der Kante der rechten Seitenleiste — Gegenstueck zu
+          dem in TitleBar ueber der linken, gleiche Klasse, gleiche Farbe. */}
+      {hasEdge && (
+        <div
+          className={`pointer-events-none absolute top-1/2 h-4 -translate-y-1/2 border-l border-stone-700/60${
+            animate ? ' titlebar-follow-animated' : ''
+          }`}
+          style={{ right: endInset - 1 }}
+        />
+      )}
     </div>
   );
 }

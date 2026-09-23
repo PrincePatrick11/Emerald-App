@@ -114,21 +114,25 @@ Both theme files define the heights as tokens: `--tab-w` (140px), which `TabBar`
 up yet. Rail buttons (`RailButton`) come out at
 32×32: an 18px icon, `p-1.5` and the 1px frame that holds room for the active accent.
 
-**Tab bar** (`TabBar.tsx`): the strip sits inside the title bar, right after its leading group
-of controls. Both sides keep room to drag the window: `pr-6` on the leading group, and a
-trailing filler of at least 48px (`min-w-12`) that stays even when the tabs overflow.
-The left sidebar's *default* width is derived from that leading group: `TitleBar` reports
-its measured width (`onLeadWidth`), and `AppShell` sizes the entry list so the sidebar's
-right edge lands on the first tab's left edge (never below `ENTRY_LIST_MIN`). A width the
-user dragged is kept instead; "Reset view" returns to the derived default. Tabs fill the full 40px, fixed 140px wide, no radius and no
-gap — separated only by a 1px `--border-subtle` edge on the right; the first tab also draws
-one on its left, against the title bar's controls. Idle tabs sit slightly
-recessed (`--tab-idle-bg`, `--text-subtle`). Every idle element (tabs, the square "+"
-button, a trailing `flex-1` filler) carries its own bottom line; the active tab takes the
-surface of `.app-main` (`--tab-active-bg`) and leaves it out, so the line opens only
-beneath it. No accent edge on the active tab. The "+" button draws its own left edge,
-pulled 1px over the last tab, so it stays separated from a clipped tab while the bar
-scrolls. Focus rings sit *inset*, since the bar clips anything beyond its height.
+**Tab bar** (`TabBar.tsx`): the strip sits inside the title bar. The leading group of
+controls grows to the left sidebar's width (`leadWidth` from `AppShell`, animated along
+with the sidebar) and ends in a short vertical divider (`h-4`, `border-stone-700/60`)
+exactly above the sidebar's right edge, so the tabs begin above the main area. When the
+sidebar is narrower than the controls, the divider and tabs follow right after them.
+On the right the tabs end at the right sidebar's edge: `TitleBar` passes the part of that
+sidebar not already under the window controls (`WINDOW_CONTROLS_WIDTH`) to `TabBar` as
+`endInset`, which caps the tab list; only the "+" may reach past it. When that strip is
+wide enough (`EDGE_ROOM`), a divider like the left one marks the edge, the tabs stop 6px
+short of it, and a "+" that would land on it moves 6px past it instead. The list scrolls
+the active tab into view, so a tab added with "+" is visible right away.
+Tabs are 30px pills, fixed 140px wide, `rounded-md`, 4px apart (`gap-1`), with no edges:
+idle tabs have no surface (`--text-subtle`, `--tab-hover-bg` on hover), the active tab a
+light one (`--tab-active-bg`, `--text-primary`). No accent edge on the active tab; the ×
+appears on hover. The "+" is a 30px square button of the same kind. The title bar's own
+bottom line runs through unbroken beneath all of it. The gaps between pills, the space
+before the divider and a trailing filler of at least 48px (`min-w-12`, kept even when the
+tabs overflow) stay free to drag the window. Focus rings sit *inset*, since the scrolling
+list clips anything beyond a pill.
 
 **Horizontal padding has exactly one source per column.** The column's outer container
 sets it; the panels inside add no `px-*` of their own. In the right sidebar that is the
@@ -271,11 +275,7 @@ define the same 81 properties. Core values:
 | `--menu-shadow` | `0 14px 36px rgba(0,0,0,0.35)` | `0 18px 36px rgba(96,63,30,0.2)` |
 | `--titlebar-bg` | `rgba(24, 20, 16, 0.94)` | `#ecdec7` |
 
-The tab strip has no background of its own — it lies on `--titlebar-bg`. The title bar's
-bottom line is drawn by its segments (`.titlebar-edge`, `--border-subtle`) and by the tabs,
-so it stays open beneath the active tab — but only over the main area: across each
-sidebar's width (`--left-sidebar-w` / `--right-sidebar-w`, set by `AppShell`) a
-`.titlebar::before` / `::after` line sits above the tabs and keeps it closed.
+The tab strip has no background of its own — it lies on `--titlebar-bg`.
 
 Deliberately **not** tokenised: the Fluent red of the close button (`#c42b1c`, active
 `#b2231a`). It is identical in both themes — a token would only be a second place to

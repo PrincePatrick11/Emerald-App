@@ -24,10 +24,9 @@ import type { ContextMenuAction } from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 
-/* Die Geometrie der Tab-Leiste, in Zahlen statt nur in Utility-Klassen: der
-   Rueckfall fuer die Standardbreite der Eintragsliste ist genau die Breite,
-   die ihre Tabs brauchen (`AppShell`s ENTRY_LIST_FALLBACK — die eigentliche
-   Standardbreite richtet sich nach dem Knopfbereich der Titelleiste). Die Werte spiegeln die Klassen
+/* Die Geometrie der Tab-Leiste, in Zahlen statt nur in Utility-Klassen: die
+   Standardbreite der Eintragsliste ist genau die Breite, die ihre Tabs
+   brauchen (`AppShell`s ENTRY_LIST_DEFAULT). Die Werte spiegeln die Klassen
    der Leiste unten — `px-3` (12), `TabIconButton`s `p-2` + 14px-Icon + 1px
    Rahmen (32), `gap-0.5` (2). Wer eine davon aendert, muss hier mit.
    Gezaehlt werden alle Tabs, auch die in den Einstellungen ausgeblendeten:
