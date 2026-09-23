@@ -9,6 +9,7 @@ html[data-theme='emerald-noctis'] {
   --text-muted: #a8a29e;
   --text-subtle: #78716c;
   --border-soft: rgba(87, 83, 78, 0.62);
+  --border-subtle: rgba(87, 83, 78, 0.5);
   --border-strong: rgba(120, 113, 108, 0.72);
   --interactive-hover: rgba(245, 245, 244, 0.06);
   --interactive-active: rgba(245, 245, 244, 0.1);
@@ -70,16 +71,19 @@ html[data-theme='emerald-noctis'] {
   --panel-hover-shadow: 0 14px 30px rgba(0, 0, 0, 0.4);
   --titlebar-bg: rgba(24, 20, 16, 0.94);
   --tabbar-bg: rgba(28, 23, 19, 0.86);
+  /* Aktiver Tab: naehert die sichtbare Flaeche von .app-main an (--shell-bg + Verlauf
+     in index.css) — mitziehen, wenn sich eins davon aendert. */
   --tab-active-bg: #1a1510;
-  --tab-active-text: #f6efe8;
-  --tab-active-border: rgba(144, 123, 101, 0.5);
-  --tab-active-shadow: 0 -1px 0 rgba(255, 243, 229, 0.08);
-  --tab-idle-bg: rgba(43, 35, 30, 0.74);
-  --tab-idle-text: #bea792;
-  --tab-idle-border: rgba(102, 86, 71, 0.42);
-  --tab-idle-hover-bg: rgba(55, 45, 38, 0.9);
-  --tab-idle-hover-text: #e6d6c6;
+  --tab-idle-bg: rgba(0, 0, 0, 0.14);
+  --tab-hover-bg: rgba(245, 245, 244, 0.04);
+  --tab-close-hover-bg: rgba(245, 245, 244, 0.08);
   --search-bg: rgba(34, 28, 24, 0.9);
   --search-border: rgba(109, 91, 75, 0.5);
   --search-inset: inset 0 1px 0 rgba(255, 241, 223, 0.06);
+  /* Hoehen (design.md, Heights and Spacing). */
+  --tabbar-h: 34px;
+  --tab-w: 140px;
+  --content-bar-h: 56px;
+  --control-h: 30px;
+  --control-h-sm: 24px;
 }

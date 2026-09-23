@@ -1916,44 +1916,84 @@ html[data-theme='emerald-noctis'] .panel-interactive:focus-visible {
   box-shadow: var(--panel-shadow), 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
-html[data-theme='emerald-noctis'] .tabbar {
+/* Tab-Leiste — beide Themes, die Unterschiede stecken nur in den Tokens.
+   `html[data-theme]` haelt die Spezifitaet ueber Parchments generischer
+   button:focus-visible-Regel. */
+html[data-theme] .tabbar {
   background: var(--tabbar-bg);
 }
 
-html[data-theme='emerald-noctis'] .tabbar::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background: rgba(110, 93, 76, 0.44);
-  pointer-events: none;
-  z-index: 0;
+/* Tabs fuellen die volle Hoehe, getrennt nur durch eine 1px-Kante rechts.
+   Inaktive Elemente tragen die Grundlinie unten selbst; der aktive Tab hat
+   die Flaeche des Inhaltsbereichs und laesst sie weg — keine Akzentkante. */
+html[data-theme] .tab-item {
+  border-right: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-html[data-theme='emerald-noctis'] .tab-item-active {
+html[data-theme] .tab-fill {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+html[data-theme] .tab-item-active {
   background: var(--tab-active-bg);
-  color: var(--tab-active-text);
-  border-color: var(--tab-active-border);
+  color: var(--text-primary);
   border-bottom-color: transparent;
-  box-shadow: var(--tab-active-shadow);
+}
+
+html[data-theme] .tab-item-idle {
+  background: var(--tab-idle-bg);
+  color: var(--text-subtle);
+}
+
+/* Eigene linke Kante, um 1px ueber die rechte Kante des letzten Tabs gezogen:
+   ohne Ueberlauf decken sich beide, beim Scrollen trennt sie das „+" vom
+   abgeschnittenen Tab darunter. */
+html[data-theme] .tab-add {
   position: relative;
   z-index: 1;
+  margin-left: -1px;
+  border-left: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-subtle);
 }
 
-html[data-theme='emerald-noctis'] .tab-item-idle,
-html[data-theme='emerald-noctis'] .tab-add {
-  background: var(--tab-idle-bg);
-  color: var(--tab-idle-text);
-  border-color: var(--tab-idle-border);
-  border-bottom-color: transparent;
+html[data-theme] .tab-add:hover,
+html[data-theme] .tab-item-idle:hover {
+  background: var(--tab-hover-bg);
+  color: var(--text-secondary);
 }
 
-html[data-theme='emerald-noctis'] .tab-add:hover,
-html[data-theme='emerald-noctis'] .tab-item-idle:hover {
-  background: var(--tab-idle-hover-bg);
-  color: var(--tab-idle-hover-text);
+html[data-theme] .tab-icon {
+  color: var(--text-subtle);
+}
+
+html[data-theme] .tab-edit-dot {
+  background: var(--accent);
+}
+
+html[data-theme] .tab-close {
+  color: var(--text-subtle);
+}
+
+html[data-theme] .tab-close:hover {
+  background: var(--tab-close-hover-bg);
+  color: var(--text-primary);
+}
+
+/* Der Ring sitzt innen: die Leiste schneidet mit overflow-hidden alles ab,
+   was ueber ihre Hoehe hinausragt. Den Ring des Titel-Buttons (Parchments
+   generische Regel) zeichnet stattdessen der ganze Tab. */
+html[data-theme] .tab-button:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+html[data-theme] .tab-item:has(.tab-button:focus-visible),
+html[data-theme] .tab-add:focus-visible,
+html[data-theme] .tab-close:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--focus-ring);
 }
 
 html[data-theme='emerald-noctis'] .sidebar-item {
@@ -2288,52 +2328,6 @@ html[data-theme='emerald-parchment'] .panel-interactive:hover {
 html[data-theme='emerald-parchment'] .panel-interactive:focus-visible {
   outline: none;
   box-shadow: var(--panel-shadow), 0 0 0 2px var(--focus-ring);
-}
-
-html[data-theme='emerald-parchment'] .tabbar {
-  background: var(--tabbar-bg);
-}
-
-html[data-theme='emerald-parchment'] .tabbar::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background: rgba(145, 108, 70, 0.32);
-  pointer-events: none;
-  z-index: 0;
-}
-
-html[data-theme='emerald-parchment'] .tab-item-active {
-  background: var(--tab-active-bg);
-  color: var(--tab-active-text);
-  border-color: var(--tab-active-border);
-  border-bottom-color: transparent;
-  box-shadow: var(--tab-active-shadow);
-  position: relative;
-  z-index: 1;
-}
-
-html[data-theme='emerald-parchment'] .tab-item-idle {
-  background: var(--tab-idle-bg);
-  color: var(--tab-idle-text);
-  border-color: var(--tab-idle-border);
-  border-bottom-color: transparent;
-}
-
-html[data-theme='emerald-parchment'] .tab-add {
-  background: var(--tab-idle-bg);
-  border-color: var(--tab-idle-border);
-  border-bottom-color: transparent;
-  color: var(--tab-idle-text);
-}
-
-html[data-theme='emerald-parchment'] .tab-add:hover,
-html[data-theme='emerald-parchment'] .tab-item-idle:hover {
-  background: var(--tab-idle-hover-bg);
-  color: var(--tab-idle-hover-text);
 }
 
 html[data-theme='emerald-parchment'] .sidebar-item {
