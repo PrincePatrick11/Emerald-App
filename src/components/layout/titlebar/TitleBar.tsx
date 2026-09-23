@@ -12,6 +12,16 @@ import { useTitleBarMenus } from './useTitleBarMenus';
 import SearchModal from './SearchModal';
 import WindowControls, { WINDOW_CONTROLS_WIDTH } from './WindowControls';
 
+interface Props {
+  tabs?: boolean;
+  /** Breite der linken Seitenleiste. */
+  leadWidth?: number;
+  /** Breite der rechten Seitenleiste. */
+  trailWidth?: number;
+  /** Aus, solange eine Seitenleiste per Drag in der Breite gezogen wird. */
+  animate?: boolean;
+}
+
 /**
  * The window's title bar.
  *
@@ -28,20 +38,10 @@ import WindowControls, { WINDOW_CONTROLS_WIDTH } from './WindowControls';
  * With `tabs` set, the bar also holds the tab strip. The leading group then
  * grows to `leadWidth` — the left sidebar's width — and ends in a divider on
  * the sidebar's edge, so the tabs begin above the main area; they end at the
- * right sidebar's edge (`trailWidth`), only the "+" may reach past it. Without `tabs`
- * (no vault yet, boot still running) the shell content is unmounted and there
- * are no tabs to show.
+ * right sidebar's edge (`trailWidth`), only the "+" may reach past it.
+ * Without `tabs` (no vault yet, boot still running) the shell content is
+ * unmounted and there are no tabs to show.
  */
-interface Props {
-  tabs?: boolean;
-  /** Breite der linken Seitenleiste. */
-  leadWidth?: number;
-  /** Breite der rechten Seitenleiste. */
-  trailWidth?: number;
-  /** Aus, solange eine Seitenleiste per Drag in der Breite gezogen wird. */
-  animate?: boolean;
-}
-
 export default function TitleBar({ tabs = false, leadWidth = 0, trailWidth = 0, animate = true }: Props) {
   const { t } = useTranslation();
   const navigateBack = useUIStore((s) => s.navigateBack);
@@ -86,7 +86,7 @@ export default function TitleBar({ tabs = false, leadWidth = 0, trailWidth = 0, 
           als die Knoepfe, beginnen die Tabs eben dahinter. */}
       <div
         data-tauri-drag-region
-        className={`flex items-center gap-1 h-full flex-shrink-0 pl-2${showTabs ? '' : ' pr-2'}${
+        className={`flex items-center gap-1 h-full flex-shrink-0 pl-2${
           showTabs && animate ? ' titlebar-follow-animated' : ''
         }`}
         style={showTabs ? { minWidth: leadWidth } : undefined}

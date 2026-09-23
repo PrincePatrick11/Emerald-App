@@ -40,6 +40,10 @@ function CloseGlyph() {
   return <svg {...GLYPH}><path d="M0.5 0.5l9 9M9.5 0.5l-9 9" /></svg>;
 }
 
+/** Breite aller drei Knoepfe — spiegelt `.window-control` (`w-[46px]`) in
+ *  index.css. `TitleBar` rechnet damit aus, wie weit die Tabs reichen. */
+export const WINDOW_CONTROLS_WIDTH = 3 * 46;
+
 /**
  * Minimise / maximise / close for the undecorated window on Windows and Linux.
  * macOS never renders these — it keeps its native traffic lights, positioned
@@ -48,10 +52,6 @@ function CloseGlyph() {
  * 46x40 px per button with square corners and no gap is the Windows Fluent
  * geometry; matching it is what makes the bar read as a real title bar.
  */
-/** Breite aller drei Knoepfe — spiegelt `.window-control` (`w-[46px]`) in
- *  index.css. `TitleBar` rechnet damit aus, wie weit die Tabs reichen. */
-export const WINDOW_CONTROLS_WIDTH = 3 * 46;
-
 export default function WindowControls() {
   const { t } = useTranslation();
   const maximized = useIsMaximized();

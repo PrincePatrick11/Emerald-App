@@ -118,9 +118,10 @@ const ADD_SIZE = 30;
 const FILL_MIN = 48;
 const EDGE_GAP = 6;
 /** Soviel Platz braucht der Streifen ueber der rechten Seitenleiste, damit
- *  Trennstrich, „+" und Ziehflaeche hineinpassen. Darunter gibt es keinen
- *  Strich, und die Tabs weichen dem „+" wie ohne Seitenleiste aus. */
-const EDGE_ROOM = 2 * EDGE_GAP + 1 + ADD_SIZE + TAB_GAP + FILL_MIN;
+ *  Trennstrich, „+" (im ungünstigsten Fall EDGE_GAP dahinter) und Ziehflaeche
+ *  hineinpassen. Darunter gibt es keinen Strich, und die Tabs weichen dem „+"
+ *  wie ohne Seitenleiste aus. */
+const EDGE_ROOM = 1 + EDGE_GAP + ADD_SIZE + TAB_GAP + FILL_MIN;
 
 interface TabBarProps {
   /** Abstand, den die Tabs selbst zum rechten Rand halten — die Breite der
@@ -139,6 +140,9 @@ export default function TabBar({ endInset = 0, animate = true }: TabBarProps) {
   const scrollRef = useRef<HTMLUListElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const hasEdge = endInset >= EDGE_ROOM;
+  // Ohne Tabs rendert die Leiste nichts, es gibt also nichts zu beobachten —
+  // der Effekt muss neu laufen, sobald wieder einer da ist.
+  const hasTabs = tabs.length > 0;
   // Wie weit das „+" nach rechts ruecken muss, um nicht auf dem Trennstrich zu
   // sitzen: reicht die Liste bis an ihn heran, springt es dahinter.
   const [addShift, setAddShift] = useState(0);
@@ -160,7 +164,7 @@ export default function TabBar({ endInset = 0, animate = true }: TabBarProps) {
     observer.observe(root);
     observer.observe(list);
     return () => observer.disconnect();
-  }, [endInset, hasEdge]);
+  }, [endInset, hasEdge, hasTabs]);
 
   // Der aktive Tab bleibt sichtbar — ein neuer per „+" ebenso wie einer, der
   // von anderswo geoeffnet oder gewaehlt wurde. Von Hand gerechnet statt
@@ -195,9 +199,11 @@ export default function TabBar({ endInset = 0, animate = true }: TabBarProps) {
   if (tabs.length === 0) return null;
 
   return (
-    // Sitzt in der Titelleiste; die Tabs sind 30px-Pills darin. Freie Flaechen —
-    // die Luecken zwischen den Pills, das flex-1-Element am Ende — bleiben
-    // Ziehflaeche fuers Fenster (das Attribut vererbt sich nicht, s. TitleBar).
+    // Sitzt in der Titelleiste; die Tabs sind 30px-Pills darin. Die freien
+    // Raender und das flex-1-Element am Ende bleiben Ziehflaeche fuers Fenster
+    // (das Attribut vererbt sich nicht, s. TitleBar). Die Luecken zwischen den
+    // Pills nicht: ein Klick dorthin kurz nach einem Tab-Klick zaehlte als
+    // Doppelklick und maximierte das Fenster.
     // Das Endelement hat eine Mindestbreite, damit auch bei vielen Tabs eine
     // zum Greifen bleibt.
     <div
@@ -208,7 +214,6 @@ export default function TabBar({ endInset = 0, animate = true }: TabBarProps) {
       <LazyMotion features={domAnimation}>
         <Reorder.Group
           ref={scrollRef}
-          data-tauri-drag-region
           axis="x"
           values={tabs.map((tab) => tab.id)}
           onReorder={setTabsOrder}
@@ -233,7 +238,7 @@ export default function TabBar({ endInset = 0, animate = true }: TabBarProps) {
                 <TabButton view={tab.view} onSelect={() => selectTab(tab.id)} onClose={() => closeTab(tab.id)} />
                 <button
                   onClick={() => closeTab(tab.id)}
-                  className="tab-close flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded opacity-0 transition-colors group-hover:opacity-100 focus-visible:opacity-100"
+                  className="tab-close flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-md opacity-0 transition-colors group-hover:opacity-100 focus-visible:opacity-100"
                   title={t('tabBar.closeTab')}
                 >
                   <X size={14} />

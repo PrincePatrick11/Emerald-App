@@ -85,9 +85,9 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   /* Traffic lights sit at x:14 and span ~52px (see tauri.macos.conf.json).
-     The inset goes on the first column, not the container: padding on the
-     grid itself would shrink its content box and shift the centre track,
-     which is the one thing the 1fr/auto/1fr layout exists to prevent. */
+     The inset goes on the leading group, not the bar: that group is
+     border-box, so with tabs its `min-width` (the left sidebar's width)
+     already includes the inset and the divider stays on the sidebar's edge. */
   html[data-platform='macos'] .titlebar > :first-child {
     padding-left: 5rem;
   }

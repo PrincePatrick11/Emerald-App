@@ -272,9 +272,7 @@ export default function AppShell() {
   }
   if (!bootSettled) return chrome(<main className="app-main flex-1 min-h-0" />);
 
-  const leftSidebarWidth = isAltarWindowFullscreen
-    ? 0
-    : (railOpen ? RAIL_WIDTH : 0) + (leftListOpen ? entryListWidth : 0);
+  const leftSidebarWidth = (railOpen ? RAIL_WIDTH : 0) + (leftListOpen ? entryListWidth : 0);
 
   return (
     <div className="app-shell flex flex-col h-screen w-screen overflow-hidden bg-stone-900 relative">
@@ -282,7 +280,7 @@ export default function AppShell() {
       <TitleBar
         tabs
         leadWidth={leftSidebarWidth}
-        trailWidth={isAltarWindowFullscreen || !rightSidebarOpen ? 0 : rightWidth}
+        trailWidth={rightSidebarOpen ? rightWidth : 0}
         animate={!resizing}
       />
 

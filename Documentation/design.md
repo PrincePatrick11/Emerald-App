@@ -129,10 +129,11 @@ Tabs are 30px pills, fixed 140px wide, `rounded-md`, 4px apart (`gap-1`), with n
 idle tabs have no surface (`--text-subtle`, `--tab-hover-bg` on hover), the active tab a
 light one (`--tab-active-bg`, `--text-primary`). No accent edge on the active tab; the ×
 appears on hover. The "+" is a 30px square button of the same kind. The title bar's own
-bottom line runs through unbroken beneath all of it. The gaps between pills, the space
-before the divider and a trailing filler of at least 48px (`min-w-12`, kept even when the
-tabs overflow) stay free to drag the window. Focus rings sit *inset*, since the scrolling
-list clips anything beyond a pill.
+bottom line runs through unbroken beneath all of it. The space before the divider and a
+trailing filler of at least 48px (`min-w-12`, kept even when the tabs overflow) stay free
+to drag the window; the gaps between pills deliberately do not, since a click there right
+after a tab click would count as a double-click and maximise the window. Focus rings sit
+*inset*, since the scrolling list clips anything beyond a pill.
 
 **Horizontal padding has exactly one source per column.** The column's outer container
 sets it; the panels inside add no `px-*` of their own. In the right sidebar that is the
