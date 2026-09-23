@@ -317,6 +317,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     background-color: var(--interactive-hover);
   }
 
+  /* Die Knoepfe der linken Rail. Der transparente Rahmen haelt den Platz fuer
+     den Akzentrahmen der aktiven Ansicht frei, damit nichts springt. */
+  .rail-button {
+    @apply rounded-lg;
+    border: 1px solid transparent;
+  }
+
   .panel {
     @apply border rounded-xl;
     background-color: var(--bg-surface-1);
@@ -1967,7 +1974,9 @@ html[data-theme='emerald-noctis'] .sidebar-item:hover {
   border-color: rgba(124, 102, 82, 0.46);
 }
 
-html[data-theme='emerald-noctis'] .sidebar-item.active {
+html[data-theme='emerald-noctis'] .sidebar-item.active,
+html[data-theme='emerald-noctis'] .rail-button.active,
+html[data-theme='emerald-noctis'] .rail-button.active:hover {
   color: #ddfff2;
   background: rgba(0, 138, 87, 0.24);
   border-color: rgba(0, 196, 127, 0.42);
@@ -2347,7 +2356,9 @@ html[data-theme='emerald-parchment'] .sidebar-item:hover {
   border-color: rgba(146, 107, 67, 0.33);
 }
 
-html[data-theme='emerald-parchment'] .sidebar-item.active {
+html[data-theme='emerald-parchment'] .sidebar-item.active,
+html[data-theme='emerald-parchment'] .rail-button.active,
+html[data-theme='emerald-parchment'] .rail-button.active:hover {
   color: #1f150d;
   background: #d8efe3;
   border-color: rgba(0, 138, 87, 0.36);

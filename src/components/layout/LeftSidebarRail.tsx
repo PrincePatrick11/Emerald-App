@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { Settings } from 'lucide-react';
-import { Suspense, lazy, useEffect, useState } from 'react';
-import { AUX_VIEWS, MODULE_LIST } from '../../lib/modules';
+import { Settings, type LucideIcon } from 'lucide-react';
+import { Fragment, Suspense, lazy, useEffect, useState } from 'react';
+import { AUX_VIEWS, MODULE_LIST, type ViewId } from '../../lib/modules';
 import { useUIStore } from '../../store/uiStore';
 import { useVaultStore } from '../../store/vaultStore';
 import { asUpdateError, checkForUpdate, updateSettings } from '../../lib/updates';
@@ -26,6 +26,7 @@ export const RAIL_WIDTH = 56;
 export default function LeftSidebarRail() {
   const { t } = useTranslation();
   const setActiveView = useUIStore((s) => s.setActiveView);
+  const activeViewType = useUIStore((s) => s.activeView.type);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsPage, setSettingsPage] = useState<SettingsPage>('general');
   const [vaultOpen, setVaultOpen] = useState(false);
@@ -55,6 +56,19 @@ export default function LeftSidebarRail() {
     return () => { dead = true; };
   }, []);
 
+  // Ein Knopf pro Ansicht; hervorgehoben ist er, solange seine Ansicht offen
+  // ist — auch mit einem geoeffneten Eintrag darin.
+  const viewButton = (type: ViewId, meta: { icon: LucideIcon; navLabelKey: string }) => (
+    <RailButton
+      key={type}
+      active={activeViewType === type}
+      onClick={() => setActiveView({ type })}
+      title={t(meta.navLabelKey)}
+    >
+      <meta.icon size={18} />
+    </RailButton>
+  );
+
   return (
     <div
       className="left-sidebar-rail rail-divider flex flex-col items-center h-full flex-shrink-0 border-r"
@@ -65,76 +79,60 @@ export default function LeftSidebarRail() {
           für dasselbe. */}
 
       {/* Main nav icons — navigate only, never touch the entry-list panel */}
-      <div className="rail-divider w-full flex flex-col items-center gap-0.5 py-2 border-b">
+      {/* Main nav icons — navigate only, never touch the entry-list panel */}
+      <div className="w-full flex flex-col items-center gap-1 py-2">
         {/* Der Weg zum Dashboard. Er hing vorher am Emerald-Logo in der
             Titelleiste, das niemand als Navigationsziel liest.
             Achtung bei MCP-Selektoren: lucide exportiert `Home` als Alias von
             `House`, das SVG traegt also `.lucide-house`, nicht `.lucide-home`. */}
-        <RailButton onClick={() => setActiveView({ type: 'home' })} title={t(AUX_VIEWS.home.navLabelKey)}>
-          <AUX_VIEWS.home.icon size={18} />
-        </RailButton>
+        {viewButton('home', AUX_VIEWS.home)}
         {MODULE_LIST.map((mod) => (
-          <RailButton key={mod.id} onClick={() => setActiveView({ type: mod.id })} title={t(mod.navLabelKey)}>
-            <mod.icon size={18} />
-          </RailButton>
+          <Fragment key={mod.id}>
+            {/* Das Lexikon ist kein Eintragsmodul, steht aber oben zwischen
+                Wiki und Altar statt unten bei Bloecken und Vorlagen. */}
+            {mod.id === 'altar' && viewButton('lexicon', AUX_VIEWS.lexicon)}
+            {viewButton(mod.id, mod)}
+          </Fragment>
         ))}
       </div>
 
-      {/* Bottom nav — always visible: Blocks/Templates/Lexicon/Tags/Categories/Trash grouped, Vault/Settings set apart below a divider */}
-      <div className="sidebar-bottom-bar w-full flex-1 flex flex-col items-center justify-end py-2">
-        <div className="flex flex-col items-center gap-0.5">
-          <RailButton onClick={() => setActiveView({ type: 'blocks' })} title={t(AUX_VIEWS.blocks.navLabelKey)}>
-            <AUX_VIEWS.blocks.icon size={18} />
-          </RailButton>
-          <RailButton onClick={() => setActiveView({ type: 'templates' })} title={t(AUX_VIEWS.templates.navLabelKey)}>
-            <AUX_VIEWS.templates.icon size={18} />
-          </RailButton>
-          <RailButton onClick={() => setActiveView({ type: 'lexicon' })} title={t(AUX_VIEWS.lexicon.navLabelKey)}>
-            <AUX_VIEWS.lexicon.icon size={18} />
-          </RailButton>
-          <RailButton onClick={() => setActiveView({ type: 'tags' })} title={t(AUX_VIEWS.tags.navLabelKey)}>
-            <AUX_VIEWS.tags.icon size={18} />
-          </RailButton>
-          <RailButton onClick={() => setActiveView({ type: 'categories' })} title={t(AUX_VIEWS.categories.navLabelKey)}>
-            <AUX_VIEWS.categories.icon size={18} />
-          </RailButton>
-          <RailButton onClick={() => setActiveView({ type: 'trash' })} title={t(AUX_VIEWS.trash.navLabelKey)}>
-            <AUX_VIEWS.trash.icon size={18} />
-          </RailButton>
-        </div>
-        <div className="rail-divider w-8 border-t my-1.5" />
-        <div className="flex flex-col items-center gap-0.5">
-          <RailButton onClick={() => setVaultOpen(true)} title={t('nav.vaults')}>
-            {/* 17px nur fuers Emoji: es traegt keine Strichstaerke und wirkt
-                neben den lucide-Icons sonst zu gross. Das Ersatz-Glyph ist
-                selbst ein lucide-Icon und bleibt bei den 18 seiner Nachbarn. */}
-            <VaultGlyph icon={activeVaultIcon} size={activeVaultIcon ? 17 : 18} />
-          </RailButton>
-          <RailButton
-            // Die Zielseite wird hier festgehalten und der Punkt sofort
-            // geloescht: er hat seine Aufgabe erfuellt, sobald das Fenster
-            // aufgeht. Andersherum spraenge das Zahnrad den Rest der Sitzung
-            // auf „Updates" — und ein Loeschen ohne dieses Merken hiesse, dass
-            // das Fenster wieder auf „Allgemein" aufginge, weil beide
-            // Zustandsaenderungen im selben Rendern landen.
-            onClick={() => {
-              setSettingsPage(updateVersion ? 'updates' : 'general');
-              setSettingsOpen(true);
-              setUpdateVersion(null);
-            }}
-            title={updateVersion ? t('settings.updateFound', { version: updateVersion }) : t('nav.settings')}
-            className="relative"
-          >
-            <Settings size={18} />
-            {updateVersion && (
-              <span
-                aria-hidden
-                className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
-                style={{ backgroundColor: 'var(--accent)' }}
-              />
-            )}
-          </RailButton>
-        </div>
+      {/* Bottom nav — always visible: Blocks/Templates/Tags/Categories/Trash, then Vault/Settings */}
+      <div className="sidebar-bottom-bar w-full flex-1 flex flex-col items-center justify-end gap-1 py-2">
+        {viewButton('blocks', AUX_VIEWS.blocks)}
+        {viewButton('templates', AUX_VIEWS.templates)}
+        {viewButton('tags', AUX_VIEWS.tags)}
+        {viewButton('categories', AUX_VIEWS.categories)}
+        {viewButton('trash', AUX_VIEWS.trash)}
+        <RailButton onClick={() => setVaultOpen(true)} title={t('nav.vaults')}>
+          {/* 17px nur fuers Emoji: es traegt keine Strichstaerke und wirkt
+              neben den lucide-Icons sonst zu gross. Das Ersatz-Glyph ist
+              selbst ein lucide-Icon und bleibt bei den 18 seiner Nachbarn. */}
+          <VaultGlyph icon={activeVaultIcon} size={activeVaultIcon ? 17 : 18} />
+        </RailButton>
+        <RailButton
+          // Die Zielseite wird hier festgehalten und der Punkt sofort
+          // geloescht: er hat seine Aufgabe erfuellt, sobald das Fenster
+          // aufgeht. Andersherum spraenge das Zahnrad den Rest der Sitzung
+          // auf „Updates" — und ein Loeschen ohne dieses Merken hiesse, dass
+          // das Fenster wieder auf „Allgemein" aufginge, weil beide
+          // Zustandsaenderungen im selben Rendern landen.
+          onClick={() => {
+            setSettingsPage(updateVersion ? 'updates' : 'general');
+            setSettingsOpen(true);
+            setUpdateVersion(null);
+          }}
+          title={updateVersion ? t('settings.updateFound', { version: updateVersion }) : t('nav.settings')}
+          className="relative"
+        >
+          <Settings size={18} />
+          {updateVersion && (
+            <span
+              aria-hidden
+              className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: 'var(--accent)' }}
+            />
+          )}
+        </RailButton>
       </div>
 
       {vaultOpen && <VaultModal onClose={() => setVaultOpen(false)} />}
