@@ -74,7 +74,7 @@ export default function LeftSidebarRail() {
       className="left-sidebar-rail rail-divider flex flex-col items-center h-full flex-shrink-0 border-r"
       style={{ width: RAIL_WIDTH }}
     >
-      {/* Die beiden Seitenleisten schaltet das Menü „Ansicht" (TitleBarMenuBar,
+      {/* Die beiden Seitenleisten schaltet das Menü „Ansicht" (useTitleBarMenus,
           nativ auf macOS) — eigene Knöpfe hier oben waren eine zweite Stelle
           für dasselbe. */}
 

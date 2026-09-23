@@ -86,17 +86,9 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     padding-left: 5rem;
   }
 
-  .titlebar-menu-trigger {
-    @apply h-7 px-2.5 rounded-md text-xs whitespace-nowrap transition-colors duration-150;
-    color: var(--text-secondary);
-  }
-
-  .titlebar-menu-trigger:hover {
-    background: var(--interactive-hover);
-    color: var(--text-primary);
-  }
-
-  .titlebar-menu-trigger[data-open] {
+  /* Ein Menü-Knopf der Titelleiste, solange sein Menü offen ist. Mit
+     `.titlebar` davor, damit es die Theme-Farben von `.btn-ghost` schlägt. */
+  .titlebar .rail-button[data-open] {
     background: var(--interactive-active);
     color: var(--text-primary);
   }
@@ -1864,7 +1856,6 @@ html[data-theme='emerald-noctis'] .rail-divider {
 }
 
 html[data-theme='emerald-noctis'] .window-control:focus-visible,
-html[data-theme='emerald-noctis'] .titlebar-menu-trigger:focus-visible,
 html[data-theme='emerald-noctis'] .menu-item:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
@@ -2234,7 +2225,6 @@ html[data-theme='emerald-parchment'] .rail-divider {
 }
 
 html[data-theme='emerald-parchment'] .window-control:focus-visible,
-html[data-theme='emerald-parchment'] .titlebar-menu-trigger:focus-visible,
 html[data-theme='emerald-parchment'] .menu-item:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);

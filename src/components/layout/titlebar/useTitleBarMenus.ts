@@ -1,11 +1,13 @@
-import { useRef, useState } from 'react';
-import { useOutsideClick } from '../../../hooks/useOutsideClick';
-import { Menu } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
 import { computeMenuEnabledState, dispatchMenuAction } from '../../../lib/menuActions';
 import { cutSelection, copySelection, pasteFromClipboard, selectAll } from './editCommands';
-import MenuDropdown, { type MenuNode } from './MenuDropdown';
+import type { MenuNode } from './MenuDropdown';
+
+export interface TitleBarMenu {
+  label: string;
+  nodes: MenuNode[];
+}
 
 /**
  * The application menu, rendered in HTML for Windows and Linux.
@@ -18,29 +20,20 @@ import MenuDropdown, { type MenuNode } from './MenuDropdown';
  * The structure mirrors the native menu exactly, down to which items are
  * disabled — both sides read that from `computeMenuEnabledState`.
  *
- * Die vier Menüs stehen nicht als Leiste nebeneinander, sondern als
- * Untermenüs hinter einem einzigen Knopf mit drei Strichen.
+ * Nur der Inhalt: wo die vier Menüs stehen, entscheidet `TitleBar` —
+ * Bearbeiten und Ansicht hinter dem Knopf mit drei Strichen, Export und
+ * Import als eigene Knöpfe hinter den Pfeilen.
  */
-export default function TitleBarMenuBar() {
+export function useTitleBarMenus() {
   const { t } = useTranslation();
   const activeView = useUIStore((s) => s.activeView);
   const railOpen = useUIStore((s) => s.railOpen);
   const leftListOpen = useUIStore((s) => s.leftListOpen);
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
-  const [open, setOpen] = useState(false);
-  // Only a keyboard-opened menu pulls focus into its panel. Opening by mouse
-  // must leave focus where it was, or Cut/Copy lose the editor's selection.
-  const [focusPanelOnOpen, setFocusPanelOnOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useOutsideClick(open, () => setOpen(false), { refs: [rootRef], escape: true });
-
   const enabled = computeMenuEnabledState(activeView);
-  const close = () => setOpen(false);
 
-  const menus: Array<{ id: string; label: string; nodes: MenuNode[] }> = [
+  const [edit, view, exportMenu, importMenu]: TitleBarMenu[] = [
     {
-      id: 'edit',
       label: t('menu.edit'),
       nodes: [
         { kind: 'item', label: t('menu.cut'), onSelect: cutSelection },
@@ -51,7 +44,6 @@ export default function TitleBarMenuBar() {
       ],
     },
     {
-      id: 'view',
       label: t('menu.view'),
       nodes: [
         { kind: 'item', label: t('menu.rail'), checked: railOpen, onSelect: () => dispatchMenuAction('toggle-rail') },
@@ -63,7 +55,6 @@ export default function TitleBarMenuBar() {
       ],
     },
     {
-      id: 'export',
       label: t('menu.export'),
       nodes: [
         { kind: 'item', label: t('menu.exportPdf'), disabled: !enabled.pdfEnabled, onSelect: () => dispatchMenuAction('export-pdf') },
@@ -83,7 +74,6 @@ export default function TitleBarMenuBar() {
       ],
     },
     {
-      id: 'import',
       label: t('menu.import'),
       nodes: [
         { kind: 'item', label: t('menu.importMarkdown'), onSelect: () => dispatchMenuAction('import-markdown') },
@@ -92,36 +82,5 @@ export default function TitleBarMenuBar() {
     },
   ];
 
-  const nodes: MenuNode[] = menus.map((menu) => ({ kind: 'submenu', label: menu.label, children: menu.nodes }));
-
-  return (
-    <div ref={rootRef} className="relative h-full flex items-center flex-shrink-0">
-      <button
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        data-open={open || undefined}
-        className="titlebar-menu-trigger"
-        title={t('titlebar.menu')}
-        aria-label={t('titlebar.menu')}
-        // Cancelling mousedown keeps the editor's selection alive, so the
-        // Edit menu's Cut and Copy still have something to act on.
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => { setFocusPanelOnOpen(false); setOpen(!open); }}
-        onKeyDown={(e) => {
-          if (e.key === 'ArrowDown') { e.preventDefault(); setFocusPanelOnOpen(true); setOpen(true); }
-        }}
-      >
-        <Menu size={15} />
-      </button>
-      {open && (
-        <MenuDropdown
-          nodes={nodes}
-          positionClass="top-full left-0 mt-px"
-          onClose={close}
-          autoFocus={focusPanelOnOpen}
-        />
-      )}
-    </div>
-  );
+  return { edit, view, exportMenu, importMenu };
 }

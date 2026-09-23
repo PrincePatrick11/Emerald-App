@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { ArrowLeft, ArrowRight, Search } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Download, Menu, Search, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { isAltarFullscreen, selectActiveHistory, useUIStore } from '../../../store/uiStore';
 import { hasActiveVault, useVaultStore } from '../../../store/vaultStore';
 import { usesCustomWindowControls, usesHtmlMenuBar } from '../../../lib/platform';
 import EmeraldMark from '../../ui/EmeraldMark';
 import RailButton from '../../ui/RailButton';
-import TitleBarMenuBar from './TitleBarMenuBar';
+import TitleBarMenuButton from './TitleBarMenuButton';
+import { useTitleBarMenus } from './useTitleBarMenus';
 import SearchModal from './SearchModal';
 import WindowControls from './WindowControls';
 
@@ -47,6 +48,7 @@ export default function TitleBar() {
   // lesen koennte — auch nachdem er "Dateien loeschen" angehakt hat.
   const vaultOpen = useVaultStore(hasActiveVault);
   const [searchOpen, setSearchOpen] = useState(false);
+  const menus = useTitleBarMenus();
 
   return (
     <header
@@ -74,13 +76,21 @@ export default function TitleBar() {
           <EmeraldMark size={20} className="pointer-events-none" />
         </div>
 
-        {/* Not gated on `minimal`: on Windows and Linux this is the only
-            route to the altar's image export, and distraction-free mode is
-            precisely where that export is wanted. */}
-        {usesHtmlMenuBar && <TitleBarMenuBar />}
+        {usesHtmlMenuBar && (
+          <TitleBarMenuButton
+            label={t('titlebar.menu')}
+            icon={<Menu size={14} />}
+            nodes={[menus.edit, menus.view].map((menu) => ({ kind: 'submenu', label: menu.label, children: menu.nodes }))}
+          />
+        )}
 
         {!minimal && (
           <div className="flex items-center gap-0.5 flex-shrink-0">
+            {vaultOpen && (
+              <RailButton onClick={() => setSearchOpen(true)} title={t('titlebar.search')}>
+                <Search size={14} />
+              </RailButton>
+            )}
             <RailButton onClick={navigateBack} disabled={!canGoBack} title={t('titlebar.back')}>
               <ArrowLeft size={14} />
             </RailButton>
@@ -91,11 +101,17 @@ export default function TitleBar() {
             >
               <ArrowRight size={14} />
             </RailButton>
-            {vaultOpen && (
-              <RailButton onClick={() => setSearchOpen(true)} title={t('titlebar.search')}>
-                <Search size={14} />
-              </RailButton>
-            )}
+          </div>
+        )}
+
+        {/* Not gated on `minimal`: on Windows and Linux this is the only
+            route to the altar's image export, and distraction-free mode is
+            precisely where that export is wanted. Export trägt Download,
+            Import Upload — wie in Settings → Backup. */}
+        {usesHtmlMenuBar && (
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            <TitleBarMenuButton label={menus.exportMenu.label} icon={<Download size={14} />} nodes={menus.exportMenu.nodes} />
+            <TitleBarMenuButton label={menus.importMenu.label} icon={<Upload size={14} />} nodes={menus.importMenu.nodes} />
           </div>
         )}
       </div>

@@ -74,7 +74,7 @@ export default function ContextMenu({ x, y, actions, onClose }: Props) {
           // Auswahl am Leben: sonst wandert der Fokus beim Mousedown auf
           // diesen Button, die Markierung im Feld kollabiert und Kopieren
           // haette nichts mehr zu kopieren. Gleicher Griff wie in
-          // MenuDropdown und TitleBarMenuBar.
+          // MenuDropdown und TitleBarMenuButton.
           onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
           onClick={() => { action.onClick(); onClose(); }}
           className={`context-menu-item w-full text-left px-3 py-2 text-xs flex items-center gap-2.5 transition-colors ${
