@@ -22,6 +22,10 @@ const KIND_META: Record<SearchKind, { icon: LucideIcon; labelKey: string }> = {
   lexiconEntry: { icon: AUX_VIEWS.lexicon.icon, labelKey: AUX_VIEWS.lexicon.navLabelKey },
 };
 
+/** Die Id einer Trefferzeile — `SearchModal` zeigt per
+ *  `aria-activedescendant` auf dieselbe. */
+export const searchOptionId = (listboxId: string, index: number) => `${listboxId}-option-${index}`;
+
 function kindIcon(kind: SearchKind): ReactNode {
   const Icon = KIND_META[kind].icon;
   return <Icon size={13} />;
@@ -102,7 +106,7 @@ export default function SearchResultList({
           {hits.map((hit, index) => (
             <button
               key={hit.key}
-              id={`${listboxId}-option-${index}`}
+              id={searchOptionId(listboxId, index)}
               type="button"
               role="option"
               aria-selected={index === activeIndex}

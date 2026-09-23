@@ -10,14 +10,15 @@ export interface TitleBarMenu {
 }
 
 /**
- * The application menu, rendered in HTML for Windows and Linux.
+ * The application menu's content for Windows and Linux, where the title bar
+ * renders it in HTML.
  *
  * macOS never renders this — there the native menu sits in the system menu
  * bar (`install_native_menu` in `src-tauri/src/lib.rs`), and that is the only
  * platform where the native menu is installed at all: an in-window HMENU or
  * GTK menubar would otherwise sit alongside this one.
  *
- * The structure mirrors the native menu exactly, down to which items are
+ * The items mirror the native menu exactly, down to which items are
  * disabled — both sides read that from `computeMenuEnabledState`.
  *
  * Nur der Inhalt: wo die vier Menüs stehen, entscheidet `TitleBar` —
@@ -32,55 +33,56 @@ export function useTitleBarMenus() {
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const enabled = computeMenuEnabledState(activeView);
 
-  const [edit, view, exportMenu, importMenu]: TitleBarMenu[] = [
-    {
-      label: t('menu.edit'),
-      nodes: [
-        { kind: 'item', label: t('menu.cut'), onSelect: cutSelection },
-        { kind: 'item', label: t('menu.copy'), onSelect: copySelection },
-        { kind: 'item', label: t('menu.paste'), onSelect: () => { void pasteFromClipboard(); } },
-        { kind: 'separator' },
-        { kind: 'item', label: t('menu.selectAll'), onSelect: selectAll },
-      ],
-    },
-    {
-      label: t('menu.view'),
-      nodes: [
-        { kind: 'item', label: t('menu.rail'), checked: railOpen, onSelect: () => dispatchMenuAction('toggle-rail') },
-        { kind: 'item', label: t('menu.entryList'), checked: leftListOpen, onSelect: () => dispatchMenuAction('toggle-left-list') },
-        { kind: 'item', label: t('menu.properties'), checked: rightSidebarOpen, onSelect: () => dispatchMenuAction('toggle-right-sidebar') },
-        { kind: 'separator' },
-        { kind: 'item', label: t('menu.resetView'), onSelect: () => dispatchMenuAction('reset-sidebar-widths') },
-        { kind: 'item', label: t('menu.showSplash'), onSelect: () => dispatchMenuAction('show-splash') },
-      ],
-    },
-    {
-      label: t('menu.export'),
-      nodes: [
-        { kind: 'item', label: t('menu.exportPdf'), disabled: !enabled.pdfEnabled, onSelect: () => dispatchMenuAction('export-pdf') },
-        { kind: 'item', label: t('menu.exportMarkdown'), disabled: !enabled.entryEnabled, onSelect: () => dispatchMenuAction('export-markdown') },
-        { kind: 'item', label: t('menu.exportEmerald'), disabled: !enabled.emeraldEnabled, onSelect: () => dispatchMenuAction('export-emerald') },
-        { kind: 'separator' },
-        {
-          kind: 'submenu',
-          label: t('menu.exportAltarImage'),
-          disabled: !enabled.altarImageEnabled,
-          children: [
-            { kind: 'item', label: t('menu.exportAltarJpeg'), onSelect: () => dispatchMenuAction('export-altar-jpeg') },
-            { kind: 'item', label: t('menu.exportAltarPng'), onSelect: () => dispatchMenuAction('export-altar-png') },
-            { kind: 'item', label: t('menu.exportAltarWebp'), onSelect: () => dispatchMenuAction('export-altar-webp') },
-          ],
-        },
-      ],
-    },
-    {
-      label: t('menu.import'),
-      nodes: [
-        { kind: 'item', label: t('menu.importMarkdown'), onSelect: () => dispatchMenuAction('import-markdown') },
-        { kind: 'item', label: t('menu.importEmerald'), onSelect: () => dispatchMenuAction('import-emerald') },
-      ],
-    },
-  ];
+  const edit: TitleBarMenu = {
+    label: t('menu.edit'),
+    nodes: [
+      { kind: 'item', label: t('menu.cut'), onSelect: cutSelection },
+      { kind: 'item', label: t('menu.copy'), onSelect: copySelection },
+      { kind: 'item', label: t('menu.paste'), onSelect: () => { void pasteFromClipboard(); } },
+      { kind: 'separator' },
+      { kind: 'item', label: t('menu.selectAll'), onSelect: selectAll },
+    ],
+  };
+  const view: TitleBarMenu = {
+    label: t('menu.view'),
+    nodes: [
+      { kind: 'item', label: t('menu.rail'), checked: railOpen, onSelect: () => dispatchMenuAction('toggle-rail') },
+      { kind: 'item', label: t('menu.entryList'), checked: leftListOpen, onSelect: () => dispatchMenuAction('toggle-left-list') },
+      { kind: 'item', label: t('menu.properties'), checked: rightSidebarOpen, onSelect: () => dispatchMenuAction('toggle-right-sidebar') },
+      { kind: 'separator' },
+      { kind: 'item', label: t('menu.resetView'), onSelect: () => dispatchMenuAction('reset-sidebar-widths') },
+      { kind: 'item', label: t('menu.showSplash'), onSelect: () => dispatchMenuAction('show-splash') },
+    ],
+  };
+  const exportMenu: TitleBarMenu = {
+    label: t('menu.export'),
+    nodes: [
+      { kind: 'item', label: t('menu.exportPdf'), disabled: !enabled.pdfEnabled, onSelect: () => dispatchMenuAction('export-pdf') },
+      { kind: 'item', label: t('menu.exportMarkdown'), disabled: !enabled.entryEnabled, onSelect: () => dispatchMenuAction('export-markdown') },
+      { kind: 'item', label: t('menu.exportEmerald'), disabled: !enabled.emeraldEnabled, onSelect: () => dispatchMenuAction('export-emerald') },
+      { kind: 'separator' },
+      {
+        kind: 'submenu',
+        label: t('menu.exportAltarImage'),
+        disabled: !enabled.altarImageEnabled,
+        children: [
+          { kind: 'item', label: t('menu.exportAltarJpeg'), onSelect: () => dispatchMenuAction('export-altar-jpeg') },
+          { kind: 'item', label: t('menu.exportAltarPng'), onSelect: () => dispatchMenuAction('export-altar-png') },
+          { kind: 'item', label: t('menu.exportAltarWebp'), onSelect: () => dispatchMenuAction('export-altar-webp') },
+        ],
+      },
+    ],
+  };
+  const importMenu: TitleBarMenu = {
+    label: t('menu.import'),
+    nodes: [
+      { kind: 'item', label: t('menu.importMarkdown'), onSelect: () => dispatchMenuAction('import-markdown') },
+      { kind: 'item', label: t('menu.importEmerald'), onSelect: () => dispatchMenuAction('import-emerald') },
+    ],
+  };
 
-  return { edit, view, exportMenu, importMenu };
+  // Bearbeiten und Ansicht als Untermenüs des Knopfs mit drei Strichen.
+  const appMenu: MenuNode[] = [edit, view].map((menu) => ({ kind: 'submenu', label: menu.label, children: menu.nodes }));
+
+  return { appMenu, exportMenu, importMenu };
 }

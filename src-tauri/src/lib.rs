@@ -290,7 +290,7 @@ async fn export_pdf(app: tauri::AppHandle, html: String, path: String, page_size
 /// screen, where it belongs. On Windows and Linux `set_menu` would attach an
 /// in-window menu bar (HMENU / GTK menubar) that would collide with the
 /// app's own menu bar in `TitleBar` — those platforms render the same items
-/// in HTML instead (`src/components/layout/titlebar/TitleBarMenuBar.tsx`),
+/// in HTML instead (`src/components/layout/titlebar/useTitleBarMenus.ts`),
 /// firing the identical events listed below.
 ///
 /// `set_export_menu_enabled`, `set_altar_export_menu_enabled` and

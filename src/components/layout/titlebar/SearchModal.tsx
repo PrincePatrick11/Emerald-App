@@ -5,7 +5,16 @@ import { useUIStore } from '../../../store/uiStore';
 import { useGlobalSearch } from '../../../hooks/useGlobalSearch';
 import { viewForSearchHit, type SearchHit } from '../../../lib/globalSearch';
 import Modal from '../../ui/Modal';
-import SearchResultList from './SearchResultList';
+import SearchResultList, { searchOptionId } from './SearchResultList';
+
+/** Die Liste und ihre Zeilen brauchen stabile Ids, damit `aria-controls` und
+ *  `aria-activedescendant` auf sie zeigen koennen. */
+const LISTBOX_ID = 'global-search-results';
+
+/** Wie viele Zeilen die Liste zeigt, bevor sie den Rest anbietet — und um
+ *  wie viele sie danach waechst. Eine reine Ansichtsgroesse: gesucht wird
+ *  ohnehin im ganzen Bestand, `lib/globalSearch` kennt die Zahl nicht. */
+const PAGE_SIZE = 50;
 
 /**
  * Die globale Suche der App, als Modal hinter der Lupe in der Titelleiste.
@@ -20,16 +29,6 @@ import SearchResultList from './SearchResultList';
  * `aria-activedescendant` ist das Einzige, was diese Auswahl an einen
  * Screenreader meldet. Escape schliesst über `Modal` selbst.
  */
-/** Die Liste und ihre Zeilen brauchen stabile Ids, damit `aria-controls` und
- *  `aria-activedescendant` auf sie zeigen koennen. */
-const LISTBOX_ID = 'global-search-results';
-const optionId = (index: number) => `${LISTBOX_ID}-option-${index}`;
-
-/** Wie viele Zeilen die Liste zeigt, bevor sie den Rest anbietet — und um
- *  wie viele sie danach waechst. Eine reine Ansichtsgroesse: gesucht wird
- *  ohnehin im ganzen Bestand, `lib/globalSearch` kennt die Zahl nicht. */
-const PAGE_SIZE = 50;
-
 export default function SearchModal({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const setActiveView = useUIStore((s) => s.setActiveView);
@@ -131,11 +130,11 @@ export default function SearchModal({ onClose }: { onClose: () => void }) {
             aria-label={t('titlebar.search')}
             role="combobox"
             aria-autocomplete="list"
-            aria-expanded
+            aria-expanded={hits.length > 0}
             aria-controls={hits.length ? LISTBOX_ID : undefined}
             // Der Fokus verlaesst das Feld nie; ohne diesen Zeiger bewegen die
             // Pfeiltasten eine Auswahl, von der nur sehende Nutzer erfahren.
-            aria-activedescendant={hits[selectedIndex] ? optionId(selectedIndex) : undefined}
+            aria-activedescendant={hits[selectedIndex] ? searchOptionId(LISTBOX_ID, selectedIndex) : undefined}
             className="sidebar-search-input flex-1 min-w-0 bg-transparent text-xs outline-none"
           />
           {query && (

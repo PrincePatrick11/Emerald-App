@@ -48,6 +48,9 @@ export default function TitleBar() {
   // lesen koennte — auch nachdem er "Dateien loeschen" angehakt hat.
   const vaultOpen = useVaultStore(hasActiveVault);
   const [searchOpen, setSearchOpen] = useState(false);
+  // Geht die Lupe weg — Altar-Vollbild, letzter Vault geschlossen —, geht die
+  // Suche mit, statt beim Zurückkehren von selbst wieder aufzuspringen.
+  if (searchOpen && (minimal || !vaultOpen)) setSearchOpen(false);
   const menus = useTitleBarMenus();
 
   return (
@@ -80,7 +83,7 @@ export default function TitleBar() {
           <TitleBarMenuButton
             label={t('titlebar.menu')}
             icon={<Menu size={14} />}
-            nodes={[menus.edit, menus.view].map((menu) => ({ kind: 'submenu', label: menu.label, children: menu.nodes }))}
+            nodes={menus.appMenu}
           />
         )}
 
@@ -124,7 +127,7 @@ export default function TitleBar() {
         {usesCustomWindowControls && <WindowControls />}
       </div>
 
-      {searchOpen && !minimal && vaultOpen && <SearchModal onClose={() => setSearchOpen(false)} />}
+      {searchOpen && <SearchModal onClose={() => setSearchOpen(false)} />}
     </header>
   );
 }

@@ -24,7 +24,7 @@ interface Props {
 }
 
 /**
- * A dropdown panel for the title bar's menu bar.
+ * A dropdown panel for the title bar's menu buttons.
  *
  * Deliberately separate from `ui/ContextMenu`: that one is positioned at a
  * cursor coordinate, has a timing hack to survive the right-click that opened

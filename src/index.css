@@ -1856,6 +1856,7 @@ html[data-theme='emerald-noctis'] .rail-divider {
 }
 
 html[data-theme='emerald-noctis'] .window-control:focus-visible,
+html[data-theme='emerald-noctis'] .titlebar .rail-button:focus-visible,
 html[data-theme='emerald-noctis'] .menu-item:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
@@ -2225,6 +2226,7 @@ html[data-theme='emerald-parchment'] .rail-divider {
 }
 
 html[data-theme='emerald-parchment'] .window-control:focus-visible,
+html[data-theme='emerald-parchment'] .titlebar .rail-button:focus-visible,
 html[data-theme='emerald-parchment'] .menu-item:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
