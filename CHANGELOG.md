@@ -5,6 +5,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] (targeting v0.2.0)
 
+### Changed
+- The Lexicon's rail button moved from the bottom group (between Templates and Tags) up to the top group, between Wiki and Altar. The left rail now also highlights the button for whichever view is open — including while an entry inside it is open — the same accent border the entry lists use for a selected row. The two divider lines that used to separate the rail's icon groups are gone.
+
 ### Fixed
 - Opening an altar from a link, or switching straight from one altar to another, briefly showed the Altar dashboard (or the previous altar) before the target one appeared.
 - An empty text block (only empty paragraphs, whitespace, or line breaks) in a multi-block stack kept its usual minimum height in read mode and showed as two blank lines; it's now hidden entirely there, the same way as a block you've hidden with the eye icon. It stays visible while editing.
