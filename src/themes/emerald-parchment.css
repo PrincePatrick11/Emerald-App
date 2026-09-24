@@ -71,10 +71,8 @@ html[data-theme='emerald-parchment'] {
   --sheet-inset: 6px;
   --panel-bg: #f7eddb;
   --panel-border: rgba(154, 117, 80, 0.34);
-  --panel-shadow: 0 8px 20px rgba(114, 79, 43, 0.07);
   --panel-hover-bg: #f9f1e3;
   --panel-hover-border: rgba(131, 96, 62, 0.48);
-  --panel-hover-shadow: 0 10px 24px rgba(114, 79, 43, 0.11);
   /* Tabs sind Pills auf der Titelleiste: inaktiv ohne Flaeche, aktiv eine leichte. */
   --tab-pill-h: 30px;
   --tab-pill-active: rgba(130, 87, 44, 0.12);

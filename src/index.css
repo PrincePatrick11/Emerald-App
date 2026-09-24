@@ -2032,21 +2032,18 @@ html[data-theme='emerald-noctis'] .panel,
 html[data-theme='emerald-noctis'] .panel-interactive {
   background: var(--panel-bg);
   border-color: var(--panel-border);
-  box-shadow: var(--panel-shadow);
 }
 
 html[data-theme='emerald-noctis'] .panel-interactive:hover {
   background: var(--panel-hover-bg);
   border-color: var(--panel-hover-border);
-  box-shadow: var(--panel-hover-shadow);
 }
 
-/* Dashboard-Einträge (DashboardItem) sind Buttons — ohne eigenen Ring blieben
-   sie per Tastatur unsichtbar: der box-shadow oben schlägt jede Fokus-Regel
-   aus dem Layer. Nach :hover, damit der Ring beim Überfahren bleibt. */
+/* Dashboard-Einträge (DashboardItem) sind Buttons und brauchen einen eigenen
+   Fokus-Ring. Panels sind bewusst schattenlos — Kante und Fläche tragen sie. */
 html[data-theme='emerald-noctis'] .panel-interactive:focus-visible {
   outline: none;
-  box-shadow: var(--panel-shadow), 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 /* Tab-Leiste — beide Themes, die Unterschiede stecken nur in den Tokens.
@@ -2389,20 +2386,17 @@ html[data-theme='emerald-parchment'] .panel,
 html[data-theme='emerald-parchment'] .panel-interactive {
   background: var(--panel-bg);
   border-color: var(--panel-border);
-  box-shadow: var(--panel-shadow);
 }
 
 html[data-theme='emerald-parchment'] .panel-interactive:hover {
   background: var(--panel-hover-bg);
   border-color: var(--panel-hover-border);
-  box-shadow: var(--panel-hover-shadow);
 }
 
-/* Siehe Noctis: der Ring der generischen button:focus-visible-Regel verlöre
-   sonst beim Überfahren gegen den Hover-Schatten. */
+/* Siehe Noctis. */
 html[data-theme='emerald-parchment'] .panel-interactive:focus-visible {
   outline: none;
-  box-shadow: var(--panel-shadow), 0 0 0 2px var(--focus-ring);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 html[data-theme='emerald-parchment'] .sidebar-item {
