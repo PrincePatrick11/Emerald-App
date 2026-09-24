@@ -34,7 +34,14 @@ export default function LeftSidebarEntryList() {
   // Neu gerendert je Vault: „Mehr anzeigen" beginnt dort wieder beim Limit.
   const vaultId = useSettingsStore((s) => s.vaultId);
 
-  return <ActiveList key={vaultId} list={list} />;
+  // `flex-1 min-w-0`: die Liste füllt die Spalte und schrumpft mit ihr —
+  // ohne `min-w-0` bliebe sie so breit wie ihr längster Titel und liefe beim
+  // Schmalerziehen unter das Blatt.
+  return (
+    <div className="flex flex-col h-full flex-1 min-w-0">
+      <ActiveList key={vaultId} list={list} />
+    </div>
+  );
 }
 
 /** Ein Component pro Liste; die Config-Hooks je Modul bleiben die Fachlogik. */
