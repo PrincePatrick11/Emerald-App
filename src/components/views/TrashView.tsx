@@ -189,6 +189,7 @@ export default function TrashView() {
   const [confirmingEmpty, setConfirmingEmpty] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false);
+  const [search, setSearch] = useState('');
 
   useEffect(() => { fetchTrashed(); }, []);
 
@@ -243,7 +244,11 @@ export default function TrashView() {
 
   const itemProps: ItemSharedProps = { confirmingId, setConfirmingId, restore, deleteNow, selectedIds, onToggleSelect: toggleSelect, t };
 
-  const sorted = sortItems(items, trashPrefs.sort, { date: (i) => i.deleted_at });
+  // Die Suche filtert nur, was angezeigt wird — Auswahl, „Alle wählen" und
+  // „Papierkorb leeren" beziehen sich weiter auf den ganzen Papierkorb.
+  const query = search.trim().toLowerCase();
+  const matching = query ? items.filter((i) => i.title.toLowerCase().includes(query)) : items;
+  const sorted = sortItems(matching, trashPrefs.sort, { date: (i) => i.deleted_at });
 
   // ── Grouped by type/category ───────────────────────────────────────────────
   // Ein Raster für beide Kartenansichten: drei Spalten, in voller Breite eine.
@@ -428,7 +433,11 @@ export default function TrashView() {
         </div>
       )}
 
-      {!loading && items.length > 0 && (
+      {!loading && items.length > 0 && matching.length === 0 && (
+        <p className="text-center py-20 text-stone-600 text-sm">{t('search.noResults')}</p>
+      )}
+
+      {!loading && matching.length > 0 && (
         <div className="space-y-1">
           <p className="text-xs text-stone-600 mb-3">
             {retentionDays === null ? t('trash.retentionNoteNever') : t('trash.retentionNote', { count: retentionDays })}
@@ -444,8 +453,11 @@ export default function TrashView() {
 
   return (
     <Dashboard<TrashedItem>
+      title={t('trash.title')}
       headerLeft={headerLeft}
       headerRight={headerRight}
+      search={search}
+      onSearch={setSearch}
       contentClassName="flex-1 overflow-y-auto p-6"
       view={trashPrefs.view}
       sort={trashPrefs.sort}

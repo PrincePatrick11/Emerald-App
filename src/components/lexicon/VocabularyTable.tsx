@@ -176,7 +176,7 @@ function VocabularyRow({ entry, autoFocus, onFocused, onPatch, onDelete }: {
 
   /**
    * Was beim Verlassen der Seite noch offen ist, wird beim Aufräumen
-   * geschrieben — wer eine Vokabel tippt und dann die Brotkrume klickt,
+   * geschrieben — wer eine Vokabel tippt und dann den Zurück-Chip klickt,
    * bekommt keinen Fokusverlust mehr mit.
    */
   const pending = useRef({ draft, entry, onPatch });

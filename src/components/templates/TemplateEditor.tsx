@@ -26,7 +26,7 @@ const draftOf = (d: TemplateDraft): TemplateDraft => ({
 interface Props {
   template: Template;
   entries: readonly EntryContentRow[];
-  /** Zurück zur Liste. Die Brotkrume lässt den Entwurf liegen; „Fertig" und „Abbrechen" erledigen ihn vorher. */
+  /** Zurück zur Liste. Der Zurück-Chip der Seitenleiste lässt den Entwurf liegen; „Fertig" und „Abbrechen" erledigen ihn vorher. */
   onClose: () => void;
   onDelete: () => void;
 }
@@ -89,7 +89,6 @@ export default function TemplateEditor({ template, entries, onClose, onDelete }:
     <LibraryPageFrame
       backLabel={t('nav.templates')}
       onBack={onClose}
-      icon={draft.icon}
       draft={{ dirty, busy, onDone: () => void finish(), onCancel: leave, onDelete }}
       name={draft.name}
       nameLabel={t('templates.name')}

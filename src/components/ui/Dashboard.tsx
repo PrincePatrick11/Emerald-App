@@ -1,10 +1,11 @@
 import { Fragment, useLayoutEffect, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, type LucideIcon } from 'lucide-react';
 import Button from './Button';
 import SidebarPortal from './SidebarPortal';
 import SidebarColumn, { SidebarActionBar } from './SidebarColumn';
 import CollapseChevron from './CollapseChevron';
-import ListToolbar from './ListToolbar';
+import ListToolbar, { ListSearchField } from './ListToolbar';
 import FilterPanel, { type FilterPanelProps } from './FilterPanel';
 import { useUIStore, type ViewMode, type SortMode, type GroupingMode } from '../../store/uiStore';
 import { isCardView, isWideCardView } from '../../lib/viewMode';
@@ -60,7 +61,8 @@ export interface DashboardFilters {
 }
 
 interface DashboardBaseProps<T> {
-  // Kopf — steht in der rechten Seitenleiste
+  // Kopf — Titel und Suche im Hauptbereich, Aktionen, Toolbar und Filter in
+  // der rechten Seitenleiste
   title?: string;
   /** Das Icon vor dem Titel — meist das Rail-Icon der Ansicht. */
   titleIcon?: LucideIcon;
@@ -69,8 +71,8 @@ interface DashboardBaseProps<T> {
   /** Ersetzt die ganze Titelzeile — für Köpfe mit mehr als Icon, Titel und
    *  Zahl (Home: zwei Zeilen; Papierkorb: `DashboardTitle` plus „Alle wählen"). */
   headerLeft?: ReactNode;
-  /** Beschrifteter Jade-Knopf auf eigener voller Zeile unter dem Titel —
-   *  neben dem Titel bliebe von ihm in der schmalen Spalte nichts Lesbares. */
+  /** Beschrifteter Jade-Knopf auf eigener voller Zeile, ganz oben in der
+   *  Seitenleiste. */
   primaryAction?: { label: string; onClick: () => void };
   /** Kompakte Icon-Knöpfe rechts neben der Primäraktion, in derselben Reihe;
    *  ihr Label steht nur im Tooltip. Für Nebenschauplätze des Moduls (Altar:
@@ -164,7 +166,7 @@ const DEFAULT_EMPTY_ACTION_CLASSNAME = 'mt-4 text-xs text-stone-500 hover:text-s
 const DEFAULT_NO_RESULTS_CLASSNAME = 'text-center py-20 text-stone-600 text-sm';
 
 /**
- * Die Titelzeile eines Dashboard-Kopfes: Icon, Titel, Zahl im Pill. Dashboard
+ * Der Titel eines Dashboards im Hauptbereich: Icon, Titel, Zahl im Pill. Dashboard
  * rendert sie selbst aus `title`/`titleIcon`/`titleCount`; exportiert für
  * Köpfe, die hinter ihr noch etwas brauchen (`children`, der Papierkorb sein
  * „Alle wählen") und sie deshalb als `headerLeft` bauen.
@@ -178,7 +180,7 @@ export function DashboardTitle({ icon: Icon, title, count, children }: {
   return (
     <div className="flex items-center gap-3 min-w-0">
       {Icon && <Icon size={18} className="text-stone-500 flex-shrink-0" />}
-      <h1 className="text-lg font-semibold text-stone-100 truncate">{title}</h1>
+      <h1 className="entry-view-title text-2xl font-semibold text-stone-100 truncate">{title}</h1>
       {count !== undefined && (
         <span className="text-xs text-stone-500 bg-stone-700/50 px-2 py-0.5 rounded-full">{count}</span>
       )}
@@ -250,6 +252,7 @@ export default function Dashboard<T>({
   contentClassName = DEFAULT_CONTENT_CLASSNAME,
   contextMenuSlot,
 }: DashboardProps<T>) {
+  const { t } = useTranslation();
   // Ohne Ansichts-Achse gibt es nur die Liste — Karten sind eine Wahl, die
   // eine solche View nicht anbietet.
   const renderItems = (subset: T[]) =>
@@ -354,36 +357,28 @@ export default function Dashboard<T>({
     </Button>
   ));
 
-  // Die Zeile oben gehört allein dem Titel: die Aktionen bekommen darunter
-  // eine eigene volle Zeile im Körper — neben dem Titel bliebe von einer
-  // beschrifteten Primäraktion in dieser schmalen Spalte nichts Lesbares
-  // übrig. `headerRight` ersetzt sie; dort kann eine breite Slot-Zeile
+  // In der Seitenleiste ganz oben die Aktionen (`actionBar`) — `headerRight`
+  // ersetzt sie im Körper; dort kann eine breite Slot-Zeile
   // (Trash-Bulk-Aktionen) umbrechen. Toolbar und FilterPanel bringen kein
   // eigenes Streifen-Chrome mit — den Einzug stellt `SidebarColumn`.
-  const header = (
-    <SidebarColumn
-      bar={(
-        <SidebarActionBar>
-          {headerLeft ?? <DashboardTitle icon={titleIcon} title={title ?? ''} count={titleCount} />}
-        </SidebarActionBar>
+  // Die Aktionen stehen wie „Bearbeiten" eines Eintrags in der 56px-Leiste
+  // mit der Trennlinie darunter: die Primäraktion füllt die Zeile, die
+  // Nebenaktionen bleiben daneben kompakt.
+  const actionBar = !headerRight && (primaryAction || !!extraActions?.length) && (
+    <SidebarActionBar>
+      {primaryAction && (
+        <Button variant="primary" onClick={primaryAction.onClick} className="flex-1 min-w-0 justify-center">
+          <Plus size={14} className="flex-shrink-0" />
+          <span className="truncate">{primaryAction.label}</span>
+        </Button>
       )}
-      bodyClassName="space-y-4"
-    >
-      {headerRight && <div className="flex flex-col gap-1.5">{headerRight}</div>}
+      {extraActionButtons}
+    </SidebarActionBar>
+  );
 
-      {/* Die Primäraktion füllt die Zeile, die Nebenaktionen bleiben daneben
-          kompakt. */}
-      {!headerRight && (primaryAction || !!extraActions?.length) && (
-        <div className="flex items-center gap-1.5">
-          {primaryAction && (
-            <Button variant="primary" onClick={primaryAction.onClick} className="flex-1 min-w-0 justify-center">
-              <Plus size={14} className="flex-shrink-0" />
-              <span className="truncate">{primaryAction.label}</span>
-            </Button>
-          )}
-          {extraActionButtons}
-        </div>
-      )}
+  const header = (
+    <SidebarColumn bar={actionBar || undefined} bodyClassName="space-y-4">
+      {headerRight && <div className="flex flex-col gap-1.5">{headerRight}</div>}
 
       <ListToolbar
         view={view}
@@ -393,8 +388,6 @@ export default function Dashboard<T>({
         viewOptions={viewOptions}
         sortModes={sortModes}
         groupBy={groupBy}
-        search={search}
-        onSearch={onSearch}
       />
 
       {/* In der Seitenleiste ist Platz in der Höhe: das FilterPanel steht
@@ -407,13 +400,30 @@ export default function Dashboard<T>({
 
   return (
     <div className="h-full flex flex-col">
-      {/* Der Kopf wohnt ausschließlich in der rechten Seitenleiste: Sie stellt
-          in Listenansichten ein Portal-Ziel (RightSidebar → setListHeaderHost).
-          Ist sie zu, gibt es keinen Kopf — bewusst, die Liste bekommt dann die
-          ganze Höhe. Beim Zuklappen hält AppShell die Leiste für die
+      {/* Aktionen, Toolbar und Filter wohnen in der rechten Seitenleiste: Sie
+          stellt in Listenansichten ein Portal-Ziel (RightSidebar →
+          setListHeaderHost). Ist sie zu, fehlen sie — bewusst, die Liste
+          bekommt dann die ganze Breite. Beim Zuklappen hält AppShell die Leiste für die
           200ms-Animation noch gemountet (inert); der Kopf fährt mit ihr hinaus
           und verschwindet, wenn der Host abgemeldet wird. */}
       <SidebarPortal>{header}</SidebarPortal>
+
+      {/* Titel und Suche im Hauptbereich, in einer Zeile: der Titel links, die
+          Suche 260px breit rechtsbündig. Über dem Scrollbereich, damit sie
+          unabhängig vom Einzug stehen, den eine View für ihren Inhalt setzt. */}
+      <div className="px-8 pt-6 flex items-center gap-4 flex-shrink-0">
+        <div className="flex-1 min-w-0">
+          {headerLeft ?? (title && <DashboardTitle icon={titleIcon} title={title} count={titleCount} />)}
+        </div>
+        {onSearch && (
+          <ListSearchField
+            value={search ?? ''}
+            onChange={onSearch}
+            placeholder={title ? t('search.placeholderIn', { name: title }) : t('search.placeholder')}
+            className="w-[260px] flex-shrink-0"
+          />
+        )}
+      </div>
 
       <div className={contentClassName}>
         {contentHeader}

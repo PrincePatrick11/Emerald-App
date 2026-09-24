@@ -367,6 +367,34 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     padding-left: 10px;
   }
 
+  /* Die Zeile ueber dem Titel (`EntryHeaderRow`): Chevron und Modulname
+     zurueck zur Uebersicht, rechts Datum oder Status mit Punkt. */
+  .entry-back-link {
+    @apply inline-flex items-center gap-1 min-w-0 rounded-md text-[13px] transition-colors;
+    color: var(--text-subtle);
+  }
+
+  .entry-back-link:hover {
+    color: var(--text-secondary);
+  }
+
+  .entry-header-meta {
+    @apply text-[13px];
+    color: var(--text-subtle);
+  }
+
+  .entry-status-dot {
+    @apply w-1.5 h-1.5 rounded-full;
+  }
+
+  .entry-status-dot-accent {
+    background: var(--accent);
+  }
+
+  .entry-status-dot-warning {
+    background: var(--warning-text);
+  }
+
   /* Die Suche der Eintragsliste: randlos auf dem Rahmen, anders als die
      umrandete `.sidebar-search-inner`-Pill der globalen Suche. */
   .entry-list-search {
@@ -1932,6 +1960,30 @@ html[data-theme] .entry-list-nav .sidebar-item:not(.active):not(:hover) {
 
 html[data-theme] .entry-list-nav .sidebar-item.active {
   color: var(--menu-item-active-text);
+}
+
+/* Die waagrechten Trennlinien der rechten Seitenleiste — unter der Leiste
+   (`SidebarActionBar`) und zwischen den Abschnitten darunter. So leise wie der
+   Rand des Blatts. `html[data-theme]` haelt die Spezifitaet ueber Parchments
+   `* { border-color }`. */
+html[data-theme] .sidebar-divider {
+  border-color: var(--sheet-border);
+}
+
+/* Das Suchfeld eines Dashboards im Hauptbereich (`ListSearchField`): die
+   helle Flaeche der Eintragslisten-Suche mit dem leisen Rand des Blatts.
+   `html[data-theme]` haelt die Spezifitaet ueber Parchments
+   `* { border-color }`. */
+html[data-theme] .list-search-field {
+  background: var(--list-search-bg);
+  border: 1px solid var(--sheet-border);
+}
+
+/* Beide Themes: der Ring des Zurueck-Links ueber dem Titel — ueber Parchments
+   generischer button:focus-visible-Regel. */
+html[data-theme] .entry-back-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 /* Beide Themes: die Seitenleisten und der Hauptbereich sind Geschwister-

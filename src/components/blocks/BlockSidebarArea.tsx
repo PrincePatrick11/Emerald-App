@@ -89,7 +89,7 @@ function BlockManager({ session }: { session: BlockSession }) {
   };
 
   return (
-    <div className="pb-4 border-t border-stone-700/60">
+    <div className="sidebar-divider pb-4 border-t">
       <SidebarSectionHeader label={t('blocks.sidebarTitle')} open={open} onToggle={toggleOpen} className="pt-4" />
 
       {open && (

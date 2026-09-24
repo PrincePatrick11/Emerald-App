@@ -510,6 +510,7 @@
   },
   "search": {
     "placeholder": "Buscar…",
+    "placeholderIn": "Buscar en {{name}} …",
     "noResults": "No se encontraron resultados.",
     "noResultsShort": "Sin resultados",
     "operations": "Buscar operaciones…",

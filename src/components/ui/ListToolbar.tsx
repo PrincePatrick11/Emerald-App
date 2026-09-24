@@ -41,7 +41,7 @@ export const GROUPING_ICONS: Record<GroupingMode, LucideIcon> = {
 interface Props {
   /** Ansicht und Sortierung sind Achsen wie `groupBy`: fehlt der Handler,
    *  entfällt die Reihe. Die Kategorien-Ansicht hat weder das eine noch das
-   *  andere — ihre Ordnung ist die von Hand gezogene — und bringt nur Suche. */
+   *  andere — ihre Ordnung ist die von Hand gezogene. */
   view?: ViewMode;
   sort?: SortMode;
   onView?: (v: ViewMode) => void;
@@ -52,8 +52,36 @@ interface Props {
   /** Die Gruppierungs-Achse; fehlt sie, zeigt die Leiste nur Ansicht und
    *  Sortierung. Siehe DashboardGroupBy. */
   groupBy?: DashboardGroupBy;
-  search?: string;
-  onSearch?: (v: string) => void;
+}
+
+/**
+ * Das Suchfeld einer Liste. Steht nicht mehr in der Toolbar-Spalte der
+ * Seitenleiste, sondern im Hauptbereich rechts neben dem Titel (`Dashboard`);
+ * die Breite gibt der Aufrufer über `className`.
+ */
+export function ListSearchField({ value, onChange, placeholder, className = '' }: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  className?: string;
+}) {
+  return (
+    <div className={`list-search-field flex items-center gap-2.5 rounded-md px-2.5 h-8 ${className}`}>
+      <Search size={16} className="list-toolbar-chip-label flex-shrink-0" />
+      <input
+        type="text"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="list-toolbar-input bg-transparent outline-none w-full min-w-0 selectable text-sm"
+      />
+      {value && (
+        <button onClick={() => onChange('')} className="list-toolbar-clear transition-colors flex-shrink-0">
+          <X size={14} />
+        </button>
+      )}
+    </div>
+  );
 }
 
 /** Der Zeitstrahl gruppiert nach Monat über die *sortierte* Liste:
@@ -64,12 +92,12 @@ interface Props {
 const sortBlockedInTimeline = (v: SortMode) => v !== 'date_desc' && v !== 'date_asc';
 
 /**
- * Suche, Ansicht, Sortierung und Gruppierung als Spalte — für den Kopf in der
- * rechten Seitenleiste (Dashboard-Portal): Suche auf eigener voller Zeile,
- * darunter die Icon-Reihen mit Umbruch.
+ * Ansicht, Sortierung und Gruppierung als Icon-Reihen mit Umbruch — für den
+ * Kopf in der rechten Seitenleiste (Dashboard-Portal). Die Suche steht im
+ * Hauptbereich (`ListSearchField`).
  */
 export default function ListToolbar({
-  view, sort, onView, onSort, viewOptions: viewOptionsProp, sortModes = DEFAULT_SORT_MODES, groupBy, search, onSearch,
+  view, sort, onView, onSort, viewOptions: viewOptionsProp, sortModes = DEFAULT_SORT_MODES, groupBy,
 }: Props) {
   const { t } = useTranslation();
 
@@ -106,26 +134,6 @@ export default function ListToolbar({
     // Ohne eigenes Streifen-Chrome: die p-3-Spalte der Seitenleiste liefert
     // den Einzug (eine Einzugsquelle pro Spalte, design.md).
     <div className="flex flex-wrap items-start gap-x-3 gap-y-3">
-      {/* Suche zuerst (basis-full = eigene volle Zeile), auf dem Höhenmaß der
-          Eintragslisten-Suche (text-sm + Icon 14 ≈ 34px) — die beiden
-          Seitenleisten-Suchen sollen gleich schwer wirken. */}
-      {onSearch !== undefined && (
-        <div className="list-toolbar-search flex items-center gap-1.5 rounded-md px-2.5 py-1.5 basis-full">
-          <Search size={14} className="list-toolbar-chip-label flex-shrink-0" />
-          <input
-            type="text"
-            placeholder={t('search.placeholder')}
-            value={search ?? ''}
-            onChange={(e) => onSearch(e.target.value)}
-            className="list-toolbar-input bg-transparent outline-none w-full selectable text-sm"
-          />
-          {search && (
-            <button onClick={() => onSearch('')} className="list-toolbar-clear transition-colors flex-shrink-0">
-              <X size={14} />
-            </button>
-          )}
-        </div>
-      )}
       {showView && (
         <IconToggleGroup
           label={t('listView.view')}

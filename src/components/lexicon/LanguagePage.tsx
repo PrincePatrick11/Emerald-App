@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { useLexiconStore } from '../../store/lexiconStore';
 import { useShrunkIcon } from '../../hooks/useShrunkIcon';
 import { DEFAULT_LANGUAGE_ICON, entriesOfLanguage } from '../../lib/lexicon';
 import Button from '../ui/Button';
 import LibraryPageFrame from '../ui/LibraryPageFrame';
-import { SidebarActionBar } from '../ui/SidebarColumn';
 import PropertiesEditView from '../sidebar/fields/PropertiesEditView';
 import IconField from '../sidebar/fields/IconField';
 import VocabularyTable from './VocabularyTable';
@@ -47,22 +46,17 @@ export default function LanguagePage({ language, onClose, onDelete }: Props) {
     <LibraryPageFrame
       backLabel={t('nav.lexicon')}
       onBack={onClose}
-      icon={language.icon}
       name={name}
       nameLabel={t('lexicon.name')}
       namePlaceholder={t('lexicon.namePlaceholder')}
       onNameChange={setName}
-      bar={(
-        <SidebarActionBar>
-          <Button tone="neutral" title={t('nav.lexicon')} onClick={onClose}>
-            <ArrowLeft size={14} />
-            <span className="truncate">{t('nav.lexicon')}</span>
-          </Button>
+      actions={(
+        <>
           <span className="flex-1" />
           <Button tone="danger" compact title={t('editor.delete')} aria-label={t('editor.delete')} onClick={onDelete}>
             <Trash2 size={14} />
           </Button>
-        </SidebarActionBar>
+        </>
       )}
       sidebar={(
         <PropertiesEditView>

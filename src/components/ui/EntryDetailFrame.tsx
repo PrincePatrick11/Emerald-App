@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ChevronLeft } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { MODULES, type EntryModuleId } from '../../lib/modules';
 import TagInput from '../editor/TagInput';
@@ -8,12 +9,49 @@ import TagInput from '../editor/TagInput';
 export const ENTRY_TITLE_INPUT_CLASSES =
   'entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100 placeholder-stone-700 outline-none selectable';
 
+/**
+ * Die schmale Zeile über dem Titel: links der Weg zurück zur Übersicht
+ * (Chevron und Modulname), rechts das Datum — im Bearbeiten stattdessen der
+ * Status (`EntryStatus`). Geteilt von `EntryDetailFrame`, `LibraryPageFrame`
+ * und `AltarView`; `inset` folgt dem Einzug des Titels darunter.
+ */
+export function EntryHeaderRow({ back, meta, inset = 'px-8' }: {
+  back: { label: string; onClick: () => void };
+  meta?: ReactNode;
+  inset?: string;
+}) {
+  return (
+    <div className={`${inset} pt-5 flex items-center gap-4 flex-shrink-0 min-w-0`}>
+      <button type="button" onClick={back.onClick} className="entry-back-link">
+        <ChevronLeft size={14} className="flex-shrink-0" />
+        <span className="truncate">{back.label}</span>
+      </button>
+      {meta && <div className="entry-header-meta ml-auto flex-shrink-0 flex items-center gap-1.5">{meta}</div>}
+    </div>
+  );
+}
+
+/** Ein Status in der Zeile über dem Titel: Punkt und Text. `warning` für Ungespeichertes. */
+export function EntryStatus({ tone, children }: { tone: 'accent' | 'warning'; children: ReactNode }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      {/* Ausgeschriebene Klassen: Tailwind erzeugt Regeln aus `@layer components`
+          nur für Namen, die wörtlich im Quelltext stehen. */}
+      <span
+        className={`entry-status-dot flex-shrink-0 ${tone === 'warning' ? 'entry-status-dot-warning' : 'entry-status-dot-accent'}`}
+        aria-hidden
+      />
+      {children}
+    </span>
+  );
+}
+
 interface EntryDetailFrameProps {
-  /** Bestimmt Breadcrumb-Ziel/-Label und den Untitled-Platzhalter (Registry). */
+  /** Bestimmt den Untitled-Platzhalter (Registry). */
   module: EntryModuleId;
   isEditing: boolean;
-  /** Spans nach dem Zurück-Button: Icon, Kategorie, `·`, Datum. */
-  breadcrumbMeta?: ReactNode;
+  /** Rechts über dem Titel im Lesen, meist das Datum. Im Bearbeiten steht dort der Status. */
+  meta?: ReactNode;
   /** Edit-Mode: lokaler Titel-State; View-Mode: gespeicherter Titel. */
   title: string;
   onTitleChange: (value: string) => void;
@@ -29,17 +67,17 @@ interface EntryDetailFrameProps {
 
 /**
  * Der gemeinsame Detail-View-Rahmen von Journal, Wiki und Operations (auch
- * Sigillen, seit v41 Blöcke): Topbar mit Breadcrumb und Editing-Marker, Titelblock
- * (Input ↔ h1), optionale Tag-Zeile, Body-Container. `useEntryEditor`,
- * `setEditActions` und der `editorEpoch`-Key bleiben in den Views — der Frame
- * ist rein präsentational plus dem einen Zurück-Klick.
+ * Sigillen, seit v41 Blöcke): Titelblock (Input ↔ h1), optionale Tag-Zeile,
+ * Body-Container. Darüber die Kopfzeile (`EntryHeaderRow`): zurück zur
+ * Übersicht des Moduls, rechts das Datum (`meta`) bzw. im Bearbeiten der
+ * Status. `useEntryEditor`, `setEditActions` und der
+ * `editorEpoch`-Key bleiben in den Views — der Frame ist rein präsentational.
  *
  * AltarView bleibt bewusst außen vor: eigener Titelblock (px-6, Fullscreen-
- * Verhalten), kein Editing-Marker — eine Teilnutzung bräuchte mehr Props als
- * sie Zeilen spart.
+ * Verhalten) — eine Teilnutzung bräuchte mehr Props als sie Zeilen spart.
  */
 export default function EntryDetailFrame({
-  module, isEditing, breadcrumbMeta,
+  module, isEditing, meta: titleMeta,
   title, onTitleChange, aboveTitle, belowTitle, tags, children,
 }: EntryDetailFrameProps) {
   const { t } = useTranslation();
@@ -48,21 +86,15 @@ export default function EntryDetailFrame({
 
   return (
     <div className="h-full flex flex-col">
-      {/* Topbar */}
-      <div className="flex items-center justify-between px-6 h-14 border-b border-stone-700/60 flex-shrink-0">
-        <div className="flex items-center gap-2 text-xs text-stone-600">
-          <button onClick={() => setActiveView({ type: module })} className="text-stone-500 transition-colors hover:text-stone-300">
-            {t(meta.navLabelKey)}
-          </button>
-          {breadcrumbMeta}
-          {isEditing && <span className="text-stone-700 italic ml-1">{t('editor.editing')}</span>}
-        </div>
-      </div>
+      <EntryHeaderRow
+        back={{ label: t(meta.navLabelKey), onClick: () => setActiveView({ type: module }) }}
+        meta={isEditing ? <EntryStatus tone="accent">{t('editor.editing')}</EntryStatus> : titleMeta}
+      />
 
       {aboveTitle}
 
       {/* Title */}
-      <div className="px-8 pt-6 pb-4 flex-shrink-0">
+      <div className="px-8 pt-4 pb-4 flex-shrink-0">
         {isEditing ? (
           <input
             autoFocus

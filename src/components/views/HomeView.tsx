@@ -157,7 +157,7 @@ export default function HomeView() {
   // eigene mit.
   const headerLeft = (
     <div className="min-w-0">
-      <h1 className="text-lg font-semibold text-stone-100 leading-tight truncate">
+      <h1 className="entry-view-title text-2xl font-semibold text-stone-100 leading-tight truncate">
         {formatDayHeading(today)}
       </h1>
       <p className="text-xs text-stone-500 truncate">

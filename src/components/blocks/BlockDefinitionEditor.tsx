@@ -45,7 +45,7 @@ const withArchivedLast = (elements: ElementDef[]): ElementDef[] => [
 interface Props {
   definition: BlockDefinition;
   usage: CopyUsage | undefined;
-  /** Zurück zur Liste. Die Brotkrume lässt den Entwurf liegen (die Liste
+  /** Zurück zur Liste. Der Zurück-Chip der Seitenleiste lässt den Entwurf liegen (die Liste
    *  zeigt ihn als ungespeichert); „Fertig" und „Abbrechen" erledigen ihn vorher. */
   onClose: () => void;
   /** Öffnet den Löschdialog — den hält die Ansicht, damit seine Abschlussmeldung
@@ -197,7 +197,6 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
     <LibraryPageFrame
       backLabel={t('nav.blocks')}
       onBack={onClose}
-      icon={draft.icon}
       draft={{ dirty, busy, onDone: () => void finish(), onCancel: leave, onDelete }}
       name={draft.name}
       nameLabel={t('blocks.library.name')}

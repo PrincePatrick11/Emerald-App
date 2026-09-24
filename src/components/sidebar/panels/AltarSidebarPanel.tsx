@@ -680,7 +680,7 @@ const [gridOpen, setGridOpen] = useState(true);
       )}
 
       {activeAltar && isEditing && (
-        <div className="pb-4 border-t border-stone-700/60">
+        <div className="sidebar-divider pb-4 border-t">
           <SidebarSectionHeader
             label={t('altar.placedElements')}
             open={placementsOpen}

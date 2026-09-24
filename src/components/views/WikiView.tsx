@@ -13,7 +13,6 @@ import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
 import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
-import { DEFAULT_ENTRY_EMOJI } from '../../lib/modules';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
@@ -361,23 +360,11 @@ export default function WikiView() {
     );
   }
 
-  const currentCat = categories.find((c) => c.id === article.category_id);
-
   return (
     <EntryDetailFrame
       module="wiki"
       isEditing={isEditing}
-      breadcrumbMeta={
-        <>
-          {isImageIcon(article.icon)
-            ? <img src={article.icon!} alt="" className="w-5 h-5 object-cover rounded" />
-            : <span>{currentCat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki}</span>
-          }
-          <span className="capitalize">{categoryLabel(t, currentCat, '—')}</span>
-          <span>·</span>
-          <span>{formatEntryDate(article.updated_at)}</span>
-        </>
-      }
+      meta={formatEntryDate(article.updated_at)}
       aboveTitle={!isEditing && coverImage && (
         <div className="flex-shrink-0 px-8 pt-5">
           <img

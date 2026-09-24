@@ -69,7 +69,9 @@ function RightSidebarActionBar() {
 
   // Eine geladene Sigille mit Sperre „ganzer Eintrag" lässt sich nicht
   // bearbeiten — der Ladung-Block entscheidet, in jeder Eintragsart.
-  if (content !== undefined && entryBlockSummary(activeView.id, content).sigil?.lockEntry) return null;
+  if (content !== undefined && entryBlockSummary(activeView.id, content).sigil?.lockEntry) {
+    return null;
+  }
 
   const isAltar = activeView.type === 'altar';
 

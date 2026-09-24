@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
 import { Flame, Maximize2, Minimize2, PackagePlus } from 'lucide-react';
-import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView, isWideCardView } from '../../lib/viewMode';
 import { groupByMonth } from '../../lib/groupBy';
@@ -19,6 +18,8 @@ import IconToggleGroup from '../ui/IconToggleGroup';
 import { GROUPING_ICONS, SORT_ICONS } from '../ui/ListToolbar';
 import { FilterChipButton } from '../ui/FilterPanel';
 import ContextMenu from '../ui/ContextMenu';
+import { EntryHeaderRow, EntryStatus } from '../ui/EntryDetailFrame';
+import { formatEntryDate } from '../../lib/formatDate';
 import Button from '../ui/Button';
 import { AltarCanvas, captureCurrentAltar } from '../altar/AltarCanvas';
 import { AltarLibraryStrip } from '../altar/AltarLibraryStrip';
@@ -434,40 +435,20 @@ export default function AltarView() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-6 h-14 border-b border-stone-700/60 flex-shrink-0">
-        <div className="flex items-center gap-2 text-xs text-stone-600">
-          <button onClick={() => setActiveView({ type: 'altar' })} className="text-stone-500 transition-colors hover:text-stone-300">
-            {t('nav.altar')}
-          </button>
-          <span>{formatEntryDate(activeAltar.updated_at)}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          {isEditing ? null : (
-            <>
-              {altarWindowFullscreen ? (
-                <Button
-                  onClick={() => setAltarWindowFullscreen(false)}
-                  variant="ghost"
-                  title={t('altar.exitWindowFullscreen')}
-                >
-                  <Minimize2 size={15} />
-                </Button>
-              ) : !rightSidebarOpen && (
-                <Button
-                  onClick={() => setAltarWindowFullscreen(true)}
-                  variant="ghost"
-                  title={t('altar.windowFullscreen')}
-                >
-                  <Maximize2 size={15} />
-                </Button>
-              )}
-            </>
-          )}
-        </div>
-      </div>
+      {/* Wie in EntryDetailFrame: darueber zurueck zum Altar-Dashboard und das
+          Datum, im Bearbeiten der Status. */}
+      {!altarWindowFullscreen && (
+        <EntryHeaderRow
+          inset="px-6"
+          back={{ label: t('nav.altar'), onClick: () => setActiveView({ type: 'altar' }) }}
+          meta={isEditing
+            ? <EntryStatus tone="accent">{t('editor.editing')}</EntryStatus>
+            : formatEntryDate(activeAltar.updated_at)}
+        />
+      )}
 
       {!altarWindowFullscreen && (
-        <div className="px-6 pt-6 pb-4 border-b border-stone-700/30">
+        <div className="px-6 pt-4 pb-4 border-b border-stone-700/30">
           {isEditing ? (
             <input
               autoFocus
@@ -486,6 +467,23 @@ export default function AltarView() {
       )}
 
       <div ref={viewportRef} className="flex-1 relative overflow-hidden min-h-0">
+        {/* Der Vollbild-Knopf steht oben in der rechten Seitenleiste.
+            Schwebend hier nur, wo die Leiste fehlt:
+            im Vollbild (sonst gaebe es keinen Weg zurueck) und bei
+            geschlossener Leiste. */}
+        {!isEditing && (altarWindowFullscreen || !rightSidebarOpen) && (
+          <div className="absolute top-3 right-3 z-10">
+            <Button
+              onClick={() => setAltarWindowFullscreen(!altarWindowFullscreen)}
+              tone="neutral"
+              compact
+              title={altarWindowFullscreen ? t('altar.exitWindowFullscreen') : t('altar.windowFullscreen')}
+              aria-label={altarWindowFullscreen ? t('altar.exitWindowFullscreen') : t('altar.windowFullscreen')}
+            >
+              {altarWindowFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </Button>
+          </div>
+        )}
         <div style={{
           position: 'absolute',
           width: canvasTransform.nativeW,

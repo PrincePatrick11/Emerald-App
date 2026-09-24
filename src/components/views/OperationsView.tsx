@@ -172,8 +172,6 @@ export default function OperationsView() {
 
   useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete, flush: flushAutoSave });
 
-  const getCatById = (id: string | null) => (id ? categories.find((c) => c.id === id) : undefined);
-
   // List view
   if (!operation) {
     const { view, sort, grouping } = operationsPrefs;
@@ -376,24 +374,11 @@ export default function OperationsView() {
     );
   }
 
-  const currentCat = getCatById(operation.category_id);
-  const operationIcon = operation.icon || currentCat?.emoji || '⚡';
-
   return (
     <EntryDetailFrame
       module="operations"
       isEditing={isEditing}
-      breadcrumbMeta={
-        <>
-          {isImageIcon(operationIcon)
-            ? <img src={operationIcon} alt="" className="w-5 h-5 object-cover rounded" />
-            : <span>{operationIcon}</span>
-          }
-          <span>{categoryLabel(t, currentCat, '—')}</span>
-          <span>·</span>
-          <span>{formatEntryDate(operation.updated_at)}</span>
-        </>
-      }
+      meta={formatEntryDate(operation.updated_at)}
       title={isEditing ? title : operation.title}
       onTitleChange={(nextTitle) => { setTitle(nextTitle); triggerAutoSave(); }}
       // Cover image — read mode hero (bewusst nach dem Titel, anders als im Wiki)

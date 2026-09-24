@@ -19,7 +19,7 @@ import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
-import { formatEntryDate, formatEntryDateLong } from '../../lib/formatDate';
+import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
 import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
@@ -341,14 +341,14 @@ export default function JournalView() {
     <EntryDetailFrame
       module="journal"
       isEditing={isEditing}
-      breadcrumbMeta={
+      meta={(
         <>
-          <span>{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</span>
-          <span>·</span>
-          <span>{formatEntryDateLong(entry.created_at)}</span>
-          {entry.moon_phase && <><span>·</span><span>{t(`moonPhase.${entry.moon_phase}`)}</span></>}
+          {entry.moon_phase && (
+            <span title={t(`moonPhase.${entry.moon_phase}`)}>{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase]}</span>
+          )}
+          <span>{formatEntryDate(entry.created_at)}</span>
         </>
-      }
+      )}
       title={isEditing ? title : entry.title}
       onTitleChange={(nextTitle) => { setTitle(nextTitle); triggerAutoSave(); }}
       tags={{ value: tags, onChange: (newTags) => { setTags(newTags); triggerAutoSave(); } }}

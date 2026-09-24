@@ -8,12 +8,16 @@ import Button from './Button';
  * Suchzeile der Eintragsliste (`EntryListTab`, `h-14`), damit beide
  * Seitenleisten ihre Oberkante des Inhalts auf derselben Linie haben — beide
  * synchron halten. Nur diese Leiste zieht eine Linie darunter: sie liegt auf
- * dem Blatt, die Suchzeile links auf dem Rahmen.
+ * dem Blatt, die Suchzeile links auf dem Rahmen. Die Linie sitzt am inneren
+ * Element und reicht deshalb nur von Knopfkante zu Knopfkante, wie die
+ * Trennlinien im Körper darunter (`.sidebar-divider`).
  */
-export function SidebarActionBar({ children }: { children: ReactNode }) {
+export function SidebarActionBar({ children }: { children?: ReactNode }) {
   return (
-    <div className="flex items-center gap-0.5 px-3 h-14 border-b border-stone-700/60 flex-shrink-0 min-w-0">
-      {children}
+    <div className="px-3 flex-shrink-0 min-w-0">
+      <div className="sidebar-divider flex items-center gap-1.5 h-14 border-b min-w-0">
+        {children}
+      </div>
     </div>
   );
 }
