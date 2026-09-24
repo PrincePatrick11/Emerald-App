@@ -21,7 +21,9 @@ import RailButton from '../ui/RailButton';
  *  die Standardbreite der rechten Seitenleiste aus, deshalb steht sie als
  *  Zahl hier statt als `w-14`-Klasse unten: zwei Wahrheiten haetten eine
  *  geklippte Rail *und* eine falsche Breite rechts ergeben. */
-export const RAIL_WIDTH = 56;
+// 44 = die 32px-Knoepfe mit je 6px Luft; knapp, damit die Liste nah an die
+// Icons rueckt (`.app-sidebar-left-with-rail` in index.css).
+export const RAIL_WIDTH = 44;
 
 export default function LeftSidebarRail() {
   const { t } = useTranslation();

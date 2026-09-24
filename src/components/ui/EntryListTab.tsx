@@ -83,7 +83,7 @@ export default function EntryListTab<T>({
       {/* 56px hoch wie die Aktionsleiste rechts (`SidebarActionBar`), ohne
           Trennlinie: die Liste liegt direkt auf dem Rahmen. Anlegen laeuft
           ueber die Hauptaktion im rechten Panel, nicht ueber einen Knopf hier. */}
-      <div className="h-14 px-3 flex-shrink-0 flex items-center">
+      <div className="entry-list-search-row h-14 px-3 flex-shrink-0 flex items-center">
         <div className="entry-list-search flex-1 flex items-center gap-2 rounded-md px-2.5 h-[30px] min-w-0">
           <Search size={14} className="text-stone-500 flex-shrink-0" />
           <input
@@ -96,11 +96,11 @@ export default function EntryListTab<T>({
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-2 px-2">
+      <nav className="entry-list-nav flex-1 overflow-y-auto py-2 px-2">
         {matching.length === 0 ? (
           <p className="text-xs text-stone-600 px-2 py-2">{emptyMessage}</p>
         ) : (
-          <div className="space-y-0.5">
+          <div className="space-y-1">
             {visible.map((item) => {
               const id = getId(item);
 
@@ -140,7 +140,7 @@ export default function EntryListTab<T>({
                         onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
                         className="w-full bg-transparent text-sm text-stone-300 outline-none selectable truncate"
                       />
-                      {dateStr && <div className="text-xs text-stone-600 mt-0.5">{dateStr}</div>}
+                      {dateStr && <div className="entry-list-date text-xs">{dateStr}</div>}
                     </div>
                   </div>
                 );
@@ -166,8 +166,8 @@ export default function EntryListTab<T>({
                 >
                   {icon}
                   <div className="flex-1 min-w-0">
-                    <div className="truncate">{title}</div>
-                    {dateStr && <div className="text-xs text-stone-600 mt-0.5 truncate">{dateStr}</div>}
+                    <div className="entry-list-title truncate">{title}</div>
+                    {dateStr && <div className="entry-list-date text-xs truncate">{dateStr}</div>}
                   </div>
                 </button>
               );

@@ -235,7 +235,7 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
       const cat = lookupCategory(catById, op.category_id);
       const iconValue = op.icon || cat?.emoji || '⚡';
       return isImageIcon(iconValue)
-        ? <img src={iconValue} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
+        ? <img src={iconValue} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
         : <span className="text-base leading-none flex-shrink-0">{iconValue}</span>;
     },
     isActive: (op) => activeView.id === op.id,
@@ -301,7 +301,7 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
     getIcon: (a) => {
       const cat = lookupCategory(catById, a.category_id);
       return isImageIcon(a.icon)
-        ? <img src={a.icon} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
+        ? <img src={a.icon} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
         : <span className="text-base leading-none flex-shrink-0">{cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki}</span>;
     },
     isActive: (a) => activeView.id === a.id,
@@ -343,8 +343,8 @@ function useAltarConfig(): EntryListTabProps<AltarRecord> {
     getTitle: (a) => a.title,
     getDateStr: (a) => formatEntryDate(a.updated_at),
     getIcon: (a) => (isImageIcon(a.icon_data)
-      ? <img src={a.icon_data!} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
-      : <Flame size={16} className="flex-shrink-0 text-stone-600" />),
+      ? <img src={a.icon_data!} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
+      : <Flame size={14} className="flex-shrink-0 text-stone-600" />),
     isActive: (a) => activeView.id === a.id,
     onOpen: (a) => setActiveView({ type: 'altar', id: a.id, mode: 'view' }),
     onOpenNewTab: (a) => openViewInNewTab({ type: 'altar', id: a.id, mode: 'view' }),
@@ -409,8 +409,8 @@ function useTasksConfig(): EntryListTabProps<Task> {
     getTitle: (task) => task.title,
     getDateStr: dateStrFor,
     getIcon: (task) => (task.completed
-      ? <CheckSquare size={16} className="flex-shrink-0 text-stone-600" />
-      : <Square size={16} className="flex-shrink-0 text-stone-600" />),
+      ? <CheckSquare size={14} className="flex-shrink-0 text-stone-600" />
+      : <Square size={14} className="flex-shrink-0 text-stone-600" />),
     isActive: (task) => activeView.id === task.id,
     onOpen: (task) => openTask(task.id),
     onDragStart: taskDragItem,
@@ -426,7 +426,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
       if (isRenaming) {
         return (
           <div className={`sidebar-item ${isActive ? 'active' : ''}`}>
-            <CheckSquare size={16} className="flex-shrink-0 text-stone-600" />
+            <CheckSquare size={14} className="flex-shrink-0 text-stone-600" />
             <div className="flex-1 min-w-0">
               <input
                 autoFocus
@@ -436,7 +436,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
                 onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') cancelRename(); }}
                 className="w-full bg-transparent text-sm text-stone-300 outline-none selectable truncate"
               />
-              {dateStr && <div className="text-xs text-stone-600 mt-0.5">{dateStr}</div>}
+              {dateStr && <div className="entry-list-date text-xs">{dateStr}</div>}
             </div>
           </div>
         );
@@ -449,7 +449,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
             className="flex-shrink-0 text-stone-500 hover:text-stone-300"
             title={task.completed ? t('tasks.markActive') : t('tasks.markCompleted')}
           >
-            {task.completed ? <CheckSquare size={16} /> : <Square size={16} />}
+            {task.completed ? <CheckSquare size={14} /> : <Square size={14} />}
           </button>
           <button
             // renderRow umgeht EntryListTabs zentrale Drag-Verdrahtung, daher
@@ -465,8 +465,8 @@ function useTasksConfig(): EntryListTabProps<Task> {
             onClick={() => openTask(task.id)}
             className="flex-1 min-w-0 text-left cursor-grab active:cursor-grabbing"
           >
-            <div className={`truncate ${task.completed ? 'line-through text-stone-500' : ''}`}>{task.title}</div>
-            {dateStr && <div className="text-xs text-stone-600 mt-0.5">{dateStr}</div>}
+            <div className={`entry-list-title truncate ${task.completed ? 'line-through text-stone-500' : ''}`}>{task.title}</div>
+            {dateStr && <div className="entry-list-date text-xs">{dateStr}</div>}
           </button>
         </div>
       );

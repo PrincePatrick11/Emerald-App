@@ -121,10 +121,10 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     @apply flex items-center justify-center w-[30px] h-[30px] p-0 rounded-md;
   }
 
-  /* Knopfbereich und Tab-Liste fahren die Breiten der Seitenleisten nach —
+  /* Der Knopfbereich faehrt die Breite der linken Seitenleiste nach —
      gleiche Dauer wie .app-sidebar-animated. */
   .titlebar-follow-animated {
-    transition: min-width 200ms ease-out, max-width 200ms ease-out, right 200ms ease-out;
+    transition: min-width 200ms ease-out;
   }
 
   /* Traffic lights sit at x:14 and span ~52px (see tauri.macos.conf.json).
@@ -318,6 +318,53 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     .titlebar-follow-animated {
       transition: none;
     }
+  }
+
+  /* Die Zeilen der Eintragsliste sind dichter als `.sidebar-item` sonst
+     (Rueckverweise, Aufgaben): 13px-Titel ueber dem Datum ohne Abstand
+     dazwischen, luftig gepolstert (48px hoch), dafuer nur 4px zwischen den
+     Zeilen (`space-y-1` in EntryListTab) und 12px vom Icon bis zum Text. Links
+     bleibt die Polsterung, sie haelt die Icon-Spalte unter der Suche. */
+  .entry-list-nav .sidebar-item {
+    padding-top: 6px;
+    padding-bottom: 6px;
+    gap: 12px;
+  }
+
+  /* Feste 16px-Spalte fuers Icon: ein Emoji belegt in seiner Schrift bis zu
+     22px Breite, ein lucide-Icon 14 — ohne feste Spalte begaennen die Titel
+     je nach Icon an anderer Stelle. */
+  .entry-list-nav .sidebar-item > :first-child {
+    width: 16px;
+    display: flex;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .entry-list-title {
+    font-size: 13px;
+    line-height: 18px;
+    font-weight: 500;
+  }
+
+  .entry-list-date {
+    line-height: 16px;
+    color: var(--text-subtle);
+  }
+
+  /* Neben der Rail braucht die Liste links nur wenig eigenen Rand — die Rail
+     bringt ihre 6px Luft mit. Suchsymbol und Zeilen-Icons stehen 14px nach der
+     Rail auf einer Linie, direkt unter dem Menue-Icon der Titelleiste (dort
+     `mr-1.5` am Logo — die Werte zusammen aendern). Ohne Rail bleiben die
+     gewohnten Raender zum Fenster. */
+  .app-sidebar-left-with-rail .entry-list-search-row,
+  .app-sidebar-left-with-rail .entry-list-nav {
+    padding-left: 4px;
+  }
+
+  .app-sidebar-left-with-rail .entry-list-search,
+  .app-sidebar-left-with-rail .entry-list-nav .sidebar-item {
+    padding-left: 10px;
   }
 
   /* Die Suche der Eintragsliste: randlos auf dem Rahmen, anders als die
@@ -1874,6 +1921,17 @@ html[data-theme] .settings-about-link:focus-visible {
   background: rgba(74, 222, 128, 0.14);
   color: #4ade80;
   border-color: rgba(74, 222, 128, 0.3);
+}
+
+/* Eintragsliste: helle Titel statt der gedaempften `.sidebar-item`-Farbe der
+   Theme-Regeln, die aktive Zeile im Minzton der Menues. Hover bleibt beim
+   Theme. */
+html[data-theme] .entry-list-nav .sidebar-item:not(.active):not(:hover) {
+  color: var(--text-secondary);
+}
+
+html[data-theme] .entry-list-nav .sidebar-item.active {
+  color: var(--menu-item-active-text);
 }
 
 /* Beide Themes: die Seitenleisten und der Hauptbereich sind Geschwister-

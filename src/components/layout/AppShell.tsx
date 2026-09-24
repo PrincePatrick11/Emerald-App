@@ -19,9 +19,9 @@ import ImageNoticeModal from '../ui/ImageNoticeModal';
 import ImportDestinationModal from '../ui/ImportDestinationModal';
 
 const ENTRY_LIST_MIN = 180;
-/** Zusammen mit der Rail (56) breiter als die Werkzeuggruppe der Titelleiste
- *  auf Windows/Linux — `pl-2` + Logo + Menue + drei Navigations- und zwei
- *  Export/Import-Knoepfe samt Abstaenden, rund 226px —, damit die Tabs dort
+/** Zusammen mit der Rail (44) breiter als die Werkzeuggruppe der Titelleiste
+ *  auf Windows/Linux — Logo in Railbreite + Menue + drei Navigations- und zwei
+ *  Export/Import-Knoepfe samt Abstaenden, rund 238px —, damit die Tabs dort
  *  buendig ueber dem Blatt beginnen. Die Breite der frueheren Modul-Tabs, damit
  *  sich bestehende Layouts nicht verschieben. */
 const ENTRY_LIST_DEFAULT = 226;
@@ -36,10 +36,6 @@ const RIGHT_DEFAULT = RAIL_WIDTH + ENTRY_LIST_DEFAULT;
    es steuert nur, wie lange der Inhalt noch gemountet bleibt. */
 const SIDEBAR_ANIM_CLASS = 'app-sidebar-animated';
 const SIDEBAR_ANIM_MS = 200;
-
-/** Der Abstand des Blatts zum Fensterrand, als Zahl fuer die Tab-Geometrie der
- *  Titelleiste. Muss zu `--sheet-inset` in `src/themes/*.css` passen. */
-const SHEET_INSET = 6;
 
 const ENTRY_LIST_WIDTH_KEY = 'entry-list-width';
 const RIGHT_WIDTH_KEY = 'sidebar-right-width';
@@ -291,15 +287,8 @@ export default function AppShell() {
 
   return (
     <div className="app-shell flex flex-col h-screen w-screen overflow-hidden relative">
-      {/* Die Tabs sitzen in der Titelleiste, ueber dem Blatt. Rechts endet das
-          Blatt SHEET_INSET vor dem Fensterrand, die Kante der rechten Leiste
-          liegt also um so viel weiter innen. */}
-      <TitleBar
-        tabs
-        leadWidth={leftSidebarWidth}
-        trailWidth={rightSidebarOpen ? rightWidth + SHEET_INSET : 0}
-        animate={!resizing}
-      />
+      {/* Die Tabs sitzen in der Titelleiste, ueber dem Blatt. */}
+      <TitleBar tabs leadWidth={leftSidebarWidth} animate={!resizing} />
 
       {/* The sidebar resize handles live in here, so the pointer handlers that
           drive them do too. */}
@@ -324,8 +313,8 @@ export default function AppShell() {
             // Rahmen, keine Trennlinie: Rail und Liste gehen nahtlos in die
             // Titelleiste ueber, abgesetzt ist erst das Blatt daneben.
             className={`app-sidebar app-sidebar-left flex-shrink-0 relative overflow-hidden${
-              resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`
-            }`}
+              railOpen ? ' app-sidebar-left-with-rail' : ''
+            }${resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`}`}
             style={{ width: leftSidebarWidth }}
           >
             {/* Eine ausgeblendete Rail schiebt der negative Rand nach links

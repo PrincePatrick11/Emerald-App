@@ -5,19 +5,18 @@ import { isAltarFullscreen, selectActiveHistory, useUIStore } from '../../../sto
 import { hasActiveVault, useVaultStore } from '../../../store/vaultStore';
 import { usesCustomWindowControls, usesHtmlMenuBar } from '../../../lib/platform';
 import EmeraldMark from '../../ui/EmeraldMark';
+import { RAIL_WIDTH } from '../LeftSidebarRail';
 import TabBar from '../TabBar';
 import RailButton from '../../ui/RailButton';
 import TitleBarMenuButton from './TitleBarMenuButton';
 import { useTitleBarMenus } from './useTitleBarMenus';
 import SearchModal from './SearchModal';
-import WindowControls, { WINDOW_CONTROLS_WIDTH } from './WindowControls';
+import WindowControls from './WindowControls';
 
 interface Props {
   tabs?: boolean;
   /** Breite der linken Seitenleiste. */
   leadWidth?: number;
-  /** Breite der rechten Seitenleiste. */
-  trailWidth?: number;
   /** Aus, solange eine Seitenleiste per Drag in der Breite gezogen wird. */
   animate?: boolean;
 }
@@ -37,12 +36,12 @@ interface Props {
  *
  * With `tabs` set, the bar also holds the tab strip. The leading group then
  * grows to `leadWidth` — the left sidebar's width — so the tabs begin flush
- * with the sheet's left edge below; they end at the right sidebar's edge
- * (`trailWidth`), only the "+" may reach past it.
+ * with the sheet's left edge below and may run up to the window buttons, minus
+ * a strip kept free for dragging the window.
  * Without `tabs` (no vault yet, boot still running) the shell content is
  * unmounted and there are no tabs to show.
  */
-export default function TitleBar({ tabs = false, leadWidth = 0, trailWidth = 0, animate = true }: Props) {
+export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }: Props) {
   const { t } = useTranslation();
   const navigateBack = useUIStore((s) => s.navigateBack);
   const navigateForward = useUIStore((s) => s.navigateForward);
@@ -71,10 +70,6 @@ export default function TitleBar({ tabs = false, leadWidth = 0, trailWidth = 0, 
   if (searchOpen && (minimal || !vaultOpen)) setSearchOpen(false);
   const menus = useTitleBarMenus();
   const showTabs = tabs && !minimal;
-  // Wie weit die Tab-Leiste in die rechte Seitenleiste hineinragt: ihr Anteil,
-  // der nicht schon unter den Fensterknoepfen liegt. Um so viel enden die Tabs
-  // vor dem rechten Rand der Leiste — und damit auf der Kante der Seitenleiste.
-  const tabsEndInset = Math.max(0, trailWidth - (usesCustomWindowControls ? WINDOW_CONTROLS_WIDTH : 0));
 
   return (
     <header
@@ -87,7 +82,7 @@ export default function TitleBar({ tabs = false, leadWidth = 0, trailWidth = 0, 
           (Rail oder Liste ausgeblendet), beginnen sie eben dahinter. */}
       <div
         data-tauri-drag-region
-        className={`flex items-center gap-1 h-full flex-shrink-0 pl-2${
+        className={`flex items-center h-full flex-shrink-0${
           showTabs && animate ? ' titlebar-follow-animated' : ''
         }`}
         style={showTabs ? { minWidth: leadWidth } : undefined}
@@ -103,11 +98,18 @@ export default function TitleBar({ tabs = false, leadWidth = 0, trailWidth = 0, 
             nebenbei, wofuer das fruehere <img> hier `draggable={false}`
             brauchte: als Drag-Quelle startete es auf macOS beim zweiten Druck
             eines Doppelklicks ein natives Bild-Drag, statt das Fenster zu
-            maximieren. Ein Inline-SVG ist keine. */}
+            maximieren. Ein Inline-SVG ist keine.
+
+            So breit wie die Rail und darin zentriert: das Logo steht in einer
+            Flucht mit deren Icons darunter. Der Menue-Knopf folgt mit `mr-1.5`,
+            sein Icon steht dann ueber denen der Eintragsliste (deren 4px
+            Rand neben der Rail in index.css) — deshalb traegt der Wrapper
+            kein `gap`, erst die Gruppen danach `ml-1`. */}
         <div
           data-tauri-drag-region
           title="Emerald App"
-          className="flex-shrink-0 flex items-center"
+          className="flex-shrink-0 flex items-center justify-center mr-1.5"
+          style={{ width: RAIL_WIDTH }}
         >
           <EmeraldMark size={20} className="pointer-events-none" />
         </div>
@@ -121,7 +123,7 @@ export default function TitleBar({ tabs = false, leadWidth = 0, trailWidth = 0, 
         )}
 
         {!minimal && (
-          <div className="flex items-center gap-0.5 flex-shrink-0">
+          <div className="ml-1 flex items-center gap-0.5 flex-shrink-0">
             {vaultOpen && (
               <RailButton onClick={() => setSearchOpen(true)} title={t('titlebar.search')}>
                 <Search size={16} />
@@ -145,7 +147,7 @@ export default function TitleBar({ tabs = false, leadWidth = 0, trailWidth = 0, 
             precisely where that export is wanted. Export trägt Download,
             Import Upload — wie in Settings → Backup. */}
         {usesHtmlMenuBar && (
-          <div className="flex items-center gap-0.5 flex-shrink-0">
+          <div className="ml-1 flex items-center gap-0.5 flex-shrink-0">
             <TitleBarMenuButton label={menus.exportMenu.label} icon={<Download size={16} />} nodes={menus.exportMenu.nodes} />
             <TitleBarMenuButton label={menus.importMenu.label} icon={<Upload size={16} />} nodes={menus.importMenu.nodes} />
           </div>
@@ -154,7 +156,7 @@ export default function TitleBar({ tabs = false, leadWidth = 0, trailWidth = 0, 
 
       {/* Ohne Tabs: leerer Zwischenraum, der als Ziehflaeche frei bleibt. */}
       {showTabs ? (
-        <TabBar endInset={tabsEndInset} animate={animate} />
+        <TabBar />
       ) : (
         <div data-tauri-drag-region className="flex-1 min-w-0 h-full" />
       )}
