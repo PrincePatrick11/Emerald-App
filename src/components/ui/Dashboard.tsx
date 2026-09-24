@@ -6,6 +6,7 @@ import SidebarPortal from './SidebarPortal';
 import SidebarColumn, { SidebarActionBar } from './SidebarColumn';
 import CollapseChevron from './CollapseChevron';
 import ListToolbar, { ListSearchField } from './ListToolbar';
+import { ENTRY_TITLE_HEADING_CLASSES } from './EntryDetailFrame';
 import FilterPanel, { type FilterPanelProps } from './FilterPanel';
 import { useUIStore, type ViewMode, type SortMode, type GroupingMode } from '../../store/uiStore';
 import { isCardView, isWideCardView } from '../../lib/viewMode';
@@ -71,8 +72,7 @@ interface DashboardBaseProps<T> {
   /** Ersetzt die ganze Titelzeile — für Köpfe mit mehr als Icon, Titel und
    *  Zahl (Home: zwei Zeilen; Papierkorb: `DashboardTitle` plus „Alle wählen"). */
   headerLeft?: ReactNode;
-  /** Beschrifteter Jade-Knopf auf eigener voller Zeile, ganz oben in der
-   *  Seitenleiste. */
+  /** Beschrifteter Jade-Knopf, der die Leiste oben in der Seitenleiste füllt. */
   primaryAction?: { label: string; onClick: () => void };
   /** Kompakte Icon-Knöpfe rechts neben der Primäraktion, in derselben Reihe;
    *  ihr Label steht nur im Tooltip. Für Nebenschauplätze des Moduls (Altar:
@@ -180,7 +180,7 @@ export function DashboardTitle({ icon: Icon, title, count, children }: {
   return (
     <div className="flex items-center gap-3 min-w-0">
       {Icon && <Icon size={18} className="text-stone-500 flex-shrink-0" />}
-      <h1 className="entry-view-title text-2xl font-semibold text-stone-100 truncate">{title}</h1>
+      <h1 className={`${ENTRY_TITLE_HEADING_CLASSES} truncate`}>{title}</h1>
       {count !== undefined && (
         <span className="text-xs text-stone-500 bg-stone-700/50 px-2 py-0.5 rounded-full">{count}</span>
       )}
@@ -364,7 +364,7 @@ export default function Dashboard<T>({
   // Die Aktionen stehen wie „Bearbeiten" eines Eintrags in der 56px-Leiste
   // mit der Trennlinie darunter: die Primäraktion füllt die Zeile, die
   // Nebenaktionen bleiben daneben kompakt.
-  const actionBar = !headerRight && (primaryAction || !!extraActions?.length) && (
+  const actionBar = !headerRight && (primaryAction || !!extraActions?.length) ? (
     <SidebarActionBar>
       {primaryAction && (
         <Button variant="primary" onClick={primaryAction.onClick} className="flex-1 min-w-0 justify-center">
@@ -374,10 +374,10 @@ export default function Dashboard<T>({
       )}
       {extraActionButtons}
     </SidebarActionBar>
-  );
+  ) : undefined;
 
   const header = (
-    <SidebarColumn bar={actionBar || undefined} bodyClassName="space-y-4">
+    <SidebarColumn bar={actionBar} bodyClassName="space-y-4">
       {headerRight && <div className="flex flex-col gap-1.5">{headerRight}</div>}
 
       <ListToolbar

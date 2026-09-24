@@ -34,14 +34,10 @@ export default function LeftSidebarEntryList() {
   // Neu gerendert je Vault: „Mehr anzeigen" beginnt dort wieder beim Limit.
   const vaultId = useSettingsStore((s) => s.vaultId);
 
-  return (
-    <div className="flex flex-col h-full flex-1 min-w-0">
-      <ActiveList key={vaultId} tab={list} />
-    </div>
-  );
+  return <ActiveList key={vaultId} list={list} />;
 }
 
-/** Ein Component pro Tab; die Config-Hooks je Modul bleiben die Fachlogik. */
+/** Ein Component pro Liste; die Config-Hooks je Modul bleiben die Fachlogik. */
 const TAB_LISTS: Record<LeftListTabId, ComponentType> = {
   all: AllList,
   journal: JournalList,
@@ -51,8 +47,8 @@ const TAB_LISTS: Record<LeftListTabId, ComponentType> = {
   altar: AltarList,
 };
 
-function ActiveList({ tab }: { tab: LeftListTabId }) {
-  const List = TAB_LISTS[tab];
+function ActiveList({ list }: { list: LeftListTabId }) {
+  const List = TAB_LISTS[list];
   return <List />;
 }
 

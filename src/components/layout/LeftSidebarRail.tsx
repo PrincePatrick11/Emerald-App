@@ -17,12 +17,12 @@ const SettingsModal = lazy(() => import('./settings/SettingsModal'));
 import type { SettingsPage } from './settings/SettingsModal';
 import RailButton from '../ui/RailButton';
 
-/** Breite der Rail. `AppShell` rechnet damit die Breite des <aside> und
- *  die Standardbreite der rechten Seitenleiste aus, deshalb steht sie als
- *  Zahl hier statt als `w-14`-Klasse unten: zwei Wahrheiten haetten eine
- *  geklippte Rail *und* eine falsche Breite rechts ergeben. */
-// 44 = die 32px-Knoepfe mit je 6px Luft; knapp, damit die Liste nah an die
-// Icons rueckt (`.app-sidebar-left-with-rail` in index.css).
+/** Breite der Rail: die 32px-Knoepfe mit je 6px Luft, knapp, damit die Liste
+ *  nah an die Icons rueckt (`.app-sidebar-left-with-rail` in index.css).
+ *  `AppShell` rechnet damit die Breite des <aside> und die Standardbreite der
+ *  rechten Seitenleiste aus, die Titelleiste die Breite des Logos — deshalb
+ *  steht sie als Zahl hier statt als Klasse unten: zwei Wahrheiten ergaeben
+ *  eine geklippte Rail *und* falsche Breiten daneben. */
 export const RAIL_WIDTH = 44;
 
 export default function LeftSidebarRail() {

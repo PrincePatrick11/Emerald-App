@@ -108,7 +108,7 @@ export default function RightSidebar() {
   const setListHeaderHost = useUIStore((s) => s.setListHeaderHost);
   const dashboardMounted = useUIStore((s) => s.dashboardMounted);
 
-  // Ist ein Dashboard gemountet, gehört die Leiste seinem Kopf — Titel,
+  // Ist ein Dashboard gemountet, gehört die Leiste seinem Kopf —
   // Aktions-Buttons, Toolbar und Filter portalt es hierher. Das entscheidet
   // seine Anmeldung, nicht `activeView.id`: Aufgaben zeigen ihre Liste auch
   // mit einer id (Sprungziel, kein offener Eintrag), und die id eines

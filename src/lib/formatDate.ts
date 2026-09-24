@@ -57,8 +57,8 @@ export function formatEntryDate(date: string | Date): string {
   return format(new Date(date), 'PP', { locale: activeLocale });
 }
 
-/** Langes Datum ('PPP', enUS: "August 26th, 2026") — Journal-Detailkopf. */
-export function formatEntryDateLong(date: string | Date): string {
+/** Langes Datum ('PPP', enUS: "August 26th, 2026") — Grundlage von `formatIsoDateLong`. */
+function formatEntryDateLong(date: string | Date): string {
   return format(new Date(date), 'PPP', { locale: activeLocale });
 }
 

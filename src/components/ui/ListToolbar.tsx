@@ -55,9 +55,8 @@ interface Props {
 }
 
 /**
- * Das Suchfeld einer Liste. Steht nicht mehr in der Toolbar-Spalte der
- * Seitenleiste, sondern im Hauptbereich rechts neben dem Titel (`Dashboard`);
- * die Breite gibt der Aufrufer über `className`.
+ * Das Suchfeld einer Liste, im Hauptbereich rechts neben dem Titel
+ * (`Dashboard`); die Breite gibt der Aufrufer über `className`.
  */
 export function ListSearchField({ value, onChange, placeholder, className = '' }: {
   value: string;
@@ -76,7 +75,7 @@ export function ListSearchField({ value, onChange, placeholder, className = '' }
         className="list-toolbar-input bg-transparent outline-none w-full min-w-0 selectable text-sm"
       />
       {value && (
-        <button onClick={() => onChange('')} className="list-toolbar-clear transition-colors flex-shrink-0">
+        <button onClick={() => onChange('')} className="list-toolbar-clear rounded-sm transition-colors flex-shrink-0">
           <X size={14} />
         </button>
       )}

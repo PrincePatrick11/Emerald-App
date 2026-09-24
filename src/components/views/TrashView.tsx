@@ -193,6 +193,12 @@ export default function TrashView() {
 
   useEffect(() => { fetchTrashed(); }, []);
 
+  // „Alle wählen" wählt nur die Treffer der Suche — sonst löschte die
+  // Mehrfachauswahl endgültig, was der Filter gerade verbirgt. „Papierkorb
+  // leeren" bleibt bewusst global.
+  const query = search.trim().toLowerCase();
+  const matching = query ? items.filter((i) => i.title.toLowerCase().includes(query)) : items;
+
   // Clear selection when items change (e.g. after deletion)
   useEffect(() => {
     setSelectedIds((prev) => {
@@ -212,7 +218,7 @@ export default function TrashView() {
   };
 
   const selectAll = () => {
-    setSelectedIds(new Set(items.map((i) => i.id)));
+    setSelectedIds(new Set(matching.map((i) => i.id)));
     setConfirmingBulkDelete(false);
   };
 
@@ -244,10 +250,6 @@ export default function TrashView() {
 
   const itemProps: ItemSharedProps = { confirmingId, setConfirmingId, restore, deleteNow, selectedIds, onToggleSelect: toggleSelect, t };
 
-  // Die Suche filtert nur, was angezeigt wird — Auswahl, „Alle wählen" und
-  // „Papierkorb leeren" beziehen sich weiter auf den ganzen Papierkorb.
-  const query = search.trim().toLowerCase();
-  const matching = query ? items.filter((i) => i.title.toLowerCase().includes(query)) : items;
   const sorted = sortItems(matching, trashPrefs.sort, { date: (i) => i.deleted_at });
 
   // ── Grouped by type/category ───────────────────────────────────────────────
@@ -372,7 +374,7 @@ export default function TrashView() {
   };
 
   const hasSelection = selectedIds.size > 0;
-  const allSelected = items.length > 0 && selectedIds.size === items.length;
+  const allSelected = matching.length > 0 && matching.every((i) => selectedIds.has(i.id));
 
   // min-w-0/truncate und flex-wrap: die beiden Slots landen im Seitenleisten-
   // Experiment in einer schmalen Spalte (Dashboard portalt den Kopf dorthin)

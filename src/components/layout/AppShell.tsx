@@ -22,8 +22,7 @@ const ENTRY_LIST_MIN = 180;
 /** Zusammen mit der Rail (44) breiter als die Werkzeuggruppe der Titelleiste
  *  auf Windows/Linux — Logo in Railbreite + Menue + drei Navigations- und zwei
  *  Export/Import-Knoepfe samt Abstaenden, rund 238px —, damit die Tabs dort
- *  buendig ueber dem Blatt beginnen. Die Breite der frueheren Modul-Tabs, damit
- *  sich bestehende Layouts nicht verschieben. */
+ *  buendig ueber dem Blatt beginnen. */
 const ENTRY_LIST_DEFAULT = 226;
 const RIGHT_MIN = 180;
 /** So breit wie die linke Seite im Ganzen — Rail plus Eintragsliste. */

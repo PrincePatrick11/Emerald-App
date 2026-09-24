@@ -5,9 +5,15 @@ import { useUIStore } from '../../store/uiStore';
 import { MODULES, type EntryModuleId } from '../../lib/modules';
 import TagInput from '../editor/TagInput';
 
-/** Die Titelzeile als Eingabe — Einträge im Bearbeiten und die Seiten der Bibliotheken (`LibraryPageFrame`). */
+/** Der Seitentitel als Überschrift — Einträge, Altar und Dashboards
+ *  (`DashboardTitle`, Home) stehen bewusst gleich groß. Eine Klassenkette,
+ *  kein `@apply` in `.entry-view-title`: die Theme-Regeln für `.text-stone-100`
+ *  griffen sonst nicht mehr. */
+export const ENTRY_TITLE_HEADING_CLASSES = 'entry-view-title text-2xl font-semibold text-stone-100';
+
+/** Die Titelzeile als Eingabe — Einträge im Bearbeiten, der Altar und die Seiten der Bibliotheken (`LibraryPageFrame`). */
 export const ENTRY_TITLE_INPUT_CLASSES =
-  'entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100 placeholder-stone-700 outline-none selectable';
+  `${ENTRY_TITLE_HEADING_CLASSES} w-full bg-transparent placeholder-stone-700 outline-none selectable`;
 
 /**
  * Die schmale Zeile über dem Titel: links der Weg zurück zur Übersicht
@@ -47,7 +53,7 @@ export function EntryStatus({ tone, children }: { tone: 'accent' | 'warning'; ch
 }
 
 interface EntryDetailFrameProps {
-  /** Bestimmt den Untitled-Platzhalter (Registry). */
+  /** Bestimmt Zurück-Ziel/-Label und den Untitled-Platzhalter (Registry). */
   module: EntryModuleId;
   isEditing: boolean;
   /** Rechts über dem Titel im Lesen, meist das Datum. Im Bearbeiten steht dort der Status. */
@@ -77,18 +83,18 @@ interface EntryDetailFrameProps {
  * Verhalten) — eine Teilnutzung bräuchte mehr Props als sie Zeilen spart.
  */
 export default function EntryDetailFrame({
-  module, isEditing, meta: titleMeta,
+  module, isEditing, meta,
   title, onTitleChange, aboveTitle, belowTitle, tags, children,
 }: EntryDetailFrameProps) {
   const { t } = useTranslation();
   const setActiveView = useUIStore((s) => s.setActiveView);
-  const meta = MODULES[module];
+  const moduleInfo = MODULES[module];
 
   return (
     <div className="h-full flex flex-col">
       <EntryHeaderRow
-        back={{ label: t(meta.navLabelKey), onClick: () => setActiveView({ type: module }) }}
-        meta={isEditing ? <EntryStatus tone="accent">{t('editor.editing')}</EntryStatus> : titleMeta}
+        back={{ label: t(moduleInfo.navLabelKey), onClick: () => setActiveView({ type: module }) }}
+        meta={isEditing ? <EntryStatus tone="accent">{t('editor.editing')}</EntryStatus> : meta}
       />
 
       {aboveTitle}
@@ -101,12 +107,12 @@ export default function EntryDetailFrame({
             type="text"
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
-            placeholder={t(meta.untitledKey)}
+            placeholder={t(moduleInfo.untitledKey)}
             className={ENTRY_TITLE_INPUT_CLASSES}
           />
         ) : (
-          <h1 className="entry-view-title text-2xl font-semibold text-stone-100">
-            {title || t(meta.untitledKey)}
+          <h1 className={ENTRY_TITLE_HEADING_CLASSES}>
+            {title || t(moduleInfo.untitledKey)}
           </h1>
         )}
       </div>

@@ -10,6 +10,7 @@ import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard from '../ui/Dashboard';
+import { ENTRY_TITLE_HEADING_CLASSES } from '../ui/EntryDetailFrame';
 import DashboardItem from '../ui/DashboardItem';
 import Dropdown from '../ui/Dropdown';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
@@ -157,7 +158,7 @@ export default function HomeView() {
   // eigene mit.
   const headerLeft = (
     <div className="min-w-0">
-      <h1 className="entry-view-title text-2xl font-semibold text-stone-100 leading-tight truncate">
+      <h1 className={`${ENTRY_TITLE_HEADING_CLASSES} leading-tight truncate`}>
         {formatDayHeading(today)}
       </h1>
       <p className="text-xs text-stone-500 truncate">

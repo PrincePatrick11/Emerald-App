@@ -28,7 +28,7 @@ interface Props {
  * Auf demselben `LibraryPageFrame` wie die Seite eines eigenen Blocks und die
  * einer Vorlage, aber ohne deren Entwurfs-Betrieb: hier wird jede Zeile sofort
  * gespeichert, es gibt also nichts zurückzunehmen. Statt Fertig/Löschen/
- * Abbrechen trägt die Leiste den Weg zurück zur Liste und das Löschen.
+ * Abbrechen trägt die Leiste nur das Löschen.
  */
 export default function LanguagePage({ language, onClose, onDelete }: Props) {
   const { t } = useTranslation();

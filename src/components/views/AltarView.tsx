@@ -18,7 +18,7 @@ import IconToggleGroup from '../ui/IconToggleGroup';
 import { GROUPING_ICONS, SORT_ICONS } from '../ui/ListToolbar';
 import { FilterChipButton } from '../ui/FilterPanel';
 import ContextMenu from '../ui/ContextMenu';
-import { EntryHeaderRow, EntryStatus } from '../ui/EntryDetailFrame';
+import { ENTRY_TITLE_HEADING_CLASSES, ENTRY_TITLE_INPUT_CLASSES, EntryHeaderRow, EntryStatus } from '../ui/EntryDetailFrame';
 import { formatEntryDate } from '../../lib/formatDate';
 import Button from '../ui/Button';
 import { AltarCanvas, captureCurrentAltar } from '../altar/AltarCanvas';
@@ -455,11 +455,11 @@ export default function AltarView() {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="entry-view-title w-full bg-transparent text-2xl font-semibold text-stone-100 placeholder-stone-700 outline-none selectable"
+              className={ENTRY_TITLE_INPUT_CLASSES}
               placeholder={t('altar.untitled')}
             />
           ) : (
-            <h1 className="entry-view-title w-full text-2xl font-semibold text-stone-100">
+            <h1 className={`${ENTRY_TITLE_HEADING_CLASSES} w-full`}>
               {activeAltar.title || t('altar.untitled')}
             </h1>
           )}

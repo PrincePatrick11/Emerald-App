@@ -9,7 +9,7 @@ import { useUIStore } from '../../store/uiStore';
 
 /**
  * Die Ausstattung einer Seite, die erst mit „Fertig" speichert: der Status
- * „Ungespeichert" neben dem Titel, Fertig/Löschen/Abbrechen in der
+ * „Ungespeichert" in der Zeile über dem Titel, Fertig/Löschen/Abbrechen in der
  * Seitenleiste und — bei geschlossener Seitenleiste — Fertig und Abbrechen
  * in einer schmalen Leiste über dem Titel. Die drei gehören zusammen und
  * setzen `useDraftPage` voraus; eine Seite ohne Entwurf lässt sie weg und
@@ -24,7 +24,7 @@ export interface LibraryPageDraft {
 }
 
 interface Props {
-  /** Der Weg zurück zur Liste (lässt einen Entwurf liegen) — vorn in der Leiste der Seitenleiste. */
+  /** Der Weg zurück zur Liste (lässt einen Entwurf liegen) — der Link in der Zeile über dem Titel. */
   backLabel: string;
   onBack: () => void;
   name: string;
@@ -33,7 +33,7 @@ interface Props {
   onNameChange: (name: string) => void;
   /** Der Entwurfs-Betrieb — oder `actions` statt seiner, siehe `LibraryPageDraft`. */
   draft?: LibraryPageDraft;
-  /** Die Aktionen neben dem Zurück-Pfeil, wenn die Seite keinen Entwurf hat. */
+  /** Die Aktionen in der Leiste der Seitenleiste, wenn die Seite keinen Entwurf hat. */
   actions?: ReactNode;
   /** Der Körper der Seitenleiste unter der Leiste. */
   sidebar: ReactNode;
@@ -44,14 +44,14 @@ interface Props {
 /**
  * Der Rahmen der Bibliotheksseiten — ein eigener Block, eine Vorlage, eine
  * Sprache des Lexikons. Gebaut wie `EntryDetailFrame` im Bearbeiten: der Name
- * als Titel (rechts daneben „Ungespeichert"), darunter der scrollende Körper,
- * und in der Seitenleiste oben die Leiste — Zurück-Pfeil und Aktionen — über
+ * als Titel (darüber Zurück-Link und „Ungespeichert"), darunter der scrollende Körper,
+ * und in der Seitenleiste oben die Leiste mit den Aktionen über
  * dem Eigenschaften-Körper.
  *
  * Welche Aktionen dort stehen, ist Sache der Seite: Entwurfsseiten reichen
  * `draft` herein und bekommen Fertig/Löschen/Abbrechen samt „Ungespeichert";
  * eine Seite, die sofort speichert, reicht ihre eigenen `actions` und hat
- * nichts zurückzunehmen. Der Rahmen selbst — Zurück-Pfeil, Titelfeld,
+ * nichts zurückzunehmen. Der Rahmen selbst — Zurück-Link, Titelfeld,
  * Scrollen, die Portale — ist für beide derselbe.
  */
 export default function LibraryPageFrame({
@@ -100,7 +100,7 @@ export default function LibraryPageFrame({
         <SidebarColumn
           bar={draft
             ? <EditActionBar onDone={draft.onDone} onDelete={draft.onDelete} onCancel={draft.onCancel} busy={draft.busy} />
-            : <SidebarActionBar>{actions}</SidebarActionBar>}
+            : actions && <SidebarActionBar>{actions}</SidebarActionBar>}
         >
           {sidebar}
         </SidebarColumn>

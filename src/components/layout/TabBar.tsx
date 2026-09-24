@@ -113,6 +113,7 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
 /** Wie lange die Layout-Animation nach dem Loslassen eines Tabs noch laeuft —
  *  reichlich fuer REORDER_SPRING, bis die ausgewichenen Tabs stehen. */
 const REORDER_SETTLE_MS = 500;
+
 export default function TabBar() {
   const { t } = useTranslation();
   const { tabs, activeTabId, selectTab, closeTab, addTab, setTabsOrder } = useUIStore(
@@ -231,7 +232,7 @@ export default function TabBar() {
       </LazyMotion>
       <button
         onClick={() => addTab()}
-        className="tab-add flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-md transition-colors"
+        className="tab-add flex h-[var(--tab-pill-h)] w-[var(--tab-pill-h)] flex-shrink-0 items-center justify-center rounded-md transition-colors"
         title={t('tabBar.newTab')}
       >
         <Plus size={14} />

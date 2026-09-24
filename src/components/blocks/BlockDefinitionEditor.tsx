@@ -45,7 +45,7 @@ const withArchivedLast = (elements: ElementDef[]): ElementDef[] => [
 interface Props {
   definition: BlockDefinition;
   usage: CopyUsage | undefined;
-  /** Zurück zur Liste. Der Zurück-Chip der Seitenleiste lässt den Entwurf liegen (die Liste
+  /** Zurück zur Liste. Der Zurück-Link über dem Titel lässt den Entwurf liegen (die Liste
    *  zeigt ihn als ungespeichert); „Fertig" und „Abbrechen" erledigen ihn vorher. */
   onClose: () => void;
   /** Öffnet den Löschdialog — den hält die Ansicht, damit seine Abschlussmeldung

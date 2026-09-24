@@ -579,8 +579,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     @apply text-xs font-semibold uppercase tracking-wider text-stone-500;
   }
 
-  .list-toolbar-chip,
-  .list-toolbar-search {
+  .list-toolbar-chip {
     background-color: color-mix(in srgb, var(--bg-surface-1) 80%, transparent);
     color: var(--text-muted);
     border: 1px solid var(--border-soft);
@@ -1979,8 +1978,9 @@ html[data-theme] .list-search-field {
   border: 1px solid var(--sheet-border);
 }
 
-/* Beide Themes: der Ring des Zurueck-Links ueber dem Titel — ueber Parchments
-   generischer button:focus-visible-Regel. */
+/* Beide Themes: der Ring des Zurueck-Links ueber dem Titel und des Leeren-X
+   im Suchfeld — ueber Parchments generischer button:focus-visible-Regel. */
+html[data-theme] .list-toolbar-clear:focus-visible,
 html[data-theme] .entry-back-link:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
@@ -2529,13 +2529,6 @@ html[data-theme='emerald-parchment'] .panel-interactive:hover .home-item-title {
 }
 
 html[data-theme='emerald-parchment'] .list-toolbar-chip,
-html[data-theme='emerald-parchment'] .list-toolbar-search {
-  background: #f7e9d2;
-  color: #4f3925;
-  border-color: rgba(151, 112, 74, 0.4);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-}
-
 html[data-theme='emerald-parchment'] .list-toolbar-chip:hover {
   background: #faefdD;
   color: #2e2013;

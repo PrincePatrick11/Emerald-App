@@ -152,6 +152,14 @@ function normalizeEmojiList(raw: unknown): string[] | null {
  * bleiben stehen — eine neuere Version, die den Vault vorher geöffnet hat,
  * soll ihre Einstellungen nach einem Abstecher in eine ältere wiederfinden.
  */
+/** Ein Vault aus der Zeit der Tab-Auswahl, in dem genau ein Tab sichtbar war,
+ *  zeigte praktisch nur diese Liste — die bleibt es. Sonst „Alle". */
+function legacySingleList(tabs: unknown): LeftListTabId {
+  if (!Array.isArray(tabs)) return DEFAULT_VAULT_SETTINGS.leftList.list;
+  const valid = LEFT_LIST_TAB_IDS.filter((id) => tabs.includes(id));
+  return valid.length === 1 ? valid[0] : DEFAULT_VAULT_SETTINGS.leftList.list;
+}
+
 export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const root = asRecord(raw);
   const appearance = asRecord(root.appearance);
@@ -182,7 +190,7 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
     },
     leftList: {
       ...leftList,
-      list: oneOf(leftList.list, LEFT_LIST_TAB_IDS, DEFAULT_VAULT_SETTINGS.leftList.list),
+      list: oneOf(leftList.list, LEFT_LIST_TAB_IDS, legacySingleList(leftList.tabs)),
       limit: oneOf(leftList.limit, LEFT_LIST_LIMIT_OPTIONS, DEFAULT_LEFT_LIST_LIMIT),
     },
     emojis: {
