@@ -102,39 +102,41 @@ the icon.
 **Bar heights:**
 
 - `h-10` (40px) — window chrome: title bar, which also holds the tab strip.
-- `h-14` (56px) — content bars: entry list tabs, `RightSidebarActionBar`, dashboard topbar.
+- `h-14` (56px) — content bars: the entry list's search row, `RightSidebarActionBar`,
+  dashboard topbar.
 
 The split is deliberate: the title bar is window chrome, not a content header, and 56px
-feels heavy for that. Because it sits *above* the three-column shell, this does not
+feels heavy for that. Because it sits *above* the frame-and-sheet shell, this does not
 collide with the 56px to its left and right below — the two sidebars must place their
 bottom divider at the same height.
 
-Both theme files define the height and width tokens: `--tab-w` (140px), which `TabBar`
+Both theme files define the height and width tokens: `--tab-pill-h` (30px), which `TabBar`
 uses, plus `--content-bar-h` (56px), `--control-h` (30px) and `--control-h-sm` (24px),
 which mirror `h-14` and the `Button` heights but are not wired up yet. Rail buttons
 (`RailButton`) come out at 32×32: an 18px icon, `p-1.5` and the 1px frame that holds room
-for the active accent.
+for the active accent. Inside the title bar, `.titlebar .rail-button` is 30×30 with a
+16px icon instead — one step down from the rail's own 32×32/18px, since the bar is shorter.
 
-**Tab bar** (`TabBar.tsx`): the strip sits inside the title bar. The leading group of
-controls grows to the left sidebar's width (`leadWidth` from `AppShell`, animated along
-with the sidebar) and ends in a short vertical divider (`h-4`, `border-stone-700/60`)
-exactly above the sidebar's right edge, so the tabs begin above the main area. When the
-sidebar is narrower than the controls, the divider and tabs follow right after them.
-On the right the tabs end at the right sidebar's edge: `TitleBar` passes the part of that
-sidebar not already under the window controls (`WINDOW_CONTROLS_WIDTH`) to `TabBar` as
-`endInset`, which caps the tab list; only the "+" may reach past it. When that strip is
-wide enough (`EDGE_ROOM`), a divider like the left one marks the edge, the tabs stop 6px
-short of it, and a "+" that would land on it moves 6px past it instead. The list scrolls
-the active tab into view, so a tab added with "+" is visible right away.
-Tabs are 30px pills, fixed 140px wide, `rounded-md`, 4px apart (`gap-1`), with no edges:
-idle tabs have no surface (`--text-subtle`, `--tab-hover-bg` on hover), the active tab a
-light one (`--tab-active-bg`, `--text-primary`). No accent edge on the active tab; the ×
-appears on hover. The "+" is a 30px square button of the same kind. The title bar's own
-bottom line runs through unbroken beneath all of it. The space before the divider and a
-trailing filler of at least 48px (`min-w-12`, kept even when the tabs overflow) stay free
-to drag the window; the gaps between pills deliberately do not, since a click there right
-after a tab click would count as a double-click and maximise the window. Focus rings sit
-*inset*, since the scrolling list clips anything beyond a pill.
+**Tab bar** (`TabBar.tsx`): the strip sits inside the title bar, flush with the sheet's
+left edge below it — no divider marks where it starts or ends any more, since the whole
+title bar is part of the frame (see Shell Layout). The leading group of controls (logo,
+menu, search, back/forward, Export/Import) grows to the left sidebar's width (`leadWidth`
+from `AppShell`, animated along with the sidebar), and the tabs start right after it. The
+list scrolls the active tab into view, so a tab added with "+" is visible right away.
+Tabs are `--tab-pill-h` (30px) pills, `rounded-md`, `flex-[0_1_180px]` — 180px wide until
+the strip is full, then shrinking together down to a 96px floor before the list starts
+scrolling — with no edges: idle tabs have no surface (`--text-subtle`, `--tab-pill-hover`
+on hover), the active tab a light one (`--tab-pill-active`, `--text-primary`). No accent
+edge on the active tab; the × sits always visible on the active tab and appears on hover
+for the rest. The "+" is a pill-height square button of the same kind, followed by a
+`min-w-8` filler. The title bar's own bottom line runs through unbroken beneath all of it.
+The space before the tabs and the trailing filler stay free to drag the window; the gaps
+between pills deliberately do not, since a click there right after a tab click would count
+as a double-click and maximise the window. `Reorder.Item`'s layout animation is only active
+while a tab is actively being dragged (plus a 500ms settle window after drop) — otherwise
+every tab would spring after it whenever the strip itself shifts (sidebar resize, sidebar
+toggle), instead of sitting still on the sheet. Focus rings sit *inset*, since the
+scrolling list clips anything beyond a pill.
 
 **Horizontal padding has exactly one source per column.** The column's outer container
 sets it; the panels inside add no `px-*` of their own. In the right sidebar that is the
@@ -235,13 +237,7 @@ automatically (`usesEditorSidebar` in `uiStore.ts`) — that covers entry, not l
 collapsing. Mitigated, not fixed: both sidebars can also be reopened from the View menu.
 *Cost: keyboard shortcuts for Edit/Done/Cancel, or a second home for the actions.*
 
-**10. Tab strip and action bar do not always line up.** `LeftSidebarEntryList`'s tab strip
-is `min-h-14` and wraps onto a second row below 226px panel width, while
-`RightSidebarActionBar` stays `h-14`. **Deliberate:** growing the right bar too would mean
-enlarging it for a reason that has nothing to do with its own content. The point is
-recorded here so the deviation is not reported as a bug.
-
-**11. `LinkPickerModal`'s six tabs are a hand-written button, not `TabIconButton`.**
+**10. `LinkPickerModal`'s six tabs are a hand-written button, not `TabIconButton`.**
 `TabIconButton`'s active state is wired to the stone tone the two sidebars use; the picker
 needs the jade tone the modal is themed in instead, and the component has no tone variant
 for that yet. The deviation is commented at the definition (`LinkPickerModal.tsx`).
@@ -275,9 +271,12 @@ define the same 79 properties. Core values:
 | `--danger-text` | `#f87171` | `#b63f32` |
 | `--panel-bg` | `rgba(38, 32, 27, 0.78)` | `#f7eddb` |
 | `--menu-shadow` | `0 14px 36px rgba(0,0,0,0.35)` | `0 18px 36px rgba(96,63,30,0.2)` |
-| `--titlebar-bg` | `rgba(24, 20, 16, 0.94)` | `#ecdec7` |
+| `--shell-bg` | `#100d0a` | `#ecdec7` |
+| `--sheet-bg` | `#1c1712` | `#faf3e6` |
+| `--sheet-border` | `rgba(87, 83, 78, 0.35)` | `rgba(145, 108, 70, 0.28)` |
 
-The tab strip has no background of its own — it lies on `--titlebar-bg`.
+The tab strip has no background of its own — it lies on the frame (`--shell-bg`), like the
+title bar, the rail and the left sidebar. See Shell Layout below for the frame/sheet split.
 
 Deliberately **not** tokenised: the Fluent red of the close button (`#c42b1c`, active
 `#b2231a`). It is identical in both themes — a token would only be a second place to
@@ -369,12 +368,32 @@ could look selected at once.
 
 ### Shell Layout
 
+**Frame and sheet.** The title bar, the rail and the left entry list all sit on
+`--shell-bg` with no dividers between them and no gradients — together they read as one
+frame. The main content area and the right sidebar together form a rounded "sheet"
+(`--sheet-bg`, `--sheet-border`, `--sheet-radius: 10px` — one step under `rounded-xl`,
+deliberately: the sheet is window surface, not a panel sitting on one, and a softer radius
+would balloon the corners against the frame) sitting on top of that frame, inset from it by
+`--sheet-inset` (6px) on the right and bottom. `.app-sheet-main`/`.app-sheet-side` carry the
+sheet's background and border; `.app-sheet-main-joined` drops the main area's own right
+border and right-side radius when the right sidebar sits next to it, so the two read as one
+surface split only by the divider the sidebar itself draws. The left inset only applies
+when nothing sits to the left of the sheet — i.e. once the rail and the entry list are both
+collapsed (`.app-sheet-frame-free-left`) — otherwise the frame's own left edge already
+provides it. `public/splash.css`'s `--splash-bg` and the four Tauri configs'
+`backgroundColor` match `--shell-bg` in both themes, so the loading screen hands off to the
+frame without a visible seam.
+
 **Title bar** (`TitleBar.tsx`, `h-10`). Flexbox, not a centring grid: the left group (logo,
 menu button, magnifier, back/forward, and on Windows/Linux the Export/Import buttons) and
-the right group (window buttons) are `flex-shrink-0`; the space between them is a plain
-drag-only spacer, not a shrinking content column. Every trigger is an icon-only `RailButton`,
-so there is nothing left to fold or measure as the window narrows — no `ResizeObserver`, no
-remembered width, no language-dependent breakpoint. The window's minimum width is 720px.
+the right group (window buttons) are `flex-shrink-0`; the space between them holds the tab
+strip and is otherwise a plain drag-only spacer, not a shrinking content column. Every
+trigger is an icon-only `.titlebar .rail-button` (30×30, 16px icon), so there is nothing
+left to fold or measure as the window narrows — no `ResizeObserver`, no remembered width, no
+language-dependent breakpoint. The window's minimum width is 720px. The Emerald logo sits
+centred in a box exactly `RAIL_WIDTH` wide, so it lines up with the rail's icon column
+underneath it; the menu button follows with its own left margin rather than a shared `gap`,
+so its icon lines up with the entry list's icons below (see `.app-sidebar-left-with-rail`).
 
 Global search opens as `SearchModal` (`w-[560px]`, fixed `h-[70vh]`, matching
 `LinkPickerModal`'s geometry) instead of living in the bar itself. Its search field reuses
@@ -387,28 +406,27 @@ gap, flush into the window corner — the Windows Fluent geometry. The glyphs ar
 on a 10×10 grid with a 1px stroke rather than lucide icons, because lucide has no correct
 "restore" symbol (two offset squares, the rear one clipped).
 
-**Left sidebar**: `LeftSidebarRail.tsx` (56px icon strip when shown, its own `--shell-bg`
-background, setting it apart from the entry list panel on `--sidebar-bg`) plus
-`LeftSidebarEntryList.tsx` beside it. `RAIL_WIDTH` is exported by the rail and consumed by
-`AppShell` instead of appearing a second time as `w-14` — the right sidebar's default width
-derives from it, so a mismatch would produce a clipped rail *and* a wrong width on the
-right. The rail itself can be hidden from the View menu like the other two sidebars (see
-below); hidden, it still occupies no width rather than a collapsed sliver.
-
-`TabIconButton` carries `border border-transparent` in its base state, because the theme
-rules give the active tab a 1px border: without the placeholder the active tab is 32px wide
-and the inactive ones 30, the row jumps by 2px on every tab change, and the six tabs no
-longer fit the entry list's default width derived from them.
+**Left sidebar**: `LeftSidebarRail.tsx` (44px icon strip when shown, part of the frame, no
+divider against the entry list panel next to it) plus `LeftSidebarEntryList.tsx` beside it.
+`RAIL_WIDTH` is exported by the rail and consumed by `AppShell` and `TitleBar` instead of
+appearing a second time as a literal — the right sidebar's default width and the title bar's
+logo box both derive from it, so a mismatch would produce a clipped rail *and* wrong widths
+elsewhere. The rail itself can be hidden from the View menu like the other two sidebars (see
+below); hidden, it still occupies no width rather than a collapsed sliver. Immediately right
+of the rail, `.app-sidebar-left-with-rail` trims the entry list's own left padding, since the
+rail already carries its own 6px of breathing room — without it, the search icon and row
+icons would sit noticeably further from the rail's icons than the alignment above suggests.
 
 **Showing and hiding any of the three sidebars is animated** (200ms width transition; the
 rail also animates a `margin-left` on the container it shares with the entry list, sliding
-out to the left so the list ends up flush with the window edge). The content keeps its pixel
-width and is clipped by the `<aside>` rather than shrinking along — otherwise it would
-visibly squeeze together and the tab strip would wrap mid-transition. During a resize drag
-`AppShell` removes the `.app-sidebar-animated` class, otherwise the edge lags behind the
-pointer. The transition lives as a class in `index.css`, not as an inline style: an inline
-style would beat the `prefers-reduced-motion` opt-out directly below it, which wins on order
-at equal specificity.
+out to the left so the list ends up flush with the window edge, plus a `padding-left`
+transition on `.app-sheet-frame` so the sheet's left inset only appears once nothing is left
+beside it). The content keeps its pixel width and is clipped by the `<aside>` rather than
+shrinking along — otherwise it would visibly squeeze together mid-transition. During a
+resize drag `AppShell` removes the `.app-sidebar-animated` class, otherwise the edge lags
+behind the pointer. The transition lives as a class in `index.css`, not as an inline style:
+an inline style would beat the `prefers-reduced-motion` opt-out directly below it, which
+wins on order at equal specificity.
 
 **A non-dismissible modal leaves the title bar clear.** The backdrop is
 `fixed inset-x-0 bottom-0` and starts at `top-10` instead of `top-0` as soon as
