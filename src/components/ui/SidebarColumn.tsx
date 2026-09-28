@@ -75,3 +75,18 @@ export default function SidebarColumn({ bar, children, bodyClassName = '' }: {
     </div>
   );
 }
+
+/**
+ * Ein beschrifteter Abschnitt im Körper der Seitenleiste: `label-xs`-
+ * Überschrift, darunter der Inhalt. Die Dashboard-Leiste reiht sie
+ * untereinander (Ansicht, Sortierung, Anzeige, Filter) — der Abstand
+ * zwischen Überschrift und Inhalt lebt nur hier.
+ */
+export function SidebarGroup({ label, children }: { label?: string; children: ReactNode }) {
+  return (
+    <div role="group" aria-label={label} className="flex flex-col gap-1.5">
+      {label && <span className="label-xs">{label}</span>}
+      {children}
+    </div>
+  );
+}

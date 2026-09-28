@@ -17,7 +17,7 @@ import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } fro
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
-import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
+import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY, countByCategory } from '../../lib/groupBy';
 
 import { useUIStore } from '../../store/uiStore';
 import { useEntryEditor } from '../../hooks/useEntryEditor';
@@ -204,9 +204,12 @@ export default function WikiView() {
     // ausgewählt ist: verschwände er unter der aktiven Auswahl, bliebe ein
     // Filter wirksam, den nichts mehr anzeigt.
     const showUncatChip = hasUncategorized(categories, articles) || filterCatIds.includes(UNCATEGORIZED_KEY);
+    // Gezählt über die Suche, ohne den Kategorie-Filter selbst: die Zahl bleibt
+    // stehen, während man Kategorien an- und abwählt.
+    const catCounts = countByCategory(searchFiltered, (id) => !!lookupCategory(catById, id), (a) => a.category_id);
     const catChips = [
-      ...usedCategories.map((c) => ({ value: c.id, label: categoryLabel(t, c), emoji: c.emoji })),
-      ...(showUncatChip ? [{ value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄' }] : []),
+      ...usedCategories.map((c) => ({ value: c.id, label: categoryLabel(t, c), emoji: c.emoji, count: catCounts.get(c.id) ?? 0 })),
+      ...(showUncatChip ? [{ value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄', count: catCounts.get(UNCATEGORIZED_KEY) ?? 0 }] : []),
     ];
 
     const activeFilterCount = filterCatIds.length > 0 ? 1 : 0;
@@ -313,13 +316,14 @@ export default function WikiView() {
         onSearch={setSearch}
         filters={{
           activeFilterCount,
+          onClearAll: () => setFilterCatIds([]),
           panelProps: {
             chipLabel: t('filters.category'),
             chips: catChips,
             selectedChips: filterCatIds,
             onChipToggle: (v) => setFilterCatIds((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
             onAllChips: () => setFilterCatIds([]),
-            onClearAll: () => setFilterCatIds([]),
+            allChipsCount: searchFiltered.length,
           },
         }}
         items={sortedArticles}

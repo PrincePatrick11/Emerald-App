@@ -25,6 +25,32 @@ export function groupByMonth<T>(items: readonly T[], date: (item: T) => string):
 /** Gruppenschlüssel des Waisen-Buckets — nie als Kategorie-id vergeben. */
 export const UNCATEGORIZED_KEY = '__uncategorized__';
 
+/** Wie viele Einträge je Schlüssel — die Anzahlen der Filterliste. */
+export function countBy<T>(items: readonly T[], keyFn: (item: T) => string): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    const key = keyFn(item);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
+ * Anzahlen je Kategorie, mit derselben Waisen-Regel wie `groupByCategory`:
+ * keine Kategorie oder eine, die `known` nicht (mehr) kennt, zählt unter
+ * `UNCATEGORIZED_KEY`.
+ */
+export function countByCategory<T>(
+  items: readonly T[],
+  known: (id: string) => boolean,
+  categoryId: (item: T) => string | null,
+): Map<string, number> {
+  return countBy(items, (item) => {
+    const id = categoryId(item);
+    return id && known(id) ? id : UNCATEGORIZED_KEY;
+  });
+}
+
 /**
  * Kategorie-Gruppierung mit Waisen-Bucket: eine Gruppe je Kategorie, dahinter
  * — nur wenn nötig — „Ohne Kategorie" für Einträge, deren Kategorie im

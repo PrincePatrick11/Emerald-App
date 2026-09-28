@@ -240,6 +240,7 @@ function BlockList({ usage, onCreate, onDelete }: {
       primaryAction={{ label: t('blocks.library.newBlock'), onClick: onCreate }}
       view={view}
       sort={sort}
+      sortDate="updated"
       onView={(next) => setPrefs({ view: next })}
       onSort={(next) => setPrefs({ sort: next })}
       sortModes={BLOCK_SORTS}

@@ -56,10 +56,19 @@ html[data-theme='emerald-parchment'] {
   --danger-hover-text: #8f2f26;
   --danger-hover-bg: rgba(239, 68, 68, 0.16);
   --danger-hover-border: rgba(239, 68, 68, 0.34);
+  /* Rote Primäraktion (.btn-primary-danger) — gebaut wie .btn-primary. */
+  --danger-solid-bg: #b63f32;
+  --danger-solid-border: #973227;
+  --danger-solid-text: #fff4f1;
+  --danger-solid-hover-bg: #973227;
   --select-option-bg: #f8efdf;
   --select-option-text: #3a2918;
   --select-option-active-bg: #d6eee1;
   --select-option-active-text: #075e3d;
+  /* Knopf des Ein/Aus-Schalters (.switch-thumb): aus hell, an in Jade auf
+     der hellgruenen Schiene. */
+  --switch-thumb: #fffaf1;
+  --switch-thumb-on: #008a57;
   /* Rahmen + Blatt (design.md, Shell Layout): Titelleiste, Rail und linke
      Seitenleiste sind der Rahmen, Inhalt und rechte Seitenleiste das Blatt darauf. */
   --shell-bg: #ecdec7;

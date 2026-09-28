@@ -57,10 +57,19 @@ html[data-theme='emerald-noctis'] {
   --danger-hover-text: #fca5a5;
   --danger-hover-bg: rgba(239, 68, 68, 0.14);
   --danger-hover-border: rgba(239, 68, 68, 0.32);
+  /* Rote Primäraktion (.btn-primary-danger) — gebaut wie .btn-primary. */
+  --danger-solid-bg: rgba(185, 28, 28, 0.3);
+  --danger-solid-border: rgba(248, 113, 113, 0.44);
+  --danger-solid-text: #ffe4e4;
+  --danger-solid-hover-bg: rgba(185, 28, 28, 0.44);
   --select-option-bg: #1c1917;
   --select-option-text: #e7e5e4;
   --select-option-active-bg: rgba(0, 122, 77, 0.2);
   --select-option-active-text: #b8ffe2;
+  /* Knopf des Ein/Aus-Schalters (.switch-thumb): aus hell, an mintgruen auf
+     der gedaempften Jade-Schiene. */
+  --switch-thumb: #f5f5f4;
+  --switch-thumb-on: #9dffd5;
   /* Rahmen + Blatt (design.md, Shell Layout): Titelleiste, Rail und linke
      Seitenleiste sind der Rahmen, Inhalt und rechte Seitenleiste das Blatt darauf. */
   --shell-bg: #100d0a;

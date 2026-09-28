@@ -6,7 +6,7 @@ import SidebarPortal from './SidebarPortal';
 import SidebarColumn, { SidebarActionBar } from './SidebarColumn';
 import CollapseChevron from './CollapseChevron';
 import EmptyState, { NoResults, type EmptyStateProps } from './EmptyState';
-import ListToolbar, { ListSearchField } from './ListToolbar';
+import ListToolbar, { ListSearchField, type SortDateField } from './ListToolbar';
 import { ENTRY_TITLE_HEADING_CLASSES } from './EntryDetailFrame';
 import FilterPanel, { type FilterPanelProps } from './FilterPanel';
 import { useUIStore, type ViewMode, type SortMode, type GroupingMode } from '../../store/uiStore';
@@ -51,9 +51,24 @@ export interface DashboardGroupBy {
   label?: string;
 }
 
+/** Die Hauptaktion der Seitenleiste: Jade mit „+", oder rot (`danger`) mit
+ *  eigenem Icon, wenn die Hauptaktion der Seite zerstört (Papierkorb leeren). */
+export interface DashboardPrimaryAction {
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  /** Ersetzt das „+". */
+  icon?: ReactNode;
+  disabled?: boolean;
+}
+
 export interface DashboardFilters {
+  /** Zählt für den Zurücksetzen-Knopf des „Keine Ergebnisse"-Hinweises. */
   activeFilterCount: number;
-  panelProps: Omit<FilterPanelProps, 'activeFilterCount'>;
+  /** Leert die Filter — derselbe Knopf; in der Leiste selbst übernimmt das
+   *  die „Alle"-Zeile jeder Liste. */
+  onClearAll?: () => void;
+  panelProps: FilterPanelProps;
 }
 
 interface DashboardBaseProps<T> {
@@ -65,15 +80,13 @@ interface DashboardBaseProps<T> {
   /** Ersetzt die ganze Titelzeile — für Köpfe mit mehr als dem Titel
    *  (Home: zwei Zeilen; Papierkorb: `DashboardTitle` plus „Alle wählen"). */
   headerLeft?: ReactNode;
-  /** Beschrifteter Jade-Knopf, der die Leiste oben in der Seitenleiste füllt. */
-  primaryAction?: { label: string; onClick: () => void };
+  /** Beschrifteter Knopf, der die Leiste oben in der Seitenleiste füllt. */
+  primaryAction?: DashboardPrimaryAction;
   /** Kompakte Icon-Knöpfe rechts neben der Primäraktion, in derselben Reihe;
    *  ihr Label steht nur im Tooltip. Für Nebenschauplätze des Moduls (Altar:
-   *  die Bibliothek unter den Altären). */
+   *  die Bibliothek unter den Altären) und das Abbrechen einer Rückfrage,
+   *  die die Primäraktion stellt (Papierkorb). */
   extraActions?: { label: string; icon: ReactNode; onClick: () => void }[];
-  /** Ersetzt die Aktionszeile (Primär- und Nebenaktionen) — dort darf eine
-   *  breite Slot-Zeile umbrechen. Trash's bulk-select. */
-  headerRight?: ReactNode;
 
   // ListToolbar passthrough. Ansicht und Sortierung sind optional wie
   // `groupBy`: ohne Handler entfällt die jeweilige Reihe.
@@ -84,6 +97,10 @@ interface DashboardBaseProps<T> {
   viewOptions?: { value: ViewMode; label: string }[];
   /** Welche Sortiermodi zur Wahl stehen — Default: die vier Datums-/Alpha-Modi. */
   sortModes?: readonly SortMode[];
+  /** Welches Datum die Datums-Sortierung vergleicht (Label „Erstellt · neueste"). */
+  sortDate?: SortDateField;
+  /** Überschrift der Sortierung statt „Sortierung" (Altar: „Sortierung · Altäre"). */
+  sortLabel?: string;
   /** Die Gruppierungs-Achse der Toolbar — als ein Objekt, damit Wert und
    *  Handler nicht einzeln fehlen können und der Name sich nicht mit
    *  `grouping` unten verwechselt, das die Struktur des Inhalts beschreibt.
@@ -200,13 +217,14 @@ export default function Dashboard<T>({
   headerLeft,
   primaryAction,
   extraActions,
-  headerRight,
   view,
   sort,
   onView,
   onSort,
   viewOptions,
   sortModes,
+  sortDate,
+  sortLabel,
   groupBy,
   search,
   onSearch,
@@ -249,7 +267,7 @@ export default function Dashboard<T>({
       filtered={activeFilterCount > 0}
       onReset={canReset ? () => {
         onSearch?.('');
-        filters?.panelProps.onClearAll?.();
+        filters?.onClearAll?.();
       } : undefined}
     />
   );
@@ -329,18 +347,22 @@ export default function Dashboard<T>({
     </Button>
   ));
 
-  // In der Seitenleiste ganz oben die Aktionen (`actionBar`) — `headerRight`
-  // ersetzt sie im Körper; dort kann eine breite Slot-Zeile
-  // (Trash-Bulk-Aktionen) umbrechen. Toolbar und FilterPanel bringen kein
-  // eigenes Streifen-Chrome mit — den Einzug stellt `SidebarColumn`.
+  // In der Seitenleiste ganz oben die Aktionen (`actionBar`). Toolbar und
+  // FilterPanel bringen kein eigenes Streifen-Chrome mit — den Einzug stellt
+  // `SidebarColumn`.
   // Die Aktionen stehen wie „Bearbeiten" eines Eintrags in der 56px-Leiste
   // mit der Trennlinie darunter: die Primäraktion füllt die Zeile, die
   // Nebenaktionen bleiben daneben kompakt.
-  const actionBar = !headerRight && (primaryAction || !!extraActions?.length) ? (
+  const actionBar = primaryAction || extraActions?.length ? (
     <SidebarActionBar>
       {primaryAction && (
-        <Button variant="primary" onClick={primaryAction.onClick} className="flex-1 min-w-0 justify-center">
-          <Plus size={14} className="flex-shrink-0" />
+        <Button
+          variant={primaryAction.danger ? 'primaryDanger' : 'primary'}
+          onClick={primaryAction.onClick}
+          disabled={primaryAction.disabled}
+          className="flex-1 min-w-0 justify-center"
+        >
+          {primaryAction.icon ?? <Plus size={14} className="flex-shrink-0" />}
           <span className="truncate">{primaryAction.label}</span>
         </Button>
       )}
@@ -350,8 +372,6 @@ export default function Dashboard<T>({
 
   const header = (
     <SidebarColumn bar={actionBar} bodyClassName="space-y-4">
-      {headerRight && <div className="flex flex-col gap-1.5">{headerRight}</div>}
-
       <ListToolbar
         view={view}
         sort={sort}
@@ -359,13 +379,15 @@ export default function Dashboard<T>({
         onSort={onSort}
         viewOptions={viewOptions}
         sortModes={sortModes}
+        sortDate={sortDate}
+        sortLabel={sortLabel}
         groupBy={groupBy}
       />
 
       {/* In der Seitenleiste ist Platz in der Höhe: das FilterPanel steht
           dauerhaft, statt hinter einem Auf/Zu-Knopf. */}
       {filters && (
-        <FilterPanel {...filters.panelProps} activeFilterCount={filters.activeFilterCount} />
+        <FilterPanel {...filters.panelProps} />
       )}
     </SidebarColumn>
   );

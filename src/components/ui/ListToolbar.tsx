@@ -1,17 +1,17 @@
 import { useTranslation } from 'react-i18next';
 import {
   ArrowDown10, ArrowDownAZ, ArrowDownZA, CalendarArrowDown, CalendarArrowUp, CalendarRange,
-  Grid3x3, Layers, LayoutGrid, List, Search, StretchHorizontal, X, type LucideIcon,
+  Layers, LayoutGrid, List, Search, StretchHorizontal, X, type LucideIcon,
 } from 'lucide-react';
-import type { ViewMode, SortMode, GroupingMode } from '../../store/uiStore';
+import type { ViewMode, SortMode } from '../../store/uiStore';
 import type { DashboardGroupBy } from './Dashboard';
 import IconToggleGroup from './IconToggleGroup';
+import FieldDropdown from './FieldDropdown';
+import { SwitchRow } from './Switch';
+import { SidebarGroup } from './SidebarColumn';
 
-/* Icon je Modus: Ansicht, Sortierung und Gruppierung stehen als wählbare
-   Icon-Reihen, das Label des jeweiligen Modus wandert in title/aria-label.
-
-   SORT_ICONS ist exportiert: die Altar-Bibliothek stellt im selben Kopf ihre
-   eigene, kleinere Sortier-Reihe und soll je Modus dasselbe Glyph zeigen. */
+/* Icon je Modus: die Ansicht steht als Icon-Leiste (Label in
+   title/aria-label), die Sortierung als Auswahl mit Icon und Text. */
 const VIEW_ICONS: Record<ViewMode, LucideIcon> = {
   list: List,
   cards: LayoutGrid,
@@ -22,7 +22,7 @@ const VIEW_ICONS: Record<ViewMode, LucideIcon> = {
  *  vorgibt. `count_desc` fehlt bewusst: nur Tags haben etwas zu zählen. */
 const DEFAULT_SORT_MODES: readonly SortMode[] = ['date_desc', 'date_asc', 'alpha_asc', 'alpha_desc'];
 
-export const SORT_ICONS: Record<SortMode, LucideIcon> = {
+const SORT_ICONS: Record<SortMode, LucideIcon> = {
   date_desc: CalendarArrowDown,
   date_asc: CalendarArrowUp,
   alpha_asc: ArrowDownAZ,
@@ -30,18 +30,20 @@ export const SORT_ICONS: Record<SortMode, LucideIcon> = {
   count_desc: ArrowDown10,
 };
 
-/** Auch von der Altar-Bibliothek benutzt, die im selben Kopf ihre eigene
- *  Gruppierung stellt. `Grid3x3` statt `LayoutGrid` fürs flache Raster:
- *  LayoutGrid steht in der Reihe darüber schon für die Kartenansicht. */
-export const GROUPING_ICONS: Record<GroupingMode, LucideIcon> = {
-  grouped: Layers,
-  flat: Grid3x3,
+/** Welches Datum die Datums-Sortierung einer Liste vergleicht — steht vorn
+ *  in ihrem Label („Erstellt · neueste"). */
+export type SortDateField = 'created' | 'updated' | 'deleted';
+
+const SORT_DATE_KEYS: Record<SortDateField, string> = {
+  created: 'listView.dateCreated',
+  updated: 'listView.dateUpdated',
+  deleted: 'listView.dateDeleted',
 };
 
 interface Props {
   /** Ansicht und Sortierung sind Achsen wie `groupBy`: fehlt der Handler,
-   *  entfällt die Reihe. Die Kategorien-Ansicht hat weder das eine noch das
-   *  andere — ihre Ordnung ist die von Hand gezogene. */
+   *  entfällt der Abschnitt. Die Kategorien-Ansicht hat weder das eine noch
+   *  das andere — ihre Ordnung ist die von Hand gezogene. */
   view?: ViewMode;
   sort?: SortMode;
   onView?: (v: ViewMode) => void;
@@ -49,7 +51,12 @@ interface Props {
   viewOptions?: { value: ViewMode; label: string }[];
   /** Welche Sortiermodi zur Wahl stehen, in dieser Reihenfolge. */
   sortModes?: readonly SortMode[];
-  /** Die Gruppierungs-Achse; fehlt sie, zeigt die Leiste nur Ansicht und
+  /** Welches Datum die Datums-Sortierung vergleicht; Default `created`. */
+  sortDate?: SortDateField;
+  /** Überschrift der Sortierung, wenn die Leiste mehr als eine hat
+   *  (Altar: „Sortierung · Altäre" über „Sortierung · Bibliothek"). */
+  sortLabel?: string;
+  /** Die Gruppierungs-Achse; fehlt sie, entfällt der Schalter unter der
    *  Sortierung. Siehe DashboardGroupBy. */
   groupBy?: DashboardGroupBy;
 }
@@ -86,17 +93,64 @@ export function ListSearchField({ value, onChange, placeholder, className = '' }
 /** Der Zeitstrahl gruppiert nach Monat über die *sortierte* Liste:
  *  Neueste/Älteste zuerst drehen ihn um und bleiben wählbar, die Alpha-Modi
  *  würden die Monatsreihenfolge verwürfeln und sind deshalb gesperrt. Die
- *  Gruppierungs-Achse sperrt der Zeitstrahl ganz: dort gruppieren die
- *  Monate. */
+ *  Gruppierung sperrt der Zeitstrahl ganz: dort gruppieren die Monate. */
 const sortBlockedInTimeline = (v: SortMode) => v !== 'date_desc' && v !== 'date_asc';
 
 /**
- * Ansicht, Sortierung und Gruppierung als Icon-Reihen mit Umbruch — für den
+ * Die Sortier-Auswahl der Dashboard-Seitenleiste: volle Breite, im Auslöser
+ * Icon und Label des gewählten Modus („Erstellt · neueste") — ein
+ * `FieldDropdown` mit `variant="sidebar"`. Exportiert für
+ * die Altar-Bibliothek, die im selben Kopf ihre eigene Sortierung stellt.
+ */
+export function SortSelect<S extends SortMode>({ label, value, modes, onChange, dateField = 'created', isDisabled, disabledHint }: {
+  /** aria-label des Auslösers, vor dem gewählten Modus. */
+  label: string;
+  value: S;
+  modes: readonly S[];
+  onChange: (s: S) => void;
+  dateField?: SortDateField;
+  isDisabled?: (s: S) => boolean;
+  /** Tooltip gesperrter Modi („Im Zeitstrahl nicht verfügbar"). */
+  disabledHint?: string;
+}) {
+  const { t } = useTranslation();
+  const field = t(SORT_DATE_KEYS[dateField]);
+  const labels: Record<SortMode, string> = {
+    date_desc: t('listView.sortNewest', { field }),
+    date_asc: t('listView.sortOldest', { field }),
+    alpha_asc: t('listView.sortAlphaAsc'),
+    alpha_desc: t('listView.sortAlphaDesc'),
+    count_desc: t('listView.sortCountDesc'),
+  };
+  const options = modes.map((mode) => {
+    const Icon: LucideIcon = SORT_ICONS[mode];
+    const disabled = isDisabled?.(mode) ?? false;
+    return {
+      value: mode,
+      label: labels[mode],
+      icon: <Icon size={14} className="flex-shrink-0" />,
+      disabled,
+      title: disabled ? disabledHint : undefined,
+    };
+  });
+  return (
+    <FieldDropdown
+      value={value}
+      options={options}
+      onChange={onChange}
+      variant="sidebar"
+      ariaLabel={`${label}: ${labels[value]}`}
+    />
+  );
+}
+
+/**
+ * Ansicht, Sortierung und Gruppierung als beschriftete Abschnitte — für den
  * Kopf in der rechten Seitenleiste (Dashboard-Portal). Die Suche steht im
  * Hauptbereich (`ListSearchField`).
  */
 export default function ListToolbar({
-  view, sort, onView, onSort, viewOptions: viewOptionsProp, sortModes = DEFAULT_SORT_MODES, groupBy,
+  view, sort, onView, onSort, viewOptions: viewOptionsProp, sortModes = DEFAULT_SORT_MODES, sortDate, sortLabel, groupBy,
 }: Props) {
   const { t } = useTranslation();
 
@@ -107,67 +161,62 @@ export default function ListToolbar({
     { value: 'timeline' as const, label: t('listView.timeline') },
   ];
 
-  const sortLabels: Record<SortMode, string> = {
-    date_desc: t('listView.dateDesc'),
-    date_asc: t('listView.dateAsc'),
-    alpha_asc: t('listView.alphaAsc'),
-    alpha_desc: t('listView.alphaDesc'),
-    count_desc: t('listView.countDesc'),
-  };
-  const sortOptions = sortModes.map((value) => ({ value, label: sortLabels[value] }));
-
-  const sortDisabled = view === 'timeline' ? sortBlockedInTimeline : undefined;
+  const inTimeline = view === 'timeline';
   const showView = view !== undefined && onView !== undefined && viewOptions.length > 1;
   const showSort = sort !== undefined && onSort !== undefined;
+  const timelineHint = t('listView.notAvailableInTimeline');
+  // Ohne Sortierung stünde der Gruppierungs-Schalter allein unter „Sortierung".
+  const sortHeading = showSort ? (sortLabel ?? t('listView.sort')) : undefined;
 
-  // Im Zeitstrahl gruppieren die Monate; die Achse hat dort keine Wirkung und
-  // wird komplett ausgegraut — dieselbe Behandlung wie die gesperrten
-  // Sortiermodi, statt die Reihe verschwinden zu lassen.
-  const groupingOptions: { value: GroupingMode; label: string }[] = [
-    { value: 'grouped', label: groupBy?.label ?? t('listView.category') },
-    { value: 'flat', label: t('listView.ungrouped') },
-  ];
-  const groupingDisabled = view === 'timeline' ? () => true : undefined;
+  if (!showView && !showSort && !groupBy) return null;
 
   return (
     // Ohne eigenes Streifen-Chrome: die p-3-Spalte der Seitenleiste liefert
     // den Einzug (eine Einzugsquelle pro Spalte, design.md).
-    <div className="flex flex-wrap items-start gap-x-3 gap-y-3">
+    <div className="flex flex-col gap-4">
       {showView && (
-        <IconToggleGroup
-          label={t('listView.view')}
-          options={viewOptions}
-          icons={VIEW_ICONS}
-          value={view!}
-          onChange={(next) => {
-            onView!(next);
-            // Der Zeitstrahl sperrt Name und Anzahl — stehen blieben sie trotzdem
-            // aktiv, und die Monate kämen in Namensreihenfolge durcheinander.
-            if (next === 'timeline' && showSort && sortBlockedInTimeline(sort!)) onSort!('date_desc');
-          }}
-        />
+        <SidebarGroup label={t('listView.view')}>
+          <IconToggleGroup
+            fill
+            label={t('listView.view')}
+            options={viewOptions}
+            icons={VIEW_ICONS}
+            value={view!}
+            onChange={(next) => {
+              onView!(next);
+              // Der Zeitstrahl sperrt Name und Anzahl — stehen blieben sie trotzdem
+              // aktiv, und die Monate kämen in Namensreihenfolge durcheinander.
+              if (next === 'timeline' && showSort && sortBlockedInTimeline(sort!)) onSort!('date_desc');
+            }}
+          />
+        </SidebarGroup>
       )}
-      {showSort && (
-        <IconToggleGroup
-          label={t('listView.sort')}
-          options={sortOptions}
-          icons={SORT_ICONS}
-          value={sort!}
-          onChange={onSort!}
-          isDisabled={sortDisabled}
-          disabledHint={t('listView.notAvailableInTimeline')}
-        />
-      )}
-      {groupBy && (
-        <IconToggleGroup
-          label={t('listView.grouping')}
-          options={groupingOptions}
-          icons={GROUPING_ICONS}
-          value={groupBy.value}
-          onChange={groupBy.onChange}
-          isDisabled={groupingDisabled}
-          disabledHint={t('listView.notAvailableInTimeline')}
-        />
+      {(showSort || groupBy) && (
+        <SidebarGroup label={sortHeading}>
+          {showSort && (
+            <SortSelect
+              label={sortHeading!}
+              value={sort!}
+              modes={sortModes}
+              onChange={onSort!}
+              dateField={sortDate}
+              isDisabled={inTimeline ? sortBlockedInTimeline : undefined}
+              disabledHint={timelineHint}
+            />
+          )}
+          {/* Im Zeitstrahl gruppieren die Monate; der Schalter hat dort keine
+              Wirkung und bleibt gesperrt stehen, statt zu verschwinden. */}
+          {groupBy && (
+            <SwitchRow
+              icon={Layers}
+              label={t('listView.groupBy', { label: groupBy.label ?? t('listView.category') })}
+              checked={groupBy.value === 'grouped'}
+              onChange={(on) => groupBy.onChange(on ? 'grouped' : 'flat')}
+              disabled={inTimeline}
+              title={inTimeline ? timelineHint : undefined}
+            />
+          )}
+        </SidebarGroup>
       )}
     </div>
   );

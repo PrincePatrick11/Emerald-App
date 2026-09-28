@@ -53,6 +53,11 @@ i18n
     },
   });
 
+// `{{label, lowercase}}`: ein Substantiv mitten im Satz („Group by
+// category"). Deutsch schreibt es groß und lässt den Formatierer weg.
+i18n.services.formatter?.add('lowercase', (value, lng) =>
+  typeof value === 'string' ? value.toLocaleLowerCase(lng) : value);
+
 /**
  * Wechselt die App-Sprache und laedt das Locale-Bundle vorher nach, falls es
  * noch fehlt. Immer diese Funktion statt `i18n.changeLanguage` direkt

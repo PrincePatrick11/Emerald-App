@@ -29,8 +29,11 @@ function flatten(obj, prefix = '', out = new Map()) {
   return out;
 }
 
+/** Nur der Name zählt, nicht ein Formatierer dahinter: `{{label, lowercase}}`
+ *  in en und `{{label}}` in de sind derselbe Platzhalter (Deutsch schreibt
+ *  das Substantiv groß und lässt den Formatierer weg). */
 function placeholders(value) {
-  return [...value.matchAll(/\{\{\s*([\w.]+)\s*\}\}/g)].map((m) => m[1]).sort();
+  return [...value.matchAll(/\{\{\s*([\w.]+)\s*(?:,[^}]*)?\}\}/g)].map((m) => m[1]).sort();
 }
 
 const flat = {};

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -204,6 +204,15 @@ export default function TagsView() {
   const query = search.trim().toLowerCase();
   const filterActive = moduleFilter.length > 0;
 
+  /** Was die Suche von einem Tag übrig lässt: passt sein Name, alle seine
+   *  Einträge, sonst die, deren Titel passt. Liste und Modul-Anzahlen teilen
+   *  diese eine Regel, damit die Zahlen zur Liste passen. */
+  const matchTag = useCallback((tag: { name: string }) => {
+    const all = itemsByTag.get(tag.name) ?? [];
+    const nameMatches = !query || tag.name.toLowerCase().includes(query);
+    return { nameMatches, items: nameMatches ? all : all.filter((item) => item.title.toLowerCase().includes(query)) };
+  }, [itemsByTag, query]);
+
   /**
    * Ein Tag steht in der Liste, wenn sein Name zur Suche passt oder Einträge
    * darunter es tun; ein Modul-Filter blendet Tags ohne Treffer ganz aus.
@@ -220,10 +229,8 @@ export default function TagsView() {
     });
     const result: DashboardGroup<TaggedItem>[] = [];
     for (const tag of sortedTags) {
-      const all = itemsByTag.get(tag.name) ?? [];
-      const inModules = filterActive ? all.filter((item) => moduleFilter.includes(item.module)) : all;
-      const nameMatches = !query || tag.name.toLowerCase().includes(query);
-      const items = nameMatches ? inModules : inModules.filter((item) => item.title.toLowerCase().includes(query));
+      const { nameMatches, items: matched } = matchTag(tag);
+      const items = filterActive ? matched.filter((item) => moduleFilter.includes(item.module)) : matched;
       // Ohne Treffer darunter bleibt ein Tag nur, wenn sein Name passt und kein
       // Modul-Filter ihn leer zurücklässt.
       const keep = items.length > 0 || (nameMatches && !filterActive);
@@ -232,7 +239,25 @@ export default function TagsView() {
       result.push({ key: tag.id, label: tag.name, items });
     }
     return { groups: result, openBySearch: openIds };
-  }, [tags, sort, itemsByTag, filterActive, moduleFilter, query]);
+  }, [tags, sort, itemsByTag, filterActive, moduleFilter, matchTag]);
+
+  /**
+   * Anzahlen der Modul-Filter: wie viele Tags stünden da, wäre nur dieses
+   * Modul gewählt — nach derselben Regel wie die Liste, über die Suche, ohne
+   * den Modul-Filter selbst. `all` ist die Zahl ohne Modul-Filter.
+   */
+  const moduleCounts = useMemo(() => {
+    const byModule = new Map<string, number>();
+    let all = 0;
+    for (const tag of tags) {
+      const { nameMatches, items } = matchTag(tag);
+      if (items.length > 0 || nameMatches) all++;
+      for (const module of new Set(items.map((item) => item.module))) {
+        byModule.set(module, (byModule.get(module) ?? 0) + 1);
+      }
+    }
+    return { byModule, all };
+  }, [tags, matchTag]);
 
   const tagById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
   const catById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
@@ -375,17 +400,18 @@ export default function TagsView() {
       onSearch={setSearch}
       filters={{
         activeFilterCount: filterActive ? 1 : 0,
+        onClearAll: () => setModuleFilter([]),
         panelProps: {
           chipLabel: t('filters.module'),
           chips: TAG_MODULE_IDS.map((id) => {
             const Icon = MODULES[id].icon;
-            return { value: id, label: t(MODULES[id].navLabelKey), icon: <Icon size={12} /> };
+            return { value: id, label: t(MODULES[id].navLabelKey), icon: <Icon size={14} />, count: moduleCounts.byModule.get(id) ?? 0 };
           }),
           selectedChips: moduleFilter,
           onChipToggle: (v) => setModuleFilter((prev) =>
             prev.includes(v as TagModuleId) ? prev.filter((x) => x !== v) : [...prev, v as TagModuleId]),
           onAllChips: () => setModuleFilter([]),
-          onClearAll: () => setModuleFilter([]),
+          allChipsCount: moduleCounts.all,
         },
       }}
       contentHeader={form?.mode === 'add' && editRow}

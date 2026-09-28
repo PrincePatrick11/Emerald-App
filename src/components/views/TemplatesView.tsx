@@ -170,6 +170,7 @@ function TemplateList({ entries, onCreate, onDelete }: {
       primaryAction={{ label: t('templates.newTemplate'), onClick: onCreate }}
       view={prefs.view}
       sort={prefs.sort}
+      sortDate="updated"
       onView={(view) => setPrefs({ view })}
       onSort={(sort) => setPrefs({ sort })}
       search={search}

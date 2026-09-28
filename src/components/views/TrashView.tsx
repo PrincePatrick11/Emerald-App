@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { Trash2, RotateCcw, CheckSquare, Square } from 'lucide-react';
+import { Trash2, RotateCcw, CheckSquare, Square, X } from 'lucide-react';
 import { AUX_VIEWS, TRASH_KIND_ICONS } from '../../lib/modules';
 import { useTrashStore } from '../../store/trashStore';
 import { useUIStore, type ViewMode } from '../../store/uiStore';
@@ -176,6 +176,10 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, deleteNow, sel
   );
 }
 
+/** So lange nach dem Öffnen der Rückfrage zählt ein Klick aufs „Ja" nicht —
+ *  länger als ein Doppelklick, kürzer als ein bewusster zweiter Klick. */
+const CONFIRM_GUARD_MS = 400;
+
 export default function TrashView() {
   const { t } = useTranslation();
   const retentionDays = useSettingsStore((s) => s.settings.trash.retentionDays);
@@ -187,9 +191,14 @@ export default function TrashView() {
   );
   const categories = useCategoryStore((s) => s.categories);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  const [confirmingEmpty, setConfirmingEmpty] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false);
+  // Welche Rückfrage der Primärknopf gerade stellt. Ein Zustand für beide,
+  // und jede Änderung der Auswahl setzt ihn zurück: sonst tauchte nach
+  // An- und Abwählen ein altes „Ja, alles löschen" wieder auf.
+  const [confirm, setConfirm] = useState<'empty' | 'selected' | null>(null);
+  // Wann die Rückfrage aufging. Das „Ja" steht auf demselben Knopf wie die
+  // Frage — der zweite Klick eines Doppelklicks löschte sonst sofort.
+  const confirmArmedAt = useRef(0);
   const [search, setSearch] = useState('');
 
   useEffect(() => { fetchTrashed(); }, []);
@@ -207,6 +216,7 @@ export default function TrashView() {
       const next = new Set([...prev].filter((id) => validIds.has(id)));
       return next.size !== prev.size ? next : prev;
     });
+    setConfirm(null);
   }, [items]);
 
   const toggleSelect = (id: string) => {
@@ -215,23 +225,23 @@ export default function TrashView() {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
-    setConfirmingBulkDelete(false);
+    setConfirm(null);
   };
 
   const selectAll = () => {
     setSelectedIds(new Set(matching.map((i) => i.id)));
-    setConfirmingBulkDelete(false);
+    setConfirm(null);
   };
 
   const deselectAll = () => {
     setSelectedIds(new Set());
-    setConfirmingBulkDelete(false);
+    setConfirm(null);
   };
 
-  // Die Knöpfe stellen nur die Rückfrage (confirming…); gelöscht wird erst
-  // über InlineConfirms „Ja".
+  // Die Knöpfe stellen nur die Rückfrage; gelöscht wird erst über das „Ja"
+  // der Primäraktion (Leeren/Auswahl) bzw. InlineConfirm (einzelne Zeile).
   const emptyTrashNow = async () => {
-    setConfirmingEmpty(false);
+    setConfirm(null);
     await emptyTrash();
   };
 
@@ -241,7 +251,7 @@ export default function TrashView() {
   };
 
   const bulkDeleteNow = async () => {
-    setConfirmingBulkDelete(false);
+    setConfirm(null);
     const toDelete = items.filter((i) => selectedIds.has(i.id));
     setSelectedIds(new Set());
     for (const item of toDelete) {
@@ -377,9 +387,6 @@ export default function TrashView() {
   const hasSelection = selectedIds.size > 0;
   const allSelected = matching.length > 0 && matching.every((i) => selectedIds.has(i.id));
 
-  // min-w-0/truncate und flex-wrap: die beiden Slots landen im Seitenleisten-
-  // Experiment in einer schmalen Spalte (Dashboard portalt den Kopf dorthin)
-  // und müssen dort umbrechen statt überzulaufen.
   const headerLeft = (
     <DashboardTitle title={t('trash.title')}>
       {items.length > 0 && (
@@ -393,35 +400,35 @@ export default function TrashView() {
     </DashboardTitle>
   );
 
-  const headerRight = (
-    <div className="flex items-center gap-2 flex-wrap">
-      {hasSelection && (
-        <>
-          {confirmingBulkDelete ? (
-            // Die Anzahl steht auf dem Bestätigen — sonst sagte die Rückfrage
-            // nicht mehr, wie viele Einträge gehen.
-            <InlineConfirm wrap confirmLabel={t('trash.deleteSelected', { count: selectedIds.size })}
-              onConfirm={bulkDeleteNow} onCancel={() => setConfirmingBulkDelete(false)} />
-          ) : (
-            <Button tone="danger" onClick={() => setConfirmingBulkDelete(true)}>
-              <Trash2 size={12} />
-              {t('trash.deleteSelected', { count: selectedIds.size })}
-            </Button>
-          )}
-          <div className="w-px h-4 bg-stone-700" />
-        </>
-      )}
-      {items.length > 0 && !hasSelection && (
-        confirmingEmpty ? (
-          <InlineConfirm wrap message={t('trash.confirmEmpty')} onConfirm={emptyTrashNow} onCancel={() => setConfirmingEmpty(false)} />
-        ) : (
-          <Button tone="danger" onClick={() => setConfirmingEmpty(true)}>
-            {t('trash.emptyTrash')}
-          </Button>
-        )
-      )}
-    </div>
-  );
+  // Die Hauptaktion des Papierkorbs ist rot und steht wie „+ Neuer …" oben
+  // in der Leiste: ohne Auswahl „Papierkorb leeren", mit Auswahl „Ausgewählte
+  // löschen". Die Rückfrage übernimmt denselben Platz — der Knopf wird zum
+  // „Ja", daneben ein X zum Abbrechen —, statt eine Zeile im Körper zu
+  // brauchen, die in der schmalen Leiste umbräche.
+  const confirming = confirm === (hasSelection ? 'selected' : 'empty');
+  const confirmNow = () => {
+    if (performance.now() - confirmArmedAt.current < CONFIRM_GUARD_MS) return;
+    if (hasSelection) void bulkDeleteNow(); else void emptyTrashNow();
+  };
+  const primaryAction = {
+    label: confirming
+      ? (hasSelection ? t('trash.confirmDeleteSelected', { count: selectedIds.size }) : t('trash.confirmEmptyAction'))
+      : (hasSelection ? t('trash.deleteSelected', { count: selectedIds.size }) : t('trash.emptyTrash')),
+    onClick: confirming
+      ? confirmNow
+      : () => {
+          confirmArmedAt.current = performance.now();
+          setConfirm(hasSelection ? 'selected' : 'empty');
+        },
+    danger: true,
+    icon: <Trash2 size={14} className="flex-shrink-0" />,
+    // Ein leerer Papierkorb behält den Knopf, gesperrt — die Leiste bleibt
+    // stehen, statt beim letzten Löschen zu verschwinden.
+    disabled: items.length === 0,
+  };
+  const extraActions = confirming
+    ? [{ label: t('common.cancel'), icon: <X size={14} />, onClick: () => setConfirm(null) }]
+    : undefined;
 
   const renderTrashContent = () => (
     <>
@@ -457,11 +464,13 @@ export default function TrashView() {
     <Dashboard<TrashedItem>
       title={t('trash.title')}
       headerLeft={headerLeft}
-      headerRight={headerRight}
+      primaryAction={primaryAction}
+      extraActions={extraActions}
       search={search}
       onSearch={setSearch}
       view={trashPrefs.view}
       sort={trashPrefs.sort}
+      sortDate="deleted"
       onView={(v) => setTrashPrefs({ view: v })}
       onSort={(s) => setTrashPrefs({ sort: s })}
       // Der Papierkorb gruppiert nach Eintragstyp, nicht nach Kategorie.

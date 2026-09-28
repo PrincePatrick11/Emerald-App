@@ -16,12 +16,11 @@ import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { useDeepLink } from '../../hooks/useDeepLink';
 import { categoriesUsedBy, categoryLabel, hasUncategorized } from '../../lib/categories';
 import { sortItems } from '../../lib/sortItems';
-import { UNCATEGORIZED_KEY } from '../../lib/groupBy';
+import { countBy, countByCategory, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import Dashboard from '../ui/Dashboard';
 import Dropdown from '../ui/Dropdown';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import LinkPickerModal from '../editor/LinkPickerModal';
-import { FilterChipButton } from '../ui/FilterPanel';
 import CategorySelect from '../ui/CategorySelect';
 import CollapseChevron from '../ui/CollapseChevron';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
@@ -78,17 +77,26 @@ export default function TasksView() {
 
   const rootTasks = tasks.filter((task) => task.parent_task_id === null);
 
-  const filteredTasks = rootTasks.filter((task) => {
-    if (!showCompleted && task.completed) return false;
-    if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    // Der „Ohne Kategorie"-Chip wählt die Waisen aus — deren category_id
-    // (gelöschte Kategorie) steht nie selbst in der Chip-Auswahl.
-    if (filterCategory.size > 0 &&
-        !(task.category_id && filterCategory.has(task.category_id)) &&
-        !(filterCategory.has(UNCATEGORIZED_KEY) && !categoryOf(task))) return false;
-    if (filterPriority.size > 0 && !filterPriority.has(task.priority)) return false;
-    return true;
-  });
+  // Erledigt und Suche gelten für alles, auch für die Anzahlen der Filter.
+  const visibleRootTasks = rootTasks.filter((task) =>
+    (showCompleted || !task.completed)
+    && (!searchQuery || task.title.toLowerCase().includes(searchQuery.toLowerCase())));
+  // Der „Ohne Kategorie"-Filter wählt die Waisen aus — deren category_id
+  // (gelöschte Kategorie) steht nie selbst in der Auswahl.
+  const matchesCategory = (task: Task) => filterCategory.size === 0
+    || (!!task.category_id && filterCategory.has(task.category_id))
+    || (filterCategory.has(UNCATEGORIZED_KEY) && !categoryOf(task));
+  const matchesPriority = (task: Task) => filterPriority.size === 0 || filterPriority.has(task.priority);
+
+  const filteredTasks = visibleRootTasks.filter((task) => matchesCategory(task) && matchesPriority(task));
+
+  // Jede Filtergruppe zählt unter der jeweils anderen, nicht unter sich
+  // selbst: die Zahlen bleiben stehen, während man in einer Gruppe an- und
+  // abwählt.
+  const categoryBase = visibleRootTasks.filter(matchesPriority);
+  const priorityBase = visibleRootTasks.filter(matchesCategory);
+  const categoryCounts = countByCategory(categoryBase, (id) => !!getCategory(id), (task) => task.category_id);
+  const priorityCounts = countBy(priorityBase, (task) => task.priority);
 
   const sortedTasks = sortItems(filteredTasks, tasksPrefs.sort, {
     date: (task) => task.created_at,
@@ -342,13 +350,15 @@ export default function TasksView() {
         onSearch={setSearchQuery}
         filters={{
           activeFilterCount,
+          onClearAll: clearFilters,
           panelProps: {
             chipLabel: t('filters.category'),
             // „Ohne Kategorie" nur, wenn es Waisen gibt.
             chips: [
-              ...usedCategories.map((c) => ({ value: c.id, label: categoryLabel(t, c), emoji: c.emoji })),
-              ...(showUncatChip ? [{ value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄' }] : []),
+              ...usedCategories.map((c) => ({ value: c.id, label: categoryLabel(t, c), emoji: c.emoji, count: categoryCounts.get(c.id) ?? 0 })),
+              ...(showUncatChip ? [{ value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄', count: categoryCounts.get(UNCATEGORIZED_KEY) ?? 0 }] : []),
             ],
+            allChipsCount: categoryBase.length,
             selectedChips: [...filterCategory],
             onChipToggle: (v) => setFilterCategory((prev) => {
               const next = new Set(prev);
@@ -357,28 +367,33 @@ export default function TasksView() {
             }),
             onAllChips: () => setFilterCategory(new Set()),
             // „Erledigte anzeigen" ist ein Anzeige-Schalter, kein Filter:
-            // zählt nicht in activeFilterCount, „Alle löschen" lässt ihn stehen.
-            displayExtras: (
-              <FilterChipButton active={showCompleted} onClick={() => setShowCompleted((o) => !o)}>
-                <CheckSquare size={12} />
-                {t('tasks.showCompleted')}
-              </FilterChipButton>
-            ),
-            // Prioritäten als zweite Chip-Gruppe des FilterPanels (statusChips
-            // mit eigenem Label) — dieselbe Mechanik wie der Operations-Status.
+            // zählt nicht in activeFilterCount, Zurücksetzen lässt ihn stehen.
+            displayToggles: [{
+              label: t('tasks.showCompleted'),
+              icon: CheckSquare,
+              checked: showCompleted,
+              onChange: setShowCompleted,
+            }],
+            // Prioritäten als zweite Filtergruppe des FilterPanels
+            // (statusChips mit eigenem Label).
             statusLabel: t('tasks.filter.priority'),
             statusChips: (['high', 'medium', 'low'] as const).map((p) => ({
               value: p,
               label: t('tasks.priority.' + p),
-              icon: <Flag size={12} />,
+              // Dieselben Prioritätsfarben wie im Prioritätsmenü der Zeile —
+              // die einzige feste Farbe in der Filterliste, bewusst: die
+              // Flagge soll hier aussehen wie an der Aufgabe.
+              icon: <Flag size={14} className={TASK_PRIORITY_COLORS[p]} />,
+              count: priorityCounts.get(p) ?? 0,
             })),
+            onAllStatus: () => setFilterPriority(new Set()),
+            allStatusCount: priorityBase.length,
             selectedStatus: [...filterPriority],
             onStatusToggle: (v) => setFilterPriority((prev) => {
               const next = new Set(prev);
               if (next.has(v)) next.delete(v); else next.add(v);
               return next;
             }),
-            onClearAll: clearFilters,
           },
         }}
         items={sortedTasks}

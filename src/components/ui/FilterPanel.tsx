@@ -1,41 +1,17 @@
 import type { ReactNode } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import Button from './Button';
+import FilterList, { type FilterChip } from './FilterList';
+import { SwitchRow } from './Switch';
+import { SidebarGroup } from './SidebarColumn';
 
-export interface FilterChip {
-  value: string;
+/** Ein Anzeige-Schalter: eine Vorliebe der Ansicht, kein Filter — zählt nicht
+ *  in `activeFilterCount` und bleibt beim Zurücksetzen stehen. */
+export interface DisplayToggle {
   label: string;
-  emoji?: string;
-  /** Lucide-Icon vor dem Label (12px-Stufe), z. B. Flag bei Tasks-Prioritäten. */
-  icon?: ReactNode;
-}
-
-/**
- * The one filter-pill look — exported so the class chain is not copied around.
- * Used by the panel's own chips and by the two list toolbars (Altar preview,
- * completed tasks). Settings use `SettingsChoiceButton` instead: its window
- * carries one kind of toggle, not two.
- */
-export function FilterChipButton({
-  active, onClick, children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`filter-chip flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${
-        active
-          ? 'filter-chip-active bg-jade-900/50 border-jade-800/40 text-jade-400'
-          : 'filter-chip-idle bg-stone-800/60 border-stone-700/60 text-stone-500 hover:text-stone-300 hover:border-stone-600'
-      }`}
-    >
-      {children}
-    </button>
-  );
+  icon?: LucideIcon;
+  checked: boolean;
+  onChange: (next: boolean) => void;
 }
 
 export interface FilterPanelProps {
@@ -43,46 +19,29 @@ export interface FilterPanelProps {
   chips?: FilterChip[];
   selectedChips?: string[];
   onChipToggle?: (value: string) => void;
-  /** Rendert vor den Chips einen „Alle"-Chip: aktiv bei leerer Auswahl,
+  /** Rendert vor den Werten eine „Alle"-Zeile: aktiv bei leerer Auswahl,
    *  Klick leert sie (= alles anzeigen). */
   onAllChips?: () => void;
-  /** Chips für eine eigene „Anzeige"-Gruppe vor den Kategorie-Chips
-   *  (Tasks: „Erledigte anzeigen"). */
-  displayExtras?: ReactNode;
+  /** Anzahl neben „Alle" — die Liste nach der Suche, ohne diesen Filter. */
+  allChipsCount?: number;
+  /** Eigene „Anzeige"-Gruppe vor den Filtern (Tasks: „Erledigte anzeigen",
+   *  Altar: „Altar-Vorschau"). */
+  displayToggles?: DisplayToggle[];
 
+  /** Zweite Filtergruppe mit eigener Überschrift — Tasks: Prioritäten. */
   statusChips?: FilterChip[];
   selectedStatus?: string[];
   onStatusToggle?: (value: string) => void;
-  /** Überschrift der statusChips-Gruppe; Default t('filters.status').
-   *  Tasks nutzt die Gruppe für Prioritäten. */
+  onAllStatus?: () => void;
+  allStatusCount?: number;
+  /** Überschrift der statusChips-Gruppe; Default t('filters.status'). */
   statusLabel?: string;
 
   /** Weitere Gruppen mit eigener Überschrift, für Regler, die weder Filter
-   *  noch Chips sind — der Altar hängt die Sortierung seiner Bibliothek hier
-   *  ein, damit sie beim übrigen Dashboard-Kopf steht statt im Inhalt. */
+   *  noch Anzeige-Schalter sind — der Altar hängt die Sortierung seiner
+   *  Bibliothek hier ein, damit sie beim übrigen Dashboard-Kopf steht statt
+   *  im Inhalt. Sie stehen zuerst, direkt unter der Sortierung. */
   extraGroups?: { label: string; content: ReactNode }[];
-
-  activeFilterCount: number;
-  /** Entfällt für Panels ohne echten Filter (Altar: nur ein Anzeige-Schalter),
-   *  deren activeFilterCount nie über null geht — dann wird der Knopf, der
-   *  ihn allein aufruft, ohnehin nicht gerendert. */
-  onClearAll?: () => void;
-}
-
-function Chip({
-  chip, active, onToggle,
-}: {
-  chip: FilterChip;
-  active: boolean;
-  onToggle: (v: string) => void;
-}) {
-  return (
-    <FilterChipButton active={active} onClick={() => onToggle(chip.value)}>
-      {chip.icon}
-      {chip.emoji && <span className="text-sm leading-none">{chip.emoji}</span>}
-      {chip.label}
-    </FilterChipButton>
-  );
 }
 
 export default function FilterPanel({
@@ -91,14 +50,15 @@ export default function FilterPanel({
   selectedChips = [],
   onChipToggle,
   onAllChips,
-  displayExtras,
+  allChipsCount,
+  displayToggles,
   statusChips,
   selectedStatus = [],
   onStatusToggle,
+  onAllStatus,
+  allStatusCount,
   statusLabel,
   extraGroups,
-  activeFilterCount,
-  onClearAll,
 }: FilterPanelProps) {
   const { t } = useTranslation();
 
@@ -106,60 +66,41 @@ export default function FilterPanel({
     // Gruppen untereinander, ohne eigenes px/bg: die Spalte der rechten
     // Seitenleiste (Dashboard-Portal) liefert den Einzug.
     <div className="flex flex-col gap-4">
-      {/* Anzeige-Schalter — eigene Gruppe vor den Auswahl-Chips. */}
-      {displayExtras && (
-        <div className="flex flex-col gap-1.5">
-          <span className="label-xs">{t('filters.display')}</span>
-          <div className="flex flex-wrap gap-1.5">{displayExtras}</div>
-        </div>
-      )}
-
-      {/* Primary chips (category / moon phase) */}
-      {chips && chips.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          {chipLabel && <span className="label-xs">{chipLabel}</span>}
-          <div className="flex flex-wrap gap-1.5">
-            {onAllChips && (
-              <FilterChipButton active={selectedChips.length === 0} onClick={onAllChips}>
-                {t('filters.all')}
-              </FilterChipButton>
-            )}
-            {chips.map((chip) => (
-              <Chip key={chip.value} chip={chip} active={selectedChips.includes(chip.value)} onToggle={onChipToggle!} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Zweite Chip-Gruppe mit eigenem Label — Operations: Status,
-          Tasks: Prioritäten (statusLabel). */}
-      {statusChips && statusChips.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <span className="label-xs">{statusLabel ?? t('filters.status')}</span>
-          <div className="flex flex-wrap gap-1.5">
-            {statusChips.map((chip) => (
-              <Chip key={chip.value} chip={chip} active={selectedStatus.includes(chip.value)} onToggle={onStatusToggle!} />
-            ))}
-          </div>
-        </div>
-      )}
-
       {extraGroups?.map((group) => (
-        <div key={group.label} className="flex flex-col gap-1.5">
-          <span className="label-xs">{group.label}</span>
-          <div className="flex flex-wrap gap-1.5">{group.content}</div>
-        </div>
+        <SidebarGroup key={group.label} label={group.label}>
+          {group.content}
+        </SidebarGroup>
       ))}
 
-      {/* Clear all */}
-      {activeFilterCount > 0 && (
-        <Button
-          onClick={onClearAll}
-          variant="danger"
-          className="text-xs self-end ml-auto"
-        >
-          {t('filters.clearAll')}
-        </Button>
+      {displayToggles && displayToggles.length > 0 && (
+        <SidebarGroup label={t('filters.display')}>
+          {displayToggles.map((toggle) => (
+            <SwitchRow key={toggle.label} {...toggle} />
+          ))}
+        </SidebarGroup>
+      )}
+
+      {/* Primäre Filter (Kategorie / Mondphase / Modul) */}
+      {chips && chips.length > 0 && onChipToggle && (
+        <FilterList
+          label={chipLabel}
+          chips={chips}
+          selected={selectedChips}
+          onToggle={onChipToggle}
+          onAll={onAllChips}
+          allCount={allChipsCount}
+        />
+      )}
+
+      {statusChips && statusChips.length > 0 && onStatusToggle && (
+        <FilterList
+          label={statusLabel ?? t('filters.status')}
+          chips={statusChips}
+          selected={selectedStatus}
+          onToggle={onStatusToggle}
+          onAll={onAllStatus}
+          allCount={allStatusCount}
+        />
       )}
     </div>
   );

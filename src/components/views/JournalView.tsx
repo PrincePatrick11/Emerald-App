@@ -23,7 +23,7 @@ import { discardNewEntry } from '../../lib/discardNewEntry';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
-import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
+import { countByCategory, groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import type { JournalEntry, MoonPhase } from '../../types';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 
@@ -195,9 +195,13 @@ export default function JournalView() {
     // ungeprüft durch), und die landet in derselben Waisen-Gruppe.
     const showNoPhaseChip = entries.some((e) => !MOON_PHASE_ORDER.includes(e.moon_phase as MoonPhase))
       || filterPhases.includes(UNCATEGORIZED_KEY);
+    // Gezählt über die Suche, ohne den Phasen-Filter selbst.
+    const phaseCounts = countByCategory(
+      searchFiltered, (p) => MOON_PHASE_ORDER.includes(p as MoonPhase), (e) => e.moon_phase ?? null,
+    );
     const phaseChips = [
-      ...MOON_PHASE_ORDER.map((p) => ({ value: p, label: t(`moonPhase.${p}`), emoji: MOON_PHASE_SYMBOLS[p] })),
-      ...(showNoPhaseChip ? [{ value: UNCATEGORIZED_KEY, label: t('journal.noPhase'), emoji: '📓' }] : []),
+      ...MOON_PHASE_ORDER.map((p) => ({ value: p, label: t(`moonPhase.${p}`), emoji: MOON_PHASE_SYMBOLS[p], count: phaseCounts.get(p) ?? 0 })),
+      ...(showNoPhaseChip ? [{ value: UNCATEGORIZED_KEY, label: t('journal.noPhase'), emoji: '📓', count: phaseCounts.get(UNCATEGORIZED_KEY) ?? 0 }] : []),
     ];
 
     const activeFilterCount = filterPhases.length > 0 ? 1 : 0;
@@ -279,20 +283,21 @@ export default function JournalView() {
         sort={sort}
         onView={(v) => setJournalPrefs({ view: v })}
         onSort={(s) => setJournalPrefs({ sort: s })}
-        // Das Journal gruppiert nach Mondphase, nicht nach Kategorie — die
-        // Option trägt deshalb das Wort, das auch über seinen Filter-Chips steht.
+        // Das Journal gruppiert nach Mondphase, nicht nach Kategorie — der
+        // Schalter trägt deshalb das Wort, das auch über seinen Filtern steht.
         groupBy={{ value: grouping, onChange: (g) => setJournalPrefs({ grouping: g }), label: t('filters.moonPhase') }}
         search={search}
         onSearch={setSearch}
         filters={{
           activeFilterCount,
+          onClearAll: () => setFilterPhases([]),
           panelProps: {
             chipLabel: t('filters.moonPhase'),
             chips: phaseChips,
             selectedChips: filterPhases,
             onChipToggle: (v) => setFilterPhases((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]),
             onAllChips: () => setFilterPhases([]),
-            onClearAll: () => setFilterPhases([]),
+            allChipsCount: searchFiltered.length,
           },
         }}
         items={sorted}

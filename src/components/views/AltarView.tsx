@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
-import { Flame, Maximize2, Minimize2, PackagePlus } from 'lucide-react';
+import { Flame, Layers, Maximize2, Minimize2, PackagePlus } from 'lucide-react';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView, isWideCardView } from '../../lib/viewMode';
 import { groupByMonth } from '../../lib/groupBy';
@@ -15,9 +15,8 @@ import { useDisplayedAltar } from '../../hooks/useDisplayedAltar';
 import { getAltarBackgroundStyle, DEFAULT_ALTAR_RESOLUTION, parseResolution, isRatioFormat } from '../../lib/altarConstants';
 import type { AltarItem, AltarRecord } from '../../types';
 import Dashboard, { GroupDivider } from '../ui/Dashboard';
-import IconToggleGroup from '../ui/IconToggleGroup';
-import { GROUPING_ICONS, SORT_ICONS } from '../ui/ListToolbar';
-import { FilterChipButton } from '../ui/FilterPanel';
+import { SortSelect } from '../ui/ListToolbar';
+import { SwitchRow } from '../ui/Switch';
 import ContextMenu from '../ui/ContextMenu';
 import { ENTRY_TITLE_HEADING_CLASSES, ENTRY_TITLE_INPUT_CLASSES, EntryHeaderRow, EntryStatus } from '../ui/EntryDetailFrame';
 import { formatEntryDate } from '../../lib/formatDate';
@@ -28,16 +27,6 @@ import { AltarItemModal } from '../altar/AltarItemModal';
 import { AltarLibrarySection } from '../altar/AltarLibrarySection';
 import { AltarCard, AltarListRow, buildAltarContextMenuActions } from '../altar/AltarCard';
 import { imageSrc } from '../../lib/images';
-import type { AltarLibrarySort } from '../../store/uiStore';
-
-/** Dieselben Beschriftungen wie die Toolbar-Sortierung — „A → Z" meint in der
- *  Bibliothek nur den Elementnamen statt den Altartitel, das Wort bleibt. */
-const LIBRARY_SORT_LABEL_KEYS: Record<AltarLibrarySort, string> = {
-  alpha_asc: 'listView.alphaAsc',
-  alpha_desc: 'listView.alphaDesc',
-  date_desc: 'listView.dateDesc',
-};
-
 
 
 export default function AltarView() {
@@ -314,30 +303,23 @@ export default function AltarView() {
       );
 
     // Die Regler der Bibliothek stehen beim übrigen Dashboard-Kopf, nicht im
-    // Inhalt: im Seitenleisten-Modus landen sie damit in derselben Spalte wie
-    // Suche, Ansicht und Sortierung — und die Bibliothek darunter bleibt der
-    // reine Inhalt.
-    // Dieselben Segment-Reihen wie Ansicht und Sortierung im Kopf darüber:
-    // die Regler stehen in derselben schmalen Spalte und sollen sich gleich
-    // bedienen lassen. Die Beschriftungen wandern in title/aria-label.
+    // Inhalt: in derselben Spalte wie Ansicht und Sortierung der Altäre, mit
+    // denselben Bausteinen — und die Bibliothek darunter bleibt der reine
+    // Inhalt. „Name · A → Z" meint hier den Elementnamen statt des
+    // Altartitels, das Wort bleibt.
     const libraryControls = (
       <>
-        <IconToggleGroup
-          label={t('listView.sort')}
-          options={ALTAR_LIBRARY_SORTS.map((value) => ({ value, label: t(LIBRARY_SORT_LABEL_KEYS[value]) }))}
-          icons={SORT_ICONS}
+        <SortSelect
+          label={t('altar.sortLibrary')}
           value={libraryPrefs.sort}
+          modes={ALTAR_LIBRARY_SORTS}
           onChange={(sort) => setLibraryPrefs({ sort })}
         />
-        <IconToggleGroup
-          label={t('listView.grouping')}
-          options={[
-            { value: 'grouped' as const, label: t('listView.category') },
-            { value: 'flat' as const, label: t('listView.ungrouped') },
-          ]}
-          icons={GROUPING_ICONS}
-          value={libraryPrefs.grouping}
-          onChange={(grouping) => setLibraryPrefs({ grouping })}
+        <SwitchRow
+          icon={Layers}
+          label={t('listView.groupBy', { label: t('listView.category') })}
+          checked={libraryPrefs.grouping === 'grouped'}
+          onChange={(on) => setLibraryPrefs({ grouping: on ? 'grouped' : 'flat' })}
         />
       </>
     );
@@ -356,22 +338,24 @@ export default function AltarView() {
         ]}
         view={altarPrefs.view}
         sort={altarPrefs.sort}
+        sortDate="updated"
+        sortLabel={t('altar.sortAltars')}
         onView={(next) => setAltarPrefs({ view: next })}
         onSort={(next) => setAltarPrefs({ sort: next })}
         search={search}
         onSearch={setSearch}
         // Nur ein Anzeige-Schalter, kein Filter: er zählt nicht als aktiver
-        // Filter, und es gibt nichts zu „Alle löschen".
+        // Filter, und es gibt nichts zurückzusetzen.
         filters={{
           activeFilterCount: 0,
           panelProps: {
-            displayExtras: (
-              <FilterChipButton active={altarShowPreview} onClick={() => setAltarShowPreview(!altarShowPreview)}>
-                <Flame size={12} />
-                {t('altar.showPreview')}
-              </FilterChipButton>
-            ),
-            extraGroups: [{ label: t('altar.libraryTitle'), content: libraryControls }],
+            displayToggles: [{
+              label: t('altar.showPreview'),
+              icon: Flame,
+              checked: altarShowPreview,
+              onChange: setAltarShowPreview,
+            }],
+            extraGroups: [{ label: t('altar.sortLibrary'), content: libraryControls }],
           },
         }}
         // Zugeklappt eine leere Liste statt eines Sonderzweigs: der Leer- und

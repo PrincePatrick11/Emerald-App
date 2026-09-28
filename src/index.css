@@ -456,6 +456,25 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
            border border-jade-800/40 transition-colors duration-150;
   }
 
+  /* Die Primäraktion in Rot — dieselbe Form wie .btn-primary, für eine
+     Seite, deren Hauptaktion zerstört (Papierkorb leeren). Farben aus den
+     --danger-solid-*-Tokens der Themes. */
+  .btn-primary-danger {
+    @apply flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors duration-150;
+    background-color: var(--danger-solid-bg);
+    border-color: var(--danger-solid-border);
+    color: var(--danger-solid-text);
+  }
+
+  .btn-primary-danger:hover {
+    background-color: var(--danger-solid-hover-bg);
+  }
+
+  .btn-primary-danger:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--danger-solid-border);
+  }
+
   /* Secondary action button — neutral stone */
   .btn-secondary {
     @apply flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors duration-150;
@@ -498,6 +517,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   .btn-primary:disabled,
+  .btn-primary-danger:disabled,
   .btn-secondary:disabled,
   .btn-ghost:disabled,
   .btn-danger:disabled {
@@ -626,26 +646,101 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     background-color: var(--menu-item-hover-bg);
   }
 
-  .filter-chip-active {
-    background-color: var(--menu-item-active-bg);
-    border-color: color-mix(in srgb, var(--accent) 48%, transparent);
+  /* Filterzeilen der Dashboard-Seitenleiste (FilterList): Icon, Name,
+     Anzahl. Aktiv in der Jade-Flaeche der Menues, wie eine gewaehlte Option.
+     Nur Theme-Variablen — Noctis und Parchment brauchen keine eigene Regel. */
+  .filter-row {
+    color: var(--text-muted);
+    transition: color 150ms, background-color 150ms;
+  }
+
+  .filter-row:hover {
+    color: var(--text-primary);
+    background-color: var(--interactive-hover);
+  }
+
+  .filter-row--active,
+  .filter-row--active:hover {
     color: var(--menu-item-active-text);
+    background-color: var(--menu-item-active-bg);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent);
   }
 
-  /* Ueber --accent in beiden Themes sichtbar — Noctis hat keine generische
-     button:focus-visible-Regel (design.md, Open Point 8), Parchment schon;
-     hier bekommt die Chip-Klasse selbst eine, damit jede Einbettung sie erbt. */
-  .filter-chip:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
+  .filter-row-count {
+    color: var(--text-subtle);
   }
 
-  /* Gleiche Begruendung wie .filter-chip:focus-visible direkt darueber: die
-     tone-Buttons (sidebar-action-btn), die Tab-/Segment-Toggles
+  .filter-row--active .filter-row-count {
+    color: inherit;
+    opacity: 0.8;
+  }
+
+  .filter-row-count--zero {
+    opacity: 0.6;
+  }
+
+  /* Ein/Aus-Schalter (Switch): Schiene 28x16, Knopf 12. */
+  .switch {
+    position: relative;
+    flex-shrink: 0;
+    width: 28px;
+    height: 16px;
+    border-radius: 9999px;
+    background-color: var(--border-strong);
+    transition: background-color 150ms;
+  }
+
+  /* An: gedämpftes Jade mit Rand, heller Knopf — wie die aktive Filterzeile,
+     nicht die volle Akzentfläche eines Primärknopfs. */
+  .switch--on {
+    background-color: color-mix(in srgb, var(--accent) 38%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+
+
+  .switch-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 9999px;
+    background-color: var(--switch-thumb);
+    transition: transform 150ms;
+  }
+
+  .switch--on .switch-thumb {
+    background-color: var(--switch-thumb-on);
+    transform: translateX(12px);
+  }
+
+  .switch:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .switch-row {
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  .switch-row > svg {
+    color: var(--text-subtle);
+  }
+
+  .switch-row--disabled {
+    color: var(--text-subtle);
+    cursor: not-allowed;
+  }
+
+  /* Ueber --accent in beiden Themes sichtbar. Die Filterzeilen, die
+     Schalter, die tone-Buttons (sidebar-action-btn), die Tab-/Segment-Toggles
      (TabIconButton), die klickbaren Bibliothekskacheln (div[role=button]),
-     die Link-Picker-Tabs und die Settings-Navigation sind fokussierbar, Noctis hat
-     aber keine generische button:focus-visible-Regel — ohne eigenen Ring
-     blieben sie dort tastatur-unsichtbar. */
+     die Link-Picker-Tabs und die Settings-Navigation sind fokussierbar, Noctis
+     hat aber keine generische button:focus-visible-Regel (design.md, Open
+     Point 8) — ohne eigenen Ring blieben sie dort tastatur-unsichtbar. */
+  .filter-row:focus-visible,
+  .switch:focus-visible,
   .settings-choice-btn:focus-visible,
   .settings-nav-item-idle:focus-visible,
   .settings-nav-item-active:focus-visible,
@@ -2556,24 +2651,6 @@ html[data-theme='emerald-parchment'] .list-toolbar-option-idle {
 html[data-theme='emerald-parchment'] .list-toolbar-option-idle:hover {
   color: #2f2114;
   background: rgba(142, 102, 63, 0.12);
-}
-
-html[data-theme='emerald-parchment'] .filter-chip-idle {
-  background: #f7e9d2;
-  color: #5b432d;
-  border-color: rgba(151, 112, 74, 0.4);
-}
-
-html[data-theme='emerald-parchment'] .filter-chip-idle:hover {
-  background: #faefdd;
-  color: #2f2114;
-  border-color: rgba(132, 94, 56, 0.48);
-}
-
-html[data-theme='emerald-parchment'] .filter-chip-active {
-  background: #d6eee1;
-  border-color: rgba(0, 138, 87, 0.42);
-  color: #005f3a;
 }
 
 html[data-theme='emerald-parchment'] .emoji-picker-popover {
