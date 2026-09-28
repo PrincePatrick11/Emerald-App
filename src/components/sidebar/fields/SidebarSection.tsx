@@ -11,9 +11,9 @@ import { usePersistedFlag } from '../../../hooks/usePersistedFlag';
  * Die Abschnitte stehen ohne Trennlinie untereinander; den Abstand zwischen
  * ihnen setzt der Aufrufer (`RightSidebar`: `gap-5` im Körper).
  *
- * Kopf und Inhalt fluchten mit der Kante der Leiste (wie „Typ“ im
- * Bearbeiten): der Inhalt rückt um `-mx-2` heraus und die Zeilen mit `px-2`
- * wieder hinein — nur ihre Hover-Fläche ragt in den Rand.
+ * Kopf und Inhalt stehen 4px innerhalb der Kante der Leiste, links wie
+ * rechts: der Kopf mit `px-1`, der Inhalt rückt um `-mx-1` heraus und die
+ * Zeilen mit `px-2` wieder hinein — so ragt nur ihre Hover-Fläche in den Rand.
  */
 export default function SidebarSection({ storageKey, label, count, children }: {
   storageKey: string;
@@ -24,12 +24,12 @@ export default function SidebarSection({ storageKey, label, count, children }: {
   const [open, toggle] = usePersistedFlag(storageKey, true);
   return (
     <section aria-label={label}>
-      <button type="button" onClick={toggle} aria-expanded={open} className="sidebar-section-title w-full">
+      <button type="button" onClick={toggle} aria-expanded={open} className="sidebar-section-title w-full px-1">
         {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         {label}
         {count !== undefined && <span className="sidebar-section-count">{count}</span>}
       </button>
-      {open && <div className="-mx-2 mt-1.5 flex flex-col gap-px">{children}</div>}
+      {open && <div className="-mx-1 mt-1.5 flex flex-col gap-px">{children}</div>}
     </section>
   );
 }
@@ -52,11 +52,13 @@ export function SidebarPropertyRow({ icon, label, value, muted = false }: {
   return (
     <div className="flex items-center gap-2.5 px-2 py-1.5 text-[13px] min-w-0">
       <RowIcon>{icon}</RowIcon>
-      <span className="sidebar-prop-label flex-shrink-0">{label}</span>
+      {/* Wird es eng, kürzt zuerst der Name — der Wert ist das, was man liest.
+          Er nimmt höchstens 65 %, darüber kürzt auch er. */}
+      <span className="sidebar-prop-label min-w-0 truncate" title={label}>{label}</span>
       {/* Kein `truncate` am Flex-Container selbst: mit `justify-end` schnitte er
           links ab. Ein Text kürzt in seiner eigenen Spanne am Ende. */}
-      <span className={`ml-auto min-w-0 flex items-center justify-end gap-1.5 ${muted ? 'sidebar-prop-value--muted' : 'sidebar-prop-value'}`}>
-        {typeof value === 'string' ? <span className="truncate" title={value}>{value}</span> : value}
+      <span className={`ml-auto flex-shrink-0 max-w-[65%] flex items-center justify-end gap-1.5 ${muted ? 'sidebar-prop-value--muted' : 'sidebar-prop-value'}`}>
+        {typeof value === 'string' ? <span className="min-w-0 truncate" title={value}>{value}</span> : value}
       </span>
     </div>
   );
