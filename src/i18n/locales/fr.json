@@ -544,6 +544,8 @@
     "changeType": "Convertir",
     "category": "Catégorie",
     "noCategory": "Aucune",
+    "noIcon": "Aucune",
+    "noCover": "Aucune",
     "moonPhase": "Phase lunaire",
     "tags": "Étiquettes",
     "noTags": "Aucun tag",

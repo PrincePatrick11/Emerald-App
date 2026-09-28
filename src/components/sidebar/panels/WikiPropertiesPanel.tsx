@@ -6,7 +6,7 @@ import TagsField from '../fields/TagsField';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
 import EntryTypeField from '../fields/EntryTypeField';
 import PropertiesEditView from '../fields/PropertiesEditView';
-import EntryReadSections, { CategoryPropertyRow } from '../fields/EntryReadSections';
+import EntryReadSections, { CategoryPropertyRow, IconCoverPropertyRows } from '../fields/EntryReadSections';
 import IconCoverField from '../fields/IconCoverField';
 import { applyDefaultAfterCategoryChange } from '../../../store/templateApply';
 import CategorySelect from '../../ui/CategorySelect';
@@ -30,7 +30,12 @@ export default function WikiPropertiesPanel() {
   if (!isEditing) {
     return (
       <EntryReadSections
-        properties={<CategoryPropertyRow categoryId={article.category_id} />}
+        properties={(
+          <>
+            <CategoryPropertyRow categoryId={article.category_id} />
+            <IconCoverPropertyRows icon={article.icon} cover={article.cover_image} />
+          </>
+        )}
         content={article.content}
         tags={article.tags ?? []}
       />

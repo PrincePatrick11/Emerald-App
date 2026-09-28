@@ -1,9 +1,10 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Folder } from 'lucide-react';
+import { Folder, Image as ImageIcon, Smile } from 'lucide-react';
 import { useCategoryStore } from '../../../store/categoryStore';
 import { categoryLabel } from '../../../lib/categories';
 import SidebarSection, { SidebarPropertyRow } from './SidebarSection';
+import { FaviconGlyph } from './Favicon';
 import { LinkedEntriesSection } from './LinkedEntriesField';
 import { TagsSection } from './TagsField';
 
@@ -45,5 +46,32 @@ export function CategoryPropertyRow({ categoryId }: { categoryId?: string | null
       value={category ? <><span className="font-normal">{category.emoji}</span><span className="truncate">{categoryLabel(t, category)}</span></> : t('properties.noCategory')}
       muted={!category}
     />
+  );
+}
+
+/**
+ * Icon und Titelbild als zwei Eigenschaften (Wiki, Operationen): gesetzt als
+ * kleine Vorschau rechts, sonst leise „Keins". Geändert wird im Bearbeiten
+ * über `IconCoverField`.
+ */
+export function IconCoverPropertyRows({ icon, cover }: { icon?: string | null; cover?: string }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <SidebarPropertyRow
+        icon={<Smile size={14} />}
+        label={t('properties.icon')}
+        value={icon ? <FaviconGlyph value={icon} className="w-4 h-4 text-sm" /> : t('properties.noIcon')}
+        muted={!icon}
+      />
+      <SidebarPropertyRow
+        icon={<ImageIcon size={14} />}
+        label={t('properties.coverImage')}
+        value={cover
+          ? <img src={cover} alt="" className="h-4 w-9 flex-shrink-0 object-cover rounded-sm border border-stone-700/60" />
+          : t('properties.noCover')}
+        muted={!cover}
+      />
+    </>
   );
 }
