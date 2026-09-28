@@ -29,7 +29,7 @@ export function TagsSection({ tags }: { tags: string[] }) {
     <SidebarSection storageKey="entry-sidebar-tags-open" label={t('properties.tags')} count={tags.length}>
       {tags.length === 0
         ? <SidebarEmpty>{t('properties.noTags')}</SidebarEmpty>
-        : <div className="pl-2 pr-2.5 pt-0.5"><TagInput tags={tags} onChange={() => {}} readOnly /></div>}
+        : <div className="pl-[9px] pr-2.5 pt-0.5"><TagInput tags={tags} onChange={() => {}} readOnly /></div>}
     </SidebarSection>
   );
 }
