@@ -70,7 +70,7 @@ Four steps, each with a responsibility. Not chosen by feel:
 | `rounded-md` | small controls: inputs, chips, icon buttons, list rows, tiles |
 | `rounded-lg` | buttons and **floating surfaces**: menu, popover, toast, dropdown |
 | `rounded-xl` | surfaces that carry content: `.panel`, `.panel-interactive`, `.modal-card` |
-| `rounded-full` | genuinely round elements only: dots, avatars, filter pills |
+| `rounded-full` | genuinely round elements only: dots, avatars, the track and thumb of a `Switch` |
 
 `rounded-sm` stays reserved for decorative miniature surfaces below ~16px (colour swatch,
 resize handle, image thumbnail) — `rounded-md` would be visibly too round there. It is not
@@ -218,15 +218,15 @@ because it is unclear whether `font-mono` is needed at all.*
 **8. Emerald Noctis lacks the generic focus rule.** Parchment has
 `html[data-theme='emerald-parchment'] button:focus-visible` (`index.css:1426`); Noctis has
 `:focus-visible` only for individual classes (`.window-control`, `.titlebar-menu-trigger`,
-`.menu-item`, `.link-picker-row`, `.filter-chip`, `.sidebar-action-btn`, `.altar-item-tile`,
+`.menu-item`, `.link-picker-row`, `.filter-row`, `.switch`, `.sidebar-action-btn`, `.altar-item-tile`,
 `.right-sidebar-tab-idle`/`-active`, `.link-picker-tab-idle`/`-active`,
 `.settings-choice-btn`, `.settings-nav-item-idle`/`-active`). `.sidebar-action-btn`,
 `.altar-item-tile`, `.right-sidebar-tab-idle`/`-active` and `.link-picker-tab-idle`/`-active`
 cover `Button`'s tone mode (so `RightSidebarActionBar`'s buttons, among every other tone-mode
 use, now get a ring) and the sidebar's and link picker's tab/segment toggles; the two
 Settings classes are the same fix for the settings-page navigation and its choice buttons
-(theme/language/import-mode) — every one of these is the same per-class patch `.filter-chip`
-already had, not the missing generic rule. The four base `Button`
+(theme/language/import-mode) — every one of these is the same per-class patch the dashboard filter
+rows and switches have, not the missing generic rule. The four base `Button`
 variants (`primary`/`secondary`/`ghost`/`danger`) and any plain `<button>` written directly
 in a view still look unfocused in Noctis. *Cost: one rule, mirrored from Parchment.*
 
