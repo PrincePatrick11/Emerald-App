@@ -78,7 +78,7 @@ function RightSidebarActionBar() {
   return (
     <SidebarActionBar>
       <Button
-        tone="jade"
+        tone="amber"
         fill
         title={t('editor.edit')}
         aria-label={t('editor.edit')}
@@ -89,7 +89,7 @@ function RightSidebarActionBar() {
       </Button>
       {isAltar && (
         <Button
-          tone={altarWindowFullscreen ? 'jade' : 'neutral'}
+          tone="jade"
           active={altarWindowFullscreen}
           compact
           title={altarWindowFullscreen ? t('altar.exitWindowFullscreen') : t('altar.windowFullscreen')}
