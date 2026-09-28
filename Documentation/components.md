@@ -155,7 +155,7 @@ the stack.
 | Building block | For | Extension point |
 | --- | --- | --- |
 | `SidebarSectionHeader` | the collapsible section heading of the right sidebar's *edit*-mode panels — chevron plus small uppercase label on `.sidebar-section-title` (theme variables, focus ring; `SidebarSection`, below, shares the class). Controlled, because callers keep open state differently (the altar per altar in one localStorage object, the block manager via `usePersistedFlag`). Replaced six hand-written copies in `AltarSidebarPanel` | `label`, `open`, `onToggle`, `className` (spacing only — the wrapper stays the caller's) |
-| `SidebarSection` | a collapsible section of the right sidebar's *read* mode — Properties, Linked entries, Tags, Blocks, the Altar's Elements. Chevron, label and an optional count on `.sidebar-section-title`; open/closed is its own `usePersistedFlag(storageKey)`, so it survives a restart per section rather than per caller. Sits flush with the sidebar's edge — the header at `px-1`, the row content pulled out `-mx-1` and back in `px-2.5`, so only a row's hover area reaches into the margin (a deliberate, commented exception to the padding rule below). Exports `SidebarPropertyRow` (icon, label, value — `muted` for an empty value like "None"/"Off"; the label truncates before the value does, the value capped at 65%), `SidebarItemRow` (a clickable row — icon, label, right-aligned `meta` — for a linked entry, a block, a placed altar element; `active` marks the selected one), and `SidebarEmpty` (a section's empty-state line) | `storageKey`, `label`, `count` |
+| `SidebarSection` | a collapsible section of the right sidebar's *read* mode — Properties, Linked entries, Tags, Blocks, the Altar's Elements. Chevron, label and an optional count on `.sidebar-section-title`; open/closed is its own `usePersistedFlag(storageKey)`, so it survives a restart per section rather than per caller. The header sits 4px inside the sidebar's edge (`px-1`); the rows are indented under the heading's text, behind its chevron (content `pl-3`, rows `pl-2`), and on the right the content is pulled out `-mr-1` and back in `pr-2.5`, so values end 6px before the edge (a deliberate, commented exception to the padding rule below). Exports `SidebarPropertyRow` (icon, label, value — `muted` for an empty value like "None"/"Off"; the label truncates before the value does, the value capped at 65%), `SidebarItemRow` (a clickable row — icon, label, right-aligned `meta` — for a linked entry, a block, a placed altar element; `active` marks the selected one), and `SidebarEmpty` (a section's empty-state line) | `storageKey`, `label`, `count` |
 | `EntryReadSections` | Journal/Wiki/Operations' read-mode sidebar body: `PropertiesSection` (wraps `SidebarSection` under `properties.title`, omitted entirely when the caller passes no `properties`) followed by `LinkedEntriesSection` and `TagsSection` (both below). Also exports `CategoryPropertyRow`, the category-as-property row shared by Wiki/Operations (a trashed category shows "None", not its raw id) | `properties`, `content`, `legacyIds`, `tags` |
 | `PropertiesEditView` | layout shell of edit mode | `children` |
 | `IconCoverField` | icon and cover image under one heading ("Icon + Cover Image") and one wrapping button row, for the two modules that have both (Wiki, Operations) — composes `Favicon` and `Banner`. Edit-mode only now; read mode shows both inline in the entry itself, not in the sidebar | — |
@@ -177,9 +177,9 @@ the stack.
 **Horizontal padding has exactly one source in the right sidebar** — the scrolling
 container in `RightSidebar.tsx`. No panel and no field here adds a `px-*` of its own
 (the read view's footnote carries a cosmetic `px-1`, which is alignment, not padding); see
-[`design.md`](design.md#heights-and-spacing). `SidebarSection`'s own `-mx-1`/`px-2.5` (above)
-is the one deliberate exception, commented in place: it exists so a row's hover area can
-reach the sidebar's edge without indenting the row's own content.
+[`design.md`](design.md#heights-and-spacing). `SidebarSection`'s own `pl-3`/`-mr-1` and its rows' `pl-2`/`pr-2.5` (above)
+are the one deliberate exception, commented in place: they indent the rows under the
+heading's text while a row's hover area still reaches into the right margin.
 
 ### `src/hooks/` and `src/lib/` — Shared Logic
 
