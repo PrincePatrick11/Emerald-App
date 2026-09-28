@@ -6,7 +6,7 @@ import TagsField from '../fields/TagsField';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
 import EntryTypeField from '../fields/EntryTypeField';
 import PropertiesEditView from '../fields/PropertiesEditView';
-import EntryReadSections, { CategoryPropertyRow, IconCoverPropertyRows } from '../fields/EntryReadSections';
+import EntryReadSections, { CategoryPropertyRow } from '../fields/EntryReadSections';
 import IconCoverField from '../fields/IconCoverField';
 import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
 import { categoryLabel } from '../../../lib/categories';
@@ -36,12 +36,7 @@ export default function OperationPropertiesPanel() {
   if (!isEditing) {
     return (
       <EntryReadSections
-        properties={(
-          <>
-            <CategoryPropertyRow categoryId={op.category_id} />
-            <IconCoverPropertyRows icon={op.icon} cover={op.cover_image} />
-          </>
-        )}
+        properties={<CategoryPropertyRow categoryId={op.category_id} />}
         content={op.content}
         tags={op.tags ?? []}
       />
