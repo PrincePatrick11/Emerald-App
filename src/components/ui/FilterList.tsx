@@ -22,11 +22,13 @@ function FilterRow({ active, onClick, lead, label, count }: {
   count?: number;
 }) {
   return (
+    // 30px hoch (leading-5 + 2×5px) wie der Primärknopf oben in der Leiste
+    // und die Sortier-Auswahl — alle Bedienelemente der Leiste gleich hoch.
     <button
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`filter-row flex items-center gap-2.5 w-full px-3 py-1.5 rounded-md text-[13px] text-left${active ? ' filter-row--active' : ''}`}
+      className={`filter-row flex items-center gap-2.5 w-full px-3 py-[5px] rounded-md text-[13px] leading-5 text-left${active ? ' filter-row--active' : ''}`}
     >
       <span className="w-4 flex-shrink-0 flex items-center justify-center leading-none">{lead}</span>
       <span className="flex-1 min-w-0 truncate">{label}</span>

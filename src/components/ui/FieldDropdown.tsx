@@ -3,12 +3,12 @@ import Dropdown, { type DropdownOption } from './Dropdown';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 
 /** Der Feld-Look mit der Schrift der Filterzeilen darunter: 13px statt
- *  `text-xs` — ausgeschrieben statt überschrieben, damit keine zwei
+ *  `text-xs`, 30px hoch wie der Primärknopf der Leiste — ausgeschrieben statt überschrieben, damit keine zwei
  *  Tailwind-Klassen um dieselbe Eigenschaft streiten. Sonst dieselben
  *  Klassen wie OP_PROP_SELECT_CLASSES (die Theme-Brücken hängen an
  *  `op-prop-select`). */
 const SIDEBAR_SELECT_CLASSES =
-  'op-prop-select w-full bg-stone-800/60 rounded-md px-3 py-1.5 text-[13px] text-stone-300 outline-none ' +
+  'op-prop-select w-full bg-stone-800/60 rounded-md px-3 py-1 text-[13px] leading-5 text-stone-300 outline-none ' +
   'border border-stone-700/40 focus:border-stone-600 transition-colors';
 
 interface Props<T extends string> {
