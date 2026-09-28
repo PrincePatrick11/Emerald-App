@@ -1309,7 +1309,7 @@ button.block-altar:hover .block-altar-title {
   color: var(--accent);
 }
 
-/* Zuweisungs-Tabelle einer Vorlage (Dialog und Übersicht, `AssignmentTable`):
+/* Zuweisungs-Tabelle einer Vorlage (nur der Dialog, `AssignmentTable`):
    Label links; im Dialog feste Spalten für Wiki, Operationen und „beide" —
    fest, damit der Hinweis unter einer Zelle kürzt statt die Spalte zu
    verbreitern. */
@@ -1327,7 +1327,7 @@ button.block-altar:hover .block-altar-title {
   border-bottom: 1px solid var(--border-soft);
 }
 
-/* Das Häkchen „zur Wahl" neben einem Vorlagennamen — leiser als der Stern. */
+/* Das Häkchen „zur Wahl" vor einem Vorlagennamen — der Standard steht ohne Zeichen. */
 .template-overview-state {
   display: flex;
   flex-shrink: 0;

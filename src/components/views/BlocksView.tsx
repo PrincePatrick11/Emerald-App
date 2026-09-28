@@ -109,6 +109,8 @@ function BuiltInBlocksSection({ query }: { query: string }) {
       />
       {!collapsed && (
         <>
+          {/* Bewusst die kleine Zeile statt `NoResults`: leer wird die Liste nur
+              durch die Suche, und das große „Keine Treffer" steht schon oben. */}
           {presets.length === 0
             ? <p className="text-xs text-stone-700 px-1 py-1">{t('search.noResults')}</p>
             : (
@@ -121,7 +123,7 @@ function BuiltInBlocksSection({ query }: { query: string }) {
                     <li
                       key={preset.id}
                       title={preset.descriptionKey ? t(preset.descriptionKey) : undefined}
-                      className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-surface-1)] px-3 py-2.5"
+                      className="panel flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5"
                     >
                       <Icon size={16} className="flex-shrink-0 text-stone-400" />
                       <span className="truncate text-sm text-stone-200">{t(preset.labelKey)}</span>

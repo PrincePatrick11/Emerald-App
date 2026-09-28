@@ -69,8 +69,10 @@ export function AltarLibrarySection({ search, onNewElement, onEditElement }: Pro
     </div>
   );
 
-  // Leer ist die Bibliothek erst ohne Suche; mit Suche fand die nur nichts.
-  const emptyHint = query || items.length > 0
+  // Ohne ein einziges Element ist die Bibliothek leer, auch wenn gesucht wird.
+  // Sonst fand nur die Suche nichts — dafür reicht die kleine Zeile, das große
+  // „Keine Treffer" steht schon über den Altären.
+  const emptyHint = items.length > 0
     ? <p className="text-xs text-stone-700 px-1 py-1">{t('search.noResults')}</p>
     : (
       <EmptyState
@@ -130,7 +132,7 @@ export function AltarLibrarySection({ search, onNewElement, onEditElement }: Pro
   return (
     <div className="mt-8">
       {/* Dieselbe Trennlinien-Überschrift wie die Timeline-Gruppen des
-          Dashboards — hier mit Chevron und Zähler. */}
+          Dashboards — hier mit Chevron. */}
       <GroupDivider
         label={t('altar.libraryTitle')}
         collapsed={sectionCollapsed}

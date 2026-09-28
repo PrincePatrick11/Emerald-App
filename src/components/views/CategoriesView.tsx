@@ -352,9 +352,8 @@ export default function CategoriesView() {
         mode: 'custom',
         render: () => (
           <div className="max-w-2xl">
-            {query
-              ? visualCategories.length === 0 && <NoResults query={search} onReset={() => setSearch('')} />
-              : <p className="text-xs text-stone-600 mb-3">{t('categories.dragHint')}</p>}
+            {!query && <p className="text-xs text-stone-600 mb-3">{t('categories.dragHint')}</p>}
+            {query && visualCategories.length === 0 && <NoResults query={search} onReset={() => setSearch('')} />}
             <div ref={listRef} className="space-y-1">
               {visualCategories.map(renderRow)}
             </div>

@@ -33,7 +33,7 @@ export default function EmptyState({
   return (
     <div className={`flex flex-col items-center px-6 pt-10 pb-6 text-center${className ? ` ${className}` : ''}`}>
       {Icon && (
-        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-stone-700/60 bg-stone-800/60 text-stone-400">
+        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-md border border-stone-700/60 bg-stone-800/60 text-stone-400">
           <Icon size={18} />
         </div>
       )}

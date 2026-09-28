@@ -830,7 +830,6 @@
   },
   "tasks": {
     "newTask": "New Task",
-    "empty": "No tasks yet.",
     "filter": {
       "priority": "Priority"
     },

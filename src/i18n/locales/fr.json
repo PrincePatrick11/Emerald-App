@@ -830,7 +830,6 @@
   },
   "tasks": {
     "newTask": "Nouvelle tâche",
-    "empty": "Pas encore de tâches.",
     "filter": {
       "priority": "Priorité"
     },

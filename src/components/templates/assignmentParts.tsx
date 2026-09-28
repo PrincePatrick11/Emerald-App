@@ -9,8 +9,8 @@ import { ALL_CATEGORIES, TEMPLATE_ENTRY_TYPES, type AssignmentState, type Templa
 /**
  * Was der Zuweisungs-Dialog einer Vorlage und die Standardvorlagen-Übersicht
  * im Dashboard gemeinsam haben: die drei Stufen, ihre Icons und Namen. Die
- * Tabelle (`AssignmentTable`) gehört nur dem Dialog — die Übersicht zeigt
- * Journal als Spalte statt als eigene Zeile und baut ihre eigene.
+ * Tabelle (`AssignmentTable`) gehört nur dem Dialog — die Übersicht hat
+ * denselben Aufbau, baut ihn aber als eigene Panel-Tabelle ohne Schalter.
  */
 
 /** Die Eintragsarten mit Kategorien — die Spalten der Tabelle. */
@@ -77,19 +77,16 @@ interface AssignmentTableProps {
 export function AssignmentTable({ cell, extraColumn }: AssignmentTableProps) {
   const { t } = useTranslation();
   const categories = useCategoryStore((s) => s.categories);
-  const rowClass = 'template-assign-row';
-  // Die Schalter sind höher als eine Textzeile; das Label sitzt mittig zur ersten Zeile.
-  const labelPad = 'pt-1';
-
   const label = (text: string, sub?: string) => (
-    <div className={`min-w-0 ${labelPad}`}>
+    // `pt-1`: die Schalter sind höher als eine Textzeile; das Label sitzt mittig zur ersten Zeile.
+    <div className="min-w-0 pt-1">
       <p className="truncate text-xs text-[var(--text-secondary)]" title={text}>{text}</p>
       {sub && <p className="block-field-hint">{sub}</p>}
     </div>
   );
 
   const row = (category: string | null, rowLabel: string, sub?: string) => (
-    <div key={category ?? ''} className={rowClass}>
+    <div key={category ?? ''} className="template-assign-row">
       {label(rowLabel, sub)}
       {CATEGORY_TYPES.map((type) => <div key={type} className="min-w-0">{cell(type, category, rowLabel)}</div>)}
       {extraColumn && <div className="min-w-0">{extraColumn.cell(category, rowLabel)}</div>}
@@ -101,14 +98,14 @@ export function AssignmentTable({ cell, extraColumn }: AssignmentTableProps) {
     <>
       <section className="space-y-2">
         <EntryTypeHeading entryType="journal" />
-        <div className={rowClass}>
+        <div className="template-assign-row">
           {label(everyEntry)}
           <div className="min-w-0">{cell('journal', ALL_CATEGORIES, everyEntry)}</div>
         </div>
       </section>
 
       <section className="space-y-1">
-        <div className={`${rowClass} template-assign-head`}>
+        <div className="template-assign-row template-assign-head">
           <span />
           {CATEGORY_TYPES.map((type) => <EntryTypeHeading key={type} entryType={type} />)}
           {extraColumn?.heading}

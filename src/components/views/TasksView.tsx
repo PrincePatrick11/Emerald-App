@@ -186,7 +186,12 @@ export default function TasksView() {
   });
 
   const activeFilterCount = filterCategory.size + filterPriority.size;
-  const isFiltering = !!searchQuery || activeFilterCount > 0;
+  const isFiltering = !!searchQuery.trim() || activeFilterCount > 0;
+  // Gruppiert zählt, ob eine Gruppe übrig bleibt (ein Kategorie-Chip kann alle
+  // ausblenden, obwohl Aufgaben passen), ungruppiert die Liste selbst.
+  const nothingVisible = groupedTasks
+    ? visibleCategories.length === 0 && !showUncatBlock
+    : sortedTasks.length === 0;
   const clearFilters = () => {
     setFilterCategory(new Set());
     setFilterPriority(new Set());
@@ -225,7 +230,7 @@ export default function TasksView() {
           ? visibleCategories.map((cat) => {
               const catTasks = groupedTasks[cat.id] || [];
               const isCollapsed = isCategoryCollapsed(cat.id);
-              const isEmpty = catTasks.length === 0;
+              // Leere Gruppen gibt es hier nicht: `visibleCategories` filtert sie schon weg.
               return (
                 <div key={cat.id} className="mb-6 space-y-1.5">
                   <CollapsibleGroupHeader
@@ -236,29 +241,23 @@ export default function TasksView() {
                     count={catTasks.length}
                     add={{ title: t('tasks.newTask'), onClick: () => handleCreateTask(cat.id) }}
                   />
-                  {!isCollapsed && (
-                    isEmpty ? (
-                      <p className="text-xs text-stone-700 px-1 py-1">{t('tasks.empty')}</p>
-                    ) : (
-                      catTasks.map((task) => (
-                        <TaskRow
-                          key={task.id}
-                          task={task}
-                          editingId={editingId}
-                          editValue={editValue}
-                          setEditValue={setEditValue}
-                          setEditingId={setEditingId}
-                          handleSaveEdit={handleSaveEdit}
-                          toggleExpand={toggleExpand}
-                          expandedTasks={expandedTasks}
-                          setCtxMenu={setCtxMenu}
-                          setLinkModal={setLinkModal}
-                          resolveTaskLinkTitle={resolveTaskLinkTitle}
-                          t={t}
-                        />
-                      )) 
-                    )
-                  )}
+                  {!isCollapsed && catTasks.map((task) => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      editingId={editingId}
+                      editValue={editValue}
+                      setEditValue={setEditValue}
+                      setEditingId={setEditingId}
+                      handleSaveEdit={handleSaveEdit}
+                      toggleExpand={toggleExpand}
+                      expandedTasks={expandedTasks}
+                      setCtxMenu={setCtxMenu}
+                      setLinkModal={setLinkModal}
+                      resolveTaskLinkTitle={resolveTaskLinkTitle}
+                      t={t}
+                    />
+                  ))}
                 </div>
               );
             })
@@ -311,17 +310,12 @@ export default function TasksView() {
           </div>
         )}
 
-        {/* Custom-Modus-Pendant zu Dashboards zentralem Rückfall: blenden die
-            Filter alle Gruppen aus, kein leerer Content-Bereich, sondern
-            „Keine Ergebnisse". Nur, solange es überhaupt passende Aufgaben
-            gibt — bleibt gar keine übrig, greift der Zweig ganz unten, der
-            auch die Ansicht ohne Gruppen abdeckt. */}
-        {groupedTasks && sortedTasks.length > 0 && visibleCategories.length === 0 && !showUncatBlock && categories.length > 0 && !searchQuery && noResults}
-
-        {/* Ohne Suche und Filter heißt „nichts zu sehen": keine offene Aufgabe
-            (erledigte blendet der Schalter aus) — ob es Kategorien gibt, spielt
-            keine Rolle, die globalen gibt es immer. */}
-        {sortedTasks.length === 0 && !isFiltering && (
+        {/* Custom-Modus-Pendant zu Dashboards zentralem Rückfall. Steht nichts
+            da, entscheidet nur, ob gesucht oder gefiltert wird: dann „Keine
+            Treffer", sonst gibt es keine offene Aufgabe (erledigte blendet der
+            Schalter aus) — ob es Kategorien gibt, spielt keine Rolle, die
+            globalen gibt es immer. */}
+        {nothingVisible && (isFiltering ? noResults : (
           <EmptyState
             icon={MODULES.tasks.icon}
             title={t('emptyState.tasks.title')}
@@ -329,11 +323,7 @@ export default function TasksView() {
             actionLabel={t('tasks.newTask')}
             onAction={() => handleCreateTask()}
           />
-        )}
-
-        {/* Nicht nur bei Suchtext: ohne Gruppen kann auch ein Kategorie- oder
-            Prioritäts-Chip alles wegfiltern, und dann stand hier nichts. */}
-        {sortedTasks.length === 0 && isFiltering && noResults}
+        ))}
     </>
   );
 

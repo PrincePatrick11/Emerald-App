@@ -42,26 +42,23 @@ export default function TemplateDefaultsOverview() {
 
   // Der Standard steht ohne Zeichen — er ist, was die Tabelle zeigt. Nur eine
   // Vorlage, die dort bloß zur Wahl steht, trägt das leise Häkchen.
-  const link = (template: Template, state: AssignmentState) => {
-    const Icon = ASSIGNMENT_STATE_ICONS.assigned;
-    return (
-      <button
-        key={template.id}
-        type="button"
-        className="template-overview-link text-sm"
-        onClick={() => setActiveView({ type: 'templates', id: template.id })}
-        title={`${templateLabel(t, template)} — ${stateLabels[state]}`}
-      >
-        {state === 'assigned' && (
-          <span className="template-overview-state">
-            <Icon size={14} />
-          </span>
-        )}
-        <BlockGlyph icon={template.icon} size={14} />
-        <span className="truncate">{templateLabel(t, template)}</span>
-      </button>
-    );
-  };
+  const link = (template: Template, state: AssignmentState) => (
+    <button
+      key={template.id}
+      type="button"
+      className="template-overview-link text-sm"
+      onClick={() => setActiveView({ type: 'templates', id: template.id })}
+      title={`${templateLabel(t, template)} — ${stateLabels[state]}`}
+    >
+      {state === 'assigned' && (
+        <span className="template-overview-state">
+          <ASSIGNMENT_STATE_ICONS.assigned size={14} />
+        </span>
+      )}
+      <BlockGlyph icon={template.icon} size={14} />
+      <span className="truncate">{templateLabel(t, template)}</span>
+    </button>
+  );
 
   /**
    * Eine Zelle: Standard, dann die Vorlagen zur Wahl. Ohne eigenen Standard

@@ -18,7 +18,7 @@ import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import { getMoonPhase, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId, isImageIcon } from '../../lib/helpers';
-import { DEFAULT_ENTRY_EMOJI, viewTypeForEntryType } from '../../lib/modules';
+import { DEFAULT_ENTRY_EMOJI, MODULES, viewTypeForEntryType } from '../../lib/modules';
 import { categoryLabel } from '../../lib/categories';
 import { formatDayHeading, formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
@@ -202,7 +202,7 @@ export default function HomeView() {
               </div>
               {entries.length === 0 ? (
                 <EmptyState
-                  icon={BookOpen}
+                  icon={MODULES.journal.icon}
                   title={t('emptyState.journal.title')}
                   description={t('emptyState.journal.description')}
                   actionLabel={t('emptyState.journal.action')}
@@ -264,7 +264,7 @@ export default function HomeView() {
                 </div>
               </div>
               {operations.length === 0 ? (
-                <EmptyState icon={Wand2} title={t('emptyState.operations.title')} description={t('emptyState.operations.description')} />
+                <EmptyState icon={MODULES.operations.icon} title={t('emptyState.operations.title')} description={t('emptyState.operations.description')} />
               ) : homeOpsPrefs.view === 'list' ? (
                 <div className="space-y-2">
                   {opsItems.map((op) => {
@@ -335,7 +335,7 @@ export default function HomeView() {
                 </div>
               </div>
               {articles.length === 0 ? (
-                <EmptyState icon={Library} title={t('emptyState.wiki.title')} description={t('emptyState.wiki.description')} />
+                <EmptyState icon={MODULES.wiki.icon} title={t('emptyState.wiki.title')} description={t('emptyState.wiki.description')} />
               ) : homeWikiPrefs.view === 'list' ? (
                 <div className="space-y-2">
                   {wikiItems.map((article) => {
