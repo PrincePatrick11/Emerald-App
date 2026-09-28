@@ -13,6 +13,7 @@ import Dashboard from '../ui/Dashboard';
 import { ENTRY_TITLE_HEADING_CLASSES } from '../ui/EntryDetailFrame';
 import DashboardItem from '../ui/DashboardItem';
 import Dropdown from '../ui/Dropdown';
+import EmptyState from '../ui/EmptyState';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import { getMoonPhase, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
@@ -200,10 +201,13 @@ export default function HomeView() {
                 </div>
               </div>
               {entries.length === 0 ? (
-                <div className="panel px-4 py-6 text-center">
-                  <p className="text-stone-600 text-sm">{t('journal.noEntries')}</p>
-                  <p className="text-stone-700 text-xs mt-1">{t('journal.startWriting')}</p>
-                </div>
+                <EmptyState
+                  icon={BookOpen}
+                  title={t('emptyState.journal.title')}
+                  description={t('emptyState.journal.description')}
+                  actionLabel={t('emptyState.journal.action')}
+                  onAction={handleNewEntry}
+                />
               ) : homeJournalPrefs.view === 'list' ? (
                 <div className="space-y-2">
                   {journalItems.map((entry) => (
@@ -260,9 +264,7 @@ export default function HomeView() {
                 </div>
               </div>
               {operations.length === 0 ? (
-                <div className="panel px-4 py-6 text-center">
-                  <p className="text-stone-600 text-sm">{t('operations.none')}</p>
-                </div>
+                <EmptyState icon={Wand2} title={t('emptyState.operations.title')} description={t('emptyState.operations.description')} />
               ) : homeOpsPrefs.view === 'list' ? (
                 <div className="space-y-2">
                   {opsItems.map((op) => {
@@ -333,10 +335,7 @@ export default function HomeView() {
                 </div>
               </div>
               {articles.length === 0 ? (
-                <div className="panel px-4 py-6 text-center">
-                  <p className="text-stone-600 text-sm">{t('wiki.noArticles')}</p>
-                  <p className="text-stone-700 text-xs mt-1">{t('wiki.startDocumenting')}</p>
-                </div>
+                <EmptyState icon={Library} title={t('emptyState.wiki.title')} description={t('emptyState.wiki.description')} />
               ) : homeWikiPrefs.view === 'list' ? (
                 <div className="space-y-2">
                   {wikiItems.map((article) => {

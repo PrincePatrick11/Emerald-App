@@ -12,6 +12,7 @@ import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
+import { MODULES } from '../../lib/modules';
 import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
@@ -324,13 +325,18 @@ export default function WikiView() {
         items={sortedArticles}
         itemKey={(a) => a.id}
         renderItem={renderArticle}
-        isEmpty={articles.length === 0 && categories.length === 0}
-        emptyState={{ message: t('wiki.noArticles'), actionLabel: t('wiki.startDocumenting'), onAction: () => handleNew() }}
+        isEmpty={articles.length === 0}
+        emptyState={{
+          icon: MODULES.wiki.icon,
+          title: t('emptyState.wiki.title'),
+          description: t('emptyState.wiki.description'),
+          actionLabel: t('wiki.newArticle'),
+          onAction: () => handleNew(),
+        }}
         // Im gruppierten Modus entscheidet Dashboard selbst: überlebt keine
         // Gruppe, zeigt es „Keine Ergebnisse". Dieser Zweig darf ihm also
         // nicht zuvorkommen.
         hasNoResults={filtered.length === 0 && !(grouping === 'grouped' && view !== 'timeline')}
-        noResultsMessage={t('search.noResults')}
         grouping={
           view === 'timeline'
             ? { mode: 'timeline', groups: timelineGroups }

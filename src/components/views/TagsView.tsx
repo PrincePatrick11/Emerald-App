@@ -367,8 +367,6 @@ export default function TagsView() {
   return (
     <Dashboard<TaggedItem>
       title={t('nav.tags')}
-      titleIcon={AUX_VIEWS.tags.icon}
-      titleCount={tags.length}
       primaryAction={{ label: t('tags.new'), onClick: openAddForm }}
       sort={sort}
       onSort={(s) => { if (isTagsSort(s)) setSort(s); }}
@@ -395,10 +393,15 @@ export default function TagsView() {
       itemKey={(item) => `${item.module}:${item.id}`}
       renderItem={renderItem}
       isEmpty={tags.length === 0}
-      emptyState={{ message: t('tags.none'), actionLabel: t('tags.new'), onAction: openAddForm }}
+      emptyState={{
+        icon: AUX_VIEWS.tags.icon,
+        title: t('emptyState.tags.title'),
+        description: t('emptyState.tags.description'),
+        actionLabel: t('tags.new'),
+        onAction: openAddForm,
+      }}
       // Bleibt keine Gruppe übrig, meldet der category-Modus das selbst.
       hasNoResults={false}
-      noResultsMessage={t('search.noResults')}
       grouping={{
         mode: 'category',
         groups,

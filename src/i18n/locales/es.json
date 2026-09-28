@@ -95,6 +95,10 @@
   },
   "sidebar": {
     "allEmpty": "Aún no hay entradas",
+    "emptyHint": "Las entradas nuevas aparecen aquí",
+    "noResultsFor": "Sin coincidencias para «{{query}}»",
+    "noResultsHint": "Prueba otra ortografía",
+    "tasksEmpty": "Aún no hay tareas",
     "showMore": "Mostrar {{count}} más",
     "showMore_other": "Mostrar {{count}} más"
   },
@@ -102,8 +106,6 @@
     "new": "Nueva operación",
     "untitled": "Operación sin título",
     "placeholder": "Documenta tu operación...",
-    "none": "Aún no hay operaciones.",
-    "start": "Comienza tu primera operación.",
     "all": "Todas",
     "categories": {
       "sigils": "Sigilos",
@@ -120,8 +122,6 @@
     "elementName": "Nombre…",
     "all": "Todos",
     "noElements": "Aún no hay elementos.",
-    "none": "Aún no hay altares.",
-    "start": "Crea tu primer altar.",
     "untitled": "Altar sin título",
     "uploadImage": "Subir imagen",
     "favicon": "Icono",
@@ -223,8 +223,6 @@
     "newEntry": "Nueva entrada",
     "untitled": "Entrada sin título",
     "placeholder": "Comienza tu registro...",
-    "noEntries": "Aún no hay entradas en el diario.",
-    "startWriting": "Escribe tu primera entrada.",
     "noPhase": "Sin fase lunar"
   },
   "creation": {
@@ -271,8 +269,6 @@
       "sigil_charging": "Carga de sigilos",
       "other": "Otro"
     },
-    "noArticles": "Aún no hay artículos wiki.",
-    "startDocumenting": "Comienza a documentar tu práctica.",
     "addIcon": "Añadir icono",
     "changeIcon": "Cambiar icono",
     "removeIcon": "Eliminar icono"
@@ -357,7 +353,6 @@
       "newBlock": "Nuevo bloque",
       "builtIn": "Bloques integrados",
       "custom": "Tus bloques",
-      "customHint": "Arma tu propio bloque a partir de campos — por ejemplo, un registro ritual con fecha, opción y lista de verificación. Una vez guardado, aparece en «Añadir bloque» en cada entrada.",
       "name": "Nombre",
       "namePlaceholder": "Nombre del bloque",
       "fields": "Campos",
@@ -513,6 +508,11 @@
     "placeholderIn": "Buscar en {{name}} …",
     "noResults": "No se encontraron resultados.",
     "noResultsShort": "Sin resultados",
+    "noResultsTitle": "Sin coincidencias",
+    "noResultsFor": "No se encontró nada para «{{query}}».",
+    "noResultsForFiltered": "No se encontró nada para «{{query}}» con los filtros elegidos.",
+    "noResultsFiltered": "Nada coincide con los filtros elegidos.",
+    "resetFilters": "Restablecer filtros",
     "operations": "Buscar operaciones…",
     "wikiArticles": "Buscar artículos wiki…",
     "globalPlaceholder": "Buscar en todo…",
@@ -524,7 +524,6 @@
     "showMore_other": "Mostrar {{count}} resultados más"
   },
   "tags": {
-    "none": "Aún no hay etiquetas. Crea una aquí o añade etiquetas al editar una entrada.",
     "new": "Nueva etiqueta",
     "name": "Nombre de la etiqueta…",
     "nameTaken": "Esta etiqueta ya existe",
@@ -761,7 +760,6 @@
   },
   "trash": {
     "title": "Papelera",
-    "empty": "La papelera está vacía.",
     "emptyTrash": "Vaciar papelera",
     "restore": "Restaurar",
     "deletePermanently": "Eliminar definitivamente",
@@ -860,7 +858,6 @@
     },
     "newTemplate": "Nueva plantilla",
     "defaultName": "Nueva plantilla",
-    "emptyHint": "Crea una plantilla para entradas que siempre empiezan igual – un registro de ritual con títulos, campos y etiquetas, por ejemplo. Asígnala a Diario, Wiki u Operaciones, o conviértela en la predeterminada para las entradas nuevas.",
     "name": "Nombre",
     "namePlaceholder": "Nombre de la plantilla",
     "entryTitle": "Título de las entradas nuevas",
@@ -899,6 +896,8 @@
     "entryCount_other": "{{count}} entradas",
     "overview": {
       "title": "Plantillas predeterminadas",
+      "hint": "Se aplica a las entradas nuevas. La fila «Todas las categorías» se aplica siempre que una categoría no tenga una predeterminada propia.",
+      "category": "Categoría",
       "none": "Sin plantilla predeterminada",
       "fallback": "Si no: {{name}} (todas las categorías)",
       "everyEntry": "Cada entrada nueva"
@@ -932,7 +931,6 @@
     "language": "Idioma",
     "newLanguage": "Nuevo idioma",
     "defaultName": "Nuevo idioma",
-    "emptyHint": "Crea un idioma —enoquiano, runas, uno propio—, añade su vocabulario y su alfabeto, y el campo de abajo traducirá tu texto con él. Todo se queda en tu vault; nada sale a la red.",
     "name": "Nombre",
     "namePlaceholder": "Nombre del idioma",
     "stats": "Tamaño",
@@ -957,7 +955,6 @@
     "letterFrom": "Carácter",
     "letterTo": "Equivale a",
     "translate": "Traducir",
-    "translateNoLanguage": "Crea primero un idioma; este campo traducirá con él.",
     "swapDirection": "Cambiar el sentido",
     "intoLanguage": "A {{name}}",
     "outOfLanguage": "Desde {{name}}",
@@ -979,5 +976,19 @@
     "unmappedWord": "Ningún carácter de la tabla",
     "unmappedCount": "{{count}} sin equivalencia",
     "unmappedCount_other": "{{count}} sin equivalencia"
+  },
+  "emptyState": {
+    "journal": { "title": "Aún no hay entradas", "description": "Registra lo que vives, sueñas y obras. Cada entrada recibe automáticamente la fase lunar del día.", "action": "Primera entrada" },
+    "wiki": { "title": "Aún no hay artículos", "description": "Reúne saber sobre hierbas, piedras y símbolos." },
+    "tasks": { "title": "Todo hecho", "description": "No hay tareas abiertas. Las nuevas aparecerán aquí." },
+    "operations": { "title": "Aún no hay operaciones", "description": "Planifica rituales con ingredientes, desarrollo y resultado." },
+    "altar": { "title": "Aún no hay altar", "description": "Diseña un altar con un fondo y elementos." },
+    "altarLibrary": { "title": "Aún no hay elementos", "description": "Velas, cristales, símbolos: con elementos construyes tus altares." },
+    "lexicon": { "title": "Aún no hay idiomas", "description": "Crea un idioma y llénalo de palabras y caracteres." },
+    "translate": { "title": "Aún no hay nada que traducir", "description": "Crea primero un idioma; luego este campo traduce con él." },
+    "templates": { "title": "Aún no hay plantillas", "description": "Guarda procesos recurrentes como plantilla." },
+    "blocks": { "title": "Aún no hay bloques", "description": "Piezas que reutilizas en tus entradas." },
+    "tags": { "title": "Aún no hay etiquetas", "description": "Asigna etiquetas al editar una entrada o crea una aquí." },
+    "trash": { "title": "La papelera está vacía" }
   }
 }

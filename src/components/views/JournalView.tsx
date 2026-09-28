@@ -18,6 +18,7 @@ import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId } from '../../lib/helpers';
+import { MODULES } from '../../lib/modules';
 import { discardNewEntry } from '../../lib/discardNewEntry';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
@@ -298,13 +299,18 @@ export default function JournalView() {
         itemKey={(e) => e.id}
         renderItem={renderEntry}
         isEmpty={entries.length === 0}
-        emptyState={{ message: t('journal.noEntries'), actionLabel: t('journal.startWriting'), onAction: handleNew }}
+        emptyState={{
+          icon: MODULES.journal.icon,
+          title: t('emptyState.journal.title'),
+          description: t('emptyState.journal.description'),
+          actionLabel: t('emptyState.journal.action'),
+          onAction: handleNew,
+        }}
         // Im gruppierten Modus entscheidet Dashboard selbst: überlebt keine
         // Gruppe, zeigt es „Keine Ergebnisse" — und ein leerer Kopf (die
         // gerade angelegte Kategorie) hat dort Vorrang. Dieser Zweig darf ihm
         // also nicht zuvorkommen.
         hasNoResults={filtered.length === 0 && !(grouping === 'grouped' && view !== 'timeline')}
-        noResultsMessage={t('search.noResults')}
         grouping={
           view === 'timeline'
             ? { mode: 'timeline', groups: timelineGroups }

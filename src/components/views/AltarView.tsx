@@ -5,6 +5,7 @@ import { Flame, Maximize2, Minimize2, PackagePlus } from 'lucide-react';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView, isWideCardView } from '../../lib/viewMode';
 import { groupByMonth } from '../../lib/groupBy';
+import { MODULES } from '../../lib/modules';
 import { useAltarStore } from '../../store/altarStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUIStore, ALTAR_LIBRARY_SORTS } from '../../store/uiStore';
@@ -380,15 +381,19 @@ export default function AltarView() {
         itemKey={(altar) => altar.id}
         renderItem={renderAltarItem}
         isEmpty={!altarsCollapsed && altars.length === 0}
-        emptyState={{ message: t('altar.none'), actionLabel: t('altar.start'), onAction: handleNew }}
+        emptyState={{
+          icon: MODULES.altar.icon,
+          title: t('emptyState.altar.title'),
+          description: t('emptyState.altar.description'),
+          actionLabel: t('altar.newAltar'),
+          onAction: handleNew,
+        }}
         hasNoResults={!altarsCollapsed && filteredCount === 0}
-        noResultsMessage={t('search.noResults')}
         contentHeader={
           <GroupDivider
             // Mehrzahl, nicht t('nav.altar'): das ist die Überschrift über
             // einer Liste, kein Modulname in der Leiste.
             label={t('altar.sectionTitle')}
-            count={filteredCount}
             collapsed={altarsCollapsed}
             onToggleCollapse={toggleAltars}
           />

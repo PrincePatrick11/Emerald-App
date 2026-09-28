@@ -11,6 +11,7 @@ import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { discardNewEntry } from '../../lib/discardNewEntry';
+import { MODULES } from '../../lib/modules';
 import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
 import { entryBlockSummary } from '../../lib/blocks/entrySummary';
 import { formatEntryDate } from '../../lib/formatDate';
@@ -335,13 +336,18 @@ export default function OperationsView() {
         items={sortedOps}
         itemKey={(o) => o.id}
         renderItem={renderOp}
-        isEmpty={operations.length === 0 && categories.length === 0}
-        emptyState={{ message: t('operations.none'), actionLabel: t('operations.start'), onAction: handleNew }}
+        isEmpty={operations.length === 0}
+        emptyState={{
+          icon: MODULES.operations.icon,
+          title: t('emptyState.operations.title'),
+          description: t('emptyState.operations.description'),
+          actionLabel: t('operations.new'),
+          onAction: handleNew,
+        }}
         // Im gruppierten Modus entscheidet Dashboard selbst: überlebt keine
         // Gruppe, zeigt es „Keine Ergebnisse". Dieser Zweig darf ihm also
         // nicht zuvorkommen.
         hasNoResults={filtered.length === 0 && !(grouping === 'grouped' && view !== 'timeline')}
-        noResultsMessage={t('search.noResults')}
         grouping={
           view === 'timeline'
             ? { mode: 'timeline', groups: timelineGroups }

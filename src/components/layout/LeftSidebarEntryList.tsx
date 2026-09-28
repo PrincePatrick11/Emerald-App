@@ -187,7 +187,7 @@ function useJournalConfig(): EntryListTabProps<JournalEntry> {
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
       { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(e), danger: true },
     ],
-    emptyMessage: t('journal.noEntries'),
+    emptyMessage: t('emptyState.journal.title'),
   };
 }
 
@@ -253,7 +253,7 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
       { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(op), danger: true },
     ],
-    emptyMessage: t('operations.none'),
+    emptyMessage: t('emptyState.operations.title'),
   };
 }
 
@@ -319,7 +319,7 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
       { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(a), danger: true },
     ],
-    emptyMessage: t('wiki.noArticles'),
+    emptyMessage: t('emptyState.wiki.title'),
   };
 }
 
@@ -357,7 +357,7 @@ function useAltarConfig(): EntryListTabProps<AltarRecord> {
       openInNewTabAction({ type: 'altar', id: a.id, mode: 'view' }),
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
     ],
-    emptyMessage: t('altar.none'),
+    emptyMessage: t('emptyState.altar.title'),
   };
 }
 
@@ -422,7 +422,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
       { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(task), danger: true },
     ],
-    emptyMessage: t('tasks.empty'),
+    emptyMessage: t('sidebar.tasksEmpty'),
     renderRow: ({ item: task, isActive, isRenaming, renameValue, setRenameValue, commitRename, cancelRename, openCtxMenu }) => {
       const dateStr = dateStrFor(task);
 

@@ -98,7 +98,16 @@ export default function EntryListTab<T>({
 
       <nav className="entry-list-nav flex-1 overflow-y-auto py-2 px-2">
         {matching.length === 0 ? (
-          <p className="text-xs text-stone-600 px-2 py-2">{emptyMessage}</p>
+          // Zwei Zeilen an der Stelle des ersten Eintrags, ohne Icon und Knopf —
+          // das Dashboard daneben trägt den großen Leer-Zustand.
+          <div className="px-2 py-1.5">
+            <p className="text-[13px] text-stone-400">
+              {items.length > 0 ? t('sidebar.noResultsFor', { query: searchQuery.trim() }) : emptyMessage}
+            </p>
+            <p className="text-xs text-stone-600">
+              {items.length > 0 ? t('sidebar.noResultsHint') : t('sidebar.emptyHint')}
+            </p>
+          </div>
         ) : (
           <div className="space-y-1">
             {visible.map((item) => {

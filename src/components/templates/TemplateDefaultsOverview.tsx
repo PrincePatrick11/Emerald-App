@@ -1,56 +1,63 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CornerDownRight } from 'lucide-react';
+import { CircleDashed, CornerDownRight, FilePlus, Layers } from 'lucide-react';
 import { GroupDivider } from '../ui/Dashboard';
 import BlockGlyph from '../blocks/BlockGlyph';
 import { useTemplateStore } from '../../store/templateStore';
+import { useCategoryStore } from '../../store/categoryStore';
 import { useUIStore } from '../../store/uiStore';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { templateLabel } from '../../lib/blocks/blockAttrs';
+import { categoryLabel } from '../../lib/categories';
 import {
   ALL_CATEGORIES, assignmentStateAt, defaultTemplateAt,
   type AssignmentState, type Template, type TemplateEntryType,
 } from '../../lib/blocks/templates';
-import {
-  AssignmentLegend, AssignmentTable, ASSIGNMENT_STATE_ICONS, useAssignmentStateLabels,
-} from './assignmentParts';
+import { ASSIGNMENT_STATE_ICONS, CATEGORY_TYPES, EntryTypeHeading, useAssignmentStateLabels } from './assignmentParts';
 
 /** Der Abschnitt als Ganzes ist eine Einstellung — wie die Altar-Bibliothek. */
 const COLLAPSED_KEY = 'templates-defaults-collapsed';
 
-/** Was die Übersicht zeigt — „nicht zugewiesen" ist hier einfach eine leere Zelle. */
-const SHOWN_STATES: AssignmentState[] = ['default', 'assigned'];
+/** Kategorie-Spalte etwas breiter, Wiki und Operationen teilen sich den Rest. */
+const GRID = 'grid grid-cols-[minmax(9rem,1.3fr)_repeat(2,minmax(0,1fr))] items-center gap-x-6';
 
 /**
- * Die Gesamtübersicht unter der Vorlagenliste, nur zum Ansehen — dieselbe
- * Tabelle wie der Zuweisungs-Dialog einer Vorlage: Journal als eine Zeile,
- * Wiki und Operationen als Spalten mit „Alle Kategorien", „Ohne Kategorie"
- * und jeder Kategorie. Eine Zelle nennt den Standard (Stern) und die Vorlagen,
- * die dort zur Wahl stehen; ohne eigenen Standard, was stattdessen greift.
- * Ein Name öffnet die Vorlage — geändert wird nur dort.
+ * Die Gesamtübersicht unter der Vorlagenliste, nur zum Ansehen, in einem
+ * Panel: oben Journal für sich — es hat keine Kategorien, als Spalte der
+ * Tabelle stünde es fast leer —, darunter die Tabelle mit einer Zeile je
+ * Kategorie („Alle Kategorien", „Ohne Kategorie", dann jede Kategorie) und
+ * Wiki und Operationen als Spalten; derselbe Aufbau wie im Zuweisungs-Dialog.
+ * Eine Zelle nennt den Standard und die Vorlagen, die dort zur Wahl stehen;
+ * ohne eigenen Standard, was stattdessen greift. Der Standard steht ohne
+ * Stern, eine Vorlage nur zur Wahl mit Häkchen. Ein Name öffnet die Vorlage —
+ * geändert wird nur dort.
  */
 export default function TemplateDefaultsOverview() {
   const { t } = useTranslation();
   const templates = useTemplateStore((s) => s.templates);
+  const categories = useCategoryStore((s) => s.categories);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const stateLabels = useAssignmentStateLabels();
   const [collapsed, toggle] = usePersistedFlag(COLLAPSED_KEY);
 
-  if (templates.length === 0) return null;
-
+  // Der Standard steht ohne Zeichen — er ist, was die Tabelle zeigt. Nur eine
+  // Vorlage, die dort bloß zur Wahl steht, trägt das leise Häkchen.
   const link = (template: Template, state: AssignmentState) => {
-    const Icon = ASSIGNMENT_STATE_ICONS[state];
+    const Icon = ASSIGNMENT_STATE_ICONS.assigned;
     return (
       <button
         key={template.id}
         type="button"
-        className="template-overview-link text-xs"
+        className="template-overview-link text-sm"
         onClick={() => setActiveView({ type: 'templates', id: template.id })}
         title={`${templateLabel(t, template)} — ${stateLabels[state]}`}
       >
-        <span className={state === 'default' ? 'template-default-star' : 'template-overview-state'}>
-          <Icon size={12} fill={state === 'default' ? 'currentColor' : 'none'} />
-        </span>
-        <BlockGlyph icon={template.icon} size={12} />
+        {state === 'assigned' && (
+          <span className="template-overview-state">
+            <Icon size={14} />
+          </span>
+        )}
+        <BlockGlyph icon={template.icon} size={14} />
         <span className="truncate">{templateLabel(t, template)}</span>
       </button>
     );
@@ -66,7 +73,7 @@ export default function TemplateDefaultsOverview() {
     const choices = templates.filter((tpl) => assignmentStateAt(tpl.assignments, entryType, category) === 'assigned');
     const fallback = !current && category !== ALL_CATEGORIES ? defaultTemplateAt(templates, entryType, ALL_CATEGORIES) : undefined;
     return (
-      <div className="flex min-w-0 flex-col items-start gap-1 pt-0.5">
+      <div className="flex min-w-0 flex-col items-start gap-1">
         {current && link(current, 'default')}
         {choices.map((tpl) => link(tpl, 'assigned'))}
         {fallback ? (
@@ -84,15 +91,57 @@ export default function TemplateDefaultsOverview() {
     );
   };
 
+  // „Alle Kategorien" ist der Rückfall aller übrigen Zeilen und hebt sich
+  // deshalb mit fettem Namen ab — nur damit, eine hinterlegte Zeile war zu laut.
+  const row = (category: string | null, label: ReactNode) => (
+    <div key={category ?? ''} className={`${GRID} border-t border-[var(--border-soft)] py-2.5`}>
+      <div
+        className={`flex min-w-0 items-center gap-2 text-sm text-[var(--text-primary)]${
+          category === ALL_CATEGORIES ? ' font-semibold' : ''
+        }`}
+      >
+        {label}
+      </div>
+      {CATEGORY_TYPES.map((type) => <div key={type} className="min-w-0">{cell(type, category)}</div>)}
+    </div>
+  );
+
+  // Die feste Emoji-Spalte hält die Namen in einer Flucht; die beiden Zeilen
+  // ohne eigene Kategorie tragen dort ein Icon statt eines Emojis.
+  const named = (glyph: ReactNode, name: string) => (
+    <>
+      <span className="flex w-5 flex-shrink-0 justify-center text-[var(--text-muted)]">{glyph}</span>
+      <span className="truncate">{name}</span>
+    </>
+  );
+
   return (
     <div className="mt-8">
       <GroupDivider label={t('templates.overview.title')} collapsed={collapsed} onToggleCollapse={toggle} />
       {!collapsed && (
-        <div className="space-y-5">
-          <AssignmentTable variant="overview" cell={cell} />
+        <>
+          <p className="mb-3 text-xs text-[var(--text-muted)]">{t('templates.overview.hint')}</p>
+          <div className="panel px-4">
+            {/* Journal: eine Zeile, die Zelle über beide Spalten. */}
+            <div className="py-3">
+              <EntryTypeHeading entryType="journal" />
+            </div>
+            <div className={`${GRID} border-t border-[var(--border-soft)] py-2.5`}>
+              <div className="flex min-w-0 items-center gap-2 text-sm text-[var(--text-primary)]">
+                {named(<FilePlus size={14} />, t('templates.overview.everyEntry'))}
+              </div>
+              <div className="col-span-2 min-w-0">{cell('journal', ALL_CATEGORIES)}</div>
+            </div>
 
-          <AssignmentLegend states={SHOWN_STATES} />
-        </div>
+            <div className={`${GRID} border-t border-[var(--border-soft)] pt-5 pb-3`}>
+              <span className="label-xs">{t('templates.overview.category')}</span>
+              {CATEGORY_TYPES.map((type) => <EntryTypeHeading key={type} entryType={type} />)}
+            </div>
+            {row(ALL_CATEGORIES, named(<Layers size={14} />, t('templates.allCategories')))}
+            {row(null, named(<CircleDashed size={14} />, t('categories.uncategorized')))}
+            {categories.map((cat) => row(cat.id, named(cat.emoji, categoryLabel(t, cat))))}
+          </div>
+        </>
       )}
     </div>
   );

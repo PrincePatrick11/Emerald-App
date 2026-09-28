@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { LayoutTemplate } from 'lucide-react';
+import { CopyPlus } from 'lucide-react';
 import { useUIStore } from '../store/uiStore';
 import { saveEntryAsTemplate } from '../store/templateApply';
 import type { ContextMenuAction } from '../components/ui/ContextMenu';
@@ -15,7 +15,7 @@ export function useSaveAsTemplateAction(): (entryType: TemplateEntryType, id: st
   const setActiveView = useUIStore((s) => s.setActiveView);
   return (entryType, id) => ({
     label: t('templates.saveAsTemplate'),
-    icon: <LayoutTemplate size={12} />,
+    icon: <CopyPlus size={12} />,
     onClick: () => {
       void saveEntryAsTemplate(entryType, id)
         .then((template) => { if (template) setActiveView({ type: 'templates', id: template.id }); })

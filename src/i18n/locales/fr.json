@@ -95,6 +95,10 @@
   },
   "sidebar": {
     "allEmpty": "Aucune entrée pour le moment",
+    "emptyHint": "Les nouvelles entrées apparaissent ici",
+    "noResultsFor": "Aucune correspondance pour « {{query}} »",
+    "noResultsHint": "Essayez une autre orthographe",
+    "tasksEmpty": "Aucune tâche pour l'instant",
     "showMore": "Afficher {{count}} de plus",
     "showMore_other": "Afficher {{count}} de plus"
   },
@@ -102,8 +106,6 @@
     "new": "Nouvelle opération",
     "untitled": "Opération sans titre",
     "placeholder": "Documentez votre opération...",
-    "none": "Pas encore d'opérations.",
-    "start": "Commencez votre première opération.",
     "all": "Toutes",
     "categories": {
       "sigils": "Sigils",
@@ -120,8 +122,6 @@
     "elementName": "Nom…",
     "all": "Tous",
     "noElements": "Pas encore d'éléments.",
-    "none": "Pas encore d'autels.",
-    "start": "Créez votre premier autel.",
     "untitled": "Autel sans titre",
     "uploadImage": "Télécharger une image",
     "favicon": "Icône",
@@ -223,8 +223,6 @@
     "newEntry": "Nouvelle entrée",
     "untitled": "Entrée sans titre",
     "placeholder": "Commencez votre enregistrement...",
-    "noEntries": "Pas encore d'entrées dans le journal.",
-    "startWriting": "Écrivez votre première entrée.",
     "noPhase": "Sans phase lunaire"
   },
   "creation": {
@@ -271,8 +269,6 @@
       "sigil_charging": "Chargement de sigils",
       "other": "Autre"
     },
-    "noArticles": "Pas encore d'articles wiki.",
-    "startDocumenting": "Commencez à documenter votre pratique.",
     "addIcon": "Ajouter une icône",
     "changeIcon": "Changer l'icône",
     "removeIcon": "Supprimer l'icône"
@@ -357,7 +353,6 @@
       "newBlock": "Nouveau bloc",
       "builtIn": "Blocs intégrés",
       "custom": "Vos blocs",
-      "customHint": "Assemblez votre propre bloc à partir de champs — par exemple un journal de rituel avec date, choix et liste de contrôle. Une fois enregistré, il apparaît sous « Ajouter un bloc » dans chaque entrée.",
       "name": "Nom",
       "namePlaceholder": "Nom du bloc",
       "fields": "Champs",
@@ -513,6 +508,11 @@
     "placeholderIn": "Rechercher dans {{name}} …",
     "noResults": "Aucun résultat trouvé.",
     "noResultsShort": "Aucun résultat",
+    "noResultsTitle": "Aucune correspondance",
+    "noResultsFor": "Rien trouvé pour « {{query}} ».",
+    "noResultsForFiltered": "Rien trouvé pour « {{query}} » avec les filtres choisis.",
+    "noResultsFiltered": "Rien ne correspond aux filtres choisis.",
+    "resetFilters": "Réinitialiser les filtres",
     "operations": "Rechercher des opérations…",
     "wikiArticles": "Rechercher des articles wiki…",
     "globalPlaceholder": "Tout rechercher…",
@@ -524,7 +524,6 @@
     "showMore_other": "Afficher {{count}} autres résultats"
   },
   "tags": {
-    "none": "Pas encore d'étiquettes. Créez-en une ici ou ajoutez des étiquettes lors de la modification d'une entrée.",
     "new": "Nouvelle étiquette",
     "name": "Nom de l'étiquette…",
     "nameTaken": "Cette étiquette existe déjà",
@@ -761,7 +760,6 @@
   },
   "trash": {
     "title": "Corbeille",
-    "empty": "La corbeille est vide.",
     "emptyTrash": "Vider la corbeille",
     "restore": "Restaurer",
     "deletePermanently": "Supprimer définitivement",
@@ -860,7 +858,6 @@
     },
     "newTemplate": "Nouveau modèle",
     "defaultName": "Nouveau modèle",
-    "emptyHint": "Crée un modèle pour les entrées qui commencent toujours de la même façon – un journal de rituel avec titres, champs et étiquettes, par exemple. Assigne-le au Journal, au Wiki ou aux Opérations, ou fais-en le modèle par défaut des nouvelles entrées.",
     "name": "Nom",
     "namePlaceholder": "Nom du modèle",
     "entryTitle": "Titre des nouvelles entrées",
@@ -899,6 +896,8 @@
     "entryCount_other": "{{count}} entrées",
     "overview": {
       "title": "Modèles par défaut",
+      "hint": "S'applique aux nouvelles entrées. La ligne « Toutes les catégories » s'applique chaque fois qu'une catégorie n'a pas de modèle par défaut propre.",
+      "category": "Catégorie",
       "none": "Aucun modèle par défaut",
       "fallback": "Sinon : {{name}} (toutes les catégories)",
       "everyEntry": "Chaque nouvelle entrée"
@@ -932,7 +931,6 @@
     "language": "Langue",
     "newLanguage": "Nouvelle langue",
     "defaultName": "Nouvelle langue",
-    "emptyHint": "Crée une langue — énochien, runes, la tienne —, saisis son vocabulaire et son alphabet, et le champ ci-dessous traduit ton texte avec. Tout reste dans ton vault ; rien ne part sur le réseau.",
     "name": "Nom",
     "namePlaceholder": "Nom de la langue",
     "stats": "Taille",
@@ -957,7 +955,6 @@
     "letterFrom": "Caractère",
     "letterTo": "Devient",
     "translate": "Traduire",
-    "translateNoLanguage": "Crée d'abord une langue ; ce champ traduira avec.",
     "swapDirection": "Inverser le sens",
     "intoLanguage": "Vers {{name}}",
     "outOfLanguage": "Depuis {{name}}",
@@ -979,5 +976,19 @@
     "unmappedWord": "Aucun caractère de la table",
     "unmappedCount": "{{count}} sans équivalent",
     "unmappedCount_other": "{{count}} sans équivalent"
+  },
+  "emptyState": {
+    "journal": { "title": "Aucune entrée pour l'instant", "description": "Notez ce que vous vivez, rêvez et accomplissez. Chaque entrée reçoit automatiquement la phase lunaire du jour.", "action": "Première entrée" },
+    "wiki": { "title": "Aucun article pour l'instant", "description": "Rassemblez votre savoir sur les herbes, les pierres et les symboles." },
+    "tasks": { "title": "Tout est fait", "description": "Aucune tâche ouverte. Les nouvelles arrivent ici." },
+    "operations": { "title": "Aucune opération pour l'instant", "description": "Planifiez des rituels avec ingrédients, déroulement et résultat." },
+    "altar": { "title": "Aucun autel pour l'instant", "description": "Composez un autel à partir d'un fond et d'éléments." },
+    "altarLibrary": { "title": "Aucun élément pour l'instant", "description": "Bougies, cristaux, symboles : les éléments composent vos autels." },
+    "lexicon": { "title": "Aucune langue pour l'instant", "description": "Créez une langue et remplissez-la de mots et de caractères." },
+    "translate": { "title": "Rien à traduire pour l'instant", "description": "Créez d'abord une langue, puis ce champ traduira avec elle." },
+    "templates": { "title": "Aucun modèle pour l'instant", "description": "Enregistrez des déroulements récurrents comme modèle." },
+    "blocks": { "title": "Aucun bloc pour l'instant", "description": "Des briques que vous réutilisez dans vos entrées." },
+    "tags": { "title": "Aucun tag pour l'instant", "description": "Attribuez des tags en modifiant une entrée, ou créez-en un ici." },
+    "trash": { "title": "La corbeille est vide" }
   }
 }

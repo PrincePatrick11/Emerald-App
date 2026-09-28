@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Package } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUIStore } from '../../store/uiStore';
@@ -12,6 +13,7 @@ import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import type { AltarItem } from '../../types';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { GroupDivider } from '../ui/Dashboard';
+import EmptyState from '../ui/EmptyState';
 import { AltarItemTile } from './AltarItemTile';
 
 /** Der Abschnitt als Ganzes ist eine Einstellung, keine Arbeitsgeste — anders
@@ -67,11 +69,18 @@ export function AltarLibrarySection({ search, onNewElement, onEditElement }: Pro
     </div>
   );
 
-  const emptyHint = (
-    <p className="text-xs text-stone-700 px-1 py-1">
-      {query ? t('search.noResults') : t('altar.noElements')}
-    </p>
-  );
+  // Leer ist die Bibliothek erst ohne Suche; mit Suche fand die nur nichts.
+  const emptyHint = query || items.length > 0
+    ? <p className="text-xs text-stone-700 px-1 py-1">{t('search.noResults')}</p>
+    : (
+      <EmptyState
+        icon={Package}
+        title={t('emptyState.altarLibrary.title')}
+        description={t('emptyState.altarLibrary.description')}
+        actionLabel={t('altar.addElement')}
+        onAction={() => onNewElement()}
+      />
+    );
 
   const renderBody = () => {
     // Ohne Gruppen: ein Raster über alle Elemente. Die Kategorie-Köpfe
@@ -124,7 +133,6 @@ export function AltarLibrarySection({ search, onNewElement, onEditElement }: Pro
           Dashboards — hier mit Chevron und Zähler. */}
       <GroupDivider
         label={t('altar.libraryTitle')}
-        count={filtered.length}
         collapsed={sectionCollapsed}
         onToggleCollapse={toggleSection}
       />

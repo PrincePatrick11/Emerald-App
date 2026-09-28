@@ -6,6 +6,7 @@ import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { entriesOfLanguage, translateText, type TranslateDirection, type TranslateMode } from '../../lib/lexicon';
 import { GroupDivider } from '../ui/Dashboard';
 import Button from '../ui/Button';
+import EmptyState from '../ui/EmptyState';
 import Dropdown from '../ui/Dropdown';
 
 /** Wie lange „Kopiert" nach dem Klick stehen bleibt. */
@@ -75,7 +76,12 @@ export default function TranslatePanel() {
     <div className="mt-8">
       <GroupDivider label={t('lexicon.translate')} collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
       {collapsed ? null : !language ? (
-        <p className="text-sm text-stone-600">{t('lexicon.translateNoLanguage')}</p>
+        // Ohne Knopf: „Neue Sprache" steht schon im Abschnitt darüber.
+        <EmptyState
+          icon={ArrowRightLeft}
+          title={t('emptyState.translate.title')}
+          description={t('emptyState.translate.description')}
+        />
       ) : (
         <div className="max-w-5xl">
           <div className="flex flex-wrap items-center gap-2 mb-3">

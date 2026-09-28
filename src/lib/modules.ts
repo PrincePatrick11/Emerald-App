@@ -14,15 +14,15 @@
  * Zyklus: nicht tun.
  */
 import {
-  Blocks,
   BookOpen,
+  Box,
   CheckSquare,
+  CopyPlus,
   Flame,
   FolderOpen,
   Home,
   Languages,
   LayoutList,
-  LayoutTemplate,
   Library,
   ListTodo,
   Tag,
@@ -136,9 +136,9 @@ export const AUX_VIEWS: Record<AuxViewId, { icon: LucideIcon; navLabelKey: strin
   // im Papierkorb und ihre Verwaltung sollen als dasselbe Ding lesbar sein.
   categories: { icon: FolderOpen, navLabelKey: 'nav.categories' },
   trash: { icon: Trash2, navLabelKey: 'nav.trash' },
-  blocks: { icon: Blocks, navLabelKey: 'nav.blocks' },
+  blocks: { icon: Box, navLabelKey: 'nav.blocks' },
   // Dieselbe Glyphe wie `TRASH_KIND_ICONS.template`.
-  templates: { icon: LayoutTemplate, navLabelKey: 'nav.templates' },
+  templates: { icon: CopyPlus, navLabelKey: 'nav.templates' },
   // Dieselbe Glyphe wie `TRASH_KIND_ICONS.language`.
   lexicon: { icon: Languages, navLabelKey: 'nav.lexicon' },
 };
@@ -188,7 +188,7 @@ export const TRASH_KIND_ICONS: Record<TrashKind, LucideIcon> = {
   // Liste, nicht die einzelne erledigte Aufgabe.
   task: ListTodo,
   category: FolderOpen,
-  blockDefinition: Blocks,
-  template: LayoutTemplate,
+  blockDefinition: Box,
+  template: CopyPlus,
   language: Languages,
 };

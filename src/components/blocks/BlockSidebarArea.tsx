@@ -1,6 +1,6 @@
 import { useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Eye, EyeOff, GripVertical, LayoutTemplate, MoreHorizontal, Pencil, Plus, Puzzle, Type } from 'lucide-react';
+import { Check, Eye, EyeOff, CopyPlus, GripVertical, MoreHorizontal, Pencil, Plus, Puzzle, Type } from 'lucide-react';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import Button from '../ui/Button';
 import SidebarSectionHeader from '../sidebar/fields/SidebarSectionHeader';
@@ -136,7 +136,7 @@ function BlockManager({ session }: { session: BlockSession }) {
               </Button>
               {session.templates && (
                 <Button tone="neutral" small onClick={api.openTemplatePicker}>
-                  <LayoutTemplate size={12} />
+                  <CopyPlus size={12} />
                   <span>{t('templates.insert.button')}</span>
                 </Button>
               )}

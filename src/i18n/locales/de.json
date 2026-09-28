@@ -95,6 +95,10 @@
   },
   "sidebar": {
     "allEmpty": "Noch keine Einträge",
+    "emptyHint": "Neue Einträge erscheinen hier",
+    "noResultsFor": "Keine Treffer für „{{query}}“",
+    "noResultsHint": "Andere Schreibweise versuchen",
+    "tasksEmpty": "Noch keine Aufgaben",
     "showMore": "{{count}} weiteren anzeigen",
     "showMore_other": "{{count}} weitere anzeigen"
   },
@@ -102,8 +106,6 @@
     "new": "Neue Operation",
     "untitled": "Unbenannte Operation",
     "placeholder": "Dokumentiere deine Operation...",
-    "none": "Noch keine Operationen.",
-    "start": "Starte deine erste Operation.",
     "all": "Alle",
     "categories": {
       "sigils": "Sigillen",
@@ -120,8 +122,6 @@
     "elementName": "Name…",
     "all": "Alle",
     "noElements": "Noch keine Elemente.",
-    "none": "Noch keine Altäre.",
-    "start": "Erstelle deinen ersten Altar.",
     "untitled": "Unbenannter Altar",
     "uploadImage": "Bild hochladen",
     "favicon": "Icon",
@@ -223,8 +223,6 @@
     "newEntry": "Neuer Eintrag",
     "untitled": "Unbenannter Eintrag",
     "placeholder": "Beginne deine Aufzeichnung...",
-    "noEntries": "Noch keine Journaleinträge.",
-    "startWriting": "Schreibe deinen ersten Eintrag.",
     "noPhase": "Ohne Mondphase"
   },
   "creation": {
@@ -271,8 +269,6 @@
       "sigil_charging": "Sigillen-Ladetechnik",
       "other": "Sonstiges"
     },
-    "noArticles": "Noch keine Wiki-Artikel.",
-    "startDocumenting": "Beginne deine Praxis zu dokumentieren.",
     "addIcon": "Icon hinzufügen",
     "changeIcon": "Icon ändern",
     "removeIcon": "Icon entfernen"
@@ -357,7 +353,6 @@
       "newBlock": "Neuer Block",
       "builtIn": "Standard-Blöcke",
       "custom": "Eigene Blöcke",
-      "customHint": "Bau dir aus Feldern einen eigenen Block — etwa ein Ritual-Protokoll mit Datum, Auswahl und Checkliste. Gespeichert steht er in jedem Eintrag unter „Block hinzufügen“.",
       "name": "Name",
       "namePlaceholder": "Name des Blocks",
       "fields": "Felder",
@@ -513,6 +508,11 @@
     "placeholderIn": "{{name}} durchsuchen …",
     "noResults": "Keine Ergebnisse gefunden.",
     "noResultsShort": "Keine Ergebnisse",
+    "noResultsTitle": "Keine Treffer",
+    "noResultsFor": "Für „{{query}}“ wurde nichts gefunden.",
+    "noResultsForFiltered": "Für „{{query}}“ wurde mit den gewählten Filtern nichts gefunden.",
+    "noResultsFiltered": "Mit den gewählten Filtern wurde nichts gefunden.",
+    "resetFilters": "Filter zurücksetzen",
     "operations": "Operationen suchen…",
     "wikiArticles": "Wiki-Artikel suchen…",
     "globalPlaceholder": "Alles durchsuchen…",
@@ -524,7 +524,6 @@
     "showMore_other": "{{count}} weitere Ergebnisse anzeigen"
   },
   "tags": {
-    "none": "Noch keine Tags. Lege hier einen an oder vergib Tags beim Bearbeiten eines Eintrags.",
     "new": "Neuer Tag",
     "name": "Tag-Name…",
     "nameTaken": "Diesen Tag gibt es schon",
@@ -761,7 +760,6 @@
   },
   "trash": {
     "title": "Papierkorb",
-    "empty": "Papierkorb ist leer.",
     "emptyTrash": "Papierkorb leeren",
     "restore": "Wiederherstellen",
     "deletePermanently": "Endgültig löschen",
@@ -860,7 +858,6 @@
     },
     "newTemplate": "Neue Vorlage",
     "defaultName": "Neue Vorlage",
-    "emptyHint": "Bau dir eine Vorlage für Einträge, die immer gleich beginnen – ein Ritual-Protokoll mit Überschriften, Feldern und Tags etwa. Weise sie Journal, Wiki oder Operationen zu oder mach sie zum Standard neuer Einträge.",
     "name": "Name",
     "namePlaceholder": "Name der Vorlage",
     "entryTitle": "Titel neuer Einträge",
@@ -899,6 +896,8 @@
     "entryCount_other": "{{count}} Einträge",
     "overview": {
       "title": "Standardvorlagen",
+      "hint": "Gilt für neue Einträge. Die Zeile „Alle Kategorien“ gilt immer dann, wenn eine Kategorie keinen eigenen Standard hat.",
+      "category": "Kategorie",
       "none": "Kein Standard",
       "fallback": "Sonst: {{name}} (alle Kategorien)",
       "everyEntry": "Jeder neue Eintrag"
@@ -932,7 +931,6 @@
     "language": "Sprache",
     "newLanguage": "Neue Sprache",
     "defaultName": "Neue Sprache",
-    "emptyHint": "Leg dir eine Sprache an — Enochisch, Runen, eine eigene —, pflege ihre Vokabeln und ihr Alphabet ein, und das Feld darunter übersetzt deinen Text damit. Alles bleibt in deinem Vault, nichts geht ins Netz.",
     "name": "Name",
     "namePlaceholder": "Name der Sprache",
     "stats": "Umfang",
@@ -957,7 +955,6 @@
     "letterFrom": "Zeichen",
     "letterTo": "Entspricht",
     "translate": "Übersetzen",
-    "translateNoLanguage": "Leg zuerst eine Sprache an — dann übersetzt dieses Feld damit.",
     "swapDirection": "Richtung wechseln",
     "intoLanguage": "Nach {{name}}",
     "outOfLanguage": "Aus {{name}}",
@@ -979,5 +976,19 @@
     "unmappedWord": "Kein Zeichen der Tabelle",
     "unmappedCount": "{{count}} ohne Entsprechung",
     "unmappedCount_other": "{{count}} ohne Entsprechung"
+  },
+  "emptyState": {
+    "journal": { "title": "Noch keine Einträge", "description": "Halte fest, was du erlebst, träumst und wirkst. Jeder Eintrag bekommt automatisch die Mondphase des Tages.", "action": "Erster Eintrag" },
+    "wiki": { "title": "Noch keine Artikel", "description": "Sammle Wissen zu Kräutern, Steinen und Symbolen." },
+    "tasks": { "title": "Alles erledigt", "description": "Keine offenen Aufgaben. Neue landen hier." },
+    "operations": { "title": "Noch keine Operationen", "description": "Plane Rituale mit Zutaten, Ablauf und Ergebnis." },
+    "altar": { "title": "Noch kein Altar", "description": "Gestalte einen Altar aus Hintergrund und Elementen." },
+    "altarLibrary": { "title": "Noch keine Elemente", "description": "Kerzen, Kristalle, Symbole – aus Elementen baust du deine Altäre." },
+    "lexicon": { "title": "Noch keine Sprachen", "description": "Leg eine Sprache an und füll sie mit Wörtern und Zeichen." },
+    "translate": { "title": "Noch nichts zu übersetzen", "description": "Leg zuerst eine Sprache an – dann übersetzt dieses Feld damit." },
+    "templates": { "title": "Noch keine Vorlagen", "description": "Speichere wiederkehrende Abläufe als Vorlage." },
+    "blocks": { "title": "Noch keine Blöcke", "description": "Bausteine, die du in Einträgen wiederverwendest." },
+    "tags": { "title": "Noch keine Tags", "description": "Vergib Tags beim Bearbeiten eines Eintrags oder leg hier einen an." },
+    "trash": { "title": "Papierkorb ist leer" }
   }
 }

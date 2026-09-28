@@ -95,6 +95,10 @@
   },
   "sidebar": {
     "allEmpty": "No entries yet",
+    "emptyHint": "New entries show up here",
+    "noResultsFor": "No matches for “{{query}}”",
+    "noResultsHint": "Try a different spelling",
+    "tasksEmpty": "No tasks yet",
     "showMore": "Show {{count}} more",
     "showMore_other": "Show {{count}} more"
   },
@@ -102,8 +106,6 @@
     "new": "New Operation",
     "untitled": "Untitled Operation",
     "placeholder": "Document your operation...",
-    "none": "No operations yet.",
-    "start": "Start your first operation.",
     "all": "All",
     "categories": {
       "sigils": "Sigils",
@@ -120,8 +122,6 @@
     "elementName": "Name…",
     "all": "All",
     "noElements": "No elements yet.",
-    "none": "No altars yet.",
-    "start": "Create your first altar.",
     "untitled": "Untitled Altar",
     "uploadImage": "Upload image",
     "favicon": "Icon",
@@ -223,8 +223,6 @@
     "newEntry": "New Entry",
     "untitled": "Untitled Entry",
     "placeholder": "Begin your record...",
-    "noEntries": "No journal entries yet.",
-    "startWriting": "Start writing your first entry.",
     "noPhase": "No moon phase"
   },
   "creation": {
@@ -271,8 +269,6 @@
       "sigil_charging": "Sigil Charging",
       "other": "Other"
     },
-    "noArticles": "No wiki articles yet.",
-    "startDocumenting": "Start documenting your practice.",
     "addIcon": "Add icon",
     "changeIcon": "Change icon",
     "removeIcon": "Remove icon"
@@ -357,7 +353,6 @@
       "newBlock": "New block",
       "builtIn": "Built-in blocks",
       "custom": "Your blocks",
-      "customHint": "Assemble a block of your own from fields — a ritual log with date, choice and checklist, say. Once saved, it appears under “Add block” in every entry.",
       "name": "Name",
       "namePlaceholder": "Name of the block",
       "fields": "Fields",
@@ -513,6 +508,11 @@
     "placeholderIn": "Search {{name}} …",
     "noResults": "No results found.",
     "noResultsShort": "No results",
+    "noResultsTitle": "No matches",
+    "noResultsFor": "Nothing found for “{{query}}”.",
+    "noResultsForFiltered": "Nothing found for “{{query}}” with the selected filters.",
+    "noResultsFiltered": "Nothing matches the selected filters.",
+    "resetFilters": "Reset filters",
     "operations": "Search operations…",
     "wikiArticles": "Search wiki articles…",
     "globalPlaceholder": "Search everything…",
@@ -524,7 +524,6 @@
     "showMore_other": "Show {{count}} more results"
   },
   "tags": {
-    "none": "No tags yet. Create one here or add tags while editing an entry.",
     "new": "New tag",
     "name": "Tag name…",
     "nameTaken": "This tag already exists",
@@ -761,7 +760,6 @@
   },
   "trash": {
     "title": "Trash",
-    "empty": "Trash is empty.",
     "emptyTrash": "Empty Trash",
     "restore": "Restore",
     "deletePermanently": "Delete permanently",
@@ -860,7 +858,6 @@
     },
     "newTemplate": "New template",
     "defaultName": "New template",
-    "emptyHint": "Build a template for entries that always start the same way – a ritual log with headings, fields and tags, say. Assign it to Journal, Wiki or Operations, or make it the default for new entries.",
     "name": "Name",
     "namePlaceholder": "Name of the template",
     "entryTitle": "Title of new entries",
@@ -899,6 +896,8 @@
     "entryCount_other": "{{count}} entries",
     "overview": {
       "title": "Defaults",
+      "hint": "Applies to new entries. The “All categories” row applies whenever a category has no default of its own.",
+      "category": "Category",
       "none": "No default",
       "fallback": "Otherwise: {{name}} (all categories)",
       "everyEntry": "Every new entry"
@@ -932,7 +931,6 @@
     "language": "Language",
     "newLanguage": "New language",
     "defaultName": "New language",
-    "emptyHint": "Create a language — Enochian, runes, one of your own — fill in its words and its alphabet, and the field below translates your text with it. Everything stays in your vault; nothing goes online.",
     "name": "Name",
     "namePlaceholder": "Name of the language",
     "stats": "Size",
@@ -957,7 +955,6 @@
     "letterFrom": "Character",
     "letterTo": "Becomes",
     "translate": "Translate",
-    "translateNoLanguage": "Create a language first — this field then translates with it.",
     "swapDirection": "Swap direction",
     "intoLanguage": "Into {{name}}",
     "outOfLanguage": "Out of {{name}}",
@@ -979,5 +976,19 @@
     "unmappedWord": "No character from the table",
     "unmappedCount": "{{count}} unmapped",
     "unmappedCount_other": "{{count}} unmapped"
+  },
+  "emptyState": {
+    "journal": { "title": "No entries yet", "description": "Record what you experience, dream and work. Every entry automatically gets the day's moon phase.", "action": "First entry" },
+    "wiki": { "title": "No articles yet", "description": "Collect knowledge about herbs, stones and symbols." },
+    "tasks": { "title": "All done", "description": "No open tasks. New ones land here." },
+    "operations": { "title": "No operations yet", "description": "Plan rituals with ingredients, steps and outcome." },
+    "altar": { "title": "No altar yet", "description": "Design an altar from a background and elements." },
+    "altarLibrary": { "title": "No elements yet", "description": "Candles, crystals, symbols – elements are what you build your altars from." },
+    "lexicon": { "title": "No languages yet", "description": "Create a language and fill it with words and characters." },
+    "translate": { "title": "Nothing to translate yet", "description": "Create a language first – then this field translates with it." },
+    "templates": { "title": "No templates yet", "description": "Save recurring routines as a template." },
+    "blocks": { "title": "No blocks yet", "description": "Building blocks you reuse across entries." },
+    "tags": { "title": "No tags yet", "description": "Add tags while editing an entry, or create one here." },
+    "trash": { "title": "Trash is empty" }
   }
 }

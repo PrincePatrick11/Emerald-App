@@ -8,8 +8,9 @@ import { ALL_CATEGORIES, TEMPLATE_ENTRY_TYPES, type AssignmentState, type Templa
 
 /**
  * Was der Zuweisungs-Dialog einer Vorlage und die Standardvorlagen-Übersicht
- * im Dashboard gemeinsam haben — damit beide dieselbe Tabelle zeigen: Journal
- * als eine Zeile, Wiki und Operationen als Spalten, eine Zeile je Kategorie.
+ * im Dashboard gemeinsam haben: die drei Stufen, ihre Icons und Namen. Die
+ * Tabelle (`AssignmentTable`) gehört nur dem Dialog — die Übersicht zeigt
+ * Journal als Spalte statt als eigene Zeile und baut ihre eigene.
  */
 
 /** Die Eintragsarten mit Kategorien — die Spalten der Tabelle. */
@@ -61,8 +62,6 @@ export function EntryTypeHeading({ entryType }: { entryType: TemplateEntryType }
 }
 
 interface AssignmentTableProps {
-  /** `dialog`: feste Spalten für die Schalter; `overview`: zwei Spalten, die sich die Breite teilen. */
-  variant: 'dialog' | 'overview';
   /** Der Inhalt einer Zelle. `rowLabel` benennt die Zeile — für Beschriftungen, die ohne sie mehrdeutig wären. */
   cell: (entryType: TemplateEntryType, category: string | null, rowLabel: string) => ReactNode;
   /** Eine Spalte hinter den Eintragsarten, je Kategorie-Zeile eine Zelle — der Dialog setzt dort beide zugleich. */
@@ -72,15 +71,15 @@ interface AssignmentTableProps {
 /**
  * Die Tabelle selbst: Journal als eine Zeile (die Zelle steht unter Wiki),
  * darunter der Kopf mit den Eintragsarten und die Zeilen „Alle Kategorien",
- * „Ohne Kategorie" und je Kategorie. Was in den Zellen steht, geben Dialog
- * und Übersicht vor.
+ * „Ohne Kategorie" und je Kategorie. Was in den Zellen steht, gibt der Dialog
+ * vor.
  */
-export function AssignmentTable({ variant, cell, extraColumn }: AssignmentTableProps) {
+export function AssignmentTable({ cell, extraColumn }: AssignmentTableProps) {
   const { t } = useTranslation();
   const categories = useCategoryStore((s) => s.categories);
-  const rowClass = `template-assign-row${variant === 'overview' ? ' template-assign-row--overview' : ''}`;
-  // Die Schalter im Dialog sind höher als die Namen in der Übersicht; das Label sitzt mittig zur ersten Zeile.
-  const labelPad = variant === 'dialog' ? 'pt-1' : 'pt-0.5';
+  const rowClass = 'template-assign-row';
+  // Die Schalter sind höher als eine Textzeile; das Label sitzt mittig zur ersten Zeile.
+  const labelPad = 'pt-1';
 
   const label = (text: string, sub?: string) => (
     <div className={`min-w-0 ${labelPad}`}>

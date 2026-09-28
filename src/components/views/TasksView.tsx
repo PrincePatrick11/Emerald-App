@@ -10,7 +10,8 @@ import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useAltarStore } from '../../store/altarStore';
 import { generateId } from '../../lib/helpers';
-import { viewTypeForEntryType } from '../../lib/modules';
+import { MODULES, viewTypeForEntryType } from '../../lib/modules';
+import EmptyState, { NoResults } from '../ui/EmptyState';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { useDeepLink } from '../../hooks/useDeepLink';
 import { categoriesUsedBy, categoryLabel, hasUncategorized } from '../../lib/categories';
@@ -185,6 +186,19 @@ export default function TasksView() {
   });
 
   const activeFilterCount = filterCategory.size + filterPriority.size;
+  const isFiltering = !!searchQuery || activeFilterCount > 0;
+  const clearFilters = () => {
+    setFilterCategory(new Set());
+    setFilterPriority(new Set());
+  };
+  // Custom-Modus: Dashboards eigenes „Keine Treffer" greift hier nicht.
+  const noResults = (
+    <NoResults
+      query={searchQuery}
+      filtered={activeFilterCount > 0}
+      onReset={() => { setSearchQuery(''); clearFilters(); }}
+    />
+  );
 
   const resolveTaskLinkTitle = useCallback((targetType: string, targetId: string) => {
     if (targetType === 'journal') {
@@ -302,29 +316,24 @@ export default function TasksView() {
             „Keine Ergebnisse". Nur, solange es überhaupt passende Aufgaben
             gibt — bleibt gar keine übrig, greift der Zweig ganz unten, der
             auch die Ansicht ohne Gruppen abdeckt. */}
-        {groupedTasks && sortedTasks.length > 0 && visibleCategories.length === 0 && !showUncatBlock && categories.length > 0 && !searchQuery && (
-          <p className="text-center py-20 text-stone-600 text-sm">{t('search.noResults')}</p>
-        )}
+        {groupedTasks && sortedTasks.length > 0 && visibleCategories.length === 0 && !showUncatBlock && categories.length > 0 && !searchQuery && noResults}
 
-        {categories.length === 0 && sortedTasks.length === 0 && !searchQuery && (
-          <div className="py-20 text-center">
-            <p className="text-stone-600 text-sm">{t('tasks.empty')}</p>
-            <button
-              onClick={() => handleCreateTask()}
-              className="mt-4 text-sm underline text-stone-500 hover:text-stone-300 transition-colors"
-            >
-              {t('tasks.newTask')}
-            </button>
-          </div>
+        {/* Ohne Suche und Filter heißt „nichts zu sehen": keine offene Aufgabe
+            (erledigte blendet der Schalter aus) — ob es Kategorien gibt, spielt
+            keine Rolle, die globalen gibt es immer. */}
+        {sortedTasks.length === 0 && !isFiltering && (
+          <EmptyState
+            icon={MODULES.tasks.icon}
+            title={t('emptyState.tasks.title')}
+            description={t('emptyState.tasks.description')}
+            actionLabel={t('tasks.newTask')}
+            onAction={() => handleCreateTask()}
+          />
         )}
 
         {/* Nicht nur bei Suchtext: ohne Gruppen kann auch ein Kategorie- oder
             Prioritäts-Chip alles wegfiltern, und dann stand hier nichts. */}
-        {sortedTasks.length === 0 && tasks.length > 0 && (
-          <div className="py-20 text-center">
-            <p className="text-stone-600 text-sm">{t('search.noResults')}</p>
-          </div>
-        )}
+        {sortedTasks.length === 0 && isFiltering && noResults}
     </>
   );
 
@@ -379,10 +388,7 @@ export default function TasksView() {
               if (next.has(v)) next.delete(v); else next.add(v);
               return next;
             }),
-            onClearAll: () => {
-              setFilterCategory(new Set());
-              setFilterPriority(new Set());
-            },
+            onClearAll: clearFilters,
           },
         }}
         items={sortedTasks}

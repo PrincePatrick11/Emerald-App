@@ -1,10 +1,11 @@
 import { Fragment, useLayoutEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, type LucideIcon } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import Button from './Button';
 import SidebarPortal from './SidebarPortal';
 import SidebarColumn, { SidebarActionBar } from './SidebarColumn';
 import CollapseChevron from './CollapseChevron';
+import EmptyState, { NoResults, type EmptyStateProps } from './EmptyState';
 import ListToolbar, { ListSearchField } from './ListToolbar';
 import { ENTRY_TITLE_HEADING_CLASSES } from './EntryDetailFrame';
 import FilterPanel, { type FilterPanelProps } from './FilterPanel';
@@ -39,14 +40,8 @@ type DashboardGrouping<T> =
     }
   | { mode: 'custom'; render: () => ReactNode };
 
-export interface DashboardEmptyState {
-  message: string;
-  actionLabel?: string;
-  onAction?: () => void;
-  className?: string;
-  messageClassName?: string;
-  actionClassName?: string;
-}
+/** Gerendert als `EmptyState` — das `icon` ist meist das Rail-Icon der Ansicht. */
+export type DashboardEmptyState = EmptyStateProps;
 
 export interface DashboardGroupBy {
   value: GroupingMode;
@@ -64,13 +59,11 @@ export interface DashboardFilters {
 interface DashboardBaseProps<T> {
   // Kopf — Titel und Suche im Hauptbereich, Aktionen, Toolbar und Filter in
   // der rechten Seitenleiste
+  /** Nur der Titel — kein Icon, keine Zahl: das Icon steht schon in der Rail,
+   *  gezählt wird in den Abschnitten darunter nicht (überall gleich schlicht). */
   title?: string;
-  /** Das Icon vor dem Titel — meist das Rail-Icon der Ansicht. */
-  titleIcon?: LucideIcon;
-  /** Die Zahl im Pill hinter dem Titel; weglassen = kein Pill. */
-  titleCount?: number;
-  /** Ersetzt die ganze Titelzeile — für Köpfe mit mehr als Icon, Titel und
-   *  Zahl (Home: zwei Zeilen; Papierkorb: `DashboardTitle` plus „Alle wählen"). */
+  /** Ersetzt die ganze Titelzeile — für Köpfe mit mehr als dem Titel
+   *  (Home: zwei Zeilen; Papierkorb: `DashboardTitle` plus „Alle wählen"). */
   headerLeft?: ReactNode;
   /** Beschrifteter Jade-Knopf, der die Leiste oben in der Seitenleiste füllt. */
   primaryAction?: { label: string; onClick: () => void };
@@ -106,8 +99,6 @@ interface DashboardBaseProps<T> {
   // Content
   items: T[];
   itemKey: (item: T) => string;
-  noResultsMessage?: string;
-  noResultsClassName?: string;
 
   /** Über dem Inhalt, auch im Leer- und „Keine Ergebnisse"-Fall — die
    *  Abschnitts-Überschrift des Hauptbereichs (Altar: „Altäre" mit Chevron,
@@ -158,32 +149,20 @@ const DEFAULT_CONTENT_CLASSNAME = 'flex-1 overflow-y-auto px-8 py-6';
 const DEFAULT_CARDS_CLASSNAME = 'grid grid-cols-3 gap-3';
 const DEFAULT_WIDE_CARDS_CLASSNAME = 'grid grid-cols-1 gap-3';
 const DEFAULT_LIST_CLASSNAME = 'space-y-1.5';
-const DEFAULT_EMPTY_WRAPPER_CLASSNAME = 'text-center py-20';
-// `max-w-md mx-auto`: ein Leer-Hinweis ist ein Satz, kein Fließtext über die
-// ganze Spaltenbreite — drei Aufrufer haben genau das vorher einzeln gesetzt.
-const DEFAULT_EMPTY_MESSAGE_CLASSNAME = 'text-stone-600 text-sm max-w-md mx-auto';
-const DEFAULT_EMPTY_ACTION_CLASSNAME = 'mt-4 text-xs text-stone-500 hover:text-stone-300 underline transition-colors';
-const DEFAULT_NO_RESULTS_CLASSNAME = 'text-center py-20 text-stone-600 text-sm';
 
 /**
- * Der Titel eines Dashboards im Hauptbereich: Icon, Titel, Zahl im Pill. Dashboard
- * rendert sie selbst aus `title`/`titleIcon`/`titleCount`; exportiert für
- * Köpfe, die hinter ihr noch etwas brauchen (`children`, der Papierkorb sein
- * „Alle wählen") und sie deshalb als `headerLeft` bauen.
+ * Der Titel eines Dashboards im Hauptbereich — nur der Titel. Dashboard rendert
+ * ihn selbst aus `title`; exportiert für Köpfe, die hinter ihm noch etwas
+ * brauchen (`children`, der Papierkorb sein „Alle wählen") und ihn deshalb als
+ * `headerLeft` bauen.
  */
-export function DashboardTitle({ icon: Icon, title, count, children }: {
-  icon?: LucideIcon;
+export function DashboardTitle({ title, children }: {
   title: string;
-  count?: number;
   children?: ReactNode;
 }) {
   return (
     <div className="flex items-center gap-3 min-w-0">
-      {Icon && <Icon size={18} className="text-stone-500 flex-shrink-0" />}
       <h1 className={`${ENTRY_TITLE_HEADING_CLASSES} truncate`}>{title}</h1>
-      {count !== undefined && (
-        <span className="text-xs text-stone-500 bg-stone-700/50 px-2 py-0.5 rounded-full">{count}</span>
-      )}
       {children}
     </div>
   );
@@ -192,15 +171,15 @@ export function DashboardTitle({ icon: Icon, title, count, children }: {
 /**
  * Die Trennlinien-Ueberschrift der Timeline-Gruppen — Label, danach eine Linie
  * bis zum Rand. Exportiert, weil auch ein ganzer Abschnitt so ueberschrieben
- * wird (die Bibliothek im Altar-Dashboard); dort mit Chevron und Zaehler.
+ * wird (die Bibliothek im Altar-Dashboard); dort mit Chevron. Bewusst ohne
+ * Zaehler — ein Abschnitt heisst nur, gezaehlt wird nirgends im Kopf.
  * Nicht CollapsibleGroupHeader: der hat keine Linie und traegt Kategoriezeilen,
  * nicht Abschnitte.
  */
 export function GroupDivider({
-  label, count, collapsed, onToggleCollapse,
+  label, collapsed, onToggleCollapse,
 }: {
   label: string;
-  count?: number;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }) {
@@ -211,7 +190,6 @@ export function GroupDivider({
       {onToggleCollapse
         ? <button onClick={onToggleCollapse} className={`${labelClass} transition-colors hover:text-stone-300`}>{label}</button>
         : <span className={labelClass}>{label}</span>}
-      {count != null && <span className="text-xs text-stone-500">({count})</span>}
       <div className="flex-1 h-px bg-stone-700/50" />
     </div>
   );
@@ -219,8 +197,6 @@ export function GroupDivider({
 
 export default function Dashboard<T>({
   title,
-  titleIcon,
-  titleCount,
   headerLeft,
   primaryAction,
   extraActions,
@@ -241,8 +217,6 @@ export default function Dashboard<T>({
   isEmpty,
   emptyState,
   hasNoResults,
-  noResultsMessage,
-  noResultsClassName = DEFAULT_NO_RESULTS_CLASSNAME,
   grouping,
   contentHeader,
   contentFooter,
@@ -266,30 +240,28 @@ export default function Dashboard<T>({
       </div>
     );
 
+  // Ein Knopf leert Suche und Filter zusammen — was davon aktiv war, ist egal.
+  const activeFilterCount = filters?.activeFilterCount ?? 0;
+  const canReset = !!search?.trim() || activeFilterCount > 0;
+  const noResults = (
+    <NoResults
+      query={search}
+      filtered={activeFilterCount > 0}
+      onReset={canReset ? () => {
+        onSearch?.('');
+        filters?.panelProps.onClearAll?.();
+      } : undefined}
+    />
+  );
+
   const renderContent = () => {
     // Custom mode owns 100% of its content — checked first so callers don't
     // need to pass meaningless isEmpty/hasNoResults values to opt out.
     if (grouping.mode === 'custom') return grouping.render();
 
-    if (isEmpty) {
-      return (
-        <div className={emptyState!.className ?? DEFAULT_EMPTY_WRAPPER_CLASSNAME}>
-          <p className={emptyState!.messageClassName ?? DEFAULT_EMPTY_MESSAGE_CLASSNAME}>{emptyState!.message}</p>
-          {emptyState!.actionLabel && emptyState!.onAction && (
-            <button
-              onClick={emptyState!.onAction}
-              className={emptyState!.actionClassName ?? DEFAULT_EMPTY_ACTION_CLASSNAME}
-            >
-              {emptyState!.actionLabel}
-            </button>
-          )}
-        </div>
-      );
-    }
+    if (isEmpty) return <EmptyState {...emptyState!} />;
 
-    if (hasNoResults) {
-      return <p className={noResultsClassName}>{noResultsMessage}</p>;
-    }
+    if (hasNoResults) return noResults;
 
     if (grouping.mode === 'flat') return renderItems(items);
 
@@ -317,9 +289,9 @@ export default function Dashboard<T>({
     const groups = grouping.keepEmptyGroups
       ? grouping.groups
       : grouping.groups.filter((group) => group.items.length > 0);
+    if (groups.length === 0) return noResults;
     return (
       <div className="space-y-6">
-        {groups.length === 0 && <p className={noResultsClassName}>{noResultsMessage}</p>}
         {groups.map((group) => (
           <div key={group.key ?? group.label}>
             {grouping.renderGroupHeader?.(group)}
@@ -413,7 +385,7 @@ export default function Dashboard<T>({
           unabhängig vom Einzug stehen, den eine View für ihren Inhalt setzt. */}
       <div className="px-8 pt-6 flex items-center gap-4 flex-shrink-0">
         <div className="flex-1 min-w-0">
-          {headerLeft ?? (title && <DashboardTitle icon={titleIcon} title={title} count={titleCount} />)}
+          {headerLeft ?? (title && <DashboardTitle title={title} />)}
         </div>
         {onSearch && (
           <ListSearchField

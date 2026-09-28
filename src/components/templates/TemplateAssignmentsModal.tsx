@@ -101,7 +101,6 @@ export default function TemplateAssignmentsModal({ templateId, name, assignments
         </div>
 
         <AssignmentTable
-          variant="dialog"
           cell={cell}
           extraColumn={{
             heading: <p className="label-xs" title={t('templates.assign.bothHint')}>{t('templates.assign.both')}</p>,

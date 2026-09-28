@@ -91,19 +91,20 @@ export default function LeftSidebarRail() {
         {MODULE_LIST.map((mod) => (
           <Fragment key={mod.id}>
             {/* Das Lexikon ist kein Eintragsmodul, steht aber oben zwischen
-                Wiki und Altar statt unten bei Bloecken und Vorlagen. */}
+                Wiki und Altar statt unten bei Vorlagen und Bloecken. */}
             {mod.id === 'altar' && viewButton('lexicon', AUX_VIEWS.lexicon)}
             {viewButton(mod.id, mod)}
           </Fragment>
         ))}
       </div>
 
-      {/* Bottom nav — always visible: Blocks/Templates/Tags/Categories/Trash, then Vault/Settings */}
+      {/* Bottom nav — always visible, von unten gelesen: Settings, Vault,
+          Trash, Tags, Categories, Blocks, Templates */}
       <div className="sidebar-bottom-bar w-full flex-1 flex flex-col items-center justify-end gap-1 py-2">
-        {viewButton('blocks', AUX_VIEWS.blocks)}
         {viewButton('templates', AUX_VIEWS.templates)}
-        {viewButton('tags', AUX_VIEWS.tags)}
+        {viewButton('blocks', AUX_VIEWS.blocks)}
         {viewButton('categories', AUX_VIEWS.categories)}
+        {viewButton('tags', AUX_VIEWS.tags)}
         {viewButton('trash', AUX_VIEWS.trash)}
         <RailButton onClick={() => setVaultOpen(true)} title={t('nav.vaults')}>
           {/* 17px nur fuers Emoji: es traegt keine Strichstaerke und wirkt

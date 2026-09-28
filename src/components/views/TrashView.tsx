@@ -16,6 +16,7 @@ import { groupBy, groupByMonth } from '../../lib/groupBy';
 import { categoryLabel } from '../../lib/categories';
 import Dashboard, { DashboardTitle } from '../ui/Dashboard';
 import Button from '../ui/Button';
+import EmptyState, { NoResults } from '../ui/EmptyState';
 import InlineConfirm from '../ui/InlineConfirm';
 import type { TrashedItem } from '../../types';
 
@@ -379,10 +380,8 @@ export default function TrashView() {
   // min-w-0/truncate und flex-wrap: die beiden Slots landen im Seitenleisten-
   // Experiment in einer schmalen Spalte (Dashboard portalt den Kopf dorthin)
   // und müssen dort umbrechen statt überzulaufen.
-  // Der leere Papierkorb zeigt keine Null — anders als die Listen, deren
-  // Null etwas sagt („noch keine Tags").
   const headerLeft = (
-    <DashboardTitle icon={AUX_VIEWS.trash.icon} title={t('trash.title')} count={items.length > 0 ? items.length : undefined}>
+    <DashboardTitle title={t('trash.title')}>
       {items.length > 0 && (
         <button
           onClick={allSelected ? deselectAll : selectAll}
@@ -429,14 +428,15 @@ export default function TrashView() {
       {loading && <p className="text-sm text-stone-600">{t('common.loading')}</p>}
 
       {!loading && items.length === 0 && (
-        <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
-          <Trash2 size={40} className="text-stone-700" />
-          <p className="text-stone-600 text-sm">{t('trash.empty')}</p>
-        </div>
+        <EmptyState
+          icon={AUX_VIEWS.trash.icon}
+          title={t('emptyState.trash.title')}
+          description={retentionDays === null ? t('trash.retentionNoteNever') : t('trash.retentionNote', { count: retentionDays })}
+        />
       )}
 
       {!loading && items.length > 0 && matching.length === 0 && (
-        <p className="text-center py-20 text-stone-600 text-sm">{t('search.noResults')}</p>
+        <NoResults query={search} onReset={() => setSearch('')} />
       )}
 
       {!loading && matching.length > 0 && (
@@ -460,7 +460,6 @@ export default function TrashView() {
       headerRight={headerRight}
       search={search}
       onSearch={setSearch}
-      contentClassName="flex-1 overflow-y-auto p-6"
       view={trashPrefs.view}
       sort={trashPrefs.sort}
       onView={(v) => setTrashPrefs({ view: v })}

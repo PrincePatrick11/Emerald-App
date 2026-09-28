@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { GripVertical, Pencil, Trash2 } from 'lucide-react';
-import { AUX_VIEWS, CATEGORY_MODULE_IDS } from '../../lib/modules';
+import { CATEGORY_MODULE_IDS } from '../../lib/modules';
 import { categoryLabel, categoryUsageCounts, emptyCategoryUsage } from '../../lib/categories';
 import { CATEGORY_NAME_TAKEN, useCategoryStore } from '../../store/categoryStore';
 import { useWikiStore } from '../../store/wikiStore';
@@ -13,6 +13,7 @@ import { useUndoStore } from '../../store/undoStore';
 import { useDeepLink } from '../../hooks/useDeepLink';
 import { generateId } from '../../lib/helpers';
 import Button from '../ui/Button';
+import { NoResults } from '../ui/EmptyState';
 import Dashboard from '../ui/Dashboard';
 import EmojiPicker from '../ui/EmojiPicker';
 import InlineConfirm from '../ui/InlineConfirm';
@@ -342,8 +343,6 @@ export default function CategoriesView() {
   return (
     <Dashboard<Category>
       title={t('nav.categories')}
-      titleIcon={AUX_VIEWS.categories.icon}
-      titleCount={categories.length}
       primaryAction={{ label: t('categories.add'), onClick: () => openForm({ mode: 'add' }, '', DEFAULT_EMOJI) }}
       search={search}
       onSearch={setSearch}
@@ -354,7 +353,7 @@ export default function CategoriesView() {
         render: () => (
           <div className="max-w-2xl">
             {query
-              ? visualCategories.length === 0 && <p className="text-sm text-stone-600">{t('search.noResults')}</p>
+              ? visualCategories.length === 0 && <NoResults query={search} onReset={() => setSearch('')} />
               : <p className="text-xs text-stone-600 mb-3">{t('categories.dragHint')}</p>}
             <div ref={listRef} className="space-y-1">
               {visualCategories.map(renderRow)}

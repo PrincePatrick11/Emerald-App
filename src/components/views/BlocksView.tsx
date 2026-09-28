@@ -103,7 +103,6 @@ function BuiltInBlocksSection({ query }: { query: string }) {
     <div className="mt-8">
       <GroupDivider
         label={t('blocks.library.builtIn')}
-        count={presets.length}
         collapsed={collapsed}
         onToggleCollapse={toggleCollapsed}
       />
@@ -234,8 +233,6 @@ function BlockList({ usage, onCreate, onDelete }: {
   return (
     <Dashboard<BlockDefinition>
       title={t('nav.blocks')}
-      titleIcon={AUX_VIEWS.blocks.icon}
-      titleCount={definitions.length}
       primaryAction={{ label: t('blocks.library.newBlock'), onClick: onCreate }}
       view={view}
       sort={sort}
@@ -252,16 +249,16 @@ function BlockList({ usage, onCreate, onDelete }: {
         : { mode: 'flat' }}
       isEmpty={!customCollapsed && definitions.length === 0}
       emptyState={{
-        message: t('blocks.library.customHint'),
+        icon: AUX_VIEWS.blocks.icon,
+        title: t('emptyState.blocks.title'),
+        description: t('emptyState.blocks.description'),
         actionLabel: t('blocks.library.newBlock'),
         onAction: onCreate,
       }}
       hasNoResults={!customCollapsed && sorted.length === 0}
-      noResultsMessage={t('search.noResults')}
       contentHeader={
         <GroupDivider
           label={t('blocks.library.custom')}
-          count={sorted.length}
           collapsed={customCollapsed}
           onToggleCollapse={toggleCustom}
         />

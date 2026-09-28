@@ -154,8 +154,6 @@ function LanguageList({ onCreate, onDelete }: {
   return (
     <Dashboard<Language>
       title={t('nav.lexicon')}
-      titleIcon={AUX_VIEWS.lexicon.icon}
-      titleCount={languages.length}
       primaryAction={{ label: t('lexicon.newLanguage'), onClick: onCreate }}
       view={prefs.view}
       sort={prefs.sort}
@@ -174,16 +172,16 @@ function LanguageList({ onCreate, onDelete }: {
       }
       isEmpty={!collapsed && languages.length === 0}
       emptyState={{
-        message: t('lexicon.emptyHint'),
+        icon: AUX_VIEWS.lexicon.icon,
+        title: t('emptyState.lexicon.title'),
+        description: t('emptyState.lexicon.description'),
         actionLabel: t('lexicon.newLanguage'),
         onAction: onCreate,
       }}
       hasNoResults={!collapsed && filtered.length === 0}
-      noResultsMessage={t('search.noResults')}
       contentHeader={
         <GroupDivider
           label={t('lexicon.languages')}
-          count={filtered.length}
           collapsed={collapsed}
           onToggleCollapse={toggleCollapsed}
         />

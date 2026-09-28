@@ -167,8 +167,6 @@ function TemplateList({ entries, onCreate, onDelete }: {
   return (
     <Dashboard<Template>
       title={t('nav.templates')}
-      titleIcon={AUX_VIEWS.templates.icon}
-      titleCount={templates.length}
       primaryAction={{ label: t('templates.newTemplate'), onClick: onCreate }}
       view={prefs.view}
       sort={prefs.sort}
@@ -187,16 +185,16 @@ function TemplateList({ entries, onCreate, onDelete }: {
       }
       isEmpty={!collapsed && templates.length === 0}
       emptyState={{
-        message: t('templates.emptyHint'),
+        icon: AUX_VIEWS.templates.icon,
+        title: t('emptyState.templates.title'),
+        description: t('emptyState.templates.description'),
         actionLabel: t('templates.newTemplate'),
         onAction: onCreate,
       }}
       hasNoResults={!collapsed && filtered.length === 0}
-      noResultsMessage={t('search.noResults')}
       contentHeader={
         <GroupDivider
           label={t('nav.templates')}
-          count={filtered.length}
           collapsed={collapsed}
           onToggleCollapse={toggleCollapsed}
         />
