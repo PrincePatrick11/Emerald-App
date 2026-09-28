@@ -90,7 +90,8 @@ export default function BlocksView() {
  * Die eingebauten Blöcke unter den eigenen, gebaut wie die Bibliothek unter
  * den Altären — dieselbe Liste wie „Block hinzufügen" im Eintrag. Nur zum
  * Nachschlagen: anlegen oder bearbeiten lässt sich an ihnen nichts, darum
- * schlichte Kacheln statt klickbarer Dashboard-Zeilen. Die Suche filtert mit.
+ * ruhende Kacheln (Rahmen, drei Spalten, kein Hover) statt klickbarer
+ * Dashboard-Zeilen. Die Suche filtert mit.
  */
 function BuiltInBlocksSection({ query }: { query: string }) {
   const { t } = useTranslation();
@@ -111,18 +112,19 @@ function BuiltInBlocksSection({ query }: { query: string }) {
           {presets.length === 0
             ? <p className="text-xs text-stone-700 px-1 py-1">{t('search.noResults')}</p>
             : (
-              // Bewusst ohne Rahmen und Hover: nichts daran sieht klickbar aus.
-              <ul className="grid [grid-template-columns:repeat(auto-fill,minmax(11rem,1fr))] gap-x-4">
+              // Kacheln mit Rahmen, aber ohne Hover und Zeiger: anlegen oder
+              // öffnen lässt sich an ihnen nichts, sie zeigen nur, was es gibt.
+              <ul className="grid grid-cols-3 gap-2">
                 {presets.map((preset) => {
                   const Icon = preset.icon;
                   return (
                     <li
                       key={preset.id}
                       title={preset.descriptionKey ? t(preset.descriptionKey) : undefined}
-                      className="flex items-center gap-2 px-1 py-1.5 min-w-0 text-stone-400"
+                      className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-surface-1)] px-3 py-2.5"
                     >
-                      <Icon size={14} className="flex-shrink-0 text-stone-500" />
-                      <span className="text-sm truncate">{t(preset.labelKey)}</span>
+                      <Icon size={16} className="flex-shrink-0 text-stone-400" />
+                      <span className="truncate text-sm text-stone-200">{t(preset.labelKey)}</span>
                     </li>
                   );
                 })}
