@@ -26,12 +26,12 @@ function FilterRow({ active, onClick, lead, label, count }: {
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`filter-row flex items-center gap-2.5 w-full px-3 py-1.5 rounded-md text-sm text-left${active ? ' filter-row--active' : ''}`}
+      className={`filter-row flex items-center gap-2.5 w-full px-3 py-1.5 rounded-md text-[13px] text-left${active ? ' filter-row--active' : ''}`}
     >
       <span className="w-4 flex-shrink-0 flex items-center justify-center leading-none">{lead}</span>
       <span className="flex-1 min-w-0 truncate">{label}</span>
       {count !== undefined && (
-        <span className={`filter-row-count text-xs tabular-nums${count === 0 ? ' filter-row-count--zero' : ''}`}>{count}</span>
+        <span className={`filter-row-count text-[11px] tabular-nums${count === 0 ? ' filter-row-count--zero' : ''}`}>{count}</span>
       )}
     </button>
   );

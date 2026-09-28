@@ -2,13 +2,13 @@ import { ChevronDown, ChevronsUpDown } from 'lucide-react';
 import Dropdown, { type DropdownOption } from './Dropdown';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 
-/** Der Feld-Look eine Stufe größer: `text-sm` statt `text-xs`, `py-2`
- *  statt `py-1.5` — ausgeschrieben statt überschrieben, damit keine zwei
+/** Der Feld-Look mit der Schrift der Filterzeilen darunter: 13px statt
+ *  `text-xs` — ausgeschrieben statt überschrieben, damit keine zwei
  *  Tailwind-Klassen um dieselbe Eigenschaft streiten. Sonst dieselben
  *  Klassen wie OP_PROP_SELECT_CLASSES (die Theme-Brücken hängen an
  *  `op-prop-select`). */
 const SIDEBAR_SELECT_CLASSES =
-  'op-prop-select w-full bg-stone-800/60 rounded-md px-3 py-2 text-sm text-stone-300 outline-none ' +
+  'op-prop-select w-full bg-stone-800/60 rounded-md px-3 py-1.5 text-[13px] text-stone-300 outline-none ' +
   'border border-stone-700/40 focus:border-stone-600 transition-colors';
 
 interface Props<T extends string> {
@@ -19,7 +19,7 @@ interface Props<T extends string> {
   triggerText?: string;
   align?: 'left' | 'right';
   /** `sidebar`: die Auswahl der Dashboard-Seitenleiste (SortSelect) — das
-   *  Icon der gewählten Option vorn, `text-sm`, etwas höher, Hoch/Runter-
+   *  Icon der gewählten Option vorn, 13px wie die Filterzeilen, Hoch/Runter-
    *  Chevron; Icon und Chevron fluchten mit den `SwitchRow`s darunter. */
   variant?: 'field' | 'sidebar';
   /** aria-label des Auslösers, wenn sein Text allein nicht sagt, was er wählt. */
