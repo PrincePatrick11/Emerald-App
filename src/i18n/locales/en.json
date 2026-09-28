@@ -870,7 +870,6 @@
     "entryTitlePlaceholder": "Leave empty for the usual title",
     "content": "Content",
     "contentPlaceholder": "What every entry from this template starts with …",
-    "assignments": "Assignment & default",
     "assign": {
       "open": "Set assignment & default …",
       "title": "Assignment & default – {{name}}",
@@ -888,9 +887,12 @@
       "heldBy": "Default: {{name}}",
       "apply": "Apply"
     },
-    "noAssignments": "Available in every entry",
     "allCategories": "All categories",
     "missingCategory": "Deleted category",
+    "availableEverywhere": "Everywhere",
+    "assignmentCount": "{{count}} assignment",
+    "assignmentCount_other": "{{count}} assignments",
+    "assignment": "Assignment",
     "usage": "Usage",
     "usedIn": "Used in {{count}} entry",
     "usedIn_other": "Used in {{count}} entries",

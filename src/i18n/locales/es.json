@@ -870,7 +870,6 @@
     "entryTitlePlaceholder": "Déjalo vacío para el título habitual",
     "content": "Contenido",
     "contentPlaceholder": "Lo que trae cada entrada creada con esta plantilla …",
-    "assignments": "Asignación y predeterminada",
     "assign": {
       "open": "Definir asignación y predeterminada …",
       "title": "Asignación y predeterminada – {{name}}",
@@ -888,9 +887,12 @@
       "heldBy": "Predeterminada: {{name}}",
       "apply": "Aplicar"
     },
-    "noAssignments": "Disponible en todas las entradas",
     "allCategories": "Todas las categorías",
     "missingCategory": "Categoría eliminada",
+    "availableEverywhere": "En todas partes",
+    "assignmentCount": "{{count}} asignación",
+    "assignmentCount_other": "{{count}} asignaciones",
+    "assignment": "Asignación",
     "usage": "Uso",
     "usedIn": "Usado en {{count}} entrada",
     "usedIn_other": "Usado en {{count}} entradas",

@@ -73,18 +73,17 @@ export default function TemplateEditor({ template, entries, onClose, onDelete }:
           onChange={(icon) => void setIcon(icon)}
           fallback={DEFAULT_TEMPLATE_ICON}
         />
+        <TemplateAssignments
+          templateId={template.id}
+          name={templateLabel(t, draft)}
+          assignments={draft.assignments}
+          onChange={(assignments) => patch({ assignments })}
+        />
       </PropertiesSection>
 
       <LinkedEntriesField content={draft.content} />
 
       <TagsField tags={draft.tags} onChange={(tags) => patch({ tags })} />
-
-      <TemplateAssignments
-        templateId={template.id}
-        name={templateLabel(t, draft)}
-        assignments={draft.assignments}
-        onChange={(assignments) => patch({ assignments })}
-      />
 
       <BlockSidebarArea />
 

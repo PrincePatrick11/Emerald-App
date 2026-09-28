@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SlidersHorizontal, Star } from 'lucide-react';
-import SidebarSection, { SidebarEmpty } from '../sidebar/fields/SidebarSection';
+import { ChevronDown, SlidersHorizontal, Star } from 'lucide-react';
+import { EditPropertyRow } from '../sidebar/fields/EditProperties';
+import { SidebarItemRow } from '../sidebar/fields/SidebarSection';
 import { useCategoryStore } from '../../store/categoryStore';
+import { MODULES, viewTypeForEntryType } from '../../lib/modules';
 import {
   ALL_CATEGORIES, assignmentKey, sameAssignments, TEMPLATE_ENTRY_TYPES, type TemplateAssignment,
 } from '../../lib/blocks/templates';
-import { useAssignmentLabel } from './useAssignmentLabel';
+import { useAssignmentLabel, useAssignmentParts } from './useAssignmentLabel';
 import TemplateAssignmentsModal from './TemplateAssignmentsModal';
 
 interface Props {
@@ -27,14 +29,17 @@ function categoryRank(category: string | null, order: ReadonlyMap<string, number
 }
 
 /**
- * Zuweisung und Standard einer Vorlage in ihrer Seitenleiste: was gerade gilt,
- * als Liste mit Stern für die Standards, und der Knopf zum Dialog, in dem man
- * beides festlegt (`TemplateAssignmentsModal`) — dort steht auch, wessen
- * Standard ein Stern ablöst; ersetzt wird erst mit „Fertig".
+ * „Zuweisung" als Eigenschaft einer Vorlage: ein Wert-Knopf („Überall" oder
+ * die Zahl der Zuweisungen), der den Dialog öffnet, in dem man Zuweisung und
+ * Standard festlegt (`TemplateAssignmentsModal`) — dort steht auch, wessen
+ * Standard ein Stern ablöst; ersetzt wird erst mit „Fertig". Darunter als
+ * gewöhnliche Zeilen, was gerade gilt: Modul-Icon, Kategorie, rechts der Stern
+ * eines Standards.
  */
 export default function TemplateAssignments({ templateId, name, assignments, onChange }: Props) {
   const { t } = useTranslation();
   const label = useAssignmentLabel();
+  const parts = useAssignmentParts();
   const [modalOpen, setModalOpen] = useState(false);
 
   const categories = useCategoryStore((s) => s.categories);
@@ -44,35 +49,44 @@ export default function TemplateAssignments({ templateId, name, assignments, onC
     TEMPLATE_ENTRY_TYPES.indexOf(a.entryType) - TEMPLATE_ENTRY_TYPES.indexOf(b.entryType)
     || categoryRank(a.category, order) - categoryRank(b.category, order));
 
+  const summary = sorted.length === 0 ? t('templates.availableEverywhere') : t('templates.assignmentCount', { count: sorted.length });
+
   return (
     <>
-      {/* Derselbe Abschnitt wie Verlinkungen, Tags und Blöcke: gleicher Kopf, Zähler, gemerktes Auf/Zu. */}
-      <SidebarSection storageKey="template-assignments-open" label={t('templates.assignments')} count={sorted.length}>
-        {sorted.length === 0 ? (
-          <SidebarEmpty>{t('templates.noAssignments')}</SidebarEmpty>
-        ) : (
-          <ul>
-            {sorted.map((a) => (
-              // Kein Icon vorn: der Text beginnt, wo die Icons der übrigen Zeilen beginnen.
-              <li key={assignmentKey(a.entryType, a.category)} className="flex items-center gap-2 h-8 pl-2.5 pr-3 text-[13px] min-w-0">
-                <span className="flex-1 min-w-0 truncate text-[var(--text-primary)]">{label(a.entryType, a.category)}</span>
-                {a.isDefault && (
-                  <span className="template-default-star" title={t('templates.assign.default')}>
-                    <Star size={14} fill="currentColor" />
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+      <EditPropertyRow icon={<SlidersHorizontal size={14} />} label={t('templates.assignment')}>
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          aria-label={`${t('templates.assignment')}: ${summary}`}
+          title={t('templates.assign.open')}
+          className="prop-value-btn"
+          onClick={() => setModalOpen(true)}
+        >
+          <span className="min-w-0 truncate">{summary}</span>
+          <ChevronDown size={13} />
+        </button>
+      </EditPropertyRow>
 
-        <div className="sidebar-section-actions sidebar-section-actions--plain">
-          <button type="button" className="sidebar-section-button" onClick={() => setModalOpen(true)}>
-            <SlidersHorizontal size={13} className="flex-shrink-0" />
-            <span className="min-w-0 truncate">{t('templates.assign.open')}</span>
-          </button>
-        </div>
-      </SidebarSection>
+      {/* Wie die übrigen Zeilen der Seitenleiste: Modul-Icon, Kategorie, rechts
+          der Stern eines Standards. Ein Klick öffnet ebenfalls den Dialog. */}
+      {sorted.map((a) => {
+        const { type, place } = parts(a.entryType, a.category);
+        const Icon = MODULES[viewTypeForEntryType(a.entryType)].icon;
+        return (
+          <SidebarItemRow
+            key={assignmentKey(a.entryType, a.category)}
+            icon={<Icon size={14} />}
+            label={place ?? type}
+            title={label(a.entryType, a.category)}
+            onClick={() => setModalOpen(true)}
+            action={a.isDefault ? (
+              <span className="template-default-star w-6 justify-center" title={t('templates.assign.default')}>
+                <Star size={14} fill="currentColor" />
+              </span>
+            ) : <span className="w-6 flex-shrink-0" />}
+          />
+        );
+      })}
 
       {modalOpen && (
         <TemplateAssignmentsModal

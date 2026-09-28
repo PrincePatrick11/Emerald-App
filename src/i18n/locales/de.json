@@ -870,7 +870,6 @@
     "entryTitlePlaceholder": "Leer lassen für den üblichen Titel",
     "content": "Inhalt",
     "contentPlaceholder": "Was jeder Eintrag aus dieser Vorlage mitbringt …",
-    "assignments": "Zuweisung & Standard",
     "assign": {
       "open": "Zuweisung & Standard festlegen …",
       "title": "Zuweisung & Standard – {{name}}",
@@ -888,9 +887,12 @@
       "heldBy": "Standard: {{name}}",
       "apply": "Übernehmen"
     },
-    "noAssignments": "In jedem Eintrag verfügbar",
     "allCategories": "Alle Kategorien",
     "missingCategory": "Gelöschte Kategorie",
+    "availableEverywhere": "Überall",
+    "assignmentCount": "{{count}} Zuweisung",
+    "assignmentCount_other": "{{count}} Zuweisungen",
+    "assignment": "Zuweisung",
     "usage": "Verwendung",
     "usedIn": "In {{count}} Eintrag verwendet",
     "usedIn_other": "In {{count}} Einträgen verwendet",

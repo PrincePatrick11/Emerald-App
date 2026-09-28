@@ -1450,7 +1450,7 @@ html[data-theme] .sidebar-add-field input::placeholder,
 
 /* Die Knöpfe am Ende eines Abschnitts, unter einer Linie: volle Breite,
    zentriert, untereinander — „Block hinzufügen" und „Vorlage einfügen"
-   unter den Blöcken, „Zuweisung & Standard festlegen …" einer Vorlage. */
+   unter den Blöcken. */
 .sidebar-section-actions {
   display: flex;
   flex-direction: column;
@@ -1458,14 +1458,6 @@ html[data-theme] .sidebar-add-field input::placeholder,
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid var(--field-border);
-}
-
-/* Ohne Linie — der Knopf einer Vorlage unter ihren Zuweisungen. */
-.sidebar-section-actions--plain,
-html[data-theme] .sidebar-section-actions--plain {
-  margin-top: 6px;
-  padding-top: 0;
-  border-top: none;
 }
 
 .sidebar-section-button {

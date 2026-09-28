@@ -913,8 +913,9 @@ replace it. `IconToggleGroup.value` now accepts `null`, which the modal's "Both"
 Wiki and Operations disagree, so the segment row shows no option pressed rather than picking one
 side arbitrarily. `TemplateAssignments` (the sidebar) shows the current assignments read-only —
 sorted the same way the table lists them (`TEMPLATE_ENTRY_TYPES` order, then the categories'
-own order) — with a star for a default (which default it replaces is said in the modal), in a `SidebarSection` (count in the header,
-collapsed state remembered) and a full-width button under a divider that opens the modal; the modal's
+own order) — with a star for a default (which default it replaces is said in the modal), as the "Assignment" property of the Properties section: a value button ("Everywhere" or the
+count) that opens the modal, and below it one ordinary `SidebarItemRow` per assignment (module
+icon, category) that opens the modal too; the modal's
 "Apply" only calls `onChange` when `sameAssignments` says something actually changed, so a
 no-op edit leaves the draft untouched. `TemplateDefaultsOverview` is the dashboard's read-only
 view of the same assignments, laid out like the modal but with its own markup rather than

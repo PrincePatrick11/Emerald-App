@@ -870,7 +870,6 @@
     "entryTitlePlaceholder": "Laisser vide pour le titre habituel",
     "content": "Contenu",
     "contentPlaceholder": "Ce que chaque entrée issue de ce modèle contient au départ …",
-    "assignments": "Affectation et défaut",
     "assign": {
       "open": "Définir l’affectation et le défaut …",
       "title": "Affectation et défaut – {{name}}",
@@ -888,9 +887,12 @@
       "heldBy": "Par défaut : {{name}}",
       "apply": "Appliquer"
     },
-    "noAssignments": "Disponible dans chaque entrée",
     "allCategories": "Toutes les catégories",
     "missingCategory": "Catégorie supprimée",
+    "availableEverywhere": "Partout",
+    "assignmentCount": "{{count}} affectation",
+    "assignmentCount_other": "{{count}} affectations",
+    "assignment": "Affectation",
     "usage": "Utilisation",
     "usedIn": "Utilisé dans {{count}} entrée",
     "usedIn_other": "Utilisé dans {{count}} entrées",
