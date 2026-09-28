@@ -90,7 +90,8 @@ export default function AltarReadingSummary() {
         <SidebarPropertyRow
           icon={<Proportions size={14} />}
           label={t('altar.summaryFormat')}
-          value={<span className="truncate font-mono font-normal text-xs">{activeAltar.resolution}</span>}
+          // Wie die übrigen Werte gesetzt; nur das „x“ der Auflösung wird zum Malzeichen.
+          value={activeAltar.resolution.replace('x', ' × ')}
         />
         {backgroundInfo && (
           <SidebarPropertyRow
