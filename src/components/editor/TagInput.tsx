@@ -11,9 +11,12 @@ interface TagInputProps {
   tags: string[];
   onChange: (tags: string[]) => void;
   readOnly?: boolean;
+  /** Nur im Lesen: `row` macht die Chips 24px hoch — für die Seitenleiste,
+   *  wo sie in einer Zeile mit den Listenzeilen darüber stehen. */
+  chipSize?: 'default' | 'row';
 }
 
-export default function TagInput({ tags, onChange, readOnly = false }: TagInputProps) {
+export default function TagInput({ tags, onChange, readOnly = false, chipSize = 'default' }: TagInputProps) {
   const { t } = useTranslation();
   const { tags: allTags, ensureTag, getByName } = useTagStore(
     useShallow((s) => ({ tags: s.tags, ensureTag: s.ensureTag, getByName: s.getByName }))
@@ -76,7 +79,7 @@ export default function TagInput({ tags, onChange, readOnly = false }: TagInputP
           return (
             <span
               key={name}
-              className="px-2 py-0.5 rounded-full text-xs font-medium"
+              className={`px-2 rounded-full text-xs font-medium ${chipSize === 'row' ? 'h-6 inline-flex items-center' : 'py-0.5'}`}
               style={{
                 backgroundColor: tag ? `${tag.color}20` : '#ffffff10',
                 color: tag?.color ?? '#a8a29e',

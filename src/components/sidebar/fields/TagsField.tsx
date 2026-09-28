@@ -29,7 +29,9 @@ export function TagsSection({ tags }: { tags: string[] }) {
     <SidebarSection storageKey="entry-sidebar-tags-open" label={t('properties.tags')} count={tags.length}>
       {tags.length === 0
         ? <SidebarEmpty>{t('properties.noTags')}</SidebarEmpty>
-        : <div className="pl-[9px] pr-3 pt-0.5"><TagInput tags={tags} onChange={() => {}} readOnly /></div>}
+        // Wie eine Zeile: der Chip beginnt, wo die Icons der Zeilen beginnen
+        // (10px), und 24px Chip plus `py-1` ergeben ihre 32px Höhe.
+        : <div className="pl-2.5 pr-3 py-1"><TagInput tags={tags} onChange={() => {}} readOnly chipSize="row" /></div>}
     </SidebarSection>
   );
 }
