@@ -78,7 +78,7 @@ function BlockOutline({ session }: { session: BlockSession }) {
               }}
             />
             {settings !== null && (
-              <div className="mt-1 mb-2 rounded border border-stone-700/50 bg-stone-900/40 px-2 py-2">{settings}</div>
+              <div className="mx-2 mt-1 mb-2 rounded border border-stone-700/50 bg-stone-900/40 px-2 py-2">{settings}</div>
             )}
           </div>
         );

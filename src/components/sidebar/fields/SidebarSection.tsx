@@ -10,6 +10,10 @@ import { usePersistedFlag } from '../../../hooks/usePersistedFlag';
  *
  * Die Abschnitte stehen ohne Trennlinie untereinander; den Abstand zwischen
  * ihnen setzt der Aufrufer (`RightSidebar`: `gap-5` im Körper).
+ *
+ * Kopf und Inhalt fluchten mit der Kante der Leiste (wie „Typ“ im
+ * Bearbeiten): der Inhalt rückt um `-mx-2` heraus und die Zeilen mit `px-2`
+ * wieder hinein — nur ihre Hover-Fläche ragt in den Rand.
  */
 export default function SidebarSection({ storageKey, label, count, children }: {
   storageKey: string;
@@ -20,12 +24,12 @@ export default function SidebarSection({ storageKey, label, count, children }: {
   const [open, toggle] = usePersistedFlag(storageKey, true);
   return (
     <section aria-label={label}>
-      <button type="button" onClick={toggle} aria-expanded={open} className="sidebar-section-title w-full px-1">
+      <button type="button" onClick={toggle} aria-expanded={open} className="sidebar-section-title w-full">
         {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         {label}
         {count !== undefined && <span className="sidebar-section-count">{count}</span>}
       </button>
-      {open && <div className="mt-1.5 flex flex-col gap-px">{children}</div>}
+      {open && <div className="-mx-2 mt-1.5 flex flex-col gap-px">{children}</div>}
     </section>
   );
 }
@@ -46,7 +50,7 @@ export function SidebarPropertyRow({ icon, label, value, muted = false }: {
   muted?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] min-w-0">
+    <div className="flex items-center gap-2.5 px-2 py-1.5 text-[13px] min-w-0">
       <RowIcon>{icon}</RowIcon>
       <span className="sidebar-prop-label flex-shrink-0">{label}</span>
       {/* Kein `truncate` am Flex-Container selbst: mit `justify-end` schnitte er
@@ -77,7 +81,7 @@ export function SidebarItemRow({ icon, label, meta, onClick, active = false, tit
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={`sidebar-row flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-md text-[13px] text-left min-w-0${active ? ' sidebar-row--active' : ''}`}
+      className={`sidebar-row flex items-center gap-2.5 w-full px-2 py-1.5 rounded-md text-[13px] text-left min-w-0${active ? ' sidebar-row--active' : ''}`}
     >
       <RowIcon>{icon}</RowIcon>
       <span className="flex-1 min-w-0 truncate">{label}</span>
@@ -86,7 +90,7 @@ export function SidebarItemRow({ icon, label, meta, onClick, active = false, tit
   );
 }
 
-/** Der Leerzustand eines Abschnitts, eingerückt wie die Namen der Zeilen. */
+/** Der Leerzustand eines Abschnitts, bündig mit den Icons der Zeilen. */
 export function SidebarEmpty({ children }: { children: ReactNode }) {
-  return <p className="sidebar-empty px-2.5 py-1 text-[13px]">{children}</p>;
+  return <p className="sidebar-empty px-2 py-1 text-[13px]">{children}</p>;
 }
