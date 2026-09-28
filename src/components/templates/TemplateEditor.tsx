@@ -67,7 +67,7 @@ export default function TemplateEditor({ template, entries, onClose, onDelete }:
 
       <div>
         <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
-        <LinkedEntriesField content={draft.content} editable inputCls={OP_PROP_SELECT_CLASSES} />
+        <LinkedEntriesField content={draft.content} inputCls={OP_PROP_SELECT_CLASSES} />
       </div>
 
       <TagsField tags={draft.tags} onChange={(tags) => patch({ tags })} />

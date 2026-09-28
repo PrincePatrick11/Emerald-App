@@ -6,7 +6,10 @@ import TagsField from '../fields/TagsField';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
 import EntryTypeField from '../fields/EntryTypeField';
 import PropertiesEditView from '../fields/PropertiesEditView';
-import PropertiesReadView from '../fields/PropertiesReadView';
+import EntryReadSections from '../fields/EntryReadSections';
+import { SidebarPropertyRow } from '../fields/SidebarSection';
+import { MOON_PHASE_SYMBOLS } from '../../../lib/moonPhase';
+import type { MoonPhase } from '../../../types';
 import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
 
 /**
@@ -38,13 +41,18 @@ export default function JournalPropertiesPanel() {
 
   if (!isEditing) {
     return (
-      <PropertiesReadView>
-        <div>
-          <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
-          <LinkedEntriesField content={entry.content} legacyIds={legacyLinks} />
-        </div>
-        <TagsField tags={entry.tags ?? []} readOnly />
-      </PropertiesReadView>
+      <EntryReadSections
+        properties={entry.moon_phase && (
+          <SidebarPropertyRow
+            icon={<span className="text-sm">{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase]}</span>}
+            label={t('properties.moonPhase')}
+            value={t(`moonPhase.${entry.moon_phase}`)}
+          />
+        )}
+        content={entry.content}
+        legacyIds={legacyLinks}
+        tags={entry.tags ?? []}
+      />
     );
   }
 
@@ -54,7 +62,7 @@ export default function JournalPropertiesPanel() {
 
       <div>
         <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
-        <LinkedEntriesField content={entry.content} legacyIds={legacyLinks} editable inputCls={inputCls} />
+        <LinkedEntriesField content={entry.content} legacyIds={legacyLinks} inputCls={inputCls} />
       </div>
 
       <TagsField tags={entry.tags ?? []} onChange={(tags) => updateEntry(entry.id, { tags })} />

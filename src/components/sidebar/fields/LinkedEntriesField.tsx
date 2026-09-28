@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
+import SidebarSection, { SidebarEmpty, SidebarItemRow } from './SidebarSection';
 import { useLinkItems } from '../../../hooks/useLinkItems';
 import LinkedEntryPicker, { LinkedEntryChip, LinkItemIcon } from './LinkedEntryPicker';
 import {
@@ -25,8 +26,6 @@ interface Props {
    * Sie werden nur gelistet — angelegt wird ab jetzt ausschließlich im Inhalt.
    */
   legacyIds?: Array<{ id: string; entryType: 'operation' | 'wiki' }>;
-  /** Edit-Modus: zusätzlich die Suchzeile zum Anhängen. */
-  editable?: boolean;
   /** Klassen der Suchzeile (OP_PROP_SELECT_CLASSES der Panels). */
   inputCls?: string;
 }
@@ -53,33 +52,22 @@ function byCategory(a: SuggestionItem, b: SuggestionItem): number {
   return ca.localeCompare(cb) || a.label.localeCompare(b.label);
 }
 
+type LegacyIds = Props['legacyIds'];
+
 /**
- * Was der Eintrag verlinkt — gelesen aus den internen Link-Chips seines
- * Inhalts, nicht aus eigenen Spalten. Damit zeigt das Feld auch die Links, die
- * im Fließtext über `[[` oder den Link-Picker entstanden sind, und eine
- * Auswahl hier landet umgekehrt als Chip unten im Eintrag.
- *
- * Im Edit-Modus lässt sich eine Verlinkung auch wieder entfernen. Nur die aus
- * dem Inhalt — die aus den alten Spalten (`legacyIds`) stehen nirgends im Text
- * und haben deshalb kein „×".
+ * Die Verlinkungen eines Eintrags, nach Kategorie sortiert: die Link-Chips
+ * seines Inhalts, dazu die alten Spalten (`legacyIds`). `pending`/`removed`
+ * überbrücken im Bearbeiten den Autosave (siehe `LinkedEntriesField`).
  */
-export default function LinkedEntriesField({ content, legacyIds, editable = false, inputCls }: Props) {
-  const { t } = useTranslation();
-  const setActiveView = useUIStore((s) => s.setActiveView);
+function useLinkedEntries(
+  content: string,
+  legacyIds: LegacyIds,
+  pending: SuggestionItem[] = NO_ITEMS,
+  removed: string[] = NO_KEYS,
+): Array<{ item: SuggestionItem; inContent: boolean }> {
   const items = useLinkItems();
-  const [query, setQuery] = useState('');
-
-  // Der Store-Inhalt hinkt dem Editor um den Autosave-Debounce hinterher — das
-  // gilt für hier angehängte Links ebenso wie für die, die im Text über `[[`
-  // entstehen. Nur die eigenen kann das Feld überbrücken: sie leben so lange
-  // hier und fallen wieder heraus, sobald der gespeicherte Inhalt sie mitbringt.
-  const [pending, setPending] = useState<SuggestionItem[]>([]);
-  const [removed, setRemoved] = useState<string[]>([]);
-  useEffect(() => { setPending([]); setRemoved([]); }, [content]);
-
   const byKey = useMemo(() => linkItemsByKey(items), [items]);
-
-  const linked = useMemo(() => {
+  return useMemo(() => {
     const gone = new Set(removed);
     const seen = new Set<string>();
     const out: Array<{ item: SuggestionItem; inContent: boolean }> = [];
@@ -103,6 +91,73 @@ export default function LinkedEntriesField({ content, legacyIds, editable = fals
     // Eintrag geraten sind.
     return out.sort((a, b) => byCategory(a.item, b.item));
   }, [content, legacyIds, pending, removed, byKey]);
+}
+
+const NO_ITEMS: SuggestionItem[] = [];
+const NO_KEYS: string[] = [];
+
+/**
+ * Ein Klick zeigt die Stelle im Eintrag, an der der Link steht. Nur wenn der
+ * Editor ihn nicht findet — Links aus den alten Spalten (`legacyIds`) stehen
+ * nirgends im Text — geht es zum verlinkten Eintrag selbst.
+ */
+function useRevealLink() {
+  const setActiveView = useUIStore((s) => s.setActiveView);
+  return (item: SuggestionItem) => {
+    if (requestEntryLinkReveal(item)) return;
+    setActiveView({ type: viewTypeForEntryType(item.entryType), id: item.id, mode: 'view' });
+  };
+}
+
+/**
+ * Die Verlinkungen in der Leseansicht: ein Abschnitt mit Zähler, je Link eine
+ * Zeile — Icon, Titel, rechts die Kategorie (ohne Kategorie die Eintragsart).
+ */
+export function LinkedEntriesSection({ content, legacyIds }: { content: string; legacyIds?: LegacyIds }) {
+  const { t } = useTranslation();
+  const linked = useLinkedEntries(content, legacyIds);
+  const reveal = useRevealLink();
+  return (
+    <SidebarSection storageKey="entry-sidebar-links-open" label={t('properties.linkedEntries')} count={linked.length}>
+      {linked.length === 0 && <SidebarEmpty>{t('properties.noLinkedEntries')}</SidebarEmpty>}
+      {linked.map(({ item }) => (
+        <SidebarItemRow
+          key={itemKey(item)}
+          icon={<LinkItemIcon item={item} />}
+          label={item.label}
+          meta={item.categoryLabel ?? t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}
+          onClick={() => reveal(item)}
+        />
+      ))}
+    </SidebarSection>
+  );
+}
+
+/**
+ * Was der Eintrag verlinkt — gelesen aus den internen Link-Chips seines
+ * Inhalts, nicht aus eigenen Spalten. Damit zeigt das Feld auch die Links, die
+ * im Fließtext über `[[` oder den Link-Picker entstanden sind, und eine
+ * Auswahl hier landet umgekehrt als Chip unten im Eintrag. Nur fürs
+ * Bearbeiten — die Leseansicht zeigt `LinkedEntriesSection`.
+ *
+ * Eine Verlinkung lässt sich hier auch wieder entfernen. Nur die aus
+ * dem Inhalt — die aus den alten Spalten (`legacyIds`) stehen nirgends im Text
+ * und haben deshalb kein „×".
+ */
+export default function LinkedEntriesField({ content, legacyIds, inputCls }: Props) {
+  const { t } = useTranslation();
+  const items = useLinkItems();
+  const [query, setQuery] = useState('');
+
+  // Der Store-Inhalt hinkt dem Editor um den Autosave-Debounce hinterher — das
+  // gilt für hier angehängte Links ebenso wie für die, die im Text über `[[`
+  // entstehen. Nur die eigenen kann das Feld überbrücken: sie leben so lange
+  // hier und fallen wieder heraus, sobald der gespeicherte Inhalt sie mitbringt.
+  const [pending, setPending] = useState<SuggestionItem[]>([]);
+  const [removed, setRemoved] = useState<string[]>([]);
+  useEffect(() => { setPending([]); setRemoved([]); }, [content]);
+
+  const linked = useLinkedEntries(content, legacyIds, pending, removed);
 
   const filtered = useMemo(() => {
     const linkedKeys = new Set(linked.map((l) => itemKey(l.item)));
@@ -115,15 +170,7 @@ export default function LinkedEntriesField({ content, legacyIds, editable = fals
       .slice(0, RESULT_LIMIT);
   }, [items, linked, query]);
 
-  /**
-   * Ein Klick zeigt die Stelle im Eintrag, an der der Link steht. Nur wenn der
-   * Editor ihn nicht findet — Links aus den alten Spalten (`legacyIds`) stehen
-   * nirgends im Text — geht es zum verlinkten Eintrag selbst.
-   */
-  const reveal = (item: SuggestionItem) => {
-    if (requestEntryLinkReveal(item)) return;
-    setActiveView({ type: viewTypeForEntryType(item.entryType), id: item.id, mode: 'view' });
-  };
+  const reveal = useRevealLink();
 
   const add = (item: SuggestionItem) => {
     // Nur als eingefügt vormerken, wenn ein Editor die Bitte quittiert hat —
@@ -155,11 +202,8 @@ export default function LinkedEntriesField({ content, legacyIds, editable = fals
       {groups.map((group) => (
         <div key={group.label} className="space-y-1">
           {/* Ohne Kategorie keine Überschrift — die Gruppe steht am Ende.
-              Bewusst nicht `PropertySummarySectionTitle`: das ist der Titel
-              einer Abschnittsgruppe im Panel und läge damit über der
-              Feldbeschriftung, unter der diese Überschrift steht. Sie muss eine
-              Stufe leiser sein als `label-xs` — dieselbe Kombination benutzt
-              `PlacedElementRow` für seine Unterbeschriftungen. */}
+              Sie steht unter der Feldbeschriftung und muss deshalb eine Stufe
+              leiser sein als `label-xs`. */}
           {group.label && (
             <p className="text-[10px] uppercase tracking-wider text-stone-500">{group.label}</p>
           )}
@@ -172,7 +216,7 @@ export default function LinkedEntriesField({ content, legacyIds, editable = fals
                 labelMaxWidth="max-w-[140px]"
                 onClick={() => reveal(item)}
                 // Nur was im Inhalt steht, lässt sich von hier entfernen.
-                onRemove={editable && inContent ? () => remove(item) : undefined}
+                onRemove={inContent ? () => remove(item) : undefined}
                 removeTitle={t('properties.removeLink')}
               />
             ))}
@@ -181,14 +225,6 @@ export default function LinkedEntriesField({ content, legacyIds, editable = fals
       ))}
     </div>
   );
-
-  if (!editable) {
-    return (
-      <div className="space-y-1.5">
-        {chips ?? <p className="text-xs text-stone-600">{t('properties.noLinkedEntries')}</p>}
-      </div>
-    );
-  }
 
   return (
     <LinkedEntryPicker

@@ -78,7 +78,7 @@ function RightSidebarActionBar() {
   return (
     <SidebarActionBar>
       <Button
-        tone="amber"
+        tone="jade"
         fill
         title={t('editor.edit')}
         aria-label={t('editor.edit')}
@@ -89,7 +89,7 @@ function RightSidebarActionBar() {
       </Button>
       {isAltar && (
         <Button
-          tone="jade"
+          tone={altarWindowFullscreen ? 'jade' : 'neutral'}
           active={altarWindowFullscreen}
           compact
           title={altarWindowFullscreen ? t('altar.exitWindowFullscreen') : t('altar.windowFullscreen')}
@@ -121,8 +121,10 @@ export default function RightSidebar() {
     return <div ref={setListHeaderHost} className="flex flex-col h-full" />;
   }
 
+  // Im Lesen stehen die Abschnitte (`SidebarSection`) ohne Linie untereinander,
+  // der Abstand kommt von hier; im Bearbeiten ziehen die Panels ihre Linien selbst.
   return (
-    <SidebarColumn bar={<RightSidebarActionBar />}>
+    <SidebarColumn bar={<RightSidebarActionBar />} bodyClassName={activeView.mode === 'edit' ? '' : 'flex flex-col gap-5'}>
       <PropertiesContent activeView={activeView} />
       {moduleMeta(activeView.type)?.usesBlocks && <BlockSidebarArea />}
     </SidebarColumn>

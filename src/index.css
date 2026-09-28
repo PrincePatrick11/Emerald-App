@@ -1015,7 +1015,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 }
 
 /* Titel eines Abschnitts in der rechten Seitenleiste — SidebarSectionHeader
-   (einklappbar) und PropertySummarySectionTitle. Über Theme-Variablen statt
+   und SidebarSection (beide einklappbar). Über Theme-Variablen statt
    stone-*-Klassen: so braucht Parchment keine eigene Brücke, auch nicht für
    den Hover. */
 .sidebar-section-title {
@@ -1037,6 +1037,60 @@ button.sidebar-section-title:hover {
 button.sidebar-section-title:focus-visible {
   outline: none;
   border-radius: 4px;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+/* Die Leseansicht eines Eintrags in der rechten Seitenleiste (`SidebarSection`):
+   Abschnittskopf mit Zähler, darunter Eigenschafts- und Listenzeilen. Wie der
+   Titel über Theme-Variablen, damit Parchment ohne Brücke auskommt. */
+.sidebar-section-count {
+  margin-left: auto;
+  font-family: theme('fontFamily.mono');
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--text-subtle);
+}
+
+.sidebar-prop-label {
+  color: var(--text-muted);
+}
+
+.sidebar-prop-value {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sidebar-prop-value--muted,
+.sidebar-row-meta,
+.sidebar-empty {
+  color: var(--text-subtle);
+}
+
+.sidebar-prop-value--muted {
+  font-weight: 400;
+}
+
+.sidebar-row-icon {
+  color: var(--text-subtle);
+}
+
+.sidebar-row {
+  color: var(--text-primary);
+  transition: background-color 150ms;
+}
+
+.sidebar-row:hover {
+  background-color: var(--interactive-hover);
+}
+
+.sidebar-row--active,
+.sidebar-row--active:hover {
+  background-color: var(--menu-item-active-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+.sidebar-row:focus-visible {
+  outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 

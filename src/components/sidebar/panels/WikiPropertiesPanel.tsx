@@ -6,8 +6,7 @@ import TagsField from '../fields/TagsField';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
 import EntryTypeField from '../fields/EntryTypeField';
 import PropertiesEditView from '../fields/PropertiesEditView';
-import PropertiesReadView from '../fields/PropertiesReadView';
-import { PropertySummaryRow } from '../fields/PropertySummaryRow';
+import EntryReadSections, { CategoryPropertyRow } from '../fields/EntryReadSections';
 import IconCoverField from '../fields/IconCoverField';
 import { applyDefaultAfterCategoryChange } from '../../../store/templateApply';
 import CategorySelect from '../../ui/CategorySelect';
@@ -28,20 +27,13 @@ export default function WikiPropertiesPanel() {
     return <p className="text-xs text-stone-600 px-2 py-3">{t('properties.noEntry')}</p>;
   }
 
-  const category = categories.find((c) => c.id === article.category_id);
-
   if (!isEditing) {
     return (
-      <PropertiesReadView>
-        {/* Gelöschte Kategorie: „Keine" statt der rohen category_id. */}
-        <PropertySummaryRow label={t('properties.category')} value={category ? `${category.emoji} ${categoryLabel(t, category)}` : t('properties.none')} />
-        <IconCoverField icon={article.icon} cover={article.cover_image} readOnly />
-        <div>
-          <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
-          <LinkedEntriesField content={article.content} />
-        </div>
-        <TagsField tags={article.tags ?? []} readOnly />
-      </PropertiesReadView>
+      <EntryReadSections
+        properties={<CategoryPropertyRow categoryId={article.category_id} />}
+        content={article.content}
+        tags={article.tags ?? []}
+      />
     );
   }
 
@@ -76,7 +68,7 @@ export default function WikiPropertiesPanel() {
 
       <div>
         <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
-        <LinkedEntriesField content={article.content} editable inputCls={OP_PROP_SELECT_CLASSES} />
+        <LinkedEntriesField content={article.content} inputCls={OP_PROP_SELECT_CLASSES} />
       </div>
 
       <TagsField tags={article.tags ?? []} onChange={(tags) => updateArticle(article.id, { tags })} />

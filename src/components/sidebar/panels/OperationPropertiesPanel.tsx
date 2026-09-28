@@ -6,8 +6,7 @@ import TagsField from '../fields/TagsField';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
 import EntryTypeField from '../fields/EntryTypeField';
 import PropertiesEditView from '../fields/PropertiesEditView';
-import PropertiesReadView from '../fields/PropertiesReadView';
-import { PropertySummaryRow } from '../fields/PropertySummaryRow';
+import EntryReadSections, { CategoryPropertyRow } from '../fields/EntryReadSections';
 import IconCoverField from '../fields/IconCoverField';
 import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
 import { categoryLabel } from '../../../lib/categories';
@@ -33,21 +32,14 @@ export default function OperationPropertiesPanel() {
   }
 
   const inputCls = OP_PROP_SELECT_CLASSES;
-  const category = categories.find((c) => c.id === op.category_id);
-  // Gelöschte Kategorie: „Keine" statt der rohen category_id.
-  const categoryDisplay = category ? `${category.emoji} ${categoryLabel(t, category)}` : t('properties.none');
 
   if (!isEditing) {
     return (
-      <PropertiesReadView>
-        <PropertySummaryRow label={t('properties.category')} value={categoryDisplay} />
-        <IconCoverField icon={op.icon} cover={op.cover_image} readOnly />
-        <div>
-          <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
-          <LinkedEntriesField content={op.content} />
-        </div>
-        <TagsField tags={op.tags ?? []} readOnly />
-      </PropertiesReadView>
+      <EntryReadSections
+        properties={<CategoryPropertyRow categoryId={op.category_id} />}
+        content={op.content}
+        tags={op.tags ?? []}
+      />
     );
   }
 
@@ -82,7 +74,7 @@ export default function OperationPropertiesPanel() {
 
       <div>
         <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
-        <LinkedEntriesField content={op.content} editable inputCls={inputCls} />
+        <LinkedEntriesField content={op.content} inputCls={inputCls} />
       </div>
 
       <TagsField tags={op.tags ?? []} onChange={(tags) => updateOperation(op.id, { tags })} />

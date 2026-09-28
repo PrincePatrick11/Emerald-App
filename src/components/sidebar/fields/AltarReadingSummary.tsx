@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Grid3x3, Layers, Palette, Proportions, Smile } from 'lucide-react';
 import { useAltarStore } from '../../../store/altarStore';
 import { useDisplayedAltar } from '../../../hooks/useDisplayedAltar';
 import {
@@ -10,33 +11,31 @@ import {
   LEGACY_GRADIENT_COLORS,
   generateGradientStyle,
   getGradientColor,
+  isCandleEmoji,
   isGradientPreset,
 } from '../../../lib/altarConstants';
 import { imageSrc } from '../../../lib/images';
-import { PropertySummaryRow } from './PropertySummaryRow';
-import PropertiesReadView from './PropertiesReadView';
+import { AltarItemVisual } from '../../altar/AltarItemVisual';
 import { FaviconGlyph } from './Favicon';
+import SidebarSection, { SidebarEmpty, SidebarItemRow, SidebarPropertyRow } from './SidebarSection';
+import { PropertiesSection } from './EntryReadSections';
 
-function BackgroundRow({ label, name, style }: { label: string; name: string; style: React.CSSProperties }) {
-  return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-stone-900/45 border border-stone-700/60">
-      <span className="text-[11px] uppercase tracking-wider text-stone-500">{label}</span>
-      <div className="ml-auto flex items-center gap-1.5">
-        <div
-          className="h-5 w-8 flex-shrink-0 rounded border border-stone-700/60 overflow-hidden"
-          style={style}
-          aria-hidden="true"
-        />
-        <span className="text-[11px] font-medium text-stone-300 text-right truncate">{name}</span>
-      </div>
-    </div>
-  );
-}
-
+/**
+ * Die Leseansicht eines Altars in der rechten Seitenleiste: seine
+ * Eigenschaften (Format, Hintergrund, Überlagerung, Raster) und die sichtbaren
+ * Elemente — ein Klick markiert eines auf der Fläche, wie im Bearbeiten.
+ */
 export default function AltarReadingSummary() {
   const { t } = useTranslation();
   const activeAltar = useDisplayedAltar();
   const placements = useAltarStore((s) => s.placements);
+  const selectedPlacementId = useAltarStore((s) => s.selectedPlacementId);
+  const selectPlacement = useAltarStore((s) => s.selectPlacement);
+  // Was auf dem Altar zu sehen ist, oben das Vorderste — wie die Liste im Bearbeiten.
+  const visiblePlacements = useMemo(
+    () => placements.filter((p) => !p.hidden).sort((a, b) => b.z_index - a.z_index),
+    [placements],
+  );
 
   const customBackgroundPreview = imageSrc(activeAltar?.background_image_data);
 
@@ -75,47 +74,61 @@ export default function AltarReadingSummary() {
   }
 
   const overlayPercent = Math.round((activeAltar.background_overlay ?? 0) * 100);
-  const placedCount = placements.length;
   const gridActive = activeAltar.grid_enabled;
-  const resolution = activeAltar.resolution;
 
+  // Eigener Abstand: das Panel des Altars liegt als ein Kind im Körper der Leiste.
   return (
-    <PropertiesReadView
-      sectionTitle={t('altar.summary')}
-      footnote={t('altar.summaryEditToChange')}
-    >
-      {activeAltar.icon_data && (
-        <PropertySummaryRow
-          label={t('properties.icon')}
-          value={<FaviconGlyph value={activeAltar.icon_data} />}
+    <div className="flex flex-col gap-5">
+      <PropertiesSection>
+        {activeAltar.icon_data && (
+          <SidebarPropertyRow
+            icon={<Smile size={14} />}
+            label={t('properties.icon')}
+            value={<FaviconGlyph value={activeAltar.icon_data} className="w-4 h-4 text-sm" />}
+          />
+        )}
+        <SidebarPropertyRow
+          icon={<Proportions size={14} />}
+          label={t('altar.summaryFormat')}
+          value={<span className="truncate font-mono font-normal text-xs">{activeAltar.resolution}</span>}
         />
-      )}
-      <PropertySummaryRow
-        label={t('altar.summaryRatio')}
-        value={resolution}
-      />
-      {backgroundInfo && (
-        <BackgroundRow
-          label={t('altar.summaryBackground')}
-          name={backgroundInfo.label}
-          style={backgroundInfo.style}
+        {backgroundInfo && (
+          <SidebarPropertyRow
+            icon={<Palette size={14} />}
+            label={t('altar.summaryBackground')}
+            value={(
+              <>
+                <span className="h-3.5 w-3.5 flex-shrink-0 rounded-sm border border-stone-700/60" style={backgroundInfo.style} aria-hidden="true" />
+                <span className="truncate">{backgroundInfo.label}</span>
+              </>
+            )}
+          />
+        )}
+        <SidebarPropertyRow
+          icon={<Layers size={14} />}
+          label={t('altar.summaryOverlay')}
+          value={`${overlayPercent} % · ${t(`altar.overlay.${activeAltar.background_overlay_color ?? 'dark'}`)}`}
         />
-      )}
-      <PropertySummaryRow
-        label={t('altar.summaryOverlay')}
-        value={`${overlayPercent}% · ${t(`altar.overlay.${activeAltar.background_overlay_color ?? 'dark'}`)}`}
-      />
-      <PropertySummaryRow
-        label={t('altar.summaryGrid')}
-        value={`${gridActive ? `${activeAltar.grid_size}px` : '—'}`}
-        badge={gridActive
-          ? { label: t('altar.summaryActive'), tone: 'jade' }
-          : { label: t('altar.summaryInactive'), tone: 'muted' }}
-      />
-      <PropertySummaryRow
-        label={t('altar.summaryElements')}
-        value={`${placedCount} ${t('altar.elementsPlaced')}`}
-      />
-    </PropertiesReadView>
+        <SidebarPropertyRow
+          icon={<Grid3x3 size={14} />}
+          label={t('altar.summaryGrid')}
+          value={gridActive ? `${activeAltar.grid_size} px` : t('altar.summaryOff')}
+          muted={!gridActive}
+        />
+      </PropertiesSection>
+
+      <SidebarSection storageKey="altar-sidebar-elements-open" label={t('altar.summaryElements')} count={visiblePlacements.length}>
+        {visiblePlacements.length === 0 && <SidebarEmpty>{t('altar.noElementsPlaced')}</SidebarEmpty>}
+        {visiblePlacements.map((placement) => (
+          <SidebarItemRow
+            key={placement.id}
+            icon={<AltarItemVisual item={placement} size={16} candleAnimate={isCandleEmoji(placement.emoji)} />}
+            label={placement.name}
+            active={selectedPlacementId === placement.id}
+            onClick={() => selectPlacement(selectedPlacementId === placement.id ? null : placement.id)}
+          />
+        ))}
+      </SidebarSection>
+    </div>
   );
 }

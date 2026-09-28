@@ -4,6 +4,7 @@ import { Check, Eye, EyeOff, CopyPlus, GripVertical, MoreHorizontal, Pencil, Plu
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import Button from '../ui/Button';
 import SidebarSectionHeader from '../sidebar/fields/SidebarSectionHeader';
+import SidebarSection, { SidebarItemRow } from '../sidebar/fields/SidebarSection';
 import { useUIStore } from '../../store/uiStore';
 import { useBlockSessionStore, type BlockSession } from '../../store/blockSessionStore';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
@@ -30,8 +31,8 @@ function listedBlocks(session: BlockSession): BlockInstance[] {
  * Die Block-Verwaltung des geöffneten Eintrags in der rechten Seitenleiste:
  * im Bearbeitungsmodus Liste mit Griff, Auge und Menü (Umbenennen, Titel im
  * Lesemodus, Duplizieren, Entfernen) plus „Block hinzufügen"; im Lesemodus
- * eine Gliederung der sichtbaren Blöcke, deren Zeilen zum Block springen —
- * dort nur, wenn es mehr als einen gibt. Bringt ein Blocktyp Einstellungen mit
+ * eine Gliederung der sichtbaren Blöcke (`BlockOutline`), deren Zeilen zum
+ * Block springen — dort nur, wenn es mehr als einen gibt. Bringt ein Blocktyp Einstellungen mit
  * (`blockSidebarViews.ts`), klappt ein Klick auf seine Zeile sie darunter auf —
  * wie die platzierten Elemente des Altars.
  *
@@ -45,7 +46,45 @@ export default function BlockSidebarArea() {
   if (!session.isEditing && listedBlocks(session).length < 2) return null;
   // Pro Montage des Stapels neu: ein offenes Menü oder Umbenennen darf einen
   // Cancel-Remount nicht überleben — es gehörte zum Stapel davor.
+  if (!session.isEditing) return <BlockOutline key={session.sessionId} session={session} />;
   return <BlockManager key={session.sessionId} session={session} />;
+}
+
+/**
+ * Die Gliederung im Lesemodus: ein Abschnitt wie Verlinkungen und Tags darüber
+ * (`SidebarSection`), je sichtbarem Block eine Zeile. Ein Klick springt zum
+ * Block; bringt sein Typ Einstellungen fürs Lesen mit, klappen sie darunter auf.
+ */
+function BlockOutline({ session }: { session: BlockSession }) {
+  const { t } = useTranslation();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const rows = listedBlocks(session);
+  return (
+    <SidebarSection storageKey="blocks-sidebar-open" label={t('blocks.sidebarTitle')} count={rows.length}>
+      {rows.map((block) => {
+        const meta = resolveBlockType(block);
+        const selected = selectedId === block.id;
+        const settings = selected ? blockSettings(session, block, meta) : null;
+        return (
+          <div key={block.id}>
+            <SidebarItemRow
+              icon={<BlockGlyph icon={blockIcon(block, meta) ?? Puzzle} size={14} />}
+              label={blockLabel(t, block, meta)}
+              title={t('blocks.jumpTo')}
+              active={selected}
+              onClick={() => {
+                if (!selected) session.api.reveal(block.id);
+                setSelectedId(selected ? null : block.id);
+              }}
+            />
+            {settings !== null && (
+              <div className="mt-1 mb-2 rounded border border-stone-700/50 bg-stone-900/40 px-2 py-2">{settings}</div>
+            )}
+          </div>
+        );
+      })}
+    </SidebarSection>
+  );
 }
 
 function BlockManager({ session }: { session: BlockSession }) {
