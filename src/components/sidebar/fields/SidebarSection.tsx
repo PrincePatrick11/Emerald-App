@@ -13,7 +13,7 @@ import { usePersistedFlag } from '../../../hooks/usePersistedFlag';
  *
  * Kopf und Inhalt stehen 4px innerhalb der Kante der Leiste, links wie
  * rechts: der Kopf mit `px-1`, der Inhalt rückt um `-mx-1` heraus und die
- * Zeilen mit `px-2` wieder hinein — so ragt nur ihre Hover-Fläche in den Rand.
+ * Zeilen mit `px-2.5` wieder hinein — so ragt nur ihre Hover-Fläche in den Rand.
  */
 export default function SidebarSection({ storageKey, label, count, children }: {
   storageKey: string;
@@ -50,7 +50,7 @@ export function SidebarPropertyRow({ icon, label, value, muted = false }: {
   muted?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2 px-2 py-1.5 text-[13px] min-w-0">
+    <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-[13px] min-w-0">
       <RowIcon>{icon}</RowIcon>
       {/* Wird es eng, kürzt zuerst der Name — der Wert ist das, was man liest.
           Er nimmt höchstens 65 %, darüber kürzt auch er. */}
@@ -83,7 +83,7 @@ export function SidebarItemRow({ icon, label, meta, onClick, active = false, tit
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={`sidebar-row flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-[13px] text-left min-w-0${active ? ' sidebar-row--active' : ''}`}
+      className={`sidebar-row flex items-center gap-1.5 w-full px-2.5 py-1.5 rounded-md text-[13px] text-left min-w-0${active ? ' sidebar-row--active' : ''}`}
     >
       <RowIcon>{icon}</RowIcon>
       <span className="flex-1 min-w-0 truncate">{label}</span>
@@ -94,5 +94,5 @@ export function SidebarItemRow({ icon, label, meta, onClick, active = false, tit
 
 /** Der Leerzustand eines Abschnitts, bündig mit den Icons der Zeilen. */
 export function SidebarEmpty({ children }: { children: ReactNode }) {
-  return <p className="sidebar-empty px-2 py-1 text-[13px]">{children}</p>;
+  return <p className="sidebar-empty px-2.5 py-1 text-[13px]">{children}</p>;
 }
