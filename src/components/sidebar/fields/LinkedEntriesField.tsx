@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
-import SidebarSection, { SidebarEmpty, SidebarItemRow } from './SidebarSection';
+import { Search } from 'lucide-react';
+import SidebarSection, { SidebarEmpty, SidebarItemRow, SidebarRowRemove } from './SidebarSection';
 import { useLinkItems } from '../../../hooks/useLinkItems';
-import LinkedEntryPicker, { LinkedEntryChip, LinkItemIcon } from './LinkedEntryPicker';
+import LinkedEntryPicker, { LinkItemIcon } from './LinkedEntryPicker';
 import {
   requestEntryLinkAppend, requestEntryLinkRemove, requestEntryLinkReveal,
 } from '../../../lib/links';
@@ -26,8 +27,6 @@ interface Props {
    * Sie werden nur gelistet — angelegt wird ab jetzt ausschließlich im Inhalt.
    */
   legacyIds?: Array<{ id: string; entryType: 'operation' | 'wiki' }>;
-  /** Klassen der Suchzeile (OP_PROP_SELECT_CLASSES der Panels). */
-  inputCls?: string;
 }
 
 /**
@@ -137,14 +136,15 @@ export function LinkedEntriesSection({ content, legacyIds }: { content: string; 
  * Was der Eintrag verlinkt — gelesen aus den internen Link-Chips seines
  * Inhalts, nicht aus eigenen Spalten. Damit zeigt das Feld auch die Links, die
  * im Fließtext über `[[` oder den Link-Picker entstanden sind, und eine
- * Auswahl hier landet umgekehrt als Chip unten im Eintrag. Nur fürs
- * Bearbeiten — die Leseansicht zeigt `LinkedEntriesSection`.
+ * Auswahl hier landet umgekehrt als Chip unten im Eintrag. Die Bearbeiten-
+ * Variante von `LinkedEntriesSection`: dieselben Zeilen, dazu je ein „×" und
+ * darunter das Suchfeld.
  *
  * Eine Verlinkung lässt sich hier auch wieder entfernen. Nur die aus
  * dem Inhalt — die aus den alten Spalten (`legacyIds`) stehen nirgends im Text
  * und haben deshalb kein „×".
  */
-export default function LinkedEntriesField({ content, legacyIds, inputCls }: Props) {
+export default function LinkedEntriesField({ content, legacyIds }: Props) {
   const { t } = useTranslation();
   const items = useLinkItems();
   const [query, setQuery] = useState('');
@@ -174,7 +174,7 @@ export default function LinkedEntriesField({ content, legacyIds, inputCls }: Pro
 
   const add = (item: SuggestionItem) => {
     // Nur als eingefügt vormerken, wenn ein Editor die Bitte quittiert hat —
-    // sonst stünde hier ein Chip für einen Link, den es im Eintrag nicht gibt.
+    // sonst stünde hier eine Zeile für einen Link, den es im Eintrag nicht gibt.
     if (requestEntryLinkAppend(item)) {
       setPending((prev) => [...prev, item]);
       setRemoved((prev) => prev.filter((k) => k !== itemKey(item)));
@@ -187,66 +187,43 @@ export default function LinkedEntriesField({ content, legacyIds, inputCls }: Pro
     setRemoved((prev) => [...prev, itemKey(item)]);
   };
 
-  // `linked` ist bereits nach Kategorie sortiert — gleiche Kategorien stehen
-  // also beieinander, und ein Durchlauf reicht, um sie zu Gruppen zu bündeln.
-  const groups: Array<{ label: string; entries: typeof linked }> = [];
-  for (const entry of linked) {
-    const label = entry.item.categoryLabel ?? '';
-    const last = groups[groups.length - 1];
-    if (last && last.label === label) last.entries.push(entry);
-    else groups.push({ label, entries: [entry] });
-  }
-
-  const chips = groups.length === 0 ? undefined : (
-    <div className="space-y-2">
-      {groups.map((group) => (
-        <div key={group.label} className="space-y-1">
-          {/* Ohne Kategorie keine Überschrift — die Gruppe steht am Ende.
-              Sie steht unter der Feldbeschriftung und muss deshalb eine Stufe
-              leiser sein als `label-xs`. */}
-          {group.label && (
-            <p className="text-[10px] uppercase tracking-wider text-stone-500">{group.label}</p>
-          )}
-          <div className="flex flex-wrap gap-1">
-            {group.entries.map(({ item, inContent }) => (
-              <LinkedEntryChip
-                key={itemKey(item)}
-                icon={<LinkItemIcon item={item} />}
-                label={item.label}
-                labelMaxWidth="max-w-[140px]"
-                onClick={() => reveal(item)}
-                // Nur was im Inhalt steht, lässt sich von hier entfernen.
-                onRemove={inContent ? () => remove(item) : undefined}
-                removeTitle={t('properties.removeLink')}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
   return (
-    <LinkedEntryPicker
-      chips={chips}
-      results={filtered}
-      resultKey={itemKey}
-      onSelect={add}
-      query={query}
-      onQueryChange={setQuery}
-      placeholder={t('linkPicker.searchPlaceholder')}
-      inputCls={inputCls}
-      renderResult={(item) => {
-        const TypeIcon = ENTRY_TYPE_ICONS[item.entryType];
-        return (
-          <>
-            <LinkItemIcon item={item} />
-            <span className="flex-1 truncate">{item.label}</span>
-            <TypeIcon size={12} className="text-stone-600 flex-shrink-0" />
-            <span className="text-stone-600 flex-shrink-0">{t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}</span>
-          </>
-        );
-      }}
-    />
+    <SidebarSection storageKey="entry-sidebar-links-open" label={t('properties.linkedEntries')} count={linked.length}>
+      {linked.length === 0 && <SidebarEmpty>{t('properties.noLinkedEntries')}</SidebarEmpty>}
+      {linked.map(({ item, inContent }) => (
+        <SidebarItemRow
+          key={itemKey(item)}
+          icon={<LinkItemIcon item={item} />}
+          label={item.label}
+          meta={item.categoryLabel ?? t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}
+          title={item.label}
+          onClick={() => reveal(item)}
+          // Nur was im Inhalt steht, lässt sich von hier entfernen.
+          action={<SidebarRowRemove title={t('properties.removeLink')} onClick={inContent ? () => remove(item) : undefined} />}
+        />
+      ))}
+      <div className="mt-1 pl-[9px] pr-3">
+        <LinkedEntryPicker
+          results={filtered}
+          resultKey={itemKey}
+          onSelect={add}
+          query={query}
+          onQueryChange={setQuery}
+          placeholder={t('properties.linkEntry')}
+          fieldIcon={<Search size={14} />}
+          renderResult={(item) => {
+            const TypeIcon = ENTRY_TYPE_ICONS[item.entryType];
+            return (
+              <>
+                <LinkItemIcon item={item} />
+                <span className="flex-1 truncate">{item.label}</span>
+                <TypeIcon size={12} className="text-stone-600 flex-shrink-0" />
+                <span className="text-stone-600 flex-shrink-0">{t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}</span>
+              </>
+            );
+          }}
+        />
+      </div>
+    </SidebarSection>
   );
 }

@@ -58,11 +58,13 @@ src/
 │   │   │             AltarSidebarPanel, BacklinksPanel (currently unrendered — RoutinesPanel,
 │   │   │             its neighbour, was removed outright along with routines, see
 │   │   │             Templates below)
-│   │   └── fields/   SidebarSection (the read-mode collapsible section — Properties,
-│   │                 Linked entries, Tags, Blocks, the Altar's Elements — plus its
-│   │                 SidebarPropertyRow/SidebarItemRow/SidebarEmpty row types),
+│   │   └── fields/   SidebarSection (the collapsible section of read and edit mode —
+│   │                 Properties, Linked entries, Tags, Blocks, the Altar's Elements — plus
+│   │                 its SidebarPropertyRow/SidebarItemRow/SidebarEmpty row types),
 │   │                 EntryReadSections (Journal/Wiki/Operations' read-mode sidebar body),
-│   │                 PropertiesEditView (edit layout shell), Favicon, Banner, SelectField
+│   │                 EditProperties (edit-mode property rows: EditPropertyRow,
+│   │                 PropertySelect, MediaPropertyRow), CategoryIconCoverRows,
+│   │                 PropertiesEditView (a language page's layout shell), Favicon, SelectField
 │   │                 (shared category-field native select for Journal/Operations properties
 │   │                 panels), TagsField/TagsSection (edit vs. read), EntryTypeField (the
 │   │                 Journal/Operations/Wiki type toggle above Category, see Edit Mode
@@ -306,7 +308,7 @@ calling `viewTypeForEntryType` directly.
 
 The main content area renders only the title and body. All metadata — tags, category, icon, cover image — is edited exclusively in the right sidebar's Properties panel. The sidebar writes directly to the relevant store; the main area subscribes to the same store fields and updates accordingly.
 
-Unlike earlier versions, the Properties panel itself is now gated by the entry's edit state (`activeView.mode === 'edit'`): each panel renders a read-only summary (`EntryReadSections`, built from collapsible `SidebarSection`s — see [`components.md`](components.md)) while viewing, and swaps to editable form fields (`PropertiesEditView`) only once the entry is opened for editing. Entering/leaving edit mode is triggered from the sidebar's own action bar, not from the main content area — there is no double-click-to-edit gesture on the entry itself; `EntryDetailFrame` has no `onEnterEditMode` prop.
+Unlike earlier versions, the Properties panel itself is now gated by the entry's edit state (`activeView.mode === 'edit'`): each panel renders a read-only summary (`EntryReadSections`, built from collapsible `SidebarSection`s — see [`components.md`](components.md)) while viewing, and swaps to the same sections with editable values (`EditPropertyRow`, `PropertySelect`, `MediaPropertyRow` — see [`components.md`](components.md)) only once the entry is opened for editing. Entering/leaving edit mode is triggered from the sidebar's own action bar, not from the main content area — there is no double-click-to-edit gesture on the entry itself; `EntryDetailFrame` has no `onEnterEditMode` prop.
 
 ### Cancel: discarding new entries and reverting autosaved edits
 
@@ -343,9 +345,9 @@ reverts title/content but leaves the entry under its new type.
 
 ### Changing an entry's type
 
-`EntryTypeField` (Journal/Wiki/Operation Properties panels, above Category — at the top for
-Journal, which has none) renders the three module icons from `MODULE_LIST` filtered by
-`usesBlocks` as an `IconToggleGroup`; picking one calls `changeEntryType(id, from, to)`
+`EntryTypeField` (Journal/Wiki/Operation Properties sections, the first row — above Category,
+or above the read-only moon phase for Journal) renders the three module icons from `MODULE_LIST` filtered by
+`usesBlocks` as a segmented control; picking one calls `changeEntryType(id, from, to)`
 (`src/lib/entryTypeChange.ts`). Tasks and Altar have a different data model and aren't
 convertible, so they get no field and no entry in `ConvertibleEntryType`.
 
@@ -935,8 +937,8 @@ overview's own dropdown; a default is now only ever set through a template's own
 whatever another template's edit did meanwhile via `mergeAssignmentChanges` (base → draft,
 replayed onto current) rather than one silently clobbering the other. `FieldDropdown`
 (`src/components/ui/FieldDropdown.tsx`) is now used only by `CategorySelect`'s `field` variant;
-`TagsField` (`src/components/sidebar/fields/TagsField.tsx`) is the tags field's
-label-plus-`TagInput` shell, shared by Journal/Wiki/Operations' properties panels and the
+`TagsField` (`src/components/sidebar/fields/TagsField.tsx`) is the edit-mode "Tags"
+section around `TagInput`, shared by Journal/Wiki/Operations' properties panels and the
 template page.
 
 **Routines became templates, then were removed.** Routines had no UI path since `RoutinesPanel`

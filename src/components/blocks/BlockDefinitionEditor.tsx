@@ -1,14 +1,16 @@
 import { useState, type MouseEvent } from 'react';
 import { Reorder, useDragControls } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { ArchiveRestore, GripVertical, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { ArchiveRestore, EyeOff, GripVertical, Heading, Lock, Plus, RefreshCw, Smile, Trash2 } from 'lucide-react';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import LibraryPageFrame from '../ui/LibraryPageFrame';
 import InlineConfirm from '../ui/InlineConfirm';
-import PropertiesEditView from '../sidebar/fields/PropertiesEditView';
-import IconField from '../sidebar/fields/IconField';
+import SidebarSection, { SidebarEmpty } from '../sidebar/fields/SidebarSection';
+import { PropertiesSection } from '../sidebar/fields/EntryReadSections';
+import { EditSidebarBody, MediaPropertyRow } from '../sidebar/fields/EditProperties';
+import { SwitchRow } from '../ui/Switch';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import { useBlockDraftStore, type DefinitionDraft } from '../../store/draftStore';
 import { useDraftPage } from '../../hooks/useDraftPage';
@@ -138,59 +140,82 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
   const outdated = (usage?.outdated ?? 0) + (usage?.outdatedTemplates ?? 0);
 
   const sidebar = (
-    <PropertiesEditView>
-      {/* Der Rückfall ist das Standard-Icon: ohne eines stünde der Block in Menüs ohne Zeichen da. */}
-      <IconField value={draft.icon} onChange={(icon) => void setIcon(icon)} fallback={DEFAULT_DEFINITION_ICON} />
+    <EditSidebarBody>
+      <PropertiesSection>
+        {/* Der Rückfall ist das Standard-Icon: ohne eines stünde der Block in Menüs ohne Zeichen da. */}
+        <MediaPropertyRow
+          rowIcon={<Smile size={14} />}
+          label={t('properties.icon')}
+          kind="icon"
+          value={draft.icon}
+          onChange={(icon) => void setIcon(icon)}
+          fallback={DEFAULT_DEFINITION_ICON}
+        />
+      </PropertiesSection>
 
-      <section className="space-y-2">
-        <p className="label-xs">{t('blocks.library.display')}</p>
-        <BlockCheckbox checked={draft.display.readHideEmpty} onChange={(v) => patchDisplay({ readHideEmpty: v })} label={t('blocks.fields.hideEmpty')} />
-        <BlockCheckbox checked={draft.display.showTitle} onChange={(v) => patchDisplay({ showTitle: v })} label={t('blocks.showTitle')} />
-        <BlockCheckbox
-          checked={draft.display.readOnly}
-          onChange={(v) => patchDisplay({ readOnly: v })}
+      <SidebarSection storageKey="block-display-open" label={t('blocks.library.display')}>
+        <SwitchRow
+          variant="sidebar"
+          icon={EyeOff}
+          label={t('blocks.fields.hideEmpty')}
+          checked={draft.display.readHideEmpty}
+          onChange={(v) => patchDisplay({ readHideEmpty: v })}
+        />
+        <SwitchRow
+          variant="sidebar"
+          icon={Heading}
+          label={t('blocks.showTitle')}
+          checked={draft.display.showTitle}
+          onChange={(v) => patchDisplay({ showTitle: v })}
+        />
+        <SwitchRow
+          variant="sidebar"
+          icon={Lock}
           label={t('blocks.fields.readOnly')}
           hint={t('blocks.fields.readOnlyHint')}
+          checked={draft.display.readOnly}
+          onChange={(v) => patchDisplay({ readOnly: v })}
         />
-      </section>
+      </SidebarSection>
 
-      <section className="space-y-2">
-        <p className="label-xs">{t('blocks.library.usage')}</p>
-        <p className="text-xs text-stone-400">
+      <SidebarSection storageKey="block-usage-open" label={t('blocks.library.usage')} count={entries + templates}>
+        <SidebarEmpty>
           {entries > 0 ? t('blocks.library.usedIn', { count: entries }) : t('blocks.library.unused')}
           {templates > 0 && <> · {t('blocks.library.inTemplates', { count: templates })}</>}
           {(usage?.outdated ?? 0) > 0 && <> · {t('blocks.library.outdated', { count: usage!.outdated })}</>}
           {(usage?.outdatedTemplates ?? 0) > 0 && <> · {t('blocks.library.outdatedTemplates', { count: usage!.outdatedTemplates })}</>}
-        </p>
+        </SidebarEmpty>
         {outdated > 0 && (
           confirmUpdate ? (
-            <InlineConfirm
-              tone="jade"
-              small
-              wrap
-              message={(usage?.outdatedTemplates ?? 0) > 0
-                ? t('blocks.library.updateAllConfirmCopies', { count: outdated })
-                : t('blocks.library.updateAllConfirm', { count: outdated })}
-              confirmLabel={t('blocks.library.updateAll')}
-              onConfirm={() => void runUpdateAll()}
-              onCancel={() => setConfirmUpdate(false)}
-            />
+            <div className="pl-[9px] pr-3 py-1">
+              <InlineConfirm
+                tone="jade"
+                small
+                wrap
+                message={(usage?.outdatedTemplates ?? 0) > 0
+                  ? t('blocks.library.updateAllConfirmCopies', { count: outdated })
+                  : t('blocks.library.updateAllConfirm', { count: outdated })}
+                confirmLabel={t('blocks.library.updateAll')}
+                onConfirm={() => void runUpdateAll()}
+                onCancel={() => setConfirmUpdate(false)}
+              />
+            </div>
           ) : (
-            <Button
-              tone="jade"
-              small
+            <button
+              type="button"
+              className="sidebar-action-row"
               disabled={dirty || busy}
               title={dirty ? t('blocks.library.saveFirst') : undefined}
               onClick={() => setConfirmUpdate(true)}
             >
-              <RefreshCw size={12} />
-              <span>{t('blocks.library.updateAll')}</span>
-            </Button>
+              <RefreshCw size={14} className="flex-shrink-0" />
+              <span className="min-w-0 truncate">{t('blocks.library.updateAll')}</span>
+            </button>
           )
         )}
-        {notice && <p className="text-xs text-stone-500">{notice}</p>}
-      </section>
-    </PropertiesEditView>
+        {notice && <SidebarEmpty>{notice}</SidebarEmpty>}
+      </SidebarSection>
+    </EditSidebarBody>
   );
 
   return (

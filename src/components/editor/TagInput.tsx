@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
+import { Tag, X } from 'lucide-react';
 import { useTagStore } from '../../store/tagStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useUIStore } from '../../store/uiStore';
@@ -94,73 +94,87 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
     );
   }
 
-  return (
-    <div ref={wrapperRef} className="relative flex flex-wrap gap-1.5 items-center">
-      {tags.map((name) => {
-        const tag = getByName(name);
-        return (
+  const menu = open && (input || suggestions.length > 0) && (
+    <div className="absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl min-w-[160px] py-1">
+      {suggestions.map((t) => (
+        <button
+          key={t.id}
+          onMouseDown={(e) => { e.preventDefault(); addTag(t.name); }}
+          className="w-full text-left px-3 py-1.5 text-xs hover:bg-stone-700 flex items-center gap-2"
+        >
           <span
-            key={name}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-            style={{
-              backgroundColor: tag ? `${tag.color}20` : '#ffffff10',
-              color: tag?.color ?? '#a8a29e',
-              border: `1px solid ${tag ? `${tag.color}40` : '#ffffff20'}`,
-            }}
-          >
-            {name}
-            <button
-              onClick={() => removeTag(name)}
-              className="opacity-60 hover:opacity-100 transition-opacity"
-            >
-              <X size={12} />
-            </button>
-          </span>
-        );
-      })}
+            className="w-2 h-2 rounded-full flex-shrink-0"
+            style={{ backgroundColor: t.color }}
+          />
+          {t.name}
+        </button>
+      ))}
+      {trimmedInput && !inputMatchesTag && (createInline ? (
+        <button
+          onMouseDown={(e) => { e.preventDefault(); addTag(input); }}
+          className="w-full text-left px-3 py-1.5 text-xs text-jade-400 hover:bg-stone-700"
+        >
+          {t('tags.createNamed', { name: trimmedInput })}
+        </button>
+      ) : (
+        <button
+          onMouseDown={(e) => { e.preventDefault(); setOpen(false); setActiveView({ type: 'tags' }); }}
+          className="w-full text-left px-3 py-1.5 text-xs text-stone-400 hover:bg-stone-700"
+        >
+          {t('tags.unknownOpenDashboard', { name: trimmedInput })}
+        </button>
+      ))}
+    </div>
+  );
 
-      <input
-        ref={inputRef}
-        value={input}
-        onChange={(e) => { setInput(e.target.value); setOpen(true); }}
-        onKeyDown={handleKeyDown}
-        onFocus={() => setOpen(true)}
-        placeholder={tags.length === 0 ? t('editor.addTags') : ''}
-        className="bg-transparent text-xs text-stone-400 placeholder-stone-700 outline-none min-w-[80px] flex-1 selectable"
-      />
-
-      {open && (input || suggestions.length > 0) && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl min-w-[160px] py-1">
-          {suggestions.map((t) => (
-            <button
-              key={t.id}
-              onMouseDown={(e) => { e.preventDefault(); addTag(t.name); }}
-              className="w-full text-left px-3 py-1.5 text-xs hover:bg-stone-700 flex items-center gap-2"
-            >
+  // Bearbeitet wird nur in der Seitenleiste (`TagsField`): die Chips (24px,
+  // mit rundem „×") stehen für sich, darunter das Feld „Tag hinzufügen …".
+  return (
+    <div ref={wrapperRef} className="relative flex flex-col gap-1">
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 pl-2.5 pr-3 pt-0.5 pb-1">
+          {tags.map((name) => {
+            const tag = getByName(name);
+            return (
               <span
-                className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{ backgroundColor: t.color }}
-              />
-              {t.name}
-            </button>
-          ))}
-          {trimmedInput && !inputMatchesTag && (createInline ? (
-            <button
-              onMouseDown={(e) => { e.preventDefault(); addTag(input); }}
-              className="w-full text-left px-3 py-1.5 text-xs text-jade-400 hover:bg-stone-700"
-            >
-              {t('tags.createNamed', { name: trimmedInput })}
-            </button>
-          ) : (
-            <button
-              onMouseDown={(e) => { e.preventDefault(); setOpen(false); setActiveView({ type: 'tags' }); }}
-              className="w-full text-left px-3 py-1.5 text-xs text-stone-400 hover:bg-stone-700"
-            >
-              {t('tags.unknownOpenDashboard', { name: trimmedInput })}
-            </button>
-          ))}
+                key={name}
+                className="h-6 inline-flex items-center gap-0.5 pl-2.5 pr-1 rounded-full text-xs font-medium max-w-full"
+                style={{
+                  backgroundColor: tag ? `${tag.color}20` : '#ffffff10',
+                  color: tag?.color ?? '#a8a29e',
+                  border: `1px solid ${tag ? `${tag.color}40` : '#ffffff20'}`,
+                }}
+              >
+                <span className="min-w-0 truncate">{name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeTag(name)}
+                  className="tag-chip-remove flex-shrink-0"
+                  title={t('properties.removeTag')}
+                  aria-label={`${t('properties.removeTag')}: ${name}`}
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            );
+          })}
         </div>
       )}
+      {/* Eingerückt wie die Zeilen der Seitenleiste, nicht wie ihre Überschriften. */}
+      <div className="sidebar-add-field ml-[9px] mr-3">
+        <Tag size={14} />
+        <input
+          ref={inputRef}
+          value={input}
+          onChange={(e) => { setInput(e.target.value); setOpen(true); }}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setOpen(true)}
+          placeholder={t('properties.addTag')}
+          aria-label={t('properties.addTag')}
+          className="selectable"
+        />
+      </div>
+      {menu}
     </div>
   );
 }

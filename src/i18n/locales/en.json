@@ -492,7 +492,6 @@
       "undo": "Undo",
       "redo": "Redo"
     },
-    "addTags": "Add tags…",
     "unsaved": "Unsaved changes"
   },
   "moonPhase": {
@@ -552,10 +551,13 @@
     "icon": "Icon",
     "emoji": "Emoji",
     "coverImage": "Cover Image",
-    "iconAndCover": "Icon + Cover Image",
-    "addCoverImage": "Add Cover Image",
     "change": "Change",
-    "remove": "Remove"
+    "remove": "Remove",
+    "add": "Add",
+    "chooseImage": "Choose image",
+    "linkEntry": "Link entry …",
+    "addTag": "Add tag …",
+    "removeTag": "Remove tag"
   },
   "filters": {
     "all": "All",

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import LibraryPageFrame from '../ui/LibraryPageFrame';
-import PropertiesEditView from '../sidebar/fields/PropertiesEditView';
+import { Smile } from 'lucide-react';
 import LinkedEntriesField from '../sidebar/fields/LinkedEntriesField';
 import TagsField from '../sidebar/fields/TagsField';
-import IconField from '../sidebar/fields/IconField';
+import { PropertiesSection } from '../sidebar/fields/EntryReadSections';
+import { EditSidebarBody, MediaPropertyRow } from '../sidebar/fields/EditProperties';
 import BlockStack from '../blocks/BlockStack';
 import BlockSidebarArea from '../blocks/BlockSidebarArea';
 import TemplateAssignments from './TemplateAssignments';
@@ -62,13 +63,19 @@ export default function TemplateEditor({ template, entries, onClose, onDelete }:
   const setIcon = useShrunkIcon((icon) => patch({ icon }), 'TemplateEditor');
 
   const sidebar = (
-    <PropertiesEditView>
-      <IconField value={draft.icon} onChange={(icon) => void setIcon(icon)} fallback={DEFAULT_TEMPLATE_ICON} />
+    <EditSidebarBody>
+      <PropertiesSection>
+        <MediaPropertyRow
+          rowIcon={<Smile size={14} />}
+          label={t('properties.icon')}
+          kind="icon"
+          value={draft.icon}
+          onChange={(icon) => void setIcon(icon)}
+          fallback={DEFAULT_TEMPLATE_ICON}
+        />
+      </PropertiesSection>
 
-      <div>
-        <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
-        <LinkedEntriesField content={draft.content} inputCls={OP_PROP_SELECT_CLASSES} />
-      </div>
+      <LinkedEntriesField content={draft.content} />
 
       <TagsField tags={draft.tags} onChange={(tags) => patch({ tags })} />
 
@@ -82,7 +89,7 @@ export default function TemplateEditor({ template, entries, onClose, onDelete }:
       <BlockSidebarArea />
 
       <TemplateUsage entries={entries} />
-    </PropertiesEditView>
+    </EditSidebarBody>
   );
 
   return (

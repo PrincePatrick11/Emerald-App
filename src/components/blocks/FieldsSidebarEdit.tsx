@@ -3,10 +3,9 @@ import { elementLabel } from '../../lib/blocks/blockAttrs';
 import {
   activeElements, canBeEmpty, elementKindLabelKey, parseFields, serializeFields, type ElementDef, type FieldsModel,
 } from '../../lib/blocks/fields';
-import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import { useFieldFallbackText } from './useFieldFallbackText';
 import OptionsEditor from './OptionsEditor';
-import BlockCheckbox from './BlockCheckbox';
+import { SwitchRow } from '../ui/Switch';
 import type { BlockSidebarEditProps } from './blockSidebarViews';
 
 /**
@@ -14,7 +13,8 @@ import type { BlockSidebarEditProps } from './blockSidebarViews';
  * Element Beschriftung, bei einer Auswahl die Optionen, und ob es im
  * Lesemodus leer ausgeblendet wird; für den ganzen Block „komplett
  * schreibgeschützt". Jede Änderung schreibt den Block neu (JSON + Fallback) —
- * über den Stapel, Cancel dreht sie zurück.
+ * über den Stapel, Cancel dreht sie zurück. Beschriftungen und Eingaben im
+ * Stil der Seitenleiste (`.panel-field-label`, `.panel-input`).
  */
 export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditProps) {
   const { t } = useTranslation();
@@ -29,28 +29,32 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
   const elements = activeElements(model);
 
   return (
-    <div className="space-y-4">
-      {elements.map((element) => {
+    <div className="space-y-3">
+      {elements.map((element, index) => {
         const hides = element.hideWhenEmpty ?? model.display.readHideEmpty;
         return (
           <div key={element.id} className="space-y-2">
-            {elements.length > 1 && <p className="text-[10px] uppercase tracking-wider text-stone-500">{elementLabel(t, element)}</p>}
-            <div className="space-y-1">
-              <p className="label-xs">{t('blocks.fields.label')}</p>
+            {/* Mehrere Elemente: je ein leiser Unterabschnitt, ab dem zweiten mit Linie davor. */}
+            {elements.length > 1 && (
+              <p className={`panel-subheading${index > 0 ? ' panel-subheading--divided' : ''}`}>{elementLabel(t, element)}</p>
+            )}
+            <label className="block">
+              <span className="panel-field-label">{t('blocks.fields.label')}</span>
               <input
-                className={OP_PROP_SELECT_CLASSES}
+                className="panel-input selectable"
                 value={element.label}
                 placeholder={t(elementKindLabelKey(element.kind))}
                 onChange={(e) => patchElement(element.id, { label: e.target.value })}
               />
-            </div>
+            </label>
 
             {element.kind === 'select' && (
-              <OptionsEditor options={element.options ?? []} onChange={(options) => patchElement(element.id, { options })} />
+              <OptionsEditor variant="panel" options={element.options ?? []} onChange={(options) => patchElement(element.id, { options })} />
             )}
 
             {canBeEmpty(element.kind) && (
-              <BlockCheckbox
+              <SwitchRow
+                variant="panel"
                 checked={hides}
                 label={t('blocks.fields.hideEmpty')}
                 onChange={(checked) => patchElement(element.id, {
@@ -63,7 +67,8 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
         );
       })}
 
-      <BlockCheckbox
+      <SwitchRow
+        variant="panel"
         checked={model.display.readOnly}
         label={t('blocks.fields.readOnly')}
         hint={t('blocks.fields.readOnlyHint')}

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { X } from 'lucide-react';
 import { usePersistedFlag } from '../../../hooks/usePersistedFlag';
 import SidebarSectionHeader from './SidebarSectionHeader';
 
@@ -35,7 +36,7 @@ export default function SidebarSection({ storageKey, label, count, children }: {
 }
 
 /** Feste 16px-Spalte vor jeder Zeile: Emoji und lucide-Icon beginnen so an derselben Stelle. */
-function RowIcon({ children }: { children: ReactNode }) {
+export function RowIcon({ children }: { children: ReactNode }) {
   return <span className="sidebar-row-icon w-4 flex-shrink-0 flex items-center justify-center leading-none">{children}</span>;
 }
 
@@ -68,15 +69,38 @@ export function SidebarPropertyRow({ icon, label, value, muted = false }: {
  * Eine anklickbare Listenzeile — eine Verlinkung, ein Block, ein Element des
  * Altars: Icon, Name, rechts leise eine Zuordnung (`meta`). Hover hebt die
  * Zeile als Fläche an; `active` markiert die gewählte.
+ *
+ * `action` hängt im Bearbeiten einen Knopf hinter die Zeile (die Verlinkungen:
+ * `SidebarRowRemove`). Die Zeile ist dann ein Rahmen um zwei Knöpfe — der
+ * Hauptteil trägt Icon, Name und Zuordnung wie sonst die ganze Zeile.
  */
-export function SidebarItemRow({ icon, label, meta, onClick, active = false, title }: {
+export function SidebarItemRow({ icon, label, meta, onClick, active = false, title, action }: {
   icon: ReactNode;
   label: string;
   meta?: string;
   onClick: () => void;
   active?: boolean;
   title?: string;
+  action?: ReactNode;
 }) {
+  if (action !== undefined) {
+    return (
+      <div className={`sidebar-row flex items-center gap-1 h-8 pr-1 rounded-md text-[13px] min-w-0${active ? ' sidebar-row--active' : ''}`}>
+        <button
+          type="button"
+          onClick={onClick}
+          title={title}
+          aria-pressed={active}
+          className="sidebar-row-main flex flex-1 min-w-0 h-full items-center gap-1.5 pl-[9px] rounded-md text-left"
+        >
+          <RowIcon>{icon}</RowIcon>
+          <span className="flex-1 min-w-0 truncate">{label}</span>
+          {meta && <span className="sidebar-row-meta flex-shrink-0 max-w-[45%] truncate text-[11px]">{meta}</span>}
+        </button>
+        {action}
+      </div>
+    );
+  }
   return (
     <button
       type="button"
@@ -88,6 +112,19 @@ export function SidebarItemRow({ icon, label, meta, onClick, active = false, tit
       <RowIcon>{icon}</RowIcon>
       <span className="flex-1 min-w-0 truncate">{label}</span>
       {meta && <span className="sidebar-row-meta flex-shrink-0 max-w-[45%] truncate text-[11px]">{meta}</span>}
+    </button>
+  );
+}
+
+/**
+ * Das „×" am Ende einer `SidebarItemRow` (`action`). Ohne `onClick` bleibt nur
+ * sein Platz leer — so fluchten die Zuordnungen mit denen der Zeilen, die eines haben.
+ */
+export function SidebarRowRemove({ title, onClick }: { title: string; onClick?: () => void }) {
+  if (!onClick) return <span className="w-6 flex-shrink-0" />;
+  return (
+    <button type="button" onClick={onClick} className="sidebar-row-remove" title={title} aria-label={title}>
+      <X size={13} />
     </button>
   );
 }

@@ -1,17 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
 import { useWikiStore } from '../../../store/wikiStore';
-import { useCategoryStore } from '../../../store/categoryStore';
 import TagsField from '../fields/TagsField';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
 import EntryTypeField from '../fields/EntryTypeField';
-import PropertiesEditView from '../fields/PropertiesEditView';
-import EntryReadSections, { CategoryPropertyRow } from '../fields/EntryReadSections';
-import IconCoverField from '../fields/IconCoverField';
-import { applyDefaultAfterCategoryChange } from '../../../store/templateApply';
-import CategorySelect from '../../ui/CategorySelect';
-import { categoryLabel } from '../../../lib/categories';
-import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
+import EntryReadSections, { CategoryPropertyRow, PropertiesSection } from '../fields/EntryReadSections';
+import CategoryIconCoverRows from '../fields/CategoryIconCoverRows';
 
 export default function WikiPropertiesPanel() {
   const { t } = useTranslation();
@@ -19,7 +13,6 @@ export default function WikiPropertiesPanel() {
   const isEditing = activeView.mode === 'edit';
   const articles = useWikiStore((s) => s.articles);
   const updateArticle = useWikiStore((s) => s.updateArticle);
-  const categories = useCategoryStore((s) => s.categories);
 
   const article = activeView.id ? articles.find((a) => a.id === activeView.id) : null;
 
@@ -38,40 +31,13 @@ export default function WikiPropertiesPanel() {
   }
 
   return (
-    <PropertiesEditView>
-      <EntryTypeField id={article.id} type="wiki" properties={article} />
-
-      <div>
-        <p className="label-xs mb-2">{t('properties.category')}</p>
-        <CategorySelect
-          categories={categories}
-          value={article.category_id}
-          onChange={(category_id) => {
-            const previous = article.category_id;
-            void updateArticle(article.id, { category_id })
-              .then(() => applyDefaultAfterCategoryChange('wiki', article.id, previous, category_id))
-              .catch((e: unknown) => console.error('[WikiPropertiesPanel] category change failed:', e));
-          }}
-          getLabel={(c) => categoryLabel(t, c)}
-          variant="field"
-        />
-      </div>
-
-      <IconCoverField
-        icon={article.icon}
-        cover={article.cover_image}
-        onIconChange={(icon) => updateArticle(article.id, { icon })}
-        onIconRemove={() => updateArticle(article.id, { icon: undefined })}
-        onCoverChange={(cover_image) => updateArticle(article.id, { cover_image })}
-        onCoverRemove={() => updateArticle(article.id, { cover_image: undefined })}
-      />
-
-      <div>
-        <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
-        <LinkedEntriesField content={article.content} inputCls={OP_PROP_SELECT_CLASSES} />
-      </div>
-
+    <>
+      <PropertiesSection>
+        <EntryTypeField id={article.id} type="wiki" properties={article} />
+        <CategoryIconCoverRows entryType="wiki" entry={article} update={(patch) => updateArticle(article.id, patch)} />
+      </PropertiesSection>
+      <LinkedEntriesField content={article.content} />
       <TagsField tags={article.tags ?? []} onChange={(tags) => updateArticle(article.id, { tags })} />
-    </PropertiesEditView>
+    </>
   );
 }

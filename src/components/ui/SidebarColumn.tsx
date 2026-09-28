@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Trash2, X } from 'lucide-react';
-import Button from './Button';
 
 /**
  * Die 56px-Leiste oben in der rechten Seitenleiste. Genauso hoch wie die
@@ -24,8 +23,14 @@ export function SidebarActionBar({ children }: { children?: ReactNode }) {
 
 /**
  * Fertig, Löschen, Abbrechen — die Leiste jedes Bearbeitungsmodus: ein
- * Eintrag (RightSidebar) und die Seite eines eigenen Blocks. Ohne `onDelete`
- * fehlt der Löschen-Knopf; `busy` sperrt Fertig, solange gespeichert wird.
+ * Eintrag (RightSidebar) und die Seiten der Bibliothek. „Fertig" ist die eine
+ * gefüllte Primäraktion, Löschen und Abbrechen sind 30px-Quadrate daneben
+ * (`.edit-bar-*`). Ohne `onDelete` fehlt der Löschen-Knopf; `busy` sperrt
+ * Fertig, solange gespeichert wird.
+ *
+ * Eigene Klassen statt `Button`: dessen tone-Stufen sind getönte Knöpfe mit
+ * 11px-Schrift für Zeilenaktionen; die Leiste des Bearbeitens hat genau eine
+ * gefüllte Primäraktion mit 13px-Schrift. Die Höhe ist dieselbe (`--control-h`).
  */
 export function EditActionBar({ onDone, onDelete, onCancel, busy }: {
   onDone: () => void;
@@ -36,18 +41,18 @@ export function EditActionBar({ onDone, onDelete, onCancel, busy }: {
   const { t } = useTranslation();
   return (
     <SidebarActionBar>
-      <Button tone="jade" fill disabled={busy} title={t('editor.done')} aria-label={t('editor.done')} onClick={onDone}>
+      <button type="button" className="edit-bar-done" disabled={busy} title={t('editor.done')} onClick={onDone}>
         <Check size={14} />
         <span className="truncate">{t('editor.done')}</span>
-      </Button>
+      </button>
       {onDelete && (
-        <Button tone="danger" compact title={t('editor.delete')} aria-label={t('editor.delete')} onClick={onDelete}>
+        <button type="button" className="edit-bar-icon edit-bar-icon--danger" title={t('editor.delete')} aria-label={t('editor.delete')} onClick={onDelete}>
           <Trash2 size={14} />
-        </Button>
+        </button>
       )}
-      <Button tone="neutral" compact title={t('editor.cancel')} aria-label={t('editor.cancel')} onClick={onCancel}>
+      <button type="button" className="edit-bar-icon" title={t('editor.cancel')} aria-label={t('editor.cancel')} onClick={onCancel}>
         <X size={14} />
-      </Button>
+      </button>
     </SidebarActionBar>
   );
 }

@@ -121,10 +121,10 @@ export default function RightSidebar() {
     return <div ref={setListHeaderHost} className="flex flex-col h-full" />;
   }
 
-  // Im Lesen stehen die Abschnitte (`SidebarSection`) ohne Linie untereinander,
-  // der Abstand kommt von hier; im Bearbeiten ziehen die Panels ihre Linien selbst.
+  // Lesen und Bearbeiten zeigen dieselben Abschnitte (`SidebarSection`) ohne
+  // Linie untereinander; der Abstand kommt von hier.
   return (
-    <SidebarColumn bar={<RightSidebarActionBar />} bodyClassName={activeView.mode === 'edit' ? '' : 'flex flex-col gap-5'}>
+    <SidebarColumn bar={<RightSidebarActionBar />} bodyClassName="flex flex-col gap-5">
       <PropertiesContent activeView={activeView} />
       {moduleMeta(activeView.type)?.usesBlocks && <BlockSidebarArea />}
     </SidebarColumn>

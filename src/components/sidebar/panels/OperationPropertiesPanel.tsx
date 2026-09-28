@@ -1,17 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
 import { useOperationStore } from '../../../store/operationStore';
-import { useCategoryStore } from '../../../store/categoryStore';
 import TagsField from '../fields/TagsField';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
 import EntryTypeField from '../fields/EntryTypeField';
-import PropertiesEditView from '../fields/PropertiesEditView';
-import EntryReadSections, { CategoryPropertyRow } from '../fields/EntryReadSections';
-import IconCoverField from '../fields/IconCoverField';
-import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
-import { categoryLabel } from '../../../lib/categories';
-import { applyDefaultAfterCategoryChange } from '../../../store/templateApply';
-import CategorySelect from '../../ui/CategorySelect';
+import EntryReadSections, { CategoryPropertyRow, PropertiesSection } from '../fields/EntryReadSections';
+import CategoryIconCoverRows from '../fields/CategoryIconCoverRows';
 
 /**
  * Die Eigenschaften einer Operation: Kategorie, Icon und Titelbild,
@@ -24,14 +18,11 @@ export default function OperationPropertiesPanel() {
   const isEditing = activeView.mode === 'edit';
   const operations = useOperationStore((s) => s.operations);
   const updateOperation = useOperationStore((s) => s.updateOperation);
-  const categories = useCategoryStore((s) => s.categories);
 
   const op = activeView.id ? operations.find((o) => o.id === activeView.id) : null;
   if (!op) {
     return <p className="text-xs text-stone-600 px-2 py-3">{t('properties.noEntry')}</p>;
   }
-
-  const inputCls = OP_PROP_SELECT_CLASSES;
 
   if (!isEditing) {
     return (
@@ -44,40 +35,13 @@ export default function OperationPropertiesPanel() {
   }
 
   return (
-    <PropertiesEditView>
-      <EntryTypeField id={op.id} type="operation" properties={op} />
-
-      <div>
-        <p className="label-xs mb-2">{t('properties.category')}</p>
-        <CategorySelect
-          categories={categories}
-          value={op.category_id}
-          onChange={(category_id) => {
-            const previous = op.category_id;
-            void updateOperation(op.id, { category_id })
-              .then(() => applyDefaultAfterCategoryChange('operation', op.id, previous, category_id))
-              .catch((e: unknown) => console.error('[OperationPropertiesPanel] category change failed:', e));
-          }}
-          getLabel={(c) => categoryLabel(t, c)}
-          variant="field"
-        />
-      </div>
-
-      <IconCoverField
-        icon={op.icon}
-        cover={op.cover_image}
-        onIconChange={(icon) => updateOperation(op.id, { icon })}
-        onIconRemove={() => updateOperation(op.id, { icon: undefined })}
-        onCoverChange={(cover_image) => updateOperation(op.id, { cover_image })}
-        onCoverRemove={() => updateOperation(op.id, { cover_image: undefined })}
-      />
-
-      <div>
-        <p className="label-xs mb-2">🔗 {t('properties.linkedEntries')}</p>
-        <LinkedEntriesField content={op.content} inputCls={inputCls} />
-      </div>
-
+    <>
+      <PropertiesSection>
+        <EntryTypeField id={op.id} type="operation" properties={op} />
+        <CategoryIconCoverRows entryType="operation" entry={op} update={(patch) => updateOperation(op.id, patch)} />
+      </PropertiesSection>
+      <LinkedEntriesField content={op.content} />
       <TagsField tags={op.tags ?? []} onChange={(tags) => updateOperation(op.id, { tags })} />
-    </PropertiesEditView>
+    </>
   );
 }

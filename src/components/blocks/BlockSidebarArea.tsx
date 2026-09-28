@@ -2,14 +2,11 @@ import { useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } 
 import { useTranslation } from 'react-i18next';
 import { Check, Eye, EyeOff, CopyPlus, GripVertical, MoreHorizontal, Pencil, Plus, Puzzle, Type } from 'lucide-react';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
-import Button from '../ui/Button';
-import SidebarSectionHeader from '../sidebar/fields/SidebarSectionHeader';
 import SidebarSection, { SidebarItemRow } from '../sidebar/fields/SidebarSection';
 import { useUIStore } from '../../store/uiStore';
 import { useBlockSessionStore, type BlockSession } from '../../store/blockSessionStore';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import BlockGlyph from './BlockGlyph';
-import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { usePointerReorder } from '../../hooks/usePointerReorder';
 import { sidebarRowStateClasses } from '../../lib/styleClasses';
 import { resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockTypes';
@@ -29,7 +26,7 @@ function readableBlocks(session: BlockSession): BlockInstance[] {
 
 /** Die aufgeklappten Einstellungen eines Blocks unter seiner Zeile. */
 function BlockSettingsBox({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`mt-1 mb-2 rounded border border-stone-700/50 bg-stone-900/40 px-2 py-2 ${className}`}>{children}</div>;
+  return <div className={`block-settings-panel ${className}`}>{children}</div>;
 }
 
 /**
@@ -94,7 +91,6 @@ function BlockOutline({ session }: { session: BlockSession }) {
 
 function BlockManager({ session }: { session: BlockSession }) {
   const { t } = useTranslation();
-  const [open, toggleOpen] = usePersistedFlag('blocks-sidebar-open', true);
   const [menu, setMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -132,59 +128,58 @@ function BlockManager({ session }: { session: BlockSession }) {
   };
 
   return (
-    <div className="sidebar-divider pb-4 border-t">
-      <SidebarSectionHeader label={t('blocks.sidebarTitle')} open={open} onToggle={toggleOpen} className="pt-4" />
-
-      {open && (
-        <>
-          <div ref={listRef} className="mt-2 space-y-1">
-            {visualItems.map((block) => {
-              const meta = resolveBlockType(block);
-              const settings = blockSettings(session, block, meta);
-              const selected = selectedId === block.id;
-              return (
-                <ManagerRow
-                  key={block.id}
-                  block={block}
-                  meta={meta}
-                  label={blockLabel(t, block, meta)}
-                  typeLabel={blockTypeLabel(t, block, meta)}
-                  renaming={renamingId === block.id}
-                  onRenamed={(title) => {
-                    setRenamingId(null);
-                    if (title !== undefined) api.setAttr(block.id, BLOCK_ATTR.title, title.trim() || null);
-                  }}
-                  selected={selected}
-                  isDragging={draggingId === block.id}
-                  onGripPointerDown={(e) => startDrag(e, block.id)}
-                  onActivate={() => {
-                    if (!selected) api.reveal(block.id);
-                    setSelectedId(selected ? null : block.id);
-                  }}
-                  onToggleHidden={() => api.setAttr(block.id, BLOCK_ATTR.hidden, hiddenAttrValue(!isBlockHidden(block)))}
-                  onOpenMenu={(e) => openRowMenu(e, block, meta)}
-                  settings={settings}
-                />
-              );
-            })}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <Button tone="neutral" small onClick={openAddMenu}>
-              <Plus size={12} />
-              <span>{t('blocks.add')}</span>
-            </Button>
-            {session.templates && (
-              <Button tone="neutral" small onClick={api.openTemplatePicker}>
-                <CopyPlus size={12} />
-                <span>{t('templates.insert.button')}</span>
-              </Button>
-            )}
-          </div>
-        </>
-      )}
+    <>
+      {/* Derselbe Abschnitt wie im Lesen (`BlockOutline`): gleicher Kopf, gleiches
+          Auf/Zu, gleicher Zähler — die Zeilen darin bleiben die der Verwaltung. */}
+      <SidebarSection storageKey="blocks-sidebar-open" label={t('blocks.sidebarTitle')} count={session.blocks.length}>
+        <div ref={listRef} className="space-y-1">
+          {visualItems.map((block) => {
+            const meta = resolveBlockType(block);
+            const settings = blockSettings(session, block, meta);
+            const selected = selectedId === block.id;
+            return (
+              <ManagerRow
+                key={block.id}
+                block={block}
+                meta={meta}
+                label={blockLabel(t, block, meta)}
+                typeLabel={blockTypeLabel(t, block, meta)}
+                renaming={renamingId === block.id}
+                onRenamed={(title) => {
+                  setRenamingId(null);
+                  if (title !== undefined) api.setAttr(block.id, BLOCK_ATTR.title, title.trim() || null);
+                }}
+                selected={selected}
+                isDragging={draggingId === block.id}
+                onGripPointerDown={(e) => startDrag(e, block.id)}
+                onActivate={() => {
+                  if (!selected) api.reveal(block.id);
+                  setSelectedId(selected ? null : block.id);
+                }}
+                onToggleHidden={() => api.setAttr(block.id, BLOCK_ATTR.hidden, hiddenAttrValue(!isBlockHidden(block)))}
+                onOpenMenu={(e) => openRowMenu(e, block, meta)}
+                settings={settings}
+              />
+            );
+          })}
+        </div>
+        {/* Unter einer Linie abgesetzt: die Knöpfe gehören zur Liste, sind aber keine Zeilen darin. */}
+        <div className="block-manager-actions">
+          <button type="button" className="block-manager-button" onClick={openAddMenu}>
+            <Plus size={13} className="flex-shrink-0" />
+            <span className="min-w-0 truncate">{t('blocks.add')}</span>
+          </button>
+          {session.templates && (
+            <button type="button" className="block-manager-button" onClick={api.openTemplatePicker}>
+              <CopyPlus size={13} className="flex-shrink-0" />
+              <span className="min-w-0 truncate">{t('templates.insert.button')}</span>
+            </button>
+          )}
+        </div>
+      </SidebarSection>
 
       {menu && <ContextMenu x={menu.x} y={menu.y} actions={menu.actions} onClose={() => setMenu(null)} />}
-    </div>
+    </>
   );
 }
 
@@ -224,8 +219,10 @@ function ManagerRow({
     <div>
       <div
         onContextMenu={(e) => { e.preventDefault(); onOpenMenu(e); }}
-        className={`w-full flex items-center gap-2 rounded border px-2 py-1.5 transition-all select-none ${
-          sidebarRowStateClasses({ dragging: isDragging, selected })
+        className={`w-full flex items-center gap-2 rounded border pl-1 pr-2 py-1.5 transition-all select-none ${
+          // Ohne Rahmen, solange sie weder gewählt noch gezogen wird — die
+          // Zustände darüber teilt sie mit den Elementen des Altars.
+          isDragging || selected ? sidebarRowStateClasses({ dragging: isDragging, selected }) : 'block-manager-row--idle'
         } ${hidden ? 'opacity-50' : ''}`}
       >
         <span

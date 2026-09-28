@@ -70,6 +70,21 @@ html[data-theme='emerald-noctis'] {
      der gedaempften Jade-Schiene. */
   --switch-thumb: #f5f5f4;
   --switch-thumb-on: #9dffd5;
+  /* Bedienelemente der Bearbeiten-Seitenleiste (design.md, Edit Sidebar):
+     Wert-Knöpfe und Eingaben (`--field-*`), die eingelassenen Suchfelder
+     (`--field-inset-bg`) und die Primäraktion „Fertig" (`--primary-solid-*`,
+     gebaut wie `--danger-solid-*`). */
+  --field-bg: #1f1915;
+  --field-bg-hover: #261f1a;
+  --field-border: rgba(95, 81, 68, 0.55);
+  --field-border-hover: rgba(168, 162, 158, 0.55);
+  --field-inset-bg: #15110d;
+  --primary-solid-bg: rgba(0, 138, 87, 0.3);
+  --primary-solid-border: rgba(0, 196, 127, 0.44);
+  --primary-solid-text: #dcfff0;
+  --primary-solid-hover-bg: rgba(0, 138, 87, 0.42);
+  --danger-soft-text: #f4a7ad;
+  --danger-soft-border: rgba(232, 100, 110, 0.5);
   /* Rahmen + Blatt (design.md, Shell Layout): Titelleiste, Rail und linke
      Seitenleiste sind der Rahmen, Inhalt und rechte Seitenleiste das Blatt darauf. */
   --shell-bg: #100d0a;

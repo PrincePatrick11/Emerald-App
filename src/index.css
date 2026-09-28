@@ -741,6 +741,20 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-subtle);
   }
 
+  .switch-row--sidebar,
+  .switch-row--panel {
+    color: var(--text-secondary);
+    transition: background-color 150ms;
+  }
+
+  .switch-row--sidebar:hover {
+    background-color: var(--interactive-hover);
+  }
+
+  .switch-row-hint {
+    color: var(--text-subtle);
+  }
+
   .switch-row--disabled {
     color: var(--text-subtle);
     cursor: not-allowed;
@@ -1096,6 +1110,466 @@ button.sidebar-section-title:focus-visible {
 }
 
 /* Hover-, Auswahl- und Fokusfläche von `.sidebar-row` stehen bei `.filter-row`. */
+
+/* ── Bearbeiten-Seitenleiste (EditProperties, design.md: Edit Sidebar) ──
+   Dieselben Abschnitte und Zeilen wie die Leseansicht; nur die Werte werden
+   zu Bedienelementen. Farben aus den `--field-*`-Tokens der Themes. */
+
+/* Leiste: „Fertig" 30px hoch (`--control-h`, wie „Bearbeiten" im Lesen),
+   daneben Löschen und Abbrechen als Quadrate derselben Höhe. */
+.edit-bar-done {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  height: var(--control-h);
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--primary-solid-border);
+  background-color: var(--primary-solid-bg);
+  color: var(--primary-solid-text);
+  font-size: 13px;
+  font-weight: 600;
+  transition: background-color 150ms;
+}
+
+.edit-bar-done:hover {
+  background-color: var(--primary-solid-hover-bg);
+}
+
+.edit-bar-icon {
+  display: flex;
+  flex-shrink: 0;
+  width: var(--control-h);
+  height: var(--control-h);
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid var(--field-border);
+  background-color: var(--field-bg);
+  color: var(--text-muted);
+  transition: color 150ms, border-color 150ms, background-color 150ms;
+}
+
+.edit-bar-icon:hover {
+  border-color: var(--field-border-hover);
+  background-color: var(--field-bg-hover);
+  color: var(--text-secondary);
+}
+
+.edit-bar-icon--danger:hover {
+  border-color: var(--danger-soft-border);
+  color: var(--danger-soft-text);
+}
+
+.edit-bar-done:disabled,
+.edit-bar-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Der Wert einer Eigenschaft als Knopf: Auswahl (mit Chevron) oder Medium
+   (nur Vorschau). Höchstens 130px, der Text kürzt am Ende. */
+.prop-value-btn {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 130px;
+  height: 1.75rem;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0 0.375rem 0 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--field-border);
+  background-color: var(--field-bg);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: border-color 150ms, background-color 150ms;
+}
+
+.prop-value-btn:hover,
+.prop-value-btn[aria-expanded='true'] {
+  border-color: var(--field-border-hover);
+  background-color: var(--field-bg-hover);
+}
+
+.prop-value-btn--media {
+  padding: 0 0.25rem;
+}
+
+.prop-value-btn--muted {
+  color: var(--text-subtle);
+  font-weight: 400;
+}
+
+.prop-value-btn > svg {
+  flex-shrink: 0;
+  color: var(--text-subtle);
+}
+
+.prop-value-btn--muted > svg {
+  color: var(--text-muted);
+}
+
+.prop-value-thumb {
+  flex-shrink: 0;
+  height: 18px;
+  border-radius: 3px;
+  object-fit: cover;
+}
+
+/* Typ als Segmente: eingelassene Schiene, das aktive Segment in Jade. */
+.prop-segments {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 7px;
+  border: 1px solid var(--field-border);
+  background-color: var(--field-inset-bg);
+}
+
+.prop-segment {
+  display: flex;
+  width: 26px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  transition: color 150ms, background-color 150ms;
+}
+
+.prop-segment:hover:not(:disabled) {
+  background-color: var(--interactive-hover);
+  color: var(--text-secondary);
+}
+
+.prop-segment--active,
+.prop-segment--active:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 44%, transparent);
+  background-color: var(--menu-item-active-bg);
+  color: var(--menu-item-active-text);
+}
+
+.prop-segment:disabled {
+  cursor: not-allowed;
+}
+
+/* Eingelassenes Suchfeld unter einer Liste („Eintrag verknüpfen …", „Tag
+   hinzufügen …"): Icon und Eingabe in einem 32px-Rahmen. */
+.sidebar-add-field {
+  display: flex;
+  height: 2rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.625rem;
+  border-radius: 6px;
+  border: 1px solid var(--field-border);
+  background-color: var(--field-inset-bg);
+  color: var(--text-subtle);
+  font-size: 13px;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.sidebar-add-field:hover {
+  border-color: var(--field-border-hover);
+}
+
+.sidebar-add-field:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.sidebar-add-field > svg {
+  flex-shrink: 0;
+}
+
+/* Theme-Brücken setzen jedem input einen Rahmen und Hintergrund — hier
+   gehört beides dem Rahmen drumherum. */
+html[data-theme] .sidebar-add-field input,
+.sidebar-add-field input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  outline: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+html[data-theme] .sidebar-add-field input::placeholder,
+.sidebar-add-field input::placeholder {
+  color: var(--text-subtle);
+}
+
+/* Das „×" am Ende einer Listenzeile (Verlinkungen) und eines Tag-Chips. */
+.sidebar-row-remove {
+  display: flex;
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--text-subtle);
+  transition: color 150ms, background-color 150ms;
+}
+
+.sidebar-row-remove:hover {
+  color: var(--danger-soft-text);
+  background-color: var(--interactive-hover);
+}
+
+.tag-chip-remove {
+  display: flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  transition: background-color 150ms;
+}
+
+.tag-chip-remove:hover {
+  /* Bewusst ohne Token: dunkelt die Tagfarbe des Chips ab, in beiden Themes gleich. */
+  background-color: rgba(0, 0, 0, 0.25);
+}
+
+/* Eine Aktion als Zeile statt als umrandeter Knopf („Alle aktualisieren"). */
+.sidebar-action-row {
+  display: flex;
+  width: 100%;
+  height: 2rem;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0 0.625rem;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: left;
+  transition: color 150ms, background-color 150ms;
+}
+
+.sidebar-action-row:hover:not(:disabled) {
+  background-color: var(--interactive-hover);
+  color: var(--menu-item-active-text);
+}
+
+.sidebar-action-row:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Die Einstellungen eines Blocks unter seiner Zeile (`BlockSettingsBox`):
+   eingelassene Fläche, darin Beschriftung über Eingabe wie in der übrigen
+   Seitenleiste — 12px, nicht in Großbuchstaben, damit sie nicht mit den
+   Abschnittsköpfen konkurriert. */
+.block-settings-panel {
+  margin: 4px 0 6px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--field-border);
+  background-color: var(--field-inset-bg);
+}
+
+.panel-field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.panel-subheading {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-subtle);
+}
+
+.panel-subheading--divided {
+  padding-top: 10px;
+  border-top: 1px solid var(--field-border);
+}
+
+.panel-input {
+  width: 100%;
+  min-width: 0;
+  height: 2rem;
+  padding: 0 0.625rem;
+  border-radius: 6px;
+  border: 1px solid var(--field-border);
+  background-color: var(--field-bg);
+  color: var(--text-secondary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.panel-input::placeholder {
+  color: var(--text-subtle);
+}
+
+.panel-input:hover {
+  border-color: var(--field-border-hover);
+}
+
+.panel-input:focus {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+/* „+ Option hinzufügen" unter den Optionen: eine leise Aktionszeile. */
+.panel-add-row {
+  display: flex;
+  height: 1.75rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.25rem;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+  transition: color 150ms;
+}
+
+.panel-add-row:hover {
+  color: var(--menu-item-active-text);
+}
+
+.panel-add-row:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+/* Unter der Block-Liste: eine Linie, darunter „Block hinzufügen" und
+   „Vorlage einfügen" als volle, zentrierte Knöpfe untereinander. */
+.block-manager-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--field-border);
+}
+
+.block-manager-button {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0 0.625rem;
+  border-radius: 6px;
+  border: 1px solid var(--field-border);
+  background-color: var(--field-bg);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  transition: border-color 150ms, background-color 150ms;
+}
+
+.block-manager-button:hover {
+  border-color: var(--field-border-hover);
+  background-color: var(--field-bg-hover);
+}
+
+.block-manager-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+html[data-theme] .block-manager-actions,
+html[data-theme] .block-manager-button {
+  border-color: var(--field-border);
+}
+
+html[data-theme] .block-manager-button:hover {
+  border-color: var(--field-border-hover);
+}
+
+/* Theme-Brücken setzen jedem input Rahmen, Fläche und Fokus — hier gehören
+   sie `.panel-input`; und Parchments `*`-Rahmenregel trifft auch den Kasten. */
+html[data-theme] .block-settings-panel,
+html[data-theme] .panel-input {
+  border-color: var(--field-border);
+}
+
+html[data-theme] .panel-input {
+  background-color: var(--field-bg);
+  color: var(--text-secondary);
+}
+
+html[data-theme] .panel-input:hover {
+  border-color: var(--field-border-hover);
+}
+
+html[data-theme] .panel-input:focus {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+  outline: none;
+}
+
+html[data-theme] .panel-subheading--divided {
+  border-color: var(--field-border);
+}
+
+/* Parchment setzt mit `html[data-theme='emerald-parchment'] *` jeden Rahmen
+   (siehe `.settings-nav-item-idle`) — die Rahmenfarben hier brauchen deshalb
+   den Attribut-Selektor davor, sonst gälte dort `--border-soft`. */
+html[data-theme] .edit-bar-done {
+  border-color: var(--primary-solid-border);
+}
+
+html[data-theme] .edit-bar-icon,
+html[data-theme] .prop-value-btn,
+html[data-theme] .prop-segments,
+html[data-theme] .sidebar-add-field {
+  border-color: var(--field-border);
+}
+
+html[data-theme] .edit-bar-icon:hover,
+html[data-theme] .prop-value-btn:hover,
+html[data-theme] .prop-value-btn[aria-expanded='true'],
+html[data-theme] .sidebar-add-field:hover {
+  border-color: var(--field-border-hover);
+}
+
+html[data-theme] .edit-bar-icon--danger:hover {
+  border-color: var(--danger-soft-border);
+}
+
+html[data-theme] .sidebar-add-field:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+html[data-theme] .prop-segment {
+  border-color: transparent;
+}
+
+html[data-theme] .prop-segment--active {
+  border-color: color-mix(in srgb, var(--accent) 44%, transparent);
+}
+
+.prop-value-btn:focus-visible,
+.prop-segment:focus-visible,
+.sidebar-row-main:focus-visible,
+.sidebar-row-remove:focus-visible,
+.tag-chip-remove:focus-visible,
+.sidebar-action-row:focus-visible,
+.edit-bar-done:focus-visible,
+.edit-bar-icon:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
 
 /* ---- Funktionale Blöcke (components/blocks/BlockStack) ----
    Lesemodus: keine sichtbare Hülle, die Blöcke fließen wie ein Dokument.
@@ -1547,6 +2021,20 @@ button.block-altar:hover .block-altar-title {
 
 .block-row-action:hover,
 .block-row-action--on {
+  color: var(--text-secondary);
+}
+
+/* Eine Zeile der Block-Verwaltung in Ruhe: kein Rahmen, keine Fläche, Hover
+   wie die übrigen Zeilen der Seitenleiste. Der Attribut-Selektor gegen
+   Parchments `*`-Rahmenregel (siehe `.settings-nav-item-idle`). */
+html[data-theme] .block-manager-row--idle,
+.block-manager-row--idle {
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.block-manager-row--idle:hover {
+  background-color: var(--interactive-hover);
   color: var(--text-secondary);
 }
 

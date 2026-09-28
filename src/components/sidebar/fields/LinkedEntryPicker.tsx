@@ -18,11 +18,6 @@ export function LinkItemIcon({ item }: { item: SuggestionItem }) {
 }
 
 interface Props<T> {
-  /**
-   * Der Block über der Suchzeile, typischerweise `LinkedEntryChip`s. Ihre
-   * Anordnung gehört dem Feld — das Verlinkungs-Feld gruppiert sie nach Kategorie.
-   */
-  chips?: ReactNode;
   /** Treffer zur aktuellen Eingabe; das Filtern bleibt beim Aufrufer, der
    *  seinen Bestand kennt. */
   results: T[];
@@ -32,8 +27,12 @@ interface Props<T> {
   query: string;
   onQueryChange: (query: string) => void;
   placeholder: string;
-  /** Überschreibt die Klassen der Suchzeile; Standard ist die der Panels. */
-  inputCls?: string;
+  /**
+   * Das eingelassene Feld der Bearbeiten-Seitenleiste (`.sidebar-add-field`):
+   * Icon vor der Eingabe, beides in einem Rahmen. Ohne es hat die Suchzeile
+   * den Feld-Look der Panels.
+   */
+  fieldIcon?: ReactNode;
 }
 
 /** Höhe des Menüs (`max-h-40`) — ab hier klappt es nach oben. */
@@ -100,8 +99,8 @@ export function LinkedEntryChip({
  * eines liest die Links aus dem Inhalt des Eintrags.
  */
 export default function LinkedEntryPicker<T>({
-  chips, results, resultKey, renderResult, onSelect,
-  query, onQueryChange, placeholder, inputCls = OP_PROP_SELECT_CLASSES,
+  results, resultKey, renderResult, onSelect,
+  query, onQueryChange, placeholder, fieldIcon,
 }: Props<T>) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -146,15 +145,16 @@ export default function LinkedEntryPicker<T>({
   };
 
   return (
-    <div className="space-y-1.5">
-      {chips}
-      <div ref={wrapRef} className="relative">
+    <div>
+      <div ref={wrapRef} className={fieldIcon ? 'sidebar-add-field relative' : 'relative'}>
+        {fieldIcon}
         <input
           value={query}
           onChange={(e) => { onQueryChange(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
           placeholder={placeholder}
-          className={inputCls}
+          aria-label={placeholder}
+          className={fieldIcon ? 'selectable' : OP_PROP_SELECT_CLASSES}
         />
         {open && createPortal(
           <div

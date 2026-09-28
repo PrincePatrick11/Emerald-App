@@ -1,9 +1,9 @@
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImagePlus, Smile, X } from 'lucide-react';
-import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, isImageIcon, readFileAsDataUrl } from '../../../lib/helpers';
+import { ACCEPTED_IMAGE_MIME, isImageIcon } from '../../../lib/helpers';
 import EmojiPicker from '../../ui/EmojiPicker';
-import { prepareImageDataUrl } from '../../../lib/imageLimits';
+import { readIconFile } from '../../../lib/imageLimits';
 import { reportImageError } from '../../../store/imageNoticeStore';
 import Button from '../../ui/Button';
 
@@ -38,13 +38,13 @@ interface FaviconProps {
  * entfernen) in einer Zeile.
  *
  * Gibt nur diese Zeile zurück, ohne Beschriftung — die bringen die Aufrufer
- * mit: `IconCoverField` teilt sich die Überschrift mit dem Titelbild, der
- * Altar hat seinen eigenen aufklappbaren Kopf. Nur zum Bearbeiten; gelesen
+ * mit: `IconField` (die Seite einer Sprache) seine Überschrift, der
+ * Altar seinen eigenen aufklappbaren Kopf. Die Bearbeiten-Seitenleiste der
+ * Einträge und Bibliotheksseiten nimmt stattdessen `MediaPropertyRow`. Nur zum Bearbeiten; gelesen
  * wird über `FaviconGlyph`.
  *
  * Die Aktionen sind tonkodierte `Button`s in der dichten 24px-Stufe, wie die
- * Kategorien-Köpfe sie benutzen — sie müssen sich im `IconCoverField` eine
- * Textzeile mit dem Titelbild-Knopf teilen. Beschriftet nur mit dem Stichwort,
+ * Kategorien-Köpfe sie benutzen. Beschriftet nur mit dem Stichwort,
  * die ausgeschriebene Form steht im `title`.
  */
 export default function Favicon({ value, onChange, onRemove }: FaviconProps) {
@@ -56,11 +56,9 @@ export default function Favicon({ value, onChange, onRemove }: FaviconProps) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    if (!isAcceptedImageFile(file) || file.type === 'image/svg+xml') return;
     try {
-      // Eintrags- und Altar-Icons liegen inline in der Zeile — dieselben Grenzen
-      // wie beim Titelbild daneben.
-      onChange?.(await prepareImageDataUrl(await readFileAsDataUrl(file)));
+      const icon = await readIconFile(file);
+      if (icon) onChange?.(icon);
     } catch (err) {
       // Lieber gar nichts setzen als ein leeres Icon: ein abgebrochener Lesevorgang
       // hat kein Ergebnis, und der bisherige Wert ist besser als keiner.

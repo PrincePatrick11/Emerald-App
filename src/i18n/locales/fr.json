@@ -492,7 +492,6 @@
       "undo": "Annuler",
       "redo": "Rétablir"
     },
-    "addTags": "Ajouter des tags…",
     "unsaved": "Modifications non enregistrées"
   },
   "moonPhase": {
@@ -552,10 +551,13 @@
     "icon": "Icône",
     "emoji": "Emoji",
     "coverImage": "Image de couverture",
-    "iconAndCover": "Icône + Image de couverture",
-    "addCoverImage": "Ajouter une image de couverture",
     "change": "Modifier",
-    "remove": "Supprimer"
+    "remove": "Supprimer",
+    "add": "Ajouter",
+    "chooseImage": "Choisir une image",
+    "linkEntry": "Lier une entrée …",
+    "addTag": "Ajouter un tag …",
+    "removeTag": "Retirer le tag"
   },
   "filters": {
     "all": "Toutes",

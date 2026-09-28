@@ -7,38 +7,44 @@ import type { SelectOption } from '../../lib/blocks/fields';
 /**
  * Die Optionen eines Auswahl-Elements: umbenennen, entfernen, hinzufügen.
  * Werte speichern die Options-ID, Umbenennen verliert also nichts. Geteilt von
- * der Block-Seitenleiste und dem Baukasten der Blöcke-Ansicht.
+ * der Block-Seitenleiste (`variant="panel"`: Beschriftung, Eingaben und
+ * „×" im Stil der Seitenleiste) und dem Baukasten der Blöcke-Ansicht.
  */
-export default function OptionsEditor({ options, onChange }: { options: SelectOption[]; onChange: (options: SelectOption[]) => void }) {
+export default function OptionsEditor({ options, onChange, variant = 'default' }: {
+  options: SelectOption[];
+  onChange: (options: SelectOption[]) => void;
+  variant?: 'default' | 'panel';
+}) {
   const { t } = useTranslation();
+  const panel = variant === 'panel';
   return (
-    <div className="space-y-1">
-      <p className="label-xs">{t('blocks.fields.options')}</p>
+    <div className={panel ? 'flex flex-col gap-1.5' : 'space-y-1'}>
+      <p className={panel ? 'panel-field-label !mb-0' : 'label-xs'}>{t('blocks.fields.options')}</p>
       {options.map((option) => (
         <div key={option.id} className="flex items-center gap-1.5">
           <input
-            className={OP_PROP_SELECT_CLASSES}
+            className={panel ? 'panel-input selectable' : OP_PROP_SELECT_CLASSES}
             value={option.label}
             placeholder={t('blocks.fields.optionPlaceholder')}
             onChange={(e) => onChange(options.map((o) => (o.id === option.id ? { ...o, label: e.target.value } : o)))}
           />
           <button
             type="button"
-            className="block-row-action"
+            className={panel ? 'sidebar-row-remove' : 'block-row-action'}
             onClick={() => onChange(options.filter((o) => o.id !== option.id))}
             title={t('blocks.fields.removeOption')}
             aria-label={t('blocks.fields.removeOption')}
           >
-            <X size={12} />
+            <X size={panel ? 13 : 12} />
           </button>
         </div>
       ))}
       <button
         type="button"
-        className="block-insert-btn"
+        className={panel ? 'panel-add-row' : 'block-insert-btn'}
         onClick={() => onChange([...options, { id: generateId(), label: '' }])}
       >
-        <Plus size={12} />
+        <Plus size={panel ? 13 : 12} />
         <span>{t('blocks.fields.addOption')}</span>
       </button>
     </div>

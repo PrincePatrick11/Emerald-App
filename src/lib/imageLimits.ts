@@ -1,5 +1,6 @@
 import { useSettingsStore } from '../store/settingsStore';
 import { scaleToMaxEdge } from './shrinkImage';
+import { isAcceptedImageFile, readFileAsDataUrl } from './helpers';
 
 /** Ein Bild, das auch nach dem Verkleinern über der Dateigröße des Vaults liegt. */
 export class ImageTooLargeError extends Error {
@@ -60,6 +61,19 @@ export async function prepareImageDataUrl(dataUrl: string, options: { capBytes?:
     if (dataUrlBytes(scaled) > maxBytes) throw new ImageTooLargeError(maxBytes);
   }
   return scaled;
+}
+
+/**
+ * Eine gewählte Datei als Icon (Eintrag, Vorlage, Block, Altar): nur die
+ * angenommenen Bildformate und kein SVG — Icons liegen inline in der Zeile —,
+ * verkleinert wie jedes Bild. `null` für eine abgelehnte Datei; die
+ * Fehlermeldung bleibt beim Aufrufer.
+ *
+ * @throws wie `prepareImageDataUrl`, oder wenn das Lesen abbricht.
+ */
+export async function readIconFile(file: File): Promise<string | null> {
+  if (!isAcceptedImageFile(file) || file.type === 'image/svg+xml') return null;
+  return prepareImageDataUrl(await readFileAsDataUrl(file));
 }
 
 /** Ob die Grenzen des Vaults überhaupt etwas an einem Bild ändern können. */

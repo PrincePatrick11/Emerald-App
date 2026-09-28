@@ -448,7 +448,7 @@ All image upload inputs across the app accept only these MIME types: **PNG**, **
 
 - Altar background and icon uploads (`AltarSidebarPanel`)
 - Altar library item images (`AltarLibraryStrip`)
-- Operation and wiki article icons and cover images (`Favicon`/`Banner`, used by `OperationPropertiesPanel`/`WikiPropertiesPanel`)
+- Operation and wiki article icons and cover images, template and block icons (`MediaPropertyRow` in `EditProperties`)
 - Editor image insert via the toolbar (`EditorToolbar`)
 - Paste events in the rich-text editor (`RichEditor`)
 - Finder drag-and-drop into the rich-text editor (`RichEditor`)
