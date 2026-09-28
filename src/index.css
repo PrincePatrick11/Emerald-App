@@ -656,12 +656,25 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
   .filter-row:hover {
     color: var(--text-primary);
+  }
+
+  /* Fläche für Hover und Auswahl teilen sich die Filterzeilen mit den
+     Listenzeilen der Leseansicht (`.sidebar-row`, `SidebarItemRow`) — nur
+     die Textfarbe bleibt je eigen. */
+  .filter-row:hover,
+  .sidebar-row:hover {
     background-color: var(--interactive-hover);
   }
 
   .filter-row--active,
   .filter-row--active:hover {
     color: var(--menu-item-active-text);
+  }
+
+  .filter-row--active,
+  .filter-row--active:hover,
+  .sidebar-row--active,
+  .sidebar-row--active:hover {
     background-color: var(--menu-item-active-bg);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent);
   }
@@ -740,6 +753,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      hat aber keine generische button:focus-visible-Regel (design.md, Open
      Point 8) — ohne eigenen Ring blieben sie dort tastatur-unsichtbar. */
   .filter-row:focus-visible,
+  .sidebar-row:focus-visible,
   .switch:focus-visible,
   .settings-choice-btn:focus-visible,
   .settings-nav-item-idle:focus-visible,
@@ -1081,20 +1095,7 @@ button.sidebar-section-title:focus-visible {
   transition: background-color 150ms;
 }
 
-.sidebar-row:hover {
-  background-color: var(--interactive-hover);
-}
-
-.sidebar-row--active,
-.sidebar-row--active:hover {
-  background-color: var(--menu-item-active-bg);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent);
-}
-
-.sidebar-row:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--focus-ring);
-}
+/* Hover-, Auswahl- und Fokusfläche von `.sidebar-row` stehen bei `.filter-row`. */
 
 /* ---- Funktionale Blöcke (components/blocks/BlockStack) ----
    Lesemodus: keine sichtbare Hülle, die Blöcke fließen wie ein Dokument.

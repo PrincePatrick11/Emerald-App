@@ -689,7 +689,7 @@ const [gridOpen, setGridOpen] = useState(true);
           />
           {placementsOpen && <div ref={listRef} className="mt-2 space-y-1 pr-1" onClick={(e) => { if (e.target === e.currentTarget) selectPlacement(null); }}>
             {sortedPlacements.length === 0 && (
-              <p className="px-2 py-2 text-xs text-stone-600">{t('altar.noPlacedElements')}</p>
+              <p className="px-2 py-2 text-xs text-stone-600">{t('altar.noElementsPlaced')}</p>
             )}
             {visualPlacements.map((placement) => (
               <div key={placement.id} className="space-y-1">

@@ -54,6 +54,9 @@ function byCategory(a: SuggestionItem, b: SuggestionItem): number {
 
 type LegacyIds = Props['legacyIds'];
 
+const NO_ITEMS: SuggestionItem[] = [];
+const NO_KEYS: string[] = [];
+
 /**
  * Die Verlinkungen eines Eintrags, nach Kategorie sortiert: die Link-Chips
  * seines Inhalts, dazu die alten Spalten (`legacyIds`). `pending`/`removed`
@@ -92,9 +95,6 @@ function useLinkedEntries(
     return out.sort((a, b) => byCategory(a.item, b.item));
   }, [content, legacyIds, pending, removed, byKey]);
 }
-
-const NO_ITEMS: SuggestionItem[] = [];
-const NO_KEYS: string[] = [];
 
 /**
  * Ein Klick zeigt die Stelle im Eintrag, an der der Link steht. Nur wenn der

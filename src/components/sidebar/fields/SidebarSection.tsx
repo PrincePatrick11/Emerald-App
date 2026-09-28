@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
 import { usePersistedFlag } from '../../../hooks/usePersistedFlag';
+import SidebarSectionHeader from './SidebarSectionHeader';
 
 /**
  * Ein einklappbarer Abschnitt der Leseansicht in der rechten Seitenleiste —
@@ -24,11 +24,7 @@ export default function SidebarSection({ storageKey, label, count, children }: {
   const [open, toggle] = usePersistedFlag(storageKey, true);
   return (
     <section aria-label={label}>
-      <button type="button" onClick={toggle} aria-expanded={open} className="sidebar-section-title w-full px-1">
-        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        {label}
-        {count !== undefined && <span className="sidebar-section-count">{count}</span>}
-      </button>
+      <SidebarSectionHeader label={label} open={open} onToggle={toggle} count={count} className="w-full px-1" />
       {open && <div className="-mx-1 mt-1.5 flex flex-col gap-px">{children}</div>}
     </section>
   );

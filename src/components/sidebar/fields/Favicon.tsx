@@ -31,24 +31,23 @@ interface FaviconProps {
   value?: string | null;
   onChange?: (value: string) => void;
   onRemove?: () => void;
-  readOnly?: boolean;
 }
 
 /**
  * Das Icon-Feld: Glyph plus die drei Aktionen (Bild wählen, Emoji wählen,
  * entfernen) in einer Zeile.
  *
- * Gibt nur diese Zeile zurück: keine Beschriftung, kein „— Keine —" im
- * Lesemodus. Beides bringen die Aufrufer mit — `IconCoverField` teilt sich die
- * Überschrift mit dem Titelbild und trägt das „— Keine —" für beide Felder
- * zusammen, der Altar hat seinen eigenen aufklappbaren Kopf.
+ * Gibt nur diese Zeile zurück, ohne Beschriftung — die bringen die Aufrufer
+ * mit: `IconCoverField` teilt sich die Überschrift mit dem Titelbild, der
+ * Altar hat seinen eigenen aufklappbaren Kopf. Nur zum Bearbeiten; gelesen
+ * wird über `FaviconGlyph`.
  *
  * Die Aktionen sind tonkodierte `Button`s in der dichten 24px-Stufe, wie die
  * Kategorien-Köpfe sie benutzen — sie müssen sich im `IconCoverField` eine
  * Textzeile mit dem Titelbild-Knopf teilen. Beschriftet nur mit dem Stichwort,
  * die ausgeschriebene Form steht im `title`.
  */
-export default function Favicon({ value, onChange, onRemove, readOnly = false }: FaviconProps) {
+export default function Favicon({ value, onChange, onRemove }: FaviconProps) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const pickFile = () => inputRef.current?.click();
@@ -68,8 +67,6 @@ export default function Favicon({ value, onChange, onRemove, readOnly = false }:
       reportImageError(err, 'icon');
     }
   };
-
-  if (readOnly) return <FaviconGlyph value={value} />;
 
   return (
     <>

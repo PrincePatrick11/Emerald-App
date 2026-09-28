@@ -154,29 +154,32 @@ the stack.
 
 | Building block | For | Extension point |
 | --- | --- | --- |
-| `SidebarSectionHeader` | the collapsible section heading of the right sidebar — chevron plus small uppercase label on `.sidebar-section-title` (theme variables, focus ring; `PropertySummarySectionTitle` shares the class). Controlled, because callers keep open state differently (the altar per altar in one localStorage object, the block manager via `usePersistedFlag`). Replaced six hand-written copies in `AltarSidebarPanel` | `label`, `open`, `onToggle`, `className` (spacing only — the wrapper stays the caller's) |
-| `PropertiesReadView` | layout shell of read mode (section title, footnote) | `children` |
+| `SidebarSectionHeader` | the collapsible section heading of the right sidebar's *edit*-mode panels — chevron plus small uppercase label on `.sidebar-section-title` (theme variables, focus ring; `SidebarSection`, below, shares the class). Controlled, because callers keep open state differently (the altar per altar in one localStorage object, the block manager via `usePersistedFlag`). Replaced six hand-written copies in `AltarSidebarPanel` | `label`, `open`, `onToggle`, `className` (spacing only — the wrapper stays the caller's) |
+| `SidebarSection` | a collapsible section of the right sidebar's *read* mode — Properties, Linked entries, Tags, Blocks, the Altar's Elements. Chevron, label and an optional count on `.sidebar-section-title`; open/closed is its own `usePersistedFlag(storageKey)`, so it survives a restart per section rather than per caller. Sits flush with the sidebar's edge — the header at `px-1`, the row content pulled out `-mx-1` and back in `px-2.5`, so only a row's hover area reaches into the margin (a deliberate, commented exception to the padding rule below). Exports `SidebarPropertyRow` (icon, label, value — `muted` for an empty value like "None"/"Off"; the label truncates before the value does, the value capped at 65%), `SidebarItemRow` (a clickable row — icon, label, right-aligned `meta` — for a linked entry, a block, a placed altar element; `active` marks the selected one), and `SidebarEmpty` (a section's empty-state line) | `storageKey`, `label`, `count` |
+| `EntryReadSections` | Journal/Wiki/Operations' read-mode sidebar body: `PropertiesSection` (wraps `SidebarSection` under `properties.title`, omitted entirely when the caller passes no `properties`) followed by `LinkedEntriesSection` and `TagsSection` (both below). Also exports `CategoryPropertyRow`, the category-as-property row shared by Wiki/Operations (a trashed category shows "None", not its raw id) | `properties`, `content`, `legacyIds`, `tags` |
 | `PropertiesEditView` | layout shell of edit mode | `children` |
-| `PropertySummaryRow` | a single label/value row in read mode | `value: ReactNode`, `badge` (`jade`/`muted`) |
-| `IconCoverField` | icon and cover image under one heading ("Icon + Cover Image") and one wrapping button row, for the two modules that have both (Wiki, Operations) — composes `Favicon` and `Banner`; in read mode it shows the "None" fallback itself, once, only when neither is set | `readOnly` |
-| `Favicon` | emoji-or-image picker including upload, in edit and read-only mode. Renders as a fragment — no heading, no wrapper, no "None" fallback — so every caller supplies those: `IconCoverField` for Wiki/Operations, `AltarSidebarPanel` directly under its own collapsible icon header | `readOnly` |
-| `Banner` | cover image picker including upload, likewise a bare fragment — used only inside `IconCoverField` | `readOnly` |
+| `IconCoverField` | icon and cover image under one heading ("Icon + Cover Image") and one wrapping button row, for the two modules that have both (Wiki, Operations) — composes `Favicon` and `Banner`. Edit-mode only now; read mode shows both inline in the entry itself, not in the sidebar | — |
+| `Favicon` | emoji-or-image picker including upload. Renders as a fragment — no heading, no wrapper, no "None" fallback — so every caller supplies those: `IconCoverField` for Wiki/Operations, `AltarSidebarPanel` directly under its own collapsible icon header | — |
+| `Banner` | cover image picker including upload, likewise a bare fragment — used only inside `IconCoverField` | — |
 | `SelectField` | the properties panels' native category-field select — label row, `op-prop-select` styling, empty option, `'' ↔ null` conversion. Used by Operations (Charging Technique); Journal's Paradigm/Bannung/Meditation fields were retired with migration v37. Deliberately native, not `CategorySelect`: these are small fixed article lists with no builtin/custom distinction — the themed picker is for categories only | `getId`/`getLabel` accessors, `noneLabel` |
 | `LinkedEntryPicker` | the shared chrome behind `LinkedEntriesField` (below): search input, portalled `fixed`/`z-9999` result menu at `document.body` (the field lives in the right sidebar's `overflow-y-auto`, where an absolutely-positioned menu would be clipped), outside-click, empty-state, flip-up when short on room below. `chips` is a plain `ReactNode` slot above the search input, laid out by the caller (`LinkedEntriesField`'s own category-grouped rows) rather than wrapped by the picker itself — a shape two now-removed single-module id fields (`LinkedOpsInput`/`LinkedWikiInput`, routine editing's operation/wiki pickers) used to share too. Exports `LinkedEntryChip` (the chip itself — `onClick` makes the label jump to it, `onRemove` adds the "×") | `chips`, `results`/`resultKey`/`renderResult`, `inputCls` |
 | `LinkItemIcon` | a link target's icon in chips and result rows — image (altar), emoji, or the type's default (same file as `LinkedEntryPicker`; used by `LinkedEntriesField` and the fields block's link element) | `item` |
-| `LinkedEntriesField` | Journal/Wiki/Operations' "Linked entries" sidebar field. Reads what the entry links out of its own `content` (`extractInternalLinks`) across all five entry types, rather than an id array; in edit mode, picking a result appends a link block into the editor and removing one asks the editor to delete it — both via the `lib/links.ts` event protocol, since the field has no reference to the TipTap instance. Chips are grouped by `categoryLabel`, each group under its own small uppercase heading (entries with no category trail at the end, unheaded); the suggestion list is sorted by `SuggestionItem.updatedAt` descending rather than module order, so an empty search doesn't just show whichever module `buildLinkItems` happens to list first | `content`, `legacyIds` (read-only bridge for entries a pre-v36 backup restored into the old `linked_operation_ids`/`linked_wiki_ids` columns — see [`database.md`](database.md#journal_entries)), `editable`, `inputCls` |
-| `TagsField` | the tags field's label plus `TagInput`, in its field frame while editing and bare while reading — used by Journal/Wiki/Operations' properties panels and the template page, replacing what used to be written out at each of those call sites | `tags`, `onChange`, `readOnly` |
+| `LinkedEntriesSection` | the "Linked entries" section in read mode (`sidebar/fields/LinkedEntriesField.tsx`) — a `SidebarSection` of `SidebarItemRow`s, one per link, sorted by `categoryLabel`; a click reveals the link in the entry's text, or opens the target when the text doesn't hold it (`legacyIds`). Shares its underlying `useLinkedEntries` hook with `LinkedEntriesField`, below | `content`, `legacyIds` |
+| `LinkedEntriesField` | Journal/Wiki/Operations' "Linked entries" sidebar field, edit mode only now — reading is `LinkedEntriesSection`, above. Reads what the entry links out of its own `content` (`extractInternalLinks`) across all five entry types, rather than an id array; picking a result appends a link block into the editor and removing one asks the editor to delete it — both via the `lib/links.ts` event protocol, since the field has no reference to the TipTap instance. Chips are grouped by `categoryLabel`, each group under its own small uppercase heading (entries with no category trail at the end, unheaded); the suggestion list is sorted by `SuggestionItem.updatedAt` descending rather than module order, so an empty search doesn't just show whichever module `buildLinkItems` happens to list first | `content`, `legacyIds` (read-only bridge for entries a pre-v36 backup restored into the old `linked_operation_ids`/`linked_wiki_ids` columns — see [`database.md`](database.md#journal_entries)), `inputCls` |
+| `TagsSection` | the "Tags" section in read mode (`sidebar/fields/TagsField.tsx`) — a `SidebarSection` with a read-only `TagInput` below, or `SidebarEmpty` when there are none | `tags` |
+| `TagsField` | the tags field's label plus `TagInput` in its field frame, edit mode only now — used by Journal/Wiki/Operations' properties panels and the template page, replacing what used to be written out at each of those call sites | `tags`, `onChange` |
 | `EntryTypeField` | the Journal/Wiki/Operation type toggle above Category in the Properties panel (top of the panel for Journal, which has no category) — an `IconToggleGroup` over `MODULE_LIST` filtered to `usesBlocks`, wired straight to `changeEntryType` (`lib/entryTypeChange.ts`, see [`architecture.md`](architecture.md#changing-an-entrys-type)). Only shown for the three convertible types — Tasks and Altar have no field and no entry point into it | `id`, `type`, `properties` (`category_id`/`icon`/`cover_image`, omitted for Journal — passing it is what triggers the drop-properties `InlineConfirm` on a switch to Journal) |
 | `PlacedElementRow` | row of a placed altar element including its row actions | the callbacks (`onToggleLocked`, `onDuplicate`, …) |
 | `PlacedElementInspector` | the inline X/Y/Rot/Scale inspector under a selected placed-element row (same file as `PlacedElementRow`) | — |
-| `PropertySummarySectionTitle` | the small uppercase section title above summary rows (same file as `PropertySummaryRow`) | — |
 | `FaviconGlyph` | just the emoji-or-image glyph of `Favicon`, without the picker (same file). Default 20px, the size of a row's meta text; `className` overrides it for a caller that shows the icon large — the Altar dashboard card, standing in for the canvas preview when it's turned off | `value`, `className` |
-| `AltarReadingSummary` | the altar's summary block in read mode | — |
+| `AltarReadingSummary` | the altar's read-mode sidebar: a `PropertiesSection` (format, background with swatch, overlay, grid — "Off" muted when disabled; no Linked entries section, the Altar links to nothing) and a `SidebarSection` of `SidebarItemRow`s for the visible placements, top-most first, each click selecting/highlighting the element on the canvas | — |
 
 **Horizontal padding has exactly one source in the right sidebar** — the scrolling
 container in `RightSidebar.tsx`. No panel and no field here adds a `px-*` of its own
 (the read view's footnote carries a cosmetic `px-1`, which is alignment, not padding); see
-[`design.md`](design.md#heights-and-spacing).
+[`design.md`](design.md#heights-and-spacing). `SidebarSection`'s own `-mx-1`/`px-2.5` (above)
+is the one deliberate exception, commented in place: it exists so a row's hover area can
+reach the sidebar's edge without indenting the row's own content.
 
 ### `src/hooks/` and `src/lib/` — Shared Logic
 
@@ -319,10 +322,7 @@ Open, deliberately recorded, and not an excuse for further copies.
 5. **The emoji empty-result message** in `EmojiPicker` uses a raw `text-stone-500` instead
    of `--text-muted`; the one unthemed remainder in an otherwise fully CSS-variable-based
    component.
-6. **`AltarReadingSummary` rebuilds `PropertySummaryRow` raw.** Its local `BackgroundRow`
-   repeats the row's exact class chain (`flex items-center gap-2 px-3 py-2 rounded-lg
-   bg-stone-900/45 border border-stone-700/60`) instead of using the component.
-7. **The altar's ratio and overlay-colour toggles** hand-write an active/inactive class
+6. **The altar's ratio and overlay-colour toggles** hand-write an active/inactive class
    chain as raw Tailwind (`AltarSidebarPanel`; the row states of `PlacedElementRow` and the
    block manager now share `sidebarRowStateClasses` in `lib/styleClasses.ts`), in a file
    that imports and uses `Button` a few lines above. It is not a copy of one tone: the
@@ -332,13 +332,13 @@ Open, deliberately recorded, and not an excuse for further copies.
    `Button` at all is open: they are selection toggles, structurally closer to a chip than
    to an action button. The background picker's change/remove/upload buttons, once part of
    this item, now run through `Button`'s tone mode.
-8. **A third dropdown row class** exists besides `.menu-item`/`.context-menu-item-*`:
+7. **A third dropdown row class** exists besides `.menu-item`/`.context-menu-item-*`:
    `linked-entry-menu-item`, with its own raw chain. Defined in one place
    (`LinkedEntryPicker`) — its former second and third users, `LinkedOpsInput` and
    `LinkedWikiInput`, are gone along with routines, so it now backs only
    `LinkedEntriesField`, but the class itself is still a one-off rather than
    `.menu-item`/`.context-menu-item-*`.
-9. **Three separate "emoji or image" glyph components.** `BlockGlyph` (a block's own icon) and
+8. **Three separate "emoji or image" glyph components.** `BlockGlyph` (a block's own icon) and
    `FaviconGlyph` (`sidebar/fields/Favicon.tsx`, Wiki/Operations/Altar icons) both branch on
    the shared `isImageIcon` (`lib/helpers.ts`: `data:image/`, `blob:`, or a bare `/` path) but
    each hand-writes its own `<img>` markup — different rounding, border and `object-contain`

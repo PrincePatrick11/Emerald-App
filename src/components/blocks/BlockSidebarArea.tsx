@@ -22,9 +22,14 @@ import { blockHoldsLocked, sigilState, todayIso } from '../../lib/blocks/sigil';
 import { BLOCK_SIDEBAR_VIEWS } from './blockSidebarViews';
 import { addBlockActions, commonBlockActions } from './blockActions';
 
-/** Was die Liste zeigt: beim Bearbeiten alles, beim Lesen nur, was man lesen kann. */
-function listedBlocks(session: BlockSession): BlockInstance[] {
-  return session.isEditing ? session.blocks : session.blocks.filter((b) => !isBlockHidden(b));
+/** Was die Gliederung im Lesemodus zeigt: nur, was man lesen kann. */
+function readableBlocks(session: BlockSession): BlockInstance[] {
+  return session.blocks.filter((b) => !isBlockHidden(b));
+}
+
+/** Die aufgeklappten Einstellungen eines Blocks unter seiner Zeile. */
+function BlockSettingsBox({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return <div className={`mt-1 mb-2 rounded border border-stone-700/50 bg-stone-900/40 px-2 py-2 ${className}`}>{children}</div>;
 }
 
 /**
@@ -32,9 +37,9 @@ function listedBlocks(session: BlockSession): BlockInstance[] {
  * im Bearbeitungsmodus Liste mit Griff, Auge und Menü (Umbenennen, Titel im
  * Lesemodus, Duplizieren, Entfernen) plus „Block hinzufügen"; im Lesemodus
  * eine Gliederung der sichtbaren Blöcke (`BlockOutline`), deren Zeilen zum
- * Block springen — dort nur, wenn es mehr als einen gibt. Bringt ein Blocktyp Einstellungen mit
- * (`blockSidebarViews.ts`), klappt ein Klick auf seine Zeile sie darunter auf —
- * wie die platzierten Elemente des Altars.
+ * Block springen — dort nur, wenn es mehr als einen gibt. Bringt ein
+ * Blocktyp Einstellungen mit (`blockSidebarViews.ts`), klappt ein Klick auf
+ * seine Zeile sie darunter auf — wie die platzierten Elemente des Altars.
  *
  * Alles läuft über die API, die der `BlockStack` im `blockSessionStore`
  * veröffentlicht — die Seitenleiste ändert nie selbst am Eintrag.
@@ -43,10 +48,12 @@ export default function BlockSidebarArea() {
   const activeViewId = useUIStore((s) => s.activeView.id);
   const session = useBlockSessionStore((s) => s.session);
   if (!session || session.entryId !== activeViewId) return null;
-  if (!session.isEditing && listedBlocks(session).length < 2) return null;
-  // Pro Montage des Stapels neu: ein offenes Menü oder Umbenennen darf einen
-  // Cancel-Remount nicht überleben — es gehörte zum Stapel davor.
-  if (!session.isEditing) return <BlockOutline key={session.sessionId} session={session} />;
+  // Beide pro Montage des Stapels neu (`key`): ein offenes Menü, Umbenennen oder
+  // eine Auswahl darf einen Cancel-Remount nicht überleben — es gehörte zum Stapel davor.
+  if (!session.isEditing) {
+    if (readableBlocks(session).length < 2) return null;
+    return <BlockOutline key={session.sessionId} session={session} />;
+  }
   return <BlockManager key={session.sessionId} session={session} />;
 }
 
@@ -58,7 +65,7 @@ export default function BlockSidebarArea() {
 function BlockOutline({ session }: { session: BlockSession }) {
   const { t } = useTranslation();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const rows = listedBlocks(session);
+  const rows = readableBlocks(session);
   return (
     <SidebarSection storageKey="blocks-sidebar-open" label={t('blocks.sidebarTitle')} count={rows.length}>
       {rows.map((block) => {
@@ -77,9 +84,7 @@ function BlockOutline({ session }: { session: BlockSession }) {
                 setSelectedId(selected ? null : block.id);
               }}
             />
-            {settings !== null && (
-              <div className="mx-1 mt-1 mb-2 rounded border border-stone-700/50 bg-stone-900/40 px-2 py-2">{settings}</div>
-            )}
+            {settings !== null && <BlockSettingsBox className="mx-1">{settings}</BlockSettingsBox>}
           </div>
         );
       })}
@@ -93,10 +98,9 @@ function BlockManager({ session }: { session: BlockSession }) {
   const [menu, setMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const { isEditing, api } = session;
-  const rows = listedBlocks(session);
+  const { api } = session;
   // Ohne Animation, wie die platzierten Elemente des Altars.
-  const { listRef, visualItems, draggingId, startDrag } = usePointerReorder(rows, (ordered) => api.reorder(ordered.map((b) => b.id)));
+  const { listRef, visualItems, draggingId, startDrag } = usePointerReorder(session.blocks, (ordered) => api.reorder(ordered.map((b) => b.id)));
   const definitions = useBlockDefinitionStore((s) => s.definitions);
   // Was eine geladene Sigille sperrt, lässt sich nicht duplizieren (siehe BlockStack.duplicate).
   const sigil = sigilState(session.blocks, todayIso());
@@ -145,10 +149,7 @@ function BlockManager({ session }: { session: BlockSession }) {
                   meta={meta}
                   label={blockLabel(t, block, meta)}
                   typeLabel={blockTypeLabel(t, block, meta)}
-                  isEditing={isEditing}
-                  // Umbenennen nur beim Bearbeiten: im Lesemodus entginge die
-                  // Änderung dem Autosave und später der Cancel-Baseline.
-                  renaming={isEditing && renamingId === block.id}
+                  renaming={renamingId === block.id}
                   onRenamed={(title) => {
                     setRenamingId(null);
                     if (title !== undefined) api.setAttr(block.id, BLOCK_ATTR.title, title.trim() || null);
@@ -167,20 +168,18 @@ function BlockManager({ session }: { session: BlockSession }) {
               );
             })}
           </div>
-          {isEditing && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <Button tone="neutral" small onClick={openAddMenu}>
-                <Plus size={12} />
-                <span>{t('blocks.add')}</span>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <Button tone="neutral" small onClick={openAddMenu}>
+              <Plus size={12} />
+              <span>{t('blocks.add')}</span>
+            </Button>
+            {session.templates && (
+              <Button tone="neutral" small onClick={api.openTemplatePicker}>
+                <CopyPlus size={12} />
+                <span>{t('templates.insert.button')}</span>
               </Button>
-              {session.templates && (
-                <Button tone="neutral" small onClick={api.openTemplatePicker}>
-                  <CopyPlus size={12} />
-                  <span>{t('templates.insert.button')}</span>
-                </Button>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </>
       )}
 
@@ -194,7 +193,6 @@ interface ManagerRowProps {
   meta: BlockTypeMeta | undefined;
   label: string;
   typeLabel: string;
-  isEditing: boolean;
   renaming: boolean;
   /** Neuer Titel, oder `undefined` für „abgebrochen". */
   onRenamed: (title: string | undefined) => void;
@@ -211,11 +209,11 @@ interface ManagerRowProps {
 }
 
 /**
- * Eine Zeile der Verwaltungsliste — dieselbe Form wie die platzierten Elemente
+ * Eine Zeile der Verwaltungsliste im Bearbeiten — dieselbe Form wie die platzierten Elemente
  * des Altars, mit denselben Zuständen (`sidebarRowStateClasses`).
  */
 function ManagerRow({
-  block, meta, label, typeLabel, isEditing, renaming, onRenamed, selected, isDragging, onGripPointerDown, onActivate, onToggleHidden, onOpenMenu, settings,
+  block, meta, label, typeLabel, renaming, onRenamed, selected, isDragging, onGripPointerDown, onActivate, onToggleHidden, onOpenMenu, settings,
 }: ManagerRowProps) {
   const { t } = useTranslation();
   const cancelledRef = useRef(false);
@@ -225,20 +223,18 @@ function ManagerRow({
   return (
     <div>
       <div
-        onContextMenu={isEditing ? (e) => { e.preventDefault(); onOpenMenu(e); } : undefined}
+        onContextMenu={(e) => { e.preventDefault(); onOpenMenu(e); }}
         className={`w-full flex items-center gap-2 rounded border px-2 py-1.5 transition-all select-none ${
           sidebarRowStateClasses({ dragging: isDragging, selected })
         } ${hidden ? 'opacity-50' : ''}`}
       >
-        {isEditing && (
-          <span
-            onPointerDown={onGripPointerDown}
-            className="block-row-action cursor-grab active:cursor-grabbing touch-none"
-            title={t('blocks.dragToMove')}
-          >
-            <GripVertical size={12} />
-          </span>
-        )}
+        <span
+          onPointerDown={onGripPointerDown}
+          className="block-row-action cursor-grab active:cursor-grabbing touch-none"
+          title={t('blocks.dragToMove')}
+        >
+          <GripVertical size={12} />
+        </span>
         {renaming ? (
           <>
             <BlockGlyph icon={glyph} />
@@ -261,32 +257,26 @@ function ManagerRow({
             <span className="truncate text-[11px] font-medium">{label}</span>
           </button>
         )}
-        {isEditing && (
-          <>
-            <button
-              type="button"
-              onClick={onToggleHidden}
-              className={`block-row-action ${hidden ? 'block-row-action--on' : ''}`}
-              title={hidden ? t('blocks.show') : t('blocks.hide')}
-              aria-label={hidden ? t('blocks.show') : t('blocks.hide')}
-            >
-              {hidden ? <EyeOff size={12} /> : <Eye size={12} />}
-            </button>
-            <button
-              type="button"
-              onClick={onOpenMenu}
-              className="block-row-action"
-              title={t('blocks.actions')}
-              aria-label={t('blocks.actions')}
-            >
-              <MoreHorizontal size={12} />
-            </button>
-          </>
-        )}
+        <button
+          type="button"
+          onClick={onToggleHidden}
+          className={`block-row-action ${hidden ? 'block-row-action--on' : ''}`}
+          title={hidden ? t('blocks.show') : t('blocks.hide')}
+          aria-label={hidden ? t('blocks.show') : t('blocks.hide')}
+        >
+          {hidden ? <EyeOff size={12} /> : <Eye size={12} />}
+        </button>
+        <button
+          type="button"
+          onClick={onOpenMenu}
+          className="block-row-action"
+          title={t('blocks.actions')}
+          aria-label={t('blocks.actions')}
+        >
+          <MoreHorizontal size={12} />
+        </button>
       </div>
-      {selected && settings !== null && (
-        <div className="mt-1 mb-2 rounded border border-stone-700/50 bg-stone-900/40 px-2 py-2">{settings}</div>
-      )}
+      {selected && settings !== null && <BlockSettingsBox>{settings}</BlockSettingsBox>}
     </div>
   );
 }

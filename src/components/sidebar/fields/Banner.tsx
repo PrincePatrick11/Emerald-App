@@ -9,7 +9,6 @@ interface BannerProps {
   value?: string;
   onChange?: (dataUrl: string) => void;
   onRemove?: () => void;
-  readOnly?: boolean;
 }
 
 /**
@@ -21,7 +20,7 @@ interface BannerProps {
  * und rutscht damit im umbrechenden Flex-Container von selbst auf eine eigene
  * Zeile, während der leere Zustand als schmaler Knopf in der Zeile bleibt.
  */
-export default function Banner({ value, onChange, onRemove, readOnly = false }: BannerProps) {
+export default function Banner({ value, onChange, onRemove }: BannerProps) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -55,10 +54,6 @@ export default function Banner({ value, onChange, onRemove, readOnly = false }: 
   const preview = value
     ? <img src={value} alt="" className="w-full h-24 object-cover rounded-lg border border-stone-700/40" />
     : null;
-
-  // Das „— Keine —" trägt `IconCoverField` für beide Felder zusammen; ein
-  // eigenes hier würde es doppeln.
-  if (readOnly) return preview;
 
   return (
     <>

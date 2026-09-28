@@ -206,9 +206,9 @@ exist.
 *Cost: mechanical but widely scattered; best done per file when it is touched anyway.*
 
 **6. Radius-rule violations.** `UndoToast` carries `rounded-xl` (a floating overlay on the
-surface step); `.sidebar-item` in `index.css` and `PropertySummaryRow` are list rows on
-`rounded-lg` instead of `rounded-md`. *Cost: one line each.* (The Tags view's own search
-field is gone — Tags uses `Dashboard`'s `ListToolbar` search now.)
+surface step); `.sidebar-item` in `index.css` is a list row on `rounded-lg` instead of
+`rounded-md`. *Cost: one line.* (The Tags view's own search field is gone — Tags uses
+`Dashboard`'s `ListToolbar` search now.)
 
 **7. `JetBrains Mono` is dead config.** Declared as `font-mono` in `tailwind.config.js:46`
 but never loaded via a `<link>`. Every site using `font-mono` falls back to the system

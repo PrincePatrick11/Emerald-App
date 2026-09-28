@@ -58,13 +58,15 @@ src/
 │   │   │             AltarSidebarPanel, BacklinksPanel (currently unrendered — RoutinesPanel,
 │   │   │             its neighbour, was removed outright along with routines, see
 │   │   │             Templates below)
-│   │   └── fields/   PropertiesReadView / PropertiesEditView (read vs. edit layout shell),
-│   │                 PropertySummaryRow, Favicon, Banner, SelectField (shared category-field
-│   │                 native select for Journal/Operations properties panels), TagsField (the
-│   │                 tags field's label + TagInput, shared by Journal/Wiki/Operations and the
-│   │                 template page), EntryTypeField (the Journal/Operations/Wiki type toggle
-│   │                 above Category, see Edit Mode Architecture below), AltarReadingSummary,
-│   │                 PlacedElementRow
+│   │   └── fields/   SidebarSection (the read-mode collapsible section — Properties,
+│   │                 Linked entries, Tags, Blocks, the Altar's Elements — plus its
+│   │                 SidebarPropertyRow/SidebarItemRow/SidebarEmpty row types),
+│   │                 EntryReadSections (Journal/Wiki/Operations' read-mode sidebar body),
+│   │                 PropertiesEditView (edit layout shell), Favicon, Banner, SelectField
+│   │                 (shared category-field native select for Journal/Operations properties
+│   │                 panels), TagsField/TagsSection (edit vs. read), EntryTypeField (the
+│   │                 Journal/Operations/Wiki type toggle above Category, see Edit Mode
+│   │                 Architecture below), AltarReadingSummary, PlacedElementRow
 │   ├── templates/    TemplateEditor (a template's own page, built on LibraryPageFrame),
 │   │                 TemplateAssignments (a template's sidebar summary of its assignments and
 │   │                 default, collapsible, with the button that opens TemplateAssignmentsModal),
@@ -304,7 +306,7 @@ calling `viewTypeForEntryType` directly.
 
 The main content area renders only the title and body. All metadata — tags, category, icon, cover image — is edited exclusively in the right sidebar's Properties panel. The sidebar writes directly to the relevant store; the main area subscribes to the same store fields and updates accordingly.
 
-Unlike earlier versions, the Properties panel itself is now gated by the entry's edit state (`activeView.mode === 'edit'`): each panel renders a read-only summary (`PropertiesReadView` + `PropertySummaryRow`) while viewing, and swaps to editable form fields (`PropertiesEditView`) only once the entry is opened for editing. Entering/leaving edit mode is triggered from the sidebar's own action bar, not from the main content area — there is no double-click-to-edit gesture on the entry itself; `EntryDetailFrame` has no `onEnterEditMode` prop.
+Unlike earlier versions, the Properties panel itself is now gated by the entry's edit state (`activeView.mode === 'edit'`): each panel renders a read-only summary (`EntryReadSections`, built from collapsible `SidebarSection`s — see [`components.md`](components.md)) while viewing, and swaps to editable form fields (`PropertiesEditView`) only once the entry is opened for editing. Entering/leaving edit mode is triggered from the sidebar's own action bar, not from the main content area — there is no double-click-to-edit gesture on the entry itself; `EntryDetailFrame` has no `onEnterEditMode` prop.
 
 ### Cancel: discarding new entries and reverting autosaved edits
 
@@ -1390,7 +1392,7 @@ Altar rendering and editing were split into focused components:
 - **`src/components/altar/AltarCardPreview.tsx`** — preview scene used by the dashboard cards and list rows (background + placed items, both compact and full-size variants).
 - **`src/components/ui/RenameField.tsx`** — the inline rename input of the dashboard cards and list rows (moved out of `altar/` once Journal, Wiki and Operations used it too).
 - **`src/components/sidebar/fields/PlacedElementRow.tsx`** — `PlacedElementRow` and `PlacedElementInspector` for the sidebar's placed-elements list and its inline inspector. `PlacedElementRow` manages its own right-click context-menu state and renders the shared `ContextMenu`, which does the portalling. The delete button is in the row (Trash icon, rightmost). `PlacedElementInspector` shows a compact 4-column input grid (X, Y, Rot, Scale) plus a custom jade opacity slider (track/fill/thumb with a transparent range overlay). Inspector fields, labels, and unit symbols (`%`, `°`) use stone colour tokens; jade is used only for the selected row highlight (border and background) and the slider fill/thumb. Z-order buttons are not in the inspector — layer order is set by dragging rows in `AltarSidebarPanel`. A `focusedFieldRef` (`useRef<string | null>`) tracks which input is currently focused; the `useEffect` that syncs placement values from the store into draft state depends on all relevant placement fields (`x`, `y`, `width`, `height`, `rotation`, `opacity`, `id`) and skips updating the focused field so canvas drag-resize does not overwrite mid-edit input.
-- **`src/components/sidebar/fields/AltarReadingSummary.tsx`** — read-only sidebar panel shown in altar view mode. Displays a "Enter Fullscreen" button at the top, then a compact summary grid: aspect ratio, background (with swatch preview), overlay (percentage + color), grid (active/inactive + size), and placed element count. Resolves background info (preset name, gradient color, or custom image preview) via `useMemo` and the same constants used by the full editor. It no longer contains an image-export control — that moved to the native Export menu (see `src/lib/altarExport.ts` and [Menu enablement gating](#menu-enablement-gating)).
+- **`src/components/sidebar/fields/AltarReadingSummary.tsx`** — read-only sidebar panel shown in altar view mode, built on the same `SidebarSection` collapsible sections as an entry's read sidebar (see [`components.md`](components.md)): a `PropertiesSection` (format, background with swatch, overlay, grid — "Off" muted when disabled) and a second section for the visible placements, top-most first, each a `SidebarItemRow` whose click selects/highlights that element on the canvas. Resolves background info (preset name, gradient color, or custom image preview) via `useMemo` and the same constants used by the full editor. It has no Linked entries section — the Altar links to nothing — and no image-export control, since that moved to the native Export menu (see `src/lib/altarExport.ts` and [Menu enablement gating](#menu-enablement-gating)).
 
 **Altar grid rendering.** The grid overlay is rendered as a single SVG `<path>` element (not a CSS tiled background). Line positions are computed as exact percentages — `(i / gridNumCols) * nativeW` for vertical lines, `(i / gridNumRows) * nativeH` for horizontal lines — drawn in a single `<path d="…">` string via `useMemo`. This eliminates sub-pixel rounding errors that accumulate in tiled `background-size` approaches, particularly on Retina displays.
 

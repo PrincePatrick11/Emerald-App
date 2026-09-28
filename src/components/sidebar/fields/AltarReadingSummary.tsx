@@ -99,7 +99,7 @@ export default function AltarReadingSummary() {
             label={t('altar.summaryBackground')}
             value={(
               <>
-                <span className="h-3.5 w-3.5 flex-shrink-0 rounded-sm border border-stone-700/60" style={backgroundInfo.style} aria-hidden="true" />
+                <span className="h-3.5 w-3.5 flex-shrink-0 rounded-sm border border-[var(--border-soft)]" style={backgroundInfo.style} aria-hidden="true" />
                 <span className="truncate">{backgroundInfo.label}</span>
               </>
             )}
@@ -113,7 +113,7 @@ export default function AltarReadingSummary() {
         <SidebarPropertyRow
           icon={<Grid3x3 size={14} />}
           label={t('altar.summaryGrid')}
-          value={gridActive ? `${activeAltar.grid_size} px` : t('altar.summaryOff')}
+          value={gridActive ? `${activeAltar.grid_size} px` : t('altar.summaryGridOff')}
           muted={!gridActive}
         />
       </PropertiesSection>
