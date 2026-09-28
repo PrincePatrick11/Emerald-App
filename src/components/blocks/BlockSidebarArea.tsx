@@ -164,13 +164,13 @@ function BlockManager({ session }: { session: BlockSession }) {
           })}
         </div>
         {/* Unter einer Linie abgesetzt: die Knöpfe gehören zur Liste, sind aber keine Zeilen darin. */}
-        <div className="block-manager-actions">
-          <button type="button" className="block-manager-button" onClick={openAddMenu}>
+        <div className="sidebar-section-actions">
+          <button type="button" className="sidebar-section-button" onClick={openAddMenu}>
             <Plus size={13} className="flex-shrink-0" />
             <span className="min-w-0 truncate">{t('blocks.add')}</span>
           </button>
           {session.templates && (
-            <button type="button" className="block-manager-button" onClick={api.openTemplatePicker}>
+            <button type="button" className="sidebar-section-button" onClick={api.openTemplatePicker}>
               <CopyPlus size={13} className="flex-shrink-0" />
               <span className="min-w-0 truncate">{t('templates.insert.button')}</span>
             </button>

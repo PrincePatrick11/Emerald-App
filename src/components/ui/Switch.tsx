@@ -61,7 +61,7 @@ export function SwitchRow({ icon: Icon, label, hint, checked, onChange, disabled
       // Bedienelemente der Leiste; bricht das Label um, bleibt es eng.
       // Seitenleiste: das Icon beginnt bei 10px wie die Zeilen-Icons dort.
       className={`switch-row flex ${hint ? 'items-start' : 'items-center'} gap-2.5 ${
-        sidebar ? 'switch-row--sidebar pl-2.5 pr-3 py-[7px] rounded-md' : variant === 'panel' ? 'switch-row--panel px-0.5 py-1' : 'px-3 py-[7px]'
+        sidebar ? 'switch-row--sidebar pl-2.5 pr-3 py-1 rounded-md' : variant === 'panel' ? 'switch-row--panel px-0.5 py-1' : 'px-3 py-[7px]'
       } text-[13px] leading-4${disabled ? ' switch-row--disabled' : ''}`}
     >
       {Icon && <Icon size={14} className="flex-shrink-0" />}

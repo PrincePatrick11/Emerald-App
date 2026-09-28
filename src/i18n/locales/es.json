@@ -891,7 +891,6 @@
     "noAssignments": "Disponible en todas las entradas",
     "allCategories": "Todas las categorías",
     "missingCategory": "Categoría eliminada",
-    "replacesDefault": "Sustituye a «{{name}}» como predeterminada al pulsar Listo.",
     "usage": "Uso",
     "usedIn": "Usado en {{count}} entrada",
     "usedIn_other": "Usado en {{count}} entradas",

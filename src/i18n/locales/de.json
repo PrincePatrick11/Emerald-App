@@ -891,7 +891,6 @@
     "noAssignments": "In jedem Eintrag verfügbar",
     "allCategories": "Alle Kategorien",
     "missingCategory": "Gelöschte Kategorie",
-    "replacesDefault": "Ersetzt „{{name}}“ als Standard, sobald du auf Fertig klickst.",
     "usage": "Verwendung",
     "usedIn": "In {{count}} Eintrag verwendet",
     "usedIn_other": "In {{count}} Einträgen verwendet",

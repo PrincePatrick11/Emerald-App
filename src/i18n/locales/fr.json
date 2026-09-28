@@ -891,7 +891,6 @@
     "noAssignments": "Disponible dans chaque entrée",
     "allCategories": "Toutes les catégories",
     "missingCategory": "Catégorie supprimée",
-    "replacesDefault": "Remplace « {{name}} » comme modèle par défaut dès que tu cliques sur Terminé.",
     "usage": "Utilisation",
     "usedIn": "Utilisé dans {{count}} entrée",
     "usedIn_other": "Utilisé dans {{count}} entrées",

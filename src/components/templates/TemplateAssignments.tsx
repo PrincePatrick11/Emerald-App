@@ -1,14 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SlidersHorizontal, Star } from 'lucide-react';
-import Button from '../ui/Button';
-import SidebarSectionHeader from '../sidebar/fields/SidebarSectionHeader';
-import { usePersistedFlag } from '../../hooks/usePersistedFlag';
-import { useTemplateStore } from '../../store/templateStore';
+import SidebarSection, { SidebarEmpty } from '../sidebar/fields/SidebarSection';
 import { useCategoryStore } from '../../store/categoryStore';
-import { templateLabel } from '../../lib/blocks/blockAttrs';
 import {
-  ALL_CATEGORIES, assignmentKey, defaultTemplateAt, sameAssignments, TEMPLATE_ENTRY_TYPES, type TemplateAssignment,
+  ALL_CATEGORIES, assignmentKey, sameAssignments, TEMPLATE_ENTRY_TYPES, type TemplateAssignment,
 } from '../../lib/blocks/templates';
 import { useAssignmentLabel } from './useAssignmentLabel';
 import TemplateAssignmentsModal from './TemplateAssignmentsModal';
@@ -33,19 +29,14 @@ function categoryRank(category: string | null, order: ReadonlyMap<string, number
 /**
  * Zuweisung und Standard einer Vorlage in ihrer Seitenleiste: was gerade gilt,
  * als Liste mit Stern für die Standards, und der Knopf zum Dialog, in dem man
- * beides festlegt (`TemplateAssignmentsModal`). Löst ein Stern den Standard
- * einer anderen Vorlage ab, sagt die Zeile, wen es trifft — ersetzt wird erst
- * mit „Fertig".
+ * beides festlegt (`TemplateAssignmentsModal`) — dort steht auch, wessen
+ * Standard ein Stern ablöst; ersetzt wird erst mit „Fertig".
  */
 export default function TemplateAssignments({ templateId, name, assignments, onChange }: Props) {
   const { t } = useTranslation();
-  const templates = useTemplateStore((s) => s.templates);
   const label = useAssignmentLabel();
   const [modalOpen, setModalOpen] = useState(false);
-  // Eingeklappt bleibt eingeklappt — wie die Block-Verwaltung darunter.
-  const [expanded, toggleExpanded] = usePersistedFlag('template-assignments-open', true);
 
-  const others = templates.filter((tpl) => tpl.id !== templateId);
   const categories = useCategoryStore((s) => s.categories);
   const order = new Map(categories.map((c, i) => [c.id, i]));
   // Journal, Wiki, Operationen; darin in der Reihenfolge der Tabelle im Dialog.
@@ -54,42 +45,34 @@ export default function TemplateAssignments({ templateId, name, assignments, onC
     || categoryRank(a.category, order) - categoryRank(b.category, order));
 
   return (
-    <section className="border-t border-stone-700/60">
-      <SidebarSectionHeader label={t('templates.assignments')} open={expanded} onToggle={toggleExpanded} className="pt-4" />
+    <>
+      {/* Derselbe Abschnitt wie Verlinkungen, Tags und Blöcke: gleicher Kopf, Zähler, gemerktes Auf/Zu. */}
+      <SidebarSection storageKey="template-assignments-open" label={t('templates.assignments')} count={sorted.length}>
+        {sorted.length === 0 ? (
+          <SidebarEmpty>{t('templates.noAssignments')}</SidebarEmpty>
+        ) : (
+          <ul>
+            {sorted.map((a) => (
+              // Kein Icon vorn: der Text beginnt, wo die Icons der übrigen Zeilen beginnen.
+              <li key={assignmentKey(a.entryType, a.category)} className="flex items-center gap-2 h-8 pl-2.5 pr-3 text-[13px] min-w-0">
+                <span className="flex-1 min-w-0 truncate text-[var(--text-primary)]">{label(a.entryType, a.category)}</span>
+                {a.isDefault && (
+                  <span className="template-default-star" title={t('templates.assign.default')}>
+                    <Star size={14} fill="currentColor" />
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
 
-      {expanded && (
-        <div className="mt-2 space-y-2">
-          {sorted.length === 0 ? (
-            <p className="text-xs text-stone-500">{t('templates.noAssignments')}</p>
-          ) : (
-            <ul className="space-y-1">
-              {sorted.map((a) => {
-                const other = a.isDefault ? defaultTemplateAt(others, a.entryType, a.category) : undefined;
-                return (
-                  <li key={assignmentKey(a.entryType, a.category)}>
-                    <div className="flex items-center gap-2">
-                      <span className="flex-1 min-w-0 truncate text-xs text-[var(--text-secondary)]">{label(a.entryType, a.category)}</span>
-                      {a.isDefault && (
-                        <span className="template-default-star" title={t('templates.assign.default')}>
-                          <Star size={12} fill="currentColor" />
-                        </span>
-                      )}
-                    </div>
-                    {other && (
-                      <p className="block-field-hint">{t('templates.replacesDefault', { name: templateLabel(t, other) })}</p>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
-          <Button tone="neutral" small onClick={() => setModalOpen(true)}>
-            <SlidersHorizontal size={12} />
-            <span>{t('templates.assign.open')}</span>
-          </Button>
+        <div className="sidebar-section-actions sidebar-section-actions--plain">
+          <button type="button" className="sidebar-section-button" onClick={() => setModalOpen(true)}>
+            <SlidersHorizontal size={13} className="flex-shrink-0" />
+            <span className="min-w-0 truncate">{t('templates.assign.open')}</span>
+          </button>
         </div>
-      )}
+      </SidebarSection>
 
       {modalOpen && (
         <TemplateAssignmentsModal
@@ -104,6 +87,6 @@ export default function TemplateAssignments({ templateId, name, assignments, onC
           onClose={() => setModalOpen(false)}
         />
       )}
-    </section>
+    </>
   );
 }

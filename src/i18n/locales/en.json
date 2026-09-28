@@ -891,7 +891,6 @@
     "noAssignments": "Available in every entry",
     "allCategories": "All categories",
     "missingCategory": "Deleted category",
-    "replacesDefault": "Replaces “{{name}}” as the default once you click Done.",
     "usage": "Usage",
     "usedIn": "Used in {{count}} entry",
     "usedIn_other": "Used in {{count}} entries",

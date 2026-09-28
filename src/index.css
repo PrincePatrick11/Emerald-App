@@ -1448,9 +1448,10 @@ html[data-theme] .sidebar-add-field input::placeholder,
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-/* Unter der Block-Liste: eine Linie, darunter „Block hinzufügen" und
-   „Vorlage einfügen" als volle, zentrierte Knöpfe untereinander. */
-.block-manager-actions {
+/* Die Knöpfe am Ende eines Abschnitts, unter einer Linie: volle Breite,
+   zentriert, untereinander — „Block hinzufügen" und „Vorlage einfügen"
+   unter den Blöcken, „Zuweisung & Standard festlegen …" einer Vorlage. */
+.sidebar-section-actions {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1459,7 +1460,15 @@ html[data-theme] .sidebar-add-field input::placeholder,
   border-top: 1px solid var(--field-border);
 }
 
-.block-manager-button {
+/* Ohne Linie — der Knopf einer Vorlage unter ihren Zuweisungen. */
+.sidebar-section-actions--plain,
+html[data-theme] .sidebar-section-actions--plain {
+  margin-top: 6px;
+  padding-top: 0;
+  border-top: none;
+}
+
+.sidebar-section-button {
   display: flex;
   width: 100%;
   min-width: 0;
@@ -1477,22 +1486,22 @@ html[data-theme] .sidebar-add-field input::placeholder,
   transition: border-color 150ms, background-color 150ms;
 }
 
-.block-manager-button:hover {
+.sidebar-section-button:hover {
   border-color: var(--field-border-hover);
   background-color: var(--field-bg-hover);
 }
 
-.block-manager-button:focus-visible {
+.sidebar-section-button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-html[data-theme] .block-manager-actions,
-html[data-theme] .block-manager-button {
+html[data-theme] .sidebar-section-actions,
+html[data-theme] .sidebar-section-button {
   border-color: var(--field-border);
 }
 
-html[data-theme] .block-manager-button:hover {
+html[data-theme] .sidebar-section-button:hover {
   border-color: var(--field-border-hover);
 }
 
