@@ -219,7 +219,8 @@ function ManagerRow({
     <div>
       <div
         onContextMenu={(e) => { e.preventDefault(); onOpenMenu(e); }}
-        className={`w-full flex items-center gap-2 rounded border pl-1 pr-2 py-1.5 transition-all select-none ${
+        // 32px hoch, 13px und 14px-Icons wie die übrigen Zeilen der Seitenleiste.
+        className={`w-full flex items-center gap-2 h-8 rounded border pl-1 pr-1 text-[13px] transition-all select-none ${
           // Ohne Rahmen, solange sie weder gewählt noch gezogen wird — die
           // Zustände darüber teilt sie mit den Elementen des Altars.
           isDragging || selected ? sidebarRowStateClasses({ dragging: isDragging, selected }) : 'block-manager-row--idle'
@@ -230,11 +231,11 @@ function ManagerRow({
           className="block-row-action cursor-grab active:cursor-grabbing touch-none"
           title={t('blocks.dragToMove')}
         >
-          <GripVertical size={12} />
+          <GripVertical size={14} />
         </span>
         {renaming ? (
           <>
-            <BlockGlyph icon={glyph} />
+            <BlockGlyph icon={glyph} size={14} />
             <input
               autoFocus
               defaultValue={customBlockTitle(block) ?? ''}
@@ -245,32 +246,32 @@ function ManagerRow({
                 if (e.key === 'Enter') e.currentTarget.blur();
                 if (e.key === 'Escape') { cancelledRef.current = true; e.currentTarget.blur(); }
               }}
-              className="block-row-rename flex-1 min-w-0 bg-transparent text-[11px] font-medium text-stone-200 outline-none selectable"
+              className="block-row-rename flex-1 min-w-0 bg-transparent text-[13px] text-stone-200 outline-none selectable"
             />
           </>
         ) : (
           <button type="button" onClick={onActivate} title={t('blocks.jumpTo')} aria-pressed={selected} className="block-row-label">
-            <BlockGlyph icon={glyph} />
-            <span className="truncate text-[11px] font-medium">{label}</span>
+            <BlockGlyph icon={glyph} size={14} />
+            <span className={`truncate${selected ? ' font-semibold' : ''}`}>{label}</span>
           </button>
         )}
         <button
           type="button"
           onClick={onToggleHidden}
-          className={`block-row-action ${hidden ? 'block-row-action--on' : ''}`}
+          className={`block-manager-icon-btn${hidden ? ' block-manager-icon-btn--on' : ''}`}
           title={hidden ? t('blocks.show') : t('blocks.hide')}
           aria-label={hidden ? t('blocks.show') : t('blocks.hide')}
         >
-          {hidden ? <EyeOff size={12} /> : <Eye size={12} />}
+          {hidden ? <EyeOff size={14} /> : <Eye size={14} />}
         </button>
         <button
           type="button"
           onClick={onOpenMenu}
-          className="block-row-action"
+          className="block-manager-icon-btn"
           title={t('blocks.actions')}
           aria-label={t('blocks.actions')}
         >
-          <MoreHorizontal size={12} />
+          <MoreHorizontal size={14} />
         </button>
       </div>
       {selected && settings !== null && <BlockSettingsBox>{settings}</BlockSettingsBox>}

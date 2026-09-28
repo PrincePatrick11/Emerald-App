@@ -2049,6 +2049,29 @@ html[data-theme] .block-manager-row--idle,
   cursor: pointer;
 }
 
+/* Auge und Menü einer Zeile der Block-Verwaltung: 24px-Trefferfläche. */
+.block-manager-icon-btn {
+  display: flex;
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--text-subtle);
+  transition: color 150ms, background-color 150ms;
+}
+
+.block-manager-icon-btn:hover {
+  background-color: var(--interactive-hover);
+  color: var(--text-primary);
+}
+
+.block-manager-icon-btn--on {
+  color: var(--text-secondary);
+}
+
+.block-manager-icon-btn:focus-visible,
 .block-row-action:focus-visible,
 .block-row-label:focus-visible,
 .block-row-rename:focus-visible {
