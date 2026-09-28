@@ -46,13 +46,13 @@ export function SidebarPropertyRow({ icon, label, value, muted = false }: {
   muted?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2.5 px-2.5 py-1.5 text-sm min-w-0">
+    <div className="flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] min-w-0">
       <RowIcon>{icon}</RowIcon>
       <span className="sidebar-prop-label flex-shrink-0">{label}</span>
       {/* Kein `truncate` am Flex-Container selbst: mit `justify-end` schnitte er
           links ab. Ein Text kürzt in seiner eigenen Spanne am Ende. */}
       <span className={`ml-auto min-w-0 flex items-center justify-end gap-1.5 ${muted ? 'sidebar-prop-value--muted' : 'sidebar-prop-value'}`}>
-        {typeof value === 'string' ? <span className="truncate">{value}</span> : value}
+        {typeof value === 'string' ? <span className="truncate" title={value}>{value}</span> : value}
       </span>
     </div>
   );
@@ -77,16 +77,16 @@ export function SidebarItemRow({ icon, label, meta, onClick, active = false, tit
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={`sidebar-row flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-md text-sm text-left min-w-0${active ? ' sidebar-row--active' : ''}`}
+      className={`sidebar-row flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-md text-[13px] text-left min-w-0${active ? ' sidebar-row--active' : ''}`}
     >
       <RowIcon>{icon}</RowIcon>
       <span className="flex-1 min-w-0 truncate">{label}</span>
-      {meta && <span className="sidebar-row-meta flex-shrink-0 max-w-[45%] truncate text-xs">{meta}</span>}
+      {meta && <span className="sidebar-row-meta flex-shrink-0 max-w-[45%] truncate text-[11px]">{meta}</span>}
     </button>
   );
 }
 
 /** Der Leerzustand eines Abschnitts, eingerückt wie die Namen der Zeilen. */
 export function SidebarEmpty({ children }: { children: ReactNode }) {
-  return <p className="sidebar-empty px-2.5 py-1 text-sm">{children}</p>;
+  return <p className="sidebar-empty px-2.5 py-1 text-[13px]">{children}</p>;
 }
