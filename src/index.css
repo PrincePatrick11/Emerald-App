@@ -1022,7 +1022,9 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 11px;
+  /* 12px wie `label-xs`: im Bearbeiten stehen beide untereinander. */
+  font-size: 0.75rem;
+  line-height: 1rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
