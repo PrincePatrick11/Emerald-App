@@ -45,7 +45,9 @@ export default function IconToggleGroup<T extends string>({ label, options, icon
             disabled={disabled}
             title={title}
             aria-label={title}
-            className={fill ? 'flex-1 flex justify-center' : undefined}
+            // Mit `fill` py-1 statt p-1.5: die Leiste wird 30px hoch wie der
+            // Primärknopf und die Auswahl darunter.
+            className={fill ? 'flex-1 flex justify-center py-1' : undefined}
           >
             <Icon size={14} />
           </TabIconButton>

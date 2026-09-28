@@ -47,8 +47,9 @@ export function SwitchRow({ icon: Icon, label, checked, onChange, disabled, titl
       title={title}
       // px-3 wie der Auslöser der Auswahl darüber (FieldDropdown) und die
       // Filterzeilen darunter: Icon und Schalter fluchten mit Icon und
-      // Chevron der Sortierung.
-      className={`switch-row flex items-center gap-2.5 px-3 py-1 text-sm${disabled ? ' switch-row--disabled' : ''}`}
+      // Chevron der Sortierung. Einzeilig 30px hoch wie die übrigen
+      // Bedienelemente der Leiste; bricht das Label um, bleibt es eng.
+      className={`switch-row flex items-center gap-2.5 px-3 py-[7px] text-[13px] leading-4${disabled ? ' switch-row--disabled' : ''}`}
     >
       {Icon && <Icon size={14} className="flex-shrink-0" />}
       <span className="flex-1 min-w-0">{label}</span>
