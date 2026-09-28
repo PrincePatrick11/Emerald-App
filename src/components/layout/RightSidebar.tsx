@@ -124,7 +124,7 @@ export default function RightSidebar() {
   // Im Lesen stehen die Abschnitte (`SidebarSection`) ohne Linie untereinander,
   // der Abstand kommt von hier; im Bearbeiten ziehen die Panels ihre Linien selbst.
   return (
-    <SidebarColumn bar={<RightSidebarActionBar />} bodyClassName={activeView.mode === 'edit' ? '' : 'flex flex-col gap-4'}>
+    <SidebarColumn bar={<RightSidebarActionBar />} bodyClassName={activeView.mode === 'edit' ? '' : 'flex flex-col gap-5'}>
       <PropertiesContent activeView={activeView} />
       {moduleMeta(activeView.type)?.usesBlocks && <BlockSidebarArea />}
     </SidebarColumn>

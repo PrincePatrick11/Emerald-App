@@ -9,7 +9,7 @@ import { usePersistedFlag } from '../../../hooks/usePersistedFlag';
  * `storageKey` über alle Einträge hinweg (eine Vorliebe, keine Arbeitsgeste).
  *
  * Die Abschnitte stehen ohne Trennlinie untereinander; den Abstand zwischen
- * ihnen setzt der Aufrufer (`RightSidebar`: `gap-4` im Körper).
+ * ihnen setzt der Aufrufer (`RightSidebar`: `gap-5` im Körper).
  */
 export default function SidebarSection({ storageKey, label, count, children }: {
   storageKey: string;
@@ -25,7 +25,7 @@ export default function SidebarSection({ storageKey, label, count, children }: {
         {label}
         {count !== undefined && <span className="sidebar-section-count">{count}</span>}
       </button>
-      {open && <div className="mt-1 flex flex-col">{children}</div>}
+      {open && <div className="mt-1.5 flex flex-col gap-px">{children}</div>}
     </section>
   );
 }
@@ -46,7 +46,7 @@ export function SidebarPropertyRow({ icon, label, value, muted = false }: {
   muted?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2 px-2 py-1 text-[13px] leading-5 min-w-0">
+    <div className="flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] min-w-0">
       <RowIcon>{icon}</RowIcon>
       <span className="sidebar-prop-label flex-shrink-0">{label}</span>
       {/* Kein `truncate` am Flex-Container selbst: mit `justify-end` schnitte er
@@ -77,7 +77,7 @@ export function SidebarItemRow({ icon, label, meta, onClick, active = false, tit
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={`sidebar-row flex items-center gap-2 w-full px-2 py-1 rounded-md text-[13px] leading-5 text-left min-w-0${active ? ' sidebar-row--active' : ''}`}
+      className={`sidebar-row flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-md text-[13px] text-left min-w-0${active ? ' sidebar-row--active' : ''}`}
     >
       <RowIcon>{icon}</RowIcon>
       <span className="flex-1 min-w-0 truncate">{label}</span>
@@ -88,5 +88,5 @@ export function SidebarItemRow({ icon, label, meta, onClick, active = false, tit
 
 /** Der Leerzustand eines Abschnitts, eingerückt wie die Namen der Zeilen. */
 export function SidebarEmpty({ children }: { children: ReactNode }) {
-  return <p className="sidebar-empty px-2 py-0.5 text-[13px] leading-5">{children}</p>;
+  return <p className="sidebar-empty px-2.5 py-1 text-[13px]">{children}</p>;
 }

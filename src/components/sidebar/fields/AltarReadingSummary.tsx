@@ -78,7 +78,7 @@ export default function AltarReadingSummary() {
 
   // Eigener Abstand: das Panel des Altars liegt als ein Kind im Körper der Leiste.
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <PropertiesSection>
         {activeAltar.icon_data && (
           <SidebarPropertyRow
