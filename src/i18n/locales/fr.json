@@ -872,6 +872,8 @@
     "contentPlaceholder": "Ce que chaque entrée issue de ce modèle contient au départ …",
     "assign": {
       "open": "Définir l’affectation et le défaut …",
+      "assignShort": "Affecter",
+      "clearShort": "Retirer",
       "title": "Affectation et défaut – {{name}}",
       "hint": "Choisis où le modèle est proposé et avec quoi commencent les nouvelles entrées. Sans aucune affectation, il est proposé dans chaque entrée.",
       "off": "Non affecté",

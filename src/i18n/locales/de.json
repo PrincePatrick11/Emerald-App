@@ -872,6 +872,8 @@
     "contentPlaceholder": "Was jeder Eintrag aus dieser Vorlage mitbringt …",
     "assign": {
       "open": "Zuweisung & Standard festlegen …",
+      "assignShort": "Zuweisen",
+      "clearShort": "Lösen",
       "title": "Zuweisung & Standard – {{name}}",
       "hint": "Lege fest, wo die Vorlage zur Wahl steht und womit neue Einträge beginnen. Ohne jede Zuweisung steht sie in jedem Eintrag zur Wahl.",
       "off": "Nicht zugewiesen",

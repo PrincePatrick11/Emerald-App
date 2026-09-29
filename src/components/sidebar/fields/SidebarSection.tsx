@@ -83,9 +83,10 @@ export function SidebarItemRow({ icon, label, meta, onClick, active = false, tit
   title?: string;
   action?: ReactNode;
 }) {
+  const state = active ? ' sidebar-row--active' : '';
   if (action !== undefined) {
     return (
-      <div className={`sidebar-row flex items-center gap-1 h-8 pr-1 rounded-md text-[13px] min-w-0${active ? ' sidebar-row--active' : ''}`}>
+      <div className={`sidebar-row flex items-center gap-1 h-8 pr-1 rounded-md text-[13px] min-w-0${state}`}>
         <button
           type="button"
           onClick={onClick}
@@ -107,7 +108,7 @@ export function SidebarItemRow({ icon, label, meta, onClick, active = false, tit
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={`sidebar-row flex items-center gap-1.5 w-full pl-[9px] pr-3 py-1.5 rounded-md text-[13px] text-left min-w-0${active ? ' sidebar-row--active' : ''}`}
+      className={`sidebar-row flex items-center gap-1.5 w-full pl-[9px] pr-3 py-1.5 rounded-md text-[13px] text-left min-w-0${state}`}
     >
       <RowIcon>{icon}</RowIcon>
       <span className="flex-1 min-w-0 truncate">{label}</span>

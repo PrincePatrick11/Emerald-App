@@ -163,7 +163,7 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
       onClick={(e) => {
         if (kind === 'cover' && !value) { pickFile(); return; }
         const r = e.currentTarget.getBoundingClientRect();
-        setMenu({ x: r.left, y: r.bottom + 4, toggleEmoji });
+        setMenu({ x: r.right, y: r.bottom + 4, toggleEmoji });
       }}
     >
       {value ? <MediaPreview kind={kind} value={value} /> : (
@@ -190,7 +190,7 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
         ) : button(() => {})}
       </EditPropertyRow>
       {notice && <p className="pl-[9px] pr-3 text-xs text-danger">{notice}</p>}
-      {menu && <ContextMenu x={menu.x} y={menu.y} actions={actions(menu.toggleEmoji)} onClose={() => setMenu(null)} />}
+      {menu && <ContextMenu align="right" minWidth={120} x={menu.x} y={menu.y} actions={actions(menu.toggleEmoji)} onClose={() => setMenu(null)} />}
     </>
   );
 }

@@ -19,6 +19,14 @@ interface Props {
   y: number;
   actions: ContextMenuAction[];
   onClose: () => void;
+  /**
+   * `right`: `x` ist die rechte Kante — das Menü schließt dort ab, wie ein
+   * rechtsbündiges `Dropdown`. Für Menüs an einem Knopf am rechten Rand (die
+   * Wert-Knöpfe der Seitenleiste); sonst kippte es erst nach links weg.
+   */
+  align?: 'left' | 'right';
+  /** Mindestbreite in px — kürzer für die knappen Menüs der Wert-Knöpfe (120). */
+  minWidth?: number;
 }
 
 /** Abstand, den das Panel zu jeder Fensterkante haelt. */
@@ -36,7 +44,7 @@ function place(cursor: number, size: number, viewport: number): number {
   return Math.min(Math.max(flipped, VIEWPORT_MARGIN), max);
 }
 
-export default function ContextMenu({ x, y, actions, onClose }: Props) {
+export default function ContextMenu({ x, y, actions, onClose, align = 'left', minWidth = 160 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: x, top: y });
 
@@ -44,10 +52,10 @@ export default function ContextMenu({ x, y, actions, onClose }: Props) {
     if (!ref.current) return;
     const { width, height } = ref.current.getBoundingClientRect();
     setPos({
-      left: place(x, width, window.innerWidth),
+      left: place(align === 'right' ? x - width : x, width, window.innerWidth),
       top: place(y, height, window.innerHeight),
     });
-  }, [x, y]);
+  }, [x, y, align]);
 
   // Delay, um das rechtsklickende mousedown zu ueberspringen, das dieses Menue oeffnete.
   // Escape in der Capture-Phase: ein Menue ueber einem Modal ist der oberste
@@ -63,8 +71,10 @@ export default function ContextMenu({ x, y, actions, onClose }: Props) {
   return createPortal(
     <div
       ref={ref}
-      className="context-menu fixed z-[9999] border border-stone-700/60 rounded-lg shadow-2xl py-1 min-w-[160px]"
-      style={{ left: pos.left, top: pos.top }}
+      // `w-max`: an der Klickposition nahe dem Fensterrand schrumpfte das Menü
+      // sonst beim Messen und stand nach dem Verschieben breiter als gemessen.
+      className="context-menu fixed z-[9999] w-max border border-stone-700/60 rounded-lg shadow-2xl py-1"
+      style={{ left: pos.left, top: pos.top, minWidth }}
     >
       {actions.map((action, i) => (
         <button

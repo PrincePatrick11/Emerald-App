@@ -914,8 +914,8 @@ Wiki and Operations disagree, so the segment row shows no option pressed rather 
 side arbitrarily. `TemplateAssignments` (the sidebar) shows the current assignments read-only —
 sorted the same way the table lists them (`TEMPLATE_ENTRY_TYPES` order, then the categories'
 own order) — with a star for a default (which default it replaces is said in the modal), as the "Assignment" property of the Properties section: a value button ("Everywhere" or the
-count) that opens the modal, and below it one ordinary `SidebarItemRow` per assignment (module
-icon, category) that opens the modal too; the modal's
+count, or the single assignment itself with a star when it is a default) that opens the modal,
+with the full list in its tooltip; the modal's
 "Apply" only calls `onChange` when `sameAssignments` says something actually changed, so a
 no-op edit leaves the draft untouched. `TemplateDefaultsOverview` is the dashboard's read-only
 view of the same assignments, laid out like the modal but with its own markup rather than

@@ -872,6 +872,8 @@
     "contentPlaceholder": "Lo que trae cada entrada creada con esta plantilla …",
     "assign": {
       "open": "Definir asignación y predeterminada …",
+      "assignShort": "Asignar",
+      "clearShort": "Quitar",
       "title": "Asignación y predeterminada – {{name}}",
       "hint": "Elige dónde se ofrece la plantilla y con qué empiezan las entradas nuevas. Sin ninguna asignación, se ofrece en todas las entradas.",
       "off": "Sin asignar",

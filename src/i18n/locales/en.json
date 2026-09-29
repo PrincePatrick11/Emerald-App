@@ -872,6 +872,8 @@
     "contentPlaceholder": "What every entry from this template starts with …",
     "assign": {
       "open": "Set assignment & default …",
+      "assignShort": "Assign",
+      "clearShort": "Clear",
       "title": "Assignment & default – {{name}}",
       "hint": "Choose where the template is offered and what new entries start with. With no assignment at all, it is offered in every entry.",
       "off": "Not assigned",

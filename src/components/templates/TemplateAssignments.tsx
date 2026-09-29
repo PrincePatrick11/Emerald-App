@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, SlidersHorizontal, Star } from 'lucide-react';
+import { SlidersHorizontal, Star, X } from 'lucide-react';
+import ContextMenu from '../ui/ContextMenu';
 import { EditPropertyRow } from '../sidebar/fields/EditProperties';
-import { SidebarItemRow } from '../sidebar/fields/SidebarSection';
 import { useCategoryStore } from '../../store/categoryStore';
-import { MODULES, viewTypeForEntryType } from '../../lib/modules';
 import {
-  ALL_CATEGORIES, assignmentKey, sameAssignments, TEMPLATE_ENTRY_TYPES, type TemplateAssignment,
+  ALL_CATEGORIES, sameAssignments, TEMPLATE_ENTRY_TYPES, type TemplateAssignment,
 } from '../../lib/blocks/templates';
 import { useAssignmentLabel, useAssignmentParts } from './useAssignmentLabel';
 import TemplateAssignmentsModal from './TemplateAssignmentsModal';
@@ -29,18 +28,19 @@ function categoryRank(category: string | null, order: ReadonlyMap<string, number
 }
 
 /**
- * „Zuweisung" als Eigenschaft einer Vorlage: ein Wert-Knopf („Überall" oder
- * die Zahl der Zuweisungen), der den Dialog öffnet, in dem man Zuweisung und
- * Standard festlegt (`TemplateAssignmentsModal`) — dort steht auch, wessen
- * Standard ein Stern ablöst; ersetzt wird erst mit „Fertig". Darunter als
- * gewöhnliche Zeilen, was gerade gilt: Modul-Icon, Kategorie, rechts der Stern
- * eines Standards.
+ * „Zuweisung" als Eigenschaft einer Vorlage: ein Wert-Knopf — „Überall", die
+ * eine Zuweisung (mit Stern, wenn sie Standard ist) oder die Zahl —, der den
+ * Dialog öffnet, in dem man Zuweisung und Standard festlegt
+ * (`TemplateAssignmentsModal`); dort steht auch, wessen Standard ein Stern
+ * ablöst, ersetzt wird erst mit „Fertig". Keine Liste darunter: jede Variante
+ * davon las sich als eigene Einträge statt als Wert der Eigenschaft.
  */
 export default function TemplateAssignments({ templateId, name, assignments, onChange }: Props) {
   const { t } = useTranslation();
   const label = useAssignmentLabel();
   const parts = useAssignmentParts();
   const [modalOpen, setModalOpen] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
 
   const categories = useCategoryStore((s) => s.categories);
   const order = new Map(categories.map((c, i) => [c.id, i]));
@@ -49,44 +49,58 @@ export default function TemplateAssignments({ templateId, name, assignments, onC
     TEMPLATE_ENTRY_TYPES.indexOf(a.entryType) - TEMPLATE_ENTRY_TYPES.indexOf(b.entryType)
     || categoryRank(a.category, order) - categoryRank(b.category, order));
 
-  const summary = sorted.length === 0 ? t('templates.availableEverywhere') : t('templates.assignmentCount', { count: sorted.length });
+  // Eine Zuweisung zeigt der Knopf selbst, mehrere als Zahl; die ganze Liste
+  // (★ für einen Standard) steht im Tooltip und im Dialog.
+  const single = sorted.length === 1 ? sorted[0] : null;
+  const singleParts = single ? parts(single.entryType, single.category) : null;
+  const summary = sorted.length === 0
+    ? t('templates.availableEverywhere')
+    : singleParts ? singleParts.place ?? singleParts.type : t('templates.assignmentCount', { count: sorted.length });
+  const tooltip = sorted.length === 0
+    ? t('templates.assign.open')
+    : sorted.map((a) => `${label(a.entryType, a.category)}${a.isDefault ? ' ★' : ''}`).join('\n');
 
   return (
     <>
       <EditPropertyRow icon={<SlidersHorizontal size={14} />} label={t('templates.assignment')}>
+        {/* Wie Icon und Titelbild: leer öffnet der Knopf gleich den Dialog,
+            sonst ein Menü — festlegen oder alle Zuweisungen lösen. */}
         <button
           type="button"
-          aria-haspopup="dialog"
+          aria-haspopup={sorted.length === 0 ? 'dialog' : 'menu'}
+          aria-expanded={sorted.length === 0 ? undefined : menu !== null}
           aria-label={`${t('templates.assignment')}: ${summary}`}
-          title={t('templates.assign.open')}
+          title={tooltip}
           className="prop-value-btn"
-          onClick={() => setModalOpen(true)}
+          onClick={(e) => {
+            if (sorted.length === 0) { setModalOpen(true); return; }
+            const r = e.currentTarget.getBoundingClientRect();
+            setMenu({ x: r.right, y: r.bottom + 4 });
+          }}
         >
           <span className="min-w-0 truncate">{summary}</span>
-          <ChevronDown size={13} />
+          {single?.isDefault && (
+            <span className="template-default-star" aria-label={t('templates.assign.default')}>
+              <Star size={12} fill="currentColor" />
+            </span>
+          )}
         </button>
       </EditPropertyRow>
 
-      {/* Wie die übrigen Zeilen der Seitenleiste: Modul-Icon, Kategorie, rechts
-          der Stern eines Standards. Ein Klick öffnet ebenfalls den Dialog. */}
-      {sorted.map((a) => {
-        const { type, place } = parts(a.entryType, a.category);
-        const Icon = MODULES[viewTypeForEntryType(a.entryType)].icon;
-        return (
-          <SidebarItemRow
-            key={assignmentKey(a.entryType, a.category)}
-            icon={<Icon size={14} />}
-            label={place ?? type}
-            title={label(a.entryType, a.category)}
-            onClick={() => setModalOpen(true)}
-            action={a.isDefault ? (
-              <span className="template-default-star w-6 justify-center" title={t('templates.assign.default')}>
-                <Star size={14} fill="currentColor" />
-              </span>
-            ) : <span className="w-6 flex-shrink-0" />}
-          />
-        );
-      })}
+      {menu && (
+        <ContextMenu
+          align="right"
+          minWidth={120}
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          actions={[
+            { label: t('templates.assign.assignShort'), icon: <SlidersHorizontal size={12} />, onClick: () => setModalOpen(true) },
+            // Landet wie jede Änderung im Entwurf — gilt erst mit „Fertig".
+            { label: t('templates.assign.clearShort'), icon: <X size={12} />, onClick: () => onChange([]), danger: true },
+          ]}
+        />
+      )}
 
       {modalOpen && (
         <TemplateAssignmentsModal
