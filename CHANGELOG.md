@@ -6,6 +6,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] (targeting v0.2.0)
 
 ### Changed
+- **"Last changed" moves only when you change that entry.** Renaming, deleting or restoring a tag, "Update all" or "Remove from all" for a block and a new altar preview no longer re-date the entries they touch or reshuffle lists sorted by last change. Done without changes leaves the date alone, and Cancel puts it back to what it was before editing. Checking a checklist item still counts as a change.
 - **The `links` table is gone (migration v47).** It copied every entry's link chips on each save for a backlinks panel that was never shown; nothing read it. The chips in the entries themselves are unchanged, and backups no longer carry the table.
 - **Cancel in an altar takes everything back.** It used to reset the title only, since every action on the canvas is saved at once. It now returns the altar to how it was when Edit was pressed — placements, background, overlay, grid, format and icon — and leaving an altar with changes asks like everywhere else.
 - **Keep editing closes the window that asked.** When an import, an update or a vault switch runs into an edit with changes and the answer is Keep editing, the Settings or Vaults window closes too — you are back in the entry instead of in front of the window.

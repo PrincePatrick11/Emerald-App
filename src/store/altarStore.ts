@@ -3,6 +3,7 @@ import { saveImage } from '../lib/images';
 import { getDb } from '../lib/db';
 import { ALTAR_RATIOS, DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY, DEFAULT_OVERLAY_COLOR, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE, isRatioFormat, parseResolution } from '../lib/altarConstants';
 import { generateId, isValidHexColor, nowIso } from '../lib/helpers';
+import { needsWrite, stampFor, type WriteOptions } from '../lib/stamp';
 import { serialKey, serialized } from '../lib/serialize';
 import { bool, fromRow, toInt, type DbRow } from '../lib/row';
 import type { AltarItem, AltarPlacement, AltarRecord } from '../types';
@@ -121,7 +122,7 @@ interface AltarState {
   clearActiveAltar: () => void;
   createAltar: () => Promise<AltarRecord>;
   duplicateAltar: (id: string) => Promise<AltarRecord | null>;
-  updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'intention' | 'background_preset' | 'background_image_data' | 'background_overlay' | 'background_overlay_color' | 'thumbnail_data' | 'icon_data'>>) => Promise<void>;
+  updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'intention' | 'background_preset' | 'background_image_data' | 'background_overlay' | 'background_overlay_color' | 'thumbnail_data' | 'icon_data'>>, options?: WriteOptions) => Promise<void>;
   updateAltarGrid: (id: string, patch: Partial<Pick<AltarRecord, 'grid_enabled' | 'grid_size' | 'grid_opacity' | 'grid_color' | 'snap_to_grid' | 'rotation_snap_enabled' | 'rotation_snap_angle' | 'snap_scale_to_grid'>>) => Promise<void>;
   updateAltarResolution: (id: string, resolution: string) => Promise<void>;
   bumpAltarUpdatedAt: (id: string) => Promise<void>;
@@ -337,11 +338,11 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   // serialized (grid/resolution share the key): see lib/serialize.ts. The most
   // realistic collision here is the automatic thumbnail save, which goes
   // through updateAltar and would overlap with an intention autosave.
-  updateAltar: (id, patch) => serialized(serialKey('altar', id), async () => {
-    const db = await getDb();
+  updateAltar: (id, patch, { touch } = {}) => serialized(serialKey('altar', id), async () => {
     const altar = get().altars.find((entry) => entry.id === id);
-    if (!altar) return;
-    const updated: AltarRecord = { ...altar, ...patch, updated_at: nowIso() };
+    if (!altar || !needsWrite(altar, patch, touch)) return;
+    const db = await getDb();
+    const updated: AltarRecord = { ...altar, ...patch, updated_at: stampFor(altar.updated_at, touch) };
     await db.execute(
       'UPDATE altars SET title=$1, intention=$2, background_preset=$3, background_image_data=$4, background_overlay=$5, background_overlay_color=$6, updated_at=$7, thumbnail_data=$8, icon_data=$9 WHERE id=$10',
       [updated.title, updated.intention, updated.background_preset || DEFAULT_ALTAR_BACKGROUND, updated.background_image_data ?? null, updated.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY, updated.background_overlay_color ?? DEFAULT_OVERLAY_COLOR, updated.updated_at, updated.thumbnail_data ?? null, updated.icon_data ?? null, id]

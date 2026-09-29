@@ -326,8 +326,9 @@ debounce after typing stops, so by the time Cancel is pressed the store already 
 edited values. `useEntryEditor` (`src/hooks/useEntryEditor.ts`) instead captures a baseline of
 the whole entry (`buildRestorePatch` — title, content and tags for Journal; Wiki and Operations
 add category, icon and cover image) the moment edit mode is entered, and `restoreOnCancel()`
-writes that baseline back on Cancel (skipping the write if nothing changed, so a no-op Cancel
-doesn't bump `updated_at`). The baseline is wider than `buildPatch` on purpose: the
+writes that baseline back on Cancel, together with the `updated_at` the entry had when editing
+began (skipping the write if nothing changed) — the autosaves in between leave no trace in the
+lists. The baseline is wider than `buildPatch` on purpose: the
 Properties panel saves its fields straight to the store, so the autosave never carries them,
 but Cancel takes them back along with the text — one rule, "Cancel restores the entry as it
 was when editing began". The one thing Cancel does not undo is a change of type: that moves

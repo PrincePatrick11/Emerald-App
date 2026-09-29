@@ -69,7 +69,7 @@ export default function JournalView() {
     buildPatch: (content) => ({ title, content, tags }),
     readStored: (id) => {
       const stored = getEntry(id);
-      return stored ? fieldsOf(stored) : null;
+      return stored ? { ...fieldsOf(stored), updated_at: stored.updated_at } : null;
     },
     update: updateEntry,
   });

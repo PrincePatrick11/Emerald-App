@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type Database from '@tauri-apps/plugin-sql';
 import { getDb } from '../lib/db';
 import { generateId, nowIso } from '../lib/helpers';
+import { needsWrite, stampFor, type WriteOptions } from '../lib/stamp';
 import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, toInt, type DbRow } from '../lib/row';
 import type { ContentType, Task, TaskLink } from '../types';
@@ -27,7 +28,7 @@ interface TaskState {
 
   fetchAll: () => Promise<void>;
   createTask: (categoryId?: string | null, parentTaskId?: string | null) => Promise<Task>;
-  updateTask: (id: string, patch: Partial<Task>) => Promise<void>;
+  updateTask: (id: string, patch: Partial<Task>, options?: WriteOptions) => Promise<void>;
   toggleComplete: (id: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   restoreTask: (id: string) => Promise<void>;
@@ -83,13 +84,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   // serialized: siehe lib/serialize.ts. Gleicher Schlüssel wie toggleComplete —
   // updateTask schreibt die ganze Zeile aus einem Snapshot-Merge, toggleComplete
   // liest den Zustand vor dem Kippen; überlappend überschriebe einer den anderen.
-  updateTask: (id: string, patch: Partial<Task>) => serialized(serialKey('task', id), async () => {
-    const db = await getDb();
-    const now = nowIso();
+  updateTask: (id: string, patch: Partial<Task>, { touch }: WriteOptions = {}) => serialized(serialKey('task', id), async () => {
     const task = get().tasks.find((t) => t.id === id);
-    if (!task) return;
+    if (!task || !needsWrite(task, patch, touch)) return;
+    const db = await getDb();
 
-    const merged = { ...task, ...patch, updated_at: now };
+    const merged = { ...task, ...patch, updated_at: stampFor(task.updated_at, touch) };
 
     await db.execute(
       `UPDATE tasks SET

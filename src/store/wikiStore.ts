@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type Database from '@tauri-apps/plugin-sql';
 import { getDb, nextEntryNumber } from '../lib/db';
 import { generateId, nowIso } from '../lib/helpers';
+import { needsWrite, stampFor, type WriteOptions } from '../lib/stamp';
 import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, type DbRow } from '../lib/row';
 import type { WikiArticle } from '../types';
@@ -42,7 +43,7 @@ interface WikiState {
   /** Mit dem Standard der Kombination (Vorlagen) — außer `blank`. */
   createArticle: (categoryId?: string | null, opts?: { blank?: boolean }) => Promise<WikiArticle>;
   duplicateArticle: (id: string) => Promise<WikiArticle | undefined>;
-  updateArticle: (id: string, patch: Partial<WikiArticle>) => Promise<void>;
+  updateArticle: (id: string, patch: Partial<WikiArticle>, options?: WriteOptions) => Promise<void>;
   deleteArticle: (id: string) => Promise<void>;
   restoreArticle: (id: string) => Promise<void>;
   permanentlyDeleteArticle: (id: string) => Promise<void>;
@@ -133,18 +134,17 @@ export const useWikiStore = create<WikiState>((set, get) => ({
   },
 
   // serialized: siehe lib/serialize.ts.
-  updateArticle: (id, patch) => serialized(serialKey('wiki', id), async () => {
-    const db = await getDb();
-    const now = nowIso();
+  updateArticle: (id, patch, { touch } = {}) => serialized(serialKey('wiki', id), async () => {
     const article = get().articles.find((a) => a.id === id);
-    if (!article) return;
+    if (!article || !needsWrite(article, patch, touch)) return;
+    const db = await getDb();
     const slug = patch.title && patch.title !== article.title
       ? await uniqueSlugify(db, patch.title, id)
       : article.slug;
     const merged = {
       ...article,
       ...patch,
-      updated_at: now,
+      updated_at: stampFor(article.updated_at, touch),
       slug,
     };
 

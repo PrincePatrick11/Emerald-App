@@ -3,6 +3,7 @@ import { editorSavesSuspended } from '../lib/editorLock';
 import type { ViewId } from '../lib/modules';
 import { isInEdit, useUIStore } from '../store/uiStore';
 import { guardKey, registerEditProbe } from '../store/leaveGuardStore';
+import type { WriteOptions } from '../lib/stamp';
 
 /**
  * Die Ausgangsstände der laufenden Bearbeitungen, je Ansicht und Eintrag — wie
@@ -21,9 +22,13 @@ const baselines = new Map<string, {
   scope: ViewId;
   id: string;
   patch: unknown;
-  /** Der gespeicherte Stand, in der Form von `patch` — `null`, wenn es den Eintrag nicht mehr gibt. */
-  stored: () => unknown;
+  /** „Zuletzt geändert" beim Betreten — Cancel stellt ihn mit dem Rest wieder her. */
+  stamp: string | undefined;
+  /** Der gespeicherte Stand, in der Form von `patch` samt `updated_at` — `null`, wenn es den Eintrag nicht mehr gibt. */
+  stored: () => Stored | null;
 }>();
+
+type Stored = { updated_at: string };
 
 const baselineKey = guardKey;
 
@@ -34,10 +39,13 @@ const baselineKey = guardKey;
  * oder einer mit ausstehendem Autosave immer; sonst zählt, ob der gespeicherte
  * Stand vom Ausgangsstand abweicht.
  */
-function editIsDirty(stored: unknown, patch: unknown, isNew: boolean, pending = false): boolean {
+function editIsDirty(stored: Stored | null, patch: unknown, isNew: boolean, pending = false): boolean {
   if (stored === null) return false;
   if (isNew || pending) return true;
-  return patch !== undefined && JSON.stringify(stored) !== JSON.stringify(patch);
+  // Der Stempel ist keine Änderung: ein Autosave stellt ihn weiter, auch wenn
+  // danach alles zurückgetippt wurde.
+  const { updated_at: _stamp, ...fields } = stored;
+  return patch !== undefined && JSON.stringify(fields) !== JSON.stringify(patch);
 }
 
 useUIStore.subscribe((s) => {
@@ -92,12 +100,13 @@ interface UseEntryEditorOptions<TPatch, TRestore = TPatch> {
    * Der gespeicherte Stand des Eintrags, in der Form von `buildRestorePatch` —
    * woran Cancel und der Wächter messen, ob sich etwas geändert hat. Nicht der
    * lokale Stand: getippt, vom Autosave geschrieben, zurückgetippt und gleich
-   * abgebrochen sähe der aus wie unverändert. `null`, wenn es den Eintrag nicht
-   * mehr gibt. Darf nur aus Stores lesen — die Probe für Tabs im Hintergrund
-   * ruft es auch, wenn die View nicht mehr montiert ist.
+   * abgebrochen sähe der aus wie unverändert. Dazu `updated_at`, das Cancel
+   * mit zurückstellt. `null`, wenn es den Eintrag nicht mehr gibt. Darf nur aus
+   * Stores lesen — die Probe für Tabs im Hintergrund ruft es auch, wenn die
+   * View nicht mehr montiert ist.
    */
-  readStored: (id: string) => TRestore | null;
-  update: (id: string, patch: TPatch | TRestore) => Promise<void>;
+  readStored: (id: string) => (TRestore & Stored) | null;
+  update: (id: string, patch: TPatch | TRestore, options?: WriteOptions) => Promise<void>;
   debounceMs?: number;
 }
 
@@ -184,14 +193,15 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
       scope,
       id: entityId,
       patch,
+      stamp: readStoredRef.current(entityId)?.updated_at,
       stored: () => readStoredRef.current(entityId),
     });
   }, [isEditing, ready, entityId, scope]);
 
   /**
    * Der Cancel-Pfad: entschärft den Timer und schreibt den Einstiegs-Stand des
-   * Eintrags zurück in Store und DB (Schreibzugriff nur, wenn der gespeicherte
-   * Stand davon abweicht — kein updated_at-Bump für ein folgenloses Cancel). Gibt die
+   * Eintrags zurück in Store und DB, „Zuletzt geändert" eingeschlossen
+   * (Schreibzugriff nur, wenn der gespeicherte Stand davon abweicht). Gibt die
    * Baseline zurück, damit die View ihren lokalen State daraus setzt; null nur,
    * wenn es keine Baseline gab oder der Schreibzugriff scheiterte — dann fällt
    * die View auf den Store-Stand zurück und verlässt den Edit-Modus trotzdem.
@@ -200,12 +210,13 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
     cancelAutoSave();
     const id = idRef.current;
     const baseline = id
-      ? baselines.get(baselineKey(scope, id)) as { id: string; patch: TRestore } | undefined
+      ? baselines.get(baselineKey(scope, id)) as { id: string; patch: TRestore; stamp: string | undefined } | undefined
       : undefined;
     if (!baseline) return null;
-    if (editIsDirty(readStoredRef.current(baseline.id), baseline.patch, false)) {
+    const stored = readStoredRef.current(baseline.id);
+    if (editIsDirty(stored, baseline.patch, false) || (stored && stored.updated_at !== baseline.stamp)) {
       try {
-        await updateRef.current(baseline.id, baseline.patch);
+        await updateRef.current(baseline.id, baseline.patch, { touch: baseline.stamp ?? true });
       } catch (e) {
         console.error('[useEntryEditor] restore on cancel failed:', e);
         return null;

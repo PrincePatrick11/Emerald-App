@@ -3,6 +3,7 @@ import type Database from '@tauri-apps/plugin-sql';
 import { getDb, nextEntryNumber } from '../lib/db';
 import { getMoonPhase } from '../lib/moonPhase';
 import { generateId, nowIso } from '../lib/helpers';
+import { needsWrite, stampFor, type WriteOptions } from '../lib/stamp';
 import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, toInt, type DbRow } from '../lib/row';
 import type { JournalEntry } from '../types';
@@ -18,7 +19,7 @@ interface JournalState {
   /** Mit dem Journal-Standard (Vorlagen) — außer `blank`. */
   createEntry: (opts?: { blank?: boolean }) => Promise<JournalEntry>;
   duplicateEntry: (id: string) => Promise<JournalEntry | undefined>;
-  updateEntry: (id: string, patch: Partial<JournalEntry>) => Promise<void>;
+  updateEntry: (id: string, patch: Partial<JournalEntry>, options?: WriteOptions) => Promise<void>;
   deleteEntry: (id: string) => Promise<void>;
   restoreEntry: (id: string) => Promise<void>;
   permanentlyDeleteEntry: (id: string) => Promise<void>;
@@ -120,13 +121,11 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   },
 
   // serialized: siehe lib/serialize.ts.
-  updateEntry: (id, patch) => serialized(serialKey('journal', id), async () => {
-    const db = await getDb();
-    const now = nowIso();
-    const updated = { ...patch, updated_at: now };
+  updateEntry: (id, patch, { touch } = {}) => serialized(serialKey('journal', id), async () => {
     const entry = get().entries.find((e) => e.id === id);
-    if (!entry) return;
-    const merged = { ...entry, ...updated };
+    if (!entry || !needsWrite(entry, patch, touch)) return;
+    const db = await getDb();
+    const merged = { ...entry, ...patch, updated_at: stampFor(entry.updated_at, touch) };
 
     await db.execute(
       `UPDATE journal_entries

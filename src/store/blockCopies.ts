@@ -6,15 +6,15 @@
  * Vorlagen-Ansicht über diese Kopien und Herkünfte zeigen.
  *
  * Geschrieben wird über `update*(id, { content })` der Stores — serialisiert
- * pro Eintrag, mit `syncLinks`, wie jede andere Änderung. Der Eintrag, der
+ * pro Eintrag, wie jede andere Änderung. Der Eintrag, der
  * gerade bearbeitet wird, bleibt aus: sein Editor hält den Inhalt und schriebe
  * beim nächsten Speichern den Stand von vorher zurück. Ein offener Eintrag im
  * Lesemodus übernimmt den neuen Stand selbst (`BlockStack`).
  *
  * Nur aktive Einträge — was im Papierkorb liegt, behält seine Kopie. Die
- * Änderung zählt wie jede andere: `updated_at` der berührten Einträge springt
- * auf jetzt, nach Änderung sortierte Listen ordnen sie neu ein. Gewollt — ihr
- * Inhalt hat sich geändert.
+ * Änderung ist eine Folge des Blocks, keine an den Einträgen selbst:
+ * „Zuletzt geändert" bleibt (`AS_A_CONSEQUENCE`, `lib/stamp.ts`), und nach
+ * Änderung sortierte Listen bleiben, wie sie waren.
  *
  * Vorlagen tragen ebenfalls Kopien und werden mitgenommen — sonst brächte eine
  * Vorlage einen entfernten Block in jeden neuen Eintrag zurück. Sie zählen
@@ -56,16 +56,18 @@ interface ContentSource extends ContentRow {
   save: (content: string) => Promise<unknown>;
 }
 
+const AS_A_CONSEQUENCE = { touch: false };
+
 function contentSources(): ContentSource[] {
   const journal = useJournalStore.getState();
   const wiki = useWikiStore.getState();
   const ops = useOperationStore.getState();
   const templates = useTemplateStore.getState();
   return [
-    ...journal.entries.map((e) => ({ kind: 'entry' as const, id: e.id, content: e.content, save: (content: string) => journal.updateEntry(e.id, { content }) })),
-    ...wiki.articles.map((a) => ({ kind: 'entry' as const, id: a.id, content: a.content, save: (content: string) => wiki.updateArticle(a.id, { content }) })),
-    ...ops.operations.map((o) => ({ kind: 'entry' as const, id: o.id, content: o.content, save: (content: string) => ops.updateOperation(o.id, { content }) })),
-    ...templates.templates.map((tpl) => ({ kind: 'template' as const, id: tpl.id, content: tpl.content, save: (content: string) => templates.updateTemplate(tpl.id, { content }) })),
+    ...journal.entries.map((e) => ({ kind: 'entry' as const, id: e.id, content: e.content, save: (content: string) => journal.updateEntry(e.id, { content }, AS_A_CONSEQUENCE) })),
+    ...wiki.articles.map((a) => ({ kind: 'entry' as const, id: a.id, content: a.content, save: (content: string) => wiki.updateArticle(a.id, { content }, AS_A_CONSEQUENCE) })),
+    ...ops.operations.map((o) => ({ kind: 'entry' as const, id: o.id, content: o.content, save: (content: string) => ops.updateOperation(o.id, { content }, AS_A_CONSEQUENCE) })),
+    ...templates.templates.map((tpl) => ({ kind: 'template' as const, id: tpl.id, content: tpl.content, save: (content: string) => templates.updateTemplate(tpl.id, { content }, AS_A_CONSEQUENCE) })),
   ];
 }
 

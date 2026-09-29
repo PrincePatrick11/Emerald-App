@@ -81,7 +81,7 @@ export default function OperationsView() {
     }),
     readStored: (id) => {
       const stored = getOperation(id);
-      return stored ? fieldsOf(stored) : null;
+      return stored ? { ...fieldsOf(stored), updated_at: stored.updated_at } : null;
     },
     update: updateOperation,
   });

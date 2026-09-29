@@ -54,13 +54,19 @@ function taggedItems(): TaggedRef[] {
   ];
 }
 
+/**
+ * Schreibt die Tags eines Eintrags, die ein Umbenennen, Löschen oder
+ * Wiederherstellen des Tags geändert hat — eine Folge, keine Änderung am
+ * Eintrag: „Zuletzt geändert" bleibt (`lib/stamp.ts`).
+ */
 function setItemTags(type: TaggedType, id: string, tags: string[]): Promise<void> {
+  const options = { touch: false };
   switch (type) {
-    case 'journal': return useJournalStore.getState().updateEntry(id, { tags });
-    case 'wiki': return useWikiStore.getState().updateArticle(id, { tags });
-    case 'operation': return useOperationStore.getState().updateOperation(id, { tags });
-    case 'task': return useTaskStore.getState().updateTask(id, { tags });
-    case 'template': return useTemplateStore.getState().updateTemplate(id, { tags }).then(() => undefined);
+    case 'journal': return useJournalStore.getState().updateEntry(id, { tags }, options);
+    case 'wiki': return useWikiStore.getState().updateArticle(id, { tags }, options);
+    case 'operation': return useOperationStore.getState().updateOperation(id, { tags }, options);
+    case 'task': return useTaskStore.getState().updateTask(id, { tags }, options);
+    case 'template': return useTemplateStore.getState().updateTemplate(id, { tags }, options).then(() => undefined);
   }
 }
 

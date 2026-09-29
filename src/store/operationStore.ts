@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type Database from '@tauri-apps/plugin-sql';
 import { getDb, nextEntryNumber } from '../lib/db';
 import { generateId, nowIso } from '../lib/helpers';
+import { needsWrite, stampFor, type WriteOptions } from '../lib/stamp';
 import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, type DbRow } from '../lib/row';
 import { withChargeUnloaded } from '../lib/blocks/sigil';
@@ -17,7 +18,7 @@ interface OperationState {
   /** Mit dem Standard der Kombination (Vorlagen) — außer `blank`. */
   createOperation: (categoryId?: string | null, opts?: { blank?: boolean }) => Promise<Operation>;
   duplicateOperation: (id: string) => Promise<Operation | undefined>;
-  updateOperation: (id: string, patch: Partial<Operation>) => Promise<void>;
+  updateOperation: (id: string, patch: Partial<Operation>, options?: WriteOptions) => Promise<void>;
   deleteOperation: (id: string) => Promise<void>;
   restoreOperation: (id: string) => Promise<void>;
   permanentlyDeleteOperation: (id: string) => Promise<void>;
@@ -96,12 +97,11 @@ export const useOperationStore = create<OperationState>((set, get) => ({
   },
 
   // serialized: siehe lib/serialize.ts.
-  updateOperation: (id, patch) => serialized(serialKey('operation', id), async () => {
-    const db = await getDb();
-    const now = nowIso();
+  updateOperation: (id, patch, { touch } = {}) => serialized(serialKey('operation', id), async () => {
     const op = get().operations.find((o) => o.id === id);
-    if (!op) return;
-    const merged = { ...op, ...patch, updated_at: now };
+    if (!op || !needsWrite(op, patch, touch)) return;
+    const db = await getDb();
+    const merged = { ...op, ...patch, updated_at: stampFor(op.updated_at, touch) };
     // Die $N-Platzhalter MUESSEN in Textreihenfolge aufsteigen: SQLite vergibt
     // die Bind-Indizes nach dem ersten Auftreten, nicht nach der Ziffer, und
     // tauri-plugin-sql bindet rein positionell.
@@ -116,7 +116,7 @@ export const useOperationStore = create<OperationState>((set, get) => ({
       ]
     );
     set((s) => ({
-      operations: s.operations.map((o) => (o.id === id ? { ...o, ...patch, updated_at: now } : o)),
+      operations: s.operations.map((o) => (o.id === id ? { ...o, ...patch, updated_at: merged.updated_at } : o)),
     }));
   }),
 

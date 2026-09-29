@@ -19,6 +19,7 @@ import { create } from 'zustand';
 import type Database from '@tauri-apps/plugin-sql';
 import { getDb } from '../lib/db';
 import { generateId, nowIso } from '../lib/helpers';
+import { needsWrite, stampFor, type WriteOptions } from '../lib/stamp';
 import { fromRow, type DbRow } from '../lib/row';
 import { serialized, serialKey } from '../lib/serialize';
 import { insertTemplateRow, nextTemplateSortOrder, templateById } from '../lib/templateRows';
@@ -47,7 +48,7 @@ interface TemplateState {
    * Vorlagen ihn für dieselbe Kombination — die liefert die Funktion zurück,
    * damit die Oberfläche sagen kann, wen es betraf.
    */
-  updateTemplate: (id: string, patch: TemplatePatch) => Promise<Template[]>;
+  updateTemplate: (id: string, patch: TemplatePatch, options?: WriteOptions) => Promise<Template[]>;
   duplicateTemplate: (id: string) => Promise<Template | undefined>;
   /** Soft-Delete. Einträge aus dieser Vorlage bleiben, wie sie sind. */
   deleteTemplate: (id: string) => Promise<void>;
@@ -108,15 +109,15 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     return template;
   }),
 
-  updateTemplate: (id, patch) => serialized(WRITE_KEY, async () => {
+  updateTemplate: (id, patch, { touch } = {}) => serialized(WRITE_KEY, async () => {
     const current = get().templates.find((t) => t.id === id);
-    if (!current) return [];
+    if (!current || !needsWrite(current, patch, touch)) return [];
     const updated: Template = {
       ...current,
       ...patch,
       name: (patch.name ?? current.name).trim(),
       assignments: patch.assignments ? parseAssignments(patch.assignments) : current.assignments,
-      updated_at: nowIso(),
+      updated_at: stampFor(current.updated_at, touch),
     };
     const db = await getDb();
     const row = templateToRow(updated);

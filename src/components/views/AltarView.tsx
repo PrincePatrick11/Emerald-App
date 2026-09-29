@@ -124,7 +124,8 @@ export default function AltarView() {
       trackAltarWrite(altarId, (async () => {
         if (titleChanged) await update(altarId, { title: typed });
         const thumbnailData = await capture;
-        if (thumbnailData !== null) await update(altarId, { thumbnail_data: thumbnailData });
+        // Das Bild folgt nur — „Zuletzt geändert" hat die Änderung selbst schon gestellt.
+        if (thumbnailData !== null) await update(altarId, { thumbnail_data: thumbnailData }, { touch: false });
       })().catch(console.error));
     };
     // Auch beim Wechsel von einem Altar im Bearbeiten zum nächsten: die View
@@ -246,7 +247,7 @@ export default function AltarView() {
       await updateAltar(altarId, { title: title.trim() || t('altar.untitled') });
       const thumbnailData = await capturePromise;
       if (thumbnailData !== null)
-        await updateAltar(altarId, { thumbnail_data: thumbnailData });
+        await updateAltar(altarId, { thumbnail_data: thumbnailData }, { touch: false });
     })().catch((err: unknown) => console.error('[handleDone]', err));
     // Wer gleich wieder „Bearbeiten" drückt, wartet darauf (`beginAltarEdit`).
     trackAltarWrite(altarId, writes);
