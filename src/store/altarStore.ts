@@ -137,11 +137,6 @@ interface AltarState {
   movePlacement: (id: string, x: number, y: number) => void;
   savePlacementPosition: (id: string, x: number, y: number) => Promise<void>;
   updatePlacement: (id: string, patch: Partial<Pick<AltarPlacement, 'x' | 'y' | 'z_index' | 'width' | 'height' | 'rotation' | 'opacity' | 'locked' | 'hidden'>>) => Promise<void>;
-  bringPlacementForward: (id: string) => Promise<void>;
-  sendPlacementBackward: (id: string) => Promise<void>;
-  bringPlacementToFront: (id: string) => Promise<void>;
-  sendPlacementToBack: (id: string) => Promise<void>;
-  swapPlacementZIndex: (idA: string, idB: string) => Promise<void>;
   duplicatePlacement: (id: string) => Promise<void>;
   removePlacement: (id: string) => Promise<void>;
   saveIntention: (text: string) => Promise<void>;
@@ -535,92 +530,6 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const activeAltarId = get().activeAltarId;
     if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
   }),
-
-  bringPlacementForward: async (id) => {
-    const sorted = [...get().placements].sort((a, b) => a.z_index - b.z_index);
-    const index = sorted.findIndex((p) => p.id === id);
-    if (index < 0 || index === sorted.length - 1) return;
-    await get().swapPlacementZIndex(sorted[index].id, sorted[index + 1].id);
-  },
-
-  sendPlacementBackward: async (id) => {
-    const sorted = [...get().placements].sort((a, b) => a.z_index - b.z_index);
-    const index = sorted.findIndex((p) => p.id === id);
-    if (index <= 0) return;
-    await get().swapPlacementZIndex(sorted[index - 1].id, sorted[index].id);
-  },
-
-  // Deliberately NOT serialized (same for sendPlacementToBack): these write
-  // z_index across several placements at once — queueing them would need to
-  // hold multiple keys together. They are discrete one-click actions writing a
-  // single column; a z_index momentarily lost to a racing full-row
-  // updatePlacement costs a layer order, not content.
-  swapPlacementZIndex: async (idA, idB) => {
-    const a = get().placements.find((p) => p.id === idA);
-    const b = get().placements.find((p) => p.id === idB);
-    if (!a || !b || a.z_index === b.z_index) return;
-    const db = await getDb();
-    await db.execute(
-      'UPDATE altar_placements SET z_index = CASE id WHEN $1 THEN $2 WHEN $3 THEN $4 END WHERE id IN ($1, $3)',
-      [idA, b.z_index, idB, a.z_index],
-    );
-    set((s) => ({
-      placements: s.placements.map((p) => {
-        if (p.id === idA) return { ...p, z_index: b.z_index };
-        if (p.id === idB) return { ...p, z_index: a.z_index };
-        return p;
-      }),
-      previewPlacements: mapEachPreview(s.previewPlacements, (p) => {
-        if (p.id === idA) return { ...p, z_index: b.z_index };
-        if (p.id === idB) return { ...p, z_index: a.z_index };
-        return p;
-      }),
-    }));
-    const activeAltarId = get().activeAltarId;
-    if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
-  },
-
-  bringPlacementToFront: async (id) => {
-    const maxZ = get().placements.reduce((max, p) => Math.max(max, p.z_index), 0);
-    await get().updatePlacement(id, { z_index: maxZ + 1 });
-  },
-
-  sendPlacementToBack: async (id) => {
-    const placements = get().placements;
-    if (placements.length === 0) return;
-
-    const minZ = placements.reduce((min, p) => Math.min(min, p.z_index), Infinity);
-    const shift = minZ <= 0 ? 1 - minZ : 0;
-    // Target goes just below the minimum of all other placements.
-    const targetZ = Math.max(0, minZ + shift - 1);
-
-    const newZMap = new Map<string, number>(
-      placements.map((p) => [p.id, p.id === id ? targetZ : p.z_index + shift]),
-    );
-
-    // Single bulk UPDATE — one CASE branch per placement, one timestamp bump.
-    const db = await getDb();
-    const params: (string | number)[] = [];
-    let caseExpr = '';
-    const inParams: string[] = [];
-    for (const [pid, z] of newZMap) {
-      const idIdx = params.length + 1;
-      params.push(pid, z);
-      caseExpr += ` WHEN $${idIdx} THEN $${idIdx + 1}`;
-      inParams.push(`$${idIdx}`);
-    }
-    await db.execute(
-      `UPDATE altar_placements SET z_index = CASE id${caseExpr} END WHERE id IN (${inParams.join(',')})`,
-      params,
-    );
-
-    set((s) => ({
-      placements: s.placements.map((p) => ({ ...p, z_index: newZMap.get(p.id) ?? p.z_index })),
-      previewPlacements: mapEachPreview(s.previewPlacements, (p) => ({ ...p, z_index: newZMap.get(p.id) ?? p.z_index })),
-    }));
-    const activeAltarId = get().activeAltarId;
-    if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
-  },
 
   duplicatePlacement: async (id) => {
     const db = await getDb();

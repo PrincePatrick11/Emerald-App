@@ -32,14 +32,10 @@ interface TaskState {
   deleteTask: (id: string) => Promise<void>;
   restoreTask: (id: string) => Promise<void>;
   permanentlyDeleteTask: (id: string) => Promise<void>;
-  getTask: (id: string) => Task | undefined;
   getSubtasks: (parentId: string) => Task[];
-  getRootTasks: () => Task[];
 
   addLink: (taskId: string, targetId: string, targetType: ContentType) => Promise<void>;
   removeLink: (id: string) => Promise<void>;
-  getLinksForTask: (taskId: string) => TaskLink[];
-  getLinksForTarget: (targetId: string) => TaskLink[];
 }
 
 async function selectAllTasks(db: Database): Promise<Task[]> {
@@ -189,11 +185,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }));
   },
 
-  getTask: (id: string) => get().tasks.find((t) => t.id === id),
-
   getSubtasks: (parentId: string) => get().tasks.filter((t) => t.parent_task_id === parentId),
-
-  getRootTasks: () => get().tasks.filter((t) => t.parent_task_id === null),
 
   addLink: async (taskId: string, targetId: string, targetType: ContentType) => {
     const db = await getDb();
@@ -211,8 +203,4 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     await db.execute('DELETE FROM task_links WHERE id=$1', [id]);
     set((s) => ({ links: s.links.filter((l) => l.id !== id) }));
   },
-
-  getLinksForTask: (taskId: string) => get().links.filter((l) => l.task_id === taskId),
-
-  getLinksForTarget: (targetId: string) => get().links.filter((l) => l.target_id === targetId),
 }));

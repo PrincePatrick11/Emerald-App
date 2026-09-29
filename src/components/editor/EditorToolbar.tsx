@@ -19,8 +19,6 @@ import {
   Redo,
   Link,
   ImagePlus,
-  Check,
-  X,
   Minus,
   AlignLeft,
   AlignCenter,
@@ -47,10 +45,7 @@ interface Props {
 export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker }: Props) {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [linkInputOpen, setLinkInputOpen] = useState(false);
-  const [linkHref, setLinkHref] = useState('');
   const [imageError, setImageError] = useState<string | null>(null);
-  const linkInputRef = useRef<HTMLInputElement>(null);
 
   const handleLinkButtonClick = () => {
     if (editor.isActive('link')) {
@@ -61,23 +56,6 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
     // Open the link picker modal for selecting internal links
     onOpenLinkPicker();
   };
-
-  const confirmExternalLink = () => {
-    const href = linkHref.trim();
-    if (href) {
-      const url = href.startsWith('http://') || href.startsWith('https://') ? href : `https://${href}`;
-      editor.chain().focus().setLink({ href: url }).run();
-    }
-    setLinkInputOpen(false);
-    setLinkHref('');
-  };
-
-  const cancelLink = () => {
-    setLinkInputOpen(false);
-    setLinkHref('');
-    editor.chain().focus().run();
-  };
-
 
   // Dieselben drei Buttons bedienen zwei Ziele: ein ausgewaehltes Bild ist ein
   // eigener Blocknode mit eigener Breite, `text-align` des Absatzes erreicht es
@@ -276,29 +254,6 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
           <ImagePlus size={14} />
         </ToolbarBtn>
       </ToolbarGroup>
-
-      {/* Inline external-link input — appears via link popup's edit button */}
-      {linkInputOpen && (
-        <div className="flex items-center gap-1 ml-1">
-          <input
-            ref={linkInputRef}
-            value={linkHref}
-            onChange={(e) => setLinkHref(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') confirmExternalLink();
-              if (e.key === 'Escape') cancelLink();
-            }}
-            placeholder="https://..."
-            className="bg-stone-900 border border-stone-600 rounded px-2 py-0.5 text-xs text-stone-200 w-52 outline-none focus:border-jade-600"
-          />
-          <button onClick={confirmExternalLink} className="p-1 text-jade-400 hover:text-jade-300" title={t('editor.toolbar.insertLink')}>
-            <Check size={12} />
-          </button>
-          <button onClick={cancelLink} className="p-1 text-stone-500 hover:text-stone-300" title={t('editor.cancel')}>
-            <X size={12} />
-          </button>
-        </div>
-      )}
 
       <input
         ref={fileInputRef}

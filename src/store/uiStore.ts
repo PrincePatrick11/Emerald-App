@@ -121,7 +121,6 @@ interface UIState {
   selectTab: (id: string) => void;
   setTabsOrder: (ids: string[]) => void;
   closeTab: (id: string) => void;
-  closeOtherTabs: (id: string) => void;
   navigateBack: () => void;
   navigateForward: () => void;
   toggleRightSidebar: () => void;
@@ -422,14 +421,6 @@ export const useUIStore = create<UIState>((set) => ({
       return { tabs, activeTabId: null, activeView: { type: 'home' }, tablessHistory: freshHistory({ type: 'home' }) };
     }
     return { tabs, activeTabId: nextTab.id, activeView: nextTab.view };
-  }),
-
-  closeOtherTabs: (id) => set((s) => {
-    const tab = s.tabs.find((candidate) => candidate.id === id);
-    if (!tab) return {};
-    const tabs = [tab];
-    saveTabs(tabs, tab.id);
-    return { activeView: tab.view, tabs, activeTabId: tab.id };
   }),
 
   navigateBack: () => set((s) => stepHistory(s, -1)),

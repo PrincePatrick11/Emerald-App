@@ -48,7 +48,6 @@ interface WikiState {
   restoreArticle: (id: string) => Promise<void>;
   permanentlyDeleteArticle: (id: string) => Promise<void>;
   getArticle: (id: string) => WikiArticle | undefined;
-  getArticleBySlug: (slug: string) => WikiArticle | undefined;
 }
 
 async function selectAllArticles(db: Database): Promise<WikiArticle[]> {
@@ -213,5 +212,4 @@ export const useWikiStore = create<WikiState>((set, get) => ({
   },
 
   getArticle: (id) => get().articles.find((a) => a.id === id),
-  getArticleBySlug: (slug) => get().articles.find((a) => a.slug === slug),
 }));
