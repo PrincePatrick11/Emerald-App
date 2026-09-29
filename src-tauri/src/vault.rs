@@ -39,6 +39,15 @@ const SETTINGS_TEMP_FILE: &str = "settings.json.tmp";
 /// Far above anything the settings page can produce — a guard against a
 /// runaway write, not a format limit.
 const SETTINGS_MAX_BYTES: u64 = 256 * 1024;
+/// The unsaved drafts of the vault's block and template pages, written along
+/// while they are being edited so that a crash takes nothing that was typed.
+/// The frontend owns the shape; Rust only moves the text.
+pub const DRAFTS_FILE: &str = "drafts.json";
+/// Written first and renamed over [`DRAFTS_FILE`], like the settings.
+const DRAFTS_TEMP_FILE: &str = "drafts.json.tmp";
+/// A template's content is block HTML and can grow — still a guard against a
+/// runaway write, not a format limit.
+const DRAFTS_MAX_BYTES: u64 = 4 * 1024 * 1024;
 /// The registry the frontend owns, in the app data directory.
 const VAULTS_FILE: &str = "vaults.json";
 
@@ -802,7 +811,7 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
         std::fs::remove_dir(&images).ok();
     }
 
-    for name in [SETTINGS_FILE, SETTINGS_TEMP_FILE] {
+    for name in [SETTINGS_FILE, SETTINGS_TEMP_FILE, DRAFTS_FILE, DRAFTS_TEMP_FILE] {
         std::fs::remove_file(dir.join(name)).ok();
     }
 
@@ -850,14 +859,58 @@ pub fn write_vault_settings(app: tauri::AppHandle, vault_id: String, contents: S
     write_settings_in(&dir, &contents)
 }
 
+/// The vault's `drafts.json` — same answers as [`read_vault_settings`].
+#[tauri::command]
+pub fn read_vault_drafts(app: tauri::AppHandle, vault_id: String) -> Result<SettingsRead, String> {
+    let dir = vault_dir(&app, &vault_id)?;
+    directory_state(&dir)?;
+    Ok(read_json_in(&dir, DRAFTS_FILE, DRAFTS_MAX_BYTES))
+}
+
+/// Replaces the vault's `drafts.json` with `contents`, a JSON object. An
+/// empty object removes the file instead: a vault nobody is editing in
+/// carries no drafts file around.
+///
+/// Returns only once the file is on disk (`sync_all`) — closing the window
+/// waits for this, and a draft that was just discarded must not come back
+/// after the restart.
+#[tauri::command]
+pub fn write_vault_drafts(app: tauri::AppHandle, vault_id: String, contents: String) -> Result<(), String> {
+    let dir = vault_dir(&app, &vault_id)?;
+    directory_state(&dir)?;
+    write_drafts_in(&dir, &contents)
+}
+
+fn write_drafts_in(dir: &Path, contents: &str) -> Result<(), String> {
+    if let Ok(serde_json::Value::Object(map)) = serde_json::from_str::<serde_json::Value>(contents) {
+        if map.is_empty() {
+            std::fs::remove_file(dir.join(DRAFTS_TEMP_FILE)).ok();
+            return match std::fs::remove_file(dir.join(DRAFTS_FILE)) {
+                Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(format!("remove {DRAFTS_FILE}: {e}")),
+                _ => Ok(()),
+            };
+        }
+    }
+    write_json_in(dir, DRAFTS_FILE, DRAFTS_TEMP_FILE, DRAFTS_MAX_BYTES, contents)
+}
+
 fn read_settings_in(dir: &Path) -> SettingsRead {
-    let file = dir.join(SETTINGS_FILE);
+    read_json_in(dir, SETTINGS_FILE, SETTINGS_MAX_BYTES)
+}
+
+fn write_settings_in(dir: &Path, contents: &str) -> Result<(), String> {
+    write_json_in(dir, SETTINGS_FILE, SETTINGS_TEMP_FILE, SETTINGS_MAX_BYTES, contents)
+}
+
+/// One of the vault's own JSON files (`settings.json`, `drafts.json`).
+fn read_json_in(dir: &Path, name: &str, max_bytes: u64) -> SettingsRead {
+    let file = dir.join(name);
     // `symlink_metadata`, nicht `metadata`: ein Vault-Ordner kann von
     // anderswo stammen, und ein Link darin soll nicht verfolgt werden — wie
     // bei `guarded_read_path` in `lib.rs`.
     match std::fs::symlink_metadata(&file) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => SettingsRead::Missing,
-        Ok(md) if md.is_file() && md.len() <= SETTINGS_MAX_BYTES => match std::fs::read_to_string(&file) {
+        Ok(md) if md.is_file() && md.len() <= max_bytes => match std::fs::read_to_string(&file) {
             Ok(contents) => SettingsRead::Found { contents },
             Err(e) => {
                 eprintln!("[vault] read {}: {e}", file.display());
@@ -868,36 +921,43 @@ fn read_settings_in(dir: &Path) -> SettingsRead {
     }
 }
 
-fn write_settings_in(dir: &Path, contents: &str) -> Result<(), String> {
+/// Writes `contents` under `name`, through `temp_name`. Only well-formed JSON
+/// objects, and nothing above `max_bytes`.
+fn write_json_in(dir: &Path, name: &str, temp_name: &str, max_bytes: u64, contents: &str) -> Result<(), String> {
     use std::io::Write;
 
-    if contents.len() as u64 > SETTINGS_MAX_BYTES {
-        return Err("settings too large".to_string());
+    if contents.len() as u64 > max_bytes {
+        return Err(format!("{name} too large"));
     }
     match serde_json::from_str::<serde_json::Value>(contents) {
         Ok(serde_json::Value::Object(_)) => {}
-        _ => return Err("settings must be a JSON object".to_string()),
+        _ => return Err(format!("{name} must be a JSON object")),
     }
     // Was unter dem Temp-Namen liegt — Rest eines Absturzes oder ein
     // untergeschobener Link —, weg damit (ein Link verschwindet, sein Ziel
     // bleibt). `create_new` scheitert, falls dazwischen wieder etwas auftaucht,
     // statt einem Link hinterherzuschreiben.
-    let temp = dir.join(SETTINGS_TEMP_FILE);
+    let temp = dir.join(temp_name);
     std::fs::remove_file(&temp).ok();
     let written = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(&temp)
-        .and_then(|mut file| file.write_all(contents.as_bytes()));
+        .and_then(|mut file| {
+            file.write_all(contents.as_bytes())?;
+            // Auf die Platte, bevor der Name wechselt: wer auf das Ergebnis
+            // wartet (Fenster schließen), verlässt sich darauf.
+            file.sync_all()
+        });
     if let Err(e) = written {
         std::fs::remove_file(&temp).ok();
         return Err(format!("write {}: {e}", temp.display()));
     }
     // `rename` ersetzt eine vorhandene Datei auf allen drei Plattformen — auch
     // einen Link unter dem Zielnamen, ohne ihm zu folgen.
-    std::fs::rename(&temp, dir.join(SETTINGS_FILE)).map_err(|e| {
+    std::fs::rename(&temp, dir.join(name)).map_err(|e| {
         std::fs::remove_file(&temp).ok();
-        format!("replace {SETTINGS_FILE}: {e}")
+        format!("replace {name}: {e}")
     })
 }
 
@@ -975,6 +1035,28 @@ mod tests {
             SettingsRead::Found { contents: r#"{"version":2}"#.to_string() }
         );
         assert!(!dir.join(SETTINGS_TEMP_FILE).exists());
+    }
+
+    #[test]
+    fn drafts_round_trip_and_an_empty_object_removes_the_file() {
+        let dir = scratch();
+        assert_eq!(read_json_in(&dir, DRAFTS_FILE, DRAFTS_MAX_BYTES), SettingsRead::Missing);
+        // Nichts da, nichts zu entfernen — kein Fehler.
+        write_drafts_in(&dir, "{}").unwrap();
+        write_drafts_in(&dir, r#"{"v":1,"templates":{}}"#).unwrap();
+        assert_eq!(
+            read_json_in(&dir, DRAFTS_FILE, DRAFTS_MAX_BYTES),
+            SettingsRead::Found { contents: r#"{"v":1,"templates":{}}"#.to_string() }
+        );
+        assert!(!dir.join(DRAFTS_TEMP_FILE).exists());
+        write_drafts_in(&dir, "{}").unwrap();
+        assert!(!dir.join(DRAFTS_FILE).exists());
+        assert!(write_drafts_in(&dir, "[]").is_err());
+        // Die Einstellungen daneben bleiben unberührt.
+        write_settings_in(&dir, r#"{"version":1}"#).unwrap();
+        write_drafts_in(&dir, r#"{"v":1}"#).unwrap();
+        write_drafts_in(&dir, "{}").unwrap();
+        assert!(dir.join(SETTINGS_FILE).exists());
     }
 
     #[test]

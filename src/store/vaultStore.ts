@@ -16,7 +16,7 @@ import { clearEntrySummaryCache } from '../lib/blocks/entrySummary';
 import { drainSerialized } from '../lib/serialize';
 import { reloadAllStores } from './moduleWiring';
 import { useUIStore } from './uiStore';
-import { clearAllDrafts } from './draftStore';
+import { detachDrafts, restoreDrafts } from './draftStore';
 import { useUndoStore } from './undoStore';
 import { useSettingsStore } from './settingsStore';
 import { captureLegacySettings } from '../lib/vaultSettings';
@@ -74,7 +74,8 @@ async function openActiveVault(): Promise<void> {
   // Tabs und History zeigen per Eintrags-ID in den alten Vault — alles zu,
   // nicht nur der aktive Tab auf Home.
   useUIStore.getState().closeAllTabs();
-  clearAllDrafts();
+  // Die Entwürfe des neuen Vaults; die des alten gehen nur aus dem Speicher.
+  await restoreDrafts(useVaultStore.getState().activeVaultId);
   // Undo entries reference rows of the old vault by id — drop them
   useUndoStore.getState().clear();
   // Die globale Suche haelt den Klartext jedes Eintrags unter dessen id fest.
@@ -125,6 +126,9 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
         (e) => { console.error('[vault] could not restore settings', e); return false; },
       );
       if (!restored) await useSettingsStore.getState().clear();
+      // Auch die Entwürfe wieder dem alten Vault zuordnen — sonst schriebe
+      // die nächste Änderung in den Ordner des gescheiterten.
+      if (hasActiveVault(get())) await restoreDrafts(previous);
       throw err;
     }
     return true;
@@ -150,6 +154,9 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   removeVault: async (id: string, deleteFiles = false) => {
     if (!get().vaults.some((v) => v.id === id)) return true;
     const wasActive = id === get().activeVaultId;
+    // Vor dem Entfernen: ein aufgeschobenes Mitschreiben legte sonst eine
+    // `drafts.json` in den Ordner, der gerade verschwinden soll.
+    if (wasActive) await detachDrafts();
 
     // Der Aktivwechsel gehoert in denselben Schreibvorgang wie das Entfernen:
     // dazwischen stuende in `vaults.json` sonst ein aktiver Vault, der nicht

@@ -12,6 +12,7 @@ import {
 import packageJson from '../../../../package.json';
 import { resolveOpenEdits } from '../../../lib/openEdits';
 import { drainSerialized } from '../../../lib/serialize';
+import { flushDrafts } from '../../../store/draftStore';
 
 type Status = 'idle' | 'checking' | 'done' | 'failed' | 'installing';
 
@@ -114,7 +115,7 @@ export default function UpdatesPage() {
     // Die Installation startet die App neu, ohne das Fenster zu fragen —
     // also vorher klären, was mit laufenden Bearbeitungen geschieht.
     if (!(await resolveOpenEdits())) return;
-    await drainSerialized();
+    await Promise.all([drainSerialized(), flushDrafts()]);
     setStatus('installing');
     setError(null);
     try {

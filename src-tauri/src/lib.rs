@@ -766,6 +766,8 @@ pub fn run() {
             vault::discard_import_staging,
             vault::read_vault_settings,
             vault::write_vault_settings,
+            vault::read_vault_drafts,
+            vault::write_vault_drafts,
             export_image,
             write_file,
             read_file,

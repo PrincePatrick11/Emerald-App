@@ -21,6 +21,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { isTauri } from '../../lib/platform';
 import { resolveOpenEdits } from '../../lib/openEdits';
 import { drainSerialized } from '../../lib/serialize';
+import { flushDrafts, restoreDrafts } from '../../store/draftStore';
 import ImportDestinationModal from '../ui/ImportDestinationModal';
 
 const ENTRY_LIST_MIN = 180;
@@ -124,8 +125,11 @@ export default function AppShell() {
       // endet in `reloadAllStores()` — dieser Effekt laeuft dafuer nicht erneut.
       const vaultState = useVaultStore.getState();
       if (!hasActiveVault(vaultState)) return;
-      // Wie in `openActiveVault`: die Einstellungen vor der Datenbank.
-      return useSettingsStore.getState().loadForVault(vaultState.activeVaultId).then(reloadAllStores);
+      // Wie in `openActiveVault`: die Einstellungen vor der Datenbank. Davor,
+      // was ein Absturz an Entwürfen übrig gelassen hat — bevor eine Seite sie sucht.
+      return restoreDrafts(vaultState.activeVaultId)
+        .then(() => useSettingsStore.getState().loadForVault(vaultState.activeVaultId))
+        .then(reloadAllStores);
     })
       // Ohne `catch` bliebe der Fehler eine unbehandelte Rejection in der
       // Konsole — sichtbar nur, wenn jemand hinschaut.
@@ -149,8 +153,9 @@ export default function AppShell() {
           event.preventDefault();
           return;
         }
-        // Was „Speichern" und das Durchschalten der Tabs noch schreiben.
-        await drainSerialized();
+        // Was „Speichern" und das Durchschalten der Tabs noch schreiben —
+        // und dass ein eben verworfener Entwurf auch aus der Datei ist.
+        await Promise.all([drainSerialized(), flushDrafts()]);
       } catch (e) {
         // Ein Fehler hier darf das Fenster nicht offen halten: Tauri schließt
         // erst, wenn dieser Handler zurückkehrt, ohne zu verhindern.

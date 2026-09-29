@@ -472,7 +472,7 @@ Handled natively in `src-tauri/src/images.rs`. Images live in `{vaultDir}/images
 
 ## Multi-Vault System
 
-A vault is a **directory** the user picks, holding `emerald.db`, an `images/` folder, a `backup/` folder, and `settings.json` — the vault's own settings (Settings → General/Sidebar/Entries), read and written by the new Rust commands `read_vault_settings`/`write_vault_settings` (see [`architecture.md`](architecture.md#vault-layout) and [`security.md`](security.md)). Metadata is stored outside SQLite in `{appDataDir}/vaults.json`:
+A vault is a **directory** the user picks, holding `emerald.db`, an `images/` folder, a `backup/` folder, `settings.json`, and at times `drafts.json` (the unsaved drafts of block and template pages, removed again once none is left) — the vault's own settings (Settings → General/Sidebar/Entries), read and written by the new Rust commands `read_vault_settings`/`write_vault_settings` (see [`architecture.md`](architecture.md#vault-layout) and [`security.md`](security.md)). Metadata is stored outside SQLite in `{appDataDir}/vaults.json`:
 
 ```json
 {

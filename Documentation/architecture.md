@@ -799,11 +799,17 @@ doesn't bump every copy's revision. An unsaved draft is mirrored into `useBlockD
 (`src/store/draftStore.ts`, one `createDraftStore<T>()` instance of two — the other backs
 templates, see [Templates](#templates) below) — not the view's own state, since `MainArea`
 unmounts a view on module switch and an open block tab would otherwise lose its edits silently;
-the list reads the same store for its "Unsaved" marker. Drafts are deliberately not persisted
-(like an entry's own edit mode) and are cleared wholesale (`clearAllDrafts()`, which empties
-every `createDraftStore` instance) on vault switch and on a replace-mode restore, both of which
-also close every tab — a stale draft would otherwise silently overwrite a freshly restored or
-switched-to block on the next Done. The delete confirmation (`DeleteDefinitionModal`,
+the list reads the same store for its "Unsaved" marker. Drafts are written along into
+`drafts.json` in the vault folder (debounced, through `write_vault_drafts`), so a crash takes
+nothing that was typed — what the autosave does for an entry. `restoreDrafts(vaultId)` reads
+them back when a vault opens (at boot and after a switch), passing every entry through the
+same parsers a database row goes through (`parseDefinitionElements`, `parseAssignments`, …) and
+dropping a file of another version; the previous vault's drafts only leave memory, their file
+stays with that vault. `flushDrafts()` writes what is pending and waits for it — called before
+the window closes and before an update installs, so a draft that was just discarded does not
+come back after the restart. `clearAllDrafts()` empties memory *and* file on a replace-mode
+restore, which also closes every tab — a stale draft would otherwise silently overwrite a
+freshly restored block on the next Done. The delete confirmation (`DeleteDefinitionModal`,
 still defined in `BlockDefinitionEditor.tsx`) is instead *hosted* by `BlocksView`, one level up
 from both list and page, so its own closing notice ("N entries left open, skipped") survives the
 navigation back to the list that deleting triggers. `BlocksView`'s page shell and draft lifecycle
@@ -1280,7 +1286,7 @@ Images are content-addressed, stored outside SQLite, and belong to one vault.
 
 ## Vault Layout
 
-A vault is a directory: `emerald.db`, `images/`, `backup/`, and `settings.json` inside it, nothing else — with one deliberately transient exception: a backup import briefly `VACUUM INTO`s a working copy to `emerald.db.import` next to `emerald.db` while it fills and checks it, then removes it again once the import succeeds or fails. `settings.json` is the vault's own settings (Settings → General/Sidebar/Entries) — see [Vault Settings](#vault-settings) below. A copy left behind by a crash is cleared before the next import runs (`discard_import_staging`, see [DB Backup / Restore](database.md#db-backup--restore-emeralddb) in `database.md`). The user picks where the vault lives, so a vault can sit in Documents, in a synced folder, or on another drive.
+A vault is a directory: `emerald.db`, `images/`, `backup/`, `settings.json` and — only while a block or template page holds unsaved edits — `drafts.json` inside it, nothing else — with one deliberately transient exception: a backup import briefly `VACUUM INTO`s a working copy to `emerald.db.import` next to `emerald.db` while it fills and checks it, then removes it again once the import succeeds or fails. `settings.json` is the vault's own settings (Settings → General/Sidebar/Entries) — see [Vault Settings](#vault-settings) below. A copy left behind by a crash is cleared before the next import runs (`discard_import_staging`, see [DB Backup / Restore](database.md#db-backup--restore-emeralddb) in `database.md`). The user picks where the vault lives, so a vault can sit in Documents, in a synced folder, or on another drive.
 
 `{appDataDir}/vaults.json` maps ids to directories:
 
@@ -1526,6 +1532,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `copy_image_file(source, vault_id)` | Read a file from an arbitrary path, write it into the vault's `images/` under its SHA-256 name. Accepts png/jpg/jpeg/gif/webp/svg only. Rejects symlinks, canonicalizes the source, and verifies it falls within the allowed storage roots. Returns the filename. |
 | `read_image_as_base64(filename, vault_id)` | Read a stored image and return a data-URL. Only for the two callers that cannot use the `emerald-img` scheme: the PDF export renders in a `file://` webview, and the backup writer embeds bytes in JSON. |
 | `read_image_file(source)` | Read an *external* image file (not yet in any vault) and return a data-URL, without storing it — so the frontend can scale it and check it against the vault's image-size settings before handing the result to `save_image`. Same extension allowlist and root confinement as `copy_image_file` (`checked_image_source`, their shared helper), plus its own 64 MB source-file cap. |
+| `read_vault_drafts(vault_id)` / `write_vault_drafts(vault_id, contents)` | The vault's `drafts.json` — the unsaved drafts of block and template pages (`store/draftStore.ts`). Same rules as the settings file; an empty object removes the file, and the write is synced to disk before the call returns |
 | `read_vault_settings(vault_id)` / `write_vault_settings(vault_id, contents)` | The vault's `settings.json` — see [Vault Settings](#vault-settings) above and [`security.md`](security.md) for the write's atomicity and symlink handling. |
 | `adopt_legacy_images(vault_id, filenames)` | Copy images out of the pre-per-vault shared pool into a vault's own folder. Migration v35 only. |
 | `list_image_files(vault_id)` / `delete_image_files(vault_id, filenames)` | Back the *Unused images* cleanup. Confined to the vault's own folder; both reject any name that is not 64 hex digits plus a known extension. |
