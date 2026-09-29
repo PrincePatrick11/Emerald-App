@@ -43,7 +43,7 @@ export function EditPropertyRow({ icon, label, children }: {
 }
 
 /**
- * Der Wert einer Auswahl-Eigenschaft (Kategorie, Phase): Wert-Knopf mit
+ * Der Wert einer Auswahl-Eigenschaft (Kategorie): Wert-Knopf mit
  * Chevron, das Menü geportalt und rechtsbündig. `muted` für „Keine".
  */
 export function PropertySelect<T extends string>({ value, options, onChange, text, muted = false, ariaLabel }: {
@@ -110,7 +110,7 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
 }) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [menu, setMenu] = useState<{ x: number; y: number; toggleEmoji: () => void } | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; toggleEmoji?: () => void } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const showNotice = (message: string) => {
@@ -128,7 +128,9 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
     }
     try {
       const next = kind === 'icon' ? await readIconFile(file) : await prepareImageDataUrl(await readFileAsDataUrl(file));
+      // `null`: ein Icon in einem abgelehnten Format (auch SVG) — wie beim Titelbild sagen.
       if (next) onChange(next);
+      else showNotice(t('common.unsupportedImageFormat'));
     } catch (err) {
       // Lieber nichts setzen als ein leeres Bild: der bisherige Wert ist besser als keiner.
       if (kind === 'icon') {
@@ -146,22 +148,26 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
     ? (value === fallback ? undefined : () => onChange(fallback))
     : (value ? onRemove : undefined);
 
-  const actions = (toggleEmoji: () => void): ContextMenuAction[] => [
+  // Emoji nur beim Icon: nur dort gibt es einen Picker, der es aufklappt.
+  const actions = (toggleEmoji?: () => void): ContextMenuAction[] => [
     { label: t('properties.chooseImage'), icon: <ImagePlus size={12} />, onClick: pickFile },
-    ...(kind === 'icon' ? [{ label: t('properties.emoji'), icon: <Smile size={12} />, onClick: toggleEmoji }] : []),
+    ...(toggleEmoji ? [{ label: t('properties.emoji'), icon: <Smile size={12} />, onClick: toggleEmoji }] : []),
     ...(remove ? [{ label: t('properties.remove'), icon: <X size={12} />, onClick: remove, danger: true }] : []),
   ];
 
-  const button = (toggleEmoji: () => void) => (
+  // Ein leeres Titelbild öffnet gleich die Dateiauswahl, kein Menü.
+  const opensMenu = kind === 'icon' || !!value;
+
+  const button = (toggleEmoji?: () => void) => (
     <button
       type="button"
-      aria-haspopup="menu"
-      aria-expanded={menu !== null}
+      aria-haspopup={opensMenu ? 'menu' : undefined}
+      aria-expanded={opensMenu ? menu !== null : undefined}
       aria-label={label}
       title={label}
       className={`prop-value-btn${value ? ' prop-value-btn--media' : ' prop-value-btn--muted'}`}
       onClick={(e) => {
-        if (kind === 'cover' && !value) { pickFile(); return; }
+        if (!opensMenu) { pickFile(); return; }
         const r = e.currentTarget.getBoundingClientRect();
         setMenu({ x: r.right, y: r.bottom + 4, toggleEmoji });
       }}
@@ -187,7 +193,7 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
             wrapperClassName="relative min-w-0"
             trigger={({ toggle }) => button(toggle)}
           />
-        ) : button(() => {})}
+        ) : button()}
       </EditPropertyRow>
       {notice && <p className="pl-[9px] pr-3 text-xs text-danger">{notice}</p>}
       {menu && <ContextMenu align="right" minWidth={120} x={menu.x} y={menu.y} actions={actions(menu.toggleEmoji)} onClose={() => setMenu(null)} />}

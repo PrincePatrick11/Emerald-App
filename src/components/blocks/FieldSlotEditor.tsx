@@ -61,7 +61,7 @@ function ImageEditor({ slot, onChange }: { slot: string | undefined; onChange: (
     <div className="block-image-field">
       {filename && <img src={imageSrc(filename)} alt="" className="block-field-image" />}
       <div className="flex items-center gap-2">
-        {/* „Ändern"/„Entfernen" wie die übrigen Bild-Picker (Favicon, Banner);
+        {/* „Ändern"/„Entfernen" wie die übrigen Bild-Picker (Favicon, MediaPropertyRow);
             nur der leere Zustand sagt „Bild wählen" — „Titelbild hinzufügen"
             wäre hier falsch. */}
         <button type="button" className="block-insert-btn" onClick={() => inputRef.current?.click()}>

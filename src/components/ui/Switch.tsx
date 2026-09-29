@@ -31,11 +31,11 @@ export default function Switch({ checked, onChange, disabled, title }: {
 /**
  * Eine Zeile aus Icon, Label und `Switch` rechts. Die ganze Zeile ist das
  * Label: ein Klick irgendwo schaltet, der Schalter selbst bleibt der eine
- * fokussierbare Knopf.
+ * fokussierbare Knopf. Mit `hint` steht ein leiser Hinweis unter dem Label,
+ * und der Schalter sitzt an dessen erster Textzeile.
  *
  * `variant="sidebar"`: die Bearbeiten-Seitenleiste (Anzeige eines eigenen
- * Blocks) — eingerückt wie ihre Zeilen, mit Hover-Fläche und optionalem
- * Hinweis unter dem Label; der Schalter steht dann an der ersten Textzeile.
+ * Blocks) — eingerückt wie ihre Zeilen, mit Hover-Fläche.
  * `variant="panel"`: ohne Einzug und Hover-Fläche, bündig mit den Feldern
  * darüber — in den Einstellungen eines Blocks unter seiner Zeile.
  */

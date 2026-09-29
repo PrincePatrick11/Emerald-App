@@ -715,8 +715,9 @@ export async function dropCategoryFromTemplates(db: Database, categoryId: string
  * selbst durch.
  *
  * Umgeschrieben werden sie trotzdem nicht, und das ist Absicht:
- * `wiki_articles`/`operations` `icon` und `cover_image` werden von `Favicon`
- * und `Banner` per `FileReader` als Data-URL geschrieben, und ihre Renderer
+ * `wiki_articles`/`operations` `icon` und `cover_image` werden von
+ * `MediaPropertyRow` (Icons wie in `Favicon` über `readIconFile`) per
+ * `FileReader` als Data-URL geschrieben, und ihre Renderer
  * pruefen mit `isImageIcon` auf `data:` / `blob:` / `/`. Ein Dateiname wuerde
  * dort als Text durchfallen. Dasselbe gilt fuer `altars.thumbnail_data` /
  * `icon_data`, `operations.drawing_data` / `thumbnail_data` und

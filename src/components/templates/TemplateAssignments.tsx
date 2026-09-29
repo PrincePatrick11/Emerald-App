@@ -53,9 +53,10 @@ export default function TemplateAssignments({ templateId, name, assignments, onC
   // (★ für einen Standard) steht im Tooltip und im Dialog.
   const single = sorted.length === 1 ? sorted[0] : null;
   const singleParts = single ? parts(single.entryType, single.category) : null;
-  const summary = sorted.length === 0
-    ? t('templates.availableEverywhere')
-    : singleParts ? singleParts.place ?? singleParts.type : t('templates.assignmentCount', { count: sorted.length });
+  let summary: string;
+  if (sorted.length === 0) summary = t('templates.availableEverywhere');
+  else if (singleParts) summary = singleParts.place ?? singleParts.type;
+  else summary = t('templates.assignmentCount', { count: sorted.length });
   const tooltip = sorted.length === 0
     ? t('templates.assign.open')
     : sorted.map((a) => `${label(a.entryType, a.category)}${a.isDefault ? ' ★' : ''}`).join('\n');

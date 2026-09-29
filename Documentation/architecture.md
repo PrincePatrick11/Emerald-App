@@ -64,9 +64,8 @@ src/
 │   │                 EntryReadSections (Journal/Wiki/Operations' read-mode sidebar body),
 │   │                 EditProperties (edit-mode property rows: EditPropertyRow,
 │   │                 PropertySelect, MediaPropertyRow), CategoryIconCoverRows,
-│   │                 PropertiesEditView (a language page's layout shell), Favicon, SelectField
-│   │                 (shared category-field native select for Journal/Operations properties
-│   │                 panels), TagsField/TagsSection (edit vs. read), EntryTypeField (the
+│   │                 PropertiesEditView (a language page's layout shell), Favicon,
+│   │                 TagsField/TagsSection (edit vs. read), EntryTypeField (the
 │   │                 Journal/Operations/Wiki type toggle above Category, see Edit Mode
 │   │                 Architecture below), AltarReadingSummary, PlacedElementRow
 │   ├── templates/    TemplateEditor (a template's own page, built on LibraryPageFrame),

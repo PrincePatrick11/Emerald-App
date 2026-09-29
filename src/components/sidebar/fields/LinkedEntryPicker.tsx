@@ -85,8 +85,8 @@ export function LinkedEntryChip({
 }
 
 /**
- * Die gemeinsame Hülle der Verknüpfungs-Felder: Chip-Zeile, Suchzeile und
- * Ergebnismenü. Zuvor stand dieses Gerüst dreimal fast wortgleich in
+ * Die gemeinsame Hülle der Verknüpfungs-Felder: Suchzeile und Ergebnismenü
+ * (mit `fieldIcon` im eingelassenen Look der Seitenleiste, `.sidebar-add-field`). Zuvor stand dieses Gerüst dreimal fast wortgleich in
  * `LinkedEntriesField` und zwei inzwischen entfernten ID-Feldern.
  *
  * Das Menü hängt per Portal am `body` und liegt `fixed`, wie `Dropdown` mit

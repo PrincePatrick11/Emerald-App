@@ -896,8 +896,6 @@
     "assignmentCount_other": "{{count}} assignments",
     "assignment": "Assignment",
     "usage": "Usage",
-    "usedIn": "Used in {{count}} entry",
-    "usedIn_other": "Used in {{count}} entries",
     "unused": "Not used in any entry yet",
     "moreEntries": "and {{count}} more",
     "moreEntries_other": "and {{count}} more",

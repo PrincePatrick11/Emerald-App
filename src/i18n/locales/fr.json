@@ -896,8 +896,6 @@
     "assignmentCount_other": "{{count}} affectations",
     "assignment": "Affectation",
     "usage": "Utilisation",
-    "usedIn": "Utilisé dans {{count}} entrée",
-    "usedIn_other": "Utilisé dans {{count}} entrées",
     "unused": "Utilisé dans aucune entrée pour l'instant",
     "moreEntries": "et {{count}} autre",
     "moreEntries_other": "et {{count}} autres",

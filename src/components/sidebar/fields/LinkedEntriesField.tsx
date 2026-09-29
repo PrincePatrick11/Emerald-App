@@ -36,6 +36,9 @@ interface Props {
  */
 const RESULT_LIMIT = 50;
 
+/** Auf/Zu der Verlinkungen — Lesen und Bearbeiten teilen es. */
+const OPEN_KEY = 'entry-sidebar-links-open';
+
 /** Zuletzt bearbeitet zuerst — ohne Zeitstempel ans Ende. */
 function byRecency(a: SuggestionItem, b: SuggestionItem): number {
   return (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '');
@@ -117,7 +120,7 @@ export function LinkedEntriesSection({ content, legacyIds }: { content: string; 
   const linked = useLinkedEntries(content, legacyIds);
   const reveal = useRevealLink();
   return (
-    <SidebarSection storageKey="entry-sidebar-links-open" label={t('properties.linkedEntries')} count={linked.length}>
+    <SidebarSection storageKey={OPEN_KEY} label={t('properties.linkedEntries')} count={linked.length}>
       {linked.length === 0 && <SidebarEmpty>{t('properties.noLinkedEntries')}</SidebarEmpty>}
       {linked.map(({ item }) => (
         <SidebarItemRow
@@ -188,7 +191,7 @@ export default function LinkedEntriesField({ content, legacyIds }: Props) {
   };
 
   return (
-    <SidebarSection storageKey="entry-sidebar-links-open" label={t('properties.linkedEntries')} count={linked.length}>
+    <SidebarSection storageKey={OPEN_KEY} label={t('properties.linkedEntries')} count={linked.length}>
       {linked.length === 0 && <SidebarEmpty>{t('properties.noLinkedEntries')}</SidebarEmpty>}
       {linked.map(({ item, inContent }) => (
         <SidebarItemRow

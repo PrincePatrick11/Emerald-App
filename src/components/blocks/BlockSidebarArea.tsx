@@ -19,6 +19,9 @@ import { blockHoldsLocked, sigilState, todayIso } from '../../lib/blocks/sigil';
 import { BLOCK_SIDEBAR_VIEWS } from './blockSidebarViews';
 import { addBlockActions, commonBlockActions } from './blockActions';
 
+/** Auf/Zu der Blöcke — Gliederung (Lesen) und Verwaltung (Bearbeiten) teilen es. */
+const OPEN_KEY = 'blocks-sidebar-open';
+
 /** Was die Gliederung im Lesemodus zeigt: nur, was man lesen kann. */
 function readableBlocks(session: BlockSession): BlockInstance[] {
   return session.blocks.filter((b) => !isBlockHidden(b));
@@ -64,7 +67,7 @@ function BlockOutline({ session }: { session: BlockSession }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const rows = readableBlocks(session);
   return (
-    <SidebarSection storageKey="blocks-sidebar-open" label={t('blocks.sidebarTitle')} count={rows.length}>
+    <SidebarSection storageKey={OPEN_KEY} label={t('blocks.sidebarTitle')} count={rows.length}>
       {rows.map((block) => {
         const meta = resolveBlockType(block);
         const selected = selectedId === block.id;
@@ -131,7 +134,7 @@ function BlockManager({ session }: { session: BlockSession }) {
     <>
       {/* Derselbe Abschnitt wie im Lesen (`BlockOutline`): gleicher Kopf, gleiches
           Auf/Zu, gleicher Zähler — die Zeilen darin bleiben die der Verwaltung. */}
-      <SidebarSection storageKey="blocks-sidebar-open" label={t('blocks.sidebarTitle')} count={session.blocks.length}>
+      <SidebarSection storageKey={OPEN_KEY} label={t('blocks.sidebarTitle')} count={session.blocks.length}>
         <div ref={listRef} className="space-y-1">
           {visualItems.map((block) => {
             const meta = resolveBlockType(block);

@@ -896,8 +896,6 @@
     "assignmentCount_other": "{{count}} Zuweisungen",
     "assignment": "Zuweisung",
     "usage": "Verwendung",
-    "usedIn": "In {{count}} Eintrag verwendet",
-    "usedIn_other": "In {{count}} Einträgen verwendet",
     "unused": "Noch in keinem Eintrag verwendet",
     "moreEntries": "und {{count}} weiterer",
     "moreEntries_other": "und {{count}} weitere",

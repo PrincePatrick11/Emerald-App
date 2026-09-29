@@ -1257,7 +1257,9 @@ button.sidebar-section-title:focus-visible {
 }
 
 .prop-segment:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* Eingelassenes Suchfeld unter einer Liste („Eintrag verknüpfen …", „Tag
@@ -2020,8 +2022,7 @@ button.block-altar:hover .block-altar-title {
   transition: color 150ms;
 }
 
-.block-row-action:hover,
-.block-row-action--on {
+.block-row-action:hover {
   color: var(--text-secondary);
 }
 

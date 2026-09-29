@@ -11,7 +11,7 @@ interface Props<C extends { id: string; emoji: string }> {
   onChange: (id: string | null) => void;
   /** Wiki/Ops binden categoryLabel: (c) => categoryLabel(t, 'wiki', c); Tasks: (c) => c.name */
   getLabel: (cat: C) => string;
-  /** 'field' = Properties-Panel-Look (volle Breite), 'chip' = Inline-Chip in der TaskRow. */
+  /** 'field' = Feld-Look in voller Breite (AltarItemModal), 'chip' = Inline-Chip in der TaskRow. */
   variant: 'field' | 'chip';
   align?: 'left' | 'right';
   /** Tooltip des Chip-Triggers. */
