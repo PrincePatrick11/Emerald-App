@@ -21,6 +21,7 @@ import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import BlockGlyph from '../blocks/BlockGlyph';
 import TemplateEditor from '../templates/TemplateEditor';
 import TemplateDefaultsOverview from '../templates/TemplateDefaultsOverview';
+import { useSessionState } from '../../store/sessionStore';
 
 /**
  * Die Rail-Ansicht „Vorlagen", gebaut wie „Blöcke": die Liste der Vorlagen im
@@ -113,7 +114,7 @@ function TemplateList({ entries, onCreate, onDelete }: {
   const prefs = useUIStore((s) => s.templatesPrefs);
   const setPrefs = useUIStore((s) => s.setTemplatesPrefs);
   const [collapsed, toggleCollapsed] = usePersistedFlag('templates-list-collapsed');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useSessionState('templates.search', '');
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
 
   const query = search.trim().toLowerCase();

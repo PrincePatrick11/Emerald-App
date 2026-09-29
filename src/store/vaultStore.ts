@@ -18,6 +18,7 @@ import { reloadAllStores } from './moduleWiring';
 import { useUIStore } from './uiStore';
 import { detachDrafts, restoreDrafts } from './draftStore';
 import { clearAltarEdits } from './altarEdit';
+import { forgetVaultPrefs, loadVaultPrefs } from './vaultPrefs';
 import { useUndoStore } from './undoStore';
 import { useSettingsStore } from './settingsStore';
 import { captureLegacySettings } from '../lib/vaultSettings';
@@ -76,6 +77,7 @@ async function openActiveVault(): Promise<void> {
   // nicht nur der aktive Tab auf Home.
   useUIStore.getState().closeAllTabs();
   clearAltarEdits();
+  loadVaultPrefs(useVaultStore.getState().activeVaultId);
   // Die Entwürfe des neuen Vaults; die des alten gehen nur aus dem Speicher.
   await restoreDrafts(useVaultStore.getState().activeVaultId);
   // Undo entries reference rows of the old vault by id — drop them
@@ -130,7 +132,10 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       if (!restored) await useSettingsStore.getState().clear();
       // Auch die Entwürfe wieder dem alten Vault zuordnen — sonst schriebe
       // die nächste Änderung in den Ordner des gescheiterten.
-      if (hasActiveVault(get())) await restoreDrafts(previous);
+      if (hasActiveVault(get())) {
+        await restoreDrafts(previous);
+        loadVaultPrefs(previous);
+      }
       throw err;
     }
     return true;
@@ -159,6 +164,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     // Vor dem Entfernen: ein aufgeschobenes Mitschreiben legte sonst eine
     // `drafts.json` in den Ordner, der gerade verschwinden soll.
     if (wasActive) await detachDrafts();
+    forgetVaultPrefs(id);
 
     // Der Aktivwechsel gehoert in denselben Schreibvorgang wie das Entfernen:
     // dazwischen stuende in `vaults.json` sonst ein aktiver Vault, der nicht

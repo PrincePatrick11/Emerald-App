@@ -10,10 +10,9 @@ const EMPTY: ReadonlySet<string> = new Set();
  * die Bibliothek im Altar-Dashboard und die Tags).
  *
  * Der Zustand liegt im uiStore, nicht View-lokal: MainArea unmountet die Views
- * beim Modulwechsel, ein useState wäre nach jedem Rail-Klick wieder leer.
- * Bewusst nicht persistiert: nach einem Neustart (und nach Vault-Wechsel,
- * siehe closeAllTabs) steht wieder der Standard — zugeklappt ist eine
- * Arbeitsgeste, kein Einstellungswert.
+ * beim Modulwechsel, ein useState wäre nach jedem Rail-Klick wieder leer. Er
+ * ist eine Vorliebe und bleibt dauerhaft, je Vault (`vaultPrefs`) — die ids
+ * sind die Kategorien dieses Vaults.
  *
  * `defaultCollapsed` dreht den Standard um (Tags: viele Gruppen, die Liste der
  * Köpfe ist die Übersicht). Das Set im Store hält dann die *aufgeklappten*

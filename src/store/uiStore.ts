@@ -8,6 +8,7 @@ import {
 } from './leaveGuardStore';
 import { isLibraryView, isViewId, moduleMeta, type EntryModuleId } from '../lib/modules';
 import type { ActiveView } from '../types';
+import { clearSessionState } from './sessionStore';
 
 export type ViewMode = 'list' | 'cards' | 'cards_wide' | 'timeline';
 /** `count_desc` = „am häufigsten zuerst" — nur das Tags-Dashboard bietet ihn
@@ -29,7 +30,7 @@ export interface AltarLibraryPrefs { sort: AltarLibrarySort; grouping: GroupingM
 export const ALTAR_LIBRARY_SORTS: AltarLibrarySort[] = ['alpha_asc', 'alpha_desc', 'date_desc'];
 
 /** Die Sortierung des Tags-Dashboards: Tags haben kein Datum, dafür eine
- *  Häufigkeit. Wie die übrigen Listen-Prefs nicht persistiert. */
+ *  Häufigkeit. */
 export type TagsSort = Extract<SortMode, 'alpha_asc' | 'alpha_desc' | 'count_desc'>;
 export const TAGS_SORTS: TagsSort[] = ['alpha_asc', 'alpha_desc', 'count_desc'];
 export const isTagsSort = (s: SortMode): s is TagsSort => (TAGS_SORTS as SortMode[]).includes(s);
@@ -93,12 +94,9 @@ interface UIState {
   tagsSort: TagsSort;
   altarWindowFullscreen: boolean;
   /** Altar-Dashboard: Vorschau der Leinwand auf den Karten und in der Liste.
-   *  Aus heißt Flammen-Icon statt Vorschau. Anders als die übrigen
-   *  Listen-Prefs dauerhaft (localStorage) — es ist eine Vorliebe, keine
-   *  Arbeitsgeste. */
+   *  Aus heißt Flammen-Icon statt Vorschau. */
   altarShowPreview: boolean;
-  /** Sortierung und Gruppierung der Bibliothek — wie altarShowPreview eine
-   *  Vorliebe und darum dauerhaft. */
+  /** Sortierung und Gruppierung der Bibliothek. */
   altarLibraryPrefs: AltarLibraryPrefs;
   homeJournalPrefs: HomeSectionPrefs;
   homeOpsPrefs: HomeSectionPrefs;
@@ -106,8 +104,10 @@ interface UIState {
   /** Die vom Standard abweichenden Gruppen je Modul (siehe hooks/useCollapsedSet):
    *  zugeklappte — bzw. in Scopes, die zugeklappt starten, aufgeklappte.
    *  Im Store statt View-lokal, weil MainArea die Views beim Modulwechsel
-   *  unmountet; bewusst nicht persistiert — zugeklappt ist eine Arbeitsgeste. */
+   *  unmountet. */
   collapsedGroups: Record<string, ReadonlySet<string>>;
+  /** Welche Abschnitte auf- oder zugeklappt sind (`usePersistedFlag`), je Schlüssel. */
+  flags: Record<string, boolean>;
 
   setActiveView: (view: ActiveView) => void;
   toggleCollapsedGroup: (scope: string, id: string) => void;
@@ -115,6 +115,7 @@ interface UIState {
   removeCollapsedGroups: (scope: string, ids: string[]) => void;
   /** Legt die ids ins Set eines Scopes — das Gegenstück zu removeCollapsedGroups. */
   addCollapsedGroups: (scope: string, ids: string[]) => void;
+  setFlag: (key: string, value: boolean) => void;
   closeAllTabs: () => void;
   /** Ein Eintrag hat den Typ gewechselt: jeder Tab und jeder Verlauf, der ihn
    *  unter `from` öffnet, öffnet ihn jetzt unter `to` — dieselbe id. */
@@ -152,9 +153,6 @@ interface UIState {
   setHomeWikiPrefs: (p: Partial<HomeSectionPrefs>) => void;
 }
 
-const ALTAR_SHOW_PREVIEW_KEY = 'altar-show-preview';
-const ALTAR_LIBRARY_SORT_KEY = 'altar-library-sort';
-const ALTAR_LIBRARY_GROUPING_KEY = 'altar-library-grouping';
 const RAIL_OPEN_KEY = 'rail-open';
 const LEFT_LIST_OPEN_KEY = 'left-list-open';
 const RIGHT_SIDEBAR_OPEN_KEY = 'right-sidebar-open';
@@ -166,18 +164,6 @@ function loadOpenFlag(key: string): boolean {
 
 function saveOpenFlag(key: string, open: boolean) {
   localStorage.setItem(key, open ? '1' : '0');
-}
-
-function loadAltarLibraryPrefs(): AltarLibraryPrefs {
-  // Gespeicherte Werte werden geprüft, nicht geglaubt: der Schlüssel überlebt
-  // eine Version, in der die Auswahl anders hieß.
-  const savedSort = localStorage.getItem(ALTAR_LIBRARY_SORT_KEY);
-  return {
-    sort: ALTAR_LIBRARY_SORTS.includes(savedSort as AltarLibrarySort)
-      ? (savedSort as AltarLibrarySort)
-      : 'alpha_asc',
-    grouping: localStorage.getItem(ALTAR_LIBRARY_GROUPING_KEY) === 'flat' ? 'flat' : 'grouped',
-  };
 }
 
 
@@ -381,12 +367,17 @@ export const useUIStore = create<UIState>((set, get) => ({
   lexiconPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
   tagsSort: 'alpha_asc',
   altarWindowFullscreen: false,
-  altarShowPreview: localStorage.getItem(ALTAR_SHOW_PREVIEW_KEY) !== '0',
-  altarLibraryPrefs: loadAltarLibraryPrefs(),
+  // Die Vorlieben hier sind die Standards eines Vaults ohne eigene —
+  // `vaultPrefs` lädt beim Öffnen eines Vaults dessen gespeicherte darüber.
+  altarShowPreview: true,
+  altarLibraryPrefs: { sort: 'alpha_asc', grouping: 'grouped' },
   homeJournalPrefs: { sort: 'date_desc', view: 'list', count: 5 },
   homeOpsPrefs:     { sort: 'date_desc', view: 'list', count: 5 },
   homeWikiPrefs:    { sort: 'alpha_asc', view: 'cards', count: 6 },
   collapsedGroups: {},
+  flags: {},
+
+  setFlag: (key, value) => set((s) => (s.flags[key] === value ? s : { flags: { ...s.flags, [key]: value } })),
 
   toggleCollapsedGroup: (scope, id) => set((s) => {
     const next = new Set(s.collapsedGroups[scope] ?? []);
@@ -437,18 +428,19 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   // Fuer Vault-Wechsel und Replace-Import: Tabs und History tragen Eintrags-IDs,
   // die es in der neuen Datenbank nicht gibt — beides faellt auf den frischen
-  // Startzustand zurueck (keine Tabs, Home), wie beim allerersten Start.
-  closeAllTabs: () => set(() => {
+  // Startzustand zurueck (keine Tabs, Home), wie beim allerersten Start. Der
+  // Arbeitszustand der Listen mit ihnen; die Vorlieben (auch die Klappzustände)
+  // gehören dem Vault und kommen mit `loadVaultPrefs`.
+  closeAllTabs: () => {
+    clearSessionState();
     saveTabs([], null);
-    return {
+    set({
       tabs: [],
       activeTabId: null,
       activeView: { type: 'home' },
       tablessHistory: freshHistory({ type: 'home' }),
-      // Die Klapp-Zustände zeigen per Kategorie-id in den alten Vault.
-      collapsedGroups: {},
-    };
-  }),
+    });
+  },
 
   retypeEntryViews: (id, from, to) => set((s) => {
     const retype = (view: ActiveView): ActiveView => (view.type === from && view.id === id ? { ...view, type: to } : view);
@@ -552,16 +544,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   setLexiconPrefs: (p) => set((s) => ({ lexiconPrefs: { ...s.lexiconPrefs, ...p } })),
   setTagsSort: (sort) => set({ tagsSort: sort }),
   setAltarWindowFullscreen: (enabled) => set({ altarWindowFullscreen: enabled }),
-  setAltarShowPreview: (enabled) => {
-    localStorage.setItem(ALTAR_SHOW_PREVIEW_KEY, enabled ? '1' : '0');
-    set({ altarShowPreview: enabled });
-  },
-  setAltarLibraryPrefs: (p) => set((s) => {
-    const next = { ...s.altarLibraryPrefs, ...p };
-    localStorage.setItem(ALTAR_LIBRARY_SORT_KEY, next.sort);
-    localStorage.setItem(ALTAR_LIBRARY_GROUPING_KEY, next.grouping);
-    return { altarLibraryPrefs: next };
-  }),
+  setAltarShowPreview: (enabled) => set({ altarShowPreview: enabled }),
+  setAltarLibraryPrefs: (p) => set((s) => ({ altarLibraryPrefs: { ...s.altarLibraryPrefs, ...p } })),
   setHomeJournalPrefs: (p) => set((s) => ({ homeJournalPrefs: { ...s.homeJournalPrefs, ...p } })),
   setHomeOpsPrefs:     (p) => set((s) => ({ homeOpsPrefs:     { ...s.homeOpsPrefs,     ...p } })),
   setHomeWikiPrefs:    (p) => set((s) => ({ homeWikiPrefs:    { ...s.homeWikiPrefs,    ...p } })),

@@ -18,6 +18,7 @@ import BlockGlyph from '../blocks/BlockGlyph';
 import LanguagePage from '../lexicon/LanguagePage';
 import TranslatePanel from '../lexicon/TranslatePanel';
 import type { Language } from '../../types';
+import { useSessionState } from '../../store/sessionStore';
 
 /**
  * Die Rail-Ansicht „Lexikon", gebaut wie „Vorlagen": die Sprachen im
@@ -95,7 +96,7 @@ function LanguageList({ onCreate, onDelete }: {
   const prefs = useUIStore((s) => s.lexiconPrefs);
   const setPrefs = useUIStore((s) => s.setLexiconPrefs);
   const [collapsed, toggleCollapsed] = usePersistedFlag('lexicon-list-collapsed');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useSessionState('lexicon.search', '');
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
 
   /** Wie viele Vokabeln je Sprache — eine Zählung für alle Zeilen statt einer je Zeile. */

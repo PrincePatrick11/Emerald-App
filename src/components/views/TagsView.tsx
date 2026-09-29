@@ -27,6 +27,7 @@ import InlineConfirm from '../ui/InlineConfirm';
 import InlineNameEditor from '../ui/InlineNameEditor';
 import ModuleCounts from '../ui/ModuleCounts';
 import type { ActiveView, Tag } from '../../types';
+import { useSessionState } from '../../store/sessionStore';
 
 /** Ein getaggter Eintrag, gleich welchen Moduls — die Zeile unter einem Tag. */
 interface TaggedItem {
@@ -148,8 +149,8 @@ export default function TagsView() {
   const setSort = useUIStore((s) => s.setTagsSort);
   const { isCollapsed, toggle, expand } = useCollapsedSet('tags', { defaultCollapsed: true });
 
-  const [search, setSearch] = useState('');
-  const [moduleFilter, setModuleFilter] = useState<TagModuleId[]>([]);
+  const [search, setSearch] = useSessionState('tags.search', '');
+  const [moduleFilter, setModuleFilter] = useSessionState<TagModuleId[]>('tags.filter', []);
   const [form, setForm] = useState<FormState | null>(null);
   const [name, setName] = useState('');
   const [color, setColor] = useState(TAG_COLORS[0]);

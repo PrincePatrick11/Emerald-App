@@ -20,6 +20,7 @@ import InlineConfirm from '../ui/InlineConfirm';
 import InlineNameEditor from '../ui/InlineNameEditor';
 import ModuleCounts from '../ui/ModuleCounts';
 import type { Category } from '../../types';
+import { useSessionState } from '../../store/sessionStore';
 
 /** Vorbelegung beim Anlegen: modulneutral, dieselbe Glyphe wie das Sammelbecken. */
 const DEFAULT_EMOJI = '📦';
@@ -115,7 +116,7 @@ export default function CategoriesView() {
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState(DEFAULT_EMOJI);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useSessionState('categories.search', '');
   /** Fehlermeldung neben dem Namensfeld — heute nur „Name schon vergeben". */
   const [nameError, setNameError] = useState<string | null>(null);
 

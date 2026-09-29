@@ -946,8 +946,8 @@ stack creates one from its current (live, if being edited) content and opens it.
 **The dashboard page.** `TemplatesView` is a `Dashboard` list of active templates under a
 collapsible "Templates" `GroupDivider` (remembered, like the built-in-blocks section on the Blocks
 dashboard), with its own view (list/cards/wide cards/timeline, grouped by month of `updated_at`)
-and sort (date/alpha) held in `uiStore.templatesPrefs` — one more `ListPrefs` field, not persisted,
-the same as the other modules'. A row or card shows only icon, name, an "Unsaved" marker for an
+and sort (date/alpha) held in `uiStore.templatesPrefs` — one more `ListPrefs` field, remembered per
+vault like the other modules' (see [Tabs and Workspace State](#tabs-and-workspace-state)). A row or card shows only icon, name, an "Unsaved" marker for an
 open draft, and the entry count — no assignments, no default star, no description; clicking one
 opens `{ type: 'templates', id }`, rendered by `TemplateEditor` on
 `LibraryPageFrame` — the same "Done"-saves-only-changed-fields page shell `BlockDefinitionEditor`
@@ -1195,6 +1195,15 @@ Tabs are persisted in `localStorage` using:
 - `active-tab-id`
 
 This keeps the user's workspace available after restarting the app without adding database tables or migrations.
+
+**What is remembered where.** Four places, each for one kind of thing:
+
+- **Settings** — `settings.json` in the vault folder (`lib/vaultSettings.ts`), travels with backups.
+- **Preferences** — per vault, in `localStorage` under `vault-prefs:<vaultId>` (`store/vaultPrefs.ts`): every `ListPrefs` field, the three Home sections, `tagsSort`, `altarShowPreview`, `altarLibraryPrefs`, `collapsedGroups` and `flags` (what `usePersistedFlag` toggles — collapsed sections, Tasks' "Show completed"). They live in `uiStore` as before; `loadVaultPrefs` fills them when a vault opens (boot, `openActiveVault`, a failed switch's rollback) and a store subscription writes every change back. Fields are validated on load, and a vault without saved preferences starts from the store's defaults plus the app-wide values that preceded per-vault preferences (`altar-show-preview`, `altar-library-sort`/`-grouping`, and for flags the old raw key). `forgetVaultPrefs` drops them with the vault.
+- **Working state** — search, filters, the Trash selection: `useSessionState(key, initial)` (`store/sessionStore.ts`), keyed like `wiki.search`. Survives a module switch (which unmounts the view), not a restart; `closeAllTabs` clears it, so a vault switch or replace import starts clean.
+- **Window layout** — tabs, the three sidebars' open state, their widths, the Altar library strip's height: app-wide `localStorage`, whatever vault is open.
+
+The Altar's per-altar sidebar sections (`altar-sidebar-sections-<altarId>`) stay under their own key; an altar id belongs to one vault anyway.
 
 **Vault switches and a Replace-mode `.emeralddb` import reset the whole workspace, not just the active tab.** `closeAllTabs()` in `uiStore` clears `tabs` and `activeTabId`, and resets `tablessHistory` to a fresh Home history, persisting the empty tab list (`saveTabs([], null)`) — every open tab (and, with it, its own back/forward history) carries row ids from the vault (or the pre-import data) that no longer exists. A Merge import does not call it: merge only adds rows, so the ids behind existing tabs stay valid. Tabs are closed rather than remembered per vault — nothing keeps a vault's own tab set around to restore when switching back to it. `openActiveVault()` in `vaultStore.ts` calls `closeAllTabs()` on `switchVault` and when the active vault is deleted, but not on the app's own startup path, so restoring the previous session's tabs on relaunch (above) is unaffected.
 

@@ -33,6 +33,7 @@ import { AltarItemModal } from '../altar/AltarItemModal';
 import { AltarLibrarySection } from '../altar/AltarLibrarySection';
 import { AltarCard, AltarListRow, buildAltarContextMenuActions } from '../altar/AltarCard';
 import { imageSrc } from '../../lib/images';
+import { useSessionState } from '../../store/sessionStore';
 
 
 export default function AltarView() {
@@ -66,7 +67,7 @@ export default function AltarView() {
   const allCategories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useSessionState('altar.search', '');
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   // Wie die Bibliothek darunter: der Abschnitt lässt sich zuklappen, und das
   // bleibt so — dieselbe Vorliebe, derselbe Hook.

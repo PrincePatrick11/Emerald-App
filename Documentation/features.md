@@ -216,6 +216,13 @@ Tab reordering uses Framer Motion's `Reorder.Group` / `Reorder.Item` for drag in
 
 If an item is already open, Emerald reuses the existing workspace context instead of forcing you to rebuild your working set from scratch.
 
+**What Emerald remembers.** Two kinds of things, with one rule each:
+
+- **Preferences stay, per vault** — how each list looks (view, sort, grouping), the Home sections, which groups and sections are collapsed, the Altar preview and library order, Tasks' "Show completed". Each vault keeps its own; a vault you open for the first time starts from the defaults (or from what the app remembered before preferences became per vault).
+- **Working state lasts for the session** — searches, filters and the Trash selection. Switching to another module and back finds them as you left them; a restart, a vault switch or restoring a backup starts clean.
+
+The window layout — open tabs, which sidebars are open, their widths — belongs to the app rather than to a vault, and settings live in the vault's settings (see Settings).
+
 
 ## Templates
 

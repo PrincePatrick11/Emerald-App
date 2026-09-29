@@ -20,6 +20,7 @@ import ContextMenu from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import BlockGlyph from '../blocks/BlockGlyph';
 import BlockDefinitionEditor, { DeleteDefinitionModal } from '../blocks/BlockDefinitionEditor';
+import { useSessionState } from '../../store/sessionStore';
 
 /**
  * Die Rail-Ansicht „Blöcke", gebaut wie die übrigen Dashboards: die Liste der
@@ -152,7 +153,7 @@ function BlockList({ usage, onCreate, onDelete }: {
   // Die Seite legt ungespeicherte Entwürfe im Store ab; hier nur der Hinweis darauf.
   const drafts = useBlockDraftStore((s) => s.drafts);
   const openInNewTabAction = useOpenInNewTabAction();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useSessionState('blocks.search', '');
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [customCollapsed, toggleCustom] = usePersistedFlag('blocks-custom-collapsed');
   const { view, sort } = useUIStore((s) => s.blocksPrefs);

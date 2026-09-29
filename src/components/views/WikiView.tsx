@@ -28,6 +28,7 @@ import { useUndoStore } from '../../store/undoStore';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
+import { useSessionState } from '../../store/sessionStore';
 
 export default function WikiView() {
   const { t } = useTranslation();
@@ -50,8 +51,8 @@ export default function WikiView() {
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  const [search, setSearch] = useState('');
-  const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
+  const [search, setSearch] = useSessionState('wiki.search', '');
+  const [filterCatIds, setFilterCatIds] = useSessionState<string[]>('wiki.filter', []);
   const { isCollapsed: isCatCollapsed, toggle: toggleCatCollapse } = useCollapsedSet('wiki');
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState<string[]>([]);

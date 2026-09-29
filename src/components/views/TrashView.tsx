@@ -19,6 +19,7 @@ import Button from '../ui/Button';
 import EmptyState, { NoResults } from '../ui/EmptyState';
 import InlineConfirm from '../ui/InlineConfirm';
 import type { TrashedItem } from '../../types';
+import { useSessionState } from '../../store/sessionStore';
 
 function typeIcon(type: TrashedItem['type']) {
   const Icon = TRASH_KIND_ICONS[type];
@@ -191,7 +192,7 @@ export default function TrashView() {
   );
   const categories = useCategoryStore((s) => s.categories);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useSessionState<Set<string>>('trash.selection', new Set());
   // Welche Rückfrage der Primärknopf gerade stellt. Ein Zustand für beide,
   // und jede Änderung der Auswahl setzt ihn zurück: sonst tauchte nach
   // An- und Abwählen ein altes „Ja, alles löschen" wieder auf.
@@ -199,7 +200,7 @@ export default function TrashView() {
   // Wann die Rückfrage aufging. Das „Ja" steht auf demselben Knopf wie die
   // Frage — der zweite Klick eines Doppelklicks löschte sonst sofort.
   const confirmArmedAt = useRef(0);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useSessionState('trash.search', '');
 
   useEffect(() => { fetchTrashed(); }, []);
 

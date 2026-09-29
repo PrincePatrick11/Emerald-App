@@ -26,6 +26,7 @@ import { isCardView } from '../../lib/viewMode';
 import { countByCategory, groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import type { JournalEntry, MoonPhase } from '../../types';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
+import { useSessionState } from '../../store/sessionStore';
 
 export default function JournalView() {
   const { t } = useTranslation();
@@ -46,8 +47,8 @@ export default function JournalView() {
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  const [search, setSearch] = useState('');
-  const [filterPhases, setFilterPhases] = useState<string[]>([]);
+  const [search, setSearch] = useSessionState('journal.search', '');
+  const [filterPhases, setFilterPhases] = useSessionState<string[]>('journal.filter', []);
   const { isCollapsed: isPhaseCollapsed, toggle: togglePhaseCollapse } = useCollapsedSet('journal');
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState<string[]>([]);

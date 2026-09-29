@@ -29,6 +29,7 @@ import {
   CheckSquare, Square, Link2,
 } from 'lucide-react';
 import type { Task, TaskPriority } from '../../types';
+import { useSessionState } from '../../store/sessionStore';
 
 const TASK_PRIORITY_COLORS: Record<string, string> = {
   high: 'text-red-400',
@@ -41,6 +42,8 @@ const TASK_PRIORITY_PILL_CLASSES: Record<string, string> = {
   medium: 'task-priority-pill task-priority-pill-medium',
   low: 'task-priority-pill task-priority-pill-low',
 };
+
+const SHOW_COMPLETED_FLAG = 'tasks-show-completed';
 
 export default function TasksView() {
   const { t } = useTranslation();
@@ -65,10 +68,13 @@ export default function TasksView() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterCategory, setFilterCategory] = useState<Set<string>>(new Set());
-  const [filterPriority, setFilterPriority] = useState<Set<string>>(new Set());
-  const [showCompleted, setShowCompleted] = useState(false);
+  const [searchQuery, setSearchQuery] = useSessionState('tasks.search', '');
+  const [filterCategory, setFilterCategory] = useSessionState<Set<string>>('tasks.filterCategory', new Set());
+  const [filterPriority, setFilterPriority] = useSessionState<Set<string>>('tasks.filterPriority', new Set());
+  // „Erledigte anzeigen" ist eine Vorliebe wie die Vorschau im Altar, kein
+  // Filter: dauerhaft je Vault (`vaultPrefs`), ein Zurücksetzen lässt es stehen.
+  const showCompleted = useUIStore((s) => s.flags[SHOW_COMPLETED_FLAG] ?? false);
+  const setShowCompleted = (value: boolean) => useUIStore.getState().setFlag(SHOW_COMPLETED_FLAG, value);
   const { isCollapsed: isCategoryCollapsed, toggle: toggleCategoryCollapse, expand: expandCategories } = useCollapsedSet('tasks');
   const [linkModal, setLinkModal] = useState<{ taskId: string } | null>(null);
 

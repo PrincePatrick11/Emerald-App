@@ -27,6 +27,7 @@ import { useEditActions } from '../../hooks/useEditActions';
 import { guardKey } from '../../store/leaveGuardStore';
 import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
+import { useSessionState } from '../../store/sessionStore';
 
 export default function OperationsView() {
   const { t } = useTranslation();
@@ -50,8 +51,8 @@ export default function OperationsView() {
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  const [search, setSearch] = useState('');
-  const [filterCatIds, setFilterCatIds] = useState<string[]>([]);
+  const [search, setSearch] = useSessionState('operations.search', '');
+  const [filterCatIds, setFilterCatIds] = useSessionState<string[]>('operations.filter', []);
   const { isCollapsed: isCatCollapsed, toggle: toggleCatCollapse } = useCollapsedSet('operations');
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState<string[]>([]);
