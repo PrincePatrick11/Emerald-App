@@ -7,6 +7,7 @@ import Button from '../ui/Button';
 import EmojiPicker from '../ui/EmojiPicker';
 import { DEFAULT_EMOJI_PICKER_EMOJIS } from '../../lib/emojiSearch';
 import { hasActiveVault, useVaultStore } from '../../store/vaultStore';
+import { useCloseOnKeepEditing } from '../../hooks/useCloseOnKeepEditing';
 import {
   DB_FILE,
   NEW_VAULT_TARGET_ERROR_KEY,
@@ -370,6 +371,7 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
   const updateVault = useVaultStore((s) => s.updateVault);
   const relocateVault = useVaultStore((s) => s.relocateVault);
   const removeVault = useVaultStore((s) => s.removeVault);
+  useCloseOnKeepEditing(onClose);
 
   const [editor, setEditor] = useState<Editor>({ kind: 'none' });
   const [switchingId, setSwitchingId] = useState<string | null>(null);

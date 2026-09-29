@@ -50,6 +50,14 @@ export function trackAltarWrite(id: string, write: Promise<unknown>): void {
   writing.set(id, tracked);
 }
 
+/**
+ * Das Zurückschreiben, das für einen Altar gerade läuft. Wer gleich nach
+ * Cancel wieder „Bearbeiten" drückt, wartet darauf: sonst hielte er den alten
+ * Stand für seinen eigenen, und der verschwände mit dem Ende des
+ * Zurückschreibens — die neue Bearbeitung hätte keinen.
+ */
+const restoring = new Map<string, Promise<void>>();
+
 function isEditingAltar(id: string): boolean {
   const { activeView, tabs } = useUIStore.getState();
   return [activeView, ...tabs.map((tab) => tab.view)]
@@ -74,6 +82,8 @@ function currentPlacements(id: string): AltarPlacement[] {
 
 /** Merkt sich den Altar beim Betreten des Bearbeitens. Läuft die Bearbeitung schon, bleibt ihr Stand. */
 export async function beginAltarEdit(id: string): Promise<void> {
+  // Scheitert es, bleibt sein Stand — und gilt dann auch für diese Bearbeitung.
+  await restoring.get(id)?.catch(() => {});
   await writing.get(id);
   // Inzwischen kann die Bearbeitung beendet oder der Stand schon da sein.
   if (snapshots.has(id) || !isEditingAltar(id)) return;
@@ -145,12 +155,20 @@ export function endAltarEdit(id: string): void {
  * Versuch: das nächste „Bearbeiten" setzt auf ihm auf, das nächste Cancel
  * bringt es zu Ende.
  */
-export async function restoreAltarEdit(id: string): Promise<void> {
+export function restoreAltarEdit(id: string): Promise<void> {
   // Vor dem ersten await: die Ansicht wechselt gleich, und der Abgleich oben
   // räumte den Stand weg, während hier noch gewartet wird.
   const snapshot = snapshots.get(id);
-  if (!snapshot) return;
+  if (!snapshot) return Promise.resolve();
   held.add(id);
+  const restore = writeBack(id, snapshot).finally(() => {
+    if (restoring.get(id) === restore) restoring.delete(id);
+  });
+  restoring.set(id, restore);
+  return restore;
+}
+
+async function writeBack(id: string, snapshot: AltarSnapshot): Promise<void> {
   // Was noch unterwegs ist (ein Vorschaubild, ein Schieberegler), erst zu
   // Ende bringen — sonst landete es nach dem Zurückschreiben.
   await writing.get(id);

@@ -38,6 +38,8 @@ interface LeaveQuestion {
 interface LeaveGuardState {
   guard: EditGuard | null;
   question: LeaveQuestion | null;
+  /** Zählt die Antworten „Weiter bearbeiten" — woran Fenster über der Seite merken, dass sie weichen sollen (`useCloseOnKeepEditing`). */
+  stays: number;
   setGuard: (guard: EditGuard) => void;
   /** Räumt nur, wenn der Wächter noch dieser Seite gehört — die nächste darf schon übernommen haben. */
   clearGuard: (key: string) => void;
@@ -46,6 +48,7 @@ interface LeaveGuardState {
 export const useLeaveGuardStore = create<LeaveGuardState>((set, get) => ({
   guard: null,
   question: null,
+  stays: 0,
   setGuard: (guard) => set({ guard }),
   clearGuard: (key) => {
     if (get().guard?.key === key) set({ guard: null });
@@ -105,7 +108,7 @@ export async function confirmLeave(): Promise<boolean> {
     const choice = await new Promise<LeaveChoice>((answer) => {
       useLeaveGuardStore.setState({ question: { title, answer } });
     });
-    useLeaveGuardStore.setState({ question: null });
+    useLeaveGuardStore.setState((s) => ({ question: null, stays: choice === 'stay' ? s.stays + 1 : s.stays }));
     if (choice === 'stay') return false;
     await withoutLeaveGuard(guard.key, () => (choice === 'save' ? guard.save() : guard.discard()));
     return true;

@@ -360,7 +360,9 @@ write is an upsert per placement followed by a delete of what does not belong â€
 transaction to lean on, so it is built to be repeatable: if it fails, the snapshot stays and
 the next Edit and Cancel finish it. Cancel switches to read mode *first* and restores behind
 it â€” `restoreAltarEdit` takes hold of the snapshot before its first `await`, since the change
-of view would otherwise prune it while the write is still waiting. `altarEditDirty` is what both the altar's leave guard and the
+of view would otherwise prune it while the write is still waiting. An Edit pressed right
+after Cancel waits for that write (`beginAltarEdit`), so that it starts from a snapshot of
+its own. `altarEditDirty` is what both the altar's leave guard and the
 probe for background tabs ask. The snapshot has the baseline's lifetime: kept across a tab
 switch, dropped once no tab shows the altar in edit mode. The title is the one field the
 altar does not write at once; leaving the view without Done saves it, so that the edit can
@@ -409,6 +411,9 @@ Whether a *background* tab holds changes is answered without mounting it:
 `useEntryEditor` (the stored state differs from the baseline, or the entry is new) register.
 Only a tab that does is switched to; an unchanged edit-mode tab closes without a flicker.
 
+Whoever answers "keep editing" wants to be in the entry: the Settings and Vaults windows
+close on that answer (`useCloseOnKeepEditing`, fed by the `stays` counter in
+`leaveGuardStore`), whether they asked themselves or the window's close button did.
 `switchVault` resolves to `false` when the user chose to keep editing. The add-vault import
 asks *before* it starts and then passes `editsResolved`, so its own switch never asks again:
 a second question answered "keep editing" would leave the old vault active, and the import

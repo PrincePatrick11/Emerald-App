@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Archive, FileText, HardDrive, Info, PanelLeft, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import Modal from '../../ui/Modal';
+import { useCloseOnKeepEditing } from '../../../hooks/useCloseOnKeepEditing';
 import GeneralPage from './GeneralPage';
 import SidebarPage from './SidebarPage';
 import EntriesPage from './EntriesPage';
@@ -32,6 +33,8 @@ interface Props {
 export default function SettingsModal({ onClose, initialPage = 'general' }: Props) {
   const { t } = useTranslation();
   const [page, setPage] = useState<SettingsPage>(initialPage);
+  // Ein Import oder Update, das an einer laufenden Bearbeitung hängen blieb.
+  useCloseOnKeepEditing(onClose);
 
   return (
     <Modal
