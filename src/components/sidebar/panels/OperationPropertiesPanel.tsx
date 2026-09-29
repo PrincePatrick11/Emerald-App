@@ -38,7 +38,7 @@ export default function OperationPropertiesPanel() {
     <>
       <PropertiesSection>
         <EntryTypeField id={op.id} type="operation" properties={op} />
-        <CategoryIconCoverRows entryType="operation" entry={op} update={(patch) => updateOperation(op.id, patch)} />
+        <CategoryIconCoverRows entry={op} update={(patch) => updateOperation(op.id, patch)} />
       </PropertiesSection>
       <LinkedEntriesField content={op.content} />
       <TagsField tags={op.tags ?? []} onChange={(tags) => updateOperation(op.id, { tags })} />

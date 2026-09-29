@@ -415,7 +415,6 @@ export default function BlockStack({
   apiRef.current = {
     insert: insertAt, duplicate, remove, reorder, setAttr, update: updateBlock, reveal,
     liveBlocks: () => blocksRef.current,
-    applyTemplate,
     openTemplatePicker: () => setTemplatePickerOpen(true),
   };
   const mountedRef = useRef(false);
@@ -430,7 +429,6 @@ export default function BlockStack({
       update: (id, next) => live()?.update(id, next),
       reveal: (id) => live()?.reveal(id),
       liveBlocks: () => live()?.liveBlocks() ?? [],
-      applyTemplate: (template, options) => live()?.applyTemplate(template, options),
       openTemplatePicker: () => live()?.openTemplatePicker(),
     };
   }, []);

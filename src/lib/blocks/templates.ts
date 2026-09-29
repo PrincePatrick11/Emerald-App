@@ -343,33 +343,6 @@ export function contentForTemplate(content: string): string {
   }));
 }
 
-/**
- * Die Blöcke eines Inhalts, vergleichbar gemacht: Block-IDs (auch in
- * Ladungszielen) durch ihre Position ersetzt, Attribute sortiert, Leerraum
- * am Rand des inneren HTML weg — zwei Anwendungen derselben Vorlage sehen
- * dann gleich aus.
- */
-function comparableBlocks(content: string): string {
-  const blocks = parseBlocks(content);
-  const byPosition = (value: string) => blocks.reduce((v, b, i) => v.split(b.id).join(`#${i}`), value);
-  return JSON.stringify(blocks.map((b) => ({
-    type: b.type,
-    html: byPosition(b.html.trim()),
-    attrs: Object.keys(b.attrs).sort().map((k) => [k, byPosition(b.attrs[k])]),
-  })));
-}
-
-/**
- * Steht im Inhalt noch genau das, was die Vorlage (in ihrer jetzigen Fassung)
- * einsetzt — nichts geändert, nichts dazu? Dann darf ein genauerer Standard
- * ihn ersetzen. Wurde die Vorlage seither geändert, gilt der Inhalt als
- * geändert: lieber einen Tausch auslassen als Arbeit überschreiben.
- */
-export function isUnchangedTemplateContent(content: string, template: Pick<Template, 'id' | 'content'>): boolean {
-  if (!content.includes(template.id)) return false;
-  return comparableBlocks(content) === comparableBlocks(serializeBlocks(instantiateTemplateBlocks(template)));
-}
-
 /** Die Vorlagen, aus denen diese Blöcke stammen — jede einmal, in Reihenfolge. */
 export function templateOriginsOf(blocks: readonly BlockInstance[]): string[] {
   const ids = new Set<string>();
@@ -440,34 +413,4 @@ export function fieldsWithoutTemplate(
     title: template.title.trim() && fields.title === template.title.trim() ? UNTITLED_TITLES[entryType] : fields.title,
     tags: fields.tags.filter((tag) => !removed.has(tag.toLowerCase())),
   };
-}
-
-/** Art und Kategorie eines Eintrags — wonach sich sein Standard richtet. */
-export interface TemplateCombination {
-  entryType: TemplateEntryType;
-  categoryId: string | null;
-}
-
-/**
- * Wechselt ein Eintrag seine Kombination (Kategorie oder Typ): der Standard der
- * neuen, der jetzt den Inhalt ersetzen darf — oder `null`. Er darf, wenn die
- * Blöcke leer sind oder noch unverändert der Standard der bisherigen
- * Kombination drinsteht (meist der Rückfall „alle Kategorien"); den liefert
- * `replaces` mit, damit sein Titel und seine Tags weichen. Eine von Hand
- * gewählte Vorlage oder eigene Arbeit bleibt.
- */
-export function defaultTemplateSwap(
-  templates: readonly Template[],
-  blocks: readonly BlockInstance[],
-  from: TemplateCombination,
-  to: TemplateCombination,
-): { template: Template; replaces?: Template } | null {
-  const template = resolveDefaultTemplate(templates, to.entryType, to.categoryId);
-  if (!template) return null;
-  if (areBlocksEmpty(blocks)) return { template };
-  const replaces = resolveDefaultTemplate(templates, from.entryType, from.categoryId);
-  const origins = templateOriginsOf(blocks);
-  if (!replaces || replaces.id === template.id || origins.length !== 1 || origins[0] !== replaces.id) return null;
-  if (!isUnchangedTemplateContent(serializeBlocks([...blocks]), replaces)) return null;
-  return { template, replaces };
 }

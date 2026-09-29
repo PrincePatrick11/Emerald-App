@@ -1,7 +1,5 @@
 import { create } from 'zustand';
 import type { BlockAttrName, BlockInstance } from '../lib/blocks/types';
-import type { Template } from '../lib/blocks/templates';
-import type { TemplateApplyOptions } from './templateApply';
 
 /**
  * Die Brücke zwischen dem `BlockStack` im Hauptbereich und der Block-Verwaltung
@@ -29,9 +27,7 @@ export interface BlockStackApi {
   reveal: (id: string) => void;
   /** Die Blöcke mit dem lebenden HTML der Textblöcke — `blocks` der Sitzung hinkt beim Tippen hinterher. */
   liveBlocks: () => BlockInstance[];
-  /** Eine Vorlage einsetzen — nur in einem Stapel mit Vorlagen (`BlockSession.templates`). */
-  applyTemplate: (template: Template, options: TemplateApplyOptions) => void;
-  /** Die Vorlagen-Auswahl des Stapels öffnen. */
+  /** Die Vorlagen-Auswahl des Stapels öffnen — nur in einem Stapel mit Vorlagen (`BlockSession.templates`). */
   openTemplatePicker: () => void;
 }
 

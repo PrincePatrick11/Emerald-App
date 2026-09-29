@@ -31,7 +31,7 @@ writeFileSync(
    export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
    export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked, withRenamedPartTargets } from '${root}/src/lib/blocks/sigil';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
-   export { parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty, isUnchangedTemplateContent, templateOriginsOf, templateStart, mergeTemplateTags, mergeAssignmentChanges, withAssignmentState, assignmentStateAt, sameAssignments, defaultTemplateAt, contentForTemplate, areBlocksEmpty, defaultTemplateSwap, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
+   export { parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty, templateOriginsOf, templateStart, mergeTemplateTags, mergeAssignmentChanges, withAssignmentState, assignmentStateAt, sameAssignments, defaultTemplateAt, contentForTemplate, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';`
 );
@@ -65,9 +65,9 @@ const {
   sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked,
   remapDefinitionDefaults, definitionImageRefs, hasFrozenCopy, withRenamedPartTargets,
   parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty,
-  isUnchangedTemplateContent, templateOriginsOf, templateStart, mergeTemplateTags,
+  templateOriginsOf, templateStart, mergeTemplateTags,
   mergeAssignmentChanges, withAssignmentState, assignmentStateAt, sameAssignments, defaultTemplateAt, contentForTemplate, areBlocksEmpty,
-  defaultTemplateSwap, fieldsWithTemplate, fieldsWithoutTemplate,
+  fieldsWithTemplate, fieldsWithoutTemplate,
 } = bundle;
 
 const failures = [];
@@ -871,33 +871,8 @@ console.log('\n6. Vorlagen: Zuweisung, Standard, Einsetzen\n');
 
   check('Herkunft aus den Blöcken lesen', templateOriginsOf([...first, createTextBlock('x')]).join() === 'sigil-tpl');
 
-  const applied = serializeBlocks(first);
-  check('unverändert eingesetzt wird als unverändert erkannt', isUnchangedTemplateContent(applied, sigilTpl));
-  check('eine Änderung im Text hebt das auf',
-    !isUnchangedTemplateContent(applied.replace('Absicht', 'Anders'), sigilTpl));
-  check('ein zusätzlicher Block hebt das auf',
-    !isUnchangedTemplateContent(serializeBlocks([...first, createTextBlock('<p>mehr</p>')]), sigilTpl));
-  check('eine andere Vorlage ist nie „unverändert"', !isUnchangedTemplateContent(applied, { ...sigilTpl, id: 'andere' }));
-
-  // Wechsel der Kombination (Kategorie oder Typ): wann der neue Standard den Inhalt ersetzt.
+  // Titel und Tags beim Ablösen einer Vorlage („Andere Vorlage").
   const journalStd = { ...sigilTpl, id: 'journal-std', title: 'Tagebuch', tags: ['tag-j'], assignments: [{ entryType: 'journal', category: '*', isDefault: true }] };
-  const wikiStd = tpl('wiki-std', [{ entryType: 'wiki', category: '*', isDefault: true }], serializeBlocks([createTextBlock('<p>Wiki</p>')]));
-  const swapTemplates = [journalStd, wikiStd];
-  const fromJournal = { entryType: 'journal', categoryId: null };
-  const toWiki = { entryType: 'wiki', categoryId: null };
-  const journalBlocks = instantiateTemplateBlocks(journalStd);
-  const emptySwap = defaultTemplateSwap(swapTemplates, [createTextBlock('')], fromJournal, toWiki);
-  check('Wechsel: leerer Inhalt bekommt den neuen Standard, ohne abzulösen',
-    emptySwap?.template.id === 'wiki-std' && emptySwap.replaces === undefined, emptySwap);
-  const stdSwap = defaultTemplateSwap(swapTemplates, journalBlocks, fromJournal, toWiki);
-  check('Wechsel: unveränderter alter Standard wird abgelöst',
-    stdSwap?.template.id === 'wiki-std' && stdSwap.replaces?.id === 'journal-std', stdSwap);
-  check('Wechsel: eigene Arbeit bleibt',
-    defaultTemplateSwap(swapTemplates, [...journalBlocks, createTextBlock('<p>mehr</p>')], fromJournal, toWiki) === null);
-  check('Wechsel: ohne Standard der neuen Kombination nichts',
-    defaultTemplateSwap(swapTemplates, [createTextBlock('')], fromJournal, { entryType: 'operation', categoryId: null }) === null);
-  check('Wechsel: eine von Hand gewählte Vorlage bleibt',
-    defaultTemplateSwap([wikiStd], journalBlocks, fromJournal, toWiki) === null);
 
   const cleared = fieldsWithoutTemplate({ title: 'Tagebuch', tags: ['eigen', 'TAG-J'] }, 'wiki', journalStd);
   check('Felder ohne Vorlage: Titel auf den Standardtitel des Typs, ihre Tags weg',

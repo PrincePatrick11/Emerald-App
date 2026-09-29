@@ -28,6 +28,7 @@ import {
   type EntryStart, type Template, type TemplateAssignment, type TemplateEntryType,
 } from '../lib/blocks/templates';
 import i18n from '../i18n';
+import { useSettingsStore } from './settingsStore';
 import { withUsableTags } from '../lib/templateTags';
 
 export type TemplatePatch = Partial<Pick<Template, 'name' | 'icon' | 'description' | 'title' | 'content' | 'tags' | 'assignments'>>;
@@ -180,7 +181,8 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
 
 /**
  * Womit ein neuer Eintrag beginnt: der Standard seiner Kombination (siehe
- * `resolveDefaultTemplate`) — oder, mit `blank`, gar keine Vorlage. Für die
+ * `resolveDefaultTemplate`) — oder gar keine Vorlage: mit `blank`, oder wenn
+ * der Vault Standards nicht von selbst einsetzt (Einstellung). Für die
  * `create*`-Aktionen der Inhalts-Stores; Importe und Duplikate übergeben
  * `blank`, sie überschreiben den Inhalt ohnehin.
  */
@@ -190,7 +192,8 @@ export function startOfNewEntry(
   fallbackTitle: string,
   blank = false,
 ): EntryStart {
-  const template = blank ? null : resolveDefaultTemplate(useTemplateStore.getState().templates, entryType, categoryId);
+  const apply = !blank && useSettingsStore.getState().settings.templates.applyDefault;
+  const template = !apply ? null : resolveDefaultTemplate(useTemplateStore.getState().templates, entryType, categoryId);
   return withUsableTags(templateStart(template, fallbackTitle));
 }
 

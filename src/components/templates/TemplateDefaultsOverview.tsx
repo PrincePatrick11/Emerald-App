@@ -6,6 +6,7 @@ import BlockGlyph from '../blocks/BlockGlyph';
 import { useTemplateStore } from '../../store/templateStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUIStore } from '../../store/uiStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { templateLabel } from '../../lib/blocks/blockAttrs';
 import { categoryLabel } from '../../lib/categories';
@@ -34,6 +35,7 @@ const GRID = 'grid grid-cols-[minmax(9rem,1.3fr)_repeat(2,minmax(0,1fr))] items-
  */
 export default function TemplateDefaultsOverview() {
   const { t } = useTranslation();
+  const applyDefault = useSettingsStore((s) => s.settings.templates.applyDefault);
   const templates = useTemplateStore((s) => s.templates);
   const categories = useCategoryStore((s) => s.categories);
   const setActiveView = useUIStore((s) => s.setActiveView);
@@ -117,7 +119,9 @@ export default function TemplateDefaultsOverview() {
       <GroupDivider label={t('templates.overview.title')} collapsed={collapsed} onToggleCollapse={toggle} />
       {!collapsed && (
         <>
-          <p className="mb-3 text-xs text-[var(--text-muted)]">{t('templates.overview.hint')}</p>
+          <p className="mb-3 text-xs text-[var(--text-muted)]">
+            {t(applyDefault ? 'templates.overview.hint' : 'templates.overview.hintOff')}
+          </p>
           <div className="panel px-4">
             {/* Journal: eine Zeile, die Zelle über beide Spalten. */}
             <div className="py-3">

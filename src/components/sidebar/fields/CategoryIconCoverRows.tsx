@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Folder, Image, Smile } from 'lucide-react';
 import { useCategoryStore } from '../../../store/categoryStore';
-import { applyDefaultAfterCategoryChange } from '../../../store/templateApply';
 import { categoryLabel } from '../../../lib/categories';
 import { EditPropertyRow, MediaPropertyRow, PropertySelect } from './EditProperties';
 
@@ -16,12 +15,10 @@ interface Patch {
 
 /**
  * Kategorie, Icon und Titelbild im Bearbeiten — was Wiki und Operationen
- * gleich tragen, unter dem Typ im Abschnitt „Eigenschaften". Nach einem
- * Kategoriewechsel greift der Standard der neuen Kategorie
- * (`applyDefaultAfterCategoryChange`).
+ * gleich tragen, unter dem Typ im Abschnitt „Eigenschaften". Ein
+ * Kategoriewechsel lässt den Inhalt, wie er ist.
  */
-export default function CategoryIconCoverRows({ entryType, entry, update }: {
-  entryType: 'wiki' | 'operation';
+export default function CategoryIconCoverRows({ entry, update }: {
   entry: { id: string; category_id: string | null; icon?: string; cover_image?: string };
   update: (patch: Patch) => Promise<void>;
 }) {
@@ -32,9 +29,7 @@ export default function CategoryIconCoverRows({ entryType, entry, update }: {
 
   const changeCategory = (next: string) => {
     const categoryId = next === NO_CATEGORY ? null : next;
-    const previous = entry.category_id;
     void update({ category_id: categoryId })
-      .then(() => applyDefaultAfterCategoryChange(entryType, entry.id, previous, categoryId))
       .catch((e: unknown) => console.error('[CategoryIconCoverRows] category change failed:', e));
   };
 

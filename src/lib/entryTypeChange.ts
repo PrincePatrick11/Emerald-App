@@ -11,10 +11,8 @@
  * Kategorie, Icon und Titelbild wandern zwischen Wiki und Operation mit — das
  * Journal kennt keine davon, sie fallen dort weg (die Seitenleiste fragt vorher).
  *
- * Vorlagen nach derselben Regel wie beim Kategoriewechsel
- * (`defaultTemplateSwap`): ist der Inhalt leer oder steht noch unverändert der
- * Standard des alten Typs drin, kommt der Standard des neuen — mit dem Hinweis
- * „Vorlage angewendet" samt Rückgängig im Blockstapel.
+ * Der Inhalt bleibt, wie er ist: ein Standard greift nur beim Anlegen. Die
+ * Vorlagen des neuen Typs stehen danach zum Einsetzen von Hand bereit.
  *
  * Ohne Transaktion (siehe `normalizeSchema.ts`), deshalb in dieser
  * Reihenfolge: erst die neue Zeile, dann die Verweise, zuletzt die alte Zeile
@@ -33,19 +31,14 @@ import { getMoonPhase } from './moonPhase';
 import { serialKey, serialized } from './serialize';
 import { viewTypeForEntryType } from './modules';
 import { remapDefinitionDefaults } from './blocks/definitions';
-import { parseBlocks, serializeBlocks } from './blocks/blockHtml';
-import {
-  defaultTemplateSwap, fieldsWithoutTemplate, fieldsWithTemplate, instantiateTemplateBlocks, UNTITLED_TITLES,
-  type TemplateEntryType,
-} from './blocks/templates';
+import { UNTITLED_TITLES, type TemplateEntryType } from './blocks/templates';
 import { useJournalStore } from '../store/journalStore';
 import { uniqueSlugify, useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { useTaskStore } from '../store/taskStore';
-import { useTemplateNoticeStore, useTemplateStore } from '../store/templateStore';
+import { useTemplateStore } from '../store/templateStore';
 import { useBlockDefinitionStore } from '../store/blockDefinitionStore';
 import { useUIStore } from '../store/uiStore';
-import { withUsableTags } from './templateTags';
 import type { JournalEntry, Operation, WikiArticle } from '../types';
 
 /** Die Typen, zwischen denen ein Eintrag wechseln kann — die Module mit Blockstapel. */
@@ -187,7 +180,7 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
     if (!source) return;
     const db = await getDb();
 
-    let core: EntryCore = {
+    const core: EntryCore = {
       ...source,
       // Ein unbenannter Eintrag heißt danach wie ein unbenannter des neuen Typs.
       title: source.title === UNTITLED_TITLES[from] ? UNTITLED_TITLES[to] : source.title,
@@ -195,25 +188,6 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
       content: retypeInternalLinks(source.content, id, to),
       ...(to === 'journal' ? { category_id: null, icon: undefined, cover_image: undefined } : {}),
     };
-    const swap = defaultTemplateSwap(
-      useTemplateStore.getState().templates,
-      parseBlocks(source.content),
-      { entryType: from, categoryId: source.category_id },
-      { entryType: to, categoryId: core.category_id },
-    );
-    if (swap) {
-      // Wie `BlockStack.applyTemplate` mit `replaces`: erst Titel und Tags der
-      // abgelösten Vorlage weg, dann die der neuen.
-      const cleared = swap.replaces ? fieldsWithoutTemplate(core, to, swap.replaces) : core;
-      core = {
-        ...core,
-        ...fieldsWithTemplate(
-          cleared, to, withUsableTags(swap.template),
-          { title: 'ifUntitled', tags: true, replaces: swap.replaces },
-        ),
-        content: serializeBlocks(instantiateTemplateBlocks(swap.template)),
-      };
-    }
     const converted = await insertAs(db, to, core);
 
     const journalContent = await retypeContentColumn(db, 'journal_entries', id, to);
@@ -250,7 +224,6 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
       case 'wiki': useWikiStore.setState((s) => ({ articles: [...s.articles, converted.entry] })); break;
       case 'operation': useOperationStore.setState((s) => ({ operations: [converted.entry, ...s.operations] })); break;
     }
-    if (swap) useTemplateNoticeStore.getState().show({ entryId: id, templateId: swap.template.id });
     useUIStore.getState().retypeEntryViews(id, viewTypeForEntryType(from), viewTypeForEntryType(to));
     useJournalStore.setState((s) => ({ entries: withContent(s.entries, journalContent).filter((e) => from !== 'journal' || e.id !== id) }));
     useWikiStore.setState((s) => ({ articles: withContent(s.articles, wikiContent).filter((a) => from !== 'wiki' || a.id !== id) }));

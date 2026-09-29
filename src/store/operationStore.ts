@@ -51,7 +51,8 @@ export const useOperationStore = create<OperationState>((set, get) => ({
   createOperation: async (categoryId = null, { blank = false } = {}) => {
     const db = await getDb();
     const now = nowIso();
-    // Die Kategorie „Sigillen" beginnt so mit Rechner, Zeichnung und Ladung (Vorlage `core-sigil`).
+    // Die Kategorie „Sigillen" beginnt so mit Rechner, Zeichnung und Ladung (Vorlage `core-sigil`) —
+    // sofern der Vault Standards von selbst einsetzt.
     const start = startOfNewEntry('operation', categoryId, UNTITLED_TITLES.operation, blank);
     const op: Operation = {
       entry_number: await nextEntryNumber(db, 'operations'),

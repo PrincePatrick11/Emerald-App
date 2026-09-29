@@ -34,7 +34,7 @@ src/
 │   │   ├── settings/ SettingsModal (two-pane shell: vertical nav + scrolling content pane,
 │   │   │             fixed `w-[680px]`/`h-[600px]` so switching pages never resizes the
 │   │   │             card), one component per page — GeneralPage, SidebarPage, EntriesPage
-│   │   │             (composing EmojiDefaultsSection/ImageLimitsSection/TagRulesSection),
+│   │   │             (composing EmojiDefaultsSection/ImageLimitsSection/TagRulesSection/TemplateDefaultSection),
 │   │   │             BackupPage, StoragePage, UpdatesPage (check/install, the update-source
 │   │   │             field — the only settings page that is not per vault, see Vault Settings
 │   │   │             below), AboutPage — plus SettingsSection/
@@ -369,12 +369,8 @@ Operation keep category, icon and cover image across the move; converting either
 drops them, and `typeChangeDropsProperties` tells the field to ask first via `InlineConfirm`
 when any of the three is actually set.
 
-The move also runs the same defaulting rule a category change uses (see
-[Templates](#templates)): `defaultTemplateSwap` — pulled out of `templateApply.ts` into
-`lib/blocks/templates.ts` as `defaultTemplateSwap`/`fieldsWithTemplate`/`fieldsWithoutTemplate`
-so both call sites share it — swaps in the new combination's default template when the content
-is empty or still exactly the old combination's unchanged default, and the same "template
-applied" notice (Undo / "Other template") appears. Once the row exists under the new type,
+The move leaves the content alone: a default template applies when an entry is created, never
+afterwards (see [Templates](#templates)). Once the row exists under the new type,
 `uiStore.retypeEntryViews(id, from, to)` rewrites every tab's `view`, every tab's history, and
 the tabless history in one `set()` — no open tab is ever left pointing at a type/id pair that
 briefly doesn't exist, since the new row is written and the stores swapped before the old row's
@@ -838,7 +834,7 @@ open or has an unsaved draft the same way they skip an entry mid-edit (`CopyRunR
 
 **Defaulting on create.** `startOfNewEntry(entryType, categoryId, fallbackTitle, blank)` resolves
 the default for the combination (unless `blank`, used by imports and duplicates, which always
-overwrite content anyway) and returns `{ title, content, tags, templateId }` via `templateStart`;
+overwrite content anyway, or unless the vault's `templates.applyDefault` setting is off) and returns `{ title, content, tags, templateId }` via `templateStart`;
 the three content stores' `create*` actions call it instead of starting from an empty string.
 Applying a default this way — rather than the old `defaultBlocksFor`/`lib/blocks/layouts.ts`,
 which is gone — is also how the built-in Sigils layout now works: `core-sigil`
@@ -846,18 +842,14 @@ which is gone — is also how the built-in Sigils layout now works: `core-sigil`
 Operations × Sigils, not a hard-wired category special case. `useTemplateNoticeStore` holds the
 one "template applied" notice a freshly created entry shows (Undo / "Other template") —
 store-level because the content stores set it on create and may not import a component.
-Changing an *existing*, still-empty entry's category re-resolves the default for the new
-combination: `isContentEmpty`/`areBlocksEmpty` decide "still empty" (no blocks, or only empty
-plain-text ones with no template origin), and `isUnchangedTemplateContent` decides whether the
-current content is still exactly what the *previous* default would produce — if so, a changed
-category swaps it for the new default instead of leaving the old one stranded; content the user
-touched, or that a since-edited template would no longer reproduce, is left alone. This rule is
-now factored out of `templateApply.ts` as `defaultTemplateSwap`/`fieldsWithTemplate`/
-`fieldsWithoutTemplate`/`mayTakeTemplateTitle` (`lib/blocks/templates.ts`, pure — no store
-reads), since `entryTypeChange.ts`'s type change needed the same swap for a change of
-*`entryType`*, not just category (see [Edit Mode Architecture](#edit-mode-architecture) above);
-`templateApply.ts`'s `applyDefaultAfterCategoryChange` is now a thin wrapper around
-`defaultTemplateSwap` over one `TemplateCombination`, the category held fixed.
+Creation is the only moment a default applies by itself. Changing an existing entry's category
+or type never touches its content — the swap that used to run there (`defaultTemplateSwap`,
+`isUnchangedTemplateContent`, `applyDefaultAfterCategoryChange`) is gone, along with its
+condition that the content still match the *current* version of the previous default, which
+editing a default template silently switched off for every older entry. What "Other template"
+still needs to take a replaced template's title and tags back lives in
+`fieldsWithTemplate`/`fieldsWithoutTemplate`/`mayTakeTemplateTitle` (`lib/blocks/templates.ts`,
+pure — no store reads).
 
 **Manual insertion, from the editor.** `TemplateInsertion` (blocks sidebar) offers
 `TemplatePickerModal` (search over name/description, ordered by `templatesFor` — assigned to
@@ -1463,7 +1455,7 @@ This means the editor font controls the TipTap editor body, entry titles in all 
 
 Settings moved from app-wide `localStorage`/`uiStore` state to a **per-vault** `settings.json` this cycle. The model, the storage round-trip, and the migration off the old app-wide values are documented in full in [`database.md` → Multi-Vault System](database.md#multi-vault-system) (on-disk shape, backup format) and [`components.md`](components.md) (`lib/vaultSettings.ts`, `store/settingsStore.ts` catalogue entries) — summarized here for where it fits in the app's data flow:
 
-- **`lib/vaultSettings.ts`** defines `VaultSettings` as six independent groups (`appearance`, `trash`, `leftList`, `emojis`, `images`, `tags`) and `normalizeVaultSettings()`, the one function that turns arbitrary JSON (a file on disk, a backup import) into a value every reader can trust — unknown keys are kept (so a newer build's settings survive a detour through an older one), invalid ones fall back to their default.
+- **`lib/vaultSettings.ts`** defines `VaultSettings` as seven independent groups (`appearance`, `trash`, `leftList`, `emojis`, `images`, `tags`, `templates`) and `normalizeVaultSettings()`, the one function that turns arbitrary JSON (a file on disk, a backup import) into a value every reader can trust — unknown keys are kept (so a newer build's settings survive a detour through an older one), invalid ones fall back to their default.
 - **`store/settingsStore.ts`** holds the open vault's settings and is the only writer of `settings.json`. `loadForVault(vaultId)` runs **before** `getDb()` opens the database — migration v39 needs the language the appearance settings (and, before them, the `localStorage` boot mirror) will carry, so the settings load has to win that race. `clear()` resets to defaults whenever no vault is open (first-run setup, every vault removed). Writes are serialized through `lib/serialize.ts` so an update fired while an earlier write is still in flight can't land out of order.
 - **Rust side**: `read_vault_settings`/`write_vault_settings` in `src-tauri/src/vault.rs` move the file's *text* only — the frontend owns the JSON shape entirely. See [`security.md`](security.md) for the write's atomicity (temp file + rename) and symlink handling.
 - **The `localStorage` boot mirror** (`APPEARANCE_MIRROR_KEYS` in `vaultSettings.ts`: `app-language`, `theme-id`, `ui-font-id`, `editor-font-id`, `ui-scale`, `editor-font-size`) still exists and is still what `index.html`'s inline boot script and `main.tsx` read before any vault is open — but it is a starting point now, written *by* `applyAppearance()` as a side effect, not the source of truth once a vault has loaded its own settings.

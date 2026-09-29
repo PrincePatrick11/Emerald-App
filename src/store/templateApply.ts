@@ -2,9 +2,8 @@
  * Eine Vorlage in einen bestehenden Eintrag bringen — was dafür außerhalb des
  * Blockstapels geschieht: Titel und Tags über den Store des Eintrags (wie die
  * Eigenschaften-Seitenleiste im Bearbeiten, die Views übernehmen den Stand
- * über ihre Sync-Effekte), der Standard nach einer nachträglich gesetzten
- * Kategorie und „Als Vorlage speichern". Die Blöcke setzt der Stapel selbst
- * (`BlockStackApi.applyTemplate`) — er hält den lebenden Inhalt.
+ * über ihre Sync-Effekte) und „Als Vorlage speichern". Die Blöcke setzt der Stapel selbst
+ * (`applyTemplate` im `BlockStack`) — er hält den lebenden Inhalt.
  *
  * Import-Regel wie `blockCopies`: dieser Store liest die Inhalts-Stores und
  * den Vorlagen-Store, keiner von ihnen importiert zurück.
@@ -17,7 +16,7 @@ import { useBlockSessionStore } from './blockSessionStore';
 import { withUsableTags } from '../lib/templateTags';
 import { serializeBlocks } from '../lib/blocks/blockHtml';
 import {
-  contentForTemplate, defaultTemplateSwap, fieldsWithoutTemplate, fieldsWithTemplate,
+  contentForTemplate, fieldsWithoutTemplate, fieldsWithTemplate,
   type Template, type TemplateEntryType, type TemplateFields,
 } from '../lib/blocks/templates';
 
@@ -37,7 +36,7 @@ export interface TemplateFieldOptions {
 export interface TemplateApplyOptions extends TemplateFieldOptions {
   /** Anhängen ans Ende oder den ganzen Inhalt ersetzen. Ein leerer Stapel wird immer ersetzt. */
   mode: 'append' | 'replace';
-  /** Die Vorlage, die sie ablöst („Andere Vorlage", Kategoriewechsel) — ihre Tags fallen vorher weg. */
+  /** Die Vorlage, die sie ablöst („Andere Vorlage") — ihre Tags fallen vorher weg. */
   replaces?: Template;
   /** Danach den Hinweis „Vorlage angewendet" zeigen (automatisch eingesetzt). */
   notice?: boolean;
@@ -98,30 +97,6 @@ export async function undoTemplateFields(
   const fields = entryFields(entryType, id);
   if (!fields) return;
   await writeChangedFields(entryType, id, fields, fieldsWithoutTemplate(fields, entryType, template));
-}
-
-/**
- * Nach einer nachträglich gesetzten Kategorie: den Standard der neuen
- * Kombination einsetzen, wenn `defaultTemplateSwap` es erlaubt. Nur, solange
- * der Eintrag im Bearbeiten offen ist: dann hält sein Stapel den lebenden
- * Inhalt. Den Typwechsel erledigt `lib/entryTypeChange.ts` nach derselben Regel.
- */
-export function applyDefaultAfterCategoryChange(
-  entryType: TemplateEntryType,
-  id: string,
-  previousCategoryId: string | null,
-  categoryId: string | null,
-): void {
-  const session = useBlockSessionStore.getState().session;
-  if (!session || session.entryId !== id || !session.isEditing || !session.templates) return;
-  const swap = defaultTemplateSwap(
-    useTemplateStore.getState().templates,
-    session.api.liveBlocks(),
-    { entryType, categoryId: previousCategoryId },
-    { entryType, categoryId },
-  );
-  if (!swap) return;
-  session.api.applyTemplate(swap.template, { mode: 'replace', title: 'ifUntitled', tags: true, replaces: swap.replaces, notice: true });
 }
 
 /**

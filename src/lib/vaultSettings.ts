@@ -74,6 +74,13 @@ export interface TagSettings {
   createInline: boolean;
 }
 
+export interface TemplateSettings {
+  /** Ob ein neuer Eintrag mit dem Standard seiner Art und Kategorie beginnt.
+   *  Aus: er beginnt leer und bietet die passenden Vorlagen zur Wahl an. Von
+   *  Hand einsetzen geht immer; ein Kategorie- oder Typwechsel setzt nie ein. */
+  applyDefault: boolean;
+}
+
 export interface VaultSettings {
   /** Nicht gelesen, wie `version` in `vaults.json`: erst eine Form, die eine
    *  Umrechnung braucht, zählt ihn hoch. Eine höhere Zahl aus einem neueren
@@ -86,13 +93,14 @@ export interface VaultSettings {
   emojis: EmojiSettings;
   images: ImageSettings;
   tags: TagSettings;
+  templates: TemplateSettings;
 }
 
 export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
 
 /** Jede Gruppe genau einmal — der Record erzwingt, dass eine neue nicht fehlt. */
 const GROUP_SET: Record<SettingsGroup, true> = {
-  appearance: true, trash: true, leftList: true, emojis: true, images: true, tags: true,
+  appearance: true, trash: true, leftList: true, emojis: true, images: true, tags: true, templates: true,
 };
 export const SETTINGS_GROUPS = Object.keys(GROUP_SET) as SettingsGroup[];
 
@@ -122,6 +130,9 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
   },
   tags: {
     createInline: true,
+  },
+  templates: {
+    applyDefault: true,
   },
 };
 
@@ -169,6 +180,7 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const emojis = asRecord(root.emojis);
   const images = asRecord(root.images);
   const tags = asRecord(root.tags);
+  const templates = asRecord(root.templates);
   const version = typeof root.version === 'number' && Number.isInteger(root.version) && root.version > 1
     ? root.version
     : 1;
@@ -205,6 +217,10 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
     tags: {
       ...tags,
       createInline: typeof tags.createInline === 'boolean' ? tags.createInline : DEFAULT_VAULT_SETTINGS.tags.createInline,
+    },
+    templates: {
+      ...templates,
+      applyDefault: typeof templates.applyDefault === 'boolean' ? templates.applyDefault : DEFAULT_VAULT_SETTINGS.templates.applyDefault,
     },
   };
 }

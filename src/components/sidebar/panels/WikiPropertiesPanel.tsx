@@ -34,7 +34,7 @@ export default function WikiPropertiesPanel() {
     <>
       <PropertiesSection>
         <EntryTypeField id={article.id} type="wiki" properties={article} />
-        <CategoryIconCoverRows entryType="wiki" entry={article} update={(patch) => updateArticle(article.id, patch)} />
+        <CategoryIconCoverRows entry={article} update={(patch) => updateArticle(article.id, patch)} />
       </PropertiesSection>
       <LinkedEntriesField content={article.content} />
       <TagsField tags={article.tags ?? []} onChange={(tags) => updateArticle(article.id, { tags })} />
