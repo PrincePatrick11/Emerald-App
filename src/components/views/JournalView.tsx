@@ -19,7 +19,6 @@ import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId } from '../../lib/helpers';
 import { MODULES } from '../../lib/modules';
-import { discardNewEntry } from '../../lib/discardNewEntry';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
@@ -33,8 +32,8 @@ export default function JournalView() {
   const { activeView, setActiveView, journalPrefs, setJournalPrefs } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, journalPrefs: s.journalPrefs, setJournalPrefs: s.setJournalPrefs }))
   );
-  const { entries, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry, permanentlyDeleteEntry, getEntry } = useJournalStore(
-    useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, permanentlyDeleteEntry: s.permanentlyDeleteEntry, getEntry: s.getEntry }))
+  const { entries, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useJournalStore(
+    useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
   );
   const pushUndo = useUndoStore((s) => s.push);
 
@@ -54,17 +53,22 @@ export default function JournalView() {
   const [loadedEntryId, setLoadedEntryId] = useState<string | null>(null);
 
   // Cancel verwirft die ungespeicherten letzten Sekunden, indem der Editor
-  // ueber den Key frisch vom letzten gespeicherten Stand mountet.
+  // ueber den Key frisch vom wiederhergestellten Stand mountet.
   const [editorEpoch, setEditorEpoch] = useState(0);
+
+  const fieldsOf = (e: NonNullable<typeof entry>) => ({ title: e.title, content: e.content, tags: e.tags ?? [] });
 
   const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
     entityId: entry?.id,
     isEditing,
     ready: !!entry && loadedEntryId === entry.id,
+    // Auch, was Cancel wiederherstellt: der Eintrag, wie er beim Betreten des
+    // Bearbeitens war — samt den Tags, die die Seitenleiste inzwischen gespeichert hat.
     buildPatch: (content) => ({ title, content, tags }),
-    // Tags gehören dem Properties-Panel (sofort gespeichert) — Cancel setzt
-    // nur zurück, was der Editor selbst besitzt.
-    buildRestorePatch: (content) => ({ title, content }),
+    readStored: () => {
+      const stored = entry && getEntry(entry.id);
+      return stored ? fieldsOf(stored) : null;
+    },
     update: updateEntry,
   });
 
@@ -129,21 +133,18 @@ export default function JournalView() {
   };
 
   const handleCancel = async () => {
+    // Ein nie mit „Fertig" bestätigter Eintrag geht, wie jeder gelöschte, in den Papierkorb.
+    if (activeView.isNew && entry) return handleDelete();
     cancelAutoSave();
-    if (activeView.isNew && entry) {
-      await discardNewEntry(entry.id, deleteEntry, permanentlyDeleteEntry);
-      setActiveView({ type: 'journal' });
-      return;
-    }
     if (entry) {
       // Nicht auf den Store-Stand zurück — nach dem ersten Debounce-Autosave
-      // IST der Store der editierte Stand. restoreOnCancel schreibt die beim
-      // Betreten des Edit-Modus gemerkten Editor-Felder zurück; die Setter
+      // IST der Store der editierte Stand. restoreOnCancel schreibt den beim
+      // Betreten des Edit-Modus gemerkten Stand des Eintrags zurück; die Setter
       // hier fangen den Fall vor dem ersten Autosave ab (Store unverändert,
-      // Sync-Effekte laufen nicht). Panel-Felder (Tags) bleiben Store-Wahrheit.
-      const from = (await restoreOnCancel()) ?? { title: entry.title, content: entry.content };
+      // Sync-Effekte laufen nicht).
+      const from = (await restoreOnCancel()) ?? fieldsOf(entry);
       setTitle(from.title);
-      setTags(entry.tags ?? []);
+      setTags(from.tags);
       contentRef.current = from.content;
       setEditorEpoch((e) => e + 1);
     }
@@ -152,7 +153,8 @@ export default function JournalView() {
 
   const handleDelete = async () => {
     if (!entry) return;
-    cancelAutoSave();
+    // Erst schreiben, was noch aufgeschoben ist: im Papierkorb liegt der letzte Stand.
+    await flushAutoSave().catch(console.error);
     const id = entry.id;
     await deleteEntry(id);
     pushUndo({ id: generateId(), description: t('undo.entryDeleted'), undo: () => restoreEntry(id) });

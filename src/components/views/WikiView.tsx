@@ -11,7 +11,6 @@ import DashboardItem from '../ui/DashboardItem';
 import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
-import { discardNewEntry } from '../../lib/discardNewEntry';
 import { MODULES } from '../../lib/modules';
 import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
 import { formatEntryDate } from '../../lib/formatDate';
@@ -36,8 +35,8 @@ export default function WikiView() {
   );
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { articles, createArticle, duplicateArticle, updateArticle, deleteArticle, restoreArticle, permanentlyDeleteArticle, getArticle } = useWikiStore(
-    useShallow((s) => ({ articles: s.articles, createArticle: s.createArticle, duplicateArticle: s.duplicateArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle, permanentlyDeleteArticle: s.permanentlyDeleteArticle, getArticle: s.getArticle }))
+  const { articles, createArticle, duplicateArticle, updateArticle, deleteArticle, restoreArticle, getArticle } = useWikiStore(
+    useShallow((s) => ({ articles: s.articles, createArticle: s.createArticle, duplicateArticle: s.duplicateArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle, getArticle: s.getArticle }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
@@ -60,17 +59,30 @@ export default function WikiView() {
 
   const [editorEpoch, setEditorEpoch] = useState(0);
 
+  const fieldsOf = (a: NonNullable<typeof article>) => ({
+    title: a.title, content: a.content, tags: a.tags ?? [],
+    category_id: a.category_id ?? null, icon: a.icon, cover_image: a.cover_image,
+  });
+
   const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
     entityId: article?.id,
     isEditing,
     ready: !!article && loadedArticleId === article.id,
     // Kategorie, Cover und Icon gehören dem Properties-Panel (sofort
     // gespeichert) und stehen deshalb nicht im Patch: ein Autosave direkt nach
-    // einer Panel-Änderung (etwa die Standardvorlage der neuen Kategorie)
-    // schriebe sonst den lokalen Stand zurück, bevor der Sync-Effekt lief.
+    // einer Panel-Änderung schriebe sonst den lokalen Stand zurück, bevor der
+    // Sync-Effekt lief.
     buildPatch: (content) => ({ title, content, tags }),
-    // Cancel setzt nur zurück, was der Editor selbst besitzt.
-    buildRestorePatch: (content) => ({ title, content }),
+    // Cancel stellt den Artikel her, wie er beim Betreten des Bearbeitens war —
+    // auch, was die Seitenleiste inzwischen gespeichert hat.
+    buildRestorePatch: (content) => ({
+      title, content, tags,
+      category_id: article?.category_id ?? null, icon: article?.icon, cover_image: article?.cover_image,
+    }),
+    readStored: () => {
+      const stored = article && getArticle(article.id);
+      return stored ? fieldsOf(stored) : null;
+    },
     update: updateArticle,
   });
 
@@ -108,22 +120,19 @@ export default function WikiView() {
   };
 
   const handleCancel = async () => {
+    // Ein nie mit „Fertig" bestätigter Artikel geht, wie jeder gelöschte, in den Papierkorb.
+    if (activeView.isNew && article) return handleDelete();
     cancelAutoSave();
-    if (activeView.isNew && article) {
-      await discardNewEntry(article.id, deleteArticle, permanentlyDeleteArticle);
-      setActiveView({ type: 'wiki' });
-      return;
-    }
     if (article) {
       // Nicht auf den Store-Stand zurück — nach dem ersten Debounce-Autosave
-      // IST der Store der editierte Stand. restoreOnCancel schreibt die beim
-      // Betreten des Edit-Modus gemerkten Editor-Felder zurück; die Setter
+      // IST der Store der editierte Stand. restoreOnCancel schreibt den beim
+      // Betreten des Edit-Modus gemerkten Stand des Artikels zurück; die Setter
       // hier fangen den Fall vor dem ersten Autosave ab (Store unverändert,
-      // Sync-Effekte laufen nicht). Panel-Felder bleiben Store-Wahrheit.
-      const from = (await restoreOnCancel()) ?? { title: article.title, content: article.content };
+      // Sync-Effekte laufen nicht).
+      const from = (await restoreOnCancel()) ?? fieldsOf(article);
       setTitle(from.title);
-      setTags(article.tags ?? []);
-      setCoverImage(article.cover_image ?? null);
+      setTags(from.tags);
+      setCoverImage(from.cover_image ?? null);
       contentRef.current = from.content;
       setEditorEpoch((e) => e + 1);
     }
@@ -132,7 +141,8 @@ export default function WikiView() {
 
   const handleDelete = async () => {
     if (!article) return;
-    cancelAutoSave();
+    // Erst schreiben, was noch aufgeschoben ist: im Papierkorb liegt der letzte Stand.
+    await flushAutoSave().catch(console.error);
     const id = article.id;
     await deleteArticle(id);
     pushUndo({ id: generateId(), description: t('undo.articleDeleted'), undo: () => restoreArticle(id) });

@@ -26,13 +26,20 @@ interface UseEntryEditorOptions<TPatch, TRestore = TPatch> {
   /** Erhält den aktuellen Editor-Inhalt (den Content-Mirror-Ref des Hooks) als Argument. */
   buildPatch: (content: string) => TPatch;
   /**
-   * Was Cancel zurücksetzt — nur die Felder, die der Editor selbst besitzt
-   * (Titel, Inhalt). Alles, was das Properties-Panel während des Editierens
-   * direkt speichert (Kategorie, Tags, Status …), gehört NICHT hinein: das
-   * ist bereits gewollt persistiert und darf ein Cancel nicht zurückdrehen.
-   * Default: buildPatch — nur für Aufrufer ohne Panel-Felder sinnvoll.
+   * Was Cancel zurücksetzt — der ganze Eintrag, wie er beim Betreten des
+   * Bearbeitens war: Titel und Inhalt, dazu alles, was die Seitenleiste
+   * während des Bearbeitens direkt speichert (Tags, Kategorie, Icon,
+   * Titelbild). Mehr als `buildPatch`, weil der Autosave diese Felder nicht
+   * anfasst. Default: buildPatch.
    */
   buildRestorePatch?: (content: string) => TRestore;
+  /**
+   * Der gespeicherte Stand des Eintrags, in der Form von `buildRestorePatch` —
+   * woran Cancel misst, ob es zurückschreiben muss. Ohne ihn zählt der lokale
+   * Stand, und der täuscht: getippt, vom Autosave geschrieben, zurückgetippt
+   * und gleich abgebrochen sähe aus wie unverändert.
+   */
+  readStored?: () => TRestore | null;
   update: (id: string, patch: TPatch | TRestore) => Promise<void>;
   debounceMs?: number;
 }
@@ -43,6 +50,7 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
   ready,
   buildPatch,
   buildRestorePatch,
+  readStored,
   update,
   debounceMs = 1500,
 }: UseEntryEditorOptions<TPatch, TRestore>) {
@@ -50,6 +58,8 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
   buildPatchRef.current = buildPatch;
   const buildRestorePatchRef = useRef(buildRestorePatch);
   buildRestorePatchRef.current = buildRestorePatch;
+  const readStoredRef = useRef(readStored);
+  readStoredRef.current = readStored;
   const updateRef = useRef(update);
   updateRef.current = update;
   const isEditingRef = useRef(isEditing);
@@ -97,7 +107,7 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
     triggerAutoSave();
   }, [triggerAutoSave]);
 
-  // Der Editor-Stand beim Betreten des Edit-Modus. Cancel kann sich nicht auf
+  // Der Stand des Eintrags beim Betreten des Edit-Modus. Cancel kann sich nicht auf
   // den Store verlassen — nach dem ersten Debounce-Autosave IST der Store
   // bereits der editierte Stand, ein "Zurücksetzen" darauf wäre ein No-op.
   // Beim Einstieg spiegelt der lokale State noch exakt das Gespeicherte, der
@@ -118,9 +128,9 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
   }, [isEditing, ready, entityId]);
 
   /**
-   * Der Cancel-Pfad: entschärft den Timer und schreibt den Einstiegs-Stand der
-   * Editor-Felder zurück in Store und DB (Schreibzugriff nur, wenn sich etwas
-   * geändert hat — kein updated_at-Bump für ein folgenloses Cancel). Gibt die
+   * Der Cancel-Pfad: entschärft den Timer und schreibt den Einstiegs-Stand des
+   * Eintrags zurück in Store und DB (Schreibzugriff nur, wenn der gespeicherte
+   * Stand davon abweicht — kein updated_at-Bump für ein folgenloses Cancel). Gibt die
    * Baseline zurück, damit die View ihren lokalen State daraus setzt; null nur,
    * wenn es keine Baseline gab oder der Schreibzugriff scheiterte — dann fällt
    * die View auf den Store-Stand zurück und verlässt den Edit-Modus trotzdem.
@@ -129,8 +139,8 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
     cancelAutoSave();
     const baseline = baselineRef.current;
     if (!baseline) return null;
-    const current = restoreFields(contentRef.current);
-    if (JSON.stringify(current) !== JSON.stringify(baseline.patch)) {
+    const stored = readStoredRef.current?.() ?? restoreFields(contentRef.current);
+    if (JSON.stringify(stored) !== JSON.stringify(baseline.patch)) {
       try {
         await updateRef.current(baseline.id, baseline.patch);
       } catch (e) {
@@ -172,7 +182,11 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
     }
   }, [entityId, isEditing, ready, cancelAutoSave]);
 
-  // Speichern beim Unmount (Tab schliessen, Modulwechsel).
+  // Speichern beim Unmount (Tab schliessen, Modulwechsel). Nach einem Löschen
+  // (auch: Cancel auf einem neuen Eintrag) trifft dieser Save und der beim
+  // Wegnavigieren oben einen Eintrag im Papierkorb — dass er ihn nicht
+  // überschreibt, liegt allein am `if (!entry) return` der update-Funktionen
+  // in den Stores. Wer den entfernt, bricht diesen Pfad.
   useEffect(() => {
     return () => {
       cancelAutoSave();

@@ -319,28 +319,33 @@ before a view is written into any history — `normalizeSavedTab` uses it when r
 from localStorage, and `pushHistory`/`normalizeSavedHistory` use it whenever a view is pushed
 onto a tab's own back/forward history (see [Navigation History](#navigation-history) below) —
 all for the same reason, so that returning to the entry later (a restart, or Back) can never
-make Cancel treat an entry that has lived past its creation session as still-discardable. When Cancel fires on a still-`isNew` entry, `discardNewEntry`
-(`src/lib/discardNewEntry.ts`) soft-deletes then immediately hard-deletes it — no trash, no
-undo, since from the user's perspective the entry was never created. Altar has no soft-delete
-of its own, so `AltarView`'s Cancel path calls `deleteAltar` directly instead of going through
-this helper.
+make Cancel treat an entry that has lived past its creation session as still-discardable. When Cancel fires on a still-`isNew` entry, Journal, Wiki and Operations run their own Delete
+handler: the entry goes to Trash with the usual undo toast, the same as any deleted entry —
+whatever was typed into it is never lost outright. Altar has no soft-delete of its own yet,
+so `AltarView`'s Cancel path still calls `deleteAltar` directly.
 
 For an entry that *was* confirmed before, Cancel cannot simply restore "the store's current
 state" — Journal, Wiki, and Operations all autosave the title/body a short
 debounce after typing stops, so by the time Cancel is pressed the store already holds the
 edited values. `useEntryEditor` (`src/hooks/useEntryEditor.ts`) instead captures a baseline of
-the editor-owned fields (`buildRestorePatch`, defaulting to `buildPatch` — Journal/Wiki/
-Operations pass `{title, content}`) the moment edit mode is entered, and `restoreOnCancel()`
+the whole entry (`buildRestorePatch` — title, content and tags for Journal; Wiki and Operations
+add category, icon and cover image) the moment edit mode is entered, and `restoreOnCancel()`
 writes that baseline back on Cancel (skipping the write if nothing changed, so a no-op Cancel
-doesn't bump `updated_at`). Deliberately out of scope: Properties-panel fields (category, tags,
-cover, icon) save directly to the store as they're changed and are never part of the baseline
-(an operation's status, end date and version are a block in `content` since v41, so Cancel does
-revert them) — Cancel must not undo something the panel already committed.
-Sigils need no variant of their own any more: since v42 they are blocks in `content`, so the
-same `{title, content}` baseline covers intention, letters, drawing and charge.
-The type toggle below is the same kind of out-of-scope commit: it writes through
-`changeEntryType` the moment it's picked, not through the baseline, so Cancel afterwards
-reverts title/content but leaves the entry under its new type.
+doesn't bump `updated_at`). The baseline is wider than `buildPatch` on purpose: the
+Properties panel saves its fields straight to the store, so the autosave never carries them,
+but Cancel takes them back along with the text — one rule, "Cancel restores the entry as it
+was when editing began". The one thing Cancel does not undo is a change of type: that moves
+the entry into another module, where editing continues with a fresh baseline.
+Sigils need no variant of their own: since v42 they are blocks in `content`, so the
+same baseline covers intention, letters, drawing and charge.
+The type toggle below is the one thing outside the baseline: it writes through
+`changeEntryType` the moment it's picked, the new module's view mounts in edit mode and
+captures a fresh baseline, so Cancel afterwards goes back to how the entry looked right after
+the move and leaves it under its new type.
+
+The baseline lives as long as the view holds the entry in edit mode. Leaving it mid-edit —
+another tab, another module, Back, a restart — saves what was typed, and coming back starts a
+new baseline from that saved state; Cancel then goes back to that point, not further.
 
 ### Changing an entry's type
 
@@ -1029,7 +1034,7 @@ that compared `editor.getHTML()` against the prop on every render (a second
 full-document serialisation per keystroke) is gone. Switching entries remounts
 the stack via its `key` (`` `${id}:${editorEpoch}` ``), and Cancel bumps
 `editorEpoch` to remount from the last saved content. Since the whole block
-stack serialises into that one `content` string, Cancel's `{title, content}`
+stack serialises into that one `content` string, Cancel's
 baseline reverts every block change of the session — sigil blocks included, since v42.
 
 Two guards protect these save paths: `ready` (the view's `loadedEntryId`

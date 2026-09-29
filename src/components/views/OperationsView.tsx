@@ -10,7 +10,6 @@ import DashboardItem from '../ui/DashboardItem';
 import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
-import { discardNewEntry } from '../../lib/discardNewEntry';
 import { MODULES } from '../../lib/modules';
 import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
 import { entryBlockSummary } from '../../lib/blocks/entrySummary';
@@ -35,8 +34,8 @@ export default function OperationsView() {
   );
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { operations, createOperation, duplicateOperation, updateOperation, deleteOperation, restoreOperation, permanentlyDeleteOperation, getOperation } = useOperationStore(
-    useShallow((s) => ({ operations: s.operations, createOperation: s.createOperation, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation, permanentlyDeleteOperation: s.permanentlyDeleteOperation, getOperation: s.getOperation }))
+  const { operations, createOperation, duplicateOperation, updateOperation, deleteOperation, restoreOperation, getOperation } = useOperationStore(
+    useShallow((s) => ({ operations: s.operations, createOperation: s.createOperation, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation, getOperation: s.getOperation }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
@@ -59,16 +58,29 @@ export default function OperationsView() {
 
   const [editorEpoch, setEditorEpoch] = useState(0);
 
+  const fieldsOf = (o: NonNullable<typeof operation>) => ({
+    title: o.title, content: o.content, tags: o.tags ?? [],
+    category_id: o.category_id ?? null, icon: o.icon, cover_image: o.cover_image,
+  });
+
   const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
     entityId: operation?.id,
     isEditing,
     ready: !!operation && loadedOperationId === operation.id,
     // Die Kategorie gehört dem Properties-Panel (sofort gespeichert) und steht
-    // deshalb nicht im Patch: ein Autosave direkt nach dem Wechsel (etwa die
-    // Standardvorlage der neuen Kategorie) schriebe sonst den alten Stand zurück.
+    // deshalb nicht im Patch: ein Autosave direkt nach dem Wechsel schriebe
+    // sonst den alten Stand zurück.
     buildPatch: (content) => ({ title, content, tags }),
-    // Cancel setzt nur zurück, was der Editor besitzt.
-    buildRestorePatch: (content) => ({ title, content }),
+    // Cancel stellt die Operation her, wie sie beim Betreten des Bearbeitens war —
+    // auch, was die Seitenleiste inzwischen gespeichert hat.
+    buildRestorePatch: (content) => ({
+      title, content, tags,
+      category_id: operation?.category_id ?? null, icon: operation?.icon, cover_image: operation?.cover_image,
+    }),
+    readStored: () => {
+      const stored = operation && getOperation(operation.id);
+      return stored ? fieldsOf(stored) : null;
+    },
     update: updateOperation,
   });
 
@@ -141,21 +153,18 @@ export default function OperationsView() {
   };
 
   const handleCancel = async () => {
+    // Eine nie mit „Fertig" bestätigte Operation geht, wie jede gelöschte, in den Papierkorb.
+    if (activeView.isNew && operation) return handleDelete();
     cancelAutoSave();
-    if (activeView.isNew && operation) {
-      await discardNewEntry(operation.id, deleteOperation, permanentlyDeleteOperation);
-      setActiveView({ type: 'operations' });
-      return;
-    }
     if (operation) {
       // Nicht auf den Store-Stand zurück — nach dem ersten Debounce-Autosave
-      // IST der Store der editierte Stand. restoreOnCancel schreibt die beim
-      // Betreten des Edit-Modus gemerkten Editor-Felder zurück; die Setter
+      // IST der Store der editierte Stand. restoreOnCancel schreibt den beim
+      // Betreten des Edit-Modus gemerkten Stand der Operation zurück; die Setter
       // hier fangen den Fall vor dem ersten Autosave ab (Store unverändert,
-      // Sync-Effekte laufen nicht). Panel-Felder bleiben Store-Wahrheit.
-      const from = (await restoreOnCancel()) ?? { title: operation.title, content: operation.content };
+      // Sync-Effekte laufen nicht).
+      const from = (await restoreOnCancel()) ?? fieldsOf(operation);
       setTitle(from.title);
-      setTags(operation.tags ?? []);
+      setTags(from.tags);
       contentRef.current = from.content;
       setEditorEpoch((e) => e + 1);
     }
@@ -164,7 +173,8 @@ export default function OperationsView() {
 
   const handleDelete = async () => {
     if (!operation) return;
-    cancelAutoSave();
+    // Erst schreiben, was noch aufgeschoben ist: im Papierkorb liegt der letzte Stand.
+    await flushAutoSave().catch(console.error);
     const id = operation.id;
     await deleteOperation(id);
     pushUndo({ id: generateId(), description: t('undo.operationDeleted'), undo: () => restoreOperation(id) });
