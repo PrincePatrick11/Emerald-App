@@ -123,6 +123,8 @@ export interface AltarRecord {
   resolution: string;
   thumbnail_data?: string | null;
   icon_data?: string | null;
+  /** Im Papierkorb seit — der Store hält nur Altäre ohne. */
+  deleted_at?: string | null;
 }
 
 export interface AltarItem {

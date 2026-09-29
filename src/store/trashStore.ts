@@ -53,6 +53,9 @@ export const useTrashStore = create<TrashState>((set) => ({
       const languages = await db.select<{ id: string; name: string; icon: string; deleted_at: string }[]>(
         `SELECT id, name, icon, deleted_at FROM languages WHERE deleted_at IS NOT NULL`
       );
+      const altars = await db.select<{ id: string; title: string; deleted_at: string }[]>(
+        `SELECT id, title, deleted_at FROM altars WHERE deleted_at IS NOT NULL`
+      );
       const items: TrashedItem[] = [
         ...journal.map((r) => ({ ...r, type: 'journal' as const })),
         ...wiki.map((r) => ({ id: r.id, title: r.title, deleted_at: r.deleted_at, type: 'wiki' as const, category: r.category ?? undefined })),
@@ -78,6 +81,7 @@ export const useTrashStore = create<TrashState>((set) => ({
           deleted_at: r.deleted_at,
           type: 'language' as const,
         })),
+        ...altars.map((r) => ({ ...r, type: 'altar' as const })),
       ].sort((a, b) => b.deleted_at.localeCompare(a.deleted_at));
       set({ items });
     } finally {
@@ -109,6 +113,8 @@ export const useTrashStore = create<TrashState>((set) => ({
     await db.execute(`DELETE FROM templates WHERE deleted_at IS NOT NULL`);
     // Die Vokabeln nimmt ON DELETE CASCADE mit — sie haben kein eigenes `deleted_at`.
     await db.execute(`DELETE FROM languages WHERE deleted_at IS NOT NULL`);
+    // Die Platzierungen ebenso; die Verknüpfungen auf den Altar fegt `sweepDanglingLinks` unten.
+    await db.execute(`DELETE FROM altars WHERE deleted_at IS NOT NULL`);
 
     // Kategorien zuletzt, und erst nachdem ihre verbliebenen Inhalte umgehängt
     // sind. Früher wurden die Zeilen einfach gelöscht und alles, was noch auf

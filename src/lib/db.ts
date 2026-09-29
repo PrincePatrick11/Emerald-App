@@ -2,7 +2,7 @@ import Database from '@tauri-apps/plugin-sql';
 import { invoke } from '@tauri-apps/api/core';
 import { getActiveDbConnectionString, getActiveVaultId } from './vaultManager';
 import {
-  BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, IMAGE_FIELDS, LEXICON_INDEX_DDL, TABLE_DDL,
+  ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, IMAGE_FIELDS, LEXICON_INDEX_DDL, TABLE_DDL,
   TEMPLATES_INDEX_DDL, createSchema, ddlIfNotExists, seedBuiltins, storedImageName,
 } from './schema';
 import { normalizeSchema } from './normalizeSchema';
@@ -261,6 +261,8 @@ const CLEANUP_TABLES = [
   'templates',
   // Ihre Vokabeln nimmt ON DELETE CASCADE mit — sie tragen kein eigenes `deleted_at`.
   'languages',
+  // Ebenso die Platzierungen eines Altars; was auf ihn zeigte, fegt `sweepDanglingLinks`.
+  'altars',
 ] as const;
 
 /**
@@ -1284,6 +1286,20 @@ export const MIGRATIONS: Migration[] = [
       await db.execute(ddlIfNotExists(TABLE_DDL.languages));
       await db.execute(ddlIfNotExists(TABLE_DDL.lexicon_entries));
       await createIndexesIfMissing(db, LEXICON_INDEX_DDL);
+    },
+  },
+  {
+    // Altäre bekommen einen Papierkorb wie alles andere: bis hierher löschte
+    // der Knopf sofort und endgültig, ohne Rückfrage und ohne Rückweg.
+    // Additiv und wiederholbar — die Spalte kommt nur dazu, wo sie fehlt.
+    version: 46,
+    name: 'altars_soft_delete',
+    up: async (db) => {
+      const columns = await db.select<{ name: string }[]>('PRAGMA table_info(altars)');
+      if (!columns.some((column) => column.name === 'deleted_at')) {
+        await db.execute('ALTER TABLE altars ADD COLUMN deleted_at TEXT');
+      }
+      await createIndexesIfMissing(db, [ALTARS_INDEX_DDL]);
     },
   },
 ];

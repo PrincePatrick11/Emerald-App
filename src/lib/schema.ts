@@ -20,7 +20,7 @@ import type Database from '@tauri-apps/plugin-sql';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 45;
+export const BASELINE_VERSION = 46;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
@@ -185,7 +185,8 @@ export const TABLE_DDL: Record<TableName, string> = {
       thumbnail_data TEXT,
       icon_data TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT
     )`,
 
   // paradigm_id, bannung_type_wiki_id, meditation_type_wiki_id und die beiden
@@ -391,9 +392,12 @@ export const LEXICON_INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_lexicon_entries_language ON lexicon_entries(language_id)',
 ];
 
+/** Der Index des Altar-Papierkorbs (v46) — getrennt wie die darüber. */
+export const ALTARS_INDEX_DDL = 'CREATE INDEX idx_altars_deleted ON altars(deleted_at)';
+
 /** Alle Indizes des aktuellen Schemas — was ein frischer Vault bekommt. */
 export const INDEX_DDL: readonly string[] = [
-  ...INDEX_DDL_V38, BLOCK_DEFINITIONS_INDEX_DDL, TEMPLATES_INDEX_DDL, ...LEXICON_INDEX_DDL,
+  ...INDEX_DDL_V38, BLOCK_DEFINITIONS_INDEX_DDL, TEMPLATES_INDEX_DDL, ...LEXICON_INDEX_DDL, ALTARS_INDEX_DDL,
 ];
 
 /**

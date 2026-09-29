@@ -164,11 +164,16 @@ const {
  * `ALTER TABLE ... RENAME` schreibt den Tabellennamen in sqlite_master
  * gequotet zurück, ein direktes CREATE nicht. Für den Vergleich ist das
  * bedeutungslos, also raus damit — zusammen mit der Einrückung aus dem DDL.
+ *
+ * Ebenso der Leerraum um Kommas und Klammern: `ALTER TABLE ... ADD COLUMN`
+ * (v46) hängt seine Spalte als `, name TYP)` an den gespeicherten Text, wo
+ * das DDL der Baseline `, name TYP )` schreibt. Dieselbe Tabelle.
  */
 function normalizeSql(sql) {
   return (sql ?? '')
     .replace(/"([A-Za-z_][A-Za-z0-9_]*)"/g, '$1')
     .replace(/\s+/g, ' ')
+    .replace(/ ?([,()]) ?/g, '$1')
     .trim();
 }
 
@@ -1624,6 +1629,64 @@ console.log('\n8j. Migration v45: das Lexikon\n');
   const v45 = MIGRATIONS.find((m) => m.version === 45);
   await v45.up(db);
   check('v45 ist wiederholbar', true);
+  db.close();
+}
+
+console.log('\n8k. Migration v46: Altaere bekommen einen Papierkorb\n');
+
+{
+  const db = freshDb('altar-trash.db');
+  await runMigrations(db);
+  check(
+    'frisches Schema: altars traegt deleted_at',
+    (await db.select('PRAGMA table_info(altars)')).some((c) => c.name === 'deleted_at')
+  );
+  check(
+    'frisches Schema: der Index auf deleted_at ist da',
+    (await db.select("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_altars_deleted'")).length === 1
+  );
+
+  await db.execute(
+    `INSERT INTO altars (id,title,intention,background_preset,created_at,updated_at)
+     VALUES ('a1','Altar','','midnight',?1,?1)`,
+    [now]
+  );
+  await db.execute(`INSERT INTO altar_items (id,name,emoji,note,created_at) VALUES ('i1','Kerze','x','',?1)`, [now]);
+  await db.execute(
+    `INSERT INTO altar_placements (id,altar_id,item_id,x,y) VALUES ('p1','a1','i1',50,50)`
+  );
+
+  // Der Papierkorb legt den Altar weg, seine Platzierungen bleiben fuer den Rueckweg.
+  await db.execute(`UPDATE altars SET deleted_at=?1 WHERE id='a1'`, [now]);
+  check(
+    'die Platzierungen ueberleben den Papierkorb ihres Altars',
+    (await db.select('SELECT COUNT(*) AS n FROM altar_placements'))[0].n === 1
+  );
+
+  // Endgueltig loeschen nimmt sie mit — darauf verlassen sich CLEANUP_TABLES und emptyTrash.
+  await db.execute(`DELETE FROM altars WHERE deleted_at IS NOT NULL`);
+  check(
+    'ON DELETE CASCADE raeumt die Platzierungen mit dem Altar weg',
+    (await db.select('SELECT COUNT(*) AS n FROM altar_placements'))[0].n === 0
+  );
+  check(
+    'das Bibliothekselement bleibt',
+    (await db.select('SELECT COUNT(*) AS n FROM altar_items'))[0].n === 1
+  );
+
+  // Ein zweiter Lauf (angelegt, aber nicht gestempelt) bricht nicht ab.
+  const v46 = MIGRATIONS.find((m) => m.version === 46);
+  await v46.up(db);
+  check('v46 ist wiederholbar', true);
+
+  // Ein Vault von vor v46: die Spalte fehlt, die Migration bringt sie.
+  await db.execute('DROP INDEX idx_altars_deleted');
+  await db.execute('ALTER TABLE altars DROP COLUMN deleted_at');
+  await v46.up(db);
+  check(
+    'v46 ergaenzt die Spalte, wo sie fehlt',
+    (await db.select('PRAGMA table_info(altars)')).some((c) => c.name === 'deleted_at')
+  );
   db.close();
 }
 

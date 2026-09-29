@@ -261,6 +261,7 @@ export const fromRow = {
       resolution: str(r.resolution),
       thumbnail_data: nullableStr(r.thumbnail_data),
       icon_data: nullableStr(r.icon_data),
+      deleted_at: nullableStr(r.deleted_at),
     };
   },
 

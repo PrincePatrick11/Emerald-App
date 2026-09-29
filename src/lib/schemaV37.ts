@@ -52,6 +52,31 @@ const V37_SOFT_DELETE_TABLES = [
 ] as const;
 
 const FROZEN: Partial<Record<V37TableName, string>> = {
+  // Seit v46 (`altars_soft_delete`) trägt die Tabelle `deleted_at` — v33 baut sie ohne.
+  altars: `
+    CREATE TABLE altars (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL DEFAULT 'Untitled Altar',
+      intention TEXT NOT NULL DEFAULT '',
+      background_preset TEXT NOT NULL DEFAULT 'midnight',
+      background_image_data TEXT,
+      background_overlay REAL NOT NULL DEFAULT 0.2,
+      background_overlay_color TEXT NOT NULL DEFAULT 'dark',
+      grid_enabled INTEGER NOT NULL DEFAULT 0,
+      grid_size REAL NOT NULL DEFAULT 32,
+      grid_opacity REAL NOT NULL DEFAULT 0.06,
+      grid_color TEXT NOT NULL DEFAULT '#dce8e2',
+      snap_to_grid INTEGER NOT NULL DEFAULT 0,
+      rotation_snap_enabled INTEGER NOT NULL DEFAULT 0,
+      rotation_snap_angle REAL NOT NULL DEFAULT 15,
+      snap_scale_to_grid INTEGER NOT NULL DEFAULT 0,
+      resolution TEXT NOT NULL DEFAULT '1920x1080',
+      thumbnail_data TEXT,
+      icon_data TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`,
+
   // Seit v44 (`routines_to_templates`) gibt es die Tabelle im lebenden Schema nicht mehr.
   routines: `
     CREATE TABLE routines (

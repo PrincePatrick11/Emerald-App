@@ -9,6 +9,8 @@ import { MODULES } from '../../lib/modules';
 import { useAltarStore } from '../../store/altarStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUIStore, ALTAR_LIBRARY_SORTS } from '../../store/uiStore';
+import { useUndoStore } from '../../store/undoStore';
+import { generateId } from '../../lib/helpers';
 import { useEditActions } from '../../hooks/useEditActions';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { useDisplayedAltar } from '../../hooks/useDisplayedAltar';
@@ -34,7 +36,7 @@ export default function AltarView() {
   const altars = useAltarStore((s) => s.altars);
   const activeAltarId = useAltarStore((s) => s.activeAltarId);
   const previewPlacements = useAltarStore((s) => s.previewPlacements);
-  const { createAltar, duplicateAltar, setActiveAltar, clearActiveAltar, updateAltar, deleteAltar } = useAltarStore(
+  const { createAltar, duplicateAltar, setActiveAltar, clearActiveAltar, updateAltar, deleteAltar, restoreAltar } = useAltarStore(
     useShallow((s) => ({
       createAltar: s.createAltar,
       duplicateAltar: s.duplicateAltar,
@@ -42,6 +44,7 @@ export default function AltarView() {
       clearActiveAltar: s.clearActiveAltar,
       updateAltar: s.updateAltar,
       deleteAltar: s.deleteAltar,
+      restoreAltar: s.restoreAltar,
     })),
   );
   const activeView = useUIStore((s) => s.activeView);
@@ -57,6 +60,7 @@ export default function AltarView() {
   const setLibraryPrefs = useUIStore((s) => s.setAltarLibraryPrefs);
 
   const allCategories = useCategoryStore((s) => s.categories);
+  const pushUndo = useUndoStore((s) => s.push);
 
   const [search, setSearch] = useState('');
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -180,6 +184,7 @@ export default function AltarView() {
 
   const handleDelete = async (id: string) => {
     await deleteAltar(id);
+    pushUndo({ id: generateId(), description: t('undo.altarDeleted'), undo: () => restoreAltar(id) });
     if (activeView.id === id) {
       setActiveView({ type: 'altar' });
     }
@@ -216,21 +221,15 @@ export default function AltarView() {
 
   const handleCancel = async () => {
     if (!activeAltar) return;
-    // Ein nie mit „Fertig" bestätigter Altar wird beim Abbrechen verworfen —
-    // er sollte nie existieren. Kein Thumbnail-Capture für einen Altar, den es
-    // gleich nicht mehr gibt; das Flag hält den isEditing-Cleanup-Effekt davon
-    // ab (gleiches Muster wie handleDone: erst navigieren, Flag erst nach den
-    // Awaits zurücksetzen, damit der Cleanup beim Commit es noch gesetzt sieht).
+    // Ein nie mit „Fertig" bestätigter Altar geht, wie jeder gelöschte, in den
+    // Papierkorb. Kein Thumbnail-Capture für einen Altar, der gleich dort
+    // liegt; das Flag hält den isEditing-Cleanup-Effekt davon ab (gleiches
+    // Muster wie handleDone: Flag erst nach den Awaits zurücksetzen, damit der
+    // Cleanup beim Commit es noch gesetzt sieht).
     if (activeView.isNew) {
       thumbnailSavingRef.current = true;
-      const altarId = activeAltar.id;
-      setActiveView({ type: 'altar' });
-      // Sofort selbst löschen statt es dem activeView.id-Effekt zu überlassen:
-      // deleteAltar würde sonst je nach Flush-Reihenfolge für einen Frame den
-      // nächstbesten Altar aktiv setzen.
-      clearActiveAltar();
       try {
-        await deleteAltar(altarId);
+        await handleDelete(activeAltar.id);
       } catch (err) {
         console.error('[handleCancel]', err);
       } finally {

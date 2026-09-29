@@ -175,7 +175,7 @@ export function viewTypeForEntryType(entryType: ContentType): EntryModuleId {
 
 /** Alle Papierkorb-Eintragstypen (`TrashedItem['type']`). */
 export const TRASH_KINDS = [
-  'journal', 'wiki', 'tag', 'operation', 'task', 'category', 'blockDefinition', 'template', 'language',
+  'journal', 'wiki', 'tag', 'operation', 'task', 'category', 'blockDefinition', 'template', 'language', 'altar',
 ] as const;
 export type TrashKind = (typeof TRASH_KINDS)[number];
 
@@ -191,4 +191,5 @@ export const TRASH_KIND_ICONS: Record<TrashKind, LucideIcon> = {
   blockDefinition: Box,
   template: CopyPlus,
   language: Languages,
+  altar: Flame,
 };

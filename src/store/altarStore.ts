@@ -125,7 +125,10 @@ interface AltarState {
   updateAltarGrid: (id: string, patch: Partial<Pick<AltarRecord, 'grid_enabled' | 'grid_size' | 'grid_opacity' | 'grid_color' | 'snap_to_grid' | 'rotation_snap_enabled' | 'rotation_snap_angle' | 'snap_scale_to_grid'>>) => Promise<void>;
   updateAltarResolution: (id: string, resolution: string) => Promise<void>;
   bumpAltarUpdatedAt: (id: string) => Promise<void>;
+  /** Soft-Delete: in den Papierkorb. Platzierungen und Verknüpfungen auf den Altar bleiben, für den Rückweg. */
   deleteAltar: (id: string) => Promise<void>;
+  restoreAltar: (id: string) => Promise<void>;
+  permanentlyDeleteAltar: (id: string) => Promise<void>;
 
   /** `createdAt` nur für den Import, der das Datum der Datei übernimmt;
    *  sonst jetzt. */
@@ -156,7 +159,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const db = await getDb();
     const itemRows = await db.select<DbRow[]>('SELECT * FROM altar_items ORDER BY name ASC');
     const items = itemRows.map(fromRow.altarItem);
-    const altarRows = await db.select<DbRow[]>('SELECT * FROM altars ORDER BY updated_at DESC, created_at DESC');
+    const altarRows = await db.select<DbRow[]>('SELECT * FROM altars WHERE deleted_at IS NULL ORDER BY updated_at DESC, created_at DESC');
     const altars = altarRows.map(fromRow.altar).map(normalizeAltar);
     for (const altar of altars) {
       if (!altar.background_image_data?.startsWith('data:')) continue;
@@ -383,24 +386,58 @@ export const useAltarStore = create<AltarState>((set, get) => ({
 
   deleteAltar: async (id) => {
     const db = await getDb();
-    const { altars, activeAltarId, items } = get();
+    await db.execute('UPDATE altars SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
+    // Platzierungen und die Verknüpfungen, die auf den Altar zeigen, bleiben
+    // stehen — wie bei einer Aufgabe: der Soft-Delete ist umkehrbar, und
+    // `sweepDanglingLinks` zählt Papierkorb-Inhalte als gültig.
+    set((s) => {
+      const { [id]: _removed, ...previewPlacements } = s.previewPlacements;
+      const wasActive = s.activeAltarId === id;
+      return {
+        altars: s.altars.filter((altar) => altar.id !== id),
+        previewPlacements,
+        ...(wasActive ? { activeAltarId: null, placements: [], selectedPlacementId: null, intention: '' } : {}),
+      };
+    });
+  },
+
+  restoreAltar: async (id) => {
+    const db = await getDb();
+    await db.execute('UPDATE altars SET deleted_at=NULL WHERE id=$1', [id]);
+    // Nur diesen Altar nachladen, nicht `fetchAltars`: das setzte auch den
+    // Stand eines anderen zurück, der gerade bearbeitet wird.
+    const rows = await db.select<DbRow[]>('SELECT * FROM altars WHERE id=$1', [id]);
+    if (!rows.length) return;
+    const altar = normalizeAltar(fromRow.altar(rows[0]));
+    const placements = await fetchPlacementsForAltar(id, get().items);
+    set((s) => ({
+      altars: [altar, ...s.altars.filter((entry) => entry.id !== id)]
+        .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
+      previewPlacements: { ...s.previewPlacements, [id]: placements },
+    }));
+  },
+
+  permanentlyDeleteAltar: async (id) => {
+    const db = await getDb();
     await db.execute('DELETE FROM altar_placements WHERE altar_id=$1', [id]);
     // Altäre sind Link-Ziele der Editoren und von task_links (nie Quellen) —
     // beide polymorphen Tabellen mit abräumen, wie journal/wikiStore es tun.
     await db.execute('DELETE FROM links WHERE target_id=$1', [id]);
     await db.execute('DELETE FROM task_links WHERE target_id=$1', [id]);
     await db.execute('DELETE FROM altars WHERE id=$1', [id]);
-    const nextAltars = altars.filter((altar) => altar.id !== id);
-    const nextActiveId = activeAltarId === id ? (nextAltars[0]?.id ?? null) : activeAltarId;
-    const placements = nextActiveId ? await fetchPlacementsForAltar(nextActiveId, items) : [];
-    const active = nextAltars.find((altar) => altar.id === nextActiveId) ?? null;
-    set({
-      altars: nextAltars,
-      activeAltarId: nextActiveId,
-      placements,
-      selectedPlacementId: null,
-      intention: active?.intention ?? '',
-    });
+    // Nur aus dem Papierkorb oder beim Zurückrollen eines Imports erreichbar;
+    // steht er doch noch im Store, geht er dort mit.
+    if (get().altars.some((altar) => altar.id === id)) {
+      set((s) => {
+        const { [id]: _removed, ...previewPlacements } = s.previewPlacements;
+        const wasActive = s.activeAltarId === id;
+        return {
+          altars: s.altars.filter((altar) => altar.id !== id),
+          previewPlacements,
+          ...(wasActive ? { activeAltarId: null, placements: [], selectedPlacementId: null, intention: '' } : {}),
+        };
+      });
+    }
   },
 
   addItem: async (name, emoji, categoryId, note = '', imageData, createdAt) => {

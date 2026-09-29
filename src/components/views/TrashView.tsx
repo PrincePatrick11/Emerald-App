@@ -279,6 +279,7 @@ export default function TrashView() {
     const blockDefs  = sorted.filter((i) => i.type === 'blockDefinition');
     const templates  = sorted.filter((i) => i.type === 'template');
     const languages  = sorted.filter((i) => i.type === 'language');
+    const altars     = sorted.filter((i) => i.type === 'altar');
 
     const renderItems = (subset: TrashedItem[]) =>
       viewMode === 'list'
@@ -331,6 +332,12 @@ export default function TrashView() {
           <>
             <SectionHeader label={t('nav.tasks')} count={tasks.length} />
             {renderItems(tasks)}
+          </>
+        )}
+        {altars.length > 0 && (
+          <>
+            <SectionHeader label={t('nav.altar')} count={altars.length} />
+            {renderItems(altars)}
           </>
         )}
         {tags.length > 0 && (

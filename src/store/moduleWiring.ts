@@ -69,6 +69,15 @@ export const trashWiring: Record<TrashKind, {
     restore: (id) => useLexiconStore.getState().restoreLanguage(id),
     permanentlyDelete: (id) => useLexiconStore.getState().permanentlyDeleteLanguage(id),
   },
+  altar: {
+    restore: (id) => useAltarStore.getState().restoreAltar(id),
+    permanentlyDelete: async (id) => {
+      await useAltarStore.getState().permanentlyDeleteAltar(id);
+      // Die `task_links` auf den Altar sind aus der Datenbank — hier, damit
+      // `altarStore` den Aufgaben-Store nicht importieren muss.
+      useTaskStore.setState((s) => ({ links: s.links.filter((link) => link.target_id !== id) }));
+    },
+  },
 };
 
 /**

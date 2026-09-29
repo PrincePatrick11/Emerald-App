@@ -141,7 +141,11 @@ type Row = Record<string, any>;
  * mit, '7' = seit v42 tragen Operationen ihre Sigille als Blöcke im Inhalt
  * statt in eigenen Spalten, '8' = seit v43 reisen die Vorlagen als
  * `data.templates` mit, '9' = seit v45 das Lexikon als `data.languages` und
- * `data.lexiconEntries`.
+ * `data.lexiconEntries`, '10' = seit v46 tragen Altäre `deleted_at`.
+ *
+ * Auch die '10' ist kein Formalismus: ein Build von vor v46 kennt die Spalte
+ * nicht, `insertRows` ließe sie fallen — und ein Altar aus dem Papierkorb
+ * käme dort als lebender zurück. Lieber lehnt er die Datei ab.
  *
  * Die '5' ist kein Formalismus: Eine so geschriebene Datei enthält Einträge
  * ohne Kategorie, und ein Build von vor v39 hat dort noch eine NOT-NULL-Spalte.
@@ -150,7 +154,7 @@ type Row = Record<string, any>;
  * Prüfung „neuer als ich" (`backup.version > BACKUP_VERSION`) die Datei ehrlich
  * ab, bevor irgendetwas passiert.
  */
-const BACKUP_VERSION = '9' as const;
+const BACKUP_VERSION = '10' as const;
 
 /** Die vier Kategorie-Arrays von Sicherungen bis Version 3. */
 interface LegacyCategoryArrays {
@@ -290,6 +294,7 @@ export function migrateBackupPayload(backup: BackupFile): void {
   // v7 → v8 braucht keinen Schritt: neu ist nur das Array `templates`.
   // v8 → v9 ebenso wenig: neu sind nur `languages`/`lexiconEntries`, und eine
   // ältere Datei bringt eben kein Lexikon mit.
+  // v9 → v10 auch nicht: Altäre ohne `deleted_at` sind lebende Altäre.
 
   // Routinen (Dateien von vor v44) bleiben hier liegen: sie werden erst beim
   // Import Vorlagen (`withRoutinesAsTemplates`), nach den Filtern — sonst
@@ -299,7 +304,7 @@ export function migrateBackupPayload(backup: BackupFile): void {
 }
 
 interface BackupFile {
-  version: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
+  version: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10';
   /** Die Version, mit der die Datei geschrieben wurde — `migrateBackupPayload` setzt `version` auf die aktuelle. */
   sourceVersion?: number;
   type: 'backup';
@@ -488,7 +493,7 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
   // ── Altars ───────────────────────────────────────────────────────────────
   if (options.includeAltars) {
     data.altars = await db.select<Row[]>(
-      `SELECT * FROM altars WHERE 1=1 ${dateClause}`,
+      `SELECT * FROM altars WHERE 1=1 ${dateClause} ${deletedClause}`,
       dateParams,
     );
     // Die Bibliothek ist eine eigene Sammlung, kein Anhängsel der Altäre:

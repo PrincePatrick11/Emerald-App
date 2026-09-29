@@ -1105,7 +1105,7 @@ async function remapAltarImagePath(path: string | undefined, images: Record<stri
 }
 
 async function importAltarEntry(file: EmeraldFile): Promise<string> {
-  const { createAltar, updateAltar, updateAltarGrid, updateAltarResolution, deleteAltar, deleteItem } = useAltarStore.getState();
+  const { createAltar, updateAltar, updateAltarGrid, updateAltarResolution, permanentlyDeleteAltar, deleteItem } = useAltarStore.getState();
   const altar = await createAltar();
   // Only items actually *created* (not reused) get rolled back on failure —
   // altar_items is a shared library, so a partial import must not leave
@@ -1184,7 +1184,7 @@ async function importAltarEntry(file: EmeraldFile): Promise<string> {
 
     return altar.id;
   } catch (e) {
-    await deleteAltar(altar.id).catch(() => {});
+    await permanentlyDeleteAltar(altar.id).catch(() => {});
     for (const itemId of createdItemIds) {
       await deleteItem(itemId).catch(() => {});
     }

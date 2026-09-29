@@ -334,9 +334,16 @@ function useAltarConfig(): EntryListTabProps<AltarRecord> {
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { altars, updateAltar } = useAltarStore(
-    useShallow((s) => ({ altars: s.altars, updateAltar: s.updateAltar }))
+  const { altars, updateAltar, deleteAltar, restoreAltar } = useAltarStore(
+    useShallow((s) => ({ altars: s.altars, updateAltar: s.updateAltar, deleteAltar: s.deleteAltar, restoreAltar: s.restoreAltar }))
   );
+  const pushUndo = useUndoStore((s) => s.push);
+
+  const handleDelete = async (altar: AltarRecord) => {
+    await deleteAltar(altar.id);
+    pushUndo({ id: generateId(), description: t('undo.altarDeleted'), undo: () => restoreAltar(altar.id) });
+    if (activeView.id === altar.id) setActiveView({ type: 'altar' });
+  };
 
   const sorted = altars.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 
@@ -356,6 +363,7 @@ function useAltarConfig(): EntryListTabProps<AltarRecord> {
     contextMenuActions: (a, startRename) => [
       openInNewTabAction({ type: 'altar', id: a.id, mode: 'view' }),
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
+      { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(a), danger: true },
     ],
     emptyMessage: t('emptyState.altar.title'),
   };
