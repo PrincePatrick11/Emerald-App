@@ -84,8 +84,9 @@ export default function WikiView() {
     }),
     readStored: (id) => {
       const stored = getArticle(id);
-      return stored ? { ...fieldsOf(stored), updated_at: stored.updated_at } : null;
+      return stored ? fieldsOf(stored) : null;
     },
+    readStamp: (id) => getArticle(id)?.updated_at,
     update: updateArticle,
   });
 

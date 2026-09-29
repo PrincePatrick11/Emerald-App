@@ -13,6 +13,7 @@ import { generateId } from '../../lib/helpers';
 import { MODULES, viewTypeForEntryType } from '../../lib/modules';
 import EmptyState, { NoResults } from '../ui/EmptyState';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
+import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { useDeepLink } from '../../hooks/useDeepLink';
 import { categoriesUsedBy, categoryLabel, hasUncategorized } from '../../lib/categories';
 import { sortItems } from '../../lib/sortItems';
@@ -73,8 +74,7 @@ export default function TasksView() {
   const [filterPriority, setFilterPriority] = useSessionState<Set<string>>('tasks.filterPriority', new Set());
   // „Erledigte anzeigen" ist eine Vorliebe wie die Vorschau im Altar, kein
   // Filter: dauerhaft je Vault (`vaultPrefs`), ein Zurücksetzen lässt es stehen.
-  const showCompleted = useUIStore((s) => s.flags[SHOW_COMPLETED_FLAG] ?? false);
-  const setShowCompleted = (value: boolean) => useUIStore.getState().setFlag(SHOW_COMPLETED_FLAG, value);
+  const [showCompleted, , setShowCompleted] = usePersistedFlag(SHOW_COMPLETED_FLAG);
   const { isCollapsed: isCategoryCollapsed, toggle: toggleCategoryCollapse, expand: expandCategories } = useCollapsedSet('tasks');
   const [linkModal, setLinkModal] = useState<{ taskId: string } | null>(null);
 

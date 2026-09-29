@@ -359,11 +359,9 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   }),
 
   updateAltarGrid: (id, patch) => serialized(serialKey('altar', id), async () => {
-    const db = await getDb();
     const altar = get().altars.find((entry) => entry.id === id);
     if (!altar) return;
-    const next: AltarRecord = {
-      ...altar,
+    const grid = {
       grid_enabled: Boolean(patch.grid_enabled ?? altar.grid_enabled),
       grid_size: Math.max(8, Math.min(128, Math.round(patch.grid_size ?? altar.grid_size))),
       grid_opacity: Math.max(0.01, Math.min(0.25, patch.grid_opacity ?? altar.grid_opacity)),
@@ -372,8 +370,10 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       rotation_snap_enabled: Boolean(patch.rotation_snap_enabled ?? altar.rotation_snap_enabled),
       rotation_snap_angle: Math.max(1, Math.min(180, Math.round(patch.rotation_snap_angle ?? altar.rotation_snap_angle))),
       snap_scale_to_grid: Boolean(patch.snap_scale_to_grid ?? altar.snap_scale_to_grid),
-      updated_at: nowIso(),
     };
+    if (!needsWrite(altar, grid)) return;
+    const db = await getDb();
+    const next: AltarRecord = { ...altar, ...grid, updated_at: stampFor(altar.updated_at) };
     await db.execute(
       'UPDATE altars SET grid_enabled=$1, grid_size=$2, grid_opacity=$3, grid_color=$4, snap_to_grid=$5, rotation_snap_enabled=$6, rotation_snap_angle=$7, snap_scale_to_grid=$8, updated_at=$9 WHERE id=$10',
       [toInt(next.grid_enabled), next.grid_size, next.grid_opacity, next.grid_color, toInt(next.snap_to_grid), toInt(next.rotation_snap_enabled), next.rotation_snap_angle, toInt(next.snap_scale_to_grid), next.updated_at, id]
@@ -384,7 +384,6 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   }),
 
   updateAltarResolution: (id, resolution) => serialized(serialKey('altar', id), async () => {
-    const db = await getDb();
     const altar = get().altars.find((entry) => entry.id === id);
     if (!altar) return;
     let safeRes: string;
@@ -394,7 +393,9 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       const { w, h } = parseResolution(resolution);
       safeRes = `${w}x${h}`;
     }
-    const updated_at = nowIso();
+    if (!needsWrite(altar, { resolution: safeRes })) return;
+    const db = await getDb();
+    const updated_at = stampFor(altar.updated_at);
     await db.execute('UPDATE altars SET resolution=$1, updated_at=$2, thumbnail_data=NULL WHERE id=$3', [safeRes, updated_at, id]);
     set((s) => ({
       altars: s.altars
@@ -421,7 +422,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     await db.execute('UPDATE altars SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
     // Platzierungen und die Verknüpfungen, die auf den Altar zeigen, bleiben
     // stehen — wie bei einer Aufgabe: der Soft-Delete ist umkehrbar, und
-    // `sweepDanglingLinks` zählt Papierkorb-Inhalte als gültig.
+    // `sweepDanglingTaskLinks` zählt Papierkorb-Inhalte als gültig.
     set((s) => withoutAltar(s, id));
   },
 

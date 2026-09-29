@@ -148,8 +148,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       await db.execute('UPDATE tasks SET deleted_at=$1 WHERE id=$2', [now, tid]);
     }
     // Nur die eigene (task_id-)Seite: der Soft-Delete ist umkehrbar, und
-    // Zeilen, die auf die Aufgabe ZEIGEN (task_links.target_id, links),
-    // bleiben stehen — sweepDanglingLinks zählt Papierkorb-Inhalte als
+    // Zeilen, die auf die Aufgabe ZEIGEN (task_links.target_id),
+    // bleiben stehen — sweepDanglingTaskLinks zählt Papierkorb-Inhalte als
     // gültig, endgültig räumt erst permanentlyDeleteTask ab.
     for (const tid of idsToDelete) {
       await db.execute('DELETE FROM task_links WHERE task_id=$1', [tid]);

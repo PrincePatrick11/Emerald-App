@@ -10,17 +10,20 @@ import { useUIStore } from '../store/uiStore';
  * Vault app-weit unter demselben Schlüssel stand — nach dem Update springt so
  * nichts auf.
  */
-export function usePersistedFlag(key: string, fallback = false): [boolean, () => void] {
-  const stored = useUIStore((s) => s.flags[key]);
+export function usePersistedFlag(key: string, fallback = false): [boolean, () => void, (value: boolean) => void] {
+  const value = useUIStore((s) => resolve(s.flags, key, fallback));
   const setFlag = useUIStore((s) => s.setFlag);
-  const value = stored ?? legacyFlag(key) ?? fallback;
 
+  const set = useCallback((next: boolean) => setFlag(key, next), [key, setFlag]);
   const toggle = useCallback(() => {
-    const current = useUIStore.getState().flags[key] ?? legacyFlag(key) ?? fallback;
-    setFlag(key, !current);
+    setFlag(key, !resolve(useUIStore.getState().flags, key, fallback));
   }, [key, fallback, setFlag]);
 
-  return [value, toggle];
+  return [value, toggle, set];
+}
+
+function resolve(flags: Record<string, boolean>, key: string, fallback: boolean): boolean {
+  return flags[key] ?? legacyFlag(key) ?? fallback;
 }
 
 function legacyFlag(key: string): boolean | undefined {

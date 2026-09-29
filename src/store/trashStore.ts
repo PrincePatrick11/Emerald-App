@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getDb, sweepDanglingLinks } from '../lib/db';
+import { getDb, sweepDanglingTaskLinks } from '../lib/db';
 import { reassignCategoryContent } from '../lib/schema';
 import { trashWiring } from './moduleWiring';
 import { reassignCategoriesInMemory } from './categoryStore';
@@ -113,7 +113,7 @@ export const useTrashStore = create<TrashState>((set) => ({
     await db.execute(`DELETE FROM templates WHERE deleted_at IS NOT NULL`);
     // Die Vokabeln nimmt ON DELETE CASCADE mit — sie haben kein eigenes `deleted_at`.
     await db.execute(`DELETE FROM languages WHERE deleted_at IS NOT NULL`);
-    // Die Platzierungen ebenso; die Verknüpfungen auf den Altar fegt `sweepDanglingLinks` unten.
+    // Die Platzierungen ebenso; die Verknüpfungen auf den Altar fegt `sweepDanglingTaskLinks` unten.
     await db.execute(`DELETE FROM altars WHERE deleted_at IS NOT NULL`);
 
     // Kategorien zuletzt, und erst nachdem ihre verbliebenen Inhalte umgehängt
@@ -138,7 +138,7 @@ export const useTrashStore = create<TrashState>((set) => ({
     // Erst jetzt, wenn alle Inhalte weg sind: Verknüpfungen ins Leere räumen.
     // Vorher lief das nur über Journal- und Wiki-IDs und ließ die Links
     // gelöschter Operationen sowie alle task_links stehen.
-    await sweepDanglingLinks(db);
+    await sweepDanglingTaskLinks(db);
 
     set({ items: [] });
   },

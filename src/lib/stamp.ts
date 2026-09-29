@@ -6,6 +6,10 @@ import { nowIso } from './helpers';
  * anderswo hereinkommt, lässt den Stempel stehen, und mit ihm die Reihenfolge
  * der Listen.
  *
+ * Gilt für die Einträge der drei Module, Aufgaben, Vorlagen, Altäre, eigene
+ * Blöcke und das Lexikon — jede Methode, die `updated_at` schreibt, fragt
+ * `needsWrite` und stempelt über `stampFor`.
+ *
  * - `true` (Standard): jetzt.
  * - `false`: eine Folge — ein umbenannter Tag, „Alle aktualisieren", ein
  *   neues Vorschaubild.
@@ -16,6 +20,9 @@ export type Touch = boolean | string;
 export interface WriteOptions {
   touch?: Touch;
 }
+
+/** Für jeden Schreibzugriff, der eine Folge von anderswo ist — so lassen sie sich alle finden. */
+export const AS_A_CONSEQUENCE: WriteOptions = { touch: false };
 
 export function stampFor(current: string, touch: Touch = true): string {
   if (touch === true) return nowIso();

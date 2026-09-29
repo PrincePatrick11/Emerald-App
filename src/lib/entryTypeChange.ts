@@ -27,6 +27,7 @@ import { getDb, nextEntryNumber } from './db';
 import { nowIso } from './helpers';
 import { retypeInternalLinks } from './internalLinkHtml';
 import { getMoonPhase } from './moonPhase';
+import { useSettingsStore } from '../store/settingsStore';
 import { serialKey, serialized } from './serialize';
 import { viewTypeForEntryType } from './modules';
 import { remapDefinitionDefaults } from './blocks/definitions';
@@ -94,8 +95,9 @@ async function insertAs(db: Database, to: ConvertibleEntryType, core: EntryCore)
       const entry: JournalEntry = {
         id: core.id, entry_number, title: core.title, content: core.content, tags: core.tags,
         created_at: core.created_at, updated_at: now,
-        // Die Mondphase des Tages, an dem der Eintrag entstand — wie beim Anlegen.
-        moon_phase: getMoonPhase(new Date(core.created_at)),
+        // Die Mondphase des Tages, an dem der Eintrag entstand — wie beim Anlegen,
+        // also nur, wenn der Vault sie will (Einstellung).
+        moon_phase: useSettingsStore.getState().settings.journal.moonPhase ? getMoonPhase(new Date(core.created_at)) : null,
         mood: null, paradigm_id: null, linked_operation_ids: [], linked_wiki_ids: [],
         is_bannung: false, bannung_type_wiki_id: null, is_meditation: false, meditation_duration: null,
         meditation_type_wiki_id: null, deleted_at: null,

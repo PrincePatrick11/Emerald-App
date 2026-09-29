@@ -37,8 +37,7 @@ import { SIGIL_CATEGORY_ID } from './schema';
  * der Nutzer die Blöcke bewusst genommen hat, sie nicht wieder hinzu.
  *
  * Die Spalten bleiben im Schema (ältere Backups kennen sie) und werden auf
- * ihre Grundwerte gesetzt. `updated_at` bleibt; die `links`-Tabelle wird für
- * Zeilen mit Ladetechnik nachgezogen, wie in v37.
+ * ihre Grundwerte gesetzt. `updated_at` bleibt.
  */
 
 interface LegacySigilRow {

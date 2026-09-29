@@ -261,7 +261,7 @@ const CLEANUP_TABLES = [
   'templates',
   // Ihre Vokabeln nimmt ON DELETE CASCADE mit — sie tragen kein eigenes `deleted_at`.
   'languages',
-  // Ebenso die Platzierungen eines Altars; was auf ihn zeigte, fegt `sweepDanglingLinks`.
+  // Ebenso die Platzierungen eines Altars; was auf ihn zeigte, fegt `sweepDanglingTaskLinks`.
   'altars',
 ] as const;
 
@@ -321,7 +321,7 @@ async function runPeriodicCleanup(db: Database, retentionDays: number | null): P
     }
   }
 
-  await sweepDanglingLinks(db);
+  await sweepDanglingTaskLinks(db);
 }
 
 /**
@@ -334,7 +334,7 @@ async function runPeriodicCleanup(db: Database, retentionDays: number | null): P
  * Wird sowohl vom Leeren nach der Frist als auch vom Leeren des Papierkorbs benutzt,
  * damit beide Wege dasselbe Ergebnis liefern.
  */
-export async function sweepDanglingLinks(db: Database): Promise<void> {
+export async function sweepDanglingTaskLinks(db: Database): Promise<void> {
   await db.execute(`DELETE FROM task_links WHERE target_id NOT IN ${CONTENT_IDS}`);
 }
 

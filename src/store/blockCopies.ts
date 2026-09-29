@@ -28,6 +28,7 @@
  */
 import { useMemo } from 'react';
 import { useJournalStore } from './journalStore';
+import { AS_A_CONSEQUENCE } from '../lib/stamp';
 import { useWikiStore } from './wikiStore';
 import { useOperationStore } from './operationStore';
 import { useBlockSessionStore } from './blockSessionStore';
@@ -55,8 +56,6 @@ interface ContentSource extends ContentRow {
   kind: 'entry' | 'template';
   save: (content: string) => Promise<unknown>;
 }
-
-const AS_A_CONSEQUENCE = { touch: false };
 
 function contentSources(): ContentSource[] {
   const journal = useJournalStore.getState();

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { registerTagCreator, registerTagLookup } from '../lib/templateTags';
+import { AS_A_CONSEQUENCE } from '../lib/stamp';
 import { getDb } from '../lib/db';
 import { fromRow, jsonArray, type DbRow } from '../lib/row';
 import { useJournalStore } from './journalStore';
@@ -60,13 +61,12 @@ function taggedItems(): TaggedRef[] {
  * Eintrag: „Zuletzt geändert" bleibt (`lib/stamp.ts`).
  */
 function setItemTags(type: TaggedType, id: string, tags: string[]): Promise<void> {
-  const options = { touch: false };
   switch (type) {
-    case 'journal': return useJournalStore.getState().updateEntry(id, { tags }, options);
-    case 'wiki': return useWikiStore.getState().updateArticle(id, { tags }, options);
-    case 'operation': return useOperationStore.getState().updateOperation(id, { tags }, options);
-    case 'task': return useTaskStore.getState().updateTask(id, { tags }, options);
-    case 'template': return useTemplateStore.getState().updateTemplate(id, { tags }, options).then(() => undefined);
+    case 'journal': return useJournalStore.getState().updateEntry(id, { tags }, AS_A_CONSEQUENCE);
+    case 'wiki': return useWikiStore.getState().updateArticle(id, { tags }, AS_A_CONSEQUENCE);
+    case 'operation': return useOperationStore.getState().updateOperation(id, { tags }, AS_A_CONSEQUENCE);
+    case 'task': return useTaskStore.getState().updateTask(id, { tags }, AS_A_CONSEQUENCE);
+    case 'template': return useTemplateStore.getState().updateTemplate(id, { tags }, AS_A_CONSEQUENCE).then(() => undefined);
   }
 }
 
@@ -253,11 +253,13 @@ export const useTagStore = create<TagState>((set, get) => {
 
     restoreTag: async (id) => {
       const db = await getDb();
-      const rows = await db.select<{ name: string; color: string; affected_ids: string }[]>(
-        'SELECT name, color, affected_ids FROM tags WHERE id=$1',
+      const rows = await db.select<{ name: string; color: string; affected_ids: string; deleted_at: string | null }[]>(
+        'SELECT name, color, affected_ids, deleted_at FROM tags WHERE id=$1',
         [id]
       );
-      if (!rows[0]) return;
+      // Schon wieder da — über seinen Namen zurückgeholt (`reviveTrashedNamesake`),
+      // während das Rückgängig noch stand.
+      if (!rows[0] || !rows[0].deleted_at || get().tags.some((t) => t.id === id)) return;
       const { name: trashedName, color, affected_ids } = rows[0];
       const affected = jsonArray<AffectedEntry>(affected_ids);
 

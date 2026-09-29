@@ -34,7 +34,8 @@ export interface CategoryState {
   updateCategory: (id: string, name: string, emoji: string) => Promise<void>;
   /** Soft-Delete. `false`, wenn die Kategorie eingebaut ist. */
   deleteCategory: (id: string) => Promise<boolean>;
-  restoreCategory: (id: string) => Promise<void>;
+  /** Die id der Kategorie, in der der Inhalt jetzt steht — die eigene, oder die gleichnamige, in der sie aufging. */
+  restoreCategory: (id: string) => Promise<string>;
   permanentlyDeleteCategory: (id: string) => Promise<void>;
   /** Schreibt die komplette Reihenfolge der aktiven Kategorien. */
   reorderCategories: (ids: string[]) => Promise<void>;
@@ -95,10 +96,10 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const trashed = (await db.select<DbRow[]>('SELECT * FROM categories WHERE deleted_at IS NOT NULL')).map(fromRow.category);
     const namesake = trashed.find((c) => categoryKey(c.name) === categoryKey(trimmed));
     if (namesake) {
-      await get().restoreCategory(namesake.id);
-      if (!namesake.is_builtin && namesake.emoji !== emoji) await get().updateCategory(namesake.id, namesake.name, emoji);
-      const restored = get().categories.find((c) => c.id === namesake.id);
-      if (restored) return restored;
+      // Eine aktive Gleichnamige gibt es nicht (oben geprüft) — sie kommt also als sie selbst zurück.
+      const restoredId = await get().restoreCategory(namesake.id);
+      if (!namesake.is_builtin && namesake.emoji !== emoji) await get().updateCategory(restoredId, namesake.name, emoji);
+      return get().categories.find((c) => c.id === restoredId)!;
     }
 
     // Ans Ende. Bis v39 schob sich Neues vor das Sammelbecken `other`, damit
@@ -145,8 +146,11 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   restoreCategory: async (id) => {
     const db = await getDb();
     const rows = await db.select<DbRow[]>('SELECT * FROM categories WHERE id=$1', [id]);
-    if (!rows[0]) return;
+    if (!rows[0]) return id;
     const cat = fromRow.category(rows[0]);
+    // Schon wieder da — über ihren Namen zurückgeholt (addCategory), während
+    // das Rückgängig noch stand. Ein zweites Mal hinzufügen hieße doppelt.
+    if (!cat.deleted_at || get().categories.some((c) => c.id === id)) return id;
     // Inzwischen kann eine gleichnamige aktive Kategorie entstanden sein. Ein
     // Name gehört einer Kategorie: die zurückgeholte geht in ihr auf — ihr
     // Inhalt zieht hinüber, die Zeile verschwindet —, wie ein Tag in seinem
@@ -157,7 +161,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       await reassignCategoryContent(db, id, namesake.id);
       await db.execute('DELETE FROM categories WHERE id=$1', [id]);
       reassignCategoriesInMemory(new Set([id]), namesake.id);
-      return;
+      return namesake.id;
     }
     // Ihr alter Platz ist inzwischen vergeben (addCategory zählt weiter), also ans Ende der Liste.
     const sortOrder = (active[active.length - 1]?.sort_order ?? -1) + 1;
@@ -168,6 +172,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     set((s) => ({
       categories: [...s.categories, { ...cat, sort_order: sortOrder, deleted_at: null }],
     }));
+    return id;
   },
 
   permanentlyDeleteCategory: async (id) => {

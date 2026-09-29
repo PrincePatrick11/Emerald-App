@@ -12,7 +12,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { getDb, sweepDanglingLinks } from './db';
+import { getDb, sweepDanglingTaskLinks } from './db';
 import { remapInternalLinks } from './internalLinkHtml';
 import {
   addVault,
@@ -1046,13 +1046,36 @@ function applyCategoryFilters(d: BackupFile['data'], filters: ImportCategoryFilt
  * ist seit v38 modulübergreifend, und ein Teil-Replace (nur Wiki) darf den
  * Aufgaben nicht die Kategorien unter den Füßen wegziehen.
  */
+/**
+ * Die Tags einer Sicherung, die beim Zusammenführen neu dazukommen. Ein Name
+ * gehört einem Tag, ohne Rücksicht auf Groß-/Kleinschreibung (`tagStore`):
+ * einen gleichnamigen lokalen gibt es schon — liegt er im Papierkorb, kommt
+ * er zurück —, und eine andere Schreibweise wird kein zweiter.
+ */
+async function newMergedTags(db: Awaited<ReturnType<typeof getDb>>, rows: Row[]): Promise<Row[]> {
+  const local = await db.select<{ id: string; name: string; deleted_at: string | null }[]>(
+    'SELECT id, name, deleted_at FROM tags'
+  );
+  const byName = new Map(local.map((t) => [t.name.toLowerCase(), t]));
+  const fresh: Row[] = [];
+  for (const row of rows) {
+    const hit = byName.get(String(row.name).toLowerCase());
+    if (!hit) fresh.push(row);
+    else if (hit.deleted_at) await db.execute("UPDATE tags SET deleted_at=NULL, affected_ids='[]' WHERE id=$1", [hit.id]);
+  }
+  return fresh;
+}
+
 async function resolveImportedCategories(
   db: Awaited<ReturnType<typeof getDb>>,
   rows: Row[],
 ): Promise<Map<string, string>> {
   const local = await db.select<Row[]>('SELECT id, name, deleted_at, sort_order FROM categories');
   const localById = new Map(local.map((r) => [String(r.id), r]));
-  const localByKey = new Map(local.map((r) => [categoryKey(String(r.name)), r]));
+  // Gibt es denselben Namen aktiv und im Papierkorb (ein Vault von vor der
+  // Namensregel), gilt der aktive: die späteren Einträge der Map gewinnen.
+  const byLiveLast = [...local].sort((a, b) => Number(!a.deleted_at) - Number(!b.deleted_at));
+  const localByKey = new Map(byLiveLast.map((r) => [categoryKey(String(r.name)), r]));
   let nextSort = local.reduce((m, r) => Math.max(m, Number(r.sort_order ?? 0)), -1) + 1;
 
   const map = new Map<string, string>();
@@ -1285,7 +1308,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   // Ein Teil-Replace (z. B. nur Tasks) kann Verknüpfungen des Bestands auf
   // gerade ersetzte Ziele verwaisen lassen — und importierte task_links
   // können auf abgewählte Typen zeigen. Gleicher Sweep wie beim Papierkorb.
-  await sweepDanglingLinks(db);
+  await sweepDanglingTaskLinks(db);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1436,9 +1459,9 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     target_id: remapId(r.target_id),
   }));
 
-  // Kategorien sind schon aufgelöst (resolveImportedCategories oben); Tags:
-  // INSERT OR IGNORE (no prefix — shared by name)
-  if (d.tags) await insertRows(db, 'tags', d.tags, true);
+  // Kategorien sind schon aufgelöst (resolveImportedCategories oben). Tags
+  // ohne Präfix — geteilt über den Namen, nach der Regel des Tag-Stores.
+  if (d.tags) await insertRows(db, 'tags', await newMergedTags(db, d.tags), true);
   // Ohne Präfix: die Kopien im Inhalt nennen ihre Definition über genau diese ID.
   // Link-Vorgaben zeigen wie die Chips im Inhalt auf die umbenannten Einträge.
   await insertBlockDefinitions(db, await withStatusDefinition(
@@ -1466,7 +1489,7 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
 
   // Importierte task_links können auf Ziele zeigen, die der
   // Typ-/Kategorie-Filter gerade abgewählt hat — wie in doReplace ausfegen.
-  await sweepDanglingLinks(db);
+  await sweepDanglingTaskLinks(db);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

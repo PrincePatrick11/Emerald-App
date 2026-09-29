@@ -103,7 +103,7 @@ export interface ModuleMeta {
   navLabelKey: string;
   untitledKey: string;
   /**
-   * Das Datenmodell-Gegenstück in `links.target_type`/Drag-Payloads —
+   * Das Datenmodell-Gegenstück in `task_links.target_type`/Drag-Payloads —
    * `'operation'` singular! tasks/altar heißen dort `'task'`/`'altar'`.
    */
   entryType: ContentType;
@@ -159,7 +159,7 @@ export function moduleMeta(viewType: string): ModuleMeta | null {
  * The view type an entry of `entryType` opens in.
  *
  * The one rename in the app: the data model says `operation`, singular — it is
- * what `links.target_type`, the drag payload and the internal-link mark all
+ * what `task_links.target_type`, the drag payload and the internal-link mark all
  * carry — while `ActiveView` says `operations`, plural, after the module rather
  * than the record. Journal and wiki spell both the same, which is why the
  * mismatch is easy to forget at exactly the fourth call site.

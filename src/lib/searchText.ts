@@ -9,7 +9,6 @@
  *
  * `DOMParser` rather than `innerHTML` on a detached `<div>`: the parsed
  * document is inert, so an `<img onerror>` that arrived through an import never
- * runs. It is also the parser `lib/links.ts` already reads content with.
  */
 
 /**

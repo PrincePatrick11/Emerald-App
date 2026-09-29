@@ -11,6 +11,7 @@ import { useCategoryStore } from '../../store/categoryStore';
 import { useUIStore, ALTAR_LIBRARY_SORTS } from '../../store/uiStore';
 import { useUndoStore } from '../../store/undoStore';
 import { generateId } from '../../lib/helpers';
+import { AS_A_CONSEQUENCE } from '../../lib/stamp';
 import { useEditActions } from '../../hooks/useEditActions';
 import { guardKey } from '../../store/leaveGuardStore';
 import {
@@ -126,7 +127,7 @@ export default function AltarView() {
         if (titleChanged) await update(altarId, { title: typed });
         const thumbnailData = await capture;
         // Das Bild folgt nur — „Zuletzt geändert" hat die Änderung selbst schon gestellt.
-        if (thumbnailData !== null) await update(altarId, { thumbnail_data: thumbnailData }, { touch: false });
+        if (thumbnailData !== null) await update(altarId, { thumbnail_data: thumbnailData }, AS_A_CONSEQUENCE);
       })().catch(console.error));
     };
     // Auch beim Wechsel von einem Altar im Bearbeiten zum nächsten: die View
@@ -248,7 +249,7 @@ export default function AltarView() {
       await updateAltar(altarId, { title: title.trim() || t('altar.untitled') });
       const thumbnailData = await capturePromise;
       if (thumbnailData !== null)
-        await updateAltar(altarId, { thumbnail_data: thumbnailData }, { touch: false });
+        await updateAltar(altarId, { thumbnail_data: thumbnailData }, AS_A_CONSEQUENCE);
     })().catch((err: unknown) => console.error('[handleDone]', err));
     // Wer gleich wieder „Bearbeiten" drückt, wartet darauf (`beginAltarEdit`).
     trackAltarWrite(altarId, writes);

@@ -22,7 +22,7 @@ function tagAttr(tag: string, name: string): string | null {
  * Alle internen Link-Ziele im Inhalt — nur `id` und `entryType`.
  *
  * Bewusst ohne `DOMParser`: diese Funktion liegt auf dem Datenbankpfad
- * (`syncLinks`, Migration v36) und muss auch ohne Browser laufen, sonst ist die
+ * (Migration v36 und der Import) und muss auch ohne Browser laufen, sonst ist die
  * Migration im Schema-Harness (Node) nicht prüfbar. Für zwei Attribute reicht
  * das Lesen des Start-Tags — und beide sind Entity-frei: IDs sind UUIDs,
  * `entryType` ist ein festes Wort. Wer das Markup selbst umbaut, nimmt

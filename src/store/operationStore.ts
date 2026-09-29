@@ -110,7 +110,7 @@ export const useOperationStore = create<OperationState>((set, get) => ({
       ]
     );
     set((s) => ({
-      operations: s.operations.map((o) => (o.id === id ? { ...o, ...patch, updated_at: merged.updated_at } : o)),
+      operations: s.operations.map((o) => (o.id === id ? merged : o)),
     }));
   }),
 

@@ -294,7 +294,7 @@ export const TABLE_DDL: Record<TableName, string> = {
       hidden INTEGER NOT NULL DEFAULT 0
     )`,
 
-  // target_id ist polymorph wie bei `links` — kein Foreign Key möglich.
+  // target_id ist polymorph — kein Foreign Key möglich; checkIntegrity() prüft die Beziehung.
   task_links: `
     CREATE TABLE task_links (
       id TEXT PRIMARY KEY,

@@ -18,7 +18,7 @@ import { reloadAllStores } from './moduleWiring';
 import { useUIStore } from './uiStore';
 import { detachDrafts, restoreDrafts } from './draftStore';
 import { clearAltarEdits } from './altarEdit';
-import { forgetVaultPrefs, loadVaultPrefs } from './vaultPrefs';
+import { detachVaultPrefs, forgetVaultPrefs, loadVaultPrefs } from './vaultPrefs';
 import { useUndoStore } from './undoStore';
 import { useSettingsStore } from './settingsStore';
 import { captureLegacySettings } from '../lib/vaultSettings';
@@ -135,6 +135,8 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       if (hasActiveVault(get())) {
         await restoreDrafts(previous);
         loadVaultPrefs(previous);
+      } else {
+        detachVaultPrefs();
       }
       throw err;
     }
@@ -164,7 +166,6 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     // Vor dem Entfernen: ein aufgeschobenes Mitschreiben legte sonst eine
     // `drafts.json` in den Ordner, der gerade verschwinden soll.
     if (wasActive) await detachDrafts();
-    forgetVaultPrefs(id);
 
     // Der Aktivwechsel gehoert in denselben Schreibvorgang wie das Entfernen:
     // dazwischen stuende in `vaults.json` sonst ein aktiver Vault, der nicht
@@ -183,6 +184,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     // abgebrochene Abfrage im laufenden Betrieb.
     if (deleteFiles && wasActive) await withDbClosed(removeFromFile);
     else await removeFromFile();
+    forgetVaultPrefs(id);
 
     // Position und Restliste beide frisch: zwischen dem Eintritt und hier
     // liegen mehrere awaits, in denen ein `addVault` die Liste verlaengert

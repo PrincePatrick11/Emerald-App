@@ -24,7 +24,7 @@ export default function EditorFormattingSection() {
           key={key}
           variant="panel"
           label={label}
-          title={hint}
+          hint={hint}
           checked={editor[key]}
           onChange={(value) => update('editor', { [key]: value })}
         />

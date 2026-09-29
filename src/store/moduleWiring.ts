@@ -46,7 +46,7 @@ export const trashWiring: Record<TrashKind, {
     permanentlyDelete: (id) => useOperationStore.getState().permanentlyDeleteOperation(id),
   },
   category: {
-    restore: (id) => useCategoryStore.getState().restoreCategory(id),
+    restore: async (id) => { await useCategoryStore.getState().restoreCategory(id); },
     permanentlyDelete: (id) => useCategoryStore.getState().permanentlyDeleteCategory(id),
   },
   tag: {

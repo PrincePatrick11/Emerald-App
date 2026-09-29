@@ -32,6 +32,7 @@ import { isAcceptedImageFile, readFileAsDataUrl } from '../../lib/helpers';
 import { prepareImageDataUrl } from '../../lib/imageLimits';
 import { reportImageError } from '../../store/imageNoticeStore';
 import { useSettingsStore } from '../../store/settingsStore';
+import type { EditorSettings } from '../../lib/vaultSettings';
 
 interface LinkPopupState {
   href: string;
@@ -54,6 +55,34 @@ interface RichEditorProps {
   onEditorReady?: (editor: Editor | null) => void;
 }
 
+/** `Link` ohne das Verlinken eingefügter Adressen — für „Automatische Links" aus. */
+const LinkWithoutPasteRule = Link.extend({ addPasteRules: () => [] });
+
+/**
+ * Was die Einstellungen der automatischen Formatierung am Editor ändern:
+ *
+ * | Einstellung       | aus heißt                                                        |
+ * |-------------------|------------------------------------------------------------------|
+ * | markdownShortcuts | keine Eingabe- und Einfügeregeln, außer denen der beiden anderen |
+ * | typography        | `Typography` fehlt ganz                                          |
+ * | autoLinks         | `Link` ohne `autolink`, `linkOnPaste` und Einfügeregel           |
+ */
+function formattingOptions(format: EditorSettings) {
+  const ownInputRules = format.typography ? ['typography'] : [];
+  const ownPasteRules = format.autoLinks ? ['link'] : [];
+  return {
+    link: (format.autoLinks ? Link : LinkWithoutPasteRule).configure({
+      openOnClick: false,
+      HTMLAttributes: { class: 'external-link' },
+      autolink: format.autoLinks,
+      linkOnPaste: format.autoLinks,
+    }),
+    typography: format.typography ? [Typography] : [],
+    enableInputRules: format.markdownShortcuts || ownInputRules,
+    enablePasteRules: format.markdownShortcuts || ownPasteRules,
+  };
+}
+
 /**
  * Die Schreibfläche eines Textblocks.
  *
@@ -67,9 +96,6 @@ interface RichEditorProps {
  * Hier bleibt, was an genau diesem Editor hängt: Extensions und Chip-Lookups,
  * das Popup für externe Links und Einfügen per Paste.
  */
-/** `Link` ohne das Verlinken eingefügter Adressen — für „Auto-Links" aus. */
-const LinkWithoutPasteRule = Link.extend({ addPasteRules: () => [] });
-
 export default function RichEditor({
   initialContent,
   // Kein englischer Default: der Stapel übergibt den lokalisierten Placeholder.
@@ -145,19 +171,14 @@ export default function RichEditor({
   // Was der Editor beim Tippen und Einfügen von selbst formatiert
   // (Einstellungen → Einträge). Beim Anlegen gelesen: ein offener Editor
   // behält, womit er aufging — ein neuer bekäme sonst mitten im Tippen andere Regeln.
-  const [format] = useState(() => useSettingsStore.getState().settings.editor);
+  const [format] = useState(() => formattingOptions(useSettingsStore.getState().settings.editor));
 
   const editor = useEditor({
     extensions: [
       StarterKit,
-      (format.autoLinks ? Link : LinkWithoutPasteRule).configure({
-        openOnClick: false,
-        HTMLAttributes: { class: 'external-link' },
-        autolink: format.autoLinks,
-        linkOnPaste: format.autoLinks,
-      }),
+      format.link,
       Placeholder.configure({ placeholder }),
-      ...(format.typography ? [Typography] : []),
+      ...format.typography,
       Highlight.configure({ multicolor: false }),
       TaskList,
       TaskItem.configure({ nested: true }),
@@ -178,10 +199,8 @@ export default function RichEditor({
       ExternalDropExtension,
       ResizableImage,
     ],
-    // Markdown-Kürzel sind die Eingaberegeln von StarterKit, Markieren und
-    // Aufgaben; Typografie hat ihre eigenen und fehlt oben ganz, wenn aus.
-    enableInputRules: format.markdownShortcuts ? true : format.typography ? ['typography'] : false,
-    enablePasteRules: format.markdownShortcuts ? true : format.autoLinks ? ['link'] : false,
+    enableInputRules: format.enableInputRules,
+    enablePasteRules: format.enablePasteRules,
     content: initialContent || '',
     editable,
     onUpdate: ({ editor }) => {

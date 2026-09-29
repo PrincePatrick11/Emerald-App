@@ -1012,7 +1012,7 @@
     "unmappedCount_other": "{{count}} sin equivalencia"
   },
   "emptyState": {
-    "journal": { "title": "Aún no hay entradas", "description": "Registra lo que vives, sueñas y obras. Cada entrada recibe automáticamente la fase lunar del día.", "action": "Primera entrada" },
+    "journal": { "title": "Aún no hay entradas", "description": "Registra lo que vives, sueñas y obras. Las entradas nuevas reciben la fase lunar del día.", "action": "Primera entrada" },
     "wiki": { "title": "Aún no hay artículos", "description": "Reúne saber sobre hierbas, piedras y símbolos." },
     "tasks": { "title": "Todo hecho", "description": "No hay tareas abiertas. Las nuevas aparecerán aquí." },
     "operations": { "title": "Aún no hay operaciones", "description": "Planifica rituales con ingredientes, desarrollo y resultado." },

@@ -12,6 +12,7 @@ import { create } from 'zustand';
 import type Database from '@tauri-apps/plugin-sql';
 import { getDb } from '../lib/db';
 import { generateId, nowIso } from '../lib/helpers';
+import { needsWrite, stampFor } from '../lib/stamp';
 import { fromRow, type DbRow } from '../lib/row';
 import { serialized, serialKey } from '../lib/serialize';
 import {
@@ -84,12 +85,12 @@ export const useBlockDefinitionStore = create<BlockDefinitionState>((set, get) =
   // sollen die Revision zweimal heben, nicht beide von derselben aus.
   updateDefinition: (id, patch) => serialized(serialKey('blockDefinition', id), async () => {
     const current = get().definitions.find((d) => d.id === id);
-    if (!current) return;
+    if (!current || !needsWrite(current, patch)) return;
     const merged: BlockDefinition = { ...current, ...patch, name: (patch.name ?? current.name).trim() };
     const updated: BlockDefinition = {
       ...merged,
       revision: sameShape(current, merged) ? current.revision : current.revision + 1,
-      updated_at: nowIso(),
+      updated_at: stampFor(current.updated_at),
     };
     const db = await getDb();
     await db.execute(

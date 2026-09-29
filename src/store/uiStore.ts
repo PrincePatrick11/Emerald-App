@@ -10,14 +10,17 @@ import { isLibraryView, isViewId, moduleMeta, type EntryModuleId } from '../lib/
 import type { ActiveView } from '../types';
 import { clearSessionState } from './sessionStore';
 
-export type ViewMode = 'list' | 'cards' | 'cards_wide' | 'timeline';
+export const VIEW_MODES = ['list', 'cards', 'cards_wide', 'timeline'] as const;
+export type ViewMode = (typeof VIEW_MODES)[number];
 /** `count_desc` = „am häufigsten zuerst" — nur das Tags-Dashboard bietet ihn
  *  an (`sortModes`), die übrigen Listen haben nichts zu zählen. */
-export type SortMode = 'date_desc' | 'date_asc' | 'alpha_asc' | 'alpha_desc' | 'count_desc';
+export const SORT_MODES = ['date_desc', 'date_asc', 'alpha_asc', 'alpha_desc', 'count_desc'] as const;
+export type SortMode = (typeof SORT_MODES)[number];
 /** Gruppierung als eigene Achse neben Ansicht und Sortierung. Früher war
  *  „Kategorie" ein SortMode — was zwei Entscheidungen in einen Knopf legte:
  *  wer nach Kategorien gruppieren wollte, verlor damit seine Sortierung. */
-export type GroupingMode = 'grouped' | 'flat';
+export const GROUPING_MODES = ['grouped', 'flat'] as const;
+export type GroupingMode = (typeof GROUPING_MODES)[number];
 export interface ListPrefs { view: ViewMode; sort: SortMode; grouping: GroupingMode; }
 
 /** Die Regler der Altar-Bibliothek. Ein Ausschnitt der SortMode — Elemente
@@ -37,7 +40,8 @@ export const isTagsSort = (s: SortMode): s is TagsSort => (TAGS_SORTS as SortMod
 
 /** Die Sortierung der Home-Abschnitte — die Datums- und Alpha-Modi. */
 export type HomeSort = Exclude<SortMode, 'count_desc'>;
-export type HomeView = 'list' | 'cards';
+export const HOME_VIEWS = ['list', 'cards'] as const;
+export type HomeView = (typeof HOME_VIEWS)[number];
 export interface HomeSectionPrefs { sort: HomeSort; view: HomeView; count: number; } // count 0 = all
 
 export interface EditActions {

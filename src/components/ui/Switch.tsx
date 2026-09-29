@@ -37,7 +37,8 @@ export default function Switch({ checked, onChange, disabled, title }: {
  * `variant="sidebar"`: die Bearbeiten-Seitenleiste (Anzeige eines eigenen
  * Blocks) — eingerückt wie ihre Zeilen, mit Hover-Fläche.
  * `variant="panel"`: ohne Einzug und Hover-Fläche, bündig mit den Feldern
- * darüber — in den Einstellungen eines Blocks unter seiner Zeile.
+ * darüber — in den Einstellungen eines Blocks unter seiner Zeile und in den
+ * Abschnitten des Einstellungsfensters.
  */
 export function SwitchRow({ icon: Icon, label, hint, checked, onChange, disabled, title, variant = 'dashboard' }: {
   icon?: LucideIcon;

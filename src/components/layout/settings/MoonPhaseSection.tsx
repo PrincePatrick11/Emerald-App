@@ -15,7 +15,7 @@ export default function MoonPhaseSection() {
       <SwitchRow
         variant="panel"
         label={t('settings.moonPhaseAuto')}
-        title={t('settings.moonPhaseAutoHint')}
+        hint={t('settings.moonPhaseAutoHint')}
         checked={moonPhase}
         onChange={(value) => update('journal', { moonPhase: value })}
       />

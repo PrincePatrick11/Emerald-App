@@ -18,6 +18,7 @@ import { create } from 'zustand';
 import type Database from '@tauri-apps/plugin-sql';
 import { getDb } from '../lib/db';
 import { generateId, nowIso } from '../lib/helpers';
+import { needsWrite, stampFor } from '../lib/stamp';
 import { fromRow, type DbRow } from '../lib/row';
 import { serialized, serialKey } from '../lib/serialize';
 import { DEFAULT_LANGUAGE_ICON, alphabetToJson } from '../lib/lexicon';
@@ -107,12 +108,12 @@ export const useLexiconStore = create<LexiconState>((set, get) => ({
 
   updateLanguage: (id, patch) => serialized(WRITE_KEY, async () => {
     const current = get().languages.find((l) => l.id === id);
-    if (!current) return;
+    if (!current || !needsWrite(current, patch)) return;
     const updated: Language = {
       ...current,
       ...patch,
       name: (patch.name ?? current.name).trim(),
-      updated_at: nowIso(),
+      updated_at: stampFor(current.updated_at),
     };
     const db = await getDb();
     await db.execute(
@@ -189,8 +190,8 @@ export const useLexiconStore = create<LexiconState>((set, get) => ({
 
   updateEntry: (id, patch) => serialized(WRITE_KEY, async () => {
     const current = get().entries.find((e) => e.id === id);
-    if (!current) return;
-    const updated: LexiconEntry = { ...current, ...patch, updated_at: nowIso() };
+    if (!current || !needsWrite(current, patch)) return;
+    const updated: LexiconEntry = { ...current, ...patch, updated_at: stampFor(current.updated_at) };
     const db = await getDb();
     await db.execute(
       `UPDATE lexicon_entries

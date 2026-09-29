@@ -259,7 +259,7 @@ export default function CategoriesView() {
     pushUndo({
       id: generateId(),
       description: t('undo.categoryDeleted'),
-      undo: () => restoreCategory(id),
+      undo: async () => { await restoreCategory(id); },
     });
   };
 

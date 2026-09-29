@@ -13,8 +13,7 @@ import { convertLegacyStatusRows, STATUS_DEFINITION_ID } from './blocks/legacySt
  * eigenen Blocks „Status" an den Anfang ihres Inhalts; die Definition wird nur
  * angelegt, wenn es eine solche Operation gibt. Die drei Spalten bleiben im
  * Schema (Backup-Wiederherstellung älterer Dateien kennt sie) und werden
- * geleert. Der Block enthält keine Links, die `links`-Tabelle bleibt, wie sie
- * ist; `updated_at` ebenso — die Migration ist keine Bearbeitung.
+ * geleert. `updated_at` bleibt — die Migration ist keine Bearbeitung.
  *
  * Wiederaufnahme nach einem Abbruch: eine schon umgeschriebene Zeile hat
  * geleerte Spalten und fällt aus der Auswahl; eine schon angelegte

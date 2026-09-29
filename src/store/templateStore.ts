@@ -186,6 +186,9 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
  * der Vault Standards nicht von selbst einsetzt (Einstellung). Für die
  * `create*`-Aktionen der Inhalts-Stores; Importe und Duplikate übergeben
  * `blank`, sie überschreiben den Inhalt ohnehin.
+ *
+ * Nebenher legt es die Tags der Vorlage an, die es noch nicht gibt
+ * (`createMissingTags`) — der Eintrag trägt die Namen sofort, die Tag-Liste folgt.
  */
 export function startOfNewEntry(
   entryType: TemplateEntryType,
@@ -196,7 +199,6 @@ export function startOfNewEntry(
   const apply = !blank && useSettingsStore.getState().settings.templates.applyDefault;
   const template = !apply ? null : resolveDefaultTemplate(useTemplateStore.getState().templates, entryType, categoryId);
   const start = withUsableTags(templateStart(template, fallbackTitle));
-  // Nebenher: der Eintrag trägt die Namen sofort, die Tag-Liste folgt.
   if (start.tags.length) void createMissingTags(start.tags).catch(console.error);
   return start;
 }
