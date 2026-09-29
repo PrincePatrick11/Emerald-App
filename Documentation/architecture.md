@@ -338,6 +338,7 @@ was when editing began". The one thing Cancel does not undo is a change of type:
 the entry into another module, where editing continues with a fresh baseline.
 Sigils need no variant of their own: since v42 they are blocks in `content`, so the
 same baseline covers intention, letters, drawing and charge.
+
 The type toggle below is the one thing outside the baseline: it writes through
 `changeEntryType` the moment it's picked, the new module's view mounts in edit mode and
 captures a fresh baseline, so Cancel afterwards goes back to how the entry looked right after
@@ -349,6 +350,24 @@ coming back continues the same edit — Cancel still goes back to where it began
 lives as long as some tab shows the entry in edit mode; a subscription on `uiStore` drops it
 once none does, which covers Done, Cancel, Delete and closing the tab. It is memory only:
 after a restart, a restored edit-mode tab starts a new baseline from what is stored.
+
+The altar has no editor buffer to fall back on — placing, dragging, backgrounds, grid and
+format all write through at once — so `store/altarEdit.ts` keeps a **snapshot** instead: the
+altar's record and its placements as they were when edit mode was entered (`beginAltarEdit`,
+called by `AltarView`). Cancel writes it back through `altarStore.restoreAltarSnapshot`,
+including `updated_at` and the thumbnail, so the altar sits in the lists where it sat. The
+write is an upsert per placement followed by a delete of what does not belong — there is no
+transaction to lean on, so it is built to be repeatable: if it fails, the snapshot stays and
+the next Edit and Cancel finish it. Cancel switches to read mode *first* and restores behind
+it — `restoreAltarEdit` takes hold of the snapshot before its first `await`, since the change
+of view would otherwise prune it while the write is still waiting. `altarEditDirty` is what both the altar's leave guard and the
+probe for background tabs ask. The snapshot has the baseline's lifetime: kept across a tab
+switch, dropped once no tab shows the altar in edit mode. The title is the one field the
+altar does not write at once; leaving the view without Done saves it, so that the edit can
+continue in the other tab, and Cancel takes it back with the rest. Writes that run outside
+the serialized chains — Done's title and thumbnail, the thumbnail taken when the view is
+left — are tracked (`trackAltarWrite`), and both a new snapshot and Cancel wait for them.
+Library items are not part of the snapshot: they belong to every altar.
 
 ### Leaving an edit
 
@@ -1475,7 +1494,7 @@ Store integration details:
 - `altarStore` uses module-private helpers `mapEachPreview(fn)` and `filterEachPreview(fn)` (not on the store interface) that operate on the `previewPlacements` map and return a new map; they replace the repeated `Object.fromEntries(Object.entries(previewPlacements).map/filter(…))` pattern in store actions. `insertAltarRow` is an internal helper that owns the `INSERT INTO altars …` SQL — including `thumbnail_data` and `icon_data` — so both `createAltar` and `duplicateAltar` delegate to it; `duplicateAltar` therefore copies the thumbnail and favicon icon to the new row. Layer order has no store actions of its own: dragging a row in the placed-elements list renumbers `z_index` through `updatePlacement`.
 - `AltarLibraryStrip`'s category tab drag-to-reorder only ever shows (and can therefore only reorder) the categories that hold at least one altar item — not the full global list. Its `pointerup` handler builds the new order for that visible subset and calls `mergeOrder(full, subsetOrder)` before writing through `useCategoryStore.getState().reorderCategories(...)`: `mergeOrder` splices the dragged subset's new relative order back into the full list of category ids, so categories the strip never showed keep their existing position instead of being pushed around by a reorder that never saw them.
 
-**Altar thumbnail capture.** Thumbnails are generated on every exit from edit mode — Done button, Cancel button, back-arrow breadcrumb, and component unmount (tab/module switch). The mechanism uses a `useEffect` on `isEditing` in `AltarView` whose cleanup function calls `captureCurrentAltar()`. Because `useEffect` cleanup runs before the component unmounts and before `clearActiveAltar()` clears the store, `getState()` still has the correct altar and placements at that point. `handleDone` and `handleCancel` set `thumbnailSavingRef.current = true` before starting their own capture so the cleanup effect skips them and avoids a duplicate write. `handleDone` sequences writes title-first then thumbnail to prevent the full-row title write from overwriting a thumbnail saved a moment earlier. The thumbnail is capped at 640 px wide and uses adaptive JPEG quality (0.85 → 0.65 → 0.45) with a 512 KB budget. On macOS WKWebView, `canvas.toBlob('image/webp')` may silently return a PNG; the encoder probes the MIME type of the result and falls back directly to JPEG if WebP encoding is not supported.
+**Altar thumbnail capture.** A thumbnail is taken when an edit is confirmed with Done, and when the view is left in the middle of an edit that changed something (a tab switch) — not on Cancel, which brings the previous thumbnail back with the rest of the snapshot, and not when nothing changed, since a new thumbnail would move the altar up in every date-sorted list. The second case is the cleanup of a `useEffect` on `isEditing` and the altar's id in `AltarView`, which also saves a typed title. Because the cleanup runs before the component unmounts and before `clearActiveAltar()` clears the store, `getState()` still has the correct altar and placements at that point. Done, Cancel and Delete run inside `endingEdit`, which sets `endingEditRef` so that the cleanup leaves the end of the edit to them. `handleDone` sequences writes title-first then thumbnail to prevent the full-row title write from overwriting a thumbnail saved a moment earlier. The thumbnail is capped at 640 px wide and uses adaptive JPEG quality (0.85 → 0.65 → 0.45) with a 512 KB budget. On macOS WKWebView, `canvas.toBlob('image/webp')` may silently return a PNG; the encoder probes the MIME type of the result and falls back directly to JPEG if WebP encoding is not supported.
 
 **Altar drag performance.** `movePlacement` updates only the `placements` slice (used by `AltarCanvas`) on every pointer-move event. It intentionally does not touch `previewPlacements` (used by `AltarCard` thumbnails), because rebuilding that map at 60–120 Hz causes `AltarView` to re-render at pointer rate. `savePlacementPosition` (called on mouse-up) syncs the final position into `previewPlacements`, which is sufficient for thumbnail accuracy.
 

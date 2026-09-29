@@ -12,6 +12,10 @@ import { useUIStore, ALTAR_LIBRARY_SORTS } from '../../store/uiStore';
 import { useUndoStore } from '../../store/undoStore';
 import { generateId } from '../../lib/helpers';
 import { useEditActions } from '../../hooks/useEditActions';
+import { guardKey } from '../../store/leaveGuardStore';
+import {
+  altarEditChanged, altarEditDirty, beginAltarEdit, endAltarEdit, restoreAltarEdit, trackAltarWrite,
+} from '../../store/altarEdit';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { useDisplayedAltar } from '../../hooks/useDisplayedAltar';
 import { getAltarBackgroundStyle, DEFAULT_ALTAR_RESOLUTION, parseResolution, isRatioFormat } from '../../lib/altarConstants';
@@ -77,9 +81,19 @@ export default function AltarView() {
   // ref keeps ResizeObserver callback current without re-observing on fullscreen toggle
   const altarWindowFullscreenRef = useRef(altarWindowFullscreen);
   const [canvasTransform, setCanvasTransform] = useState<{ scale: number; offsetX: number; offsetY: number; nativeW: number; nativeH: number }>({ scale: 1, offsetX: 0, offsetY: 0, nativeW: 1920, nativeH: 1080 });
-  // Set to true while handleDone/handleCancel are running their own capture so the
-  // isEditing cleanup effect doesn't fire a redundant second capture.
-  const thumbnailSavingRef = useRef(false);
+  // Gesetzt, während „Fertig", Cancel oder Löschen die Bearbeitung beenden:
+  // ihr Ende gehört dann dem Handler, und der Abbau des Bearbeiten-Effekts
+  // unten (Titel sichern, Vorschaubild aufnehmen) tut nichts.
+  const endingEditRef = useRef(false);
+  /** Führt das Ende der Bearbeitung aus; das Flag fällt erst nach dem Commit, damit der Abbau es noch sieht. */
+  const endingEdit = async (run: () => Promise<void>) => {
+    endingEditRef.current = true;
+    try {
+      await run();
+    } finally {
+      setTimeout(() => { endingEditRef.current = false; });
+    }
+  };
 
   // Kein Refetch beim Mount: AppShell laedt die Altaere beim Start und beim
   // Vault-Wechsel; danach haelt der Store sich selbst aktuell.
@@ -87,21 +101,39 @@ export default function AltarView() {
   // Must be placed BEFORE the activeView.id effect so that when both run in the same
   // commit (e.g. back-button press), getState() is called before clearActiveAltar().
   const isEditing = activeView.mode === 'edit';
+  // Der getippte Titel, für den Abbau unten: dessen Closure ist so alt wie der Effekt.
+  const titleRef = useRef('');
   useEffect(() => {
     if (!isEditing) return;
     return () => {
-      if (thumbnailSavingRef.current) return; // handleDone / handleCancel already owns it
-      const altarId = useAltarStore.getState().activeAltarId;
+      if (endingEditRef.current) return;
+      const { activeAltarId: altarId, altars: current, updateAltar: update } = useAltarStore.getState();
       if (!altarId) return;
-      captureCurrentAltar()
-        .then((thumbnailData) => {
-          if (thumbnailData !== null)
-            useAltarStore.getState().updateAltar(altarId, { thumbnail_data: thumbnailData });
-        })
-        .catch(console.error);
+      // Weggeschaltet, ohne „Fertig" oder Cancel (ein anderer Tab): der Titel
+      // lebt nur in dieser View und ginge mit ihr. Die Bearbeitung läuft
+      // weiter, und Cancel holt auch ihn zurück (`altarEdit.ts`).
+      const typed = titleRef.current.trim();
+      const stored = current.find((altar) => altar.id === altarId)?.title;
+      const titleChanged = !!typed && stored !== undefined && typed !== stored;
+      // Ohne Änderung bleibt alles, wie es war — ein neues Vorschaubild schöbe
+      // den Altar in den Listen nach oben, obwohl nichts geschah.
+      if (!titleChanged && !altarEditChanged(altarId)) return;
+      // Die Aufnahme sofort beginnen: sie liest den aktiven Altar aus dem
+      // Store, und nach dem ersten await ist das schon der nächste.
+      const capture = captureCurrentAltar();
+      trackAltarWrite(altarId, (async () => {
+        if (titleChanged) await update(altarId, { title: typed });
+        const thumbnailData = await capture;
+        if (thumbnailData !== null) await update(altarId, { thumbnail_data: thumbnailData });
+      })().catch(console.error));
     };
-  }, [isEditing]);
+    // Auch beim Wechsel von einem Altar im Bearbeiten zum nächsten: die View
+    // bleibt dabei montiert, und `isEditing` ändert sich nicht.
+  }, [isEditing, activeView.id]);
 
+  // Als Abhängigkeit unten: ein Altar, der aus dem Papierkorb zurückkommt,
+  // während die Ansicht schon auf ihn zeigt, wird sonst nie geladen.
+  const viewAltarExists = altars.some((altar) => altar.id === activeView.id);
   useEffect(() => {
     if (activeView.id) {
       if (activeView.id !== activeAltarId) {
@@ -110,17 +142,23 @@ export default function AltarView() {
     } else if (activeAltarId !== null) {
       clearActiveAltar();
     }
-  }, [activeView.id, activeAltarId, setActiveAltar, clearActiveAltar]);
+  }, [activeView.id, activeAltarId, viewAltarExists, setActiveAltar, clearActiveAltar]);
 
   // Ohne den Abgleich mit der Ansicht blitzte beim Öffnen per Link erst das
   // Dashboard auf — siehe useDisplayedAltar.
   const activeAltar = useDisplayedAltar();
-  const isAltarLoading = !activeAltar && !!activeView.id && altars.some((altar) => altar.id === activeView.id);
+  const isAltarLoading = !activeAltar && !!activeView.id && viewAltarExists;
 
   useEffect(() => {
     if (!activeAltar) return;
     setTitle(activeAltar.title);
   }, [activeAltar?.id, activeAltar?.title]);
+  titleRef.current = title;
+
+  // Der Stand, zu dem Cancel zurückkehrt — sobald der Altar geladen im Bearbeiten steht.
+  useEffect(() => {
+    if (isEditing && activeAltar) void beginAltarEdit(activeAltar.id);
+  }, [isEditing, activeAltar?.id]);
 
   useEffect(() => { altarWindowFullscreenRef.current = altarWindowFullscreen; }, [altarWindowFullscreen]);
 
@@ -201,59 +239,63 @@ export default function AltarView() {
     if (altar) setActiveView({ type: 'altar', id: altar.id, mode: 'view' });
   };
 
-  const handleDone = async () => {
+  const handleDone = () => endingEdit(async () => {
     if (!activeAltar) return;
-    thumbnailSavingRef.current = true;
     const altarId = activeAltar.id;
     const capturePromise = captureCurrentAltar(); // start before any state changes
+    endAltarEdit(altarId);
     setActiveView({ type: 'altar', id: altarId, mode: 'view' });
-    try {
+    const writes = (async () => {
       await updateAltar(altarId, { title: title.trim() || t('altar.untitled') });
       const thumbnailData = await capturePromise;
       if (thumbnailData !== null)
         await updateAltar(altarId, { thumbnail_data: thumbnailData });
-    } catch (err) {
-      console.error('[handleDone]', err);
-    } finally {
-      thumbnailSavingRef.current = false;
-    }
-  };
+    })().catch((err: unknown) => console.error('[handleDone]', err));
+    // Wer gleich wieder „Bearbeiten" drückt, wartet darauf (`beginAltarEdit`).
+    trackAltarWrite(altarId, writes);
+    await writes;
+  });
 
-  const handleCancel = async () => {
+  const handleCancel = () => endingEdit(async () => {
     if (!activeAltar) return;
-    // Ein nie mit „Fertig" bestätigter Altar geht, wie jeder gelöschte, in den
-    // Papierkorb. Kein Thumbnail-Capture für einen Altar, der gleich dort
-    // liegt; das Flag hält den isEditing-Cleanup-Effekt davon ab (gleiches
-    // Muster wie handleDone: Flag erst nach den Awaits zurücksetzen, damit der
-    // Cleanup beim Commit es noch gesetzt sieht).
+    const altarId = activeAltar.id;
+    // Ein nie mit „Fertig" bestätigter Altar geht, wie jeder gelöschte, in den Papierkorb.
     if (activeView.isNew) {
-      thumbnailSavingRef.current = true;
-      try {
-        await handleDelete(activeAltar.id);
-      } catch (err) {
-        console.error('[handleCancel]', err);
-      } finally {
-        thumbnailSavingRef.current = false;
-      }
+      await handleDelete(altarId).catch((err: unknown) => console.error('[handleCancel]', err));
       return;
     }
-    thumbnailSavingRef.current = true;
-    const altarId = activeAltar.id;
-    setTitle(activeAltar.title);
-    const capturePromise = captureCurrentAltar(); // start before navigation
+    // Zurück auf den Stand beim Betreten des Bearbeitens — der Altar hat jede
+    // Handlung sofort gespeichert. Das Vorschaubild kommt mit dem Stand
+    // zurück; ein neues aufzunehmen hieße, ihn in den Listen nach oben zu schieben.
+    //
+    // Erst die Ansicht, dann warten: das Zurückschreiben greift sich den
+    // gemerkten Stand sofort, und im Lesemodus kann währenddessen nichts mehr
+    // verschoben werden. Wer gleich woanders hinklickt, kommt dort an.
+    const restoring = restoreAltarEdit(altarId);
     setActiveView({ type: 'altar', id: altarId, mode: 'view' });
     try {
-      const thumbnailData = await capturePromise;
-      if (thumbnailData !== null)
-        await updateAltar(altarId, { thumbnail_data: thumbnailData });
+      await restoring;
     } catch (err) {
+      // Zeigen, was wirklich in der Datenbank steht. Der gemerkte Stand ist
+      // noch da: „Bearbeiten" und noch einmal Cancel bringt es zu Ende.
       console.error('[handleCancel]', err);
-    } finally {
-      thumbnailSavingRef.current = false;
+      await useAltarStore.getState().fetchAltars().catch(console.error);
     }
-  };
+    // Der getippte Titel lebt nur hier — zurück auf den gespeicherten, solange
+    // die Ansicht noch diesen Altar zeigt.
+    if (useUIStore.getState().activeView.id !== altarId) return;
+    const stored = useAltarStore.getState().altars.find((altar) => altar.id === altarId)?.title;
+    if (stored !== undefined) setTitle(stored);
+  });
 
-  useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDeleteActive });
+  useEditActions(isEditing, {
+    onSave: handleDone, onCancel: handleCancel, onDelete: handleDeleteActive,
+    guard: activeAltar ? {
+      key: guardKey('altar', activeAltar.id),
+      title: () => title.trim() || activeAltar.title || t('altar.untitled'),
+      isDirty: () => altarEditDirty(activeAltar.id, !!activeView.isNew, title),
+    } : undefined,
+  });
 
   const backgroundSrc = imageSrc(activeAltar?.background_image_data);
 

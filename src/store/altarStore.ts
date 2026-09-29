@@ -128,6 +128,13 @@ interface AltarState {
   /** Soft-Delete: in den Papierkorb. Platzierungen und Verknüpfungen auf den Altar bleiben, für den Rückweg. */
   deleteAltar: (id: string) => Promise<void>;
   restoreAltar: (id: string) => Promise<void>;
+  /**
+   * Cancel im Altar (`altarEdit.ts`): schreibt den Altar und seine
+   * Platzierungen zurück, wie sie beim Betreten des Bearbeitens waren — samt
+   * Zeitstempel und Vorschaubild, damit er in den Listen steht, wo er stand.
+   * Wirft, wenn das Schreiben scheitert; ein zweiter Aufruf bringt es zu Ende.
+   */
+  restoreAltarSnapshot: (altar: AltarRecord, placements: readonly AltarPlacement[]) => Promise<void>;
   permanentlyDeleteAltar: (id: string) => Promise<void>;
 
   /** `createdAt` nur für den Import, der das Datum der Datei übernimmt;
@@ -230,7 +237,15 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       resolution: DEFAULT_ALTAR_RESOLUTION,
     };
     await insertAltarRow(altar);
-    set((s) => ({ altars: [altar, ...s.altars], activeAltarId: altar.id, placements: [], selectedPlacementId: null, intention: '' }));
+    set((s) => ({
+      altars: [altar, ...s.altars],
+      activeAltarId: altar.id,
+      placements: [],
+      selectedPlacementId: null,
+      // Auch leer ein Eintrag: wer die Platzierungen eines Altars dort sucht, soll ihn finden.
+      previewPlacements: { ...s.previewPlacements, [altar.id]: [] },
+      intention: '',
+    }));
     return altar;
   },
 
@@ -299,7 +314,13 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       );
     }
 
-    set((s) => ({ altars: [copy, ...s.altars] }));
+    // Samt den Platzierungen: ohne sie zeigte die Karte die Kopie leer, und
+    // wer sie dort nachschlägt (`altarEdit.ts`), hielte sie für leer.
+    const placements = await fetchPlacementsForAltar(copy.id, get().items);
+    set((s) => ({
+      altars: [copy, ...s.altars],
+      previewPlacements: { ...s.previewPlacements, [copy.id]: placements },
+    }));
     return copy;
   },
 
@@ -416,6 +437,69 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       previewPlacements: { ...s.previewPlacements, [id]: placements },
     }));
   },
+
+  restoreAltarSnapshot: (altar, placements) => serialized(serialKey('altar', altar.id), async () => {
+    const db = await getDb();
+    if (!get().altars.some((entry) => entry.id === altar.id)) return;
+    await db.execute(
+      `UPDATE altars SET
+        title=$1, intention=$2, background_preset=$3, background_image_data=$4, background_overlay=$5,
+        background_overlay_color=$6, grid_enabled=$7, grid_size=$8, grid_opacity=$9, grid_color=$10,
+        snap_to_grid=$11, rotation_snap_enabled=$12, rotation_snap_angle=$13, snap_scale_to_grid=$14,
+        resolution=$15, thumbnail_data=$16, icon_data=$17, updated_at=$18
+       WHERE id=$19`,
+      [
+        altar.title, altar.intention, altar.background_preset || DEFAULT_ALTAR_BACKGROUND, altar.background_image_data ?? null,
+        altar.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY, altar.background_overlay_color ?? DEFAULT_OVERLAY_COLOR,
+        toInt(altar.grid_enabled), altar.grid_size, altar.grid_opacity, altar.grid_color,
+        toInt(altar.snap_to_grid), toInt(altar.rotation_snap_enabled), altar.rotation_snap_angle, toInt(altar.snap_scale_to_grid),
+        altar.resolution, altar.thumbnail_data ?? null, altar.icon_data ?? null, altar.updated_at,
+        altar.id,
+      ],
+    );
+
+    // Ein Element, das inzwischen aus der Bibliothek gelöscht wurde, hat
+    // keine Zeile mehr, an der seine Platzierung hängen könnte.
+    const items = get().items;
+    const itemsById = new Map(items.map((item) => [item.id, item]));
+    const restored = placements
+      .filter((placement) => itemsById.has(placement.item_id))
+      // Name, Emoji und Bild in der heutigen Fassung des Elements.
+      .map((placement) => {
+        const item = itemsById.get(placement.item_id)!;
+        return { ...placement, name: item.name, emoji: item.emoji, category_id: item.category_id, image_data: item.image_data };
+      });
+    // Ohne Transaktion, deshalb so, dass ein abgebrochener Lauf sich
+    // wiederholen lässt: erst jede gemerkte Platzierung anlegen oder auf ihren
+    // Stand bringen, dann weg, was nicht dazugehört. Nie steht der Altar
+    // dazwischen ohne die Platzierungen da, die er hatte.
+    for (const p of restored) {
+      await db.execute(
+        `INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         ON CONFLICT(id) DO UPDATE SET
+           altar_id=excluded.altar_id, item_id=excluded.item_id, x=excluded.x, y=excluded.y, z_index=excluded.z_index,
+           width=excluded.width, height=excluded.height, rotation=excluded.rotation, opacity=excluded.opacity,
+           locked=excluded.locked, hidden=excluded.hidden`,
+        [p.id, altar.id, p.item_id, p.x, p.y, p.z_index, p.width, p.height, p.rotation, p.opacity, toInt(p.locked), toInt(p.hidden)],
+      );
+    }
+    const kept = restored.map((_, i) => `$${i + 2}`).join(', ');
+    await db.execute(
+      `DELETE FROM altar_placements WHERE altar_id=$1${restored.length ? ` AND id NOT IN (${kept})` : ''}`,
+      [altar.id, ...restored.map((p) => p.id)],
+    );
+
+    set((s) => ({
+      altars: s.altars
+        .map((entry) => (entry.id === altar.id ? altar : entry))
+        .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
+      previewPlacements: { ...s.previewPlacements, [altar.id]: restored },
+      ...(s.activeAltarId === altar.id
+        ? { placements: restored, selectedPlacementId: null, intention: altar.intention }
+        : {}),
+    }));
+  }),
 
   permanentlyDeleteAltar: async (id) => {
     const db = await getDb();

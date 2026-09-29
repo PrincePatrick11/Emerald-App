@@ -33,7 +33,7 @@ export function useEditActions(active: boolean, handlers: EditHandlers): void {
 
   useEffect(() => {
     if (!active) return;
-    // Ohne Wächter (Altar) gibt es nichts zu umgehen.
+    // Ohne Wächter gibt es nichts zu umgehen.
     const ending = <T,>(run: () => T | Promise<T>) => (key ? withoutLeaveGuard(key, run) : run());
     setEditActions({
       onSave: () => ending(() => handlersRef.current.onSave()),
