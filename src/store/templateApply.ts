@@ -13,7 +13,7 @@ import { useWikiStore } from './wikiStore';
 import { useOperationStore } from './operationStore';
 import { useTemplateStore } from './templateStore';
 import { useBlockSessionStore } from './blockSessionStore';
-import { withUsableTags } from '../lib/templateTags';
+import { createMissingTags, withUsableTags } from '../lib/templateTags';
 import { serializeBlocks } from '../lib/blocks/blockHtml';
 import {
   contentForTemplate, fieldsWithoutTemplate, fieldsWithTemplate,
@@ -81,7 +81,9 @@ export async function applyTemplateFields(
 ): Promise<void> {
   const fields = entryFields(entryType, id);
   if (!fields) return;
-  await writeChangedFields(entryType, id, fields, fieldsWithTemplate(fields, entryType, withUsableTags(template), options));
+  const usable = withUsableTags(template);
+  await createMissingTags(usable.tags);
+  await writeChangedFields(entryType, id, fields, fieldsWithTemplate(fields, entryType, usable, options));
 }
 
 /**

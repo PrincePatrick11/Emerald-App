@@ -521,13 +521,16 @@ export async function seedBuiltins(
  * Seit v43 nimmt es die Kategorie auch aus den Zuweisungen der Vorlagen
  * (`dropCategoryFromTemplates`) — beide Aufräumarbeiten gehören zum selben
  * endgültigen Löschen.
+ *
+ * Mit `to` ziehen die Inhalte statt dessen in diese Kategorie — wenn eine
+ * zurückgeholte in ihrer gleichnamigen aufgeht (`categoryStore.restoreCategory`).
  */
-export async function reassignCategoryContent(db: Database, categoryId: string): Promise<number> {
+export async function reassignCategoryContent(db: Database, categoryId: string, to: string | null = null): Promise<number> {
   let moved = 0;
   for (const table of CATEGORIZED_TABLES) {
     const result = await db.execute(
-      `UPDATE ${table} SET category_id = NULL WHERE category_id = $1`,
-      [categoryId]
+      `UPDATE ${table} SET category_id = $1 WHERE category_id = $2`,
+      [to, categoryId]
     );
     moved += result.rowsAffected ?? 0;
   }

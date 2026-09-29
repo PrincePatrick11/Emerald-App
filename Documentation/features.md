@@ -272,9 +272,9 @@ Each row shows the category's emoji, its name, and how many entries in each of t
 
 From here you can:
 
-- **Add** a category with the button in the header — pick an emoji, type a name, Enter saves. A duplicate name is refused with a message under the field.
+- **Add** a category with the button in the header — pick an emoji, type a name, Enter saves. A name already in use is refused with a message under the field; the name of a category in the Trash brings that one back instead (with the emoji you picked), together with the entries still in it.
 - **Rename and change the emoji** inline, with the pencil on the row. Enter saves, Escape cancels. The change shows up immediately everywhere the category appears.
-- **Delete** with a two-step confirmation on the row, undoable from the toast that follows. A deleted category goes to the Trash; its entries keep pointing at it and appear under "Uncategorized" in their module until it is restored (which brings them back with it) or deleted permanently (which moves them to **Other**).
+- **Delete** with a two-step confirmation on the row, undoable from the toast that follows. A deleted category goes to the Trash; its entries keep pointing at it and appear under "Uncategorized" in their module until it is restored (which brings them back with it) or deleted permanently (which leaves them uncategorized). If another category took its name in the meantime, restoring merges the two: its entries move into the one that has the name.
 - **Reorder** by dragging a row by its grip. This is the order categories appear in everywhere — group headers, filter rows, the Altar tab strip, the category picker — and it is saved immediately.
 
 **Sigils** is the one built-in: it has no rename or delete button, since its name comes from the app's own translations rather than the stored row, and an operation inside it opens the sigil editor. It can still be dragged. Everything else, including the **Other** that older vaults carry, is an ordinary category you can rename or delete. New categories go to the end of the list.

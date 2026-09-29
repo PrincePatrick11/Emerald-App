@@ -16,6 +16,12 @@ export function registerTagLookup(lookup: (name: string) => string | undefined):
   tagNameOf = lookup;
 }
 
+let createTag: (name: string) => Promise<unknown> = async () => undefined;
+
+export function registerTagCreator(create: (name: string) => Promise<unknown>): void {
+  createTag = create;
+}
+
 /**
  * Die Namen, die ein Eintrag aus einer Vorlage übernimmt — in der Schreibweise
  * des Tags, wie beim Eintippen (Umbenennen und Löschen suchen den Namen exakt).
@@ -29,6 +35,18 @@ export function usableTemplateTags(names: readonly string[]): string[] {
     .map((name) => tagNameOf(name) ?? (createInline ? name : undefined))
     .filter((name): name is string => !!name);
   return [...new Set(usable)];
+}
+
+/**
+ * Legt die Tags an, die ein Eintrag gerade aus einer Vorlage übernommen hat
+ * und die es noch nicht gibt — wie das Tag-Feld beim Eintippen. Ohne das
+ * stünde der Name im Eintrag, aber in keiner Tag-Liste. Nur für Namen, die
+ * `usableTemplateTags` durchgelassen hat.
+ */
+export async function createMissingTags(names: readonly string[]): Promise<void> {
+  for (const name of names) {
+    if (tagNameOf(name) === undefined) await createTag(name);
+  }
 }
 
 /** `template` mit den Tags, die es wirklich übernimmt (`usableTemplateTags`). */

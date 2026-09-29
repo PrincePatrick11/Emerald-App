@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { registerTagLookup } from '../lib/templateTags';
+import { registerTagCreator, registerTagLookup } from '../lib/templateTags';
 import { getDb } from '../lib/db';
 import { fromRow, jsonArray, type DbRow } from '../lib/row';
 import { useJournalStore } from './journalStore';
@@ -73,11 +73,28 @@ function setItemTags(type: TaggedType, id: string, tags: string[]): Promise<void
 const sameName = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
 /**
- * `name` ist in der Tabelle UNIQUE — auch für Tags im Papierkorb. Wer den
- * Namen jetzt bewusst neu vergibt, räumt den gelöschten Namensvetter weg;
- * sonst schlüge das INSERT/UPDATE fehl (bzw. ensureTag verwarf es still).
- * Ohne Rücksicht auf Groß-/Kleinschreibung, wie jeder Namensvergleich hier —
- * sonst stünden nach dem Wiederherstellen „foo" und „Foo" nebeneinander.
+ * Ein Name gehört einem Tag — dieselbe Regel wie bei Kategorien. Wer einen
+ * Namen anlegt (eintippen, Vorlage, Import), den ein Tag im Papierkorb trägt,
+ * holt diesen zurück, mit Farbe und Schreibweise, statt einen zweiten zu
+ * schaffen. Die Einträge, von denen er beim Löschen genommen wurde, bekommen
+ * ihn dabei nicht wieder: wer den Namen jetzt vergibt, meint den einen Eintrag.
+ * Ohne Rücksicht auf Groß-/Kleinschreibung, wie jeder Namensvergleich hier.
+ */
+async function reviveTrashedNamesake(name: string): Promise<Tag | null> {
+  const db = await getDb();
+  const trashed = await db.select<{ id: string; name: string; color: string }[]>(
+    'SELECT id, name, color FROM tags WHERE deleted_at IS NOT NULL'
+  );
+  const hit = trashed.find((row) => sameName(row.name, name));
+  if (!hit) return null;
+  await db.execute("UPDATE tags SET deleted_at=NULL, affected_ids='[]' WHERE id=$1", [hit.id]);
+  return { id: hit.id, name: hit.name, color: hit.color };
+}
+
+/**
+ * `name` ist in der Tabelle UNIQUE — auch für Tags im Papierkorb. Wer einen
+ * Tag auf den Namen eines gelöschten umbenennt, übernimmt den Namen: der
+ * Namensvetter im Papierkorb geht, sonst schlüge das UPDATE fehl.
  */
 async function purgeTrashedNamesake(name: string) {
   const db = await getDb();
@@ -141,10 +158,17 @@ export const useTagStore = create<TagState>((set, get) => {
     const trimmed = name.trim();
     const existing = get().tags.find((t) => sameName(t.name, trimmed));
     if (existing) return existing;
-    const tag: Tag = { id: generateId(), name: trimmed, color: color ?? randomTagColor() };
-    await purgeTrashedNamesake(tag.name);
     const db = await getDb();
-    await db.execute('INSERT INTO tags (id, name, color) VALUES ($1, $2, $3)', [tag.id, tag.name, tag.color]);
+    const revived = await reviveTrashedNamesake(trimmed);
+    let tag: Tag;
+    if (revived) {
+      // Eine ausdrücklich gewählte Farbe (Tags-Ansicht) gilt auch für den zurückgeholten.
+      tag = color ? { ...revived, color } : revived;
+      if (color) await db.execute('UPDATE tags SET color=$1 WHERE id=$2', [color, tag.id]);
+    } else {
+      tag = { id: generateId(), name: trimmed, color: color ?? randomTagColor() };
+      await db.execute('INSERT INTO tags (id, name, color) VALUES ($1, $2, $3)', [tag.id, tag.name, tag.color]);
+    }
     set((s) => ({
       tags: [...s.tags, tag].sort(byName),
     }));
@@ -270,5 +294,6 @@ export const useTagStore = create<TagState>((set, get) => {
   };
 });
 
-// Vorlagen prüfen ihre Tags gegen den Store, ohne ihn zu importieren (siehe lib/templateTags).
+// Vorlagen prüfen und legen ihre Tags über den Store an, ohne ihn zu importieren (siehe lib/templateTags).
 registerTagLookup((name) => useTagStore.getState().getByName(name)?.name);
+registerTagCreator((name) => useTagStore.getState().ensureTag(name));

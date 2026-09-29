@@ -53,24 +53,15 @@ function nameTaken(categories: Category[], name: string, exceptId?: string): boo
   return categories.some((c) => c.id !== exceptId && categoryKey(c.name) === key);
 }
 
-/** Erster freier Name der Form „Name", „Name (2)", „Name (3)", … */
-function freeName(categories: Category[], name: string, exceptId: string): string {
-  if (!nameTaken(categories, name, exceptId)) return name;
-  for (let i = 2; ; i++) {
-    const candidate = `${name} (${i})`;
-    if (!nameTaken(categories, candidate, exceptId)) return candidate;
-  }
-}
-
 /**
  * Löst die Kategorie von Inhalten, die auf eine der `ids` zeigen, in den
  * geladenen Stores — das Gegenstück zu `reassignCategoryContent` für den
  * Speicher. Auch vom Papierkorb-Leeren benutzt; die vier Store-Formen sollen
  * nur an einer Stelle stehen.
  */
-export function reassignCategoriesInMemory(ids: ReadonlySet<string>): void {
+export function reassignCategoriesInMemory(ids: ReadonlySet<string>, to: string | null = null): void {
   const move = <T extends { category_id: string | null }>(x: T): T =>
-    x.category_id && ids.has(x.category_id) ? { ...x, category_id: null } : x;
+    x.category_id && ids.has(x.category_id) ? { ...x, category_id: to } : x;
   useWikiStore.setState((s) => ({ articles: s.articles.map(move) }));
   useOperationStore.setState((s) => ({ operations: s.operations.map(move) }));
   useTaskStore.setState((s) => ({ tasks: s.tasks.map(move) }));
@@ -97,14 +88,26 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const current = get().categories;
     if (nameTaken(current, trimmed)) throw new Error(CATEGORY_NAME_TAKEN);
 
+    // Ein Name gehört einer Kategorie — dieselbe Regel wie bei Tags. Liegt eine
+    // gleichnamige im Papierkorb, kommt sie zurück, samt dem, was noch in ihr
+    // steht, statt dass eine zweite entsteht. Das gewählte Emoji gilt.
+    const db = await getDb();
+    const trashed = (await db.select<DbRow[]>('SELECT * FROM categories WHERE deleted_at IS NOT NULL')).map(fromRow.category);
+    const namesake = trashed.find((c) => categoryKey(c.name) === categoryKey(trimmed));
+    if (namesake) {
+      await get().restoreCategory(namesake.id);
+      if (!namesake.is_builtin && namesake.emoji !== emoji) await get().updateCategory(namesake.id, namesake.name, emoji);
+      const restored = get().categories.find((c) => c.id === namesake.id);
+      if (restored) return restored;
+    }
+
     // Ans Ende. Bis v39 schob sich Neues vor das Sammelbecken `other`, damit
     // das immer letztes blieb — seit es eine gewöhnliche Kategorie ist, gibt
     // es dafür keinen Grund mehr, und die Reihenfolge gehört ohnehin dem
     // Nutzer (Ziehen in der Kategorien-Ansicht).
-    const last = current[current.length - 1];
+    const last = get().categories[get().categories.length - 1];
     const sortOrder = (last?.sort_order ?? -1) + 1;
 
-    const db = await getDb();
     const cat: Category = {
       id: generateId(), name: trimmed, emoji, sort_order: sortOrder, is_builtin: false, deleted_at: null,
     };
@@ -144,19 +147,26 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const rows = await db.select<DbRow[]>('SELECT * FROM categories WHERE id=$1', [id]);
     if (!rows[0]) return;
     const cat = fromRow.category(rows[0]);
-    // Inzwischen kann eine gleichnamige aktive Kategorie entstanden sein —
-    // dann bekommt die zurückgeholte einen Zusatz statt eines Fehlers. Ihr
-    // alter Platz ist inzwischen vergeben (addCategory zählt weiter), also
-    // ans Ende der Liste.
+    // Inzwischen kann eine gleichnamige aktive Kategorie entstanden sein. Ein
+    // Name gehört einer Kategorie: die zurückgeholte geht in ihr auf — ihr
+    // Inhalt zieht hinüber, die Zeile verschwindet —, wie ein Tag in seinem
+    // gleichnamigen. Vorlagen verlieren die Zuweisung an die alte.
     const active = get().categories;
-    const name = freeName(active, cat.name, id);
+    const namesake = active.find((c) => c.id !== id && categoryKey(c.name) === categoryKey(cat.name));
+    if (namesake) {
+      await reassignCategoryContent(db, id, namesake.id);
+      await db.execute('DELETE FROM categories WHERE id=$1', [id]);
+      reassignCategoriesInMemory(new Set([id]), namesake.id);
+      return;
+    }
+    // Ihr alter Platz ist inzwischen vergeben (addCategory zählt weiter), also ans Ende der Liste.
     const sortOrder = (active[active.length - 1]?.sort_order ?? -1) + 1;
     await db.execute(
-      'UPDATE categories SET deleted_at=NULL, name=$1, sort_order=$2 WHERE id=$3',
-      [name, sortOrder, id]
+      'UPDATE categories SET deleted_at=NULL, sort_order=$1 WHERE id=$2',
+      [sortOrder, id]
     );
     set((s) => ({
-      categories: [...s.categories, { ...cat, name, sort_order: sortOrder, deleted_at: null }],
+      categories: [...s.categories, { ...cat, sort_order: sortOrder, deleted_at: null }],
     }));
   },
 

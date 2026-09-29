@@ -10,6 +10,7 @@ import { useJournalStore } from '../store/journalStore';
 import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { useTagStore } from '../store/tagStore';
+import { useSettingsStore } from '../store/settingsStore';
 import { useAltarStore } from '../store/altarStore';
 import { reloadModules } from '../store/moduleWiring';
 import { useImportStore } from '../store/importStore';
@@ -682,11 +683,16 @@ async function withImportedStatus(content: string, status: LegacyStatus): Promis
 /** Ensures each tag name exists in the tags table and returns the names as the
  *  table spells them. entry.tags stores tag NAMES (not IDs), and ensureTag
  *  matches case-insensitively — an imported "foo" for an existing "Foo" must
- *  become "Foo", or renaming/deleting that tag would miss this entry. */
+ *  become "Foo", or renaming/deleting that tag would miss this entry.
+ *  Like typing into the tag field, a vault that may not create tags that way
+ *  (`tags.createInline` off) keeps only names that already are tags. */
 async function ensureTagNames(names: string[]): Promise<string[]> {
+  const createInline = useSettingsStore.getState().settings.tags.createInline;
   const result: string[] = [];
   for (const name of names) {
-    const { name: canonical } = await useTagStore.getState().ensureTag(name);
+    const known = useTagStore.getState().getByName(name);
+    if (!known && !createInline) continue;
+    const { name: canonical } = known ?? await useTagStore.getState().ensureTag(name);
     if (!result.includes(canonical)) result.push(canonical);
   }
   return result;
@@ -980,8 +986,9 @@ async function ensureCategoryByName(name: string | null | undefined, emoji = '�
   const active = store.categories.find(matches);
   if (active) return active.id;
 
-  // Im Papierkorb? Dann zurückholen statt eine zweite anzulegen — wie der
-  // Backup-Import (resolveImportedCategories).
+  // Im Papierkorb? Dann zurückholen statt eine zweite anzulegen — die Regel
+  // von `addCategory` und dem Backup-Import. Hier selbst gesucht, damit die
+  // zurückgeholte ihr Emoji behält statt das der Datei zu bekommen.
   const db = await getDb();
   const trashed = await db.select<{ id: string; name: string }[]>(
     'SELECT id, name FROM categories WHERE deleted_at IS NOT NULL'

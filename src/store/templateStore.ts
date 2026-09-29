@@ -30,7 +30,7 @@ import {
 } from '../lib/blocks/templates';
 import i18n from '../i18n';
 import { useSettingsStore } from './settingsStore';
-import { withUsableTags } from '../lib/templateTags';
+import { createMissingTags, withUsableTags } from '../lib/templateTags';
 
 export type TemplatePatch = Partial<Pick<Template, 'name' | 'icon' | 'description' | 'title' | 'content' | 'tags' | 'assignments'>>;
 
@@ -195,7 +195,10 @@ export function startOfNewEntry(
 ): EntryStart {
   const apply = !blank && useSettingsStore.getState().settings.templates.applyDefault;
   const template = !apply ? null : resolveDefaultTemplate(useTemplateStore.getState().templates, entryType, categoryId);
-  return withUsableTags(templateStart(template, fallbackTitle));
+  const start = withUsableTags(templateStart(template, fallbackTitle));
+  // Nebenher: der Eintrag trägt die Namen sofort, die Tag-Liste folgt.
+  if (start.tags.length) void createMissingTags(start.tags).catch(console.error);
+  return start;
 }
 
 /** Eine gerade automatisch eingesetzte Vorlage — der Blockstapel des Eintrags zeigt dazu Rückgängig und „Andere Vorlage". */
