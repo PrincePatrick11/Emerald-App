@@ -10,9 +10,7 @@ import {
   type UpdateCheck, type UpdateError, type UpdateProgress,
 } from '../../../lib/updates';
 import packageJson from '../../../../package.json';
-import { resolveOpenEdits } from '../../../lib/openEdits';
-import { drainSerialized } from '../../../lib/serialize';
-import { flushDrafts } from '../../../store/draftStore';
+import { settleBeforeExit } from '../../../lib/openEdits';
 
 type Status = 'idle' | 'checking' | 'done' | 'failed' | 'installing';
 
@@ -114,8 +112,7 @@ export default function UpdatesPage() {
   async function install() {
     // Die Installation startet die App neu, ohne das Fenster zu fragen —
     // also vorher klären, was mit laufenden Bearbeitungen geschieht.
-    if (!(await resolveOpenEdits())) return;
-    await Promise.all([drainSerialized(), flushDrafts()]);
+    if (!(await settleBeforeExit())) return;
     setStatus('installing');
     setError(null);
     try {

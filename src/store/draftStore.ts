@@ -5,6 +5,7 @@ import { isDefinitionId, parseDefinitionDisplay, parseDefinitionElements } from 
 import { parseAssignments } from '../lib/blocks/templates';
 import type { BlockDefinitionPatch } from './blockDefinitionStore';
 import type { TemplatePatch } from './templateStore';
+import type { VaultFileRead } from '../lib/vaultSettings';
 
 /** Was die Seite eines eigenen Blocks bearbeitet — genau das, was `updateDefinition` annimmt. */
 export type DefinitionDraft = Required<BlockDefinitionPatch>;
@@ -66,8 +67,6 @@ const stores: { kind: DraftKind; store: DraftStore<unknown>; normalize: Normaliz
 const DRAFTS_VERSION = 1;
 const PERSIST_DELAY_MS = 400;
 
-/** Mirrors `SettingsRead` in `src-tauri/src/vault.rs`. */
-type DraftsRead = { kind: 'missing' } | { kind: 'found'; contents: string } | { kind: 'unreadable' };
 
 /** Der Vault, dessen Entwürfe im Speicher stehen — `null`, solange keiner geladen ist. Dann wird nichts geschrieben. */
 let draftVaultId: string | null = null;
@@ -102,7 +101,7 @@ export function flushDrafts(): Promise<void> {
       .filter(([, drafts]) => Object.keys(drafts).length > 0),
   );
   // Ohne Entwürfe ein leeres Objekt: Rust nimmt dann die Datei weg.
-  const contents = JSON.stringify(Object.keys(byKind).length ? { v: DRAFTS_VERSION, ...byKind } : {});
+  const contents = JSON.stringify(Object.keys(byKind).length ? { version: DRAFTS_VERSION, ...byKind } : {});
   writing = writing
     .then(() => invoke<void>('write_vault_drafts', { vaultId, contents }))
     .catch((err: unknown) => {
@@ -146,12 +145,12 @@ function readKind(raw: unknown, normalize: Normalize<unknown>): Record<string, D
  */
 async function readDraftsFile(vaultId: string): Promise<{ drafts: Record<string, unknown>; foreign: boolean }> {
   try {
-    const read = await invoke<DraftsRead>('read_vault_drafts', { vaultId });
+    const read = await invoke<VaultFileRead>('read_vault_drafts', { vaultId });
     if (read.kind !== 'found') return { drafts: {}, foreign: false };
     const parsed: unknown = JSON.parse(read.contents);
     if (!isPlainObject(parsed)) return { drafts: {}, foreign: false };
-    if (parsed.v === DRAFTS_VERSION) return { drafts: parsed, foreign: false };
-    return { drafts: {}, foreign: typeof parsed.v === 'number' && parsed.v > DRAFTS_VERSION };
+    if (parsed.version === DRAFTS_VERSION) return { drafts: parsed, foreign: false };
+    return { drafts: {}, foreign: typeof parsed.version === 'number' && parsed.version > DRAFTS_VERSION };
   } catch (err) {
     console.warn('[drafts] could not read drafts', err);
     return { drafts: {}, foreign: false };

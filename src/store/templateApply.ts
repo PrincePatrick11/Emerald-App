@@ -38,7 +38,7 @@ export interface TemplateApplyOptions extends TemplateFieldOptions {
   mode: 'append' | 'replace';
   /** Die Vorlage, die sie ablöst („Andere Vorlage") — ihre Tags fallen vorher weg. */
   replaces?: Template;
-  /** Danach den Hinweis „Vorlage angewendet" zeigen (automatisch eingesetzt). */
+  /** Danach den Hinweis „Vorlage angewendet" zeigen. */
   notice?: boolean;
 }
 

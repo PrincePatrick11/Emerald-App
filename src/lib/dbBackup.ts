@@ -51,7 +51,8 @@ import { generateId, nowIso } from './helpers';
 import { useVaultStore } from '../store/vaultStore';
 import { reloadAllStores } from '../store/moduleWiring';
 import { useUIStore } from '../store/uiStore';
-import { clearAllDrafts } from '../store/draftStore';
+import { clearAllDrafts, flushDrafts } from '../store/draftStore';
+import { clearAltarEdits } from '../store/altarEdit';
 import { resumeEditorSaves, suspendEditorSaves } from './editorLock';
 import { drainSerialized } from './serialize';
 import { importViaStaging } from './importStaging';
@@ -1669,7 +1670,11 @@ export async function importDatabase(
   // bleiben die Tabs gueltig; add-vault laeuft ueber switchVault und raeumt dort.
   if (mode === 'replace') {
     useUIStore.getState().closeAllTabs();
+    clearAltarEdits();
     clearAllDrafts();
+    // Gleich aus der Datei, nicht erst nach der Verzögerung: ein alter Entwurf,
+    // der einen Absturz überlebt, schriebe beim nächsten „Fertig" über das Eingespielte.
+    await flushDrafts();
   }
 
   // Die globale Suche merkt sich den Klartext eines Eintrags unter (id,

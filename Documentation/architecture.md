@@ -360,7 +360,9 @@ write is an upsert per placement followed by a delete of what does not belong �
 transaction to lean on, so it is built to be repeatable: if it fails, the snapshot stays and
 the next Edit and Cancel finish it. Cancel switches to read mode *first* and restores behind
 it — `restoreAltarEdit` takes hold of the snapshot before its first `await`, since the change
-of view would otherwise prune it while the write is still waiting. An Edit pressed right
+of view would otherwise prune it while the write is still waiting. A vault switch and a
+replace-mode restore drop every snapshot (`clearAltarEdits`), held ones included: the ids of
+a replaced vault come back, and Cancel would write the old altar over the restored one. An Edit pressed right
 after Cancel waits for that write (`beginAltarEdit`), so that it starts from a snapshot of
 its own. `altarEditDirty` is what both the altar's leave guard and the
 probe for background tabs ask. The snapshot has the baseline's lifetime: kept across a tab
@@ -393,13 +395,15 @@ What asks:
   Back/Forward step from the history *as it was before the question* (`stepGuarded`), because
   Save and Discard navigate themselves (back to the list) and would otherwise shift the step
   by one.
-- Closing a tab in the background that holds changes switches to it first, waits for its view
-  to register its guard (`guardRegistered` — the view may have to load), asks, closes, and
-  returns to the tab it was closed from.
+- Closing a tab in the background that holds changes goes through `uiStore.askInTab`: it
+  switches to the tab, waits for its view to register its guard (`guardRegistered` — the view
+  may have to load), and asks; then the tab closes and the one it was closed from comes back.
 - `lib/openEdits.ts`'s `resolveOpenEdits()` asks for every open edit in turn — the open page,
-  then each background tab — and is what a vault switch (`vaultStore.switchVault`), a
-  replace or add-vault import (`BackupPage`), an update install (`UpdatesPage`) and closing
-  the window (`AppShell`, Tauri's `onCloseRequested`) call before they do anything.
+  then each background tab through the same `askInTab` — and is what a vault switch
+  (`vaultStore.switchVault`) and a replace or add-vault import (`BackupPage`) call before they
+  do anything. `settleBeforeExit()` adds waiting for the writes still under way
+  (`drainSerialized`, `flushDrafts`) — for an update install (`UpdatesPage`) and closing the
+  window (`AppShell`, Tauri's `onCloseRequested`), after which nothing gets another chance.
 
 What does not ask: switching to another tab (the edit continues there, see the baseline
 above), and Done, Cancel and Delete themselves — `useEditActions` wraps them in
@@ -831,8 +835,8 @@ same parsers a database row goes through (`parseDefinitionElements`, `parseAssig
 dropping a file of another version; the previous vault's drafts only leave memory, their file
 stays with that vault. `flushDrafts()` writes what is pending and waits for it — called before
 the window closes and before an update installs, so a draft that was just discarded does not
-come back after the restart. `clearAllDrafts()` empties memory *and* file on a replace-mode
-restore, which also closes every tab — a stale draft would otherwise silently overwrite a
+come back after the restart. `clearAllDrafts()` empties memory, and the `flushDrafts()` right
+after it the file, on a replace-mode restore, which also closes every tab — a stale draft would otherwise silently overwrite a
 freshly restored block on the next Done. The delete confirmation (`DeleteDefinitionModal`,
 still defined in `BlockDefinitionEditor.tsx`) is instead *hosted* by `BlocksView`, one level up
 from both list and page, so its own closing notice ("N entries left open, skipped") survives the
@@ -1111,7 +1115,7 @@ whole view per keystroke. `BlockStack`'s `initialContent` (and each
 that compared `editor.getHTML()` against the prop on every render (a second
 full-document serialisation per keystroke) is gone. Switching entries remounts
 the stack via its `key` (`` `${id}:${editorEpoch}` ``), and Cancel bumps
-`editorEpoch` to remount from the last saved content. Since the whole block
+`editorEpoch` to remount from the restored baseline. Since the whole block
 stack serialises into that one `content` string, Cancel's
 baseline reverts every block change of the session — sigil blocks included, since v42.
 
@@ -1637,10 +1641,11 @@ Both forms resolve to the same code. `src/lib/menuActions.ts` owns the action im
 ### Closing the window
 
 Closing asks about unsaved edits first (see [Leaving an edit](#leaving-an-edit)): `AppShell`
-registers `onCloseRequested`, runs `resolveOpenEdits()`, and prevents the close when the answer
+registers `onCloseRequested`, runs `settleBeforeExit()`, and prevents the close when the answer
 is "keep editing". Before the window goes it waits for the writes still under way
 (`drainSerialized`, `flushDrafts`). A window that is minimised is restored and focused before
-the question, which would otherwise be asked where nobody sees it.
+the question, which would otherwise be asked where nobody sees it — on Linux (X11) only once
+the window no longer reports itself as minimised, since tao drops a focus request before that.
 
 A registered handler has a price: Tauri holds back *every* close while a JS listener exists,
 so a frontend that hangs or has crashed would leave a window that cannot be closed — and on

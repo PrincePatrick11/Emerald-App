@@ -251,8 +251,8 @@ export function withSettingsGroups(current: VaultSettings, incoming: VaultSettin
   return next as unknown as VaultSettings;
 }
 
-/** Mirrors `SettingsRead` in `src-tauri/src/vault.rs`. */
-type SettingsRead = { kind: 'missing' } | { kind: 'found'; contents: string } | { kind: 'unreadable' };
+/** Mirrors `VaultFileRead` in `src-tauri/src/vault.rs` — the answer of `read_vault_settings` and `read_vault_drafts`. */
+export type VaultFileRead = { kind: 'missing' } | { kind: 'found'; contents: string } | { kind: 'unreadable' };
 
 /**
  * `settings: null`, wenn der Vault keine brauchbare Datei hat. `corrupt` heißt:
@@ -260,7 +260,7 @@ type SettingsRead = { kind: 'missing' } | { kind: 'found'; contents: string } | 
  * Nutzer selbst etwas ändert. Den Vault sperrt es nie.
  */
 export async function readVaultSettings(vaultId: string): Promise<{ settings: VaultSettings | null; corrupt: boolean }> {
-  const read = await invoke<SettingsRead>('read_vault_settings', { vaultId });
+  const read = await invoke<VaultFileRead>('read_vault_settings', { vaultId });
   if (read.kind === 'missing') return { settings: null, corrupt: false };
   if (read.kind === 'found') {
     try {

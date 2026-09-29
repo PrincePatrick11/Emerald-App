@@ -19,9 +19,8 @@ import ImageNoticeModal from '../ui/ImageNoticeModal';
 import LeaveGuardModal from './LeaveGuardModal';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { isTauri } from '../../lib/platform';
-import { hasOpenEdits, resolveOpenEdits } from '../../lib/openEdits';
-import { drainSerialized } from '../../lib/serialize';
-import { flushDrafts, restoreDrafts } from '../../store/draftStore';
+import { hasOpenEdits, settleBeforeExit } from '../../lib/openEdits';
+import { restoreDrafts } from '../../store/draftStore';
 import ImportDestinationModal from '../ui/ImportDestinationModal';
 
 const ENTRY_LIST_MIN = 180;
@@ -156,16 +155,18 @@ export default function AppShell() {
         if (hasOpenEdits()) {
           // Die Frage in einem minimierten Fenster sähe niemand — es wirkte,
           // als würde das Schließen ignoriert.
-          if (await appWindow.isMinimized()) await appWindow.unminimize();
+          if (await appWindow.isMinimized()) {
+            await appWindow.unminimize();
+            // Linux (X11): tao lässt `setFocus` fallen, solange es das Fenster
+            // noch für minimiert hält — und das erfährt es erst, wenn GTK den
+            // neuen Zustand zurückmeldet. Höchstens eine Sekunde darauf warten.
+            for (let i = 0; i < 20 && (await appWindow.isMinimized()); i++) {
+              await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+          }
           await appWindow.setFocus();
         }
-        if (!(await resolveOpenEdits())) {
-          event.preventDefault();
-          return;
-        }
-        // Was „Speichern" und das Durchschalten der Tabs noch schreiben —
-        // und dass ein eben verworfener Entwurf auch aus der Datei ist.
-        await Promise.all([drainSerialized(), flushDrafts()]);
+        if (!(await settleBeforeExit())) event.preventDefault();
       } catch (e) {
         // Ein Fehler hier darf das Fenster nicht offen halten: Tauri schließt
         // erst, wenn dieser Handler zurückkehrt, ohne zu verhindern.
@@ -196,6 +197,7 @@ export default function AppShell() {
       exportAltarWebp: t('menu.exportAltarWebp'),
       importMarkdown:  t('menu.importMarkdown'),
       importEmerald:   t('menu.importEmerald'),
+      quit:            t('menu.quit'),
     }).catch(() => {/* desktop-only, ignore in browser preview */});
   }, [i18n.language, t]);
 

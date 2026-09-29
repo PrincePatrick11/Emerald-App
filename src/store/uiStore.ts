@@ -264,6 +264,34 @@ function whenLeaveConfirmed(leaves: boolean, run: () => void): void {
   void confirmLeave().then((ok) => { if (ok) run(); });
 }
 
+/** Zeigt irgendein Tab — oder die Ansicht ohne Tab — `type`/`id` im Bearbeiten? */
+export function isInEdit(s: Pick<UIState, 'activeView' | 'tabs'>, type: string, id: string): boolean {
+  return [s.activeView, ...s.tabs.map((tab) => tab.view)]
+    .some((view) => view.type === type && view.id === id && view.mode === 'edit');
+}
+
+/**
+ * Fragt nach der Bearbeitung im Tab `tabId`, wenn sie Änderungen trägt: erst
+ * hinschauen — dorthin wechseln und warten, bis die Seite ihren Wächter
+ * angemeldet hat (nach dem Wechsel montiert sie erst) —, dann fragen.
+ * `true`: der Tab darf gehen. `false`: weiter bearbeiten, oder man ist
+ * inzwischen woanders und die Frage gälte einer anderen Seite.
+ */
+export async function askInTab(tabId: string): Promise<boolean> {
+  const { tabs, activeTabId, selectTab } = useUIStore.getState();
+  const tab = tabs.find((candidate) => candidate.id === tabId);
+  if (!tab || !holdsOpenEdit(tab.view)) return true;
+  const key = guardKey(tab.view.type, tab.view.id);
+  if (activeTabId !== tabId) selectTab(tabId);
+  const registered = await guardRegistered(key);
+  if (useUIStore.getState().activeTabId !== tabId) return false;
+  // Meldet sich die Seite nicht, gibt es niemanden zu fragen — ihre Arbeit
+  // ist gespeichert (Autosave) oder mitgeschrieben (Entwurf).
+  if (!registered) return true;
+  if (useLeaveGuardStore.getState().guard?.key !== key) return false;
+  return confirmLeave();
+}
+
 /** Dieselbe Seite im selben Modus ist kein Verlassen. */
 function leavesPage(current: ActiveView, next: ActiveView): boolean {
   return !(current.type === next.type && current.id === next.id && current.mode === next.mode);
@@ -469,7 +497,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   }),
 
   closeTab: (id) => {
-    const { tabs, activeTabId, selectTab } = get();
+    const { tabs, activeTabId } = get();
     const tab = tabs.find((candidate) => candidate.id === id);
     if (!tab) return;
     if (activeTabId === id) {
@@ -480,20 +508,12 @@ export const useUIStore = create<UIState>((set, get) => ({
       closeTabNow(id);
       return;
     }
-    // Ein Tab im Hintergrund mit ungesicherten Änderungen: erst hinschauen,
-    // dann fragen — und danach zurück in den Tab, aus dem heraus er geschlossen wurde.
-    const key = guardKey(tab.view.type, tab.view.id);
-    selectTab(id);
-    void guardRegistered(key).then((registered) => {
-      // Inzwischen woanders: die Frage gälte einer anderen Seite.
-      if (get().activeTabId !== id) return;
-      if (registered && useLeaveGuardStore.getState().guard?.key !== key) return;
-      // Meldet sich die Seite nicht, gibt es niemanden zu fragen — ihre
-      // Arbeit ist gespeichert (Autosave) oder mitgeschrieben (Entwurf).
-      whenLeaveConfirmed(registered, () => {
-        closeTabNow(id);
-        if (activeTabId && get().tabs.some((candidate) => candidate.id === activeTabId)) get().selectTab(activeTabId);
-      });
+    // Ein Tab im Hintergrund mit ungesicherten Änderungen: fragen — und danach
+    // zurück in den Tab, aus dem heraus er geschlossen wurde.
+    void askInTab(id).then((leave) => {
+      if (!leave) return;
+      closeTabNow(id);
+      if (activeTabId && get().tabs.some((candidate) => candidate.id === activeTabId)) get().selectTab(activeTabId);
     });
   },
 

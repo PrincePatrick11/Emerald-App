@@ -65,7 +65,7 @@ export default function WikiView() {
     category_id: a.category_id ?? null, icon: a.icon, cover_image: a.cover_image,
   });
 
-  const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, hasChanges, contentRef, handleContentChange } = useEntryEditor({
+  const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, isDirty, contentRef, handleContentChange } = useEntryEditor({
     scope: 'wiki',
     entityId: article?.id,
     isEditing,
@@ -156,8 +156,7 @@ export default function WikiView() {
     guard: article ? {
       key: guardKey('wiki', article.id),
       title: () => title.trim() || getArticle(article.id)?.title.trim() || t('wiki.untitled'),
-      // Ein inzwischen gelöschter Artikel hat nichts mehr zu sichern.
-      isDirty: () => !!getArticle(article.id) && (!!activeView.isNew || hasChanges()),
+      isDirty: () => isDirty(!!activeView.isNew),
     } : undefined,
   });
 

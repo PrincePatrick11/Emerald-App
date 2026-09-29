@@ -331,7 +331,7 @@ tick, on export and on import.
 
 Deleting a journal entry, wiki article, or operation moves it to the Trash rather than removing it permanently. Trashed items are retained for a period configurable per vault (Settings → Entries — 7/14/30/60/90 days, or never; 30 days by default, matching the previous fixed behaviour) and then automatically purged at startup. Trash's "time left" note names the vault's own period, or is left out entirely when purging is turned off.
 
-**Altars go to the Trash like everything else.** The delete button in the altar action bar and the dashboard card's context menu move the altar there, with the same undo toast; its placements stay with it, and restoring brings the arrangement back — except for elements whose library item was deleted in the meantime, since deleting a library item removes it from every altar, trashed ones included. Links that point at the altar keep pointing at it while it is in the Trash and are removed only when it is deleted for good. (Until v46 deleting an altar was final at once, without a question.)
+**Altars go to the Trash like everything else.** The delete button in the altar action bar, the dashboard card's context menu and the one in the left sidebar's list move the altar there, with the same undo toast; its placements stay with it, and restoring brings the arrangement back — except for elements whose library item was deleted in the meantime, since deleting a library item removes it from every altar, trashed ones included. Links that point at the altar keep pointing at it while it is in the Trash and are removed only when it is deleted for good. (Until v46 deleting an altar was final at once, without a question.)
 
 From the Trash view you can:
 

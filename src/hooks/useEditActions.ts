@@ -34,11 +34,11 @@ export function useEditActions(active: boolean, handlers: EditHandlers): void {
   useEffect(() => {
     if (!active) return;
     // Ohne Wächter gibt es nichts zu umgehen.
-    const ending = <T,>(run: () => T | Promise<T>) => (key ? withoutLeaveGuard(key, run) : run());
+    const unguarded = <T,>(run: () => T | Promise<T>) => (key ? withoutLeaveGuard(key, run) : run());
     setEditActions({
-      onSave: () => ending(() => handlersRef.current.onSave()),
-      onCancel: () => ending(() => handlersRef.current.onCancel()),
-      onDelete: handlersRef.current.onDelete ? () => ending(() => handlersRef.current.onDelete?.()) : undefined,
+      onSave: () => unguarded(() => handlersRef.current.onSave()),
+      onCancel: () => unguarded(() => handlersRef.current.onCancel()),
+      onDelete: handlersRef.current.onDelete ? () => unguarded(() => handlersRef.current.onDelete?.()) : undefined,
       flush: handlersRef.current.flush ? async () => { await handlersRef.current.flush?.(); } : undefined,
     });
     if (key) {

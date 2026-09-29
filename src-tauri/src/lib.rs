@@ -652,6 +652,7 @@ fn update_menu_labels(
     export_altar_webp: String,
     import_markdown: String,
     import_emerald: String,
+    quit: String,
 ) {
     use tauri::menu::MenuItemKind;
     let Some(menu) = app.menu() else { return };
@@ -695,6 +696,7 @@ fn update_menu_labels(
                         "export-emerald"       => Some(export_emerald.as_str()),
                         "import-markdown"      => Some(import_markdown.as_str()),
                         "import-emerald"       => Some(import_emerald.as_str()),
+                        "quit"                 => Some(quit.as_str()),
                         _ => None,
                     };
                     if let Some(text) = new_child_text {

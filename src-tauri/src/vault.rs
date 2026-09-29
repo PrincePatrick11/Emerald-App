@@ -824,10 +824,10 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
     Ok(std::fs::remove_dir(&dir).is_ok())
 }
 
-/// What [`read_vault_settings`] found.
+/// What [`read_vault_settings`] and [`read_vault_drafts`] found.
 #[derive(serde::Serialize, Debug, PartialEq)]
 #[serde(tag = "kind", rename_all = "lowercase")]
-pub enum SettingsRead {
+pub enum VaultFileRead {
     Missing,
     Found { contents: String },
     /// There is something, but not a file this app wrote: a link, a directory,
@@ -842,7 +842,7 @@ pub enum SettingsRead {
 /// [`images_dir`]: the caller is about to open that vault and must hear about
 /// it before SQLite creates an empty database in a resurrected folder.
 #[tauri::command]
-pub fn read_vault_settings(app: tauri::AppHandle, vault_id: String) -> Result<SettingsRead, String> {
+pub fn read_vault_settings(app: tauri::AppHandle, vault_id: String) -> Result<VaultFileRead, String> {
     let dir = vault_dir(&app, &vault_id)?;
     directory_state(&dir)?;
     Ok(read_settings_in(&dir))
@@ -852,7 +852,9 @@ pub fn read_vault_settings(app: tauri::AppHandle, vault_id: String) -> Result<Se
 ///
 /// Only well-formed JSON objects are written: the file is read back by every
 /// build, and a stray string here would only ever be thrown away there.
-#[tauri::command]
+/// `async`, like [`write_vault_drafts`]: a file held by a scanner or a sync
+/// client is waited out ([`patiently`]), and not on the main thread.
+#[tauri::command(async)]
 pub fn write_vault_settings(app: tauri::AppHandle, vault_id: String, contents: String) -> Result<(), String> {
     let dir = vault_dir(&app, &vault_id)?;
     directory_state(&dir)?;
@@ -861,7 +863,7 @@ pub fn write_vault_settings(app: tauri::AppHandle, vault_id: String, contents: S
 
 /// The vault's `drafts.json` — same answers as [`read_vault_settings`].
 #[tauri::command(async)]
-pub fn read_vault_drafts(app: tauri::AppHandle, vault_id: String) -> Result<SettingsRead, String> {
+pub fn read_vault_drafts(app: tauri::AppHandle, vault_id: String) -> Result<VaultFileRead, String> {
     let dir = vault_dir(&app, &vault_id)?;
     directory_state(&dir)?;
     Ok(read_json_in(&dir, DRAFTS_FILE, DRAFTS_MAX_BYTES))
@@ -897,7 +899,7 @@ fn write_drafts_in(dir: &Path, contents: &str) -> Result<(), String> {
     write_json_in(dir, DRAFTS_FILE, DRAFTS_TEMP_FILE, DRAFTS_MAX_BYTES, contents)
 }
 
-fn read_settings_in(dir: &Path) -> SettingsRead {
+fn read_settings_in(dir: &Path) -> VaultFileRead {
     read_json_in(dir, SETTINGS_FILE, SETTINGS_MAX_BYTES)
 }
 
@@ -907,15 +909,19 @@ fn write_settings_in(dir: &Path, contents: &str) -> Result<(), String> {
 
 /// Runs `op` again a few times when it fails. On Windows a virus scanner, the
 /// indexer or a sync client holding the file for a moment makes a rename or a
-/// remove fail with a sharing violation that is gone a few milliseconds later.
-/// A missing file is an answer, not a failure to retry.
+/// remove fail with a sharing violation that is gone a little later. The wait
+/// doubles each time (30 ms up to 480 ms, just under a second in all): a sync
+/// client in a OneDrive or Dropbox folder holds on longer than a scanner. A
+/// missing file is an answer, not a failure to retry.
 fn patiently<T>(mut op: impl FnMut() -> std::io::Result<T>) -> std::io::Result<T> {
-    const ATTEMPTS: u32 = 5;
+    const ATTEMPTS: u32 = 6;
+    let mut wait_ms = 30;
     let mut attempt = 1;
     loop {
         match op() {
             Err(e) if attempt < ATTEMPTS && e.kind() != std::io::ErrorKind::NotFound => {
-                std::thread::sleep(std::time::Duration::from_millis(30));
+                std::thread::sleep(std::time::Duration::from_millis(wait_ms));
+                wait_ms *= 2;
                 attempt += 1;
             }
             result => return result,
@@ -924,21 +930,21 @@ fn patiently<T>(mut op: impl FnMut() -> std::io::Result<T>) -> std::io::Result<T
 }
 
 /// One of the vault's own JSON files (`settings.json`, `drafts.json`).
-fn read_json_in(dir: &Path, name: &str, max_bytes: u64) -> SettingsRead {
+fn read_json_in(dir: &Path, name: &str, max_bytes: u64) -> VaultFileRead {
     let file = dir.join(name);
     // `symlink_metadata`, nicht `metadata`: ein Vault-Ordner kann von
     // anderswo stammen, und ein Link darin soll nicht verfolgt werden — wie
     // bei `guarded_read_path` in `lib.rs`.
     match std::fs::symlink_metadata(&file) {
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => SettingsRead::Missing,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => VaultFileRead::Missing,
         Ok(md) if md.is_file() && md.len() <= max_bytes => match std::fs::read_to_string(&file) {
-            Ok(contents) => SettingsRead::Found { contents },
+            Ok(contents) => VaultFileRead::Found { contents },
             Err(e) => {
                 eprintln!("[vault] read {}: {e}", file.display());
-                SettingsRead::Unreadable
+                VaultFileRead::Unreadable
             }
         },
-        _ => SettingsRead::Unreadable,
+        _ => VaultFileRead::Unreadable,
     }
 }
 
@@ -1044,12 +1050,12 @@ mod tests {
     #[test]
     fn settings_round_trip_and_a_missing_file_is_missing() {
         let dir = scratch();
-        assert_eq!(read_settings_in(&dir), SettingsRead::Missing);
+        assert_eq!(read_settings_in(&dir), VaultFileRead::Missing);
         write_settings_in(&dir, r#"{"version":1}"#).unwrap();
         write_settings_in(&dir, r#"{"version":2}"#).unwrap();
         assert_eq!(
             read_settings_in(&dir),
-            SettingsRead::Found { contents: r#"{"version":2}"#.to_string() }
+            VaultFileRead::Found { contents: r#"{"version":2}"#.to_string() }
         );
         assert!(!dir.join(SETTINGS_TEMP_FILE).exists());
     }
@@ -1057,13 +1063,13 @@ mod tests {
     #[test]
     fn drafts_round_trip_and_an_empty_object_removes_the_file() {
         let dir = scratch();
-        assert_eq!(read_json_in(&dir, DRAFTS_FILE, DRAFTS_MAX_BYTES), SettingsRead::Missing);
+        assert_eq!(read_json_in(&dir, DRAFTS_FILE, DRAFTS_MAX_BYTES), VaultFileRead::Missing);
         // Nichts da, nichts zu entfernen — kein Fehler.
         write_drafts_in(&dir, "{}").unwrap();
-        write_drafts_in(&dir, r#"{"v":1,"templates":{}}"#).unwrap();
+        write_drafts_in(&dir, r#"{"version":1,"templates":{}}"#).unwrap();
         assert_eq!(
             read_json_in(&dir, DRAFTS_FILE, DRAFTS_MAX_BYTES),
-            SettingsRead::Found { contents: r#"{"v":1,"templates":{}}"#.to_string() }
+            VaultFileRead::Found { contents: r#"{"version":1,"templates":{}}"#.to_string() }
         );
         assert!(!dir.join(DRAFTS_TEMP_FILE).exists());
         write_drafts_in(&dir, "{}").unwrap();
@@ -1071,7 +1077,7 @@ mod tests {
         assert!(write_drafts_in(&dir, "[]").is_err());
         // Die Einstellungen daneben bleiben unberührt.
         write_settings_in(&dir, r#"{"version":1}"#).unwrap();
-        write_drafts_in(&dir, r#"{"v":1}"#).unwrap();
+        write_drafts_in(&dir, r#"{"version":1}"#).unwrap();
         write_drafts_in(&dir, "{}").unwrap();
         assert!(dir.join(SETTINGS_FILE).exists());
     }
@@ -1091,11 +1097,11 @@ mod tests {
     fn a_settings_path_that_is_no_plain_file_is_unreadable_not_an_error() {
         let dir = scratch();
         std::fs::create_dir_all(dir.join(SETTINGS_FILE)).unwrap();
-        assert_eq!(read_settings_in(&dir), SettingsRead::Unreadable);
+        assert_eq!(read_settings_in(&dir), VaultFileRead::Unreadable);
 
         let big = scratch();
         write(&big.join(SETTINGS_FILE), &"a".repeat(SETTINGS_MAX_BYTES as usize + 1));
-        assert_eq!(read_settings_in(&big), SettingsRead::Unreadable);
+        assert_eq!(read_settings_in(&big), VaultFileRead::Unreadable);
     }
 
     #[test]
@@ -1103,7 +1109,7 @@ mod tests {
         let dir = scratch();
         write(&dir.join(SETTINGS_TEMP_FILE), "leftover");
         write_settings_in(&dir, "{}").unwrap();
-        assert_eq!(read_settings_in(&dir), SettingsRead::Found { contents: "{}".to_string() });
+        assert_eq!(read_settings_in(&dir), VaultFileRead::Found { contents: "{}".to_string() });
     }
 
     #[cfg(unix)]
@@ -1119,7 +1125,7 @@ mod tests {
 
         let linked = scratch();
         std::os::unix::fs::symlink(&outside, linked.join(SETTINGS_FILE)).unwrap();
-        assert_eq!(read_settings_in(&linked), SettingsRead::Unreadable);
+        assert_eq!(read_settings_in(&linked), VaultFileRead::Unreadable);
     }
 
     #[test]

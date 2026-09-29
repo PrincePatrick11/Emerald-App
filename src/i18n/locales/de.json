@@ -794,7 +794,7 @@
     "retentionNoteNever": "Elemente bleiben, bis du sie endgültig löschst."
   },
   "leaveGuard": {
-    "title": "Bearbeitung nicht abgeschlossen",
+    "title": "Ungespeicherte Änderungen",
     "message": "„{{name}}“ wird noch bearbeitet. Was soll mit den Änderungen geschehen?",
     "discard": "Verwerfen",
     "stay": "Weiter bearbeiten"
@@ -821,7 +821,8 @@
     "exportAltarPng": "PNG…",
     "exportAltarWebp": "WebP…",
     "importMarkdown": "Aus Markdown…",
-    "importEmerald": "Aus Emerald…"
+    "importEmerald": "Aus Emerald…",
+    "quit": "Emerald App beenden"
   },
   "titlebar": {
     "minimize": "Minimieren",
@@ -918,7 +919,7 @@
     "overview": {
       "title": "Standardvorlagen",
       "hint": "Gilt für neue Einträge. Die Zeile „Alle Kategorien“ gilt immer dann, wenn eine Kategorie keinen eigenen Standard hat.",
-      "hintOff": "In den Einstellungen steht die Standardvorlage auf „Nur von Hand“: Neue Einträge beginnen leer und bieten ihre Vorlagen zur Auswahl an.",
+      "hintOff": "Unter Einstellungen → Einträge steht die Standardvorlage auf „Nur von Hand“: Neue Einträge beginnen leer und bieten ihre Vorlagen zur Auswahl an.",
       "category": "Kategorie",
       "none": "Kein Standard",
       "fallback": "Sonst: {{name}} (alle Kategorien)",
@@ -937,7 +938,7 @@
       "append": "Anhängen",
       "replace": "Ersetzen",
       "appendHint": "Die Blöcke der Vorlage kommen unter den vorhandenen Inhalt.",
-      "replaceHint": "Die Vorlage ersetzt den ganzen Inhalt. Abbrechen im Eintrag stellt Inhalt und Titel wieder her; ergänzte Tags bleiben.",
+      "replaceHint": "Die Vorlage ersetzt den ganzen Inhalt. Abbrechen im Eintrag stellt ihn wieder her, wie er vor dem Bearbeiten war – samt Tags.",
       "takeTitle": "Titel übernehmen: „{{title}}“",
       "noTitle": "Die Vorlage hat keinen Titel",
       "addTags": "Tags ergänzen: {{tags}}",

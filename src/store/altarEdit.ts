@@ -1,5 +1,5 @@
 import { useAltarStore } from './altarStore';
-import { useUIStore } from './uiStore';
+import { isInEdit, useUIStore } from './uiStore';
 import { registerEditProbe } from './leaveGuardStore';
 import { drainSerialized } from '../lib/serialize';
 import type { AltarPlacement, AltarRecord } from '../types';
@@ -58,11 +58,7 @@ export function trackAltarWrite(id: string, write: Promise<unknown>): void {
  */
 const restoring = new Map<string, Promise<void>>();
 
-function isEditingAltar(id: string): boolean {
-  const { activeView, tabs } = useUIStore.getState();
-  return [activeView, ...tabs.map((tab) => tab.view)]
-    .some((view) => view.type === 'altar' && view.id === id && view.mode === 'edit');
-}
+const isEditingAltar = (id: string) => isInEdit(useUIStore.getState(), 'altar', id);
 
 useUIStore.subscribe(() => {
   for (const id of snapshots.keys()) {
@@ -140,6 +136,16 @@ export function altarEditChanged(id: string, title?: string): boolean {
 export function altarEditDirty(id: string, isNew: boolean, title?: string): boolean {
   if (!useAltarStore.getState().altars.some((altar) => altar.id === id)) return false;
   return isNew || altarEditChanged(id, title);
+}
+
+/**
+ * Vault-Wechsel und Ersetzen aus einer Sicherung: kein Stand gilt mehr. Auch
+ * kein gehaltener — die Ids eines ersetzten Vaults kommen wieder, und Cancel
+ * schriebe dann den alten Altar über den eingespielten.
+ */
+export function clearAltarEdits(): void {
+  held.clear();
+  snapshots.clear();
 }
 
 /** „Fertig": die Bearbeitung ist bestätigt, ihr Stand wird nicht mehr gebraucht. */

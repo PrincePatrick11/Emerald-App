@@ -746,8 +746,8 @@
     "tagCreationHint": "Dónde pueden crearse etiquetas nuevas. Las importaciones siempre crean las que faltan.",
     "tagCreateInlineHint": "Un nombre desconocido en el campo de etiquetas de una entrada o plantilla se crea como etiqueta nueva",
     "tagCreateDashboardOnlyHint": "El campo solo acepta etiquetas existentes y las plantillas solo traen las existentes. Crea etiquetas nuevas en Etiquetas.",
-    "templateDefaultHint": "Si una entrada nueva empieza con la plantilla predeterminada de su tipo y categoría. Siempre se puede insertar una plantilla a mano.",
-    "templateDefaultAutoHint": "Una entrada nueva empieza con su plantilla predeterminada. Cambiar después la categoría o el tipo no altera el contenido.",
+    "templateDefaultHint": "Si una entrada nueva empieza con la plantilla predeterminada de su tipo de entrada y categoría. Siempre se puede insertar una plantilla a mano.",
+    "templateDefaultAutoHint": "Una entrada nueva empieza con su plantilla predeterminada. Cambiar después la categoría o el tipo de entrada no altera el contenido.",
     "templateDefaultManualHint": "Las entradas nuevas empiezan vacías y ofrecen las plantillas adecuadas para elegir.",
     "trashRetentionHint": "Cuánto tiempo permanece lo eliminado en la papelera. Después se borra definitivamente al abrir el vault.",
     "languageHint": "El idioma de la interfaz en este vault.",
@@ -794,7 +794,7 @@
     "retentionNoteNever": "Los elementos se quedan hasta que los elimines definitivamente."
   },
   "leaveGuard": {
-    "title": "Edición sin terminar",
+    "title": "Cambios sin guardar",
     "message": "«{{name}}» todavía se está editando. ¿Qué hacemos con los cambios?",
     "discard": "Descartar",
     "stay": "Seguir editando"
@@ -821,7 +821,8 @@
     "exportAltarPng": "PNG…",
     "exportAltarWebp": "WebP…",
     "importMarkdown": "Desde Markdown…",
-    "importEmerald": "Desde Emerald…"
+    "importEmerald": "Desde Emerald…",
+    "quit": "Salir de Emerald App"
   },
   "titlebar": {
     "minimize": "Minimizar",
@@ -918,7 +919,7 @@
     "overview": {
       "title": "Plantillas predeterminadas",
       "hint": "Se aplica a las entradas nuevas. La fila «Todas las categorías» se aplica siempre que una categoría no tenga una predeterminada propia.",
-      "hintOff": "En Ajustes, la plantilla predeterminada está en «Solo a mano»: las entradas nuevas empiezan vacías y ofrecen sus plantillas para elegir.",
+      "hintOff": "En Ajustes → Entradas, la plantilla predeterminada está en «Solo a mano»: las entradas nuevas empiezan vacías y ofrecen sus plantillas para elegir.",
       "category": "Categoría",
       "none": "Sin plantilla predeterminada",
       "fallback": "Si no: {{name}} (todas las categorías)",
@@ -937,7 +938,7 @@
       "append": "Añadir al final",
       "replace": "Reemplazar",
       "appendHint": "Los bloques de la plantilla van debajo del contenido existente.",
-      "replaceHint": "La plantilla reemplaza todo el contenido. Cancelar en la entrada restaura el contenido y el título; las etiquetas añadidas se quedan.",
+      "replaceHint": "La plantilla reemplaza todo el contenido. Cancelar en la entrada la restaura tal como estaba antes de editarla, etiquetas incluidas.",
       "takeTitle": "Usar su título: «{{title}}»",
       "noTitle": "La plantilla no tiene título",
       "addTags": "Añadir sus etiquetas: {{tags}}",

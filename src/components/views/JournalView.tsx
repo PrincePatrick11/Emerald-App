@@ -59,7 +59,7 @@ export default function JournalView() {
 
   const fieldsOf = (e: NonNullable<typeof entry>) => ({ title: e.title, content: e.content, tags: e.tags ?? [] });
 
-  const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, hasChanges, contentRef, handleContentChange } = useEntryEditor({
+  const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, isDirty, contentRef, handleContentChange } = useEntryEditor({
     scope: 'journal',
     entityId: entry?.id,
     isEditing,
@@ -168,8 +168,7 @@ export default function JournalView() {
     guard: entry ? {
       key: guardKey('journal', entry.id),
       title: () => title.trim() || getEntry(entry.id)?.title.trim() || t('journal.untitled'),
-      // Ein inzwischen gelöschter Eintrag hat nichts mehr zu sichern.
-      isDirty: () => !!getEntry(entry.id) && (!!activeView.isNew || hasChanges()),
+      isDirty: () => isDirty(!!activeView.isNew),
     } : undefined,
   });
 

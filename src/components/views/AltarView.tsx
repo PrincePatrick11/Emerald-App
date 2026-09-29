@@ -81,7 +81,7 @@ export default function AltarView() {
   // ref keeps ResizeObserver callback current without re-observing on fullscreen toggle
   const altarWindowFullscreenRef = useRef(altarWindowFullscreen);
   const [canvasTransform, setCanvasTransform] = useState<{ scale: number; offsetX: number; offsetY: number; nativeW: number; nativeH: number }>({ scale: 1, offsetX: 0, offsetY: 0, nativeW: 1920, nativeH: 1080 });
-  // Gesetzt, während „Fertig", Cancel oder Löschen die Bearbeitung beenden:
+  // Gesetzt, während „Fertig" oder Cancel die Bearbeitung beenden:
   // ihr Ende gehört dann dem Handler, und der Abbau des Bearbeiten-Effekts
   // unten (Titel sichern, Vorschaubild aufnehmen) tut nichts.
   const endingEditRef = useRef(false);
@@ -228,10 +228,7 @@ export default function AltarView() {
     }
   };
 
-  const handleDeleteActive = () => {
-    if (!activeAltar) return;
-    handleDelete(activeAltar.id);
-  };
+  const handleDeleteActive = () => (activeAltar ? handleDelete(activeAltar.id) : undefined);
 
   const handleDuplicate = async (id: string) => {
     const altar = await duplicateAltar(id);

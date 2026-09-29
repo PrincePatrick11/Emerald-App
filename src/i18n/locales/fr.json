@@ -746,8 +746,8 @@
     "tagCreationHint": "Où de nouvelles étiquettes peuvent être créées. Les importations créent toujours celles qui manquent.",
     "tagCreateInlineHint": "Un nom inconnu saisi dans le champ d'étiquettes d'une entrée ou d'un modèle devient une nouvelle étiquette",
     "tagCreateDashboardOnlyHint": "Le champ n'accepte que les étiquettes existantes, et les modèles n'apportent que celles-ci. Créez-en de nouvelles dans Étiquettes.",
-    "templateDefaultHint": "Si une nouvelle entrée commence par le modèle par défaut de son type et de sa catégorie. Un modèle peut toujours être inséré à la main.",
-    "templateDefaultAutoHint": "Une nouvelle entrée commence par son modèle par défaut. Changer ensuite de catégorie ou de type ne modifie pas le contenu.",
+    "templateDefaultHint": "Si une nouvelle entrée commence par le modèle par défaut de son type d’entrée et de sa catégorie. Un modèle peut toujours être inséré à la main.",
+    "templateDefaultAutoHint": "Une nouvelle entrée commence par son modèle par défaut. Changer ensuite de catégorie ou de type d’entrée ne modifie pas le contenu.",
     "templateDefaultManualHint": "Les nouvelles entrées commencent vides et proposent les modèles adaptés.",
     "trashRetentionHint": "Durée pendant laquelle les éléments supprimés restent dans la corbeille. Ensuite, ils sont effacés définitivement à l'ouverture du vault.",
     "languageHint": "La langue de l'interface dans ce vault.",
@@ -794,7 +794,7 @@
     "retentionNoteNever": "Les éléments restent jusqu'à ce que vous les supprimiez définitivement."
   },
   "leaveGuard": {
-    "title": "Modification en cours",
+    "title": "Modifications non enregistrées",
     "message": "« {{name}} » est encore en cours de modification. Que faire des changements ?",
     "discard": "Abandonner",
     "stay": "Continuer la modification"
@@ -821,7 +821,8 @@
     "exportAltarPng": "PNG…",
     "exportAltarWebp": "WebP…",
     "importMarkdown": "Depuis Markdown…",
-    "importEmerald": "Depuis Emerald…"
+    "importEmerald": "Depuis Emerald…",
+    "quit": "Quitter Emerald App"
   },
   "titlebar": {
     "minimize": "Réduire",
@@ -918,7 +919,7 @@
     "overview": {
       "title": "Modèles par défaut",
       "hint": "S'applique aux nouvelles entrées. La ligne « Toutes les catégories » s'applique chaque fois qu'une catégorie n'a pas de modèle par défaut propre.",
-      "hintOff": "Dans les Paramètres, le modèle par défaut est réglé sur « Uniquement à la main » : les nouvelles entrées commencent vides et proposent leurs modèles.",
+      "hintOff": "Dans Paramètres → Entrées, le modèle par défaut est réglé sur « Uniquement à la main » : les nouvelles entrées commencent vides et proposent leurs modèles.",
       "category": "Catégorie",
       "none": "Aucun modèle par défaut",
       "fallback": "Sinon : {{name}} (toutes les catégories)",
@@ -937,7 +938,7 @@
       "append": "Ajouter à la fin",
       "replace": "Remplacer",
       "appendHint": "Les blocs du modèle vont sous le contenu existant.",
-      "replaceHint": "Le modèle remplace tout le contenu. Annuler dans l’entrée rétablit le contenu et le titre ; les étiquettes ajoutées restent.",
+      "replaceHint": "Le modèle remplace tout le contenu. Annuler dans l’entrée la rétablit telle qu’elle était avant la modification, étiquettes comprises.",
       "takeTitle": "Reprendre son titre : « {{title}} »",
       "noTitle": "Le modèle n’a pas de titre",
       "addTags": "Ajouter ses étiquettes : {{tags}}",

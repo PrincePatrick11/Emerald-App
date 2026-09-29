@@ -1,5 +1,7 @@
-import { useUIStore } from '../store/uiStore';
-import { confirmLeave, guardKey, guardRegistered, holdsOpenEdit, useLeaveGuardStore } from '../store/leaveGuardStore';
+import { askInTab, useUIStore } from '../store/uiStore';
+import { confirmLeave, holdsOpenEdit, leaveNeedsConfirm } from '../store/leaveGuardStore';
+import { flushDrafts } from '../store/draftStore';
+import { drainSerialized } from './serialize';
 
 /**
  * Vor allem, was jede offene Seite auf einmal schließt — Vault-Wechsel,
@@ -15,20 +17,10 @@ export async function resolveOpenEdits(): Promise<boolean> {
   const origin = useUIStore.getState().activeTabId;
   if (!(await confirmLeave())) return false;
 
+  // Je Tab neu nachgesehen (`askInTab`): „Fertig" auf der offenen Seite beendet auch deren Tab.
   const pending = useUIStore.getState().tabs.filter((tab) => holdsOpenEdit(tab.view)).map((tab) => tab.id);
   for (const id of pending) {
-    const { tabs, activeTabId, selectTab } = useUIStore.getState();
-    // Die Seite kann sich inzwischen geändert haben: „Fertig" auf der offenen beendet auch deren Tab.
-    const tab = tabs.find((candidate) => candidate.id === id);
-    if (!tab || !holdsOpenEdit(tab.view)) continue;
-    const key = guardKey(tab.view.type, tab.view.id);
-    if (activeTabId !== id) selectTab(id);
-    // Meldet sich die Seite nicht, gibt es niemanden zu fragen — ihre Arbeit
-    // ist gespeichert (Autosave) oder mitgeschrieben (Entwurf).
-    if (!(await guardRegistered(key))) continue;
-    // Nur fragen, wenn wirklich diese Seite offen ist — sonst gälte die Frage einer anderen.
-    if (useUIStore.getState().activeTabId !== id || useLeaveGuardStore.getState().guard?.key !== key) return false;
-    if (!(await confirmLeave())) return false;
+    if (!(await askInTab(id))) return false;
   }
 
   const { tabs, activeTabId, selectTab } = useUIStore.getState();
@@ -38,13 +30,18 @@ export async function resolveOpenEdits(): Promise<boolean> {
 
 /** Gibt es irgendwo eine Bearbeitung, nach der `resolveOpenEdits` fragen würde? */
 export function hasOpenEdits(): boolean {
-  const { guard } = useLeaveGuardStore.getState();
-  if (guard) {
-    try {
-      if (guard.isDirty()) return true;
-    } catch {
-      // Wie in `leaveNeedsConfirm`: ein Wächter ohne Antwort zählt nicht.
-    }
-  }
-  return useUIStore.getState().tabs.some((tab) => holdsOpenEdit(tab.view));
+  return leaveNeedsConfirm() || useUIStore.getState().tabs.some((tab) => holdsOpenEdit(tab.view));
+}
+
+/**
+ * Vor allem, was die App ohne weitere Frage beendet — Fenster zu, Update
+ * installieren: die offenen Bearbeitungen klären, dann abwarten, was noch
+ * geschrieben wird (was „Speichern" und das Durchschalten der Tabs auslösten,
+ * und dass ein eben verworfener Entwurf auch aus der Datei ist). `false`:
+ * weiter bearbeiten.
+ */
+export async function settleBeforeExit(): Promise<boolean> {
+  if (!(await resolveOpenEdits())) return false;
+  await Promise.all([drainSerialized(), flushDrafts()]);
+  return true;
 }

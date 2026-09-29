@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { editorSavesSuspended } from '../lib/editorLock';
 import type { ViewId } from '../lib/modules';
-import { useUIStore } from '../store/uiStore';
-import { registerEditProbe } from '../store/leaveGuardStore';
+import { isInEdit, useUIStore } from '../store/uiStore';
+import { guardKey, registerEditProbe } from '../store/leaveGuardStore';
 
 /**
  * Die Ausgangsstände der laufenden Bearbeitungen, je Ansicht und Eintrag — wie
@@ -25,15 +25,24 @@ const baselines = new Map<string, {
   stored: () => unknown;
 }>();
 
-const baselineKey = (scope: ViewId, id: string) => `${scope}:${id}`;
+const baselineKey = guardKey;
+
+/**
+ * Trägt eine Bearbeitung Änderungen? Die eine Regel für den Wächter der
+ * offenen Seite und die Probe im Hintergrund: ein gelöschter Eintrag
+ * (`stored === null`) hat nichts mehr zu sichern, ein neuer, nie bestätigter
+ * oder einer mit ausstehendem Autosave immer; sonst zählt, ob der gespeicherte
+ * Stand vom Ausgangsstand abweicht.
+ */
+function editIsDirty(stored: unknown, patch: unknown, isNew: boolean, pending = false): boolean {
+  if (stored === null) return false;
+  if (isNew || pending) return true;
+  return patch !== undefined && JSON.stringify(stored) !== JSON.stringify(patch);
+}
 
 useUIStore.subscribe((s) => {
-  if (!baselines.size) return;
-  const editing = (scope: ViewId, id: string) =>
-    [s.activeView, ...s.tabs.map((tab) => tab.view)]
-      .some((view) => view.type === scope && view.id === id && view.mode === 'edit');
   for (const [key, { scope, id }] of baselines) {
-    if (!editing(scope, id)) baselines.delete(key);
+    if (!isInEdit(s, scope, id)) baselines.delete(key);
   }
 });
 
@@ -42,10 +51,7 @@ useUIStore.subscribe((s) => {
 registerEditProbe((view) => {
   if (view.mode !== 'edit' || !view.id) return false;
   const baseline = baselines.get(baselineKey(view.type, view.id));
-  if (!baseline) return false;
-  const stored = baseline.stored();
-  if (stored === null) return false;
-  return !!view.isNew || JSON.stringify(stored) !== JSON.stringify(baseline.patch);
+  return !!baseline && editIsDirty(baseline.stored(), baseline.patch, !!view.isNew);
 });
 
 /**
@@ -84,11 +90,13 @@ interface UseEntryEditorOptions<TPatch, TRestore = TPatch> {
   buildRestorePatch?: (content: string) => TRestore;
   /**
    * Der gespeicherte Stand des Eintrags, in der Form von `buildRestorePatch` —
-   * woran Cancel misst, ob es zurückschreiben muss. Ohne ihn zählt der lokale
-   * Stand, und der täuscht: getippt, vom Autosave geschrieben, zurückgetippt
-   * und gleich abgebrochen sähe aus wie unverändert.
+   * woran Cancel und der Wächter messen, ob sich etwas geändert hat. Nicht der
+   * lokale Stand: getippt, vom Autosave geschrieben, zurückgetippt und gleich
+   * abgebrochen sähe der aus wie unverändert. `null`, wenn es den Eintrag nicht
+   * mehr gibt. Darf nur aus Stores lesen — die Probe für Tabs im Hintergrund
+   * ruft es auch, wenn die View nicht mehr montiert ist.
    */
-  readStored?: (id: string) => TRestore | null;
+  readStored: (id: string) => TRestore | null;
   update: (id: string, patch: TPatch | TRestore) => Promise<void>;
   debounceMs?: number;
 }
@@ -176,8 +184,7 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
       scope,
       id: entityId,
       patch,
-      // Ohne `readStored` gibt es nichts zu vergleichen: dann zählt nur `isNew`.
-      stored: () => (readStoredRef.current ? readStoredRef.current(entityId) : patch),
+      stored: () => readStoredRef.current(entityId),
     });
   }, [isEditing, ready, entityId, scope]);
 
@@ -196,8 +203,7 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
       ? baselines.get(baselineKey(scope, id)) as { id: string; patch: TRestore } | undefined
       : undefined;
     if (!baseline) return null;
-    const stored = readStoredRef.current?.(baseline.id) ?? restoreFields(contentRef.current);
-    if (JSON.stringify(stored) !== JSON.stringify(baseline.patch)) {
+    if (editIsDirty(readStoredRef.current(baseline.id), baseline.patch, false)) {
       try {
         await updateRef.current(baseline.id, baseline.patch);
       } catch (e) {
@@ -211,18 +217,13 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
   }, [cancelAutoSave, scope]);
 
   /**
-   * Trägt die laufende Bearbeitung Änderungen — weicht der gespeicherte Stand
-   * vom Ausgangsstand ab, oder wartet noch ein Autosave? Danach fragt der
-   * Wächter beim Verlassen der Seite (`leaveGuardStore`).
+   * Trägt die laufende Bearbeitung Änderungen (`editIsDirty`)? Danach fragt
+   * der Wächter beim Verlassen der Seite (`leaveGuardStore`).
    */
-  const hasChanges = useCallback((): boolean => {
+  const isDirty = useCallback((isNew: boolean): boolean => {
     const id = idRef.current;
     if (!id) return false;
-    if (timer.current !== null) return true;
-    const baseline = baselines.get(baselineKey(scope, id));
-    if (!baseline) return false;
-    const stored = readStoredRef.current?.(id) ?? restoreFields(contentRef.current);
-    return JSON.stringify(stored) !== JSON.stringify(baseline.patch);
+    return editIsDirty(readStoredRef.current(id), baselines.get(baselineKey(scope, id))?.patch, isNew, timer.current !== null);
   }, [scope]);
 
   const prevRef = useRef<{ id: string; isEditing: boolean } | null>(null);
@@ -283,5 +284,5 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
     await updateRef.current(id, buildPatchRef.current(contentRef.current));
   }, [cancelAutoSave]);
 
-  return { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, hasChanges, contentRef, handleContentChange };
+  return { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, isDirty, contentRef, handleContentChange };
 }

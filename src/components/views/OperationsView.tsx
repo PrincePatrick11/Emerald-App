@@ -64,7 +64,7 @@ export default function OperationsView() {
     category_id: o.category_id ?? null, icon: o.icon, cover_image: o.cover_image,
   });
 
-  const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, hasChanges, contentRef, handleContentChange } = useEntryEditor({
+  const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, isDirty, contentRef, handleContentChange } = useEntryEditor({
     scope: 'operations',
     entityId: operation?.id,
     isEditing,
@@ -188,8 +188,7 @@ export default function OperationsView() {
     guard: operation ? {
       key: guardKey('operations', operation.id),
       title: () => title.trim() || getOperation(operation.id)?.title.trim() || t('operations.untitled'),
-      // Eine inzwischen gelöschte Operation hat nichts mehr zu sichern.
-      isDirty: () => !!getOperation(operation.id) && (!!activeView.isNew || hasChanges()),
+      isDirty: () => isDirty(!!activeView.isNew),
     } : undefined,
   });
 

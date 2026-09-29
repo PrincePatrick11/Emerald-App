@@ -153,6 +153,16 @@ interface AltarState {
   setIntentionLocal: (text: string) => void;
 }
 
+/** Der Store ohne den Altar `id` — in den Papierkorb gelegt oder endgültig gelöscht. */
+function withoutAltar(s: AltarState, id: string): Partial<AltarState> {
+  const { [id]: _removed, ...previewPlacements } = s.previewPlacements;
+  return {
+    altars: s.altars.filter((altar) => altar.id !== id),
+    previewPlacements,
+    ...(s.activeAltarId === id ? { activeAltarId: null, placements: [], selectedPlacementId: null, intention: '' } : {}),
+  };
+}
+
 export const useAltarStore = create<AltarState>((set, get) => ({
   altars: [],
   activeAltarId: null,
@@ -411,15 +421,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     // Platzierungen und die Verknüpfungen, die auf den Altar zeigen, bleiben
     // stehen — wie bei einer Aufgabe: der Soft-Delete ist umkehrbar, und
     // `sweepDanglingLinks` zählt Papierkorb-Inhalte als gültig.
-    set((s) => {
-      const { [id]: _removed, ...previewPlacements } = s.previewPlacements;
-      const wasActive = s.activeAltarId === id;
-      return {
-        altars: s.altars.filter((altar) => altar.id !== id),
-        previewPlacements,
-        ...(wasActive ? { activeAltarId: null, placements: [], selectedPlacementId: null, intention: '' } : {}),
-      };
-    });
+    set((s) => withoutAltar(s, id));
   },
 
   restoreAltar: async (id) => {
@@ -511,17 +513,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     await db.execute('DELETE FROM altars WHERE id=$1', [id]);
     // Nur aus dem Papierkorb oder beim Zurückrollen eines Imports erreichbar;
     // steht er doch noch im Store, geht er dort mit.
-    if (get().altars.some((altar) => altar.id === id)) {
-      set((s) => {
-        const { [id]: _removed, ...previewPlacements } = s.previewPlacements;
-        const wasActive = s.activeAltarId === id;
-        return {
-          altars: s.altars.filter((altar) => altar.id !== id),
-          previewPlacements,
-          ...(wasActive ? { activeAltarId: null, placements: [], selectedPlacementId: null, intention: '' } : {}),
-        };
-      });
-    }
+    if (get().altars.some((altar) => altar.id === id)) set((s) => withoutAltar(s, id));
   },
 
   addItem: async (name, emoji, categoryId, note = '', imageData, createdAt) => {

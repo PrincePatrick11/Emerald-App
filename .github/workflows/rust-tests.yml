@@ -1,11 +1,13 @@
 name: Rust tests
 
-# Eine eigene Datei statt einer Zeile in `ci.yml`, weil das hier ein
-# Verfallsdatum hat: `cargo test` deckt heute genau eine Sache ab — die
-# Uebernahme der Daten aus dem Verzeichnis des vorigen Identifiers
-# (`adopt_previous_identifier_dirs` in `src-tauri/src/vault.rs`). Faellt die
-# eines Tages raus und bleibt nichts uebrig, geht diese Datei in einem Zug mit,
-# ohne dass jemand in `ci.yml` herumschneiden muss.
+# Eine eigene Datei statt einer Zeile in `ci.yml`: `cargo test` deckt eine
+# kleine, wechselnde Zahl von Dingen ab — die Uebernahme der Daten aus dem
+# Verzeichnis des vorigen Identifiers (`adopt_previous_identifier_dirs`), das
+# Lesen und Schreiben von `settings.json` und `drafts.json` (alle in
+# `src-tauri/src/vault.rs`) und den Waechter beim Fensterschliessen
+# (`CloseWatch` in `src-tauri/src/lib.rs`). Bleibt eines Tages nichts davon
+# uebrig, geht diese Datei in einem Zug mit, ohne dass jemand in `ci.yml`
+# herumschneiden muss.
 #
 # Was die Matrix bringt, und was nicht — der Unterschied ist wichtig genug fuer
 # eigene Zeilen, weil er sonst falsch erinnert wird:

@@ -17,6 +17,7 @@ import { drainSerialized } from '../lib/serialize';
 import { reloadAllStores } from './moduleWiring';
 import { useUIStore } from './uiStore';
 import { detachDrafts, restoreDrafts } from './draftStore';
+import { clearAltarEdits } from './altarEdit';
 import { useUndoStore } from './undoStore';
 import { useSettingsStore } from './settingsStore';
 import { captureLegacySettings } from '../lib/vaultSettings';
@@ -74,6 +75,7 @@ async function openActiveVault(): Promise<void> {
   // Tabs und History zeigen per Eintrags-ID in den alten Vault — alles zu,
   // nicht nur der aktive Tab auf Home.
   useUIStore.getState().closeAllTabs();
+  clearAltarEdits();
   // Die Entwürfe des neuen Vaults; die des alten gehen nur aus dem Speicher.
   await restoreDrafts(useVaultStore.getState().activeVaultId);
   // Undo entries reference rows of the old vault by id — drop them

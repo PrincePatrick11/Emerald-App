@@ -12,8 +12,8 @@ import type { ActiveView } from '../types';
  * (`useEditActions`, `useDraftPage`). Wer die Seite verlassen will, fragt über
  * `confirmLeave()`; das Modal (`LeaveGuardModal`) beantwortet die Frage.
  *
- * Import-Regel: dieser Store importiert keinen anderen — `uiStore`,
- * `vaultStore` und `draftStore` lesen ihn, nicht umgekehrt.
+ * Import-Regel: dieser Store importiert keinen anderen — die anderen lesen
+ * ihn, nicht umgekehrt.
  */
 export interface EditGuard {
   /** Die Seite, der der Wächter gehört: `guardKey(View-Typ, id)`. */
