@@ -58,9 +58,10 @@ const stores: { kind: DraftKind; store: DraftStore<unknown>; normalize: Normaliz
 /**
  * Entwürfe werden mitgeschrieben, damit ein Absturz nichts nimmt, was getippt
  * war — bei einem Eintrag leistet das der Autosave. In `drafts.json` im
- * Vault-Ordner, über Rust: dort ist ein Schreiben abgeschlossen, wenn der
- * Aufruf zurückkehrt (das Fenster wartet beim Schließen darauf), und der
- * Inhalt eines Vaults bleibt in seinem Ordner.
+ * Vault-Ordner, über Rust: der Aufruf kehrt zurück, wenn die Datei
+ * geschrieben ist (das Fenster wartet beim Schließen darauf — der verzögert
+ * schreibende Speicher des WebViews könnte das nicht zusagen), und der Inhalt
+ * eines Vaults bleibt in seinem Ordner.
  */
 const DRAFTS_VERSION = 1;
 const PERSIST_DELAY_MS = 400;
@@ -104,8 +105,13 @@ export function flushDrafts(): Promise<void> {
   const contents = JSON.stringify(Object.keys(byKind).length ? { v: DRAFTS_VERSION, ...byKind } : {});
   writing = writing
     .then(() => invoke<void>('write_vault_drafts', { vaultId, contents }))
-    // Scheitert das Schreiben, bleibt der Entwurf wenigstens im Speicher.
-    .catch((err: unknown) => console.warn('[drafts] could not write drafts', err));
+    .catch((err: unknown) => {
+      // Der Entwurf bleibt im Speicher, und der nächste Anlass schreibt erneut
+      // — spätestens das Schließen des Fensters. Sonst stünde auf der Platte
+      // ein Entwurf, der längst verworfen ist.
+      if (draftVaultId === vaultId) unwritten = true;
+      console.warn('[drafts] could not write drafts', err);
+    });
   return writing;
 }
 

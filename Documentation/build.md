@@ -386,13 +386,14 @@ Delete this section once that release is out.
 - Nothing runs clippy, and warnings do not fail a build. (`src-tauri/Cargo.toml`
   declares an empty `cargo-clippy` feature so that a manual clippy run compiles;
   CI does not use it.)
-- Almost nothing is covered by automated tests. The eight in `vault.rs` cover
-  exactly one area — the adoption of a previous identifier's data — and
-  `rust-tests.yml` runs them on all three platforms. Everything else in the app
-  is verified by running it by hand.
+- Little is covered by automated tests. Those in `vault.rs` cover the adoption
+  of a previous identifier's data and the vault's own JSON files
+  (`settings.json`, `drafts.json`), two in `lib.rs` the watchdog behind closing
+  the window, and `rust-tests.yml` runs them on all three platforms. Everything
+  else in the app is verified by running it by hand.
 - **What that workflow does not prove**, and it is worth being precise because
   the mistake is tempting: `vault.rs` has no `cfg(target_os)` at all, so its
-  tests are the same eight everywhere. The matrix buys the three path parsers
+  tests are the same everywhere. The matrix buys the three path parsers
   and `rename` semantics against each other — plus the fact that the Rust side
   is now *linked* on a push and not only checked. It does **not** cover the
   Linux case that shaped the adoption, because that one lives in Tauri's

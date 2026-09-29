@@ -308,7 +308,11 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
         &PredefinedMenuItem::hide(app, None)?,
         &PredefinedMenuItem::hide_others(app, None)?,
         &PredefinedMenuItem::separator(app)?,
-        &PredefinedMenuItem::quit(app, None)?,
+        // Kein `PredefinedMenuItem::quit`: das beendet die App am Fenster
+        // vorbei (`terminate:`), und die Frage nach ungesicherten Bearbeitungen
+        // kaeme nie. Der eigene Punkt schliesst das Fenster — siehe "quit" in
+        // `on_menu_event` unten. Auf echter Hardware ungetestet.
+        &MenuItem::with_id(app, "quit", "Quit Emerald App", true, Some("CmdOrCtrl+Q"))?,
     ])?;
     let edit_submenu = Submenu::with_id_and_items(app, "edit-submenu", "Edit", true, &[
         &PredefinedMenuItem::cut(app, None)?,
@@ -482,6 +486,12 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
             "export-altar-webp"    => { app.emit("export-altar-webp", ()).ok(); }
             "import-markdown"      => { app.emit("import-markdown", ()).ok(); }
             "import-emerald"       => { app.emit("import-emerald", ()).ok(); }
+            // Ueber das Fenster: `close()` loest die Schliess-Anfrage aus, die
+            // das Frontend beantwortet. Mit dem letzten Fenster endet die App.
+            "quit" => match app.get_webview_window("main") {
+                Some(window) => { window.close().ok(); }
+                None => app.exit(0),
+            },
             _ => {}
         }
     });
@@ -713,6 +723,51 @@ fn update_menu_labels(
     }
 }
 
+/// Wann das Fenster zuletzt geschlossen werden sollte, ohne dass das Frontend
+/// die Anfrage bestaetigt hat.
+///
+/// Das Frontend fragt vor dem Schliessen nach ungesicherten Bearbeitungen
+/// (`onCloseRequested` in `AppShell.tsx`), und solange es dafuer einen
+/// Listener angemeldet hat, haelt Tauri jedes Schliessen zurueck. Haengt die
+/// Oberflaeche oder ist sie abgestuerzt, antwortet niemand mehr — und ohne
+/// Systemdekoration fuehrten dann auch Alt+F4 und die Taskleiste ins Leere.
+/// Deshalb bestaetigt das Frontend jede Anfrage sofort
+/// (`close_request_seen`); bleibt das aus, schliesst die naechste Anfrage nach
+/// [`CLOSE_ANSWER_TIMEOUT`] das Fenster direkt.
+#[derive(Default)]
+struct CloseWatch(std::sync::Mutex<Option<std::time::Instant>>);
+
+const CLOSE_ANSWER_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+
+impl CloseWatch {
+    /// Eine Schliess-Anfrage kam an. `true`: die vorige blieb unbeantwortet,
+    /// das Fenster soll jetzt ohne Frage zu.
+    fn requested(&self, now: std::time::Instant) -> bool {
+        let mut pending = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        match *pending {
+            Some(since) if now.duration_since(since) >= CLOSE_ANSWER_TIMEOUT => {
+                *pending = None;
+                true
+            }
+            Some(_) => false,
+            None => {
+                *pending = Some(now);
+                false
+            }
+        }
+    }
+
+    fn seen(&self) {
+        *self.0.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    }
+}
+
+/// Das Frontend hat die Schliess-Anfrage bekommen und kuemmert sich.
+#[tauri::command]
+fn close_request_seen(watch: tauri::State<'_, CloseWatch>) {
+    watch.seen();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -742,7 +797,16 @@ pub fn run() {
         // steht keine `updater:`-Berechtigung in der Capability.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(vault::VaultRegistry::default())
-        .manage(updates::PendingUpdate::default());
+        .manage(updates::PendingUpdate::default())
+        .manage(CloseWatch::default())
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                // Nur das Hauptfenster fragt; das versteckte PDF-Fenster hat keinen Listener.
+                if window.label() == "main" && window.state::<CloseWatch>().requested(std::time::Instant::now()) {
+                    window.destroy().ok();
+                }
+            }
+        });
 
     images::register(builder)
         .invoke_handler(tauri::generate_handler![
@@ -777,6 +841,7 @@ pub fn run() {
             set_altar_export_menu_enabled,
             set_view_menu_checked,
             update_menu_labels,
+            close_request_seen,
             updates::update_settings,
             updates::set_update_settings,
             updates::check_for_update,
@@ -794,4 +859,33 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod close_watch_tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn an_answered_request_never_closes_by_itself() {
+        let watch = CloseWatch::default();
+        let start = Instant::now();
+        assert!(!watch.requested(start));
+        watch.seen();
+        // Beliebig viel spaeter: die vorige Anfrage war beantwortet.
+        assert!(!watch.requested(start + CLOSE_ANSWER_TIMEOUT * 10));
+    }
+
+    #[test]
+    fn an_unanswered_request_lets_the_next_one_close_after_the_timeout() {
+        let watch = CloseWatch::default();
+        let start = Instant::now();
+        assert!(!watch.requested(start));
+        // Ungeduldiges zweites Klicken zaehlt noch nicht ...
+        assert!(!watch.requested(start + Duration::from_millis(500)));
+        // ... nach der Frist schon, gemessen an der ersten Anfrage.
+        assert!(watch.requested(start + CLOSE_ANSWER_TIMEOUT));
+        // Danach beginnt es von vorn.
+        assert!(!watch.requested(start + CLOSE_ANSWER_TIMEOUT * 2));
+    }
 }

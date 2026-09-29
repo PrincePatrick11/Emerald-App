@@ -860,7 +860,7 @@ pub fn write_vault_settings(app: tauri::AppHandle, vault_id: String, contents: S
 }
 
 /// The vault's `drafts.json` — same answers as [`read_vault_settings`].
-#[tauri::command]
+#[tauri::command(async)]
 pub fn read_vault_drafts(app: tauri::AppHandle, vault_id: String) -> Result<SettingsRead, String> {
     let dir = vault_dir(&app, &vault_id)?;
     directory_state(&dir)?;
@@ -871,10 +871,12 @@ pub fn read_vault_drafts(app: tauri::AppHandle, vault_id: String) -> Result<Sett
 /// empty object removes the file instead: a vault nobody is editing in
 /// carries no drafts file around.
 ///
-/// Returns only once the file is on disk (`sync_all`) — closing the window
-/// waits for this, and a draft that was just discarded must not come back
-/// after the restart.
-#[tauri::command]
+/// `async`: written after every pause in typing, and a synchronous command
+/// would do that on the main thread, where the window lives. The frontend
+/// chains its calls, so they still arrive one after the other — and closing
+/// the window waits for the last one, so that a draft that was just discarded
+/// does not come back after the restart.
+#[tauri::command(async)]
 pub fn write_vault_drafts(app: tauri::AppHandle, vault_id: String, contents: String) -> Result<(), String> {
     let dir = vault_dir(&app, &vault_id)?;
     directory_state(&dir)?;
@@ -885,7 +887,8 @@ fn write_drafts_in(dir: &Path, contents: &str) -> Result<(), String> {
     if let Ok(serde_json::Value::Object(map)) = serde_json::from_str::<serde_json::Value>(contents) {
         if map.is_empty() {
             std::fs::remove_file(dir.join(DRAFTS_TEMP_FILE)).ok();
-            return match std::fs::remove_file(dir.join(DRAFTS_FILE)) {
+            let file = dir.join(DRAFTS_FILE);
+            return match patiently(|| std::fs::remove_file(&file)) {
                 Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(format!("remove {DRAFTS_FILE}: {e}")),
                 _ => Ok(()),
             };
@@ -900,6 +903,24 @@ fn read_settings_in(dir: &Path) -> SettingsRead {
 
 fn write_settings_in(dir: &Path, contents: &str) -> Result<(), String> {
     write_json_in(dir, SETTINGS_FILE, SETTINGS_TEMP_FILE, SETTINGS_MAX_BYTES, contents)
+}
+
+/// Runs `op` again a few times when it fails. On Windows a virus scanner, the
+/// indexer or a sync client holding the file for a moment makes a rename or a
+/// remove fail with a sharing violation that is gone a few milliseconds later.
+/// A missing file is an answer, not a failure to retry.
+fn patiently<T>(mut op: impl FnMut() -> std::io::Result<T>) -> std::io::Result<T> {
+    const ATTEMPTS: u32 = 5;
+    let mut attempt = 1;
+    loop {
+        match op() {
+            Err(e) if attempt < ATTEMPTS && e.kind() != std::io::ErrorKind::NotFound => {
+                std::thread::sleep(std::time::Duration::from_millis(30));
+                attempt += 1;
+            }
+            result => return result,
+        }
+    }
 }
 
 /// One of the vault's own JSON files (`settings.json`, `drafts.json`).
@@ -943,19 +964,15 @@ fn write_json_in(dir: &Path, name: &str, temp_name: &str, max_bytes: u64, conten
         .write(true)
         .create_new(true)
         .open(&temp)
-        .and_then(|mut file| {
-            file.write_all(contents.as_bytes())?;
-            // Auf die Platte, bevor der Name wechselt: wer auf das Ergebnis
-            // wartet (Fenster schließen), verlässt sich darauf.
-            file.sync_all()
-        });
+        .and_then(|mut file| file.write_all(contents.as_bytes()));
     if let Err(e) = written {
         std::fs::remove_file(&temp).ok();
         return Err(format!("write {}: {e}", temp.display()));
     }
     // `rename` ersetzt eine vorhandene Datei auf allen drei Plattformen — auch
     // einen Link unter dem Zielnamen, ohne ihm zu folgen.
-    std::fs::rename(&temp, dir.join(name)).map_err(|e| {
+    let target = dir.join(name);
+    patiently(|| std::fs::rename(&temp, &target)).map_err(|e| {
         std::fs::remove_file(&temp).ok();
         format!("replace {name}: {e}")
     })

@@ -16,6 +16,8 @@ Tauri 2 uses a capability file to declare which permissions each window receives
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
     "core:window:allow-destroy",
+    "core:window:allow-unminimize",
+    "core:window:allow-set-focus",
     "core:webview:allow-set-webview-zoom",
     "dialog:allow-save",
     "dialog:allow-open",
@@ -29,7 +31,7 @@ Tauri 2 uses a capability file to declare which permissions each window receives
 }
 ```
 
-`core:window:allow-destroy` exists for the question about unsaved edits (`AppShell.tsx`, see [Leaving an edit](architecture.md#leaving-an-edit)): with an `onCloseRequested` handler registered, Tauri's JS API closes the window through `destroy()` once the handler returns without preventing it. `destroy` reaches the same windows `close` does and only skips the close-requested event — nothing a frontend that may already `close` could not do.
+`core:window:allow-destroy`, `allow-unminimize` and `allow-set-focus` exist for the question about unsaved edits — the last two so that the question, asked while the window is minimised, is not asked where nobody sees it. `allow-destroy` (`AppShell.tsx`, see [Leaving an edit](architecture.md#leaving-an-edit)): with an `onCloseRequested` handler registered, Tauri's JS API closes the window through `destroy()` once the handler returns without preventing it. `destroy` reaches the same windows `close` does and only skips the close-requested event — nothing a frontend that may already `close` could not do.
 
 The other four `core:window:allow-*` permissions exist for the custom title bar: on Windows and Linux the window runs undecorated and the HTML window buttons (`WindowControls.tsx`) drive minimize/maximize/close over IPC, and the bar itself starts window dragging. They widen what a compromised frontend could do only marginally (annoyance-level window manipulation, no data access).
 
@@ -59,6 +61,7 @@ PDF export runs in a hidden window built and torn down by the per-platform `expo
 | `read_vault_settings`, `write_vault_settings` | `vault.rs` | the vault's `settings.json` — resolved by vault id through the same registry as every other storage command, never by path. `write_vault_settings` refuses anything that doesn't parse as a JSON object and anything over 256 KB (`SETTINGS_MAX_BYTES`, far above what the settings page can produce — a guard against a runaway write, not a format limit); it writes to a `.tmp` file first and `rename`s it over the real one, so a crash mid-write leaves the previous settings rather than a half-written file, and never follows a symlink under either name (`symlink_metadata`, matching `guarded_read_path`'s rule) in either direction. `read_vault_settings` returns a tagged `Missing`/`Found`/`Unreadable` result rather than an error for anything but "the vault directory itself is gone" — a settings file that exists but isn't a plain, readable, size-capped file must not block opening the vault; the frontend falls back to defaults and leaves it alone |
 | `default_vault_dir`, `new_vault_base_dir`, `legacy_default_db_exists` | `vault.rs` | pure path/existence oracles for the vault modal and the settings backup import (add-vault mode); return strings, take no path |
 | `migrate_vault_layout` | `vault.rs` | one-time move of a pre-multi-vault `.db` into the vault layout; the legacy name is validated with `is_valid_legacy_db_name` |
+| `close_request_seen` | `lib.rs` | takes no arguments: tells the Rust side that the frontend received a close request and is handling it (see [Closing the window](architecture.md#closing-the-window)). All it can do is *prevent* the fallback that closes an unresponsive window |
 | `update_menu_labels`, `set_export_menu_enabled`, `set_altar_export_menu_enabled`, `set_view_menu_checked` | `lib.rs` | native-menu state sync; no-ops on Windows/Linux where no native menu is installed |
 | `update_settings`, `set_update_settings`, `check_for_update`, `install_update` | `updates.rs` | the only commands that reach the network — see [In-App Updates](#in-app-updates) |
 

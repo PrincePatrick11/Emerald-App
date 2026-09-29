@@ -19,7 +19,7 @@ import ImageNoticeModal from '../ui/ImageNoticeModal';
 import LeaveGuardModal from './LeaveGuardModal';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { isTauri } from '../../lib/platform';
-import { resolveOpenEdits } from '../../lib/openEdits';
+import { hasOpenEdits, resolveOpenEdits } from '../../lib/openEdits';
 import { drainSerialized } from '../../lib/serialize';
 import { flushDrafts, restoreDrafts } from '../../store/draftStore';
 import ImportDestinationModal from '../ui/ImportDestinationModal';
@@ -147,8 +147,18 @@ export default function AppShell() {
   // hält es offen.
   useEffect(() => {
     if (!isTauri) return;
-    const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
+    const appWindow = getCurrentWindow();
+    const unlisten = appWindow.onCloseRequested(async (event) => {
+      // Zuerst, und ohne darauf zu warten: Rust schließt das Fenster sonst
+      // beim nächsten Versuch selbst (`CloseWatch` in `lib.rs`).
+      void invoke('close_request_seen').catch(() => {});
       try {
+        if (hasOpenEdits()) {
+          // Die Frage in einem minimierten Fenster sähe niemand — es wirkte,
+          // als würde das Schließen ignoriert.
+          if (await appWindow.isMinimized()) await appWindow.unminimize();
+          await appWindow.setFocus();
+        }
         if (!(await resolveOpenEdits())) {
           event.preventDefault();
           return;

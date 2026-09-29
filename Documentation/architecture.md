@@ -1532,7 +1532,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `copy_image_file(source, vault_id)` | Read a file from an arbitrary path, write it into the vault's `images/` under its SHA-256 name. Accepts png/jpg/jpeg/gif/webp/svg only. Rejects symlinks, canonicalizes the source, and verifies it falls within the allowed storage roots. Returns the filename. |
 | `read_image_as_base64(filename, vault_id)` | Read a stored image and return a data-URL. Only for the two callers that cannot use the `emerald-img` scheme: the PDF export renders in a `file://` webview, and the backup writer embeds bytes in JSON. |
 | `read_image_file(source)` | Read an *external* image file (not yet in any vault) and return a data-URL, without storing it — so the frontend can scale it and check it against the vault's image-size settings before handing the result to `save_image`. Same extension allowlist and root confinement as `copy_image_file` (`checked_image_source`, their shared helper), plus its own 64 MB source-file cap. |
-| `read_vault_drafts(vault_id)` / `write_vault_drafts(vault_id, contents)` | The vault's `drafts.json` — the unsaved drafts of block and template pages (`store/draftStore.ts`). Same rules as the settings file; an empty object removes the file, and the write is synced to disk before the call returns |
+| `read_vault_drafts(vault_id)` / `write_vault_drafts(vault_id, contents)` | The vault's `drafts.json` — the unsaved drafts of block and template pages (`store/draftStore.ts`). Same rules as the settings file; an empty object removes the file. Both are `async` commands — written after every pause in typing, they must not run on the main thread — and a rename or remove that fails is tried again a few times, since on Windows a scanner or sync client may hold the file for a moment |
 | `read_vault_settings(vault_id)` / `write_vault_settings(vault_id, contents)` | The vault's `settings.json` — see [Vault Settings](#vault-settings) above and [`security.md`](security.md) for the write's atomicity and symlink handling. |
 | `adopt_legacy_images(vault_id, filenames)` | Copy images out of the pre-per-vault shared pool into a vault's own folder. Migration v35 only. |
 | `list_image_files(vault_id)` / `delete_image_files(vault_id, filenames)` | Back the *Unused images* cleanup. Confined to the vault's own folder; both reject any name that is not 64 hex digits plus a known extension. |
@@ -1550,6 +1550,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `read_file(path)` | Read a file and return its UTF-8 content. Same extension allowlist and root confinement as `write_file`. |
 | `ensure_app_storage_dirs()` | Create app data and app config directories if they don't exist. Called before frontend writes vault metadata or opens SQLite. |
 | `export_pdf(html, path, page_size?)` | Render the supplied HTML to a PDF at `path` by driving the app's own webview. The frontend first prompts the user for a save location via the `dialog` plugin and passes the chosen path here. `page_size`, an optional `(width_in, height_in)` tuple in inches, overrides the default Letter/Portrait page with a custom size — used only by the Altar PDF export (see below); Journal/Wiki/Operations export calls it without `page_size` and gets the old default behavior. Per-platform implementations live in `src-tauri/src/pdf_export/{windows,macos,linux}.rs`, all behind the same `pub async fn export_pdf` signature; `mod.rs` does the `#[cfg(target_os = "…")]` re-export so `lib.rs` calls `pdf_export::export_pdf` without knowing which platform it's on. |
+| `close_request_seen()` | The frontend's acknowledgement of a close request — see [Closing the window](#closing-the-window). |
 | `update_menu_labels(...)` | Update native menu item labels for i18n (edit, view, export, import submenus and their items, including `show_splash` and the View menu's three `CheckMenuItem`s, which need their own `MenuItemKind::Check` arm). macOS only in effect — see [Window Chrome](#window-chrome). |
 | `set_view_menu_checked(rail, left_list, right_sidebar)` | Mirror the frontend's sidebar visibility onto the View menu's three check items. Called on every change, since other actions besides the menu itself can flip the same state (e.g. `setActiveView` opening the right sidebar for edit mode). macOS only in effect. |
 | `set_export_menu_enabled(entry, pdf, emerald)` | Enable/disable the native "Export as …" items for the current view. Driven by `computeMenuEnabledState`; macOS only in effect. |
@@ -1607,6 +1608,39 @@ Beyond `core:default`, the window controls need four permissions in `src-tauri/c
 `install_native_menu` in `src-tauri/src/lib.rs` is gated to macOS. On Windows and Linux, `set_menu` attaches an in-window menu bar (an HMENU / a GTK menubar) regardless of `decorations`, which would sit alongside the app's own title-bar menu buttons. The three menu commands (`update_menu_labels`, `set_export_menu_enabled`, `set_altar_export_menu_enabled`) all bail out when `app.menu()` returns `None`, so they become no-ops on those platforms without any frontend branching.
 
 Both forms resolve to the same code. `src/lib/menuActions.ts` owns the action implementations (`runMenuAction`) and the rules for which export items are available (`computeMenuEnabledState`); the native macOS menu reaches them by emitting the event ids listed above, which `AppShell` forwards, while the HTML title-bar buttons call them directly. `View > Reset View` is the one exception: it manipulates `AppShell`'s local sidebar widths, so the HTML menu re-emits `reset-sidebar-widths` rather than calling a function, and `AppShell`'s existing listener answers it on both platforms.
+
+### Closing the window
+
+Closing asks about unsaved edits first (see [Leaving an edit](#leaving-an-edit)): `AppShell`
+registers `onCloseRequested`, runs `resolveOpenEdits()`, and prevents the close when the answer
+is "keep editing". Before the window goes it waits for the writes still under way
+(`drainSerialized`, `flushDrafts`). A window that is minimised is restored and focused before
+the question, which would otherwise be asked where nobody sees it.
+
+A registered handler has a price: Tauri holds back *every* close while a JS listener exists,
+so a frontend that hangs or has crashed would leave a window that cannot be closed — and on
+Windows and Linux, without system decorations, Alt+F4 and the taskbar run into the same
+handler. Two safeguards:
+
+- An error inside the handler is caught and lets the window close.
+- `CloseWatch` (`src-tauri/src/lib.rs`): the handler acknowledges every request at once
+  through `close_request_seen`. If a request stays unacknowledged, the next one after
+  `CLOSE_ANSWER_TIMEOUT` (3 s) destroys the window from Rust, without asking.
+
+What reaches the question, and what does not:
+
+| Way out | Asks |
+|---|---|
+| Title bar close button, Alt+F4, taskbar or window manager close (Windows, Linux) | yes |
+| Red traffic light (macOS) | yes |
+| Cmd+Q and "Quit" in the app menu (macOS) | yes — the menu carries its own `quit` item that closes the window instead of `PredefinedMenuItem::quit`, which terminates the app past it. **Untested on real hardware.** |
+| Installing an update | yes — `UpdatesPage` asks before it calls `install_update`, which restarts the app without a close request |
+| Quit from the Dock, logging out, shutting down, killing the process | no — nothing the app could answer. Entries are covered by the autosave, drafts by `drafts.json` |
+
+Known limit: on Linux under Wayland a minimised window cannot be told to come forward (there
+is no minimised state to read, and focus cannot be taken without an activation token), so a
+close from the panel while minimised may show the question where it is not seen until the
+window is raised by hand. Untested on real hardware.
 
 ### Known limitations
 
