@@ -31,6 +31,7 @@ import { useAltarStore } from '../../store/altarStore';
 import { isAcceptedImageFile, readFileAsDataUrl } from '../../lib/helpers';
 import { prepareImageDataUrl } from '../../lib/imageLimits';
 import { reportImageError } from '../../store/imageNoticeStore';
+import { useSettingsStore } from '../../store/settingsStore';
 
 interface LinkPopupState {
   href: string;
@@ -66,6 +67,9 @@ interface RichEditorProps {
  * Hier bleibt, was an genau diesem Editor hängt: Extensions und Chip-Lookups,
  * das Popup für externe Links und Einfügen per Paste.
  */
+/** `Link` ohne das Verlinken eingefügter Adressen — für „Auto-Links" aus. */
+const LinkWithoutPasteRule = Link.extend({ addPasteRules: () => [] });
+
 export default function RichEditor({
   initialContent,
   // Kein englischer Default: der Stapel übergibt den lokalisierten Placeholder.
@@ -138,15 +142,22 @@ export default function RichEditor({
   const itemsRef = useRef<SuggestionItem[]>([]);
   itemsRef.current = linkItems;
 
+  // Was der Editor beim Tippen und Einfügen von selbst formatiert
+  // (Einstellungen → Einträge). Beim Anlegen gelesen: ein offener Editor
+  // behält, womit er aufging — ein neuer bekäme sonst mitten im Tippen andere Regeln.
+  const [format] = useState(() => useSettingsStore.getState().settings.editor);
+
   const editor = useEditor({
     extensions: [
       StarterKit,
-      Link.configure({
+      (format.autoLinks ? Link : LinkWithoutPasteRule).configure({
         openOnClick: false,
         HTMLAttributes: { class: 'external-link' },
+        autolink: format.autoLinks,
+        linkOnPaste: format.autoLinks,
       }),
       Placeholder.configure({ placeholder }),
-      Typography,
+      ...(format.typography ? [Typography] : []),
       Highlight.configure({ multicolor: false }),
       TaskList,
       TaskItem.configure({ nested: true }),
@@ -167,6 +178,10 @@ export default function RichEditor({
       ExternalDropExtension,
       ResizableImage,
     ],
+    // Markdown-Kürzel sind die Eingaberegeln von StarterKit, Markieren und
+    // Aufgaben; Typografie hat ihre eigenen und fehlt oben ganz, wenn aus.
+    enableInputRules: format.markdownShortcuts ? true : format.typography ? ['typography'] : false,
+    enablePasteRules: format.markdownShortcuts ? true : format.autoLinks ? ['link'] : false,
     content: initialContent || '',
     editable,
     onUpdate: ({ editor }) => {

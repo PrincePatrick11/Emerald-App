@@ -1,4 +1,6 @@
+import EditorFormattingSection from './EditorFormattingSection';
 import EmojiDefaultsSection from './EmojiDefaultsSection';
+import MoonPhaseSection from './MoonPhaseSection';
 import ImageLimitsSection from './ImageLimitsSection';
 import TagRulesSection from './TagRulesSection';
 import TemplateDefaultSection from './TemplateDefaultSection';
@@ -11,6 +13,8 @@ export default function EntriesPage() {
       <ImageLimitsSection />
       <TagRulesSection />
       <TemplateDefaultSection />
+      <EditorFormattingSection />
+      <MoonPhaseSection />
     </>
   );
 }

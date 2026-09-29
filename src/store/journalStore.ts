@@ -8,6 +8,7 @@ import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, toInt, type DbRow } from '../lib/row';
 import type { JournalEntry } from '../types';
 import i18n from '../i18n';
+import { useSettingsStore } from './settingsStore';
 import { startOfNewEntry, useTemplateNoticeStore } from './templateStore';
 import { UNTITLED_TITLES } from '../lib/blocks/templates';
 
@@ -55,7 +56,8 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   createEntry: async ({ blank = false } = {}) => {
     const db = await getDb();
     const now = nowIso();
-    const moonPhase = getMoonPhase();
+    // Die Mondphase des Tages — sofern der Vault sie will (Einstellung).
+    const moonPhase = useSettingsStore.getState().settings.journal.moonPhase ? getMoonPhase() : null;
     const entryNumber = await nextEntryNumber(db, 'journal_entries');
     const start = startOfNewEntry('journal', null, UNTITLED_TITLES.journal, blank);
     const entry: JournalEntry = {

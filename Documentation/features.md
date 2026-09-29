@@ -484,7 +484,7 @@ Settings are **per vault** — stored in that vault's own `settings.json`, not s
 
 - **General** — language, theme, the two fonts, interface size, and editor text size (see Language/Typography/Theming/Sizing below).
 - **Sidebar** — which single list the left entry list shows (all items together, or one module's own), and how many entries it lists before a "Show more" button reveals the rest.
-- **Entries** — per-vault defaults for new content: the emoji picker's own default set, an inserted image's size limits, whether the tag field may create new tags on the spot, and whether a new entry starts with its default template.
+- **Entries** — per-vault defaults for new content: the emoji picker's own default set, an inserted image's size limits, whether new tags may appear on the spot (typed, from a template, from an import), whether a new entry starts with its default template, what the editor formats on its own (**Automatic formatting**: Markdown shortcuts such as `# ` for a heading or `**bold**`; typography such as curly quotes, dashes, arrows and fractions; auto-links for typed or pasted addresses — each its own switch, taking effect in every editor opened afterwards), and whether a new journal entry gets the day's **moon phase** (off: it starts without one and shows under "No moon phase").
 - **Backup** — see [Vault Backup](#vault-backup-emeralddb) below.
 - **Storage** — as before.
 - **Updates** — see [Updates](#updates) below. The one page whose settings are *not* per vault: which source this installation asks, and whether it asks on start, belong to the installation rather than to a vault, so they live in the app directory (see [In-App Updates](security.md#in-app-updates)).

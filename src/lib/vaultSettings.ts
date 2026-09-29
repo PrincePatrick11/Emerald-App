@@ -68,9 +68,9 @@ export interface ImageSettings {
 }
 
 export interface TagSettings {
-  /** Ob das Tag-Feld (Einträge, Vorlagen) unbekannte Namen als neue Tags
-   *  anlegt. Aus: neue Tags nur im Tags-Dashboard, und eine Vorlage bringt
-   *  nur Tags mit, die es gibt. Importe legen fehlende Tags immer an. */
+  /** Ob unbekannte Namen zu neuen Tags werden — getippt ins Tag-Feld, aus
+   *  einer Vorlage, aus einem `.emerald`-Import. Aus: neue Tags nur im
+   *  Tags-Dashboard. Eine Sicherung bringt ihre Tags immer mit. */
   createInline: boolean;
 }
 
@@ -79,6 +79,21 @@ export interface TemplateSettings {
    *  Aus: er beginnt leer und bietet die passenden Vorlagen zur Wahl an. Von
    *  Hand einsetzen geht immer; ein Kategorie- oder Typwechsel setzt nie ein. */
   applyDefault: boolean;
+}
+
+/** Was der Editor beim Tippen und Einfügen von selbst formatiert. Gilt für jeden Editor, der danach aufgeht. */
+export interface EditorSettings {
+  /** Markdown-Kürzel: `# ` Überschrift, `- ` und `1. ` Listen, `> ` Zitat, `[ ] ` Aufgabe, `**fett**`, `==markiert==` … */
+  markdownShortcuts: boolean;
+  /** Typografie: „…"-Anführungszeichen, Gedankenstrich, Pfeile, Brüche, ©. */
+  typography: boolean;
+  /** Eine getippte oder eingefügte Adresse wird zum Link. */
+  autoLinks: boolean;
+}
+
+export interface JournalSettings {
+  /** Ob ein neuer Journal-Eintrag die Mondphase des Tages bekommt. */
+  moonPhase: boolean;
 }
 
 export interface VaultSettings {
@@ -94,6 +109,8 @@ export interface VaultSettings {
   images: ImageSettings;
   tags: TagSettings;
   templates: TemplateSettings;
+  editor: EditorSettings;
+  journal: JournalSettings;
 }
 
 export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
@@ -101,6 +118,7 @@ export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
 /** Jede Gruppe genau einmal — der Record erzwingt, dass eine neue nicht fehlt. */
 const GROUP_SET: Record<SettingsGroup, true> = {
   appearance: true, trash: true, leftList: true, emojis: true, images: true, tags: true, templates: true,
+  editor: true, journal: true,
 };
 export const SETTINGS_GROUPS = Object.keys(GROUP_SET) as SettingsGroup[];
 
@@ -133,6 +151,14 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
   },
   templates: {
     applyDefault: true,
+  },
+  editor: {
+    markdownShortcuts: true,
+    typography: true,
+    autoLinks: true,
+  },
+  journal: {
+    moonPhase: true,
   },
 };
 
@@ -181,6 +207,9 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const images = asRecord(root.images);
   const tags = asRecord(root.tags);
   const templates = asRecord(root.templates);
+  const editor = asRecord(root.editor);
+  const journal = asRecord(root.journal);
+  const flag = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
   const version = typeof root.version === 'number' && Number.isInteger(root.version) && root.version > 1
     ? root.version
     : 1;
@@ -221,6 +250,16 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
     templates: {
       ...templates,
       applyDefault: typeof templates.applyDefault === 'boolean' ? templates.applyDefault : DEFAULT_VAULT_SETTINGS.templates.applyDefault,
+    },
+    editor: {
+      ...editor,
+      markdownShortcuts: flag(editor.markdownShortcuts, DEFAULT_VAULT_SETTINGS.editor.markdownShortcuts),
+      typography: flag(editor.typography, DEFAULT_VAULT_SETTINGS.editor.typography),
+      autoLinks: flag(editor.autoLinks, DEFAULT_VAULT_SETTINGS.editor.autoLinks),
+    },
+    journal: {
+      ...journal,
+      moonPhase: flag(journal.moonPhase, DEFAULT_VAULT_SETTINGS.journal.moonPhase),
     },
   };
 }
