@@ -343,9 +343,14 @@ The type toggle below is the one thing outside the baseline: it writes through
 captures a fresh baseline, so Cancel afterwards goes back to how the entry looked right after
 the move and leaves it under its new type.
 
-The baseline lives as long as the view holds the entry in edit mode. Leaving it mid-edit —
-another tab, another module, Back, a restart — saves what was typed, and coming back starts a
-new baseline from that saved state; Cancel then goes back to that point, not further.
+The baseline outlives the view: `useEntryEditor` keeps it in a module-level map keyed by view
+type and entry id, not in a ref, so looking into another tab in the middle of editing and
+coming back continues the same edit — Cancel still goes back to where it began. A baseline
+lives as long as some tab shows the entry in edit mode; a subscription on `uiStore` drops it
+once none does, which covers Done, Cancel, Delete, closing the tab, and navigating elsewhere
+within the same tab (that last one saves what was typed and ends the edit, as it always has).
+It is memory only: after a restart, a restored edit-mode tab starts a new baseline from what
+is stored.
 
 ### Changing an entry's type
 

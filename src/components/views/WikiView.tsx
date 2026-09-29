@@ -65,6 +65,7 @@ export default function WikiView() {
   });
 
   const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
+    scope: 'wiki',
     entityId: article?.id,
     isEditing,
     ready: !!article && loadedArticleId === article.id,

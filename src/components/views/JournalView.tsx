@@ -59,6 +59,7 @@ export default function JournalView() {
   const fieldsOf = (e: NonNullable<typeof entry>) => ({ title: e.title, content: e.content, tags: e.tags ?? [] });
 
   const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
+    scope: 'journal',
     entityId: entry?.id,
     isEditing,
     ready: !!entry && loadedEntryId === entry.id,

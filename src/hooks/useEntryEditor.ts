@@ -1,5 +1,34 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { editorSavesSuspended } from '../lib/editorLock';
+import type { ViewId } from '../lib/modules';
+import { useUIStore } from '../store/uiStore';
+
+/**
+ * Die Ausgangsstände der laufenden Bearbeitungen, je Ansicht und Eintrag — wie
+ * der Eintrag aussah, als „Bearbeiten" gedrückt wurde. Außerhalb der
+ * Komponente, weil eine Bearbeitung ihre View überlebt: wer mittendrin in
+ * einen anderen Tab schaut, kommt in dieselbe Bearbeitung zurück, und Cancel
+ * geht dann bis zu ihrem Anfang, nicht nur bis zum Tabwechsel.
+ *
+ * Ein Stand lebt, solange irgendein Tab den Eintrag im Bearbeiten zeigt.
+ * „Fertig", Cancel, Löschen, das Schließen des Tabs und ein Wechsel der Seite
+ * im selben Tab beenden die Bearbeitung — das liest der Abgleich unten am
+ * `uiStore` ab, keine View muss es melden. Nur im Speicher: ein Neustart
+ * beginnt mit dem, was gespeichert ist.
+ */
+const baselines = new Map<string, { scope: ViewId; id: string; patch: unknown }>();
+
+const baselineKey = (scope: ViewId, id: string) => `${scope}:${id}`;
+
+useUIStore.subscribe((s) => {
+  if (!baselines.size) return;
+  const editing = (scope: ViewId, id: string) =>
+    [s.activeView, ...s.tabs.map((tab) => tab.view)]
+      .some((view) => view.type === scope && view.id === id && view.mode === 'edit');
+  for (const [key, { scope, id }] of baselines) {
+    if (!editing(scope, id)) baselines.delete(key);
+  }
+});
 
 /**
  * Debounce-Autosave, Speichern beim Wegnavigieren und Speichern beim Unmount —
@@ -20,6 +49,8 @@ import { editorSavesSuspended } from '../lib/editorLock';
  * localStorage restaurierter Edit-Tab) den noch leeren Titel in die DB.
  */
 interface UseEntryEditorOptions<TPatch, TRestore = TPatch> {
+  /** Die Ansicht, der die Einträge gehören — unterscheidet die Ausgangsstände (`baselines`). */
+  scope: ViewId;
   entityId: string | undefined;
   isEditing: boolean;
   ready: boolean;
@@ -45,6 +76,7 @@ interface UseEntryEditorOptions<TPatch, TRestore = TPatch> {
 }
 
 export function useEntryEditor<TPatch, TRestore = TPatch>({
+  scope,
   entityId,
   isEditing,
   ready,
@@ -113,19 +145,15 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
   // Beim Einstieg spiegelt der lokale State noch exakt das Gespeicherte, der
   // Restore-Patch liefert hier also die Vorher-Werte. Das `ready`-Gate hält
   // die Erfassung zurück, bis die View ihren State aus dem Eintrag geladen
-  // hat — die Hook-Effekte laufen vor den Load-Effekten der View.
+  // hat — die Hook-Effekte laufen vor den Load-Effekten der View. Gibt es
+  // schon einen Stand, läuft die Bearbeitung noch (siehe `baselines`): er bleibt.
   const restoreFields = (content: string): TRestore =>
     (buildRestorePatchRef.current ?? (buildPatchRef.current as unknown as (c: string) => TRestore))(content);
-  const baselineRef = useRef<{ id: string; patch: TRestore } | null>(null);
   useEffect(() => {
-    if (isEditing && ready && entityId) {
-      if (baselineRef.current?.id !== entityId) {
-        baselineRef.current = { id: entityId, patch: restoreFields(contentRef.current) };
-      }
-    } else {
-      baselineRef.current = null;
-    }
-  }, [isEditing, ready, entityId]);
+    if (!isEditing || !ready || !entityId) return;
+    const key = baselineKey(scope, entityId);
+    if (!baselines.has(key)) baselines.set(key, { scope, id: entityId, patch: restoreFields(contentRef.current) });
+  }, [isEditing, ready, entityId, scope]);
 
   /**
    * Der Cancel-Pfad: entschärft den Timer und schreibt den Einstiegs-Stand des
@@ -137,7 +165,10 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
    */
   const restoreOnCancel = useCallback(async (): Promise<TRestore | null> => {
     cancelAutoSave();
-    const baseline = baselineRef.current;
+    const id = idRef.current;
+    const baseline = id
+      ? baselines.get(baselineKey(scope, id)) as { id: string; patch: TRestore } | undefined
+      : undefined;
     if (!baseline) return null;
     const stored = readStoredRef.current?.() ?? restoreFields(contentRef.current);
     if (JSON.stringify(stored) !== JSON.stringify(baseline.patch)) {
@@ -151,7 +182,7 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
       cancelAutoSave();
     }
     return baseline.patch;
-  }, [cancelAutoSave]);
+  }, [cancelAutoSave, scope]);
 
   const prevRef = useRef<{ id: string; isEditing: boolean } | null>(null);
 

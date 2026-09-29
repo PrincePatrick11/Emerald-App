@@ -64,6 +64,7 @@ export default function OperationsView() {
   });
 
   const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
+    scope: 'operations',
     entityId: operation?.id,
     isEditing,
     ready: !!operation && loadedOperationId === operation.id,
