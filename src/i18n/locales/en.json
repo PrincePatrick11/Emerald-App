@@ -739,7 +739,7 @@
     "tagCreateDashboardOnlyHint": "The tag field only accepts existing tags, and templates only bring existing ones. Create new tags in Tags.",
     "templateDefaultHint": "Whether a new entry starts with the default template for its type and category. A template can always be inserted by hand.",
     "templateDefaultAutoHint": "A new entry starts with its default template. Changing its category or type later leaves the content alone.",
-    "templateDefaultManualHint": "New entries start empty and offer the matching templates to choose from",
+    "templateDefaultManualHint": "New entries start empty and offer the matching templates to choose from.",
     "trashRetentionHint": "How long deleted items stay in the trash. After that they are removed for good when the vault opens.",
     "languageHint": "The interface language in this vault.",
     "appearanceHint": "Color scheme, fonts and sizes of this vault.",
@@ -791,6 +791,12 @@
     "deleteSelected": "Delete selected ({{count}})",
     "confirmDeleteSelected": "Yes, delete {{count}}",
     "retentionNoteNever": "Items stay until you delete them permanently."
+  },
+  "leaveGuard": {
+    "title": "Editing not finished",
+    "message": "“{{name}}” is still being edited. What should happen to the changes?",
+    "discard": "Discard",
+    "stay": "Keep editing"
   },
   "menu": {
     "cut": "Cut",
@@ -911,7 +917,7 @@
     "overview": {
       "title": "Defaults",
       "hint": "Applies to new entries. The “All categories” row applies whenever a category has no default of its own.",
-      "hintOff": "Inserting automatically is turned off in Settings – new entries start empty and offer their templates to choose from.",
+      "hintOff": "Default templates are set to “Only by hand” in Settings: new entries start empty and offer their templates to choose from.",
       "category": "Category",
       "none": "No default",
       "fallback": "Otherwise: {{name}} (all categories)",

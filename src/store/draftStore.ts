@@ -1,4 +1,5 @@
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
+import { registerEditProbe } from './leaveGuardStore';
 import type { BlockDefinitionPatch } from './blockDefinitionStore';
 import type { TemplatePatch } from './templateStore';
 
@@ -50,7 +51,7 @@ const stores: DraftStore<unknown>[] = [];
  * ihren „Ungespeichert"-Hinweis. Bewusst nicht persistiert: wie ein Eintrag im
  * Bearbeitungsmodus überlebt ein Entwurf keinen Neustart.
  */
-function createDraftStore<T>(): DraftStore<T> {
+function createDraftStore<T>(viewType: 'blocks' | 'templates'): DraftStore<T> {
   const store = create<DraftState<T>>((set) => ({
     drafts: {},
     saveDraft: (id, entry) => set((s) => ({ drafts: { ...s.drafts, [id]: entry } })),
@@ -62,12 +63,14 @@ function createDraftStore<T>(): DraftStore<T> {
     clearAll: () => set({ drafts: {} }),
   }));
   stores.push(store as DraftStore<unknown>);
+  // Für Tabs im Hintergrund: ein Entwurf heißt ungesicherte Änderungen (`leaveGuardStore`).
+  registerEditProbe((view) => view.type === viewType && !!view.id && view.id in store.getState().drafts);
   return store;
 }
 
-export const useBlockDraftStore = createDraftStore<DefinitionDraft>();
+export const useBlockDraftStore = createDraftStore<DefinitionDraft>('blocks');
 
-export const useTemplateDraftStore = createDraftStore<TemplateDraft>();
+export const useTemplateDraftStore = createDraftStore<TemplateDraft>('templates');
 
 /** Alle Entwurfslisten leeren — siehe `clearAll`. */
 export function clearAllDrafts(): void {

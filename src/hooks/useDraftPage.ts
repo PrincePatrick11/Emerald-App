@@ -1,9 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { DraftStore } from '../store/draftStore';
+import { guardKey, useLeaveGuardStore } from '../store/leaveGuardStore';
 
 interface Options<T extends { name: string }> {
   store: DraftStore<T>;
+  /** Die Ansicht, der die Seite gehört — für den Wächter (`leaveGuardStore`). */
+  viewType: 'blocks' | 'templates';
   id: string;
+  /** Wie der Entwurf in der Frage beim Verlassen heißt. */
+  label: (draft: T) => string;
   /** Der gespeicherte Stand, auf die Felder des Entwurfs gebracht. */
   saved: T;
   /** Speichert die geänderten Felder — genau die, sonst nichts. `base` ist der Stand beim Öffnen. */
@@ -25,8 +30,12 @@ function comparable<T extends { name: string }>(value: T, key: keyof T): string 
  * auch wenn die Ansicht unmountet. „Fertig" schreibt nur die Felder, die sich
  * gegenüber dem Stand beim Öffnen geändert haben, und bleibt bei einem Fehler
  * auf der Seite; „Abbrechen" verwirft. Beide führen zurück zur Liste.
+ *
+ * Wer die Seite mit einem Entwurf anders verlässt, wird gefragt
+ * (`leaveGuardStore`) — wie bei einem Eintrag im Bearbeiten. Nur der Wechsel
+ * in einen anderen Tab lässt den Entwurf liegen: dort geht die Arbeit weiter.
  */
-export function useDraftPage<T extends { name: string }>({ store, id, saved, save, onClose, logTag }: Options<T>) {
+export function useDraftPage<T extends { name: string }>({ store, viewType, id, label, saved, save, onClose, logTag }: Options<T>) {
   const [base] = useState<T>(() => store.getState().drafts[id]?.base ?? saved);
   const [draft, setDraft] = useState<T>(() => store.getState().drafts[id]?.draft ?? saved);
   const [busy, setBusy] = useState(false);
@@ -66,6 +75,29 @@ export function useDraftPage<T extends { name: string }>({ store, id, saved, sav
     }
     leave();
   };
+
+  // Der Wächter ruft immer die Handgriffe des letzten Renders. Die Probe für
+  // Tabs im Hintergrund meldet der Store selbst an (`draftStore`).
+  const latest = useRef({ draft, label, finish, leave });
+  latest.current = { draft, label, finish, leave };
+  useEffect(() => {
+    const key = guardKey(viewType, id);
+    // Ob es einen Entwurf gibt, sagt der Store: „Fertig", „Abbrechen" und
+    // Löschen räumen ihn, bevor sie die Seite verlassen — und fragen damit nicht.
+    const hasDraft = () => id in store.getState().drafts;
+    useLeaveGuardStore.getState().setGuard({
+      key,
+      title: () => latest.current.label(latest.current.draft),
+      isDirty: hasDraft,
+      save: async () => {
+        await latest.current.finish();
+        // `finish` bleibt bei einem Fehler auf der Seite — dann auch hier bleiben.
+        if (hasDraft()) throw new Error('draft could not be saved');
+      },
+      discard: () => latest.current.leave(),
+    });
+    return () => useLeaveGuardStore.getState().clearGuard(key);
+  }, [viewType, id, store]);
 
   return { draft, setDraft, patch, dirty, busy, setBusy, finish, leave };
 }

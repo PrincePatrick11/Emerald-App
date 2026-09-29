@@ -49,7 +49,9 @@ export default function TemplateEditor({ template, entries, onClose, onDelete }:
   const updateTemplate = useTemplateStore((s) => s.updateTemplate);
   const { draft, patch, dirty, busy, finish, leave } = useDraftPage({
     store: useTemplateDraftStore,
+    viewType: 'templates',
     id: template.id,
+    label: (current) => templateLabel(t, current),
     saved: draftOf(template),
     // Zuweisungen als Änderung auf den aktuellen Stand — eine andere Vorlage kann inzwischen Sterne genommen haben.
     save: (id, patch, base) => updateTemplate(id, patch.assignments

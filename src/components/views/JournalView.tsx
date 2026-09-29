@@ -7,6 +7,7 @@ import ContextMenu from '../ui/ContextMenu';
 import { useUIStore } from '../../store/uiStore';
 import { useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEditActions } from '../../hooks/useEditActions';
+import { guardKey } from '../../store/leaveGuardStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useUndoStore } from '../../store/undoStore';
 import BlockStack from '../blocks/BlockStack';
@@ -58,7 +59,7 @@ export default function JournalView() {
 
   const fieldsOf = (e: NonNullable<typeof entry>) => ({ title: e.title, content: e.content, tags: e.tags ?? [] });
 
-  const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
+  const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, hasChanges, contentRef, handleContentChange } = useEntryEditor({
     scope: 'journal',
     entityId: entry?.id,
     isEditing,
@@ -66,8 +67,8 @@ export default function JournalView() {
     // Auch, was Cancel wiederherstellt: der Eintrag, wie er beim Betreten des
     // Bearbeitens war — samt den Tags, die die Seitenleiste inzwischen gespeichert hat.
     buildPatch: (content) => ({ title, content, tags }),
-    readStored: () => {
-      const stored = entry && getEntry(entry.id);
+    readStored: (id) => {
+      const stored = getEntry(id);
       return stored ? fieldsOf(stored) : null;
     },
     update: updateEntry,
@@ -162,7 +163,15 @@ export default function JournalView() {
     setActiveView({ type: 'journal' });
   };
 
-  useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete, flush: flushAutoSave });
+  useEditActions(isEditing, {
+    onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete, flush: flushAutoSave,
+    guard: entry ? {
+      key: guardKey('journal', entry.id),
+      title: () => title.trim() || getEntry(entry.id)?.title.trim() || t('journal.untitled'),
+      // Ein inzwischen gelöschter Eintrag hat nichts mehr zu sichern.
+      isDirty: () => !!getEntry(entry.id) && (!!activeView.isNew || hasChanges()),
+    } : undefined,
+  });
 
   // List view
   if (!entry) {

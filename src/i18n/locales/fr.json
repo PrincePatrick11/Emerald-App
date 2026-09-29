@@ -747,7 +747,7 @@
     "tagCreateDashboardOnlyHint": "Le champ n'accepte que les étiquettes existantes, et les modèles n'apportent que celles-ci. Créez-en de nouvelles dans Étiquettes.",
     "templateDefaultHint": "Si une nouvelle entrée commence par le modèle par défaut de son type et de sa catégorie. Un modèle peut toujours être inséré à la main.",
     "templateDefaultAutoHint": "Une nouvelle entrée commence par son modèle par défaut. Changer ensuite de catégorie ou de type ne modifie pas le contenu.",
-    "templateDefaultManualHint": "Les nouvelles entrées commencent vides et proposent les modèles adaptés",
+    "templateDefaultManualHint": "Les nouvelles entrées commencent vides et proposent les modèles adaptés.",
     "trashRetentionHint": "Durée pendant laquelle les éléments supprimés restent dans la corbeille. Ensuite, ils sont effacés définitivement à l'ouverture du vault.",
     "languageHint": "La langue de l'interface dans ce vault.",
     "appearanceHint": "Palette de couleurs, polices et tailles de ce vault.",
@@ -791,6 +791,12 @@
     "deleteSelected": "Supprimer la sélection ({{count}})",
     "confirmDeleteSelected": "Oui, supprimer {{count}}",
     "retentionNoteNever": "Les éléments restent jusqu'à ce que vous les supprimiez définitivement."
+  },
+  "leaveGuard": {
+    "title": "Modification en cours",
+    "message": "« {{name}} » est encore en cours de modification. Que faire des changements ?",
+    "discard": "Abandonner",
+    "stay": "Continuer la modification"
   },
   "menu": {
     "cut": "Couper",
@@ -911,7 +917,7 @@
     "overview": {
       "title": "Modèles par défaut",
       "hint": "S'applique aux nouvelles entrées. La ligne « Toutes les catégories » s'applique chaque fois qu'une catégorie n'a pas de modèle par défaut propre.",
-      "hintOff": "L'insertion automatique est désactivée dans les Paramètres : les nouvelles entrées commencent vides et proposent leurs modèles.",
+      "hintOff": "Dans les Paramètres, le modèle par défaut est réglé sur « Uniquement à la main » : les nouvelles entrées commencent vides et proposent leurs modèles.",
       "category": "Catégorie",
       "none": "Aucun modèle par défaut",
       "fallback": "Sinon : {{name}} (toutes les catégories)",

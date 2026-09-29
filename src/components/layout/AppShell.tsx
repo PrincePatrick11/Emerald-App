@@ -16,6 +16,11 @@ import MainArea from './MainArea';
 import VaultModal from './VaultModal';
 import UndoToast from '../ui/UndoToast';
 import ImageNoticeModal from '../ui/ImageNoticeModal';
+import LeaveGuardModal from './LeaveGuardModal';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { isTauri } from '../../lib/platform';
+import { resolveOpenEdits } from '../../lib/openEdits';
+import { drainSerialized } from '../../lib/serialize';
 import ImportDestinationModal from '../ui/ImportDestinationModal';
 
 const ENTRY_LIST_MIN = 180;
@@ -131,6 +136,28 @@ export default function AppShell() {
       // Ladebildschirm weg. Auch im Fehlerfall: eine leere Oberflaeche ist
       // immer noch besser als ein Ladebildschirm, der nie endet.
       .finally(hideSplash);
+  }, []);
+
+  // Fenster zu: erst klären, was mit laufenden Bearbeitungen geschieht. Der
+  // Handler wird abgewartet, bevor das Fenster geht — „Weiter bearbeiten"
+  // hält es offen.
+  useEffect(() => {
+    if (!isTauri) return;
+    const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
+      try {
+        if (!(await resolveOpenEdits())) {
+          event.preventDefault();
+          return;
+        }
+        // Was „Speichern" und das Durchschalten der Tabs noch schreiben.
+        await drainSerialized();
+      } catch (e) {
+        // Ein Fehler hier darf das Fenster nicht offen halten: Tauri schließt
+        // erst, wenn dieser Handler zurückkehrt, ohne zu verhindern.
+        console.error('[close] leave guard failed', e);
+      }
+    });
+    return () => { void unlisten.then((stop) => stop()); };
   }, []);
 
   // Sync menu bar labels with the current language
@@ -391,6 +418,7 @@ export default function AppShell() {
 
       <UndoToast />
       <ImageNoticeModal />
+      <LeaveGuardModal />
       <ImportDestinationModal />
     </div>
   );

@@ -24,6 +24,7 @@ import { useUndoStore } from '../../store/undoStore';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEditActions } from '../../hooks/useEditActions';
+import { guardKey } from '../../store/leaveGuardStore';
 import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
 
@@ -63,7 +64,7 @@ export default function OperationsView() {
     category_id: o.category_id ?? null, icon: o.icon, cover_image: o.cover_image,
   });
 
-  const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
+  const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, hasChanges, contentRef, handleContentChange } = useEntryEditor({
     scope: 'operations',
     entityId: operation?.id,
     isEditing,
@@ -78,8 +79,8 @@ export default function OperationsView() {
       title, content, tags,
       category_id: operation?.category_id ?? null, icon: operation?.icon, cover_image: operation?.cover_image,
     }),
-    readStored: () => {
-      const stored = operation && getOperation(operation.id);
+    readStored: (id) => {
+      const stored = getOperation(id);
       return stored ? fieldsOf(stored) : null;
     },
     update: updateOperation,
@@ -182,7 +183,15 @@ export default function OperationsView() {
     setActiveView({ type: 'operations' });
   };
 
-  useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete, flush: flushAutoSave });
+  useEditActions(isEditing, {
+    onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete, flush: flushAutoSave,
+    guard: operation ? {
+      key: guardKey('operations', operation.id),
+      title: () => title.trim() || getOperation(operation.id)?.title.trim() || t('operations.untitled'),
+      // Eine inzwischen gelöschte Operation hat nichts mehr zu sichern.
+      isDirty: () => !!getOperation(operation.id) && (!!activeView.isNew || hasChanges()),
+    } : undefined,
+  });
 
   // List view
   if (!operation) {

@@ -72,7 +72,9 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
   const updateDefinition = useBlockDefinitionStore((s) => s.updateDefinition);
   const { draft, setDraft, patch, dirty, busy, setBusy, finish, leave } = useDraftPage({
     store: useBlockDraftStore,
+    viewType: 'blocks',
     id: definition.id,
+    label: (current) => definitionLabel(t, current),
     saved: draftOf(definition),
     save: updateDefinition,
     onClose,

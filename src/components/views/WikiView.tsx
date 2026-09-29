@@ -21,6 +21,7 @@ import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY, countByCategory } fro
 import { useUIStore } from '../../store/uiStore';
 import { useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEditActions } from '../../hooks/useEditActions';
+import { guardKey } from '../../store/leaveGuardStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
@@ -64,7 +65,7 @@ export default function WikiView() {
     category_id: a.category_id ?? null, icon: a.icon, cover_image: a.cover_image,
   });
 
-  const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, contentRef, handleContentChange } = useEntryEditor({
+  const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, hasChanges, contentRef, handleContentChange } = useEntryEditor({
     scope: 'wiki',
     entityId: article?.id,
     isEditing,
@@ -80,8 +81,8 @@ export default function WikiView() {
       title, content, tags,
       category_id: article?.category_id ?? null, icon: article?.icon, cover_image: article?.cover_image,
     }),
-    readStored: () => {
-      const stored = article && getArticle(article.id);
+    readStored: (id) => {
+      const stored = getArticle(id);
       return stored ? fieldsOf(stored) : null;
     },
     update: updateArticle,
@@ -150,7 +151,15 @@ export default function WikiView() {
     setActiveView({ type: 'wiki' });
   };
 
-  useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete, flush: flushAutoSave });
+  useEditActions(isEditing, {
+    onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete, flush: flushAutoSave,
+    guard: article ? {
+      key: guardKey('wiki', article.id),
+      title: () => title.trim() || getArticle(article.id)?.title.trim() || t('wiki.untitled'),
+      // Ein inzwischen gelöschter Artikel hat nichts mehr zu sichern.
+      isDirty: () => !!getArticle(article.id) && (!!activeView.isNew || hasChanges()),
+    } : undefined,
+  });
 
   // Ohne Argument fällt createArticle auf „other" zurück; der „+"-Knopf am
   // Kategorienkopf gibt seine Kategorie mit — wie handleCreateTask(cat.id).

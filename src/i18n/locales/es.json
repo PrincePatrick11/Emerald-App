@@ -747,7 +747,7 @@
     "tagCreateDashboardOnlyHint": "El campo solo acepta etiquetas existentes y las plantillas solo traen las existentes. Crea etiquetas nuevas en Etiquetas.",
     "templateDefaultHint": "Si una entrada nueva empieza con la plantilla predeterminada de su tipo y categoría. Siempre se puede insertar una plantilla a mano.",
     "templateDefaultAutoHint": "Una entrada nueva empieza con su plantilla predeterminada. Cambiar después la categoría o el tipo no altera el contenido.",
-    "templateDefaultManualHint": "Las entradas nuevas empiezan vacías y ofrecen las plantillas adecuadas para elegir",
+    "templateDefaultManualHint": "Las entradas nuevas empiezan vacías y ofrecen las plantillas adecuadas para elegir.",
     "trashRetentionHint": "Cuánto tiempo permanece lo eliminado en la papelera. Después se borra definitivamente al abrir el vault.",
     "languageHint": "El idioma de la interfaz en este vault.",
     "appearanceHint": "Esquema de colores, fuentes y tamaños de este vault.",
@@ -791,6 +791,12 @@
     "deleteSelected": "Eliminar seleccionados ({{count}})",
     "confirmDeleteSelected": "Sí, eliminar {{count}}",
     "retentionNoteNever": "Los elementos se quedan hasta que los elimines definitivamente."
+  },
+  "leaveGuard": {
+    "title": "Edición sin terminar",
+    "message": "«{{name}}» todavía se está editando. ¿Qué hacemos con los cambios?",
+    "discard": "Descartar",
+    "stay": "Seguir editando"
   },
   "menu": {
     "cut": "Cortar",
@@ -911,7 +917,7 @@
     "overview": {
       "title": "Plantillas predeterminadas",
       "hint": "Se aplica a las entradas nuevas. La fila «Todas las categorías» se aplica siempre que una categoría no tenga una predeterminada propia.",
-      "hintOff": "La inserción automática está desactivada en Ajustes: las entradas nuevas empiezan vacías y ofrecen sus plantillas para elegir.",
+      "hintOff": "En Ajustes, la plantilla predeterminada está en «Solo a mano»: las entradas nuevas empiezan vacías y ofrecen sus plantillas para elegir.",
       "category": "Categoría",
       "none": "Sin plantilla predeterminada",
       "fallback": "Si no: {{name}} (todas las categorías)",

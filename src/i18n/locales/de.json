@@ -721,7 +721,7 @@
     "tagCreateDashboardOnly": "Nur unter Tags",
     "groupTags": "Tags",
     "groupTemplates": "Vorlagen",
-    "templateDefault": "Standard-Vorlage",
+    "templateDefault": "Standardvorlage",
     "templateDefaultAuto": "Automatisch einsetzen",
     "templateDefaultManual": "Nur von Hand",
     "uiScaleHint": "Vergrößert oder verkleinert die ganze Oberfläche — Text, Symbole und Abstände.",
@@ -737,9 +737,9 @@
     "tagCreationHint": "Wo neue Tags entstehen dürfen. Importe legen fehlende Tags immer an.",
     "tagCreateInlineHint": "Ein unbekannter Name im Tag-Feld eines Eintrags oder einer Vorlage wird als neuer Tag angelegt",
     "tagCreateDashboardOnlyHint": "Das Tag-Feld übernimmt nur vorhandene Tags, und Vorlagen bringen nur vorhandene mit. Neue Tags legst du unter Tags an.",
-    "templateDefaultHint": "Ob ein neuer Eintrag mit der Standard-Vorlage seiner Art und Kategorie beginnt. Von Hand einsetzen lässt sich eine Vorlage immer.",
-    "templateDefaultAutoHint": "Ein neuer Eintrag beginnt mit seiner Standard-Vorlage. Ein späterer Wechsel von Kategorie oder Typ ändert den Inhalt nicht.",
-    "templateDefaultManualHint": "Neue Einträge beginnen leer und bieten die passenden Vorlagen zur Auswahl an",
+    "templateDefaultHint": "Ob ein neuer Eintrag mit der Standardvorlage seiner Art und Kategorie beginnt. Von Hand einsetzen lässt sich eine Vorlage immer.",
+    "templateDefaultAutoHint": "Ein neuer Eintrag beginnt mit seiner Standardvorlage. Ein späterer Wechsel von Kategorie oder Art ändert den Inhalt nicht.",
+    "templateDefaultManualHint": "Neue Einträge beginnen leer und bieten die passenden Vorlagen zur Auswahl an.",
     "trashRetentionHint": "So lange bleibt Gelöschtes im Papierkorb. Danach wird es beim Öffnen des Vaults endgültig gelöscht.",
     "languageHint": "Die Sprache der Oberfläche in diesem Vault.",
     "appearanceHint": "Farbschema, Schriften und Größen dieses Vaults.",
@@ -791,6 +791,12 @@
     "deleteSelected": "Ausgewählte löschen ({{count}})",
     "confirmDeleteSelected": "Ja, {{count}} löschen",
     "retentionNoteNever": "Elemente bleiben, bis du sie endgültig löschst."
+  },
+  "leaveGuard": {
+    "title": "Bearbeitung nicht abgeschlossen",
+    "message": "„{{name}}“ wird noch bearbeitet. Was soll mit den Änderungen geschehen?",
+    "discard": "Verwerfen",
+    "stay": "Weiter bearbeiten"
   },
   "menu": {
     "cut": "Ausschneiden",
@@ -911,7 +917,7 @@
     "overview": {
       "title": "Standardvorlagen",
       "hint": "Gilt für neue Einträge. Die Zeile „Alle Kategorien“ gilt immer dann, wenn eine Kategorie keinen eigenen Standard hat.",
-      "hintOff": "Das automatische Einsetzen ist in den Einstellungen ausgeschaltet – neue Einträge beginnen leer und bieten ihre Vorlagen zur Auswahl an.",
+      "hintOff": "In den Einstellungen steht die Standardvorlage auf „Nur von Hand“: Neue Einträge beginnen leer und bieten ihre Vorlagen zur Auswahl an.",
       "category": "Kategorie",
       "none": "Kein Standard",
       "fallback": "Sonst: {{name}} (alle Kategorien)",

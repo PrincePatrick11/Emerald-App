@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { editorSavesSuspended } from '../lib/editorLock';
 import type { ViewId } from '../lib/modules';
 import { useUIStore } from '../store/uiStore';
+import { registerEditProbe } from '../store/leaveGuardStore';
 
 /**
  * Die Ausgangsstände der laufenden Bearbeitungen, je Ansicht und Eintrag — wie
@@ -16,7 +17,13 @@ import { useUIStore } from '../store/uiStore';
  * `uiStore` ab, keine View muss es melden. Nur im Speicher: ein Neustart
  * beginnt mit dem, was gespeichert ist.
  */
-const baselines = new Map<string, { scope: ViewId; id: string; patch: unknown }>();
+const baselines = new Map<string, {
+  scope: ViewId;
+  id: string;
+  patch: unknown;
+  /** Der gespeicherte Stand, in der Form von `patch` — `null`, wenn es den Eintrag nicht mehr gibt. */
+  stored: () => unknown;
+}>();
 
 const baselineKey = (scope: ViewId, id: string) => `${scope}:${id}`;
 
@@ -28,6 +35,17 @@ useUIStore.subscribe((s) => {
   for (const [key, { scope, id }] of baselines) {
     if (!editing(scope, id)) baselines.delete(key);
   }
+});
+
+// Für Tabs im Hintergrund: trägt die Bearbeitung dort Änderungen? Beim
+// Wegschalten hat der Editor gespeichert, der gespeicherte Stand sagt also alles.
+registerEditProbe((view) => {
+  if (view.mode !== 'edit' || !view.id) return false;
+  const baseline = baselines.get(baselineKey(view.type, view.id));
+  if (!baseline) return false;
+  const stored = baseline.stored();
+  if (stored === null) return false;
+  return !!view.isNew || JSON.stringify(stored) !== JSON.stringify(baseline.patch);
 });
 
 /**
@@ -70,7 +88,7 @@ interface UseEntryEditorOptions<TPatch, TRestore = TPatch> {
    * Stand, und der täuscht: getippt, vom Autosave geschrieben, zurückgetippt
    * und gleich abgebrochen sähe aus wie unverändert.
    */
-  readStored?: () => TRestore | null;
+  readStored?: (id: string) => TRestore | null;
   update: (id: string, patch: TPatch | TRestore) => Promise<void>;
   debounceMs?: number;
 }
@@ -152,7 +170,15 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
   useEffect(() => {
     if (!isEditing || !ready || !entityId) return;
     const key = baselineKey(scope, entityId);
-    if (!baselines.has(key)) baselines.set(key, { scope, id: entityId, patch: restoreFields(contentRef.current) });
+    if (baselines.has(key)) return;
+    const patch = restoreFields(contentRef.current);
+    baselines.set(key, {
+      scope,
+      id: entityId,
+      patch,
+      // Ohne `readStored` gibt es nichts zu vergleichen: dann zählt nur `isNew`.
+      stored: () => (readStoredRef.current ? readStoredRef.current(entityId) : patch),
+    });
   }, [isEditing, ready, entityId, scope]);
 
   /**
@@ -170,7 +196,7 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
       ? baselines.get(baselineKey(scope, id)) as { id: string; patch: TRestore } | undefined
       : undefined;
     if (!baseline) return null;
-    const stored = readStoredRef.current?.() ?? restoreFields(contentRef.current);
+    const stored = readStoredRef.current?.(baseline.id) ?? restoreFields(contentRef.current);
     if (JSON.stringify(stored) !== JSON.stringify(baseline.patch)) {
       try {
         await updateRef.current(baseline.id, baseline.patch);
@@ -183,6 +209,21 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
     }
     return baseline.patch;
   }, [cancelAutoSave, scope]);
+
+  /**
+   * Trägt die laufende Bearbeitung Änderungen — weicht der gespeicherte Stand
+   * vom Ausgangsstand ab, oder wartet noch ein Autosave? Danach fragt der
+   * Wächter beim Verlassen der Seite (`leaveGuardStore`).
+   */
+  const hasChanges = useCallback((): boolean => {
+    const id = idRef.current;
+    if (!id) return false;
+    if (timer.current !== null) return true;
+    const baseline = baselines.get(baselineKey(scope, id));
+    if (!baseline) return false;
+    const stored = readStoredRef.current?.(id) ?? restoreFields(contentRef.current);
+    return JSON.stringify(stored) !== JSON.stringify(baseline.patch);
+  }, [scope]);
 
   const prevRef = useRef<{ id: string; isEditing: boolean } | null>(null);
 
@@ -197,11 +238,12 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
         void updateRef.current(prev.id, buildPatchRef.current(contentRef.current)).catch(console.error);
         prevRef.current = null;
       } else if (!isEditing && timer.current !== null) {
-        // Edit-Modus verlassen ohne Done/Cancel (Klick auf denselben Eintrag
-        // in der Liste, Back-Navigation): der scharfe Timer wuerde sonst
-        // wegen isEditing=false wortlos verfallen und bis zu debounceMs an
-        // Tipparbeit verwerfen. Done/Cancel entschaerfen den Timer vorher —
-        // fuer die ist das hier ein No-op.
+        // Edit-Modus verlassen ohne Done/Cancel — seit dem Waechter
+        // (`leaveGuardStore`) nur noch auf Wegen, die nicht fragen, etwa wenn
+        // eine Sigillen-Sperre den Eintrag aus dem Bearbeiten nimmt: der
+        // scharfe Timer wuerde sonst wegen isEditing=false wortlos verfallen
+        // und bis zu debounceMs an Tipparbeit verwerfen. Done/Cancel
+        // entschaerfen den Timer vorher — fuer die ist das hier ein No-op.
         cancelAutoSave();
         void updateRef.current(prev.id, buildPatchRef.current(contentRef.current)).catch(console.error);
       }
@@ -241,5 +283,5 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
     await updateRef.current(id, buildPatchRef.current(contentRef.current));
   }, [cancelAutoSave]);
 
-  return { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, contentRef, handleContentChange };
+  return { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, hasChanges, contentRef, handleContentChange };
 }

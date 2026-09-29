@@ -3,6 +3,9 @@ import {
   createTabId, freshHistory, isContentView, normalizeSavedHistory, pushHistory, stripSessionFlags,
   type NavHistory, type OpenTab,
 } from '../lib/tabs';
+import {
+  confirmLeave, guardKey, guardRegistered, holdsOpenEdit, leaveNeedsConfirm, useLeaveGuardStore,
+} from './leaveGuardStore';
 import { isLibraryView, isViewId, moduleMeta, type EntryModuleId } from '../lib/modules';
 import type { ActiveView } from '../types';
 
@@ -37,9 +40,9 @@ export type HomeView = 'list' | 'cards';
 export interface HomeSectionPrefs { sort: HomeSort; view: HomeView; count: number; } // count 0 = all
 
 export interface EditActions {
-  onSave: () => void;
-  onCancel: () => void;
-  onDelete?: () => void;
+  onSave: () => void | Promise<void>;
+  onCancel: () => void | Promise<void>;
+  onDelete?: () => void | Promise<void>;
   /** Den aufgeschobenen Autosave sofort schreiben — für Aktionen der
    *  Seitenleiste, die danach den Store-Stand des Eintrags lesen (Typwechsel). */
   flush?: () => Promise<void>;
@@ -120,6 +123,7 @@ interface UIState {
   addTab: (view?: ActiveView) => void;
   selectTab: (id: string) => void;
   setTabsOrder: (ids: string[]) => void;
+  /** Fragt vorher, wenn der Tab noch bearbeitet wird (`leaveGuardStore`). */
   closeTab: (id: string) => void;
   navigateBack: () => void;
   navigateForward: () => void;
@@ -247,12 +251,71 @@ function stepHistory(s: UIState, delta: -1 | 1): Partial<UIState> {
   return { activeView, tabs };
 }
 
+/**
+ * Führt `run` aus — sofort, oder erst nach der Frage, wenn die offene Seite
+ * ungesicherte Änderungen trägt und `leaves` sie verlässt. Bei „Weiter
+ * bearbeiten" entfällt `run`.
+ */
+function whenLeaveConfirmed(leaves: boolean, run: () => void): void {
+  if (!leaves || !leaveNeedsConfirm()) {
+    run();
+    return;
+  }
+  void confirmLeave().then((ok) => { if (ok) run(); });
+}
+
+/** Dieselbe Seite im selben Modus ist kein Verlassen. */
+function leavesPage(current: ActiveView, next: ActiveView): boolean {
+  return !(current.type === next.type && current.id === next.id && current.mode === next.mode);
+}
+
+/** `s` mit `history` als aktivem Verlauf — dem des aktiven Tabs, sonst dem tablosen. */
+function withActiveHistory(s: UIState, history: NavHistory): UIState {
+  if (!s.activeTabId) return { ...s, tablessHistory: history };
+  return { ...s, tabs: s.tabs.map((tab) => (tab.id === s.activeTabId ? { ...tab, history } : tab)) };
+}
+
+/**
+ * Zurück oder Vor. Der Schritt geht vom Verlauf aus, wie er vor der Frage war:
+ * „Speichern" und „Verwerfen" wechseln selbst die Seite (zurück zur Liste)
+ * und hätten ihn sonst um genau diesen Schritt verschoben — man stünde wieder
+ * auf der Seite, die man verlassen wollte.
+ */
+function stepGuarded(delta: -1 | 1): void {
+  const tabId = useUIStore.getState().activeTabId;
+  const before = selectActiveHistory(useUIStore.getState());
+  whenLeaveConfirmed(true, () => useUIStore.setState((s) => (
+    s.activeTabId === tabId ? stepHistory(withActiveHistory(s, before), delta) : {}
+  )));
+}
+
+/** Schließt den Tab, ohne zu fragen — das Fragen erledigt `closeTab`. */
+function closeTabNow(id: string): void {
+  useUIStore.setState((s) => {
+    const tabIndex = s.tabs.findIndex((tab) => tab.id === id);
+    if (tabIndex < 0) return {};
+    const tabs = s.tabs.filter((tab) => tab.id !== id);
+    if (s.activeTabId !== id) {
+      saveTabs(tabs, s.activeTabId);
+      return { tabs };
+    }
+
+    const nextTab = tabs[Math.min(tabIndex, tabs.length - 1)] ?? tabs[tabIndex - 1];
+    saveTabs(tabs, nextTab?.id ?? null);
+    // Der Verlauf des geschlossenen Tabs geht mit ihm; ohne Tab beginnt der tablose frisch.
+    if (!nextTab) {
+      return { tabs, activeTabId: null, activeView: { type: 'home' }, tablessHistory: freshHistory({ type: 'home' }) };
+    }
+    return { tabs, activeTabId: nextTab.id, activeView: nextTab.view };
+  });
+}
+
 const savedTabs = loadSavedTabs();
 const initialView: ActiveView = savedTabs.activeTabId
   ? savedTabs.tabs.find((tab) => tab.id === savedTabs.activeTabId)?.view ?? { type: 'home' }
   : { type: 'home' };
 
-export const useUIStore = create<UIState>((set) => ({
+export const useUIStore = create<UIState>((set, get) => ({
   activeView: initialView,
   tabs: savedTabs.tabs,
   activeTabId: savedTabs.activeTabId,
@@ -320,7 +383,7 @@ export const useUIStore = create<UIState>((set) => ({
     return { collapsedGroups: { ...s.collapsedGroups, [scope]: next } };
   }),
 
-  setActiveView: (view) => set((s) => {
+  setActiveView: (view) => whenLeaveConfirmed(leavesPage(get().activeView, view), () => set((s) => {
     const openSidebar = viewNeedsSidebar(view) && !s.rightSidebarOpen
       ? { rightSidebarOpen: true }
       : {};
@@ -342,7 +405,7 @@ export const useUIStore = create<UIState>((set) => ({
     saveTabs(tabs, activeTabId);
 
     return { activeView: view, tabs, activeTabId, tablessHistory, ...openSidebar };
-  }),
+  })),
 
   // Fuer Vault-Wechsel und Replace-Import: Tabs und History tragen Eintrags-IDs,
   // die es in der neuen Datenbank nicht gibt — beides faellt auf den frischen
@@ -405,26 +468,37 @@ export const useUIStore = create<UIState>((set) => ({
     return { tabs };
   }),
 
-  closeTab: (id) => set((s) => {
-    const tabIndex = s.tabs.findIndex((tab) => tab.id === id);
-    if (tabIndex < 0) return {};
-    const tabs = s.tabs.filter((tab) => tab.id !== id);
-    if (s.activeTabId !== id) {
-      saveTabs(tabs, s.activeTabId);
-      return { tabs };
+  closeTab: (id) => {
+    const { tabs, activeTabId, selectTab } = get();
+    const tab = tabs.find((candidate) => candidate.id === id);
+    if (!tab) return;
+    if (activeTabId === id) {
+      whenLeaveConfirmed(true, () => closeTabNow(id));
+      return;
     }
-
-    const nextTab = tabs[Math.min(tabIndex, tabs.length - 1)] ?? tabs[tabIndex - 1];
-    saveTabs(tabs, nextTab?.id ?? null);
-    // Der Verlauf des geschlossenen Tabs geht mit ihm; ohne Tab beginnt der tablose frisch.
-    if (!nextTab) {
-      return { tabs, activeTabId: null, activeView: { type: 'home' }, tablessHistory: freshHistory({ type: 'home' }) };
+    if (!holdsOpenEdit(tab.view)) {
+      closeTabNow(id);
+      return;
     }
-    return { tabs, activeTabId: nextTab.id, activeView: nextTab.view };
-  }),
+    // Ein Tab im Hintergrund mit ungesicherten Änderungen: erst hinschauen,
+    // dann fragen — und danach zurück in den Tab, aus dem heraus er geschlossen wurde.
+    const key = guardKey(tab.view.type, tab.view.id);
+    selectTab(id);
+    void guardRegistered(key).then((registered) => {
+      // Inzwischen woanders: die Frage gälte einer anderen Seite.
+      if (get().activeTabId !== id) return;
+      if (registered && useLeaveGuardStore.getState().guard?.key !== key) return;
+      // Meldet sich die Seite nicht, gibt es niemanden zu fragen — ihre
+      // Arbeit ist gespeichert (Autosave) oder mitgeschrieben (Entwurf).
+      whenLeaveConfirmed(registered, () => {
+        closeTabNow(id);
+        if (activeTabId && get().tabs.some((candidate) => candidate.id === activeTabId)) get().selectTab(activeTabId);
+      });
+    });
+  },
 
-  navigateBack: () => set((s) => stepHistory(s, -1)),
-  navigateForward: () => set((s) => stepHistory(s, 1)),
+  navigateBack: () => stepGuarded(-1),
+  navigateForward: () => stepGuarded(1),
   toggleRightSidebar: () => set((s) => {
     const rightSidebarOpen = !s.rightSidebarOpen;
     saveOpenFlag(RIGHT_SIDEBAR_OPEN_KEY, rightSidebarOpen);

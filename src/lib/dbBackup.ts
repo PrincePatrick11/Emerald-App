@@ -1613,7 +1613,14 @@ export async function importDatabase(
 
     // 3. Switch to it (resets DB cache + runs migrations on new empty DB)
     await useVaultStore.getState().loadVaults();
-    await useVaultStore.getState().switchVault(vaultId);
+    // `editsResolved`: die Frage nach laufenden Bearbeitungen ist gestellt,
+    // bevor der Import begann (`BackupPage`). Käme sie hier noch einmal und
+    // hieße die Antwort „weiter bearbeiten", bliebe der alte Vault aktiv —
+    // und Schritt 4 füllte ihn statt des neuen.
+    const switched = await useVaultStore.getState().switchVault(vaultId, { editsResolved: true });
+    if (!switched || useVaultStore.getState().activeVaultId !== vaultId) {
+      throw new Error('could not switch to the new vault');
+    }
 
     // 4. Fill the new (empty) vault with the backup data
     const db = await getDb();

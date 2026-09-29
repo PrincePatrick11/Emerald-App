@@ -15,6 +15,7 @@ Tauri 2 uses a capability file to declare which permissions each window receives
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
+    "core:window:allow-destroy",
     "core:webview:allow-set-webview-zoom",
     "dialog:allow-save",
     "dialog:allow-open",
@@ -28,7 +29,9 @@ Tauri 2 uses a capability file to declare which permissions each window receives
 }
 ```
 
-The four `core:window:allow-*` permissions exist for the custom title bar: on Windows and Linux the window runs undecorated and the HTML window buttons (`WindowControls.tsx`) drive minimize/maximize/close over IPC, and the bar itself starts window dragging. They widen what a compromised frontend could do only marginally (annoyance-level window manipulation, no data access).
+`core:window:allow-destroy` exists for the question about unsaved edits (`AppShell.tsx`, see [Leaving an edit](architecture.md#leaving-an-edit)): with an `onCloseRequested` handler registered, Tauri's JS API closes the window through `destroy()` once the handler returns without preventing it. `destroy` reaches the same windows `close` does and only skips the close-requested event — nothing a frontend that may already `close` could not do.
+
+The other four `core:window:allow-*` permissions exist for the custom title bar: on Windows and Linux the window runs undecorated and the HTML window buttons (`WindowControls.tsx`) drive minimize/maximize/close over IPC, and the bar itself starts window dragging. They widen what a compromised frontend could do only marginally (annoyance-level window manipulation, no data access).
 
 `core:webview:allow-set-webview-zoom` backs the interface-size setting (Settings → General): `applyUIScale()` in `src/themes/theme.ts` calls `getCurrentWebview().setZoom(scale / 100)`. It only scales what's rendered — no new data access.
 

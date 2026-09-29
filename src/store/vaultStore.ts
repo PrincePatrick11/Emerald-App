@@ -20,6 +20,7 @@ import { clearAllDrafts } from './draftStore';
 import { useUndoStore } from './undoStore';
 import { useSettingsStore } from './settingsStore';
 import { captureLegacySettings } from '../lib/vaultSettings';
+import { resolveOpenEdits } from '../lib/openEdits';
 
 interface VaultStore {
   vaults: Vault[];
@@ -27,7 +28,12 @@ interface VaultStore {
   loaded: boolean;
 
   loadVaults: () => Promise<void>;
-  switchVault: (id: string) => Promise<void>;
+  /**
+   * `false`, wenn nicht gewechselt wurde, weil eine laufende Bearbeitung
+   * weitergehen soll (`resolveOpenEdits`). `editsResolved`: der Aufrufer hat
+   * das schon geklärt — der Import, der seine Frage vor allem anderen stellt.
+   */
+  switchVault: (id: string, options?: { editsResolved?: boolean }) => Promise<boolean>;
   addVault: (vault: Vault) => Promise<void>;
   updateVault: (id: string, patch: VaultPatch) => Promise<void>;
   relocateVault: (id: string, path: string) => Promise<void>;
@@ -93,9 +99,11 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     set({ vaults: data.vaults, activeVaultId: data.activeVaultId, loaded: true });
   },
 
-  switchVault: async (id: string) => {
+  switchVault: async (id, { editsResolved = false } = {}) => {
     const previous = get().activeVaultId;
-    if (id === previous) return;
+    if (id === previous) return true;
+    // Der Wechsel schließt jeden Tab — erst klären, was mit laufenden Bearbeitungen geschieht.
+    if (!editsResolved && !(await resolveOpenEdits())) return false;
 
     // Persist new active vault
     await setActiveVaultId(id);
@@ -119,6 +127,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       if (!restored) await useSettingsStore.getState().clear();
       throw err;
     }
+    return true;
   },
 
   addVault: async (vault: Vault) => {

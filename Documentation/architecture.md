@@ -347,10 +347,53 @@ The baseline outlives the view: `useEntryEditor` keeps it in a module-level map 
 type and entry id, not in a ref, so looking into another tab in the middle of editing and
 coming back continues the same edit — Cancel still goes back to where it began. A baseline
 lives as long as some tab shows the entry in edit mode; a subscription on `uiStore` drops it
-once none does, which covers Done, Cancel, Delete, closing the tab, and navigating elsewhere
-within the same tab (that last one saves what was typed and ends the edit, as it always has).
-It is memory only: after a restart, a restored edit-mode tab starts a new baseline from what
-is stored.
+once none does, which covers Done, Cancel, Delete and closing the tab. It is memory only:
+after a restart, a restored edit-mode tab starts a new baseline from what is stored.
+
+### Leaving an edit
+
+An edit ends with Done or Cancel and nothing else. Leaving a page that is being edited *and
+has changes* any other way asks first — save, discard, or keep editing — instead of silently
+keeping what was typed, which is what navigating away used to do.
+
+`store/leaveGuardStore.ts` holds the one **guard** of the page that is open: a key
+(`guardKey(viewType, id)`), a title for the question, `isDirty()`, and `save`/`discard`, which
+are the page's own Done and Cancel. Entries register theirs through `useEditActions` (the
+views pass `guard`; dirty means the stored state differs from Cancel's baseline, an autosave
+is pending, or the entry is new and unconfirmed), a block's or template's page through
+`useDraftPage` (dirty means a draft exists in its draft store). `confirmLeave()` raises the
+question — `LeaveGuardModal`, rendered once in `AppShell` — and runs the answer; Escape, the X
+and a click beside the modal all mean "keep editing".
+
+What asks:
+
+- `uiStore.setActiveView`, `navigateBack`/`navigateForward` and `closeTab` run through
+  `whenLeaveConfirmed`: immediately when nothing is dirty, otherwise after the answer.
+  Back/Forward step from the history *as it was before the question* (`stepGuarded`), because
+  Save and Discard navigate themselves (back to the list) and would otherwise shift the step
+  by one.
+- Closing a tab in the background that holds changes switches to it first, waits for its view
+  to register its guard (`guardRegistered` — the view may have to load), asks, closes, and
+  returns to the tab it was closed from.
+- `lib/openEdits.ts`'s `resolveOpenEdits()` asks for every open edit in turn — the open page,
+  then each background tab — and is what a vault switch (`vaultStore.switchVault`), a
+  replace or add-vault import (`BackupPage`), an update install (`UpdatesPage`) and closing
+  the window (`AppShell`, Tauri's `onCloseRequested`) call before they do anything.
+
+What does not ask: switching to another tab (the edit continues there, see the baseline
+above), and Done, Cancel and Delete themselves — `useEditActions` wraps them in
+`withoutLeaveGuard(key, …)`, which exempts that one page while its handler runs, not the
+others.
+
+Whether a *background* tab holds changes is answered without mounting it:
+`holdsOpenEdit(view)` asks the **probes** that `draftStore` (a draft exists) and
+`useEntryEditor` (the stored state differs from the baseline, or the entry is new) register.
+Only a tab that does is switched to; an unchanged edit-mode tab closes without a flicker.
+
+`switchVault` resolves to `false` when the user chose to keep editing. The add-vault import
+asks *before* it starts and then passes `editsResolved`, so its own switch never asks again:
+a second question answered "keep editing" would leave the old vault active, and the import
+would fill it instead of the new one.
 
 ### Changing an entry's type
 

@@ -25,6 +25,7 @@ import {
   importDatabase,
 } from '../../../lib/dbBackup';
 import { SETTINGS_GROUPS, type SettingsGroup } from '../../../lib/vaultSettings';
+import { resolveOpenEdits } from '../../../lib/openEdits';
 import SettingsChoiceButton from './SettingsChoiceButton';
 import SettingsSection, { SettingsCheckboxGrid, SettingsStatus } from './SettingsSection';
 
@@ -137,6 +138,9 @@ export default function BackupPage() {
 
   async function handleImport() {
     if (!importedFile) return;
+    // Ersetzen und „Neuer Vault" schließen jeden Tab — vorher klären, was mit
+    // laufenden Bearbeitungen geschieht. Zusammenführen lässt sie offen.
+    if (importMode !== 'merge' && !(await resolveOpenEdits())) return;
     setImporting(true);
     setImportDone(false);
     setImportError('');
