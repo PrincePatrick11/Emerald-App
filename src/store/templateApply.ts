@@ -63,7 +63,8 @@ function updateFields(entryType: TemplateEntryType, id: string, patch: Partial<T
 async function writeChangedFields(entryType: TemplateEntryType, id: string, before: TemplateFields, after: TemplateFields): Promise<void> {
   const patch: Partial<TemplateFields> = {};
   if (after.title !== before.title) patch.title = after.title;
-  if (after.tags.length !== before.tags.length) patch.tags = after.tags;
+  // Nicht nur die Länge: ein Tausch gegen gleich viele Tags ändert sie nicht.
+  if (after.tags.length !== before.tags.length || after.tags.some((tag, i) => tag !== before.tags[i])) patch.tags = after.tags;
   if (Object.keys(patch).length) await updateFields(entryType, id, patch);
 }
 

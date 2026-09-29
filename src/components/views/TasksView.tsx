@@ -468,7 +468,8 @@ const TaskRow = memo(function TaskRow({
 
   const handleCreateSubtaskLocal = async () => {
     const subtask = await createTask(task.category_id, task.id);
-    toggleExpand(task.id);
+    // Nur aufklappen: eine schon offene Aufgabe klappte sonst zu und verbärge die neue Zeile.
+    if (!isExpanded) toggleExpand(task.id);
     setEditingId(subtask.id);
     setEditValue(subtask.title);
   };

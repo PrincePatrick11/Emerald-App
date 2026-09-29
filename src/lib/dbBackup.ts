@@ -1296,7 +1296,9 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   if (hasOps) await db.execute('DELETE FROM operations');
   if (hasJournal) await db.execute('DELETE FROM journal_entries');
   if (hasWiki) await db.execute('DELETE FROM wiki_articles');
-  if (hasAny && d.tags) await db.execute('DELETE FROM tags');
+  // Wie die Inhalte oben nur, wenn die Datei welche bringt: abgewählte Tags
+  // kommen als `[]` an, und das ist wahr.
+  if (hasAny && d.tags?.length) await db.execute('DELETE FROM tags');
 
   // Re-insert
   if (d.tags) await insertRows(db, 'tags', d.tags, true);

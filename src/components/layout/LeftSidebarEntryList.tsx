@@ -371,8 +371,8 @@ function useTasksConfig(): EntryListTabProps<Task> {
   const { activeView, setActiveView } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView }))
   );
-  const { tasks, updateTask, deleteTask, restoreTask } = useTaskStore(
-    useShallow((s) => ({ tasks: s.tasks, updateTask: s.updateTask, deleteTask: s.deleteTask, restoreTask: s.restoreTask }))
+  const { tasks, updateTask, toggleComplete, deleteTask, restoreTask } = useTaskStore(
+    useShallow((s) => ({ tasks: s.tasks, updateTask: s.updateTask, toggleComplete: s.toggleComplete, deleteTask: s.deleteTask, restoreTask: s.restoreTask }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
@@ -448,7 +448,8 @@ function useTasksConfig(): EntryListTabProps<Task> {
       return (
         <div onContextMenu={openCtxMenu} className={`sidebar-item w-full text-left ${isActive ? 'active' : ''}`}>
           <button
-            onClick={(e) => { e.stopPropagation(); updateTask(task.id, { completed: !task.completed }); }}
+            // Wie das Kästchen in der Aufgaben-Ansicht: mit Unteraufgaben und `completed_at`.
+            onClick={(e) => { e.stopPropagation(); toggleComplete(task.id); }}
             className="flex-shrink-0 text-stone-500 hover:text-stone-300"
             title={task.completed ? t('tasks.markActive') : t('tasks.markCompleted')}
           >

@@ -68,6 +68,7 @@ const noticeTimerRef = useRef<number | null>(null);
   const [gradientModalOpen, setGradientModalOpen] = useState(false);
   const [gradientOriginalColor, setGradientOriginalColor] = useState<string>(GRADIENT_PRESET_COLORS[0]);
   const [gradientOriginalPreset, setGradientOriginalPreset] = useState<string>('');
+  const [gradientOriginalImage, setGradientOriginalImage] = useState<string | null>(null);
 const [gridOpen, setGridOpen] = useState(true);
   const [faviconOpen, setFaviconOpen] = useState(true);
   const [canvasOptionsOpen, setCanvasOptionsOpen] = useState(true);
@@ -305,6 +306,7 @@ const [gridOpen, setGridOpen] = useState(true);
                 const openModal = () => {
                   setGradientOriginalColor(displayColor);
                   setGradientOriginalPreset(activeAltar.background_preset);
+                  setGradientOriginalImage(activeAltar.background_image_data ?? null);
                   setGradientModalOpen(true);
                 };
 
@@ -358,7 +360,8 @@ const [gridOpen, setGridOpen] = useState(true);
                       const previewW = w >= h ? maxW : Math.round(128 * w / h);
                       const previewH = w >= h ? Math.round(maxW * h / w) : 128;
                       const revertAndClose = () => {
-                        updateAltar(activeAltar.id, { background_preset: gradientOriginalPreset || DEFAULT_ALTAR_BACKGROUND, background_image_data: null }).catch(console.error);
+                        // Mit dem Bild von vorher: war ein eigenes aktiv, käme sonst nur sein Preset zurück.
+                        updateAltar(activeAltar.id, { background_preset: gradientOriginalPreset || DEFAULT_ALTAR_BACKGROUND, background_image_data: gradientOriginalImage }).catch(console.error);
                         if (isGradientPreset(gradientOriginalPreset) || ALTAR_BACKGROUND_PRESETS.includes(gradientOriginalPreset as (typeof ALTAR_BACKGROUND_PRESETS)[number])) {
                           setGradientColorMap((prev) => ({ ...prev, [activeAltar.id]: gradientOriginalColor }));
                         } else {
