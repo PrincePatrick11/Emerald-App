@@ -34,7 +34,7 @@ import { blockIcon, createFromPreset } from '../../lib/blocks/presets';
 import { blockOrigin, isOutdatedCopy, updateInstanceToDefinition, type BlockDefinition } from '../../lib/blocks/definitions';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import {
-  blockHoldsLocked, isSigilFrozen, SIGIL_CHARGE_TYPE, sigilState, sigilUnits, todayIso, withoutConcealedParts,
+  isSigilFrozen, SIGIL_CHARGE_TYPE, sigilState, sigilUnits, todayIso, withChargesCoveringCopy, withoutConcealedParts,
   withRenamedPartTargets,
 } from '../../lib/blocks/sigil';
 import { blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
@@ -290,13 +290,13 @@ export default function BlockStack({
 
   const duplicate = (id: string) => {
     const index = blocksRef.current.findIndex((b) => b.id === id);
-    // Eine Kopie bekäme eine neue ID, die keine Ladung verdeckt — sie zeigte
-    // die verborgene Zeichnung. Auch die Seitenleiste kommt hier vorbei.
-    if (index < 0 || blockHoldsLocked(sigilState(blocksRef.current, todayIso()), id)) return;
+    if (index < 0) return;
     const source = blocksRef.current[index];
-    const next = [...blocksRef.current];
     const id2 = generateId();
-    // Ladung-Teile der Kopie zielen auf die Teile der Kopie.
+    // Eine geladene Sigille bleibt geladen: Ladung-Teile der Kopie zielen auf
+    // die Teile der Kopie, und jede Ladung anderswo, die das Original
+    // verdeckt, verdeckt auch die Kopie. Auch die Seitenleiste kommt hier vorbei.
+    const next = blocksRef.current.map((b) => (b.id === source.id ? b : withChargesCoveringCopy(b, source.id, id2)));
     next.splice(index + 1, 0, withRenamedPartTargets({ ...source, id: id2, attrs: { ...source.attrs } }, source.id, id2));
     commit(next);
   };
@@ -476,7 +476,7 @@ export default function BlockStack({
           onClick: () => setAttr(block.id, BLOCK_ATTR.hidden, hiddenAttrValue(!hidden)),
         },
         ...commonBlockActions(t, meta, {
-          duplicate: blockHoldsLocked(sigil, block.id) ? undefined : () => duplicate(block.id),
+          duplicate: () => duplicate(block.id),
           remove: () => remove(block.id),
         }),
       ],

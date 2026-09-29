@@ -6,6 +6,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] (targeting v0.2.0)
 
 ### Changed
+- **A charged sigil can be duplicated, and the copy stays charged.** Duplicating an operation used to unload its sigil (a journal entry or wiki article didn't), and a block the charge hides or locks couldn't be duplicated at all. Now every copy — of the entry or of the block — is loaded and hidden exactly like the original. Templates still bring a sigil unloaded.
 - **Lists remember how you left them — per vault.** View, sort and grouping of every list, the Home sections, collapsed groups and sections, and Tasks' "Show completed" now survive a restart, and each vault keeps its own. Searches, filters and the Trash selection last for the session instead: they are still there when you come back to a module, and start clean after a restart or a vault switch.
 - **"Last changed" moves only when you change that entry.** Renaming, deleting or restoring a tag, "Update all" or "Remove from all" for a block and a new altar preview no longer re-date the entries they touch or reshuffle lists sorted by last change. Done without changes leaves the date alone, and Cancel puts it back to what it was before editing. Checking a checklist item still counts as a change.
 - **The `links` table is gone (migration v47).** It copied every entry's link chips on each save for a backlinks panel that was never shown; nothing read it. The chips in the entries themselves are unchanged, and backups no longer carry the table.

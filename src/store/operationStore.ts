@@ -5,7 +5,6 @@ import { generateId, nowIso } from '../lib/helpers';
 import { needsWrite, stampFor, type WriteOptions } from '../lib/stamp';
 import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, type DbRow } from '../lib/row';
-import { withChargeUnloaded } from '../lib/blocks/sigil';
 import { startOfNewEntry, useTemplateNoticeStore } from './templateStore';
 import { UNTITLED_TITLES } from '../lib/blocks/templates';
 import type { Operation } from '../types';
@@ -71,11 +70,7 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     return op;
   },
 
-  /**
-   * Kopiert alle Inhaltsfelder. Eine geladene Sigille kommt entladen mit:
-   * eine Kopie, die man nie bearbeiten kann, wäre sinnlos — das
-   * Enthüllungsdatum bleibt.
-   */
+  /** Kopiert alle Inhaltsfelder — eine geladene Sigille bleibt geladen, wie beim Journal und im Wiki. */
   duplicateOperation: async (id) => {
     const src = get().operations.find((o) => o.id === id);
     if (!src) return undefined;
@@ -91,7 +86,6 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     await get().updateOperation(copy.id, {
       ...fields,
       title: src.title + i18n.t('common.copySuffix'),
-      content: withChargeUnloaded(src.content),
     });
     return get().operations.find((o) => o.id === copy.id) ?? copy;
   },

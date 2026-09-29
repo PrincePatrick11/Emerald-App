@@ -788,16 +788,19 @@ the cheap string pre-filters (looking for `core.sigil.` *or* the bare kind names
 since an imported part's JSON may quote them differently) that let most content skip parsing
 entirely, replacing the old single-marker check.
 
-**Freezing a copy that holds a loaded sigil.** `blockHoldsLocked(state, blockId)` says whether a
+**Copies of a loaded sigil stay loaded.** `blockHoldsLocked(state, blockId)` says whether a
 block itself or any part of it (`<blockId>:*`) is in `state.locked`; `isSigilFrozen(block, state)`
-adds "or the block *is* a loaded charge" — the two callers that need to know are duplication (a
-copy would get a fresh id no charge covers, defeating the concealment it's supposed to have) and a
-user-built block's own update/removal (below), where rebuilding the block would silently drop the
-charge that's currently hiding something. `BlockStack.duplicate` and the block menu's "Duplicate"
-action check `blockHoldsLocked` and simply don't offer it. Duplicating a fields block that *isn't*
-frozen still needs one adjustment: `withRenamedPartTargets` retargets any charge part inside the
-copy from the original block's id to the copy's own, so the copy's charge covers the copy's own
-parts instead of reaching back into the original.
+adds "or the block *is* a loaded charge" — what a user-built block's own update/removal (below)
+needs to know, since rebuilding the block would silently drop the charge that's currently hiding
+something. Duplicating is always allowed, and the copy is as loaded as the original:
+`withRenamedPartTargets` retargets any charge part inside the copy from the original block's id to
+the copy's own, and `withChargesCoveringCopy` adds the copy (or its parts) to every charge
+*elsewhere* in the entry that covers the original — without that, the copy would get a fresh id
+no charge covers and show what the original hides. A charge that covers everything
+(`targets: null`) needs neither. Whole entries copy the same way: `duplicateEntry`,
+`duplicateArticle` and `duplicateOperation` keep the content as it is, charge included, since the
+block ids stay the same within the copy. Only a template unloads (`withChargeUnloaded` in
+`instantiateTemplateBlocks` and `contentForTemplate`): a blueprint carries no charge.
 
 The entry's sigil state is computed once per structure by `BlockStack` and passed to every view as
 `sigil`; lists, sidebar and menu read it from `entryBlockSummary` (which now also finds the first

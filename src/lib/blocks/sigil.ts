@@ -322,7 +322,7 @@ export interface SigilState {
   locked: ReadonlySet<string>;
 }
 
-/** Sperrt eine geladene Ladung den Block selbst oder einen seiner Teile? Dann kein Duplizieren — die Kopie wäre nicht verdeckt. */
+/** Sperrt eine geladene Ladung den Block selbst oder einen seiner Teile? */
 export function blockHoldsLocked(state: SigilState, blockId: string): boolean {
   if (state.locked.has(blockId)) return true;
   const prefix = `${blockId}:`;
@@ -345,14 +345,15 @@ export function isSigilFrozen(block: BlockInstance, state: SigilState): boolean 
 /**
  * Die Ziele jeder Ladung im Block umschreiben — ein Ladung-Block selbst oder
  * die Ladung-Teile eines Feldblocks. `map` bekommt jedes Ziel (Block-ID oder
- * `<Block-ID>:<Element-ID>`) und gibt das neue zurück; ändert sich keins,
- * bleibt die Ladung unberührt.
+ * `<Block-ID>:<Element-ID>`) und gibt das neue zurück, oder mehrere; ändert
+ * sich keins, bleibt die Ladung unberührt.
  */
-export function withMappedChargeTargets(block: BlockInstance, map: (target: string) => string): BlockInstance {
+export function withMappedChargeTargets(block: BlockInstance, map: (target: string) => string | readonly string[]): BlockInstance {
   const mapped = (charge: SigilCharge): string[] | null => {
     if (charge.broken || !charge.targets) return null;
-    const targets = charge.targets.map(map);
-    return targets.some((id, i) => id !== charge.targets![i]) ? targets : null;
+    const before = charge.targets;
+    const targets = before.flatMap(map);
+    return targets.length !== before.length || targets.some((id, i) => id !== before[i]) ? targets : null;
   };
   if (block.type === SIGIL_CHARGE_TYPE) {
     const charge = parseSigilCharge(block);
@@ -379,6 +380,19 @@ export function withMappedChargeTargets(block: BlockInstance, map: (target: stri
 export function withRenamedPartTargets(block: BlockInstance, oldId: string, newId: string): BlockInstance {
   const from = `${oldId}:`;
   return withMappedChargeTargets(block, (id) => (id.startsWith(from) ? `${newId}:${id.slice(from.length)}` : id));
+}
+
+/**
+ * Ein Block wurde dupliziert: eine Ladung in `block`, die das Original (oder
+ * Teile davon) verdeckt, verdeckt auch die Kopie. Eine geladene Sigille bleibt
+ * beim Duplizieren geladen — und die Kopie zeigt nicht, was das Original verbirgt.
+ */
+export function withChargesCoveringCopy(block: BlockInstance, oldId: string, newId: string): BlockInstance {
+  const from = `${oldId}:`;
+  return withMappedChargeTargets(block, (id) => {
+    if (id === oldId) return [id, newId];
+    return id.startsWith(from) ? [id, `${newId}:${id.slice(from.length)}`] : id;
+  });
 }
 
 const NO_SIGIL: SigilState = { revealDate: null, lockEntry: false, concealed: new Map(), locked: new Set() };
@@ -447,7 +461,11 @@ export function withoutConcealed(content: string, today: string): string {
   return serializeBlocks(blocks.filter((b) => !concealed.has(b.id)).map((b) => withoutConcealedParts(b, concealed)));
 }
 
-/** Der Inhalt mit entladener Sigille — eine Kopie des Eintrags soll sich bearbeiten lassen. */
+/**
+ * Der Inhalt mit entladener Sigille — für Vorlagen: ein Bauplan trägt keine
+ * Ladung, und ein Eintrag aus ihm beginnt nicht verborgen. Ein duplizierter
+ * Eintrag dagegen bleibt geladen.
+ */
 export function withChargeUnloaded(content: string): string {
   if (!mayHoldCharge(content)) return content;
   let changed = false;

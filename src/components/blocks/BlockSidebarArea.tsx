@@ -15,7 +15,6 @@ import {
 } from '../../lib/blocks/blockAttrs';
 import { BLOCK_ATTR, type BlockInstance } from '../../lib/blocks/types';
 import { blockIcon } from '../../lib/blocks/presets';
-import { blockHoldsLocked, sigilState, todayIso } from '../../lib/blocks/sigil';
 import { BLOCK_SIDEBAR_VIEWS } from './blockSidebarViews';
 import { addBlockActions, commonBlockActions } from './blockActions';
 
@@ -101,8 +100,6 @@ function BlockManager({ session }: { session: BlockSession }) {
   // Ohne Animation, wie die platzierten Elemente des Altars.
   const { listRef, visualItems, draggingId, startDrag } = usePointerReorder(session.blocks, (ordered) => api.reorder(ordered.map((b) => b.id)));
   const definitions = useBlockDefinitionStore((s) => s.definitions);
-  // Was eine geladene Sigille sperrt, lässt sich nicht duplizieren (siehe BlockStack.duplicate).
-  const sigil = sigilState(session.blocks, todayIso());
 
   const openAddMenu = (e: MouseEvent) => setMenu({
     x: e.clientX,
@@ -123,7 +120,7 @@ function BlockManager({ session }: { session: BlockSession }) {
           onClick: () => api.setAttr(block.id, BLOCK_ATTR.showTitle, showTitleAttrValue(!showsTitle, meta)),
         },
         ...commonBlockActions(t, meta, {
-          duplicate: blockHoldsLocked(sigil, block.id) ? undefined : () => api.duplicate(block.id),
+          duplicate: () => api.duplicate(block.id),
           remove: () => api.remove(block.id),
         }),
       ],
