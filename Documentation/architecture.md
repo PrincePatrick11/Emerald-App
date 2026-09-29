@@ -930,13 +930,11 @@ Operations × Sigils, not a hard-wired category special case. `useTemplateNotice
 one "template applied" notice a freshly created entry shows (Undo / "Other template") —
 store-level because the content stores set it on create and may not import a component.
 Creation is the only moment a default applies by itself. Changing an existing entry's category
-or type never touches its content — the swap that used to run there (`defaultTemplateSwap`,
-`isUnchangedTemplateContent`, `applyDefaultAfterCategoryChange`) is gone, along with its
-condition that the content still match the *current* version of the previous default, which
-editing a default template silently switched off for every older entry. What "Other template"
-still needs to take a replaced template's title and tags back lives in
-`fieldsWithTemplate`/`fieldsWithoutTemplate`/`mayTakeTemplateTitle` (`lib/blocks/templates.ts`,
-pure — no store reads).
+or type never touches its content: deciding whether content is "still the old default" would
+mean comparing it with the *current* version of that template, which editing the template
+silently breaks for every older entry. What "Other template" needs to take a replaced
+template's title and tags back lives in `fieldsWithTemplate`/`fieldsWithoutTemplate`/
+`mayTakeTemplateTitle` (`lib/blocks/templates.ts`, pure — no store reads).
 
 **Manual insertion, from the editor.** `TemplateInsertion` (blocks sidebar) offers
 `TemplatePickerModal` (search over name/description, ordered by `templatesFor` — assigned to
