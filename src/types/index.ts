@@ -85,13 +85,6 @@ export interface Tag {
   color: string;
 }
 
-export interface InternalLink {
-  source_id: string;
-  source_type: ContentType;
-  target_id: string;
-  target_type: ContentType;
-}
-
 export type MoonPhase =
   | 'new'
   | 'waxing_crescent'

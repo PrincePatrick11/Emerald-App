@@ -19,7 +19,6 @@ import type {
   AltarItem,
   AltarRecord,
   Category,
-  InternalLink,
   JournalEntry,
   Language,
   LexiconEntry,
@@ -287,15 +286,6 @@ export const fromRow = {
       task_id: str(r.task_id),
       target_id: str(r.target_id),
       target_type: r.target_type as TaskLink['target_type'],
-    };
-  },
-
-  link(r: DbRow): InternalLink {
-    return {
-      source_id: str(r.source_id),
-      source_type: r.source_type as InternalLink['source_type'],
-      target_id: str(r.target_id),
-      target_type: r.target_type as InternalLink['target_type'],
     };
   },
 };
