@@ -182,18 +182,5 @@ export async function migrateLinkedIdsToContent(db: Database): Promise<void> {
       `UPDATE journal_entries SET content = $1, linked_operation_ids = '[]', linked_wiki_ids = '[]' WHERE id = $2`,
       [nextContent, entry.id]
     );
-
-    // Die `links`-Tabelle spiegelt normalerweise `syncLinks` beim Speichern.
-    // Die Migration schreibt am Store vorbei und muss den Spiegel selbst
-    // nachziehen, sonst fehlen dem migrierten Eintrag seine Rückverweise, bis
-    // ihn jemand zufällig neu speichert.
-    await db.execute('DELETE FROM links WHERE source_id=$1', [entry.id]);
-    for (const link of extractInternalLinks(nextContent)) {
-      await db.execute(
-        `INSERT OR IGNORE INTO links (source_id, source_type, target_id, target_type)
-         VALUES ($1, 'journal', $2, $3)`,
-        [entry.id, link.id, link.entryType]
-      );
-    }
   }
 }

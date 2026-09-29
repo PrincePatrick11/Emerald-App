@@ -1,14 +1,5 @@
-import { getDb } from './db';
-import { extractInternalLinks, isValidLinkTarget } from './internalLinkHtml';
+import { isValidLinkTarget } from './internalLinkHtml';
 import type { ContentType } from '../types';
-
-export interface BacklinkEntry {
-  id: string;
-  title: string;
-  /** Bewusst schmaler als ContentType: Link-QUELLEN sind nur die Module mit
-   *  Editor — tasks/altar können Ziel sein, aber nie Quelle. */
-  type: 'journal' | 'wiki' | 'operation';
-}
 
 /** Was das Verlinkungs-Feld der Seitenleiste an den Editor schickt. Deckt sich
  *  mit `SuggestionItem` (dort mit `label` als Pflichtfeld), bleibt hier aber
@@ -101,64 +92,4 @@ export function subscribeEntryLinkRequest(
   };
   document.addEventListener(eventName, listener);
   return () => document.removeEventListener(eventName, listener);
-}
-
-/** Updates the links table for a given source after content is saved. */
-export async function syncLinks(
-  sourceId: string,
-  sourceType: 'journal' | 'wiki' | 'operation',
-  content: string
-): Promise<void> {
-  const db = await getDb();
-  const links = extractInternalLinks(content);
-
-  await db.execute('DELETE FROM links WHERE source_id=$1', [sourceId]);
-
-  for (const link of links) {
-    await db.execute(
-      `INSERT OR IGNORE INTO links (source_id, source_type, target_id, target_type)
-       VALUES ($1, $2, $3, $4)`,
-      [sourceId, sourceType, link.id, link.entryType]
-    );
-  }
-}
-
-/** Returns all entries/articles that link TO the given target. */
-export async function fetchBacklinks(
-  targetId: string
-): Promise<BacklinkEntry[]> {
-  const db = await getDb();
-
-  const journalLinks = await db.select<
-    Array<{ id: string; title: string }>
-  >(
-    `SELECT je.id, je.title FROM links l
-     JOIN journal_entries je ON l.source_id = je.id
-     WHERE l.target_id = $1 AND l.source_type = 'journal'`,
-    [targetId]
-  );
-
-  const wikiLinks = await db.select<
-    Array<{ id: string; title: string }>
-  >(
-    `SELECT wa.id, wa.title FROM links l
-     JOIN wiki_articles wa ON l.source_id = wa.id
-     WHERE l.target_id = $1 AND l.source_type = 'wiki'`,
-    [targetId]
-  );
-
-  const operationLinks = await db.select<
-    Array<{ id: string; title: string }>
-  >(
-    `SELECT o.id, o.title FROM links l
-     JOIN operations o ON l.source_id = o.id
-     WHERE l.target_id = $1 AND l.source_type = 'operation'`,
-    [targetId]
-  );
-
-  return [
-    ...journalLinks.map((r) => ({ ...r, type: 'journal' as const })),
-    ...wikiLinks.map((r) => ({ ...r, type: 'wiki' as const })),
-    ...operationLinks.map((r) => ({ ...r, type: 'operation' as const })),
-  ];
 }

@@ -20,7 +20,7 @@ import type Database from '@tauri-apps/plugin-sql';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 46;
+export const BASELINE_VERSION = 47;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
@@ -36,7 +36,6 @@ export const BASELINE_VERSION = 46;
 export const TABLES = [
   'schema_version',
   'tags',
-  'links',
   'categories',
   'block_definitions',
   'templates',
@@ -84,19 +83,6 @@ export const TABLE_DDL: Record<TableName, string> = {
       color TEXT NOT NULL DEFAULT '#8347ff',
       affected_ids TEXT NOT NULL DEFAULT '[]',
       deleted_at TEXT
-    )`,
-
-  // source_id/target_id sind polymorph — Quellen sind journal_entries,
-  // wiki_articles oder operations (die Module mit Editor); Ziele zusätzlich
-  // tasks und altars. Ein Foreign Key ist hier nicht deklarierbar;
-  // checkIntegrity() prüft die Beziehung stattdessen.
-  links: `
-    CREATE TABLE links (
-      source_id TEXT NOT NULL,
-      source_type TEXT NOT NULL,
-      target_id TEXT NOT NULL,
-      target_type TEXT NOT NULL,
-      PRIMARY KEY (source_id, target_id)
     )`,
 
   // Eine Liste für Wiki, Operationen, Aufgaben und Altar-Elemente (seit v38;
@@ -356,13 +342,12 @@ export const TABLE_DDL: Record<TableName, string> = {
 
 
 /**
- * Indizes auf jeder Foreign-Key-Spalte, auf beiden Seiten der Link-Tabellen und
- * auf jeder `deleted_at`-Spalte. Letztere, weil `runPeriodicCleanup` bei jedem
- * Öffnen eines Vaults einen Bereichsscan über alle Soft-Delete-Tabellen fährt.
+ * Die Indizes aus `INDEX_DDL_V38`, die es noch gibt: auf jeder Foreign-Key-Spalte,
+ * auf beiden Seiten von `task_links` und auf jeder `deleted_at`-Spalte. Letztere,
+ * weil `runPeriodicCleanup` bei jedem Öffnen eines Vaults einen Bereichsscan über
+ * alle Soft-Delete-Tabellen fährt.
  */
-export const INDEX_DDL_V38: readonly string[] = [
-  'CREATE INDEX idx_links_source ON links(source_id)',
-  'CREATE INDEX idx_links_target ON links(target_id)',
+const KEPT_INDEX_DDL_V38: readonly string[] = [
   'CREATE INDEX idx_task_links_task ON task_links(task_id)',
   'CREATE INDEX idx_task_links_target ON task_links(target_id)',
   'CREATE INDEX idx_wiki_articles_category ON wiki_articles(category_id)',
@@ -373,6 +358,16 @@ export const INDEX_DDL_V38: readonly string[] = [
   'CREATE INDEX idx_altar_placements_altar ON altar_placements(altar_id)',
   'CREATE INDEX idx_altar_placements_item ON altar_placements(item_id)',
   ...SOFT_DELETE_TABLES_V38.map((t) => `CREATE INDEX idx_${t}_deleted ON ${t}(deleted_at)`),
+];
+
+/**
+ * Was v38 (`mergeCategoryTables`) und v39 (`nullableCategory`) mitten in der
+ * Kette anlegen — dort gibt es `links` noch, v47 wirft sie samt Indizes weg.
+ */
+export const INDEX_DDL_V38: readonly string[] = [
+  'CREATE INDEX idx_links_source ON links(source_id)',
+  'CREATE INDEX idx_links_target ON links(target_id)',
+  ...KEPT_INDEX_DDL_V38,
 ];
 
 /**
@@ -397,7 +392,7 @@ export const ALTARS_INDEX_DDL = 'CREATE INDEX idx_altars_deleted ON altars(delet
 
 /** Alle Indizes des aktuellen Schemas — was ein frischer Vault bekommt. */
 export const INDEX_DDL: readonly string[] = [
-  ...INDEX_DDL_V38, BLOCK_DEFINITIONS_INDEX_DDL, TEMPLATES_INDEX_DDL, ...LEXICON_INDEX_DDL, ALTARS_INDEX_DDL,
+  ...KEPT_INDEX_DDL_V38, BLOCK_DEFINITIONS_INDEX_DDL, TEMPLATES_INDEX_DDL, ...LEXICON_INDEX_DDL, ALTARS_INDEX_DDL,
 ];
 
 /**
@@ -571,8 +566,6 @@ export async function checkIntegrity(db: Database): Promise<Orphan[]> {
 
   for (const [type, target] of Object.entries(contentTables)) {
     for (const [table, column, typeColumn] of [
-      ['links', 'source_id', 'source_type'],
-      ['links', 'target_id', 'target_type'],
       ['task_links', 'target_id', 'target_type'],
     ] as const) {
       const rows = await db.select<{ id: string }[]>(

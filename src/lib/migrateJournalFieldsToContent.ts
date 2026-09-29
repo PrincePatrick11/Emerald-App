@@ -187,16 +187,5 @@ export async function migrateJournalFieldsToContent(db: Database): Promise<void>
         WHERE id = $2`,
       [nextContent, entry.id]
     );
-
-    // Die `links`-Tabelle spiegelt sonst `syncLinks` beim Speichern; die
-    // Migration schreibt am Store vorbei und zieht den Spiegel selbst nach.
-    await db.execute('DELETE FROM links WHERE source_id=$1', [entry.id]);
-    for (const link of extractInternalLinks(nextContent)) {
-      await db.execute(
-        `INSERT OR IGNORE INTO links (source_id, source_type, target_id, target_type)
-         VALUES ($1, 'journal', $2, $3)`,
-        [entry.id, link.id, link.entryType]
-      );
-    }
   }
 }

@@ -506,9 +506,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   permanentlyDeleteAltar: async (id) => {
     const db = await getDb();
     await db.execute('DELETE FROM altar_placements WHERE altar_id=$1', [id]);
-    // Altäre sind Link-Ziele der Editoren und von task_links (nie Quellen) —
-    // beide polymorphen Tabellen mit abräumen, wie journal/wikiStore es tun.
-    await db.execute('DELETE FROM links WHERE target_id=$1', [id]);
+    // Altäre sind Link-Ziele von task_links (polymorph, ohne Foreign Key).
     await db.execute('DELETE FROM task_links WHERE target_id=$1', [id]);
     await db.execute('DELETE FROM altars WHERE id=$1', [id]);
     // Nur aus dem Papierkorb oder beim Zurückrollen eines Imports erreichbar;

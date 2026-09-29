@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import type Database from '@tauri-apps/plugin-sql';
 import { getDb, nextEntryNumber } from '../lib/db';
-import { syncLinks } from '../lib/links';
 import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, type DbRow } from '../lib/row';
@@ -108,8 +107,6 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     );
     set((s) => ({ articles: [...s.articles, article] }));
     if (start.templateId) useTemplateNoticeStore.getState().show({ entryId: id, templateId: start.templateId });
-    // Eine Vorlage kann Link-Chips mitbringen — wie nach jedem Speichern in die links-Tabelle.
-    if (article.content) void serialized(serialKey('links', id), () => syncLinks(id, 'wiki', article.content));
     return article;
   },
 
@@ -170,8 +167,6 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     set((s) => ({
       articles: s.articles.map((a) => (a.id === id ? merged : a)),
     }));
-    // Eigener Schlüssel statt awaiten — wie in journalStore.updateEntry.
-    void serialized(serialKey('links', id), () => syncLinks(id, 'wiki', merged.content));
   }),
 
   deleteArticle: async (id) => {
@@ -181,10 +176,6 @@ export const useWikiStore = create<WikiState>((set, get) => ({
       await db.execute(
         'UPDATE wiki_articles SET deleted_at=$1 WHERE id=$2',
         [now, id]
-      );
-      await db.execute(
-        'DELETE FROM links WHERE source_id=$1 OR target_id=$1',
-        [id]
       );
       set((s) => ({ articles: s.articles.filter((a) => a.id !== id) }));
     } catch (e) {
@@ -205,10 +196,6 @@ export const useWikiStore = create<WikiState>((set, get) => ({
   permanentlyDeleteArticle: async (id) => {
     const db = await getDb();
     await db.execute('DELETE FROM wiki_articles WHERE id=$1', [id]);
-    await db.execute(
-      'DELETE FROM links WHERE source_id=$1 OR target_id=$1',
-      [id]
-    );
   },
 
   getArticle: (id) => get().articles.find((a) => a.id === id),

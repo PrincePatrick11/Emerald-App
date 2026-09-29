@@ -174,9 +174,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
     for (const tid of idsToDelete) {
       await db.execute('DELETE FROM task_links WHERE task_id=$1 OR target_id=$1', [tid]);
-      // Aufgaben sind Link-Ziele der Editoren (nie Quellen) — wie bei
-      // journal/wikiStore räumt das endgültige Löschen die links-Zeilen mit ab.
-      await db.execute('DELETE FROM links WHERE target_id=$1', [tid]);
       await db.execute('DELETE FROM tasks WHERE id=$1', [tid]);
     }
     set((s) => ({

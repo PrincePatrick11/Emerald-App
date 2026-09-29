@@ -52,6 +52,16 @@ const V37_SOFT_DELETE_TABLES = [
 ] as const;
 
 const FROZEN: Partial<Record<V37TableName, string>> = {
+  // Seit v47 (`drop_links`) gibt es die Tabelle nicht mehr — v33 baut sie noch.
+  links: `
+    CREATE TABLE links (
+      source_id TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      target_type TEXT NOT NULL,
+      PRIMARY KEY (source_id, target_id)
+    )`,
+
   // Seit v46 (`altars_soft_delete`) trägt die Tabelle `deleted_at` — v33 baut sie ohne.
   altars: `
     CREATE TABLE altars (

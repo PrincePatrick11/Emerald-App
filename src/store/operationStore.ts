@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import type Database from '@tauri-apps/plugin-sql';
 import { getDb, nextEntryNumber } from '../lib/db';
-import { syncLinks } from '../lib/links';
 import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, type DbRow } from '../lib/row';
@@ -68,8 +67,6 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     );
     set((s) => ({ operations: [op, ...s.operations] }));
     if (start.templateId) useTemplateNoticeStore.getState().show({ entryId: op.id, templateId: start.templateId });
-    // Eine Vorlage kann Link-Chips mitbringen — wie nach jedem Speichern in die links-Tabelle.
-    if (op.content) void serialized(serialKey('links', op.id), () => syncLinks(op.id, 'operation', op.content));
     return op;
   },
 
@@ -121,15 +118,12 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     set((s) => ({
       operations: s.operations.map((o) => (o.id === id ? { ...o, ...patch, updated_at: now } : o)),
     }));
-    // Eigener Schlüssel statt awaiten — wie in journalStore.updateEntry.
-    void serialized(serialKey('links', id), () => syncLinks(id, 'operation', merged.content));
   }),
 
   deleteOperation: async (id) => {
     const db = await getDb();
     const now = nowIso();
     await db.execute('UPDATE operations SET deleted_at=$1 WHERE id=$2', [now, id]);
-    await db.execute('DELETE FROM links WHERE source_id=$1 OR target_id=$1', [id]);
     set((s) => ({ operations: s.operations.filter((o) => o.id !== id) }));
   },
 

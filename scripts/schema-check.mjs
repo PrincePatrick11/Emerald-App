@@ -210,6 +210,12 @@ async function readSchema(db) {
  * Die zwei Wege zum Schema
  * ------------------------------------------------------------------ */
 
+/** `links`, wie sie bis v46 stand — für Tests, die einen Vault von vor v47 nachstellen. */
+const LINKS_BEFORE_V47 = `CREATE TABLE links (
+  source_id TEXT NOT NULL, source_type TEXT NOT NULL,
+  target_id TEXT NOT NULL, target_type TEXT NOT NULL,
+  PRIMARY KEY (source_id, target_id))`;
+
 function freshDb(name) {
   // Jeder Durchlauf bekommt sein eigenes Verzeichnis, sonst kollidieren die
   // Snapshots, die v33 unter einem festen Namen ablegt.
@@ -774,16 +780,16 @@ console.log('\n4. checkIntegrity findet, was Foreign Keys nicht abdecken\n');
      VALUES ('j1','Eintrag','',$1,$1,'[]','["gibt-es-nicht"]')`,
     [now]
   );
+  await db.execute(`INSERT INTO tasks (id,title,created_at,updated_at) VALUES ('t1','Aufgabe',$1,$1)`, [now]);
   await db.execute(
-    `INSERT INTO links (source_id,source_type,target_id,target_type)
-     VALUES ('fehlt','journal','fehlt-auch','wiki')`
+    `INSERT INTO task_links (id,task_id,target_id,target_type) VALUES ('tl1','t1','fehlt','wiki')`
   );
 
   const found = await checkIntegrity(db);
   const hit = (table, column) => found.some((o) => o.table === table && o.column === column);
 
   check('Waise in linked_wiki_ids erkannt', hit('journal_entries', 'linked_wiki_ids'));
-  check('Waise in links erkannt', hit('links', 'source_id') || hit('links', 'target_id'));
+  check('Waise in task_links erkannt', hit('task_links', 'target_id'));
   check(
     'PRAGMA foreign_key_check sieht davon nichts',
     (await db.select('PRAGMA foreign_key_check')).length === 0
@@ -1018,9 +1024,11 @@ if (backups.length) {
     JSON.stringify(before));
 
   // Den Abbruch nachstellen: v39 entstempeln, den Rebuild von Hand bis kurz
-  // vor Schluss nachbauen. Die Stempel danach (v40–v42) mit: ein Abbruch in
+  // vor Schluss nachbauen. Die Stempel danach (v40–v47) mit: ein Abbruch in
   // v39 kommt nie bis zu ihnen, und der Lauf setzt beim höchsten Stempel an.
+  // Auch nicht bis v47 — `links` steht dort also noch.
   await db.execute('DELETE FROM schema_version WHERE version >= 39');
+  await db.execute(LINKS_BEFORE_V47);
   for (const t of ['task_links', 'altar_placements', 'tasks', 'altar_items', 'operations', 'wiki_articles']) {
     await db.execute(`ALTER TABLE ${t} RENAME TO ${t}_old`);
   }
@@ -1120,7 +1128,6 @@ console.log('\n8b. Migration v36: Journal-Verknuepfungen in den Inhalt\n');
   const [broken] = await v36.select(
     "SELECT content, linked_operation_ids FROM journal_entries WHERE id='j2'"
   );
-  const links = await v36.select("SELECT target_id, target_type FROM links WHERE source_id='j1'");
 
   check(
     'die Operation steht als Link-Chip im Inhalt',
@@ -1146,13 +1153,6 @@ console.log('\n8b. Migration v36: Journal-Verknuepfungen in den Inhalt\n');
     'die beiden Spalten sind geleert',
     entry.linked_operation_ids === '[]' && entry.linked_wiki_ids === '[]',
     `${entry.linked_operation_ids} / ${entry.linked_wiki_ids}`
-  );
-  // Die Migration schreibt an den Stores vorbei und muss den Spiegel selbst
-  // nachziehen — sonst fehlen dem Eintrag seine Rueckverweise.
-  check(
-    'die links-Tabelle wurde nachgezogen',
-    links.length === 2 && links.some((l) => l.target_id === 'o1' && l.target_type === 'operation'),
-    JSON.stringify(links)
   );
   // Kaputtes JSON darf die Spalte nicht leeren: der Originalwert waere sonst
   // unwiederbringlich weg.
@@ -1195,7 +1195,6 @@ console.log('\n8c. Migration v37: Paradigma/Bannung/Meditation in den Inhalt\n')
             is_meditation, meditation_type_wiki_id, meditation_duration
        FROM journal_entries WHERE id='j1'`
   );
-  const links = await v37.select("SELECT target_id, target_type FROM links WHERE source_id='j1'");
 
   check(
     'alle drei Felder stehen als Link-Chip im Inhalt',
@@ -1223,11 +1222,6 @@ console.log('\n8c. Migration v37: Paradigma/Bannung/Meditation in den Inhalt\n')
     entry.paradigm_id === null && entry.is_bannung === 0 && entry.bannung_type_wiki_id === null &&
       entry.is_meditation === 0 && entry.meditation_type_wiki_id === null && entry.meditation_duration === null,
     JSON.stringify(entry)
-  );
-  check(
-    'die links-Tabelle wurde nachgezogen',
-    links.length === 3 && links.every((l) => l.target_type === 'wiki'),
-    JSON.stringify(links)
   );
 
   const [flagOnly] = await v37.select("SELECT content, is_bannung FROM journal_entries WHERE id='j2'");
@@ -1437,10 +1431,6 @@ console.log('\n8g. Migration v42: Sigillen werden Blöcke\n');
     JSON.stringify(g1)
   );
   check(
-    'die Ladetechnik steht in der links-Tabelle',
-    (await v42.select("SELECT COUNT(*) AS n FROM links WHERE source_id='g1' AND target_id='wt1'"))[0].n === 1
-  );
-  check(
     'scheitert das Speichern der Zeichnung, bleibt die Zeile unberührt',
     g2.drawing_data === 'data:image/png;base64,FAIL' && g2.content === '',
     JSON.stringify(g2)
@@ -1517,6 +1507,9 @@ console.log('\n8h. Umstempeln: Blöcke-Migrationen mit alter Zählung (v39–v41
   await db.execute("UPDATE schema_version SET version = 39 WHERE name = 'block_definitions'");
   await db.execute("UPDATE schema_version SET version = 40 WHERE name = 'operation_status_to_blocks'");
   await db.execute("UPDATE schema_version SET version = 41 WHERE name = 'sigils_to_blocks'");
+  // Ein solcher Vault stammt von vor v47: `links` steht noch, und v47 steht aus.
+  await db.execute(LINKS_BEFORE_V47);
+  await db.execute('DELETE FROM schema_version WHERE version = 47');
   await runMigrations(db);
   const stamps = Object.fromEntries(
     (await db.select('SELECT name, version FROM schema_version WHERE version >= 39')).map((r) => [r.name, r.version])
@@ -1687,6 +1680,28 @@ console.log('\n8k. Migration v46: Altaere bekommen einen Papierkorb\n');
     'v46 ergaenzt die Spalte, wo sie fehlt',
     (await db.select('PRAGMA table_info(altars)')).some((c) => c.name === 'deleted_at')
   );
+  db.close();
+}
+
+console.log('\n8l. Migration v47: die links-Tabelle geht\n');
+
+{
+  const db = freshDb('drop-links.db');
+  await runMigrations(db);
+  const linksObjects = async () =>
+    db.select("SELECT name FROM sqlite_master WHERE name='links' OR tbl_name='links'");
+  check('frisches Schema: keine links-Tabelle, kein Index darauf', (await linksObjects()).length === 0);
+
+  // Ein Vault von vor v47: Tabelle und Indizes da, mit Zeilen darin.
+  await db.execute(LINKS_BEFORE_V47);
+  await db.execute('CREATE INDEX idx_links_source ON links(source_id)');
+  await db.execute('CREATE INDEX idx_links_target ON links(target_id)');
+  await db.execute(`INSERT INTO links VALUES ('j1','journal','w1','wiki')`);
+  const v47 = MIGRATIONS.find((m) => m.version === 47);
+  await v47.up(db);
+  check('v47 nimmt Tabelle und Indizes mit', (await linksObjects()).length === 0);
+  await v47.up(db);
+  check('v47 ist wiederholbar', true);
   db.close();
 }
 

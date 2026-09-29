@@ -91,7 +91,6 @@ The translation files follow this top-level structure (from `en.json`):
 | `settings` | Settings modal strings |
 | `home` | Home view strings |
 | `contextMenu` | Context menu action labels, including `openInNewTab` |
-| `backlinks` | Backlinks panel strings |
 | `trash` | Trash view strings, including `categories`/`blockDefinitions`/`templates`/`languages` (the trash's own section labels for those four kinds), and `confirmEmptyAction`/`confirmDeleteSelected` (the red "Empty trash"/"Delete selected" primary action's own in-place confirmation label, `"Yes, delete all"`/`"Yes, delete {{count}}"` — replacing the former `confirmEmpty` question text now that the confirmation swaps the button's own label instead of asking separately). Its former `sure`/`confirmYes`/`confirmNo`/`loading` keys moved to `common.*` (see above), since Tags and the Altar library shared the exact same three-string confirmation under this module's name |
 | `tabBar` | Tab strip strings (`editing`, `closeTab`, `newTab`); the tab titles themselves fall back to `nav.*` and the modules' `untitled` keys |
 | `linkPicker` | Internal link picker modal (title, search placeholder, tab labels, no-results message) |

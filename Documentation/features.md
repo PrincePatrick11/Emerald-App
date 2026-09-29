@@ -42,8 +42,6 @@ The wiki stores reference articles about anything relevant to your practice: rit
 
 **Cover Images.** A banner image displayed at the top of the article in read mode. Stored as an inline data-URL directly on the entry row, not as a file in the vault's image folder.
 
-**Backlinks.** `fetchBacklinks` and the `BacklinksPanel` component that lists every journal entry, wiki article, or operation linking to the current article still exist, but the panel is not currently surfaced anywhere in the UI — it was removed from the right sidebar along with the old tab bar and has not yet been reintroduced elsewhere.
-
 ## Operations
 
 Operations track magical workings: rituals in progress, ongoing practices, servitors, and sigils.

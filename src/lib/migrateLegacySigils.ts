@@ -1,6 +1,6 @@
 import type Database from '@tauri-apps/plugin-sql';
 import { isStoredImage, saveImage } from './images';
-import { extractInternalLinks, internalLinkChipHtml } from './internalLinkHtml';
+import { internalLinkChipHtml } from './internalLinkHtml';
 import { isImageIcon } from './helpers';
 import { createTextBlock, parseBlocks, serializeBlocks } from './blocks/blockHtml';
 import { hiddenAttrValue } from './blocks/blockAttrs';
@@ -186,15 +186,6 @@ export async function convertLegacySigils(
         WHERE id=$2`,
       [content, row.id]
     );
-    if (row.charging_technique_wiki_id) {
-      await db.execute('DELETE FROM links WHERE source_id=$1', [row.id]);
-      for (const link of extractInternalLinks(content)) {
-        await db.execute(
-          `INSERT OR IGNORE INTO links (source_id, source_type, target_id, target_type) VALUES ($1, 'operation', $2, $3)`,
-          [row.id, link.id, link.entryType]
-        );
-      }
-    }
     converted += 1;
   }
   return { converted, failed };

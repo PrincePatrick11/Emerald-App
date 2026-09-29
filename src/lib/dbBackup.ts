@@ -329,7 +329,8 @@ interface BackupFile {
     altarPlacements?: Row[];
     tasks?: Row[];
     taskLinks?: Row[];
-    links?: Row[];
+    // Bis zum Schema v46 stand hier noch `links`, ein Spiegel der Link-Chips,
+    // den nichts las. Alte Dateien tragen ihn weiter; der Import übergeht ihn.
     /** Die Sprachen des Lexikons (seit '9'). */
     languages?: Row[];
     /** Ihre Vokabeln (seit '9') — ohne ihre Sprache wertlos, deshalb immer zusammen. */
@@ -452,12 +453,6 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
       `SELECT * FROM journal_entries WHERE 1=1 ${dateClause} ${deletedClause}`,
       dateParams,
     );
-    const lnks = await selectWhereIn(
-      db,
-      (ph) => `SELECT * FROM links WHERE source_type='journal' AND source_id IN (${ph})`,
-      data.journalEntries,
-    );
-    if (lnks.length) data.links = [...(data.links ?? []), ...lnks];
     collectImageRefs('journal_entries', data.journalEntries, allImagePaths);
   }
 
@@ -467,12 +462,6 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
       `SELECT * FROM wiki_articles WHERE 1=1 ${dateClause} ${deletedClause}`,
       dateParams,
     );
-    const lnks = await selectWhereIn(
-      db,
-      (ph) => `SELECT * FROM links WHERE source_type='wiki' AND source_id IN (${ph})`,
-      data.wikiArticles,
-    );
-    if (lnks.length) data.links = [...(data.links ?? []), ...lnks];
     collectImageRefs('wiki_articles', data.wikiArticles, allImagePaths);
   }
 
@@ -482,12 +471,6 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
       `SELECT * FROM operations WHERE 1=1 ${dateClause} ${deletedClause}`,
       dateParams,
     );
-    const lnks = await selectWhereIn(
-      db,
-      (ph) => `SELECT * FROM links WHERE source_type='operation' AND source_id IN (${ph})`,
-      data.operations,
-    );
-    if (lnks.length) data.links = [...(data.links ?? []), ...lnks];
     collectImageRefs('operations', data.operations, allImagePaths);
   }
 
@@ -992,13 +975,6 @@ async function insertTasks(
 // ─────────────────────────────────────────────────────────────────────────────
 
 function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFile['data'] {
-  const keptContentIds = new Set<string>([
-    ...(f.includeJournal ? (d.journalEntries ?? []).map((r) => r.id as string) : []),
-    ...(f.includeWiki    ? (d.wikiArticles   ?? []).map((r) => r.id as string) : []),
-    ...(f.includeOperations ? (d.operations ?? []).map((r) => r.id as string) : []),
-    ...(f.includeAltars     ? (d.altars      ?? []).map((r) => r.id as string) : []),
-    ...(f.includeTasks      ? (d.tasks       ?? []).map((r) => r.id as string) : []),
-  ]);
   const anyCategorized = f.includeWiki || f.includeOperations || f.includeTasks || f.includeAltars;
   const anyBlocks = f.includeJournal || f.includeWiki || f.includeOperations;
   return {
@@ -1019,7 +995,6 @@ function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFi
     tags:               f.includeTags       ? d.tags              : [],
     languages:          f.includeLexicon    ? d.languages         : [],
     lexiconEntries:     f.includeLexicon    ? d.lexiconEntries    : [],
-    links:            (d.links ?? []).filter((r) => keptContentIds.has(r.source_id as string)),
   };
 }
 
@@ -1040,14 +1015,6 @@ function applyCategoryFilters(d: BackupFile['data'], filters: ImportCategoryFilt
   const keptItemIds = new Set(altarItems.map((r) => r.id as string));
   const keptTaskIds = new Set(tasks.map((r) => r.id as string));
 
-  const keptIds = new Set([
-    ...wikiArticles.map((r) => r.id as string),
-    ...operations.map((r) => r.id as string),
-    ...(d.journalEntries ?? []).map((r) => r.id as string),
-    ...(d.altars ?? []).map((r) => r.id as string),
-    ...tasks.map((r) => r.id as string),
-  ]);
-
   // Vorlagen bleiben, verlieren aber ihre Zuweisungen an abgewählte Kategorien.
   const templates = (d.templates ?? []).map((r) => ({
     ...r,
@@ -1066,7 +1033,6 @@ function applyCategoryFilters(d: BackupFile['data'], filters: ImportCategoryFilt
     altarItems,
     altarPlacements: (d.altarPlacements ?? []).filter((r) => keptItemIds.has(r.item_id as string)),
     taskLinks: (d.taskLinks ?? []).filter((r) => keptTaskIds.has(r.task_id as string)),
-    links: (d.links ?? []).filter((r) => keptIds.has(r.source_id as string)),
   };
 }
 
@@ -1274,16 +1240,6 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   const hasTasks = (d.tasks?.length ?? 0) > 0;
   const hasAny = hasJournal || hasWiki || hasOps || hasTasks;
 
-  // Links: delete only for present entry types
-  if (hasJournal) {
-    await db.execute(`DELETE FROM links WHERE source_type='journal'`);
-  }
-  if (hasWiki) {
-    await db.execute(`DELETE FROM links WHERE source_type='wiki'`);
-  }
-  if (hasOps) {
-    await db.execute(`DELETE FROM links WHERE source_type='operation'`);
-  }
   // Die Bibliothek hängt an `hasAltars`, obwohl der Export sie inzwischen
   // unabhängig von den Altären mitnimmt: `altar_placements.item_id` ist
   // ON DELETE CASCADE, ein Leeren von `altar_items` risse also den Altären
@@ -1323,12 +1279,11 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   if (d.altarPlacements) await insertRows(db, 'altar_placements', d.altarPlacements);
   await insertTasks(db, tasks);
   if (d.taskLinks) await insertRows(db, 'task_links', d.taskLinks);
-  if (d.links) await insertRows(db, 'links', d.links, true);
 
   await convertImportedSigils(db, backup, operations);
 
   // Ein Teil-Replace (z. B. nur Tasks) kann Verknüpfungen des Bestands auf
-  // gerade ersetzte Ziele verwaisen lassen — und importierte links/task_links
+  // gerade ersetzte Ziele verwaisen lassen — und importierte task_links
   // können auf abgewählte Typen zeigen. Gleicher Sweep wie beim Papierkorb.
   await sweepDanglingLinks(db);
 }
@@ -1419,10 +1374,8 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   /**
    * Die Ziel-IDs der internen Link-Chips IM `content` mitziehen. `remapEntry`
    * behandelt `content` nur als Bildpfad-Feld; die `data-id`-Attribute darin
-   * blieben sonst auf den alten, hier umbenannten IDs stehen — und weil die
-   * `links`-Tabelle weiter unten sehr wohl umgeschrieben wird, widersprächen
-   * sich Tabelle und Text. Der erste Speichervorgang ließe dann `syncLinks`
-   * über den veralteten Inhalt laufen und die richtigen Zeilen löschen.
+   * blieben sonst auf den alten, hier umbenannten IDs stehen, und jeder
+   * Link-Chip zeigte ins Leere.
    *
    * Bewusst immer eine ID zurückgeben: `null` würde den Chip durch seinen Text
    * ersetzen, und beim Merge existiert das Ziel ja. `remapId` lässt unbekannte
@@ -1482,11 +1435,6 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     task_id: remapId(r.task_id),
     target_id: remapId(r.target_id),
   }));
-  const links = (d.links ?? []).map((r: Row) => ({
-    ...r,
-    source_id: remapId(r.source_id),
-    target_id: remapId(r.target_id),
-  }));
 
   // Kategorien sind schon aufgelöst (resolveImportedCategories oben); Tags:
   // INSERT OR IGNORE (no prefix — shared by name)
@@ -1513,11 +1461,10 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   await insertRows(db, 'altar_placements', altarPlacements);
   await insertTasks(db, tasks);
   await insertRows(db, 'task_links', taskLinks, true);
-  await insertRows(db, 'links', links, true);
 
   await convertImportedSigils(db, backup, operations);
 
-  // Importierte links/task_links können auf Ziele zeigen, die der
+  // Importierte task_links können auf Ziele zeigen, die der
   // Typ-/Kategorie-Filter gerade abgewählt hat — wie in doReplace ausfegen.
   await sweepDanglingLinks(db);
 }

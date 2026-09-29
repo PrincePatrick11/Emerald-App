@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import type Database from '@tauri-apps/plugin-sql';
 import { getDb, nextEntryNumber } from '../lib/db';
 import { getMoonPhase } from '../lib/moonPhase';
-import { syncLinks } from '../lib/links';
 import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, toInt, type DbRow } from '../lib/row';
@@ -95,8 +94,6 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     );
     set((s) => ({ entries: [entry, ...s.entries] }));
     if (start.templateId) useTemplateNoticeStore.getState().show({ entryId: entry.id, templateId: start.templateId });
-    // Eine Vorlage kann Link-Chips mitbringen — wie nach jedem Speichern in die links-Tabelle.
-    if (entry.content) void serialized(serialKey('links', entry.id), () => syncLinks(entry.id, 'journal', entry.content));
     return entry;
   },
 
@@ -157,9 +154,6 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     set((s) => ({
       entries: s.entries.map((e) => (e.id === id ? merged : e)),
     }));
-    // Eigener Schlüssel statt awaiten: syncLinks (DELETE + INSERTs) soll auch
-    // serialisiert laufen, aber die Update-Kette nicht auf sich warten lassen.
-    void serialized(serialKey('links', id), () => syncLinks(id, 'journal', merged.content));
   }),
 
   deleteEntry: async (id) => {
@@ -169,10 +163,6 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       await db.execute(
         'UPDATE journal_entries SET deleted_at=$1 WHERE id=$2',
         [now, id]
-      );
-      await db.execute(
-        'DELETE FROM links WHERE source_id=$1 OR target_id=$1',
-        [id]
       );
       set((s) => ({ entries: s.entries.filter((e) => e.id !== id) }));
     } catch (e) {
@@ -194,10 +184,6 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   permanentlyDeleteEntry: async (id) => {
     const db = await getDb();
     await db.execute('DELETE FROM journal_entries WHERE id=$1', [id]);
-    await db.execute(
-      'DELETE FROM links WHERE source_id=$1 OR target_id=$1',
-      [id]
-    );
   },
 
   getEntry: (id) => get().entries.find((e) => e.id === id),

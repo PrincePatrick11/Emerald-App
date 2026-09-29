@@ -5,8 +5,8 @@
  *
  * Der Eintrag behält seine id: die Zeile zieht in die Tabelle des neuen Typs
  * um, und alles, was ihn über `(id, Typ)` adressiert, zieht mit — Link-Chips in
- * Einträgen, Vorlagen und den Vorgaben eigener Blöcke, die `links`- und
- * `task_links`-Zeilen, offene Tabs und ihre Verläufe. Titel, Inhalt, Tags und
+ * Einträgen, Vorlagen und den Vorgaben eigener Blöcke, die `task_links`-Zeilen,
+ * offene Tabs und ihre Verläufe. Titel, Inhalt, Tags und
  * Anlagedatum bleiben; die Nummer (`entry_number`) vergibt die neue Tabelle.
  * Kategorie, Icon und Titelbild wandern zwischen Wiki und Operation mit — das
  * Journal kennt keine davon, sie fallen dort weg (die Seitenleiste fragt vorher).
@@ -25,7 +25,6 @@
 import type Database from '@tauri-apps/plugin-sql';
 import { getDb, nextEntryNumber } from './db';
 import { nowIso } from './helpers';
-import { syncLinks } from './links';
 import { retypeInternalLinks } from './internalLinkHtml';
 import { getMoonPhase } from './moonPhase';
 import { serialKey, serialized } from './serialize';
@@ -212,7 +211,6 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
       definitionsChanged = true;
     }
 
-    await db.execute('UPDATE links SET target_type=$1 WHERE target_id=$2', [to, id]);
     await db.execute('UPDATE task_links SET target_type=$1 WHERE target_id=$2', [to, id]);
     await db.execute(`DELETE FROM ${TABLES[from]} WHERE id=$1`, [id]);
 
@@ -233,9 +231,5 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
       links: s.links.map((link) => (link.target_id === id ? { ...link, target_type: to } : link)),
     }));
     if (definitionsChanged) void useBlockDefinitionStore.getState().fetchDefinitions();
-
-    // Die ausgehenden Links unter dem neuen Quelltyp — hinter einem noch
-    // laufenden syncLinks des alten Typs eingereiht, nicht davor.
-    void serialized(serialKey('links', id), () => syncLinks(id, to, converted.entry.content));
   });
 }

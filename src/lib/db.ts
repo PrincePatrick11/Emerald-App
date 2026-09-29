@@ -327,22 +327,15 @@ async function runPeriodicCleanup(db: Database, retentionDays: number | null): P
 /**
  * Entfernt Verknüpfungen, deren Ziel nicht mehr existiert.
  *
- * `links` und `task_links.target_id` sind polymorph — das `*_type`-Feld
- * entscheidet, welche Tabelle gemeint ist — und können deshalb keinen Foreign
- * Key tragen. Es räumt hier also nichts von selbst auf, und jedes endgültige
+ * `task_links.target_id` ist polymorph — `target_type` entscheidet, welche
+ * Tabelle gemeint ist — und kann deshalb keinen Foreign Key tragen. Es räumt hier also nichts von selbst auf, und jedes endgültige
  * Löschen von Inhalten hinterlässt Waisen, wenn es nicht ausdrücklich passiert.
  *
  * Wird sowohl vom Leeren nach der Frist als auch vom Leeren des Papierkorbs benutzt,
  * damit beide Wege dasselbe Ergebnis liefern.
  */
 export async function sweepDanglingLinks(db: Database): Promise<void> {
-  const contentIds = `${CONTENT_IDS}`;
-  await db.execute(
-    `DELETE FROM links
-      WHERE source_id NOT IN ${contentIds}
-         OR target_id NOT IN ${contentIds}`
-  );
-  await db.execute(`DELETE FROM task_links WHERE target_id NOT IN ${contentIds}`);
+  await db.execute(`DELETE FROM task_links WHERE target_id NOT IN ${CONTENT_IDS}`);
 }
 
 export const MIGRATIONS: Migration[] = [
@@ -1300,6 +1293,16 @@ export const MIGRATIONS: Migration[] = [
         await db.execute('ALTER TABLE altars ADD COLUMN deleted_at TEXT');
       }
       await createIndexesIfMissing(db, [ALTARS_INDEX_DDL]);
+    },
+  },
+  {
+    // `links` spiegelte bei jedem Speichern die Link-Chips eines Eintrags —
+    // für ein Rückverweis-Panel, das nie eingebunden wurde. Gelesen hat es
+    // niemand; die Chips selbst stehen im `content`. Die Indizes gehen mit.
+    version: 47,
+    name: 'drop_links',
+    up: async (db) => {
+      await db.execute('DROP TABLE IF EXISTS links');
     },
   },
 ];

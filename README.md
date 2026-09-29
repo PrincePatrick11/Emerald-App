@@ -53,7 +53,7 @@ Emerald is the private workspace for your magical practice. A journal, personal 
 
 **Journal** — Rich-text entries (TipTap) with automatic moon phase tracking. Attach paradigm, banishing technique, and meditation type via linked wiki articles. Add free-form tags, custom properties (text, number, date, toggle, checkbox), and internal links to operations and wiki articles. Three list layouts (List, Cards, Timeline) with sort, filter by moon phase or property value, and full-text search.
 
-**Wiki** — A personal reference library with 12 built-in category types (deities, herbs, rituals, symbols, …) and unlimited custom categories. Articles support emoji or image icons, cover images, and show backlinks from any content in the app.
+**Wiki** — A personal reference library with 12 built-in category types (deities, herbs, rituals, symbols, …) and unlimited custom categories. Articles support emoji or image icons and cover images.
 
 **Operations** — Track rituals, workings, servitors, and sigils. Mark them active or inactive, set end dates and version strings, and attach icons and cover images. Link wiki articles and journal entries.
 
@@ -62,8 +62,6 @@ Emerald is the private workspace for your magical practice. A journal, personal 
 **Altar** — A virtual canvas for your sacred space. Build a personal item library with fully dynamic, reorderable categories. Drag items onto the canvas and adjust position, scale, rotation, opacity, and layer order. Keep multiple altar setups with customisable backgrounds (7 gradient presets, 16 photographic presets, or a custom upload) and a dark/light overlay. Snap items to a configurable grid. Export any altar as JPEG, PNG, or WebP at full native resolution. Dashboard shows live thumbnail previews of all altars.
 
 **Tasks** — Hierarchical task manager with unlimited subtask depth, categories, and three priority levels (Low / Medium / High). Link tasks to journal entries, wiki articles, or operations. Filter by category and priority, inline-edit titles. Soft-delete with trash recovery.
-
-**Backlinks** — Every journal entry, wiki article, and operation shows all content that references it in a live sidebar panel.
 
 **Templates** — Pre-filled starting points for journal entries, wiki articles, and operations: a title, content, and tags, assignable to an entry type and category and optionally set as the default so new entries start with them automatically.
 

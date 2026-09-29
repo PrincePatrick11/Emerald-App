@@ -6,6 +6,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] (targeting v0.2.0)
 
 ### Changed
+- **The `links` table is gone (migration v47).** It copied every entry's link chips on each save for a backlinks panel that was never shown; nothing read it. The chips in the entries themselves are unchanged, and backups no longer carry the table.
 - **Cancel in an altar takes everything back.** It used to reset the title only, since every action on the canvas is saved at once. It now returns the altar to how it was when Edit was pressed — placements, background, overlay, grid, format and icon — and leaving an altar with changes asks like everywhere else.
 - **Keep editing closes the window that asked.** When an import, an update or a vault switch runs into an edit with changes and the answer is Keep editing, the Settings or Vaults window closes too — you are back in the entry instead of in front of the window.
 - **Deleting an altar moves it to the Trash.** It used to be final at once, without a question and without a way back. Now the altar goes to the Trash with the usual undo, keeps its placements there, and is purged after the vault's retention period like everything else.

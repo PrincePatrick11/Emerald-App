@@ -55,9 +55,7 @@ src/
 │   │                 LexiconView
 │   ├── sidebar/
 │   │   ├── panels/   JournalPropertiesPanel, WikiPropertiesPanel, OperationPropertiesPanel,
-│   │   │             AltarSidebarPanel, BacklinksPanel (currently unrendered — RoutinesPanel,
-│   │   │             its neighbour, was removed outright along with routines, see
-│   │   │             Templates below)
+│   │   │             AltarSidebarPanel
 │   │   └── fields/   SidebarSection (the collapsible section of read and edit mode —
 │   │                 Properties, Linked entries, Tags, Blocks, the Altar's Elements — plus
 │   │                 its SidebarPropertyRow/SidebarItemRow/SidebarEmpty row types),
@@ -230,9 +228,7 @@ src-tauri/
 each" — icon, nav-label key, untitled-placeholder key, the module's `ContentType`, and whether
 it uses the right sidebar's editor action bar. `ModuleMeta.entryType` is non-null for all five
 modules: Tasks and Altar are link *targets* (`'task'`/`'altar'` in `ContentType`) even though,
-lacking an editor of their own, they can never be a link's *source* — `BacklinkEntry.type` in
-`src/lib/links.ts` stays the narrower `'journal' | 'wiki' | 'operation'` for exactly that
-reason. `ENTRY_MODULE_IDS` (`journal`/`tasks`/`operations`/`wiki`/`altar`) is the canonical
+lacking an editor of their own, they can never be a link's *source*. `ENTRY_MODULE_IDS` (`journal`/`tasks`/`operations`/`wiki`/`altar`) is the canonical
 order — it drives the rail's icon order, the entry list's tab order and, through the derived
 `CATEGORY_MODULE_IDS` (the same minus `journal`), the order of the per-module usage columns
 in `CategoriesView`. `MODULES` is the
@@ -455,8 +451,7 @@ afterwards (see [Templates](#templates)). Once the row exists under the new type
 `uiStore.retypeEntryViews(id, from, to)` rewrites every tab's `view`, every tab's history, and
 the tabless history in one `set()` — no open tab is ever left pointing at a type/id pair that
 briefly doesn't exist, since the new row is written and the stores swapped before the old row's
-delete resolves. Outgoing links are re-synced last, under the new source type and behind any
-`syncLinks` call already queued for the old one (both go through the same `serialized` key).
+delete resolves.
 
 ### Right Sidebar Action Bar
 
@@ -616,8 +611,8 @@ Journal, Wiki and Operations entries render their body as a vertical stack of bl
 operation's Status) and the three sigil blocks (`core.sigil.calc`/`.canvas`/`.charge`, below).
 
 **Stored format.** Blocks live in the existing `content` column, not in a side table — every
-pipeline that already reads `content` (search, `syncLinks`, image cleanup, merge-import link
-remapping, `.emerald`, backup, export) keeps working unchanged. Each block is a top-level
+pipeline that already reads `content` (search, the "Linked entries" field, image cleanup,
+merge-import link remapping, `.emerald`, backup, export) keeps working unchanged. Each block is a top-level
 `<section data-block="<type>" data-block-id="<id>" …>inner HTML</section>`
 (`src/lib/blocks/blockHtml.ts`). Three rules carry the format:
 
@@ -690,7 +685,7 @@ named and iconed after its element. Where things live follows the content conven
 `data-block-data` (JSON) the scalar values keyed by element id (a sigil part's whole data JSON
 counts as its "value" here), and **links, images and altars are markup, never JSON** — a real
 internal-link chip or `<img src>` inside a `<dd data-block-slot="el:<id>">` (`isSlotKind`). That
-keeps the links table, backlinks, merge-import remapping and image cleanup working with no
+keeps the "Linked entries" field, merge-import remapping and image cleanup working with no
 special case. The inner HTML doubles as the readable fallback (a `<dl>` of label and value) for
 search, export and apps that don't know the type; it is rewritten on every change, while the JSON
 stays the truth for scalars. Values whose element is unknown are kept and written back
@@ -749,8 +744,8 @@ without animation — a row simply jumps to its new place while dragged. `blockS
 eagerly.
 
 A fields block's **`text` element** is the text block's own `RichEditor`; its HTML lives in the
-element's slot like a link chip or image, so link table, backlinks, image cleanup and import remap
-see it unchanged. It registers with the stack's editor registry as `<blockId>:<elementId>`, so the
+element's slot like a link chip or image, so the "Linked entries" field, image cleanup and import
+remap see it unchanged. It registers with the stack's editor registry as `<blockId>:<elementId>`, so the
 toolbar, sidebar link requests and drops treat it like a text block at its block's position. It is
 only offered in the Blocks builder (the standalone Text block already covers the "Add block" menu)
 and has no prefill, since that would put markup into the definition.
@@ -1131,9 +1126,7 @@ the freshly restored rows.
 
 Chips are rendered identically in both edit mode and view mode — the `[[Label(id)]]` raw-text edit representation was removed. The node view no longer tracks `editor.isEditable` via `useState`/`useEffect`; editability checks (e.g. click handling) read `editor.isEditable` directly at event time.
 
-After every save, `syncLinks(sourceId, sourceType, htmlContent)` in `src/lib/links.ts` parses the saved HTML, deletes the old link rows for that source, and inserts fresh rows. This keeps the `links` table accurate without requiring a separate link-tracking mechanism.
-
-Backlinks are fetched on demand by `fetchBacklinks(targetId)`, which joins the `links` table with each content table to return entry titles and types.
+The chips in `content` are the only record of what links where. Until v47 a `links` table mirrored them on every save, for a backlinks panel that was never mounted; nothing read it, and migration v47 dropped it.
 
 **What an entry links** — Journal, Wiki and Operations' right-sidebar "Linked entries" field (`LinkedEntriesField`) — is read straight out of the same content, via `extractInternalLinks` (`src/lib/internalLinkHtml.ts`), rather than tracked as its own list. That file is deliberately `DOMParser`-free for reading (regex over the opening `<span>` tag): it sits on the database path too — migration v36 and the schema-check Node harness call it outside a browser — while writing/remapping a chip's markup (`remapInternalLinks`) does use a real `DOMParser`, since correctness there matters more than portability.
 
@@ -1193,7 +1186,7 @@ Emerald uses browser-like tabs to keep multiple pieces of content open at the sa
 - Each tab contains an `ActiveView`, so a tab can represent a journal entry, wiki article, operation, altar, or a top-level view.
 
 Tab IDs, `isContentView`, and the per-tab navigation-history helpers (see [Navigation
-History](#navigation-history) below) live in `src/lib/tabs.ts`. `viewTypeForEntryType()` — the one place that translates the data model's `operation` (singular — what `links.target_type`, the drag payload, and the internal-link mark all carry) into `ActiveView`'s `operations` (plural, named after the module rather than the record) — now lives in `src/lib/modules.ts` as part of the module registry (see [Module Registry](#module-registry) above), a reverse lookup over `MODULES` rather than its own mapping. The mapping used to be copied at each call site; `RichEditor.tsx`, `BacklinksPanel.tsx`, `HomeView.tsx`, `TasksView.tsx`, and `globalSearch.ts` (see [Global Search](#global-search) below) now call the shared function instead.
+History](#navigation-history) below) live in `src/lib/tabs.ts`. `viewTypeForEntryType()` — the one place that translates the data model's `operation` (singular — what `task_links.target_type`, the drag payload, and the internal-link mark all carry) into `ActiveView`'s `operations` (plural, named after the module rather than the record) — now lives in `src/lib/modules.ts` as part of the module registry (see [Module Registry](#module-registry) above), a reverse lookup over `MODULES` rather than its own mapping. The mapping used to be copied at each call site; `RichEditor.tsx`, `HomeView.tsx`, `TasksView.tsx`, and `globalSearch.ts` (see [Global Search](#global-search) below) now call the shared function instead.
 
 Tabs are persisted in `localStorage` using:
 
@@ -1284,7 +1277,7 @@ Two deliberate exceptions to "the store holds the whole row":
 
 Every content-store update method (`updateEntry`, `updateArticle`, `updateOperation`, `updateTask`/`toggleComplete`, `updateTag`, `updateTemplate`, `updateAltar`/`updateAltarGrid`/`updateAltarResolution`, `updateItem`, `updatePlacement`) follows the same shape: read a snapshot from the store, merge the patch into it, and write the *entire* row back to SQLite. Two overlapping updates to the same entity — an editor autosave firing while the sidebar changes a property, or an altar's automatic thumbnail save overlapping an intention autosave — used to race: whichever finished last won, overwriting the other's fields with a stale snapshot, including content that had just been typed.
 
-`src/lib/serialize.ts` closes that race. `serialized(serialKey(domain, id), task)` chains same-key tasks strictly one after another on a `Map<string, Promise<void>>`, so a merge-and-write always runs against the previous one's result rather than a snapshot taken before it landed. The invariant going forward: **any store method that writes back a whole row from a snapshot must run its write through `serialized()`, keyed per entity id.** `serialKey` types the domains that currently participate (`journal`/`wiki`/`operation`/`task`/`tag`/`altar`/`altarItem`/`placement`/`links`/`blockDefinition`/`template`). `syncLinks`'s own DELETE+INSERT of a content item's link rows runs under its own `links:<id>` key — fire-and-forgotten from the update method rather than awaited, so a link-sync failure can't block the content save that triggered it. `taskStore.toggleComplete` queues each affected descendant under its own `task:<id>` key rather than one shared key, so a concurrent `updateTask` on a child can't have its `completed` columns rewound by the parent's cascade (or vice versa).
+`src/lib/serialize.ts` closes that race. `serialized(serialKey(domain, id), task)` chains same-key tasks strictly one after another on a `Map<string, Promise<void>>`, so a merge-and-write always runs against the previous one's result rather than a snapshot taken before it landed. The invariant going forward: **any store method that writes back a whole row from a snapshot must run its write through `serialized()`, keyed per entity id.** `serialKey` types the domains that currently participate (`journal`/`wiki`/`operation`/`task`/`tag`/`altar`/`altarItem`/`placement`/`blockDefinition`/`template`/`language`). `taskStore.toggleComplete` queues each affected descendant under its own `task:<id>` key rather than one shared key, so a concurrent `updateTask` on a child can't have its `completed` columns rewound by the parent's cascade (or vice versa).
 
 Deliberately not serialized, each with a comment at its own definition rather than here: `bumpAltarUpdatedAt` (writes only `updated_at`, nothing to race) and the four `updateCategory` variants (write only the columns passed in, no snapshot merge to race against).
 
