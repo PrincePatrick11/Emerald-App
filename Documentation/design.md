@@ -258,7 +258,8 @@ for that yet. The deviation is commented at the definition (`LinkPickerModal.tsx
 | `stone` | Tailwind default, only `950: #0f0e0c` overridden | | | | |
 
 **Theme variables** (`src/themes/emerald-noctis.css`, `emerald-parchment.css`). Both files
-define the same 80 properties. Core values:
+define the same 97 properties, including the edit sidebar's `--field-*`, `--primary-solid-*`
+and `--danger-soft-*` tokens. Core values:
 
 | Property | Emerald Noctis (dark) | Emerald Parchment (light) |
 | --- | --- | --- |
