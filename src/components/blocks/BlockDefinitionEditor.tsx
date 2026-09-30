@@ -35,7 +35,7 @@ import FieldSlotEditor from './FieldSlotEditor';
 import SigilPartSettings from './SigilPartSettings';
 
 const draftOf = (d: DefinitionDraft): DefinitionDraft => ({
-  name: d.name, icon: d.icon, description: d.description, elements: d.elements, display: d.display,
+  name: d.name, icon: d.icon, elements: d.elements, display: d.display,
 });
 
 /** Die sichtbaren Elemente vorn, die archivierten dahinter — die Ordnung, die Definition und Kopie halten. */

@@ -98,14 +98,14 @@ async function insertAs(db: Database, to: ConvertibleEntryType, core: EntryCore)
         // Die Mondphase des Tages, an dem der Eintrag entstand — wie beim Anlegen,
         // also nur, wenn der Vault sie will (Einstellung).
         moon_phase: useSettingsStore.getState().settings.journal.moonPhase ? getMoonPhase(new Date(core.created_at)) : null,
-        mood: null, paradigm_id: null, linked_operation_ids: [], linked_wiki_ids: [],
+        paradigm_id: null, linked_operation_ids: [], linked_wiki_ids: [],
         is_bannung: false, bannung_type_wiki_id: null, is_meditation: false, meditation_duration: null,
         meditation_type_wiki_id: null, deleted_at: null,
       };
       await db.execute(
-        `INSERT INTO journal_entries (id, title, content, created_at, updated_at, tags, moon_phase, mood, entry_number)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [entry.id, entry.title, entry.content, entry.created_at, entry.updated_at, tags, entry.moon_phase, entry.mood, entry_number]
+        `INSERT INTO journal_entries (id, title, content, created_at, updated_at, tags, moon_phase, entry_number)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [entry.id, entry.title, entry.content, entry.created_at, entry.updated_at, tags, entry.moon_phase, entry_number]
       );
       return { type: to, entry };
     }

@@ -18,10 +18,10 @@ export async function insertDefinitionRow(db: Database, def: BlockDefinition): P
   const row = definitionToRow(def);
   await db.execute(
     `INSERT INTO block_definitions
-       (id, name, icon, description, elements, display, revision, sort_order, created_at, updated_at, deleted_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+       (id, name, icon, elements, display, revision, sort_order, created_at, updated_at, deleted_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
     [
-      row.id, row.name, row.icon, row.description, row.elements, row.display, row.revision, row.sort_order,
+      row.id, row.name, row.icon, row.elements, row.display, row.revision, row.sort_order,
       row.created_at, row.updated_at, row.deleted_at,
     ]
   );

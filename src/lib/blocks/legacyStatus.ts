@@ -44,7 +44,6 @@ export function statusDefinition(t: TFunction, now: string): BlockDefinition {
     id: STATUS_DEFINITION_ID,
     name: label('blocks.status.name', 'Status'),
     icon: '📌',
-    description: '',
     elements: [
       { id: 'active', kind: 'toggle', label: label('blocks.status.active', 'Active') },
       { id: 'end-date', kind: 'date', label: label('blocks.status.endDate', 'End date') },

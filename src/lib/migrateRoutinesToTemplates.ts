@@ -110,7 +110,6 @@ export function routineToTemplate(
     id: routine.id,
     name: stringOr(routine.name),
     icon: stringOr(routine.emoji) || DEFAULT_TEMPLATE_ICON,
-    description: '',
     title: '',
     content: body + links,
     tags: stringList(routine.tags),

@@ -32,7 +32,7 @@ import i18n from '../i18n';
 import { useSettingsStore } from './settingsStore';
 import { createMissingTags, withUsableTags } from '../lib/templateTags';
 
-export type TemplatePatch = Partial<Pick<Template, 'name' | 'icon' | 'description' | 'title' | 'content' | 'tags' | 'assignments'>>;
+export type TemplatePatch = Partial<Pick<Template, 'name' | 'icon' | 'title' | 'content' | 'tags' | 'assignments'>>;
 
 /** Was eine neue Vorlage mitbringt. Sterne (`isDefault`) werden dabei verworfen — die setzt nur `updateTemplate`. */
 export type TemplateInit = Omit<TemplatePatch, 'name'>;
@@ -93,7 +93,6 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       id: generateId(),
       name: name.trim(),
       icon: init.icon ?? DEFAULT_TEMPLATE_ICON,
-      description: init.description ?? '',
       title: init.title ?? '',
       content: init.content ?? '',
       tags: init.tags ?? [],
@@ -123,9 +122,9 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     const row = templateToRow(updated);
     await db.execute(
       `UPDATE templates
-          SET name=$1, icon=$2, description=$3, title=$4, content=$5, tags=$6, assignments=$7, updated_at=$8
-        WHERE id=$9`,
-      [row.name, row.icon, row.description, row.title, row.content, row.tags, row.assignments, row.updated_at, id]
+          SET name=$1, icon=$2, title=$3, content=$4, tags=$5, assignments=$6, updated_at=$7
+        WHERE id=$8`,
+      [row.name, row.icon, row.title, row.content, row.tags, row.assignments, row.updated_at, id]
     );
     // Nur neu gesetzte Sterne verdrängen — ein unveränderter hält seine Kombination ohnehin schon.
     const before = defaultKeys(current.assignments);
@@ -144,7 +143,6 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     // Ohne Sterne: zwei Standards für dieselbe Kombination gibt es nicht.
     return get().createTemplate(source.name + i18n.t('common.copySuffix'), {
       icon: source.icon,
-      description: source.description,
       title: source.title,
       content: source.content,
       tags: source.tags,

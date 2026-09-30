@@ -234,15 +234,14 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
   }
 
   for (const task of corpus.tasks.filter(notDeleted)) {
-    // `description` is plain text already — no editor ever wrote it.
     push('task', task.id, task.title,
-      matchRecord(q, task.title, task.tags, () => [task.description]),
+      matchRecord(q, task.title, task.tags, () => []),
       { updatedAt: task.updated_at, categoryId: task.category_id });
   }
 
   for (const altar of corpus.altars) {
     push('altar', altar.id, altar.title,
-      matchRecord(q, altar.title, null, () => [altar.intention]),
+      matchRecord(q, altar.title, null, () => []),
       { updatedAt: altar.updated_at });
   }
 

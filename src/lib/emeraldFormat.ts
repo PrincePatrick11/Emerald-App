@@ -290,12 +290,11 @@ interface EmeraldMeta {
   blockDefinitions?: Array<Record<string, unknown>>;
   /**
    * Nur Vorlagen (der Name steht in `title`, Icon und Tags in `icon`/`tags`):
-   * ihre Beschreibung, der Titel neuer Einträge und die Zuweisungen —
+   * der Titel neuer Einträge und die Zuweisungen —
    * Kategorien wie beim Eintrag über Namen und Emoji, eingebaute zusätzlich
    * über ihre ID (ihr Name hängt an der Sprache); `all` für „alle
    * Kategorien", ohne beides „ohne Kategorie". Sterne reisen nicht mit.
    */
-  templateDescription?: string;
   newEntryTitle?: string;
   templateAssignments?: Array<{
     entryType: string;
@@ -525,7 +524,6 @@ export async function buildTemplateEmeraldFile(templateId: string): Promise<Emer
   const meta: EmeraldMeta = {
     icon: template.icon,
     tags: template.tags,
-    templateDescription: template.description,
     newEntryTitle: template.title,
     templateAssignments: await exportedAssignments(template.assignments),
     contentLinks: collectContentLinks(content),
@@ -629,7 +627,7 @@ async function exportAltarAsEmerald(): Promise<void> {
     type: 'altar',
     title: altar.title || 'Untitled Altar',
     createdAt: altar.created_at,
-    content: altar.intention || '',
+    content: '',
     images,
     meta,
   };
@@ -643,8 +641,8 @@ function definitionsUsedIn(entryId: string, content: string): NonNullable<Emeral
   if (!ids.size) return [];
   return useBlockDefinitionStore.getState().definitions
     .filter((d) => ids.has(d.id))
-    .map(({ id, name, icon, description, elements, display, revision }) => ({
-      id, name, icon, description, elements, display, revision,
+    .map(({ id, name, icon, elements, display, revision }) => ({
+      id, name, icon, elements, display, revision,
     }));
 }
 
@@ -875,7 +873,6 @@ async function createImportedTemplate(file: EmeraldFile, content: string, tagNam
   const text = (v: unknown) => (typeof v === 'string' ? v : '');
   const created = await useTemplateStore.getState().createTemplate(text(file.title), {
     icon: text(meta.icon) || undefined,
-    description: text(meta.templateDescription),
     title: text(meta.newEntryTitle),
     content,
     tags: tagNames,
@@ -1128,7 +1125,6 @@ async function importAltarEntry(file: EmeraldFile): Promise<string> {
 
     await updateAltar(altar.id, {
       title: file.title || 'Untitled Altar',
-      intention: file.content || '',
       background_preset: meta.altarBackgroundPreset || DEFAULT_ALTAR_BACKGROUND,
       background_image_data: backgroundImageData,
       background_overlay: meta.altarBackgroundOverlay ?? DEFAULT_BACKGROUND_OVERLAY,

@@ -96,7 +96,7 @@ export async function beginAltarEdit(id: string): Promise<void> {
  */
 function comparableAltar(altar: AltarRecord, title = altar.title): string {
   return JSON.stringify([
-    title, altar.intention,
+    title,
     altar.background_preset, altar.background_image_data ?? null, altar.background_overlay, altar.background_overlay_color,
     altar.grid_enabled, altar.grid_size, altar.grid_opacity, altar.grid_color,
     altar.snap_to_grid, altar.rotation_snap_enabled, altar.rotation_snap_angle, altar.snap_scale_to_grid,

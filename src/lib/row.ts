@@ -97,7 +97,6 @@ export const fromRow = {
       updated_at: str(r.updated_at),
       tags: jsonArray(r.tags),
       moon_phase: nullableStr(r.moon_phase),
-      mood: nullableStr(r.mood),
       paradigm_id: nullableStr(r.paradigm_id),
       linked_operation_ids: jsonArray(r.linked_operation_ids),
       linked_wiki_ids: jsonArray(r.linked_wiki_ids),
@@ -148,12 +147,10 @@ export const fromRow = {
     return {
       id: str(r.id),
       title: str(r.title),
-      description: str(r.description),
       category_id: nullableStr(r.category_id),
       priority: (['low', 'medium', 'high'] as const).includes(r.priority as 'low')
         ? (r.priority as Task['priority'])
         : 'medium',
-      due_date: nullableStr(r.due_date),
       completed: bool(r.completed),
       completed_at: nullableStr(r.completed_at),
       parent_task_id: nullableStr(r.parent_task_id),
@@ -182,7 +179,6 @@ export const fromRow = {
       id: str(r.id),
       name: str(r.name),
       icon: str(r.icon) || DEFAULT_DEFINITION_ICON,
-      description: str(r.description),
       elements: parseDefinitionElements(r.elements),
       display: parseDefinitionDisplay(r.display),
       revision: Math.max(1, Math.trunc(num(r.revision, 1))),
@@ -199,7 +195,6 @@ export const fromRow = {
       id: str(r.id),
       name: str(r.name),
       icon: str(r.icon) || DEFAULT_TEMPLATE_ICON,
-      description: str(r.description),
       title: str(r.title),
       content: str(r.content),
       tags: jsonArray<unknown>(r.tags).filter((t): t is string => typeof t === 'string'),
@@ -242,7 +237,6 @@ export const fromRow = {
     return {
       id: str(r.id),
       title: str(r.title),
-      intention: str(r.intention),
       background_preset: str(r.background_preset),
       background_image_data: nullableStr(r.background_image_data),
       background_overlay: num(r.background_overlay, 0.2),

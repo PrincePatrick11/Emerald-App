@@ -69,7 +69,6 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       updated_at: now,
       tags: start.tags,
       moon_phase: moonPhase,
-      mood: null,
       paradigm_id: null,
       linked_operation_ids: [],
       linked_wiki_ids: [],
@@ -81,8 +80,8 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       deleted_at: null,
     };
     await db.execute(
-      `INSERT INTO journal_entries (id, title, content, created_at, updated_at, tags, moon_phase, mood, entry_number)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      `INSERT INTO journal_entries (id, title, content, created_at, updated_at, tags, moon_phase, entry_number)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         entry.id,
         entry.title,
@@ -91,7 +90,6 @@ export const useJournalStore = create<JournalState>((set, get) => ({
         entry.updated_at,
         JSON.stringify(entry.tags),
         entry.moon_phase,
-        entry.mood,
         entryNumber,
       ]
     );
@@ -104,7 +102,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
    * Kopiert alle Inhaltsfelder des Quelleintrags; nur Identität und Zeitstempel
    * bleiben beim neuen Eintrag. Die Aufrufer haben die Feldliste früher jeweils
    * selbst aufgezählt — ein neues Feld fehlte dann still an einzelnen Stellen
-   * (so ist `mood` beim Duplizieren verloren gegangen).
+   * (so ist ein Feld beim Duplizieren verloren gegangen).
    */
   duplicateEntry: async (id) => {
     const src = get().entries.find((e) => e.id === id);
@@ -131,16 +129,15 @@ export const useJournalStore = create<JournalState>((set, get) => ({
 
     await db.execute(
       `UPDATE journal_entries
-       SET title=$1, content=$2, updated_at=$3, tags=$4, moon_phase=$5, mood=$6, paradigm_id=$7, linked_operation_ids=$8, linked_wiki_ids=$9,
-           is_bannung=$10, bannung_type_wiki_id=$11, is_meditation=$12, meditation_duration=$13, meditation_type_wiki_id=$14
-       WHERE id=$15`,
+       SET title=$1, content=$2, updated_at=$3, tags=$4, moon_phase=$5, paradigm_id=$6, linked_operation_ids=$7, linked_wiki_ids=$8,
+           is_bannung=$9, bannung_type_wiki_id=$10, is_meditation=$11, meditation_duration=$12, meditation_type_wiki_id=$13
+       WHERE id=$14`,
       [
         merged.title,
         merged.content,
         merged.updated_at,
         JSON.stringify(merged.tags),
         merged.moon_phase,
-        merged.mood,
         merged.paradigm_id ?? null,
         JSON.stringify(merged.linked_operation_ids ?? []),
         JSON.stringify(merged.linked_wiki_ids ?? []),

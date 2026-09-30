@@ -22,7 +22,7 @@ import {
   DEFAULT_DEFINITION_DISPLAY, DEFAULT_DEFINITION_ICON, sameShape, type BlockDefinition,
 } from '../lib/blocks/definitions';
 
-export type BlockDefinitionPatch = Partial<Pick<BlockDefinition, 'name' | 'icon' | 'description' | 'elements' | 'display'>>;
+export type BlockDefinitionPatch = Partial<Pick<BlockDefinition, 'name' | 'icon' | 'elements' | 'display'>>;
 
 interface BlockDefinitionState {
   /** Aktive Definitionen in Anzeigereihenfolge. */
@@ -67,7 +67,6 @@ export const useBlockDefinitionStore = create<BlockDefinitionState>((set, get) =
       id: generateId(),
       name: name.trim(),
       icon: DEFAULT_DEFINITION_ICON,
-      description: '',
       elements: [],
       display: DEFAULT_DEFINITION_DISPLAY,
       revision: 1,
@@ -95,10 +94,10 @@ export const useBlockDefinitionStore = create<BlockDefinitionState>((set, get) =
     const db = await getDb();
     await db.execute(
       `UPDATE block_definitions
-          SET name=$1, icon=$2, description=$3, elements=$4, display=$5, revision=$6, updated_at=$7
-        WHERE id=$8`,
+          SET name=$1, icon=$2, elements=$3, display=$4, revision=$5, updated_at=$6
+        WHERE id=$7`,
       [
-        updated.name, updated.icon, updated.description, JSON.stringify(updated.elements),
+        updated.name, updated.icon, JSON.stringify(updated.elements),
         JSON.stringify(updated.display), updated.revision, updated.updated_at, id,
       ]
     );

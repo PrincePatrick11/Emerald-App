@@ -98,7 +98,7 @@ Library tiles use a compact fixed footprint (**70×85 px**) to keep more items v
 
 Locked placements are click-through on the canvas (pointer events disabled), so interactions pass to items behind them.
 
-**Inspector and placement controls.** The right sidebar includes a placed-elements list and an inline inspector rendered directly under the selected row. The inspector shows a compact 4-column grid of `x (%)`, `y (%)`, `rot (°)`, `scale (%)`, plus a jade-styled opacity slider. Layer order is controlled by dragging rows in the list (see below); Z-order buttons are not shown in the inspector. The delete button is in the placed-element row, not the inspector.
+**Inspector and placement controls.** The right sidebar includes a placed-elements list and an inline inspector rendered directly under the selected row. The inspector shows a compact 4-column grid of `x (%)`, `y (%)`, `rot (°)`, `scale (%)`, plus a jade-styled opacity slider. Layer order is controlled by dragging rows in the list (see below); Z-order buttons are not shown in the inspector. The delete button is in the placed-element row, not the inspector; it removes the element without a question, and the toast that follows puts it back.
 
 **Duplicate.** In edit mode, each placed-element row has a Duplicate button (copy icon). Duplicating a placement creates a copy with identical size, rotation, and opacity, offset +2% in both axes, placed on top of all other elements, unlocked, visible, and immediately selected. The same action is available via right-click on any row.
 
@@ -137,7 +137,7 @@ The grid is rendered as an SVG overlay directly in the canvas, with lines placed
 
 The grid is also visible in exported images and captured thumbnails — the same grid settings (`grid_enabled`, `grid_size`, `grid_color`, `grid_opacity`) are applied by the Canvas 2D renderer that produces thumbnails and the altar image export (Export → Export as Image).
 
-**Multiple altars.** You can create several named altars and switch between them. Each altar has its own title, intention text, background, and set of placements.
+**Multiple altars.** You can create several named altars and switch between them. Each altar has its own title, background, and set of placements.
 
 **Backgrounds.** A **Gradient** background type — pick one of 7 preset swatch colours or any custom colour via a colour wheel, opened from a small modal — plus 16 photographic image presets, and the option to upload a custom background image. The four original named presets (Midnight, Ember, Forest, Moon) are no longer offered as a picker in the sidebar; they are kept only so altars saved before the gradient picker was introduced keep rendering their original colour.
 
@@ -151,8 +151,6 @@ Custom backgrounds are persisted as file-backed image paths (legacy inline data 
 - *Dark / Light toggle* — switches the overlay color between a dark gradient (`rgba(10,10,15,…)`, the default) and a light gradient (`rgba(255,255,255,…)`). Stored per altar in `background_overlay_color` (values: `'dark'` or `'light'`).
 
 The overlay is applied on top of all background types — colour presets, gradient presets, photographic image presets, and custom background images.
-
-**Intention.** A text field on each altar records your intention or purpose for that setup.
 
 **View mode and full-window mode.** Full-window altar mode is only available in view mode. Entering edit mode exits full-window mode automatically. Pressing **Escape** while in full-window mode also exits it. Grid controls and all edit panels are hidden in read/view mode. The fullscreen toggle is accessible both in the altar header and in the sidebar summary. In the header: the Exit Fullscreen (Minimize2) button is always visible while fullscreen is active — regardless of whether the sidebar is open — and the Enter Fullscreen (Maximize2) button appears only when not in fullscreen and the sidebar is closed.
 
@@ -274,7 +272,7 @@ From here you can:
 
 - **Add** a category with the button in the header — pick an emoji, type a name, Enter saves. A name already in use is refused with a message under the field; the name of a category in the Trash brings that one back instead (with the emoji you picked), together with the entries still in it.
 - **Rename and change the emoji** inline, with the pencil on the row. Enter saves, Escape cancels. The change shows up immediately everywhere the category appears.
-- **Delete** with a two-step confirmation on the row, undoable from the toast that follows. A deleted category goes to the Trash; its entries keep pointing at it and appear under "Uncategorized" in their module until it is restored (which brings them back with it) or deleted permanently (which leaves them uncategorized). If another category took its name in the meantime, restoring merges the two: its entries move into the one that has the name.
+- **Delete** without a question, like every delete that has a trash to land in, undoable from the toast that follows. A deleted category goes to the Trash; its entries keep pointing at it and appear under "Uncategorized" in their module until it is restored (which brings them back with it) or deleted permanently (which leaves them uncategorized). If another category took its name in the meantime, restoring merges the two: its entries move into the one that has the name.
 - **Reorder** by dragging a row by its grip. This is the order categories appear in everywhere — group headers, filter rows, the Altar tab strip, the category picker — and it is saved immediately.
 
 **Sigils** is the one built-in: it has no rename or delete button, since its name comes from the app's own translations rather than the stored row, and an operation inside it opens the sigil editor. It can still be dragged. Everything else, including the **Other** that older vaults carry, is an ordinary category you can rename or delete. New categories go to the end of the list.
@@ -405,7 +403,7 @@ The file structure:
   "type": "journal | wiki | operations | altar",
   "title": "…",
   "createdAt": "ISO 8601",
-  "content": "HTML string (intention text for altars)",
+  "content": "HTML string (empty for altars)",
   "images": { "/absolute/path/to/image.png": "data:image/png;base64,…" },
   "meta": { … }
 }
@@ -415,7 +413,7 @@ For `journal` / `wiki` / `operations`, on import image data-URLs are re-saved in
 
 An entry that holds copies of Blocks-view blocks is written as `"version": "2"`, with `meta.blockDefinitions` carrying those blocks; every other entry (and every altar) stays `"1"`, so older app versions keep accepting it. Importing creates any that are missing, under their original id, so the copies are recognised and can be updated; an existing one (even in the trash) is left as it is. The copies themselves need nothing from it — they render from the entry's own content. Version `"1"` files still import.
 
-**A single template can also be exported and imported this way**, as `"version": "3"`, `"type": "template"` — the one version/type combination reserved exclusively for a template, so an older app rejects the file outright rather than mistaking it for an operation. Opening a template's own page enables the same **Export → Export as Emerald…** menu item entries do (the templates dashboard's list also offers it from a template's context menu), and it carries the template's blocks, images, and any Blocks-view blocks it uses exactly like an entry's export does, plus its icon, description, the title new entries get, its tags, and its assignments. A built-in category in an assignment travels by id, since its name depends on the importing vault's language; any other category travels by name and emoji, created on import if nothing matching exists (up to 20 new categories per file, so a crafted file can't flood the category list). Which template is a *default* never travels — importing never displaces a default the target vault already has.
+**A single template can also be exported and imported this way**, as `"version": "3"`, `"type": "template"` — the one version/type combination reserved exclusively for a template, so an older app rejects the file outright rather than mistaking it for an operation. Opening a template's own page enables the same **Export → Export as Emerald…** menu item entries do (the templates dashboard's list also offers it from a template's context menu), and it carries the template's blocks, images, and any Blocks-view blocks it uses exactly like an entry's export does, plus its icon, the title new entries get, its tags, and its assignments. A built-in category in an assignment travels by id, since its name depends on the importing vault's language; any other category travels by name and emoji, created on import if nothing matching exists (up to 20 new categories per file, so a crafted file can't flood the category list). Which template is a *default* never travels — importing never displaces a default the target vault already has.
 
 For `altar`, `meta` carries the background preset/image/overlay, grid and snapping settings, resolution, the categories used by the placed items (name + emoji), and the full list of placed items (each with name, emoji, category, note, optional image, and placement geometry — position, size, rotation, opacity, z-index, locked/hidden). Only the background image is a local file path in the database, so it alone is round-tripped through `images` like content images; the icon, thumbnail, and every item image are already inline `data:` URLs in the database and are embedded directly.
 

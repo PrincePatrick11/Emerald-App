@@ -124,9 +124,6 @@ export const AltarCard = memo(function AltarCard({
       <div className="mt-2 flex flex-wrap gap-2 text-xs">
         <span className="text-parchment-500/70">{formatEntryDate(altar.updated_at)}</span>
       </div>
-      {altar.intention && (
-        <p className="mt-2 max-h-8 overflow-hidden text-xs leading-4 text-stone-500">{altar.intention}</p>
-      )}
     </DashboardItem>
   );
 });

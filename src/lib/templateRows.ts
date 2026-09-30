@@ -24,10 +24,10 @@ export async function insertTemplateRow(db: Database, template: Template): Promi
   const row = templateToRow(template);
   await db.execute(
     `INSERT INTO templates
-       (id, name, icon, description, title, content, tags, assignments, sort_order, created_at, updated_at, deleted_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+       (id, name, icon, title, content, tags, assignments, sort_order, created_at, updated_at, deleted_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
     [
-      row.id, row.name, row.icon, row.description, row.title, row.content, row.tags, row.assignments,
+      row.id, row.name, row.icon, row.title, row.content, row.tags, row.assignments,
       row.sort_order, row.created_at, row.updated_at, row.deleted_at,
     ]
   );
@@ -49,7 +49,6 @@ function sigilTemplate(t: TFunction, now: string, sortOrder: number): Omit<Templ
     id: SIGIL_TEMPLATE_ID,
     name: translatedOr(t, 'templates.builtin.sigil', 'Sigil'),
     icon: '🔯',
-    description: '',
     title: '',
     content: serializeBlocks(sigilBlockSet()),
     tags: [],

@@ -164,7 +164,7 @@ Since v40: the user-built blocks of the Blocks view. A row is only the template 
 | id | TEXT PK | UUID; copies name it in `data-block-origin`, which is why imports keep it |
 | name | TEXT | NOT NULL |
 | icon | TEXT | emoji, NOT NULL DEFAULT `'🧩'` |
-| description | TEXT | NOT NULL DEFAULT `''`; not passed on to copies |
+| description | TEXT | NOT NULL DEFAULT `''`; unused — nothing reads or writes it; kept for older backups |
 | elements | TEXT | JSON array of `ElementDef` (`id`, `kind`, `label`, `options`, `hideWhenEmpty`, `archived`, `defaultValue`, plus `calcMode` for a `sigilCalc` element and `brushColor`/`brushSize` for a `sigilCanvas` one), NOT NULL DEFAULT `'[]'`; read through the same validation as a copy in content |
 | display | TEXT | JSON `{ readHideEmpty, readOnly, showTitle }`, NOT NULL DEFAULT `'{}'` (missing keys fall back to their defaults) |
 | revision | INTEGER | NOT NULL DEFAULT 1; rises with every save that changes name, icon, elements or display — a copy with a lower `data-block-rev` is "an older version" |
@@ -189,7 +189,7 @@ references an entry and deleting a row touches none.
 | id | TEXT PK | UUID (or `'core-sigil'` for the one built-in) |
 | name | TEXT | NOT NULL |
 | icon | TEXT | emoji or image, NOT NULL DEFAULT `'📄'` |
-| description | TEXT | NOT NULL DEFAULT `''` |
+| description | TEXT | NOT NULL DEFAULT `''`; unused — nothing reads or writes it; kept for older backups |
 | title | TEXT | NOT NULL DEFAULT `''`; the title a new entry gets — empty falls back to the entry type's own "Untitled …" |
 | content | TEXT | NOT NULL DEFAULT `''`; a block stack, same format as an entry's `content` |
 | tags | TEXT | JSON array, NOT NULL DEFAULT `'[]'` |
@@ -264,7 +264,7 @@ The whole rule lives in `src/lib/lexicon.ts` — see
 |---|---|---|
 | id | TEXT PK | UUID |
 | title | TEXT | default `'Untitled Altar'` |
-| intention | TEXT | NOT NULL DEFAULT `''` |
+| intention | TEXT | NOT NULL DEFAULT `''`; unused — nothing reads or writes it since the field without an input was removed; kept for older backups |
 | background_preset | TEXT | default `'midnight'` |
 | background_image_data | TEXT | despite the name, holds the **bare filename** of a stored image, not base64 (migration v35 reduced old paths/data URLs to filenames) |
 | background_overlay | REAL | NOT NULL DEFAULT 0.2 |
@@ -292,7 +292,7 @@ Numeric grid defaults must stay in sync with `DEFAULT_GRID_*` in `altarConstants
 | content | TEXT | NOT NULL DEFAULT `''`; HTML produced by TipTap |
 | entry_number | INTEGER | stable per row — see Key Conventions |
 | moon_phase | TEXT | one of the eight `MoonPhase` keys, or NULL |
-| mood | TEXT | unused; reserved |
+| mood | TEXT | unused — nothing reads or writes it; kept for older backups |
 | paradigm_id | TEXT | wiki article id, no FK (optional); legacy — see note below |
 | linked_operation_ids | TEXT | JSON array, NOT NULL DEFAULT `'[]'`; legacy — see note below |
 | linked_wiki_ids | TEXT | JSON array, NOT NULL DEFAULT `'[]'`; legacy — see note below |
@@ -367,11 +367,11 @@ Until v33 this column was called `category` and held the category **name** — t
 |---|---|---|
 | id | TEXT PK | UUID |
 | title | TEXT | default `'Untitled Task'` |
-| description | TEXT | |
+| description | TEXT | unused — nothing reads or writes it (no input ever existed); kept for older backups |
 | category_id | TEXT | nullable **FK → categories.id**, RESTRICT; `NULL` = no category (the default for a new entry since v39) |
 | parent_task_id | TEXT | **FK → tasks.id**, SET NULL |
 | priority | TEXT | `'low'` \| `'medium'` \| `'high'`, default `'medium'` |
-| due_date | TEXT | date-only `YYYY-MM-DD` |
+| due_date | TEXT | unused — nothing reads or writes it (no input ever existed); kept for older backups |
 | completed | INTEGER | boolean 0/1 |
 | completed_at | TEXT | ISO 8601 |
 | sort_order | INTEGER | NOT NULL DEFAULT 0 |
@@ -431,7 +431,7 @@ The `deleted_at` indexes matter because `runPeriodicCleanup` runs a range scan a
 
 **entry_number.** A stable, compact, human-readable number, shown in the link picker as `#12`. Migration v9 backfilled it once from `ROWID`. Until v33, no insert ever wrote the column — the stores masked that by selecting `ROWID as entry_number` and overlaying the persisted value, which meant a replace-import that reassigned ROWIDs shifted every displayed number. The alias is gone; `nextEntryNumber(db, table)` in `db.ts` assigns the number at insert time, and v33 backfills the rows that never had one.
 
-**Timestamps.** ISO 8601 text produced by `nowIso()`, sorted and compared lexicographically. `due_date`, the legacy `end_date`, and `target_reveal_date` are the exception: they come from `<input type="date">` and are date-only `YYYY-MM-DD`.
+**Timestamps.** ISO 8601 text produced by `nowIso()`, sorted and compared lexicographically. The legacy `due_date`, `end_date` and `target_reveal_date` are the exception: they come from `<input type="date">` and are date-only `YYYY-MM-DD`.
 
 **`updated_at` means "last changed by you".** It moves only when someone changes that very row. The store update methods (`updateEntry`, `updateArticle`, `updateOperation`, `updateTask`, `updateTemplate`, `updateAltar`) take `{ touch }` from `src/lib/stamp.ts`: `true` (the default) stamps now; `false` keeps the stamp for writes that are a consequence of something elsewhere (renaming, deleting or restoring a tag, "Update all"/"Remove from all" for a block, a new altar thumbnail); a timestamp sets exactly that one (Cancel puts back the stamp from before editing). A patch that changes nothing is not written at all (`needsWrite`), so Done without changes or an autosave onto the same state leaves the stamp alone. Checking a checklist item in read mode is a change to the entry and does stamp.
 

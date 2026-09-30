@@ -32,8 +32,8 @@ function filterEachPreview(
 async function insertAltarRow(altar: AltarRecord): Promise<void> {
   const db = await getDb();
   await db.execute(
-    'INSERT INTO altars (id, title, intention, background_preset, background_image_data, background_overlay, background_overlay_color, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid, resolution, thumbnail_data, icon_data) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)',
-    [altar.id, altar.title, altar.intention, altar.background_preset, altar.background_image_data, altar.background_overlay, altar.background_overlay_color, altar.created_at, altar.updated_at, toInt(altar.grid_enabled), altar.grid_size, altar.grid_opacity, altar.grid_color, toInt(altar.snap_to_grid), toInt(altar.rotation_snap_enabled), altar.rotation_snap_angle, toInt(altar.snap_scale_to_grid), altar.resolution, altar.thumbnail_data ?? null, altar.icon_data ?? null],
+    'INSERT INTO altars (id, title, background_preset, background_image_data, background_overlay, background_overlay_color, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid, resolution, thumbnail_data, icon_data) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)',
+    [altar.id, altar.title, altar.background_preset, altar.background_image_data, altar.background_overlay, altar.background_overlay_color, altar.created_at, altar.updated_at, toInt(altar.grid_enabled), altar.grid_size, altar.grid_opacity, altar.grid_color, toInt(altar.snap_to_grid), toInt(altar.rotation_snap_enabled), altar.rotation_snap_angle, toInt(altar.snap_scale_to_grid), altar.resolution, altar.thumbnail_data ?? null, altar.icon_data ?? null],
   );
 }
 
@@ -115,14 +115,13 @@ interface AltarState {
   placements: AltarPlacement[];
   selectedPlacementId: string | null;
   previewPlacements: Record<string, AltarPlacement[]>;
-  intention: string;
 
   fetchAltars: () => Promise<void>;
   setActiveAltar: (id: string) => Promise<void>;
   clearActiveAltar: () => void;
   createAltar: () => Promise<AltarRecord>;
   duplicateAltar: (id: string) => Promise<AltarRecord | null>;
-  updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'intention' | 'background_preset' | 'background_image_data' | 'background_overlay' | 'background_overlay_color' | 'thumbnail_data' | 'icon_data'>>, options?: WriteOptions) => Promise<void>;
+  updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'background_preset' | 'background_image_data' | 'background_overlay' | 'background_overlay_color' | 'thumbnail_data' | 'icon_data'>>, options?: WriteOptions) => Promise<void>;
   updateAltarGrid: (id: string, patch: Partial<Pick<AltarRecord, 'grid_enabled' | 'grid_size' | 'grid_opacity' | 'grid_color' | 'snap_to_grid' | 'rotation_snap_enabled' | 'rotation_snap_angle' | 'snap_scale_to_grid'>>) => Promise<void>;
   updateAltarResolution: (id: string, resolution: string) => Promise<void>;
   bumpAltarUpdatedAt: (id: string) => Promise<void>;
@@ -153,8 +152,6 @@ interface AltarState {
   removePlacement: (id: string) => Promise<AltarPlacement | undefined>;
   /** Legt eine entfernte Platzierung wieder hin, wie sie war — sofern Altar und Element noch da sind. */
   restorePlacement: (placement: AltarPlacement) => Promise<void>;
-  saveIntention: (text: string) => Promise<void>;
-  setIntentionLocal: (text: string) => void;
 }
 
 /** Der Store ohne den Altar `id` — in den Papierkorb gelegt oder endgültig gelöscht. */
@@ -163,7 +160,7 @@ function withoutAltar(s: AltarState, id: string): Partial<AltarState> {
   return {
     altars: s.altars.filter((altar) => altar.id !== id),
     previewPlacements,
-    ...(s.activeAltarId === id ? { activeAltarId: null, placements: [], selectedPlacementId: null, intention: '' } : {}),
+    ...(s.activeAltarId === id ? { activeAltarId: null, placements: [], selectedPlacementId: null } : {}),
   };
 }
 
@@ -174,7 +171,6 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   placements: [],
   selectedPlacementId: null,
   previewPlacements: {},
-  intention: '',
 
   fetchAltars: async () => {
     const db = await getDb();
@@ -212,7 +208,6 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       placements,
       selectedPlacementId: null,
       previewPlacements,
-      intention: activeAltar?.intention ?? '',
     });
   },
 
@@ -221,11 +216,11 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const active = altars.find((altar) => altar.id === id);
     if (!active) return;
     const placements = await fetchPlacementsForAltar(id, items);
-    set({ activeAltarId: id, placements, selectedPlacementId: null, intention: active.intention });
+    set({ activeAltarId: id, placements, selectedPlacementId: null });
   },
 
   clearActiveAltar: () => {
-    set({ activeAltarId: null, placements: [], selectedPlacementId: null, intention: '' });
+    set({ activeAltarId: null, placements: [], selectedPlacementId: null });
   },
 
   createAltar: async () => {
@@ -233,7 +228,6 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const altar: AltarRecord = {
       id: generateId(),
       title: 'Untitled Altar',
-      intention: '',
       background_preset: DEFAULT_ALTAR_BACKGROUND,
       background_image_data: null,
       background_overlay: DEFAULT_BACKGROUND_OVERLAY,
@@ -258,7 +252,6 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       selectedPlacementId: null,
       // Auch leer ein Eintrag: wer die Platzierungen eines Altars dort sucht, soll ihn finden.
       previewPlacements: { ...s.previewPlacements, [altar.id]: [] },
-      intention: '',
     }));
     return altar;
   },
@@ -272,7 +265,6 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const copy: AltarRecord = {
       id: newId,
       title: source.title + i18n.t('common.copySuffix'),
-      intention: source.intention,
       background_preset: source.background_preset || DEFAULT_ALTAR_BACKGROUND,
       background_image_data: source.background_image_data ?? null,
       background_overlay: source.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY,
@@ -340,15 +332,15 @@ export const useAltarStore = create<AltarState>((set, get) => ({
 
   // serialized (grid/resolution share the key): see lib/serialize.ts. The most
   // realistic collision here is the automatic thumbnail save, which goes
-  // through updateAltar and would overlap with an intention autosave.
+  // through updateAltar and would overlap with a title save.
   updateAltar: (id, patch, { touch } = {}) => serialized(serialKey('altar', id), async () => {
     const altar = get().altars.find((entry) => entry.id === id);
     if (!altar || !needsWrite(altar, patch, touch)) return;
     const db = await getDb();
     const updated: AltarRecord = { ...altar, ...patch, updated_at: stampFor(altar.updated_at, touch) };
     await db.execute(
-      'UPDATE altars SET title=$1, intention=$2, background_preset=$3, background_image_data=$4, background_overlay=$5, background_overlay_color=$6, updated_at=$7, thumbnail_data=$8, icon_data=$9 WHERE id=$10',
-      [updated.title, updated.intention, updated.background_preset || DEFAULT_ALTAR_BACKGROUND, updated.background_image_data ?? null, updated.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY, updated.background_overlay_color ?? DEFAULT_OVERLAY_COLOR, updated.updated_at, updated.thumbnail_data ?? null, updated.icon_data ?? null, id]
+      'UPDATE altars SET title=$1, background_preset=$2, background_image_data=$3, background_overlay=$4, background_overlay_color=$5, updated_at=$6, thumbnail_data=$7, icon_data=$8 WHERE id=$9',
+      [updated.title, updated.background_preset || DEFAULT_ALTAR_BACKGROUND, updated.background_image_data ?? null, updated.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY, updated.background_overlay_color ?? DEFAULT_OVERLAY_COLOR, updated.updated_at, updated.thumbnail_data ?? null, updated.icon_data ?? null, id]
     );
     set((s) => {
       const cur = s.altars.find(e => e.id === id);
@@ -356,7 +348,6 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       const next = { ...cur, ...patch, updated_at: updated.updated_at };
       return {
         altars: s.altars.map(e => e.id === id ? next : e).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
-        intention: s.activeAltarId === id ? next.intention : s.intention,
       };
     });
   }),
@@ -450,13 +441,13 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     if (!get().altars.some((entry) => entry.id === altar.id)) return;
     await db.execute(
       `UPDATE altars SET
-        title=$1, intention=$2, background_preset=$3, background_image_data=$4, background_overlay=$5,
-        background_overlay_color=$6, grid_enabled=$7, grid_size=$8, grid_opacity=$9, grid_color=$10,
-        snap_to_grid=$11, rotation_snap_enabled=$12, rotation_snap_angle=$13, snap_scale_to_grid=$14,
-        resolution=$15, thumbnail_data=$16, icon_data=$17, updated_at=$18
-       WHERE id=$19`,
+        title=$1, background_preset=$2, background_image_data=$3, background_overlay=$4,
+        background_overlay_color=$5, grid_enabled=$6, grid_size=$7, grid_opacity=$8, grid_color=$9,
+        snap_to_grid=$10, rotation_snap_enabled=$11, rotation_snap_angle=$12, snap_scale_to_grid=$13,
+        resolution=$14, thumbnail_data=$15, icon_data=$16, updated_at=$17
+       WHERE id=$18`,
       [
-        altar.title, altar.intention, altar.background_preset || DEFAULT_ALTAR_BACKGROUND, altar.background_image_data ?? null,
+        altar.title, altar.background_preset || DEFAULT_ALTAR_BACKGROUND, altar.background_image_data ?? null,
         altar.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY, altar.background_overlay_color ?? DEFAULT_OVERLAY_COLOR,
         toInt(altar.grid_enabled), altar.grid_size, altar.grid_opacity, altar.grid_color,
         toInt(altar.snap_to_grid), toInt(altar.rotation_snap_enabled), altar.rotation_snap_angle, toInt(altar.snap_scale_to_grid),
@@ -503,7 +494,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
         .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
       previewPlacements: { ...s.previewPlacements, [altar.id]: restored },
       ...(s.activeAltarId === altar.id
-        ? { placements: restored, selectedPlacementId: null, intention: altar.intention }
+        ? { placements: restored, selectedPlacementId: null }
         : {}),
     }));
   }),
@@ -730,12 +721,4 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     }));
     await get().bumpAltarUpdatedAt(altarId);
   },
-
-  saveIntention: async (text) => {
-    const activeAltarId = get().activeAltarId;
-    if (!activeAltarId) return;
-    await get().updateAltar(activeAltarId, { intention: text });
-  },
-
-  setIntentionLocal: (text) => set({ intention: text }),
 }));

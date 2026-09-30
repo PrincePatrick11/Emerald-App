@@ -305,10 +305,7 @@ export default function AltarView() {
 
   if (!activeAltar) {
     const filtered = search
-      ? altars.filter((altar) =>
-          altar.title.toLowerCase().includes(search.toLowerCase()) ||
-          altar.intention.toLowerCase().includes(search.toLowerCase())
-        )
+      ? altars.filter((altar) => altar.title.toLowerCase().includes(search.toLowerCase()))
       : altars;
 
     const sorted = sortItems(filtered, altarPrefs.sort, { date: (a) => a.updated_at });

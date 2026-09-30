@@ -10,7 +10,6 @@ export interface JournalEntry {
   updated_at: string;
   tags: string[];
   moon_phase: string | null;
-  mood: string | null;
   paradigm_id: string | null;
   linked_operation_ids: string[] | null;
   linked_wiki_ids: string[] | null;
@@ -98,7 +97,6 @@ export type MoonPhase =
 export interface AltarRecord {
   id: string;
   title: string;
-  intention: string;
   background_preset: string;
   background_image_data: string | null;
   background_overlay: number;
@@ -167,11 +165,9 @@ export interface TaskLink {
 export interface Task {
   id: string;
   title: string;
-  description: string;
   /** `null` = ohne Kategorie, seit v39 der Normalfall eines neuen Eintrags. */
   category_id: string | null;
   priority: TaskPriority;
-  due_date: string | null;
   completed: boolean;
   completed_at: string | null;
   parent_task_id: string | null;

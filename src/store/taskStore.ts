@@ -65,14 +65,14 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const now = nowIso();
 
     await db.execute(
-      `INSERT INTO tasks (id, title, description, category_id, priority, due_date, completed, completed_at, parent_task_id, sort_order, created_at, updated_at, tags, deleted_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
-      [id, 'New Task', '', categoryId, 'medium', null, 0, null, parentTaskId, 0, now, now, '[]', null]
+      `INSERT INTO tasks (id, title, category_id, priority, completed, completed_at, parent_task_id, sort_order, created_at, updated_at, tags, deleted_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+      [id, 'New Task', categoryId, 'medium', 0, null, parentTaskId, 0, now, now, '[]', null]
     );
 
     const newTask: Task = {
-      id, title: 'New Task', description: '', category_id: categoryId,
-      priority: 'medium', due_date: null, completed: false, completed_at: null,
+      id, title: 'New Task', category_id: categoryId,
+      priority: 'medium', completed: false, completed_at: null,
       parent_task_id: parentTaskId, sort_order: 0, created_at: now, updated_at: now,
       tags: [], deleted_at: null,
     };
@@ -93,13 +93,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
     await db.execute(
       `UPDATE tasks SET
-        title=$1, description=$2, category_id=$3, priority=$4, due_date=$5,
-        completed=$6, completed_at=$7, parent_task_id=$8, sort_order=$9,
-        updated_at=$10, tags=$11
-       WHERE id=$12`,
+        title=$1, category_id=$2, priority=$3,
+        completed=$4, completed_at=$5, parent_task_id=$6, sort_order=$7,
+        updated_at=$8, tags=$9
+       WHERE id=$10`,
       [
-        merged.title, merged.description, merged.category_id, merged.priority,
-        merged.due_date ?? null, toInt(merged.completed),
+        merged.title, merged.category_id, merged.priority,
+        toInt(merged.completed),
         merged.completed_at ?? null, merged.parent_task_id ?? null,
         merged.sort_order, merged.updated_at, JSON.stringify(merged.tags), id,
       ]

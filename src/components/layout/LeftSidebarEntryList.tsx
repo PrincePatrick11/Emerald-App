@@ -401,10 +401,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
     pushUndo({ id: generateId(), description: t('undo.taskDeleted'), undo: () => restoreTask(task.id) });
   };
 
-  const dateStrFor = (task: (typeof tasks)[number]) => {
-    const cat = lookupCategory(catById, task.category_id);
-    return `${cat?.name ?? ''}${cat?.name && task.due_date ? ' · ' : ''}${task.due_date ? formatEntryDate(task.due_date) : ''}`;
-  };
+  const dateStrFor = (task: (typeof tasks)[number]) => lookupCategory(catById, task.category_id)?.name ?? '';
 
   const sorted = tasks.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 

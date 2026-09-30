@@ -44,7 +44,6 @@ export interface Template {
   name: string;
   /** Emoji oder Bild (Data-URL), wie bei eigenen Blöcken. */
   icon: string;
-  description: string;
   /** Der Titel, den ein neuer Eintrag bekommt — leer = der Standardtitel des Typs. */
   title: string;
   /** Der Blockstapel, im selben Format wie der Inhalt eines Eintrags. */
