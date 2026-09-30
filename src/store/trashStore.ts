@@ -8,7 +8,7 @@ import { definitionLabel, templateLabel } from '../lib/blocks/blockAttrs';
 import { iconTitle } from '../lib/helpers';
 import i18n from '../i18n';
 import { displayTitle } from '../lib/entryTitle';
-import type { TrashedItem } from '../types';
+import type { EntryType, TrashedItem } from '../types';
 
 interface TrashState {
   items: TrashedItem[];
@@ -28,17 +28,14 @@ export const useTrashStore = create<TrashState>((set, get) => ({
     set({ loading: true });
     try {
       const db = await getDb();
-      const journal = await db.select<{ id: string; title: string; deleted_at: string }[]>(
-        `SELECT id, title, deleted_at FROM journal_entries WHERE deleted_at IS NOT NULL`
-      );
-      const wiki = await db.select<{ id: string; title: string; deleted_at: string; category: string | null }[]>(
-        `SELECT w.id, w.title, w.deleted_at, c.name as category FROM wiki_articles w LEFT JOIN categories c ON w.category_id = c.id WHERE w.deleted_at IS NOT NULL`
+      // Journal, Wiki und Operationen in einer Abfrage — die Kategorie haben nur die beiden letzten.
+      const entries = await db.select<{ id: string; type: EntryType; title: string; deleted_at: string; category: string | null }[]>(
+        `SELECT e.id, e.type, e.title, e.deleted_at, c.name as category
+           FROM entries e LEFT JOIN categories c ON e.category_id = c.id
+          WHERE e.deleted_at IS NOT NULL`
       );
       const tags = await db.select<{ id: string; name: string; deleted_at: string }[]>(
         `SELECT id, name, deleted_at FROM tags WHERE deleted_at IS NOT NULL`
-      );
-      const operations = await db.select<{ id: string; title: string; deleted_at: string; category: string | null }[]>(
-        `SELECT o.id, o.title, o.deleted_at, c.name as category FROM operations o LEFT JOIN categories c ON o.category_id = c.id WHERE o.deleted_at IS NOT NULL`
       );
       const categories = await db.select<{ id: string; name: string; emoji: string; deleted_at: string }[]>(
         `SELECT id, name, emoji, deleted_at FROM categories WHERE deleted_at IS NOT NULL`
@@ -59,10 +56,14 @@ export const useTrashStore = create<TrashState>((set, get) => ({
       );
       const items: TrashedItem[] = [
         // Ohne eigenen Titel „Unbenannt…", wie überall (`displayTitle`).
-        ...journal.map((r) => ({ ...r, title: displayTitle(i18n.t, 'journal', r.title), type: 'journal' as const })),
-        ...wiki.map((r) => ({ id: r.id, title: displayTitle(i18n.t, 'wiki', r.title), deleted_at: r.deleted_at, type: 'wiki' as const, category: r.category ?? undefined })),
+        ...entries.map((r) => ({
+          id: r.id,
+          title: displayTitle(i18n.t, r.type, r.title),
+          deleted_at: r.deleted_at,
+          type: r.type,
+          category: r.category ?? undefined,
+        })),
         ...tags.map((r) => ({ id: r.id, title: r.name, deleted_at: r.deleted_at, type: 'tag' as const })),
-        ...operations.map((r) => ({ ...r, title: displayTitle(i18n.t, 'operation', r.title), type: 'operation' as const, category: r.category ?? undefined })),
         ...categories.map((r) => ({ id: r.id, title: `${r.emoji} ${r.name}`, deleted_at: r.deleted_at, type: 'category' as const })),
         ...tasks.map((r) => ({ ...r, title: displayTitle(i18n.t, 'task', r.title), type: 'task' as const })),
         ...blockDefinitions.map((r) => ({
@@ -105,10 +106,8 @@ export const useTrashStore = create<TrashState>((set, get) => ({
 
   emptyTrash: async () => {
     const db = await getDb();
-    await db.execute(`DELETE FROM journal_entries WHERE deleted_at IS NOT NULL`);
-    await db.execute(`DELETE FROM wiki_articles WHERE deleted_at IS NOT NULL`);
+    await db.execute(`DELETE FROM entries WHERE deleted_at IS NOT NULL`);
     await db.execute(`DELETE FROM tags WHERE deleted_at IS NOT NULL`);
-    await db.execute(`DELETE FROM operations WHERE deleted_at IS NOT NULL`);
     await db.execute(`DELETE FROM task_links WHERE task_id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL)`);
     await db.execute(`DELETE FROM tasks WHERE deleted_at IS NOT NULL`);
     // Kopien in Einträgen kommen ohne ihre Definition aus — nichts nachzuziehen.

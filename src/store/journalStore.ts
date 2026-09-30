@@ -32,7 +32,7 @@ interface JournalState {
  */
 async function selectAllEntries(db: Database): Promise<JournalEntry[]> {
   const rows = await db.select<DbRow[]>(
-    'SELECT * FROM journal_entries WHERE deleted_at IS NULL ORDER BY created_at DESC'
+    "SELECT * FROM entries WHERE type = 'journal' AND deleted_at IS NULL ORDER BY created_at DESC"
   );
   return rows.map(fromRow.journalEntry);
 }
@@ -54,7 +54,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   createEntry: async ({ blank = false, createdAt } = {}) => {
     const db = await getDb();
     const now = nowIso();
-    const entryNumber = await nextEntryNumber(db, 'journal_entries');
+    const entryNumber = await nextEntryNumber(db, 'journal');
     const start = startOfNewEntry('journal', null, blank);
     const entry: JournalEntry = {
       entry_number: entryNumber,
@@ -67,8 +67,8 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       deleted_at: null,
     };
     await db.execute(
-      `INSERT INTO journal_entries (id, title, content, created_at, updated_at, tags, entry_number)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO entries (id, type, title, content, created_at, updated_at, tags, entry_number)
+       VALUES ($1, 'journal', $2, $3, $4, $5, $6, $7)`,
       [
         entry.id,
         entry.title,
@@ -115,7 +115,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     const merged = { ...entry, ...patch, updated_at: stampFor(entry.updated_at, touch) };
 
     await db.execute(
-      `UPDATE journal_entries
+      `UPDATE entries
        SET title=$1, content=$2, updated_at=$3, tags=$4
        WHERE id=$5`,
       [
@@ -136,7 +136,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     try {
       const now = nowIso();
       await db.execute(
-        'UPDATE journal_entries SET deleted_at=$1 WHERE id=$2',
+        'UPDATE entries SET deleted_at=$1 WHERE id=$2',
         [now, id]
       );
       set((s) => ({ entries: s.entries.filter((e) => e.id !== id) }));
@@ -149,7 +149,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   restoreEntry: async (id) => {
     const db = await getDb();
     await db.execute(
-      'UPDATE journal_entries SET deleted_at=NULL WHERE id=$1',
+      'UPDATE entries SET deleted_at=NULL WHERE id=$1',
       [id]
     );
     // Neu laden, damit der Eintrag wieder in der Liste auftaucht
@@ -158,7 +158,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
 
   permanentlyDeleteEntry: async (id) => {
     const db = await getDb();
-    await db.execute('DELETE FROM journal_entries WHERE id=$1', [id]);
+    await db.execute('DELETE FROM entries WHERE id=$1', [id]);
   },
 
   getEntry: (id) => get().entries.find((e) => e.id === id),

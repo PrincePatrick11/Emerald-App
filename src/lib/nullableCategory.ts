@@ -42,7 +42,9 @@ import type Database from '@tauri-apps/plugin-sql';
 import i18n, { savedAppLanguage } from '../i18n';
 // INDEX_DDL_V38, nicht INDEX_DDL: in der Kette fehlen hier noch die Tabellen
 // späterer Migrationen (`block_definitions` kommt mit v40).
-import { TABLE_DDL, INDEX_DDL_V38, FALLBACK_CATEGORY_ID } from './schema';
+import { INDEX_DDL_V38, FALLBACK_CATEGORY_ID } from './schema';
+// `wiki_articles`/`operations` in ihrer Form bis v48 — seit v49 stehen sie in `entries`.
+import { ddlBeforeV49 } from './schemaV48';
 import { categoryKey } from './categoryMerge';
 import {
   assertForeignKeysIntact,
@@ -167,7 +169,7 @@ export async function makeCategoryOptional(db: Database): Promise<void> {
         await db.execute(`ALTER TABLE ${table} RENAME TO ${table}_old`);
       }
       for (const table of REBUILT_PARENTS_FIRST) {
-        await db.execute(TABLE_DDL[table]);
+        await db.execute(ddlBeforeV49(table));
         // `tasks` samt `parent_task_id` in einem INSERT … SELECT: SQLite prüft
         // Foreign Keys am Ende der Anweisung, ein Kind darf im Ergebnis also vor
         // seinem Elternteil stehen (v33 und v38 kopieren genauso).

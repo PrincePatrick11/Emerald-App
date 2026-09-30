@@ -3,16 +3,17 @@
  *
  * Der Baseline-Pfad in `db.ts` führt es für frische Vaults direkt aus; die
  * Rebuild-Migrationen v33 (`normalizeSchema.ts`, gegen die eingefrorene Kopie
- * in `schemaV37.ts`) und v38 (`mergeCategoryTables.ts`, gegen dieses DDL)
- * bringen bestehende Vaults auf denselben Stand. `scripts/schema-check.mjs`
+ * in `schemaV37.ts`), v38/v39 (`mergeCategoryTables.ts`/`nullableCategory.ts`,
+ * gegen dieses DDL und `schemaV48.ts`) und v49 (`unifyEntries.ts`) bringen
+ * bestehende Vaults auf denselben Stand. `scripts/schema-check.mjs`
  * beweist, dass beide Wege beim identischen Schema landen — ohne diese Prüfung
  * produziert ein Baseline-Squash erfahrungsgemäß nach ein paar Releases zwei
  * verschiedene Schemata, und niemand merkt es.
  *
  * Wer eine Spalte ändern will, ändert sie hier — und schreibt zusätzlich eine
  * neue Migration, die dasselbe für bestehende Datenbanken tut. Baut die
- * Migration eine Tabelle neu, die v33 oder v38 ebenfalls anfassen, bekommen
- * die ihren alten Stand eingefroren (siehe `schemaV37.ts`).
+ * Migration eine Tabelle neu, die v33, v38 oder v39 ebenfalls anfassen, bekommen
+ * die ihren alten Stand eingefroren (siehe `schemaV37.ts` und `schemaV48.ts`).
  */
 import type Database from '@tauri-apps/plugin-sql';
 
@@ -20,7 +21,7 @@ import type Database from '@tauri-apps/plugin-sql';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 48;
+export const BASELINE_VERSION = 49;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
@@ -40,9 +41,7 @@ export const TABLES = [
   'block_definitions',
   'templates',
   'altars',
-  'journal_entries',
-  'wiki_articles',
-  'operations',
+  'entries',
   'altar_items',
   'tasks',
   'altar_placements',
@@ -57,7 +56,8 @@ export type TableName = (typeof TABLES)[number];
  * Die Tabellen mit Soft-Delete bis v38 — ihre `deleted_at`-Spalte indiziert
  * `INDEX_DDL_V38`. Eine spätere Tabelle gehört NICHT hierher: v38 und v39 legen
  * diese Indizes mitten in der Kette an, wo es sie noch nicht gibt. Sie bringt ihren
- * Index selbst mit (siehe `BLOCK_DEFINITIONS_INDEX_DDL`).
+ * Index selbst mit (siehe `BLOCK_DEFINITIONS_INDEX_DDL`). Eingefroren: die drei
+ * Eintragstabellen gibt es seit v49 nicht mehr, v38 und v39 indizieren sie trotzdem.
  */
 export const SOFT_DELETE_TABLES_V38 = [
   'journal_entries',
@@ -175,71 +175,26 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // paradigm_id, bannung_type_wiki_id, meditation_type_wiki_id und die beiden
-  // linked_*_ids-Arrays verweisen auf Wiki-Artikel bzw. Operationen, sind aber
-  // optional und teils JSON — kein Foreign Key möglich, siehe checkIntegrity().
-  journal_entries: `
-    CREATE TABLE journal_entries (
+  // Journal-Einträge, Wiki-Artikel und Operationen in einer Tabelle (seit v49;
+  // vorher drei, siehe `schemaV48.ts`). Was sie unterscheidet, steht im
+  // Inhalt — Blöcke —, nicht in Spalten: `type` sagt nur, in welchem Modul der
+  // Eintrag steht. Ein Typwechsel ist deshalb ein UPDATE (`entryTypeChange`).
+  // - `category_id`: das Journal hat keine Kategorien; Store und Typwechsel
+  //   halten sie dort auf NULL.
+  // - `entry_number` zählt pro Typ (`nextEntryNumber`) — dieselben Nummern
+  //   wie zu Zeiten der drei Tabellen.
+  // - Die Mondphase eines Journal-Eintrags folgt aus `created_at`
+  //   (`entryMoonPhase`), sie ist keine Spalte.
+  entries: `
+    CREATE TABLE entries (
       id TEXT PRIMARY KEY,
-      title TEXT NOT NULL DEFAULT 'Untitled Entry',
-      content TEXT NOT NULL DEFAULT '',
-      entry_number INTEGER,
-      moon_phase TEXT,
-      mood TEXT,
-      paradigm_id TEXT,
-      linked_operation_ids TEXT NOT NULL DEFAULT '[]',
-      linked_wiki_ids TEXT NOT NULL DEFAULT '[]',
-      is_bannung INTEGER NOT NULL DEFAULT 0,
-      bannung_type_wiki_id TEXT,
-      is_meditation INTEGER NOT NULL DEFAULT 0,
-      meditation_duration INTEGER,
-      meditation_type_wiki_id TEXT,
-      tags TEXT NOT NULL DEFAULT '[]',
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      deleted_at TEXT
-    )`,
-
-  wiki_articles: `
-    CREATE TABLE wiki_articles (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL DEFAULT 'Untitled Article',
-      slug TEXT NOT NULL UNIQUE,
+      type TEXT NOT NULL CHECK (type IN ('journal', 'wiki', 'operation')),
+      title TEXT NOT NULL DEFAULT '',
       content TEXT NOT NULL DEFAULT '',
       category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
       entry_number INTEGER,
-      cover_image TEXT,
-      icon TEXT,
-      tags TEXT NOT NULL DEFAULT '[]',
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      deleted_at TEXT
-    )`,
-
-  operations: `
-    CREATE TABLE operations (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL DEFAULT 'Untitled Operation',
-      content TEXT NOT NULL DEFAULT '',
-      category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
-      entry_number INTEGER,
-      description TEXT NOT NULL DEFAULT '',
       icon TEXT,
       cover_image TEXT,
-      version TEXT,
-      is_active INTEGER NOT NULL DEFAULT 1,
-      end_date TEXT,
-      target_reveal_date TEXT,
-      charging_technique_wiki_id TEXT,
-      is_loaded INTEGER NOT NULL DEFAULT 0,
-      intention_text TEXT NOT NULL DEFAULT '',
-      letter_bank TEXT NOT NULL DEFAULT '[]',
-      implemented_letters TEXT NOT NULL DEFAULT '[]',
-      show_intention_in_properties INTEGER NOT NULL DEFAULT 1,
-      show_letter_bank_in_properties INTEGER NOT NULL DEFAULT 1,
-      show_sigil INTEGER NOT NULL DEFAULT 1,
-      drawing_data TEXT,
-      thumbnail_data TEXT,
       tags TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -342,12 +297,14 @@ export const TABLE_DDL: Record<TableName, string> = {
 
 
 /**
- * Die Indizes aus `INDEX_DDL_V38`, die es noch gibt: auf jeder Foreign-Key-Spalte,
- * auf beiden Seiten von `task_links` und auf jeder `deleted_at`-Spalte. Letztere,
- * weil `runPeriodicCleanup` bei jedem Öffnen eines Vaults einen Bereichsscan über
- * alle Soft-Delete-Tabellen fährt.
+ * Was v38 (`mergeCategoryTables`) und v39 (`nullableCategory`) mitten in der
+ * Kette anlegen — auf jeder Foreign-Key-Spalte, auf beiden Seiten von
+ * `task_links` und auf jeder `deleted_at`-Spalte. Dort gibt es `links` und die
+ * drei Eintragstabellen noch; v47 wirft `links` weg, v49 die drei.
  */
-const KEPT_INDEX_DDL_V38: readonly string[] = [
+export const INDEX_DDL_V38: readonly string[] = [
+  'CREATE INDEX idx_links_source ON links(source_id)',
+  'CREATE INDEX idx_links_target ON links(target_id)',
   'CREATE INDEX idx_task_links_task ON task_links(task_id)',
   'CREATE INDEX idx_task_links_target ON task_links(target_id)',
   'CREATE INDEX idx_wiki_articles_category ON wiki_articles(category_id)',
@@ -361,14 +318,13 @@ const KEPT_INDEX_DDL_V38: readonly string[] = [
 ];
 
 /**
- * Was v38 (`mergeCategoryTables`) und v39 (`nullableCategory`) mitten in der
- * Kette anlegen — dort gibt es `links` noch, v47 wirft sie samt Indizes weg.
+ * Die Indizes aus `INDEX_DDL_V38`, die es noch gibt. Die `deleted_at`-Indizes,
+ * weil `runPeriodicCleanup` bei jedem Öffnen eines Vaults einen Bereichsscan
+ * über alle Soft-Delete-Tabellen fährt.
  */
-export const INDEX_DDL_V38: readonly string[] = [
-  'CREATE INDEX idx_links_source ON links(source_id)',
-  'CREATE INDEX idx_links_target ON links(target_id)',
-  ...KEPT_INDEX_DDL_V38,
-];
+const KEPT_INDEX_DDL_V38: readonly string[] = INDEX_DDL_V38.filter(
+  (sql) => !/ ON (links|journal_entries|wiki_articles|operations)\(/.test(sql)
+);
 
 /**
  * Der Index von `block_definitions` (v40), getrennt von `INDEX_DDL_V38`: v38
@@ -390,9 +346,21 @@ export const LEXICON_INDEX_DDL: readonly string[] = [
 /** Der Index des Altar-Papierkorbs (v46) — getrennt wie die darüber. */
 export const ALTARS_INDEX_DDL = 'CREATE INDEX idx_altars_deleted ON altars(deleted_at)';
 
+/**
+ * Die Indizes von `entries` (v49). `type` samt `deleted_at`, weil jedes Modul
+ * seine lebenden Einträge so lädt; `deleted_at` allein für den Bereichsscan
+ * von `runPeriodicCleanup`.
+ */
+export const ENTRIES_INDEX_DDL: readonly string[] = [
+  'CREATE INDEX idx_entries_type ON entries(type, deleted_at)',
+  'CREATE INDEX idx_entries_category ON entries(category_id)',
+  'CREATE INDEX idx_entries_deleted ON entries(deleted_at)',
+];
+
 /** Alle Indizes des aktuellen Schemas — was ein frischer Vault bekommt. */
 export const INDEX_DDL: readonly string[] = [
   ...KEPT_INDEX_DDL_V38, BLOCK_DEFINITIONS_INDEX_DDL, TEMPLATES_INDEX_DDL, ...LEXICON_INDEX_DDL, ALTARS_INDEX_DDL,
+  ...ENTRIES_INDEX_DDL,
 ];
 
 /**
@@ -438,8 +406,8 @@ export const STARTER_CATEGORIES: readonly [string, string][] = [
   ['tools', '⚗️'],
 ];
 
-/** Die vier Inhaltstabellen mit `category_id`. Literal, weil in SQL interpoliert. */
-export const CATEGORIZED_TABLES = ['wiki_articles', 'operations', 'tasks', 'altar_items'] as const;
+/** Die Inhaltstabellen mit `category_id` (Wiki und Operationen stehen in `entries`). Literal, weil in SQL interpoliert. */
+export const CATEGORIZED_TABLES = ['entries', 'tasks', 'altar_items'] as const;
 
 /**
  * Dasselbe DDL, aber verträglich mit einer bereits vorhandenen Tabelle.
@@ -557,8 +525,8 @@ export interface Orphan {
 
 /**
  * Prüft die Beziehungen, für die kein Foreign Key deklarierbar ist: die
- * polymorphen Link-Tabellen und die losen ID-Spalten. Foreign Keys decken den
- * Rest ab, das prüft `PRAGMA foreign_key_check`.
+ * polymorphe `task_links` und die Kategorie-IDs im JSON der Vorlagen. Foreign
+ * Keys decken den Rest ab, das prüft `PRAGMA foreign_key_check`.
  *
  * Nur für Verifikation und Diagnose gedacht, nicht für den Produktionspfad —
  * die Abfragen scannen mehrere Tabellen vollständig.
@@ -566,81 +534,32 @@ export interface Orphan {
 export async function checkIntegrity(db: Database): Promise<Orphan[]> {
   const orphans: Orphan[] = [];
 
-  // Polymorphe Ziele: das *_type-Feld entscheidet, welche Tabelle gemeint ist.
-  const contentTables: Record<string, string> = {
-    journal: 'journal_entries',
-    wiki: 'wiki_articles',
-    operation: 'operations',
-    task: 'tasks',
-    altar: 'altars',
+  // Polymorphe Ziele: das *_type-Feld entscheidet, wo das Ziel steht. Die drei
+  // Eintragsarten stehen in `entries` und müssen dort auch den Typ tragen.
+  const contentTargets: Record<string, string> = {
+    journal: "SELECT id FROM entries WHERE type = 'journal'",
+    wiki: "SELECT id FROM entries WHERE type = 'wiki'",
+    operation: "SELECT id FROM entries WHERE type = 'operation'",
+    task: 'SELECT id FROM tasks',
+    altar: 'SELECT id FROM altars',
   };
 
-  for (const [type, target] of Object.entries(contentTables)) {
-    for (const [table, column, typeColumn] of [
-      ['task_links', 'target_id', 'target_type'],
-    ] as const) {
-      const rows = await db.select<{ id: string }[]>(
-        `SELECT ${column} AS id FROM ${table}
-          WHERE ${typeColumn} = $1
-            AND ${column} NOT IN (SELECT id FROM ${target})`,
-        [type]
-      );
-      for (const r of rows) {
-        orphans.push({ table, column, id: r.id, missingTarget: target });
-      }
-    }
-  }
-
-  // Lose ID-Spalten ohne Foreign Key: optional, deshalb nur prüfen wenn gesetzt.
-  for (const [table, column, target] of [
-    ['journal_entries', 'paradigm_id', 'wiki_articles'],
-    ['journal_entries', 'bannung_type_wiki_id', 'wiki_articles'],
-    ['journal_entries', 'meditation_type_wiki_id', 'wiki_articles'],
-    ['operations', 'charging_technique_wiki_id', 'wiki_articles'],
-  ] as const) {
+  for (const [type, target] of Object.entries(contentTargets)) {
     const rows = await db.select<{ id: string }[]>(
-      `SELECT id FROM ${table}
-        WHERE ${column} IS NOT NULL
-          AND ${column} NOT IN (SELECT id FROM ${target})`
+      `SELECT target_id AS id FROM task_links
+        WHERE target_type = $1
+          AND target_id NOT IN (${target})`,
+      [type]
     );
     for (const r of rows) {
-      orphans.push({ table, column, id: r.id, missingTarget: target });
+      orphans.push({ table: 'task_links', column: 'target_id', id: r.id, missingTarget: type });
     }
   }
 
-  // JSON-Arrays von IDs. In SQL nicht sinnvoll prüfbar, also hier auspacken.
   const idsOf = async (target: string): Promise<Set<string>> => {
     const rows = await db.select<{ id: string }[]>(`SELECT id FROM ${target}`);
     return new Set(rows.map((r) => r.id));
   };
-  const targetIds: Record<string, Set<string>> = {
-    operations: await idsOf('operations'),
-    wiki_articles: await idsOf('wiki_articles'),
-  };
-
-  for (const [table, column, target] of [
-    ['journal_entries', 'linked_operation_ids', 'operations'],
-    ['journal_entries', 'linked_wiki_ids', 'wiki_articles'],
-  ] as const) {
-    const rows = await db.select<{ id: string; value: string | null }[]>(
-      `SELECT id, ${column} AS value FROM ${table}`
-    );
-    for (const r of rows) {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(r.value ?? '[]');
-      } catch {
-        orphans.push({ table, column, id: r.id, missingTarget: '(kein gültiges JSON)' });
-        continue;
-      }
-      if (!Array.isArray(parsed)) continue;
-      for (const ref of parsed) {
-        if (!targetIds[target].has(String(ref))) {
-          orphans.push({ table, column, id: r.id, missingTarget: `${target}.${String(ref)}` });
-        }
-      }
-    }
-  }
 
   // Kategorie-IDs in den Zuweisungen der Vorlagen.
   const categoryIds = await idsOf('categories');
@@ -755,17 +674,16 @@ async function moveCategoryInTemplates(db: Database, from: string, to: string): 
  * selbst durch.
  *
  * Umgeschrieben werden sie trotzdem nicht, und das ist Absicht:
- * `wiki_articles`/`operations` `icon` und `cover_image` werden von
+ * `entries.icon` und `cover_image` werden von
  * `MediaPropertyRow` (Icons wie in `Favicon` über `readIconFile`) per
  * `FileReader` als Data-URL geschrieben, und ihre Renderer
  * pruefen mit `isImageIcon` auf `data:` / `blob:` / `/`. Ein Dateiname wuerde
  * dort als Text durchfallen. Dasselbe gilt fuer `altars.thumbnail_data` /
- * `icon_data`, `operations.drawing_data` / `thumbnail_data` und
- * `altar_items.image_data` (siehe die Base64-Notiz in `database.md`).
+ * `icon_data` und `altar_items.image_data` (siehe die Base64-Notiz in
+ * `database.md`).
  *
- * Migration v35 und `collectUsedImageFilenames` lesen dieselbe Liste. Liefe
- * jede fuer sich, wuerde die Bereinigung frueher oder spaeter ein Bild
- * loeschen, das die Migration noch kennt.
+ * Migration v35 läuft über den Stand von damals (`IMAGE_FIELDS_V48`), noch mit
+ * den drei Eintragstabellen.
  */
 export const IMAGE_FIELDS: {
   table: string;
@@ -773,14 +691,7 @@ export const IMAGE_FIELDS: {
   plain: string[];
   legacy: string[];
 }[] = [
-  { table: 'journal_entries', html: ['content'], plain: [], legacy: [] },
-  { table: 'wiki_articles', html: ['content'], plain: [], legacy: ['icon', 'cover_image'] },
-  {
-    table: 'operations',
-    html: ['content'],
-    plain: [],
-    legacy: ['icon', 'cover_image', 'drawing_data', 'thumbnail_data'],
-  },
+  { table: 'entries', html: ['content'], plain: [], legacy: ['icon', 'cover_image'] },
   { table: 'altars', html: [], plain: ['background_image_data'], legacy: ['thumbnail_data', 'icon_data'] },
   { table: 'altar_items', html: [], plain: [], legacy: ['image_data'] },
 ];

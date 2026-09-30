@@ -3,21 +3,21 @@
  * die drei Module mit Blockstapel. Aufgaben und Altäre haben ein anderes
  * Datenmodell und bleiben, was sie sind.
  *
- * Der Eintrag behält seine id: die Zeile zieht in die Tabelle des neuen Typs
- * um, und alles, was ihn über `(id, Typ)` adressiert, zieht mit — Link-Chips in
+ * Der Eintrag behält seine id: seine Zeile in `entries` bekommt den neuen Typ,
+ * und alles, was ihn über `(id, Typ)` adressiert, zieht mit — Link-Chips in
  * Einträgen, Vorlagen und den Vorgaben eigener Blöcke, die `task_links`-Zeilen,
  * offene Tabs und ihre Verläufe. Titel, Inhalt, Tags und
- * Anlagedatum bleiben; die Nummer (`entry_number`) vergibt die neue Tabelle.
+ * Anlagedatum bleiben; die Nummer (`entry_number`) zählt im neuen Typ weiter.
  * Kategorie, Icon und Titelbild wandern zwischen Wiki und Operation mit — das
  * Journal kennt keine davon, sie fallen dort weg (die Seitenleiste fragt vorher).
  *
  * Der Inhalt bleibt, wie er ist: ein Standard greift nur beim Anlegen. Die
  * Vorlagen des neuen Typs stehen danach zum Einsetzen von Hand bereit.
  *
- * Ohne Transaktion (siehe `normalizeSchema.ts`), deshalb in dieser
- * Reihenfolge: erst die neue Zeile, dann die Verweise, zuletzt die alte Zeile
- * löschen. Bricht es mittendrin ab, steht der Eintrag schlimmstenfalls doppelt
- * da — verloren geht nichts.
+ * Ohne Transaktion (siehe `normalizeSchema.ts`): erst die Zeile, dann die
+ * Verweise. Bricht es dazwischen ab, zeigen schlimmstenfalls einzelne Chips
+ * noch den alten Typ — der Eintrag selbst ist nie doppelt und nie weg (bis v48
+ * zog die Zeile zwischen drei Tabellen um).
  *
  * Import-Regel wie `dbBackup`: liest und schreibt die Stores von außen; keiner
  * von ihnen importiert zurück.
@@ -42,12 +42,6 @@ import type { JournalEntry, Operation, WikiArticle } from '../types';
 
 /** Die Typen, zwischen denen ein Eintrag wechseln kann — die Module mit Blockstapel. */
 export type ConvertibleEntryType = TemplateEntryType;
-
-const TABLES: Record<ConvertibleEntryType, 'journal_entries' | 'wiki_articles' | 'operations'> = {
-  journal: 'journal_entries',
-  wiki: 'wiki_articles',
-  operation: 'operations',
-};
 
 /** Was ein Eintrag über den Typwechsel mitnimmt. */
 interface EntryCore {
@@ -85,52 +79,28 @@ type Converted =
   | { type: 'wiki'; entry: WikiArticle }
   | { type: 'operation'; entry: Operation };
 
-async function insertAs(db: Database, to: ConvertibleEntryType, core: EntryCore): Promise<Converted> {
-  const now = nowIso();
-  const entry_number = await nextEntryNumber(db, TABLES[to]);
-  const tags = JSON.stringify(core.tags);
+/** Gibt der Zeile den neuen Typ — samt Nummer in dessen Zählung und den Feldern aus `core`. */
+async function retypeRow(db: Database, to: ConvertibleEntryType, core: EntryCore): Promise<Converted> {
+  const entry_number = await nextEntryNumber(db, to);
+  const entry = {
+    id: core.id, entry_number, title: core.title, content: core.content, tags: core.tags,
+    category_id: core.category_id, icon: core.icon, cover_image: core.cover_image,
+    created_at: core.created_at, updated_at: nowIso(), deleted_at: null,
+  };
+  await db.execute(
+    `UPDATE entries
+        SET type=$1, entry_number=$2, title=$3, content=$4, category_id=$5, icon=$6, cover_image=$7, updated_at=$8
+      WHERE id=$9`,
+    [to, entry_number, entry.title, entry.content, entry.category_id, entry.icon ?? null, entry.cover_image ?? null,
+      entry.updated_at, entry.id]
+  );
   switch (to) {
     case 'journal': {
-      const entry: JournalEntry = {
-        id: core.id, entry_number, title: core.title, content: core.content, tags: core.tags,
-        created_at: core.created_at, updated_at: now, deleted_at: null,
-      };
-      await db.execute(
-        `INSERT INTO journal_entries (id, title, content, created_at, updated_at, tags, entry_number)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [entry.id, entry.title, entry.content, entry.created_at, entry.updated_at, tags, entry_number]
-      );
-      return { type: to, entry };
+      const { category_id: _category, icon: _icon, cover_image: _cover, ...journal } = entry;
+      return { type: to, entry: journal };
     }
-    case 'wiki': {
-      const entry: WikiArticle = {
-        id: core.id, entry_number, title: core.title, content: core.content, tags: core.tags,
-        category_id: core.category_id, icon: core.icon, cover_image: core.cover_image,
-        created_at: core.created_at, updated_at: now, deleted_at: null,
-      };
-      await db.execute(
-        // `slug`: NOT NULL UNIQUE, aber ungelesen — die ID wie in `createArticle`.
-        `INSERT INTO wiki_articles (id, title, slug, content, category_id, created_at, updated_at, tags, entry_number, cover_image, icon)
-         VALUES ($1, $2, $1, $3, $4, $5, $6, $7, $8, $9, $10)`,
-        [entry.id, entry.title, entry.content, entry.category_id, entry.created_at, entry.updated_at, tags,
-          entry_number, entry.cover_image ?? null, entry.icon ?? null]
-      );
-      return { type: to, entry };
-    }
-    case 'operation': {
-      const entry: Operation = {
-        id: core.id, entry_number, title: core.title, content: core.content, tags: core.tags,
-        category_id: core.category_id, icon: core.icon, cover_image: core.cover_image,
-        created_at: core.created_at, updated_at: now, deleted_at: null,
-      };
-      await db.execute(
-        `INSERT INTO operations (id, title, content, category_id, created_at, updated_at, tags, entry_number, icon, cover_image)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-        [entry.id, entry.title, entry.content, entry.category_id, entry.created_at, entry.updated_at, tags,
-          entry_number, entry.icon ?? null, entry.cover_image ?? null]
-      );
-      return { type: to, entry };
-    }
+    case 'wiki': return { type: to, entry };
+    case 'operation': return { type: to, entry };
   }
 }
 
@@ -183,11 +153,9 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
       content: retypeInternalLinks(source.content, id, to),
       ...(to === 'journal' ? { category_id: null, icon: undefined, cover_image: undefined } : {}),
     };
-    const converted = await insertAs(db, to, core);
+    const converted = await retypeRow(db, to, core);
 
-    const journalContent = await retypeContentColumn(db, 'journal_entries', id, to);
-    const wikiContent = await retypeContentColumn(db, 'wiki_articles', id, to);
-    const operationContent = await retypeContentColumn(db, 'operations', id, to);
+    const entryContent = await retypeContentColumn(db, 'entries', id, to);
     const templateContent = await retypeContentColumn(db, 'templates', id, to);
 
     const definitionRows = await db.select<{ id: string; elements: string }[]>(
@@ -208,7 +176,6 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
     }
 
     await db.execute('UPDATE task_links SET target_type=$1 WHERE target_id=$2', [to, id]);
-    await db.execute(`DELETE FROM ${TABLES[from]} WHERE id=$1`, [id]);
 
     // Ohne await dazwischen: der neue Typ steht im Store, bevor die Ansicht
     // wechselt, und der alte verschwindet erst mit ihr — kein Frame, in dem
@@ -219,9 +186,9 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
       case 'operation': useOperationStore.setState((s) => ({ operations: [converted.entry, ...s.operations] })); break;
     }
     useUIStore.getState().retypeEntryViews(id, viewTypeForEntryType(from), viewTypeForEntryType(to));
-    useJournalStore.setState((s) => ({ entries: withContent(s.entries, journalContent).filter((e) => from !== 'journal' || e.id !== id) }));
-    useWikiStore.setState((s) => ({ articles: withContent(s.articles, wikiContent).filter((a) => from !== 'wiki' || a.id !== id) }));
-    useOperationStore.setState((s) => ({ operations: withContent(s.operations, operationContent).filter((o) => from !== 'operation' || o.id !== id) }));
+    useJournalStore.setState((s) => ({ entries: withContent(s.entries, entryContent).filter((e) => from !== 'journal' || e.id !== id) }));
+    useWikiStore.setState((s) => ({ articles: withContent(s.articles, entryContent).filter((a) => from !== 'wiki' || a.id !== id) }));
+    useOperationStore.setState((s) => ({ operations: withContent(s.operations, entryContent).filter((o) => from !== 'operation' || o.id !== id) }));
     useTemplateStore.setState((s) => ({ templates: withContent(s.templates, templateContent) }));
     useTaskStore.setState((s) => ({
       links: s.links.map((link) => (link.target_id === id ? { ...link, target_type: to } : link)),

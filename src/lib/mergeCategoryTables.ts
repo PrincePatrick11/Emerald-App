@@ -20,7 +20,7 @@
  *      ablegen — eine echte Tabelle, keine TEMP-Tabelle: die wäre an eine
  *      Pool-Verbindung gebunden und für die nächste Anweisung womöglich weg
  *   5. Kinder zuerst auf `*_old` umbenennen
- *   6. Neue Tabellen aus `schema.ts` anlegen, Eltern zuerst kopieren; die
+ *   6. Neue Tabellen anlegen (`ddlBeforeV49`), Eltern zuerst kopieren; die
  *      `category_id` läuft dabei durch die Zuordnung
  *   7. Kinder zuerst `*_old` löschen, dann die vier alten Kategorie-Tabellen
  *      und die Zuordnung
@@ -39,6 +39,8 @@ import type Database from '@tauri-apps/plugin-sql';
 import i18n from '../i18n';
 // INDEX_DDL_V38, nicht INDEX_DDL: in der Kette fehlen hier noch die Tabellen späterer Migrationen.
 import { TABLE_DDL, INDEX_DDL_V38, FALLBACK_CATEGORY_ID, insertCategoryRows } from './schema';
+// `wiki_articles`/`operations` in ihrer Form bis v48 — seit v49 stehen sie in `entries`.
+import { ddlBeforeV49 } from './schemaV48';
 import { mergeCategoryRows, type CategorySource } from './categoryMerge';
 import { legacyDisplayName, type LegacyCategoryTable } from './categories';
 import {
@@ -173,7 +175,7 @@ async function rebuildContentTables(db: Database): Promise<void> {
     tasks: { category_id: mappedCategory('task_categories') },
   };
   for (const table of REBUILT_PARENTS_FIRST) {
-    await db.execute(TABLE_DDL[table]);
+    await db.execute(ddlBeforeV49(table));
     // `tasks` samt `parent_task_id` in einem INSERT … SELECT: SQLite prüft
     // Foreign Keys am Ende der Anweisung, ein Kind darf im Ergebnis also vor
     // seinem Elternteil stehen (v33 kopiert genauso).

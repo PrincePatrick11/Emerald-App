@@ -5,7 +5,7 @@ import { categoryLabel } from './categories';
 import { isImageIcon } from './helpers';
 import { DEFAULT_ENTRY_EMOJI } from './modules';
 import { escapeHtml, internalLinkBlockHtml } from './internalLinkHtml';
-import { backupDatabaseFile } from './dbRebuild';
+import { backupDatabaseFile, tableExists } from './dbRebuild';
 import { jsonArray } from './row';
 import { insertTemplateRow, nextTemplateSortOrder, templateById } from './templateRows';
 import { DEFAULT_TEMPLATE_ICON, isTemplateId, type Template } from './blocks/templates';
@@ -153,11 +153,21 @@ export function routineLinkResolver(
   };
 }
 
-/** Die Link-Ziele eines Vaults — für die Migration und als Rückfall beim Import. */
+/**
+ * Die Link-Ziele eines Vaults — für die Migration und als Rückfall beim Import.
+ * v44 läuft vor v49 und liest noch die zwei alten Tabellen, der Import danach
+ * `entries`.
+ */
 export async function vaultRoutineLinkSource(db: Database) {
+  const columns = 'id, title, icon, category_id, entry_number, deleted_at';
+  const unified = await tableExists(db, 'entries');
+  const targets = (type: 'operation' | 'wiki', table: string) => db.select<RoutineTargetRow[]>(
+    unified ? `SELECT ${columns} FROM entries WHERE type = $1` : `SELECT ${columns} FROM ${table}`,
+    unified ? [type] : [],
+  );
   return {
-    operations: await db.select<RoutineTargetRow[]>('SELECT id, title, icon, category_id, entry_number, deleted_at FROM operations'),
-    articles: await db.select<RoutineTargetRow[]>('SELECT id, title, icon, category_id, entry_number, deleted_at FROM wiki_articles'),
+    operations: await targets('operation', 'operations'),
+    articles: await targets('wiki', 'wiki_articles'),
     categories: await db.select<RoutineCategoryRow[]>('SELECT id, name, emoji, is_builtin FROM categories'),
   };
 }

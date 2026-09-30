@@ -24,17 +24,9 @@ interface OperationState {
   getOperation: (id: string) => Operation | undefined;
 }
 
-/**
- * Die Spalten, die die App liest und schreibt. Status/Enddatum/Version (v41)
- * und alles, was die Sigille ausmachte — Absicht, Buchstaben, Zeichnung,
- * Ladung, Notizen (v42) —, sind Blöcke im Inhalt. Die Spalten stehen noch im
- * Schema, für ältere Backups.
- */
-const OPERATION_COLUMNS = 'id, title, content, category_id, entry_number, icon, cover_image, tags, created_at, updated_at, deleted_at';
-
 async function selectAllOperations(db: Database): Promise<Operation[]> {
   const rows = await db.select<DbRow[]>(
-    `SELECT ${OPERATION_COLUMNS} FROM operations WHERE deleted_at IS NULL ORDER BY updated_at DESC`
+    "SELECT * FROM entries WHERE type = 'operation' AND deleted_at IS NULL ORDER BY updated_at DESC"
   );
   return rows.map(fromRow.operation);
 }
@@ -54,15 +46,15 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     // sofern der Vault Standards von selbst einsetzt.
     const start = startOfNewEntry('operation', categoryId, blank);
     const op: Operation = {
-      entry_number: await nextEntryNumber(db, 'operations'),
+      entry_number: await nextEntryNumber(db, 'operation'),
       id: generateId(),
       title: start.title,
       content: start.content,
       category_id: categoryId, created_at: createdAt ?? now, updated_at: now, tags: start.tags, deleted_at: null,
     };
     await db.execute(
-      `INSERT INTO operations (id, title, content, category_id, created_at, updated_at, tags, entry_number)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      `INSERT INTO entries (id, type, title, content, category_id, created_at, updated_at, tags, entry_number)
+       VALUES ($1,'operation',$2,$3,$4,$5,$6,$7,$8)`,
       [op.id, op.title, op.content, op.category_id, op.created_at, op.updated_at, JSON.stringify(op.tags), op.entry_number ?? null]
     );
     set((s) => ({ operations: [op, ...s.operations] }));
@@ -100,7 +92,7 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     // die Bind-Indizes nach dem ersten Auftreten, nicht nach der Ziffer, und
     // tauri-plugin-sql bindet rein positionell.
     await db.execute(
-      `UPDATE operations SET
+      `UPDATE entries SET
         title=$1, content=$2, category_id=$3, updated_at=$4, tags=$5, icon=$6, cover_image=$7
        WHERE id=$8`,
       [
@@ -117,19 +109,19 @@ export const useOperationStore = create<OperationState>((set, get) => ({
   deleteOperation: async (id) => {
     const db = await getDb();
     const now = nowIso();
-    await db.execute('UPDATE operations SET deleted_at=$1 WHERE id=$2', [now, id]);
+    await db.execute('UPDATE entries SET deleted_at=$1 WHERE id=$2', [now, id]);
     set((s) => ({ operations: s.operations.filter((o) => o.id !== id) }));
   },
 
   restoreOperation: async (id) => {
     const db = await getDb();
-    await db.execute('UPDATE operations SET deleted_at=NULL WHERE id=$1', [id]);
+    await db.execute('UPDATE entries SET deleted_at=NULL WHERE id=$1', [id]);
     set({ operations: await selectAllOperations(db) });
   },
 
   permanentlyDeleteOperation: async (id) => {
     const db = await getDb();
-    await db.execute('DELETE FROM operations WHERE id=$1', [id]);
+    await db.execute('DELETE FROM entries WHERE id=$1', [id]);
   },
 
   getOperation: (id) => get().operations.find((o) => o.id === id),

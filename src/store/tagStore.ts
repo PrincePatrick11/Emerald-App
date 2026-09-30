@@ -107,7 +107,7 @@ async function purgeTrashedNamesake(name: string) {
 }
 
 /** Die Tabellen, deren Zeilen in den Papierkorb gehen und Tag-Namen tragen. */
-const TRASHABLE_TAGGED_TABLES = ['journal_entries', 'wiki_articles', 'operations', 'templates'] as const;
+const TRASHABLE_TAGGED_TABLES = ['entries', 'templates'] as const;
 
 /**
  * Einträge im Papierkorb stehen in keinem Store. Ihr Tag-Name wird darum

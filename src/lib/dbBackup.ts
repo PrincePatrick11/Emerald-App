@@ -34,7 +34,7 @@ import { definitionById, nextDefinitionSortOrder } from './blockDefinitionRows';
 import { nextTemplateSortOrder } from './templateRows';
 import { nextEntrySortOrder, nextLanguageSortOrder } from './lexiconRows';
 import { alphabetToJson, DEFAULT_LANGUAGE_ICON } from './lexicon';
-import type { Language } from '../types';
+import type { EntryType, Language } from '../types';
 import {
   routineLinkResolver, routineToTemplate, vaultRoutineLinkSource, type RoutineCategoryRow, type RoutineTargetRow,
 } from './migrateRoutinesToTemplates';
@@ -139,7 +139,13 @@ type Row = Record<string, any>;
  * mit, '7' = seit v42 tragen Operationen ihre Sigille als Blöcke im Inhalt
  * statt in eigenen Spalten, '8' = seit v43 reisen die Vorlagen als
  * `data.templates` mit, '9' = seit v45 das Lexikon als `data.languages` und
- * `data.lexiconEntries`, '10' = seit v46 tragen Altäre `deleted_at`.
+ * `data.lexiconEntries`, '10' = seit v46 tragen Altäre `deleted_at`, '11' =
+ * seit v49 stehen Journal, Wiki und Operationen als `data.entries` in einem
+ * Array, jede Zeile mit `type` und ohne die Spalten, die es nicht mehr gibt.
+ *
+ * Die '11' braucht es, weil ein älterer Build `slug` und die Tabellen der
+ * drei Typen erwartet: er fände in der Datei keine Einträge und löschte beim
+ * Ersetzen trotzdem nichts — aber er würde sie still übergehen.
  *
  * Auch die '10' ist kein Formalismus: ein Build von vor v46 kennt die Spalte
  * nicht, `insertRows` ließe sie fallen — und ein Altar aus dem Papierkorb
@@ -152,7 +158,7 @@ type Row = Record<string, any>;
  * Prüfung „neuer als ich" (`backup.version > BACKUP_VERSION`) die Datei ehrlich
  * ab, bevor irgendetwas passiert.
  */
-const BACKUP_VERSION = '10' as const;
+const BACKUP_VERSION = '11' as const;
 
 /** Die vier Kategorie-Arrays von Sicherungen bis Version 3. */
 interface LegacyCategoryArrays {
@@ -295,6 +301,11 @@ export function migrateBackupPayload(backup: BackupFile): void {
   // ältere Datei bringt eben kein Lexikon mit.
   // v9 → v10 auch nicht: Altäre ohne `deleted_at` sind lebende Altäre.
 
+  // v10 → v11 ist umgekehrt: die Datei hat die drei Listen schon, erst eine
+  // '11' bringt `entries` mit, und das teilt sich hier nach Typ. Eine Zeile
+  // mit unbekanntem Typ fällt weg — in `entries` gäbe es für sie kein Modul.
+  if (version >= 11) splitEntries(data);
+
   // Routinen (Dateien von vor v44) bleiben hier liegen: sie werden erst beim
   // Import Vorlagen (`withRoutinesAsTemplates`), nach den Filtern — sonst
   // zeigten ihre Links auf Einträge, die gar nicht mitkommen.
@@ -302,14 +313,66 @@ export function migrateBackupPayload(backup: BackupFile): void {
   backup.version = BACKUP_VERSION;
 }
 
+/** Teilt `data.entries` (Datei ab '11') in die Listen, mit denen der Import arbeitet. */
+function splitEntries(data: BackupFile['data']): void {
+  const rows = Array.isArray(data.entries) ? data.entries : [];
+  const ofType = (type: EntryType) => rows.filter((r) => r?.type === type);
+  data.journalEntries = ofType('journal');
+  data.wikiArticles = ofType('wiki');
+  data.operations = ofType('operation');
+  delete data.entries;
+}
+
+/**
+ * Die Spalten von `entries` außer `type`. Jede Zeile bekommt alle: `insertRows`
+ * nimmt die Spaltenliste aus der ersten Zeile, und ein Journal-Eintrag vorne
+ * nähme den Wiki-Artikeln dahinter sonst Kategorie, Icon und Titelbild. Was
+ * die alten Tabellen mehr hatten (`slug`, `moon_phase`, tote Spalten), fällt
+ * hier weg — die Umwandlungen davor haben gelesen, was sie brauchten.
+ */
+const ENTRY_COLUMNS = [
+  'id', 'title', 'content', 'category_id', 'entry_number', 'icon', 'cover_image',
+  'tags', 'created_at', 'updated_at', 'deleted_at',
+] as const;
+
+function asEntryRows(type: EntryType, rows: Row[]): Row[] {
+  return rows.map((row) => {
+    const out: Row = { type };
+    for (const column of ENTRY_COLUMNS) out[column] = row[column] ?? null;
+    out.title ??= '';
+    out.content ??= '';
+    out.tags ??= '[]';
+    // Das Journal hat keine Kategorie, kein Icon und kein Titelbild.
+    if (type === 'journal') out.category_id = out.icon = out.cover_image = null;
+    return out;
+  });
+}
+
+/** Die Eintragstypen, die eine Sicherung mitbringt — nur deren Einträge ersetzt `doReplace`. */
+function presentEntryTypes(d: BackupFile['data']): EntryType[] {
+  return ([
+    ['journal', d.journalEntries],
+    ['wiki', d.wikiArticles],
+    ['operation', d.operations],
+  ] as const).filter(([, rows]) => (rows?.length ?? 0) > 0).map(([type]) => type);
+}
+
 interface BackupFile {
-  version: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10';
+  version: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11';
   /** Die Version, mit der die Datei geschrieben wurde — `migrateBackupPayload` setzt `version` auf die aktuelle. */
   sourceVersion?: number;
   type: 'backup';
   exportedAt: string;
   filters: BackupOptions;
   data: {
+    /**
+     * In der Datei (seit '11'): Journal, Wiki und Operationen wie in der
+     * Tabelle `entries`. `migrateBackupPayload` teilt sie in die drei Listen
+     * darunter — der Import behandelt jeden Typ anders (Kategorien, Status,
+     * Sigillen, alte Journal-Felder).
+     */
+    entries?: Row[];
+    /** Im Import: die Einträge je Typ. In Dateien bis '10' standen sie so auch in der Datei. */
     journalEntries?: Row[];
     wikiArticles?: Row[];
     operations?: Row[];
@@ -445,31 +508,20 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
   const { clause: dateClause, params: dateParams } = buildDateFilter(options.dateFrom, options.dateTo);
   const deletedClause = deletedFilter(options.includeDeleted);
 
-  // ── Journal ──────────────────────────────────────────────────────────────
-  if (options.includeJournal) {
-    data.journalEntries = await db.select<Row[]>(
-      `SELECT * FROM journal_entries WHERE 1=1 ${dateClause} ${deletedClause}`,
+  // ── Journal, Wiki, Operationen ───────────────────────────────────────────
+  // Eine Tabelle, ein Array — die Auswahl entscheidet, welche Typen mitkommen.
+  // Die Typen stehen literal im SQL (keine Nutzereingabe).
+  const entryTypes = [
+    options.includeJournal && "'journal'",
+    options.includeWiki && "'wiki'",
+    options.includeOperations && "'operation'",
+  ].filter(Boolean);
+  if (entryTypes.length) {
+    data.entries = await db.select<Row[]>(
+      `SELECT * FROM entries WHERE type IN (${entryTypes.join(', ')}) ${dateClause} ${deletedClause}`,
       dateParams,
     );
-    collectImageRefs('journal_entries', data.journalEntries, allImagePaths);
-  }
-
-  // ── Wiki ─────────────────────────────────────────────────────────────────
-  if (options.includeWiki) {
-    data.wikiArticles = await db.select<Row[]>(
-      `SELECT * FROM wiki_articles WHERE 1=1 ${dateClause} ${deletedClause}`,
-      dateParams,
-    );
-    collectImageRefs('wiki_articles', data.wikiArticles, allImagePaths);
-  }
-
-  // ── Operations ───────────────────────────────────────────────────────────
-  if (options.includeOperations) {
-    data.operations = await db.select<Row[]>(
-      `SELECT * FROM operations WHERE 1=1 ${dateClause} ${deletedClause}`,
-      dateParams,
-    );
-    collectImageRefs('operations', data.operations, allImagePaths);
+    collectImageRefs('entries', data.entries, allImagePaths);
   }
 
   // ── Altars ───────────────────────────────────────────────────────────────
@@ -1245,9 +1297,10 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   await assertPayloadReferencesResolve(db, d);
 
   // Remap image paths — Spalten aus `IMAGE_FIELDS`, nicht von Hand gepflegt.
-  const IMAGE_FIELDS_JOURNAL = imageColumns('journal_entries');
-  const IMAGE_FIELDS_WIKI = imageColumns('wiki_articles');
-  const IMAGE_FIELDS_OP = imageColumns('operations');
+  // Bei Operationen dazu die Sigillen-Zeichnung alter Dateien: sie wird erst
+  // unten zur Datei (`liftLegacySigilRows`) und muss dafür richtig heißen.
+  const IMAGE_FIELDS_ENTRY = imageColumns('entries');
+  const IMAGE_FIELDS_OP = [...IMAGE_FIELDS_ENTRY, 'drawing_data'];
   const IMAGE_FIELDS_ALTAR = imageColumns('altars');
   const IMAGE_FIELDS_ITEM = imageColumns('altar_items');
 
@@ -1255,8 +1308,8 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   // eingefügt werden. Gelöscht wird bei Kategorien nie (siehe dort).
   const catMap = await resolveImportedCategories(db, usedCategoryRows(d));
 
-  const journalEntries = (d.journalEntries ?? []).map((r) => remapRow(r, IMAGE_FIELDS_JOURNAL, pathMap));
-  const wikiArticles = remapCategoryIds((d.wikiArticles ?? []).map((r) => remapRow(r, IMAGE_FIELDS_WIKI, pathMap)), catMap);
+  const journalEntries = (d.journalEntries ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ENTRY, pathMap));
+  const wikiArticles = remapCategoryIds((d.wikiArticles ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ENTRY, pathMap)), catMap);
   // Sicherungen bis v40 tragen Status/Enddatum/Version noch in den Spalten.
   const replaceStatus = await statusDefinitionForImport(db, d.blockDefinitions);
   const replaceOps = convertLegacyStatusRows(
@@ -1280,12 +1333,10 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
 
   // Delete only the content types present in the backup (so a partial backup
   // replacing only Journal data won't wipe wiki/ops).
-  const hasJournal = (d.journalEntries?.length ?? 0) > 0;
-  const hasWiki = (d.wikiArticles?.length ?? 0) > 0;
-  const hasOps = (d.operations?.length ?? 0) > 0;
+  const entryTypes = presentEntryTypes(d);
   const hasAltars = (d.altars?.length ?? 0) > 0;
   const hasTasks = (d.tasks?.length ?? 0) > 0;
-  const hasAny = hasJournal || hasWiki || hasOps || hasTasks;
+  const hasAny = entryTypes.length > 0 || hasTasks;
 
   // Die Bibliothek hängt an `hasAltars`, obwohl der Export sie inzwischen
   // unabhängig von den Altären mitnimmt: `altar_placements.item_id` ist
@@ -1302,18 +1353,18 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
     await db.execute('DELETE FROM task_links');
     await db.execute('DELETE FROM tasks');
   }
-  if (hasOps) await db.execute('DELETE FROM operations');
-  if (hasJournal) await db.execute('DELETE FROM journal_entries');
-  if (hasWiki) await db.execute('DELETE FROM wiki_articles');
+  for (const type of entryTypes) await db.execute('DELETE FROM entries WHERE type=$1', [type]);
   // Wie die Inhalte oben nur, wenn die Datei welche bringt: abgewählte Tags
   // kommen als `[]` an, und das ist wahr.
   if (hasAny && d.tags?.length) await db.execute('DELETE FROM tags');
 
   // Re-insert
   if (d.tags) await insertRows(db, 'tags', d.tags, true);
-  await insertRows(db, 'journal_entries', journalEntries);
-  await insertRows(db, 'wiki_articles', wikiArticles);
-  await insertRows(db, 'operations', operations);
+  await insertRows(db, 'entries', [
+    ...asEntryRows('journal', journalEntries),
+    ...asEntryRows('wiki', wikiArticles),
+    ...asEntryRows('operation', operations),
+  ]);
   await insertRows(db, 'altars', altars);
   // OR IGNORE, wenn oben nicht geleert wurde: die Datei kann eine Bibliothek
   // ohne Altäre tragen (Datumsfilter, oder ein Vault, der nur Elemente hat),
@@ -1385,16 +1436,17 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
    * hinter den Bestand geschoben werden — sonst zeigen zwei Eintraege dieselbe
    * `#n`.
    */
-  async function entryNumberOffset(table: string): Promise<number> {
+  async function entryNumberOffset(type: EntryType): Promise<number> {
     const rows = await db.select<{ n: number }[]>(
-      `SELECT COALESCE(MAX(entry_number), 0) AS n FROM ${table}`
+      'SELECT COALESCE(MAX(entry_number), 0) AS n FROM entries WHERE type = $1',
+      [type]
     );
     return rows[0]?.n ?? 0;
   }
-  const offsets = {
-    journal_entries: await entryNumberOffset('journal_entries'),
-    wiki_articles: await entryNumberOffset('wiki_articles'),
-    operations: await entryNumberOffset('operations'),
+  const offsets: Record<EntryType, number> = {
+    journal: await entryNumberOffset('journal'),
+    wiki: await entryNumberOffset('wiki'),
+    operation: await entryNumberOffset('operation'),
   };
 
   function remapEntry(
@@ -1402,12 +1454,12 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     imagePaths: string[],
     idFields: string[],
     jsonIdFields: string[],
-    entryNumberTable?: keyof typeof offsets,
+    entryType?: EntryType,
   ): Row {
     const out = remapRow(row, imagePaths, pathMap);
     out.id = pid(out.id as string);
-    if (entryNumberTable && out.entry_number != null) {
-      out.entry_number = Number(out.entry_number) + offsets[entryNumberTable];
+    if (entryType && out.entry_number != null) {
+      out.entry_number = Number(out.entry_number) + offsets[entryType];
     }
     for (const f of idFields) {
       if (out[f] != null) out[f] = remapId(out[f]);
@@ -1444,17 +1496,14 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   };
 
   const journalEntries = (d.journalEntries ?? []).map((r: Row) =>
-    withContentLinks(remapEntry(r, ['content'], ['paradigm_id', 'bannung_type_wiki_id', 'meditation_type_wiki_id'], ['linked_operation_ids', 'linked_wiki_ids'], 'journal_entries'))
+    withContentLinks(remapEntry(r, ['content'], ['paradigm_id', 'bannung_type_wiki_id', 'meditation_type_wiki_id'], ['linked_operation_ids', 'linked_wiki_ids'], 'journal'))
   );
-  const wikiArticles = remapCategoryIds((d.wikiArticles ?? []).map((r: Row) => {
-    const row = withContentLinks(remapEntry(r, ['content', 'icon', 'cover_image'], [], [], 'wiki_articles'));
-    // slug has a UNIQUE constraint — prefix it to avoid collisions on merge
-    if (typeof row.slug === 'string') row.slug = `${prefix}-${row.slug}`;
-    return row;
-  }), catMap);
+  const wikiArticles = remapCategoryIds((d.wikiArticles ?? []).map((r: Row) =>
+    withContentLinks(remapEntry(r, ['content', 'icon', 'cover_image'], [], [], 'wiki'))
+  ), catMap);
   const mergeStatus = await statusDefinitionForImport(db, d.blockDefinitions);
   const mergeOps = convertLegacyStatusRows(remapCategoryIds((d.operations ?? []).map((r: Row) =>
-    withContentLinks(remapEntry(r, ['content', 'icon', 'cover_image', 'drawing_data', 'thumbnail_data'], ['charging_technique_wiki_id'], [], 'operations'))
+    withContentLinks(remapEntry(r, ['content', 'icon', 'cover_image', 'drawing_data', 'thumbnail_data'], ['charging_technique_wiki_id'], [], 'operation'))
   ), catMap), i18n.t, nowIso(), mergeStatus);
   const operations = await liftLegacySigilRows(mergeOps.rows, wikiArticles, backup);
   const altars = (d.altars ?? []).map((r: Row) =>
@@ -1500,9 +1549,11 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   await insertLexicon(db, d.languages, d.lexiconEntries);
 
   // Content: plain INSERT with prefixed IDs (no conflicts possible)
-  await insertRows(db, 'journal_entries', journalEntries);
-  await insertRows(db, 'wiki_articles', wikiArticles);
-  await insertRows(db, 'operations', operations);
+  await insertRows(db, 'entries', [
+    ...asEntryRows('journal', journalEntries),
+    ...asEntryRows('wiki', wikiArticles),
+    ...asEntryRows('operation', operations),
+  ]);
   await insertRows(db, 'altars', altars);
   await insertRows(db, 'altar_items', altarItems);
   await insertRows(db, 'altar_placements', altarPlacements);

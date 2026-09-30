@@ -9,6 +9,8 @@
  * nicht mehr gibt. Also bekommt v33 hier seine eigene Kopie der Tabellen, die
  * sich seither geändert haben. Alle anderen zieht es weiter aus `schema.ts` —
  * **wer eine davon in einer späteren Migration ändert, friert sie hier ein.**
+ * (`journal_entries` kommt aus `schemaV48.ts`: bis v48 unverändert, seit v49
+ * in `entries` aufgegangen.)
  *
  * `scripts/schema-check.mjs` beweist weiterhin, dass Baseline und Kettenende
  * beim identischen Schema landen.
@@ -17,7 +19,7 @@
  * (`LEGACY_*_CATEGORIES`), die v36–v38 und der Import alter Dateien noch
  * brauchen, um IDs von früher zu Namen und Emojis aufzulösen.
  */
-import { TABLE_DDL, type TableName } from './schema';
+import { ddlBeforeV49 } from './schemaV48';
 
 export const V37_TABLES = [
   'schema_version',
@@ -217,7 +219,7 @@ const FROZEN: Partial<Record<V37TableName, string>> = {
 };
 
 export const V37_TABLE_DDL: Record<V37TableName, string> = Object.fromEntries(
-  V37_TABLES.map((t) => [t, FROZEN[t] ?? TABLE_DDL[t as TableName]])
+  V37_TABLES.map((t) => [t, FROZEN[t] ?? ddlBeforeV49(t as Parameters<typeof ddlBeforeV49>[0])])
 ) as Record<V37TableName, string>;
 
 export const V37_INDEX_DDL: string[] = [

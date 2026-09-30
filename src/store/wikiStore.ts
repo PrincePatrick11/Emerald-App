@@ -27,7 +27,7 @@ interface WikiState {
 
 async function selectAllArticles(db: Database): Promise<WikiArticle[]> {
   const rows = await db.select<DbRow[]>(
-    'SELECT * FROM wiki_articles WHERE deleted_at IS NULL ORDER BY title ASC'
+    "SELECT * FROM entries WHERE type = 'wiki' AND deleted_at IS NULL ORDER BY title ASC"
   );
   return rows.map(fromRow.wikiArticle);
 }
@@ -50,7 +50,7 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     const db = await getDb();
     const now = nowIso();
     const id = generateId();
-    const entryNumber = await nextEntryNumber(db, 'wiki_articles');
+    const entryNumber = await nextEntryNumber(db, 'wiki');
     const start = startOfNewEntry('wiki', categoryId, blank);
     const article: WikiArticle = {
       id,
@@ -65,10 +65,8 @@ export const useWikiStore = create<WikiState>((set, get) => ({
       cover_image: undefined,
     };
     await db.execute(
-      // `slug` ist ein Überbleibsel: NOT NULL UNIQUE, gelesen wird er nicht mehr.
-      // Die ID erfüllt beides.
-      `INSERT INTO wiki_articles (id, title, slug, content, category_id, created_at, updated_at, tags, entry_number)
-       VALUES ($1, $2, $1, $3, $4, $5, $6, $7, $8)`,
+      `INSERT INTO entries (id, type, title, content, category_id, created_at, updated_at, tags, entry_number)
+       VALUES ($1, 'wiki', $2, $3, $4, $5, $6, $7, $8)`,
       [
         article.id,
         article.title,
@@ -114,7 +112,7 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     };
 
     await db.execute(
-      `UPDATE wiki_articles
+      `UPDATE entries
        SET title=$1, content=$2, category_id=$3, updated_at=$4, tags=$5, cover_image=$6, icon=$7
        WHERE id=$8`,
       [
@@ -138,7 +136,7 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     try {
       const now = nowIso();
       await db.execute(
-        'UPDATE wiki_articles SET deleted_at=$1 WHERE id=$2',
+        'UPDATE entries SET deleted_at=$1 WHERE id=$2',
         [now, id]
       );
       set((s) => ({ articles: s.articles.filter((a) => a.id !== id) }));
@@ -151,7 +149,7 @@ export const useWikiStore = create<WikiState>((set, get) => ({
   restoreArticle: async (id) => {
     const db = await getDb();
     await db.execute(
-      'UPDATE wiki_articles SET deleted_at=NULL WHERE id=$1',
+      'UPDATE entries SET deleted_at=NULL WHERE id=$1',
       [id]
     );
     set({ articles: await selectAllArticles(db) });
@@ -159,7 +157,7 @@ export const useWikiStore = create<WikiState>((set, get) => ({
 
   permanentlyDeleteArticle: async (id) => {
     const db = await getDb();
-    await db.execute('DELETE FROM wiki_articles WHERE id=$1', [id]);
+    await db.execute('DELETE FROM entries WHERE id=$1', [id]);
   },
 
   getArticle: (id) => get().articles.find((a) => a.id === id),

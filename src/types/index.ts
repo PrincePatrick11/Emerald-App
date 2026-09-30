@@ -2,6 +2,9 @@ import type { TrashKind, ViewId } from '../lib/modules';
 
 export type ContentType = 'journal' | 'wiki' | 'operation' | 'task' | 'altar';
 
+/** Die Eintragsarten der Tabelle `entries` — die Module mit Blockstapel. */
+export type EntryType = 'journal' | 'wiki' | 'operation';
+
 export interface JournalEntry {
   id: string;
   title: string;

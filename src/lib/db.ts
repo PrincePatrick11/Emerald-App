@@ -2,7 +2,7 @@ import Database from '@tauri-apps/plugin-sql';
 import { invoke } from '@tauri-apps/api/core';
 import { getActiveDbConnectionString, getActiveVaultId } from './vaultManager';
 import {
-  ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, IMAGE_FIELDS, LEXICON_INDEX_DDL, TABLE_DDL,
+  ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, LEXICON_INDEX_DDL, TABLE_DDL,
   TEMPLATES_INDEX_DDL, createSchema, ddlIfNotExists, purgeCategory, seedBuiltins, storedImageName,
 } from './schema';
 import { normalizeSchema } from './normalizeSchema';
@@ -13,6 +13,9 @@ import { mergeCategoryTables } from './mergeCategoryTables';
 import { backupDatabaseFile, createIndexesIfMissing } from './dbRebuild';
 import { migrateOperationStatusToBlocks } from './migrateOperationStatusToBlocks';
 import { convertLegacySigils, hasLegacySigilRows } from './migrateLegacySigils';
+import { IMAGE_FIELDS_V48, TITLED_TABLES_V48 } from './schemaV48';
+import { unifyEntries } from './unifyEntries';
+import type { EntryType } from '../types';
 import { makeCategoryOptional } from './nullableCategory';
 import { seedSigilTemplate } from './templateRows';
 import { migrateRoutinesToTemplates } from './migrateRoutinesToTemplates';
@@ -95,11 +98,6 @@ export async function getDb(): Promise<Database> {
     await invoke('prune_migration_backups', { vaultId })
       .catch((e: unknown) => console.warn('[db] migration backups:', e));
     await runPeriodicCleanup(db, trashRetentionFor(vaultId));
-    // Sigillen-Zeichnungen, die v42 (oder ein Backup-Import) nicht als Datei
-    // speichern konnte — bei jedem Öffnen ein neuer Versuch. Scheitern darf
-    // das Öffnen daran nicht: die Zeilen bleiben einfach, wie sie sind.
-    await convertLegacySigils(db, { includeSigilCategory: false })
-      .catch((e: unknown) => console.error('[db] legacy sigils:', e));
     _dbCache.set(identifier, db);
     _initPromises.delete(identifier);
     return db;
@@ -252,10 +250,8 @@ export async function runMigrations(db: Database): Promise<void> {
  * Table names interpolated into SQL — must stay a hardcoded literal list.
  */
 const CLEANUP_TABLES = [
-  'journal_entries',
-  'wiki_articles',
+  'entries',
   'tags',
-  'operations',
   'tasks',
   // Ohne Fremdschlüssel und ohne Nachlauf: Einträge tragen ihre Kopien selbst.
   'block_definitions',
@@ -267,23 +263,20 @@ const CLEANUP_TABLES = [
 ] as const;
 
 /**
- * Die nächste laufende Nummer für `journal_entries`, `wiki_articles` oder
- * `operations`.
+ * Die nächste laufende Nummer eines Eintragstyps — jeder Typ zählt für sich,
+ * wie zu Zeiten der drei Tabellen. Einträge im Papierkorb zählen mit, damit
+ * eine Nummer nach dem Wiederherstellen nicht doppelt vorkommt.
  *
  * Früher wurde `entry_number` gar nicht geschrieben — die Stores holten sich
  * beim Lesen `SELECT *, ROWID as entry_number` und überschrieben damit die
  * Spalte, die Migration v9 einmal befuellt hatte. Das ging so lange gut, bis
  * ein Replace-Import die ROWIDs neu vergab und sich alle angezeigten Nummern
  * verschoben. Jetzt wird die Nummer beim Anlegen vergeben und bleibt.
- *
- * Table name interpolated into SQL — nur mit literalen Namen aufrufen.
  */
-export async function nextEntryNumber(
-  db: Database,
-  table: 'journal_entries' | 'wiki_articles' | 'operations'
-): Promise<number> {
+export async function nextEntryNumber(db: Database, type: EntryType): Promise<number> {
   const rows = await db.select<{ n: number }[]>(
-    `SELECT COALESCE(MAX(entry_number), 0) + 1 AS n FROM ${table}`
+    'SELECT COALESCE(MAX(entry_number), 0) + 1 AS n FROM entries WHERE type = $1',
+    [type]
   );
   return rows[0]?.n ?? 1;
 }
@@ -292,9 +285,7 @@ export async function nextEntryNumber(
  *  Typenliste von `checkIntegrity` (schema.ts) spiegeln, sonst löscht der
  *  Sweep genau die Zeilen, die die Diagnose für gültig hält. Soft-gelöschte
  *  Zeilen zählen bewusst mit: Papierkorb-Inhalte sind noch keine Waisen. */
-const CONTENT_IDS = `(SELECT id FROM journal_entries
-                      UNION ALL SELECT id FROM wiki_articles
-                      UNION ALL SELECT id FROM operations
+const CONTENT_IDS = `(SELECT id FROM entries
                       UNION ALL SELECT id FROM tasks
                       UNION ALL SELECT id FROM altars)`;
 
@@ -1102,12 +1093,12 @@ export const MIGRATIONS: Migration[] = [
       const adopt = new Set<string>();
       const updates: { sql: string; params: unknown[] }[] = [];
 
-      // Bewusst ohne die `legacy`-Spalten aus IMAGE_FIELDS: die halten
+      // Bewusst ohne die `legacy`-Spalten aus IMAGE_FIELDS_V48: die halten
       // Data-URLs, und ihre Renderer koennen mit einem Dateinamen nichts
       // anfangen. Gelesen werden sie trotzdem — von
       // `collectUsedImageFilenames`, damit die Aufraeum-Aktion nichts loescht,
       // worauf sie noch zeigen.
-      for (const { table, html, plain } of IMAGE_FIELDS) {
+      for (const { table, html, plain } of IMAGE_FIELDS_V48) {
         const columns = [...html, ...plain];
         if (columns.length === 0) continue;
         const rows = await db.select<Record<string, string | null>[]>(
@@ -1319,17 +1310,30 @@ export const MIGRATIONS: Migration[] = [
     // werden leer — wiederholbar, ein Backup-Import ruft es auch.
     version: 48,
     name: 'untitled_is_empty',
-    up: clearLegacyUntitledTitles,
+    up: (db) => clearLegacyUntitledTitles(db, TITLED_TABLES_V48),
+  },
+  {
+    // Journal, Wiki und Operationen in eine Tabelle `entries` — die toten
+    // Spalten, `slug` und `moon_phase` bleiben dabei zurück (`unifyEntries.ts`).
+    version: 49,
+    name: 'unify_entries',
+    up: unifyEntries,
   },
 ];
 
 /** Die Tabellen, deren Zeilen einen Titel tragen, der leer sein darf. */
-const TITLED_TABLES = ['journal_entries', 'wiki_articles', 'operations', 'tasks', 'altars'] as const;
+const TITLED_TABLES = ['entries', 'tasks', 'altars'] as const;
 
-/** Leert die englischen Standardtitel früherer Versionen (`LEGACY_UNTITLED_TITLES`). */
-export async function clearLegacyUntitledTitles(db: Database): Promise<void> {
+/**
+ * Leert die englischen Standardtitel früherer Versionen (`LEGACY_UNTITLED_TITLES`).
+ * `tables` ist für v48, die vor `entries` läuft.
+ */
+export async function clearLegacyUntitledTitles(
+  db: Database,
+  tables: readonly string[] = TITLED_TABLES,
+): Promise<void> {
   const placeholders = LEGACY_UNTITLED_TITLES.map((_, i) => `$${i + 1}`).join(', ');
-  for (const table of TITLED_TABLES) {
+  for (const table of tables) {
     await db.execute(`UPDATE ${table} SET title='' WHERE trim(title) IN (${placeholders})`, [...LEGACY_UNTITLED_TITLES]);
   }
 }

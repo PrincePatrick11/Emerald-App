@@ -27,8 +27,8 @@ import { SIGIL_CATEGORY_ID } from './schema';
  * bekommt nur den Textblock.
  *
  * Scheitert das Speichern einer Zeichnung, bleibt die Zeile ganz unberührt
- * (Spalten und Inhalt) — `convertLegacySigils` läuft bei jedem Öffnen des
- * Vaults erneut über die Zeilen mit Altdaten und holt sie nach. Eine
+ * (Spalten und Inhalt) — v49 (`unifyEntries`) holt sie nach, bevor es die
+ * Spalten verwirft, und bricht ab, solange das nicht gelingt. Eine
  * Zeichnung, die gar kein Bild ist (oder übergroß), wird verworfen statt
  * endlos wiederholt. Die leeren Operationen der Kategorie „Sigillen" nimmt
  * nur die Migration selbst mit — und nur, solange ihr Inhalt noch keine
@@ -182,12 +182,11 @@ export async function hasLegacySigilRows(db: Database): Promise<boolean> {
 
 /**
  * Wandelt Operationszeilen mit Sigillen-Altdaten um. `includeSigilCategory`
- * nimmt auch leere Operationen der Kategorie „Sigillen" mit (nur v42 und der
- * Import alter Backups); `ids` beschränkt auf bestimmte Zeilen (Import).
+ * nimmt auch leere Operationen der Kategorie „Sigillen" mit (nur v42).
  */
 export async function convertLegacySigils(
   db: Database,
-  { includeSigilCategory, ids }: { includeSigilCategory: boolean; ids?: ReadonlySet<string> },
+  { includeSigilCategory }: { includeSigilCategory: boolean },
 ): Promise<{ converted: number; failed: number }> {
   const where = includeSigilCategory ? `category_id = $1 OR ${LEGACY_DATA}` : LEGACY_DATA;
   const rows = (await db.select<LegacySigilRow[]>(
@@ -195,7 +194,7 @@ export async function convertLegacySigils(
             drawing_data, is_loaded, target_reveal_date, charging_technique_wiki_id, show_sigil
        FROM operations WHERE ${where}`,
     includeSigilCategory ? [SIGIL_CATEGORY_ID] : []
-  )).filter((row) => !ids || ids.has(row.id));
+  ));
   if (rows.length === 0) return { converted: 0, failed: 0 };
 
   const articles = new Map(

@@ -111,9 +111,10 @@ const stubPlugin = {
 const entry = join(workDir, 'entry.ts');
 writeFileSync(
   entry,
-  `export { runMigrations, MIGRATIONS } from '${process.cwd().replace(/\\/g, '/')}/src/lib/db';
+  `export { runMigrations, MIGRATIONS, clearLegacyUntitledTitles } from '${process.cwd().replace(/\\/g, '/')}/src/lib/db';
    export { TABLES, TABLE_DDL, ddlIfNotExists, checkIntegrity, reassignCategoryContent, collectUsedImageFilenames } from '${process.cwd().replace(/\\/g, '/')}/src/lib/schema';
    export { copyTable } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbRebuild';
+   export { ddlBeforeV49 } from '${process.cwd().replace(/\\/g, '/')}/src/lib/schemaV48';
    export { assertPayloadReferencesResolve, migrateBackupPayload, withRoutinesAsTemplates } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbBackup';
    export { invalidateVaultCache } from '${process.cwd().replace(/\\/g, '/')}/src/lib/vaultManager';
    export { convertLegacySigils, needsSigilConversion, sigilRowToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLegacySigils';
@@ -152,9 +153,9 @@ globalThis.localStorage ??= {
   removeItem: () => {},
 };
 const {
-  runMigrations, MIGRATIONS, TABLES, TABLE_DDL,
+  runMigrations, MIGRATIONS, clearLegacyUntitledTitles, TABLES, TABLE_DDL,
   ddlIfNotExists, checkIntegrity, reassignCategoryContent,
-  collectUsedImageFilenames, invalidateVaultCache, copyTable,
+  collectUsedImageFilenames, invalidateVaultCache, copyTable, ddlBeforeV49,
   assertPayloadReferencesResolve, convertLegacySigils, migrateBackupPayload, withRoutinesAsTemplates,
   needsSigilConversion, sigilRowToContent, linkedIdsToContent, rowsLinkSource, journalFieldsToContent,
 } = await import(pathToFileURL(bundlePath).href);
@@ -268,10 +269,26 @@ async function chainTo32(name, seed) {
   return db;
 }
 
-/** Der Kettenpfad: v1–v32, dann übernimmt runMigrations und wendet v33–v38 an. */
-async function buildViaChain(name, seed) {
+/**
+ * Der Kettenpfad: v1–v32, dann übernimmt runMigrations und wendet den Rest an.
+ * Mit `until` hält die Kette nach dieser Version an — für Tests, die den Stand
+ * direkt nach einer Migration sehen wollen, bevor eine spätere (etwa v49) die
+ * Tabellen umbaut. `runMigrations(db)` danach setzt die Kette fort.
+ */
+async function buildViaChain(name, seed, until) {
   const db = await chainTo32(name, seed);
-  await runMigrations(db);
+  if (until === undefined) {
+    await runMigrations(db);
+    return db;
+  }
+  for (const m of MIGRATIONS) {
+    if (m.version <= 32 || m.version > until) continue;
+    await m.up(db);
+    await db.execute(
+      'INSERT INTO schema_version (version, name, applied_at) VALUES ($1,$2,$3)',
+      [m.version, m.name, new Date().toISOString()]
+    );
+  }
   return db;
 }
 
@@ -648,10 +665,11 @@ check(
 const droppedCheck = await chain.select(
   `SELECT name FROM sqlite_master WHERE type='table' AND name IN (
      'creations','altar_intentions','custom_properties',
-     'wiki_categories','operation_categories','task_categories','altar_categories','_category_id_map'
+     'wiki_categories','operation_categories','task_categories','altar_categories','_category_id_map',
+     'journal_entries','wiki_articles','operations'
    ) OR name LIKE '%_old'`
 );
-check('Altlasten, alte Kategorie-Tabellen und _old-Tabellen entfernt', droppedCheck.length === 0, JSON.stringify(droppedCheck));
+check('Altlasten, alte Kategorie- und Eintragstabellen und _old-Tabellen entfernt', droppedCheck.length === 0, JSON.stringify(droppedCheck));
 
 console.log('\n2. Foreign Keys\n');
 for (const [label, db] of [['baseline', baseline], ['kette', chain]]) {
@@ -667,11 +685,11 @@ const rows = async (sql) => (await seeded.select(sql))[0];
 
 check(
   'creations-Zeile ist als Operation erhalten',
-  (await rows("SELECT COUNT(*) n FROM operations WHERE id='c1'")).n === 1
+  (await rows("SELECT COUNT(*) n FROM entries WHERE id='c1' AND type='operation'")).n === 1
 );
 check(
   'Operationen vollständig (1 eigene + 1 aus creations)',
-  (await rows('SELECT COUNT(*) n FROM operations')).n === 2
+  (await rows("SELECT COUNT(*) n FROM entries WHERE type='operation'")).n === 2
 );
 check(
   'altar_items.category_id hält jetzt die ID',
@@ -681,19 +699,19 @@ check(
   // v38 hängt eine unbekannte Kategorie auf `other` um — das ist der Stand,
   // den v39 danach vorfindet, es hängt selbst nichts um.
   'verwaister Artikel beim v38-Aufstieg auf „other" umgehängt',
-  (await rows("SELECT category_id c FROM wiki_articles WHERE id='w2'")).c === 'other'
+  (await rows("SELECT category_id c FROM entries WHERE id='w2' AND type='wiki'")).c === 'other'
 );
 check(
   'Artikel mit gültiger Kategorie unverändert',
-  (await rows("SELECT category_id c FROM wiki_articles WHERE id='w1'")).c === 'ritual'
+  (await rows("SELECT category_id c FROM entries WHERE id='w1' AND type='wiki'")).c === 'ritual'
 );
 check(
   'kein Journal-Eintrag verloren',
-  (await rows('SELECT COUNT(*) n FROM journal_entries')).n === 1
+  (await rows("SELECT COUNT(*) n FROM entries WHERE type='journal'")).n === 1
 );
 check(
-  'NULL-JSON-Spalte wurde zu []',
-  (await rows("SELECT linked_wiki_ids v FROM journal_entries WHERE id='j1'")).v === '[]'
+  'das Journal hat nach v49 weder Kategorie noch Icon',
+  (await rows("SELECT COUNT(*) n FROM entries WHERE type='journal' AND (category_id IS NOT NULL OR icon IS NOT NULL)")).n === 0
 );
 check(
   'doppelter task_link entfernt',
@@ -779,20 +797,22 @@ console.log('\n4. checkIntegrity findet, was Foreign Keys nicht abdecken\n');
   const db = freshDb('integrity.db');
   await runMigrations(db);
   await db.execute(
-    `INSERT INTO journal_entries (id,title,content,created_at,updated_at,tags,linked_wiki_ids)
-     VALUES ('j1','Eintrag','',$1,$1,'[]','["gibt-es-nicht"]')`,
+    `INSERT INTO entries (id,type,title,content,created_at,updated_at,tags)
+     VALUES ('e1','wiki','Artikel','',$1,$1,'[]')`,
     [now]
   );
   await db.execute(`INSERT INTO tasks (id,title,created_at,updated_at) VALUES ('t1','Aufgabe',$1,$1)`, [now]);
   await db.execute(
-    `INSERT INTO task_links (id,task_id,target_id,target_type) VALUES ('tl1','t1','fehlt','wiki')`
+    `INSERT INTO task_links (id,task_id,target_id,target_type)
+     VALUES ('tl1','t1','fehlt','wiki'), ('tl2','t1','e1','journal'), ('tl3','t1','e1','wiki')`
   );
 
   const found = await checkIntegrity(db);
-  const hit = (table, column) => found.some((o) => o.table === table && o.column === column);
+  const hit = (id, type) => found.some((o) => o.table === 'task_links' && o.id === id && o.missingTarget === type);
 
-  check('Waise in linked_wiki_ids erkannt', hit('journal_entries', 'linked_wiki_ids'));
-  check('Waise in task_links erkannt', hit('task_links', 'target_id'));
+  check('Waise in task_links erkannt', hit('fehlt', 'wiki'));
+  check('ein Link mit falschem Typ gilt als Waise', hit('e1', 'journal'));
+  check('der richtige Link auf denselben Eintrag nicht', !hit('e1', 'wiki'), JSON.stringify(found));
   check(
     'PRAGMA foreign_key_check sieht davon nichts',
     (await db.select('PRAGMA foreign_key_check')).length === 0
@@ -809,8 +829,8 @@ console.log('\n5. Kategorie löschen verliert keine Einträge\n');
      VALUES ('temporaer','Temporär','🧪',99,0)`
   );
   await db.execute(
-    `INSERT INTO wiki_articles (id,title,slug,content,category_id,created_at,updated_at,tags)
-     VALUES ('a1','Wichtiger Artikel','wichtig','Inhalt','temporaer',$1,$1,'[]')`,
+    `INSERT INTO entries (id,type,title,content,category_id,created_at,updated_at,tags)
+     VALUES ('a1','wiki','Wichtiger Artikel','Inhalt','temporaer',$1,$1,'[]')`,
     [now]
   );
   // Dieselbe Kategorie hält seit v38 auch Inhalte der anderen Module.
@@ -835,7 +855,7 @@ console.log('\n5. Kategorie löschen verliert keine Einträge\n');
 
   await db.execute("DELETE FROM categories WHERE id='temporaer'");
 
-  const [article] = await db.select("SELECT title, category_id FROM wiki_articles WHERE id='a1'");
+  const [article] = await db.select("SELECT title, category_id FROM entries WHERE id='a1'");
   check('Artikel existiert nach der Kategorielöschung weiter', article !== undefined);
   // Seit v39 gibt es kein Sammelbecken mehr: die Inhalte werden kategorielos.
   check('Artikel ist jetzt ohne Kategorie', article?.category_id === null);
@@ -980,7 +1000,7 @@ if (backups.length) {
   check(
     'Schema nach der Wiederaufnahme unverändert',
     (await db.select(
-      "SELECT COUNT(*) AS n FROM pragma_table_info('wiki_articles') WHERE name='category_id'"
+      "SELECT COUNT(*) AS n FROM pragma_table_info('entries') WHERE name='category_id'"
     ))[0].n === 1
   );
   check(
@@ -1018,7 +1038,7 @@ if (backups.length) {
   // `altar_placements_old` sind weg, `tasks_old` und `altar_items_old` noch da.
   // Ohne Marke räumte der nächste Start das fertige `tasks` weg, und dessen
   // ON DELETE CASCADE nähme die ebenfalls fertigen `task_links` mit.
-  const db = await buildViaChain('resume39.db', seedLegacyData);
+  const db = await buildViaChain('resume39.db', seedLegacyData, 48);
   const before = {
     links: (await db.select('SELECT COUNT(*) n FROM task_links'))[0].n,
     placements: (await db.select('SELECT COUNT(*) n FROM altar_placements'))[0].n,
@@ -1027,7 +1047,7 @@ if (backups.length) {
     JSON.stringify(before));
 
   // Den Abbruch nachstellen: v39 entstempeln, den Rebuild von Hand bis kurz
-  // vor Schluss nachbauen. Die Stempel danach (v40–v47) mit: ein Abbruch in
+  // vor Schluss nachbauen. Die Stempel danach (v40–v48) mit: ein Abbruch in
   // v39 kommt nie bis zu ihnen, und der Lauf setzt beim höchsten Stempel an.
   // Auch nicht bis v47 — `links` steht dort also noch.
   await db.execute('DELETE FROM schema_version WHERE version >= 39');
@@ -1036,7 +1056,7 @@ if (backups.length) {
     await db.execute(`ALTER TABLE ${t} RENAME TO ${t}_old`);
   }
   for (const t of ['wiki_articles', 'operations', 'altar_items', 'tasks', 'altar_placements', 'task_links']) {
-    await db.execute(TABLE_DDL[t]);
+    await db.execute(ddlBeforeV49(t));
     await copyTable(db, t, `${t}_old`);
   }
   await db.execute('CREATE TABLE IF NOT EXISTS _v39_content_rebuilt (done INTEGER)');
@@ -1071,7 +1091,7 @@ if (backups.length) {
   check(
     'Indizes stehen auch nach der Wiederaufnahme',
     (await db.select(
-      "SELECT COUNT(*) n FROM sqlite_master WHERE type='index' AND name='idx_wiki_articles_category'"
+      "SELECT COUNT(*) n FROM sqlite_master WHERE type='index' AND name='idx_entries_category'"
     ))[0].n === 1
   );
   check(
@@ -1085,7 +1105,7 @@ console.log('\n8. Migration v35: Bildverweise\n');
 
 {
   const v35 = await buildViaChain('v35.db', seedImageRefs);
-  const [entry] = await v35.select("SELECT content FROM journal_entries WHERE id='j1'");
+  const [entry] = await v35.select("SELECT content FROM entries WHERE id='j1' AND type='journal'");
   const [altar] = await v35.select("SELECT background_image_data, icon_data FROM altars WHERE id='a1'");
 
   check(
@@ -1124,7 +1144,8 @@ console.log('\n8. Migration v35: Bildverweise\n');
 console.log('\n8b. Migration v36: Journal-Verknuepfungen in den Inhalt\n');
 
 {
-  const v36 = await buildViaChain('v36.db', seedLinkedIds);
+  // Bis v48: danach gibt es die Spalten nicht mehr, deren Leeren hier geprüft wird.
+  const v36 = await buildViaChain('v36.db', seedLinkedIds, 48);
   const [entry] = await v36.select(
     "SELECT content, linked_operation_ids, linked_wiki_ids FROM journal_entries WHERE id='j1'"
   );
@@ -1186,13 +1207,17 @@ console.log('\n8b. Migration v36: Journal-Verknuepfungen in den Inhalt\n');
     fourth.content
   );
 
+  await runMigrations(v36);
+  const [carried] = await v36.select("SELECT content FROM entries WHERE id='j1' AND type='journal'");
+  check('v49 übernimmt den umgewandelten Inhalt unverändert', carried?.content === entry.content, carried?.content);
+
   v36.close();
 }
 
 console.log('\n8c. Migration v37: Paradigma/Bannung/Meditation in den Inhalt\n');
 
 {
-  const v37 = await buildViaChain('v37.db', seedJournalFields);
+  const v37 = await buildViaChain('v37.db', seedJournalFields, 48);
   const [entry] = await v37.select(
     `SELECT content, paradigm_id, is_bannung, bannung_type_wiki_id,
             is_meditation, meditation_type_wiki_id, meditation_duration
@@ -1243,6 +1268,10 @@ console.log('\n8c. Migration v37: Paradigma/Bannung/Meditation in den Inhalt\n')
     gone.content === '<p>Text</p>' && gone.paradigm_id === null,
     `${gone.content} / ${gone.paradigm_id}`
   );
+
+  await runMigrations(v37);
+  const [carried] = await v37.select("SELECT content FROM entries WHERE id='j1' AND type='journal'");
+  check('v49 übernimmt den umgewandelten Inhalt unverändert', carried?.content === entry.content, carried?.content);
 
   v37.close();
 }
@@ -1339,7 +1368,7 @@ console.log('\n8d. Migration v38: vier Kategorie-Tabellen werden eine\n');
   check(
     'eigene Operations-„Ritual" ging im Wiki-„ritual" auf, die Operation folgt',
     !byId.has('oc1') && byId.has('ritual') &&
-      (await one("SELECT category_id c FROM operations WHERE id='o1'")).c === 'ritual'
+      (await one("SELECT category_id c FROM entries WHERE id='o1' AND type='operation'")).c === 'ritual'
   );
   check(
     'ehemalige Builtins sind normale Kategorien mit übersetztem Namen',
@@ -1360,8 +1389,8 @@ console.log('\n8d. Migration v38: vier Kategorie-Tabellen werden eine\n');
   );
   check(
     'Artikel unverändert an ihren Kategorien',
-    (await one("SELECT category_id c FROM wiki_articles WHERE id='w1'")).c === 'wc1' &&
-      (await one("SELECT category_id c FROM wiki_articles WHERE id='w2'")).c === 'ritual'
+    (await one("SELECT category_id c FROM entries WHERE id='w1'")).c === 'wc1' &&
+      (await one("SELECT category_id c FROM entries WHERE id='w2'")).c === 'ritual'
   );
   // Die Falle des Umbaus: das Umbenennen von altar_items/tasks biegt die
   // Fremdschlüssel der Kind-Tabellen um — ohne den Mit-Umbau nähme das DROP
@@ -1421,7 +1450,7 @@ console.log('\n8e. Frischer Vault: Builtins und Starter-Set\n');
 console.log('\n8f. Migration v41: Status, Enddatum und Version werden ein Block\n');
 
 {
-  const v41 = await buildViaChain('v41.db', seedOperationStatus);
+  const v41 = await buildViaChain('v41.db', seedOperationStatus, 48);
   const op = async (id) => (await v41.select('SELECT content, is_active, end_date, version, updated_at FROM operations WHERE id=?1', [id]))[0];
   const [s1, s2, s3] = [await op('s1'), await op('s2'), await op('s3')];
   const defs = await v41.select("SELECT id, elements FROM block_definitions WHERE id='core-status'");
@@ -1459,6 +1488,9 @@ console.log('\n8f. Migration v41: Status, Enddatum und Version werden ein Block\
     (await plain.select('SELECT COUNT(*) AS n FROM block_definitions'))[0].n === 0
   );
   plain.close();
+  await runMigrations(v41);
+  const [carried] = await v41.select("SELECT content FROM entries WHERE id='s1' AND type='operation'");
+  check('v49 übernimmt den Status-Block unverändert', carried?.content === s1.content, carried?.content);
   check('v41: Schema identisch mit der Baseline', JSON.stringify(await readSchema(v41)) === JSON.stringify(schemaA));
   v41.close();
 }
@@ -1466,7 +1498,7 @@ console.log('\n8f. Migration v41: Status, Enddatum und Version werden ein Block\
 console.log('\n8g. Migration v42: Sigillen werden Blöcke\n');
 
 {
-  const v42 = await buildViaChain('v42.db', seedSigils);
+  const v42 = await buildViaChain('v42.db', seedSigils, 48);
   const op = async (id) => (await v42.select(
     'SELECT content, drawing_data, intention_text, is_loaded, description, updated_at FROM operations WHERE id=?1', [id]
   ))[0];
@@ -1558,6 +1590,9 @@ console.log('\n8g. Migration v42: Sigillen werden Blöcke\n');
     (await sigilRowToContent(fileRow({ drawing_data: 'data:image/png;base64,FAIL' }), () => undefined)) === undefined
   );
 
+  await runMigrations(v42);
+  const [carried] = await v42.select("SELECT content FROM entries WHERE id='g1' AND type='operation'");
+  check('v49 übernimmt die Sigillen-Blöcke unverändert', carried?.content === g1.content, carried?.content);
   check('v42: Schema identisch mit der Baseline', JSON.stringify(await readSchema(v42)) === JSON.stringify(schemaA));
   v42.close();
 }
@@ -1568,15 +1603,14 @@ console.log('\n8h. Umstempeln: Blöcke-Migrationen mit alter Zählung (v39–v41
   // Der Blöcke-Zweig zählte block_definitions/Status/Sigillen zuerst als
   // v39–v41; v39 ging danach an category_optional. Einen solchen
   // Entwicklungs-Vault nachstellen: Stempel zurückdrehen, v39 fehlt.
-  const db = await buildViaChain('renumber.db', async () => {});
+  // Bis v46: ein solcher Vault stammt von vor v47, und v48 braucht die alten Eintragstabellen.
+  const db = await buildViaChain('renumber.db', async () => {}, 46);
   await db.execute("DELETE FROM schema_version WHERE name = 'category_optional'");
   await db.execute("UPDATE schema_version SET version = 39 WHERE name = 'block_definitions'");
   await db.execute("UPDATE schema_version SET version = 40 WHERE name = 'operation_status_to_blocks'");
   await db.execute("UPDATE schema_version SET version = 41 WHERE name = 'sigils_to_blocks'");
-  // Ein solcher Vault stammt von vor v47: `links` steht noch, und v47 und
-  // alles danach stehen aus.
-  await db.execute(LINKS_BEFORE_V47);
-  await db.execute('DELETE FROM schema_version WHERE version >= 47');
+  // Ein solcher Vault stammt von vor v47: `links` steht noch (die Kette hielt
+  // bei v46 an), und v47 und alles danach stehen aus.
   await runMigrations(db);
   const stamps = Object.fromEntries(
     (await db.select('SELECT name, version FROM schema_version WHERE version >= 39')).map((r) => [r.name, r.version])
@@ -1798,8 +1832,8 @@ console.log('\n8l. Migration v47: die links-Tabelle geht\n');
 console.log('\n8m. Migration v48: alte englische Standardtitel werden leer\n');
 
 {
-  const db = freshDb('untitled.db');
-  await runMigrations(db);
+  // v48 läuft vor v49 und kennt noch die drei Eintragstabellen.
+  const db = await buildViaChain('untitled.db', undefined, 48);
   const at = new Date().toISOString();
   await db.execute(`INSERT INTO journal_entries (id, title, content, created_at, updated_at) VALUES ('j1','Untitled Entry','',$1,$1), ('j2','Mein Tag','',$1,$1)`, [at]);
   await db.execute(`INSERT INTO wiki_articles (id, title, slug, content, created_at, updated_at) VALUES ('w1',' Untitled Article ','w1','',$1,$1)`, [at]);
@@ -1821,6 +1855,141 @@ console.log('\n8m. Migration v48: alte englische Standardtitel werden leer\n');
     titles.j2 === 'Mein Tag' && titles.t2 === 'Untitled Entry list', JSON.stringify(titles));
   await v48.up(db);
   check('v48 ist wiederholbar', true);
+
+  // Der Import alter Sicherungen ruft dasselbe gegen `entries`.
+  await runMigrations(db);
+  await db.execute(`INSERT INTO entries (id, type, title, content, created_at, updated_at) VALUES ('e9','wiki','Untitled Article','',$1,$1)`, [at]);
+  await clearLegacyUntitledTitles(db);
+  check('nach v49 leert es die Standardtitel in entries',
+    (await db.select("SELECT title FROM entries WHERE id='e9'"))[0]?.title === '');
+  db.close();
+}
+
+console.log('\n8n. Migration v49: drei Eintragstabellen werden entries\n');
+
+{
+  const db = await buildViaChain('v49.db', undefined, 48);
+  const at = '2026-01-02T03:04:05.000Z';
+  await db.execute(
+    `INSERT INTO journal_entries (id, title, content, entry_number, moon_phase, paradigm_id, tags, created_at, updated_at)
+     VALUES ('j1','Tag','<p>J</p>',7,'full','alt','["a"]',$1,$1), ('dup','Doppelt','<p>Journal</p>',8,NULL,NULL,'[]',$1,$1)`,
+    [at]
+  );
+  await db.execute(
+    `INSERT INTO wiki_articles (id, title, slug, content, category_id, entry_number, icon, cover_image, tags, created_at, updated_at, deleted_at)
+     VALUES ('w1','Artikel','w1','<p>W</p>','sigils',3,'🌿','bild.png','[]',$1,$1,NULL),
+            ('w2','Gelöscht','w2','','sigils',4,NULL,NULL,'[]',$1,$1,$1),
+            ('dup','Doppelt','dup','<p>Wiki</p>',NULL,1,NULL,NULL,'[]',$1,$1,NULL)`,
+    [at]
+  );
+  await db.execute(
+    `INSERT INTO operations (id, title, content, category_id, entry_number, intention_text, tags, created_at, updated_at)
+     VALUES ('o1','Operation','<p>O</p>',NULL,12,'weg','["b"]',$1,$1)`,
+    [at]
+  );
+
+  // Abbruch nachstellen: das Journal ist schon drüben und seine Tabelle weg,
+  // Wiki und Operationen stehen noch.
+  await db.execute(TABLE_DDL.entries);
+  await db.execute(
+    `INSERT INTO entries (id, type, title, content, entry_number, tags, created_at, updated_at)
+     SELECT id, 'journal', title, content, entry_number, tags, created_at, updated_at FROM journal_entries`
+  );
+  await db.execute('DROP TABLE journal_entries');
+
+  let resumed = true;
+  let message = '';
+  try {
+    await runMigrations(db);
+  } catch (err) {
+    resumed = false;
+    message = String(err?.message ?? err);
+  }
+  check('abgebrochenes v49 setzt beim nächsten Start wieder an', resumed, message);
+
+  const rows = Object.fromEntries((await db.select('SELECT * FROM entries')).map((r) => [r.id, r]));
+  check('jede Zeile steht genau einmal in entries', Object.keys(rows).length === 5, JSON.stringify(Object.keys(rows)));
+  check(
+    'Typ, Nummer, Kategorie, Icon, Titelbild und Tags bleiben',
+    rows.w1?.type === 'wiki' && rows.w1.entry_number === 3 && rows.w1.category_id === 'sigils' &&
+      rows.w1.icon === '🌿' && rows.w1.cover_image === 'bild.png' &&
+      rows.o1?.type === 'operation' && rows.o1.entry_number === 12 && rows.o1.tags === '["b"]' &&
+      rows.j1?.type === 'journal' && rows.j1.entry_number === 7 && rows.j1.content === '<p>J</p>',
+    JSON.stringify(rows)
+  );
+  check('der Papierkorb bleibt Papierkorb', rows.w2?.deleted_at === at, JSON.stringify(rows.w2));
+  check(
+    'eine ID aus zwei Tabellen kommt einmal an — die erste gewinnt',
+    rows.dup?.type === 'journal' && rows.dup.content === '<p>Journal</p>',
+    JSON.stringify(rows.dup)
+  );
+  check(
+    'slug, moon_phase und die toten Spalten sind weg',
+    !['slug', 'moon_phase', 'paradigm_id', 'intention_text'].some((c) => c in rows.w1),
+    JSON.stringify(Object.keys(rows.w1))
+  );
+  check(
+    'v49 hat vorher eine Sicherung angelegt',
+    readdirSync(join(workDir, 'v49')).some((f) => f.includes('.pre-v49'))
+  );
+  await MIGRATIONS.find((m) => m.version === 49).up(db);
+  check('v49 ist wiederholbar', (await db.select('SELECT COUNT(*) n FROM entries'))[0].n === 5);
+  check('v49: Schema identisch mit der Baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
+  db.close();
+}
+
+{
+  // Eine '11'-Datei trägt `entries`; der Import teilt sie wieder nach Typ.
+  const backup = {
+    version: '11', type: 'backup', exportedAt: now, filters: {}, images: {},
+    data: {
+      entries: [
+        { id: 'j', type: 'journal', title: 'J' },
+        { id: 'w', type: 'wiki', title: 'W' },
+        { id: 'o', type: 'operation', title: 'O' },
+        { id: 'x', type: 'unbekannt', title: 'X' },
+      ],
+    },
+  };
+  migrateBackupPayload(backup);
+  check(
+    "Import einer '11': entries wird nach Typ geteilt, Unbekanntes fällt weg",
+    backup.data.journalEntries.length === 1 && backup.data.wikiArticles[0].id === 'w' &&
+      backup.data.operations[0].id === 'o' && !('entries' in backup.data),
+    JSON.stringify(backup.data)
+  );
+  let rejected = false;
+  try {
+    migrateBackupPayload({ ...backup, version: '12', data: {} });
+  } catch {
+    rejected = true;
+  }
+  check('eine Datei aus einer neueren Version wird abgewiesen', rejected);
+}
+
+{
+  // Eine Sigille, deren Zeichnung v42 nicht speichern konnte, wartet in ihrer
+  // Spalte — v49 darf sie nicht wegwerfen.
+  const db = await buildViaChain('v49-sigil.db', undefined, 48);
+  await db.execute(
+    `INSERT INTO operations (id, title, content, created_at, updated_at, tags, drawing_data)
+     VALUES ('s1','Sigille','',$1,$1,'[]','data:image/png;base64,FAIL')`,
+    [now]
+  );
+  let failed = false;
+  try {
+    await runMigrations(db);
+  } catch {
+    failed = true;
+  }
+  check(
+    'v49 bricht ab, solange eine Zeichnung nicht gespeichert werden kann',
+    failed && (await db.select("SELECT drawing_data d FROM operations WHERE id='s1'"))[0]?.d === 'data:image/png;base64,FAIL'
+  );
+  await db.execute("UPDATE operations SET drawing_data='data:image/png;base64,CCCC' WHERE id='s1'");
+  await runMigrations(db);
+  const [s1] = await db.select("SELECT content FROM entries WHERE id='s1'");
+  check('beim nächsten Versuch wird sie Block und v49 läuft durch', s1?.content.includes('core.sigil.canvas'), s1?.content);
   db.close();
 }
 
