@@ -16,7 +16,6 @@ import Button from '../ui/Button';
 import { NoResults } from '../ui/EmptyState';
 import Dashboard from '../ui/Dashboard';
 import EmojiPicker from '../ui/EmojiPicker';
-import InlineConfirm from '../ui/InlineConfirm';
 import InlineNameEditor from '../ui/InlineNameEditor';
 import ModuleCounts from '../ui/ModuleCounts';
 import type { Category } from '../../types';
@@ -115,7 +114,6 @@ export default function CategoriesView() {
   const [form, setForm] = useState<FormState | null>(null);
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState(DEFAULT_EMOJI);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useSessionState('categories.search', '');
   /** Fehlermeldung neben dem Namensfeld — heute nur „Name schon vergeben". */
   const [nameError, setNameError] = useState<string | null>(null);
@@ -216,7 +214,6 @@ export default function CategoriesView() {
 
   // ── Anlegen / Bearbeiten / Löschen ────────────────────────────────────────
   const openForm = (next: FormState, withName: string, withEmoji: string) => {
-    setConfirmDeleteId(null);
     setNameError(null);
     setName(withName);
     setEmoji(withEmoji);
@@ -224,7 +221,6 @@ export default function CategoriesView() {
   };
 
   const closeForm = () => {
-    setConfirmDeleteId(null);
     setNameError(null);
     setForm(null);
   };
@@ -245,13 +241,8 @@ export default function CategoriesView() {
     closeForm();
   };
 
-  /** Erster Aufruf fragt nach, zweiter löscht. */
+  /** Ohne Rückfrage in den Papierkorb, wie alles andere — der Hinweis bietet Rückgängig. */
   const handleDelete = async (id: string) => {
-    if (confirmDeleteId !== id) {
-      setConfirmDeleteId(id);
-      return;
-    }
-    setConfirmDeleteId(null);
     // Eingebaute Kategorien lehnt der Store ab. Ohne diese Prüfung meldete die
     // Oberfläche „Kategorie gelöscht" samt Rückgängig-Knopf für etwas, das nie
     // passiert ist.
@@ -281,7 +272,6 @@ export default function CategoriesView() {
 
     const counts = countsById.get(cat.id) ?? emptyCategoryUsage();
     const isDragging = dragState?.fromId === cat.id;
-    const confirming = confirmDeleteId === cat.id;
 
     return (
       <div
@@ -318,22 +308,18 @@ export default function CategoriesView() {
             die Breite der beiden Knöpfe aus der Flucht. */}
         <span className="flex items-center justify-end gap-1.5 flex-shrink-0 min-w-[54px]">
           {cat.is_builtin ? null : (
-            confirming ? (
-              <InlineConfirm small onConfirm={() => handleDelete(cat.id)} onCancel={() => setConfirmDeleteId(null)} />
-            ) : (
-              <>
-                <Button
-                  tone="amber" compact small
-                  title={t('editor.edit')} aria-label={t('editor.edit')}
-                  onClick={() => openForm({ mode: 'edit', id: cat.id }, cat.name, cat.emoji)}
-                >
-                  <Pencil size={12} />
-                </Button>
-                <Button tone="danger" compact small title={t('common.delete')} aria-label={t('common.delete')} onClick={() => handleDelete(cat.id)}>
-                  <Trash2 size={12} />
-                </Button>
-              </>
-            )
+            <>
+              <Button
+                tone="amber" compact small
+                title={t('editor.edit')} aria-label={t('editor.edit')}
+                onClick={() => openForm({ mode: 'edit', id: cat.id }, cat.name, cat.emoji)}
+              >
+                <Pencil size={12} />
+              </Button>
+              <Button tone="danger" compact small title={t('common.delete')} aria-label={t('common.delete')} onClick={() => handleDelete(cat.id)}>
+                <Trash2 size={12} />
+              </Button>
+            </>
           )}
         </span>
       </div>

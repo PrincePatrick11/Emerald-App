@@ -149,7 +149,10 @@ interface AltarState {
   savePlacementPosition: (id: string, x: number, y: number) => Promise<void>;
   updatePlacement: (id: string, patch: Partial<Pick<AltarPlacement, 'x' | 'y' | 'z_index' | 'width' | 'height' | 'rotation' | 'opacity' | 'locked' | 'hidden'>>) => Promise<void>;
   duplicatePlacement: (id: string) => Promise<void>;
-  removePlacement: (id: string) => Promise<void>;
+  /** Nimmt eine Platzierung vom Altar und gibt sie zurück — für das Rückgängig (`restorePlacement`). */
+  removePlacement: (id: string) => Promise<AltarPlacement | undefined>;
+  /** Legt eine entfernte Platzierung wieder hin, wie sie war — sofern Altar und Element noch da sind. */
+  restorePlacement: (placement: AltarPlacement) => Promise<void>;
   saveIntention: (text: string) => Promise<void>;
   setIntentionLocal: (text: string) => void;
 }
@@ -689,6 +692,9 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   },
 
   removePlacement: async (id) => {
+    const found = get().placements.find((p) => p.id === id);
+    const altarId = found?.altar_id ?? get().activeAltarId;
+    const removed = found && altarId ? { ...found, altar_id: altarId } : undefined;
     const db = await getDb();
     await db.execute('DELETE FROM altar_placements WHERE id=$1', [id]);
     set((s) => ({
@@ -698,6 +704,31 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     }));
     const activeAltarId = get().activeAltarId;
     if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
+    return removed;
+  },
+
+  restorePlacement: async (placement) => {
+    const { altars, items } = get();
+    const altarId = placement.altar_id;
+    const item = items.find((entry) => entry.id === placement.item_id);
+    if (!altarId || !item || !altars.some((altar) => altar.id === altarId)) return;
+    const db = await getDb();
+    // OR IGNORE: ein Abbrechen der Bearbeitung kann sie schon zurückgebracht haben.
+    const { rowsAffected } = await db.execute(
+      'INSERT OR IGNORE INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
+      [placement.id, altarId, placement.item_id, placement.x, placement.y, placement.z_index, placement.width,
+        placement.height, placement.rotation, placement.opacity, toInt(placement.locked), toInt(placement.hidden)]
+    );
+    if (!rowsAffected) return;
+    // Name, Emoji und Bild in der heutigen Fassung des Elements.
+    const back = { ...placement, name: item.name, emoji: item.emoji, category_id: item.category_id, image_data: item.image_data };
+    set((s) => ({
+      placements: s.activeAltarId === altarId ? [...s.placements, back] : s.placements,
+      previewPlacements: s.previewPlacements[altarId]
+        ? { ...s.previewPlacements, [altarId]: [...s.previewPlacements[altarId], back] }
+        : s.previewPlacements,
+    }));
+    await get().bumpAltarUpdatedAt(altarId);
   },
 
   saveIntention: async (text) => {

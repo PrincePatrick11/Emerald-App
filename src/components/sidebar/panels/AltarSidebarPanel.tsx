@@ -20,10 +20,11 @@ import {
   isRatioFormat,
   ratioFromResolution,
 } from '../../../lib/altarConstants';
-import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../../lib/helpers';
+import { generateId, readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../../lib/helpers';
 import { ImageTooLargeError, imageSizeLabel, prepareImageDataUrl } from '../../../lib/imageLimits';
 import Button from '../../ui/Button';
 import { useUIStore } from '../../../store/uiStore';
+import { useUndoStore } from '../../../store/undoStore';
 import { useDisplayedAltar } from '../../../hooks/useDisplayedAltar';
 import { usePointerReorder } from '../../../hooks/usePointerReorder';
 import { imageSrc, saveImage } from '../../../lib/images';
@@ -45,6 +46,7 @@ export default function AltarSidebarPanel() {
     updatePlacement,
     duplicatePlacement,
     removePlacement,
+    restorePlacement,
   } = useAltarStore(
     useShallow((s) => ({
       updateAltar: s.updateAltar,
@@ -52,9 +54,17 @@ export default function AltarSidebarPanel() {
       updatePlacement: s.updatePlacement,
       duplicatePlacement: s.duplicatePlacement,
       removePlacement: s.removePlacement,
+      restorePlacement: s.restorePlacement,
     })),
   );
   const updateAltarGrid = useAltarStore((s) => s.updateAltarGrid);
+  const pushUndo = useUndoStore((s) => s.push);
+  /** Ohne Rückfrage, wie jedes Löschen — der Hinweis bietet Rückgängig. */
+  const removeWithUndo = async (id: string) => {
+    const removed = await removePlacement(id);
+    if (!removed) return;
+    pushUndo({ id: generateId(), description: t('undo.placementRemoved'), undo: () => restorePlacement(removed) });
+  };
   const updateAltarResolution = useAltarStore((s) => s.updateAltarResolution);
   const activeView = useUIStore((s) => s.activeView);
   const isEditing = activeView.type === 'altar' && activeView.mode === 'edit';
@@ -705,7 +715,7 @@ const [gridOpen, setGridOpen] = useState(true);
                   onToggleHidden={() => updatePlacement(placement.id, { hidden: !placement.hidden })}
                   onToggleLocked={() => updatePlacement(placement.id, { locked: !placement.locked })}
                   onDuplicate={() => duplicatePlacement(placement.id)}
-                  onRemove={() => removePlacement(placement.id)}
+                  onRemove={() => void removeWithUndo(placement.id)}
                   onGripPointerDown={(e) => startDrag(e, placement.id)}
                 />
                 {isEditing && selectedPlacementId === placement.id && selectedPlacement && (

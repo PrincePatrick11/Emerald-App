@@ -79,7 +79,8 @@
     "templateDeleted": "Vorlage gelöscht",
     "languageDeleted": "Sprache gelöscht",
     "altarDeleted": "Altar gelöscht",
-    "wordDeleted": "Vokabel gelöscht"
+    "wordDeleted": "Vokabel gelöscht",
+    "placementRemoved": "Element vom Altar genommen"
   },
   "nav": {
     "home": "Start",

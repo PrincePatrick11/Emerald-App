@@ -79,7 +79,8 @@
     "templateDeleted": "Template deleted",
     "languageDeleted": "Language deleted",
     "altarDeleted": "Altar deleted",
-    "wordDeleted": "Word deleted"
+    "wordDeleted": "Word deleted",
+    "placementRemoved": "Element removed from altar"
   },
   "nav": {
     "home": "Home",

@@ -23,7 +23,6 @@ import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import DashboardItem from '../ui/DashboardItem';
-import InlineConfirm from '../ui/InlineConfirm';
 import InlineNameEditor from '../ui/InlineNameEditor';
 import ModuleCounts from '../ui/ModuleCounts';
 import type { ActiveView, Tag } from '../../types';
@@ -155,7 +154,6 @@ export default function TagsView() {
   const [name, setName] = useState('');
   const [color, setColor] = useState(TAG_COLORS[0]);
   const [nameError, setNameError] = useState<string | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ tagId: string; x: number; y: number } | null>(null);
 
   // Der Tiefenlink aus der globalen Suche klappt den Tag auf; Suche und
@@ -265,7 +263,6 @@ export default function TagsView() {
 
   // ── Anlegen / Umbenennen / Löschen ────────────────────────────────────────
   const openForm = (next: FormState, withName: string, withColor: string) => {
-    setConfirmDeleteId(null);
     setNameError(null);
     setName(withName);
     setColor(withColor);
@@ -303,13 +300,8 @@ export default function TagsView() {
     closeForm();
   };
 
-  /** Erster Aufruf fragt nach, zweiter löscht. */
+  /** Ohne Rückfrage in den Papierkorb, wie alles andere — der Hinweis bietet Rückgängig. */
   const handleDelete = async (tag: Tag) => {
-    if (confirmDeleteId !== tag.id) {
-      setConfirmDeleteId(tag.id);
-      return;
-    }
-    setConfirmDeleteId(null);
     await deleteTag(tag.name);
     pushUndo({
       id: generateId(),
@@ -336,7 +328,6 @@ export default function TagsView() {
         <div data-tag-id={tag.id}>{editRow}</div>
       );
     }
-    const confirming = confirmDeleteId === tag.id;
     const usage = usageByTag.get(tag.name);
     return (
       <div
@@ -351,9 +342,7 @@ export default function TagsView() {
           meta={usage
             ? <ModuleCounts modules={TAG_MODULE_IDS} counts={usage} />
             : <span className="text-xs text-stone-600">{t('tags.unused')}</span>}
-          actions={confirming ? (
-            <InlineConfirm small onConfirm={() => handleDelete(tag)} onCancel={() => setConfirmDeleteId(null)} />
-          ) : (
+          actions={
             // Dauerhaft sichtbar wie in der Kategorien-Ansicht.
             <span className="flex items-center gap-1.5 flex-shrink-0">
               <Button tone="amber" compact small title={t('contextMenu.rename')} aria-label={t('contextMenu.rename')}
@@ -365,7 +354,7 @@ export default function TagsView() {
                 <Trash2 size={12} />
               </Button>
             </span>
-          )}
+          }
         />
       </div>
     );

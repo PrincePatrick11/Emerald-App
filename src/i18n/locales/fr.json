@@ -79,7 +79,8 @@
     "templateDeleted": "Modèle supprimé",
     "languageDeleted": "Langue supprimée",
     "altarDeleted": "Autel supprimé",
-    "wordDeleted": "Mot supprimé"
+    "wordDeleted": "Mot supprimé",
+    "placementRemoved": "Élément retiré de l'autel"
   },
   "nav": {
     "home": "Accueil",
