@@ -159,7 +159,6 @@
     "rotationSnap": "Snap rotation angle",
     "rotationSnapAngle": "Angle step (°)",
     "snapScaleToGrid": "Scale to grid",
-    "snapNeedsGrid": "Show the grid to snap to it",
     "gridToggleGrid": "Grid",
     "gridToggleSnap": "Snap",
     "gridToggleRotate": "Rotate",

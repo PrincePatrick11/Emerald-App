@@ -134,7 +134,7 @@ Exporting the altar as an image (JPEG / PNG / WebP) is done from the application
 
 The grid is rendered as an SVG overlay directly in the canvas, with lines placed at exact percentage positions derived from a stable reference resolution. This means the grid renders without edge artefacts on Retina displays and does not change its cell count when the window is resized.
 
-- *Snap to grid* — snaps item positions precisely to the nearest grid intersection. Step sizes match the visual grid lines exactly. Both snap buttons (position and scale) need the grid to be shown: with it off they are disabled and their tooltip says so, and nothing snaps.
+- *Snap to grid* — snaps item positions precisely to the nearest grid intersection. Step sizes match the visual grid lines exactly. Snapping works with the grid hidden as well; the grid size can then still be set, since the size slider shows as soon as the grid or a snap option is on (opacity and colour only while the grid is shown).
 - *Snap rotation angle* — when enabled, dragging the rotation handle snaps to a configurable angle step (1–180°, default 15°). When disabled, rotation is free; holding Shift still snaps to 15° steps.
 - *Scale to grid* — when enabled, resizing a placement snaps to an even number of grid cells (at least 2), the same on both axes, so items always align to the grid as a square box.
 

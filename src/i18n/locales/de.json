@@ -159,7 +159,6 @@
     "rotationSnap": "Rotationswinkel einrasten",
     "rotationSnapAngle": "Winkelschritt (°)",
     "snapScaleToGrid": "Skalierung am Raster einrasten",
-    "snapNeedsGrid": "Raster einblenden, um daran einzurasten",
     "gridToggleGrid": "Raster",
     "gridToggleSnap": "Einrasten",
     "gridToggleRotate": "Drehen",

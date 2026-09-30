@@ -337,9 +337,9 @@ export function AltarCanvas({
    * Ziehen — ein Klick wählt nur aus und verschiebt nichts.
    */
   const draggingRef = useRef<{ id: string; grabX: number; grabY: number; startX: number; startY: number; moved: boolean } | null>(null);
-  // Einrasten braucht das Raster, an dem es einrastet: ohne sichtbares Raster rastet nichts.
-  const snapPosition = snapToGrid && showGrid;
-  const snapScale = snapScaleToGrid && showGrid;
+  // Eingerastet wird auch am ausgeblendeten Raster — „Raster" blendet es nur ein.
+  const snapPosition = snapToGrid;
+  const snapScale = snapScaleToGrid;
   const [sidebarDragItem, setSidebarDragItem] = useState<AltarItem | null>(null);
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
   const sortedPlacements = useMemo(

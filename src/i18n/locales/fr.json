@@ -159,7 +159,6 @@
     "rotationSnap": "Aligner l'angle de rotation",
     "rotationSnapAngle": "Pas d'angle (°)",
     "snapScaleToGrid": "Mettre à l'échelle de la grille",
-    "snapNeedsGrid": "Affichez la grille pour vous y aligner",
     "gridToggleGrid": "Grille",
     "gridToggleSnap": "Aligner",
     "gridToggleRotate": "Rotation",

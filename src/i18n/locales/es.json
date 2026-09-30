@@ -159,7 +159,6 @@
     "rotationSnap": "Ajustar ángulo de rotación",
     "rotationSnapAngle": "Paso de ángulo (°)",
     "snapScaleToGrid": "Escalar a la cuadrícula",
-    "snapNeedsGrid": "Muestra la cuadrícula para ajustar a ella",
     "gridToggleGrid": "Cuadrícula",
     "gridToggleSnap": "Ajustar",
     "gridToggleRotate": "Rotar",

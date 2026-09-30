@@ -557,28 +557,24 @@ const noticeTimerRef = useRef<number | null>(null);
               {gridOpen && <>
               <div className="mt-2 grid grid-cols-4 gap-1">
                 {([
-                  { key: 'grid_enabled' as const, icon: Grid3x3, label: t('altar.gridToggleGrid'), title: t('altar.gridOverlay'), toggle: () => updateAltarGrid(activeAltar.id, { grid_enabled: !activeAltar.grid_enabled }), active: activeAltar.grid_enabled, needsGrid: false },
-                  { key: 'snap_to_grid' as const, icon: Magnet, label: t('altar.gridToggleSnap'), title: t('altar.snapToGrid'), toggle: () => updateAltarGrid(activeAltar.id, { snap_to_grid: !activeAltar.snap_to_grid }), active: activeAltar.snap_to_grid, needsGrid: true },
-                  { key: 'rotation_snap_enabled' as const, icon: RotateCw, label: t('altar.gridToggleRotate'), title: t('altar.rotationSnap'), toggle: () => updateAltarGrid(activeAltar.id, { rotation_snap_enabled: !activeAltar.rotation_snap_enabled }), active: activeAltar.rotation_snap_enabled, needsGrid: false },
-                  { key: 'snap_scale_to_grid' as const, icon: Scaling, label: t('altar.gridToggleScale'), title: t('altar.snapScaleToGrid'), toggle: () => updateAltarGrid(activeAltar.id, { snap_scale_to_grid: !activeAltar.snap_scale_to_grid }), active: activeAltar.snap_scale_to_grid, needsGrid: true },
-                ] as const).map(({ key, icon: Icon, label, title, toggle, active, needsGrid }) => {
-                  // Einrasten am Raster wirkt nur, solange es zu sehen ist (AltarCanvas).
-                  const off = needsGrid && !activeAltar.grid_enabled;
-                  return (
+                  { key: 'grid_enabled' as const, icon: Grid3x3, label: t('altar.gridToggleGrid'), title: t('altar.gridOverlay'), toggle: () => updateAltarGrid(activeAltar.id, { grid_enabled: !activeAltar.grid_enabled }), active: activeAltar.grid_enabled },
+                  { key: 'snap_to_grid' as const, icon: Magnet, label: t('altar.gridToggleSnap'), title: t('altar.snapToGrid'), toggle: () => updateAltarGrid(activeAltar.id, { snap_to_grid: !activeAltar.snap_to_grid }), active: activeAltar.snap_to_grid },
+                  { key: 'rotation_snap_enabled' as const, icon: RotateCw, label: t('altar.gridToggleRotate'), title: t('altar.rotationSnap'), toggle: () => updateAltarGrid(activeAltar.id, { rotation_snap_enabled: !activeAltar.rotation_snap_enabled }), active: activeAltar.rotation_snap_enabled },
+                  { key: 'snap_scale_to_grid' as const, icon: Scaling, label: t('altar.gridToggleScale'), title: t('altar.snapScaleToGrid'), toggle: () => updateAltarGrid(activeAltar.id, { snap_scale_to_grid: !activeAltar.snap_scale_to_grid }), active: activeAltar.snap_scale_to_grid },
+                ] as const).map(({ key, icon: Icon, label, title, toggle, active }) => (
                   <button
                     key={key}
                     onClick={toggle}
-                    disabled={off}
-                    title={off ? `${title} — ${t('altar.snapNeedsGrid')}` : title}
-                    className={`flex flex-col items-center gap-0.5 rounded-md border px-1 py-1.5 transition-colors ${off ? 'border-stone-700/60 bg-stone-900/45 text-stone-500 opacity-50 cursor-not-allowed' : active ? 'border-jade-600/70 bg-jade-900/40 text-jade-300' : 'border-stone-700/60 bg-stone-900/45 text-stone-500 hover:border-stone-500/70 hover:text-stone-300'}`}
+                    title={title}
+                    className={`flex flex-col items-center gap-0.5 rounded-md border px-1 py-1.5 transition-colors ${active ? 'border-jade-600/70 bg-jade-900/40 text-jade-300' : 'border-stone-700/60 bg-stone-900/45 text-stone-500 hover:border-stone-500/70 hover:text-stone-300'}`}
                   >
                     <Icon size={13} />
                     <span className="text-[9px] leading-none">{label}</span>
                   </button>
-                  );
-                })}
+                ))}
               </div>
-              {activeAltar.grid_enabled && (
+              {/* Die Größe gilt auch fürs Einrasten am ausgeblendeten Raster; Deckkraft und Farbe nur fürs sichtbare. */}
+              {(activeAltar.grid_enabled || activeAltar.snap_to_grid || activeAltar.snap_scale_to_grid) && (
                 <div className="mt-2 rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2 space-y-2">
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
@@ -603,6 +599,7 @@ const noticeTimerRef = useRef<number | null>(null);
                       />
                     </div>
                   </div>
+                  {activeAltar.grid_enabled && <>
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] uppercase tracking-wider text-stone-500">{t('altar.gridOpacity')}</span>
@@ -636,6 +633,7 @@ const noticeTimerRef = useRef<number | null>(null);
                       className="h-6 w-10 rounded border border-stone-700 bg-stone-800 p-0"
                     />
                   </div>
+                  </>}
                 </div>
               )}
               {activeAltar.rotation_snap_enabled && (
