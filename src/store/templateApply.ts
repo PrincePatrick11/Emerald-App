@@ -8,9 +8,7 @@
  * Import-Regel wie `blockCopies`: dieser Store liest die Inhalts-Stores und
  * den Vorlagen-Store, keiner von ihnen importiert zurück.
  */
-import { useJournalStore } from './journalStore';
-import { useWikiStore } from './wikiStore';
-import { useOperationStore } from './operationStore';
+import { useEntryStore } from './entryStore';
 import { useTemplateStore } from './templateStore';
 import { useBlockSessionStore } from './blockSessionStore';
 import { createMissingTags, withUsableTags } from '../lib/templateTags';
@@ -43,19 +41,12 @@ export interface TemplateApplyOptions extends TemplateFieldOptions {
 }
 
 function entryFields(entryType: TemplateEntryType, id: string): (TemplateFields & { content: string }) | undefined {
-  switch (entryType) {
-    case 'journal': return useJournalStore.getState().entries.find((e) => e.id === id);
-    case 'wiki': return useWikiStore.getState().articles.find((a) => a.id === id);
-    case 'operation': return useOperationStore.getState().operations.find((o) => o.id === id);
-  }
+  const entry = useEntryStore.getState().getEntry(id);
+  return entry?.type === entryType ? entry : undefined;
 }
 
-function updateFields(entryType: TemplateEntryType, id: string, patch: Partial<TemplateFields>): Promise<void> {
-  switch (entryType) {
-    case 'journal': return useJournalStore.getState().updateEntry(id, patch);
-    case 'wiki': return useWikiStore.getState().updateArticle(id, patch);
-    case 'operation': return useOperationStore.getState().updateOperation(id, patch);
-  }
+function updateFields(_entryType: TemplateEntryType, id: string, patch: Partial<TemplateFields>): Promise<void> {
+  return useEntryStore.getState().updateEntry(id, patch);
 }
 
 /** Schreibt nur, was sich an Titel oder Tags geändert hat. */

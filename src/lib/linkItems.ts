@@ -4,10 +4,7 @@ import { DEFAULT_ENTRY_EMOJI } from './modules';
 import { displayTitle } from './entryTitle';
 import { categoryLabel, lookupCategory } from './categories';
 import { isImageIcon } from './helpers';
-import type {
-  AltarRecord, Category, ContentType, JournalEntry, Operation,
-  Task, WikiArticle,
-} from '../types';
+import type { AltarRecord, Category, ContentType, Entry, Task } from '../types';
 
 /**
  * Ein verlinkbarer Eintrag, wie ihn die `[[`-Autovervollständigung, der
@@ -66,10 +63,10 @@ export interface SuggestionItem {
  * beim Laden), hier braucht es dafür keinen zweiten Filter.
  */
 export interface LinkItemSources {
-  entries: JournalEntry[];
+  entries: Entry[];
   tasks: Task[];
-  operations: Operation[];
-  articles: WikiArticle[];
+  operations: Entry[];
+  articles: Entry[];
   /** Die eine globale Liste — Aufgaben, Operationen und Artikel zeigen alle hinein. */
   categories: Category[];
   altars: AltarRecord[];

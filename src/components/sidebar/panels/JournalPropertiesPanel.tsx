@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
-import { useJournalStore } from '../../../store/journalStore';
+import { useEntryStore } from '../../../store/entryStore';
 import TagsField from '../fields/TagsField';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
 import EntryTypeField from '../fields/EntryTypeField';
@@ -35,8 +35,8 @@ export default function JournalPropertiesPanel() {
   const { t } = useTranslation();
   const activeView = useUIStore((s) => s.activeView);
   const isEditing = activeView.mode === 'edit';
-  const entries = useJournalStore((s) => s.entries);
-  const updateEntry = useJournalStore((s) => s.updateEntry);
+  const entries = useEntryStore((s) => s.entries.journal);
+  const updateEntry = useEntryStore((s) => s.updateEntry);
 
   const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
 

@@ -25,9 +25,7 @@ import { journalIcon } from '../../lib/moonPhase';
 import type { ContentType } from '../../types';
 import { displayTitle } from '../../lib/entryTitle';
 import i18n from '../../i18n';
-import { useJournalStore } from '../../store/journalStore';
-import { useWikiStore } from '../../store/wikiStore';
-import { useOperationStore } from '../../store/operationStore';
+import { useEntryStore } from '../../store/entryStore';
 import { useTaskStore } from '../../store/taskStore';
 import { useAltarStore } from '../../store/altarStore';
 import { isAcceptedImageFile, readFileAsDataUrl } from '../../lib/helpers';
@@ -106,10 +104,10 @@ export default function RichEditor({
   editable = true,
   onEditorReady,
 }: RichEditorProps) {
-  const entries = useJournalStore((s) => s.entries);
-  const articles = useWikiStore((s) => s.articles);
+  const entries = useEntryStore((s) => s.entries.journal);
+  const articles = useEntryStore((s) => s.entries.wiki);
   const categories = useCategoryStore((s) => s.categories);
-  const operations = useOperationStore((s) => s.operations);
+  const operations = useEntryStore((s) => s.entries.operation);
   const tasks = useTaskStore((s) => s.tasks);
   const altars = useAltarStore((s) => s.altars);
   const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);

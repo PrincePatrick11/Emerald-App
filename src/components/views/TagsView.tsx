@@ -3,9 +3,7 @@ import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Pencil, Trash2 } from 'lucide-react';
 import { TAG_COLORS, TAG_NAME_TAKEN, randomTagColor, useTagStore } from '../../store/tagStore';
-import { useJournalStore } from '../../store/journalStore';
-import { useWikiStore } from '../../store/wikiStore';
-import { useOperationStore } from '../../store/operationStore';
+import { useEntryStore } from '../../store/entryStore';
 import { useTemplateStore } from '../../store/templateStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { TAGS_SORTS, isTagsSort, useUIStore } from '../../store/uiStore';
@@ -138,9 +136,9 @@ export default function TagsView() {
   const pushUndo = useUndoStore((s) => s.push);
   // Kein fetch beim Mount: reloadAllStores() lädt Tags und Inhalte beim Start
   // und beim Vault-Wechsel.
-  const entries = useJournalStore((s) => s.entries);
-  const articles = useWikiStore((s) => s.articles);
-  const operations = useOperationStore((s) => s.operations);
+  const entries = useEntryStore((s) => s.entries.journal);
+  const articles = useEntryStore((s) => s.entries.wiki);
+  const operations = useEntryStore((s) => s.entries.operation);
   const templates = useTemplateStore((s) => s.templates);
   const categories = useCategoryStore((s) => s.categories);
   const sort = useUIStore((s) => s.tagsSort);

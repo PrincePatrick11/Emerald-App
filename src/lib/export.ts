@@ -5,8 +5,7 @@ import TurndownService from 'turndown';
 import { format } from 'date-fns';
 import DOMPurify from 'dompurify';
 import type { ExportData } from './exportData';
-import { useWikiStore } from '../store/wikiStore';
-import { useOperationStore } from '../store/operationStore';
+import { useEntryStore } from '../store/entryStore';
 import { useTaskStore } from '../store/taskStore';
 import { useAltarStore } from '../store/altarStore';
 import { useCategoryStore } from '../store/categoryStore';
@@ -71,8 +70,8 @@ function resolveInternalLinkIcons(html: string): string {
   const links = doc.querySelectorAll<HTMLElement>('span[data-type="internalLink"]');
   if (!links.length) return html;
 
-  const { articles } = useWikiStore.getState();
-  const { operations } = useOperationStore.getState();
+  const articles = useEntryStore.getState().entries.wiki;
+  const operations = useEntryStore.getState().entries.operation;
   const { tasks } = useTaskStore.getState();
   const { categories } = useCategoryStore.getState();
   const { altars } = useAltarStore.getState();

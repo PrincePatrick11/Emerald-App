@@ -6,9 +6,7 @@ import { format } from 'date-fns';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { useUIStore } from '../store/uiStore';
-import { useJournalStore } from '../store/journalStore';
-import { useWikiStore } from '../store/wikiStore';
-import { useOperationStore } from '../store/operationStore';
+import { useEntryStore } from '../store/entryStore';
 import { useTagStore } from '../store/tagStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { entryMoonPhase } from './moonPhase';
@@ -59,10 +57,10 @@ import { noAltarOpenMessage } from './altarExport';
  *  `useLinkItems`, für die Import-/Export-Pfade. */
 function linkItemsSnapshot(): SuggestionItem[] {
   return buildLinkItems({
-    entries: useJournalStore.getState().entries,
+    entries: useEntryStore.getState().entries.journal,
     tasks: useTaskStore.getState().tasks,
-    operations: useOperationStore.getState().operations,
-    articles: useWikiStore.getState().articles,
+    operations: useEntryStore.getState().entries.operation,
+    articles: useEntryStore.getState().entries.wiki,
     categories: useCategoryStore.getState().categories,
     altars: useAltarStore.getState().altars,
     showMoonPhase: useSettingsStore.getState().settings.journal.moonPhase,
@@ -386,9 +384,9 @@ export async function exportAsEmerald(): Promise<void> {
     return;
   }
 
-  const { entries }                           = useJournalStore.getState();
-  const { articles }    = useWikiStore.getState();
-  const { operations }  = useOperationStore.getState();
+  const entries                           = useEntryStore.getState().entries.journal;
+  const articles    = useEntryStore.getState().entries.wiki;
+  const operations  = useEntryStore.getState().entries.operation;
   const { categories }  = useCategoryStore.getState();
   let content = '';
   let title = '';
@@ -946,8 +944,8 @@ function importedStamp(createdAt: string | undefined): WriteOptions {
  * Rückverweis, kein Suchtreffer.
  */
 function legacyJournalTargets(file: EmeraldFile): Parameters<typeof appendLegacyLinks>[2] {
-  const { articles }   = useWikiStore.getState();
-  const { operations } = useOperationStore.getState();
+  const articles   = useEntryStore.getState().entries.wiki;
+  const operations = useEntryStore.getState().entries.operation;
 
   const paradigmId = file.meta.paradigmaTitle
     ? (articles.find(a => a.title === file.meta.paradigmaTitle)?.id ?? null)
@@ -990,10 +988,10 @@ function legacyJournalTargets(file: EmeraldFile): Parameters<typeof appendLegacy
 }
 
 async function importJournalEntry(file: EmeraldFile, content: string, tagNames: string[]): Promise<string> {
-  const { createEntry, updateEntry } = useJournalStore.getState();
-  // Die Mondphase rechnet `createEntry` aus dem Erstelldatum, nach der Einstellung dieses Vaults.
+  const { createEntry, updateEntry } = useEntryStore.getState();
+  // Die Mondphase folgt aus dem Erstelldatum der Datei (`entryMoonPhase`).
   const createdAt = importedCreatedAt(file);
-  const entry = await createEntry({ blank: true, createdAt });
+  const entry = await createEntry('journal', { blank: true, createdAt });
   await updateEntry(entry.id, { title: importedTitle(file), content, tags: tagNames }, importedStamp(createdAt));
   return entry.id;
 }
@@ -1059,7 +1057,7 @@ function legacyWikiCategory(meta: EmeraldMeta): { name: string | undefined; emoj
 }
 
 async function importWikiArticle(file: EmeraldFile, content: string, tagNames: string[]): Promise<string> {
-  const { createArticle, updateArticle } = useWikiStore.getState();
+  const { createEntry, updateEntry } = useEntryStore.getState();
 
   const legacy = legacyWikiCategory(file.meta);
   const categoryId = await ensureCategoryByName(
@@ -1068,8 +1066,8 @@ async function importWikiArticle(file: EmeraldFile, content: string, tagNames: s
   );
 
   const createdAt = importedCreatedAt(file);
-  const article = await createArticle(categoryId, { blank: true, createdAt });
-  await updateArticle(article.id, {
+  const article = await createEntry('wiki', { categoryId, blank: true, createdAt });
+  await updateEntry(article.id, {
     title: importedTitle(file),
     content,
     category_id: categoryId,
@@ -1080,7 +1078,7 @@ async function importWikiArticle(file: EmeraldFile, content: string, tagNames: s
 }
 
 async function importOperationEntry(file: EmeraldFile, content: string, tagNames: string[]): Promise<string> {
-  const { createOperation, updateOperation } = useOperationStore.getState();
+  const { createEntry, updateEntry } = useEntryStore.getState();
 
   const categoryId = await ensureCategoryByName(
     file.meta.categoryName ?? file.meta.opCategoryName,
@@ -1088,8 +1086,8 @@ async function importOperationEntry(file: EmeraldFile, content: string, tagNames
   );
 
   const createdAt = importedCreatedAt(file);
-  const op = await createOperation(categoryId, { blank: true, createdAt });
-  await updateOperation(op.id, {
+  const op = await createEntry('operation', { categoryId, blank: true, createdAt });
+  await updateEntry(op.id, {
     title: importedTitle(file),
     content,
     category_id: categoryId,
@@ -1349,9 +1347,9 @@ async function importJournalFromMarkdown(
   title: string, html: string, tagNames: string[],
   meta: Record<string, string>,
 ): Promise<string> {
-  const { createEntry, updateEntry } = useJournalStore.getState();
-  const { articles }   = useWikiStore.getState();
-  const { operations } = useOperationStore.getState();
+  const { createEntry, updateEntry } = useEntryStore.getState();
+  const articles   = useEntryStore.getState().entries.wiki;
+  const operations = useEntryStore.getState().entries.operation;
 
   const paradigmaName = meta['paradigma'] ? stripIconPrefix(meta['paradigma']) : null;
   const paradigmId = paradigmaName
@@ -1402,8 +1400,8 @@ async function importJournalFromMarkdown(
     ]),
   ]));
 
-  // Ohne Datum in der Datei entsteht der Eintrag heute — mit der Mondphase von heute (`createEntry`).
-  const entry = await createEntry({ blank: true });
+  // Ohne Datum in der Datei entsteht der Eintrag heute — mit der Mondphase von heute.
+  const entry = await createEntry('journal', { blank: true });
   await updateEntry(entry.id, { title, content, tags: tagNames });
   return entry.id;
 }
@@ -1412,13 +1410,13 @@ async function importWikiFromMarkdown(
   title: string, html: string, tagNames: string[],
   meta: Record<string, string>,
 ): Promise<string> {
-  const { createArticle, updateArticle } = useWikiStore.getState();
+  const { createEntry, updateEntry } = useEntryStore.getState();
 
   const categoryName = meta['category'] ? stripIconPrefix(meta['category']) : null;
   const categoryId = await ensureCategoryByName(categoryName, '📄');
 
-  const article = await createArticle(categoryId, { blank: true });
-  await updateArticle(article.id, { title, content: sanitizeImportedHtml(html), category_id: categoryId, tags: tagNames });
+  const article = await createEntry('wiki', { categoryId, blank: true });
+  await updateEntry(article.id, { title, content: sanitizeImportedHtml(html), category_id: categoryId, tags: tagNames });
   return article.id;
 }
 
@@ -1426,7 +1424,7 @@ async function importOperationFromMarkdown(
   title: string, html: string, tagNames: string[],
   meta: Record<string, string>,
 ): Promise<string> {
-  const { createOperation, updateOperation } = useOperationStore.getState();
+  const { createEntry, updateEntry } = useEntryStore.getState();
 
   const categoryName = meta['category'] ? stripIconPrefix(meta['category']) : null;
   const categoryId = await ensureCategoryByName(categoryName, '⚡');
@@ -1438,7 +1436,7 @@ async function importOperationFromMarkdown(
     endDate: meta['end date'] ?? null,
     version: meta['version'] ?? null,
   }));
-  const op = await createOperation(categoryId, { blank: true });
-  await updateOperation(op.id, { title, content, category_id: categoryId, tags: tagNames });
+  const op = await createEntry('operation', { categoryId, blank: true });
+  await updateEntry(op.id, { title, content, category_id: categoryId, tags: tagNames });
   return op.id;
 }

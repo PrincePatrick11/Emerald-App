@@ -8,11 +8,9 @@ import { journalIcon } from '../../lib/moonPhase';
 import { hasOwnTitle } from '../../lib/entryTitle';
 import { REORDER_SPRING } from '../../lib/motion';
 import { useAltarStore } from '../../store/altarStore';
-import { useJournalStore } from '../../store/journalStore';
-import { useOperationStore } from '../../store/operationStore';
+import { useEntryStore } from '../../store/entryStore';
 import { useTaskStore } from '../../store/taskStore';
 import { useUIStore } from '../../store/uiStore';
-import { useWikiStore } from '../../store/wikiStore';
 import type { ActiveView } from '../../types';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
@@ -56,9 +54,9 @@ function AltarTabIcon({ iconData }: { iconData: string | null | undefined }) {
 function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: () => void; onClose: () => void }) {
   const { t } = useTranslation();
   const { type, id } = view;
-  const entry = useJournalStore((s) => (type === 'journal' && id ? s.entries.find((e) => e.id === id) : undefined));
-  const article = useWikiStore((s) => (type === 'wiki' && id ? s.articles.find((a) => a.id === id) : undefined));
-  const operation = useOperationStore((s) => (type === 'operations' && id ? s.operations.find((o) => o.id === id) : undefined));
+  const entry = useEntryStore((s) => (type === 'journal' && id ? s.entries.journal.find((e) => e.id === id) : undefined));
+  const article = useEntryStore((s) => (type === 'wiki' && id ? s.entries.wiki.find((a) => a.id === id) : undefined));
+  const operation = useEntryStore((s) => (type === 'operations' && id ? s.entries.operation.find((o) => o.id === id) : undefined));
   const task = useTaskStore((s) => (type === 'tasks' && id ? s.tasks.find((task) => task.id === id) : undefined));
   const altar = useAltarStore((s) => (type === 'altar' && id ? s.altars.find((a) => a.id === id) : undefined));
   const definition = useBlockDefinitionStore((s) => (type === 'blocks' && id ? s.definitions.find((d) => d.id === id) : undefined));

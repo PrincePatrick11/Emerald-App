@@ -31,39 +31,22 @@ import { viewTypeForEntryType } from './modules';
 import { remapDefinitionDefaults } from './blocks/definitions';
 import type { TemplateEntryType } from './blocks/templates';
 import { hasOwnTitle } from './entryTitle';
-import { useJournalStore } from '../store/journalStore';
-import { useWikiStore } from '../store/wikiStore';
-import { useOperationStore } from '../store/operationStore';
+import { useEntryStore, withAddedEntry } from '../store/entryStore';
 import { useTaskStore } from '../store/taskStore';
 import { useTemplateStore } from '../store/templateStore';
 import { useBlockDefinitionStore } from '../store/blockDefinitionStore';
 import { useUIStore } from '../store/uiStore';
-import type { JournalEntry, Operation, WikiArticle } from '../types';
+import type { Entry } from '../types';
 
 /** Die Typen, zwischen denen ein Eintrag wechseln kann — die Module mit Blockstapel. */
 export type ConvertibleEntryType = TemplateEntryType;
 
 /** Was ein Eintrag über den Typwechsel mitnimmt. */
-interface EntryCore {
-  id: string;
-  title: string;
-  content: string;
-  tags: string[];
-  created_at: string;
-  category_id: string | null;
-  icon?: string;
-  cover_image?: string;
-}
+type EntryCore = Pick<Entry, 'id' | 'title' | 'content' | 'tags' | 'created_at' | 'category_id' | 'icon' | 'cover_image'>;
 
-function readEntry(type: ConvertibleEntryType, id: string): EntryCore | undefined {
-  switch (type) {
-    case 'journal': {
-      const e = useJournalStore.getState().entries.find((x) => x.id === id);
-      return e && { ...e, category_id: null };
-    }
-    case 'wiki': return useWikiStore.getState().articles.find((x) => x.id === id);
-    case 'operation': return useOperationStore.getState().operations.find((x) => x.id === id);
-  }
+function readEntry(type: ConvertibleEntryType, id: string): Entry | undefined {
+  const entry = useEntryStore.getState().getEntry(id);
+  return entry?.type === type ? entry : undefined;
 }
 
 /**
@@ -74,34 +57,23 @@ export function typeChangeDropsProperties(entry: Pick<EntryCore, 'category_id' |
   return to === 'journal' && !!(entry.category_id || entry.icon || entry.cover_image);
 }
 
-type Converted =
-  | { type: 'journal'; entry: JournalEntry }
-  | { type: 'wiki'; entry: WikiArticle }
-  | { type: 'operation'; entry: Operation };
-
 /** Gibt der Zeile den neuen Typ — samt Nummer in dessen Zählung und den Feldern aus `core`. */
-async function retypeRow(db: Database, to: ConvertibleEntryType, core: EntryCore): Promise<Converted> {
-  const entry_number = await nextEntryNumber(db, to);
-  const entry = {
-    id: core.id, entry_number, title: core.title, content: core.content, tags: core.tags,
-    category_id: core.category_id, icon: core.icon, cover_image: core.cover_image,
-    created_at: core.created_at, updated_at: nowIso(), deleted_at: null,
+async function retypeRow(db: Database, to: ConvertibleEntryType, core: EntryCore): Promise<Entry> {
+  const entry: Entry = {
+    ...core,
+    type: to,
+    entry_number: await nextEntryNumber(db, to),
+    updated_at: nowIso(),
+    deleted_at: null,
   };
   await db.execute(
     `UPDATE entries
         SET type=$1, entry_number=$2, title=$3, content=$4, category_id=$5, icon=$6, cover_image=$7, updated_at=$8
       WHERE id=$9`,
-    [to, entry_number, entry.title, entry.content, entry.category_id, entry.icon ?? null, entry.cover_image ?? null,
+    [to, entry.entry_number, entry.title, entry.content, entry.category_id, entry.icon ?? null, entry.cover_image ?? null,
       entry.updated_at, entry.id]
   );
-  switch (to) {
-    case 'journal': {
-      const { category_id: _category, icon: _icon, cover_image: _cover, ...journal } = entry;
-      return { type: to, entry: journal };
-    }
-    case 'wiki': return { type: to, entry };
-    case 'operation': return { type: to, entry };
-  }
+  return entry;
 }
 
 /**
@@ -139,13 +111,18 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
   // Vor der Kette unten: der Flush läuft selbst unter dem Schlüssel des Eintrags.
   await useUIStore.getState().editActions?.flush?.();
 
-  await serialized(serialKey(from, id), async () => {
+  await serialized(serialKey('entry', id), async () => {
     const source = readEntry(from, id);
     if (!source) return;
     const db = await getDb();
 
     const core: EntryCore = {
-      ...source,
+      id: source.id,
+      tags: source.tags,
+      created_at: source.created_at,
+      category_id: source.category_id,
+      icon: source.icon,
+      cover_image: source.cover_image,
       // Ein unbenannter Eintrag heißt danach wie ein unbenannter des neuen Typs.
       // Ohne eigenen Titel bleibt er leer — „Unbenannt…" zeigt die neue Art von selbst.
       title: hasOwnTitle(source.title) ? source.title : '',
@@ -180,15 +157,16 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
     // Ohne await dazwischen: der neue Typ steht im Store, bevor die Ansicht
     // wechselt, und der alte verschwindet erst mit ihr — kein Frame, in dem
     // der offene Tab auf einen Eintrag zeigt, den es nicht gibt.
-    switch (converted.type) {
-      case 'journal': useJournalStore.setState((s) => ({ entries: [converted.entry, ...s.entries] })); break;
-      case 'wiki': useWikiStore.setState((s) => ({ articles: [...s.articles, converted.entry] })); break;
-      case 'operation': useOperationStore.setState((s) => ({ operations: [converted.entry, ...s.operations] })); break;
-    }
+    useEntryStore.setState((s) => ({ entries: withAddedEntry(s.entries, converted) }));
     useUIStore.getState().retypeEntryViews(id, viewTypeForEntryType(from), viewTypeForEntryType(to));
-    useJournalStore.setState((s) => ({ entries: withContent(s.entries, entryContent).filter((e) => from !== 'journal' || e.id !== id) }));
-    useWikiStore.setState((s) => ({ articles: withContent(s.articles, entryContent).filter((a) => from !== 'wiki' || a.id !== id) }));
-    useOperationStore.setState((s) => ({ operations: withContent(s.operations, entryContent).filter((o) => from !== 'operation' || o.id !== id) }));
+    useEntryStore.setState((s) => ({
+      entries: {
+        journal: withContent(s.entries.journal, entryContent),
+        wiki: withContent(s.entries.wiki, entryContent),
+        operation: withContent(s.entries.operation, entryContent),
+        [from]: withContent(s.entries[from], entryContent).filter((e) => e.id !== id),
+      },
+    }));
     useTemplateStore.setState((s) => ({ templates: withContent(s.templates, templateContent) }));
     useTaskStore.setState((s) => ({
       links: s.links.map((link) => (link.target_id === id ? { ...link, target_type: to } : link)),

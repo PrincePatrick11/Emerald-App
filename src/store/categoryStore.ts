@@ -16,8 +16,7 @@ import { categoryKey } from '../lib/categoryMerge';
 import { generateId, nowIso } from '../lib/helpers';
 import { fromRow, type DbRow } from '../lib/row';
 import type { Category } from '../types';
-import { useWikiStore } from './wikiStore';
-import { useOperationStore } from './operationStore';
+import { useEntryStore } from './entryStore';
 import { useTaskStore } from './taskStore';
 import { useAltarStore } from './altarStore';
 import { dropCategoriesFromTemplatesInMemory, useTemplateStore } from './templateStore';
@@ -65,8 +64,7 @@ function nameTaken(categories: Category[], name: string, exceptId?: string): boo
 export function reassignCategoriesInMemory(ids: ReadonlySet<string>, to: string | null = null): void {
   const move = <T extends { category_id: string | null }>(x: T): T =>
     x.category_id && ids.has(x.category_id) ? { ...x, category_id: to } : x;
-  useWikiStore.setState((s) => ({ articles: s.articles.map(move) }));
-  useOperationStore.setState((s) => ({ operations: s.operations.map(move) }));
+  useEntryStore.setState((s) => ({ entries: { ...s.entries, wiki: s.entries.wiki.map(move), operation: s.entries.operation.map(move) } }));
   useTaskStore.setState((s) => ({ tasks: s.tasks.map(move) }));
   useAltarStore.setState((s) => ({
     items: s.items.map(move),

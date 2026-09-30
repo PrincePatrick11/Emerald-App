@@ -3,9 +3,7 @@ import { entryBlockSummary } from '../../lib/blocks/entrySummary';
 import type { ComponentType } from 'react';
 import { Pencil, Maximize2, Minimize2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
-import { useOperationStore } from '../../store/operationStore';
-import { useJournalStore } from '../../store/journalStore';
-import { useWikiStore } from '../../store/wikiStore';
+import { useEntryStore } from '../../store/entryStore';
 import type { ActiveView } from '../../types';
 import { LIBRARY_VIEW_IDS, moduleMeta, type ViewId } from '../../lib/modules';
 import BlockSidebarArea from '../blocks/BlockSidebarArea';
@@ -54,9 +52,9 @@ function RightSidebarActionBar() {
   const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
   // Der Inhalt des offenen Eintrags — für die Sperre einer geladenen Sigille.
   // Alle drei Hooks laufen immer; nur der passende liefert etwas.
-  const journalContent = useJournalStore((s) => (activeView.type === 'journal' ? s.entries.find((e) => e.id === activeView.id)?.content : undefined));
-  const wikiContent = useWikiStore((s) => (activeView.type === 'wiki' ? s.articles.find((a) => a.id === activeView.id)?.content : undefined));
-  const operationContent = useOperationStore((s) => (activeView.type === 'operations' ? s.operations.find((o) => o.id === activeView.id)?.content : undefined));
+  const journalContent = useEntryStore((s) => (activeView.type === 'journal' ? s.entries.journal.find((e) => e.id === activeView.id)?.content : undefined));
+  const wikiContent = useEntryStore((s) => (activeView.type === 'wiki' ? s.entries.wiki.find((a) => a.id === activeView.id)?.content : undefined));
+  const operationContent = useEntryStore((s) => (activeView.type === 'operations' ? s.entries.operation.find((o) => o.id === activeView.id)?.content : undefined));
   const content = journalContent ?? wikiContent ?? operationContent;
 
   if (!activeView.id) return null;

@@ -27,10 +27,8 @@
  * lesen dieselbe Liste.
  */
 import { useMemo } from 'react';
-import { useJournalStore } from './journalStore';
+import { useEntryStore, allEntries } from './entryStore';
 import { AS_A_CONSEQUENCE } from '../lib/stamp';
-import { useWikiStore } from './wikiStore';
-import { useOperationStore } from './operationStore';
 import { useBlockSessionStore } from './blockSessionStore';
 import { useTemplateStore } from './templateStore';
 import { useTemplateDraftStore } from './draftStore';
@@ -58,28 +56,20 @@ interface ContentSource extends ContentRow {
 }
 
 function contentSources(): ContentSource[] {
-  const journal = useJournalStore.getState();
-  const wiki = useWikiStore.getState();
-  const ops = useOperationStore.getState();
+  const { entries, updateEntry } = useEntryStore.getState();
   const templates = useTemplateStore.getState();
   return [
-    ...journal.entries.map((e) => ({ kind: 'entry' as const, id: e.id, content: e.content, save: (content: string) => journal.updateEntry(e.id, { content }, AS_A_CONSEQUENCE) })),
-    ...wiki.articles.map((a) => ({ kind: 'entry' as const, id: a.id, content: a.content, save: (content: string) => wiki.updateArticle(a.id, { content }, AS_A_CONSEQUENCE) })),
-    ...ops.operations.map((o) => ({ kind: 'entry' as const, id: o.id, content: o.content, save: (content: string) => ops.updateOperation(o.id, { content }, AS_A_CONSEQUENCE) })),
+    ...allEntries(entries).map((e) => ({ kind: 'entry' as const, id: e.id, content: e.content, save: (content: string) => updateEntry(e.id, { content }, AS_A_CONSEQUENCE) })),
     ...templates.templates.map((tpl) => ({ kind: 'template' as const, id: tpl.id, content: tpl.content, save: (content: string) => templates.updateTemplate(tpl.id, { content }, AS_A_CONSEQUENCE) })),
   ];
 }
 
 /** Die Einträge mit Blöcken, reaktiv — für Verwendungszahlen und die Herkunft aus Vorlagen. */
 export function useBlockContentRows(): EntryContentRow[] {
-  const entries = useJournalStore((s) => s.entries);
-  const articles = useWikiStore((s) => s.articles);
-  const operations = useOperationStore((s) => s.operations);
-  return useMemo(() => [
-    ...entries.map((e) => ({ id: e.id, content: e.content, title: e.title, updated_at: e.updated_at, entryType: 'journal' as const })),
-    ...articles.map((a) => ({ id: a.id, content: a.content, title: a.title, updated_at: a.updated_at, entryType: 'wiki' as const })),
-    ...operations.map((o) => ({ id: o.id, content: o.content, title: o.title, updated_at: o.updated_at, entryType: 'operation' as const })),
-  ], [entries, articles, operations]);
+  const entries = useEntryStore((s) => s.entries);
+  return useMemo(() => allEntries(entries).map((e) => ({
+    id: e.id, content: e.content, title: e.title, updated_at: e.updated_at, entryType: e.type,
+  })), [entries]);
 }
 
 export interface CopyUsage {

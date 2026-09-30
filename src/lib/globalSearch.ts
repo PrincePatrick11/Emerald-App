@@ -1,6 +1,4 @@
-import type {
-  ActiveView, AltarItem, AltarRecord, JournalEntry, Language, LexiconEntry, Operation, Tag, Task, WikiArticle,
-} from '../types';
+import type { ActiveView, AltarItem, AltarRecord, Entry, Language, LexiconEntry, Tag, Task } from '../types';
 import { foldTypography, plainTextFor } from './searchText';
 import { todayIso, withoutConcealed } from './blocks/sigil';
 import { viewTypeForEntryType } from './modules';
@@ -67,9 +65,9 @@ export interface SearchCategory {
 }
 
 export interface SearchCorpus {
-  journal: JournalEntry[];
-  wiki: WikiArticle[];
-  operations: Operation[];
+  journal: Entry[];
+  wiki: Entry[];
+  operations: Entry[];
   tasks: Task[];
   altars: AltarRecord[];
   altarItems: AltarItem[];

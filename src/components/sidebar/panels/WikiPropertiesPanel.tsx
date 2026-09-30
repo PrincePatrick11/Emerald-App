@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
-import { useWikiStore } from '../../../store/wikiStore';
+import { useEntryStore } from '../../../store/entryStore';
 import TagsField from '../fields/TagsField';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
 import EntryTypeField from '../fields/EntryTypeField';
@@ -11,8 +11,8 @@ export default function WikiPropertiesPanel() {
   const { t } = useTranslation();
   const activeView = useUIStore((s) => s.activeView);
   const isEditing = activeView.mode === 'edit';
-  const articles = useWikiStore((s) => s.articles);
-  const updateArticle = useWikiStore((s) => s.updateArticle);
+  const articles = useEntryStore((s) => s.entries.wiki);
+  const updateArticle = useEntryStore((s) => s.updateEntry);
 
   const article = activeView.id ? articles.find((a) => a.id === activeView.id) : null;
 

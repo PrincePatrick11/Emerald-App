@@ -23,7 +23,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEditActions } from '../../hooks/useEditActions';
 import { guardKey } from '../../store/leaveGuardStore';
-import { useWikiStore } from '../../store/wikiStore';
+import { useEntryStore } from '../../store/entryStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
@@ -38,8 +38,8 @@ export default function WikiView() {
   );
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { articles, createArticle, duplicateArticle, updateArticle, deleteArticle, restoreArticle, getArticle } = useWikiStore(
-    useShallow((s) => ({ articles: s.articles, createArticle: s.createArticle, duplicateArticle: s.duplicateArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle, getArticle: s.getArticle }))
+  const { articles, createEntry, duplicateArticle, updateArticle, deleteArticle, restoreArticle, getArticle } = useEntryStore(
+    useShallow((s) => ({ articles: s.entries.wiki, createEntry: s.createEntry, duplicateArticle: s.duplicateEntry, updateArticle: s.updateEntry, deleteArticle: s.deleteEntry, restoreArticle: s.restoreEntry, getArticle: s.getEntry }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
@@ -163,10 +163,10 @@ export default function WikiView() {
     } : undefined,
   });
 
-  // Ohne Argument fällt createArticle auf „other" zurück; der „+"-Knopf am
+  // Ohne Argument entsteht der Artikel ohne Kategorie; der „+"-Knopf am
   // Kategorienkopf gibt seine Kategorie mit — wie handleCreateTask(cat.id).
   const handleNew = async (categoryId?: string) => {
-    const a = await createArticle(categoryId);
+    const a = await createEntry('wiki', { categoryId });
     setActiveView({ type: 'wiki', id: a.id, mode: 'edit', isNew: true });
   };
 

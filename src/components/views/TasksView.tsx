@@ -5,9 +5,7 @@ import { useTaskStore } from '../../store/taskStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUIStore } from '../../store/uiStore';
 import { useUndoStore } from '../../store/undoStore';
-import { useJournalStore } from '../../store/journalStore';
-import { useWikiStore } from '../../store/wikiStore';
-import { useOperationStore } from '../../store/operationStore';
+import { useEntryStore } from '../../store/entryStore';
 import { useAltarStore } from '../../store/altarStore';
 import { generateId } from '../../lib/helpers';
 import { displayTitle, hasOwnTitle } from '../../lib/entryTitle';
@@ -61,9 +59,9 @@ export default function TasksView() {
   const categoryOf = (task: { category_id: string | null }) =>
     (task.category_id ? getCategory(task.category_id) : undefined);
 
-  const journalEntries = useJournalStore((s) => s.entries);
-  const wikiArticles = useWikiStore((s) => s.articles);
-  const operations = useOperationStore((s) => s.operations);
+  const journalEntries = useEntryStore((s) => s.entries.journal);
+  const wikiArticles = useEntryStore((s) => s.entries.wiki);
+  const operations = useEntryStore((s) => s.entries.operation);
   const altars = useAltarStore((s) => s.altars);
 
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number; actions: ContextMenuAction[] } | null>(null);

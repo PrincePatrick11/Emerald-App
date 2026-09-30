@@ -3,14 +3,12 @@
  * welches Modul, und wie werden Papierkorb-Einträge je Typ wiederhergestellt
  * bzw. endgültig gelöscht.
  *
- * Import-Regel dieser Datei: nur Content-Stores (journal/wiki/operation/task/
- * altar/tag/category/blockDefinition/template/lexicon) — niemals uiStore, vaultStore oder trashStore,
+ * Import-Regel dieser Datei: nur Content-Stores (entry/task/altar/tag/category/
+ * blockDefinition/template/lexicon) — niemals uiStore, vaultStore oder trashStore,
  * die ihrerseits hierher zeigen (dürfen). Alle Zugriffe laufen zur Laufzeit
  * über `getState()`, nicht zur Import-Zeit.
  */
-import { useJournalStore } from './journalStore';
-import { useWikiStore } from './wikiStore';
-import { useOperationStore } from './operationStore';
+import { useEntryStore } from './entryStore';
 import { useTaskStore } from './taskStore';
 import { useAltarStore } from './altarStore';
 import { useTagStore, type TaggedType } from './tagStore';
@@ -20,12 +18,16 @@ import { useTemplateStore } from './templateStore';
 import { useLexiconStore } from './lexiconStore';
 import { ENTRY_MODULE_IDS, type EntryModuleId, type TrashKind } from '../lib/modules';
 
-/** Lädt den Inhalt eines Moduls neu aus der aktiven DB. */
+/**
+ * Lädt den Inhalt eines Moduls neu aus der aktiven DB. Journal, Wiki und
+ * Operationen teilen sich einen Store — wer mehrere davon neu lädt, stößt
+ * `fetchEntries` mehrmals an; das kostet eine Abfrage, keine Inkonsistenz.
+ */
 export const moduleWiring: Record<EntryModuleId, { reload: () => Promise<void> }> = {
-  journal: { reload: () => useJournalStore.getState().fetchEntries() },
+  journal: { reload: () => useEntryStore.getState().fetchEntries() },
   tasks: { reload: () => useTaskStore.getState().fetchAll() },
-  operations: { reload: () => useOperationStore.getState().fetchAll() },
-  wiki: { reload: () => useWikiStore.getState().fetchArticles() },
+  operations: { reload: () => useEntryStore.getState().fetchEntries() },
+  wiki: { reload: () => useEntryStore.getState().fetchEntries() },
   altar: { reload: () => useAltarStore.getState().fetchAltars() },
 };
 
@@ -43,16 +45,16 @@ export const trashWiring: Record<TrashKind, {
   permanentlyDelete: (id: string) => Promise<void>;
 }> = {
   journal: {
-    restore: (id) => withLiveTags('journal', id, useJournalStore.getState().restoreEntry(id)),
-    permanentlyDelete: (id) => useJournalStore.getState().permanentlyDeleteEntry(id),
+    restore: (id) => withLiveTags('journal', id, useEntryStore.getState().restoreEntry(id)),
+    permanentlyDelete: (id) => useEntryStore.getState().permanentlyDeleteEntry(id),
   },
   wiki: {
-    restore: (id) => withLiveTags('wiki', id, useWikiStore.getState().restoreArticle(id)),
-    permanentlyDelete: (id) => useWikiStore.getState().permanentlyDeleteArticle(id),
+    restore: (id) => withLiveTags('wiki', id, useEntryStore.getState().restoreEntry(id)),
+    permanentlyDelete: (id) => useEntryStore.getState().permanentlyDeleteEntry(id),
   },
   operation: {
-    restore: (id) => withLiveTags('operation', id, useOperationStore.getState().restoreOperation(id)),
-    permanentlyDelete: (id) => useOperationStore.getState().permanentlyDeleteOperation(id),
+    restore: (id) => withLiveTags('operation', id, useEntryStore.getState().restoreEntry(id)),
+    permanentlyDelete: (id) => useEntryStore.getState().permanentlyDeleteEntry(id),
   },
   category: {
     restore: async (id) => { await useCategoryStore.getState().restoreCategory(id); },

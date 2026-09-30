@@ -5,8 +5,7 @@ import { GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { CATEGORY_MODULE_IDS } from '../../lib/modules';
 import { categoryLabel, categoryUsageCounts, emptyCategoryUsage } from '../../lib/categories';
 import { CATEGORY_NAME_TAKEN, useCategoryStore } from '../../store/categoryStore';
-import { useWikiStore } from '../../store/wikiStore';
-import { useOperationStore } from '../../store/operationStore';
+import { useEntryStore } from '../../store/entryStore';
 import { useTaskStore } from '../../store/taskStore';
 import { useAltarStore } from '../../store/altarStore';
 import { useUndoStore } from '../../store/undoStore';
@@ -106,8 +105,8 @@ export default function CategoriesView() {
 
   // Kein fetch beim Mount: reloadAllStores() lädt beim Start und beim
   // Vault-Wechsel alle vier Modul-Stores samt Kategorien.
-  const articles = useWikiStore((s) => s.articles);
-  const operations = useOperationStore((s) => s.operations);
+  const articles = useEntryStore((s) => s.entries.wiki);
+  const operations = useEntryStore((s) => s.entries.operation);
   const tasks = useTaskStore((s) => s.tasks);
   const items = useAltarStore((s) => s.items);
 

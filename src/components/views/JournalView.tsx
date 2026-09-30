@@ -8,7 +8,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEditActions } from '../../hooks/useEditActions';
 import { guardKey } from '../../store/leaveGuardStore';
-import { useJournalStore } from '../../store/journalStore';
+import { useEntryStore } from '../../store/entryStore';
 import { useUndoStore } from '../../store/undoStore';
 import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
@@ -26,7 +26,7 @@ import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
 import { countByCategory, groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import { useSettingsStore } from '../../store/settingsStore';
-import type { JournalEntry, MoonPhase } from '../../types';
+import type { Entry, MoonPhase } from '../../types';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import { useSessionState } from '../../store/sessionStore';
 
@@ -36,8 +36,8 @@ export default function JournalView() {
   const { activeView, setActiveView, journalPrefs, setJournalPrefs } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, journalPrefs: s.journalPrefs, setJournalPrefs: s.setJournalPrefs }))
   );
-  const { entries, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useJournalStore(
-    useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
+  const { entries, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
+    useShallow((s) => ({ entries: s.entries.journal, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
   );
   const pushUndo = useUndoStore((s) => s.push);
 
@@ -102,7 +102,7 @@ export default function JournalView() {
   }, [entry?.title]);
 
   const handleNew = async () => {
-    const e = await createEntry();
+    const e = await createEntry('journal');
     setActiveView({ type: 'journal', id: e.id, mode: 'edit', isNew: true });
   };
 
@@ -192,7 +192,7 @@ export default function JournalView() {
     // sie nicht, gibt es weder Phasen-Filter noch Phasen-Gruppen — ein Filter,
     // den man nicht sieht, darf auch nicht wirken. Nur Phasen des Zyklus: der
     // frühere Chip „Ohne Mondphase“ kann noch in der Sitzung stehen.
-    const phaseOf = (e: JournalEntry) => entryMoonPhase(e, showMoonPhase);
+    const phaseOf = (e: Entry) => entryMoonPhase(e, showMoonPhase);
     const activePhases = showMoonPhase ? filterPhases.filter((p) => MOON_PHASE_ORDER.includes(p as MoonPhase)) : [];
 
     const filtered = activePhases.length === 0
@@ -226,14 +226,14 @@ export default function JournalView() {
     const visiblePhases = activePhases.length > 0
       ? MOON_PHASE_ORDER.filter((p) => activePhases.includes(p))
       : MOON_PHASE_ORDER;
-    const phaseGroups: DashboardGroup<JournalEntry>[] = groupByCategory(
+    const phaseGroups: DashboardGroup<Entry>[] = groupByCategory(
       sorted, visiblePhases.map((p) => ({ id: p })), (e) => phaseOf(e) ?? '',
       (c) => t(`moonPhase.${c.id}`), t('journal.noPhase'),
     );
 
     const grouped = showMoonPhase && grouping === 'grouped';
 
-    const renderPhaseHeader = (group: DashboardGroup<JournalEntry>) => (
+    const renderPhaseHeader = (group: DashboardGroup<Entry>) => (
       <CollapsibleGroupHeader
         collapsed={isPhaseCollapsed(group.key!)}
         onToggleCollapse={() => togglePhaseCollapse(group.key!)}
@@ -243,7 +243,7 @@ export default function JournalView() {
       />
     );
 
-    const renderEntry = (e: JournalEntry) => {
+    const renderEntry = (e: Entry) => {
       const icon = journalIcon(e, showMoonPhase);
       const renaming = renamingId === e.id;
       const renameInput = (className: string) => (
@@ -286,7 +286,7 @@ export default function JournalView() {
     };
 
     return (
-      <Dashboard<JournalEntry>
+      <Dashboard<Entry>
         title={t('journal.title')}
         primaryAction={{ label: t('journal.newEntry'), onClick: handleNew }}
         view={view}

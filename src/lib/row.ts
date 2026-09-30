@@ -19,14 +19,13 @@ import type {
   AltarItem,
   AltarRecord,
   Category,
-  JournalEntry,
+  Entry,
+  EntryType,
   Language,
   LexiconEntry,
-  Operation,
   Tag,
   Task,
   TaskLink,
-  WikiArticle,
 } from '../types';
 import {
   DEFAULT_DEFINITION_ICON, parseDefinitionDisplay, parseDefinitionElements, type BlockDefinition,
@@ -83,43 +82,18 @@ const num = (v: unknown, fallback: number): number =>
 const nullableNum = (v: unknown): number | null =>
   v == null || Number.isNaN(Number(v)) ? null : Number(v);
 
+/** Die Spalte hat einen CHECK — was sonst käme, landet im Journal statt die Liste zu sprengen. */
+const entryType = (v: unknown): EntryType => (v === 'wiki' || v === 'operation' ? v : 'journal');
+
 /**
- * Aufrufbar als `rows.map(fromRow.journalEntry)` — die Mapper ignorieren die
+ * Aufrufbar als `rows.map(fromRow.entry)` — die Mapper ignorieren die
  * zusätzlichen Argumente, die `Array.map` mitgibt.
  */
 export const fromRow = {
-  journalEntry(r: DbRow): JournalEntry {
+  entry(r: DbRow): Entry {
     return {
       id: str(r.id),
-      title: str(r.title),
-      content: str(r.content),
-      created_at: str(r.created_at),
-      updated_at: str(r.updated_at),
-      tags: jsonArray(r.tags),
-      deleted_at: nullableStr(r.deleted_at),
-      entry_number: nullableNum(r.entry_number) ?? undefined,
-    };
-  },
-
-  wikiArticle(r: DbRow): WikiArticle {
-    return {
-      id: str(r.id),
-      title: str(r.title),
-      content: str(r.content),
-      category_id: nullableStr(r.category_id),
-      created_at: str(r.created_at),
-      updated_at: str(r.updated_at),
-      tags: jsonArray(r.tags),
-      deleted_at: nullableStr(r.deleted_at),
-      cover_image: r.cover_image == null ? undefined : String(r.cover_image),
-      icon: r.icon == null ? undefined : String(r.icon),
-      entry_number: nullableNum(r.entry_number) ?? undefined,
-    };
-  },
-
-  operation(r: DbRow): Operation {
-    return {
-      id: str(r.id),
+      type: entryType(r.type),
       title: str(r.title),
       content: str(r.content),
       category_id: nullableStr(r.category_id),

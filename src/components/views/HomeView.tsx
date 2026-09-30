@@ -3,9 +3,7 @@ import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { BookOpen, Library, Wand2, Copy, Pencil, Trash2 } from 'lucide-react';
 import { HOME_COUNTS, useUIStore } from '../../store/uiStore';
-import { useJournalStore } from '../../store/journalStore';
-import { useWikiStore } from '../../store/wikiStore';
-import { useOperationStore } from '../../store/operationStore';
+import { useEntryStore } from '../../store/entryStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import ContextMenu from '../ui/ContextMenu';
@@ -31,6 +29,13 @@ type CtxTarget =
   | { kind: 'journal'; id: string }
   | { kind: 'wiki'; id: string }
   | { kind: 'operation'; id: string };
+
+/** Der Rückgängig-Hinweis nach dem Löschen, je Eintragsart. */
+const UNDO_DELETED = {
+  journal: 'undo.entryDeleted',
+  wiki: 'undo.articleDeleted',
+  operation: 'undo.operationDeleted',
+} as const satisfies Record<CtxTarget['kind'], string>;
 
 // ── Section toolbar (sort + view + count) ─────────────────────────────────────
 
@@ -77,14 +82,12 @@ export default function HomeView() {
   );
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { entries, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useJournalStore(
-    useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
-  );
-  const { articles, duplicateArticle, updateArticle, deleteArticle, restoreArticle } = useWikiStore(
-    useShallow((s) => ({ articles: s.articles, duplicateArticle: s.duplicateArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle }))
-  );
-  const { operations, duplicateOperation, updateOperation, deleteOperation, restoreOperation } = useOperationStore(
-    useShallow((s) => ({ operations: s.operations, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation }))
+  const { entries, articles, operations, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
+    useShallow((s) => ({
+      entries: s.entries.journal, articles: s.entries.wiki, operations: s.entries.operation,
+      createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry,
+      deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry,
+    }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
@@ -96,7 +99,7 @@ export default function HomeView() {
   const moonPhase = getMoonPhase(today);
 
   const handleNewEntry = async () => {
-    const entry = await createEntry();
+    const entry = await createEntry('journal');
     setActiveView({ type: 'journal', id: entry.id, mode: 'edit', isNew: true });
   };
 
@@ -106,16 +109,8 @@ export default function HomeView() {
   };
 
   const handleDuplicate = async (target: CtxTarget) => {
-    if (target.kind === 'journal') {
-      const ne = await duplicateEntry(target.id);
-      if (ne) setActiveView({ type: 'journal', id: ne.id, mode: 'view' });
-    } else if (target.kind === 'wiki') {
-      const na = await duplicateArticle(target.id);
-      if (na) setActiveView({ type: 'wiki', id: na.id, mode: 'view' });
-    } else if (target.kind === 'operation') {
-      const no = await duplicateOperation(target.id);
-      if (no) setActiveView({ type: 'operations', id: no.id, mode: 'view' });
-    }
+    const copy = await duplicateEntry(target.id);
+    if (copy) setActiveView({ type: viewTypeForEntryType(copy.type), id: copy.id, mode: 'view' });
   };
 
   // Umbenennen an Ort und Stelle, wie in den Listen der Module.
@@ -136,9 +131,7 @@ export default function HomeView() {
     const title = renameValue.trim();
     setRenaming(null);
     if (!title) return;
-    if (renaming.kind === 'journal') await updateEntry(renaming.id, { title });
-    else if (renaming.kind === 'wiki') await updateArticle(renaming.id, { title });
-    else await updateOperation(renaming.id, { title });
+    await updateEntry(renaming.id, { title });
   };
 
   /** Der Titel einer Zeile oder Karte — beim Umbenennen das Eingabefeld. */
@@ -148,16 +141,8 @@ export default function HomeView() {
     : <div className="home-item-title text-sm font-medium truncate">{displayTitle(t, kind, title)}</div>);
 
   const handleDelete = async (target: CtxTarget) => {
-    if (target.kind === 'journal') {
-      await deleteEntry(target.id);
-      pushUndo({ id: generateId(), description: t('undo.entryDeleted'),     undo: () => restoreEntry(target.id) });
-    } else if (target.kind === 'wiki') {
-      await deleteArticle(target.id);
-      pushUndo({ id: generateId(), description: t('undo.articleDeleted'),   undo: () => restoreArticle(target.id) });
-    } else if (target.kind === 'operation') {
-      await deleteOperation(target.id);
-      pushUndo({ id: generateId(), description: t('undo.operationDeleted'), undo: () => restoreOperation(target.id) });
-    }
+    await deleteEntry(target.id);
+    pushUndo({ id: generateId(), description: t(UNDO_DELETED[target.kind]), undo: () => restoreEntry(target.id) });
   };
 
   const ctxActions = ctxMenu

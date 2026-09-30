@@ -8,9 +8,7 @@ import { displayTitle } from '../../lib/entryTitle';
 import { Flame, CheckSquare, Square, Copy, Pencil, Trash2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useSettingsStore } from '../../store/settingsStore';
-import { useJournalStore } from '../../store/journalStore';
-import { useOperationStore } from '../../store/operationStore';
-import { useWikiStore } from '../../store/wikiStore';
+import { useEntryStore } from '../../store/entryStore';
 import { useTaskStore } from '../../store/taskStore';
 import { useAltarStore } from '../../store/altarStore';
 import { useCategoryStore } from '../../store/categoryStore';
@@ -18,7 +16,7 @@ import { useUndoStore } from '../../store/undoStore';
 import { setDragItem } from '../../lib/dragState';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { journalIcon } from '../../lib/moonPhase';
-import type { AltarRecord, JournalEntry, Operation, Task, WikiArticle } from '../../types';
+import type { AltarRecord, Entry, Task } from '../../types';
 import EntryListTab, { type EntryListTabProps } from '../ui/EntryListTab';
 import type { ContextMenuAction } from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
@@ -151,15 +149,15 @@ function AllList() {
 }
 
 // ── Journal ──────────────────────────────────────────────────────────────────
-function useJournalConfig(): EntryListTabProps<JournalEntry> {
+function useJournalConfig(): EntryListTabProps<Entry> {
   const { t } = useTranslation();
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { entries, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useJournalStore(
-    useShallow((s) => ({ entries: s.entries, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
+  const { entries, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
+    useShallow((s) => ({ entries: s.entries.journal, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
   );
   const pushUndo = useUndoStore((s) => s.push);
   const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
@@ -203,15 +201,15 @@ function JournalList() {
 }
 
 // ── Operations ───────────────────────────────────────────────────────────────
-function useOperationsConfig(): EntryListTabProps<Operation> {
+function useOperationsConfig(): EntryListTabProps<Entry> {
   const { t } = useTranslation();
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { operations, duplicateOperation, updateOperation, deleteOperation, restoreOperation } = useOperationStore(
-    useShallow((s) => ({ operations: s.operations, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation }))
+  const { operations, duplicateOperation, updateOperation, deleteOperation, restoreOperation } = useEntryStore(
+    useShallow((s) => ({ operations: s.entries.operation, duplicateOperation: s.duplicateEntry, updateOperation: s.updateEntry, deleteOperation: s.deleteEntry, restoreOperation: s.restoreEntry }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
@@ -270,15 +268,15 @@ function OperationsList() {
 }
 
 // ── Wiki ─────────────────────────────────────────────────────────────────────
-function useWikiConfig(): EntryListTabProps<WikiArticle> {
+function useWikiConfig(): EntryListTabProps<Entry> {
   const { t } = useTranslation();
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { articles, duplicateArticle, updateArticle, deleteArticle, restoreArticle } = useWikiStore(
-    useShallow((s) => ({ articles: s.articles, duplicateArticle: s.duplicateArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle }))
+  const { articles, duplicateArticle, updateArticle, deleteArticle, restoreArticle } = useEntryStore(
+    useShallow((s) => ({ articles: s.entries.wiki, duplicateArticle: s.duplicateEntry, updateArticle: s.updateEntry, deleteArticle: s.deleteEntry, restoreArticle: s.restoreEntry }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);

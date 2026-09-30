@@ -1,8 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useJournalStore } from '../store/journalStore';
-import { useWikiStore } from '../store/wikiStore';
-import { useOperationStore } from '../store/operationStore';
+import { useEntryStore } from '../store/entryStore';
 import { useTaskStore } from '../store/taskStore';
 import { useAltarStore } from '../store/altarStore';
 import { useCategoryStore } from '../store/categoryStore';
@@ -16,9 +14,9 @@ import type { SuggestionItem } from '../components/editor/SuggestionList';
  */
 export function useLinkItems(): SuggestionItem[] {
   const { t } = useTranslation();
-  const entries = useJournalStore((s) => s.entries);
-  const articles = useWikiStore((s) => s.articles);
-  const operations = useOperationStore((s) => s.operations);
+  const entries = useEntryStore((s) => s.entries.journal);
+  const articles = useEntryStore((s) => s.entries.wiki);
+  const operations = useEntryStore((s) => s.entries.operation);
   const categories = useCategoryStore((s) => s.categories);
   const tasks = useTaskStore((s) => s.tasks);
   const altars = useAltarStore((s) => s.altars);

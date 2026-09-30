@@ -2,11 +2,9 @@ import { useDeferredValue, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAltarStore } from '../store/altarStore';
 import { useCategoryStore } from '../store/categoryStore';
-import { useJournalStore } from '../store/journalStore';
-import { useOperationStore } from '../store/operationStore';
+import { useEntryStore } from '../store/entryStore';
 import { useTagStore } from '../store/tagStore';
 import { useTaskStore } from '../store/taskStore';
-import { useWikiStore } from '../store/wikiStore';
 import { useLexiconStore } from '../store/lexiconStore';
 import { searchCorpus, type SearchCategory, type SearchCorpus, type SearchResults } from '../lib/globalSearch';
 import { categoryLabel, categoryUsageCounts, dominantCategoryModule } from '../lib/categories';
@@ -23,9 +21,9 @@ import { categoryLabel, categoryUsageCounts, dominantCategoryModule } from '../l
 function useSearchCorpus(): SearchCorpus {
   const { t } = useTranslation();
 
-  const journal = useJournalStore((s) => s.entries);
-  const wiki = useWikiStore((s) => s.articles);
-  const operations = useOperationStore((s) => s.operations);
+  const journal = useEntryStore((s) => s.entries.journal);
+  const wiki = useEntryStore((s) => s.entries.wiki);
+  const operations = useEntryStore((s) => s.entries.operation);
   const tasks = useTaskStore((s) => s.tasks);
   const altars = useAltarStore((s) => s.altars);
   const altarItems = useAltarStore((s) => s.items);

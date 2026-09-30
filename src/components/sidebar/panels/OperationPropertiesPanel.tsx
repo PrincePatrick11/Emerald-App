@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
-import { useOperationStore } from '../../../store/operationStore';
+import { useEntryStore } from '../../../store/entryStore';
 import TagsField from '../fields/TagsField';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
 import EntryTypeField from '../fields/EntryTypeField';
@@ -16,8 +16,8 @@ export default function OperationPropertiesPanel() {
   const { t } = useTranslation();
   const activeView = useUIStore((s) => s.activeView);
   const isEditing = activeView.mode === 'edit';
-  const operations = useOperationStore((s) => s.operations);
-  const updateOperation = useOperationStore((s) => s.updateOperation);
+  const operations = useEntryStore((s) => s.entries.operation);
+  const updateOperation = useEntryStore((s) => s.updateEntry);
 
   const op = activeView.id ? operations.find((o) => o.id === activeView.id) : null;
   if (!op) {

@@ -1,9 +1,7 @@
-import { useJournalStore } from '../store/journalStore';
+import { useEntryStore } from '../store/entryStore';
 import { renderBlocksForExport, type ExportText } from './blocks/exportRender';
 import { blockLabel, fieldFallbackText } from './blocks/blockAttrs';
 import { formatIsoDateLong } from './formatDate';
-import { useWikiStore } from '../store/wikiStore';
-import { useOperationStore } from '../store/operationStore';
 import { useCategoryStore } from '../store/categoryStore';
 import { useAltarStore } from '../store/altarStore';
 import { useUIStore } from '../store/uiStore';
@@ -64,9 +62,9 @@ export async function collectExportData(): Promise<ExportData | null> {
   const view = useUIStore.getState().activeView;
   if (!view.id) return null;
 
-  const { entries }    = useJournalStore.getState();
-  const { articles }   = useWikiStore.getState();
-  const { operations } = useOperationStore.getState();
+  const entries    = useEntryStore.getState().entries.journal;
+  const articles   = useEntryStore.getState().entries.wiki;
+  const operations = useEntryStore.getState().entries.operation;
   const { categories } = useCategoryStore.getState();
   // entry.tags stores tag names directly (not IDs)
 

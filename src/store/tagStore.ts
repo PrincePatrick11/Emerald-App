@@ -3,9 +3,7 @@ import { registerTagCreator, registerTagLookup } from '../lib/templateTags';
 import { AS_A_CONSEQUENCE } from '../lib/stamp';
 import { getDb } from '../lib/db';
 import { fromRow, jsonArray, type DbRow } from '../lib/row';
-import { useJournalStore } from './journalStore';
-import { useWikiStore } from './wikiStore';
-import { useOperationStore } from './operationStore';
+import { useEntryStore, allEntries } from './entryStore';
 import { useTemplateStore } from './templateStore';
 import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
@@ -45,9 +43,7 @@ interface TaggedRef extends AffectedEntry { tags: string[] }
  */
 function taggedItems(): TaggedRef[] {
   return [
-    ...useJournalStore.getState().entries.map((e) => ({ id: e.id, type: 'journal' as const, tags: e.tags ?? [] })),
-    ...useWikiStore.getState().articles.map((a) => ({ id: a.id, type: 'wiki' as const, tags: a.tags ?? [] })),
-    ...useOperationStore.getState().operations.map((o) => ({ id: o.id, type: 'operation' as const, tags: o.tags ?? [] })),
+    ...allEntries(useEntryStore.getState().entries).map((e) => ({ id: e.id, type: e.type, tags: e.tags ?? [] })),
     // Vorlagen tragen Tags wie Einträge, die sie beim Einsetzen weitergeben.
     ...useTemplateStore.getState().templates.map((t) => ({ id: t.id, type: 'template' as const, tags: t.tags })),
   ];
@@ -60,9 +56,9 @@ function taggedItems(): TaggedRef[] {
  */
 function setItemTags(type: TaggedType, id: string, tags: string[]): Promise<void> {
   switch (type) {
-    case 'journal': return useJournalStore.getState().updateEntry(id, { tags }, AS_A_CONSEQUENCE);
-    case 'wiki': return useWikiStore.getState().updateArticle(id, { tags }, AS_A_CONSEQUENCE);
-    case 'operation': return useOperationStore.getState().updateOperation(id, { tags }, AS_A_CONSEQUENCE);
+    case 'journal':
+    case 'wiki':
+    case 'operation': return useEntryStore.getState().updateEntry(id, { tags }, AS_A_CONSEQUENCE);
     case 'template': return useTemplateStore.getState().updateTemplate(id, { tags }, AS_A_CONSEQUENCE);
   }
 }

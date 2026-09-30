@@ -19,7 +19,8 @@ import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
 import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY, countByCategory } from '../../lib/groupBy';
 import { useUIStore } from '../../store/uiStore';
-import { useOperationStore } from '../../store/operationStore';
+import { useEntryStore } from '../../store/entryStore';
+import type { Entry } from '../../types';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
@@ -37,8 +38,8 @@ export default function OperationsView() {
   );
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { operations, createOperation, duplicateOperation, updateOperation, deleteOperation, restoreOperation, getOperation } = useOperationStore(
-    useShallow((s) => ({ operations: s.operations, createOperation: s.createOperation, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation, getOperation: s.getOperation }))
+  const { operations, createEntry, duplicateOperation, updateOperation, deleteOperation, restoreOperation, getOperation } = useEntryStore(
+    useShallow((s) => ({ operations: s.entries.operation, createEntry: s.createEntry, duplicateOperation: s.duplicateEntry, updateOperation: s.updateEntry, deleteOperation: s.deleteEntry, restoreOperation: s.restoreEntry, getOperation: s.getEntry }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
@@ -114,13 +115,13 @@ export default function OperationsView() {
   }, [operation?.title]);
 
   const handleNew = async () => {
-    const op = await createOperation();
+    const op = await createEntry('operation');
     setActiveView({ type: 'operations', id: op.id, mode: 'edit', isNew: true });
   };
 
   // Der „+"-Knopf am Kategorienkopf — wie handleCreateTask(cat.id) in TasksView.
   const handleNewInCategory = async (categoryId: string) => {
-    const op = await createOperation(categoryId);
+    const op = await createEntry('operation', { categoryId });
     setActiveView({ type: 'operations', id: op.id, mode: 'edit', isNew: true });
   };
 
@@ -292,8 +293,6 @@ export default function OperationsView() {
       );
     };
 
-    type Operation = typeof operations[number];
-
     // Abgewählte Kategorien ganz ausblenden statt sie leer stehen zu lassen —
     // wie visibleCategories in TasksView.
     const visibleCategories = filterCatIds.length > 0
@@ -301,12 +300,12 @@ export default function OperationsView() {
       : usedCategories;
     // Der Waisen-Bucket fängt Operationen auf, deren Kategorie im Papierkorb
     // liegt — sonst verschwänden sie aus der Kategorien-Gruppierung.
-    const catGroups: DashboardGroup<Operation>[] = groupByCategory(
+    const catGroups: DashboardGroup<Entry>[] = groupByCategory(
       sortedOps, visibleCategories, (o) => o.category_id,
       catName, t('categories.uncategorized'),
     );
 
-    const renderCategoryHeader = (group: DashboardGroup<Operation>) => {
+    const renderCategoryHeader = (group: DashboardGroup<Entry>) => {
       if (group.key === UNCATEGORIZED_KEY) {
         return (
           <CollapsibleGroupHeader
@@ -333,7 +332,7 @@ export default function OperationsView() {
     };
 
     return (
-      <Dashboard<Operation>
+      <Dashboard<Entry>
         title={t('nav.operations')}
         primaryAction={{ label: t('operations.new'), onClick: handleNew }}
         view={view}

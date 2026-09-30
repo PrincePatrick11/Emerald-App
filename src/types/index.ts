@@ -5,33 +5,31 @@ export type ContentType = 'journal' | 'wiki' | 'operation' | 'task' | 'altar';
 /** Die Eintragsarten der Tabelle `entries` — die Module mit Blockstapel. */
 export type EntryType = 'journal' | 'wiki' | 'operation';
 
-export interface JournalEntry {
+/**
+ * Ein Eintrag aus `entries` — Journal, Wiki oder Operation. Was die drei
+ * unterscheidet, steht im Inhalt (Blöcke); `type` sagt nur, in welchem Modul
+ * er steht, und ein Typwechsel ändert genau das (`entryTypeChange`).
+ *
+ * Die Mondphase eines Journal-Eintrags folgt aus `created_at`
+ * (`entryMoonPhase`); Status, Sigillen, Paradigma, Bannung, Meditation und die
+ * verlinkten Einträge sind seit v36–v42 Blöcke bzw. Link-Chips im Inhalt.
+ */
+export interface Entry {
   id: string;
+  type: EntryType;
   title: string;
   content: string; // HTML, wie TipTaps getHTML() es liefert
-  created_at: string;
-  updated_at: string;
-  tags: string[];
-  // Die Mondphase ist keine Spalte mehr: sie folgt aus `created_at`
-  // (`entryMoonPhase` in lib/moonPhase.ts). Paradigma, Bannung, Meditation und
-  // die verlinkten Einträge sind seit v36/v37 Link-Chips im Inhalt.
-  deleted_at: string | null;
-  entry_number?: number;
-}
-
-export interface WikiArticle {
-  id: string;
-  title: string;
-  content: string; // HTML, wie TipTaps getHTML() es liefert
-  /** `null` = ohne Kategorie, seit v39 der Normalfall eines neuen Eintrags. */
+  /** `null` = ohne Kategorie, seit v39 der Normalfall eines neuen Eintrags — im Journal immer. */
   category_id: string | null;
   created_at: string;
   updated_at: string;
   tags: string[];
   deleted_at: string | null;
-  cover_image?: string;
-  icon?: string;
   entry_number?: number;
+  /** Eigenes Icon (Emoji oder Bild) — nur Wiki und Operationen. */
+  icon?: string;
+  /** Titelbild — nur Wiki und Operationen. */
+  cover_image?: string;
 }
 
 /**
@@ -46,24 +44,6 @@ export interface Category {
   sort_order: number;
   is_builtin: boolean;
   deleted_at: string | null;
-}
-
-export interface Operation {
-  id: string;
-  title: string;
-  content: string; // HTML, wie TipTaps getHTML() es liefert
-  /** `null` = ohne Kategorie, seit v39 der Normalfall eines neuen Eintrags. */
-  category_id: string | null;
-  created_at: string;
-  updated_at: string;
-  tags: string[];
-  deleted_at: string | null;
-  // Status/Enddatum/Version (v41, lib/blocks/legacyStatus.ts) und die
-  // Sigillen-Felder samt Notizen (v42, lib/blocks/sigil.ts) sind Blöcke im
-  // Inhalt; ihre Spalten stehen noch im Schema, die App liest sie nicht mehr.
-  entry_number?: number;
-  icon?: string;
-  cover_image?: string;
 }
 
 export interface TrashedItem {
