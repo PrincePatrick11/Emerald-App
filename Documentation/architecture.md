@@ -107,7 +107,8 @@ src/
 │                     editor), RenameField (the in-place rename input used inside a
 │                     `DashboardItem`) — the shared component layer; what each one
 │                     encapsulates and where it can be extended is in components.md
-├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
+├── store/            entryStore (the one store for Journal, Wiki and Operations — see Entry Store
+│                                      below), uiStore, tagStore, taskStore,
 │                     altarStore, categoryStore (the one Wiki/Operations/Tasks/Altar category
 │                                      list, see Categories below), templateStore (the templates
 │                                      dashboard, see Templates below),
@@ -151,9 +152,10 @@ src/
 │                                      against activeView.id rather than read straight off
 │                                      altarStore — see Altar UI Composition below)
 ├── lib/              db.ts, schema.ts, normalizeSchema.ts, row.ts,
-│                     entryTypeChange.ts (moves a Journal/Wiki/Operation entry into another of
-│                                      the three under the same id, see Edit Mode Architecture
-│                                      below),
+│                     entryTypeChange.ts (turns a Journal/Wiki/Operation entry into another of
+│                                      the three — one UPDATE on the same row, see Edit Mode
+│                                      Architecture below),
+│                     unifyEntries.ts (migration v49), schemaV48.ts (the frozen DDL before it),
 │                     links.ts, tabs.ts (tab IDs, isContentView), globalSearch.ts, searchText.ts,
 │                     modules.ts (the module registry — see Module Registry below),
 │                     entryTitle.ts (displayTitle/hasOwnTitle — an entry's title is stored
@@ -290,7 +292,7 @@ stays free of both:
   Emerald-format import, to reload only the modules the import touched) but always refetches
   `categories`, `block_definitions`, `templates` and the lexicon too, since an import can create
   new ones.
-  Import rule: content stores only (`journal`/`wiki`/`operation`/`task`/`altar`/`tag`/
+  Import rule: content stores only (`entry`/`task`/`altar`/`tag`/
   `category`/`blockDefinition`/`template`/`lexicon`) — never `uiStore`, `vaultStore`, or `trashStore`,
   which point at this module instead.
 - **`src/components/layout/moduleViews.ts`** — the component-layer half. `VIEW_COMPONENTS` maps
@@ -430,35 +432,33 @@ would fill it instead of the new one.
 ### Changing an entry's type
 
 `EntryTypeField` (Journal/Wiki/Operation Properties sections, the first row — above Category,
-or above the read-only moon phase for Journal) renders the three module icons from `MODULE_LIST` filtered by
+or above the moon phase for Journal) renders the three module icons from `MODULE_LIST` filtered by
 `usesBlocks` as a segmented control; picking one calls `changeEntryType(id, from, to)`
 (`src/lib/entryTypeChange.ts`). Tasks and Altar have a different data model and aren't
 convertible, so they get no field and no entry in `ConvertibleEntryType`.
 
-The entry keeps its id and moves row: `changeEntryType` first flushes the source view's
+The entry keeps its id and its row: `changeEntryType` first flushes the source view's
 pending autosave (the new optional `EditActions.flush`, set via `useEditActions`'s
 `flushAutoSave` — see Right Sidebar Action Bar below, needed since the store may still hold
-stale content at the moment the toggle is clicked), then, serialized under the source's own
-write key, inserts a row into the target table with the same id (a fresh `entry_number` from
-the target table, the entry's id in the unused `slug` column, a journal `moon_phase`
-recomputed from `created_at`, and an empty title kept empty — the new type's "Untitled …" shows by itself), rewrites every chip pointing at the id to the new `data-entry-type` across all three
-content tables — trashed rows included, so a restored entry doesn't come back with a stale
+stale content at the moment the toggle is clicked), then, serialized under the entry's write
+key, runs one `UPDATE` of `type`, `entry_number` (a fresh one for the target type) and category
+(`retypeRow`) — an empty title stays empty, the new type's "Untitled …" shows by itself —
+rewrites every chip pointing at the id to the new `data-entry-type` across all entries —
+trashed rows included, so a restored entry doesn't come back with a stale
 chip — and templates (`retypeInternalLinks`, see Internal Links below), remaps the id inside
 any `block_definitions` link default that targeted it (`remapDefinitionDefaults`'s resolver may
-now hand back an `entryType` alongside `id`/`label`), and updates `links.target_type` and
-`task_links.target_type`. Only then does it delete the source row. There is no transaction
-available (see [`database.md`](database.md#foreign-keys)), so the order is deliberate: if
-something fails partway, the entry survives twice at worst, never zero times. Wiki and
+now hand back an `entryType` alongside `id`/`label`), and updates `task_links.target_type`.
+Since the row never leaves its table, there is no window in which the entry exists twice or
+not at all. Wiki and
 Operation keep category, icon and cover image across the move; converting either to Journal
-drops them, and `typeChangeDropsProperties` tells the field to ask first via `InlineConfirm`
+drops them (a journal entry has no category), and `typeChangeDropsProperties` tells the field to ask first via `InlineConfirm`
 when any of the three is actually set.
 
 The move leaves the content alone: a default template applies when an entry is created, never
 afterwards (see [Templates](#templates)). Once the row exists under the new type,
 `uiStore.retypeEntryViews(id, from, to)` rewrites every tab's `view`, every tab's history, and
 the tabless history in one `set()` — no open tab is ever left pointing at a type/id pair that
-briefly doesn't exist, since the new row is written and the stores swapped before the old row's
-delete resolves.
+briefly doesn't exist, since the row is updated and the store moved across types in one step.
 
 ### Right Sidebar Action Bar
 
@@ -563,21 +563,34 @@ old horizontal filter chips), and a second `FilterList` for Tasks' priorities. T
 button (in the shared no-results state) is the only remaining way to clear search and every
 filter at once.
 
+### Entry Store
+
+Journal entries, wiki articles and operations live in one Zustand store, `useEntryStore` (`src/store/entryStore.ts`), over the one `entries` table (see [`database.md`](database.md#entries)); it replaced `journalStore`, `wikiStore` and `operationStore`, which had the same actions three times. The type is `Entry` (with a `type: EntryType`, `'journal' | 'wiki' | 'operation'`, both in `types/index.ts`) instead of `JournalEntry`/`WikiArticle`/`Operation`; `TemplateEntryType` is `EntryType` and `TaggedType` is `EntryType | 'template'`.
+
+- **State:** `entries: Record<EntryType, Entry[]>` — one array per type, in the order rules each module had before (so a selector for one module re-renders on that module's changes only).
+- **Actions:** `createEntry(type, { categoryId, blank, createdAt })`, `updateEntry`, `duplicateEntry`, `deleteEntry`, `restoreEntry`, `permanentlyDeleteEntry`, `getEntry(id, type?)`; `ENTRY_TYPES`, `allEntries`, `findEntry(entries, id, type?)`, `mapEntries` and `withAddedEntry` are the helpers for code that has to walk or patch all three lists (block copies, tag renames, category reassignment, the trash).
+- **Write serialization** uses one key domain, `'entry'`, per entry id — not per type — so a type change and an autosave of the same entry queue behind each other.
+- `lib/modules.ts`'s `entryTypeForView` maps a view (`journal`/`wiki`/`operations`) to its `EntryType`. `TabBar` and `RightSidebar` subscribe to one selector; the link chip's icon/label in `RichEditor` and the link titles in `TasksView` come from `useLinkItems`/`linkItemsByKey` instead of reading the stores themselves; `moduleWiring` reloads entries once for all three modules.
+
+### Moon Phase
+
+A journal entry's moon phase is not stored: `entryMoonPhase(createdAt)` / `journalIcon` in `src/lib/moonPhase.ts` derive it from `created_at`. The vault setting `journal.moonPhase` means "show it on journal entries" and works retroactively; with it off `JournalView` has no phase filter and no grouping by phase, and the "no moon phase" chip no longer exists. The setting keys are `moonPhaseShow`/`moonPhaseShowHint` in all four locales.
+
 ### Store Selectors
 
 Every component subscribes to individual store fields, never the whole store:
 
 ```ts
 // correct — single field
-const entries = useJournalStore((s) => s.entries);
+const entries = useEntryStore((s) => s.entries.journal);
 
 // correct — several fields at once, shallow-compared
-const { entries, createEntry } = useJournalStore(
-  useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry }))
+const { entries, createEntry } = useEntryStore(
+  useShallow((s) => ({ entries: s.entries.journal, createEntry: s.createEntry }))
 );
 
 // wrong — re-renders on any store change
-const store = useJournalStore();
+const store = useEntryStore();
 ```
 
 This prevents unnecessary re-renders when unrelated fields change — a whole-store subscription in a permanently mounted component (sidebar, tab bar) re-renders it on every keystroke that touches the same store. The `useShallow` form (from `zustand/shallow`) is the way to pull several fields in one call; a plain object selector without it would defeat the purpose, since the fresh object fails the identity check every time. `RoutinesPanel`, the codebase's one remaining whole-store subscription, was removed along with routines rather than fixed.
@@ -588,9 +601,9 @@ All `useState`, `useEffect`, `useRef`, `useMemo`, and `useCallback` calls must a
 
 ### Categories
 
-Since v38, Wiki, Operations, Tasks, and Altar items share one category list — `useCategoryStore` (`src/store/categoryStore.ts`), backed by the single `categories` table (see [`database.md`](database.md#categories)). Since v39 an entry's `category_id` may be `NULL`: having no category is the state a new entry starts in, and the one place that state is called something is the "Uncategorized" bucket, which also collects entries whose category has been moved to Trash — for the reader the two are the same thing. `lookupCategory(byId, id)` in `lib/categories.ts` is the one way to resolve a possibly-null id against a map or record; `categoryLabel` already accepted `null`. Before v38, each of the four modules carried its own store slice with the same five actions duplicated four times; that duplication is gone. Journal is not part of this — it groups by moon phase, not by category. Import rule: `categoryStore` may import the four content stores (it reassigns their in-memory rows when a category is permanently deleted); none of them import it back. All cross-store access goes through `getState()` at call time, never at import time.
+Since v38, Wiki, Operations, Tasks, and Altar items share one category list (Wiki and Operations are `entries` rows since v49) — `useCategoryStore` (`src/store/categoryStore.ts`), backed by the single `categories` table (see [`database.md`](database.md#categories)). Since v39 an entry's `category_id` may be `NULL`: having no category is the state a new entry starts in, and the one place that state is called something is the "Uncategorized" bucket, which also collects entries whose category has been moved to Trash — for the reader the two are the same thing. `lookupCategory(byId, id)` in `lib/categories.ts` is the one way to resolve a possibly-null id against a map or record; `categoryLabel` already accepted `null`. Before v38, each of the four modules carried its own store slice with the same five actions duplicated four times; that duplication is gone. Journal is not part of this — it groups by moon phase, not by category. Import rule: `categoryStore` may import the content stores (it reassigns their in-memory rows when a category is permanently deleted); none of them import it back. All cross-store access goes through `getState()` at call time, never at import time.
 
-- **`useCategoryStore`** holds `categories: Category[]` (active only, ordered by `sort_order`) and `fetchCategories`/`addCategory`/`updateCategory`/`deleteCategory` (soft, rejects builtins)/`restoreCategory`/`permanentlyDeleteCategory`/`reorderCategories`/`getCategory`. `addCategory`/`updateCategory` reject a duplicate name via `categoryKey` (trim + lowercase, `src/lib/categoryMerge.ts` — the same comparison the v38 migration and the backup import use) by throwing `CATEGORY_NAME_TAKEN`. `addCategory` appends new categories to the end. Until v39 it slipped them in before the fallback `other` so that row stayed last; now that `other` is an ordinary category, there is nothing to keep last, and the order belongs to the user anyway (drag in `CategoriesView`). **A name belongs to one category** — the same rule as for tags: `addCategory` with the name of a trashed category restores that one (with whatever still points at it) and gives it the chosen emoji, rather than creating a second; `restoreCategory` into a name a live category took in the meantime merges into it, and so does `updateCategory` when a category is renamed to the name of one in the Trash (`mergeCategory`): `reassignCategoryContent(db, from, to)` moves the content over, the row goes, and the templates' assignments move to the survivor (a star only where no active template already has one for that type; see database.md), after which `templateStore` reloads. Otherwise a restored category goes to the end of the list rather than its old position. `permanentlyDeleteCategory` calls `reassignCategoryContent` (see database.md), which sets the affected content's `category_id` to `NULL`, then also `reassignCategoriesInMemory` — the same change applied to the four already-loaded content stores' in-memory rows, so a later `update*` on one of them can't try to write back a `category_id` the foreign key would now reject. `trashStore.emptyTrash` calls the same in-memory helper for the same reason.
+- **`useCategoryStore`** holds `categories: Category[]` (active only, ordered by `sort_order`) and `fetchCategories`/`addCategory`/`updateCategory`/`deleteCategory` (soft, rejects builtins)/`restoreCategory`/`permanentlyDeleteCategory`/`reorderCategories`/`getCategory`. `addCategory`/`updateCategory` reject a duplicate name via `categoryKey` (trim + lowercase, `src/lib/categoryMerge.ts` — the same comparison the v38 migration and the backup import use) by throwing `CATEGORY_NAME_TAKEN`. `addCategory` appends new categories to the end. Until v39 it slipped them in before the fallback `other` so that row stayed last; now that `other` is an ordinary category, there is nothing to keep last, and the order belongs to the user anyway (drag in `CategoriesView`). **A name belongs to one category** — the same rule as for tags: `addCategory` with the name of a trashed category restores that one (with whatever still points at it) and gives it the chosen emoji, rather than creating a second; `restoreCategory` into a name a live category took in the meantime merges into it, and so does `updateCategory` when a category is renamed to the name of one in the Trash (`mergeCategory`): `reassignCategoryContent(db, from, to)` moves the content over, the row goes, and the templates' assignments move to the survivor (a star only where no active template already has one for that type; see database.md), after which `templateStore` reloads. Otherwise a restored category goes to the end of the list rather than its old position. `permanentlyDeleteCategory` calls `reassignCategoryContent` (see database.md), which sets the affected content's `category_id` to `NULL`, then also `reassignCategoriesInMemory` — the same change applied to the already-loaded content stores' in-memory rows, so a later `update*` on one of them can't try to write back a `category_id` the foreign key would now reject. `trashStore.emptyTrash` calls the same in-memory helper for the same reason.
 - **`CategoriesView`** (`src/components/views/CategoriesView.tsx`, the `categories` aux view) is the **one** place categories are managed: add, rename, change emoji, delete (no question) plus undo, drag-to-reorder, and a per-module usage count on every row. The four module dashboards only *assign* (`CategorySelect` in the properties panels, the task row, `AltarItemModal`) and group by category; none of them can create, rename or delete one any more. That replaced five scattered surfaces — a "+ Category" button in each of the four dashboards, a pencil and a delete button in every category group header, and the Altar strip's own pencil and "+ Category". Builtins (`other`, `sigils`) render without the edit and delete buttons — their action slot stays reserved, or their count columns would fall out of line with every other row — but stay draggable, since `reorderCategories` accepts any id. The view runs on `Dashboard` for its header but renders its list through `grouping: 'custom'` with no sort axis: a sort control over a list whose order *is* the user's hand-dragged `sort_order` would contradict itself. Consequence worth knowing: a freshly created category holds nothing, so it appears in no module until an entry points at it — deliberate, and why `categoriesUsedBy` no longer takes a "keep this one anyway" argument.
 - **`CategorySelect`** carries an "Uncategorized" entry at the top of its list — since v39 a real value (`null`), not just the trigger's text for a category that no longer resolves. It is what a new entry shows, and choosing it clears an assignment.
 - **`lib/categories.ts`**: `categoryLabel(t, cat)` is the one display-name rule for all four modules — a builtin (`other`/`sigils`) is named via `categories.builtin.<id>` in the active locale, everything else via its stored `name`. `categoriesUsedBy(all, items)` returns the categories a view should actually render as chips/groups/tabs: every category at least one item points at, plus the fallback. `categoryUsageCounts(sources)` counts in one pass per list how many entries of each module point at each category, and `dominantCategoryModule(usage)` picks the largest — one truth for `CategoriesView`'s count columns and for the module hint the global search puts beside a category hit, so a fifth categorized module cannot make the two disagree. The rest of the file (`legacyCategoryLabel`, `legacyBuiltinLabelKey`, `legacyDisplayName`, `legacyWikiCategoryEmoji`) exists only for migrations v36–v38 and for importing files/backups written before v38, resolving an old per-module builtin id or name back to a display name; nothing in the live UI reads it.
@@ -599,7 +612,7 @@ Since v38, Wiki, Operations, Tasks, and Altar items share one category list — 
 
 ### Tags
 
-Entries store tag **names** (`tags: string[]`), not ids; the `tags` table (`useTagStore`, `src/store/tagStore.ts`) holds name and colour. Four lists carry names: journal entries, wiki articles, operations and templates (a template has no tag editor of its own in `TagsView` — see below — but passes its tags on to whatever entry it fills in). Tasks carry none (`TaggedType` has no `task`; the `tasks.tags` column is unused). `taggedItems()`/`setItemTags()` in the store are the one enumeration of those four, shared by the three actions that have to touch every list:
+Entries store tag **names** (`tags: string[]`), not ids; the `tags` table (`useTagStore`, `src/store/tagStore.ts`) holds name and colour. Four lists carry names: the three entry types and templates (a template has no tag editor of its own in `TagsView` — see below — but passes its tags on to whatever entry it fills in). Tasks carry none (`TaggedType` has no `task`; the `tasks.tags` column is unused). `taggedItems()`/`setItemTags()` in the store are the one enumeration of those four, shared by the three actions that have to touch every list:
 
 - **`updateTag`** — a new name is written into every item that carried the old one (deduplicated, in case an item already had both spellings), including entries sitting in Trash (`renameInTrashedRows`, straight in the four soft-delete tables — the stores only hold live rows), so a restored entry doesn't come back with a name that no longer exists. Until this was added a rename only changed the `tags` row, and every entry silently lost the tag. A name another live tag already has (case-insensitive) throws `TAG_NAME_TAKEN` — checked before the `serialized` chain, which would otherwise log the expected rejection as an error.
 - **`deleteTag`** (soft) removes the name from every live item and snapshots the affected `{ id, type }` pairs into `affected_ids`; **`restoreTag`** puts it back from that snapshot. If a live tag of the same name (case-insensitive) appeared in the meantime, `restoreTag` merges into it — the entries get that tag's spelling and the trashed row is dropped — rather than leaving two.
@@ -884,7 +897,7 @@ elements the definition no longer shows (`ElementDef.archived` — invisible eve
 back when the element returns), takes labels, options, display rules, name and icon from the
 definition, and leaves the instance's own attributes (title, eye, read-mode title) alone. "Update
 all" and "also remove from entries" live in `store/blockCopies.ts`: they rewrite content through
-the three stores' `update*` and skip the entry open in edit mode, whose editor would write its old
+`useEntryStore`'s `updateEntry` and skip the entry open in edit mode, whose editor would write its old
 state back, and — per source, via `hasFrozenCopy` — any entry holding a frozen copy, counted
 separately as `CopyRunResult.skippedLocked` and reported in the builder's notice alongside
 `skippedEditing`. An entry open in read mode picks a real change up itself — `BlockStack` resets
@@ -926,14 +939,14 @@ origins with one more field, `templateEntries()` (`store/blockCopies.ts`) groups
 `outdatedTemplates` on `CopyUsage`, alongside `entries`/`outdated`) — a template is content that
 can go stale exactly like an entry can. Changing a template later never touches entries it
 already filled; `updateAllCopies`/`removeAllCopies` (`blockCopies.ts`) walk templates as a
-second content source next to the three entry stores, skipping a template whose own page is
+second content source next to the entry store, skipping a template whose own page is
 open or has an unsaved draft the same way they skip an entry mid-edit (`CopyRunResult` gained
 `changedTemplates`/`skippedDrafts` alongside `skippedEditing`).
 
 **Defaulting on create.** `startOfNewEntry(entryType, categoryId, fallbackTitle, blank)` resolves
 the default for the combination (unless `blank`, used by imports and duplicates, which always
 overwrite content anyway, or unless the vault's `templates.applyDefault` setting is off) and returns `{ title, content, tags, templateId }` via `templateStart`;
-the three content stores' `create*` actions call it instead of starting from an empty string.
+`createEntry` calls it instead of starting from an empty string.
 Applying a default this way — rather than the old `defaultBlocksFor`/`lib/blocks/layouts.ts`,
 which is gone — is also how the built-in Sigils layout now works: `core-sigil`
 (`SIGIL_TEMPLATE_ID`) is a normal, editable, deletable template seeded as the default for
@@ -1156,9 +1169,9 @@ If the entry was completely empty (`<p></p>`), the block goes in without its lea
 
 **A chip's own type, rewritten in place.** `retypeInternalLinks(html, id, entryType)` (`src/lib/internalLinkHtml.ts`) sets `data-entry-type` on every chip pointing at `id` to a new value, for an entry that changed which of Journal/Wiki/Operation it is (see Edit Mode Architecture below) — the id stays the same, so only that one attribute needs to change. Like `extractInternalLinks`/`isBlankContent`, it stays regex-over-the-tag rather than `DOMParser`-based: `entryTypeChange.ts` runs it over every stored row across all three content tables plus `templates`, and a full parse-and-reserialise of each would rewrite content nobody actually touched.
 
-**Pre-v36 legacy bridge.** Journal entries used to carry two dedicated columns, `linked_operation_ids`/`linked_wiki_ids`, shown as their own chip rows under the title. Migration v36 rewrites them into content blocks the same way described above and empties the columns (see [`database.md`](database.md#journal_entries)); `.emerald`/Markdown import of a file written before that migration append the same blocks instead of writing to the columns. The columns themselves stay in the schema only for round-tripping an older `.emeralddb` backup — `LinkedEntriesField`'s `legacyIds` prop is the read-only bridge that still lists them if a restore ever repopulates them, but nothing writes to them going forward.
+**Pre-v36 legacy bridge.** Journal entries used to carry two dedicated columns, `linked_operation_ids`/`linked_wiki_ids`, shown as their own chip rows under the title. Migration v36 rewrites them into content blocks the same way described above and empties the columns (see [`database.md`](database.md#entries)); `.emerald`/Markdown import of a file written before that migration append the same blocks instead of writing to the columns. The columns are gone since v49 (`entries` has no `linked_*` columns); import converts an older backup's values into chips row by row before inserting (`linkedIdsToContent`, `tablesLinkSource`/`rowsLinkSource` in `migrateLinkedIdsToContent.ts`), so the `legacyIds` bridge in `LinkedEntriesField`, `EntryReadSections` and `JournalPropertiesPanel` no longer exists.
 
-**Pre-v37 legacy bridge.** Journal also used to carry three fixed properties — Paradigm, Banishing, Meditation — each a dropdown tied to one wiki article, plus a meditation-duration number field. `JournalPropertiesPanel` no longer has any of the four; migration v37 (`migrateJournalFieldsToContent.ts`) rewrites the six columns behind them into the same kind of content block, once, and clears all six. The meditation duration has no link target, so it becomes plain text appended after its chip (`"(20 min)"`, via `internalLinkBlockHtml`'s `suffix` option); `is_bannung`/`is_meditation` could be set without an article attached (the checkbox predates the dropdown), which becomes a `plainBlockHtml` text paragraph naming the category instead of vanishing outright. `.emerald`/Markdown import applies the same conversion to files written before v37, through `appendLegacyLinks`/`legacyFieldTargets` in `emeraldFormat.ts` — the one place that also decides the plain-text fallback when a referenced article doesn't exist in the importing vault. Unlike the v36 bridge, there is no `legacyIds`-style read path for these six columns: nothing in the UI reads them any more, so a backup restore that repopulates them (see [`database.md`](database.md#journal_entries)) leaves the data stranded there.
+**Pre-v37 legacy bridge.** Journal also used to carry three fixed properties — Paradigm, Banishing, Meditation — each a dropdown tied to one wiki article, plus a meditation-duration number field. `JournalPropertiesPanel` no longer has any of the four; migration v37 (`migrateJournalFieldsToContent.ts`) rewrites the six columns behind them into the same kind of content block, once, and clears all six. The meditation duration has no link target, so it becomes plain text appended after its chip (`"(20 min)"`, via `internalLinkBlockHtml`'s `suffix` option); `is_bannung`/`is_meditation` could be set without an article attached (the checkbox predates the dropdown), which becomes a `plainBlockHtml` text paragraph naming the category instead of vanishing outright. `.emerald`/Markdown import applies the same conversion to files written before v37, through `appendLegacyLinks`/`legacyFieldTargets` in `emeraldFormat.ts` — the one place that also decides the plain-text fallback when a referenced article doesn't exist in the importing vault. Since v49 the six columns no longer exist; a backup that still carries them is converted row by row before insert (`journalFieldsToContent`, see [`database.md`](database.md#entries)).
 
 ### Text and Image Alignment
 
