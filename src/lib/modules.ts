@@ -30,7 +30,7 @@ import {
   Wand2,
   type LucideIcon,
 } from 'lucide-react';
-import type { ContentType } from '../types';
+import type { ContentType, EntryType } from '../types';
 
 /**
  * Emoji-Fallback je Link-Typ, wenn weder ein eigenes Icon noch ein
@@ -185,6 +185,16 @@ export function viewTypeForEntryType(entryType: ContentType): EntryModuleId {
   const mod = MODULE_LIST.find((meta) => meta.entryType === entryType);
   if (!mod) throw new Error(`No module for entry type "${entryType}"`);
   return mod.id;
+}
+
+/**
+ * Der Eintragstyp (`entries.type`) einer Ansicht — `undefined` für alles, was
+ * kein Journal-, Wiki- oder Operationen-Eintrag ist. Wie `viewTypeForEntryType`
+ * über `ModuleMeta.entryType`, nur in die andere Richtung.
+ */
+export function entryTypeForView(viewType: string): EntryType | undefined {
+  const entryType = (MODULES as Partial<Record<string, ModuleMeta>>)[viewType]?.entryType;
+  return entryType === 'journal' || entryType === 'wiki' || entryType === 'operation' ? entryType : undefined;
 }
 
 /** Alle Papierkorb-Eintragstypen (`TrashedItem['type']`). */

@@ -281,13 +281,17 @@ export async function nextEntryNumber(db: Database, type: EntryType): Promise<nu
   return rows[0]?.n ?? 1;
 }
 
-/** Alle IDs, auf die eine polymorphe Verknüpfung zeigen darf — muss die
- *  Typenliste von `checkIntegrity` (schema.ts) spiegeln, sonst löscht der
- *  Sweep genau die Zeilen, die die Diagnose für gültig hält. Soft-gelöschte
- *  Zeilen zählen bewusst mit: Papierkorb-Inhalte sind noch keine Waisen. */
-const CONTENT_IDS = `(SELECT id FROM entries
-                      UNION ALL SELECT id FROM tasks
-                      UNION ALL SELECT id FROM altars)`;
+/** Wann das Ziel einer Verknüpfung existiert — dieselben Typen und dieselbe
+ *  Regel wie `checkIntegrity` (schema.ts), sonst löscht der Sweep genau die
+ *  Zeilen, die die Diagnose für gültig hält: ein Eintrag zählt nur unter
+ *  seinem eigenen Typ. Soft-gelöschte Zeilen zählen bewusst mit:
+ *  Papierkorb-Inhalte sind noch keine Waisen. */
+const LINK_TARGET_EXISTS = `(
+  (target_type IN ('journal', 'wiki', 'operation')
+    AND EXISTS (SELECT 1 FROM entries e WHERE e.id = task_links.target_id AND e.type = task_links.target_type))
+  OR (target_type = 'task' AND EXISTS (SELECT 1 FROM tasks t WHERE t.id = task_links.target_id))
+  OR (target_type = 'altar' AND EXISTS (SELECT 1 FROM altars a WHERE a.id = task_links.target_id))
+)`;
 
 /**
  * Die Papierkorb-Frist des Vaults, der gerade geöffnet wird — seine
@@ -334,7 +338,7 @@ async function runPeriodicCleanup(db: Database, retentionDays: number | null): P
  * damit beide Wege dasselbe Ergebnis liefern.
  */
 export async function sweepDanglingTaskLinks(db: Database): Promise<void> {
-  await db.execute(`DELETE FROM task_links WHERE target_id NOT IN ${CONTENT_IDS}`);
+  await db.execute(`DELETE FROM task_links WHERE NOT ${LINK_TARGET_EXISTS}`);
 }
 
 export const MIGRATIONS: Migration[] = [

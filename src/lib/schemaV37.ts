@@ -219,7 +219,7 @@ const FROZEN: Partial<Record<V37TableName, string>> = {
 };
 
 export const V37_TABLE_DDL: Record<V37TableName, string> = Object.fromEntries(
-  V37_TABLES.map((t) => [t, FROZEN[t] ?? ddlBeforeV49(t as Parameters<typeof ddlBeforeV49>[0])])
+  V37_TABLES.map((t) => [t, FROZEN[t] ?? ddlBeforeV49(t)])
 ) as Record<V37TableName, string>;
 
 export const V37_INDEX_DDL: string[] = [

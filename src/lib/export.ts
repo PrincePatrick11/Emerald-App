@@ -70,8 +70,7 @@ function resolveInternalLinkIcons(html: string): string {
   const links = doc.querySelectorAll<HTMLElement>('span[data-type="internalLink"]');
   if (!links.length) return html;
 
-  const articles = useEntryStore.getState().entries.wiki;
-  const operations = useEntryStore.getState().entries.operation;
+  const { wiki: articles, operation: operations } = useEntryStore.getState().entries;
   const { tasks } = useTaskStore.getState();
   const { categories } = useCategoryStore.getState();
   const { altars } = useAltarStore.getState();

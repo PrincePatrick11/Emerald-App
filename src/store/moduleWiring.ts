@@ -20,14 +20,16 @@ import { ENTRY_MODULE_IDS, type EntryModuleId, type TrashKind } from '../lib/mod
 
 /**
  * Lädt den Inhalt eines Moduls neu aus der aktiven DB. Journal, Wiki und
- * Operationen teilen sich einen Store — wer mehrere davon neu lädt, stößt
- * `fetchEntries` mehrmals an; das kostet eine Abfrage, keine Inkonsistenz.
+ * Operationen teilen sich einen Store und damit dieselbe Funktion — die
+ * Reload-Helfer unten rufen sie je Aufruf nur einmal.
  */
+const reloadEntries = () => useEntryStore.getState().fetchEntries();
+
 export const moduleWiring: Record<EntryModuleId, { reload: () => Promise<void> }> = {
-  journal: { reload: () => useEntryStore.getState().fetchEntries() },
+  journal: { reload: reloadEntries },
   tasks: { reload: () => useTaskStore.getState().fetchAll() },
-  operations: { reload: () => useEntryStore.getState().fetchEntries() },
-  wiki: { reload: () => useEntryStore.getState().fetchEntries() },
+  operations: { reload: reloadEntries },
+  wiki: { reload: reloadEntries },
   altar: { reload: () => useAltarStore.getState().fetchAltars() },
 };
 
@@ -110,7 +112,7 @@ export async function reloadAllStores(): Promise<void> {
     useTemplateStore.getState().fetchTemplates(),
     useLexiconStore.getState().fetchLexicon(),
   ]);
-  await Promise.all(ENTRY_MODULE_IDS.map((id) => moduleWiring[id].reload()));
+  await reloadEach(ENTRY_MODULE_IDS);
 }
 
 /**
@@ -126,5 +128,11 @@ export async function reloadModules(ids: readonly EntryModuleId[]): Promise<void
     useTemplateStore.getState().fetchTemplates(),
     useLexiconStore.getState().fetchLexicon(),
   ]);
-  await Promise.all(ids.map((id) => moduleWiring[id].reload()));
+  await reloadEach(ids);
+}
+
+/** Lädt die Module neu — Journal, Wiki und Operationen teilen sich dabei eine Abfrage. */
+function reloadEach(ids: readonly EntryModuleId[]): Promise<unknown> {
+  const reloads = new Set(ids.map((id) => moduleWiring[id].reload));
+  return Promise.all([...reloads].map((reload) => reload()));
 }

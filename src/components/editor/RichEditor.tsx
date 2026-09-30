@@ -8,7 +8,7 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import TextAlign from '@tiptap/extension-text-align';
 import { ResizableImage } from './ResizableImageExtension';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { saveImage } from '../../lib/images';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ExternalLink, Pencil, Trash2, Check, X } from 'lucide-react';
@@ -18,16 +18,9 @@ import { TEXT_ALIGN_TYPES } from './EditorToolbar';
 import Button from '../ui/Button';
 import { createInternalLinkExtension } from './InternalLinkExtension';
 import { ExternalDropExtension } from './ExternalDropExtension';
-import { DEFAULT_ENTRY_EMOJI, type SuggestionItem } from './SuggestionList';
+import type { SuggestionItem } from './SuggestionList';
 import { useLinkItems } from '../../hooks/useLinkItems';
-import { useCategoryStore } from '../../store/categoryStore';
-import { journalIcon } from '../../lib/moonPhase';
-import type { ContentType } from '../../types';
-import { displayTitle } from '../../lib/entryTitle';
-import i18n from '../../i18n';
-import { useEntryStore } from '../../store/entryStore';
-import { useTaskStore } from '../../store/taskStore';
-import { useAltarStore } from '../../store/altarStore';
+import { linkItemKey, linkItemsByKey } from '../../lib/linkItems';
 import { isAcceptedImageFile, readFileAsDataUrl } from '../../lib/helpers';
 import { prepareImageDataUrl } from '../../lib/imageLimits';
 import { reportImageError } from '../../store/imageNoticeStore';
@@ -104,13 +97,6 @@ export default function RichEditor({
   editable = true,
   onEditorReady,
 }: RichEditorProps) {
-  const entries = useEntryStore((s) => s.entries.journal);
-  const articles = useEntryStore((s) => s.entries.wiki);
-  const categories = useCategoryStore((s) => s.categories);
-  const operations = useEntryStore((s) => s.entries.operation);
-  const tasks = useTaskStore((s) => s.tasks);
-  const altars = useAltarStore((s) => s.altars);
-  const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
   const { t } = useTranslation();
 
   // Link popup state (edit mode only)
@@ -118,59 +104,23 @@ export default function RichEditor({
   const [editingHref, setEditingHref] = useState<string | null>(null);
   const linkPopupRef = useRef<HTMLDivElement>(null);
 
-  // Always-fresh icon lookup ref — returns the current icon for any entry from the store.
-  // Backed by a ref so the extension closure never goes stale after initial mount.
-  const storeRef = useRef({ entries, articles, categories, operations, tasks, altars, showMoonPhase });
-  storeRef.current = { entries, articles, categories, operations, tasks, altars, showMoonPhase };
-  const getIconRef = useRef((id: string, entryType: string): string | null => {
-    const { entries, articles, categories, operations, tasks, altars, showMoonPhase } = storeRef.current;
-    if (entryType === 'journal') {
-      const e = entries.find((e) => e.id === id);
-      return e ? journalIcon(e, showMoonPhase) : null;
-    }
-    if (entryType === 'wiki') {
-      const a = articles.find((a) => a.id === id);
-      if (!a) return null;
-      const catEmoji = categories.find((c) => c.id === a.category_id)?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
-      return a.icon || catEmoji;
-    }
-    if (entryType === 'operation') {
-      const o = operations.find((o) => o.id === id);
-      if (!o) return null;
-      return o.icon || categories.find((c) => c.id === o.category_id)?.emoji || DEFAULT_ENTRY_EMOJI.operation;
-    }
-    if (entryType === 'task') {
-      const task = tasks.find((task) => task.id === id);
-      if (!task) return null;
-      return categories.find((c) => c.id === task.category_id)?.emoji || DEFAULT_ENTRY_EMOJI.task;
-    }
-    if (entryType === 'altar') {
-      const altar = altars.find((a) => a.id === id);
-      if (!altar) return null;
-      // icon_data ist eine data-URL und bleibt bewusst nur hier im Live-Lookup —
-      // in die Node-Attrs (und damit ins gespeicherte HTML) gehört sie nicht.
-      return altar.icon_data || DEFAULT_ENTRY_EMOJI.altar;
-    }
-    return null;
-  });
-
-  const getLabelRef = useRef((id: string, entryType: string): string | null => {
-    const { entries, articles, operations, tasks, altars } = storeRef.current;
-    const pool: readonly { id: string; title: string }[] | null =
-      entryType === 'journal' ? entries
-        : entryType === 'wiki' ? articles
-        : entryType === 'operation' ? operations
-        : entryType === 'task' ? tasks
-        : entryType === 'altar' ? altars
-        : null;
-    const target = pool?.find((item) => item.id === id);
-    return target ? displayTitle(i18n.t, entryType as ContentType, target.title) : null;
-  });
-
   // Always-fresh items ref so the extension closure never goes stale.
   const linkItems = useLinkItems();
   const itemsRef = useRef<SuggestionItem[]>([]);
   itemsRef.current = linkItems;
+
+  // Icon und Titel eines Chips, live nachgeschlagen — aus derselben Liste wie
+  // Picker und Seitenleiste (`buildLinkItems`), damit alle drei dasselbe
+  // zeigen. `displayIcon` ist auch ein Bild, das nicht in die Node-Attrs darf.
+  const byKey = useMemo(() => linkItemsByKey(linkItems), [linkItems]);
+  const byKeyRef = useRef(byKey);
+  byKeyRef.current = byKey;
+  const getIconRef = useRef((id: string, entryType: string): string | null => {
+    const item = byKeyRef.current.get(linkItemKey({ id, entryType }));
+    return item ? (item.displayIcon ?? item.icon ?? null) : null;
+  });
+  const getLabelRef = useRef((id: string, entryType: string): string | null =>
+    byKeyRef.current.get(linkItemKey({ id, entryType }))?.label ?? null);
 
   // Was der Editor beim Tippen und Einfügen von selbst formatiert
   // (Einstellungen → Einträge). Beim Anlegen gelesen: ein offener Editor

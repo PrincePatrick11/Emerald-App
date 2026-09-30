@@ -52,22 +52,6 @@ export const TABLES = [
 
 export type TableName = (typeof TABLES)[number];
 
-/**
- * Die Tabellen mit Soft-Delete bis v38 — ihre `deleted_at`-Spalte indiziert
- * `INDEX_DDL_V38`. Eine spätere Tabelle gehört NICHT hierher: v38 und v39 legen
- * diese Indizes mitten in der Kette an, wo es sie noch nicht gibt. Sie bringt ihren
- * Index selbst mit (siehe `BLOCK_DEFINITIONS_INDEX_DDL`). Eingefroren: die drei
- * Eintragstabellen gibt es seit v49 nicht mehr, v38 und v39 indizieren sie trotzdem.
- */
-export const SOFT_DELETE_TABLES_V38 = [
-  'journal_entries',
-  'wiki_articles',
-  'tags',
-  'operations',
-  'categories',
-  'tasks',
-] as const;
-
 export const TABLE_DDL: Record<TableName, string> = {
   schema_version: `
     CREATE TABLE schema_version (
@@ -302,29 +286,32 @@ export const TABLE_DDL: Record<TableName, string> = {
  * `task_links` und auf jeder `deleted_at`-Spalte. Dort gibt es `links` und die
  * drei Eintragstabellen noch; v47 wirft `links` weg, v49 die drei.
  */
-export const INDEX_DDL_V38: readonly string[] = [
-  'CREATE INDEX idx_links_source ON links(source_id)',
-  'CREATE INDEX idx_links_target ON links(target_id)',
-  'CREATE INDEX idx_task_links_task ON task_links(task_id)',
-  'CREATE INDEX idx_task_links_target ON task_links(target_id)',
-  'CREATE INDEX idx_wiki_articles_category ON wiki_articles(category_id)',
-  'CREATE INDEX idx_operations_category ON operations(category_id)',
-  'CREATE INDEX idx_tasks_category ON tasks(category_id)',
-  'CREATE INDEX idx_tasks_parent ON tasks(parent_task_id)',
-  'CREATE INDEX idx_altar_items_category ON altar_items(category_id)',
-  'CREATE INDEX idx_altar_placements_altar ON altar_placements(altar_id)',
-  'CREATE INDEX idx_altar_placements_item ON altar_placements(item_id)',
-  ...SOFT_DELETE_TABLES_V38.map((t) => `CREATE INDEX idx_${t}_deleted ON ${t}(deleted_at)`),
-];
-
 /**
  * Die Indizes aus `INDEX_DDL_V38`, die es noch gibt. Die `deleted_at`-Indizes,
  * weil `runPeriodicCleanup` bei jedem Öffnen eines Vaults einen Bereichsscan
  * über alle Soft-Delete-Tabellen fährt.
  */
-const KEPT_INDEX_DDL_V38: readonly string[] = INDEX_DDL_V38.filter(
-  (sql) => !/ ON (links|journal_entries|wiki_articles|operations)\(/.test(sql)
-);
+const KEPT_INDEX_DDL_V38: readonly string[] = [
+  'CREATE INDEX idx_task_links_task ON task_links(task_id)',
+  'CREATE INDEX idx_task_links_target ON task_links(target_id)',
+  'CREATE INDEX idx_tasks_category ON tasks(category_id)',
+  'CREATE INDEX idx_tasks_parent ON tasks(parent_task_id)',
+  'CREATE INDEX idx_altar_items_category ON altar_items(category_id)',
+  'CREATE INDEX idx_altar_placements_altar ON altar_placements(altar_id)',
+  'CREATE INDEX idx_altar_placements_item ON altar_placements(item_id)',
+  ...(['tags', 'categories', 'tasks'] as const).map((t) => `CREATE INDEX idx_${t}_deleted ON ${t}(deleted_at)`),
+];
+
+/** Die aus `INDEX_DDL_V38`, deren Tabellen v47 (`links`) und v49 (die drei Eintragstabellen) verwerfen. */
+const DROPPED_INDEX_DDL_V38: readonly string[] = [
+  'CREATE INDEX idx_links_source ON links(source_id)',
+  'CREATE INDEX idx_links_target ON links(target_id)',
+  'CREATE INDEX idx_wiki_articles_category ON wiki_articles(category_id)',
+  'CREATE INDEX idx_operations_category ON operations(category_id)',
+  ...(['journal_entries', 'wiki_articles', 'operations'] as const).map((t) => `CREATE INDEX idx_${t}_deleted ON ${t}(deleted_at)`),
+];
+
+export const INDEX_DDL_V38: readonly string[] = [...DROPPED_INDEX_DDL_V38, ...KEPT_INDEX_DDL_V38];
 
 /**
  * Der Index von `block_definitions` (v40), getrennt von `INDEX_DDL_V38`: v38

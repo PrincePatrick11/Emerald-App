@@ -104,7 +104,7 @@ export default function CategoriesView() {
   const pushUndo = useUndoStore((s) => s.push);
 
   // Kein fetch beim Mount: reloadAllStores() lädt beim Start und beim
-  // Vault-Wechsel alle vier Modul-Stores samt Kategorien.
+  // Vault-Wechsel Einträge, Aufgaben und Altar samt Kategorien.
   const articles = useEntryStore((s) => s.entries.wiki);
   const operations = useEntryStore((s) => s.entries.operation);
   const tasks = useTaskStore((s) => s.tasks);

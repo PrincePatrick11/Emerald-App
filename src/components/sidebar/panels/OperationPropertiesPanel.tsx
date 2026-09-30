@@ -17,7 +17,7 @@ export default function OperationPropertiesPanel() {
   const activeView = useUIStore((s) => s.activeView);
   const isEditing = activeView.mode === 'edit';
   const operations = useEntryStore((s) => s.entries.operation);
-  const updateOperation = useEntryStore((s) => s.updateEntry);
+  const updateEntry = useEntryStore((s) => s.updateEntry);
 
   const op = activeView.id ? operations.find((o) => o.id === activeView.id) : null;
   if (!op) {
@@ -38,10 +38,10 @@ export default function OperationPropertiesPanel() {
     <>
       <PropertiesSection>
         <EntryTypeField id={op.id} type="operation" properties={op} />
-        <CategoryIconCoverRows entry={op} update={(patch) => updateOperation(op.id, patch)} />
+        <CategoryIconCoverRows entry={op} update={(patch) => updateEntry(op.id, patch)} />
       </PropertiesSection>
       <LinkedEntriesField content={op.content} />
-      <TagsField tags={op.tags ?? []} onChange={(tags) => updateOperation(op.id, { tags })} />
+      <TagsField tags={op.tags ?? []} onChange={(tags) => updateEntry(op.id, { tags })} />
     </>
   );
 }

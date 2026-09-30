@@ -111,11 +111,11 @@ const stubPlugin = {
 const entry = join(workDir, 'entry.ts');
 writeFileSync(
   entry,
-  `export { runMigrations, MIGRATIONS, clearLegacyUntitledTitles } from '${process.cwd().replace(/\\/g, '/')}/src/lib/db';
+  `export { runMigrations, MIGRATIONS, clearLegacyUntitledTitles, sweepDanglingTaskLinks } from '${process.cwd().replace(/\\/g, '/')}/src/lib/db';
    export { TABLES, TABLE_DDL, ddlIfNotExists, checkIntegrity, reassignCategoryContent, collectUsedImageFilenames } from '${process.cwd().replace(/\\/g, '/')}/src/lib/schema';
    export { copyTable } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbRebuild';
    export { ddlBeforeV49 } from '${process.cwd().replace(/\\/g, '/')}/src/lib/schemaV48';
-   export { assertPayloadReferencesResolve, migrateBackupPayload, withRoutinesAsTemplates } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbBackup';
+   export { assertPayloadReferencesResolve, entryRowsForInsert, migrateBackupPayload, withRoutinesAsTemplates } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbBackup';
    export { invalidateVaultCache } from '${process.cwd().replace(/\\/g, '/')}/src/lib/vaultManager';
    export { convertLegacySigils, needsSigilConversion, sigilRowToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLegacySigils';
    export { linkedIdsToContent, rowsLinkSource } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLinkedIdsToContent';
@@ -153,7 +153,7 @@ globalThis.localStorage ??= {
   removeItem: () => {},
 };
 const {
-  runMigrations, MIGRATIONS, clearLegacyUntitledTitles, TABLES, TABLE_DDL,
+  runMigrations, MIGRATIONS, clearLegacyUntitledTitles, sweepDanglingTaskLinks, entryRowsForInsert, TABLES, TABLE_DDL,
   ddlIfNotExists, checkIntegrity, reassignCategoryContent,
   collectUsedImageFilenames, invalidateVaultCache, copyTable, ddlBeforeV49,
   assertPayloadReferencesResolve, convertLegacySigils, migrateBackupPayload, withRoutinesAsTemplates,
@@ -813,6 +813,9 @@ console.log('\n4. checkIntegrity findet, was Foreign Keys nicht abdecken\n');
   check('Waise in task_links erkannt', hit('fehlt', 'wiki'));
   check('ein Link mit falschem Typ gilt als Waise', hit('e1', 'journal'));
   check('der richtige Link auf denselben Eintrag nicht', !hit('e1', 'wiki'), JSON.stringify(found));
+  await sweepDanglingTaskLinks(db);
+  const kept = (await db.select('SELECT id FROM task_links ORDER BY id')).map((r) => r.id);
+  check('der Sweep räumt dieselben Links weg, die checkIntegrity meldet', JSON.stringify(kept) === '["tl3"]', JSON.stringify(kept));
   check(
     'PRAGMA foreign_key_check sieht davon nichts',
     (await db.select('PRAGMA foreign_key_check')).length === 0
@@ -1965,6 +1968,23 @@ console.log('\n8n. Migration v49: drei Eintragstabellen werden entries\n');
     rejected = true;
   }
   check('eine Datei aus einer neueren Version wird abgewiesen', rejected);
+
+  // Derselbe Eintrag in zwei Listen einer alten Datei: einmal, der erste gewinnt.
+  const rows = entryRowsForInsert(
+    [{ id: 'x', title: 'Journal', category_id: 'sigils', icon: '🌿' }],
+    [{ id: 'x', title: 'Wiki' }, { id: 'w', title: 'W', slug: 'w', category_id: 'c' }],
+    [{ id: 'o', title: 'O', intention_text: 'alt' }],
+  );
+  check(
+    'Import: eine doppelte ID kommt einmal an, das Journal ohne Kategorie und Icon',
+    rows.length === 3 && rows[0].type === 'journal' && rows[0].category_id === null && rows[0].icon === null,
+    JSON.stringify(rows)
+  );
+  check(
+    'Import: jede Zeile trägt genau die Spalten von entries',
+    rows.every((r) => !('slug' in r) && !('intention_text' in r) && 'cover_image' in r) && rows[1].category_id === 'c',
+    JSON.stringify(rows)
+  );
 }
 
 {

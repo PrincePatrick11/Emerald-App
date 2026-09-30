@@ -29,25 +29,20 @@ import { retypeInternalLinks } from './internalLinkHtml';
 import { serialKey, serialized } from './serialize';
 import { viewTypeForEntryType } from './modules';
 import { remapDefinitionDefaults } from './blocks/definitions';
-import type { TemplateEntryType } from './blocks/templates';
 import { hasOwnTitle } from './entryTitle';
-import { useEntryStore, withAddedEntry } from '../store/entryStore';
+import { mapEntries, useEntryStore, withAddedEntry } from '../store/entryStore';
 import { useTaskStore } from '../store/taskStore';
 import { useTemplateStore } from '../store/templateStore';
 import { useBlockDefinitionStore } from '../store/blockDefinitionStore';
 import { useUIStore } from '../store/uiStore';
-import type { Entry } from '../types';
+import type { Entry, EntryType } from '../types';
 
 /** Die Typen, zwischen denen ein Eintrag wechseln kann — die Module mit Blockstapel. */
-export type ConvertibleEntryType = TemplateEntryType;
+export type ConvertibleEntryType = EntryType;
 
 /** Was ein Eintrag über den Typwechsel mitnimmt. */
 type EntryCore = Pick<Entry, 'id' | 'title' | 'content' | 'tags' | 'created_at' | 'category_id' | 'icon' | 'cover_image'>;
 
-function readEntry(type: ConvertibleEntryType, id: string): Entry | undefined {
-  const entry = useEntryStore.getState().getEntry(id);
-  return entry?.type === type ? entry : undefined;
-}
 
 /**
  * Verliert der Eintrag etwas, wenn er `to` wird? Nur das Journal hat weniger
@@ -112,7 +107,7 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
   await useUIStore.getState().editActions?.flush?.();
 
   await serialized(serialKey('entry', id), async () => {
-    const source = readEntry(from, id);
+    const source = useEntryStore.getState().getEntry(id, from);
     if (!source) return;
     const db = await getDb();
 
@@ -160,12 +155,10 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
     useEntryStore.setState((s) => ({ entries: withAddedEntry(s.entries, converted) }));
     useUIStore.getState().retypeEntryViews(id, viewTypeForEntryType(from), viewTypeForEntryType(to));
     useEntryStore.setState((s) => ({
-      entries: {
-        journal: withContent(s.entries.journal, entryContent),
-        wiki: withContent(s.entries.wiki, entryContent),
-        operation: withContent(s.entries.operation, entryContent),
-        [from]: withContent(s.entries[from], entryContent).filter((e) => e.id !== id),
-      },
+      entries: mapEntries(s.entries, (list, type) => {
+        const next = withContent(list, entryContent);
+        return type === from ? next.filter((e) => e.id !== id) : next;
+      }),
     }));
     useTemplateStore.setState((s) => ({ templates: withContent(s.templates, templateContent) }));
     useTaskStore.setState((s) => ({

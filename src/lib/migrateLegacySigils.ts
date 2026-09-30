@@ -30,8 +30,9 @@ import { SIGIL_CATEGORY_ID } from './schema';
  * (Spalten und Inhalt) — v49 (`unifyEntries`) holt sie nach, bevor es die
  * Spalten verwirft, und bricht ab, solange das nicht gelingt. Eine
  * Zeichnung, die gar kein Bild ist (oder übergroß), wird verworfen statt
- * endlos wiederholt. Die leeren Operationen der Kategorie „Sigillen" nimmt
- * nur die Migration selbst mit — und nur, solange ihr Inhalt noch keine
+ * endlos wiederholt. Die leeren Operationen der Kategorie „Sigillen" nehmen
+ * nur v42 selbst und der Import von Sicherungen vor Version 7 mit — und
+ * nur, solange ihr Inhalt noch keine
  * Sigillen-Blöcke trägt: ein abgebrochener und neu gestarteter v42-Lauf
  * setzt kein zweites Set davor, und das Nachholen fügt einem Eintrag, dem
  * der Nutzer die Blöcke bewusst genommen hat, sie nicht wieder hinzu.
@@ -78,11 +79,17 @@ function jsonLetters(raw: unknown): string[] {
   }
 }
 
-function hasSigilData(row: LegacySigilRow): boolean {
-  const inSigilCategory = row.category_id === SIGIL_CATEGORY_ID && !(row.content ?? '').includes(SIGIL_BLOCK_MARKER);
-  return inSigilCategory || !!row.drawing_data || !!row.intention_text?.trim()
+/** Die Sigillen-Werte selbst — was `LEGACY_DATA` in SQL fragt, ohne die Notizen. */
+function hasSigilValues(row: LegacySigilRow): boolean {
+  return !!row.drawing_data || !!row.intention_text?.trim()
     || jsonLetters(row.letter_bank).length > 0 || Number(row.is_loaded) === 1
     || !!row.target_reveal_date || !!row.charging_technique_wiki_id;
+}
+
+/** Bekommt die Zeile Rechner, Zeichnung und Ladung? */
+function hasSigilData(row: LegacySigilRow): boolean {
+  const inSigilCategory = row.category_id === SIGIL_CATEGORY_ID && !(row.content ?? '').includes(SIGIL_BLOCK_MARKER);
+  return inSigilCategory || hasSigilValues(row);
 }
 
 /**
@@ -107,11 +114,8 @@ async function drawingFile(drawing: string | null): Promise<string | null | unde
  * `includeSigilCategory` zählt auch leere Operationen der Kategorie „Sigillen".
  */
 export function needsSigilConversion(row: LegacySigilRow, includeSigilCategory: boolean): boolean {
-  if (includeSigilCategory && row.category_id === SIGIL_CATEGORY_ID) return true;
-  return !!row.drawing_data || !!row.intention_text?.trim()
-    || !['', '[]'].includes(typeof row.letter_bank === 'string' ? row.letter_bank : JSON.stringify(row.letter_bank ?? []))
-    || Number(row.is_loaded) === 1 || !!row.target_reveal_date || !!row.charging_technique_wiki_id
-    || !!row.description?.trim();
+  return (includeSigilCategory && row.category_id === SIGIL_CATEGORY_ID)
+    || hasSigilValues(row) || !!row.description?.trim();
 }
 
 /** Die Felder eines Wiki-Artikels, die der Ladetechnik-Chip braucht. */

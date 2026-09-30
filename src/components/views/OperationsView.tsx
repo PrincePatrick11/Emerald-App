@@ -38,13 +38,13 @@ export default function OperationsView() {
   );
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { operations, createEntry, duplicateOperation, updateOperation, deleteOperation, restoreOperation, getOperation } = useEntryStore(
-    useShallow((s) => ({ operations: s.entries.operation, createEntry: s.createEntry, duplicateOperation: s.duplicateEntry, updateOperation: s.updateEntry, deleteOperation: s.deleteEntry, restoreOperation: s.restoreEntry, getOperation: s.getEntry }))
+  const { operations, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
+    useShallow((s) => ({ operations: s.entries.operation, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
 
-  const operation = activeView.id ? getOperation(activeView.id) : null;
+  const operation = activeView.id ? getEntry(activeView.id, 'operation') : null;
   // Eine geladene Sigille mit Sperre „ganzer Eintrag" öffnet nie im
   // Bearbeitungsmodus — gleich, woher der kommt (Seitenleiste, Home, Tab).
   const locked = !!operation && !!entryBlockSummary(operation.id, operation.content).sigil?.lockEntry;
@@ -83,11 +83,11 @@ export default function OperationsView() {
       category_id: operation?.category_id ?? null, icon: operation?.icon, cover_image: operation?.cover_image,
     }),
     readStored: (id) => {
-      const stored = getOperation(id);
+      const stored = getEntry(id, 'operation');
       return stored ? fieldsOf(stored) : null;
     },
-    readStamp: (id) => getOperation(id)?.updated_at,
-    update: updateOperation,
+    readStamp: (id) => getEntry(id, 'operation')?.updated_at,
+    update: updateEntry,
   });
 
   useEffect(() => {
@@ -128,7 +128,7 @@ export default function OperationsView() {
   const openCtxMenu = (e: React.MouseEvent, id: string) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); };
 
   const handleDuplicate = async (id: string) => {
-    const newOp = await duplicateOperation(id);
+    const newOp = await duplicateEntry(id);
     if (newOp) setActiveView({ type: 'operations', id: newOp.id, mode: 'view' });
   };
 
@@ -141,20 +141,20 @@ export default function OperationsView() {
 
   const commitRename = async () => {
     if (!renamingId) return;
-    if (renameValue.trim()) await updateOperation(renamingId, { title: renameValue.trim() });
+    if (renameValue.trim()) await updateEntry(renamingId, { title: renameValue.trim() });
     setRenamingId(null);
   };
 
   const handleCtxDelete = async (id: string) => {
-    await deleteOperation(id);
-    pushUndo({ id: generateId(), description: t('undo.operationDeleted'), undo: () => restoreOperation(id) });
+    await deleteEntry(id);
+    pushUndo({ id: generateId(), description: t('undo.operationDeleted'), undo: () => restoreEntry(id) });
     if (activeView.id === id) setActiveView({ type: 'operations' });
   };
 
   const handleDone = async () => {
     if (!operation) return;
     cancelAutoSave();
-    await updateOperation(operation.id, { title, content: contentRef.current, tags });
+    await updateEntry(operation.id, { title, content: contentRef.current, tags });
     setActiveView({ type: 'operations', id: operation.id, mode: 'view' });
   };
 
@@ -182,8 +182,8 @@ export default function OperationsView() {
     // Erst schreiben, was noch aufgeschoben ist: im Papierkorb liegt der letzte Stand.
     await flushAutoSave().catch(console.error);
     const id = operation.id;
-    await deleteOperation(id);
-    pushUndo({ id: generateId(), description: t('undo.operationDeleted'), undo: () => restoreOperation(id) });
+    await deleteEntry(id);
+    pushUndo({ id: generateId(), description: t('undo.operationDeleted'), undo: () => restoreEntry(id) });
     setActiveView({ type: 'operations' });
   };
 
@@ -191,7 +191,7 @@ export default function OperationsView() {
     onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete, flush: flushAutoSave,
     guard: operation ? {
       key: guardKey('operations', operation.id),
-      title: () => title.trim() || getOperation(operation.id)?.title.trim() || t('operations.untitled'),
+      title: () => title.trim() || getEntry(operation.id, 'operation')?.title.trim() || t('operations.untitled'),
       isDirty: () => isDirty(!!activeView.isNew),
     } : undefined,
   });
@@ -389,8 +389,8 @@ export default function OperationsView() {
             actions={[
               openInNewTabAction({ type: 'operations', id: ctxMenu.id, mode: 'view' }),
               // Sigil-Operationen waren hier frueher ausgenommen, weil das
-              // Duplizieren die Zeichnung verlor. duplicateOperation laedt sie
-              // inzwischen nach und entsperrt die Kopie — die Ausnahme ist weg.
+              // Duplizieren die Zeichnung verlor. Seit die Sigille Blöcke im
+              // Inhalt sind, kopiert duplicateEntry sie mit — die Ausnahme ist weg.
               { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
               saveAsTemplateAction('operation', ctxMenu.id),
               { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
@@ -424,7 +424,7 @@ export default function OperationsView() {
           initialContent={operation.content}
           placeholder={t('operations.placeholder')}
           onChange={handleContentChange}
-          onReadModeChange={(content) => updateOperation(operation.id, { content })}
+          onReadModeChange={(content) => updateEntry(operation.id, { content })}
           isEditing={isEditing}
           templateTarget={{ entryType: 'operation', categoryId: operation.category_id, flush: flushAutoSave }}
         />

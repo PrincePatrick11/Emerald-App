@@ -5,8 +5,6 @@ import { useTaskStore } from '../../store/taskStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUIStore } from '../../store/uiStore';
 import { useUndoStore } from '../../store/undoStore';
-import { useEntryStore } from '../../store/entryStore';
-import { useAltarStore } from '../../store/altarStore';
 import { generateId } from '../../lib/helpers';
 import { displayTitle, hasOwnTitle } from '../../lib/entryTitle';
 import { MODULES, viewTypeForEntryType } from '../../lib/modules';
@@ -14,6 +12,8 @@ import EmptyState, { NoResults } from '../ui/EmptyState';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { useDeepLink } from '../../hooks/useDeepLink';
+import { useLinkItems } from '../../hooks/useLinkItems';
+import { linkItemKey, linkItemsByKey } from '../../lib/linkItems';
 import { categoriesUsedBy, categoryLabel, hasUncategorized } from '../../lib/categories';
 import { sortItems } from '../../lib/sortItems';
 import { countBy, countByCategory, UNCATEGORIZED_KEY } from '../../lib/groupBy';
@@ -28,7 +28,7 @@ import {
   Plus, Flag, Trash2,
   CheckSquare, Square, Link2,
 } from 'lucide-react';
-import type { ContentType, Task, TaskPriority } from '../../types';
+import type { Task, TaskPriority } from '../../types';
 import { useSessionState } from '../../store/sessionStore';
 
 const TASK_PRIORITY_COLORS: Record<string, string> = {
@@ -59,10 +59,6 @@ export default function TasksView() {
   const categoryOf = (task: { category_id: string | null }) =>
     (task.category_id ? getCategory(task.category_id) : undefined);
 
-  const journalEntries = useEntryStore((s) => s.entries.journal);
-  const wikiArticles = useEntryStore((s) => s.entries.wiki);
-  const operations = useEntryStore((s) => s.entries.operation);
-  const altars = useAltarStore((s) => s.altars);
 
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number; actions: ContextMenuAction[] } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -217,18 +213,15 @@ export default function TasksView() {
     />
   );
 
-  /** Der Titel eines Verknüpfungsziels — liegt es im Papierkorb oder ist es weg, „Gelöscht". */
-  const resolveTaskLinkTitle = useCallback((targetType: string, targetId: string) => {
-    const pool: readonly { id: string; title: string }[] =
-      targetType === 'journal' ? journalEntries
-        : targetType === 'wiki' ? wikiArticles
-        : targetType === 'operation' ? operations
-        : targetType === 'task' ? tasks
-        : targetType === 'altar' ? altars
-        : [];
-    const target = pool.find((item) => item.id === targetId);
-    return target ? displayTitle(t, targetType as ContentType, target.title) : t('tasks.linkTargetGone');
-  }, [journalEntries, wikiArticles, operations, tasks, altars, t]);
+  /**
+   * Der Titel eines Verknüpfungsziels — aus derselben Liste wie Link-Chips und
+   * Picker (`useLinkItems`). Liegt es im Papierkorb oder ist es weg, „Gelöscht".
+   */
+  const linkItems = useLinkItems();
+  const linkItemByKey = useMemo(() => linkItemsByKey(linkItems), [linkItems]);
+  const resolveTaskLinkTitle = useCallback((targetType: string, targetId: string) =>
+    linkItemByKey.get(linkItemKey({ id: targetId, entryType: targetType }))?.label ?? t('tasks.linkTargetGone'),
+  [linkItemByKey, t]);
 
   const renderTasksContent = () => (
     <>

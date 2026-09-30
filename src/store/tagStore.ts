@@ -7,7 +7,7 @@ import { useEntryStore, allEntries } from './entryStore';
 import { useTemplateStore } from './templateStore';
 import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
-import type { Tag } from '../types';
+import type { EntryType, Tag } from '../types';
 
 /** Die Palette der Tag-Farben — Farbwahl in TagsView und Zufallsfarbe neuer Tags. */
 export const TAG_COLORS = [
@@ -30,7 +30,7 @@ const byName = (a: Tag, b: Tag) => a.name.localeCompare(b.name);
 const renameInList = (tags: string[], from: string, to: string) =>
   [...new Set(tags.map((t) => (t === from ? to : t)))];
 
-export type TaggedType = 'journal' | 'wiki' | 'operation' | 'template';
+export type TaggedType = EntryType | 'template';
 
 interface AffectedEntry { id: string; type: TaggedType }
 
@@ -274,12 +274,13 @@ export const useTagStore = create<TagState>((set, get) => {
       if (namesake) await db.execute('DELETE FROM tags WHERE id=$1', [id]);
       else await db.execute('UPDATE tags SET deleted_at=NULL, affected_ids=$1 WHERE id=$2', ['[]', id]);
 
-      // Re-add tag to affected entries
+      // Re-add tag to affected entries — nach ID allein: die ist über alle
+      // Typen eindeutig, und ein Eintrag kann seither den Typ gewechselt haben.
       const current = taggedItems();
-      for (const { id: eid, type } of affected) {
-        const item = current.find((i) => i.id === eid && i.type === type);
+      for (const { id: eid } of affected) {
+        const item = current.find((i) => i.id === eid);
         if (item && !item.tags.includes(name)) {
-          await setItemTags(type, eid, [...item.tags, name]);
+          await setItemTags(item.type, eid, [...item.tags, name]);
         }
       }
 

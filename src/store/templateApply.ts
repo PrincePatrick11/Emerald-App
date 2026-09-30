@@ -41,21 +41,16 @@ export interface TemplateApplyOptions extends TemplateFieldOptions {
 }
 
 function entryFields(entryType: TemplateEntryType, id: string): (TemplateFields & { content: string }) | undefined {
-  const entry = useEntryStore.getState().getEntry(id);
-  return entry?.type === entryType ? entry : undefined;
-}
-
-function updateFields(_entryType: TemplateEntryType, id: string, patch: Partial<TemplateFields>): Promise<void> {
-  return useEntryStore.getState().updateEntry(id, patch);
+  return useEntryStore.getState().getEntry(id, entryType);
 }
 
 /** Schreibt nur, was sich an Titel oder Tags geändert hat. */
-async function writeChangedFields(entryType: TemplateEntryType, id: string, before: TemplateFields, after: TemplateFields): Promise<void> {
+async function writeChangedFields(id: string, before: TemplateFields, after: TemplateFields): Promise<void> {
   const patch: Partial<TemplateFields> = {};
   if (after.title !== before.title) patch.title = after.title;
   // Nicht nur die Länge: ein Tausch gegen gleich viele Tags ändert sie nicht.
   if (after.tags.length !== before.tags.length || after.tags.some((tag, i) => tag !== before.tags[i])) patch.tags = after.tags;
-  if (Object.keys(patch).length) await updateFields(entryType, id, patch);
+  if (Object.keys(patch).length) await useEntryStore.getState().updateEntry(id, patch);
 }
 
 /**
@@ -74,7 +69,7 @@ export async function applyTemplateFields(
   if (!fields) return;
   const usable = withUsableTags(template);
   await createMissingTags(usable.tags);
-  await writeChangedFields(entryType, id, fields, fieldsWithTemplate(fields, usable, options));
+  await writeChangedFields(id, fields, fieldsWithTemplate(fields, usable, options));
 }
 
 /**
@@ -89,7 +84,7 @@ export async function undoTemplateFields(
 ): Promise<void> {
   const fields = entryFields(entryType, id);
   if (!fields) return;
-  await writeChangedFields(entryType, id, fields, fieldsWithoutTemplate(fields, template));
+  await writeChangedFields(id, fields, fieldsWithoutTemplate(fields, template));
 }
 
 /**

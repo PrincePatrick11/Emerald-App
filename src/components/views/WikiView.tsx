@@ -38,13 +38,13 @@ export default function WikiView() {
   );
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { articles, createEntry, duplicateArticle, updateArticle, deleteArticle, restoreArticle, getArticle } = useEntryStore(
-    useShallow((s) => ({ articles: s.entries.wiki, createEntry: s.createEntry, duplicateArticle: s.duplicateEntry, updateArticle: s.updateEntry, deleteArticle: s.deleteEntry, restoreArticle: s.restoreEntry, getArticle: s.getEntry }))
+  const { articles, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
+    useShallow((s) => ({ articles: s.entries.wiki, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
 
-  const article = activeView.id ? getArticle(activeView.id) : null;
+  const article = activeView.id ? getEntry(activeView.id, 'wiki') : null;
   // Eine geladene Sigille mit Sperre „ganzer Eintrag" öffnet nie im Bearbeitungsmodus.
   const locked = !!article && !!entryBlockSummary(article.id, article.content).sigil?.lockEntry;
   const isEditing = activeView.mode === 'edit' && !locked;
@@ -84,11 +84,11 @@ export default function WikiView() {
       category_id: article?.category_id ?? null, icon: article?.icon, cover_image: article?.cover_image,
     }),
     readStored: (id) => {
-      const stored = getArticle(id);
+      const stored = getEntry(id, 'wiki');
       return stored ? fieldsOf(stored) : null;
     },
-    readStamp: (id) => getArticle(id)?.updated_at,
-    update: updateArticle,
+    readStamp: (id) => getEntry(id, 'wiki')?.updated_at,
+    update: updateEntry,
   });
 
   useEffect(() => {
@@ -120,7 +120,7 @@ export default function WikiView() {
   const handleDone = async () => {
     if (!article) return;
     cancelAutoSave();
-    await updateArticle(article.id, { title, content: contentRef.current, tags });
+    await updateEntry(article.id, { title, content: contentRef.current, tags });
     setActiveView({ type: 'wiki', id: article.id, mode: 'view' });
   };
 
@@ -149,8 +149,8 @@ export default function WikiView() {
     // Erst schreiben, was noch aufgeschoben ist: im Papierkorb liegt der letzte Stand.
     await flushAutoSave().catch(console.error);
     const id = article.id;
-    await deleteArticle(id);
-    pushUndo({ id: generateId(), description: t('undo.articleDeleted'), undo: () => restoreArticle(id) });
+    await deleteEntry(id);
+    pushUndo({ id: generateId(), description: t('undo.articleDeleted'), undo: () => restoreEntry(id) });
     setActiveView({ type: 'wiki' });
   };
 
@@ -158,7 +158,7 @@ export default function WikiView() {
     onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete, flush: flushAutoSave,
     guard: article ? {
       key: guardKey('wiki', article.id),
-      title: () => title.trim() || getArticle(article.id)?.title.trim() || t('wiki.untitled'),
+      title: () => title.trim() || getEntry(article.id, 'wiki')?.title.trim() || t('wiki.untitled'),
       isDirty: () => isDirty(!!activeView.isNew),
     } : undefined,
   });
@@ -173,7 +173,7 @@ export default function WikiView() {
   const openCtxMenu = (e: React.MouseEvent, id: string) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); };
 
   const handleDuplicate = async (id: string) => {
-    const newArt = await duplicateArticle(id);
+    const newArt = await duplicateEntry(id);
     if (newArt) setActiveView({ type: 'wiki', id: newArt.id, mode: 'view' });
   };
 
@@ -186,13 +186,13 @@ export default function WikiView() {
 
   const commitRename = async () => {
     if (!renamingId) return;
-    if (renameValue.trim()) await updateArticle(renamingId, { title: renameValue.trim() });
+    if (renameValue.trim()) await updateEntry(renamingId, { title: renameValue.trim() });
     setRenamingId(null);
   };
 
   const handleCtxDelete = async (id: string) => {
-    await deleteArticle(id);
-    pushUndo({ id: generateId(), description: t('undo.articleDeleted'), undo: () => restoreArticle(id) });
+    await deleteEntry(id);
+    pushUndo({ id: generateId(), description: t('undo.articleDeleted'), undo: () => restoreEntry(id) });
     if (activeView.id === id) setActiveView({ type: 'wiki' });
   };
 
@@ -418,7 +418,7 @@ export default function WikiView() {
           initialContent={article.content}
           placeholder={t('wiki.placeholder')}
           onChange={handleContentChange}
-          onReadModeChange={(content) => updateArticle(article.id, { content })}
+          onReadModeChange={(content) => updateEntry(article.id, { content })}
           isEditing={isEditing}
           templateTarget={{ entryType: 'wiki', categoryId: article.category_id, flush: flushAutoSave }}
         />

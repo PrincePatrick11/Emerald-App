@@ -41,7 +41,7 @@ export default function JournalView() {
   );
   const pushUndo = useUndoStore((s) => s.push);
 
-  const entry = activeView.id ? getEntry(activeView.id) : null;
+  const entry = activeView.id ? getEntry(activeView.id, 'journal') : null;
   // Eine geladene Sigille mit Sperre „ganzer Eintrag" öffnet nie im Bearbeitungsmodus.
   const locked = !!entry && !!entryBlockSummary(entry.id, entry.content).sigil?.lockEntry;
   const isEditing = activeView.mode === 'edit' && !locked;
@@ -72,10 +72,10 @@ export default function JournalView() {
     // Bearbeitens war — samt den Tags, die die Seitenleiste inzwischen gespeichert hat.
     buildPatch: (content) => ({ title, content, tags }),
     readStored: (id) => {
-      const stored = getEntry(id);
+      const stored = getEntry(id, 'journal');
       return stored ? fieldsOf(stored) : null;
     },
-    readStamp: (id) => getEntry(id)?.updated_at,
+    readStamp: (id) => getEntry(id, 'journal')?.updated_at,
     update: updateEntry,
   });
 
@@ -172,7 +172,7 @@ export default function JournalView() {
     onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete, flush: flushAutoSave,
     guard: entry ? {
       key: guardKey('journal', entry.id),
-      title: () => title.trim() || getEntry(entry.id)?.title.trim() || t('journal.untitled'),
+      title: () => title.trim() || getEntry(entry.id, 'journal')?.title.trim() || t('journal.untitled'),
       isDirty: () => isDirty(!!activeView.isNew),
     } : undefined,
   });

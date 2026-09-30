@@ -384,9 +384,7 @@ export async function exportAsEmerald(): Promise<void> {
     return;
   }
 
-  const entries                           = useEntryStore.getState().entries.journal;
-  const articles    = useEntryStore.getState().entries.wiki;
-  const operations  = useEntryStore.getState().entries.operation;
+  const { journal: entries, wiki: articles, operation: operations } = useEntryStore.getState().entries;
   const { categories }  = useCategoryStore.getState();
   let content = '';
   let title = '';
@@ -944,8 +942,7 @@ function importedStamp(createdAt: string | undefined): WriteOptions {
  * Rückverweis, kein Suchtreffer.
  */
 function legacyJournalTargets(file: EmeraldFile): Parameters<typeof appendLegacyLinks>[2] {
-  const articles   = useEntryStore.getState().entries.wiki;
-  const operations = useEntryStore.getState().entries.operation;
+  const { wiki: articles, operation: operations } = useEntryStore.getState().entries;
 
   const paradigmId = file.meta.paradigmaTitle
     ? (articles.find(a => a.title === file.meta.paradigmaTitle)?.id ?? null)
@@ -1348,8 +1345,7 @@ async function importJournalFromMarkdown(
   meta: Record<string, string>,
 ): Promise<string> {
   const { createEntry, updateEntry } = useEntryStore.getState();
-  const articles   = useEntryStore.getState().entries.wiki;
-  const operations = useEntryStore.getState().entries.operation;
+  const { wiki: articles, operation: operations } = useEntryStore.getState().entries;
 
   const paradigmaName = meta['paradigma'] ? stripIconPrefix(meta['paradigma']) : null;
   const paradigmId = paradigmaName

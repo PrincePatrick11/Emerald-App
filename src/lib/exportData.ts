@@ -62,9 +62,7 @@ export async function collectExportData(): Promise<ExportData | null> {
   const view = useUIStore.getState().activeView;
   if (!view.id) return null;
 
-  const entries    = useEntryStore.getState().entries.journal;
-  const articles   = useEntryStore.getState().entries.wiki;
-  const operations = useEntryStore.getState().entries.operation;
+  const { journal: entries, wiki: articles, operation: operations } = useEntryStore.getState().entries;
   const { categories } = useCategoryStore.getState();
   // entry.tags stores tag names directly (not IDs)
 

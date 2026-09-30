@@ -8,7 +8,7 @@ import { journalIcon } from '../../lib/moonPhase';
 import { hasOwnTitle } from '../../lib/entryTitle';
 import { REORDER_SPRING } from '../../lib/motion';
 import { useAltarStore } from '../../store/altarStore';
-import { useEntryStore } from '../../store/entryStore';
+import { findEntry, useEntryStore } from '../../store/entryStore';
 import { useTaskStore } from '../../store/taskStore';
 import { useUIStore } from '../../store/uiStore';
 import type { ActiveView } from '../../types';
@@ -19,7 +19,7 @@ import { useLexiconStore } from '../../store/lexiconStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { definitionLabel, templateLabel } from '../../lib/blocks/blockAttrs';
 import { imageSrc } from '../../lib/images';
-import { AUX_VIEWS, DEFAULT_ENTRY_EMOJI, moduleMeta, type AuxViewId } from '../../lib/modules';
+import { AUX_VIEWS, DEFAULT_ENTRY_EMOJI, entryIcon, entryTypeForView, moduleMeta, type AuxViewId } from '../../lib/modules';
 
 function getFallbackTitle(view: ActiveView, t: TFunction) {
   const meta = moduleMeta(view.type);
@@ -54,22 +54,21 @@ function AltarTabIcon({ iconData }: { iconData: string | null | undefined }) {
 function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: () => void; onClose: () => void }) {
   const { t } = useTranslation();
   const { type, id } = view;
-  const entry = useEntryStore((s) => (type === 'journal' && id ? s.entries.journal.find((e) => e.id === id) : undefined));
-  const article = useEntryStore((s) => (type === 'wiki' && id ? s.entries.wiki.find((a) => a.id === id) : undefined));
-  const operation = useEntryStore((s) => (type === 'operations' && id ? s.entries.operation.find((o) => o.id === id) : undefined));
+  const entryType = entryTypeForView(type);
+  const entry = useEntryStore((s) => (entryType && id ? findEntry(s.entries, id, entryType) : undefined));
   const task = useTaskStore((s) => (type === 'tasks' && id ? s.tasks.find((task) => task.id === id) : undefined));
   const altar = useAltarStore((s) => (type === 'altar' && id ? s.altars.find((a) => a.id === id) : undefined));
   const definition = useBlockDefinitionStore((s) => (type === 'blocks' && id ? s.definitions.find((d) => d.id === id) : undefined));
   const template = useTemplateStore((s) => (type === 'templates' && id ? s.templates.find((tpl) => tpl.id === id) : undefined));
   const language = useLexiconStore((s) => (type === 'lexicon' && id ? s.languages.find((l) => l.id === id) : undefined));
-  const categoryId = article?.category_id ?? operation?.category_id;
-  const categoryEmoji = useCategoryStore((s) => (categoryId ? s.categories.find((c) => c.id === categoryId)?.emoji : undefined));
+  const categoryId = entry?.category_id;
+  const category = useCategoryStore((s) => (categoryId ? s.categories.find((c) => c.id === categoryId) : undefined));
   const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
 
   const fallback = getFallbackTitle(view, t);
   let title = fallback;
   if (id) {
-    const entityTitle = entry?.title ?? article?.title ?? operation?.title ?? task?.title ?? altar?.title;
+    const entityTitle = entry?.title ?? task?.title ?? altar?.title;
     if (hasOwnTitle(entityTitle)) title = entityTitle;
     else if (definition) title = definitionLabel(t, definition);
     else if (template) title = templateLabel(t, template);
@@ -78,12 +77,10 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
 
   let icon: ReactNode;
   const Icon = moduleMeta(type)?.icon ?? AUX_VIEWS[type as AuxViewId]?.icon ?? MoreHorizontal;
-  if (type === 'journal' && id) {
-    icon = <span className="text-sm leading-none">{entry ? journalIcon(entry, showMoonPhase) : DEFAULT_ENTRY_EMOJI.journal}</span>;
-  } else if (type === 'wiki' && id) {
-    icon = renderIconValue(article?.icon, <span className="text-sm leading-none">{categoryEmoji ?? DEFAULT_ENTRY_EMOJI.wiki}</span>);
-  } else if (type === 'operations' && id) {
-    icon = renderIconValue(operation?.icon, <span className="text-sm leading-none">{categoryEmoji ?? '⚡'}</span>);
+  if (entryType && id) {
+    icon = entryType === 'journal'
+      ? <span className="text-sm leading-none">{entry ? journalIcon(entry, showMoonPhase) : DEFAULT_ENTRY_EMOJI.journal}</span>
+      : renderIconValue(entryIcon(entryType, entry ?? {}, category), null);
   } else if (type === 'altar' && id) {
     icon = <AltarTabIcon iconData={altar?.icon_data} />;
   } else if (type === 'blocks' && id) {

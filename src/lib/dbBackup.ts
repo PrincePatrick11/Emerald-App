@@ -143,9 +143,10 @@ type Row = Record<string, any>;
  * seit v49 stehen Journal, Wiki und Operationen als `data.entries` in einem
  * Array, jede Zeile mit `type` und ohne die Spalten, die es nicht mehr gibt.
  *
- * Die '11' braucht es, weil ein älterer Build `slug` und die Tabellen der
- * drei Typen erwartet: er fände in der Datei keine Einträge und löschte beim
- * Ersetzen trotzdem nichts — aber er würde sie still übergehen.
+ * Die '11' braucht es, weil ein älterer Build die Einträge unter
+ * `journalEntries`/`wikiArticles`/`operations` sucht: er fände dort nichts und
+ * übernähme sie still nicht. Mit der '11' lehnt er die Datei ab
+ * (`version > BACKUP_VERSION`), bevor irgendetwas passiert.
  *
  * Auch die '10' ist kein Formalismus: ein Build von vor v46 kennt die Spalte
  * nicht, `insertRows` ließe sie fallen — und ein Altar aus dem Papierkorb
@@ -335,17 +336,45 @@ const ENTRY_COLUMNS = [
   'tags', 'created_at', 'updated_at', 'deleted_at',
 ] as const;
 
-function asEntryRows(type: EntryType, rows: Row[]): Row[] {
-  return rows.map((row) => {
-    const out: Row = { type };
-    for (const column of ENTRY_COLUMNS) out[column] = row[column] ?? null;
-    out.title ??= '';
-    out.content ??= '';
-    out.tags ??= '[]';
-    // Das Journal hat keine Kategorie, kein Icon und kein Titelbild.
-    if (type === 'journal') out.category_id = out.icon = out.cover_image = null;
-    return out;
-  });
+/**
+ * Die Bildspalten einer Operationszeile beim Import: die von `entries` und die
+ * Sigillen-Zeichnung alter Dateien — sie wird erst in `liftLegacySigilRows`
+ * zur Datei und muss dafür schon den lokalen Namen tragen.
+ */
+const IMAGE_FIELDS_OP = [...imageColumns('entries'), 'drawing_data'];
+
+function asEntryRow(type: EntryType, row: Row): Row {
+  const out: Row = { type };
+  for (const column of ENTRY_COLUMNS) out[column] = row[column] ?? null;
+  out.title ??= '';
+  out.content ??= '';
+  out.tags ??= '[]';
+  // Das Journal hat keine Kategorie, kein Icon und kein Titelbild.
+  if (type === 'journal') out.category_id = out.icon = out.cover_image = null;
+  return out;
+}
+
+/**
+ * Die Eintragszeilen des Imports für `entries`. Eine ID kommt nur einmal an:
+ * eine Sicherung bis '10' kann denselben Eintrag in zwei Listen tragen (ein
+ * Typwechsel, der mittendrin abbrach) — wie in v49 gewinnt die erste, in der
+ * Reihenfolge Journal, Wiki, Operationen.
+ */
+export function entryRowsForInsert(journal: Row[], wiki: Row[], operations: Row[]): Row[] {
+  const seen = new Set<string>();
+  const out: Row[] = [];
+  for (const [type, rows] of [['journal', journal], ['wiki', wiki], ['operation', operations]] as const) {
+    for (const row of rows) {
+      const id = String(row.id);
+      if (seen.has(id)) {
+        console.warn(`[backup] ${type}.${id} steht in der Datei schon unter einem anderen Typ — übersprungen`);
+        continue;
+      }
+      seen.add(id);
+      out.push(asEntryRow(type, row));
+    }
+  }
+  return out;
 }
 
 /** Die Eintragstypen, die eine Sicherung mitbringt — nur deren Einträge ersetzt `doReplace`. */
@@ -950,39 +979,42 @@ async function insertLexicon(
 }
 
 /**
- * Die Umwandlungen der Migrationen für die Eintragszeilen einer älteren
- * Sicherung — vor dem Einfügen, denn seit v49 gibt es die alten Spalten nicht
- * mehr. Eine Zeile ohne Altdaten bleibt, wie sie ist; umgewandelte Felder
- * werden auf ihre Grundwerte gesetzt statt gelöscht: `insertRows` nimmt die
- * Spaltenliste aus der ersten Zeile, alle Zeilen tragen dieselben Schlüssel.
+ * Journal (v36/v37): verknüpfte Operationen und Artikel, Paradigma, Bannung
+ * und Meditation einer älteren Sicherung werden Link-Blöcke im Inhalt — vor
+ * dem Einfügen, denn seit v49 gibt es die alten Spalten nicht mehr (die
+ * übrigen fallen in `asEntryRows` weg). Die Ziele stehen in der Datei oder,
+ * wenn der Import sie abgewählt hat, womöglich schon im Vault; die Datei hat
+ * Vorrang. Der Merge benennt die Chips danach mit allen anderen um — ein Ziel
+ * aus dem Vault behält dabei seine ID.
  *
  * Status/Enddatum/Version (v41) wandelt `convertLegacyStatusRows` je Modus um —
  * es braucht die „Status"-Definition des Ziel-Vaults.
  */
-
-/**
- * Journal (v36/v37): verknüpfte Operationen und Artikel, Paradigma, Bannung
- * und Meditation werden Link-Blöcke im Inhalt. Nachgeschlagen wird in der
- * Datei selbst; der Merge benennt die Chips danach mit allen anderen um.
- */
-function liftLegacyJournalRows(d: BackupFile['data']): BackupFile['data'] {
-  if (!d.journalEntries) return d;
+async function liftLegacyJournalRows(
+  db: Awaited<ReturnType<typeof getDb>>,
+  d: BackupFile['data'],
+): Promise<BackupFile['data']> {
+  if (!d.journalEntries?.length) return d;
+  const [vaultTargets, vaultCategories] = await Promise.all([
+    db.select<Row[]>(
+      "SELECT id, type, title, icon, category_id, entry_number, deleted_at FROM entries WHERE type IN ('wiki', 'operation')"
+    ),
+    db.select<Row[]>('SELECT id, name, emoji, is_builtin FROM categories'),
+  ]);
+  // Später gewinnt: erst der Vault, dann die Datei.
   const source = rowsLinkSource(
-    { operation: d.operations ?? [], wiki: d.wikiArticles ?? [] },
-    d.categories ?? [],
+    {
+      operation: [...vaultTargets.filter((r) => r.type === 'operation'), ...(d.operations ?? [])],
+      wiki: [...vaultTargets.filter((r) => r.type === 'wiki'), ...(d.wikiArticles ?? [])],
+    },
+    [...vaultCategories, ...(d.categories ?? [])],
   );
-  const journalEntries = (d.journalEntries ?? []).map((row) => {
+  const journalEntries = d.journalEntries.map((row) => {
     const linked = linkedIdsToContent(String(row.content ?? ''), { id: String(row.id), ...row }, source);
     // Kaputtes JSON in den verknüpften IDs: die Zeile bleibt wie in v36 unberührt.
     if (linked === null) return row;
     const content = journalFieldsToContent(linked, row, source);
-    if (content === row.content) return row;
-    return {
-      ...row, content,
-      linked_operation_ids: '[]', linked_wiki_ids: '[]',
-      paradigm_id: null, is_bannung: 0, bannung_type_wiki_id: null,
-      is_meditation: 0, meditation_duration: null, meditation_type_wiki_id: null,
-    };
+    return content === row.content ? row : { ...row, content };
   });
   return { ...d, journalEntries };
 }
@@ -1014,13 +1046,7 @@ async function liftLegacySigilRows(operations: Row[], wikiArticles: Row[], backu
     // Anders als die Migration kann der Import nicht später nachholen — nach
     // v49 gibt es keine Spalte, in der die Zeichnung warten könnte.
     if (content === undefined) throw new Error(`Sigil drawing of operation ${String(row.id)} could not be saved`);
-    out.push({
-      ...row, content,
-      description: '', intention_text: '', letter_bank: '[]', implemented_letters: '[]',
-      drawing_data: null, thumbnail_data: null, is_loaded: 0, target_reveal_date: null,
-      charging_technique_wiki_id: null, show_sigil: 1, show_intention_in_properties: 1,
-      show_letter_bank_in_properties: 1,
-    });
+    out.push({ ...row, content });
   }
 
   return out;
@@ -1292,15 +1318,12 @@ export async function withRoutinesAsTemplates(db: Awaited<ReturnType<typeof getD
 
 async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
   const pathMap = await restoreImages(backup);
-  const d = liftLegacyJournalRows(await withRoutinesAsTemplates(db, backup.data));
+  const d = await liftLegacyJournalRows(db, await withRoutinesAsTemplates(db, backup.data));
 
   await assertPayloadReferencesResolve(db, d);
 
   // Remap image paths — Spalten aus `IMAGE_FIELDS`, nicht von Hand gepflegt.
-  // Bei Operationen dazu die Sigillen-Zeichnung alter Dateien: sie wird erst
-  // unten zur Datei (`liftLegacySigilRows`) und muss dafür richtig heißen.
   const IMAGE_FIELDS_ENTRY = imageColumns('entries');
-  const IMAGE_FIELDS_OP = [...IMAGE_FIELDS_ENTRY, 'drawing_data'];
   const IMAGE_FIELDS_ALTAR = imageColumns('altars');
   const IMAGE_FIELDS_ITEM = imageColumns('altar_items');
 
@@ -1354,17 +1377,21 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
     await db.execute('DELETE FROM tasks');
   }
   for (const type of entryTypes) await db.execute('DELETE FROM entries WHERE type=$1', [type]);
+  // Dazu jede importierte ID, welchen Typ sie im Vault inzwischen hat: ein
+  // Eintrag, der seit der Sicherung sein Modul gewechselt hat, stünde sonst
+  // doppelt da — und `entries.id` ist über alle Typen eindeutig.
+  const entries = entryRowsForInsert(journalEntries, wikiArticles, operations);
+  for (let i = 0; i < entries.length; i += IN_CHUNK) {
+    const chunk = entries.slice(i, i + IN_CHUNK).map((r) => String(r.id));
+    await db.execute(`DELETE FROM entries WHERE id IN (${chunk.map((_, n) => `$${n + 1}`).join(',')})`, chunk);
+  }
   // Wie die Inhalte oben nur, wenn die Datei welche bringt: abgewählte Tags
   // kommen als `[]` an, und das ist wahr.
   if (hasAny && d.tags?.length) await db.execute('DELETE FROM tags');
 
   // Re-insert
   if (d.tags) await insertRows(db, 'tags', d.tags, true);
-  await insertRows(db, 'entries', [
-    ...asEntryRows('journal', journalEntries),
-    ...asEntryRows('wiki', wikiArticles),
-    ...asEntryRows('operation', operations),
-  ]);
+  await insertRows(db, 'entries', entries);
   await insertRows(db, 'altars', altars);
   // OR IGNORE, wenn oben nicht geleert wurde: die Datei kann eine Bibliothek
   // ohne Altäre tragen (Datumsfilter, oder ein Vault, der nur Elemente hat),
@@ -1392,7 +1419,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
 
 async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
   const pathMap = await restoreImages(backup);
-  const d = liftLegacyJournalRows(await withRoutinesAsTemplates(db, backup.data));
+  const d = await liftLegacyJournalRows(db, await withRoutinesAsTemplates(db, backup.data));
 
   // Merge loescht zwar nichts, bricht aber mitten im Einfuegen ab, wenn eine
   // Kategorie fehlt — vorher pruefen, damit die Meldung sagt, welche.
@@ -1496,14 +1523,14 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   };
 
   const journalEntries = (d.journalEntries ?? []).map((r: Row) =>
-    withContentLinks(remapEntry(r, ['content'], ['paradigm_id', 'bannung_type_wiki_id', 'meditation_type_wiki_id'], ['linked_operation_ids', 'linked_wiki_ids'], 'journal'))
+    withContentLinks(remapEntry(r, ['content'], [], [], 'journal'))
   );
   const wikiArticles = remapCategoryIds((d.wikiArticles ?? []).map((r: Row) =>
     withContentLinks(remapEntry(r, ['content', 'icon', 'cover_image'], [], [], 'wiki'))
   ), catMap);
   const mergeStatus = await statusDefinitionForImport(db, d.blockDefinitions);
   const mergeOps = convertLegacyStatusRows(remapCategoryIds((d.operations ?? []).map((r: Row) =>
-    withContentLinks(remapEntry(r, ['content', 'icon', 'cover_image', 'drawing_data', 'thumbnail_data'], ['charging_technique_wiki_id'], [], 'operation'))
+    withContentLinks(remapEntry(r, IMAGE_FIELDS_OP, ['charging_technique_wiki_id'], [], 'operation'))
   ), catMap), i18n.t, nowIso(), mergeStatus);
   const operations = await liftLegacySigilRows(mergeOps.rows, wikiArticles, backup);
   const altars = (d.altars ?? []).map((r: Row) =>
@@ -1549,11 +1576,7 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   await insertLexicon(db, d.languages, d.lexiconEntries);
 
   // Content: plain INSERT with prefixed IDs (no conflicts possible)
-  await insertRows(db, 'entries', [
-    ...asEntryRows('journal', journalEntries),
-    ...asEntryRows('wiki', wikiArticles),
-    ...asEntryRows('operation', operations),
-  ]);
+  await insertRows(db, 'entries', entryRowsForInsert(journalEntries, wikiArticles, operations));
   await insertRows(db, 'altars', altars);
   await insertRows(db, 'altar_items', altarItems);
   await insertRows(db, 'altar_placements', altarPlacements);

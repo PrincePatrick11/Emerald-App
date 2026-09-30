@@ -208,8 +208,8 @@ function useOperationsConfig(): EntryListTabProps<Entry> {
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { operations, duplicateOperation, updateOperation, deleteOperation, restoreOperation } = useEntryStore(
-    useShallow((s) => ({ operations: s.entries.operation, duplicateOperation: s.duplicateEntry, updateOperation: s.updateEntry, deleteOperation: s.deleteEntry, restoreOperation: s.restoreEntry }))
+  const { operations, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
+    useShallow((s) => ({ operations: s.entries.operation, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
@@ -218,13 +218,13 @@ function useOperationsConfig(): EntryListTabProps<Entry> {
   const catName = (c: (typeof categories)[number]) => categoryLabel(t, c);
 
   const handleDuplicate = async (op: (typeof operations)[number]) => {
-    const newOp = await duplicateOperation(op.id);
+    const newOp = await duplicateEntry(op.id);
     if (newOp) setActiveView({ type: 'operations', id: newOp.id, mode: 'view' });
   };
 
   const handleDelete = async (op: (typeof operations)[number]) => {
-    await deleteOperation(op.id);
-    pushUndo({ id: generateId(), description: t('undo.operationDeleted'), undo: () => restoreOperation(op.id) });
+    await deleteEntry(op.id);
+    pushUndo({ id: generateId(), description: t('undo.operationDeleted'), undo: () => restoreEntry(op.id) });
     if (activeView.id === op.id) setActiveView({ type: 'operations' });
   };
 
@@ -251,7 +251,7 @@ function useOperationsConfig(): EntryListTabProps<Entry> {
     onOpen: (op) => setActiveView({ type: 'operations', id: op.id, mode: 'view' }),
     onOpenNewTab: (op) => openViewInNewTab({ type: 'operations', id: op.id, mode: 'view' }),
     onDragStart: (op) => setDragItem({ id: op.id, entryType: 'operation', label: displayTitle(t, 'operation', op.title), category: lookupCategory(catById, op.category_id)?.emoji }),
-    onRename: (op, title) => updateOperation(op.id, { title }),
+    onRename: (op, title) => updateEntry(op.id, { title }),
     contextMenuActions: (op, startRename) => [
       openInNewTabAction({ type: 'operations', id: op.id, mode: 'view' }),
       { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(op) },
@@ -275,8 +275,8 @@ function useWikiConfig(): EntryListTabProps<Entry> {
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { articles, duplicateArticle, updateArticle, deleteArticle, restoreArticle } = useEntryStore(
-    useShallow((s) => ({ articles: s.entries.wiki, duplicateArticle: s.duplicateEntry, updateArticle: s.updateEntry, deleteArticle: s.deleteEntry, restoreArticle: s.restoreEntry }))
+  const { articles, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
+    useShallow((s) => ({ articles: s.entries.wiki, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
@@ -284,13 +284,13 @@ function useWikiConfig(): EntryListTabProps<Entry> {
   const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
 
   const handleDuplicate = async (article: (typeof articles)[number]) => {
-    const newArt = await duplicateArticle(article.id);
+    const newArt = await duplicateEntry(article.id);
     if (newArt) setActiveView({ type: 'wiki', id: newArt.id, mode: 'view' });
   };
 
   const handleDelete = async (article: (typeof articles)[number]) => {
-    await deleteArticle(article.id);
-    pushUndo({ id: generateId(), description: t('undo.articleDeleted'), undo: () => restoreArticle(article.id) });
+    await deleteEntry(article.id);
+    pushUndo({ id: generateId(), description: t('undo.articleDeleted'), undo: () => restoreEntry(article.id) });
     if (activeView.id === article.id) setActiveView({ type: 'wiki' });
   };
 
@@ -318,7 +318,7 @@ function useWikiConfig(): EntryListTabProps<Entry> {
     onOpen: (a) => setActiveView({ type: 'wiki', id: a.id, mode: 'view' }),
     onOpenNewTab: (a) => openViewInNewTab({ type: 'wiki', id: a.id, mode: 'view' }),
     onDragStart: (a) => setDragItem({ id: a.id, entryType: 'wiki', label: displayTitle(t, 'wiki', a.title), category: lookupCategory(catById, a.category_id)?.emoji }),
-    onRename: (a, title) => updateArticle(a.id, { title }),
+    onRename: (a, title) => updateEntry(a.id, { title }),
     contextMenuActions: (a, startRename) => [
       openInNewTabAction({ type: 'wiki', id: a.id, mode: 'view' }),
       { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(a) },

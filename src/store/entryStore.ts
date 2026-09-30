@@ -32,10 +32,11 @@ interface EntryState {
   deleteEntry: (id: string) => Promise<void>;
   restoreEntry: (id: string) => Promise<void>;
   permanentlyDeleteEntry: (id: string) => Promise<void>;
-  getEntry: (id: string) => Entry | undefined;
+  /** Mit `type` nur ein Eintrag dieses Typs (`findEntry`). */
+  getEntry: (id: string, type?: EntryType) => Entry | undefined;
 }
 
-const ENTRY_TYPES: readonly EntryType[] = ['journal', 'wiki', 'operation'];
+export const ENTRY_TYPES: readonly EntryType[] = ['journal', 'wiki', 'operation'];
 
 /**
  * Die Reihenfolge der Listen, wie sie die drei Stores hatten: das Journal
@@ -49,13 +50,13 @@ const ORDER: Record<EntryType, { sort: (a: Entry, b: Entry) => number; newAtEnd:
   operation: { sort: (a, b) => b.updated_at.localeCompare(a.updated_at), newAtEnd: false },
 };
 
-const EMPTY: EntriesByType = { journal: [], wiki: [], operation: [] };
+const emptyEntries = (): EntriesByType => ({ journal: [], wiki: [], operation: [] });
 
 /** Die lebenden Einträge aus der Datenbank, je Typ sortiert. */
 async function selectLiveEntries(): Promise<EntriesByType> {
   const db = await getDb();
   const rows = await db.select<DbRow[]>('SELECT * FROM entries WHERE deleted_at IS NULL');
-  const byType: EntriesByType = { journal: [], wiki: [], operation: [] };
+  const byType = emptyEntries();
   for (const row of rows) {
     const entry = fromRow.entry(row);
     byType[entry.type].push(entry);
@@ -69,12 +70,22 @@ export function allEntries(entries: EntriesByType): Entry[] {
   return [...entries.journal, ...entries.wiki, ...entries.operation];
 }
 
-function findEntry(entries: EntriesByType, id: string): Entry | undefined {
-  for (const type of ENTRY_TYPES) {
-    const entry = entries[type].find((e) => e.id === id);
+/**
+ * Der Eintrag `id` — mit `type` nur, wenn er diesen Typ hat. Liefert das
+ * Objekt aus dem Store selbst: ein Selektor darüber zeichnet nur neu, wenn
+ * sich genau dieser Eintrag ändert.
+ */
+export function findEntry(entries: EntriesByType, id: string, type?: EntryType): Entry | undefined {
+  for (const t of type ? [type] : ENTRY_TYPES) {
+    const entry = entries[t].find((e) => e.id === id);
     if (entry) return entry;
   }
   return undefined;
+}
+
+/** Wendet `map` auf die Liste jedes Typs an. */
+export function mapEntries(entries: EntriesByType, map: (list: Entry[], type: EntryType) => Entry[]): EntriesByType {
+  return { journal: map(entries.journal, 'journal'), wiki: map(entries.wiki, 'wiki'), operation: map(entries.operation, 'operation') };
 }
 
 /**
@@ -91,7 +102,7 @@ function withEntry(entries: EntriesByType, type: EntryType, map: (list: Entry[])
 }
 
 export const useEntryStore = create<EntryState>((set, get) => ({
-  entries: EMPTY,
+  entries: emptyEntries(),
   loading: false,
 
   fetchEntries: async () => {
@@ -204,5 +215,5 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     await db.execute('DELETE FROM entries WHERE id=$1', [id]);
   },
 
-  getEntry: (id) => findEntry(get().entries, id),
+  getEntry: (id, type) => findEntry(get().entries, id, type),
 }));

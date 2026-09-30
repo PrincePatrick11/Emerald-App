@@ -88,7 +88,7 @@ export const V48_TABLE_DDL: Record<V48EntryTable, string> = {
 };
 
 /** Das DDL, das eine Migration bis v48 für `table` meint: die eingefrorene Fassung, sonst die lebende. */
-export function ddlBeforeV49(table: V48EntryTable | TableName): string {
+export function ddlBeforeV49(table: string): string {
   return (V48_TABLE_DDL as Record<string, string>)[table] ?? TABLE_DDL[table as TableName];
 }
 

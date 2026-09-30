@@ -1,3 +1,4 @@
+import type { EntryType } from '../../types';
 import { generateId } from '../helpers';
 import { hasOwnTitle } from '../entryTitle';
 import { parseBlocks, serializeBlocks } from './blockHtml';
@@ -21,9 +22,9 @@ import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockInstance } from './types';
  * `scripts/check-blocks.mjs` benutzen es.
  */
 
-/** Die Eintragsarten, in die eine Vorlage passt — die Module mit Blockstapel. */
-export const TEMPLATE_ENTRY_TYPES = ['journal', 'wiki', 'operation'] as const;
-export type TemplateEntryType = (typeof TEMPLATE_ENTRY_TYPES)[number];
+/** Die Eintragsarten, in die eine Vorlage passt — die Module mit Blockstapel, also die von `entries`. */
+export const TEMPLATE_ENTRY_TYPES = ['journal', 'wiki', 'operation'] as const satisfies readonly EntryType[];
+export type TemplateEntryType = EntryType;
 
 /** Die Kategorie-Stufe „alle Kategorien" — der Rückfall, wenn die genaue Kombination keinen Standard hat. */
 export const ALL_CATEGORIES = '*';

@@ -12,7 +12,7 @@ export default function WikiPropertiesPanel() {
   const activeView = useUIStore((s) => s.activeView);
   const isEditing = activeView.mode === 'edit';
   const articles = useEntryStore((s) => s.entries.wiki);
-  const updateArticle = useEntryStore((s) => s.updateEntry);
+  const updateEntry = useEntryStore((s) => s.updateEntry);
 
   const article = activeView.id ? articles.find((a) => a.id === activeView.id) : null;
 
@@ -34,10 +34,10 @@ export default function WikiPropertiesPanel() {
     <>
       <PropertiesSection>
         <EntryTypeField id={article.id} type="wiki" properties={article} />
-        <CategoryIconCoverRows entry={article} update={(patch) => updateArticle(article.id, patch)} />
+        <CategoryIconCoverRows entry={article} update={(patch) => updateEntry(article.id, patch)} />
       </PropertiesSection>
       <LinkedEntriesField content={article.content} />
-      <TagsField tags={article.tags ?? []} onChange={(tags) => updateArticle(article.id, { tags })} />
+      <TagsField tags={article.tags ?? []} onChange={(tags) => updateEntry(article.id, { tags })} />
     </>
   );
 }
