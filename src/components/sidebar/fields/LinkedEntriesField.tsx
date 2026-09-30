@@ -20,13 +20,6 @@ import {
 interface Props {
   /** Der gespeicherte HTML-Inhalt des Eintrags — die Quelle der Liste. */
   content: string;
-  /**
-   * Übergangsbrücke für Journal-Einträge aus der Zeit der Spalten
-   * `linked_operation_ids`/`linked_wiki_ids`: deren Verknüpfungen stehen nicht
-   * im Inhalt und wären ohne das hier von einem Tag auf den anderen unsichtbar.
-   * Sie werden nur gelistet — angelegt wird ab jetzt ausschließlich im Inhalt.
-   */
-  legacyIds?: Array<{ id: string; entryType: 'operation' | 'wiki' }>;
 }
 
 /**
@@ -54,34 +47,26 @@ function byCategory(a: SuggestionItem, b: SuggestionItem): number {
   return ca.localeCompare(cb) || a.label.localeCompare(b.label);
 }
 
-type LegacyIds = Props['legacyIds'];
-
 const NO_ITEMS: SuggestionItem[] = [];
 const NO_KEYS: string[] = [];
 
 /**
  * Die Verlinkungen eines Eintrags, nach Kategorie sortiert: die Link-Chips
- * seines Inhalts, dazu die alten Spalten (`legacyIds`). `pending`/`removed`
- * überbrücken im Bearbeiten den Autosave (siehe `LinkedEntriesField`).
+ * seines Inhalts. `pending`/`removed` überbrücken im Bearbeiten den Autosave
+ * (siehe `LinkedEntriesField`).
  */
 function useLinkedEntries(
   content: string,
-  legacyIds: LegacyIds,
   pending: SuggestionItem[] = NO_ITEMS,
   removed: string[] = NO_KEYS,
-): Array<{ item: SuggestionItem; inContent: boolean }> {
+): SuggestionItem[] {
   const items = useLinkItems();
   const byKey = useMemo(() => linkItemsByKey(items), [items]);
   return useMemo(() => {
     const gone = new Set(removed);
     const seen = new Set<string>();
-    const out: Array<{ item: SuggestionItem; inContent: boolean }> = [];
-    const sources = [
-      ...extractInternalLinks(content).map((l) => ({ link: l, inContent: true })),
-      ...pending.map((l) => ({ link: l, inContent: true })),
-      ...(legacyIds ?? []).map((l) => ({ link: l, inContent: false })),
-    ];
-    for (const { link, inContent } of sources) {
+    const out: SuggestionItem[] = [];
+    for (const link of [...extractInternalLinks(content), ...pending]) {
       const key = itemKey(link);
       if (seen.has(key) || gone.has(key)) continue;
       // Ziel gelöscht oder unbekannt: der Chip im Text zeigt dann seinen
@@ -89,19 +74,18 @@ function useLinkedEntries(
       const item = byKey.get(key);
       if (!item) continue;
       seen.add(key);
-      out.push({ item, inContent });
+      out.push(item);
     }
     // Nach Kategorie sortiert, nicht in der Reihenfolge des Textes: gleichartige
     // Verlinkungen stehen so beieinander, unabhängig davon, wann sie in den
     // Eintrag geraten sind.
-    return out.sort((a, b) => byCategory(a.item, b.item));
-  }, [content, legacyIds, pending, removed, byKey]);
+    return out.sort(byCategory);
+  }, [content, pending, removed, byKey]);
 }
 
 /**
  * Ein Klick zeigt die Stelle im Eintrag, an der der Link steht. Nur wenn der
- * Editor ihn nicht findet — Links aus den alten Spalten (`legacyIds`) stehen
- * nirgends im Text — geht es zum verlinkten Eintrag selbst.
+ * Editor ihn nicht findet, geht es zum verlinkten Eintrag selbst.
  */
 function useRevealLink() {
   const setActiveView = useUIStore((s) => s.setActiveView);
@@ -115,14 +99,14 @@ function useRevealLink() {
  * Die Verlinkungen in der Leseansicht: ein Abschnitt mit Zähler, je Link eine
  * Zeile — Icon, Titel, rechts die Kategorie (ohne Kategorie die Eintragsart).
  */
-export function LinkedEntriesSection({ content, legacyIds }: { content: string; legacyIds?: LegacyIds }) {
+export function LinkedEntriesSection({ content }: Props) {
   const { t } = useTranslation();
-  const linked = useLinkedEntries(content, legacyIds);
+  const linked = useLinkedEntries(content);
   const reveal = useRevealLink();
   return (
     <SidebarSection storageKey={OPEN_KEY} label={t('properties.linkedEntries')} count={linked.length}>
       {linked.length === 0 && <SidebarEmpty>{t('properties.noLinkedEntries')}</SidebarEmpty>}
-      {linked.map(({ item }) => (
+      {linked.map((item) => (
         <SidebarItemRow
           key={itemKey(item)}
           icon={<LinkItemIcon item={item} />}
@@ -143,11 +127,9 @@ export function LinkedEntriesSection({ content, legacyIds }: { content: string; 
  * Variante von `LinkedEntriesSection`: dieselben Zeilen, dazu je ein „×" und
  * darunter das Suchfeld.
  *
- * Eine Verlinkung lässt sich hier auch wieder entfernen. Nur die aus
- * dem Inhalt — die aus den alten Spalten (`legacyIds`) stehen nirgends im Text
- * und haben deshalb kein „×".
+ * Eine Verlinkung lässt sich hier auch wieder entfernen.
  */
-export default function LinkedEntriesField({ content, legacyIds }: Props) {
+export default function LinkedEntriesField({ content }: Props) {
   const { t } = useTranslation();
   const items = useLinkItems();
   const [query, setQuery] = useState('');
@@ -160,10 +142,10 @@ export default function LinkedEntriesField({ content, legacyIds }: Props) {
   const [removed, setRemoved] = useState<string[]>([]);
   useEffect(() => { setPending([]); setRemoved([]); }, [content]);
 
-  const linked = useLinkedEntries(content, legacyIds, pending, removed);
+  const linked = useLinkedEntries(content, pending, removed);
 
   const filtered = useMemo(() => {
-    const linkedKeys = new Set(linked.map((l) => itemKey(l.item)));
+    const linkedKeys = new Set(linked.map(itemKey));
     const q = query.toLowerCase();
     return items
       .filter((i) => !linkedKeys.has(itemKey(i)) && i.label.toLowerCase().includes(q))
@@ -193,7 +175,7 @@ export default function LinkedEntriesField({ content, legacyIds }: Props) {
   return (
     <SidebarSection storageKey={OPEN_KEY} label={t('properties.linkedEntries')} count={linked.length}>
       {linked.length === 0 && <SidebarEmpty>{t('properties.noLinkedEntries')}</SidebarEmpty>}
-      {linked.map(({ item, inContent }) => (
+      {linked.map((item) => (
         <SidebarItemRow
           key={itemKey(item)}
           icon={<LinkItemIcon item={item} />}
@@ -201,8 +183,7 @@ export default function LinkedEntriesField({ content, legacyIds }: Props) {
           meta={item.categoryLabel ?? t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}
           title={item.label}
           onClick={() => reveal(item)}
-          // Nur was im Inhalt steht, lässt sich von hier entfernen.
-          action={<SidebarRowRemove title={t('properties.removeLink')} onClick={inContent ? () => remove(item) : undefined} />}
+          action={<SidebarRowRemove title={t('properties.removeLink')} onClick={() => remove(item)} />}
         />
       ))}
       <div className="mt-1 pl-[9px] pr-3">

@@ -17,15 +17,15 @@ import Dropdown from '../ui/Dropdown';
 import EmptyState from '../ui/EmptyState';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
-import { getMoonPhase, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
+import { getMoonPhase, journalIcon, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { entryIcon, MODULES, viewTypeForEntryType } from '../../lib/modules';
 import { displayTitle, hasOwnTitle } from '../../lib/entryTitle';
 import { categoryLabel } from '../../lib/categories';
 import { formatDayHeading, formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
-import type { MoonPhase } from '../../types';
 import type { HomeSort, HomeView, HomeSectionPrefs } from '../../store/uiStore';
+import { useSettingsStore } from '../../store/settingsStore';
 
 type CtxTarget =
   | { kind: 'journal'; id: string }
@@ -91,6 +91,7 @@ export default function HomeView() {
 
   const [ctxMenu, setCtxMenu] = useState<{ target: CtxTarget; x: number; y: number } | null>(null);
 
+  const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
   const today = new Date();
   const moonPhase = getMoonPhase(today);
 
@@ -239,7 +240,7 @@ export default function HomeView() {
                       editing={isRenaming('journal', entry.id)}
                       onContextMenu={(e) => openCtx(e, { kind: 'journal', id: entry.id })}
                     >
-                      <span className="text-xl">{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</span>
+                      <span className="text-xl">{journalIcon(entry, showMoonPhase)}</span>
                       <div className="flex-1 min-w-0">
                         {itemTitle('journal', entry.id, entry.title)}
                         <div className="home-item-meta text-xs mt-0.5">
@@ -259,7 +260,7 @@ export default function HomeView() {
                       editing={isRenaming('journal', entry.id)}
                       onContextMenu={(e) => openCtx(e, { kind: 'journal', id: entry.id })}
                     >
-                      <div className="text-lg mb-1">{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</div>
+                      <div className="text-lg mb-1">{journalIcon(entry, showMoonPhase)}</div>
                       {itemTitle('journal', entry.id, entry.title)}
                       <div className="home-item-meta text-xs mt-0.5">
                         {formatEntryDate(entry.created_at)}

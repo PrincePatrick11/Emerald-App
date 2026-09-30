@@ -17,7 +17,7 @@ import DashboardItem from '../ui/DashboardItem';
 import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
-import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
+import { entryMoonPhase, journalIcon, MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId } from '../../lib/helpers';
 import { MODULES } from '../../lib/modules';
 import { displayTitle } from '../../lib/entryTitle';
@@ -25,6 +25,7 @@ import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
 import { countByCategory, groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
+import { useSettingsStore } from '../../store/settingsStore';
 import type { JournalEntry, MoonPhase } from '../../types';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import { useSessionState } from '../../store/sessionStore';
@@ -50,6 +51,7 @@ export default function JournalView() {
   const [renameValue, setRenameValue] = useState('');
   const [search, setSearch] = useSessionState('journal.search', '');
   const [filterPhases, setFilterPhases] = useSessionState<string[]>('journal.filter', []);
+  const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
   const { isCollapsed: isPhaseCollapsed, toggle: togglePhaseCollapse } = useCollapsedSet('journal');
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -186,39 +188,31 @@ export default function JournalView() {
         )
       : entries;
 
-    const phaseFiltered = filterPhases.length === 0
-      ? searchFiltered
-      : searchFiltered.filter((e) =>
-          (e.moon_phase != null && filterPhases.includes(e.moon_phase)) ||
-          // Der „Ohne Mondphase"-Chip wählt Einträge ohne Phase aus — und
-          // solche mit einer, die nicht zum Zyklus gehört: die landen auch in
-          // der Waisen-Gruppe, der Chip muss sie also erwischen.
-          (filterPhases.includes(UNCATEGORIZED_KEY)
-            && !MOON_PHASE_ORDER.includes(e.moon_phase as MoonPhase)));
+    // Die Phase folgt aus dem Anlagedatum (`entryMoonPhase`). Zeigt der Vault
+    // sie nicht, gibt es weder Phasen-Filter noch Phasen-Gruppen — ein Filter,
+    // den man nicht sieht, darf auch nicht wirken. Nur Phasen des Zyklus: der
+    // frühere Chip „Ohne Mondphase“ kann noch in der Sitzung stehen.
+    const phaseOf = (e: JournalEntry) => entryMoonPhase(e, showMoonPhase);
+    const activePhases = showMoonPhase ? filterPhases.filter((p) => MOON_PHASE_ORDER.includes(p as MoonPhase)) : [];
 
-    const filtered = phaseFiltered;
+    const filtered = activePhases.length === 0
+      ? searchFiltered
+      : searchFiltered.filter((e) => {
+          const phase = phaseOf(e);
+          return phase != null && activePhases.includes(phase);
+        });
 
     // Alle acht Phasen anbieten, auch die ohne Einträge — sie sind ein fester
     // Zyklus, keine wachsende Liste; die Gruppen darunter zeigen trotzdem nur
-    // die belegten. „Ohne Mondphase" dagegen nur, wenn es solche Einträge
-    // gibt — oder solange der Chip ausgewählt ist, sonst bliebe ein Filter
-    // wirksam, den nichts mehr anzeigt.
-    //
-    // Nicht `!e.moon_phase`, sondern die Zugehörigkeit zum Zyklus: ein Import
-    // kann eine unbekannte Phase schreiben (emeraldFormat reicht sie
-    // ungeprüft durch), und die landet in derselben Waisen-Gruppe.
-    const showNoPhaseChip = entries.some((e) => !MOON_PHASE_ORDER.includes(e.moon_phase as MoonPhase))
-      || filterPhases.includes(UNCATEGORIZED_KEY);
-    // Gezählt über die Suche, ohne den Phasen-Filter selbst.
+    // die belegten. Gezählt über die Suche, ohne den Phasen-Filter selbst.
     const phaseCounts = countByCategory(
-      searchFiltered, (p) => MOON_PHASE_ORDER.includes(p as MoonPhase), (e) => e.moon_phase ?? null,
+      searchFiltered, (p) => MOON_PHASE_ORDER.includes(p as MoonPhase), phaseOf,
     );
-    const phaseChips = [
-      ...MOON_PHASE_ORDER.map((p) => ({ value: p, label: t(`moonPhase.${p}`), emoji: MOON_PHASE_SYMBOLS[p], count: phaseCounts.get(p) ?? 0 })),
-      ...(showNoPhaseChip ? [{ value: UNCATEGORIZED_KEY, label: t('journal.noPhase'), emoji: '📓', count: phaseCounts.get(UNCATEGORIZED_KEY) ?? 0 }] : []),
-    ];
+    const phaseChips = MOON_PHASE_ORDER.map((p) => ({
+      value: p, label: t(`moonPhase.${p}`), emoji: MOON_PHASE_SYMBOLS[p], count: phaseCounts.get(p) ?? 0,
+    }));
 
-    const activeFilterCount = filterPhases.length > 0 ? 1 : 0;
+    const activeFilterCount = activePhases.length > 0 ? 1 : 0;
 
     const sorted = sortItems(filtered, sort, { date: (e) => e.created_at });
 
@@ -227,15 +221,17 @@ export default function JournalView() {
     // Gruppiert heißt im Journal: nach Mondphase — gerendert mit denselben
     // Gruppenköpfen wie die Kategorie-Gruppen der anderen Module, in fester
     // Zyklus-Reihenfolge. Abgewählte Phasen fallen weg, leere ebenso (das
-    // erledigt Dashboard zentral); der Waisen-Bucket fängt Einträge ohne
-    // Phase auf.
-    const visiblePhases = filterPhases.length > 0
-      ? MOON_PHASE_ORDER.filter((p) => filterPhases.includes(p))
+    // erledigt Dashboard zentral); der Waisen-Bucket fängt nur noch Einträge
+    // mit unlesbarem Anlagedatum auf.
+    const visiblePhases = activePhases.length > 0
+      ? MOON_PHASE_ORDER.filter((p) => activePhases.includes(p))
       : MOON_PHASE_ORDER;
     const phaseGroups: DashboardGroup<JournalEntry>[] = groupByCategory(
-      sorted, visiblePhases.map((p) => ({ id: p })), (e) => e.moon_phase ?? '',
+      sorted, visiblePhases.map((p) => ({ id: p })), (e) => phaseOf(e) ?? '',
       (c) => t(`moonPhase.${c.id}`), t('journal.noPhase'),
     );
+
+    const grouped = showMoonPhase && grouping === 'grouped';
 
     const renderPhaseHeader = (group: DashboardGroup<JournalEntry>) => (
       <CollapsibleGroupHeader
@@ -248,7 +244,7 @@ export default function JournalView() {
     );
 
     const renderEntry = (e: JournalEntry) => {
-      const icon = MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓';
+      const icon = journalIcon(e, showMoonPhase);
       const renaming = renamingId === e.id;
       const renameInput = (className: string) => (
         <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename}
@@ -299,10 +295,10 @@ export default function JournalView() {
         onSort={(s) => setJournalPrefs({ sort: s })}
         // Das Journal gruppiert nach Mondphase, nicht nach Kategorie — der
         // Schalter trägt deshalb das Wort, das auch über seinen Filtern steht.
-        groupBy={{ value: grouping, onChange: (g) => setJournalPrefs({ grouping: g }), label: t('filters.moonPhase') }}
+        groupBy={showMoonPhase ? { value: grouping, onChange: (g) => setJournalPrefs({ grouping: g }), label: t('filters.moonPhase') } : undefined}
         search={search}
         onSearch={setSearch}
-        filters={{
+        filters={showMoonPhase ? {
           activeFilterCount,
           onClearAll: () => setFilterPhases([]),
           panelProps: {
@@ -313,7 +309,7 @@ export default function JournalView() {
             onAllChips: () => setFilterPhases([]),
             allChipsCount: searchFiltered.length,
           },
-        }}
+        } : undefined}
         items={sorted}
         itemKey={(e) => e.id}
         renderItem={renderEntry}
@@ -329,11 +325,11 @@ export default function JournalView() {
         // Gruppe, zeigt es „Keine Ergebnisse" — und ein leerer Kopf (die
         // gerade angelegte Kategorie) hat dort Vorrang. Dieser Zweig darf ihm
         // also nicht zuvorkommen.
-        hasNoResults={filtered.length === 0 && !(grouping === 'grouped' && view !== 'timeline')}
+        hasNoResults={filtered.length === 0 && !(grouped && view !== 'timeline')}
         grouping={
           view === 'timeline'
             ? { mode: 'timeline', groups: timelineGroups }
-            : grouping === 'grouped'
+            : grouped
               ? {
                   mode: 'category',
                   groups: phaseGroups,
@@ -358,6 +354,8 @@ export default function JournalView() {
     );
   }
 
+  const detailPhase = entryMoonPhase(entry, showMoonPhase);
+
   // Unter dem Titel steht beim Journal nichts mehr: die Verlinkungs-Badges sind
   // seit v36 Chips im Fließtext, die Paradigma-/Bannung-/Meditations-Chips seit
   // v37 ebenfalls. Gesammelt zeigt beides das Verlinkungs-Feld der rechten
@@ -368,8 +366,8 @@ export default function JournalView() {
       isEditing={isEditing}
       meta={(
         <>
-          {entry.moon_phase && (
-            <span title={t(`moonPhase.${entry.moon_phase}`)}>{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase]}</span>
+          {detailPhase && (
+            <span title={t(`moonPhase.${detailPhase}`)}>{MOON_PHASE_SYMBOLS[detailPhase]}</span>
           )}
           <span>{formatEntryDate(entry.created_at)}</span>
         </>

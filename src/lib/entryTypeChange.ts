@@ -26,8 +26,6 @@ import type Database from '@tauri-apps/plugin-sql';
 import { getDb, nextEntryNumber } from './db';
 import { nowIso } from './helpers';
 import { retypeInternalLinks } from './internalLinkHtml';
-import { getMoonPhase } from './moonPhase';
-import { useSettingsStore } from '../store/settingsStore';
 import { serialKey, serialized } from './serialize';
 import { viewTypeForEntryType } from './modules';
 import { remapDefinitionDefaults } from './blocks/definitions';
@@ -95,18 +93,12 @@ async function insertAs(db: Database, to: ConvertibleEntryType, core: EntryCore)
     case 'journal': {
       const entry: JournalEntry = {
         id: core.id, entry_number, title: core.title, content: core.content, tags: core.tags,
-        created_at: core.created_at, updated_at: now,
-        // Die Mondphase des Tages, an dem der Eintrag entstand — wie beim Anlegen,
-        // also nur, wenn der Vault sie will (Einstellung).
-        moon_phase: useSettingsStore.getState().settings.journal.moonPhase ? getMoonPhase(new Date(core.created_at)) : null,
-        paradigm_id: null, linked_operation_ids: [], linked_wiki_ids: [],
-        is_bannung: false, bannung_type_wiki_id: null, is_meditation: false, meditation_duration: null,
-        meditation_type_wiki_id: null, deleted_at: null,
+        created_at: core.created_at, updated_at: now, deleted_at: null,
       };
       await db.execute(
-        `INSERT INTO journal_entries (id, title, content, created_at, updated_at, tags, moon_phase, entry_number)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [entry.id, entry.title, entry.content, entry.created_at, entry.updated_at, tags, entry.moon_phase, entry_number]
+        `INSERT INTO journal_entries (id, title, content, created_at, updated_at, tags, entry_number)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [entry.id, entry.title, entry.content, entry.created_at, entry.updated_at, tags, entry_number]
       );
       return { type: to, entry };
     }

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { LazyMotion, Reorder, domAnimation } from 'framer-motion';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
+import { journalIcon } from '../../lib/moonPhase';
 import { hasOwnTitle } from '../../lib/entryTitle';
 import { REORDER_SPRING } from '../../lib/motion';
 import { useAltarStore } from '../../store/altarStore';
@@ -13,11 +13,12 @@ import { useOperationStore } from '../../store/operationStore';
 import { useTaskStore } from '../../store/taskStore';
 import { useUIStore } from '../../store/uiStore';
 import { useWikiStore } from '../../store/wikiStore';
-import type { ActiveView, MoonPhase } from '../../types';
+import type { ActiveView } from '../../types';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import { useTemplateStore } from '../../store/templateStore';
 import { useLexiconStore } from '../../store/lexiconStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { definitionLabel, templateLabel } from '../../lib/blocks/blockAttrs';
 import { imageSrc } from '../../lib/images';
 import { AUX_VIEWS, DEFAULT_ENTRY_EMOJI, moduleMeta, type AuxViewId } from '../../lib/modules';
@@ -65,6 +66,7 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
   const language = useLexiconStore((s) => (type === 'lexicon' && id ? s.languages.find((l) => l.id === id) : undefined));
   const categoryId = article?.category_id ?? operation?.category_id;
   const categoryEmoji = useCategoryStore((s) => (categoryId ? s.categories.find((c) => c.id === categoryId)?.emoji : undefined));
+  const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
 
   const fallback = getFallbackTitle(view, t);
   let title = fallback;
@@ -79,7 +81,7 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
   let icon: ReactNode;
   const Icon = moduleMeta(type)?.icon ?? AUX_VIEWS[type as AuxViewId]?.icon ?? MoreHorizontal;
   if (type === 'journal' && id) {
-    icon = <span className="text-sm leading-none">{MOON_PHASE_SYMBOLS[entry?.moon_phase as MoonPhase] ?? '📓'}</span>;
+    icon = <span className="text-sm leading-none">{entry ? journalIcon(entry, showMoonPhase) : DEFAULT_ENTRY_EMOJI.journal}</span>;
   } else if (type === 'wiki' && id) {
     icon = renderIconValue(article?.icon, <span className="text-sm leading-none">{categoryEmoji ?? DEFAULT_ENTRY_EMOJI.wiki}</span>);
   } else if (type === 'operations' && id) {

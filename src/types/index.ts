@@ -9,15 +9,9 @@ export interface JournalEntry {
   created_at: string;
   updated_at: string;
   tags: string[];
-  moon_phase: string | null;
-  paradigm_id: string | null;
-  linked_operation_ids: string[] | null;
-  linked_wiki_ids: string[] | null;
-  is_bannung: boolean;
-  bannung_type_wiki_id: string | null;
-  is_meditation: boolean;
-  meditation_duration: number | null;
-  meditation_type_wiki_id: string | null;
+  // Die Mondphase ist keine Spalte mehr: sie folgt aus `created_at`
+  // (`entryMoonPhase` in lib/moonPhase.ts). Paradigma, Bannung, Meditation und
+  // die verlinkten Einträge sind seit v36/v37 Link-Chips im Inhalt.
   deleted_at: string | null;
   entry_number?: number;
 }

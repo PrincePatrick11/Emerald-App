@@ -4,7 +4,7 @@ import { save, message } from '@tauri-apps/plugin-dialog';
 import TurndownService from 'turndown';
 import { format } from 'date-fns';
 import DOMPurify from 'dompurify';
-import type { ExportData, ChipData } from './exportData';
+import type { ExportData } from './exportData';
 import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { useTaskStore } from '../store/taskStore';
@@ -164,15 +164,6 @@ function exportFilename(title: string, date: string, ext: string): string {
   return `${base}_${dateStr}.${ext}`;
 }
 
-// Render a chip for the metadata header (icon can be data-URL or emoji)
-function chip(data: ChipData, extra = ''): string {
-  const safeIconDataUrl = sanitizeDataImageUrl(data.icon);
-  const iconHtml = safeIconDataUrl
-    ? `<img src="${safeIconDataUrl}" class="chip-img">`
-    : data.icon ? `<span class="chip-emoji">${htmlEscape(data.icon)}</span>` : '';
-  return `<span class="chip${extra ? ' ' + extra : ''}">${iconHtml}<span class="chip-label">${htmlEscape(data.label)}</span></span>`;
-}
-
 // Top bar: exactly like the main view — 🌕 January 15, 2026 · Full Moon
 function buildTopBar(data: ExportData): string {
   const dateStr = format(new Date(data.createdAt), 'MMMM d, yyyy');
@@ -206,25 +197,7 @@ function buildTopBar(data: ExportData): string {
 function buildMetaHtml(data: ExportData): string {
   const parts: string[] = [];
 
-  // Journal: paradigma / bannung / meditation
-  const propChips: string[] = [];
-  if (data.paradigma) propChips.push(chip(data.paradigma));
-  if (data.bannung)   propChips.push(chip(data.bannung));
-  if (data.meditation) {
-    const dur = data.meditation.duration ? ` <span class="chip-badge">${data.meditation.duration} min</span>` : '';
-    propChips.push(chip(data.meditation) + dur);
-  }
   // the category is shown in the topbar, not here
-  if (propChips.length) parts.push(`<div class="meta-row">${propChips.join('')}</div>`);
-
-  // Linked ops
-  if (data.linkedOps?.length) {
-    parts.push(`<div class="meta-row">${data.linkedOps.map(o => chip(o)).join('')}</div>`);
-  }
-  // Linked wiki
-  if (data.linkedWiki?.length) {
-    parts.push(`<div class="meta-row">${data.linkedWiki.map(w => chip(w)).join('')}</div>`);
-  }
   // Tags
   if (data.tagNames?.length) {
     const tags = data.tagNames.map(t => `<span class="tag">${htmlEscape(t)}</span>`).join('');
@@ -284,18 +257,6 @@ const PRINT_CSS = `
   .meta-section { margin-bottom: 1.2em; padding-bottom: 0.8em; border-bottom: 1px solid #eee; }
   .meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
   .meta-date { font-size: 0.85em; color: #666; font-style: italic; margin-right: 4px; }
-  .chip {
-    display: inline-flex; align-items: baseline; gap: 4px;
-    font-family: system-ui,sans-serif; font-size: 0.78em;
-    background: #f2f2f2; border: 1px solid #ddd; border-radius: 6px;
-    padding: 2px 8px; color: #333; white-space: nowrap;
-  }
-  .chip-img { width: 14px; height: 14px; object-fit: cover; border-radius: 2px; }
-  .chip-emoji { font-size: 1em; line-height: 1; }
-  .chip-badge {
-    display: inline-block; font-size: 0.9em;
-    background: #e8e8e8; border-radius: 4px; padding: 0 5px; margin-left: 2px;
-  }
   .tag {
     display: inline-block; font-family: system-ui,sans-serif; font-size: 0.78em;
     background: #e8e8e8; border-radius: 12px; padding: 2px 10px; color: #444;
@@ -469,14 +430,6 @@ export async function exportAsMarkdown(data: ExportData): Promise<void> {
   lines.push(`Type: ${data.type}`);
   lines.push(`*${format(new Date(data.createdAt), 'MMMM d, yyyy')}*`);
   if (data.moonPhase)   lines.push(`Moon: ${data.moonPhase}`);
-  if (data.paradigma)   lines.push(`Paradigma: ${mdIcon(data.paradigma.icon, data.paradigma.fallbackIcon)}${data.paradigma.label}`.trim());
-  if (data.bannung)     lines.push(`Bannung: ${mdIcon(data.bannung.icon, data.bannung.fallbackIcon)}${data.bannung.label}`.trim());
-  if (data.meditation)  {
-    const dur = data.meditation.duration ? ` (${data.meditation.duration} min)` : '';
-    lines.push(`Meditation: ${mdIcon(data.meditation.icon, data.meditation.fallbackIcon)}${data.meditation.label}${dur}`.trim());
-  }
-  if (data.linkedOps?.length)   lines.push(`Operations: ${data.linkedOps.map(o => (`${mdIcon(o.icon, o.fallbackIcon)}${o.label}`.trim()) + (o.id ? ` [${o.id}]` : '')).join(', ')}`);
-  if (data.linkedWiki?.length)  lines.push(`Wiki: ${data.linkedWiki.map(w => (`${mdIcon(w.icon, w.fallbackIcon)}${w.label}`.trim()) + (w.id ? ` [${w.id}]` : '')).join(', ')}`);
   if (data.category)            lines.push(`Category: ${mdIcon(data.category.icon, data.category.fallbackIcon)}${data.category.label}`.trim());
   if (data.tagNames?.length)    lines.push(`Tags: ${data.tagNames.join(', ')}`);
   lines.push('', '---', '');

@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Folder } from 'lucide-react';
 import { useCategoryStore } from '../../../store/categoryStore';
@@ -13,16 +13,15 @@ import { TagsSection } from './TagsField';
  * damit die Blöcke darunter (`BlockSidebarArea`) im selben Abstand folgen.
  * Ohne `properties` entfällt der Eigenschaften-Abschnitt.
  */
-export default function EntryReadSections({ properties, content, legacyIds, tags }: {
+export default function EntryReadSections({ properties, content, tags }: {
   properties?: ReactNode;
   content: string;
-  legacyIds?: ComponentProps<typeof LinkedEntriesSection>['legacyIds'];
   tags: string[];
 }) {
   return (
     <>
       {properties && <PropertiesSection>{properties}</PropertiesSection>}
-      <LinkedEntriesSection content={content} legacyIds={legacyIds} />
+      <LinkedEntriesSection content={content} />
       <TagsSection tags={tags} />
     </>
   );

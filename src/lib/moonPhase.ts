@@ -1,4 +1,5 @@
 import type { MoonPhase } from '../types';
+import { DEFAULT_ENTRY_EMOJI } from './modules';
 
 /**
  * Calculates the approximate moon phase for a given date.
@@ -39,3 +40,22 @@ export const MOON_PHASE_SYMBOLS: Record<MoonPhase, string> = {
   last_quarter: '🌗',
   waning_crescent: '🌘',
 };
+
+/**
+ * Die Mondphase eines Journal-Eintrags: die des Tages, an dem er angelegt
+ * wurde. Keine Spalte — ein gespeicherter Wert war nur eine Kopie davon, die
+ * beim Import, Typwechsel und Duplizieren jeweils neu gesetzt werden musste.
+ * `shown` ist die Vault-Einstellung `journal.moonPhase`: aus heißt, kein
+ * Eintrag zeigt eine Phase, auch kein alter.
+ */
+export function entryMoonPhase(entry: { created_at: string }, shown: boolean): MoonPhase | null {
+  if (!shown) return null;
+  const created = new Date(entry.created_at);
+  return Number.isNaN(created.getTime()) ? null : getMoonPhase(created);
+}
+
+/** Das Icon eines Journal-Eintrags: seine Mondphase, sonst das Journal-Emoji. */
+export function journalIcon(entry: { created_at: string }, shown: boolean): string {
+  const phase = entryMoonPhase(entry, shown);
+  return phase ? MOON_PHASE_SYMBOLS[phase] : DEFAULT_ENTRY_EMOJI.journal;
+}

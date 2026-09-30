@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
 import { useJournalStore } from '../../../store/journalStore';
@@ -7,12 +6,13 @@ import LinkedEntriesField from '../fields/LinkedEntriesField';
 import EntryTypeField from '../fields/EntryTypeField';
 import EntryReadSections, { PropertiesSection } from '../fields/EntryReadSections';
 import { SidebarPropertyRow } from '../fields/SidebarSection';
-import { MOON_PHASE_SYMBOLS } from '../../../lib/moonPhase';
+import { useSettingsStore } from '../../../store/settingsStore';
+import { entryMoonPhase, MOON_PHASE_SYMBOLS } from '../../../lib/moonPhase';
 import type { MoonPhase } from '../../../types';
 
 /**
  * Die Mondphase als Eigenschaft — auch im Bearbeiten nur angezeigt: sie
- * gehört zum Tag des Eintrags und wird beim Anlegen gesetzt, nicht gewählt.
+ * folgt aus dem Tag, an dem der Eintrag angelegt wurde, und wird nicht gewählt.
  */
 function MoonPhaseRow({ phase }: { phase: MoonPhase }) {
   const { t } = useTranslation();
@@ -38,24 +38,21 @@ export default function JournalPropertiesPanel() {
   const entries = useJournalStore((s) => s.entries);
   const updateEntry = useJournalStore((s) => s.updateEntry);
 
-  const entry = activeView.id ? entries.find((e) => e.id === activeView.id) : null;
+  const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
 
-  // Verknüpfungen aus den alten Spalten — siehe `legacyIds` in LinkedEntriesField.
-  const legacyLinks = useMemo(() => [
-    ...(entry?.linked_operation_ids ?? []).map((id) => ({ id, entryType: 'operation' as const })),
-    ...(entry?.linked_wiki_ids ?? []).map((id) => ({ id, entryType: 'wiki' as const })),
-  ], [entry?.linked_operation_ids, entry?.linked_wiki_ids]);
+  const entry = activeView.id ? entries.find((e) => e.id === activeView.id) : null;
 
   if (!entry) {
     return <p className="text-xs text-stone-600 px-2 py-3">{t('properties.noEntry')}</p>;
   }
 
+  const phase = entryMoonPhase(entry, showMoonPhase);
+
   if (!isEditing) {
     return (
       <EntryReadSections
-        properties={entry.moon_phase && <MoonPhaseRow phase={entry.moon_phase as MoonPhase} />}
+        properties={phase && <MoonPhaseRow phase={phase} />}
         content={entry.content}
-        legacyIds={legacyLinks}
         tags={entry.tags ?? []}
       />
     );
@@ -65,9 +62,9 @@ export default function JournalPropertiesPanel() {
     <>
       <PropertiesSection>
         <EntryTypeField id={entry.id} type="journal" />
-        {entry.moon_phase && <MoonPhaseRow phase={entry.moon_phase as MoonPhase} />}
+        {phase && <MoonPhaseRow phase={phase} />}
       </PropertiesSection>
-      <LinkedEntriesField content={entry.content} legacyIds={legacyLinks} />
+      <LinkedEntriesField content={entry.content} />
       <TagsField tags={entry.tags ?? []} onChange={(tags) => updateEntry(entry.id, { tags })} />
     </>
   );

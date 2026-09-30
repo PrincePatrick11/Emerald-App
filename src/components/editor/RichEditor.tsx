@@ -21,8 +21,8 @@ import { ExternalDropExtension } from './ExternalDropExtension';
 import { DEFAULT_ENTRY_EMOJI, type SuggestionItem } from './SuggestionList';
 import { useLinkItems } from '../../hooks/useLinkItems';
 import { useCategoryStore } from '../../store/categoryStore';
-import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
-import type { ContentType, MoonPhase } from '../../types';
+import { journalIcon } from '../../lib/moonPhase';
+import type { ContentType } from '../../types';
 import { displayTitle } from '../../lib/entryTitle';
 import i18n from '../../i18n';
 import { useJournalStore } from '../../store/journalStore';
@@ -112,6 +112,7 @@ export default function RichEditor({
   const operations = useOperationStore((s) => s.operations);
   const tasks = useTaskStore((s) => s.tasks);
   const altars = useAltarStore((s) => s.altars);
+  const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
   const { t } = useTranslation();
 
   // Link popup state (edit mode only)
@@ -121,13 +122,13 @@ export default function RichEditor({
 
   // Always-fresh icon lookup ref — returns the current icon for any entry from the store.
   // Backed by a ref so the extension closure never goes stale after initial mount.
-  const storeRef = useRef({ entries, articles, categories, operations, tasks, altars });
-  storeRef.current = { entries, articles, categories, operations, tasks, altars };
+  const storeRef = useRef({ entries, articles, categories, operations, tasks, altars, showMoonPhase });
+  storeRef.current = { entries, articles, categories, operations, tasks, altars, showMoonPhase };
   const getIconRef = useRef((id: string, entryType: string): string | null => {
-    const { entries, articles, categories, operations, tasks, altars } = storeRef.current;
+    const { entries, articles, categories, operations, tasks, altars, showMoonPhase } = storeRef.current;
     if (entryType === 'journal') {
       const e = entries.find((e) => e.id === id);
-      return e ? (MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? DEFAULT_ENTRY_EMOJI.journal) : null;
+      return e ? journalIcon(e, showMoonPhase) : null;
     }
     if (entryType === 'wiki') {
       const a = articles.find((a) => a.id === id);

@@ -11,6 +11,7 @@ import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { useTagStore } from '../store/tagStore';
 import { useSettingsStore } from '../store/settingsStore';
+import { entryMoonPhase } from './moonPhase';
 import { useAltarStore } from '../store/altarStore';
 import { reloadModules } from '../store/moduleWiring';
 import { useImportStore } from '../store/importStore';
@@ -64,6 +65,7 @@ function linkItemsSnapshot(): SuggestionItem[] {
     articles: useWikiStore.getState().articles,
     categories: useCategoryStore.getState().categories,
     altars: useAltarStore.getState().altars,
+    showMoonPhase: useSettingsStore.getState().settings.journal.moonPhase,
   }, i18n.t);
 }
 
@@ -402,25 +404,8 @@ export async function exportAsEmerald(): Promise<void> {
     content   = entry.content || '';
     createdAt = entry.created_at;
 
-    meta.moonPhase = entry.moon_phase ?? undefined;
-
-    if (entry.paradigm_id) {
-      meta.paradigmaTitle = articles.find(a => a.id === entry.paradigm_id)?.title;
-    }
-    meta.isBannung  = !!entry.is_bannung;
-    meta.bannungTitle = entry.bannung_type_wiki_id
-      ? articles.find(a => a.id === entry.bannung_type_wiki_id)?.title : undefined;
-    meta.isMeditation = !!entry.is_meditation;
-    meta.meditationTitle = entry.meditation_type_wiki_id
-      ? articles.find(a => a.id === entry.meditation_type_wiki_id)?.title : undefined;
-    if (entry.meditation_duration) meta.meditationDuration = entry.meditation_duration;
-
-    const linkedOpIds   = (entry.linked_operation_ids ?? []) as string[];
-    const linkedWikiIds = (entry.linked_wiki_ids       ?? []) as string[];
-    if (linkedOpIds.length)
-      meta.linkedOps  = linkedOpIds.map(id => ({ id, title: operations.find(o => o.id === id)?.title ?? '' }));
-    if (linkedWikiIds.length)
-      meta.linkedWiki = linkedWikiIds.map(id => ({ id, title: articles.find(a => a.id === id)?.title ?? '' }));
+    // Nur zur Information: der Import rechnet die Phase aus `createdAt` neu.
+    meta.moonPhase = entryMoonPhase(entry, useSettingsStore.getState().settings.journal.moonPhase) ?? undefined;
 
     meta.tags = (entry.tags ?? []) as string[];
 

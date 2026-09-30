@@ -1,11 +1,11 @@
 import type { TFunction } from 'i18next';
-import { MOON_PHASE_SYMBOLS } from './moonPhase';
+import { entryMoonPhase, journalIcon } from './moonPhase';
 import { DEFAULT_ENTRY_EMOJI } from './modules';
 import { displayTitle } from './entryTitle';
 import { categoryLabel, lookupCategory } from './categories';
 import { isImageIcon } from './helpers';
 import type {
-  AltarRecord, Category, ContentType, JournalEntry, MoonPhase, Operation,
+  AltarRecord, Category, ContentType, JournalEntry, Operation,
   Task, WikiArticle,
 } from '../types';
 
@@ -36,7 +36,8 @@ export interface SuggestionItem {
    * Übersetzter Name der Kategorie, in der der Eintrag in seinem Modul steht —
    * die Überschrift, unter der ein angehängter Link im Eintrag landet. Journal
    * hat keine Kategorien und nimmt die Mondphase (so heißt „Kategorie" dort
-   * auch beim Sortieren), Altäre haben gar keine und nehmen den Modulnamen.
+   * auch beim Sortieren) — oder, wenn der Vault sie nicht zeigt, wie Altäre
+   * den Modulnamen.
    */
   categoryLabel?: string;
   /**
@@ -72,6 +73,8 @@ export interface LinkItemSources {
   /** Die eine globale Liste — Aufgaben, Operationen und Artikel zeigen alle hinein. */
   categories: Category[];
   altars: AltarRecord[];
+  /** Die Vault-Einstellung `journal.moonPhase` — ob Journal-Einträge ihre Phase zeigen. */
+  showMoonPhase: boolean;
 }
 
 /**
@@ -90,15 +93,18 @@ function splitIcon(icon: string | null | undefined, emojiFallback: string) {
 export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem[] {
   const catById = new Map(s.categories.map((c) => [c.id, c]));
   return [
-    ...s.entries.map((e) => ({
-      id: e.id,
-      entryType: 'journal' as const,
-      label: displayTitle(t, 'journal', e.title),
-      icon: MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? DEFAULT_ENTRY_EMOJI.journal,
-      categoryLabel: e.moon_phase ? t(`moonPhase.${e.moon_phase}`) : t('journal.noPhase'),
-      updatedAt: e.updated_at,
-      entry_number: e.entry_number,
-    })),
+    ...s.entries.map((e) => {
+      const phase = entryMoonPhase(e, s.showMoonPhase);
+      return {
+        id: e.id,
+        entryType: 'journal' as const,
+        label: displayTitle(t, 'journal', e.title),
+        icon: journalIcon(e, s.showMoonPhase),
+        categoryLabel: phase ? t(`moonPhase.${phase}`) : t('nav.journal'),
+        updatedAt: e.updated_at,
+        entry_number: e.entry_number,
+      };
+    }),
     ...s.tasks.map((task) => {
       const cat = lookupCategory(catById, task.category_id);
       return {

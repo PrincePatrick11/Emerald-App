@@ -6,6 +6,7 @@ import { useOperationStore } from '../store/operationStore';
 import { useTaskStore } from '../store/taskStore';
 import { useAltarStore } from '../store/altarStore';
 import { useCategoryStore } from '../store/categoryStore';
+import { useSettingsStore } from '../store/settingsStore';
 import { buildLinkItems } from '../lib/linkItems';
 import type { SuggestionItem } from '../components/editor/SuggestionList';
 
@@ -21,12 +22,13 @@ export function useLinkItems(): SuggestionItem[] {
   const categories = useCategoryStore((s) => s.categories);
   const tasks = useTaskStore((s) => s.tasks);
   const altars = useAltarStore((s) => s.altars);
+  const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
 
   return useMemo(
     () => buildLinkItems(
-      { entries, tasks, operations, articles, categories, altars },
+      { entries, tasks, operations, articles, categories, altars, showMoonPhase },
       t,
     ),
-    [t, entries, articles, operations, tasks, categories, altars],
+    [t, entries, articles, operations, tasks, categories, altars, showMoonPhase],
   );
 }

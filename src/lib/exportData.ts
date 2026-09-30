@@ -7,12 +7,11 @@ import { useOperationStore } from '../store/operationStore';
 import { useCategoryStore } from '../store/categoryStore';
 import { useAltarStore } from '../store/altarStore';
 import { useUIStore } from '../store/uiStore';
-import { MOON_PHASE_SYMBOLS } from './moonPhase';
-import { DEFAULT_ENTRY_EMOJI } from './modules';
+import { entryMoonPhase, MOON_PHASE_SYMBOLS } from './moonPhase';
+import { useSettingsStore } from '../store/settingsStore';
 import { displayTitle } from './entryTitle';
 import { categoryLabel } from './categories';
 import i18n from '../i18n';
-import type { Category } from '../types';
 
 export interface ChipData {
   id?: string;            // entry ID (for import resolution)
@@ -49,23 +48,12 @@ export interface ExportData {
   createdAt: string;
   // journal
   moonPhase?: string;         // emoji + label, e.g. "🌕 Full Moon"
-  paradigma?: ChipData;
-  bannung?: ChipData;
-  meditation?: ChipData & { duration?: number };
-  linkedOps?: ChipData[];
-  linkedWiki?: ChipData[];
   // wiki + operation: die Kategorie des Eintrags, in der Kopfzeile gezeigt
   category?: ChipData;
   // custom icon on the entry itself (wiki article or operation), may be data-URL or emoji
   entryIcon?: string;
   // common
   tagNames?: string[];
-}
-
-function wikiIcon(article: { icon?: string; category_id: string | null }, cats: Category[]): string {
-  if (article.icon?.startsWith('data:')) return article.icon;
-  const cat = cats.find(c => c.id === article.category_id);
-  return cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
 }
 
 function moonLabel(phase: string): string {
@@ -87,41 +75,8 @@ export async function collectExportData(): Promise<ExportData | null> {
     const entry = entries.find(e => e.id === view.id);
     if (!entry) return null;
 
-    // Ebenfalls Altbestands-Brücke: seit Migration v37 sind Paradigma, Bannung
-    // und Meditation gewöhnliche Link-Chips im Inhalt, die drei Spalten sind
-    // geleert. Der Zweig bleibt für eine Datenbank, die noch vor v37 steht —
-    // etwa beim Export direkt nach dem Einspielen eines alten Backups.
-    const paradigmaArt   = entry.paradigm_id            ? articles.find(a => a.id === entry.paradigm_id)            : undefined;
-    const bannungArt     = entry.bannung_type_wiki_id    ? articles.find(a => a.id === entry.bannung_type_wiki_id)    : undefined;
-    const meditationArt  = entry.meditation_type_wiki_id ? articles.find(a => a.id === entry.meditation_type_wiki_id) : undefined;
-
-    // Altbestands-Brücke. Seit Migration v36 stehen Journal-Verknüpfungen als
-    // Chips IM Inhalt, und `export.ts` rendert sie von dort (resolveInternalLinkIcons /
-    // transformInternalLinks) — für migrierte Einträge sind diese beiden Listen
-    // deshalb leer, und das ist richtig: sonst stünde derselbe Link zweimal im
-    // Export, einmal als eigener Abschnitt und einmal im Text. Gefüllt sind sie
-    // nur noch bei Einträgen, die ein Backup oder ein .emerald-Import aus der
-    // Zeit davor wieder in die Spalten geschrieben hat.
-    const linkedOps = (entry.linked_operation_ids ?? [])
-      .map(id => operations.find(o => o.id === id)).filter(Boolean)
-      .map(op => {
-        const cat = categories.find(c => c.id === op!.category_id);
-        const fallback = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.operation;
-        return { id: op!.id, label: displayTitle(i18n.t, 'operation', op!.title), icon: op!.icon ?? fallback, fallbackIcon: fallback };
-      });
-
-    const linkedWiki = (entry.linked_wiki_ids ?? [])
-      .map(id => articles.find(a => a.id === id)).filter(Boolean)
-      .map(a => {
-        const cat = categories.find(c => c.id === a!.category_id);
-        const fallback = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
-        return { id: a!.id, label: displayTitle(i18n.t, 'wiki', a!.title), icon: wikiIcon(a!, categories), fallbackIcon: fallback };
-      });
-
-    const phaseKey = entry.moon_phase as keyof typeof MOON_PHASE_SYMBOLS;
-    const moonPhase = phaseKey && MOON_PHASE_SYMBOLS[phaseKey]
-      ? `${MOON_PHASE_SYMBOLS[phaseKey]} ${moonLabel(phaseKey)}`
-      : undefined;
+    const phase = entryMoonPhase(entry, useSettingsStore.getState().settings.journal.moonPhase);
+    const moonPhase = phase ? `${MOON_PHASE_SYMBOLS[phase]} ${moonLabel(phase)}` : undefined;
 
     return {
       type: 'journal',
@@ -130,24 +85,6 @@ export async function collectExportData(): Promise<ExportData | null> {
       content: renderBlocksForExport(entry.content, exportText()),
       createdAt: entry.created_at,
       moonPhase,
-      paradigma: paradigmaArt ? (() => {
-        const cat = categories.find(c => c.id === paradigmaArt.category_id);
-        const fallback = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
-        return { label: displayTitle(i18n.t, 'wiki', paradigmaArt.title), icon: wikiIcon(paradigmaArt, categories), fallbackIcon: fallback };
-      })() : undefined,
-      bannung: entry.is_bannung ? {
-        label: bannungArt?.title ?? 'Bannung',
-        icon: bannungArt ? wikiIcon(bannungArt, categories) : '🚫',
-        fallbackIcon: '🚫',
-      } : undefined,
-      meditation: entry.is_meditation ? {
-        label: meditationArt?.title ?? 'Meditation',
-        icon: meditationArt ? wikiIcon(meditationArt, categories) : '🧘',
-        fallbackIcon: '🧘',
-        duration: entry.meditation_duration ?? undefined,
-      } : undefined,
-      linkedOps,
-      linkedWiki,
       tagNames: (entry.tags ?? []) as string[],
     };
   }

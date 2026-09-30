@@ -1,15 +1,13 @@
 import { create } from 'zustand';
 import type Database from '@tauri-apps/plugin-sql';
 import { getDb, nextEntryNumber } from '../lib/db';
-import { getMoonPhase } from '../lib/moonPhase';
 import { generateId, nowIso } from '../lib/helpers';
 import { needsWrite, stampFor, type WriteOptions } from '../lib/stamp';
 import { serialKey, serialized } from '../lib/serialize';
-import { fromRow, toInt, type DbRow } from '../lib/row';
+import { fromRow, type DbRow } from '../lib/row';
 import type { JournalEntry } from '../types';
 import i18n from '../i18n';
 import { displayTitle } from '../lib/entryTitle';
-import { useSettingsStore } from './settingsStore';
 import { startOfNewEntry, useTemplateNoticeStore } from './templateStore';
 
 interface JournalState {
@@ -56,12 +54,6 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   createEntry: async ({ blank = false, createdAt } = {}) => {
     const db = await getDb();
     const now = nowIso();
-    // Die Mondphase des Tages, an dem der Eintrag entsteht — sofern der Vault
-    // sie will (Einstellung). Eine Regel für Anlegen, Duplizieren, Import und
-    // Typwechsel (`entryTypeChange`): die Phase folgt dem Erstelldatum.
-    const moonPhase = useSettingsStore.getState().settings.journal.moonPhase
-      ? getMoonPhase(new Date(createdAt ?? now))
-      : null;
     const entryNumber = await nextEntryNumber(db, 'journal_entries');
     const start = startOfNewEntry('journal', null, blank);
     const entry: JournalEntry = {
@@ -72,20 +64,11 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       created_at: createdAt ?? now,
       updated_at: now,
       tags: start.tags,
-      moon_phase: moonPhase,
-      paradigm_id: null,
-      linked_operation_ids: [],
-      linked_wiki_ids: [],
-      is_bannung: false,
-      bannung_type_wiki_id: null,
-      is_meditation: false,
-      meditation_duration: null,
-      meditation_type_wiki_id: null,
       deleted_at: null,
     };
     await db.execute(
-      `INSERT INTO journal_entries (id, title, content, created_at, updated_at, tags, moon_phase, entry_number)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      `INSERT INTO journal_entries (id, title, content, created_at, updated_at, tags, entry_number)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         entry.id,
         entry.title,
@@ -93,7 +76,6 @@ export const useJournalStore = create<JournalState>((set, get) => ({
         entry.created_at,
         entry.updated_at,
         JSON.stringify(entry.tags),
-        entry.moon_phase,
         entryNumber,
       ]
     );
@@ -103,8 +85,9 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   },
 
   /**
-   * Kopiert alle Inhaltsfelder des Quelleintrags; Identität, Zeitstempel und
-   * die Mondphase (sie folgt dem Erstelldatum, also heute) bleiben beim neuen Eintrag. Die Aufrufer haben die Feldliste früher jeweils
+   * Kopiert alle Inhaltsfelder des Quelleintrags; Identität und Zeitstempel
+   * bleiben beim neuen Eintrag — und mit dem Anlagedatum die Mondphase, die
+   * daraus folgt. Die Aufrufer haben die Feldliste früher jeweils
    * selbst aufgezählt — ein neues Feld fehlte dann still an einzelnen Stellen
    * (so ist ein Feld beim Duplizieren verloren gegangen).
    */
@@ -118,7 +101,6 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       updated_at: _updated,
       deleted_at: _deleted,
       entry_number: _number,
-      moon_phase: _moonPhase,
       ...fields
     } = src;
     await get().updateEntry(copy.id, { ...fields, title: displayTitle(i18n.t, 'journal', src.title) + i18n.t('common.copySuffix') });
@@ -134,23 +116,13 @@ export const useJournalStore = create<JournalState>((set, get) => ({
 
     await db.execute(
       `UPDATE journal_entries
-       SET title=$1, content=$2, updated_at=$3, tags=$4, moon_phase=$5, paradigm_id=$6, linked_operation_ids=$7, linked_wiki_ids=$8,
-           is_bannung=$9, bannung_type_wiki_id=$10, is_meditation=$11, meditation_duration=$12, meditation_type_wiki_id=$13
-       WHERE id=$14`,
+       SET title=$1, content=$2, updated_at=$3, tags=$4
+       WHERE id=$5`,
       [
         merged.title,
         merged.content,
         merged.updated_at,
         JSON.stringify(merged.tags),
-        merged.moon_phase,
-        merged.paradigm_id ?? null,
-        JSON.stringify(merged.linked_operation_ids ?? []),
-        JSON.stringify(merged.linked_wiki_ids ?? []),
-        toInt(merged.is_bannung),
-        merged.bannung_type_wiki_id ?? null,
-        toInt(merged.is_meditation),
-        merged.meditation_duration ?? null,
-        merged.meditation_type_wiki_id ?? null,
         id,
       ]
     );

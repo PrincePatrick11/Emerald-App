@@ -17,8 +17,8 @@ import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import { setDragItem } from '../../lib/dragState';
 import { generateId, isImageIcon } from '../../lib/helpers';
-import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
-import type { AltarRecord, JournalEntry, MoonPhase, Operation, Task, WikiArticle } from '../../types';
+import { journalIcon } from '../../lib/moonPhase';
+import type { AltarRecord, JournalEntry, Operation, Task, WikiArticle } from '../../types';
 import EntryListTab, { type EntryListTabProps } from '../ui/EntryListTab';
 import type { ContextMenuAction } from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
@@ -162,6 +162,7 @@ function useJournalConfig(): EntryListTabProps<JournalEntry> {
     useShallow((s) => ({ entries: s.entries, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
   );
   const pushUndo = useUndoStore((s) => s.push);
+  const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
 
   const handleDuplicate = async (entry: (typeof entries)[number]) => {
     const newEntry = await duplicateEntry(entry.id);
@@ -180,7 +181,7 @@ function useJournalConfig(): EntryListTabProps<JournalEntry> {
     getTitle: (e) => displayTitle(t, 'journal', e.title),
     getEditTitle: (e) => e.title,
     getDateStr: (e) => formatEntryDate(e.created_at),
-    getIcon: (e) => <span className="text-base leading-none flex-shrink-0">{MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓'}</span>,
+    getIcon: (e) => <span className="text-base leading-none flex-shrink-0">{journalIcon(e, showMoonPhase)}</span>,
     isActive: (e) => activeView.id === e.id,
     onOpen: (e) => setActiveView({ type: 'journal', id: e.id, mode: 'view' }),
     onOpenNewTab: (e) => openViewInNewTab({ type: 'journal', id: e.id, mode: 'view' }),
