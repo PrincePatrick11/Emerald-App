@@ -36,8 +36,9 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
   const elements = activeElements(model);
 
   return (
-    <fieldset disabled={!!origin} className="min-w-0 space-y-3">
+    <div className="space-y-3">
       {origin && <p className="block-field-hint">{t('blocks.fields.fromDefinition', { name: definitionLabel(t, origin) })}</p>}
+    <fieldset disabled={!!origin} className={`min-w-0 space-y-3${origin ? ' opacity-50' : ''}`}>
       {elements.map((element, index) => {
         const hides = element.hideWhenEmpty ?? model.display.readHideEmpty;
         return (
@@ -83,5 +84,6 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
         onChange={(readOnly) => write({ ...model, display: { ...model.display, readOnly } })}
       />
     </fieldset>
+    </div>
   );
 }

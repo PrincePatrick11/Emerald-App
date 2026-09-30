@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronLeft } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { MODULES, type EntryModuleId } from '../../lib/modules';
+import { displayTitle } from '../../lib/entryTitle';
 import TagInput from '../editor/TagInput';
 
 /** Der Seitentitel als Überschrift — Einträge, Altar und Dashboards
@@ -112,7 +113,7 @@ export default function EntryDetailFrame({
           />
         ) : (
           <h1 className={ENTRY_TITLE_HEADING_CLASSES}>
-            {title || t(moduleInfo.untitledKey)}
+            {displayTitle(t, moduleInfo.entryType, title)}
           </h1>
         )}
       </div>

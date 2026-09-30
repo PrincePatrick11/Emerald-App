@@ -130,14 +130,12 @@ export default function UpdatesPage() {
     }
   }
 
-  async function saveSource(nextEndpoint: string, nextAutoCheck: boolean) {
+  /** `keepTyped`: nur das Häkchen — eine getippte, noch nicht gespeicherte Adresse bleibt im Feld. */
+  async function saveSource(nextEndpoint: string, nextAutoCheck: boolean, { keepTyped = false } = {}) {
     setSourceFeedback(null);
     try {
       const saved = await setUpdateSettings(nextEndpoint, nextAutoCheck);
-      // Das Häkchen speichert die gespeicherte Adresse mit; eine getippte,
-      // noch nicht gespeicherte bleibt dabei im Feld stehen.
-      const onlyTheCheckbox = nextEndpoint === savedEndpoint && endpoint !== savedEndpoint;
-      if (!onlyTheCheckbox) setEndpoint(saved.endpoint);
+      if (!keepTyped) setEndpoint(saved.endpoint);
       setSavedEndpoint(saved.endpoint);
       setAutoCheck(saved.auto_check);
       setSourceFeedback({ kind: 'saved' });
@@ -310,7 +308,7 @@ export default function UpdatesPage() {
               mit Tastatur erreichbar und in beiden Themes im Akzent. */}
           <BlockCheckbox
             checked={autoCheck}
-            onChange={(next) => saveSource(savedEndpoint, next)}
+            onChange={(next) => saveSource(savedEndpoint, next, { keepTyped: true })}
             label={t('settings.updateAutoCheck')}
             hint={t('settings.updateAutoCheckDesc')}
           />

@@ -224,7 +224,7 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
               setDraft((d) => ({ ...d, opacity: val }));
               applyNumber('opacity', val);
             }}
-            className="absolute inset-x-0 w-full opacity-0 cursor-pointer h-4 disabled:cursor-default"
+            className="absolute inset-x-0 w-full opacity-0 cursor-pointer h-4 disabled:cursor-not-allowed"
           />
         </div>
       </div>

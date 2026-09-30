@@ -17,6 +17,7 @@ import { generateId } from '../../lib/helpers';
 import { categoryLabel } from '../../lib/categories';
 import { formatEntryDate } from '../../lib/formatDate';
 import { AUX_VIEWS, MODULES, TAG_MODULE_IDS, type TagModuleId } from '../../lib/modules';
+import { displayTitle } from '../../lib/entryTitle';
 import { sortItems } from '../../lib/sortItems';
 import Button from '../ui/Button';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
@@ -377,7 +378,7 @@ export default function TagsView() {
     return (
       <DashboardItem view={itemView(item)} layout="row">
         <Icon size={14} className="text-stone-500 flex-shrink-0" />
-        <span className="flex-1 text-sm text-stone-300 truncate">{item.title || t(meta.untitledKey)}</span>
+        <span className="flex-1 text-sm text-stone-300 truncate">{displayTitle(t, meta.entryType, item.title)}</span>
         <span className="text-xs text-parchment-500/70 flex-shrink-0">{label} · {formatEntryDate(item.updated_at)}</span>
       </DashboardItem>
     );

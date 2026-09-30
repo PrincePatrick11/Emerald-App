@@ -74,6 +74,8 @@ type EntryKind = 'journal' | 'task' | 'operation' | 'wiki' | 'altar';
 interface AllRow {
   id: string;
   title: string;
+  /** Der gespeicherte Titel, mit dem das Umbenennen beginnt. */
+  editTitle: string;
   sortDate: string;
   icon: ReactNode;
   dateStr: string;
@@ -98,6 +100,7 @@ function toAllRows<T>(
   return cfg.items.map((item) => ({
     id: `${kind}:${cfg.getId(item)}`,
     title: cfg.getTitle(item),
+    editTitle: (cfg.getEditTitle ?? cfg.getTitle)(item),
     sortDate: getSortDate(item),
     icon: cfg.getIcon?.(item),
     // Reuse the tab's own subtitle so an entry never shows one date here and
@@ -133,6 +136,7 @@ function AllList() {
       items={rows}
       getId={(r) => r.id}
       getTitle={(r) => r.title}
+      getEditTitle={(r) => r.editTitle}
       getDateStr={(r) => r.dateStr}
       getIcon={(r) => r.icon}
       isActive={(r) => r.active}
@@ -174,6 +178,7 @@ function useJournalConfig(): EntryListTabProps<JournalEntry> {
     items: entries,
     getId: (e) => e.id,
     getTitle: (e) => displayTitle(t, 'journal', e.title),
+    getEditTitle: (e) => e.title,
     getDateStr: (e) => formatEntryDate(e.created_at),
     getIcon: (e) => <span className="text-base leading-none flex-shrink-0">{MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓'}</span>,
     isActive: (e) => activeView.id === e.id,
@@ -230,6 +235,7 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
     items: sorted,
     getId: (op) => op.id,
     getTitle: (op) => displayTitle(t, 'operation', op.title),
+    getEditTitle: (op) => op.title,
     getDateStr: (op) => {
       const cat = lookupCategory(catById, op.category_id);
       const catDisplayName = cat ? catName(cat) : '';
@@ -295,6 +301,7 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
     items: sorted,
     getId: (a) => a.id,
     getTitle: (a) => displayTitle(t, 'wiki', a.title),
+    getEditTitle: (a) => a.title,
     getDateStr: (a) => {
       const cat = lookupCategory(catById, a.category_id);
       // Kein Fallback auf die rohe category_id — bei gelöschter Kategorie
@@ -352,6 +359,7 @@ function useAltarConfig(): EntryListTabProps<AltarRecord> {
     items: sorted,
     getId: (a) => a.id,
     getTitle: (a) => displayTitle(t, 'altar', a.title),
+    getEditTitle: (a) => a.title,
     getDateStr: (a) => formatEntryDate(a.updated_at),
     getIcon: (a) => (isImageIcon(a.icon_data)
       ? <img src={a.icon_data!} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
@@ -416,6 +424,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
     items: sorted,
     getId: (task) => task.id,
     getTitle: (task) => displayTitle(t, 'task', task.title),
+    getEditTitle: (task) => task.title,
     getDateStr: categoryNameOf,
     getIcon: (task) => (task.completed
       ? <CheckSquare size={14} className="flex-shrink-0 text-stone-600" />
@@ -454,7 +463,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
       return (
         <div onContextMenu={openCtxMenu} className={`sidebar-item w-full text-left ${isActive ? 'active' : ''}`}>
           <button
-            // Wie das Kästchen in der Aufgaben-Ansicht: mit Unteraufgaben und `completed_at`.
+            // Wie das Kästchen in der Aufgaben-Ansicht: mit Unteraufgaben.
             onClick={(e) => { e.stopPropagation(); toggleComplete(task.id); }}
             className="flex-shrink-0 text-stone-500 hover:text-stone-300"
             title={task.completed ? t('tasks.markActive') : t('tasks.markCompleted')}

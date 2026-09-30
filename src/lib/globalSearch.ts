@@ -4,6 +4,8 @@ import type {
 import { foldTypography, plainTextFor } from './searchText';
 import { todayIso, withoutConcealed } from './blocks/sigil';
 import { viewTypeForEntryType } from './modules';
+import { displayTitle } from './entryTitle';
+import i18n from '../i18n';
 import type { CategoryModuleId } from './modules';
 
 /**
@@ -212,34 +214,34 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
   };
 
   for (const entry of corpus.journal.filter(notDeleted)) {
-    push('journal', entry.id, entry.title,
-      matchRecord(q, entry.title, entry.tags,
+    push('journal', entry.id, displayTitle(i18n.t, 'journal', entry.title),
+      matchRecord(q, displayTitle(i18n.t, 'journal', entry.title), entry.tags,
         () => [visibleText(entry.id, entry.updated_at, entry.content)]),
       { updatedAt: entry.updated_at, entryNumber: entry.entry_number });
   }
 
   for (const article of corpus.wiki.filter(notDeleted)) {
-    push('wiki', article.id, article.title,
-      matchRecord(q, article.title, article.tags,
+    push('wiki', article.id, displayTitle(i18n.t, 'wiki', article.title),
+      matchRecord(q, displayTitle(i18n.t, 'wiki', article.title), article.tags,
         () => [visibleText(article.id, article.updated_at, article.content)]),
       { updatedAt: article.updated_at, categoryId: article.category_id, entryNumber: article.entry_number });
   }
 
   for (const op of corpus.operations.filter(notDeleted)) {
-    push('operation', op.id, op.title,
-      matchRecord(q, op.title, op.tags, () => [visibleText(op.id, op.updated_at, op.content)]),
+    push('operation', op.id, displayTitle(i18n.t, 'operation', op.title),
+      matchRecord(q, displayTitle(i18n.t, 'operation', op.title), op.tags, () => [visibleText(op.id, op.updated_at, op.content)]),
       { updatedAt: op.updated_at, categoryId: op.category_id, entryNumber: op.entry_number });
   }
 
   for (const task of corpus.tasks.filter(notDeleted)) {
-    push('task', task.id, task.title,
-      matchRecord(q, task.title, null, () => []),
+    push('task', task.id, displayTitle(i18n.t, 'task', task.title),
+      matchRecord(q, displayTitle(i18n.t, 'task', task.title), null, () => []),
       { updatedAt: task.updated_at, categoryId: task.category_id });
   }
 
   for (const altar of corpus.altars) {
-    push('altar', altar.id, altar.title,
-      matchRecord(q, altar.title, null, () => []),
+    push('altar', altar.id, displayTitle(i18n.t, 'altar', altar.title),
+      matchRecord(q, displayTitle(i18n.t, 'altar', altar.title), null, () => []),
       { updatedAt: altar.updated_at });
   }
 

@@ -107,7 +107,7 @@ export async function collectExportData(): Promise<ExportData | null> {
       .map(op => {
         const cat = categories.find(c => c.id === op!.category_id);
         const fallback = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.operation;
-        return { id: op!.id, label: op!.title, icon: op!.icon ?? fallback, fallbackIcon: fallback };
+        return { id: op!.id, label: displayTitle(i18n.t, 'operation', op!.title), icon: op!.icon ?? fallback, fallbackIcon: fallback };
       });
 
     const linkedWiki = (entry.linked_wiki_ids ?? [])
@@ -115,7 +115,7 @@ export async function collectExportData(): Promise<ExportData | null> {
       .map(a => {
         const cat = categories.find(c => c.id === a!.category_id);
         const fallback = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
-        return { id: a!.id, label: a!.title, icon: wikiIcon(a!, categories), fallbackIcon: fallback };
+        return { id: a!.id, label: displayTitle(i18n.t, 'wiki', a!.title), icon: wikiIcon(a!, categories), fallbackIcon: fallback };
       });
 
     const phaseKey = entry.moon_phase as keyof typeof MOON_PHASE_SYMBOLS;
@@ -133,7 +133,7 @@ export async function collectExportData(): Promise<ExportData | null> {
       paradigma: paradigmaArt ? (() => {
         const cat = categories.find(c => c.id === paradigmaArt.category_id);
         const fallback = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
-        return { label: paradigmaArt.title, icon: wikiIcon(paradigmaArt, categories), fallbackIcon: fallback };
+        return { label: displayTitle(i18n.t, 'wiki', paradigmaArt.title), icon: wikiIcon(paradigmaArt, categories), fallbackIcon: fallback };
       })() : undefined,
       bannung: entry.is_bannung ? {
         label: bannungArt?.title ?? 'Bannung',

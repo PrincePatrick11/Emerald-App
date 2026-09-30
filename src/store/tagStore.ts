@@ -302,7 +302,7 @@ export const useTagStore = create<TagState>((set, get) => {
     dropDeletedTags: async (type, id) => {
       const item = taggedItems().find((i) => i.id === id && i.type === type);
       if (!item) return;
-      const kept = item.tags.filter((name) => get().tags.some((t) => t.name === name));
+      const kept = item.tags.filter((name) => get().tags.some((t) => sameName(t.name, name)));
       if (kept.length !== item.tags.length) await setItemTags(type, id, kept);
     },
 

@@ -23,6 +23,8 @@ export interface EntryListTabProps<T> {
   items: T[];
   getId: (item: T) => string;
   getTitle: (item: T) => string;
+  /** Womit das Umbenennen beginnt — der gespeicherte Titel, ohne „Unbenannt…". Fehlt es, `getTitle`. */
+  getEditTitle?: (item: T) => string;
   getDateStr?: (item: T) => string | null | undefined;
   getIcon?: (item: T) => ReactNode;
   isActive?: (item: T) => boolean;
@@ -37,7 +39,7 @@ export interface EntryListTabProps<T> {
 }
 
 export default function EntryListTab<T>({
-  items, getId, getTitle, getDateStr, getIcon, isActive, onOpen, onOpenNewTab, onDragStart,
+  items, getId, getTitle, getEditTitle = getTitle, getDateStr, getIcon, isActive, onOpen, onOpenNewTab, onDragStart,
   onRename, contextMenuActions, emptyMessage, renderRow,
 }: EntryListTabProps<T>) {
   const { t } = useTranslation();
@@ -65,7 +67,7 @@ export default function EntryListTab<T>({
   };
 
   const startRename = (item: T) => {
-    setRenameValue(getTitle(item));
+    setRenameValue(getEditTitle(item));
     setRenamingId(getId(item));
   };
 

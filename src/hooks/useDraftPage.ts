@@ -63,12 +63,11 @@ export function useDraftPage<T extends { name: string }>({ store, viewType, id, 
     onClose();
   };
 
-  /** „Abbrechen": verwirft den Entwurf — und eine neue, nie bestätigte Seite gleich mit. */
-  const cancel = () => {
-    if (!onCancelNew) return leave();
-    clearDraft(id);
-    onCancelNew();
-  };
+  /**
+   * „Abbrechen": verwirft den Entwurf — und eine neue, nie bestätigte Seite
+   * gleich mit. Den Entwurf räumt dann das Löschen, erst wenn es geglückt ist.
+   */
+  const cancel = () => (onCancelNew ? onCancelNew() : leave());
 
   const finish = async () => {
     if (busy) return;

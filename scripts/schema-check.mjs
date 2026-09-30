@@ -1583,6 +1583,29 @@ console.log('\n8i. Migration v43: Vorlagen und die Sigillen-Vorlage\n');
     'collectUsedImageFilenames kennt Bilder im Blockstapel einer Vorlage',
     (await collectUsedImageFilenames(db)).has(`${'d'.repeat(64)}.png`)
   );
+
+  // Zusammenlegen: Zuweisungen ziehen mit, ein Stern je Typ und Kategorie, aktive Vorlagen zuerst.
+  await db.execute(`INSERT INTO categories (id,name,emoji,sort_order,is_builtin) VALUES ('alt','Alt','x',100,0), ('neu','Neu','x',101,0)`);
+  const insertTpl = (id, assignments, deletedAt = null) => db.execute(
+    `INSERT INTO templates (id,name,content,assignments,created_at,updated_at,deleted_at) VALUES (?1,?1,'',?2,?3,?3,?4)`,
+    [id, JSON.stringify(assignments), now, deletedAt]
+  );
+  await insertTpl('papierkorb', [{ entryType: 'operation', category: 'alt', isDefault: true }], now);
+  await insertTpl('m1', [{ entryType: 'wiki', category: 'alt', isDefault: true }, { entryType: 'operation', category: 'alt', isDefault: true }]);
+  await insertTpl('m2', [{ entryType: 'wiki', category: 'neu', isDefault: true }]);
+  await insertTpl('m3', [{ entryType: 'wiki', category: 'alt', isDefault: false }, { entryType: 'wiki', category: 'neu', isDefault: false }]);
+  await reassignCategoryContent(db, 'alt', 'neu');
+  const merged = Object.fromEntries((await db.select("SELECT id, assignments FROM templates WHERE id IN ('papierkorb','m1','m2','m3')"))
+    .map((r) => [r.id, JSON.parse(r.assignments)]));
+  const stars = Object.values(merged).flat().filter((a) => a.category === 'neu' && a.isDefault).map((a) => a.entryType).sort();
+  check('Zusammenlegen: keine Zuweisung bleibt an der alten Kategorie',
+    !JSON.stringify(merged).includes('"alt"'), JSON.stringify(merged));
+  check('Zusammenlegen: je Typ ein Stern, der bestehende gewinnt, die aktive Vorlage vor der im Papierkorb',
+    stars.join() === 'operation,wiki' && merged.m2[0].isDefault && merged.m1.find((a) => a.entryType === 'operation').isDefault
+      && !merged.papierkorb[0].isDefault, JSON.stringify(merged));
+  check('Zusammenlegen: eine Vorlage mit beiden Kategorien behält eine Zuweisung',
+    merged.m3.length === 1 && merged.m3[0].category === 'neu', JSON.stringify(merged.m3));
+  check('Zusammenlegen: keine Waisen', (await checkIntegrity(db)).filter((o) => o.table === 'templates' && o.missingTarget !== 'categories.fehlt').length === 0);
   db.close();
 }
 
@@ -1715,15 +1738,19 @@ console.log('\n8m. Migration v48: alte englische Standardtitel werden leer\n');
   await db.execute(`INSERT INTO journal_entries (id, title, content, created_at, updated_at) VALUES ('j1','Untitled Entry','',$1,$1), ('j2','Mein Tag','',$1,$1)`, [at]);
   await db.execute(`INSERT INTO wiki_articles (id, title, slug, content, created_at, updated_at) VALUES ('w1',' Untitled Article ','w1','',$1,$1)`, [at]);
   await db.execute(`INSERT INTO tasks (id, title, created_at, updated_at) VALUES ('t1','New Task',$1,$1), ('t2','Untitled Entry list',$1,$1)`, [at]);
+  await db.execute(`INSERT INTO operations (id, title, content, created_at, updated_at) VALUES ('o1','Untitled Operation','',$1,$1)`, [at]);
+  await db.execute(`INSERT INTO altars (id, title, created_at, updated_at) VALUES ('a1','Untitled Altar',$1,$1)`, [at]);
   const v48 = MIGRATIONS.find((m) => m.version === 48);
   await v48.up(db);
   const titles = Object.fromEntries([
     ...(await db.select('SELECT id, title FROM journal_entries')),
     ...(await db.select('SELECT id, title FROM wiki_articles')),
     ...(await db.select('SELECT id, title FROM tasks')),
+    ...(await db.select('SELECT id, title FROM operations')),
+    ...(await db.select("SELECT id, title FROM altars WHERE id='a1'")),
   ].map((r) => [r.id, r.title]));
-  check('v48 leert die alten Standardtitel, auch mit Leerraum',
-    titles.j1 === '' && titles.w1 === '' && titles.t1 === '', JSON.stringify(titles));
+  check('v48 leert die alten Standardtitel in allen fünf Tabellen, auch mit Leerraum',
+    titles.j1 === '' && titles.w1 === '' && titles.t1 === '' && titles.o1 === '' && titles.a1 === '', JSON.stringify(titles));
   check('v48 lässt eigene Titel stehen, auch wenn sie so anfangen',
     titles.j2 === 'Mein Tag' && titles.t2 === 'Untitled Entry list', JSON.stringify(titles));
   await v48.up(db);
@@ -1765,6 +1792,16 @@ console.log('\n9. Gespiegelte Konstanten\n');
 
   // Der Datenbankname baut auf der einen Seite den Connection-String, auf der
   // anderen den Guard in delete_vault_files.
+  // Den Namen der Migrations-Sicherung schreibt TypeScript, Rust räumt nach
+  // ihm auf. Laufen die beiden auseinander, bleibt alles liegen — oder Rust
+  // erkennt Dateien, die keine Sicherungen sind.
+  const dbRebuildTs = read('src/lib/dbRebuild.ts');
+  check(
+    'Migrations-Sicherung: dbRebuild.ts schreibt, was vault.rs aufräumt (emerald.db.pre-vNN.bak)',
+    dbRebuildTs.includes('`${await getActiveDbFile()}.pre-${tag}.bak`') &&
+      vaultRs.includes('.strip_prefix(".pre-v")?') && vaultRs.includes('.strip_suffix(".bak")?') &&
+      vaultManagerTs.includes("const DB_FILE = 'emerald.db'")
+  );
   check(
     'DB_FILE stimmt in vault.rs und vaultManager.ts ueberein',
     vaultRs.includes('pub const DB_FILE: &str = "emerald.db"') &&

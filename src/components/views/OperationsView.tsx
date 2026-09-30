@@ -285,7 +285,7 @@ export default function OperationsView() {
               {renaming
                 ? renameInput('flex-1 bg-transparent text-sm text-stone-300 outline-none selectable')
                 : <span className="flex-1 text-sm text-stone-300 truncate">{displayTitle(t, 'operation', op.title)}</span>}
-              <span className="text-xs text-parchment-500/70 flex-shrink-0">{dateStr}</span>
+              <span className="text-xs text-parchment-500/70 min-w-0 max-w-[50%] truncate">{dateStr}</span>
             </>
           )}
         </DashboardItem>

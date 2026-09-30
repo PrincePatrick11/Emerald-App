@@ -2,9 +2,9 @@ import type { ContentType } from '../types';
 
 /**
  * Die englischen Standardtitel früherer Versionen. Neue Einträge heißen leer
- * und zeigen „Unbenannt…" in der Sprache der App (`displayTitle`); wer noch so
- * heißt — aus einer alten Sicherung oder einem alten Export —, gilt ebenso als
- * unbenannt.
+ * und zeigen „Unbenannt…" in der Sprache der App (`displayTitle`). Was so heißt,
+ * wird leer, wenn es hereinkommt: Migration v48, Backup- und Datei-Import
+ * (`isLegacyUntitled`). Danach ist ein Titel, was jemand eingibt.
  */
 export const LEGACY_UNTITLED_TITLES = [
   'Untitled Entry', 'Untitled Article', 'Untitled Operation', 'Untitled Altar', 'Untitled Task', 'New Task',
@@ -13,10 +13,14 @@ export const LEGACY_UNTITLED_TITLES = [
 ] as const;
 const LEGACY_UNTITLED = new Set<string>(LEGACY_UNTITLED_TITLES);
 
-/** Ob `title` ein eigener Titel ist: nicht leer und kein alter Standardtitel. */
+/** Ein alter englischer Standardtitel — für Importe, die ihn leer machen. */
+export function isLegacyUntitled(title: string | null | undefined): boolean {
+  return LEGACY_UNTITLED.has(title?.trim() ?? '');
+}
+
+/** Ob `title` ein eigener Titel ist: nicht leer. */
 export function hasOwnTitle(title: string | null | undefined): title is string {
-  const trimmed = title?.trim();
-  return !!trimmed && !LEGACY_UNTITLED.has(trimmed);
+  return !!title?.trim();
 }
 
 const UNTITLED_KEYS: Record<ContentType, string> = {

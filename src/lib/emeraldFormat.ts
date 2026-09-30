@@ -44,8 +44,8 @@ import {
 import type { SuggestionItem } from '../components/editor/SuggestionList';
 import type { Category } from '../types';
 import type { WriteOptions } from './stamp';
-import { hasOwnTitle } from './entryTitle';
-import { ImageTooLargeError, prepareImageDataUrl } from './imageLimits';
+import { displayTitle, hasOwnTitle, isLegacyUntitled } from './entryTitle';
+import { prepareImageDataUrl } from './imageLimits';
 import {
   DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY,
   DEFAULT_OVERLAY_COLOR, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE,
@@ -701,18 +701,15 @@ async function ensureTagNames(names: string[]): Promise<string[]> {
 /**
  * Speichert die Bilder der Datei in den Bildordner und schreibt ihre Verweise
  * um. Dabei gelten die Bildgrenzen des Vaults wie beim Einfügen; ist ein Bild
- * auch verkleinert noch zu groß, kommt es unverändert — ein Import soll nichts
- * verlieren, was die Datei mitbringt.
+ * auch verkleinert noch zu groß oder lässt es sich nicht verkleinern, kommt es
+ * unverändert — ein Import soll nichts verlieren, was die Datei mitbringt.
  */
 async function remapImages(content: string, images: Record<string, string>): Promise<string> {
   const map = new Map<string, string>();
   for (const [oldRef, dataUrl] of Object.entries(images)) {
     if (!dataUrl) continue;
     try {
-      const prepared = await prepareImageDataUrl(dataUrl).catch((e: unknown) => {
-        if (e instanceof ImageTooLargeError) return dataUrl;
-        throw e;
-      });
+      const prepared = await prepareImageDataUrl(dataUrl).catch(() => dataUrl);
       map.set(oldRef, await saveImage(prepared));
     } catch { /* skip */ }
   }
@@ -938,8 +935,13 @@ function importedCreatedAt(file: EmeraldFile): string | undefined {
 }
 
 /** Der Titel aus der Datei — ein alter englischer Standardtitel wird leer, wie in der Datenbank (v48). */
-function importedTitle(file: EmeraldFile): string {
-  return hasOwnTitle(file.title) ? file.title : '';
+function importedTitle(file: Pick<EmeraldFile, 'title'>): string {
+  if (!hasOwnTitle(file.title) || isLegacyUntitled(file.title)) return '';
+  // Ein Markdown- oder PDF-Export schreibt für einen leeren Titel „Unbenannt…"
+  // in der Sprache der App — der kommt beim Wiedereinlesen leer zurück.
+  const untitled = (['journal', 'wiki', 'operation', 'task', 'altar'] as const)
+    .map((type) => displayTitle(i18n.t, type, ''));
+  return untitled.includes(file.title.trim()) ? '' : file.title;
 }
 
 /**
@@ -1235,6 +1237,10 @@ async function importAltarEntry(file: EmeraldFile): Promise<string> {
       );
     }
 
+    // Raster und Format stempeln beim Schreiben „jetzt" — zum Schluss gilt, wie
+    // bei den Einträgen, das Erstelldatum der Datei.
+    await updateAltar(altar.id, {}, importedStamp(importedCreatedAt(file)));
+
     return altar.id;
   } catch (e) {
     await permanentlyDeleteAltar(altar.id).catch(() => {});
@@ -1292,7 +1298,7 @@ export async function importFromMarkdown(): Promise<void> {
   let bodyStart = 0;
 
   if (lines[0]?.startsWith('# ')) {
-    title = lines[0].slice(2).trim();
+    title = importedTitle({ title: lines[0].slice(2).trim() });
     let i = 1;
     while (i < lines.length && lines[i].trim() === '') i++;
     while (i < lines.length && lines[i].trim() !== '---') {

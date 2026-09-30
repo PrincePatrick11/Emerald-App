@@ -75,17 +75,21 @@ function RightSidebarActionBar() {
 
   return (
     <SidebarActionBar>
-      <Button
-        tone="amber"
-        fill
-        disabled={locked}
-        title={locked ? t('editor.lockedBySigil') : t('editor.edit')}
-        aria-label={t('editor.edit')}
-        onClick={() => setActiveView({ ...activeView, mode: 'edit' })}
-      >
-        <Pencil size={14} />
-        <span className="truncate">{t('editor.edit')}</span>
-      </Button>
+      {/* Der Tooltip hängt an einer Hülle: ein gesperrter Tone-Button lässt
+          keine Maus an sich heran (`disabled:pointer-events-none`). */}
+      <span className="flex flex-1 min-w-0" title={locked ? t('editor.lockedBySigil') : undefined}>
+        <Button
+          tone="amber"
+          fill
+          disabled={locked}
+          title={locked ? undefined : t('editor.edit')}
+          aria-label={t('editor.edit')}
+          onClick={() => setActiveView({ ...activeView, mode: 'edit' })}
+        >
+          <Pencil size={14} />
+          <span className="truncate">{t('editor.edit')}</span>
+        </Button>
+      </span>
       {isAltar && (
         <Button
           tone="jade"

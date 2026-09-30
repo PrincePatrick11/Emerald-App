@@ -5,6 +5,7 @@ import { exportCurrentAltarImage } from '../components/altar/AltarCanvas';
 import { DEFAULT_ALTAR_RESOLUTION, resolveResolutionPixels } from './altarConstants';
 import { htmlEscape } from './export';
 import i18n from '../i18n';
+import { displayTitle } from './entryTitle';
 
 // Long edge of the generated PDF page, in inches — same ballpark as a
 // Letter/A4 sheet. The short edge is derived from the altar's own pixel
@@ -41,7 +42,7 @@ export async function saveAltarImage(format: 'jpeg' | 'png' | 'webp'): Promise<v
   const dataUrl = await exportCurrentAltarImage(format);
   if (!dataUrl) throw new Error('capture failed');
 
-  const safeName = activeAltar.title.replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'altar';
+  const safeName = displayTitle(i18n.t, 'altar', activeAltar.title).replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'altar';
   const dateStr = new Date().toISOString().slice(0, 10);
   const ext = format === 'jpeg' ? 'jpg' : format;
 
@@ -66,7 +67,7 @@ export async function saveAltarPDF(): Promise<void> {
   const dataUrl = await exportCurrentAltarImage('png');
   if (!dataUrl) throw new Error('capture failed');
 
-  const safeName = activeAltar.title.replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'altar';
+  const safeName = displayTitle(i18n.t, 'altar', activeAltar.title).replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'altar';
   const dateStr = new Date().toISOString().slice(0, 10);
 
   const filePath = await save({
@@ -77,7 +78,7 @@ export async function saveAltarPDF(): Promise<void> {
 
   const [widthIn, heightIn] = pdfPageSizeForResolution(activeAltar.resolution);
 
-  const escapedTitle = htmlEscape(activeAltar.title);
+  const escapedTitle = htmlEscape(displayTitle(i18n.t, 'altar', activeAltar.title));
   const html = `<!DOCTYPE html>
 <html lang="${i18n.language}">
 <head>

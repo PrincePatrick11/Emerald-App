@@ -69,7 +69,13 @@ export default function BlocksView() {
       setDeleting(def);
       return;
     }
-    await deleteDefinition(def.id);
+    try {
+      await deleteDefinition(def.id);
+    } catch (err) {
+      // Nichts verloren: Block und Entwurf bleiben, wo sie waren.
+      console.error('[BlocksView] deleting the block failed:', err);
+      return;
+    }
     clearDraft(def.id);
     if (activeView.id === def.id) backToList();
     pushUndo({

@@ -283,7 +283,7 @@ export interface EntryStart {
   templateId: string | null;
 }
 
-/** Womit ein neuer Eintrag aus der Vorlage beginnt — ohne Vorlage leer, mit dem Standardtitel des Typs. */
+/** Womit ein neuer Eintrag aus der Vorlage beginnt — ohne Vorlage leer, auch der Titel. */
 export function templateStart(template: Pick<Template, 'id' | 'title' | 'content' | 'tags'> | null): EntryStart {
   // Ohne Titel aus der Vorlage bleibt er leer — angezeigt wird „Unbenannt…" (`displayTitle`).
   if (!template) return { title: '', content: '', tags: [], templateId: null };

@@ -882,8 +882,8 @@ console.log('\n6. Vorlagen: Zuweisung, Standard, Einsetzen\n');
     withNew.title === 'Artikel' && withNew.tags.join() === 'eigen,neu', withNew);
   check('Felder mit Vorlage: ein eigener Titel bleibt',
     fieldsWithTemplate({ title: 'Mein Titel', tags: [] }, { title: 'Artikel', tags: [] }, { title: 'ifUntitled', tags: false }).title === 'Mein Titel');
-  check('Felder mit Vorlage: ein alter englischer Standardtitel zählt als keiner',
-    fieldsWithTemplate({ title: 'Untitled Article', tags: [] }, { title: 'Artikel', tags: [] }, { title: 'ifUntitled', tags: false }).title === 'Artikel');
+  check('Felder mit Vorlage: ohne eigenen Titel kommt der der Vorlage',
+    fieldsWithTemplate({ title: '  ', tags: [] }, { title: 'Artikel', tags: [] }, { title: 'ifUntitled', tags: false }).title === 'Artikel');
 
   check('leer: kein Inhalt', isContentEmpty(''));
   check('leer: nur leere Absätze', isContentEmpty('<p></p><p style="text-align: center"><br></p>'));

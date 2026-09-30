@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../store/uiStore';
 import type { EntryContentRow } from '../../store/blockCopies';
 import { MODULES, viewTypeForEntryType } from '../../lib/modules';
+import { displayTitle } from '../../lib/entryTitle';
 import SidebarSection, { SidebarEmpty, SidebarItemRow } from '../sidebar/fields/SidebarSection';
 
 /** So viele Einträge listet „Verwendung" — der Rest steht als Zahl darunter. */
@@ -25,7 +26,7 @@ export default function TemplateUsage({ entries }: { entries: readonly EntryCont
           <SidebarItemRow
             key={entry.id}
             icon={<meta.icon size={14} />}
-            label={entry.title || t(meta.untitledKey)}
+            label={displayTitle(t, entry.entryType, entry.title)}
             meta={t(meta.navLabelKey)}
             onClick={() => setActiveView({ type: meta.id, id: entry.id, mode: 'view' })}
           />

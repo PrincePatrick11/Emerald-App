@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
-import { Check, Grid3x3, Image as ImageIcon, Magnet, Pencil, RotateCw, Scaling, Trash2, X } from 'lucide-react';
+import { Check, Grid3x3, Image as ImageIcon, Magnet, Pencil, RotateCw, Scaling, Trash2 } from 'lucide-react';
 import SidebarSectionHeader from '../fields/SidebarSectionHeader';
 import { useAltarStore } from '../../../store/altarStore';
 import {
@@ -401,8 +401,8 @@ const noticeTimerRef = useRef<number | null>(null);
                                 </button>
                               </div>
                               <div className="flex items-center justify-end gap-1">
-                                <Button onClick={close} variant="ghost"><X size={13} /></Button>
-                                <Button onClick={() => { applyGradient(draft); close(); }} variant="ghost" className="text-jade-400"><Check size={13} /></Button>
+                                <Button tone="neutral" onClick={close}>{t('common.cancel')}</Button>
+                                <Button tone="jade" onClick={() => { applyGradient(draft); close(); }}>{t('common.save')}</Button>
                               </div>
                         </Modal>
                       );
@@ -570,7 +570,7 @@ const noticeTimerRef = useRef<number | null>(null);
                     onClick={toggle}
                     disabled={off}
                     title={off ? `${title} — ${t('altar.snapNeedsGrid')}` : title}
-                    className={`flex flex-col items-center gap-0.5 rounded-md border px-1 py-1.5 transition-colors ${off ? 'border-stone-700/60 bg-stone-900/45 text-stone-500 opacity-40 cursor-default' : active ? 'border-jade-600/70 bg-jade-900/40 text-jade-300' : 'border-stone-700/60 bg-stone-900/45 text-stone-500 hover:border-stone-500/70 hover:text-stone-300'}`}
+                    className={`flex flex-col items-center gap-0.5 rounded-md border px-1 py-1.5 transition-colors ${off ? 'border-stone-700/60 bg-stone-900/45 text-stone-500 opacity-50 cursor-not-allowed' : active ? 'border-jade-600/70 bg-jade-900/40 text-jade-300' : 'border-stone-700/60 bg-stone-900/45 text-stone-500 hover:border-stone-500/70 hover:text-stone-300'}`}
                   >
                     <Icon size={13} />
                     <span className="text-[9px] leading-none">{label}</span>

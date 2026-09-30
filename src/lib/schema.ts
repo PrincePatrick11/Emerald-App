@@ -705,24 +705,28 @@ export async function dropCategoryFromTemplates(db: Database, categoryId: string
 /**
  * Hängt die Zuweisungen an `from` auf `to` um — wenn eine Kategorie in ihrer
  * gleichnamigen aufgeht. Hatte eine Vorlage beide, bleibt eine Zuweisung. Ein
- * Stern zieht nur mit, wenn für diesen Typ und `to` noch keine Vorlage einen
- * trägt: zwei Standards für dieselbe Kombination gibt es nicht.
+ * Stern zieht nur mit, wenn für diesen Typ und `to` noch keine aktive Vorlage
+ * einen trägt: zwei Standards für dieselbe Kombination gibt es nicht. Sterne
+ * gehören aktiven Vorlagen (wie in `restoreTemplate`) — eine im Papierkorb
+ * verliert ihren hier.
  */
 async function moveCategoryInTemplates(db: Database, from: string, to: string): Promise<void> {
-  const rows = await db.select<{ id: string; assignments: string | null }[]>('SELECT id, assignments FROM templates');
-  const parsed = rows.map((row) => ({ id: row.id, assignments: rawAssignments(row.assignments) }));
+  const rows = await db.select<{ id: string; assignments: string | null; deleted_at: string | null }[]>(
+    'SELECT id, assignments, deleted_at FROM templates ORDER BY deleted_at IS NOT NULL'
+  );
+  const parsed = rows.map((row) => ({ id: row.id, active: !row.deleted_at, assignments: rawAssignments(row.assignments) }));
   const entryTypeOf = (a: unknown) => String((a as { entryType?: unknown } | null)?.entryType);
   const isDefault = (a: unknown) => (a as { isDefault?: unknown } | null)?.isDefault === true;
-  const starred = new Set(parsed.flatMap(({ assignments }) =>
+  const starred = new Set(parsed.filter((row) => row.active).flatMap(({ assignments }) =>
     (assignments ?? []).filter((a) => assignedCategory(a) === to && isDefault(a)).map(entryTypeOf)));
-  for (const { id, assignments } of parsed) {
+  for (const { id, active, assignments } of parsed) {
     if (!assignments?.some((a) => assignedCategory(a) === from)) continue;
     const next: unknown[] = [];
     for (const a of assignments) {
       if (assignedCategory(a) !== from) { next.push(a); continue; }
       const entryType = entryTypeOf(a);
       if (assignments.some((b) => assignedCategory(b) === to && entryTypeOf(b) === entryType)) continue;
-      const star = isDefault(a) && !starred.has(entryType);
+      const star = active && isDefault(a) && !starred.has(entryType);
       if (star) starred.add(entryType);
       next.push({ ...(a as object), category: to, isDefault: star });
     }

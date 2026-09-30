@@ -473,7 +473,7 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "edit": "Edit",
-    "lockedBySigil": "A charged sigil locks this entry — discharge it first",
+    "lockedBySigil": "A loaded sigil locks this entry — unload it first",
     "editing": "editing…",
     "confirm": "Confirm",
     "editLink": "Edit link",

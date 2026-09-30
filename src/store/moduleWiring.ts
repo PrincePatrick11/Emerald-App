@@ -13,7 +13,7 @@ import { useWikiStore } from './wikiStore';
 import { useOperationStore } from './operationStore';
 import { useTaskStore } from './taskStore';
 import { useAltarStore } from './altarStore';
-import { useTagStore } from './tagStore';
+import { useTagStore, type TaggedType } from './tagStore';
 import { useCategoryStore } from './categoryStore';
 import { useBlockDefinitionStore } from './blockDefinitionStore';
 import { useTemplateStore } from './templateStore';
@@ -29,29 +29,29 @@ export const moduleWiring: Record<EntryModuleId, { reload: () => Promise<void> }
   altar: { reload: () => useAltarStore.getState().fetchAltars() },
 };
 
+/**
+ * Nach dem Wiederherstellen: Namen von Tags, die inzwischen gelöscht sind,
+ * fallen weg (`dropDeletedTags`) — für alles, was Tags trägt.
+ */
+async function withLiveTags(type: TaggedType, id: string, restored: Promise<void>): Promise<void> {
+  await restored;
+  await useTagStore.getState().dropDeletedTags(type, id);
+}
+
 export const trashWiring: Record<TrashKind, {
   restore: (id: string) => Promise<void>;
   permanentlyDelete: (id: string) => Promise<void>;
 }> = {
   journal: {
-    restore: async (id) => {
-      await useJournalStore.getState().restoreEntry(id);
-      await useTagStore.getState().dropDeletedTags('journal', id);
-    },
+    restore: (id) => withLiveTags('journal', id, useJournalStore.getState().restoreEntry(id)),
     permanentlyDelete: (id) => useJournalStore.getState().permanentlyDeleteEntry(id),
   },
   wiki: {
-    restore: async (id) => {
-      await useWikiStore.getState().restoreArticle(id);
-      await useTagStore.getState().dropDeletedTags('wiki', id);
-    },
+    restore: (id) => withLiveTags('wiki', id, useWikiStore.getState().restoreArticle(id)),
     permanentlyDelete: (id) => useWikiStore.getState().permanentlyDeleteArticle(id),
   },
   operation: {
-    restore: async (id) => {
-      await useOperationStore.getState().restoreOperation(id);
-      await useTagStore.getState().dropDeletedTags('operation', id);
-    },
+    restore: (id) => withLiveTags('operation', id, useOperationStore.getState().restoreOperation(id)),
     permanentlyDelete: (id) => useOperationStore.getState().permanentlyDeleteOperation(id),
   },
   category: {
@@ -71,10 +71,7 @@ export const trashWiring: Record<TrashKind, {
     permanentlyDelete: (id) => useBlockDefinitionStore.getState().permanentlyDeleteDefinition(id),
   },
   template: {
-    restore: async (id) => {
-      await useTemplateStore.getState().restoreTemplate(id);
-      await useTagStore.getState().dropDeletedTags('template', id);
-    },
+    restore: (id) => withLiveTags('template', id, useTemplateStore.getState().restoreTemplate(id)),
     permanentlyDelete: (id) => useTemplateStore.getState().permanentlyDeleteTemplate(id),
   },
   language: {
