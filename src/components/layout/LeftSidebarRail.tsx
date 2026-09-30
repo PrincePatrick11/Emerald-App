@@ -25,6 +25,31 @@ import RailButton from '../ui/RailButton';
  *  eine geklippte Rail *und* falsche Breiten daneben. */
 export const RAIL_WIDTH = 44;
 
+/**
+ * Die Prüfung beim Start, einmal je App-Start: die Leiste wird neu eingehängt,
+ * etwa nach dem Vollbild des Altars, und prüfte sonst jedes Mal wieder.
+ */
+let startupCheck: Promise<string | null> | undefined;
+/** Der Punkt am Zahnrad hat seine Aufgabe erfüllt — ein neues Einhängen zeigt ihn nicht wieder. */
+let dotSeen = false;
+
+function checkOnStart(): Promise<string | null> {
+  startupCheck ??= (async () => {
+    try {
+      if (!(await updateSettings()).auto_check) return null;
+      const found = await checkForUpdate();
+      return found.available && found.installable ? found.version : null;
+    } catch (e: unknown) {
+      // Kein Netz, keine Quelle, kein Problem: der Punkt bleibt aus. Gesagt
+      // wird es nur der Konsole — beim Start ungefragt eine Fehlermeldung zu
+      // zeigen, waere schlimmer als das ausbleibende Update.
+      console.error('[updates] check on start failed:', asUpdateError(e).detail);
+      return null;
+    }
+  })();
+  return startupCheck;
+}
+
 export default function LeftSidebarRail() {
   const { t } = useTranslation();
   const setActiveView = useUIStore((s) => s.setActiveView);
@@ -43,18 +68,9 @@ export default function LeftSidebarRail() {
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
   useEffect(() => {
     let dead = false;
-    (async () => {
-      try {
-        if (!(await updateSettings()).auto_check) return;
-        const found = await checkForUpdate();
-        if (!dead && found.available && found.installable) setUpdateVersion(found.version);
-      } catch (e: unknown) {
-        // Kein Netz, keine Quelle, kein Problem: der Punkt bleibt aus. Gesagt
-        // wird es nur der Konsole — beim Start ungefragt eine Fehlermeldung zu
-        // zeigen, waere schlimmer als das ausbleibende Update.
-        console.error('[updates] check on start failed:', asUpdateError(e).detail);
-      }
-    })();
+    void checkOnStart().then((version) => {
+      if (!dead && version && !dotSeen) setUpdateVersion(version);
+    });
     return () => { dead = true; };
   }, []);
 
@@ -123,6 +139,7 @@ export default function LeftSidebarRail() {
             setSettingsPage(updateVersion ? 'updates' : 'general');
             setSettingsOpen(true);
             setUpdateVersion(null);
+            if (updateVersion) dotSeen = true;
           }}
           title={updateVersion ? t('settings.updateFound', { version: updateVersion }) : t('nav.settings')}
           className="relative"

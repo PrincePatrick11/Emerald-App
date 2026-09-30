@@ -119,7 +119,8 @@ interface AltarState {
   fetchAltars: () => Promise<void>;
   setActiveAltar: (id: string) => Promise<void>;
   clearActiveAltar: () => void;
-  createAltar: () => Promise<AltarRecord>;
+  /** `createdAt` nur für den Import, der das Datum der Datei übernimmt; sonst jetzt. */
+  createAltar: (opts?: { createdAt?: string }) => Promise<AltarRecord>;
   duplicateAltar: (id: string) => Promise<AltarRecord | null>;
   updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'background_preset' | 'background_image_data' | 'background_overlay' | 'background_overlay_color' | 'thumbnail_data' | 'icon_data'>>, options?: WriteOptions) => Promise<void>;
   updateAltarGrid: (id: string, patch: Partial<Pick<AltarRecord, 'grid_enabled' | 'grid_size' | 'grid_opacity' | 'grid_color' | 'snap_to_grid' | 'rotation_snap_enabled' | 'rotation_snap_angle' | 'snap_scale_to_grid'>>) => Promise<void>;
@@ -223,7 +224,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     set({ activeAltarId: null, placements: [], selectedPlacementId: null });
   },
 
-  createAltar: async () => {
+  createAltar: async ({ createdAt } = {}) => {
     const now = nowIso();
     const altar: AltarRecord = {
       id: generateId(),
@@ -232,7 +233,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       background_image_data: null,
       background_overlay: DEFAULT_BACKGROUND_OVERLAY,
       background_overlay_color: DEFAULT_OVERLAY_COLOR,
-      created_at: now,
+      created_at: createdAt ?? now,
       updated_at: now,
       grid_enabled: false,
       grid_size: DEFAULT_GRID_SIZE,

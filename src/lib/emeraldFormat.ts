@@ -821,9 +821,16 @@ async function importedContent(
 ): Promise<string> {
   const remapped = await remapImages(typeof file.content === 'string' ? file.content : '', file.images ?? {});
   const relinked = remapImportedLinks(remapped, file.meta.contentLinks, items);
-  // Skripte und Event-Handler raus; die TipTap-eigenen data-Attribute
-  // (Link-Chips, Bildausrichtung) und Inline-Styles bleiben.
-  return DOMPurify.sanitize(await beforeSanitize(relinked), {
+  return sanitizeImportedHtml(await beforeSanitize(relinked));
+}
+
+/**
+ * Der letzte Schritt jedes Imports, der HTML in die Datenbank schreibt:
+ * Skripte und Event-Handler raus; die TipTap-eigenen data-Attribute
+ * (Link-Chips, Bildausrichtung) und Inline-Styles bleiben.
+ */
+function sanitizeImportedHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
     ADD_ATTR: [
       'data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon',
       'data-entry-number', 'data-align',
@@ -905,6 +912,16 @@ async function importedAssignmentCategory(
   return resolvedByName.get(key) ?? undefined;
 }
 
+/**
+ * Das Erstelldatum aus der Datei, damit ein Eintrag an seinem Platz in der
+ * Zeitleiste landet statt als neuester. Die Datei ist fremd: nur ein lesbares
+ * Datum, als ISO wie jedes andere; sonst jetzt.
+ */
+function importedCreatedAt(file: EmeraldFile): string | undefined {
+  const time = typeof file.createdAt === 'string' ? Date.parse(file.createdAt) : NaN;
+  return Number.isNaN(time) ? undefined : new Date(time).toISOString();
+}
+
 async function importJournalEntry(
   file: EmeraldFile, content: string, tagNames: string[], items: SuggestionItem[],
 ): Promise<string> {
@@ -941,10 +958,11 @@ async function importJournalEntry(
   // drei Felder Paradigma/Bannung/Meditation noch im meta statt im Inhalt. Sie
   // werden hier zu Blöcken im Text — in die Spalten geschrieben hätten sie
   // keine Anzeige mehr: kein Chip, kein Rückverweis, kein Suchtreffer.
-  const entry = await createEntry({ blank: true });
+  const entry = await createEntry({ blank: true, createdAt: importedCreatedAt(file) });
   await updateEntry(entry.id, {
     title: file.title,
-    content: appendLegacyLinks(content, items, [
+    // Die Titel der Verknüpfungen stammen aus der Datei — auch das geht noch durch den Filter.
+    content: sanitizeImportedHtml(appendLegacyLinks(content, items, [
       ...linkedOpIds.map((id) => ({ id, entryType: 'operation' as const })),
       ...linkedWikiIds.map((id) => ({ id, entryType: 'wiki' as const })),
       ...legacyFieldTargets([
@@ -956,7 +974,7 @@ async function importJournalEntry(
           suffix: file.meta.meditationDuration ? `(${file.meta.meditationDuration} min)` : undefined,
         },
       ]),
-    ]),
+    ])),
     tags: tagNames,
     moon_phase: file.meta.moonPhase ?? null,
   });
@@ -1032,7 +1050,7 @@ async function importWikiArticle(file: EmeraldFile, content: string, tagNames: s
     file.meta.categoryEmoji ?? legacy.emoji ?? '📄',
   );
 
-  const article = await createArticle(categoryId, { blank: true });
+  const article = await createArticle(categoryId, { blank: true, createdAt: importedCreatedAt(file) });
   await updateArticle(article.id, {
     title: file.title,
     content,
@@ -1051,7 +1069,7 @@ async function importOperationEntry(file: EmeraldFile, content: string, tagNames
     file.meta.categoryEmoji ?? '⚡',
   );
 
-  const op = await createOperation(categoryId, { blank: true });
+  const op = await createOperation(categoryId, { blank: true, createdAt: importedCreatedAt(file) });
   await updateOperation(op.id, {
     title: file.title,
     content,
@@ -1110,7 +1128,7 @@ async function remapAltarImagePath(path: string | undefined, images: Record<stri
 
 async function importAltarEntry(file: EmeraldFile): Promise<string> {
   const { createAltar, updateAltar, updateAltarGrid, updateAltarResolution, permanentlyDeleteAltar, deleteItem } = useAltarStore.getState();
-  const altar = await createAltar();
+  const altar = await createAltar({ createdAt: importedCreatedAt(file) });
   // Only items actually *created* (not reused) get rolled back on failure —
   // altar_items is a shared library, so a partial import must not leave
   // undetectable debris in it the way it briefly leaves the (fully deleted)
@@ -1349,7 +1367,7 @@ async function importJournalFromMarkdown(
 
   // Wie beim `.emerald`-Import: alles aus der Markdown-Kopfzeile landet als
   // Block im Text, nicht in den abgelösten Spalten.
-  const content = appendLegacyLinks(html, linkItemsSnapshot(), [
+  const content = sanitizeImportedHtml(appendLegacyLinks(html, linkItemsSnapshot(), [
     ...linkedOpIds.map((id) => ({ id, entryType: 'operation' as const })),
     ...linkedWikiIds.map((id) => ({ id, entryType: 'wiki' as const })),
     ...legacyFieldTargets([
@@ -1360,7 +1378,7 @@ async function importJournalFromMarkdown(
         suffix: meditationDuration ? `(${meditationDuration} min)` : undefined,
       },
     ]),
-  ]);
+  ]));
 
   const entry = await createEntry({ blank: true });
   await updateEntry(entry.id, {
@@ -1380,7 +1398,7 @@ async function importWikiFromMarkdown(
   const categoryId = await ensureCategoryByName(categoryName, '📄');
 
   const article = await createArticle(categoryId, { blank: true });
-  await updateArticle(article.id, { title, content: html, category_id: categoryId, tags: tagNames });
+  await updateArticle(article.id, { title, content: sanitizeImportedHtml(html), category_id: categoryId, tags: tagNames });
   return article.id;
 }
 
@@ -1395,11 +1413,11 @@ async function importOperationFromMarkdown(
 
   // „Status"/„End Date"/„Version" im Kopf stammen aus Exporten bis v40. Vor
   // dem Anlegen: scheitert die Umwandlung, bleibt keine leere Operation zurück.
-  const content = await withImportedStatus(html, {
+  const content = sanitizeImportedHtml(await withImportedStatus(html, {
     isActive: meta['status'] ? meta['status'].toLowerCase() === 'active' : true,
     endDate: meta['end date'] ?? null,
     version: meta['version'] ?? null,
-  });
+  }));
   const op = await createOperation(categoryId, { blank: true });
   await updateOperation(op.id, { title, content, category_id: categoryId, tags: tagNames });
   return op.id;

@@ -18,7 +18,7 @@ interface JournalState {
 
   fetchEntries: () => Promise<void>;
   /** Mit dem Journal-Standard (Vorlagen) — außer `blank`. */
-  createEntry: (opts?: { blank?: boolean }) => Promise<JournalEntry>;
+  createEntry: (opts?: { blank?: boolean; createdAt?: string }) => Promise<JournalEntry>;
   duplicateEntry: (id: string) => Promise<JournalEntry | undefined>;
   updateEntry: (id: string, patch: Partial<JournalEntry>, options?: WriteOptions) => Promise<void>;
   deleteEntry: (id: string) => Promise<void>;
@@ -53,7 +53,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     }
   },
 
-  createEntry: async ({ blank = false } = {}) => {
+  createEntry: async ({ blank = false, createdAt } = {}) => {
     const db = await getDb();
     const now = nowIso();
     // Die Mondphase des Tages — sofern der Vault sie will (Einstellung).
@@ -65,7 +65,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       id: generateId(),
       title: start.title,
       content: start.content,
-      created_at: now,
+      created_at: createdAt ?? now,
       updated_at: now,
       tags: start.tags,
       moon_phase: moonPhase,

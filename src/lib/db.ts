@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getActiveDbConnectionString, getActiveVaultId } from './vaultManager';
 import {
   ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, IMAGE_FIELDS, LEXICON_INDEX_DDL, TABLE_DDL,
-  TEMPLATES_INDEX_DDL, createSchema, ddlIfNotExists, seedBuiltins, storedImageName,
+  TEMPLATES_INDEX_DDL, createSchema, ddlIfNotExists, reassignCategoryContent, seedBuiltins, storedImageName,
 } from './schema';
 import { normalizeSchema } from './normalizeSchema';
 import { adoptLegacyImages, rewriteImageRefs } from './images';
@@ -240,13 +240,9 @@ export async function runMigrations(db: Database): Promise<void> {
  * Öffnen eines Vaults, bewusst getrennt vom Migrationssystem — idempotent,
  * zeitabhängig und kein Teil der Schema-Historie.
  *
- * `categories` steht bewusst **nicht** hier. Eine Kategorie nach Ablauf der Frist hart
- * zu löschen, während Artikel, Operationen, Tasks oder Altar-Elemente noch
- * darauf zeigen, hinterließ ins Leere zeigende `category_id`-Werte — still und
- * unbemerkt. Seit v33 verhindert ein Foreign Key mit ON DELETE RESTRICT das
- * ohnehin. Kategorien werden nur noch über den Papierkorb entfernt, und dort
- * werden ihre Inhalte vorher auf das Sammelbecken umgehängt (siehe
- * `reassignCategoryContent`).
+ * `categories` steht nicht hier: was noch auf eine Kategorie zeigt, muss erst
+ * von ihr gelöst werden (ON DELETE RESTRICT, seit v33). Das macht
+ * `runPeriodicCleanup` danach, wie das Leeren des Papierkorbs.
  *
  * Table names interpolated into SQL — must stay a hardcoded literal list.
  */
@@ -318,6 +314,16 @@ async function runPeriodicCleanup(db: Database, retentionDays: number | null): P
         `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
         [cutoff]
       );
+    }
+    // Die Kategorien zuletzt, nachdem ihre Inhalte kategorielos sind. Hier
+    // reicht die Datenbank: die Stores laden erst nach `getDb()`.
+    const expired = await db.select<{ id: string }[]>(
+      'SELECT id FROM categories WHERE deleted_at IS NOT NULL AND deleted_at < $1',
+      [cutoff]
+    );
+    for (const { id } of expired) {
+      await reassignCategoryContent(db, id);
+      await db.execute('DELETE FROM categories WHERE id=$1', [id]);
     }
   }
 

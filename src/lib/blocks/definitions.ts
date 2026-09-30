@@ -77,10 +77,11 @@ function elementForCopy(element: ElementDef): ElementDef {
 
 // Vergleich per JSON: hängt an der Schlüsselreihenfolge. Elemente entstehen
 // deshalb immer über `parseElement` bzw. als Kopie von dort — ein anders
-// sortiertes Objekt ergäbe eine Revision ohne echte Änderung. Vorgaben zählen
-// nicht: sie wirken nur auf neue Kopien, eine bestehende hätte nichts zu aktualisieren.
+// sortiertes Objekt ergäbe eine Revision ohne echte Änderung. Vorgaben und
+// „Titel zeigen" zählen nicht: sie wirken nur auf neue Kopien, eine bestehende
+// hätte nichts zu aktualisieren (`updateInstanceToDefinition`).
 export function sameShape(a: DefinitionShape, b: DefinitionShape): boolean {
-  const shape = (d: DefinitionShape) => JSON.stringify([d.name, d.icon, d.elements.map(elementForCopy), d.display]);
+  const shape = (d: DefinitionShape) => JSON.stringify([d.name, d.icon, d.elements.map(elementForCopy), blockDisplay(d.display)]);
   return shape(a) === shape(b);
 }
 

@@ -15,7 +15,7 @@ interface OperationState {
 
   fetchAll: () => Promise<void>;
   /** Mit dem Standard der Kombination (Vorlagen) — außer `blank`. */
-  createOperation: (categoryId?: string | null, opts?: { blank?: boolean }) => Promise<Operation>;
+  createOperation: (categoryId?: string | null, opts?: { blank?: boolean; createdAt?: string }) => Promise<Operation>;
   duplicateOperation: (id: string) => Promise<Operation | undefined>;
   updateOperation: (id: string, patch: Partial<Operation>, options?: WriteOptions) => Promise<void>;
   deleteOperation: (id: string) => Promise<void>;
@@ -47,7 +47,7 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     set({ operations: await selectAllOperations(db) });
   },
 
-  createOperation: async (categoryId = null, { blank = false } = {}) => {
+  createOperation: async (categoryId = null, { blank = false, createdAt } = {}) => {
     const db = await getDb();
     const now = nowIso();
     // Die Kategorie „Sigillen" beginnt so mit Rechner, Zeichnung und Ladung (Vorlage `core-sigil`) —
@@ -58,7 +58,7 @@ export const useOperationStore = create<OperationState>((set, get) => ({
       id: generateId(),
       title: start.title,
       content: start.content,
-      category_id: categoryId, created_at: now, updated_at: now, tags: start.tags, deleted_at: null,
+      category_id: categoryId, created_at: createdAt ?? now, updated_at: now, tags: start.tags, deleted_at: null,
     };
     await db.execute(
       `INSERT INTO operations (id, title, content, category_id, created_at, updated_at, tags, entry_number)

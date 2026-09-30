@@ -41,7 +41,7 @@ interface WikiState {
 
   fetchArticles: () => Promise<void>;
   /** Mit dem Standard der Kombination (Vorlagen) — außer `blank`. */
-  createArticle: (categoryId?: string | null, opts?: { blank?: boolean }) => Promise<WikiArticle>;
+  createArticle: (categoryId?: string | null, opts?: { blank?: boolean; createdAt?: string }) => Promise<WikiArticle>;
   duplicateArticle: (id: string) => Promise<WikiArticle | undefined>;
   updateArticle: (id: string, patch: Partial<WikiArticle>, options?: WriteOptions) => Promise<void>;
   deleteArticle: (id: string) => Promise<void>;
@@ -71,7 +71,7 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     }
   },
 
-  createArticle: async (categoryId: string | null = null, { blank = false } = {}) => {
+  createArticle: async (categoryId: string | null = null, { blank = false, createdAt } = {}) => {
     const db = await getDb();
     const now = nowIso();
     const id = generateId();
@@ -85,7 +85,7 @@ export const useWikiStore = create<WikiState>((set, get) => ({
       slug: `untitled-${id.slice(0, 8)}`,
       content: start.content,
       category_id: categoryId,
-      created_at: now,
+      created_at: createdAt ?? now,
       updated_at: now,
       tags: start.tags,
       deleted_at: null,
