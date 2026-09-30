@@ -5,6 +5,7 @@ import { Check, Grid3x3, Image as ImageIcon, Magnet, Pencil, RotateCw, Scaling, 
 import SidebarSectionHeader from '../fields/SidebarSectionHeader';
 import { useAltarStore } from '../../../store/altarStore';
 import {
+  ALTAR_BACKGROUND_MAX_BYTES,
   ALTAR_RATIOS,
   ALTAR_BACKGROUND_PRESETS,
   ALTAR_BACKGROUND_STYLES,
@@ -41,8 +42,6 @@ import Modal from '../../ui/Modal';
  */
 const BACKGROUND_AFTER_REMOVE = ALTAR_IMAGE_PRESETS[0];
 
-/** Fester Deckel für Hintergründe, nach den Grenzen des Vaults geprüft. */
-const BACKGROUND_MAX_BYTES = 5 * 1024 * 1024;
 
 // Die Klappzustände lagen früher je Altar im localStorage — was davon übrig ist, geht.
 try {
@@ -150,7 +149,7 @@ const noticeTimerRef = useRef<number | null>(null);
       return;
     }
     readFileAsDataUrl(file)
-      .then((data) => prepareImageDataUrl(data, { capBytes: BACKGROUND_MAX_BYTES }))
+      .then((data) => prepareImageDataUrl(data, { capBytes: ALTAR_BACKGROUND_MAX_BYTES }))
       .then((data) => saveImage(data))
       .then((filename) => {
         setCustomBackgroundMap((current) => ({ ...current, [activeAltar.id]: filename }));

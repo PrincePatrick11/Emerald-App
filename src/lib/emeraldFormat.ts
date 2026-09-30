@@ -47,7 +47,7 @@ import type { WriteOptions } from './stamp';
 import { displayTitle, hasOwnTitle, isLegacyUntitled } from './entryTitle';
 import { prepareImageDataUrl } from './imageLimits';
 import {
-  DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY,
+  ALTAR_BACKGROUND_MAX_BYTES, DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY,
   DEFAULT_OVERLAY_COLOR, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE,
 } from './altarConstants';
 import { noAltarOpenMessage } from './altarExport';
@@ -1149,12 +1149,19 @@ async function resolveOrCreateItem(
   return { id: created.id, created: true };
 }
 
+/**
+ * Der Hintergrund eines importierten Altars: nach denselben Grenzen wie beim
+ * Hochladen in der Seitenleiste (Vault-Grenzen plus `ALTAR_BACKGROUND_MAX_BYTES`).
+ * Ist er auch verkleinert zu groß, kommt er unverändert — wie Bilder im Inhalt
+ * (`remapImages`).
+ */
 async function remapAltarImagePath(path: string | undefined, images: Record<string, string>): Promise<string | null> {
   if (!path) return null;
   const dataUrl = images[path];
   if (!dataUrl) return path;
   try {
-    return await saveImage(dataUrl);
+    const prepared = await prepareImageDataUrl(dataUrl, { capBytes: ALTAR_BACKGROUND_MAX_BYTES }).catch(() => dataUrl);
+    return await saveImage(prepared);
   } catch {
     return null;
   }

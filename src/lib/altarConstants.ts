@@ -2,6 +2,9 @@ import type { AltarRecord } from '../types';
 
 export const DEFAULT_ALTAR_BACKGROUND = 'midnight' as const;
 
+/** Fester Deckel für eigene Hintergründe, zusätzlich zu den Bildgrenzen des Vaults — beim Hochladen wie beim Import. */
+export const ALTAR_BACKGROUND_MAX_BYTES = 5 * 1024 * 1024;
+
 export const DEFAULT_ALTAR_RESOLUTION = '1920x1080';
 // BASE_RESOLUTION_WIDTH is the reference width at which BASE_SIZE (40px) in AltarCanvas gives correct proportions.
 export const BASE_RESOLUTION_WIDTH = 1920;
