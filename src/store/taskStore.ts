@@ -46,16 +46,42 @@ async function selectAllTasks(db: Database): Promise<Task[]> {
   return rows.map(fromRow.task);
 }
 
+/** Die Verknüpfungen der Aufgaben außerhalb des Papierkorbs — die im Papierkorb behalten ihre für den Rückweg. */
+async function selectLiveLinks(db: Database): Promise<TaskLink[]> {
+  const rows = await db.select<DbRow[]>(
+    'SELECT * FROM task_links WHERE task_id IN (SELECT id FROM tasks WHERE deleted_at IS NULL)'
+  );
+  return rows.map(fromRow.taskLink);
+}
+
+/**
+ * `id` und ihre Unteraufgaben im Papierkorb, aus der Datenbank statt aus dem
+ * Store, der nur die aktiven kennt. Mit `trashedWith` nur die, die mit diesem
+ * Stempel dorthin kamen — also mit ihr, nicht schon vorher für sich.
+ */
+async function selectTrashedSubtree(db: Database, id: string, trashedWith?: string): Promise<string[]> {
+  const rows = await db.select<{ id: string }[]>(
+    `WITH RECURSIVE sub(id) AS (
+       SELECT $1
+       UNION ALL
+       SELECT t.id FROM tasks t JOIN sub ON t.parent_task_id = sub.id
+        WHERE t.deleted_at IS NOT NULL AND ($2 IS NULL OR t.deleted_at = $2)
+     )
+     SELECT id FROM sub`,
+    [id, trashedWith ?? null]
+  );
+  return rows.map((r) => r.id);
+}
+
 export const useTaskStore = create<TaskState>((set, get) => ({
   tasks: [],
   links: [],
 
   fetchAll: async () => {
     const db = await getDb();
-    const linkRows = await db.select<DbRow[]>('SELECT * FROM task_links');
     set({
       tasks: await selectAllTasks(db),
-      links: linkRows.map(fromRow.taskLink),
+      links: await selectLiveLinks(db),
     });
   },
 
@@ -144,17 +170,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const now = nowIso();
     const idsToDelete = collectDescendantIds(get().tasks, id);
 
+    // Ein Stempel für alle: an ihm erkennt `restoreTask`, was zusammen ging.
     for (const tid of idsToDelete) {
       await db.execute('UPDATE tasks SET deleted_at=$1 WHERE id=$2', [now, tid]);
     }
-    // Nur die eigene (task_id-)Seite: der Soft-Delete ist umkehrbar, und
-    // Zeilen, die auf die Aufgabe ZEIGEN (task_links.target_id),
-    // bleiben stehen — sweepDanglingTaskLinks zählt Papierkorb-Inhalte als
-    // gültig, endgültig räumt erst permanentlyDeleteTask ab.
-    for (const tid of idsToDelete) {
-      await db.execute('DELETE FROM task_links WHERE task_id=$1', [tid]);
-    }
-
+    // Die Verknüpfungen bleiben in der Datenbank, für den Rückweg; endgültig
+    // räumen sie erst permanentlyDeleteTask und das Leeren des Papierkorbs ab.
     set((s) => ({
       tasks: s.tasks.filter((t) => !idsToDelete.includes(t.id)),
       links: s.links.filter((l) => !idsToDelete.includes(l.task_id)),
@@ -163,14 +184,32 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   restoreTask: async (id: string) => {
     const db = await getDb();
-    await db.execute('UPDATE tasks SET deleted_at=NULL WHERE id=$1', [id]);
-    const tasks = await selectAllTasks(db);
-    set((s) => ({ ...s, tasks }));
+    const [row] = await db.select<{ deleted_at: string | null; parent_trashed: number }[]>(
+      `SELECT t.deleted_at,
+              EXISTS (SELECT 1 FROM tasks p WHERE p.id = t.parent_task_id AND p.deleted_at IS NOT NULL) AS parent_trashed
+         FROM tasks t WHERE t.id=$1`,
+      [id]
+    );
+    // Schon zurück — über ihre Oberaufgabe oder ein zweites Rückgängig.
+    if (!row?.deleted_at) return;
+    // Mit den Unteraufgaben, die mit ihr gingen.
+    for (const tid of await selectTrashedSubtree(db, id, row.deleted_at)) {
+      await db.execute('UPDATE tasks SET deleted_at=NULL WHERE id=$1', [tid]);
+    }
+    // Liegt die Oberaufgabe noch im Papierkorb, stünde sie sonst unsichtbar
+    // unter ihr; so kommt sie oben in die Liste.
+    if (row.parent_trashed) await db.execute('UPDATE tasks SET parent_task_id=NULL WHERE id=$1', [id]);
+    set({ tasks: await selectAllTasks(db), links: await selectLiveLinks(db) });
   },
 
   permanentlyDeleteTask: async (id: string) => {
     const db = await getDb();
-    const idsToDelete = collectDescendantIds(get().tasks, id);
+    const [row] = await db.select<{ deleted_at: string | null }[]>('SELECT deleted_at FROM tasks WHERE id=$1', [id]);
+    // Aus dem Papierkorb: alle Unteraufgaben darin mit, auch die, die schon
+    // vorher für sich gingen — ohne ihre Oberaufgabe wären sie Wurzeln.
+    const idsToDelete = row?.deleted_at
+      ? await selectTrashedSubtree(db, id)
+      : collectDescendantIds(get().tasks, id);
 
     for (const tid of idsToDelete) {
       await db.execute('DELETE FROM task_links WHERE task_id=$1 OR target_id=$1', [tid]);
@@ -185,6 +224,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   getSubtasks: (parentId: string) => get().tasks.filter((t) => t.parent_task_id === parentId),
 
   addLink: async (taskId: string, targetId: string, targetType: ContentType) => {
+    // Schon verknüpft: nichts zu tun (die Tabelle hält jede Verknüpfung nur einmal).
+    if (get().links.some((l) => l.task_id === taskId && l.target_id === targetId && l.target_type === targetType)) return;
     const db = await getDb();
     const id = generateId();
     await db.execute(

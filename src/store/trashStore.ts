@@ -18,7 +18,7 @@ interface TrashState {
   emptyTrash: () => Promise<void>;
 }
 
-export const useTrashStore = create<TrashState>((set) => ({
+export const useTrashStore = create<TrashState>((set, get) => ({
   items: [],
   loading: false,
 
@@ -41,8 +41,12 @@ export const useTrashStore = create<TrashState>((set) => ({
       const categories = await db.select<{ id: string; name: string; emoji: string; deleted_at: string }[]>(
         `SELECT id, name, emoji, deleted_at FROM categories WHERE deleted_at IS NOT NULL`
       );
+      // Eine Aufgabe samt der Unteraufgaben, die mit ihr gingen, ist ein
+      // Eintrag: Wiederherstellen und Löschen nehmen sie mit (`taskStore`).
       const tasks = await db.select<{ id: string; title: string; deleted_at: string }[]>(
-        `SELECT id, title, deleted_at FROM tasks WHERE deleted_at IS NOT NULL`
+        `SELECT t.id, t.title, t.deleted_at FROM tasks t
+          WHERE t.deleted_at IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM tasks p WHERE p.id = t.parent_task_id AND p.deleted_at = t.deleted_at)`
       );
       const blockDefinitions = await db.select<{ id: string; name: string; icon: string; deleted_at: string }[]>(
         `SELECT id, name, icon, deleted_at FROM block_definitions WHERE deleted_at IS NOT NULL`
@@ -96,7 +100,9 @@ export const useTrashStore = create<TrashState>((set) => ({
 
   permanentlyDelete: async (item) => {
     await trashWiring[item.type].permanentlyDelete(item.id);
-    set((s) => ({ items: s.items.filter((i) => i.id !== item.id) }));
+    // Eine Aufgabe nimmt Unteraufgaben mit, die für sich im Papierkorb lagen.
+    if (item.type === 'task') await get().fetchTrashed();
+    else set((s) => ({ items: s.items.filter((i) => i.id !== item.id) }));
   },
 
   emptyTrash: async () => {
