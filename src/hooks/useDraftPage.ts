@@ -89,8 +89,8 @@ export function useDraftPage<T extends { name: string }>({ store, viewType, id, 
 
   // Der Wächter ruft immer die Handgriffe des letzten Renders. Die Probe für
   // Tabs im Hintergrund meldet der Store selbst an (`draftStore`).
-  const latest = useRef({ draft, label, finish, leave });
-  latest.current = { draft, label, finish, leave };
+  const latest = useRef({ draft, label, finish, cancel });
+  latest.current = { draft, label, finish, cancel };
   useEffect(() => {
     const key = guardKey(viewType, id);
     // Ob es einen Entwurf gibt, sagt der Store: „Fertig", „Abbrechen" und
@@ -105,7 +105,8 @@ export function useDraftPage<T extends { name: string }>({ store, viewType, id, 
         // `finish` bleibt bei einem Fehler auf der Seite — dann auch hier bleiben.
         if (hasDraft()) throw new Error('draft could not be saved');
       },
-      discard: () => latest.current.leave(),
+      // Wie „Abbrechen": eine neue, nie bestätigte Seite geht in den Papierkorb.
+      discard: () => latest.current.cancel(),
     });
     return () => useLeaveGuardStore.getState().clearGuard(key);
   }, [viewType, id, store]);

@@ -62,7 +62,9 @@ export default function TemplatesView() {
       return;
     }
     clearDraft(template.id);
-    if (activeView.id === template.id) backToList();
+    // Der Stand nach dem Löschen, nicht der beim Rendern: wer über die Frage
+    // beim Verlassen verworfen hat, ist inzwischen woanders und bleibt dort.
+    if (useUIStore.getState().activeView.id === template.id) backToList();
     pushUndo({
       id: generateId(),
       description: t('undo.templateDeleted'),

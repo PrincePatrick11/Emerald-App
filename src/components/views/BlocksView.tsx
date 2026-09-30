@@ -77,7 +77,8 @@ export default function BlocksView() {
       return;
     }
     clearDraft(def.id);
-    if (activeView.id === def.id) backToList();
+    // Der Stand nach dem Löschen — siehe TemplatesView.remove.
+    if (useUIStore.getState().activeView.id === def.id) backToList();
     pushUndo({
       id: generateId(),
       description: t('undo.blockDefinitionDeleted'),
