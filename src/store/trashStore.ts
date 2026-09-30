@@ -7,6 +7,7 @@ import { reassignCategoriesInMemory } from './categoryStore';
 import { definitionLabel, templateLabel } from '../lib/blocks/blockAttrs';
 import { iconTitle } from '../lib/helpers';
 import i18n from '../i18n';
+import { displayTitle } from '../lib/entryTitle';
 import type { TrashedItem } from '../types';
 
 interface TrashState {
@@ -57,12 +58,13 @@ export const useTrashStore = create<TrashState>((set, get) => ({
         `SELECT id, title, deleted_at FROM altars WHERE deleted_at IS NOT NULL`
       );
       const items: TrashedItem[] = [
-        ...journal.map((r) => ({ ...r, type: 'journal' as const })),
-        ...wiki.map((r) => ({ id: r.id, title: r.title, deleted_at: r.deleted_at, type: 'wiki' as const, category: r.category ?? undefined })),
+        // Ohne eigenen Titel „Unbenannt…", wie überall (`displayTitle`).
+        ...journal.map((r) => ({ ...r, title: displayTitle(i18n.t, 'journal', r.title), type: 'journal' as const })),
+        ...wiki.map((r) => ({ id: r.id, title: displayTitle(i18n.t, 'wiki', r.title), deleted_at: r.deleted_at, type: 'wiki' as const, category: r.category ?? undefined })),
         ...tags.map((r) => ({ id: r.id, title: r.name, deleted_at: r.deleted_at, type: 'tag' as const })),
-        ...operations.map((r) => ({ ...r, type: 'operation' as const, category: r.category ?? undefined })),
+        ...operations.map((r) => ({ ...r, title: displayTitle(i18n.t, 'operation', r.title), type: 'operation' as const, category: r.category ?? undefined })),
         ...categories.map((r) => ({ id: r.id, title: `${r.emoji} ${r.name}`, deleted_at: r.deleted_at, type: 'category' as const })),
-        ...tasks.map((r) => ({ ...r, type: 'task' as const })),
+        ...tasks.map((r) => ({ ...r, title: displayTitle(i18n.t, 'task', r.title), type: 'task' as const })),
         ...blockDefinitions.map((r) => ({
           id: r.id,
           title: iconTitle(r.icon, definitionLabel(i18n.t, r)),
@@ -81,7 +83,7 @@ export const useTrashStore = create<TrashState>((set, get) => ({
           deleted_at: r.deleted_at,
           type: 'language' as const,
         })),
-        ...altars.map((r) => ({ ...r, type: 'altar' as const })),
+        ...altars.map((r) => ({ ...r, title: displayTitle(i18n.t, 'altar', r.title), type: 'altar' as const })),
       ].sort((a, b) => b.deleted_at.localeCompare(a.deleted_at));
       set({ items });
     } finally {

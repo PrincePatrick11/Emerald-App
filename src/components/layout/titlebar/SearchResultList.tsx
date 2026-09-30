@@ -3,6 +3,10 @@ import { Folder, Sparkles, Tag, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { comparable, type SearchHit, type SearchKind, type SearchResults } from '../../../lib/globalSearch';
 import { AUX_VIEWS, MODULES } from '../../../lib/modules';
+import { displayTitle } from '../../../lib/entryTitle';
+
+const isContentKind = (kind: SearchKind): kind is 'journal' | 'wiki' | 'operation' | 'task' | 'altar' =>
+  kind === 'journal' || kind === 'wiki' || kind === 'operation' || kind === 'task' || kind === 'altar';
 
 /** Die Suche spricht Datenmodell-Vokabular ('operation' singular, 'task') —
  *  die Modul-Kinds ziehen Icon und nav-Label aus der Registry, die drei
@@ -75,6 +79,8 @@ export default function SearchResultList({
   results, pending, query, activeIndex, listboxId, onActiveIndexChange, onSelect, onShowMore,
 }: Props) {
   const { t } = useTranslation();
+  // Einträge ohne eigenen Titel heißen „Unbenannt…" wie überall.
+  const shownTitle = (hit: SearchHit) => (isContentKind(hit.kind) ? displayTitle(t, hit.kind, hit.title) : hit.title);
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Die Tastaturauswahl in den Blick holen. `block: 'nearest'` scrollt nur,
@@ -121,7 +127,7 @@ export default function SearchResultList({
 
               <span className="flex-1 min-w-0">
                 <span className="search-result-title block">
-                  {hit.matchedIn === 'title' ? highlight(hit.title, query) : hit.title}
+                  {hit.matchedIn === 'title' ? highlight(hit.title, query) : shownTitle(hit)}
                 </span>
                 {hit.snippet && (
                   <span className="search-result-snippet block">

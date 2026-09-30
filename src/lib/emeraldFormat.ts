@@ -44,6 +44,7 @@ import {
 import type { SuggestionItem } from '../components/editor/SuggestionList';
 import type { Category } from '../types';
 import type { WriteOptions } from './stamp';
+import { hasOwnTitle } from './entryTitle';
 import { ImageTooLargeError, prepareImageDataUrl } from './imageLimits';
 import {
   DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY,
@@ -397,7 +398,7 @@ export async function exportAsEmerald(): Promise<void> {
     const entry = entries.find(e => e.id === view.id);
     if (!entry) return;
     type      = 'journal';
-    title     = entry.title || 'Untitled';
+    title     = entry.title;
     content   = entry.content || '';
     createdAt = entry.created_at;
 
@@ -427,7 +428,7 @@ export async function exportAsEmerald(): Promise<void> {
     const article = articles.find(a => a.id === view.id);
     if (!article) return;
     type      = 'wiki';
-    title     = article.title || 'Untitled';
+    title     = article.title;
     content   = article.content || '';
     createdAt = article.created_at;
 
@@ -445,7 +446,7 @@ export async function exportAsEmerald(): Promise<void> {
     const op = operations.find(o => o.id === view.id);
     if (!op) return;
     type      = 'operations';
-    title     = op.title || 'Untitled';
+    title     = op.title;
     content   = op.content || '';
     createdAt = op.created_at;
 
@@ -626,7 +627,7 @@ async function exportAltarAsEmerald(): Promise<void> {
   const file: EmeraldFile = {
     version: '1',
     type: 'altar',
-    title: altar.title || 'Untitled Altar',
+    title: altar.title,
     createdAt: altar.created_at,
     content: '',
     images,
@@ -936,6 +937,11 @@ function importedCreatedAt(file: EmeraldFile): string | undefined {
   return /^\d{4}-/.test(iso) ? iso : undefined;
 }
 
+/** Der Titel aus der Datei — ein alter englischer Standardtitel wird leer, wie in der Datenbank (v48). */
+function importedTitle(file: EmeraldFile): string {
+  return hasOwnTitle(file.title) ? file.title : '';
+}
+
 /**
  * „Zuletzt geändert" eines importierten Eintrags: sein Erstelldatum. Die Datei
  * kennt kein Änderungsdatum, und ein Import ist keine Bearbeitung — sonst
@@ -1001,7 +1007,7 @@ async function importJournalEntry(file: EmeraldFile, content: string, tagNames: 
   // Die Mondphase rechnet `createEntry` aus dem Erstelldatum, nach der Einstellung dieses Vaults.
   const createdAt = importedCreatedAt(file);
   const entry = await createEntry({ blank: true, createdAt });
-  await updateEntry(entry.id, { title: file.title, content, tags: tagNames }, importedStamp(createdAt));
+  await updateEntry(entry.id, { title: importedTitle(file), content, tags: tagNames }, importedStamp(createdAt));
   return entry.id;
 }
 
@@ -1077,7 +1083,7 @@ async function importWikiArticle(file: EmeraldFile, content: string, tagNames: s
   const createdAt = importedCreatedAt(file);
   const article = await createArticle(categoryId, { blank: true, createdAt });
   await updateArticle(article.id, {
-    title: file.title,
+    title: importedTitle(file),
     content,
     category_id: categoryId,
     tags: tagNames,
@@ -1097,7 +1103,7 @@ async function importOperationEntry(file: EmeraldFile, content: string, tagNames
   const createdAt = importedCreatedAt(file);
   const op = await createOperation(categoryId, { blank: true, createdAt });
   await updateOperation(op.id, {
-    title: file.title,
+    title: importedTitle(file),
     content,
     category_id: categoryId,
     tags: tagNames,
@@ -1168,7 +1174,7 @@ async function importAltarEntry(file: EmeraldFile): Promise<string> {
     const backgroundImageData = await remapAltarImagePath(meta.altarBackgroundImagePath, images);
 
     await updateAltar(altar.id, {
-      title: file.title || 'Untitled Altar',
+      title: importedTitle(file),
       background_preset: meta.altarBackgroundPreset || DEFAULT_ALTAR_BACKGROUND,
       background_image_data: backgroundImageData,
       background_overlay: meta.altarBackgroundOverlay ?? DEFAULT_BACKGROUND_OVERLAY,
@@ -1281,7 +1287,7 @@ export async function importFromMarkdown(): Promise<void> {
 
   // ── Parse frontmatter ──────────────────────────────────────────────────
   const lines = raw.split('\n');
-  let title = 'Untitled';
+  let title = '';
   const frontMeta: Record<string, string> = {};
   let bodyStart = 0;
 

@@ -12,6 +12,7 @@ import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { entryIcon, MODULES } from '../../lib/modules';
+import { displayTitle } from '../../lib/entryTitle';
 import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
@@ -266,7 +267,7 @@ export default function WikiView() {
               </div>
               {renaming
                 ? renameInput('text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1')
-                : <div className="text-sm font-medium text-stone-200 truncate mb-1">{a.title}</div>}
+                : <div className="text-sm font-medium text-stone-200 truncate mb-1">{displayTitle(t, 'wiki', a.title)}</div>}
               <div className="text-xs text-parchment-500/70">{dateStr}</div>
             </>
           ) : (
@@ -274,7 +275,7 @@ export default function WikiView() {
               <span className="text-base flex-shrink-0">{iconEl}</span>
               {renaming
                 ? renameInput('flex-1 bg-transparent text-sm text-stone-300 outline-none selectable')
-                : <span className="flex-1 text-sm text-stone-300 truncate">{a.title}</span>}
+                : <span className="flex-1 text-sm text-stone-300 truncate">{displayTitle(t, 'wiki', a.title)}</span>}
               <span className="text-xs text-parchment-500/70 flex-shrink-0">{dateStr}</span>
             </>
           )}

@@ -17,6 +17,7 @@ import { makeCategoryOptional } from './nullableCategory';
 import { seedSigilTemplate } from './templateRows';
 import { migrateRoutinesToTemplates } from './migrateRoutinesToTemplates';
 import i18n from '../i18n';
+import { LEGACY_UNTITLED_TITLES } from './entryTitle';
 import { useSettingsStore } from '../store/settingsStore';
 
 // Per-vault DB cache: SQLite identifier → Database instance
@@ -1312,4 +1313,23 @@ export const MIGRATIONS: Migration[] = [
       await db.execute('DROP TABLE IF EXISTS links');
     },
   },
+  {
+    // Neue Einträge heißen seit v48 leer, angezeigt wird „Unbenannt…" in der
+    // Sprache der App (`displayTitle`). Die englischen Standardtitel von früher
+    // werden leer — wiederholbar, ein Backup-Import ruft es auch.
+    version: 48,
+    name: 'untitled_is_empty',
+    up: clearLegacyUntitledTitles,
+  },
 ];
+
+/** Die Tabellen, deren Zeilen einen Titel tragen, der leer sein darf. */
+const TITLED_TABLES = ['journal_entries', 'wiki_articles', 'operations', 'tasks', 'altars'] as const;
+
+/** Leert die englischen Standardtitel früherer Versionen (`LEGACY_UNTITLED_TITLES`). */
+export async function clearLegacyUntitledTitles(db: Database): Promise<void> {
+  const placeholders = LEGACY_UNTITLED_TITLES.map((_, i) => `$${i + 1}`).join(', ');
+  for (const table of TITLED_TABLES) {
+    await db.execute(`UPDATE ${table} SET title='' WHERE trim(title) IN (${placeholders})`, [...LEGACY_UNTITLED_TITLES]);
+  }
+}

@@ -22,7 +22,9 @@ import { DEFAULT_ENTRY_EMOJI, type SuggestionItem } from './SuggestionList';
 import { useLinkItems } from '../../hooks/useLinkItems';
 import { useCategoryStore } from '../../store/categoryStore';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
-import type { MoonPhase } from '../../types';
+import type { ContentType, MoonPhase } from '../../types';
+import { displayTitle } from '../../lib/entryTitle';
+import i18n from '../../i18n';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
@@ -155,12 +157,15 @@ export default function RichEditor({
 
   const getLabelRef = useRef((id: string, entryType: string): string | null => {
     const { entries, articles, operations, tasks, altars } = storeRef.current;
-    if (entryType === 'journal') return entries.find((e) => e.id === id)?.title ?? null;
-    if (entryType === 'wiki') return articles.find((a) => a.id === id)?.title ?? null;
-    if (entryType === 'operation') return operations.find((o) => o.id === id)?.title ?? null;
-    if (entryType === 'task') return tasks.find((task) => task.id === id)?.title ?? null;
-    if (entryType === 'altar') return altars.find((a) => a.id === id)?.title ?? null;
-    return null;
+    const pool: readonly { id: string; title: string }[] | null =
+      entryType === 'journal' ? entries
+        : entryType === 'wiki' ? articles
+        : entryType === 'operation' ? operations
+        : entryType === 'task' ? tasks
+        : entryType === 'altar' ? altars
+        : null;
+    const target = pool?.find((item) => item.id === id);
+    return target ? displayTitle(i18n.t, entryType as ContentType, target.title) : null;
   });
 
   // Always-fresh items ref so the extension closure never goes stale.

@@ -7,8 +7,8 @@ import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, type DbRow } from '../lib/row';
 import type { WikiArticle } from '../types';
 import i18n from '../i18n';
+import { displayTitle } from '../lib/entryTitle';
 import { startOfNewEntry, useTemplateNoticeStore } from './templateStore';
-import { UNTITLED_TITLES } from '../lib/blocks/templates';
 
 interface WikiState {
   articles: WikiArticle[];
@@ -51,7 +51,7 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     const now = nowIso();
     const id = generateId();
     const entryNumber = await nextEntryNumber(db, 'wiki_articles');
-    const start = startOfNewEntry('wiki', categoryId, UNTITLED_TITLES.wiki, blank);
+    const start = startOfNewEntry('wiki', categoryId, blank);
     const article: WikiArticle = {
       id,
       entry_number: entryNumber,
@@ -98,7 +98,7 @@ export const useWikiStore = create<WikiState>((set, get) => ({
       entry_number: _number,
       ...fields
     } = src;
-    await get().updateArticle(copy.id, { ...fields, title: src.title + i18n.t('common.copySuffix') });
+    await get().updateArticle(copy.id, { ...fields, title: displayTitle(i18n.t, 'wiki', src.title) + i18n.t('common.copySuffix') });
     return get().articles.find((a) => a.id === copy.id) ?? copy;
   },
 

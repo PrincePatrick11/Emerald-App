@@ -874,14 +874,16 @@ console.log('\n6. Vorlagen: Zuweisung, Standard, Einsetzen\n');
   // Titel und Tags beim Ablösen einer Vorlage („Andere Vorlage").
   const journalStd = { ...sigilTpl, id: 'journal-std', title: 'Tagebuch', tags: ['tag-j'], assignments: [{ entryType: 'journal', category: '*', isDefault: true }] };
 
-  const cleared = fieldsWithoutTemplate({ title: 'Tagebuch', tags: ['eigen', 'TAG-J'] }, 'wiki', journalStd);
-  check('Felder ohne Vorlage: Titel auf den Standardtitel des Typs, ihre Tags weg',
-    cleared.title === 'Untitled Article' && cleared.tags.join() === 'eigen', cleared);
-  const withNew = fieldsWithTemplate(cleared, 'wiki', { title: ' Artikel ', tags: ['eigen', 'neu'] }, { title: 'ifUntitled', tags: true });
+  const cleared = fieldsWithoutTemplate({ title: 'Tagebuch', tags: ['eigen', 'TAG-J'] }, journalStd);
+  check('Felder ohne Vorlage: Titel wieder leer, ihre Tags weg',
+    cleared.title === '' && cleared.tags.join() === 'eigen', cleared);
+  const withNew = fieldsWithTemplate(cleared, { title: ' Artikel ', tags: ['eigen', 'neu'] }, { title: 'ifUntitled', tags: true });
   check('Felder mit Vorlage: Titel nur ohne eigenen, Tags ohne Doppelte',
     withNew.title === 'Artikel' && withNew.tags.join() === 'eigen,neu', withNew);
   check('Felder mit Vorlage: ein eigener Titel bleibt',
-    fieldsWithTemplate({ title: 'Mein Titel', tags: [] }, 'wiki', { title: 'Artikel', tags: [] }, { title: 'ifUntitled', tags: false }).title === 'Mein Titel');
+    fieldsWithTemplate({ title: 'Mein Titel', tags: [] }, { title: 'Artikel', tags: [] }, { title: 'ifUntitled', tags: false }).title === 'Mein Titel');
+  check('Felder mit Vorlage: ein alter englischer Standardtitel zählt als keiner',
+    fieldsWithTemplate({ title: 'Untitled Article', tags: [] }, { title: 'Artikel', tags: [] }, { title: 'ifUntitled', tags: false }).title === 'Artikel');
 
   check('leer: kein Inhalt', isContentEmpty(''));
   check('leer: nur leere Absätze', isContentEmpty('<p></p><p style="text-align: center"><br></p>'));
@@ -891,11 +893,11 @@ console.log('\n6. Vorlagen: Zuweisung, Standard, Einsetzen\n');
   check('nicht leer: ein leerer Textblock aus einer Vorlage',
     !isContentEmpty(serializeBlocks([{ ...createTextBlock(''), attrs: { 'data-template-origin': 't' } }])));
 
-  const start = templateStart({ ...sigilTpl, title: '  Ritual ', tags: ['a'] }, 'Untitled Entry');
+  const start = templateStart({ ...sigilTpl, title: '  Ritual ', tags: ['a'] });
   check('Start aus Vorlage: Titel getrimmt, Tags kopiert, Inhalt eingesetzt',
     start.title === 'Ritual' && start.tags.join() === 'a' && start.content.includes('data-template-origin="sigil-tpl"'), start);
-  check('Start ohne Vorlage: leer mit Standardtitel',
-    JSON.stringify(templateStart(null, 'Untitled Entry')) === JSON.stringify({ title: 'Untitled Entry', content: '', tags: [], templateId: null }));
+  check('Start ohne Vorlage: leer, auch der Titel',
+    JSON.stringify(templateStart(null)) === JSON.stringify({ title: '', content: '', tags: [], templateId: null }));
   check('Tags zusammenführen ohne Doppelte (Groß/Klein egal)', mergeTemplateTags(['A', 'b'], ['a', 'c']).join() === 'A,b,c');
 
   // Zuweisungen einer Bearbeitung auf einen inzwischen geänderten Stand legen.

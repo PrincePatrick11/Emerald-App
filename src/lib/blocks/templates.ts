@@ -1,4 +1,5 @@
 import { generateId } from '../helpers';
+import { hasOwnTitle } from '../entryTitle';
 import { parseBlocks, serializeBlocks } from './blockHtml';
 import { isDefinitionId } from './definitions';
 import { withChargeUnloaded, withMappedChargeTargets } from './sigil';
@@ -57,17 +58,6 @@ export interface Template {
 }
 
 export const DEFAULT_TEMPLATE_ICON = '📄';
-
-/**
- * Der Titel, mit dem ein Eintrag ohne eigenen (und ohne Titel aus einer
- * Vorlage) angelegt wird — die Inhalts-Stores schreiben ihn, das Einsetzen und
- * Rückgängigmachen von Vorlagen erkennt ihn wieder.
- */
-export const UNTITLED_TITLES: Record<TemplateEntryType, string> = {
-  journal: 'Untitled Entry',
-  wiki: 'Untitled Article',
-  operation: 'Untitled Operation',
-};
 
 /** Die eingebaute Sigillen-Vorlage: Standard für Operation × Sigillen. Bearbeit- und löschbar; die feste ID lässt Migration und Import sie wiedererkennen. */
 export const SIGIL_TEMPLATE_ID = 'core-sigil';
@@ -294,13 +284,11 @@ export interface EntryStart {
 }
 
 /** Womit ein neuer Eintrag aus der Vorlage beginnt — ohne Vorlage leer, mit dem Standardtitel des Typs. */
-export function templateStart(
-  template: Pick<Template, 'id' | 'title' | 'content' | 'tags'> | null,
-  fallbackTitle: string,
-): EntryStart {
-  if (!template) return { title: fallbackTitle, content: '', tags: [], templateId: null };
+export function templateStart(template: Pick<Template, 'id' | 'title' | 'content' | 'tags'> | null): EntryStart {
+  // Ohne Titel aus der Vorlage bleibt er leer — angezeigt wird „Unbenannt…" (`displayTitle`).
+  if (!template) return { title: '', content: '', tags: [], templateId: null };
   return {
-    title: template.title.trim() || fallbackTitle,
+    title: template.title.trim(),
     content: serializeBlocks(instantiateTemplateBlocks(template)),
     tags: [...template.tags],
     templateId: template.id,
@@ -372,12 +360,11 @@ export interface TemplateFields {
 
 /**
  * Darf eine Vorlage den Titel setzen, ohne einen eigenen zu überschreiben?
- * Ja, solange der Eintrag leer oder mit dem Standardtitel seiner Art heißt —
- * oder noch den Titel der Vorlage trägt, die gerade abgelöst wird.
+ * Ja, solange der Eintrag keinen eigenen hat (`hasOwnTitle`) — oder noch den
+ * Titel der Vorlage trägt, die gerade abgelöst wird.
  */
-export function mayTakeTemplateTitle(title: string, entryType: TemplateEntryType, replaces?: Pick<Template, 'title'>): boolean {
-  const current = title.trim();
-  return !current || current === UNTITLED_TITLES[entryType] || (!!replaces?.title.trim() && current === replaces.title.trim());
+export function mayTakeTemplateTitle(title: string, replaces?: Pick<Template, 'title'>): boolean {
+  return !hasOwnTitle(title) || (!!replaces?.title.trim() && title.trim() === replaces.title.trim());
 }
 
 /**
@@ -386,11 +373,10 @@ export function mayTakeTemplateTitle(title: string, entryType: TemplateEntryType
  */
 export function fieldsWithTemplate(
   fields: TemplateFields,
-  entryType: TemplateEntryType,
   template: Pick<Template, 'title' | 'tags'>,
   options: { title: boolean | 'ifUntitled'; tags: boolean; replaces?: Pick<Template, 'title'> },
 ): TemplateFields {
-  const takeTitle = options.title === 'ifUntitled' ? mayTakeTemplateTitle(fields.title, entryType, options.replaces) : options.title;
+  const takeTitle = options.title === 'ifUntitled' ? mayTakeTemplateTitle(fields.title, options.replaces) : options.title;
   return {
     title: takeTitle && template.title.trim() ? template.title.trim() : fields.title,
     tags: options.tags ? mergeTemplateTags(fields.tags, template.tags) : fields.tags,
@@ -398,18 +384,17 @@ export function fieldsWithTemplate(
 }
 
 /**
- * Titel und Tags ohne die Vorlage: der Titel geht zurück auf den Standardtitel,
- * wenn er noch der der Vorlage ist; ihre Tags fallen weg — auch einer, den der
- * Eintrag schon vorher trug.
+ * Titel und Tags ohne die Vorlage: der Titel wird wieder leer, wenn er noch
+ * der der Vorlage ist; ihre Tags fallen weg — auch einer, den der Eintrag
+ * schon vorher trug.
  */
 export function fieldsWithoutTemplate(
   fields: TemplateFields,
-  entryType: TemplateEntryType,
   template: Pick<Template, 'title' | 'tags'>,
 ): TemplateFields {
   const removed = new Set(template.tags.map((tag) => tag.toLowerCase()));
   return {
-    title: template.title.trim() && fields.title === template.title.trim() ? UNTITLED_TITLES[entryType] : fields.title,
+    title: template.title.trim() && fields.title === template.title.trim() ? '' : fields.title,
     tags: fields.tags.filter((tag) => !removed.has(tag.toLowerCase())),
   };
 }

@@ -10,6 +10,7 @@ import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useAltarStore } from '../../store/altarStore';
 import { generateId } from '../../lib/helpers';
+import { displayTitle, hasOwnTitle } from '../../lib/entryTitle';
 import { MODULES, viewTypeForEntryType } from '../../lib/modules';
 import EmptyState, { NoResults } from '../ui/EmptyState';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
@@ -29,7 +30,7 @@ import {
   Plus, Flag, Trash2,
   CheckSquare, Square, Link2,
 } from 'lucide-react';
-import type { Task, TaskPriority } from '../../types';
+import type { ContentType, Task, TaskPriority } from '../../types';
 import { useSessionState } from '../../store/sessionStore';
 
 const TASK_PRIORITY_COLORS: Record<string, string> = {
@@ -145,11 +146,13 @@ export default function TasksView() {
 
   const handleCreateTask = async (categoryId?: string | null) => {
     const task = await createTask(categoryId ?? null);
+    freshTaskIds.add(task.id);
     setEditingId(task.id);
     setEditValue(task.title);
   };
 
   const handleSaveEdit = async (id: string) => {
+    freshTaskIds.delete(id);
     if (editValue.trim()) {
       await updateTask(id, { title: editValue.trim() });
     }
@@ -225,7 +228,8 @@ export default function TasksView() {
         : targetType === 'task' ? tasks
         : targetType === 'altar' ? altars
         : [];
-    return pool.find((item) => item.id === targetId)?.title ?? t('tasks.linkTargetGone');
+    const target = pool.find((item) => item.id === targetId);
+    return target ? displayTitle(t, targetType as ContentType, target.title) : t('tasks.linkTargetGone');
   }, [journalEntries, wikiArticles, operations, tasks, altars, t]);
 
   const renderTasksContent = () => (
@@ -415,6 +419,13 @@ export default function TasksView() {
   );
 }
 
+/**
+ * Die gerade angelegten Aufgaben, deren Titel noch nie bestätigt wurde. Escape
+ * legt eine solche wieder weg (in den Papierkorb, mit Rückgängig) — wie
+ * „Abbrechen" bei einem neuen Eintrag. Nur für die Sitzung.
+ */
+const freshTaskIds = new Set<string>();
+
 interface TaskRowProps {
   task: Task;
   editingId: string | null;
@@ -466,6 +477,7 @@ const TaskRow = memo(function TaskRow({
 
   const handleCreateSubtaskLocal = async () => {
     const subtask = await createTask(task.category_id, task.id);
+    freshTaskIds.add(subtask.id);
     // Nur aufklappen: eine schon offene Aufgabe klappte sonst zu und verbärge die neue Zeile.
     if (!isExpanded) toggleExpand(task.id);
     setEditingId(subtask.id);
@@ -549,7 +561,10 @@ const TaskRow = memo(function TaskRow({
             onBlur={() => handleSaveEdit(task.id)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleSaveEdit(task.id);
-              if (e.key === 'Escape') setEditingId(null);
+              if (e.key === 'Escape') {
+                setEditingId(null);
+                if (freshTaskIds.delete(task.id)) void handleDelete();
+              }
             }}
             className="flex-1 bg-stone-800 border border-stone-600 rounded px-2 py-0.5 text-sm text-stone-200 outline-none focus:border-jade-500"
             autoFocus
@@ -559,10 +574,10 @@ const TaskRow = memo(function TaskRow({
             className={`flex-1 text-sm truncate cursor-default ${task.completed ? 'line-through text-stone-500' : 'text-stone-200'}`}
             onDoubleClick={() => {
               setEditingId(task.id);
-              setEditValue(task.title);
+              setEditValue(hasOwnTitle(task.title) ? task.title : '');
             }}
           >
-            {task.title}
+            {displayTitle(t, 'task', task.title)}
           </span>
         )}
 

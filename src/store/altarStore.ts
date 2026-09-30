@@ -8,6 +8,7 @@ import { serialKey, serialized } from '../lib/serialize';
 import { bool, fromRow, toInt, type DbRow } from '../lib/row';
 import type { AltarItem, AltarPlacement, AltarRecord } from '../types';
 import i18n from '../i18n';
+import { displayTitle } from '../lib/entryTitle';
 
 const DEFAULT_PLACEMENT_SIZE = 40;
 
@@ -243,7 +244,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const now = nowIso();
     const altar: AltarRecord = {
       id: generateId(),
-      title: 'Untitled Altar',
+      // Leer — angezeigt wird „Unbenannter Altar" (`displayTitle`).
+      title: '',
       background_preset: DEFAULT_ALTAR_BACKGROUND,
       background_image_data: null,
       background_overlay: DEFAULT_BACKGROUND_OVERLAY,
@@ -280,7 +282,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const now = nowIso();
     const copy: AltarRecord = {
       id: newId,
-      title: source.title + i18n.t('common.copySuffix'),
+      title: displayTitle(i18n.t, 'altar', source.title) + i18n.t('common.copySuffix'),
       background_preset: source.background_preset || DEFAULT_ALTAR_BACKGROUND,
       background_image_data: source.background_image_data ?? null,
       background_overlay: source.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY,

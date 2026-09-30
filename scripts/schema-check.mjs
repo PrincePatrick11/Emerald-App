@@ -1507,9 +1507,10 @@ console.log('\n8h. Umstempeln: Blöcke-Migrationen mit alter Zählung (v39–v41
   await db.execute("UPDATE schema_version SET version = 39 WHERE name = 'block_definitions'");
   await db.execute("UPDATE schema_version SET version = 40 WHERE name = 'operation_status_to_blocks'");
   await db.execute("UPDATE schema_version SET version = 41 WHERE name = 'sigils_to_blocks'");
-  // Ein solcher Vault stammt von vor v47: `links` steht noch, und v47 steht aus.
+  // Ein solcher Vault stammt von vor v47: `links` steht noch, und v47 und
+  // alles danach stehen aus.
   await db.execute(LINKS_BEFORE_V47);
-  await db.execute('DELETE FROM schema_version WHERE version = 47');
+  await db.execute('DELETE FROM schema_version WHERE version >= 47');
   await runMigrations(db);
   const stamps = Object.fromEntries(
     (await db.select('SELECT name, version FROM schema_version WHERE version >= 39')).map((r) => [r.name, r.version])
@@ -1702,6 +1703,31 @@ console.log('\n8l. Migration v47: die links-Tabelle geht\n');
   check('v47 nimmt Tabelle und Indizes mit', (await linksObjects()).length === 0);
   await v47.up(db);
   check('v47 ist wiederholbar', true);
+  db.close();
+}
+
+console.log('\n8m. Migration v48: alte englische Standardtitel werden leer\n');
+
+{
+  const db = freshDb('untitled.db');
+  await runMigrations(db);
+  const at = new Date().toISOString();
+  await db.execute(`INSERT INTO journal_entries (id, title, content, created_at, updated_at) VALUES ('j1','Untitled Entry','',$1,$1), ('j2','Mein Tag','',$1,$1)`, [at]);
+  await db.execute(`INSERT INTO wiki_articles (id, title, slug, content, created_at, updated_at) VALUES ('w1',' Untitled Article ','w1','',$1,$1)`, [at]);
+  await db.execute(`INSERT INTO tasks (id, title, created_at, updated_at) VALUES ('t1','New Task',$1,$1), ('t2','Untitled Entry list',$1,$1)`, [at]);
+  const v48 = MIGRATIONS.find((m) => m.version === 48);
+  await v48.up(db);
+  const titles = Object.fromEntries([
+    ...(await db.select('SELECT id, title FROM journal_entries')),
+    ...(await db.select('SELECT id, title FROM wiki_articles')),
+    ...(await db.select('SELECT id, title FROM tasks')),
+  ].map((r) => [r.id, r.title]));
+  check('v48 leert die alten Standardtitel, auch mit Leerraum',
+    titles.j1 === '' && titles.w1 === '' && titles.t1 === '', JSON.stringify(titles));
+  check('v48 lässt eigene Titel stehen, auch wenn sie so anfangen',
+    titles.j2 === 'Mein Tag' && titles.t2 === 'Untitled Entry list', JSON.stringify(titles));
+  await v48.up(db);
+  check('v48 ist wiederholbar', true);
   db.close();
 }
 

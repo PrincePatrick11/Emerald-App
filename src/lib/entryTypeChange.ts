@@ -31,7 +31,8 @@ import { useSettingsStore } from '../store/settingsStore';
 import { serialKey, serialized } from './serialize';
 import { viewTypeForEntryType } from './modules';
 import { remapDefinitionDefaults } from './blocks/definitions';
-import { UNTITLED_TITLES, type TemplateEntryType } from './blocks/templates';
+import type { TemplateEntryType } from './blocks/templates';
+import { hasOwnTitle } from './entryTitle';
 import { useJournalStore } from '../store/journalStore';
 import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
@@ -184,7 +185,8 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
     const core: EntryCore = {
       ...source,
       // Ein unbenannter Eintrag heißt danach wie ein unbenannter des neuen Typs.
-      title: source.title === UNTITLED_TITLES[from] ? UNTITLED_TITLES[to] : source.title,
+      // Ohne eigenen Titel bleibt er leer — „Unbenannt…" zeigt die neue Art von selbst.
+      title: hasOwnTitle(source.title) ? source.title : '',
       // Ein Link des Eintrags auf sich selbst zieht mit.
       content: retypeInternalLinks(source.content, id, to),
       ...(to === 'journal' ? { category_id: null, icon: undefined, cover_image: undefined } : {}),

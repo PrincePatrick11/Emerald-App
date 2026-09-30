@@ -9,6 +9,7 @@ import { useAltarStore } from '../store/altarStore';
 import { useUIStore } from '../store/uiStore';
 import { MOON_PHASE_SYMBOLS } from './moonPhase';
 import { DEFAULT_ENTRY_EMOJI } from './modules';
+import { displayTitle } from './entryTitle';
 import { categoryLabel } from './categories';
 import i18n from '../i18n';
 import type { Category } from '../types';
@@ -35,7 +36,7 @@ function exportText(): ExportText {
     drawing: t('blocks.types.sigilCanvas.label'),
     altar: (id) => {
       const altar = useAltarStore.getState().altars.find((a) => a.id === id);
-      return altar ? { title: altar.title, image: altar.thumbnail_data ?? null } : null;
+      return altar ? { title: displayTitle(i18n.t, 'altar', altar.title), image: altar.thumbnail_data ?? null } : null;
     },
   };
 }
@@ -124,7 +125,7 @@ export async function collectExportData(): Promise<ExportData | null> {
 
     return {
       type: 'journal',
-      title: entry.title || 'Untitled',
+      title: displayTitle(i18n.t, 'journal', entry.title),
       entryNumber: entry.entry_number,
       content: renderBlocksForExport(entry.content, exportText()),
       createdAt: entry.created_at,
@@ -160,7 +161,7 @@ export async function collectExportData(): Promise<ExportData | null> {
 
     return {
       type: 'wiki',
-      title: article.title || 'Untitled',
+      title: displayTitle(i18n.t, 'wiki', article.title),
       entryNumber: article.entry_number,
       content: renderBlocksForExport(article.content, exportText()),
       createdAt: article.created_at,
@@ -179,7 +180,7 @@ export async function collectExportData(): Promise<ExportData | null> {
 
     return {
       type: 'operations',
-      title: op.title || 'Untitled',
+      title: displayTitle(i18n.t, 'operation', op.title),
       entryNumber: op.entry_number,
       content: renderBlocksForExport(op.content, exportText()),
       createdAt: op.created_at,

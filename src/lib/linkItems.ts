@@ -1,6 +1,7 @@
 import type { TFunction } from 'i18next';
 import { MOON_PHASE_SYMBOLS } from './moonPhase';
 import { DEFAULT_ENTRY_EMOJI } from './modules';
+import { displayTitle } from './entryTitle';
 import { categoryLabel, lookupCategory } from './categories';
 import { isImageIcon } from './helpers';
 import type {
@@ -92,7 +93,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
     ...s.entries.map((e) => ({
       id: e.id,
       entryType: 'journal' as const,
-      label: e.title,
+      label: displayTitle(t, 'journal', e.title),
       icon: MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? DEFAULT_ENTRY_EMOJI.journal,
       categoryLabel: e.moon_phase ? t(`moonPhase.${e.moon_phase}`) : t('journal.noPhase'),
       updatedAt: e.updated_at,
@@ -103,7 +104,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
       return {
         id: task.id,
         entryType: 'task' as const,
-        label: task.title,
+        label: displayTitle(t, 'task', task.title),
         category: cat?.emoji,
         icon: cat?.emoji || DEFAULT_ENTRY_EMOJI.task,
         categoryLabel: categoryLabel(t, cat),
@@ -115,7 +116,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
       return {
         id: o.id,
         entryType: 'operation' as const,
-        label: o.title,
+        label: displayTitle(t, 'operation', o.title),
         category: cat?.emoji,
         ...splitIcon(o.icon, cat?.emoji || DEFAULT_ENTRY_EMOJI.operation),
         categoryLabel: categoryLabel(t, cat),
@@ -128,7 +129,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
       return {
         id: a.id,
         entryType: 'wiki' as const,
-        label: a.title,
+        label: displayTitle(t, 'wiki', a.title),
         category: cat?.emoji,
         ...splitIcon(a.icon, cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki),
         categoryLabel: categoryLabel(t, cat),
@@ -142,7 +143,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
     ...s.altars.map((a) => ({
       id: a.id,
       entryType: 'altar' as const,
-      label: a.title,
+      label: displayTitle(t, 'altar', a.title),
       displayIcon: a.icon_data || DEFAULT_ENTRY_EMOJI.altar,
       // Altäre kennen keine Kategorien (die Kategorien gehören den Elementen
       // auf dem Altar, nicht dem Altar selbst) — es bleibt der Modulname.

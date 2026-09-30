@@ -189,12 +189,11 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
 export function startOfNewEntry(
   entryType: TemplateEntryType,
   categoryId: string | null,
-  fallbackTitle: string,
   blank = false,
 ): EntryStart {
   const apply = !blank && useSettingsStore.getState().settings.templates.applyDefault;
   const template = !apply ? null : resolveDefaultTemplate(useTemplateStore.getState().templates, entryType, categoryId);
-  const start = withUsableTags(templateStart(template, fallbackTitle));
+  const start = withUsableTags(templateStart(template));
   if (start.tags.length) void createMissingTags(start.tags).catch(console.error);
   return start;
 }

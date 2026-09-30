@@ -20,6 +20,7 @@ import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import { getMoonPhase, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { entryIcon, MODULES, viewTypeForEntryType } from '../../lib/modules';
+import { displayTitle, hasOwnTitle } from '../../lib/entryTitle';
 import { categoryLabel } from '../../lib/categories';
 import { formatDayHeading, formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
@@ -123,7 +124,8 @@ export default function HomeView() {
 
   const handleRename = (target: CtxTarget) => {
     const pool = target.kind === 'journal' ? entries : target.kind === 'wiki' ? articles : operations;
-    setRenameValue(pool.find((item) => item.id === target.id)?.title ?? '');
+    const title = pool.find((item) => item.id === target.id)?.title;
+    setRenameValue(hasOwnTitle(title) ? title : '');
     setRenaming(target);
   };
 
@@ -142,7 +144,7 @@ export default function HomeView() {
   const itemTitle = (kind: CtxTarget['kind'], id: string, title: string) => (isRenaming(kind, id)
     ? <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename} onCancel={() => setRenaming(null)}
         className="home-item-title text-sm font-medium w-full bg-transparent outline-none selectable" />
-    : <div className="home-item-title text-sm font-medium truncate">{title}</div>);
+    : <div className="home-item-title text-sm font-medium truncate">{displayTitle(t, kind, title)}</div>);
 
   const handleDelete = async (target: CtxTarget) => {
     if (target.kind === 'journal') {

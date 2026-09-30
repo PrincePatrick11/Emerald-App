@@ -250,7 +250,7 @@ export default function AltarView() {
     endAltarEdit(altarId);
     setActiveView({ type: 'altar', id: altarId, mode: 'view' });
     const writes = (async () => {
-      await updateAltar(altarId, { title: title.trim() || t('altar.untitled') });
+      await updateAltar(altarId, { title: title.trim() });
       const thumbnailData = await capturePromise;
       if (thumbnailData !== null)
         await updateAltar(altarId, { thumbnail_data: thumbnailData }, AS_A_CONSEQUENCE);

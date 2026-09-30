@@ -107,11 +107,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     await db.execute(
       `INSERT INTO tasks (id, title, category_id, priority, completed, parent_task_id, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, 'New Task', categoryId, 'medium', 0, parentTaskId, now, now]
+      [id, '', categoryId, 'medium', 0, parentTaskId, now, now]
     );
 
     const newTask: Task = {
-      id, title: 'New Task', category_id: categoryId,
+      // Leer — angezeigt wird „Unbenannte Aufgabe" (`displayTitle`).
+      id, title: '', category_id: categoryId,
       priority: 'medium', completed: false,
       parent_task_id: parentTaskId, created_at: now, updated_at: now,
       deleted_at: null,

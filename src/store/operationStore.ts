@@ -6,9 +6,9 @@ import { needsWrite, stampFor, type WriteOptions } from '../lib/stamp';
 import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, type DbRow } from '../lib/row';
 import { startOfNewEntry, useTemplateNoticeStore } from './templateStore';
-import { UNTITLED_TITLES } from '../lib/blocks/templates';
 import type { Operation } from '../types';
 import i18n from '../i18n';
+import { displayTitle } from '../lib/entryTitle';
 
 interface OperationState {
   operations: Operation[];
@@ -52,7 +52,7 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     const now = nowIso();
     // Die Kategorie „Sigillen" beginnt so mit Rechner, Zeichnung und Ladung (Vorlage `core-sigil`) —
     // sofern der Vault Standards von selbst einsetzt.
-    const start = startOfNewEntry('operation', categoryId, UNTITLED_TITLES.operation, blank);
+    const start = startOfNewEntry('operation', categoryId, blank);
     const op: Operation = {
       entry_number: await nextEntryNumber(db, 'operations'),
       id: generateId(),
@@ -85,7 +85,7 @@ export const useOperationStore = create<OperationState>((set, get) => ({
     } = src;
     await get().updateOperation(copy.id, {
       ...fields,
-      title: src.title + i18n.t('common.copySuffix'),
+      title: displayTitle(i18n.t, 'operation', src.title) + i18n.t('common.copySuffix'),
     });
     return get().operations.find((o) => o.id === copy.id) ?? copy;
   },

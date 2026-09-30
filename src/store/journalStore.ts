@@ -8,9 +8,9 @@ import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, toInt, type DbRow } from '../lib/row';
 import type { JournalEntry } from '../types';
 import i18n from '../i18n';
+import { displayTitle } from '../lib/entryTitle';
 import { useSettingsStore } from './settingsStore';
 import { startOfNewEntry, useTemplateNoticeStore } from './templateStore';
-import { UNTITLED_TITLES } from '../lib/blocks/templates';
 
 interface JournalState {
   entries: JournalEntry[];
@@ -63,7 +63,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       ? getMoonPhase(new Date(createdAt ?? now))
       : null;
     const entryNumber = await nextEntryNumber(db, 'journal_entries');
-    const start = startOfNewEntry('journal', null, UNTITLED_TITLES.journal, blank);
+    const start = startOfNewEntry('journal', null, blank);
     const entry: JournalEntry = {
       entry_number: entryNumber,
       id: generateId(),
@@ -121,7 +121,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       moon_phase: _moonPhase,
       ...fields
     } = src;
-    await get().updateEntry(copy.id, { ...fields, title: src.title + i18n.t('common.copySuffix') });
+    await get().updateEntry(copy.id, { ...fields, title: displayTitle(i18n.t, 'journal', src.title) + i18n.t('common.copySuffix') });
     return get().entries.find((e) => e.id === copy.id) ?? copy;
   },
 

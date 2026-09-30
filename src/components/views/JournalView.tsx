@@ -20,6 +20,7 @@ import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId } from '../../lib/helpers';
 import { MODULES } from '../../lib/modules';
+import { displayTitle } from '../../lib/entryTitle';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
@@ -265,7 +266,7 @@ export default function JournalView() {
               <div className="text-2xl mb-2">{icon}</div>
               {renaming
                 ? renameInput('text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1')
-                : <div className="text-sm font-medium text-stone-200 truncate mb-1">{e.title}</div>}
+                : <div className="text-sm font-medium text-stone-200 truncate mb-1">{displayTitle(t, 'journal', e.title)}</div>}
               <div className="text-xs text-parchment-500/70">{formatEntryDate(e.created_at)}</div>
               {!renaming && e.tags?.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
@@ -280,7 +281,7 @@ export default function JournalView() {
               <span className="text-base flex-shrink-0">{icon}</span>
               {renaming
                 ? renameInput('flex-1 bg-transparent text-sm text-stone-300 outline-none selectable')
-                : <span className="flex-1 text-sm text-stone-300 truncate">{e.title}</span>}
+                : <span className="flex-1 text-sm text-stone-300 truncate">{displayTitle(t, 'journal', e.title)}</span>}
               <span className="text-xs text-parchment-500/70 flex-shrink-0">{formatEntryDate(e.created_at)}</span>
             </>
           )}

@@ -12,7 +12,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { getDb, sweepDanglingTaskLinks } from './db';
+import { clearLegacyUntitledTitles, getDb, sweepDanglingTaskLinks } from './db';
 import { remapInternalLinks } from './internalLinkHtml';
 import {
   addVault,
@@ -1273,6 +1273,8 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   // gerade ersetzte Ziele verwaisen lassen — und importierte task_links
   // können auf abgewählte Typen zeigen. Gleicher Sweep wie beim Papierkorb.
   await sweepDanglingTaskLinks(db);
+  // Eine Sicherung von vor v48 bringt die englischen Standardtitel mit.
+  await clearLegacyUntitledTitles(db);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1451,9 +1453,10 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
 
   await convertImportedSigils(db, backup, operations);
 
-  // Importierte task_links können auf Ziele zeigen, die der
-  // Typ-/Kategorie-Filter gerade abgewählt hat — wie in doReplace ausfegen.
+  // Importierte task_links können auf Ziele zeigen, die der Typ-Filter
+  // gerade abgewählt hat — wie in doReplace ausfegen.
   await sweepDanglingTaskLinks(db);
+  await clearLegacyUntitledTitles(db);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

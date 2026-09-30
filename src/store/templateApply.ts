@@ -83,7 +83,7 @@ export async function applyTemplateFields(
   if (!fields) return;
   const usable = withUsableTags(template);
   await createMissingTags(usable.tags);
-  await writeChangedFields(entryType, id, fields, fieldsWithTemplate(fields, entryType, usable, options));
+  await writeChangedFields(entryType, id, fields, fieldsWithTemplate(fields, usable, options));
 }
 
 /**
@@ -98,7 +98,7 @@ export async function undoTemplateFields(
 ): Promise<void> {
   const fields = entryFields(entryType, id);
   if (!fields) return;
-  await writeChangedFields(entryType, id, fields, fieldsWithoutTemplate(fields, entryType, template));
+  await writeChangedFields(entryType, id, fields, fieldsWithoutTemplate(fields, template));
 }
 
 /**

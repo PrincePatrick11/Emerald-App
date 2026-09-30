@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { formatEntryDate } from '../../lib/formatDate';
 import { categoryLabel, lookupCategory } from '../../lib/categories';
 import { entryIcon, type LeftListTabId } from '../../lib/modules';
+import { displayTitle } from '../../lib/entryTitle';
 import { Flame, CheckSquare, Square, Copy, Pencil, Trash2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -172,13 +173,13 @@ function useJournalConfig(): EntryListTabProps<JournalEntry> {
   return {
     items: entries,
     getId: (e) => e.id,
-    getTitle: (e) => e.title,
+    getTitle: (e) => displayTitle(t, 'journal', e.title),
     getDateStr: (e) => formatEntryDate(e.created_at),
     getIcon: (e) => <span className="text-base leading-none flex-shrink-0">{MOON_PHASE_SYMBOLS[e.moon_phase as MoonPhase] ?? '📓'}</span>,
     isActive: (e) => activeView.id === e.id,
     onOpen: (e) => setActiveView({ type: 'journal', id: e.id, mode: 'view' }),
     onOpenNewTab: (e) => openViewInNewTab({ type: 'journal', id: e.id, mode: 'view' }),
-    onDragStart: (e) => setDragItem({ id: e.id, entryType: 'journal', label: e.title }),
+    onDragStart: (e) => setDragItem({ id: e.id, entryType: 'journal', label: displayTitle(t, 'journal', e.title) }),
     onRename: (e, title) => updateEntry(e.id, { title }),
     contextMenuActions: (e, startRename) => [
       openInNewTabAction({ type: 'journal', id: e.id, mode: 'view' }),
@@ -228,7 +229,7 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
   return {
     items: sorted,
     getId: (op) => op.id,
-    getTitle: (op) => op.title,
+    getTitle: (op) => displayTitle(t, 'operation', op.title),
     getDateStr: (op) => {
       const cat = lookupCategory(catById, op.category_id);
       const catDisplayName = cat ? catName(cat) : '';
@@ -244,7 +245,7 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
     isActive: (op) => activeView.id === op.id,
     onOpen: (op) => setActiveView({ type: 'operations', id: op.id, mode: 'view' }),
     onOpenNewTab: (op) => openViewInNewTab({ type: 'operations', id: op.id, mode: 'view' }),
-    onDragStart: (op) => setDragItem({ id: op.id, entryType: 'operation', label: op.title, category: lookupCategory(catById, op.category_id)?.emoji }),
+    onDragStart: (op) => setDragItem({ id: op.id, entryType: 'operation', label: displayTitle(t, 'operation', op.title), category: lookupCategory(catById, op.category_id)?.emoji }),
     onRename: (op, title) => updateOperation(op.id, { title }),
     contextMenuActions: (op, startRename) => [
       openInNewTabAction({ type: 'operations', id: op.id, mode: 'view' }),
@@ -293,7 +294,7 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
   return {
     items: sorted,
     getId: (a) => a.id,
-    getTitle: (a) => a.title,
+    getTitle: (a) => displayTitle(t, 'wiki', a.title),
     getDateStr: (a) => {
       const cat = lookupCategory(catById, a.category_id);
       // Kein Fallback auf die rohe category_id — bei gelöschter Kategorie
@@ -310,7 +311,7 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
     isActive: (a) => activeView.id === a.id,
     onOpen: (a) => setActiveView({ type: 'wiki', id: a.id, mode: 'view' }),
     onOpenNewTab: (a) => openViewInNewTab({ type: 'wiki', id: a.id, mode: 'view' }),
-    onDragStart: (a) => setDragItem({ id: a.id, entryType: 'wiki', label: a.title, category: lookupCategory(catById, a.category_id)?.emoji }),
+    onDragStart: (a) => setDragItem({ id: a.id, entryType: 'wiki', label: displayTitle(t, 'wiki', a.title), category: lookupCategory(catById, a.category_id)?.emoji }),
     onRename: (a, title) => updateArticle(a.id, { title }),
     contextMenuActions: (a, startRename) => [
       openInNewTabAction({ type: 'wiki', id: a.id, mode: 'view' }),
@@ -350,7 +351,7 @@ function useAltarConfig(): EntryListTabProps<AltarRecord> {
   return {
     items: sorted,
     getId: (a) => a.id,
-    getTitle: (a) => a.title,
+    getTitle: (a) => displayTitle(t, 'altar', a.title),
     getDateStr: (a) => formatEntryDate(a.updated_at),
     getIcon: (a) => (isImageIcon(a.icon_data)
       ? <img src={a.icon_data!} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
@@ -358,7 +359,7 @@ function useAltarConfig(): EntryListTabProps<AltarRecord> {
     isActive: (a) => activeView.id === a.id,
     onOpen: (a) => setActiveView({ type: 'altar', id: a.id, mode: 'view' }),
     onOpenNewTab: (a) => openViewInNewTab({ type: 'altar', id: a.id, mode: 'view' }),
-    onDragStart: (a) => setDragItem({ id: a.id, entryType: 'altar', label: a.title }),
+    onDragStart: (a) => setDragItem({ id: a.id, entryType: 'altar', label: displayTitle(t, 'altar', a.title) }),
     onRename: (a, title) => updateAltar(a.id, { title }),
     contextMenuActions: (a, startRename) => [
       openInNewTabAction({ type: 'altar', id: a.id, mode: 'view' }),
@@ -394,7 +395,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
   // Eine Payload für beide Drag-Stellen (Standard-Config fürs „Alle"-Tab und
   // der Hand-Griff im renderRow unten), damit sie nicht auseinanderdriften.
   const taskDragItem = (task: Task) =>
-    setDragItem({ id: task.id, entryType: 'task', label: task.title, category: lookupCategory(catById, task.category_id)?.emoji });
+    setDragItem({ id: task.id, entryType: 'task', label: displayTitle(t, 'task', task.title), category: lookupCategory(catById, task.category_id)?.emoji });
 
   const handleDelete = async (task: (typeof tasks)[number]) => {
     await deleteTask(task.id);
@@ -414,7 +415,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
   return {
     items: sorted,
     getId: (task) => task.id,
-    getTitle: (task) => task.title,
+    getTitle: (task) => displayTitle(t, 'task', task.title),
     getDateStr: categoryNameOf,
     getIcon: (task) => (task.completed
       ? <CheckSquare size={14} className="flex-shrink-0 text-stone-600" />
@@ -474,7 +475,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
             onClick={() => openTask(task.id)}
             className="flex-1 min-w-0 text-left cursor-grab active:cursor-grabbing"
           >
-            <div className={`entry-list-title truncate ${task.completed ? 'line-through text-stone-500' : ''}`}>{task.title}</div>
+            <div className={`entry-list-title truncate ${task.completed ? 'line-through text-stone-500' : ''}`}>{displayTitle(t, 'task', task.title)}</div>
             {categoryName && <div className="entry-list-date text-xs">{categoryName}</div>}
           </button>
         </div>

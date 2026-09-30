@@ -5,6 +5,7 @@ import type { TFunction } from 'i18next';
 import { LazyMotion, Reorder, domAnimation } from 'framer-motion';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
+import { hasOwnTitle } from '../../lib/entryTitle';
 import { REORDER_SPRING } from '../../lib/motion';
 import { useAltarStore } from '../../store/altarStore';
 import { useJournalStore } from '../../store/journalStore';
@@ -69,7 +70,7 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
   let title = fallback;
   if (id) {
     const entityTitle = entry?.title ?? article?.title ?? operation?.title ?? task?.title ?? altar?.title;
-    if (entityTitle) title = entityTitle;
+    if (hasOwnTitle(entityTitle)) title = entityTitle;
     else if (definition) title = definitionLabel(t, definition);
     else if (template) title = templateLabel(t, template);
     else if (language) title = language.name;

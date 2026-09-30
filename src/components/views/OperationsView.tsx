@@ -11,6 +11,7 @@ import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { entryIcon, MODULES } from '../../lib/modules';
+import { displayTitle } from '../../lib/entryTitle';
 import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
 import { entryBlockSummary } from '../../lib/blocks/entrySummary';
 import { formatEntryDate } from '../../lib/formatDate';
@@ -270,7 +271,7 @@ export default function OperationsView() {
                 : <div className="text-xl mb-2">{iconValue}</div>}
               {renaming
                 ? renameInput('text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1')
-                : <div className="text-sm font-medium text-stone-200 truncate mb-1">{op.title}</div>}
+                : <div className="text-sm font-medium text-stone-200 truncate mb-1">{displayTitle(t, 'operation', op.title)}</div>}
               <div className="mt-1">
                 <span className="text-xs text-parchment-500/70">{dateStr}</span>
               </div>
@@ -283,7 +284,7 @@ export default function OperationsView() {
               }
               {renaming
                 ? renameInput('flex-1 bg-transparent text-sm text-stone-300 outline-none selectable')
-                : <span className="flex-1 text-sm text-stone-300 truncate">{op.title}</span>}
+                : <span className="flex-1 text-sm text-stone-300 truncate">{displayTitle(t, 'operation', op.title)}</span>}
               <span className="text-xs text-parchment-500/70 flex-shrink-0">{dateStr}</span>
             </>
           )}

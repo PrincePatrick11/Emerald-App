@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { displayTitle } from '../../lib/entryTitle';
 import { Copy, Flame, Pencil, Trash2 } from 'lucide-react';
 import { formatEntryDate } from '../../lib/formatDate';
 import type { TFunction } from 'i18next';
@@ -79,9 +80,9 @@ export const AltarCard = memo(function AltarCard({
   onCancelRename,
   onContextMenu,
 }: AltarCardProps) {
-  // Abonniert Sprachwechsel für die Datums-Locale — memo ohne t-Prop würde
+  // Abonniert auch Sprachwechsel für die Datums-Locale — memo ohne t-Prop würde
   // sonst beim Umschalten das alte Format weiterzeigen.
-  useTranslation();
+  const { t } = useTranslation();
   if (isRenaming) {
     return (
       <DashboardItem view={altarView(altar)} layout="card" editing>
@@ -120,7 +121,7 @@ export const AltarCard = memo(function AltarCard({
   return (
     <DashboardItem view={altarView(altar)} layout="card" onContextMenu={onContextMenu}>
       <div className="mb-3">{preview}</div>
-      <div className="text-sm font-medium text-stone-200 truncate">{altar.title}</div>
+      <div className="text-sm font-medium text-stone-200 truncate">{displayTitle(t, 'altar', altar.title)}</div>
       <div className="mt-2 flex flex-wrap gap-2 text-xs">
         <span className="text-parchment-500/70">{formatEntryDate(altar.updated_at)}</span>
       </div>
@@ -139,8 +140,8 @@ export const AltarListRow = memo(function AltarListRow({
   onCancelRename,
   onContextMenu,
 }: CommonProps) {
-  // Siehe AltarCard: Subscription für die Datums-Locale.
-  useTranslation();
+  // Siehe AltarCard: auch die Subscription für die Datums-Locale.
+  const { t } = useTranslation();
   if (isRenaming) {
     return (
       <DashboardItem view={altarView(altar)} layout="row" editing>
@@ -171,7 +172,7 @@ export const AltarListRow = memo(function AltarListRow({
   return (
     <DashboardItem view={altarView(altar)} layout="row" onContextMenu={onContextMenu}>
       <span className="flex-shrink-0">{preview}</span>
-      <span className="flex-1 text-sm text-stone-300 truncate">{altar.title}</span>
+      <span className="flex-1 text-sm text-stone-300 truncate">{displayTitle(t, 'altar', altar.title)}</span>
       <span className="text-xs text-stone-600">{formatEntryDate(altar.updated_at)}</span>
     </DashboardItem>
   );
