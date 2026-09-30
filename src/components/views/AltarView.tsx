@@ -165,9 +165,13 @@ export default function AltarView() {
 
   useEffect(() => { altarWindowFullscreenRef.current = altarWindowFullscreen; }, [altarWindowFullscreen]);
 
+  // Vollbild gilt dem einen Altar im Lesen: Bearbeiten, das Dashboard und
+  // jedes Wegnavigieren beenden es — sonst stünde der nächste Altar-Besuch
+  // (auch das Dashboard, ohne Knopf zum Verlassen) wieder darin.
   useEffect(() => {
-    if (isEditing && altarWindowFullscreen) setAltarWindowFullscreen(false);
-  }, [isEditing, altarWindowFullscreen, setAltarWindowFullscreen]);
+    if (altarWindowFullscreen && (isEditing || !activeAltar)) setAltarWindowFullscreen(false);
+  }, [isEditing, activeAltar, altarWindowFullscreen, setAltarWindowFullscreen]);
+  useEffect(() => () => useUIStore.getState().setAltarWindowFullscreen(false), []);
 
   useEffect(() => {
     if (!altarWindowFullscreen) return;

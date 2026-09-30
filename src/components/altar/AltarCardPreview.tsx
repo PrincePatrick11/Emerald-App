@@ -24,7 +24,7 @@ export const AltarCardPreview = memo(function AltarCardPreview({
     >
       <div className="absolute bottom-[28%] left-[8%] right-[8%] h-px bg-gradient-to-r from-transparent via-stone-700/50 to-transparent pointer-events-none" />
       <div className="absolute bottom-[26%] left-[12%] right-[12%] h-px bg-gradient-to-r from-transparent via-stone-800/30 to-transparent pointer-events-none" />
-      {previewItems.slice(0, compact ? 1 : 7).map((placement) => {
+      {previewItems.filter((placement) => !placement.hidden).slice(0, compact ? 1 : 7).map((placement) => {
         const size = compact
           ? 16
           : Math.max(16, Math.min(52, Math.round((placement.width ?? 8) * 2)));

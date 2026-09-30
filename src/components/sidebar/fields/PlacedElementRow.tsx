@@ -179,8 +179,13 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
 
   const opacityPercent = Math.max(5, Math.min(100, Number(draft.opacity) || 100));
 
+  // Gesperrt heißt auch hier gesperrt, nicht nur auf der Fläche.
   return (
-    <div className="rounded border border-stone-700/50 bg-stone-900/40 px-2 py-1.5 space-y-1.5">
+    <fieldset
+      disabled={placement.locked}
+      title={placement.locked ? t('altar.inspectorLocked') : undefined}
+      className={`min-w-0 rounded border border-stone-700/50 bg-stone-900/40 px-2 py-1.5 space-y-1.5 ${placement.locked ? 'opacity-50' : ''}`}
+    >
       <div className="grid grid-cols-4 gap-1">
         {([
           { field: 'x'            as const, label: t('altar.inspectorX'),        apply: () => applyNumber('x', draft.x),             unit: '%' },
@@ -219,10 +224,10 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
               setDraft((d) => ({ ...d, opacity: val }));
               applyNumber('opacity', val);
             }}
-            className="absolute inset-x-0 w-full opacity-0 cursor-pointer h-4"
+            className="absolute inset-x-0 w-full opacity-0 cursor-pointer h-4 disabled:cursor-default"
           />
         </div>
       </div>
-    </div>
+    </fieldset>
   );
 });

@@ -25,6 +25,14 @@ import { canvasImageSrc } from '../../lib/images';
 import { THUMBNAIL_W, canvasToCappedThumbnail } from '../../lib/thumbnail';
 
 const BASE_SIZE = 40;
+/** Ab so viel Weg wird aus einem Druck auf ein Element ein Ziehen. */
+const DRAG_THRESHOLD_PX = 3;
+
+/** Ein Bildschirmpunkt in Prozent der Fläche `el`, ungerundet. */
+function pointerPercent(el: HTMLElement, clientX: number, clientY: number): { x: number; y: number } {
+  const rect = el.getBoundingClientRect();
+  return { x: ((clientX - rect.left) / rect.width) * 100, y: ((clientY - rect.top) / rect.height) * 100 };
+}
 
 // ---------------------------------------------------------------------------
 // Altar thumbnail renderer — draws directly to a Canvas 2D context from
@@ -323,7 +331,15 @@ export function AltarCanvas({
 
   const canvasScale = nativeW / BASE_RESOLUTION_WIDTH;
   const canvasRef = useRef<HTMLDivElement>(null);
-  const draggingRef = useRef<string | null>(null);
+  /**
+   * Das gezogene Element: wo es gegriffen wurde (relativ zu seiner Mitte, in
+   * Prozent) und wo der Druck begann. Erst ab ein paar Pixeln Weg ist es ein
+   * Ziehen — ein Klick wählt nur aus und verschiebt nichts.
+   */
+  const draggingRef = useRef<{ id: string; grabX: number; grabY: number; startX: number; startY: number; moved: boolean } | null>(null);
+  // Einrasten braucht das Raster, an dem es einrastet: ohne sichtbares Raster rastet nichts.
+  const snapPosition = snapToGrid && showGrid;
+  const snapScale = snapScaleToGrid && showGrid;
   const [sidebarDragItem, setSidebarDragItem] = useState<AltarItem | null>(null);
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
   const sortedPlacements = useMemo(
@@ -334,11 +350,16 @@ export function AltarCanvas({
   // down once to PlacedItem rather than recreated per-item inside the map.
   // PlacedItem calls e.g. onStartDrag() — we give it the bound version below
   // via useMemo so memo() can bail out when nothing changed.
-  const handleStartDragById = useCallback((id: string) => { draggingRef.current = id; }, []);
+  const handleStartDragById = useCallback((id: string, clientX: number, clientY: number) => {
+    const placement = useAltarStore.getState().placements.find((p) => p.id === id);
+    if (!placement) return;
+    const { x, y } = pointerPercent(canvasRef.current!, clientX, clientY);
+    draggingRef.current = { id, grabX: x - placement.x, grabY: y - placement.y, startX: clientX, startY: clientY, moved: false };
+  }, []);
   const handleSelectById = useCallback((id: string) => { selectPlacement(id); }, [selectPlacement]);
   const handleResizeById = useCallback(
     (id: string, width: number, height: number) => {
-      if (snapScaleToGrid && gridSize > 0) {
+      if (snapScale && gridSize > 0) {
         // Determine N (cells to span) from width, apply same N to height → snaps as a box.
         const displayW = gridScaledBase * (width / 8);
         const N = Math.max(2, Math.round(displayW / gridCellW / 2) * 2);
@@ -349,18 +370,16 @@ export function AltarCanvas({
         updatePlacement(id, { width, height });
       }
     },
-    [updatePlacement, snapScaleToGrid, gridCellW, gridCellH, gridScaledBase],
+    [updatePlacement, snapScale, gridSize, gridCellW, gridCellH, gridScaledBase],
   );
   const handleRotateById = useCallback(
     (id: string, rotation: number) => updatePlacement(id, { rotation }),
     [updatePlacement],
   );
 
-  const coordsToPercent = useCallback((clientX: number, clientY: number) => {
-    const rect = canvasRef.current!.getBoundingClientRect();
-    const rawX = ((clientX - rect.left) / rect.width) * 100;
-    const rawY = ((clientY - rect.top) / rect.height) * 100;
-    if (snapToGrid) {
+  /** Ein Punkt in Prozent der Fläche, eingerastet und am Rand gehalten. */
+  const placeAt = useCallback((rawX: number, rawY: number) => {
+    if (snapPosition) {
       const stepX = 100 / gridNumCols;
       const stepY = 100 / gridNumRows;
       const snappedX = stepX > 0 ? Math.round(rawX / stepX) * stepX : rawX;
@@ -368,7 +387,19 @@ export function AltarCanvas({
       return { x: Math.max(3, Math.min(97, snappedX)), y: Math.max(3, Math.min(97, snappedY)) };
     }
     return { x: Math.max(3, Math.min(97, rawX)), y: Math.max(3, Math.min(97, rawY)) };
-  }, [snapToGrid, gridNumCols, gridNumRows]);
+  }, [snapPosition, gridNumCols, gridNumRows]);
+
+  const coordsToPercent = useCallback((clientX: number, clientY: number) => {
+    const { x, y } = pointerPercent(canvasRef.current!, clientX, clientY);
+    return placeAt(x, y);
+  }, [placeAt]);
+
+  /** Wohin das gezogene Element gehört: der Zeiger, versetzt um die Stelle, an der es gegriffen wurde. */
+  const dragTarget = useCallback((clientX: number, clientY: number) => {
+    const drag = draggingRef.current!;
+    const { x, y } = pointerPercent(canvasRef.current!, clientX, clientY);
+    return placeAt(x - drag.grabX, y - drag.grabY);
+  }, [placeAt]);
 
   useEffect(() => subscribeAltarDrag(setSidebarDragItem), []);
 
@@ -404,19 +435,22 @@ export function AltarCanvas({
   }, [editable, sidebarDragItem, placeItem, coordsToPercent]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!editable) return;
-    if (!draggingRef.current) return;
-    const { x, y } = coordsToPercent(e.clientX, e.clientY);
-    movePlacement(draggingRef.current, x, y);
-  }, [editable, coordsToPercent, movePlacement]);
+    const drag = draggingRef.current;
+    if (!editable || !drag) return;
+    if (!drag.moved && Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < DRAG_THRESHOLD_PX) return;
+    drag.moved = true;
+    const { x, y } = dragTarget(e.clientX, e.clientY);
+    movePlacement(drag.id, x, y);
+  }, [editable, dragTarget, movePlacement]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    if (!editable) return;
-    if (!draggingRef.current) return;
-    const { x, y } = coordsToPercent(e.clientX, e.clientY);
-    savePlacementPosition(draggingRef.current, x, y);
+    const drag = draggingRef.current;
+    if (!editable || !drag) return;
     draggingRef.current = null;
-  }, [editable, coordsToPercent, savePlacementPosition]);
+    if (!drag.moved) return;
+    const { x, y } = dragTarget(e.clientX, e.clientY);
+    savePlacementPosition(drag.id, x, y);
+  }, [editable, dragTarget, savePlacementPosition]);
 
   return (
     <div
@@ -487,7 +521,7 @@ interface PlacedItemProps {
   cssScale: number;
   // Callbacks accept `id` so a single stable reference can be shared
   // across all PlacedItem instances, letting React.memo bail out correctly.
-  onStartDrag: (id: string) => void;
+  onStartDrag: (id: string, clientX: number, clientY: number) => void;
   onSelect: (id: string) => void;
   onResize: (id: string, width: number, height: number) => void;
   onRotate: (id: string, rotation: number) => void;
@@ -512,15 +546,6 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rot
   const rotateTopOffset = -Math.round(38 / safeScale);
   const resizeEdgeOffset = -Math.round(10 / safeScale);
   const tooltipTopOffset = -Math.round(75 / safeScale);
-
-  const handleWheel = (e: React.WheelEvent) => {
-    if (!editable || placement.locked) return;
-    e.stopPropagation();
-    const delta = e.deltaY < 0 ? 0.4 : -0.4;
-    const nextWidth = Math.round(Math.max(2, Math.min(500, width + delta)) * 100) / 100;
-    const nextHeight = Math.round(Math.max(2, Math.min(500, height + delta)) * 100) / 100;
-    onResize(placement.id, nextWidth, nextHeight);
-  };
 
   const startRotate = (event: React.MouseEvent) => {
     if (!editable || placement.locked) return;
@@ -602,11 +627,10 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rot
         onSelect(placement.id);
         if (!editable) return;
         e.preventDefault();
-        onStartDrag(placement.id);
+        onStartDrag(placement.id, e.clientX, e.clientY);
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      onWheel={handleWheel}
     >
       <div style={{ opacity: placement.opacity ?? 1 }}>
         <AltarItemVisual item={placement} size={Math.max(displayWidth, displayHeight)} candleAnimate={isCandleEmoji(placement.emoji)} />

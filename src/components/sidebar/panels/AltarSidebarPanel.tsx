@@ -27,14 +27,31 @@ import { useUIStore } from '../../../store/uiStore';
 import { useUndoStore } from '../../../store/undoStore';
 import { useDisplayedAltar } from '../../../hooks/useDisplayedAltar';
 import { usePointerReorder } from '../../../hooks/usePointerReorder';
+import { usePersistedFlag } from '../../../hooks/usePersistedFlag';
 import { imageSrc, saveImage } from '../../../lib/images';
 import { PlacedElementRow, PlacedElementInspector } from '../fields/PlacedElementRow';
 import AltarReadingSummary from '../fields/AltarReadingSummary';
 import Favicon from '../fields/Favicon';
 import Modal from '../../ui/Modal';
 
+/**
+ * Wohin ein entfernter Hintergrund fällt, eigenes Bild wie Verlauf: das erste
+ * Bild. Nicht der Standard eines neuen Altars — der ist ein alter Verlauf und
+ * sähe nach dem Entfernen aus, als wäre wieder einer aktiv.
+ */
+const BACKGROUND_AFTER_REMOVE = ALTAR_IMAGE_PRESETS[0];
+
 /** Fester Deckel für Hintergründe, nach den Grenzen des Vaults geprüft. */
 const BACKGROUND_MAX_BYTES = 5 * 1024 * 1024;
+
+// Die Klappzustände lagen früher je Altar im localStorage — was davon übrig ist, geht.
+try {
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith('altar-sidebar-sections-')) localStorage.removeItem(key);
+  }
+} catch {
+  // Ohne Speicher gibt es nichts aufzuräumen.
+}
 
 export default function AltarSidebarPanel() {
   const { t } = useTranslation();
@@ -73,43 +90,15 @@ export default function AltarSidebarPanel() {
   const backgroundInputRef = useRef<HTMLInputElement>(null);
 const noticeTimerRef = useRef<number | null>(null);
   const [backgroundNotice, setBackgroundNotice] = useState<string | null>(null);
-  const [backgroundOpen, setBackgroundOpen] = useState(true);
-  const [overlayOpen, setOverlayOpen] = useState(true);
-  const [gradientModalOpen, setGradientModalOpen] = useState(false);
-  const [gradientOriginalColor, setGradientOriginalColor] = useState<string>(GRADIENT_PRESET_COLORS[0]);
-  const [gradientOriginalPreset, setGradientOriginalPreset] = useState<string>('');
-  const [gradientOriginalImage, setGradientOriginalImage] = useState<string | null>(null);
-const [gridOpen, setGridOpen] = useState(true);
-  const [faviconOpen, setFaviconOpen] = useState(true);
-  const [canvasOptionsOpen, setCanvasOptionsOpen] = useState(true);
-  const [placementsOpen, setPlacementsOpen] = useState(true);
-  const altarId = activeAltar?.id;
-  const altarIdRef = useRef<string | undefined>(undefined);
-
-  useEffect(() => {
-    altarIdRef.current = altarId;
-    if (!altarId) return;
-    try {
-      const stored = localStorage.getItem(`altar-sidebar-sections-${altarId}`);
-      const s = stored ? JSON.parse(stored) : {};
-      setBackgroundOpen(typeof s.backgroundOpen === 'boolean' ? s.backgroundOpen : true);
-      setOverlayOpen(typeof s.overlayOpen === 'boolean' ? s.overlayOpen : true);
-      setGridOpen(typeof s.gridOpen === 'boolean' ? s.gridOpen : true);
-      setFaviconOpen(typeof s.faviconOpen === 'boolean' ? s.faviconOpen : true);
-      setCanvasOptionsOpen(typeof s.canvasOptionsOpen === 'boolean' ? s.canvasOptionsOpen : true);
-      setPlacementsOpen(typeof s.placementsOpen === 'boolean' ? s.placementsOpen : true);
-    } catch {}
-  }, [altarId]);
-
-  useEffect(() => {
-    const id = altarIdRef.current;
-    if (!id) return;
-    localStorage.setItem(`altar-sidebar-sections-${id}`, JSON.stringify({
-      backgroundOpen, overlayOpen, gridOpen, faviconOpen, canvasOptionsOpen, placementsOpen,
-    }));
-  // altarIdRef ist absichtlich nicht in den Deps – nur Section-Toggles sollen speichern, nicht der Altar-Wechsel
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backgroundOpen, overlayOpen, gridOpen, faviconOpen, canvasOptionsOpen, placementsOpen]);
+  /** Die Farbe im offenen Verlaufs-Fenster — `null`, solange es zu ist. Geschrieben wird erst mit ✓. */
+  const [gradientDraft, setGradientDraft] = useState<string | null>(null);
+  // Klappzustände wie überall: eine Vorliebe des Vaults, gleich für jeden Altar.
+  const [backgroundOpen, toggleBackground] = usePersistedFlag('altar-edit-background-open', true);
+  const [overlayOpen, toggleOverlay] = usePersistedFlag('altar-edit-overlay-open', true);
+  const [gridOpen, toggleGrid] = usePersistedFlag('altar-edit-grid-open', true);
+  const [faviconOpen, toggleFavicon] = usePersistedFlag('altar-edit-favicon-open', true);
+  const [canvasOptionsOpen, toggleCanvasOptions] = usePersistedFlag('altar-edit-canvas-open', true);
+  const [placementsOpen, togglePlacements] = usePersistedFlag('altar-edit-placements-open', true);
 
   // In-memory cache of previously uploaded background paths for the current session.
   // Allows re-activating a custom background after switching to a preset without
@@ -196,7 +185,7 @@ const [gridOpen, setGridOpen] = useState(true);
       delete next[activeAltar.id];
       return next;
     });
-    updateAltar(activeAltar.id, { background_preset: DEFAULT_ALTAR_BACKGROUND, background_image_data: null }).catch(console.error);
+    updateBackgroundPreset(BACKGROUND_AFTER_REMOVE).catch(console.error);
   };
 
   return (
@@ -217,7 +206,7 @@ const [gridOpen, setGridOpen] = useState(true);
       {activeAltar && isEditing && (
         <div className="pb-5">
           <>
-              <SidebarSectionHeader label={t('altar.favicon')} open={faviconOpen} onToggle={() => setFaviconOpen((v) => !v)} />
+              <SidebarSectionHeader label={t('altar.favicon')} open={faviconOpen} onToggle={toggleFavicon} />
               {faviconOpen && (
                 <div className="mt-2 mb-4">
                   <Favicon
@@ -230,7 +219,7 @@ const [gridOpen, setGridOpen] = useState(true);
               <SidebarSectionHeader
                 label={t('altar.canvasOptions')}
                 open={canvasOptionsOpen}
-                onToggle={() => setCanvasOptionsOpen((v) => !v)}
+                onToggle={toggleCanvasOptions}
                 className="mt-4"
               />
               {canvasOptionsOpen && (
@@ -261,7 +250,7 @@ const [gridOpen, setGridOpen] = useState(true);
           <SidebarSectionHeader
             label={isEditing ? t('altar.changeBackground') : t('altar.background')}
             open={backgroundOpen}
-            onToggle={() => setBackgroundOpen((v) => !v)}
+            onToggle={toggleBackground}
           />
           {backgroundOpen && (isEditing ? (
             <div className="mt-2 space-y-1.5">
@@ -311,14 +300,9 @@ const [gridOpen, setGridOpen] = useState(true);
                 };
                 const removeGradient = () => {
                   setGradientColorMap((prev) => { const next = { ...prev }; delete next[activeAltar.id]; return next; });
-                  if (isGradientActive) updateBackgroundPreset(ALTAR_IMAGE_PRESETS[0]);
+                  if (isGradientActive) updateBackgroundPreset(BACKGROUND_AFTER_REMOVE);
                 };
-                const openModal = () => {
-                  setGradientOriginalColor(displayColor);
-                  setGradientOriginalPreset(activeAltar.background_preset);
-                  setGradientOriginalImage(activeAltar.background_image_data ?? null);
-                  setGradientModalOpen(true);
-                };
+                const openModal = () => setGradientDraft(displayColor);
 
                 return (
                   <>
@@ -361,7 +345,7 @@ const [gridOpen, setGridOpen] = useState(true);
                         {t('altar.backgrounds.gradient')}
                       </Button>
                     )}
-                    {gradientModalOpen && (() => {
+                    {gradientDraft !== null && (() => {
                       const res = activeAltar.resolution;
                       const { w, h } = isRatioFormat(res)
                         ? { w: Number(res.split(':')[0]), h: Number(res.split(':')[1]) }
@@ -369,20 +353,13 @@ const [gridOpen, setGridOpen] = useState(true);
                       const maxW = 240;
                       const previewW = w >= h ? maxW : Math.round(128 * w / h);
                       const previewH = w >= h ? Math.round(maxW * h / w) : 128;
-                      const revertAndClose = () => {
-                        // Mit dem Bild von vorher: war ein eigenes aktiv, käme sonst nur sein Preset zurück.
-                        updateAltar(activeAltar.id, { background_preset: gradientOriginalPreset || DEFAULT_ALTAR_BACKGROUND, background_image_data: gradientOriginalImage }).catch(console.error);
-                        if (isGradientPreset(gradientOriginalPreset) || ALTAR_BACKGROUND_PRESETS.includes(gradientOriginalPreset as (typeof ALTAR_BACKGROUND_PRESETS)[number])) {
-                          setGradientColorMap((prev) => ({ ...prev, [activeAltar.id]: gradientOriginalColor }));
-                        } else {
-                          setGradientColorMap((prev) => { const next = { ...prev }; delete next[activeAltar.id]; return next; });
-                        }
-                        setGradientModalOpen(false);
-                      };
+                      const draft = gradientDraft;
+                      const isPresetDraft = GRADIENT_PRESET_COLORS.includes(draft as (typeof GRADIENT_PRESET_COLORS)[number]);
+                      const close = () => setGradientDraft(null);
                       return (
                         <Modal
                           title={t('altar.backgrounds.gradient')}
-                          onClose={revertAndClose}
+                          onClose={close}
                           widthClassName="w-72"
                           bodyClassName="p-4 space-y-3"
                           className="overflow-hidden"
@@ -390,17 +367,17 @@ const [gridOpen, setGridOpen] = useState(true);
                               <div className="flex justify-center">
                                 <div
                                   className="rounded-lg overflow-hidden border border-stone-700/50"
-                                  style={{ width: previewW, height: previewH, background: generateGradientStyle(displayColor) }}
+                                  style={{ width: previewW, height: previewH, background: generateGradientStyle(draft) }}
                                 />
                               </div>
                               <div className="flex items-center gap-2">
                                 {GRADIENT_PRESET_COLORS.map((color) => (
                                   <button
                                     key={color}
-                                    onClick={() => applyGradient(color)}
+                                    onClick={() => setGradientDraft(color)}
                                     title={color}
                                     className={`h-6 w-6 flex-shrink-0 rounded-full border-2 transition-all ${
-                                      displayColor === color ? 'border-jade-400 scale-110' : 'border-stone-600 hover:border-stone-400'
+                                      draft === color ? 'border-jade-400 scale-110' : 'border-stone-600 hover:border-stone-400'
                                     }`}
                                     style={{ backgroundColor: color }}
                                   />
@@ -408,30 +385,24 @@ const [gridOpen, setGridOpen] = useState(true);
                                 <button
                                   title={t('altar.customColor')}
                                   className={`relative flex h-6 w-6 flex-shrink-0 cursor-pointer items-center justify-center rounded-full border-2 transition-all ${
-                                    !GRADIENT_PRESET_COLORS.includes(displayColor as (typeof GRADIENT_PRESET_COLORS)[number])
-                                      ? 'border-jade-400 scale-110'
-                                      : 'border-stone-600 hover:border-stone-400'
+                                    !isPresetDraft ? 'border-jade-400 scale-110' : 'border-stone-600 hover:border-stone-400'
                                   }`}
-                                  style={
-                                    !GRADIENT_PRESET_COLORS.includes(displayColor as (typeof GRADIENT_PRESET_COLORS)[number])
-                                      ? { backgroundColor: displayColor }
-                                      : { backgroundColor: '#44403c' }
-                                  }
+                                  style={!isPresetDraft ? { backgroundColor: draft } : { backgroundColor: '#44403c' }}
                                 >
                                   <input
                                     type="color"
-                                    value={displayColor}
-                                    onChange={(e) => applyGradient(e.target.value)}
+                                    value={draft}
+                                    onChange={(e) => setGradientDraft(e.target.value)}
                                     className="absolute inset-0 h-full w-full cursor-pointer rounded-full opacity-0"
                                   />
-                                  {GRADIENT_PRESET_COLORS.includes(displayColor as (typeof GRADIENT_PRESET_COLORS)[number]) && (
+                                  {isPresetDraft && (
                                     <span className="text-[10px] leading-none text-stone-400 pointer-events-none">+</span>
                                   )}
                                 </button>
                               </div>
                               <div className="flex items-center justify-end gap-1">
-                                <Button onClick={revertAndClose} variant="ghost"><X size={13} /></Button>
-                                <Button onClick={() => { applyGradient(displayColor); setGradientModalOpen(false); }} variant="ghost" className="text-jade-400"><Check size={13} /></Button>
+                                <Button onClick={close} variant="ghost"><X size={13} /></Button>
+                                <Button onClick={() => { applyGradient(draft); close(); }} variant="ghost" className="text-jade-400"><Check size={13} /></Button>
                               </div>
                         </Modal>
                       );
@@ -525,7 +496,7 @@ const [gridOpen, setGridOpen] = useState(true);
               <SidebarSectionHeader
                 label={t('altar.overlayOptions')}
                 open={overlayOpen}
-                onToggle={() => setOverlayOpen((v) => !v)}
+                onToggle={toggleOverlay}
                 className="mt-4"
               />
               {overlayOpen && (() => {
@@ -580,27 +551,32 @@ const [gridOpen, setGridOpen] = useState(true);
               <SidebarSectionHeader
                 label={t('altar.gridOptions')}
                 open={gridOpen}
-                onToggle={() => setGridOpen((v) => !v)}
+                onToggle={toggleGrid}
                 className="mt-4"
               />
               {gridOpen && <>
               <div className="mt-2 grid grid-cols-4 gap-1">
                 {([
-                  { key: 'grid_enabled' as const, icon: Grid3x3, label: t('altar.gridToggleGrid'), title: t('altar.gridOverlay'), toggle: () => updateAltarGrid(activeAltar.id, { grid_enabled: !activeAltar.grid_enabled }), active: activeAltar.grid_enabled },
-                  { key: 'snap_to_grid' as const, icon: Magnet, label: t('altar.gridToggleSnap'), title: t('altar.snapToGrid'), toggle: () => updateAltarGrid(activeAltar.id, { snap_to_grid: !activeAltar.snap_to_grid }), active: activeAltar.snap_to_grid },
-                  { key: 'rotation_snap_enabled' as const, icon: RotateCw, label: t('altar.gridToggleRotate'), title: t('altar.rotationSnap'), toggle: () => updateAltarGrid(activeAltar.id, { rotation_snap_enabled: !activeAltar.rotation_snap_enabled }), active: activeAltar.rotation_snap_enabled },
-                  { key: 'snap_scale_to_grid' as const, icon: Scaling, label: t('altar.gridToggleScale'), title: t('altar.snapScaleToGrid'), toggle: () => updateAltarGrid(activeAltar.id, { snap_scale_to_grid: !activeAltar.snap_scale_to_grid }), active: activeAltar.snap_scale_to_grid },
-                ] as const).map(({ key, icon: Icon, label, title, toggle, active }) => (
+                  { key: 'grid_enabled' as const, icon: Grid3x3, label: t('altar.gridToggleGrid'), title: t('altar.gridOverlay'), toggle: () => updateAltarGrid(activeAltar.id, { grid_enabled: !activeAltar.grid_enabled }), active: activeAltar.grid_enabled, needsGrid: false },
+                  { key: 'snap_to_grid' as const, icon: Magnet, label: t('altar.gridToggleSnap'), title: t('altar.snapToGrid'), toggle: () => updateAltarGrid(activeAltar.id, { snap_to_grid: !activeAltar.snap_to_grid }), active: activeAltar.snap_to_grid, needsGrid: true },
+                  { key: 'rotation_snap_enabled' as const, icon: RotateCw, label: t('altar.gridToggleRotate'), title: t('altar.rotationSnap'), toggle: () => updateAltarGrid(activeAltar.id, { rotation_snap_enabled: !activeAltar.rotation_snap_enabled }), active: activeAltar.rotation_snap_enabled, needsGrid: false },
+                  { key: 'snap_scale_to_grid' as const, icon: Scaling, label: t('altar.gridToggleScale'), title: t('altar.snapScaleToGrid'), toggle: () => updateAltarGrid(activeAltar.id, { snap_scale_to_grid: !activeAltar.snap_scale_to_grid }), active: activeAltar.snap_scale_to_grid, needsGrid: true },
+                ] as const).map(({ key, icon: Icon, label, title, toggle, active, needsGrid }) => {
+                  // Einrasten am Raster wirkt nur, solange es zu sehen ist (AltarCanvas).
+                  const off = needsGrid && !activeAltar.grid_enabled;
+                  return (
                   <button
                     key={key}
                     onClick={toggle}
-                    title={title}
-                    className={`flex flex-col items-center gap-0.5 rounded-md border px-1 py-1.5 transition-colors ${active ? 'border-jade-600/70 bg-jade-900/40 text-jade-300' : 'border-stone-700/60 bg-stone-900/45 text-stone-500 hover:border-stone-500/70 hover:text-stone-300'}`}
+                    disabled={off}
+                    title={off ? `${title} — ${t('altar.snapNeedsGrid')}` : title}
+                    className={`flex flex-col items-center gap-0.5 rounded-md border px-1 py-1.5 transition-colors ${off ? 'border-stone-700/60 bg-stone-900/45 text-stone-500 opacity-40 cursor-default' : active ? 'border-jade-600/70 bg-jade-900/40 text-jade-300' : 'border-stone-700/60 bg-stone-900/45 text-stone-500 hover:border-stone-500/70 hover:text-stone-300'}`}
                   >
                     <Icon size={13} />
                     <span className="text-[9px] leading-none">{label}</span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
               {activeAltar.grid_enabled && (
                 <div className="mt-2 rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2 space-y-2">
@@ -697,7 +673,7 @@ const [gridOpen, setGridOpen] = useState(true);
           <SidebarSectionHeader
             label={t('altar.placedElements')}
             open={placementsOpen}
-            onToggle={() => setPlacementsOpen((v) => !v)}
+            onToggle={togglePlacements}
             className="pt-4"
           />
           {placementsOpen && <div ref={listRef} className="mt-2 space-y-1 pr-1" onClick={(e) => { if (e.target === e.currentTarget) selectPlacement(null); }}>

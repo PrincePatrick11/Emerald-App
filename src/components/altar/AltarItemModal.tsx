@@ -98,6 +98,11 @@ export function AltarItemModal({
     onClose();
   };
 
+  // Die Rückfrage sagt, was mitgeht: das Element verschwindet von jedem Altar, auf dem es liegt.
+  const altarsShowingItem = useAltarStore((s) => (item
+    ? Object.values(s.previewPlacements).filter((list) => list.some((p) => p.item_id === item.id)).length
+    : 0));
+
   const doDelete = async () => {
     if (!item) return;
     if (!confirmDelete) { setConfirmDelete(true); return; }
@@ -143,7 +148,12 @@ export function AltarItemModal({
           />
         </div>
         {item && confirmDelete ? (
-          <InlineConfirm variant="banner" message={t('common.deleteConfirm')} onConfirm={doDelete} onCancel={() => setConfirmDelete(false)} />
+          <InlineConfirm
+            variant="banner"
+            message={altarsShowingItem ? t('altar.deleteElementConfirm', { count: altarsShowingItem }) : t('common.deleteConfirm')}
+            onConfirm={doDelete}
+            onCancel={() => setConfirmDelete(false)}
+          />
         ) : (
           <div className="flex items-center justify-between gap-2">
             {item ? (

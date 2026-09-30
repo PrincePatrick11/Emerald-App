@@ -155,6 +155,21 @@ interface AltarState {
   restorePlacement: (placement: AltarPlacement) => Promise<void>;
 }
 
+/**
+ * Verwirft die Vorschaubilder der Altäre, auf denen Element `itemId` liegt —
+ * sie zeigten es noch, wie es war. Die Karte fällt bis zum nächsten Rechnen
+ * auf die Live-Vorschau zurück. Eine Folge, keine Änderung am Altar: „Zuletzt
+ * geändert" bleibt.
+ */
+async function dropThumbnailsShowing(db: Awaited<ReturnType<typeof getDb>>, itemId: string): Promise<Set<string>> {
+  const rows = await db.select<{ altar_id: string }[]>(
+    'SELECT DISTINCT altar_id FROM altar_placements WHERE item_id=$1', [itemId]
+  );
+  const ids = new Set(rows.map((r) => r.altar_id));
+  for (const id of ids) await db.execute('UPDATE altars SET thumbnail_data=NULL WHERE id=$1', [id]);
+  return ids;
+}
+
 /** Der Store ohne den Altar `id` — in den Papierkorb gelegt oder endgültig gelöscht. */
 function withoutAltar(s: AltarState, id: string): Partial<AltarState> {
   const { [id]: _removed, ...previewPlacements } = s.previewPlacements;
@@ -391,10 +406,12 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     if (!needsWrite(altar, { resolution: safeRes })) return;
     const db = await getDb();
     const updated_at = stampFor(altar.updated_at);
-    await db.execute('UPDATE altars SET resolution=$1, updated_at=$2, thumbnail_data=NULL WHERE id=$3', [safeRes, updated_at, id]);
+    // Das Vorschaubild bleibt: „Fertig" und das Verlassen rechnen es ohnehin
+    // neu, und ein Import brächte sonst sein passendes nicht mit.
+    await db.execute('UPDATE altars SET resolution=$1, updated_at=$2 WHERE id=$3', [safeRes, updated_at, id]);
     set((s) => ({
       altars: s.altars
-        .map((entry) => (entry.id === id ? { ...entry, resolution: safeRes, updated_at, thumbnail_data: null } : entry))
+        .map((entry) => (entry.id === id ? { ...entry, resolution: safeRes, updated_at } : entry))
         .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
     }));
   }),
@@ -532,7 +549,10 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       'UPDATE altar_items SET name=$1, emoji=$2, category_id=$3, note=$4, image_data=$5 WHERE id=$6',
       [updated.name, updated.emoji, updated.category_id, updated.note, updated.image_data ?? null, id]
     );
+    const looksDifferent = updated.emoji !== item.emoji || (updated.image_data ?? null) !== (item.image_data ?? null);
+    const stale = looksDifferent ? await dropThumbnailsShowing(db, id) : new Set<string>();
     set((s) => ({
+      altars: stale.size ? s.altars.map((a) => (stale.has(a.id) ? { ...a, thumbnail_data: null } : a)) : s.altars,
       items: s.items.map((i) => (i.id === id ? updated : i)).sort((a, b) => a.name.localeCompare(b.name)),
       placements: s.placements.map((p) => (p.item_id === id ? { ...p, name: updated.name, emoji: updated.emoji, category_id: updated.category_id, image_data: updated.image_data } : p)),
       previewPlacements: mapEachPreview(s.previewPlacements, (p) => p.item_id === id ? { ...p, name: updated.name, emoji: updated.emoji, category_id: updated.category_id, image_data: updated.image_data } : p),
@@ -541,9 +561,11 @@ export const useAltarStore = create<AltarState>((set, get) => ({
 
   deleteItem: async (id) => {
     const db = await getDb();
+    const stale = await dropThumbnailsShowing(db, id);
     await db.execute('DELETE FROM altar_items WHERE id=$1', [id]);
     await db.execute('DELETE FROM altar_placements WHERE item_id=$1', [id]);
     set((s) => ({
+      altars: s.altars.map((a) => (stale.has(a.id) ? { ...a, thumbnail_data: null } : a)),
       items: s.items.filter((i) => i.id !== id),
       placements: s.placements.filter((p) => p.item_id !== id),
       previewPlacements: filterEachPreview(s.previewPlacements, (p) => p.item_id !== id),
@@ -626,6 +648,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const current = get().placements.find((entry) => entry.id === id);
     if (!current) return;
     const safePatch = clampPlacementPatch(patch);
+    // Nichts geändert (etwa ein Einrasten auf dieselbe Größe): nichts schreiben, nichts stempeln.
+    if (Object.entries(safePatch).every(([key, value]) => current[key as keyof AltarPlacement] === value)) return;
     const next = { ...current, ...safePatch };
     await db.execute(
       'UPDATE altar_placements SET x=$1, y=$2, z_index=$3, width=$4, height=$5, rotation=$6, opacity=$7, locked=$8, hidden=$9 WHERE id=$10',
