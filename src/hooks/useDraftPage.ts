@@ -15,6 +15,11 @@ interface Options<T extends { name: string }> {
   save: (id: string, patch: Partial<T>, base: T) => Promise<unknown>;
   /** Zurück zur Liste. */
   onClose: () => void;
+  /**
+   * Nur für eine gerade mit „Neu" angelegte Seite: was „Abbrechen" tut — sie
+   * in den Papierkorb legen, wie einen neuen Eintrag (`useEntryEditor`).
+   */
+  onCancelNew?: () => void;
   logTag: string;
 }
 
@@ -35,7 +40,7 @@ function comparable<T extends { name: string }>(value: T, key: keyof T): string 
  * (`leaveGuardStore`) — wie bei einem Eintrag im Bearbeiten. Nur der Wechsel
  * in einen anderen Tab lässt den Entwurf liegen: dort geht die Arbeit weiter.
  */
-export function useDraftPage<T extends { name: string }>({ store, viewType, id, label, saved, save, onClose, logTag }: Options<T>) {
+export function useDraftPage<T extends { name: string }>({ store, viewType, id, label, saved, save, onClose, onCancelNew, logTag }: Options<T>) {
   const [base] = useState<T>(() => store.getState().drafts[id]?.base ?? saved);
   const [draft, setDraft] = useState<T>(() => store.getState().drafts[id]?.draft ?? saved);
   const [busy, setBusy] = useState(false);
@@ -56,6 +61,13 @@ export function useDraftPage<T extends { name: string }>({ store, viewType, id, 
   const leave = () => {
     clearDraft(id);
     onClose();
+  };
+
+  /** „Abbrechen": verwirft den Entwurf — und eine neue, nie bestätigte Seite gleich mit. */
+  const cancel = () => {
+    if (!onCancelNew) return leave();
+    clearDraft(id);
+    onCancelNew();
   };
 
   const finish = async () => {
@@ -99,5 +111,5 @@ export function useDraftPage<T extends { name: string }>({ store, viewType, id, 
     return () => useLeaveGuardStore.getState().clearGuard(key);
   }, [viewType, id, store]);
 
-  return { draft, setDraft, patch, dirty, busy, setBusy, finish, leave };
+  return { draft, setDraft, patch, dirty, busy, setBusy, finish, leave, cancel };
 }

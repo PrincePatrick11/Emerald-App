@@ -353,7 +353,8 @@
       "removeOption": "Option entfernen",
       "hideEmpty": "Leer im Lesemodus ausblenden",
       "readOnly": "Komplett schreibgeschützt",
-      "readOnlyHint": "Auch im Lesemodus nichts abhaken oder umschalten"
+      "readOnlyHint": "Auch im Lesemodus nichts abhaken oder umschalten",
+      "fromDefinition": "Kommt aus dem Block „{{name}}“ — dort ändern, dann hier „Block aktualisieren“."
     },
     "library": {
       "defaultName": "Neuer Block",
@@ -472,6 +473,7 @@
     "cancel": "Abbrechen",
     "delete": "Löschen",
     "edit": "Bearbeiten",
+    "lockedBySigil": "Eine geladene Sigille sperrt diesen Eintrag — erst entladen",
     "editing": "wird bearbeitet…",
     "confirm": "Bestätigen",
     "editLink": "Link bearbeiten",

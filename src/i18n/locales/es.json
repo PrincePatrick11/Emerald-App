@@ -353,7 +353,8 @@
       "removeOption": "Eliminar opción",
       "hideEmpty": "Ocultar vacío en modo lectura",
       "readOnly": "Totalmente de solo lectura",
-      "readOnlyHint": "Tampoco marcar ni alternar en modo lectura"
+      "readOnlyHint": "Tampoco marcar ni alternar en modo lectura",
+      "fromDefinition": "Viene del bloque «{{name}}»: cámbialo allí y luego «Actualizar bloque» aquí."
     },
     "library": {
       "defaultName": "Nuevo bloque",
@@ -472,6 +473,7 @@
     "cancel": "Cancelar",
     "delete": "Eliminar",
     "edit": "Editar",
+    "lockedBySigil": "Un sigilo cargado bloquea esta entrada: descárgalo primero",
     "editing": "editando…",
     "confirm": "Confirmar",
     "editLink": "Editar enlace",

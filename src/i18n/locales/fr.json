@@ -353,7 +353,8 @@
       "removeOption": "Supprimer l'option",
       "hideEmpty": "Masquer si vide en mode lecture",
       "readOnly": "Entièrement en lecture seule",
-      "readOnlyHint": "Pas de cochage ni de bascule en mode lecture non plus"
+      "readOnlyHint": "Pas de cochage ni de bascule en mode lecture non plus",
+      "fromDefinition": "Vient du bloc « {{name}} » — modifiez-le là-bas, puis « Mettre à jour le bloc » ici."
     },
     "library": {
       "defaultName": "Nouveau bloc",
@@ -472,6 +473,7 @@
     "cancel": "Annuler",
     "delete": "Supprimer",
     "edit": "Modifier",
+    "lockedBySigil": "Un sigil chargé verrouille cette entrée — déchargez-le d’abord",
     "editing": "en cours de modification…",
     "confirm": "Confirmer",
     "editLink": "Modifier le lien",

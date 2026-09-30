@@ -30,6 +30,8 @@ interface Props {
   /** Zurück zur Liste. Der Zurück-Link über dem Titel lässt den Entwurf liegen; „Fertig" und „Abbrechen" erledigen ihn vorher. */
   onClose: () => void;
   onDelete: () => void;
+  /** Gerade mit „Neu" angelegt: „Abbrechen" legt sie in den Papierkorb (`onDelete`). */
+  isNew?: boolean;
 }
 
 /**
@@ -44,10 +46,10 @@ interface Props {
  * geänderten Felder — und setzt dabei gewählte Sterne, die anderen Vorlagen
  * dann fehlen. Einträge ändern sich nie: sie tragen Kopien.
  */
-export default function TemplateEditor({ template, entries, onClose, onDelete }: Props) {
+export default function TemplateEditor({ template, entries, onClose, onDelete, isNew }: Props) {
   const { t } = useTranslation();
   const updateTemplate = useTemplateStore((s) => s.updateTemplate);
-  const { draft, patch, dirty, busy, finish, leave } = useDraftPage({
+  const { draft, patch, dirty, busy, finish, cancel } = useDraftPage({
     store: useTemplateDraftStore,
     viewType: 'templates',
     id: template.id,
@@ -58,6 +60,7 @@ export default function TemplateEditor({ template, entries, onClose, onDelete }:
       ? { ...patch, assignments: mergeAssignmentChanges(base.assignments, patch.assignments, useTemplateStore.getState().templates.find((t) => t.id === id)?.assignments ?? []) }
       : patch),
     onClose,
+    onCancelNew: isNew ? onDelete : undefined,
     logTag: 'TemplateEditor',
   });
   // Nur der Anfangswert: der Stapel ist danach unkontrolliert (siehe BlockStack).
@@ -97,7 +100,7 @@ export default function TemplateEditor({ template, entries, onClose, onDelete }:
     <LibraryPageFrame
       backLabel={t('nav.templates')}
       onBack={onClose}
-      draft={{ dirty, busy, onDone: () => void finish(), onCancel: leave, onDelete }}
+      draft={{ dirty, busy, onDone: () => void finish(), onCancel: cancel, onDelete }}
       name={draft.name}
       nameLabel={t('templates.name')}
       namePlaceholder={t('templates.namePlaceholder')}

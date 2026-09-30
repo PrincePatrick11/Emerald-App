@@ -6,6 +6,8 @@ import { copyUsage, useBlockContentRows, type CopyUsage } from '../../store/bloc
 import { useTemplateStore } from '../../store/templateStore';
 import { useUIStore, type SortMode } from '../../store/uiStore';
 import { useBlockDraftStore } from '../../store/draftStore';
+import { useUndoStore } from '../../store/undoStore';
+import { generateId } from '../../lib/helpers';
 import { AUX_VIEWS } from '../../lib/modules';
 import { definitionLabel } from '../../lib/blocks/blockAttrs';
 import type { BlockDefinition } from '../../lib/blocks/definitions';
@@ -34,6 +36,9 @@ export default function BlocksView() {
   const { t } = useTranslation();
   const definitions = useBlockDefinitionStore((s) => s.definitions);
   const createDefinition = useBlockDefinitionStore((s) => s.createDefinition);
+  const deleteDefinition = useBlockDefinitionStore((s) => s.deleteDefinition);
+  const restoreDefinition = useBlockDefinitionStore((s) => s.restoreDefinition);
+  const pushUndo = useUndoStore((s) => s.push);
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const clearDraft = useBlockDraftStore((s) => s.clearDraft);
@@ -46,12 +51,32 @@ export default function BlocksView() {
   // Eine id ohne Definition (gelöscht, anderer Vault im gemerkten Tab) fällt auf die Liste zurück.
   const selected = activeView.id ? definitions.find((d) => d.id === activeView.id) ?? null : null;
 
-  const open = (id: string) => setActiveView({ type: 'blocks', id });
   const backToList = () => setActiveView({ type: 'blocks' });
 
   const create = async () => {
     const def = await createDefinition(t('blocks.library.defaultName'));
-    open(def.id);
+    setActiveView({ type: 'blocks', id: def.id, isNew: true });
+  };
+
+  /**
+   * Wie alles andere ohne Rückfrage in den Papierkorb, mit Rückgängig. Nur wo
+   * Kopien in Einträgen oder Vorlagen stecken, fragt der Dialog, ob sie mit
+   * entfernt werden sollen.
+   */
+  const remove = async (def: BlockDefinition) => {
+    const used = usage.get(def.id);
+    if ((used?.entries ?? 0) + (used?.templates ?? 0) > 0) {
+      setDeleting(def);
+      return;
+    }
+    await deleteDefinition(def.id);
+    clearDraft(def.id);
+    if (activeView.id === def.id) backToList();
+    pushUndo({
+      id: generateId(),
+      description: t('undo.blockDefinitionDeleted'),
+      undo: () => restoreDefinition(def.id),
+    });
   };
 
   const deleteModal = deleting && (
@@ -77,10 +102,11 @@ export default function BlocksView() {
           definition={selected}
           usage={usage.get(selected.id)}
           onClose={backToList}
-          onDelete={() => setDeleting(selected)}
+          onDelete={() => void remove(selected)}
+          isNew={activeView.isNew}
         />
       ) : (
-        <BlockList usage={usage} onCreate={() => void create()} onDelete={setDeleting} />
+        <BlockList usage={usage} onCreate={() => void create()} onDelete={(def) => void remove(def)} />
       )}
       {deleteModal}
     </>

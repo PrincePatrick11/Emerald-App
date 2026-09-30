@@ -353,7 +353,8 @@
       "removeOption": "Remove option",
       "hideEmpty": "Hide empty in read mode",
       "readOnly": "Fully read-only",
-      "readOnlyHint": "No ticking or toggling in read mode either"
+      "readOnlyHint": "No ticking or toggling in read mode either",
+      "fromDefinition": "Comes from the block “{{name}}” — change it there, then “Update block” here."
     },
     "library": {
       "defaultName": "New block",
@@ -472,6 +473,7 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "edit": "Edit",
+    "lockedBySigil": "A charged sigil locks this entry — discharge it first",
     "editing": "editing…",
     "confirm": "Confirm",
     "editLink": "Edit link",

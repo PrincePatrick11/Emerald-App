@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { elementLabel } from '../../lib/blocks/blockAttrs';
+import { definitionLabel, elementLabel } from '../../lib/blocks/blockAttrs';
+import { BLOCK_ATTR } from '../../lib/blocks/types';
+import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import {
   activeElements, canBeEmpty, elementKindLabelKey, parseFields, serializeFields, type ElementDef, type FieldsModel,
 } from '../../lib/blocks/fields';
@@ -19,6 +21,11 @@ import type { BlockSidebarEditProps } from './blockSidebarViews';
 export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditProps) {
   const { t } = useTranslation();
   const text = useFieldFallbackText();
+  // Eine Kopie eines eigenen Blocks trägt dessen Einstellungen: „Block
+  // aktualisieren" schriebe hier Geändertes still zurück. Geändert wird darum
+  // nur in der Definition — solange es sie gibt.
+  const originId = block.attrs[BLOCK_ATTR.origin];
+  const origin = useBlockDefinitionStore((s) => (originId ? s.definitions.find((d) => d.id === originId) : undefined));
   const model = parseFields(block);
   // Unlesbare Daten: keine Einstellungen — jede würde sie mit „leer" überschreiben.
   if (model.broken) return null;
@@ -29,7 +36,8 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
   const elements = activeElements(model);
 
   return (
-    <div className="space-y-3">
+    <fieldset disabled={!!origin} className="min-w-0 space-y-3">
+      {origin && <p className="block-field-hint">{t('blocks.fields.fromDefinition', { name: definitionLabel(t, origin) })}</p>}
       {elements.map((element, index) => {
         const hides = element.hideWhenEmpty ?? model.display.readHideEmpty;
         return (
@@ -74,6 +82,6 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
         hint={t('blocks.fields.readOnlyHint')}
         onChange={(readOnly) => write({ ...model, display: { ...model.display, readOnly } })}
       />
-    </div>
+    </fieldset>
   );
 }

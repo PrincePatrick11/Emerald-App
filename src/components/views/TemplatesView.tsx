@@ -46,12 +46,11 @@ export default function TemplatesView() {
   // Eine id ohne Vorlage (gelöscht, anderer Vault im gemerkten Tab) fällt auf die Liste zurück.
   const selected = activeView.id ? templates.find((tpl) => tpl.id === activeView.id) ?? null : null;
 
-  const open = (id: string) => setActiveView({ type: 'templates', id });
   const backToList = () => setActiveView({ type: 'templates' });
 
   const create = async () => {
     const template = await createTemplate(t('templates.defaultName'));
-    open(template.id);
+    setActiveView({ type: 'templates', id: template.id, isNew: true });
   };
 
   const remove = async (template: Template) => {
@@ -78,6 +77,7 @@ export default function TemplatesView() {
       entries={entries.get(selected.id) ?? []}
       onClose={backToList}
       onDelete={() => void remove(selected)}
+      isNew={activeView.isNew}
     />
   ) : (
     <TemplateList entries={entries} onCreate={() => void create()} onDelete={(tpl) => void remove(tpl)} />

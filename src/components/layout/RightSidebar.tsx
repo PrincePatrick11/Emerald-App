@@ -68,11 +68,9 @@ function RightSidebarActionBar() {
   }
 
   // Eine geladene Sigille mit Sperre „ganzer Eintrag" lässt sich nicht
-  // bearbeiten — der Ladung-Block entscheidet, in jeder Eintragsart.
-  if (content !== undefined && entryBlockSummary(activeView.id, content).sigil?.lockEntry) {
-    return null;
-  }
-
+  // bearbeiten — der Ladung-Block entscheidet, in jeder Eintragsart. Der Knopf
+  // bleibt stehen und sagt, warum er nichts tut.
+  const locked = content !== undefined && !!entryBlockSummary(activeView.id, content).sigil?.lockEntry;
   const isAltar = activeView.type === 'altar';
 
   return (
@@ -80,7 +78,8 @@ function RightSidebarActionBar() {
       <Button
         tone="amber"
         fill
-        title={t('editor.edit')}
+        disabled={locked}
+        title={locked ? t('editor.lockedBySigil') : t('editor.edit')}
         aria-label={t('editor.edit')}
         onClick={() => setActiveView({ ...activeView, mode: 'edit' })}
       >

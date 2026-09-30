@@ -50,9 +50,11 @@ interface Props {
   /** Zurück zur Liste. Der Zurück-Link über dem Titel lässt den Entwurf liegen (die Liste
    *  zeigt ihn als ungespeichert); „Fertig" und „Abbrechen" erledigen ihn vorher. */
   onClose: () => void;
-  /** Öffnet den Löschdialog — den hält die Ansicht, damit seine Abschlussmeldung
-   *  die Seite überlebt, die mit der Definition verschwindet. */
+  /** Löscht — ohne Kopien sofort, sonst über den Dialog, den die Ansicht hält,
+   *  damit seine Abschlussmeldung die Seite überlebt, die mit der Definition verschwindet. */
   onDelete: () => void;
+  /** Gerade mit „Neu" angelegt: „Abbrechen" legt ihn in den Papierkorb (`onDelete`). */
+  isNew?: boolean;
 }
 
 /**
@@ -66,11 +68,11 @@ interface Props {
  * statt gelöscht: Kopien können Werte dafür haben, und es lässt sich
  * zurückholen.
  */
-export default function BlockDefinitionEditor({ definition, usage, onClose, onDelete }: Props) {
+export default function BlockDefinitionEditor({ definition, usage, onClose, onDelete, isNew }: Props) {
   const { t } = useTranslation();
   const text = useFieldFallbackText();
   const updateDefinition = useBlockDefinitionStore((s) => s.updateDefinition);
-  const { draft, setDraft, patch, dirty, busy, setBusy, finish, leave } = useDraftPage({
+  const { draft, setDraft, patch, dirty, busy, setBusy, finish, cancel } = useDraftPage({
     store: useBlockDraftStore,
     viewType: 'blocks',
     id: definition.id,
@@ -78,6 +80,7 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
     saved: draftOf(definition),
     save: updateDefinition,
     onClose,
+    onCancelNew: isNew ? onDelete : undefined,
     logTag: 'BlockDefinitionEditor',
   });
   const [menu, setMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
@@ -224,7 +227,7 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
     <LibraryPageFrame
       backLabel={t('nav.blocks')}
       onBack={onClose}
-      draft={{ dirty, busy, onDone: () => void finish(), onCancel: leave, onDelete }}
+      draft={{ dirty, busy, onDone: () => void finish(), onCancel: cancel, onDelete }}
       name={draft.name}
       nameLabel={t('blocks.library.name')}
       namePlaceholder={t('blocks.library.namePlaceholder')}
