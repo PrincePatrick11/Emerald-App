@@ -32,7 +32,7 @@ const byName = (a: Tag, b: Tag) => a.name.localeCompare(b.name);
 const renameInList = (tags: string[], from: string, to: string) =>
   [...new Set(tags.map((t) => (t === from ? to : t)))];
 
-type TaggedType = 'journal' | 'wiki' | 'operation' | 'template';
+export type TaggedType = 'journal' | 'wiki' | 'operation' | 'template';
 
 interface AffectedEntry { id: string; type: TaggedType }
 
@@ -89,9 +89,12 @@ async function reviveTrashedNamesake(name: string): Promise<Tag | null> {
 }
 
 /**
- * `name` ist in der Tabelle UNIQUE — auch für Tags im Papierkorb. Wer einen
- * Tag auf den Namen eines gelöschten umbenennt, übernimmt den Namen: der
- * Namensvetter im Papierkorb geht, sonst schlüge das UPDATE fehl.
+ * Umbenennen auf den Namen eines gelöschten Tags heißt, ihn neu zu vergeben
+ * (`reviveTrashedNamesake`): der Name gehört dann diesem Tag, und die Einträge
+ * des gelöschten bekommen ihn nicht wieder. Der Namensvetter im Papierkorb
+ * geht darum ganz — `name` ist UNIQUE, auch im Papierkorb. Kategorien folgen
+ * derselben Regel; nur behalten deren Einträge die Zuordnung, solange die
+ * Kategorie im Papierkorb liegt, und ziehen darum mit (`categoryStore`).
  */
 async function purgeTrashedNamesake(name: string) {
   const db = await getDb();
@@ -146,6 +149,13 @@ interface TagState {
   deleteTag: (name: string) => Promise<void>;
   restoreTag: (id: string) => Promise<void>;
   permanentlyDeleteTag: (id: string) => Promise<void>;
+  /**
+   * Ein Eintrag ist aus dem Papierkorb zurück: Namen von Tags, die inzwischen
+   * gelöscht sind, fallen weg — wie bei allen anderen Einträgen, als der Tag
+   * ging (`deleteTag` lässt den Papierkorb aus, damit `restoreTag` ihn dort
+   * unverändert findet).
+   */
+  dropDeletedTags: (type: TaggedType, id: string) => Promise<void>;
   getByName: (name: string) => Tag | undefined;
 }
 
@@ -287,6 +297,13 @@ export const useTagStore = create<TagState>((set, get) => {
     permanentlyDeleteTag: async (id) => {
       const db = await getDb();
       await db.execute('DELETE FROM tags WHERE id=$1', [id]);
+    },
+
+    dropDeletedTags: async (type, id) => {
+      const item = taggedItems().find((i) => i.id === id && i.type === type);
+      if (!item) return;
+      const kept = item.tags.filter((name) => get().tags.some((t) => t.name === name));
+      if (kept.length !== item.tags.length) await setItemTags(type, id, kept);
     },
 
     getByName: (name) => get().tags.find((t) => sameName(t.name, name)),

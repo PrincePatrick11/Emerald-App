@@ -540,8 +540,10 @@ export async function reassignCategoryContent(db: Database, categoryId: string, 
     );
     moved += result.rowsAffected ?? 0;
   }
-  // Vorlagen zählen nicht mit — sie sind keine Inhalte, verlieren nur die Zuweisung.
-  await dropCategoryFromTemplates(db, categoryId);
+  // Vorlagen zählen nicht mit — sie sind keine Inhalte. Beim Zusammenlegen
+  // ziehen ihre Zuweisungen mit, sonst gehen sie.
+  if (to) await moveCategoryInTemplates(db, categoryId, to);
+  else await dropCategoryFromTemplates(db, categoryId);
   return moved;
 }
 
@@ -697,6 +699,34 @@ export async function dropCategoryFromTemplates(db: Database, categoryId: string
     const kept = assignments.filter((a) => assignedCategory(a) !== categoryId);
     if (kept.length === assignments.length) continue;
     await db.execute('UPDATE templates SET assignments=$1 WHERE id=$2', [JSON.stringify(kept), row.id]);
+  }
+}
+
+/**
+ * Hängt die Zuweisungen an `from` auf `to` um — wenn eine Kategorie in ihrer
+ * gleichnamigen aufgeht. Hatte eine Vorlage beide, bleibt eine Zuweisung. Ein
+ * Stern zieht nur mit, wenn für diesen Typ und `to` noch keine Vorlage einen
+ * trägt: zwei Standards für dieselbe Kombination gibt es nicht.
+ */
+async function moveCategoryInTemplates(db: Database, from: string, to: string): Promise<void> {
+  const rows = await db.select<{ id: string; assignments: string | null }[]>('SELECT id, assignments FROM templates');
+  const parsed = rows.map((row) => ({ id: row.id, assignments: rawAssignments(row.assignments) }));
+  const entryTypeOf = (a: unknown) => String((a as { entryType?: unknown } | null)?.entryType);
+  const isDefault = (a: unknown) => (a as { isDefault?: unknown } | null)?.isDefault === true;
+  const starred = new Set(parsed.flatMap(({ assignments }) =>
+    (assignments ?? []).filter((a) => assignedCategory(a) === to && isDefault(a)).map(entryTypeOf)));
+  for (const { id, assignments } of parsed) {
+    if (!assignments?.some((a) => assignedCategory(a) === from)) continue;
+    const next: unknown[] = [];
+    for (const a of assignments) {
+      if (assignedCategory(a) !== from) { next.push(a); continue; }
+      const entryType = entryTypeOf(a);
+      if (assignments.some((b) => assignedCategory(b) === to && entryTypeOf(b) === entryType)) continue;
+      const star = isDefault(a) && !starred.has(entryType);
+      if (star) starred.add(entryType);
+      next.push({ ...(a as object), category: to, isDefault: star });
+    }
+    await db.execute('UPDATE templates SET assignments=$1 WHERE id=$2', [JSON.stringify(next), id]);
   }
 }
 

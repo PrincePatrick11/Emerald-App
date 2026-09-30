@@ -34,15 +34,24 @@ export const trashWiring: Record<TrashKind, {
   permanentlyDelete: (id: string) => Promise<void>;
 }> = {
   journal: {
-    restore: (id) => useJournalStore.getState().restoreEntry(id),
+    restore: async (id) => {
+      await useJournalStore.getState().restoreEntry(id);
+      await useTagStore.getState().dropDeletedTags('journal', id);
+    },
     permanentlyDelete: (id) => useJournalStore.getState().permanentlyDeleteEntry(id),
   },
   wiki: {
-    restore: (id) => useWikiStore.getState().restoreArticle(id),
+    restore: async (id) => {
+      await useWikiStore.getState().restoreArticle(id);
+      await useTagStore.getState().dropDeletedTags('wiki', id);
+    },
     permanentlyDelete: (id) => useWikiStore.getState().permanentlyDeleteArticle(id),
   },
   operation: {
-    restore: (id) => useOperationStore.getState().restoreOperation(id),
+    restore: async (id) => {
+      await useOperationStore.getState().restoreOperation(id);
+      await useTagStore.getState().dropDeletedTags('operation', id);
+    },
     permanentlyDelete: (id) => useOperationStore.getState().permanentlyDeleteOperation(id),
   },
   category: {
@@ -62,7 +71,10 @@ export const trashWiring: Record<TrashKind, {
     permanentlyDelete: (id) => useBlockDefinitionStore.getState().permanentlyDeleteDefinition(id),
   },
   template: {
-    restore: (id) => useTemplateStore.getState().restoreTemplate(id),
+    restore: async (id) => {
+      await useTemplateStore.getState().restoreTemplate(id);
+      await useTagStore.getState().dropDeletedTags('template', id);
+    },
     permanentlyDelete: (id) => useTemplateStore.getState().permanentlyDeleteTemplate(id),
   },
   language: {

@@ -56,8 +56,12 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   createEntry: async ({ blank = false, createdAt } = {}) => {
     const db = await getDb();
     const now = nowIso();
-    // Die Mondphase des Tages — sofern der Vault sie will (Einstellung).
-    const moonPhase = useSettingsStore.getState().settings.journal.moonPhase ? getMoonPhase() : null;
+    // Die Mondphase des Tages, an dem der Eintrag entsteht — sofern der Vault
+    // sie will (Einstellung). Eine Regel für Anlegen, Duplizieren, Import und
+    // Typwechsel (`entryTypeChange`): die Phase folgt dem Erstelldatum.
+    const moonPhase = useSettingsStore.getState().settings.journal.moonPhase
+      ? getMoonPhase(new Date(createdAt ?? now))
+      : null;
     const entryNumber = await nextEntryNumber(db, 'journal_entries');
     const start = startOfNewEntry('journal', null, UNTITLED_TITLES.journal, blank);
     const entry: JournalEntry = {
@@ -99,8 +103,8 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   },
 
   /**
-   * Kopiert alle Inhaltsfelder des Quelleintrags; nur Identität und Zeitstempel
-   * bleiben beim neuen Eintrag. Die Aufrufer haben die Feldliste früher jeweils
+   * Kopiert alle Inhaltsfelder des Quelleintrags; Identität, Zeitstempel und
+   * die Mondphase (sie folgt dem Erstelldatum, also heute) bleiben beim neuen Eintrag. Die Aufrufer haben die Feldliste früher jeweils
    * selbst aufgezählt — ein neues Feld fehlte dann still an einzelnen Stellen
    * (so ist ein Feld beim Duplizieren verloren gegangen).
    */
@@ -114,6 +118,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       updated_at: _updated,
       deleted_at: _deleted,
       entry_number: _number,
+      moon_phase: _moonPhase,
       ...fields
     } = src;
     await get().updateEntry(copy.id, { ...fields, title: src.title + i18n.t('common.copySuffix') });

@@ -43,11 +43,12 @@ import {
 } from './migrateJournalFieldsToContent';
 import type { SuggestionItem } from '../components/editor/SuggestionList';
 import type { Category } from '../types';
+import type { WriteOptions } from './stamp';
+import { ImageTooLargeError, prepareImageDataUrl } from './imageLimits';
 import {
   DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY,
   DEFAULT_OVERLAY_COLOR, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE,
 } from './altarConstants';
-import { MOON_PHASE_SYMBOLS } from './moonPhase';
 import { noAltarOpenMessage } from './altarExport';
 
 // ── Link-Chips über Vault-Grenzen ────────────────────────────────────────────
@@ -696,13 +697,22 @@ async function ensureTagNames(names: string[]): Promise<string[]> {
   return result;
 }
 
-/** Re-saves images into local storage and returns content with updated paths. */
+/**
+ * Speichert die Bilder der Datei in den Bildordner und schreibt ihre Verweise
+ * um. Dabei gelten die Bildgrenzen des Vaults wie beim Einfügen; ist ein Bild
+ * auch verkleinert noch zu groß, kommt es unverändert — ein Import soll nichts
+ * verlieren, was die Datei mitbringt.
+ */
 async function remapImages(content: string, images: Record<string, string>): Promise<string> {
   const map = new Map<string, string>();
   for (const [oldRef, dataUrl] of Object.entries(images)) {
     if (!dataUrl) continue;
     try {
-      map.set(oldRef, await saveImage(dataUrl));
+      const prepared = await prepareImageDataUrl(dataUrl).catch((e: unknown) => {
+        if (e instanceof ImageTooLargeError) return dataUrl;
+        throw e;
+      });
+      map.set(oldRef, await saveImage(prepared));
     } catch { /* skip */ }
   }
   return rewriteImageRefs(content, (ref) => map.get(ref) ?? null);
@@ -927,6 +937,15 @@ function importedCreatedAt(file: EmeraldFile): string | undefined {
 }
 
 /**
+ * „Zuletzt geändert" eines importierten Eintrags: sein Erstelldatum. Die Datei
+ * kennt kein Änderungsdatum, und ein Import ist keine Bearbeitung — sonst
+ * stünde er in Listen, die danach sortieren (Operationen), trotzdem ganz oben.
+ */
+function importedStamp(createdAt: string | undefined): WriteOptions {
+  return { touch: createdAt ?? true };
+}
+
+/**
  * Dateien von vor den Migrationen v36/v37 tragen ihre Verknüpfungen und die
  * drei Felder Paradigma/Bannung/Meditation noch im meta statt im Inhalt. Sie
  * werden beim Import zu Blöcken im Text (`appendLegacyLinks`, vor dem Filter)
@@ -979,13 +998,10 @@ function legacyJournalTargets(file: EmeraldFile): Parameters<typeof appendLegacy
 
 async function importJournalEntry(file: EmeraldFile, content: string, tagNames: string[]): Promise<string> {
   const { createEntry, updateEntry } = useJournalStore.getState();
-  const entry = await createEntry({ blank: true, createdAt: importedCreatedAt(file) });
-  await updateEntry(entry.id, {
-    title: file.title,
-    content,
-    tags: tagNames,
-    moon_phase: file.meta.moonPhase ?? null,
-  });
+  // Die Mondphase rechnet `createEntry` aus dem Erstelldatum, nach der Einstellung dieses Vaults.
+  const createdAt = importedCreatedAt(file);
+  const entry = await createEntry({ blank: true, createdAt });
+  await updateEntry(entry.id, { title: file.title, content, tags: tagNames }, importedStamp(createdAt));
   return entry.id;
 }
 
@@ -1058,14 +1074,15 @@ async function importWikiArticle(file: EmeraldFile, content: string, tagNames: s
     file.meta.categoryEmoji ?? legacy.emoji ?? '📄',
   );
 
-  const article = await createArticle(categoryId, { blank: true, createdAt: importedCreatedAt(file) });
+  const createdAt = importedCreatedAt(file);
+  const article = await createArticle(categoryId, { blank: true, createdAt });
   await updateArticle(article.id, {
     title: file.title,
     content,
     category_id: categoryId,
     tags: tagNames,
     icon: file.meta.icon ?? undefined,
-  });
+  }, importedStamp(createdAt));
   return article.id;
 }
 
@@ -1077,14 +1094,15 @@ async function importOperationEntry(file: EmeraldFile, content: string, tagNames
     file.meta.categoryEmoji ?? '⚡',
   );
 
-  const op = await createOperation(categoryId, { blank: true, createdAt: importedCreatedAt(file) });
+  const createdAt = importedCreatedAt(file);
+  const op = await createOperation(categoryId, { blank: true, createdAt });
   await updateOperation(op.id, {
     title: file.title,
     content,
     category_id: categoryId,
     tags: tagNames,
     icon: file.meta.icon ?? undefined,
-  });
+  }, importedStamp(createdAt));
   return op.id;
 }
 
@@ -1233,12 +1251,6 @@ function stripIconPrefix(val: string): string {
   return trimmed;
 }
 
-/** Reverse-maps a moon phase display string (e.g. "🌕 Full") to its DB key (e.g. "full"). */
-function parseMoonPhaseKey(display: string): string | null {
-  const text = stripIconPrefix(display).toLowerCase().replace(/\s+/g, '_');
-  return (text in MOON_PHASE_SYMBOLS) ? text : null;
-}
-
 /** Parses a comma-separated linked-items string. Each item may be "Icon Title [id]" or just "Icon Title". */
 function parseLinkedItems(raw: string): Array<{ id: string | null; title: string }> {
   return raw.split(',').map(s => {
@@ -1337,8 +1349,6 @@ async function importJournalFromMarkdown(
   const { articles }   = useWikiStore.getState();
   const { operations } = useOperationStore.getState();
 
-  const moonPhase = meta['moon'] ? parseMoonPhaseKey(meta['moon']) : null;
-
   const paradigmaName = meta['paradigma'] ? stripIconPrefix(meta['paradigma']) : null;
   const paradigmId = paradigmaName
     ? (articles.find(a => a.title === paradigmaName)?.id ?? null)
@@ -1388,11 +1398,9 @@ async function importJournalFromMarkdown(
     ]),
   ]));
 
+  // Ohne Datum in der Datei entsteht der Eintrag heute — mit der Mondphase von heute (`createEntry`).
   const entry = await createEntry({ blank: true });
-  await updateEntry(entry.id, {
-    title, content, tags: tagNames,
-    moon_phase: moonPhase,
-  });
+  await updateEntry(entry.id, { title, content, tags: tagNames });
   return entry.id;
 }
 

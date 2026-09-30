@@ -447,7 +447,9 @@ const TaskRow = memo(function TaskRow({
   const createTask = useTaskStore((s) => s.createTask);
   const toggleComplete = useTaskStore((s) => s.toggleComplete);
   const pushUndo = useUndoStore((s) => s.push);
-  const subtasks = getSubtasks(task.id);
+  // „Erledigte anzeigen" gilt auf jeder Ebene, nicht nur für die obersten.
+  const [showCompleted] = usePersistedFlag(SHOW_COMPLETED_FLAG);
+  const subtasks = getSubtasks(task.id).filter((sub) => showCompleted || !sub.completed);
   const hasSubtasks = subtasks.length > 0;
   const isExpanded = expandedTasks.has(task.id);
   const isEditing = editingId === task.id;
