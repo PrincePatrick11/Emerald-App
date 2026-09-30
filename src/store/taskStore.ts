@@ -59,11 +59,25 @@ async function selectLiveLinks(db: Database): Promise<TaskLink[]> {
  * Store, der nur die aktiven kennt. Mit `trashedWith` nur die, die mit diesem
  * Stempel dorthin kamen — also mit ihr, nicht schon vorher für sich.
  */
+/**
+ * Die Aufgaben im Papierkorb, die für sich gingen — eine Unteraufgabe mit dem
+ * Stempel ihrer Oberaufgabe gehört zu dieser (`deleteTask`) und kommt mit ihr
+ * zurück (`restoreTask`). Für die Liste des Papierkorbs.
+ */
+export async function selectTrashedTaskRoots(db: Database): Promise<{ id: string; title: string; deleted_at: string }[]> {
+  return db.select(
+    `SELECT t.id, t.title, t.deleted_at FROM tasks t
+      WHERE t.deleted_at IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM tasks p WHERE p.id = t.parent_task_id AND p.deleted_at = t.deleted_at)`
+  );
+}
+
 async function selectTrashedSubtree(db: Database, id: string, trashedWith?: string): Promise<string[]> {
   const rows = await db.select<{ id: string }[]>(
     `WITH RECURSIVE sub(id) AS (
        SELECT $1
-       UNION ALL
+       -- UNION statt UNION ALL: ein Kreis A → B → A (aus einem kaputten Backup) endet so.
+       UNION
        SELECT t.id FROM tasks t JOIN sub ON t.parent_task_id = sub.id
         WHERE t.deleted_at IS NOT NULL AND ($2 IS NULL OR t.deleted_at = $2)
      )
@@ -175,7 +189,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       await db.execute('UPDATE tasks SET deleted_at=$1 WHERE id=$2', [now, tid]);
     }
     // Die Verknüpfungen bleiben in der Datenbank, für den Rückweg; endgültig
-    // räumen sie erst permanentlyDeleteTask und das Leeren des Papierkorbs ab.
+    // räumen sie permanentlyDeleteTask, das Leeren des Papierkorbs und — per
+    // ON DELETE CASCADE — `runPeriodicCleanup` ab.
     set((s) => ({
       tasks: s.tasks.filter((t) => !idsToDelete.includes(t.id)),
       links: s.links.filter((l) => !idsToDelete.includes(l.task_id)),
@@ -184,32 +199,27 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   restoreTask: async (id: string) => {
     const db = await getDb();
-    const [row] = await db.select<{ deleted_at: string | null; parent_trashed: number }[]>(
-      `SELECT t.deleted_at,
-              EXISTS (SELECT 1 FROM tasks p WHERE p.id = t.parent_task_id AND p.deleted_at IS NOT NULL) AS parent_trashed
-         FROM tasks t WHERE t.id=$1`,
-      [id]
-    );
+    const [row] = await db.select<{ deleted_at: string | null }[]>('SELECT deleted_at FROM tasks WHERE id=$1', [id]);
     // Schon zurück — über ihre Oberaufgabe oder ein zweites Rückgängig.
     if (!row?.deleted_at) return;
     // Mit den Unteraufgaben, die mit ihr gingen.
     for (const tid of await selectTrashedSubtree(db, id, row.deleted_at)) {
       await db.execute('UPDATE tasks SET deleted_at=NULL WHERE id=$1', [tid]);
     }
-    // Liegt die Oberaufgabe noch im Papierkorb, stünde sie sonst unsichtbar
-    // unter ihr; so kommt sie oben in die Liste.
-    if (row.parent_trashed) await db.execute('UPDATE tasks SET parent_task_id=NULL WHERE id=$1', [id]);
+    // Liegt die Oberaufgabe noch im Papierkorb, rückt die Aufgabe nach oben —
+    // unter einer unsichtbaren Oberaufgabe bliebe sie selbst unsichtbar.
+    await db.execute(
+      'UPDATE tasks SET parent_task_id=NULL WHERE id=$1 AND parent_task_id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL)',
+      [id]
+    );
     set({ tasks: await selectAllTasks(db), links: await selectLiveLinks(db) });
   },
 
   permanentlyDeleteTask: async (id: string) => {
     const db = await getDb();
-    const [row] = await db.select<{ deleted_at: string | null }[]>('SELECT deleted_at FROM tasks WHERE id=$1', [id]);
-    // Aus dem Papierkorb: alle Unteraufgaben darin mit, auch die, die schon
-    // vorher für sich gingen — ohne ihre Oberaufgabe wären sie Wurzeln.
-    const idsToDelete = row?.deleted_at
-      ? await selectTrashedSubtree(db, id)
-      : collectDescendantIds(get().tasks, id);
+    // Nur aus dem Papierkorb: alle Unteraufgaben darin mit, auch die, die
+    // schon vorher für sich gingen — ohne ihre Oberaufgabe wären sie Wurzeln.
+    const idsToDelete = await selectTrashedSubtree(db, id);
 
     for (const tid of idsToDelete) {
       await db.execute('DELETE FROM task_links WHERE task_id=$1 OR target_id=$1', [tid]);

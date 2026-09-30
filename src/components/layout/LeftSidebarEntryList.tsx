@@ -401,7 +401,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
     pushUndo({ id: generateId(), description: t('undo.taskDeleted'), undo: () => restoreTask(task.id) });
   };
 
-  const dateStrFor = (task: (typeof tasks)[number]) => lookupCategory(catById, task.category_id)?.name ?? '';
+  const categoryNameOf = (task: (typeof tasks)[number]) => lookupCategory(catById, task.category_id)?.name ?? '';
 
   const sorted = tasks.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 
@@ -415,7 +415,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
     items: sorted,
     getId: (task) => task.id,
     getTitle: (task) => task.title,
-    getDateStr: dateStrFor,
+    getDateStr: categoryNameOf,
     getIcon: (task) => (task.completed
       ? <CheckSquare size={14} className="flex-shrink-0 text-stone-600" />
       : <Square size={14} className="flex-shrink-0 text-stone-600" />),
@@ -429,7 +429,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
     ],
     emptyMessage: t('sidebar.tasksEmpty'),
     renderRow: ({ item: task, isActive, isRenaming, renameValue, setRenameValue, commitRename, cancelRename, openCtxMenu }) => {
-      const dateStr = dateStrFor(task);
+      const categoryName = categoryNameOf(task);
 
       if (isRenaming) {
         return (
@@ -444,7 +444,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
                 onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') cancelRename(); }}
                 className="w-full bg-transparent text-sm text-stone-300 outline-none selectable truncate"
               />
-              {dateStr && <div className="entry-list-date text-xs">{dateStr}</div>}
+              {categoryName && <div className="entry-list-date text-xs">{categoryName}</div>}
             </div>
           </div>
         );
@@ -475,7 +475,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
             className="flex-1 min-w-0 text-left cursor-grab active:cursor-grabbing"
           >
             <div className={`entry-list-title truncate ${task.completed ? 'line-through text-stone-500' : ''}`}>{task.title}</div>
-            {dateStr && <div className="entry-list-date text-xs">{dateStr}</div>}
+            {categoryName && <div className="entry-list-date text-xs">{categoryName}</div>}
           </button>
         </div>
       );

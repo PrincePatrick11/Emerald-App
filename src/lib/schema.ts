@@ -525,6 +525,12 @@ export async function seedBuiltins(
  * Mit `to` ziehen die Inhalte statt dessen in diese Kategorie — wenn eine
  * zurückgeholte in ihrer gleichnamigen aufgeht (`categoryStore.restoreCategory`).
  */
+/** Endgültig löschen: erst die Inhalte lösen (ON DELETE RESTRICT), dann die Zeile. */
+export async function purgeCategory(db: Database, categoryId: string): Promise<void> {
+  await reassignCategoryContent(db, categoryId);
+  await db.execute('DELETE FROM categories WHERE id=$1', [categoryId]);
+}
+
 export async function reassignCategoryContent(db: Database, categoryId: string, to: string | null = null): Promise<number> {
   let moved = 0;
   for (const table of CATEGORIZED_TABLES) {

@@ -11,7 +11,7 @@
  */
 import { create } from 'zustand';
 import { getDb } from '../lib/db';
-import { reassignCategoryContent } from '../lib/schema';
+import { purgeCategory, reassignCategoryContent } from '../lib/schema';
 import { categoryKey } from '../lib/categoryMerge';
 import { generateId, nowIso } from '../lib/helpers';
 import { fromRow, type DbRow } from '../lib/row';
@@ -177,10 +177,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
 
   permanentlyDeleteCategory: async (id) => {
     const db = await getDb();
-    // Erst umhängen, dann löschen: die Zeile endgültig zu entfernen, während
-    // Inhalte darauf zeigen, verbietet der Foreign Key.
-    await reassignCategoryContent(db, id);
-    await db.execute('DELETE FROM categories WHERE id=$1', [id]);
+    await purgeCategory(db, id);
     set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }));
     // Auch im Speicher: ein späteres update* würde die gelöschte category_id
     // sonst zurückschreiben und am Foreign Key scheitern.

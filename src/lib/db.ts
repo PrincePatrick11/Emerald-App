@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getActiveDbConnectionString, getActiveVaultId } from './vaultManager';
 import {
   ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, IMAGE_FIELDS, LEXICON_INDEX_DDL, TABLE_DDL,
-  TEMPLATES_INDEX_DDL, createSchema, ddlIfNotExists, reassignCategoryContent, seedBuiltins, storedImageName,
+  TEMPLATES_INDEX_DDL, createSchema, ddlIfNotExists, purgeCategory, seedBuiltins, storedImageName,
 } from './schema';
 import { normalizeSchema } from './normalizeSchema';
 import { adoptLegacyImages, rewriteImageRefs } from './images';
@@ -321,10 +321,7 @@ async function runPeriodicCleanup(db: Database, retentionDays: number | null): P
       'SELECT id FROM categories WHERE deleted_at IS NOT NULL AND deleted_at < $1',
       [cutoff]
     );
-    for (const { id } of expired) {
-      await reassignCategoryContent(db, id);
-      await db.execute('DELETE FROM categories WHERE id=$1', [id]);
-    }
+    for (const { id } of expired) await purgeCategory(db, id);
   }
 
   await sweepDanglingTaskLinks(db);

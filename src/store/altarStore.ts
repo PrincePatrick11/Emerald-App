@@ -684,9 +684,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   },
 
   removePlacement: async (id) => {
-    const found = get().placements.find((p) => p.id === id);
-    const altarId = found?.altar_id ?? get().activeAltarId;
-    const removed = found && altarId ? { ...found, altar_id: altarId } : undefined;
+    const removed = get().placements.find((p) => p.id === id);
     const db = await getDb();
     await db.execute('DELETE FROM altar_placements WHERE id=$1', [id]);
     set((s) => ({
@@ -694,8 +692,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       selectedPlacementId: s.selectedPlacementId === id ? null : s.selectedPlacementId,
       previewPlacements: filterEachPreview(s.previewPlacements, (p) => p.id !== id),
     }));
-    const activeAltarId = get().activeAltarId;
-    if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
+    if (removed?.altar_id) await get().bumpAltarUpdatedAt(removed.altar_id);
     return removed;
   },
 

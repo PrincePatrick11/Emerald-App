@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { getDb, sweepDanglingTaskLinks } from '../lib/db';
-import { reassignCategoryContent } from '../lib/schema';
+import { purgeCategory } from '../lib/schema';
 import { trashWiring } from './moduleWiring';
+import { selectTrashedTaskRoots } from './taskStore';
 import { reassignCategoriesInMemory } from './categoryStore';
 import { definitionLabel, templateLabel } from '../lib/blocks/blockAttrs';
 import { iconTitle } from '../lib/helpers';
@@ -41,13 +42,8 @@ export const useTrashStore = create<TrashState>((set, get) => ({
       const categories = await db.select<{ id: string; name: string; emoji: string; deleted_at: string }[]>(
         `SELECT id, name, emoji, deleted_at FROM categories WHERE deleted_at IS NOT NULL`
       );
-      // Eine Aufgabe samt der Unteraufgaben, die mit ihr gingen, ist ein
-      // Eintrag: Wiederherstellen und Löschen nehmen sie mit (`taskStore`).
-      const tasks = await db.select<{ id: string; title: string; deleted_at: string }[]>(
-        `SELECT t.id, t.title, t.deleted_at FROM tasks t
-          WHERE t.deleted_at IS NOT NULL
-            AND NOT EXISTS (SELECT 1 FROM tasks p WHERE p.id = t.parent_task_id AND p.deleted_at = t.deleted_at)`
-      );
+      // Eine Aufgabe samt der Unteraufgaben, die mit ihr gingen, ist ein Eintrag.
+      const tasks = await selectTrashedTaskRoots(db);
       const blockDefinitions = await db.select<{ id: string; name: string; icon: string; deleted_at: string }[]>(
         `SELECT id, name, icon, deleted_at FROM block_definitions WHERE deleted_at IS NOT NULL`
       );
@@ -131,10 +127,7 @@ export const useTrashStore = create<TrashState>((set, get) => ({
       (await db.select<{ id: string }[]>(`SELECT id FROM categories WHERE deleted_at IS NOT NULL`))
         .map((r) => r.id)
     );
-    for (const id of doomed) {
-      await reassignCategoryContent(db, id);
-    }
-    await db.execute(`DELETE FROM categories WHERE deleted_at IS NOT NULL`);
+    for (const id of doomed) await purgeCategory(db, id);
 
     // Die Umhängung auch in den In-Memory-Stores nachziehen: dort geladene
     // Zeilen zeigen sonst weiter auf die geloeschte Kategorie, und der naechste

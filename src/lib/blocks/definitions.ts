@@ -66,7 +66,7 @@ export function definitionToRow(def: BlockDefinition) {
   return { ...def, elements: JSON.stringify(def.elements), display: JSON.stringify(def.display) };
 }
 
-/** Was eine Definition an ihre Kopien weitergibt — ändert es sich, steigt die Revision. */
+/** Was eine Definition an ihre Kopien weitergibt; `sameShape` entscheidet, was davon die Revision hebt. */
 export type DefinitionShape = Pick<BlockDefinition, 'name' | 'icon' | 'elements' | 'display'>;
 
 /** Das Element, wie eine Kopie es trägt: ohne Vorgabe — die ist dort schon Wert geworden. */

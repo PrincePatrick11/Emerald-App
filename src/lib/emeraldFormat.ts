@@ -773,19 +773,20 @@ export async function importFromEmerald(): Promise<void> {
   // Alt-Verknüpfungen brauchen dieselbe Liste, und zwischen beiden ändert sich
   // am Bestand nichts.
   const items = linkItemsSnapshot();
-  // Status/Enddatum/Version einer Operation von vor v41 als Block. Die Werte
-  // stammen aus der Datei und werden geprüft wie eine Backup-Zeile.
+  // Status/Enddatum/Version einer Operation von vor v41 als Block (die Werte
+  // stammen aus der Datei und werden geprüft wie eine Backup-Zeile), die
+  // Alt-Verknüpfungen eines Journal-Eintrags als Chips — beides vor dem Filter.
   const content = await importedContent(file, items, (html) => file.type === 'operations'
     ? withImportedStatus(html, legacyStatusOfRow({
         is_active: file.meta.isActive, end_date: file.meta.endDate, version: file.meta.version,
       }))
-    : html);
+    : file.type === 'journal' ? appendLegacyLinks(html, items, legacyJournalTargets(file)) : html);
   const tagNames = await importedTags(file.meta);
 
   let newId: string;
   try {
     if (file.type === 'journal') {
-      newId = await importJournalEntry(file, content, tagNames, items);
+      newId = await importJournalEntry(file, content, tagNames);
     } else if (file.type === 'wiki') {
       newId = await importWikiArticle(file, content, tagNames);
     } else {
@@ -915,17 +916,24 @@ async function importedAssignmentCategory(
 /**
  * Das Erstelldatum aus der Datei, damit ein Eintrag an seinem Platz in der
  * Zeitleiste landet statt als neuester. Die Datei ist fremd: nur ein lesbares
- * Datum, als ISO wie jedes andere; sonst jetzt.
+ * Datum mit vierstelligem Jahr, als ISO wie jedes andere — Daten werden als
+ * Text sortiert, und `+010000-…` stünde vor 2024. Sonst jetzt.
  */
 function importedCreatedAt(file: EmeraldFile): string | undefined {
   const time = typeof file.createdAt === 'string' ? Date.parse(file.createdAt) : NaN;
-  return Number.isNaN(time) ? undefined : new Date(time).toISOString();
+  if (Number.isNaN(time)) return undefined;
+  const iso = new Date(time).toISOString();
+  return /^\d{4}-/.test(iso) ? iso : undefined;
 }
 
-async function importJournalEntry(
-  file: EmeraldFile, content: string, tagNames: string[], items: SuggestionItem[],
-): Promise<string> {
-  const { createEntry, updateEntry } = useJournalStore.getState();
+/**
+ * Dateien von vor den Migrationen v36/v37 tragen ihre Verknüpfungen und die
+ * drei Felder Paradigma/Bannung/Meditation noch im meta statt im Inhalt. Sie
+ * werden beim Import zu Blöcken im Text (`appendLegacyLinks`, vor dem Filter)
+ * — in die Spalten geschrieben hätten sie keine Anzeige mehr: kein Chip, kein
+ * Rückverweis, kein Suchtreffer.
+ */
+function legacyJournalTargets(file: EmeraldFile): Parameters<typeof appendLegacyLinks>[2] {
   const { articles }   = useWikiStore.getState();
   const { operations } = useOperationStore.getState();
 
@@ -954,27 +962,27 @@ async function importJournalEntry(
       : (file.meta.linkedWikiTitles ?? []).map(t => articles.find(a => a.title === t)?.id)
   ).filter(Boolean) as string[];
 
-  // Dateien von vor den Migrationen v36/v37 tragen ihre Verknüpfungen und die
-  // drei Felder Paradigma/Bannung/Meditation noch im meta statt im Inhalt. Sie
-  // werden hier zu Blöcken im Text — in die Spalten geschrieben hätten sie
-  // keine Anzeige mehr: kein Chip, kein Rückverweis, kein Suchtreffer.
+  return [
+    ...linkedOpIds.map((id) => ({ id, entryType: 'operation' as const })),
+    ...linkedWikiIds.map((id) => ({ id, entryType: 'wiki' as const })),
+    ...legacyFieldTargets([
+      { key: 'paradigm', id: paradigmId, title: file.meta.paradigmaTitle },
+      { key: 'bannung', id: bannungId, title: file.meta.bannungTitle, active: file.meta.isBannung },
+      {
+        key: 'meditation', id: meditationId, title: file.meta.meditationTitle,
+        active: file.meta.isMeditation,
+        suffix: file.meta.meditationDuration ? `(${file.meta.meditationDuration} min)` : undefined,
+      },
+    ]),
+  ];
+}
+
+async function importJournalEntry(file: EmeraldFile, content: string, tagNames: string[]): Promise<string> {
+  const { createEntry, updateEntry } = useJournalStore.getState();
   const entry = await createEntry({ blank: true, createdAt: importedCreatedAt(file) });
   await updateEntry(entry.id, {
     title: file.title,
-    // Die Titel der Verknüpfungen stammen aus der Datei — auch das geht noch durch den Filter.
-    content: sanitizeImportedHtml(appendLegacyLinks(content, items, [
-      ...linkedOpIds.map((id) => ({ id, entryType: 'operation' as const })),
-      ...linkedWikiIds.map((id) => ({ id, entryType: 'wiki' as const })),
-      ...legacyFieldTargets([
-        { key: 'paradigm', id: paradigmId, title: file.meta.paradigmaTitle },
-        { key: 'bannung', id: bannungId, title: file.meta.bannungTitle, active: file.meta.isBannung },
-        {
-          key: 'meditation', id: meditationId, title: file.meta.meditationTitle,
-          active: file.meta.isMeditation,
-          suffix: file.meta.meditationDuration ? `(${file.meta.meditationDuration} min)` : undefined,
-        },
-      ]),
-    ])),
+    content,
     tags: tagNames,
     moon_phase: file.meta.moonPhase ?? null,
   });
