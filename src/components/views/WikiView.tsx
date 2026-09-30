@@ -11,7 +11,7 @@ import DashboardItem from '../ui/DashboardItem';
 import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
-import { MODULES } from '../../lib/modules';
+import { entryIcon, MODULES } from '../../lib/modules';
 import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
@@ -235,14 +235,14 @@ export default function WikiView() {
 
     const activeFilterCount = filterCatIds.length > 0 ? 1 : 0;
 
-    const sortedArticles = sortItems(filtered, sort, { date: (a) => a.created_at });
-
-    // For timeline (by month)
-    const timelineGroups = groupByMonth(sortedArticles, (a) => a.created_at);
+    // Nach dem Datum, das die Zeile zeigt — „zuletzt geändert", wie auf Home und in der linken Liste.
+    const sortedArticles = sortItems(filtered, sort, { date: (a) => a.updated_at });
+    const timelineGroups = groupByMonth(sortedArticles, (a) => a.updated_at);
 
     const renderArticle = (a: typeof articles[0]) => {
       const cat = lookupCategory(catById, a.category_id);
-      const iconEl = isImageIcon(a.icon) ? <img src={a.icon!} alt="" className="w-5 h-5 object-cover rounded inline" /> : (cat?.emoji ?? '📄');
+      const icon = entryIcon('wiki', a, cat);
+      const iconEl = isImageIcon(icon) ? <img src={icon} alt="" className="w-5 h-5 object-cover rounded inline" /> : icon;
       // Ohne Fallback auf die rohe category_id: bei gelöschter Kategorie stünde
       // hier sonst deren id als Label (wie in OperationsView entfällt es dann).
       const catLabel = categoryLabel(t, cat);
@@ -262,7 +262,7 @@ export default function WikiView() {
           {isCardView(view) ? (
             <>
               <div className="flex items-center gap-2 mb-2">
-                {isImageIcon(a.icon) ? <img src={a.icon!} alt="" className="w-6 h-6 object-cover rounded" /> : <span className="text-xl">{cat?.emoji ?? '📄'}</span>}
+                {isImageIcon(icon) ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded" /> : <span className="text-xl">{icon}</span>}
               </div>
               {renaming
                 ? renameInput('text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1')
@@ -330,6 +330,7 @@ export default function WikiView() {
         primaryAction={{ label: t('wiki.newArticle'), onClick: () => handleNew() }}
         view={view}
         sort={sort}
+        sortDate="updated"
         onView={(v) => setWikiPrefs({ view: v })}
         onSort={(s) => setWikiPrefs({ sort: s })}
         groupBy={{ value: grouping, onChange: (g) => setWikiPrefs({ grouping: g }) }}

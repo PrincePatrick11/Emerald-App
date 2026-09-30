@@ -10,7 +10,7 @@ import DashboardItem from '../ui/DashboardItem';
 import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId, isImageIcon } from '../../lib/helpers';
-import { MODULES } from '../../lib/modules';
+import { entryIcon, MODULES } from '../../lib/modules';
 import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
 import { entryBlockSummary } from '../../lib/blocks/entrySummary';
 import { formatEntryDate } from '../../lib/formatDate';
@@ -242,13 +242,15 @@ export default function OperationsView() {
 
     const renderOp = (op: typeof operations[0]) => {
       const cat = lookupCategory(catById, op.category_id);
-      const iconValue = op.icon || cat?.emoji || '⚡';
+      const iconValue = entryIcon('operation', op, cat);
       const catDisplayName = cat ? catName(cat) : '';
-      // Sigillen-Operationen zeigen in der Zeile das Zieldatum statt Kategorie · Datum.
-      const sigil = entryBlockSummary(op.id, op.content).sigil;
-      const isSigil = !!sigil;
-      const dateStr = `${catDisplayName}${catDisplayName ? ' · ' : ''}${formatEntryDate(op.updated_at)}`;
-      const createdDate = formatEntryDate(op.created_at);
+      // Eine Sigille mit Zieldatum hängt es an — Zeile und Karte gleich.
+      const revealDate = entryBlockSummary(op.id, op.content).sigil?.revealDate;
+      const dateStr = [
+        catDisplayName,
+        formatEntryDate(op.updated_at),
+        revealDate ? `${t('creation.targetDate')}: ${formatEntryDate(revealDate)}` : '',
+      ].filter(Boolean).join(' · ');
       const renaming = renamingId === op.id;
       const renameInput = (className: string) => (
         <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename}
@@ -282,13 +284,7 @@ export default function OperationsView() {
               {renaming
                 ? renameInput('flex-1 bg-transparent text-sm text-stone-300 outline-none selectable')
                 : <span className="flex-1 text-sm text-stone-300 truncate">{op.title}</span>}
-              {isSigil ? (
-                <span className="text-xs text-parchment-500/70 flex-shrink-0">
-                  {sigil?.revealDate ? `${t('creation.targetDate')}: ${formatEntryDate(sigil.revealDate)}` : createdDate}
-                </span>
-              ) : (
-                <span className="text-xs text-parchment-500/70 flex-shrink-0">{dateStr}</span>
-              )}
+              <span className="text-xs text-parchment-500/70 flex-shrink-0">{dateStr}</span>
             </>
           )}
         </DashboardItem>

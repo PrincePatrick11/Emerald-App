@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { formatEntryDate } from '../../lib/formatDate';
 import { categoryLabel, lookupCategory } from '../../lib/categories';
-import { DEFAULT_ENTRY_EMOJI, type LeftListTabId } from '../../lib/modules';
+import { entryIcon, type LeftListTabId } from '../../lib/modules';
 import { Flame, CheckSquare, Square, Copy, Pencil, Trash2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -236,7 +236,7 @@ function useOperationsConfig(): EntryListTabProps<Operation> {
     },
     getIcon: (op) => {
       const cat = lookupCategory(catById, op.category_id);
-      const iconValue = op.icon || cat?.emoji || '⚡';
+      const iconValue = entryIcon('operation', op, cat);
       return isImageIcon(iconValue)
         ? <img src={iconValue} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
         : <span className="text-base leading-none flex-shrink-0">{iconValue}</span>;
@@ -302,10 +302,10 @@ function useWikiConfig(): EntryListTabProps<WikiArticle> {
       return `${catLabel}${catLabel ? ' · ' : ''}${formatEntryDate(a.updated_at)}`;
     },
     getIcon: (a) => {
-      const cat = lookupCategory(catById, a.category_id);
-      return isImageIcon(a.icon)
-        ? <img src={a.icon} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
-        : <span className="text-base leading-none flex-shrink-0">{cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki}</span>;
+      const icon = entryIcon('wiki', a, lookupCategory(catById, a.category_id));
+      return isImageIcon(icon)
+        ? <img src={icon} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
+        : <span className="text-base leading-none flex-shrink-0">{icon}</span>;
     },
     isActive: (a) => activeView.id === a.id,
     onOpen: (a) => setActiveView({ type: 'wiki', id: a.id, mode: 'view' }),

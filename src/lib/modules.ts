@@ -49,6 +49,20 @@ export const DEFAULT_ENTRY_EMOJI: Record<ContentType, string> = {
 };
 
 /**
+ * Das Icon eines Wiki-Artikels oder einer Operation in Listen, auf Home, in
+ * der linken Liste und im Export: das eigene (Emoji oder Bild), sonst das
+ * Emoji der Kategorie, sonst das des Moduls. Ein Emoji oder eine Bild-Adresse
+ * — `isImageIcon` unterscheidet. Journal-Einträge zeigen ihre Mondphase.
+ */
+export function entryIcon(
+  type: 'wiki' | 'operation',
+  entry: { icon?: string | null },
+  category: { emoji: string } | null | undefined,
+): string {
+  return entry.icon || category?.emoji || DEFAULT_ENTRY_EMOJI[type];
+}
+
+/**
  * Reihenfolge = Rail- und Eintragslisten-Tab-Reihenfolge. Über
  * `CATEGORY_MODULE_IDS` hängen zwei weitere Dinge daran: die Spaltenfolge der
  * Verwendungszähler in `CategoriesView` und, bei Gleichstand, welches Modul

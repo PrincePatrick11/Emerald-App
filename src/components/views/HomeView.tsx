@@ -12,13 +12,14 @@ import ContextMenu from '../ui/ContextMenu';
 import Dashboard from '../ui/Dashboard';
 import { ENTRY_TITLE_HEADING_CLASSES } from '../ui/EntryDetailFrame';
 import DashboardItem from '../ui/DashboardItem';
+import RenameField from '../ui/RenameField';
 import Dropdown from '../ui/Dropdown';
 import EmptyState from '../ui/EmptyState';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import { getMoonPhase, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId, isImageIcon } from '../../lib/helpers';
-import { DEFAULT_ENTRY_EMOJI, MODULES, viewTypeForEntryType } from '../../lib/modules';
+import { entryIcon, MODULES, viewTypeForEntryType } from '../../lib/modules';
 import { categoryLabel } from '../../lib/categories';
 import { formatDayHeading, formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
@@ -75,14 +76,14 @@ export default function HomeView() {
   );
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { entries, createEntry, duplicateEntry, deleteEntry, restoreEntry } = useJournalStore(
-    useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
+  const { entries, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useJournalStore(
+    useShallow((s) => ({ entries: s.entries, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
   );
-  const { articles, duplicateArticle, deleteArticle, restoreArticle } = useWikiStore(
-    useShallow((s) => ({ articles: s.articles, duplicateArticle: s.duplicateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle }))
+  const { articles, duplicateArticle, updateArticle, deleteArticle, restoreArticle } = useWikiStore(
+    useShallow((s) => ({ articles: s.articles, duplicateArticle: s.duplicateArticle, updateArticle: s.updateArticle, deleteArticle: s.deleteArticle, restoreArticle: s.restoreArticle }))
   );
-  const { operations, duplicateOperation, deleteOperation, restoreOperation } = useOperationStore(
-    useShallow((s) => ({ operations: s.operations, duplicateOperation: s.duplicateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation }))
+  const { operations, duplicateOperation, updateOperation, deleteOperation, restoreOperation } = useOperationStore(
+    useShallow((s) => ({ operations: s.operations, duplicateOperation: s.duplicateOperation, updateOperation: s.updateOperation, deleteOperation: s.deleteOperation, restoreOperation: s.restoreOperation }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
@@ -115,9 +116,33 @@ export default function HomeView() {
     }
   };
 
+  // Umbenennen an Ort und Stelle, wie in den Listen der Module.
+  const [renaming, setRenaming] = useState<CtxTarget | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const isRenaming = (kind: CtxTarget['kind'], id: string) => renaming?.kind === kind && renaming.id === id;
+
   const handleRename = (target: CtxTarget) => {
-    setActiveView({ type: viewTypeForEntryType(target.kind), id: target.id, mode: 'edit' });
+    const pool = target.kind === 'journal' ? entries : target.kind === 'wiki' ? articles : operations;
+    setRenameValue(pool.find((item) => item.id === target.id)?.title ?? '');
+    setRenaming(target);
   };
+
+  /** Ein leerer Name ändert nichts, wie in den Listen der Module. */
+  const commitRename = async () => {
+    if (!renaming) return;
+    const title = renameValue.trim();
+    setRenaming(null);
+    if (!title) return;
+    if (renaming.kind === 'journal') await updateEntry(renaming.id, { title });
+    else if (renaming.kind === 'wiki') await updateArticle(renaming.id, { title });
+    else await updateOperation(renaming.id, { title });
+  };
+
+  /** Der Titel einer Zeile oder Karte — beim Umbenennen das Eingabefeld. */
+  const itemTitle = (kind: CtxTarget['kind'], id: string, title: string) => (isRenaming(kind, id)
+    ? <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename} onCancel={() => setRenaming(null)}
+        className="home-item-title text-sm font-medium w-full bg-transparent outline-none selectable" />
+    : <div className="home-item-title text-sm font-medium truncate">{title}</div>);
 
   const handleDelete = async (target: CtxTarget) => {
     if (target.kind === 'journal') {
@@ -209,13 +234,12 @@ export default function HomeView() {
                       key={entry.id}
                       view={{ type: 'journal', id: entry.id, mode: 'view' }}
                       layout="row"
+                      editing={isRenaming('journal', entry.id)}
                       onContextMenu={(e) => openCtx(e, { kind: 'journal', id: entry.id })}
                     >
                       <span className="text-xl">{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</span>
                       <div className="flex-1 min-w-0">
-                        <div className="home-item-title text-sm font-medium truncate">
-                          {entry.title}
-                        </div>
+                        {itemTitle('journal', entry.id, entry.title)}
                         <div className="home-item-meta text-xs mt-0.5">
                           {formatEntryDate(entry.created_at)}
                         </div>
@@ -230,10 +254,11 @@ export default function HomeView() {
                       key={entry.id}
                       view={{ type: 'journal', id: entry.id, mode: 'view' }}
                       layout="card"
+                      editing={isRenaming('journal', entry.id)}
                       onContextMenu={(e) => openCtx(e, { kind: 'journal', id: entry.id })}
                     >
                       <div className="text-lg mb-1">{MOON_PHASE_SYMBOLS[entry.moon_phase as MoonPhase] ?? '📓'}</div>
-                      <div className="home-item-title text-sm font-medium truncate">{entry.title}</div>
+                      {itemTitle('journal', entry.id, entry.title)}
                       <div className="home-item-meta text-xs mt-0.5">
                         {formatEntryDate(entry.created_at)}
                       </div>
@@ -263,12 +288,13 @@ export default function HomeView() {
                 <div className="space-y-2">
                   {opsItems.map((op) => {
                     const cat = categories.find((c) => c.id === op.category_id);
-                    const icon = op.icon || cat?.emoji || '⚡';
+                    const icon = entryIcon('operation', op, cat);
                     return (
                       <DashboardItem
                         key={op.id}
                         view={{ type: 'operations', id: op.id, mode: 'view' }}
                         layout="row"
+                        editing={isRenaming('operation', op.id)}
                         onContextMenu={(e) => openCtx(e, { kind: 'operation', id: op.id })}
                       >
                         {isImageIcon(icon)
@@ -276,9 +302,7 @@ export default function HomeView() {
                           : <span className="text-xl">{icon}</span>
                         }
                         <div className="flex-1 min-w-0">
-                          <div className="home-item-title text-sm font-medium truncate">
-                            {op.title}
-                          </div>
+                          {itemTitle('operation', op.id, op.title)}
                           <div className="home-item-meta text-xs mt-0.5">
                             {categoryLabel(t, cat)} · {formatEntryDate(op.updated_at)}
                           </div>
@@ -291,19 +315,20 @@ export default function HomeView() {
                 <div className="grid grid-cols-3 gap-2">
                   {opsItems.map((op) => {
                     const cat = categories.find((c) => c.id === op.category_id);
-                    const icon = op.icon || cat?.emoji || '⚡';
+                    const icon = entryIcon('operation', op, cat);
                     return (
                       <DashboardItem
                         key={op.id}
                         view={{ type: 'operations', id: op.id, mode: 'view' }}
                         layout="card"
+                        editing={isRenaming('operation', op.id)}
                         onContextMenu={(e) => openCtx(e, { kind: 'operation', id: op.id })}
                       >
                         {isImageIcon(icon)
                           ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded mb-1" />
                           : <div className="text-lg mb-1">{icon}</div>
                         }
-                        <div className="home-item-title text-sm font-medium truncate">{op.title}</div>
+                        {itemTitle('operation', op.id, op.title)}
                         <div className="home-item-meta text-xs mt-0.5">
                           {categoryLabel(t, cat)} · {formatEntryDate(op.updated_at)}
                         </div>
@@ -334,7 +359,7 @@ export default function HomeView() {
                 <div className="space-y-2">
                   {wikiItems.map((article) => {
                     const cat = categories.find((c) => c.id === article.category_id);
-                    const icon = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
+                    const icon = entryIcon('wiki', article, cat);
                     // Kein Fallback auf die rohe category_id — bei gelöschter
                     // Kategorie entfällt das Label.
                     const catLabel = categoryLabel(t, cat);
@@ -343,16 +368,15 @@ export default function HomeView() {
                         key={article.id}
                         view={{ type: 'wiki', id: article.id, mode: 'view' }}
                         layout="row"
+                        editing={isRenaming('wiki', article.id)}
                         onContextMenu={(e) => openCtx(e, { kind: 'wiki', id: article.id })}
                       >
-                        {isImageIcon(article.icon)
-                          ? <img src={article.icon!} alt="" className="w-6 h-6 object-cover rounded flex-shrink-0" />
+                        {isImageIcon(icon)
+                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded flex-shrink-0" />
                           : <span className="text-xl flex-shrink-0">{icon}</span>
                         }
                         <div className="flex-1 min-w-0">
-                          <div className="home-item-title text-sm font-medium truncate">
-                            {article.title}
-                          </div>
+                          {itemTitle('wiki', article.id, article.title)}
                           <div className="home-item-meta text-xs capitalize mt-0.5">
                             {catLabel ? `${catLabel} · ` : ''}{formatEntryDate(article.updated_at)}
                           </div>
@@ -365,20 +389,21 @@ export default function HomeView() {
                 <div className="grid grid-cols-2 gap-2">
                   {wikiItems.map((article) => {
                     const cat = categories.find((c) => c.id === article.category_id);
-                    const icon = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
+                    const icon = entryIcon('wiki', article, cat);
                     const catLabel = categoryLabel(t, cat);
                     return (
                       <DashboardItem
                         key={article.id}
                         view={{ type: 'wiki', id: article.id, mode: 'view' }}
                         layout="card"
+                        editing={isRenaming('wiki', article.id)}
                         onContextMenu={(e) => openCtx(e, { kind: 'wiki', id: article.id })}
                       >
-                        {isImageIcon(article.icon)
-                          ? <img src={article.icon!} alt="" className="w-6 h-6 object-cover rounded mb-1" />
+                        {isImageIcon(icon)
+                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded mb-1" />
                           : <div className="text-lg mb-1">{icon}</div>
                         }
-                        <div className="home-item-title text-sm font-medium truncate">{article.title}</div>
+                        {itemTitle('wiki', article.id, article.title)}
                         <div className="home-item-meta text-xs capitalize mt-0.5">
                           {catLabel ? `${catLabel} · ` : ''}{formatEntryDate(article.updated_at)}
                         </div>

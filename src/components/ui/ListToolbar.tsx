@@ -182,12 +182,7 @@ export default function ListToolbar({
             options={viewOptions}
             icons={VIEW_ICONS}
             value={view!}
-            onChange={(next) => {
-              onView!(next);
-              // Der Zeitstrahl sperrt Name und Anzahl — stehen blieben sie trotzdem
-              // aktiv, und die Monate kämen in Namensreihenfolge durcheinander.
-              if (next === 'timeline' && showSort && sortBlockedInTimeline(sort!)) onSort!('date_desc');
-            }}
+            onChange={onView!}
           />
         </SidebarGroup>
       )}
@@ -196,7 +191,9 @@ export default function ListToolbar({
           {showSort && (
             <SortSelect
               label={sortHeading!}
-              value={sort!}
+              // Im Zeitstrahl gilt ein Datum (`groupByMonth`); die gespeicherte
+              // Sortierung bleibt und gilt wieder, sobald er verlassen wird.
+              value={inTimeline && sortBlockedInTimeline(sort!) ? 'date_desc' : sort!}
               modes={sortModes}
               onChange={onSort!}
               dateField={sortDate}

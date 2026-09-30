@@ -19,7 +19,12 @@ export function groupBy<T>(items: readonly T[], keyFn: (item: T) => string): Das
 
 /** Timeline-Gruppierung nach lokalisiertem Monat („August 2026"). */
 export function groupByMonth<T>(items: readonly T[], date: (item: T) => string): DashboardGroup<T>[] {
-  return groupBy(items, (item) => formatMonthGroup(date(item)));
+  // Der Zeitstrahl geht nach Datum, gleich wie die Liste sonst sortiert ist:
+  // aufsteigend, wenn sie es schon ist, sonst neueste zuerst. Name oder
+  // Anzahl würfeln die Monate sonst durcheinander.
+  const ascending = items.every((item, i) => i === 0 || date(items[i - 1]) <= date(item));
+  const ordered = ascending ? items : [...items].sort((a, b) => (date(a) < date(b) ? 1 : date(a) > date(b) ? -1 : 0));
+  return groupBy(ordered, (item) => formatMonthGroup(date(item)));
 }
 
 /** Gruppenschlüssel des Waisen-Buckets — nie als Kategorie-id vergeben. */

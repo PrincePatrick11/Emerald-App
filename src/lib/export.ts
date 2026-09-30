@@ -10,7 +10,7 @@ import { useOperationStore } from '../store/operationStore';
 import { useTaskStore } from '../store/taskStore';
 import { useAltarStore } from '../store/altarStore';
 import { useCategoryStore } from '../store/categoryStore';
-import { DEFAULT_ENTRY_EMOJI } from '../components/editor/SuggestionList';
+import { DEFAULT_ENTRY_EMOJI, entryIcon } from './modules';
 import i18n from '../i18n';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -87,20 +87,10 @@ function resolveInternalLinkIcons(html: string): string {
     let icon = '';
     if (entryType === 'wiki') {
       const article = articles.find(a => a.id === id);
-      if (article) {
-        if (article.icon?.startsWith('data:')) {
-          icon = article.icon;
-        } else {
-          const cat = categories.find(c => c.id === article.category_id);
-          icon = cat?.emoji ?? DEFAULT_ENTRY_EMOJI.wiki;
-        }
-      }
+      if (article) icon = entryIcon('wiki', article, categories.find(c => c.id === article.category_id));
     } else if (entryType === 'operation') {
       const op = operations.find(o => o.id === id);
-      if (op) {
-        const cat = categories.find(c => c.id === op.category_id);
-        icon = op.icon ?? cat?.emoji ?? '⚡';
-      }
+      if (op) icon = entryIcon('operation', op, categories.find(c => c.id === op.category_id));
     } else if (entryType === 'task') {
       // Task-Chips aus Sidebar-Drags tragen kein data-icon — wie im
       // Live-Lookup des Editors: Kategorie-Emoji, sonst der Chip-Fallback.
@@ -198,7 +188,7 @@ function buildTopBar(data: ExportData): string {
     moonName = sp > 0 ? data.moonPhase.slice(sp + 1) : '';
   } else if (data.category) {
     const ic = data.entryIcon ?? data.category.icon;
-    icon = (!ic || ic.startsWith('data:')) ? (data.type === 'wiki' ? '📖' : '⚡') : ic;
+    icon = (!ic || ic.startsWith('data:')) ? DEFAULT_ENTRY_EMOJI[data.type === 'wiki' ? 'wiki' : 'operation'] : ic;
     moonName = data.category.label;
   }
 
