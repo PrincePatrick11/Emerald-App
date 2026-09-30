@@ -260,7 +260,7 @@ The Tasks module provides a hierarchical task manager with categories, prioritie
 
 **Context menu.** Right-click any task to Mark as Completed/Active, Add Subtask, Link Entry, or Delete.
 
-**Trash integration.** Deleting a task (or category) soft-deletes it and sends it to the Trash view where it can be restored or permanently removed.
+**Trash integration.** Deleting a task (or category) soft-deletes it and sends it to the Trash view where it can be restored or permanently removed. A task deleted with its subtasks is one item in the Trash, not one per subtask; its links to entries stay with it and come back on restore. A subtask deleted on its own earlier is a separate item, and deleting the parent for good takes it along.
 
 ## Categories
 
@@ -409,7 +409,7 @@ The file structure:
 }
 ```
 
-For `journal` / `wiki` / `operations`, on import image data-URLs are re-saved into the local image directory (with SHA-256 deduplication), HTML is sanitised with DOMPurify, and linked entries are resolved by ID first and then by title as a fallback. Tags are synced into the local tags table.
+For `journal` / `wiki` / `operations`, on import image data-URLs are re-saved into the local image directory (with SHA-256 deduplication), HTML is sanitised with DOMPurify, and linked entries are resolved by ID first and then by title as a fallback. Tags are synced into the local tags table. An imported journal entry, wiki article, operation or altar keeps the file's `createdAt`, so it lands at its place in the timeline instead of showing up as the newest — only if it is a readable date with a four-digit year (dates are sorted as text, and a year like `+010000` would sort before 2024); otherwise the entry is created now. A Markdown import has no creation date and is created now. The `.emerald` file no longer carries an altar's intention, a template's description or a block's description — older files that still have them import fine, the values are ignored.
 
 An entry that holds copies of Blocks-view blocks is written as `"version": "2"`, with `meta.blockDefinitions` carrying those blocks; every other entry (and every altar) stays `"1"`, so older app versions keep accepting it. Importing creates any that are missing, under their original id, so the copies are recognised and can be updated; an existing one (even in the trash) is left as it is. The copies themselves need nothing from it — they render from the entry's own content. Version `"1"` files still import.
 
