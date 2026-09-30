@@ -304,6 +304,19 @@ silently overwrite one platform's icon with the other's shape. Not run in
 CI: the generated files are committed, since the Rust build needs them and
 regenerating them is a design decision, not a build step.
 
+## Bundled fonts
+
+The eight selectable typefaces are `@fontsource/*` packages in `dependencies`,
+not a request to Google. `npm run fonts` (`scripts/make-fonts-css.mjs`) writes
+`src/fonts.css` from them — `@font-face` rules for the `latin` and `latin-ext`
+subsets and `woff2` only, taken from each package's complete stylesheet because
+the per-subset ones lack `unicode-range`. Like the icons, the result is
+committed and not run in CI: a fresh checkout builds with `npm install` alone,
+and the fonts add about 1.7 MB to the bundle. A new typeface or weight: add it
+to `FONTS` in the script, install the package, run `npm run fonts`, and add the
+font to `src/themes/theme.ts`. The CSP has no remote origin left for any of it
+(see [`security.md`](security.md#content-security-policy)).
+
 ## Signing
 
 macOS signing and notarisation are wired up but optional. The step reads

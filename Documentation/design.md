@@ -47,11 +47,16 @@ not via a per-site red treatment of its own.
 - **Editor**: `font-serif` — Lora by default, configured separately.
 - Applied through `data-ui-font`/`data-editor-font` on `<html>`, never through a direct
   `font-family` in a component.
-- Eight selectable Google Fonts. The stylesheet `<link>` is injected at runtime in
-  `src/main.tsx` (moved there from `index.html` so it never blocks the first render).
-  A ninth font means `theme.ts` **and** that link in `main.tsx` — both or neither.
-  `index.html`'s `<head>` otherwise keeps only the two `preconnect` hints and one more,
-  deliberately render-blocking `<link>`: `public/splash.css`, the startup loading
+- Eight selectable fonts, shipped with the app: the `@fontsource` packages provide the
+  files, `src/fonts.css` holds the `@font-face` rules and is imported in `src/main.tsx`
+  — nothing is fetched from the network. Only the `latin` and `latin-ext` subsets and
+  only `woff2` are bundled. `src/fonts.css` is **generated** by `scripts/make-fonts-css.mjs`
+  (`npm run fonts`) and never edited by hand: the packages' per-subset stylesheets lack
+  `unicode-range`, so the script takes the rules from their complete files. A ninth font
+  (or another weight) means the `FONTS` list in that script, the package in
+  `package.json`, **and** the font list in `theme.ts` — all three or none.
+  `index.html`'s `<head>` otherwise keeps only one deliberately render-blocking `<link>`:
+  `public/splash.css`, the startup loading
   screen's styles (see [Loading Screen and Boot Order](architecture.md#loading-screen-and-boot-order)
   in `architecture.md`). Its `--splash-bg` / `--splash-gem` / `--splash-text` are hand-kept
   copies of `--shell-bg` / `--accent` / `--text-subtle` from `src/themes/*.css` — change one,
@@ -159,6 +164,14 @@ exactly this.
 Where theme rules are more specific than `:disabled` — `.menu-item`, for instance — the
 element is dimmed via `opacity`, because a colour declaration there would not get through.
 
+**A tooltip for a disabled control sits on a wrapper.** A disabled `Button`
+carries `pointer-events-none`, so a `title` on the element itself never shows. When the
+reason is the point — the sigil-locked Edit button — the tooltip belongs on a wrapping
+`<span>`. (A hand-written button without that class, like the altar's snap buttons, can keep
+its own `title` naming the reason.) A group of inputs that is locked as a whole (a locked placement's
+inspector, the read-only settings of a copy of one of your own blocks) is a disabled
+`<fieldset>` dimmed to `opacity-50` with its hint above or as its tooltip.
+
 **Active/inactive toggles use `Button`'s `tone` mode**, not a ternary in the `className`
 template. The four base variants (`primary`/`secondary`/`ghost`/`danger`) have no active
 state; `tone` does. Documented exceptions: `EditorToolbar`'s `ToolbarBtn` and
@@ -211,7 +224,7 @@ surface step); `.sidebar-item` in `index.css` is a list row on `rounded-lg` inst
 `Dashboard`'s `ListToolbar` search now.)
 
 **7. `JetBrains Mono` is dead config.** Declared as `font-mono` in `tailwind.config.js:46`
-but never loaded via a `<link>`. Every site using `font-mono` falls back to the system
+but not among the bundled fonts (`src/fonts.css`). Every site using `font-mono` falls back to the system
 monospace. *Cost: either load it or strike it from the config — the decision is open
 because it is unclear whether `font-mono` is needed at all.*
 
