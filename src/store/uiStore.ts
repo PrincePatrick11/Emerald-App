@@ -140,6 +140,8 @@ interface UIState {
   setEditActions: (actions: EditActions | null) => void;
   toggleRail: () => void;
   toggleLeftList: () => void;
+  /** Blendet Rail, linke Liste und rechte Leiste wieder ein — Teil von „Ansicht zurücksetzen". */
+  showAllPanels: () => void;
   setSearchQuery: (q: string) => void;
   setJournalPrefs: (p: Partial<ListPrefs>) => void;
   setWikiPrefs: (p: Partial<ListPrefs>) => void;
@@ -538,6 +540,12 @@ export const useUIStore = create<UIState>((set, get) => ({
     saveOpenFlag(LEFT_LIST_OPEN_KEY, leftListOpen);
     return { leftListOpen };
   }),
+  showAllPanels: () => {
+    saveOpenFlag(RAIL_OPEN_KEY, true);
+    saveOpenFlag(LEFT_LIST_OPEN_KEY, true);
+    saveOpenFlag(RIGHT_SIDEBAR_OPEN_KEY, true);
+    set({ railOpen: true, leftListOpen: true, rightSidebarOpen: true });
+  },
   setSearchQuery: (q) => set({ searchQuery: q }),
   setJournalPrefs: (p) => set((s) => ({ journalPrefs: { ...s.journalPrefs, ...p } })),
   setWikiPrefs: (p) => set((s) => ({ wikiPrefs: { ...s.wikiPrefs, ...p } })),

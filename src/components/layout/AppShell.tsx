@@ -243,6 +243,9 @@ export default function AppShell() {
       localStorage.removeItem(ENTRY_LIST_WIDTH_KEY);
       localStorage.removeItem(RIGHT_WIDTH_KEY);
       setAltarWindowFullscreen(false);
+      // Auch der Rückweg zu ausgeblendeten Leisten — mit der Rail wären sonst
+      // Einstellungen und Vault-Knopf weg, bis man das Ansicht-Menü findet.
+      useUIStore.getState().showAllPanels();
     });
     return () => { unlisten.then(fn => fn()); };
   }, [setAltarWindowFullscreen]);

@@ -1005,6 +1005,52 @@ pub fn discard_import_staging(app: tauri::AppHandle, vault_id: String) -> Result
     Ok(())
 }
 
+/// Die Versionsnummer einer Migrations-Sicherung (`emerald.db.pre-v42.bak`,
+/// angelegt von `backupDatabaseFile` in `dbRebuild.ts`) — `None` für jeden
+/// anderen Namen.
+fn migration_backup_version(name: &str) -> Option<u32> {
+    name.strip_prefix(DB_FILE)?
+        .strip_prefix(".pre-v")?
+        .strip_suffix(".bak")?
+        .parse()
+        .ok()
+}
+
+/// Löscht in `dir` alle Migrations-Sicherungen bis auf die jüngste und gibt
+/// zurück, wie viele es waren. Nur gewöhnliche Dateien genau dieses Namens —
+/// ein Symlink oder Ordner gleichen Namens bleibt stehen.
+fn prune_migration_backups_in(dir: &Path) -> Result<u32, String> {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+        Err(e) => return Err(format!("read {}: {e}", dir.display())),
+    };
+    let mut found: Vec<(u32, PathBuf)> = entries
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().map(|t| t.is_file()).unwrap_or(false))
+        .filter_map(|entry| {
+            let version = migration_backup_version(entry.file_name().to_str()?)?;
+            Some((version, entry.path()))
+        })
+        .collect();
+    found.sort_by_key(|(version, _)| *version);
+    found.pop();
+    for (_, path) in &found {
+        std::fs::remove_file(path).map_err(|e| format!("remove {}: {e}", path.display()))?;
+    }
+    Ok(found.len() as u32)
+}
+
+/// Jede Migration, die umbaut, legt vorher eine volle Kopie der Datenbank an
+/// (samt eingebetteter Bilder). Ist der Vault danach geöffnet, braucht es nur
+/// noch die jüngste — die älteren lagen bisher für immer im Vault-Ordner.
+/// Löscht nichts außerhalb des registrierten Vault-Ordners und nichts, was
+/// nicht genau `emerald.db.pre-vNN.bak` heißt.
+#[tauri::command]
+pub fn prune_migration_backups(app: tauri::AppHandle, vault_id: String) -> Result<u32, String> {
+    prune_migration_backups_in(&vault_dir(&app, &vault_id)?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1295,5 +1341,29 @@ mod tests {
         );
         assert!(current.join("images").join("a.jpg").is_file());
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn prune_keeps_only_the_newest_migration_backup() {
+        let dir = scratch();
+        for name in ["emerald.db.pre-v33.bak", "emerald.db.pre-v9.bak", "emerald.db.pre-v42.bak"] {
+            write(&dir.join(name), "db");
+        }
+        // Nicht dieses Muster, oder kein Dateiname in Ordnung: bleibt.
+        for name in ["emerald.db", "emerald.db.pre-vx.bak", "other.db.pre-v50.bak", "emerald.db.pre-v50.bak.old"] {
+            write(&dir.join(name), "keep");
+        }
+        std::fs::create_dir_all(dir.join("emerald.db.pre-v60.bak")).unwrap();
+
+        assert_eq!(prune_migration_backups_in(&dir).unwrap(), 2);
+        assert!(dir.join("emerald.db.pre-v42.bak").is_file());
+        assert!(!dir.join("emerald.db.pre-v33.bak").exists());
+        assert!(!dir.join("emerald.db.pre-v9.bak").exists());
+        for name in ["emerald.db", "emerald.db.pre-vx.bak", "other.db.pre-v50.bak", "emerald.db.pre-v50.bak.old"] {
+            assert!(dir.join(name).is_file(), "{name}");
+        }
+        assert!(dir.join("emerald.db.pre-v60.bak").is_dir());
+        assert_eq!(prune_migration_backups_in(&dir.join("missing")).unwrap(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

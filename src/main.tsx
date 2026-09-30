@@ -6,19 +6,12 @@ import "./themes/emerald-noctis.css";
 import "./themes/emerald-parchment.css";
 import "./index.css";
 import "tippy.js/dist/tippy.css";
+// Die Schriften liegen in der App (`npm run fonts`) — nichts wird aus dem Netz geladen.
+import "./fonts.css";
 import { applyEditorFont, applyEditorFontSize, applyTheme, applyUIFont, applyUIScale } from "./themes/theme";
 import { readAppearanceMirror } from "./lib/vaultSettings";
 import { platformName } from "./lib/platform";
 import { initSplash } from "./lib/splash";
-
-// Load Google Fonts asynchronously so they never block the initial render.
-// The render-blocking <link rel="stylesheet"> was moved here from index.html.
-// With font-display:swap the app renders immediately with system fonts and
-// swaps to the custom fonts once the Google Fonts CSS has loaded.
-const _fontLink = document.createElement('link');
-_fontLink.rel = 'stylesheet';
-_fontLink.href = 'https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Merriweather:wght@400;500;700&family=Nunito:wght@400;500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap';
-document.head.appendChild(_fontLink);
 
 // Theme und Schriften des zuletzt geoeffneten Vaults vor dem ersten Render —
 // seine eigenen Einstellungen setzt der settingsStore erst, wenn der Vault

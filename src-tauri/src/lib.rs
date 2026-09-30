@@ -830,6 +830,7 @@ pub fn run() {
             vault::migrate_vault_layout,
             vault::delete_vault_files,
             vault::discard_import_staging,
+            vault::prune_migration_backups,
             vault::read_vault_settings,
             vault::write_vault_settings,
             vault::read_vault_drafts,

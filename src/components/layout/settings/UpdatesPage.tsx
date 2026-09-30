@@ -134,7 +134,10 @@ export default function UpdatesPage() {
     setSourceFeedback(null);
     try {
       const saved = await setUpdateSettings(nextEndpoint, nextAutoCheck);
-      setEndpoint(saved.endpoint);
+      // Das Häkchen speichert die gespeicherte Adresse mit; eine getippte,
+      // noch nicht gespeicherte bleibt dabei im Feld stehen.
+      const onlyTheCheckbox = nextEndpoint === savedEndpoint && endpoint !== savedEndpoint;
+      if (!onlyTheCheckbox) setEndpoint(saved.endpoint);
       setSavedEndpoint(saved.endpoint);
       setAutoCheck(saved.auto_check);
       setSourceFeedback({ kind: 'saved' });

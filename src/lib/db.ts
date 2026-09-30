@@ -89,6 +89,10 @@ export async function getDb(): Promise<Database> {
     await invoke('ensure_vault_dirs', { vaultId });
     const db = await Database.load(identifier);
     await runMigrations(db);
+    // Von den Sicherungen vor einem Umbau (`backupDatabaseFile`) bleibt nur die
+    // jüngste. Scheitern darf das Öffnen daran nicht.
+    await invoke('prune_migration_backups', { vaultId })
+      .catch((e: unknown) => console.warn('[db] migration backups:', e));
     await runPeriodicCleanup(db, trashRetentionFor(vaultId));
     // Sigillen-Zeichnungen, die v42 (oder ein Backup-Import) nicht als Datei
     // speichern konnte — bei jedem Öffnen ein neuer Versuch. Scheitern darf
