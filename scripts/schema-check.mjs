@@ -116,7 +116,9 @@ writeFileSync(
    export { copyTable } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbRebuild';
    export { assertPayloadReferencesResolve, migrateBackupPayload, withRoutinesAsTemplates } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbBackup';
    export { invalidateVaultCache } from '${process.cwd().replace(/\\/g, '/')}/src/lib/vaultManager';
-   export { convertLegacySigils } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLegacySigils';`
+   export { convertLegacySigils, needsSigilConversion, sigilRowToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLegacySigils';
+   export { linkedIdsToContent, rowsLinkSource } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLinkedIdsToContent';
+   export { journalFieldsToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateJournalFieldsToContent';`
 );
 
 const bundlePath = join(workDir, 'bundle.mjs');
@@ -154,6 +156,7 @@ const {
   ddlIfNotExists, checkIntegrity, reassignCategoryContent,
   collectUsedImageFilenames, invalidateVaultCache, copyTable,
   assertPayloadReferencesResolve, convertLegacySigils, migrateBackupPayload, withRoutinesAsTemplates,
+  needsSigilConversion, sigilRowToContent, linkedIdsToContent, rowsLinkSource, journalFieldsToContent,
 } = await import(pathToFileURL(bundlePath).href);
 
 /* ------------------------------------------------------------------ *
@@ -1244,6 +1247,59 @@ console.log('\n8c. Migration v37: Paradigma/Bannung/Meditation in den Inhalt\n')
   v37.close();
 }
 
+console.log('\n8c2. Import alter Sicherungen: Journal-Felder werden vor dem Einfügen Blöcke\n');
+
+{
+  // Eine Sicherung trägt Ziele und Kategorien selbst — schon als eine Liste.
+  const source = rowsLinkSource(
+    {
+      operation: [{ id: 'o1', title: 'Ritual', icon: null, category_id: 'ritual', entry_number: 4 }],
+      wiki: [
+        { id: 'w1', title: 'Chaos', icon: 'data:image/png;base64,AAAA', category_id: 'paradigm', entry_number: 1 },
+        { id: 'w3', title: 'Stilles Sitzen', icon: null, category_id: 'meditation', entry_number: 3 },
+        { id: 'w9', title: 'Im Papierkorb', icon: null, category_id: null, entry_number: 9, deleted_at: now },
+      ],
+    },
+    [
+      { id: 'paradigm', name: 'Paradigma', emoji: '🌀', is_builtin: 0 },
+      { id: 'meditation', name: 'Meditation', emoji: '🧘', is_builtin: 0 },
+      { id: 'ritual', name: 'Ritual', emoji: '🪄', is_builtin: 0 },
+    ],
+  );
+  const row = {
+    id: 'j9', content: '<p>Alt</p>',
+    linked_operation_ids: '["o1","weg"]', linked_wiki_ids: '["w9"]',
+    paradigm_id: 'w1', is_bannung: 0, bannung_type_wiki_id: null,
+    is_meditation: 1, meditation_type_wiki_id: 'w3', meditation_duration: 15,
+  };
+  const linked = linkedIdsToContent(row.content, row, source);
+  const content = journalFieldsToContent(linked, row, source);
+  check(
+    'verknüpfte Operation, Paradigma und Meditation stehen als Chips hinter dem Text',
+    content.startsWith('<p>Alt</p>') && ['o1', 'w1', 'w3'].every((id) => content.includes(`data-id="${id}"`)),
+    content
+  );
+  check(
+    'Ziele im Papierkorb der Datei oder ohne Zeile fallen weg',
+    !content.includes('data-id="w9"') && !content.includes('data-id="weg"'),
+    content
+  );
+  check(
+    'die Kategorie der Datei wird Überschrift, die Dauer Text hinter dem Chip',
+    content.includes('<h3>Ritual</h3>') && /data-id="w3"[\s\S]*?<\/span> \(15 min\)/.test(content),
+    content
+  );
+  check('ein Bild-Icon landet nicht im Chip', !content.includes('base64'), content);
+  check(
+    'kaputtes JSON lässt die Zeile unberührt',
+    linkedIdsToContent('<p>x</p>', { id: 'j8', linked_wiki_ids: '{kaputt' }, source) === null
+  );
+  check(
+    'eine Zeile ohne Altdaten bleibt, wie sie ist',
+    journalFieldsToContent(linkedIdsToContent('<p>x</p>', { id: 'j7' }, source), {}, source) === '<p>x</p>'
+  );
+}
+
 console.log('\n8d. Migration v38: vier Kategorie-Tabellen werden eine\n');
 
 {
@@ -1477,19 +1533,29 @@ console.log('\n8g. Migration v42: Sigillen werden Blöcke\n');
     g7.content
   );
 
-  // Import: nur die eingefügten Zeilen, samt leerer Operationen der Kategorie.
-  await v42.execute(
-    `INSERT INTO operations (id,title,content,category_id,created_at,updated_at,tags,intention_text)
-     VALUES ('h1','Importiert','','sigils',?1,?1,'[]','A'), ('h2','Fremd','','other',?1,?1,'[]','B'),
-            ('h3','Leer importiert','','sigils',?1,?1,'[]','')`,
-    [now]
-  );
-  const imported = await convertLegacySigils(v42, { includeSigilCategory: true, ids: new Set(['h1', 'h3']) });
-  const [h1, h2, h3] = [await op('h1'), await op('h2'), await op('h3')];
+  // Import: dieselbe Umwandlung auf Zeilen einer Sicherung, vor dem Einfügen.
+  const fileRow = (over) => ({
+    id: 'h', content: '', category_id: 'other', description: '', intention_text: '', letter_bank: '[]',
+    implemented_letters: '[]', drawing_data: null, is_loaded: 0, target_reveal_date: null,
+    charging_technique_wiki_id: null, show_sigil: 1, ...over,
+  });
+  const h1 = fileRow({ category_id: 'sigils', intention_text: 'A', charging_technique_wiki_id: 'wt1' });
+  const h3 = fileRow({ category_id: 'sigils' });
+  const h4 = fileRow({ letter_bank: '["X"]' });
   check(
-    'Import: nur die eingefügten Zeilen werden umgewandelt',
-    imported.converted === 2 && h1.content.includes('core.sigil.calc') && h3.content.includes('core.sigil.charge') && h2.content === '',
-    JSON.stringify(imported)
+    'Import: Zeilen mit Altdaten werden erkannt, leere der Kategorie nur aus alten Dateien',
+    needsSigilConversion(h1, false) && needsSigilConversion(h4, false) && !needsSigilConversion(fileRow({}), true)
+      && needsSigilConversion(h3, true) && !needsSigilConversion(h3, false)
+  );
+  const h1Content = await sigilRowToContent(h1, (id) => (id === 'wt1' ? { title: 'Technik', icon: '🔥', entry_number: 3 } : undefined));
+  check(
+    'Import: die Zeile wird zu Rechner, Zeichnung und Ladung — mit Ladetechnik aus der Datei',
+    h1Content.includes('core.sigil.calc') && h1Content.includes('core.sigil.charge') && h1Content.includes('Technik'),
+    h1Content
+  );
+  check(
+    'Import: scheitert das Speichern der Zeichnung, meldet die Umwandlung das',
+    (await sigilRowToContent(fileRow({ drawing_data: 'data:image/png;base64,FAIL' }), () => undefined)) === undefined
   );
 
   check('v42: Schema identisch mit der Baseline', JSON.stringify(await readSchema(v42)) === JSON.stringify(schemaA));

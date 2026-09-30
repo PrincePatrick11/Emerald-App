@@ -1,7 +1,4 @@
 import type Database from '@tauri-apps/plugin-sql';
-import i18n from '../i18n';
-import { legacyCategoryLabel, legacyWikiCategoryEmoji } from './categories';
-import { isImageIcon } from './helpers';
 import { linkItemKey } from './linkItems';
 import {
   extractInternalLinks,
@@ -10,6 +7,13 @@ import {
   plainBlockHtml,
   type InternalLinkChip,
 } from './internalLinkHtml';
+import {
+  legacyChipIcon,
+  tablesLinkSource,
+  type LegacyCategoryRow,
+  type LegacyLinkSource,
+  type LegacyLinkTarget,
+} from './migrateLinkedIdsToContent';
 
 /**
  * Migration v37 — die drei festen Journal-Felder Paradigma, Bannung und
@@ -31,35 +35,10 @@ import {
  * Ein Feld, dessen Artikel im Papierkorb liegt oder gelöscht wurde, fällt weg;
  * wie in v36 wird ein verschwundenes Ziel nicht als Chip verewigt.
  *
- * Die Spalten bleiben im Schema (Backup-Wiederherstellung und die
- * Integritätsprüfung kennen sie), werden hier aber geleert.
+ * Wie in v36 arbeitet die Umwandlung (`journalFieldsToContent`) auf einer
+ * Zeile und einer `LegacyLinkSource` — der Import einer Sicherung von vor v37
+ * nimmt denselben Weg, seit v49 die Spalten gestrichen hat.
  */
-
-interface EntryRow {
-  id: string;
-  content: string | null;
-  paradigm_id: string | null;
-  is_bannung: number | null;
-  bannung_type_wiki_id: string | null;
-  is_meditation: number | null;
-  meditation_duration: number | null;
-  meditation_type_wiki_id: string | null;
-}
-
-interface ArticleRow {
-  id: string;
-  title: string | null;
-  icon: string | null;
-  category_id: string | null;
-  entry_number: number | null;
-}
-
-interface CategoryRow {
-  id: string;
-  name: string;
-  emoji: string | null;
-  is_builtin: number;
-}
 
 /**
  * Die drei abgelösten Felder in der Reihenfolge, in der sie in der Seitenleiste
@@ -81,6 +60,96 @@ export type LegacyJournalField = keyof typeof LEGACY_JOURNAL_FIELDS;
 
 const FIELD_ORDER: LegacyJournalField[] = ['paradigm', 'bannung', 'meditation'];
 
+/** Die sechs alten Spalten einer Journal-Zeile — aus der Datenbank oder aus einer Sicherung. */
+export interface JournalFieldsRow {
+  paradigm_id?: unknown;
+  is_bannung?: unknown;
+  bannung_type_wiki_id?: unknown;
+  is_meditation?: unknown;
+  meditation_duration?: unknown;
+  meditation_type_wiki_id?: unknown;
+}
+
+const idOf = (v: unknown): string | null => (v == null || v === '' ? null : String(v));
+/** `1`, `true` oder `'1'` — die Datenbank liefert Zahlen, eine Sicherung womöglich Booleans. */
+const flag = (v: unknown): boolean => v === true || Number(v) === 1;
+
+/**
+ * Der Inhalt mit Paradigma, Bannung und Meditation als Blöcke dahinter. Ohne
+ * gesetzte Felder kommt `content` unverändert zurück.
+ */
+export function journalFieldsToContent(content: string, row: JournalFieldsRow, source: LegacyLinkSource): string {
+  const alreadyLinked = new Set(extractInternalLinks(content).map(linkItemKey));
+  let separator = !isBlankContent(content);
+  let appended = '';
+
+  // Was jedes Feld zu sagen hat: eine Artikel-ID, ein „war gesetzt"-Flag und
+  // beim Meditations-Feld die Dauer. Erst hier zusammengetragen, damit die
+  // Schleife darunter alle drei gleich behandelt.
+  const paradigmId = idOf(row.paradigm_id);
+  const bannungId = idOf(row.bannung_type_wiki_id);
+  const meditationId = idOf(row.meditation_type_wiki_id);
+  const duration = Number(row.meditation_duration);
+  const values: Record<LegacyJournalField, { id: string | null; active: boolean; suffix?: string }> = {
+    paradigm: { id: paradigmId, active: !!paradigmId },
+    bannung: { id: bannungId, active: flag(row.is_bannung) || !!bannungId },
+    meditation: {
+      id: meditationId,
+      active: flag(row.is_meditation) || !!meditationId,
+      suffix: duration > 0 ? `(${duration} min)` : undefined,
+    },
+  };
+
+  for (const key of FIELD_ORDER) {
+    const { id, active, suffix } = values[key];
+    if (!active) continue;
+
+    const field = LEGACY_JOURNAL_FIELDS[key];
+    const article: LegacyLinkTarget | undefined = id ? source.target('wiki', id) : undefined;
+    // Eingebaute Wiki-Kategorien liegen mit deutschem Seed-Namen in der DB;
+    // der Anzeigename kommt aus der Quelle (Locale-Key). Ohne diesen Umweg
+    // stünde in einem englischen Vault dauerhaft „Bannung" im Eintrag. Ohne
+    // Kategorie-Zeile bleibt der Name leer — lieber keine Überschrift als
+    // eine erfundene.
+    const cat = source.category('wiki', article?.category_id ?? key);
+    const label = cat?.label ?? '';
+
+    if (!article) {
+      // Gesetzt, aber ohne Artikel dahinter — nur der Name der Kategorie.
+      // Ein `paradigm_id`, dessen Artikel gelöscht wurde, fällt hier ebenfalls
+      // heraus: `active` ist dann zwar wahr, aber der Text „Paradigma" allein
+      // sagt nichts, was der Eintrag nicht schon durch sein Fehlen sagt.
+      if (id) continue;
+      const text = `${cat?.emoji || field.emoji} ${label || field.fallbackName}`;
+      appended += plainBlockHtml(suffix ? `${text} ${suffix}` : text, { separator });
+      separator = true;
+      continue;
+    }
+
+    const linkKey = linkItemKey({ id: article.id, entryType: 'wiki' });
+    if (alreadyLinked.has(linkKey)) continue;
+    alreadyLinked.add(linkKey);
+
+    const chip: InternalLinkChip = {
+      id: article.id,
+      entryType: 'wiki',
+      label: article.title ?? '',
+      // Wie in v36: ein hochgeladenes Bild gehört nicht in die Node-Attrs.
+      icon: legacyChipIcon('wiki', article, cat?.emoji),
+      entry_number: article.entry_number,
+    };
+    appended += internalLinkBlockHtml(chip, label, { separator, suffix });
+    separator = true;
+  }
+
+  return content + appended;
+}
+
+interface EntryRow extends JournalFieldsRow {
+  id: string;
+  content: string | null;
+}
+
 export async function migrateJournalFieldsToContent(db: Database): Promise<void> {
   const entries = await db.select<EntryRow[]>(
     `SELECT id, content, paradigm_id, is_bannung, bannung_type_wiki_id,
@@ -94,92 +163,18 @@ export async function migrateJournalFieldsToContent(db: Database): Promise<void>
   );
   if (entries.length === 0) return;
 
-  const [articleRows, categoryRows] = await Promise.all([
-    db.select<ArticleRow[]>(
+  const [articles, categories] = await Promise.all([
+    db.select<LegacyLinkTarget[]>(
       'SELECT id, title, icon, category_id, entry_number FROM wiki_articles WHERE deleted_at IS NULL'
     ),
-    db.select<CategoryRow[]>('SELECT id, name, emoji, is_builtin FROM wiki_categories'),
+    db.select<LegacyCategoryRow[]>('SELECT id, name, emoji, is_builtin FROM wiki_categories'),
   ]);
-  const articles = new Map(articleRows.map((a) => [a.id, a]));
-  const categories = new Map(categoryRows.map((c) => [c.id, c]));
-
-  const t = i18n.t;
+  const source = tablesLinkSource({ wiki: articles }, { wiki: categories });
 
   for (const entry of entries) {
-    const content = entry.content ?? '';
-    const alreadyLinked = new Set(extractInternalLinks(content).map(linkItemKey));
-    let separator = !isBlankContent(content);
-    let appended = '';
-
-    // Was jedes Feld zu sagen hat: eine Artikel-ID, ein „war gesetzt"-Flag und
-    // beim Meditations-Feld die Dauer. Erst hier zusammengetragen, damit die
-    // Schleife darunter alle drei gleich behandelt.
-    const values: Record<LegacyJournalField, { id: string | null; active: boolean; suffix?: string }> = {
-      paradigm: { id: entry.paradigm_id, active: !!entry.paradigm_id },
-      bannung: {
-        id: entry.bannung_type_wiki_id,
-        active: !!entry.is_bannung || !!entry.bannung_type_wiki_id,
-      },
-      meditation: {
-        id: entry.meditation_type_wiki_id,
-        active: !!entry.is_meditation || !!entry.meditation_type_wiki_id,
-        suffix: entry.meditation_duration ? `(${entry.meditation_duration} min)` : undefined,
-      },
-    };
-
-    for (const key of FIELD_ORDER) {
-      const { id, active, suffix } = values[key];
-      if (!active) continue;
-
-      const field = LEGACY_JOURNAL_FIELDS[key];
-      const article = id ? articles.get(id) : undefined;
-      const cat = categories.get(article?.category_id ?? key);
-      // Eingebaute Wiki-Kategorien liegen mit deutschem Seed-Namen in der DB;
-      // der Anzeigename kommt aus dem Locale-Key. Ohne diesen Umweg stünde in
-      // einem englischen Vault dauerhaft „Bannung" im Eintrag. Ohne
-      // Kategorie-Zeile bleibt der Name leer — lieber keine Überschrift als
-      // eine erfundene.
-      const label = legacyCategoryLabel(
-        t, 'wiki',
-        cat ? { id: cat.id, name: cat.name, is_builtin: !!cat.is_builtin } : undefined,
-      );
-
-      if (!article) {
-        // Gesetzt, aber ohne Artikel dahinter — nur der Name der Kategorie.
-        // Ein `paradigm_id`, dessen Artikel gelöscht wurde, fällt hier ebenfalls
-        // heraus: `active` ist dann zwar wahr, aber der Text „Paradigma" allein
-        // sagt nichts, was der Eintrag nicht schon durch sein Fehlen sagt.
-        if (id) continue;
-        const text = `${cat?.emoji || field.emoji} ${label || field.fallbackName}`;
-        appended += plainBlockHtml(suffix ? `${text} ${suffix}` : text, { separator });
-        separator = true;
-        continue;
-      }
-
-      const linkKey = linkItemKey({ id: article.id, entryType: 'wiki' });
-      if (alreadyLinked.has(linkKey)) continue;
-      alreadyLinked.add(linkKey);
-
-      // Wie in v36: ein hochgeladenes Bild gehört nicht in die Node-Attrs, dort
-      // steht nur der Emoji-Rückfall (der Chip löst sein Bild live auf).
-      const icon = article.icon && !isImageIcon(article.icon)
-        ? article.icon
-        : (cat?.emoji || legacyWikiCategoryEmoji(article.category_id ?? ''));
-
-      const chip: InternalLinkChip = {
-        id: article.id,
-        entryType: 'wiki',
-        label: article.title ?? '',
-        icon,
-        entry_number: article.entry_number,
-      };
-      appended += internalLinkBlockHtml(chip, label, { separator, suffix });
-      separator = true;
-    }
-
     // `updated_at` bleibt unangetastet — die Migration ist keine Bearbeitung
     // durch den Nutzer und soll die Sortierung nicht umwerfen.
-    const nextContent = content + appended;
+    const nextContent = journalFieldsToContent(entry.content ?? '', entry, source);
     await db.execute(
       `UPDATE journal_entries
           SET content = $1, paradigm_id = NULL, is_bannung = 0, bannung_type_wiki_id = NULL,

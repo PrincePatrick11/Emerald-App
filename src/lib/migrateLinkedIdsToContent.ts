@@ -1,6 +1,6 @@
 import type Database from '@tauri-apps/plugin-sql';
 import i18n from '../i18n';
-import { legacyCategoryLabel, legacyWikiCategoryEmoji } from './categories';
+import { categoryLabel, legacyCategoryLabel, legacyWikiCategoryEmoji } from './categories';
 import { DEFAULT_ENTRY_EMOJI } from './modules';
 import { isImageIcon } from './helpers';
 import { linkItemKey } from './linkItems';
@@ -25,10 +25,11 @@ import {
  * `internalLinkBlockHtml`): Trennlinie, Kategorie des Ziels als Überschrift,
  * dann der Chip.
  *
- * Die Spalten bleiben im Schema — Export, Import und die Integritätsprüfung
- * kennen sie, und ein Backup aus der Zeit davor muss sie weiterhin füllen
- * dürfen. Geleert werden sie hier trotzdem, sonst stünde dieselbe Verknüpfung
- * zweimal in der Datenbank.
+ * Die Umwandlung selbst (`linkedIdsToContent`) arbeitet auf einer Zeile und
+ * einer Nachschlage-Quelle (`LegacyLinkSource`): die Migration schlägt in den
+ * alten Tabellen nach, der Import einer Sicherung von vor v36 in der Datei
+ * (`rowsLinkSource`). Seit v49 gibt es die Spalten nicht mehr — alte
+ * Sicherungen gehen deshalb vor dem Einfügen durch dieselbe Funktion.
  *
  * Zwei Dinge, die man beim Lesen wissen sollte:
  * - Die Überschrift wird in der Sprache geschrieben, die beim Migrationslauf
@@ -39,14 +40,11 @@ import {
  *   mittendrin lässt v36 ungestempelt, der nächste Start macht sauber weiter.
  */
 
-interface EntryRow {
-  id: string;
-  content: string | null;
-  linked_operation_ids: string | null;
-  linked_wiki_ids: string | null;
-}
+/** Die beiden Link-Arten, auf die die alten Journal-Felder zeigten. */
+export type LegacyLinkType = 'operation' | 'wiki';
 
-interface TargetRow {
+/** Ein Link-Ziel der alten Journal-Felder, wie die Umwandlung es braucht. */
+export interface LegacyLinkTarget {
   id: string;
   title: string | null;
   icon: string | null;
@@ -54,24 +52,172 @@ interface TargetRow {
   entry_number: number | null;
 }
 
-interface CategoryRow {
+/**
+ * Wo die Umwandlung Ziele und Kategorien nachschlägt. Ein Ziel, das es nicht
+ * gibt (gelöscht, im Papierkorb, nicht in der Datei), fällt weg — ein
+ * verschwundenes Ziel wird nicht als Chip verewigt.
+ */
+export interface LegacyLinkSource {
+  target(type: LegacyLinkType, id: string): LegacyLinkTarget | undefined;
+  /** Überschrift und Emoji einer Kategorie; `undefined`, wenn es die Zeile nicht gibt. */
+  category(type: LegacyLinkType, id: string): { label: string; emoji: string | null } | undefined;
+}
+
+/** Eine Kategoriezeile, wie beide Quellen sie lesen. */
+export interface LegacyCategoryRow {
   id: string;
   name: string;
   emoji: string | null;
-  is_builtin: number;
+  is_builtin: number | boolean;
 }
 
 const byId = <T extends { id: string }>(rows: T[]) => new Map(rows.map((r) => [r.id, r]));
 
+/**
+ * Die Quelle der Migrationen v36/v37: Ziele und je Modul eine eigene
+ * Kategorie-Tabelle aus der Zeit vor v38, eingebaute Kategorien mit dem
+ * Anzeigenamen ihres Moduls (`legacyCategoryLabel`).
+ */
+export function tablesLinkSource(
+  targets: Partial<Record<LegacyLinkType, LegacyLinkTarget[]>>,
+  categories: Partial<Record<LegacyLinkType, LegacyCategoryRow[]>>,
+): LegacyLinkSource {
+  const t = i18n.t;
+  const targetMaps = { operation: byId(targets.operation ?? []), wiki: byId(targets.wiki ?? []) };
+  const categoryMaps = { operation: byId(categories.operation ?? []), wiki: byId(categories.wiki ?? []) };
+  const module = { operation: 'operations', wiki: 'wiki' } as const;
+  return {
+    target: (type, id) => targetMaps[type].get(id),
+    category: (type, id) => {
+      const cat = categoryMaps[type].get(id);
+      return cat && {
+        label: legacyCategoryLabel(t, module[type], { id: cat.id, name: cat.name, is_builtin: !!cat.is_builtin }),
+        emoji: cat.emoji,
+      };
+    },
+  };
+}
+
+/**
+ * Die Quelle beim Import einer Sicherung: Ziele und Kategorien aus der Datei
+ * selbst, die Kategorien schon als eine Liste (`categories`, seit Format 4 —
+ * ältere hebt `migrateBackupPayload` vorher an). Einträge im Papierkorb der
+ * Datei zählen wie in der Migration nicht als Ziel.
+ */
+export function rowsLinkSource(
+  targets: Record<LegacyLinkType, readonly Record<string, unknown>[]>,
+  categories: readonly Record<string, unknown>[],
+): LegacyLinkSource {
+  const t = i18n.t;
+  const toTarget = (r: Record<string, unknown>): LegacyLinkTarget => ({
+    id: String(r.id),
+    title: r.title == null ? null : String(r.title),
+    icon: r.icon == null ? null : String(r.icon),
+    category_id: r.category_id == null ? null : String(r.category_id),
+    entry_number: r.entry_number == null || Number.isNaN(Number(r.entry_number)) ? null : Number(r.entry_number),
+  });
+  const live = (rows: readonly Record<string, unknown>[]) => byId(rows.filter((r) => !r.deleted_at).map(toTarget));
+  const targetMaps = { operation: live(targets.operation), wiki: live(targets.wiki) };
+  const categoryMap = new Map(categories.map((c) => [String(c.id), c]));
+  return {
+    target: (type, id) => targetMaps[type].get(id),
+    category: (_type, id) => {
+      const cat = categoryMap.get(id);
+      return cat && {
+        label: categoryLabel(t, { id: String(cat.id), name: String(cat.name ?? ''), is_builtin: !!cat.is_builtin }),
+        emoji: cat.emoji == null ? null : String(cat.emoji),
+      };
+    },
+  };
+}
+
+/**
+ * Das Emoji, das im Chip gespeichert wird. Bilder gehören nicht in die
+ * Node-Attrs: `icon` landet im gespeicherten HTML, und eine hochgeladene
+ * data-URL bläht damit jeden Eintrag auf, der das Ziel verlinkt. Der Chip
+ * holt sein Bild ohnehin live — hier steht nur der Emoji-Rückfall. (Dieselbe
+ * Regel wie beim Altar-Zweig in useLinkItems.)
+ */
+export function legacyChipIcon(type: LegacyLinkType, target: LegacyLinkTarget, categoryEmoji: string | null | undefined): string {
+  if (target.icon && !isImageIcon(target.icon)) return target.icon;
+  if (categoryEmoji) return categoryEmoji;
+  // Ohne Kategorie-Zeile bleibt nur der Modul-Fallback.
+  return type === 'wiki' ? legacyWikiCategoryEmoji(target.category_id ?? '') : DEFAULT_ENTRY_EMOJI.operation;
+}
+
 /** `null` statt `[]` bei kaputtem JSON — der Aufrufer lässt die Zeile dann in Ruhe. */
-function parseIds(value: string | null): string[] | null {
+function parseIds(value: unknown): string[] | null {
+  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string');
   if (!value) return [];
   try {
-    const parsed = JSON.parse(value);
+    const parsed = JSON.parse(String(value));
     return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : null;
   } catch {
     return null;
   }
+}
+
+/** Die beiden alten Spalten einer Journal-Zeile — als JSON-Text (Datenbank) oder schon als Liste (Datei). */
+export interface LinkedIdsRow {
+  id: string;
+  linked_operation_ids?: unknown;
+  linked_wiki_ids?: unknown;
+}
+
+/**
+ * Der Inhalt mit den Verknüpfungen der alten Spalten als Link-Blöcke dahinter.
+ * `null`, wenn eine Spalte kein gültiges JSON ist — dann bleibt die Zeile, wie
+ * sie ist. Ohne Verknüpfungen kommt `content` unverändert zurück.
+ */
+export function linkedIdsToContent(content: string, row: LinkedIdsRow, source: LegacyLinkSource): string | null {
+  /** Reihenfolge wie in den beiden abgelösten Feldern: erst Operationen, dann Wiki. */
+  const columns = [
+    { column: 'linked_operation_ids', type: 'operation' },
+    { column: 'linked_wiki_ids', type: 'wiki' },
+  ] as const;
+
+  const alreadyLinked = new Set(extractInternalLinks(content).map(linkItemKey));
+  let appended = '';
+  // Bei einem leeren Eintrag bleibt die erste Trennlinie weg — sie trennt
+  // Text von Links, und Text gibt es dort keinen.
+  let separator = !isBlankContent(content);
+
+  for (const { column, type } of columns) {
+    const ids = parseIds(row[column]);
+    if (ids === null) {
+      console.warn(`[db] ${column} von Eintrag ${row.id} ist kein gültiges JSON — Zeile bleibt unverändert`, row[column]);
+      return null;
+    }
+
+    for (const id of ids) {
+      const target = source.target(type, id);
+      if (!target) continue; // Ziel gelöscht oder im Papierkorb.
+      const key = linkItemKey({ id: target.id, entryType: type });
+      if (alreadyLinked.has(key)) continue; // Steht schon im Text.
+      alreadyLinked.add(key);
+
+      const cat = source.category(type, target.category_id ?? '');
+      const chip: InternalLinkChip = {
+        id: target.id,
+        entryType: type,
+        label: target.title ?? '',
+        icon: legacyChipIcon(type, target, cat?.emoji),
+        entry_number: target.entry_number,
+      };
+      // Ohne Kategorie lieber gar keine Überschrift als ein „Keine".
+      appended += internalLinkBlockHtml(chip, cat?.label ?? '', { separator });
+      separator = true;
+    }
+  }
+
+  return content + appended;
+}
+
+interface EntryRow {
+  id: string;
+  content: string | null;
+  linked_operation_ids: string | null;
+  linked_wiki_ids: string | null;
 }
 
 export async function migrateLinkedIdsToContent(db: Database): Promise<void> {
@@ -85,99 +231,21 @@ export async function migrateLinkedIdsToContent(db: Database): Promise<void> {
   // Papierkorb bleibt draußen: ein gelöschtes Ziel würde als Chip dauerhaft im
   // Text stehen, auch wenn der Papierkorb es später endgültig entfernt.
   const [operations, opCategories, articles, wikiCategories] = await Promise.all([
-    db.select<TargetRow[]>('SELECT id, title, icon, category_id, entry_number FROM operations WHERE deleted_at IS NULL'),
-    db.select<CategoryRow[]>('SELECT id, name, emoji, is_builtin FROM operation_categories'),
-    db.select<TargetRow[]>('SELECT id, title, icon, category_id, entry_number FROM wiki_articles WHERE deleted_at IS NULL'),
-    db.select<CategoryRow[]>('SELECT id, name, emoji, is_builtin FROM wiki_categories'),
+    db.select<LegacyLinkTarget[]>('SELECT id, title, icon, category_id, entry_number FROM operations WHERE deleted_at IS NULL'),
+    db.select<LegacyCategoryRow[]>('SELECT id, name, emoji, is_builtin FROM operation_categories'),
+    db.select<LegacyLinkTarget[]>('SELECT id, title, icon, category_id, entry_number FROM wiki_articles WHERE deleted_at IS NULL'),
+    db.select<LegacyCategoryRow[]>('SELECT id, name, emoji, is_builtin FROM wiki_categories'),
   ]);
-
-  const t = i18n.t;
-  const toLabelable = (cat: CategoryRow | undefined) =>
-    cat ? { id: cat.id, name: cat.name, is_builtin: !!cat.is_builtin } : undefined;
-
-  /** Reihenfolge wie in den beiden abgelösten Feldern: erst Operationen, dann Wiki. */
-  const sources = [
-    {
-      column: 'linked_operation_ids' as const,
-      entryType: 'operation' as const,
-      rows: byId(operations),
-      cats: byId(opCategories),
-      module: 'operations' as const,
-      // Ohne Kategorie-Zeile bleibt nur der Modul-Fallback.
-      iconFallback: (_row: TargetRow) => DEFAULT_ENTRY_EMOJI.operation,
-    },
-    {
-      column: 'linked_wiki_ids' as const,
-      entryType: 'wiki' as const,
-      rows: byId(articles),
-      cats: byId(wikiCategories),
-      module: 'wiki' as const,
-      iconFallback: (row: TargetRow) => legacyWikiCategoryEmoji(row.category_id ?? ''),
-    },
-  ];
+  const source = tablesLinkSource(
+    { operation: operations, wiki: articles },
+    { operation: opCategories, wiki: wikiCategories },
+  );
 
   for (const entry of entries) {
-    const content = entry.content ?? '';
-    const alreadyLinked = new Set(
-      extractInternalLinks(content).map(linkItemKey)
-    );
-
-    let appended = '';
-    let broken = false;
-    // Bei einem leeren Eintrag bleibt die erste Trennlinie weg — sie trennt
-    // Text von Links, und Text gibt es dort keinen.
-    let separator = !isBlankContent(content);
-
-    for (const source of sources) {
-      const ids = parseIds(entry[source.column]);
-      if (ids === null) {
-        console.warn(
-          `[db] v36: ${source.column} von Eintrag ${entry.id} ist kein gültiges JSON — Zeile bleibt unverändert`,
-          entry[source.column]
-        );
-        broken = true;
-        break;
-      }
-
-      for (const id of ids) {
-        const row = source.rows.get(id);
-        if (!row) continue; // Ziel gelöscht oder im Papierkorb.
-        const key = linkItemKey({ id: row.id, entryType: source.entryType });
-        if (alreadyLinked.has(key)) continue; // Steht schon im Text.
-        alreadyLinked.add(key);
-
-        const cat = source.cats.get(row.category_id ?? '');
-        // Bilder gehören nicht in die Node-Attrs: `icon` landet im
-        // gespeicherten HTML, und eine hochgeladene data-URL bläht damit jeden
-        // Eintrag auf, der das Ziel verlinkt. Der Chip holt sein Bild ohnehin
-        // live — hier steht nur der Emoji-Rückfall. (Dieselbe Regel wie beim
-        // Altar-Zweig in useLinkItems.)
-        const icon = row.icon && !isImageIcon(row.icon)
-          ? row.icon
-          : (cat?.emoji || source.iconFallback(row));
-
-        const chip: InternalLinkChip = {
-          id: row.id,
-          entryType: source.entryType,
-          label: row.title ?? '',
-          icon,
-          entry_number: row.entry_number,
-        };
-        // Ohne Kategorie lieber gar keine Überschrift als ein „Keine".
-        appended += internalLinkBlockHtml(
-          chip,
-          legacyCategoryLabel(t, source.module, toLabelable(cat)),
-          { separator }
-        );
-        separator = true;
-      }
-    }
-
-    if (broken) continue;
-
+    const nextContent = linkedIdsToContent(entry.content ?? '', entry, source);
+    if (nextContent === null) continue;
     // `updated_at` bleibt bewusst unangetastet: die Migration ist keine
     // Bearbeitung durch den Nutzer und soll die Sortierung nicht umwerfen.
-    const nextContent = content + appended;
     await db.execute(
       `UPDATE journal_entries SET content = $1, linked_operation_ids = '[]', linked_wiki_ids = '[]' WHERE id = $2`,
       [nextContent, entry.id]

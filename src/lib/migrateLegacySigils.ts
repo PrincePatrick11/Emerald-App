@@ -36,11 +36,13 @@ import { SIGIL_CATEGORY_ID } from './schema';
  * setzt kein zweites Set davor, und das Nachholen fügt einem Eintrag, dem
  * der Nutzer die Blöcke bewusst genommen hat, sie nicht wieder hinzu.
  *
- * Die Spalten bleiben im Schema (ältere Backups kennen sie) und werden auf
- * ihre Grundwerte gesetzt. `updated_at` bleibt.
+ * Die Spalten werden auf ihre Grundwerte gesetzt, `updated_at` bleibt. Die
+ * Umwandlung einer Zeile (`sigilRowToContent`) nimmt auch der Import alter
+ * Sicherungen — vor dem Einfügen, denn seit v49 gibt es die Spalten nicht mehr.
  */
 
-interface LegacySigilRow {
+/** Die Sigillen-Spalten einer Operationszeile — aus der Datenbank oder aus einer Sicherung. */
+export interface LegacySigilRow {
   id: string;
   content: string | null;
   category_id: string | null;
@@ -67,9 +69,10 @@ const LEGACY_DATA = `drawing_data IS NOT NULL
 const DRAWING_DATA_URL = /^data:image\/(?:png|jpeg|gif|webp);base64,/;
 const MAX_DRAWING_CHARS = 25 * 1024 * 1024;
 
-function jsonLetters(raw: string | null): string[] {
+function jsonLetters(raw: unknown): string[] {
+  if (Array.isArray(raw)) return letterList(raw);
   try {
-    return letterList(JSON.parse(raw ?? '[]'));
+    return letterList(JSON.parse(typeof raw === 'string' && raw ? raw : '[]'));
   } catch {
     return [];
   }
@@ -78,7 +81,7 @@ function jsonLetters(raw: string | null): string[] {
 function hasSigilData(row: LegacySigilRow): boolean {
   const inSigilCategory = row.category_id === SIGIL_CATEGORY_ID && !(row.content ?? '').includes(SIGIL_BLOCK_MARKER);
   return inSigilCategory || !!row.drawing_data || !!row.intention_text?.trim()
-    || jsonLetters(row.letter_bank).length > 0 || row.is_loaded === 1
+    || jsonLetters(row.letter_bank).length > 0 || Number(row.is_loaded) === 1
     || !!row.target_reveal_date || !!row.charging_technique_wiki_id;
 }
 
@@ -96,6 +99,76 @@ async function drawingFile(drawing: string | null): Promise<string | null | unde
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Trägt die Zeile Sigillen-Altdaten? Dieselbe Frage wie `LEGACY_DATA`, für
+ * Zeilen, die nicht aus der Datenbank kommen (Import einer Sicherung).
+ * `includeSigilCategory` zählt auch leere Operationen der Kategorie „Sigillen".
+ */
+export function needsSigilConversion(row: LegacySigilRow, includeSigilCategory: boolean): boolean {
+  if (includeSigilCategory && row.category_id === SIGIL_CATEGORY_ID) return true;
+  return !!row.drawing_data || !!row.intention_text?.trim()
+    || !['', '[]'].includes(typeof row.letter_bank === 'string' ? row.letter_bank : JSON.stringify(row.letter_bank ?? []))
+    || Number(row.is_loaded) === 1 || !!row.target_reveal_date || !!row.charging_technique_wiki_id
+    || !!row.description?.trim();
+}
+
+/** Die Felder eines Wiki-Artikels, die der Ladetechnik-Chip braucht. */
+export interface SigilTechniqueArticle {
+  title: string | null;
+  icon: string | null;
+  entry_number: number | null;
+}
+
+/**
+ * Der Inhalt einer Operationszeile mit ihren Sigillen-Altdaten als Blöcke
+ * davor. `undefined`, wenn das Speichern der Zeichnung scheiterte — dann
+ * bleibt die Zeile, wie sie ist, und ein späterer Lauf versucht es erneut.
+ */
+export async function sigilRowToContent(
+  row: LegacySigilRow,
+  article: (id: string) => SigilTechniqueArticle | undefined,
+): Promise<string | undefined> {
+  const blocks: BlockInstance[] = [];
+  if (hasSigilData(row)) {
+    const drawing = await drawingFile(row.drawing_data);
+    if (drawing === undefined) return undefined;
+    const letters = jsonLetters(row.letter_bank);
+    blocks.push(serializeSigilCalc(createSigilCalcBlock(), {
+      intention: row.intention_text ?? '',
+      letters,
+      implemented: implementedIn(letters, jsonLetters(row.implemented_letters)),
+    }));
+    const canvas = withSigilImage(createSigilCanvasBlock(), drawing);
+    const loaded = Number(row.is_loaded) === 1;
+    const hidden = Number(row.show_sigil) === 0 && !loaded;
+    blocks.push(hidden ? { ...canvas, attrs: { ...canvas.attrs, [BLOCK_ATTR.hidden]: hiddenAttrValue(true)! } } : canvas);
+
+    // Fehlt der Artikel (etwa ein Import ohne Wiki), bleibt der Verweis als
+    // Chip mit seiner ID stehen — ein späterer Wiki-Import löst ihn wieder auf.
+    const techniqueId = row.charging_technique_wiki_id;
+    const technique = techniqueId ? article(techniqueId) : undefined;
+    const chip = techniqueId
+      ? internalLinkChipHtml({
+          id: techniqueId,
+          entryType: 'wiki',
+          label: technique?.title ?? techniqueId,
+          icon: technique?.icon && !isImageIcon(technique.icon) ? technique.icon : '📚',
+          entry_number: technique?.entry_number,
+        })
+      : null;
+    const date = row.target_reveal_date?.slice(0, 10);
+    blocks.push(serializeSigilCharge(createSigilChargeBlock(), {
+      loaded,
+      revealDate: isIsoDate(date) ? date : null,
+      lock: 'entry',
+      technique: chip,
+      targets: null,
+    }));
+  }
+  if (row.description?.trim()) blocks.push(createTextBlock(textParagraphs(row.description)));
+  return serializeBlocks([...blocks, ...parseBlocks(row.content ?? '')]);
 }
 
 /** Gibt es Zeilen, die die Umwandlung anfassen würde? Für die Sicherung vor v42. */
@@ -134,48 +207,11 @@ export async function convertLegacySigils(
   let converted = 0;
   let failed = 0;
   for (const row of rows) {
-    const blocks: BlockInstance[] = [];
-    if (hasSigilData(row)) {
-      const drawing = await drawingFile(row.drawing_data);
-      if (drawing === undefined) {
-        failed += 1;
-        continue;
-      }
-      const letters = jsonLetters(row.letter_bank);
-      blocks.push(serializeSigilCalc(createSigilCalcBlock(), {
-        intention: row.intention_text ?? '',
-        letters,
-        implemented: implementedIn(letters, jsonLetters(row.implemented_letters)),
-      }));
-      const canvas = withSigilImage(createSigilCanvasBlock(), drawing);
-      const hidden = row.show_sigil === 0 && row.is_loaded !== 1;
-      blocks.push(hidden ? { ...canvas, attrs: { ...canvas.attrs, [BLOCK_ATTR.hidden]: hiddenAttrValue(true)! } } : canvas);
-
-      // Fehlt der Artikel (etwa ein Import ohne Wiki), bleibt der Verweis als
-      // Chip mit seiner ID stehen — ein späterer Wiki-Import löst ihn wieder auf.
-      const techniqueId = row.charging_technique_wiki_id;
-      const article = techniqueId ? articles.get(techniqueId) : undefined;
-      const chip = techniqueId
-        ? internalLinkChipHtml({
-            id: techniqueId,
-            entryType: 'wiki',
-            label: article?.title ?? techniqueId,
-            icon: article?.icon && !isImageIcon(article.icon) ? article.icon : '📚',
-            entry_number: article?.entry_number,
-          })
-        : null;
-      const date = row.target_reveal_date?.slice(0, 10);
-      blocks.push(serializeSigilCharge(createSigilChargeBlock(), {
-        loaded: row.is_loaded === 1,
-        revealDate: isIsoDate(date) ? date : null,
-        lock: 'entry',
-        technique: chip,
-        targets: null,
-      }));
+    const content = await sigilRowToContent(row, (id) => articles.get(id));
+    if (content === undefined) {
+      failed += 1;
+      continue;
     }
-    if (row.description?.trim()) blocks.push(createTextBlock(textParagraphs(row.description)));
-
-    const content = serializeBlocks([...blocks, ...parseBlocks(row.content ?? '')]);
     await db.execute(
       `UPDATE operations
           SET content=$1, description='', intention_text='', letter_bank='[]', implemented_letters='[]',

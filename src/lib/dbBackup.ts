@@ -42,7 +42,9 @@ import {
   assignedCategoryId, assignmentKey, defaultKeys, isTemplateId, parseAssignments, SIGIL_TEMPLATE_ID, templateToRow,
 } from './blocks/templates';
 import { fromRow } from './row';
-import { convertLegacySigils } from './migrateLegacySigils';
+import { needsSigilConversion, sigilRowToContent, type LegacySigilRow } from './migrateLegacySigils';
+import { linkedIdsToContent, rowsLinkSource } from './migrateLinkedIdsToContent';
+import { journalFieldsToContent } from './migrateJournalFieldsToContent';
 import { IMAGE_FIELDS, imageColumns } from './schema';
 import { categoryKey, mergeCategoryRows, type CategorySource } from './categoryMerge';
 import { legacyDisplayName, type LegacyCategoryTable } from './categories';
@@ -285,7 +287,8 @@ export function migrateBackupPayload(backup: BackupFile): void {
   // und eine Datei ohne es bringt schlicht keine eigenen Blöcke mit.
 
   // v6 → v7 braucht keinen Schritt an der Datei: Sigillen-Spalten alter
-  // Operationen wandelt der Import nach dem Einfügen um (`convertLegacySigils`).
+  // Operationen wandelt der Import vor dem Einfügen um (`liftLegacySigilRows`),
+  // die alten Journal-Felder ebenso (`liftLegacyJournalRows`).
 
   // v7 → v8 braucht keinen Schritt: neu ist nur das Array `templates`.
   // v8 → v9 ebenso wenig: neu sind nur `languages`/`lexiconEntries`, und eine
@@ -895,23 +898,80 @@ async function insertLexicon(
 }
 
 /**
- * Sigillen-Spalten importierter Operationen (Sicherungen von vor v42) in
- * Blöcke umwandeln — derselbe Weg wie Migration v42, nur für die gerade
- * eingefügten Zeilen. Leere Operationen der Kategorie „Sigillen" bekommen das
- * Sigillen-Set nur aus Dateien vor Version 7: in einer neueren hat der Nutzer
- * die Blöcke womöglich bewusst entfernt. Eine Zeichnung, die sich nicht
- * speichern lässt, holt `getDb` beim nächsten Öffnen nach.
+ * Die Umwandlungen der Migrationen für die Eintragszeilen einer älteren
+ * Sicherung — vor dem Einfügen, denn seit v49 gibt es die alten Spalten nicht
+ * mehr. Eine Zeile ohne Altdaten bleibt, wie sie ist; umgewandelte Felder
+ * werden auf ihre Grundwerte gesetzt statt gelöscht: `insertRows` nimmt die
+ * Spaltenliste aus der ersten Zeile, alle Zeilen tragen dieselben Schlüssel.
+ *
+ * Status/Enddatum/Version (v41) wandelt `convertLegacyStatusRows` je Modus um —
+ * es braucht die „Status"-Definition des Ziel-Vaults.
  */
-async function convertImportedSigils(
-  db: Awaited<ReturnType<typeof getDb>>,
-  backup: BackupFile,
-  operations: Row[],
-): Promise<void> {
-  if (!operations.length) return;
-  await convertLegacySigils(db, {
-    includeSigilCategory: (backup.sourceVersion ?? Number(BACKUP_VERSION)) < 7,
-    ids: new Set(operations.map((r) => String(r.id))),
+
+/**
+ * Journal (v36/v37): verknüpfte Operationen und Artikel, Paradigma, Bannung
+ * und Meditation werden Link-Blöcke im Inhalt. Nachgeschlagen wird in der
+ * Datei selbst; der Merge benennt die Chips danach mit allen anderen um.
+ */
+function liftLegacyJournalRows(d: BackupFile['data']): BackupFile['data'] {
+  if (!d.journalEntries) return d;
+  const source = rowsLinkSource(
+    { operation: d.operations ?? [], wiki: d.wikiArticles ?? [] },
+    d.categories ?? [],
+  );
+  const journalEntries = (d.journalEntries ?? []).map((row) => {
+    const linked = linkedIdsToContent(String(row.content ?? ''), { id: String(row.id), ...row }, source);
+    // Kaputtes JSON in den verknüpften IDs: die Zeile bleibt wie in v36 unberührt.
+    if (linked === null) return row;
+    const content = journalFieldsToContent(linked, row, source);
+    if (content === row.content) return row;
+    return {
+      ...row, content,
+      linked_operation_ids: '[]', linked_wiki_ids: '[]',
+      paradigm_id: null, is_bannung: 0, bannung_type_wiki_id: null,
+      is_meditation: 0, meditation_duration: null, meditation_type_wiki_id: null,
+    };
   });
+  return { ...d, journalEntries };
+}
+
+/**
+ * Operationen (v42): Sigillen-Spalten werden Blöcke — nach der Status-
+ * Umwandlung, damit die Blöcke in derselben Reihenfolge stehen wie nach den
+ * Migrationen v41 und v42. `operations` und `wikiArticles` sind die Zeilen des
+ * Modus, also schon umbenannt (Merge) und mit lokalen Bildnamen. Leere
+ * Operationen der Kategorie „Sigillen" bekommen das Set nur aus Dateien vor
+ * Version 7: in einer neueren hat der Nutzer die Blöcke womöglich bewusst
+ * entfernt.
+ */
+async function liftLegacySigilRows(operations: Row[], wikiArticles: Row[], backup: BackupFile): Promise<Row[]> {
+  const includeSigilCategory = (backup.sourceVersion ?? Number(BACKUP_VERSION)) < 7;
+  const articles = new Map(wikiArticles.map((a) => [String(a.id), {
+    title: a.title == null ? null : String(a.title),
+    icon: a.icon == null ? null : String(a.icon),
+    entry_number: a.entry_number == null ? null : Number(a.entry_number),
+  }]));
+  const out: Row[] = [];
+  for (const row of operations) {
+    const sigilRow = row as LegacySigilRow;
+    if (!needsSigilConversion(sigilRow, includeSigilCategory)) {
+      out.push(row);
+      continue;
+    }
+    const content = await sigilRowToContent(sigilRow, (id) => articles.get(id));
+    // Anders als die Migration kann der Import nicht später nachholen — nach
+    // v49 gibt es keine Spalte, in der die Zeichnung warten könnte.
+    if (content === undefined) throw new Error(`Sigil drawing of operation ${String(row.id)} could not be saved`);
+    out.push({
+      ...row, content,
+      description: '', intention_text: '', letter_bank: '[]', implemented_letters: '[]',
+      drawing_data: null, thumbnail_data: null, is_loaded: 0, target_reveal_date: null,
+      charging_technique_wiki_id: null, show_sigil: 1, show_intention_in_properties: 1,
+      show_letter_bank_in_properties: 1,
+    });
+  }
+
+  return out;
 }
 
 /**
@@ -1180,7 +1240,7 @@ export async function withRoutinesAsTemplates(db: Awaited<ReturnType<typeof getD
 
 async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
   const pathMap = await restoreImages(backup);
-  const d = await withRoutinesAsTemplates(db, backup.data);
+  const d = liftLegacyJournalRows(await withRoutinesAsTemplates(db, backup.data));
 
   await assertPayloadReferencesResolve(db, d);
 
@@ -1203,7 +1263,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
     remapCategoryIds((d.operations ?? []).map((r) => remapRow(r, IMAGE_FIELDS_OP, pathMap)), catMap),
     i18n.t, nowIso(), replaceStatus,
   );
-  const operations = replaceOps.rows;
+  const operations = await liftLegacySigilRows(replaceOps.rows, wikiArticles, backup);
   const altars = (d.altars ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ALTAR, pathMap));
   const altarItems = remapCategoryIds((d.altarItems ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ITEM, pathMap)), catMap);
   const tasks = remapCategoryIds(d.tasks ?? [], catMap);
@@ -1267,8 +1327,6 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   await insertTasks(db, tasks);
   if (d.taskLinks) await insertRows(db, 'task_links', d.taskLinks);
 
-  await convertImportedSigils(db, backup, operations);
-
   // Ein Teil-Replace (z. B. nur Tasks) kann Verknüpfungen des Bestands auf
   // gerade ersetzte Ziele verwaisen lassen — und importierte task_links
   // können auf abgewählte Typen zeigen. Gleicher Sweep wie beim Papierkorb.
@@ -1283,7 +1341,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
 
 async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
   const pathMap = await restoreImages(backup);
-  const d = await withRoutinesAsTemplates(db, backup.data);
+  const d = liftLegacyJournalRows(await withRoutinesAsTemplates(db, backup.data));
 
   // Merge loescht zwar nichts, bricht aber mitten im Einfuegen ab, wenn eine
   // Kategorie fehlt — vorher pruefen, damit die Meldung sagt, welche.
@@ -1398,7 +1456,7 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   const mergeOps = convertLegacyStatusRows(remapCategoryIds((d.operations ?? []).map((r: Row) =>
     withContentLinks(remapEntry(r, ['content', 'icon', 'cover_image', 'drawing_data', 'thumbnail_data'], ['charging_technique_wiki_id'], [], 'operations'))
   ), catMap), i18n.t, nowIso(), mergeStatus);
-  const operations = mergeOps.rows;
+  const operations = await liftLegacySigilRows(mergeOps.rows, wikiArticles, backup);
   const altars = (d.altars ?? []).map((r: Row) =>
     // Dieselben drei Spalten wie in doReplace. Solange thumbnail_data und
     // icon_data Data-URLs halten, ist der Unterschied folgenlos — aber der
@@ -1450,8 +1508,6 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   await insertRows(db, 'altar_placements', altarPlacements);
   await insertTasks(db, tasks);
   await insertRows(db, 'task_links', taskLinks, true);
-
-  await convertImportedSigils(db, backup, operations);
 
   // Importierte task_links können auf Ziele zeigen, die der Typ-Filter
   // gerade abgewählt hat — wie in doReplace ausfegen.
