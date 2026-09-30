@@ -3,7 +3,7 @@ import type { SortMode } from '../store/uiStore';
 interface BaseSortOptions<T> {
   /** ISO-Datumsstring des Items — created_at, updated_at oder deleted_at, je nach Modul. */
   date: (item: T) => string;
-  /** Nachrangiges Kriterium bei Gleichstand (Tasks: sort_order). */
+  /** Nachrangiges Kriterium bei Gleichstand (Tags: Name). */
   tiebreak?: (a: T, b: T) => number;
   /** Für `count_desc` (Tags: Anzahl Verwendungen). Fehlt er, zählt jedes Item 0. */
   count?: (item: T) => number;

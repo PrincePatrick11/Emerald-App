@@ -104,10 +104,7 @@ export default function TasksView() {
   const categoryCounts = countByCategory(categoryBase, (id) => !!getCategory(id), (task) => task.category_id);
   const priorityCounts = countBy(priorityBase, (task) => task.priority);
 
-  const sortedTasks = sortItems(filteredTasks, tasksPrefs.sort, {
-    date: (task) => task.created_at,
-    tiebreak: (a, b) => a.sort_order - b.sort_order,
-  });
+  const sortedTasks = sortItems(filteredTasks, tasksPrefs.sort, { date: (task) => task.created_at });
 
   const groupedTasks = tasksPrefs.grouping === 'grouped'
     ? sortedTasks.reduce((acc, task) => {
@@ -219,24 +216,17 @@ export default function TasksView() {
     />
   );
 
+  /** Der Titel eines Verknüpfungsziels — liegt es im Papierkorb oder ist es weg, „Gelöscht". */
   const resolveTaskLinkTitle = useCallback((targetType: string, targetId: string) => {
-    if (targetType === 'journal') {
-      return journalEntries.find((entry) => entry.id === targetId)?.title ?? 'Unknown';
-    }
-    if (targetType === 'wiki') {
-      return wikiArticles.find((article) => article.id === targetId)?.title ?? 'Unknown';
-    }
-    if (targetType === 'operation') {
-      return operations.find((operation) => operation.id === targetId)?.title ?? 'Unknown';
-    }
-    if (targetType === 'task') {
-      return tasks.find((task) => task.id === targetId)?.title ?? 'Unknown';
-    }
-    if (targetType === 'altar') {
-      return altars.find((altar) => altar.id === targetId)?.title ?? 'Unknown';
-    }
-    return 'Unknown';
-  }, [journalEntries, wikiArticles, operations, tasks, altars]);
+    const pool: readonly { id: string; title: string }[] =
+      targetType === 'journal' ? journalEntries
+        : targetType === 'wiki' ? wikiArticles
+        : targetType === 'operation' ? operations
+        : targetType === 'task' ? tasks
+        : targetType === 'altar' ? altars
+        : [];
+    return pool.find((item) => item.id === targetId)?.title ?? t('tasks.linkTargetGone');
+  }, [journalEntries, wikiArticles, operations, tasks, altars, t]);
 
   const renderTasksContent = () => (
     <>

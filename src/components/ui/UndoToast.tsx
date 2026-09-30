@@ -7,23 +7,23 @@ import Button from './Button';
 
 export default function UndoToast() {
   const { t } = useTranslation();
-  const { activeToast, toastVisible, executeUndo, dismissToast } = useUndoStore(
-    useShallow((s) => ({ activeToast: s.activeToast, toastVisible: s.toastVisible, executeUndo: s.executeUndo, dismissToast: s.dismissToast }))
+  const { active, executeUndo, dismiss } = useUndoStore(
+    useShallow((s) => ({ active: s.active, executeUndo: s.executeUndo, dismiss: s.dismiss }))
   );
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!toastVisible) return;
+    if (!active) return;
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => dismissToast(), 5000);
+    timerRef.current = setTimeout(() => dismiss(), 5000);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [activeToast?.id, toastVisible]);
+  }, [active?.id]);
 
-  if (!toastVisible || !activeToast) return null;
+  if (!active) return null;
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 px-4 py-3 bg-stone-800 border border-stone-700/60 rounded-xl shadow-xl animate-slide-in">
-      <span className="text-sm text-stone-300 max-w-xs truncate">{activeToast.description}</span>
+      <span className="text-sm text-stone-300 max-w-xs truncate">{active.description}</span>
       <Button
         onClick={executeUndo}
         variant="primary"
@@ -31,7 +31,7 @@ export default function UndoToast() {
       >
         {t('undo.action')}
       </Button>
-      <button onClick={dismissToast} className="flex-shrink-0 text-stone-600 hover:text-stone-400 transition-colors">
+      <button onClick={dismiss} className="flex-shrink-0 text-stone-600 hover:text-stone-400 transition-colors">
         <X size={14} />
       </button>
     </div>

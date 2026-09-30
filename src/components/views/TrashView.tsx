@@ -287,8 +287,13 @@ export default function TrashView() {
         ? <div className="space-y-1">{subset.map((item) => <ItemRow key={item.id} item={item} {...itemProps} />)}</div>
         : <div className={cardsGridClass}>{subset.map((item) => <ItemCard key={item.id} item={item} {...itemProps} />)}</div>;
 
-    const wikiByCategory = groupBy(wiki, (item) => item.category ?? 'other');
-    const opsByCategory = groupBy(operations, (item) => item.category ?? '—');
+    // '' = ohne Kategorie; trashStore joint c.name als category — der Schlüssel ist der Name, nicht die id.
+    const wikiByCategory = groupBy(wiki, (item) => item.category ?? '');
+    const opsByCategory = groupBy(operations, (item) => item.category ?? '');
+    const categoryGroupLabel = (name: string) => {
+      const catDef = categories.find((c) => c.name === name);
+      return catDef ? `${catDef.emoji} ${categoryLabel(t, catDef)}` : name || t('categories.uncategorized');
+    };
 
     return (
       <div>
@@ -301,32 +306,23 @@ export default function TrashView() {
         {wiki.length > 0 && (
           <>
             <SectionHeader label={t('nav.wiki')} count={wiki.length} />
-            {wikiByCategory.map(({ label: catKey, items: catItems }) => {
-              // trashStore joint c.name als category — der Schlüssel ist der Name, nicht die id.
-              const catDef = categories.find((c) => c.name === catKey);
-              const label = catDef ? `${catDef.emoji} ${categoryLabel(t, catDef)}` : catKey;
-              return (
-                <div key={catKey}>
-                  {wikiByCategory.length > 1 && <SubSectionHeader label={label} />}
-                  {renderItems(catItems)}
-                </div>
-              );
-            })}
+            {wikiByCategory.map(({ label: catName, items: catItems }) => (
+              <div key={catName}>
+                {wikiByCategory.length > 1 && <SubSectionHeader label={categoryGroupLabel(catName)} />}
+                {renderItems(catItems)}
+              </div>
+            ))}
           </>
         )}
         {operations.length > 0 && (
           <>
             <SectionHeader label={t('nav.operations')} count={operations.length} />
-            {opsByCategory.map(({ label: catName, items: catItems }) => {
-              const catDef = categories.find((c) => c.name === catName);
-              const label = catDef ? `${catDef.emoji} ${categoryLabel(t, catDef)}` : catName;
-              return (
-                <div key={catName}>
-                  {opsByCategory.length > 1 && <SubSectionHeader label={label} />}
-                  {renderItems(catItems)}
-                </div>
-              );
-            })}
+            {opsByCategory.map(({ label: catName, items: catItems }) => (
+              <div key={catName}>
+                {opsByCategory.length > 1 && <SubSectionHeader label={categoryGroupLabel(catName)} />}
+                {renderItems(catItems)}
+              </div>
+            ))}
           </>
         )}
         {tasks.length > 0 && (

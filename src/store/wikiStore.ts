@@ -10,31 +10,6 @@ import i18n from '../i18n';
 import { startOfNewEntry, useTemplateNoticeStore } from './templateStore';
 import { UNTITLED_TITLES } from '../lib/blocks/templates';
 
-function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '') || generateId();
-}
-
-/** slug has a UNIQUE constraint that applies to every row, including
- *  soft-deleted ones — so collisions must be checked against the DB, not just
- *  the in-memory (non-deleted) article list, or a title matching a
- *  soft-deleted article's slug would still fail the UPDATE. Appends
- *  -2, -3, ... until free. */
-export async function uniqueSlugify(db: Database, title: string, excludeId: string): Promise<string> {
-  const base = slugify(title);
-  const rows = await db.select<{ slug: string }[]>(
-    'SELECT slug FROM wiki_articles WHERE id != $1 AND (slug = $2 OR slug LIKE $3)',
-    [excludeId, base, `${base}-%`]
-  );
-  const taken = new Set(rows.map((r) => r.slug));
-  if (!taken.has(base)) return base;
-  let i = 2;
-  while (taken.has(`${base}-${i}`)) i++;
-  return `${base}-${i}`;
-}
-
 interface WikiState {
   articles: WikiArticle[];
   loading: boolean;
@@ -81,8 +56,6 @@ export const useWikiStore = create<WikiState>((set, get) => ({
       id,
       entry_number: entryNumber,
       title: start.title,
-      // Der Slug folgt dem Titel erst beim ersten Umbenennen (updateArticle) — wie bisher.
-      slug: `untitled-${id.slice(0, 8)}`,
       content: start.content,
       category_id: categoryId,
       created_at: createdAt ?? now,
@@ -92,12 +65,13 @@ export const useWikiStore = create<WikiState>((set, get) => ({
       cover_image: undefined,
     };
     await db.execute(
+      // `slug` ist ein Überbleibsel: NOT NULL UNIQUE, gelesen wird er nicht mehr.
+      // Die ID erfüllt beides.
       `INSERT INTO wiki_articles (id, title, slug, content, category_id, created_at, updated_at, tags, entry_number)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+       VALUES ($1, $2, $1, $3, $4, $5, $6, $7, $8)`,
       [
         article.id,
         article.title,
-        article.slug,
         article.content,
         article.category_id,
         article.created_at,
@@ -111,18 +85,13 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     return article;
   },
 
-  /**
-   * Kopiert alle Inhaltsfelder; Slug und Identitaet bleiben beim neuen
-   * Artikel (updateArticle vergibt fuer den "(Copy)"-Titel selbst einen
-   * eindeutigen Slug). Ersetzt die frueher dreifach kopierten Feldlisten.
-   */
+  /** Kopiert alle Inhaltsfelder; die Identität bleibt beim neuen Artikel. */
   duplicateArticle: async (id) => {
     const src = get().articles.find((a) => a.id === id);
     if (!src) return undefined;
     const copy = await get().createArticle(src.category_id, { blank: true });
     const {
       id: _id,
-      slug: _slug,
       created_at: _created,
       updated_at: _updated,
       deleted_at: _deleted,
@@ -138,23 +107,18 @@ export const useWikiStore = create<WikiState>((set, get) => ({
     const article = get().articles.find((a) => a.id === id);
     if (!article || !needsWrite(article, patch, touch)) return;
     const db = await getDb();
-    const slug = patch.title && patch.title !== article.title
-      ? await uniqueSlugify(db, patch.title, id)
-      : article.slug;
     const merged = {
       ...article,
       ...patch,
       updated_at: stampFor(article.updated_at, touch),
-      slug,
     };
 
     await db.execute(
       `UPDATE wiki_articles
-       SET title=$1, slug=$2, content=$3, category_id=$4, updated_at=$5, tags=$6, cover_image=$7, icon=$8
-       WHERE id=$9`,
+       SET title=$1, content=$2, category_id=$3, updated_at=$4, tags=$5, cover_image=$6, icon=$7
+       WHERE id=$8`,
       [
         merged.title,
-        merged.slug,
         merged.content,
         merged.category_id,
         merged.updated_at,

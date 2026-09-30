@@ -114,7 +114,6 @@ export const fromRow = {
     return {
       id: str(r.id),
       title: str(r.title),
-      slug: str(r.slug),
       content: str(r.content),
       category_id: nullableStr(r.category_id),
       created_at: str(r.created_at),
@@ -152,12 +151,9 @@ export const fromRow = {
         ? (r.priority as Task['priority'])
         : 'medium',
       completed: bool(r.completed),
-      completed_at: nullableStr(r.completed_at),
       parent_task_id: nullableStr(r.parent_task_id),
-      sort_order: num(r.sort_order, 0),
       created_at: str(r.created_at),
       updated_at: str(r.updated_at),
-      tags: jsonArray(r.tags),
       deleted_at: nullableStr(r.deleted_at),
     };
   },

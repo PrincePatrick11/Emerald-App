@@ -362,9 +362,8 @@ export default function BlockStack({
   /**
    * Eine Vorlage einsetzen: ihre Blöcke anhängen oder den Inhalt ersetzen (ein
    * leerer Stapel wird immer ersetzt) — wie jede Blockänderung über den
-   * Editor; Abbrechen dreht Blöcke und Titel zurück. Titel und Tags gehen über
-   * den Store des Eintrags, wie aus der Eigenschaften-Seitenleiste — Tags
-   * bleiben deshalb nach Abbrechen stehen, wie dort.
+   * Editor. Titel und Tags gehen über den Store des Eintrags, wie aus der
+   * Eigenschaften-Seitenleiste; Abbrechen dreht alles zurück.
    */
   const applyTemplate = (template: Template, options: TemplateApplyOptions) => {
     if (!templateTarget || !isEditing) return;

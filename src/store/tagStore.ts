@@ -6,7 +6,6 @@ import { fromRow, jsonArray, type DbRow } from '../lib/row';
 import { useJournalStore } from './journalStore';
 import { useWikiStore } from './wikiStore';
 import { useOperationStore } from './operationStore';
-import { useTaskStore } from './taskStore';
 import { useTemplateStore } from './templateStore';
 import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
@@ -33,7 +32,7 @@ const byName = (a: Tag, b: Tag) => a.name.localeCompare(b.name);
 const renameInList = (tags: string[], from: string, to: string) =>
   [...new Set(tags.map((t) => (t === from ? to : t)))];
 
-type TaggedType = 'journal' | 'wiki' | 'operation' | 'task' | 'template';
+type TaggedType = 'journal' | 'wiki' | 'operation' | 'template';
 
 interface AffectedEntry { id: string; type: TaggedType }
 
@@ -49,7 +48,6 @@ function taggedItems(): TaggedRef[] {
     ...useJournalStore.getState().entries.map((e) => ({ id: e.id, type: 'journal' as const, tags: e.tags ?? [] })),
     ...useWikiStore.getState().articles.map((a) => ({ id: a.id, type: 'wiki' as const, tags: a.tags ?? [] })),
     ...useOperationStore.getState().operations.map((o) => ({ id: o.id, type: 'operation' as const, tags: o.tags ?? [] })),
-    ...useTaskStore.getState().tasks.map((t) => ({ id: t.id, type: 'task' as const, tags: t.tags ?? [] })),
     // Vorlagen tragen Tags wie Einträge, die sie beim Einsetzen weitergeben.
     ...useTemplateStore.getState().templates.map((t) => ({ id: t.id, type: 'template' as const, tags: t.tags })),
   ];
@@ -65,8 +63,7 @@ function setItemTags(type: TaggedType, id: string, tags: string[]): Promise<void
     case 'journal': return useJournalStore.getState().updateEntry(id, { tags }, AS_A_CONSEQUENCE);
     case 'wiki': return useWikiStore.getState().updateArticle(id, { tags }, AS_A_CONSEQUENCE);
     case 'operation': return useOperationStore.getState().updateOperation(id, { tags }, AS_A_CONSEQUENCE);
-    case 'task': return useTaskStore.getState().updateTask(id, { tags }, AS_A_CONSEQUENCE);
-    case 'template': return useTemplateStore.getState().updateTemplate(id, { tags }, AS_A_CONSEQUENCE).then(() => undefined);
+    case 'template': return useTemplateStore.getState().updateTemplate(id, { tags }, AS_A_CONSEQUENCE);
   }
 }
 
@@ -107,7 +104,7 @@ async function purgeTrashedNamesake(name: string) {
 }
 
 /** Die Tabellen, deren Zeilen in den Papierkorb gehen und Tag-Namen tragen. */
-const TRASHABLE_TAGGED_TABLES = ['journal_entries', 'wiki_articles', 'operations', 'tasks', 'templates'] as const;
+const TRASHABLE_TAGGED_TABLES = ['journal_entries', 'wiki_articles', 'operations', 'templates'] as const;
 
 /**
  * Einträge im Papierkorb stehen in keinem Store. Ihr Tag-Name wird darum

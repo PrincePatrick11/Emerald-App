@@ -1,5 +1,5 @@
 import {
-  ALTAR_LIBRARY_SORTS, GROUPING_MODES, HOME_VIEWS, SORT_MODES, TAGS_SORTS, VIEW_MODES, useUIStore,
+  ALTAR_LIBRARY_SORTS, GROUPING_MODES, HOME_COUNTS, HOME_VIEWS, SORT_MODES, TAGS_SORTS, VIEW_MODES, useUIStore,
   type AltarLibraryPrefs, type HomeSectionPrefs, type ListPrefs,
 } from './uiStore';
 
@@ -73,7 +73,8 @@ function homePrefs(saved: unknown, fallback: HomeSectionPrefs): HomeSectionPrefs
   return {
     view: oneOf(saved.view, HOME_VIEWS, fallback.view),
     sort: oneOf(saved.sort, SORT_MODES.filter((s) => s !== 'count_desc'), fallback.sort),
-    count: typeof saved.count === 'number' && Number.isInteger(saved.count) && saved.count >= 0 ? saved.count : fallback.count,
+    // Nur, was das Menü anbietet — ein Vault von früher kann noch den alten Wiki-Standard 6 tragen.
+    count: (HOME_COUNTS as readonly unknown[]).includes(saved.count) ? (saved.count as number) : fallback.count,
   };
 }
 

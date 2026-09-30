@@ -532,6 +532,7 @@
     "nameTaken": "Diesen Tag gibt es schon",
     "color": "Farbe ändern",
     "unused": "nicht verwendet",
+    "onlyInTemplates": "nur in Vorlagen",
     "unusedHint": "Noch kein Eintrag trägt diesen Tag.",
     "createNamed": "+ „{{name}}“ anlegen",
     "unknownOpenDashboard": "Kein Tag „{{name}}“ — unter Tags anlegen"
@@ -876,6 +877,7 @@
     "markCompleted": "Als erledigt markieren",
     "addSubtask": "Unteraufgabe hinzufügen",
     "linkEntry": "Eintrag verlinken",
+    "linkTargetGone": "Gelöscht",
     "showCompleted": "Erledigte anzeigen",
     "untitled": "Unbenannte Aufgabe"
   },

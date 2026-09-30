@@ -6,44 +6,29 @@ export interface UndoAction {
   undo: () => Promise<void>;
 }
 
+/**
+ * Das eine Rückgängig: die jüngste Aktion, solange ihr Hinweis steht. Eine
+ * neue ersetzt sie — zurück an ältere kommt man über den Papierkorb.
+ */
 interface UndoState {
-  stack: UndoAction[];
-  activeToast: UndoAction | null;
-  toastVisible: boolean;
+  active: UndoAction | null;
   push: (action: UndoAction) => void;
   executeUndo: () => Promise<void>;
-  dismissToast: () => void;
-  clear: () => void;
+  dismiss: () => void;
 }
 
 export const useUndoStore = create<UndoState>((set, get) => ({
-  stack: [],
-  activeToast: null,
-  toastVisible: false,
+  active: null,
 
-  push: (action) => {
-    set((s) => ({
-      stack: [action, ...s.stack].slice(0, 20),
-      activeToast: action,
-      toastVisible: true,
-    }));
-  },
+  push: (action) => set({ active: action }),
 
   executeUndo: async () => {
-    const { stack } = get();
-    if (stack.length === 0) return;
-    const [top, ...rest] = stack;
-    set({ stack: rest, toastVisible: false, activeToast: null });
-    await top.undo();
+    const { active } = get();
+    if (!active) return;
+    set({ active: null });
+    await active.undo();
   },
 
-  dismissToast: () => {
-    set({ toastVisible: false });
-  },
-
-  /** Drop every queued undo — their closures restore rows by id against whatever
-      DB is active, so they are meaningless once the vault changes. */
-  clear: () => {
-    set({ stack: [], activeToast: null, toastVisible: false });
-  },
+  /** Auch beim Vault-Wechsel: die Aktion stellt Zeilen per ID in der gerade offenen DB wieder her. */
+  dismiss: () => set({ active: null }),
 }));

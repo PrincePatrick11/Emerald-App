@@ -532,6 +532,7 @@
     "nameTaken": "Cette étiquette existe déjà",
     "color": "Changer la couleur",
     "unused": "inutilisée",
+    "onlyInTemplates": "seulement dans des modèles",
     "unusedHint": "Aucune entrée ne porte encore cette étiquette.",
     "createNamed": "+ Créer « {{name}} »",
     "unknownOpenDashboard": "Aucune étiquette « {{name}} » — la créer dans Étiquettes"
@@ -876,6 +877,7 @@
     "markCompleted": "Marquer comme terminée",
     "addSubtask": "Ajouter sous-tâche",
     "linkEntry": "Lier une entrée",
+    "linkTargetGone": "Supprimé",
     "showCompleted": "Afficher terminées",
     "untitled": "Tâche sans titre"
   },

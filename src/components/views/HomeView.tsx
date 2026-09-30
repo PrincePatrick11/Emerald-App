@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { BookOpen, Library, Wand2, Copy, Pencil, Trash2 } from 'lucide-react';
-import { useUIStore } from '../../store/uiStore';
+import { HOME_COUNTS, useUIStore } from '../../store/uiStore';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
@@ -49,13 +49,7 @@ function SectionToolbar({
     { value: 'list',  label: t('listView.list') },
     { value: 'cards', label: t('listView.cards') },
   ];
-  const countOptions: { value: string; label: string }[] = [
-    { value: '3',  label: '3' },
-    { value: '5',  label: '5' },
-    { value: '10', label: '10' },
-    { value: '25', label: '25' },
-    { value: '0',  label: t('operations.all') },
-  ];
+  const countOptions = HOME_COUNTS.map((count) => ({ value: String(count), label: count ? String(count) : t('operations.all') }));
 
   return (
     <div className="flex items-center gap-2">

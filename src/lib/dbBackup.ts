@@ -119,11 +119,6 @@ export interface ImportTypeFilters {
   includeLexicon: boolean;
 }
 
-/** Category IDs (aus der Sicherung) to exclude during import. Empty set = import all. */
-export interface ImportCategoryFilters {
-  excludedCategoryIds: Set<string>;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1006,44 +1001,6 @@ function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFi
 }
 
 /**
- * Lässt Inhalte abgewählter Kategorien weg — in allen vier Modulen. Was an
- * ihnen hängt (Platzierungen, Aufgaben-Verknüpfungen, Links), fällt mit.
- */
-function applyCategoryFilters(d: BackupFile['data'], filters: ImportCategoryFilters): BackupFile['data'] {
-  const excluded = filters.excludedCategoryIds;
-  if (!excluded.size) return d;
-
-  const keep = (rows: Row[] | undefined) =>
-    (rows ?? []).filter((r) => !excluded.has(r.category_id as string));
-  const wikiArticles = keep(d.wikiArticles);
-  const operations = keep(d.operations);
-  const tasks = keep(d.tasks);
-  const altarItems = keep(d.altarItems);
-  const keptItemIds = new Set(altarItems.map((r) => r.id as string));
-  const keptTaskIds = new Set(tasks.map((r) => r.id as string));
-
-  // Vorlagen bleiben, verlieren aber ihre Zuweisungen an abgewählte Kategorien.
-  const templates = (d.templates ?? []).map((r) => ({
-    ...r,
-    assignments: JSON.stringify(parseAssignments(r.assignments).filter((a) => {
-      const id = assignedCategoryId(a);
-      return id === null || !excluded.has(id);
-    })),
-  }));
-
-  return {
-    ...d,
-    templates,
-    wikiArticles,
-    operations,
-    tasks,
-    altarItems,
-    altarPlacements: (d.altarPlacements ?? []).filter((r) => keptItemIds.has(r.item_id as string)),
-    taskLinks: (d.taskLinks ?? []).filter((r) => keptTaskIds.has(r.task_id as string)),
-  };
-}
-
-/**
  * Übersetzt die Kategorien einer Sicherung in die dieses Vaults: gleiche ID
  * (die beiden Builtins) oder gleicher Name (ohne Groß/Klein) → lokale Zeile,
  * sonst neu angelegt. Liefert die Zuordnung Sicherungs-ID → lokale ID, mit
@@ -1221,9 +1178,9 @@ export async function withRoutinesAsTemplates(db: Awaited<ReturnType<typeof getD
   return { ...d, templates: [...(d.templates ?? []), ...converted], routines: [] };
 }
 
-async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile, filters: ImportCategoryFilters): Promise<void> {
+async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
   const pathMap = await restoreImages(backup);
-  const d = await withRoutinesAsTemplates(db, applyCategoryFilters(backup.data, filters));
+  const d = await withRoutinesAsTemplates(db, backup.data);
 
   await assertPayloadReferencesResolve(db, d);
 
@@ -1322,9 +1279,9 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
 // Merge import (ID-prefix strategy)
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile, filters: ImportCategoryFilters): Promise<void> {
+async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
   const pathMap = await restoreImages(backup);
-  const d = await withRoutinesAsTemplates(db, applyCategoryFilters(backup.data, filters));
+  const d = await withRoutinesAsTemplates(db, backup.data);
 
   // Merge loescht zwar nichts, bricht aber mitten im Einfuegen ab, wenn eine
   // Kategorie fehlt — vorher pruefen, damit die Meldung sagt, welche.
@@ -1544,13 +1501,11 @@ export async function importDatabase(
    *  Zielordner des neuen Vaults. Ohne `path` greift der Rueckfall aus
    *  `newVaultRecord` (`{appDataDir}/vaults/{id}`). */
   newVault?: { name: string; path?: string },
-  categoryFilters?: ImportCategoryFilters,
   typeFilters?: ImportTypeFilters,
   /** Nur für `merge`: welche Einstellungs-Gruppen aus der Datei gelten sollen.
    *  replace und add-vault übernehmen die Einstellungen der Datei ganz. */
   settingsGroups: readonly SettingsGroup[] = [],
 ): Promise<void> {
-  const filters: ImportCategoryFilters = categoryFilters ?? { excludedCategoryIds: new Set<string>() };
   // Ungeprüft aus der Datei — ab hier nur noch in geprüfter Form.
   const backupSettings = importableSettings(backup.settings);
 
@@ -1567,10 +1522,9 @@ export async function importDatabase(
   // erst zu Ende laufen lassen, bevor die Arbeitskopie gezogen wird.
   await drainSerialized();
 
-  // Apply type-level filtering first, then subcategory filtering
   const filteredBackup: BackupFile = {
     ...backup,
-    data: applyCategoryFilters(applyTypeFilters(backup.data, typeFilters ?? ALL_TYPES_INCLUDED), filters),
+    data: applyTypeFilters(backup.data, typeFilters ?? ALL_TYPES_INCLUDED),
   };
 
   if (mode === 'add-vault') {
@@ -1619,13 +1573,13 @@ export async function importDatabase(
       if (bringsTemplates && (types.includeJournal || types.includeWiki || types.includeOperations)) {
         await staging.execute('DELETE FROM templates WHERE id=$1', [SIGIL_TEMPLATE_ID]);
       }
-      await doReplace(staging, filteredBackup, filters);
+      await doReplace(staging, filteredBackup);
     });
   } else {
     // Nie direkt gegen den Vault: `doReplace` löscht, bevor es einfügt, und
     // ein abgebrochener Merge ließe halb importierte Daten zurück (siehe `importStaging.ts`).
     const run = mode === 'replace' ? doReplace : doMerge;
-    await importViaStaging(await getDb(), (staging) => run(staging, filteredBackup, filters));
+    await importViaStaging(await getDb(), (staging) => run(staging, filteredBackup));
 
     // Erst nach geglücktem Austausch: ein abgebrochener Import lässt auch die
     // Einstellungen, wie sie waren.

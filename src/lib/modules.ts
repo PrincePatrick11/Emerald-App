@@ -91,9 +91,9 @@ export const CATEGORY_MODULE_IDS: readonly Exclude<EntryModuleId, 'journal'>[] =
 );
 export type CategoryModuleId = (typeof CATEGORY_MODULE_IDS)[number];
 
-/** Module, deren Einträge im Tags-Dashboard stehen — alle außer Altar. */
-export const TAG_MODULE_IDS: readonly Exclude<EntryModuleId, 'altar'>[] = ENTRY_MODULE_IDS.filter(
-  (id): id is Exclude<EntryModuleId, 'altar'> => id !== 'altar',
+/** Module, deren Einträge Tags tragen — alle außer Altar und Aufgaben. */
+export const TAG_MODULE_IDS: readonly Exclude<EntryModuleId, 'altar' | 'tasks'>[] = ENTRY_MODULE_IDS.filter(
+  (id): id is Exclude<EntryModuleId, 'altar' | 'tasks'> => id !== 'altar' && id !== 'tasks',
 );
 export type TagModuleId = (typeof TAG_MODULE_IDS)[number];
 

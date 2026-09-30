@@ -42,6 +42,8 @@ export const isTagsSort = (s: SortMode): s is TagsSort => (TAGS_SORTS as SortMod
 export type HomeSort = Exclude<SortMode, 'count_desc'>;
 export const HOME_VIEWS = ['list', 'cards'] as const;
 export type HomeView = (typeof HOME_VIEWS)[number];
+/** Wie viele Einträge ein Abschnitt der Startseite zeigt; 0 = alle. */
+export const HOME_COUNTS = [3, 5, 10, 25, 0] as const;
 export interface HomeSectionPrefs { sort: HomeSort; view: HomeView; count: number; } // count 0 = all
 
 export interface EditActions {
@@ -377,7 +379,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   altarLibraryPrefs: { sort: 'alpha_asc', grouping: 'grouped' },
   homeJournalPrefs: { sort: 'date_desc', view: 'list', count: 5 },
   homeOpsPrefs:     { sort: 'date_desc', view: 'list', count: 5 },
-  homeWikiPrefs:    { sort: 'alpha_asc', view: 'cards', count: 6 },
+  homeWikiPrefs:    { sort: 'alpha_asc', view: 'cards', count: 5 },
   collapsedGroups: {},
   flags: {},
 

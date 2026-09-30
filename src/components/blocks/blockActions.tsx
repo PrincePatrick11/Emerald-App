@@ -37,16 +37,15 @@ export function addBlockActions(
 /**
  * Duplizieren und Entfernen. Ein unbekannter Block (`meta` fehlt: fremder Typ
  * oder zu neues Datenformat) lässt sich nur entfernen — eine Kopie seiner
- * Daten wäre ohne den Typ, der sie versteht, nichts wert. Ohne `duplicate`
- * (ein Block, den eine geladene Sigille sperrt) ebenso.
+ * Daten wäre ohne den Typ, der sie versteht, nichts wert.
  */
 export function commonBlockActions(
   t: TFunction,
   meta: BlockTypeMeta | undefined,
-  { duplicate, remove }: { duplicate?: () => void; remove: () => void },
+  { duplicate, remove }: { duplicate: () => void; remove: () => void },
 ): ContextMenuAction[] {
   return [
-    ...(meta && duplicate ? [{ label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: duplicate }] : []),
+    ...(meta ? [{ label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: duplicate }] : []),
     { label: t('blocks.remove'), icon: <Trash2 size={12} />, onClick: remove, danger: true },
   ];
 }

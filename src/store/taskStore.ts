@@ -41,7 +41,7 @@ interface TaskState {
 
 async function selectAllTasks(db: Database): Promise<Task[]> {
   const rows = await db.select<DbRow[]>(
-    'SELECT * FROM tasks WHERE deleted_at IS NULL ORDER BY sort_order ASC, created_at DESC'
+    'SELECT * FROM tasks WHERE deleted_at IS NULL ORDER BY created_at DESC'
   );
   return rows.map(fromRow.task);
 }
@@ -55,11 +55,6 @@ async function selectLiveLinks(db: Database): Promise<TaskLink[]> {
 }
 
 /**
- * `id` und ihre Unteraufgaben im Papierkorb, aus der Datenbank statt aus dem
- * Store, der nur die aktiven kennt. Mit `trashedWith` nur die, die mit diesem
- * Stempel dorthin kamen — also mit ihr, nicht schon vorher für sich.
- */
-/**
  * Die Aufgaben im Papierkorb, die für sich gingen — eine Unteraufgabe mit dem
  * Stempel ihrer Oberaufgabe gehört zu dieser (`deleteTask`) und kommt mit ihr
  * zurück (`restoreTask`). Für die Liste des Papierkorbs.
@@ -72,6 +67,11 @@ export async function selectTrashedTaskRoots(db: Database): Promise<{ id: string
   );
 }
 
+/**
+ * `id` und ihre Unteraufgaben im Papierkorb, aus der Datenbank statt aus dem
+ * Store, der nur die aktiven kennt. Mit `trashedWith` nur die, die mit diesem
+ * Stempel dorthin kamen — also mit ihr, nicht schon vorher für sich.
+ */
 async function selectTrashedSubtree(db: Database, id: string, trashedWith?: string): Promise<string[]> {
   const rows = await db.select<{ id: string }[]>(
     `WITH RECURSIVE sub(id) AS (
@@ -105,16 +105,16 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const now = nowIso();
 
     await db.execute(
-      `INSERT INTO tasks (id, title, category_id, priority, completed, completed_at, parent_task_id, sort_order, created_at, updated_at, tags, deleted_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-      [id, 'New Task', categoryId, 'medium', 0, null, parentTaskId, 0, now, now, '[]', null]
+      `INSERT INTO tasks (id, title, category_id, priority, completed, parent_task_id, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [id, 'New Task', categoryId, 'medium', 0, parentTaskId, now, now]
     );
 
     const newTask: Task = {
       id, title: 'New Task', category_id: categoryId,
-      priority: 'medium', completed: false, completed_at: null,
-      parent_task_id: parentTaskId, sort_order: 0, created_at: now, updated_at: now,
-      tags: [], deleted_at: null,
+      priority: 'medium', completed: false,
+      parent_task_id: parentTaskId, created_at: now, updated_at: now,
+      deleted_at: null,
     };
 
     set((s) => ({ tasks: [newTask, ...s.tasks] }));
@@ -134,20 +134,23 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     await db.execute(
       `UPDATE tasks SET
         title=$1, category_id=$2, priority=$3,
-        completed=$4, completed_at=$5, parent_task_id=$6, sort_order=$7,
-        updated_at=$8, tags=$9
-       WHERE id=$10`,
+        completed=$4, parent_task_id=$5, updated_at=$6
+       WHERE id=$7`,
       [
         merged.title, merged.category_id, merged.priority,
-        toInt(merged.completed),
-        merged.completed_at ?? null, merged.parent_task_id ?? null,
-        merged.sort_order, merged.updated_at, JSON.stringify(merged.tags), id,
+        toInt(merged.completed), merged.parent_task_id ?? null,
+        merged.updated_at, id,
       ]
     );
 
     set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? merged : t)) }));
   }),
 
+  /**
+   * Kippt `id` und bringt die Unteraufgaben auf denselben Stand. „Zuletzt
+   * geändert" springt nur an der abgehakten Aufgabe; an den Unteraufgaben ist
+   * es eine Folge (`lib/stamp.ts`), und wer schon so stand, wird nicht geschrieben.
+   */
   toggleComplete: (id: string) => serialized(serialKey('task', id), async () => {
     const db = await getDb();
     const now = nowIso();
@@ -155,27 +158,27 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     if (!task) return;
 
     const newCompleted = !task.completed;
-    const newCompletedAt = newCompleted ? now : null;
-    const idsToUpdate = collectDescendantIds(get().tasks, id);
+    const subtree = new Set(collectDescendantIds(get().tasks, id));
+    const changed = get().tasks.filter((t) => subtree.has(t.id) && (t.id === id || t.completed !== newCompleted));
+    const stamps = new Map(changed.map((t) => [t.id, t.id === id ? now : t.updated_at]));
 
-    for (const tid of idsToUpdate) {
+    for (const t of changed) {
       const write = () => db.execute(
-        'UPDATE tasks SET completed=$1, completed_at=$2, updated_at=$3 WHERE id=$4',
-        [toInt(newCompleted), newCompletedAt, now, tid]
+        'UPDATE tasks SET completed=$1, updated_at=$2 WHERE id=$3',
+        [toInt(newCompleted), stamps.get(t.id), t.id]
       );
       // Nachfahren über deren eigene Kette, damit ein gleichzeitiges updateTask
-      // auf ein Kind dessen completed-Spalten nicht zurückdreht. Die Wurzel
+      // auf ein Kind dessen completed-Spalte nicht zurückdreht. Die Wurzel
       // selbst läuft schon unter diesem Schlüssel — einreihen wartete auf sich.
-      if (tid === id) await write();
-      else await serialized(serialKey('task', tid), write);
+      if (t.id === id) await write();
+      else await serialized(serialKey('task', t.id), write);
     }
 
     set((s) => ({
-      tasks: s.tasks.map((t) =>
-        idsToUpdate.includes(t.id)
-          ? { ...t, completed: newCompleted, completed_at: newCompletedAt, updated_at: now }
-          : t
-      ),
+      tasks: s.tasks.map((t) => {
+        const updated_at = stamps.get(t.id);
+        return updated_at ? { ...t, completed: newCompleted, updated_at } : t;
+      }),
     }));
   }),
 

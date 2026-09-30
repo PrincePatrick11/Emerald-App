@@ -45,10 +45,9 @@ interface TemplateState {
   createTemplate: (name: string, init?: TemplateInit) => Promise<Template>;
   /**
    * Speichert die Änderung. Setzt sie einen Standard, verlieren andere aktive
-   * Vorlagen ihn für dieselbe Kombination — die liefert die Funktion zurück,
-   * damit die Oberfläche sagen kann, wen es betraf.
+   * Vorlagen ihn für dieselbe Kombination.
    */
-  updateTemplate: (id: string, patch: TemplatePatch, options?: WriteOptions) => Promise<Template[]>;
+  updateTemplate: (id: string, patch: TemplatePatch, options?: WriteOptions) => Promise<void>;
   duplicateTemplate: (id: string) => Promise<Template | undefined>;
   /** Soft-Delete. Einträge aus dieser Vorlage bleiben, wie sie sind. */
   deleteTemplate: (id: string) => Promise<void>;
@@ -110,7 +109,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
 
   updateTemplate: (id, patch, { touch } = {}) => serialized(WRITE_KEY, async () => {
     const current = get().templates.find((t) => t.id === id);
-    if (!current || !needsWrite(current, patch, touch)) return [];
+    if (!current || !needsWrite(current, patch, touch)) return;
     const updated: Template = {
       ...current,
       ...patch,
@@ -134,7 +133,6 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     set((s) => ({
       templates: s.templates.map((t) => (t.id === id ? updated : byId.get(t.id) ?? t)),
     }));
-    return replaced;
   }),
 
   duplicateTemplate: async (id) => {

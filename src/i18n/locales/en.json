@@ -532,6 +532,7 @@
     "nameTaken": "This tag already exists",
     "color": "Change color",
     "unused": "unused",
+    "onlyInTemplates": "only in templates",
     "unusedHint": "No entry carries this tag yet.",
     "createNamed": "+ Create “{{name}}”",
     "unknownOpenDashboard": "No tag “{{name}}” — create it in Tags"
@@ -876,6 +877,7 @@
     "markCompleted": "Mark as completed",
     "addSubtask": "Add subtask",
     "linkEntry": "Link entry",
+    "linkTargetGone": "Deleted",
     "showCompleted": "Show completed",
     "untitled": "Untitled Task"
   },

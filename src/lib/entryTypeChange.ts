@@ -33,7 +33,7 @@ import { viewTypeForEntryType } from './modules';
 import { remapDefinitionDefaults } from './blocks/definitions';
 import { UNTITLED_TITLES, type TemplateEntryType } from './blocks/templates';
 import { useJournalStore } from '../store/journalStore';
-import { uniqueSlugify, useWikiStore } from '../store/wikiStore';
+import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { useTaskStore } from '../store/taskStore';
 import { useTemplateStore } from '../store/templateStore';
@@ -112,14 +112,14 @@ async function insertAs(db: Database, to: ConvertibleEntryType, core: EntryCore)
     case 'wiki': {
       const entry: WikiArticle = {
         id: core.id, entry_number, title: core.title, content: core.content, tags: core.tags,
-        slug: await uniqueSlugify(db, core.title, core.id),
         category_id: core.category_id, icon: core.icon, cover_image: core.cover_image,
         created_at: core.created_at, updated_at: now, deleted_at: null,
       };
       await db.execute(
+        // `slug`: NOT NULL UNIQUE, aber ungelesen — die ID wie in `createArticle`.
         `INSERT INTO wiki_articles (id, title, slug, content, category_id, created_at, updated_at, tags, entry_number, cover_image, icon)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [entry.id, entry.title, entry.slug, entry.content, entry.category_id, entry.created_at, entry.updated_at, tags,
+         VALUES ($1, $2, $1, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [entry.id, entry.title, entry.content, entry.category_id, entry.created_at, entry.updated_at, tags,
           entry_number, entry.cover_image ?? null, entry.icon ?? null]
       );
       return { type: to, entry };

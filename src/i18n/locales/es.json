@@ -532,6 +532,7 @@
     "nameTaken": "Esta etiqueta ya existe",
     "color": "Cambiar color",
     "unused": "sin usar",
+    "onlyInTemplates": "solo en plantillas",
     "unusedHint": "Ninguna entrada lleva esta etiqueta todavía.",
     "createNamed": "+ Crear «{{name}}»",
     "unknownOpenDashboard": "No existe «{{name}}» — créala en Etiquetas"
@@ -876,6 +877,7 @@
     "markCompleted": "Marcar como completada",
     "addSubtask": "Añadir subtarea",
     "linkEntry": "Enlazar entrada",
+    "linkTargetGone": "Eliminado",
     "showCompleted": "Mostrar completadas",
     "untitled": "Tarea sin título"
   },

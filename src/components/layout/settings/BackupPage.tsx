@@ -19,7 +19,6 @@ import {
   allTypesIncluded,
   type BackupFile,
   type BackupPreview,
-  type ImportCategoryFilters,
   exportDatabase,
   openBackupFile,
   importDatabase,
@@ -90,7 +89,6 @@ export default function BackupPage() {
   const [vaultBaseDir, setVaultBaseDir] = useState<string | null>(null);
   const [vaultCustomPath, setVaultCustomPath] = useState<string | null>(null);
   const [importTypeFilters, setImportTypeFilters] = useState<ImportTypeFilters>(allTypesIncluded);
-  const [excludedCategoryIds] = useState<Set<string>>(new Set());
   // Beim Zusammenführen bleibt ohne Wahl alles, wie es im Vault eingestellt ist.
   const [settingsGroups, setSettingsGroups] = useState<SettingsGroup[]>([]);
   const [importing, setImporting] = useState(false);
@@ -146,9 +144,6 @@ export default function BackupPage() {
     setImporting(true);
     setImportDone(false);
     setImportError('');
-    const categoryFilters: ImportCategoryFilters = {
-      excludedCategoryIds,
-    };
     const vaultName = newVaultName.trim() || t('settings.importedVault');
     const vaultTarget = importMode === 'add-vault'
       ? newVaultTarget(vaultBaseDir, vaultCustomPath, vaultName)
@@ -170,7 +165,6 @@ export default function BackupPage() {
         importMode === 'add-vault'
           ? { name: vaultName, path: vaultTarget ?? undefined }
           : undefined,
-        categoryFilters,
         importTypeFilters,
         importMode === 'merge' ? settingsGroups : [],
       );

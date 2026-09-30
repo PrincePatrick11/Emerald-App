@@ -208,7 +208,7 @@ export async function insertImageFromDataUrl(editor: Editor, dataUrl: string): P
   }
 }
 
-/** Link-Chip aus der Linkauswahl (Toolbar-Knopf, Strg/Cmd+K) an der Cursorstelle. */
+/** Link-Chip aus der Linkauswahl (Toolbar-Knopf) an der Cursorstelle. */
 export function insertInternalLinkChip(editor: Editor, item: SuggestionItem): void {
   editor.chain().focus()
     .insertContent({ type: 'internalLink', attrs: toInternalLinkChip(item) })

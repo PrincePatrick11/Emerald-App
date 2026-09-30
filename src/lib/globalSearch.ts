@@ -220,9 +220,7 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
 
   for (const article of corpus.wiki.filter(notDeleted)) {
     push('wiki', article.id, article.title,
-      // The slug rides along with the tags: it is a short handle the way a tag
-      // is, and it is what an internal link spells once the title has drifted.
-      matchRecord(q, article.title, [...article.tags, article.slug],
+      matchRecord(q, article.title, article.tags,
         () => [visibleText(article.id, article.updated_at, article.content)]),
       { updatedAt: article.updated_at, categoryId: article.category_id, entryNumber: article.entry_number });
   }
@@ -235,7 +233,7 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
 
   for (const task of corpus.tasks.filter(notDeleted)) {
     push('task', task.id, task.title,
-      matchRecord(q, task.title, task.tags, () => []),
+      matchRecord(q, task.title, null, () => []),
       { updatedAt: task.updated_at, categoryId: task.category_id });
   }
 

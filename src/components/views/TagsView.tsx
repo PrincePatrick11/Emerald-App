@@ -6,7 +6,7 @@ import { TAG_COLORS, TAG_NAME_TAKEN, randomTagColor, useTagStore } from '../../s
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useOperationStore } from '../../store/operationStore';
-import { useTaskStore } from '../../store/taskStore';
+import { useTemplateStore } from '../../store/templateStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { TAGS_SORTS, isTagsSort, useUIStore } from '../../store/uiStore';
 import { useUndoStore } from '../../store/undoStore';
@@ -40,16 +40,14 @@ interface TaggedItem {
 
 type TagUsage = Record<TagModuleId, number>;
 
-const emptyUsage = (): TagUsage => ({ journal: 0, tasks: 0, operations: 0, wiki: 0 });
+const emptyUsage = (): TagUsage => ({ journal: 0, operations: 0, wiki: 0 });
 
 /** Anlegen und Umbenennen schließen sich aus — ein Zustand statt zwei. */
 type FormState = { mode: 'add' } | { mode: 'rename'; id: string };
 
-/** Wohin ein Klick auf die Zeile führt — Aufgaben öffnen ihre Liste mit Sprungziel. */
+/** Wohin ein Klick auf die Zeile führt. */
 function itemView(item: TaggedItem): ActiveView {
-  return item.module === 'tasks'
-    ? { type: 'tasks', id: item.id }
-    : { type: item.module, id: item.id, mode: 'view' };
+  return { type: item.module, id: item.id, mode: 'view' };
 }
 
 /** Der Farbpunkt eines Tags; mit `onPick` öffnet ein Klick die Palette. */
@@ -142,7 +140,7 @@ export default function TagsView() {
   const entries = useJournalStore((s) => s.entries);
   const articles = useWikiStore((s) => s.articles);
   const operations = useOperationStore((s) => s.operations);
-  const tasks = useTaskStore((s) => s.tasks);
+  const templates = useTemplateStore((s) => s.templates);
   const categories = useCategoryStore((s) => s.categories);
   const sort = useUIStore((s) => s.tagsSort);
   const setSort = useUIStore((s) => s.setTagsSort);
@@ -180,7 +178,6 @@ export default function TagsView() {
       }
     };
     for (const e of entries) add(e.tags, { module: 'journal', id: e.id, title: e.title, updated_at: e.updated_at });
-    for (const task of tasks) add(task.tags, { module: 'tasks', id: task.id, title: task.title, updated_at: task.updated_at });
     for (const op of operations) add(op.tags, { module: 'operations', id: op.id, title: op.title, updated_at: op.updated_at, categoryId: op.category_id });
     for (const a of articles) add(a.tags, { module: 'wiki', id: a.id, title: a.title, updated_at: a.updated_at });
     for (const list of map.values()) {
@@ -188,7 +185,7 @@ export default function TagsView() {
         TAG_MODULE_IDS.indexOf(a.module) - TAG_MODULE_IDS.indexOf(b.module) || a.title.localeCompare(b.title));
     }
     return map;
-  }, [entries, tasks, operations, articles]);
+  }, [entries, operations, articles]);
 
   const usageByTag = useMemo(() => {
     const map = new Map<string, TagUsage>();
@@ -199,6 +196,13 @@ export default function TagsView() {
     }
     return map;
   }, [itemsByTag]);
+
+  /** Tag-Name → Anzahl Vorlagen, die ihn tragen. Ein Tag nur dort ist nicht unbenutzt. */
+  const templateUsage = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const template of templates) for (const tagName of template.tags) map.set(tagName, (map.get(tagName) ?? 0) + 1);
+    return map;
+  }, [templates]);
 
   const query = search.trim().toLowerCase();
   const filterActive = moduleFilter.length > 0;
@@ -341,7 +345,9 @@ export default function TagsView() {
           label={tag.name}
           meta={usage
             ? <ModuleCounts modules={TAG_MODULE_IDS} counts={usage} />
-            : <span className="text-xs text-stone-600">{t('tags.unused')}</span>}
+            : <span className="text-xs text-stone-600">
+                {templateUsage.has(tag.name) ? t('tags.onlyInTemplates') : t('tags.unused')}
+              </span>}
           actions={
             // Dauerhaft sichtbar wie in der Kategorien-Ansicht.
             <span className="flex items-center gap-1.5 flex-shrink-0">

@@ -25,7 +25,6 @@ export interface JournalEntry {
 export interface WikiArticle {
   id: string;
   title: string;
-  slug: string;
   content: string; // HTML, wie TipTaps getHTML() es liefert
   /** `null` = ohne Kategorie, seit v39 der Normalfall eines neuen Eintrags. */
   category_id: string | null;
@@ -169,12 +168,9 @@ export interface Task {
   category_id: string | null;
   priority: TaskPriority;
   completed: boolean;
-  completed_at: string | null;
   parent_task_id: string | null;
-  sort_order: number;
   created_at: string;
   updated_at: string;
-  tags: string[];
   deleted_at: string | null;
 }
 

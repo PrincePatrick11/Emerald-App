@@ -81,7 +81,7 @@ async function openActiveVault(): Promise<void> {
   // Die Entwürfe des neuen Vaults; die des alten gehen nur aus dem Speicher.
   await restoreDrafts(useVaultStore.getState().activeVaultId);
   // Undo entries reference rows of the old vault by id — drop them
-  useUndoStore.getState().clear();
+  useUndoStore.getState().dismiss();
   // Die globale Suche haelt den Klartext jedes Eintrags unter dessen id fest.
   // Die ids des eben geschlossenen Vaults werden nie wieder erfragt, also
   // waere ihr Text ein Leck, das mit jedem Wechsel weiterwaechst.
