@@ -395,8 +395,7 @@ export function AltarCanvas({
   }, [placeAt]);
 
   /** Wohin das gezogene Element gehört: der Zeiger, versetzt um die Stelle, an der es gegriffen wurde. */
-  const dragTarget = useCallback((clientX: number, clientY: number) => {
-    const drag = draggingRef.current!;
+  const dragTarget = useCallback((drag: { grabX: number; grabY: number }, clientX: number, clientY: number) => {
     const { x, y } = pointerPercent(canvasRef.current!, clientX, clientY);
     return placeAt(x - drag.grabX, y - drag.grabY);
   }, [placeAt]);
@@ -439,7 +438,7 @@ export function AltarCanvas({
     if (!editable || !drag) return;
     if (!drag.moved && Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < DRAG_THRESHOLD_PX) return;
     drag.moved = true;
-    const { x, y } = dragTarget(e.clientX, e.clientY);
+    const { x, y } = dragTarget(drag, e.clientX, e.clientY);
     movePlacement(drag.id, x, y);
   }, [editable, dragTarget, movePlacement]);
 
@@ -448,7 +447,7 @@ export function AltarCanvas({
     if (!editable || !drag) return;
     draggingRef.current = null;
     if (!drag.moved) return;
-    const { x, y } = dragTarget(e.clientX, e.clientY);
+    const { x, y } = dragTarget(drag, e.clientX, e.clientY);
     savePlacementPosition(drag.id, x, y);
   }, [editable, dragTarget, savePlacementPosition]);
 
