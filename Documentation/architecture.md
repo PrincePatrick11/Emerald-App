@@ -969,7 +969,7 @@ template's title and tags back lives in `fieldsWithTemplate`/`fieldsWithoutTempl
 `mayTakeTemplateTitle` (`lib/blocks/templates.ts`, pure — no store reads).
 
 **Manual insertion, from the editor.** `TemplateInsertion` (blocks sidebar) offers
-`TemplatePickerModal` (search over name/description, ordered by `templatesFor` — assigned to
+`TemplatePickerModal` (search over name, ordered by `templatesFor` — assigned to
 this combination first) and, once a template is chosen into a non-empty entry,
 `TemplateApplyDialog` (append or replace, plus checkboxes for title/tags — skipped for an empty
 entry, which just inserts). `store/templateApply.ts` is the seam between the block stack (which
@@ -998,8 +998,8 @@ the view on a module switch) and, on "Done", writes only the fields that actuall
 the page opened (comparing trimmed names) rather than the whole draft — a tag renamed or a star
 taken by another template while the page was open is left as it is instead of being silently
 overwritten. `TemplateDraft` (`store/draftStore.ts`) omits `description` — the page has no field
-for it any more, though the `templates.description` column stays for import/export and duplication,
-and `TemplatePickerModal`'s search and the insertion suggestions now match the name only.
+for it any more, the `templates.description` column is gone since v54, and `TemplatePickerModal`'s
+search and the insertion suggestions match the name only.
 `useShrunkIcon` (`src/hooks/useShrunkIcon.ts`) is the shared "shrink an image icon to 64px, last
 write wins" logic behind a draft's icon field, used by both pages.
 

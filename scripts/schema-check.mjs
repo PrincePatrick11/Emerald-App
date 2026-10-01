@@ -846,8 +846,8 @@ console.log('\n5. Kategorie löschen verliert keine Einträge\n');
   );
   // Dieselbe Kategorie hält seit v38 auch Inhalte der anderen Module.
   await db.execute(
-    `INSERT INTO tasks (id,title,description,category_id,created_at,updated_at)
-     VALUES ('a1t','Aufgabe','','temporaer',$1,$1)`,
+    `INSERT INTO tasks (id,title,category_id,created_at,updated_at)
+     VALUES ('a1t','Aufgabe','temporaer',$1,$1)`,
     [now]
   );
 
@@ -941,8 +941,8 @@ console.log('\n6. Einfügereihenfolge beim Import\n');
   try {
     for (const t of kind) {
       await db.execute(
-        `INSERT INTO tasks (id,title,description,category_id,parent_task_id,created_at,updated_at)
-         VALUES ($1,$2,'',NULL,$3,$4,$4)`,
+        `INSERT INTO tasks (id,title,category_id,parent_task_id,created_at,updated_at)
+         VALUES ($1,$2,NULL,$3,$4,$4)`,
         [t.id, t.title, t.parent_task_id, now]
       );
     }
@@ -954,8 +954,8 @@ console.log('\n6. Einfügereihenfolge beim Import\n');
   await db.execute('DELETE FROM tasks');
   for (const t of kind) {
     await db.execute(
-      `INSERT INTO tasks (id,title,description,category_id,parent_task_id,created_at,updated_at)
-       VALUES ($1,$2,'',NULL,NULL,$3,$3)`,
+      `INSERT INTO tasks (id,title,category_id,parent_task_id,created_at,updated_at)
+       VALUES ($1,$2,NULL,NULL,$3,$3)`,
       [t.id, t.title, now]
     );
   }
@@ -2045,6 +2045,22 @@ console.log('\n8o. Migration v50: tote Spalten gehen\n');
   check('Zeilen, übrige Spalten und Platzierungen bleiben',
     altar?.title === 'Altar' && altar?.grid_size === 40 && placements.n === 1
       && (await db.select("SELECT title FROM tasks WHERE id='t1'"))[0]?.title === 'Aufgabe');
+  db.close();
+}
+
+console.log('\n8o2. Migration v54: ungenutzte Beschreibungen gehen\n');
+
+{
+  const db = await buildViaChain('v54.db', undefined, 53);
+  await db.execute(`INSERT INTO tasks (id, title, description, due_date, created_at, updated_at) VALUES ('t1','A','alt','2026-01-01',$1,$1)`, [now]);
+  const v54 = MIGRATIONS.find((m) => m.version === 54);
+  await v54.up(db);
+  await v54.up(db);
+  const cols = async (t) => (await db.select(`PRAGMA table_info(${t})`)).map((c) => c.name);
+  check('v54 nimmt die vier Spalten weg, auch beim zweiten Lauf',
+    !(await cols('tasks')).some((c) => c === 'description' || c === 'due_date')
+      && !(await cols('block_definitions')).includes('description') && !(await cols('templates')).includes('description'));
+  check('v54: die Aufgabe bleibt', (await db.select("SELECT title FROM tasks WHERE id='t1'"))[0]?.title === 'A');
   db.close();
 }
 

@@ -929,7 +929,6 @@ async function insertBlockDefinitions(
       id: r.id as string,
       name: text(r.name, ''),
       icon: text(r.icon, '') || DEFAULT_DEFINITION_ICON,
-      description: text(r.description, ''),
       elements: json(r.elements, '[]'),
       display: json(r.display, '{}'),
       revision: Number.isInteger(r.revision) && (r.revision as number) > 0 ? r.revision : 1,
@@ -981,10 +980,6 @@ async function insertTemplates(
     // Eine ID, die schon da ist — auch eine zweite Zeile derselben ID in der Datei — kommt nicht hinein.
     .filter((t) => !known.has(t.id) && !!known.add(t.id));
   let sortOrder = await nextTemplateSortOrder(db);
-  // Die Beschreibung kennt `Template` nicht mehr; die Spalte reist trotzdem
-  // mit, wie bei den eigenen Blöcken.
-  const descriptions = new Map(rows.filter((r): r is Row => typeof r === 'object' && r !== null)
-    .map((r) => [String(r.id), typeof r.description === 'string' ? r.description : '']));
   const normalized = fresh.map((t) => {
     const active = t.deleted_at === null;
     const remapped = parseAssignments(t.assignments.flatMap((a) => {
@@ -1000,17 +995,14 @@ async function insertTemplates(
       taken.add(key);
       return a;
     });
-    return {
-      ...templateToRow({
-        ...t,
-        content: remapContent(String(remapPaths(t.content, pathMap))),
-        assignments,
-        sort_order: sortOrder++,
-        created_at: t.created_at || now,
-        updated_at: t.updated_at || now,
-      }),
-      description: descriptions.get(t.id) ?? '',
-    };
+    return templateToRow({
+      ...t,
+      content: remapContent(String(remapPaths(t.content, pathMap))),
+      assignments,
+      sort_order: sortOrder++,
+      created_at: t.created_at || now,
+      updated_at: t.updated_at || now,
+    });
   });
   await insertRows(db, 'templates', normalized, true);
 }

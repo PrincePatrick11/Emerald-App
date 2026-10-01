@@ -337,7 +337,7 @@ console.log('\n4d. Eigene Blöcke: Kopien und Aktualisieren\n');
 {
   const text = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p };
   const def = {
-    id: 'def-1', name: 'Ritual', icon: '🕯️', description: '', revision: 1, sort_order: 0,
+    id: 'def-1', name: 'Ritual', icon: '🕯️', revision: 1, sort_order: 0,
     created_at: '', updated_at: '', deleted_at: null,
     display: { readHideEmpty: true, readOnly: false, showTitle: true },
     elements: [{ id: 'e-date', kind: 'date', label: 'Datum' }, { id: 'e-result', kind: 'shorttext', label: 'Ergebnis' }],
@@ -628,7 +628,7 @@ console.log('\n4g. Altar-Feld und Vorgaben mit Markup\n');
     byId.alt2.defaultValue === undefined && byId.lnk2.defaultValue === undefined && byId.pic2.defaultValue === undefined);
 
   const def = {
-    id: 'def-slots', name: 'Ritualplatz', icon: '🕯️', description: '', revision: 1, sort_order: 0,
+    id: 'def-slots', name: 'Ritualplatz', icon: '🕯️', revision: 1, sort_order: 0,
     created_at: '', updated_at: '', deleted_at: null,
     display: { readHideEmpty: true, readOnly: false, showTitle: true }, elements,
   };
@@ -660,7 +660,7 @@ console.log('\n4h. Sigillen als Teile eigener Blöcke\n');
 {
   const text = { label: (e) => e.label || e.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p };
   const def = {
-    id: 'def-sigil', name: 'Sigillen-Ritual', icon: '🕯️', description: '', revision: 1, sort_order: 0,
+    id: 'def-sigil', name: 'Sigillen-Ritual', icon: '🕯️', revision: 1, sort_order: 0,
     created_at: '', updated_at: '', deleted_at: null,
     display: { readHideEmpty: true, readOnly: false, showTitle: true },
     elements: parseDefinitionElements(JSON.stringify([
@@ -823,7 +823,7 @@ console.log('\n6. Vorlagen: Zuweisung, Standard, Einsetzen\n');
     ]), assignments);
   check('Zuweisungen: unlesbares JSON ergibt keine', parseAssignments('{kaputt').length === 0);
 
-  const tpl = (id, assignments, content = '') => ({ id, name: id, icon: '', description: '', title: '', content, tags: [], assignments, sort_order: 0, created_at: '', updated_at: '', deleted_at: null });
+  const tpl = (id, assignments, content = '') => ({ id, name: id, icon: '', title: '', content, tags: [], assignments, sort_order: 0, created_at: '', updated_at: '', deleted_at: null });
   const exact = tpl('exact', [{ entryType: 'wiki', category: 'ritual', isDefault: true }]);
   const fallback = tpl('fallback', [{ entryType: 'wiki', category: '*', isDefault: true }]);
   const none = tpl('none', [{ entryType: 'wiki', category: null, isDefault: true }]);
@@ -855,7 +855,7 @@ console.log('\n6. Vorlagen: Zuweisung, Standard, Einsetzen\n');
   // Eine Ladung als Teil eines eigenen Blocks zielt auf `<Block-ID>:<Element-ID>` — auch das wandert mit.
   const partText = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein', moonName: (ph) => ph };
   const partDef = {
-    id: 'part-def', name: 'Teile', icon: '', description: '', revision: 1, sort_order: 0,
+    id: 'part-def', name: 'Teile', icon: '', revision: 1, sort_order: 0,
     created_at: '', updated_at: '', deleted_at: null,
     display: { readHideEmpty: true, readOnly: false, showTitle: false },
     elements: parseDefinitionElements(JSON.stringify([

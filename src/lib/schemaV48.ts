@@ -2,7 +2,7 @@
  * Eingefrorenes Schema, Stand v48 — jede Tabelle, die eine spätere Migration
  * noch umgebaut hat: die drei Eintragstabellen, bevor v49 (`unifyEntries.ts`)
  * sie zu `entries` zusammenlegt, und `tasks`, `altar_items` und `tags`, bevor
- * v50, v52 und v53 Spalten wegnehmen oder dazutun.
+ * v50, v52, v53 und v54 Spalten wegnehmen oder dazutun.
  *
  * Die Migrationen davor bauen oder lesen diese Tabellen noch: v33 legt
  * `journal_entries` und `tags` an (`schemaV37.ts` holt sie von hier), v38 und

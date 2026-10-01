@@ -1386,6 +1386,18 @@ export const MIGRATIONS: Migration[] = [
     name: 'tags_by_id',
     up: tagsById,
   },
+  {
+    // Noch vier Spalten, die nichts mehr las oder schrieb: Beschreibung und
+    // Fälligkeit einer Aufgabe, die Beschreibung eigener Blöcke und Vorlagen —
+    // Felder ohne Eingabe. Wiederholbar wie v50.
+    version: 54,
+    name: 'drop_unused_descriptions',
+    up: async (db) => {
+      await dropColumnsIfPresent(db, 'tasks', ['description', 'due_date']);
+      await dropColumnsIfPresent(db, 'block_definitions', ['description']);
+      await dropColumnsIfPresent(db, 'templates', ['description']);
+    },
+  },
 ];
 
 async function altarSettingsToJson(db: Database): Promise<void> {

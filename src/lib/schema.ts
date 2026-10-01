@@ -21,7 +21,7 @@ import type Database from '@tauri-apps/plugin-sql';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 53;
+export const BASELINE_VERSION = 54;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
@@ -101,7 +101,6 @@ export const TABLE_DDL: Record<TableName, string> = {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       icon TEXT NOT NULL DEFAULT '🧩',
-      description TEXT NOT NULL DEFAULT '',
       elements TEXT NOT NULL DEFAULT '[]',
       display TEXT NOT NULL DEFAULT '{}',
       revision INTEGER NOT NULL DEFAULT 1,
@@ -124,7 +123,6 @@ export const TABLE_DDL: Record<TableName, string> = {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       icon TEXT NOT NULL DEFAULT '📄',
-      description TEXT NOT NULL DEFAULT '',
       title TEXT NOT NULL DEFAULT '',
       content TEXT NOT NULL DEFAULT '',
       tags TEXT NOT NULL DEFAULT '[]',
@@ -200,11 +198,9 @@ export const TABLE_DDL: Record<TableName, string> = {
     CREATE TABLE tasks (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL DEFAULT 'Untitled Task',
-      description TEXT NOT NULL DEFAULT '',
       category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
       parent_task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
       priority TEXT NOT NULL DEFAULT 'medium',
-      due_date TEXT,
       completed INTEGER NOT NULL DEFAULT 0,
       completed_at TEXT,
       sort_order INTEGER NOT NULL DEFAULT 0,
