@@ -863,12 +863,55 @@ pub fn write_vault_settings(app: tauri::AppHandle, vault_id: String, contents: S
     write_settings_in(&dir, &contents)
 }
 
-/// The vault's `drafts.json` — same answers as [`read_vault_settings`].
+/// The vault's `drafts.json` — same answers as [`read_vault_settings`]. In an
+/// encrypted vault the file is sealed; a plain one (written before the vault
+/// was encrypted) is still read.
 #[tauri::command(async)]
 pub fn read_vault_drafts(app: tauri::AppHandle, vault_id: String) -> Result<VaultFileRead, String> {
     let dir = vault_dir(&app, &vault_id)?;
     directory_state(&dir)?;
-    Ok(read_json_in(&dir, DRAFTS_FILE, DRAFTS_MAX_BYTES))
+    let key = drafts_key(&app, &vault_id)?;
+    Ok(read_drafts_in(&dir, key.as_ref()))
+}
+
+/// The key `drafts.json` is sealed with, `None` in an unencrypted vault.
+fn drafts_key(app: &tauri::AppHandle, vault_id: &str) -> Result<Option<crate::crypto::Key>, String> {
+    Ok(crate::keys::key_for(app, vault_id)?.map(|key| crate::crypto::subkey(&key, crate::crypto::Purpose::Files)))
+}
+
+fn read_drafts_in(dir: &Path, key: Option<&crate::crypto::Key>) -> VaultFileRead {
+    use crate::crypto::{self, Context};
+    let Some(key) = key else {
+        return read_json_in(dir, DRAFTS_FILE, DRAFTS_MAX_BYTES);
+    };
+    let file = dir.join(DRAFTS_FILE);
+    let bytes = match std::fs::symlink_metadata(&file) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return VaultFileRead::Missing,
+        // Versiegelt ist die Datei um Kopf und Tag größer als ihr Inhalt.
+        Ok(md) if md.is_file() && md.len() <= DRAFTS_MAX_BYTES + 64 => match std::fs::read(&file) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                eprintln!("[vault] read {}: {e}", file.display());
+                return VaultFileRead::Unreadable;
+            }
+        },
+        _ => return VaultFileRead::Unreadable,
+    };
+    let plain = if crypto::is_sealed(&bytes) {
+        match crypto::open(key, Context::Drafts, &bytes) {
+            Ok(plain) => plain.to_vec(),
+            Err(e) => {
+                eprintln!("[vault] {DRAFTS_FILE}: {e}");
+                return VaultFileRead::Unreadable;
+            }
+        }
+    } else {
+        bytes
+    };
+    match String::from_utf8(plain) {
+        Ok(contents) => VaultFileRead::Found { contents },
+        Err(_) => VaultFileRead::Unreadable,
+    }
 }
 
 /// Replaces the vault's `drafts.json` with `contents`, a JSON object. An
@@ -884,10 +927,11 @@ pub fn read_vault_drafts(app: tauri::AppHandle, vault_id: String) -> Result<Vaul
 pub fn write_vault_drafts(app: tauri::AppHandle, vault_id: String, contents: String) -> Result<(), String> {
     let dir = vault_dir(&app, &vault_id)?;
     directory_state(&dir)?;
-    write_drafts_in(&dir, &contents)
+    let key = drafts_key(&app, &vault_id)?;
+    write_drafts_in(&dir, &contents, key.as_ref())
 }
 
-fn write_drafts_in(dir: &Path, contents: &str) -> Result<(), String> {
+fn write_drafts_in(dir: &Path, contents: &str, key: Option<&crate::crypto::Key>) -> Result<(), String> {
     if let Ok(serde_json::Value::Object(map)) = serde_json::from_str::<serde_json::Value>(contents) {
         if map.is_empty() {
             std::fs::remove_file(dir.join(DRAFTS_TEMP_FILE)).ok();
@@ -898,7 +942,18 @@ fn write_drafts_in(dir: &Path, contents: &str) -> Result<(), String> {
             };
         }
     }
-    write_json_in(dir, DRAFTS_FILE, DRAFTS_TEMP_FILE, DRAFTS_MAX_BYTES, contents)
+    let Some(key) = key else {
+        return write_json_in(dir, DRAFTS_FILE, DRAFTS_TEMP_FILE, DRAFTS_MAX_BYTES, contents);
+    };
+    if contents.len() as u64 > DRAFTS_MAX_BYTES {
+        return Err(format!("{DRAFTS_FILE} too large"));
+    }
+    match serde_json::from_str::<serde_json::Value>(contents) {
+        Ok(serde_json::Value::Object(_)) => {}
+        _ => return Err(format!("{DRAFTS_FILE} must be a JSON object")),
+    }
+    let sealed = crate::crypto::seal(key, crate::crypto::Context::Drafts, contents.as_bytes());
+    write_atomic(dir, DRAFTS_FILE, DRAFTS_TEMP_FILE, &sealed)
 }
 
 fn read_settings_in(dir: &Path) -> VaultFileRead {
@@ -978,7 +1033,10 @@ pub(crate) fn write_atomic(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]
         .write(true)
         .create_new(true)
         .open(&temp)
-        .and_then(|mut file| file.write_all(bytes));
+        // Erst auf der Platte, dann umbenennen: sonst kann nach einem
+        // Stromausfall eine leere Datei unter dem Zielnamen stehen — bei
+        // `vault.key` hieße das, der Vault ist verloren.
+        .and_then(|mut file| file.write_all(bytes).and_then(|()| file.sync_all()));
     if let Err(e) = written {
         std::fs::remove_file(&temp).ok();
         return Err(format!("write {}: {e}", temp.display()));
@@ -989,7 +1047,14 @@ pub(crate) fn write_atomic(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]
     patiently(|| std::fs::rename(&temp, &target)).map_err(|e| {
         std::fs::remove_file(&temp).ok();
         format!("replace {name}: {e}")
-    })
+    })?;
+    // Unter Unix steht der neue Name erst fest, wenn der Ordner selbst auf der
+    // Platte ist. Windows hält das mit dem Umbenennen fest.
+    #[cfg(unix)]
+    if let Ok(dir) = std::fs::File::open(dir) {
+        dir.sync_all().ok();
+    }
+    Ok(())
 }
 
 /// Entfernt die Arbeitskopie eines Backup-Imports (`importStaging.ts`) samt
@@ -1119,21 +1184,45 @@ mod tests {
         let dir = scratch();
         assert_eq!(read_json_in(&dir, DRAFTS_FILE, DRAFTS_MAX_BYTES), VaultFileRead::Missing);
         // Nichts da, nichts zu entfernen — kein Fehler.
-        write_drafts_in(&dir, "{}").unwrap();
-        write_drafts_in(&dir, r#"{"version":1,"templates":{}}"#).unwrap();
+        write_drafts_in(&dir, "{}", None).unwrap();
+        write_drafts_in(&dir, r#"{"version":1,"templates":{}}"#, None).unwrap();
         assert_eq!(
             read_json_in(&dir, DRAFTS_FILE, DRAFTS_MAX_BYTES),
             VaultFileRead::Found { contents: r#"{"version":1,"templates":{}}"#.to_string() }
         );
         assert!(!dir.join(DRAFTS_TEMP_FILE).exists());
-        write_drafts_in(&dir, "{}").unwrap();
+        write_drafts_in(&dir, "{}", None).unwrap();
         assert!(!dir.join(DRAFTS_FILE).exists());
-        assert!(write_drafts_in(&dir, "[]").is_err());
+        assert!(write_drafts_in(&dir, "[]", None).is_err());
         // Die Einstellungen daneben bleiben unberührt.
         write_settings_in(&dir, r#"{"version":1}"#).unwrap();
-        write_drafts_in(&dir, r#"{"version":1}"#).unwrap();
-        write_drafts_in(&dir, "{}").unwrap();
+        write_drafts_in(&dir, r#"{"version":1}"#, None).unwrap();
+        write_drafts_in(&dir, "{}", None).unwrap();
         assert!(dir.join(SETTINGS_FILE).exists());
+    }
+
+    #[test]
+    fn drafts_are_sealed_in_an_encrypted_vault() {
+        let dir = scratch();
+        let key = crate::crypto::random_key();
+        // Ein Klartext-Rest aus der Zeit vor der Verschlüsselung wird noch gelesen.
+        write_drafts_in(&dir, r#"{"version":1,"old":true}"#, None).unwrap();
+        assert_eq!(
+            read_drafts_in(&dir, Some(&key)),
+            VaultFileRead::Found { contents: r#"{"version":1,"old":true}"#.to_string() }
+        );
+        write_drafts_in(&dir, r#"{"version":1,"secret":"GEHEIM-DRAFT"}"#, Some(&key)).unwrap();
+        let raw = std::fs::read(dir.join(DRAFTS_FILE)).unwrap();
+        assert!(!raw.windows(12).any(|w| w == b"GEHEIM-DRAFT"));
+        assert_eq!(
+            read_drafts_in(&dir, Some(&key)),
+            VaultFileRead::Found { contents: r#"{"version":1,"secret":"GEHEIM-DRAFT"}"#.to_string() }
+        );
+        // Ohne den richtigen Schlüssel: unlesbar, nicht Klartext.
+        assert_eq!(read_drafts_in(&dir, Some(&crate::crypto::random_key())), VaultFileRead::Unreadable);
+        assert!(write_drafts_in(&dir, "[]", Some(&key)).is_err());
+        write_drafts_in(&dir, "{}", Some(&key)).unwrap();
+        assert!(!dir.join(DRAFTS_FILE).exists());
     }
 
     #[test]

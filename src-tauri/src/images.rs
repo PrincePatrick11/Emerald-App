@@ -11,6 +11,13 @@
 //! `read_image_as_base64` remains for the two callers that genuinely need a
 //! data-URL: the PDF export (which renders in a `file://` webview the scheme
 //! cannot reach) and the backup writer.
+//!
+//! In an encrypted vault every image file is sealed (`crypto.rs`), and its
+//! name is a keyed hash instead of the plain SHA-256 — the plain hash would let
+//! anyone holding a copy of a known picture confirm it is in the vault. Names
+//! stay 64 hex digits either way, so nothing that reads them changes, and
+//! identical images still share one file. [`store`] and [`load`] are the only
+//! places that touch image bytes on disk.
 
 use base64::{engine::general_purpose, Engine as _};
 use sha2::{Digest, Sha256};
@@ -18,10 +25,65 @@ use std::path::PathBuf;
 use tauri::http::{Request, Response};
 use tauri::UriSchemeContext;
 
-use crate::vault;
+use crate::crypto::{self, Context, Key, Purpose};
+use crate::{keys, vault};
 
-fn sha256_hex(data: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(data))
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// The keys an encrypted vault's images need.
+struct ImageKeys {
+    files: Key,
+    names: Key,
+}
+
+/// `None` for an unencrypted vault; `VAULT_LOCKED` for a locked one.
+fn image_keys(app: &tauri::AppHandle, vault_id: &str) -> Result<Option<ImageKeys>, String> {
+    Ok(keys::key_for(app, vault_id)?.map(|key| ImageKeys {
+        files: crypto::subkey(&key, Purpose::Files),
+        names: crypto::subkey(&key, Purpose::ImageNames),
+    }))
+}
+
+/// The name an image's bytes are stored under.
+fn image_name(keys: Option<&ImageKeys>, bytes: &[u8], ext: &str) -> String {
+    let digest = match keys {
+        Some(keys) => hex(&crypto::keyed_hash(&keys.names, bytes)),
+        None => format!("{:x}", Sha256::digest(bytes)),
+    };
+    format!("{digest}.{ext}")
+}
+
+/// Writes an image into the vault — sealed in an encrypted one — unless a file
+/// of that name is there already. Returns the name.
+fn store(app: &tauri::AppHandle, vault_id: &str, bytes: &[u8], ext: &str) -> Result<String, String> {
+    let keys = image_keys(app, vault_id)?;
+    let filename = image_name(keys.as_ref(), bytes, ext);
+    let path = vault::images_dir(app, vault_id)?.join(&filename);
+    let _guard = image_write_guard();
+    if !path.exists() {
+        let contents = match &keys {
+            Some(keys) => crypto::seal(&keys.files, Context::Image(&filename), bytes),
+            None => bytes.to_vec(),
+        };
+        std::fs::write(&path, contents).map_err(|e| e.to_string())?;
+    }
+    Ok(filename)
+}
+
+/// Reads a stored image's bytes, opening it in an encrypted vault. A file that
+/// is not sealed is returned as it is: the shared pre-0.2.1 pool is plain.
+fn load(app: &tauri::AppHandle, vault_id: &str, filename: &str) -> Result<Vec<u8>, String> {
+    let path = locate(app, vault_id, filename)?;
+    let bytes = std::fs::read(&path).map_err(|e| format!("read: {e}"))?;
+    if !crypto::is_sealed(&bytes) {
+        return Ok(bytes);
+    }
+    let keys = image_keys(app, vault_id)?.ok_or("sealed image in an unencrypted vault")?;
+    crypto::open(&keys.files, Context::Image(filename), &bytes)
+        .map(|plain| plain.to_vec())
+        .map_err(|e| e.to_string())
 }
 
 pub fn ext_for_mime(mime: &str) -> &'static str {
@@ -48,8 +110,9 @@ pub fn mime_for_ext(ext: &str) -> &'static str {
 
 const IMAGE_EXTS: [&str; 6] = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
 
-/// A stored image is named after the SHA-256 of its own bytes, so a valid name
-/// is 64 hex digits and a known extension — nothing else.
+/// A stored image is named after a hash of its own bytes (SHA-256, or a keyed
+/// hash in an encrypted vault), so a valid name is 64 hex digits and a known
+/// extension — nothing else.
 ///
 /// This is the only thing standing between the URI scheme and the filesystem.
 /// The names it guards reach us out of stored HTML content, which may have come
@@ -102,7 +165,7 @@ fn image_write_guard() -> std::sync::MutexGuard<'static, ()> {
 }
 
 /// Stores a base64 data-URL and returns the filename it was given.
-/// SHA-256 of the raw bytes is the name, so identical images share one file.
+/// A hash of the raw bytes is the name, so identical images share one file.
 #[tauri::command]
 pub async fn save_image(
     app: tauri::AppHandle,
@@ -119,14 +182,7 @@ pub async fn save_image(
         let bytes = general_purpose::STANDARD
             .decode(b64)
             .map_err(|e| e.to_string())?;
-
-        let filename = format!("{}.{}", sha256_hex(&bytes), ext);
-        let path = vault::images_dir(&app, &vault_id)?.join(&filename);
-        let _guard = image_write_guard();
-        if !path.exists() {
-            std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
-        }
-        Ok(filename)
+        store(&app, &vault_id, &bytes, ext)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -154,13 +210,7 @@ pub async fn copy_image_file(
     tauri::async_runtime::spawn_blocking(move || {
         let (ext, canonical_source) = checked_image_source(&app, &source)?;
         let bytes = std::fs::read(&canonical_source).map_err(|e| format!("read {source}: {e}"))?;
-        let filename = format!("{}.{}", sha256_hex(&bytes), ext);
-        let path = vault::images_dir(&app, &vault_id)?.join(&filename);
-        let _guard = image_write_guard();
-        if !path.exists() {
-            std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
-        }
-        Ok(filename)
+        store(&app, &vault_id, &bytes, &ext)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -209,8 +259,7 @@ pub async fn read_image_as_base64(
     vault_id: String,
 ) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let path = locate(&app, &vault_id, &filename)?;
-        let bytes = std::fs::read(&path).map_err(|e| format!("read: {e}"))?;
+        let bytes = load(&app, &vault_id, &filename)?;
         let ext = crate::ext_for_path(&filename);
         Ok(format!(
             "data:{};base64,{}",
@@ -224,7 +273,8 @@ pub async fn read_image_as_base64(
 
 /// Copies images out of the pre-per-vault shared pool into a vault's own folder.
 /// Migration v35 calls this with the names it found in that vault's content.
-/// Returns how many files were copied.
+/// Returns how many files were copied. An encrypted vault gets them sealed,
+/// under their old names — the content refers to those.
 #[tauri::command]
 pub async fn adopt_legacy_images(
     app: tauri::AppHandle,
@@ -234,6 +284,7 @@ pub async fn adopt_legacy_images(
     tauri::async_runtime::spawn_blocking(move || {
         let target_dir = vault::images_dir(&app, &vault_id)?;
         let legacy_dir = vault::legacy_images_dir(&app)?;
+        let keys = image_keys(&app, &vault_id)?;
         let _guard = image_write_guard();
         let mut copied = 0;
 
@@ -249,7 +300,13 @@ pub async fn adopt_legacy_images(
             if !source.is_file() {
                 continue;
             }
-            if std::fs::copy(&source, &target).is_ok() {
+            let done = match &keys {
+                Some(keys) => std::fs::read(&source)
+                    .and_then(|bytes| std::fs::write(&target, crypto::seal(&keys.files, Context::Image(&name), &bytes)))
+                    .is_ok(),
+                None => std::fs::copy(&source, &target).is_ok(),
+            };
+            if done {
                 copied += 1;
             }
         }
@@ -343,12 +400,15 @@ fn serve(app: &tauri::AppHandle, request: &Request<Vec<u8>>) -> Response<Vec<u8>
         return not_found();
     };
 
-    let Ok(file) = locate(app, vault_id, filename) else {
+    let Ok(bytes) = load(app, vault_id, filename) else {
         return not_found();
     };
-    let Ok(bytes) = std::fs::read(&file) else {
-        return not_found();
-    };
+    // Entschlüsselte Bilder gehören nicht in den Platten-Cache der WebView —
+    // dort lägen sie im Klartext außerhalb des Vaults.
+    let encrypted = vault::vault_dir(app, vault_id)
+        .map(|dir| keys::is_encrypted_dir(&dir))
+        .unwrap_or(true);
+    let cache = if encrypted { "no-store" } else { "max-age=31536000, immutable" };
 
     Response::builder()
         .status(200)
@@ -361,9 +421,9 @@ fn serve(app: &tauri::AppHandle, request: &Request<Vec<u8>>) -> Response<Vec<u8>
         // these images come from the app's own storage, so allowing the read
         // gives the page nothing it could not already ask for.
         .header("Access-Control-Allow-Origin", "*")
-        // The filename is the hash of the content, so a given URL can never
-        // return anything else.
-        .header("Cache-Control", "max-age=31536000, immutable")
+        // Unencrypted: the filename is the hash of the content, so a given URL
+        // can never return anything else.
+        .header("Cache-Control", cache)
         .body(bytes)
         .unwrap_or_else(|_| not_found())
 }

@@ -23,8 +23,8 @@ import { useUndoStore } from './undoStore';
 import { useSettingsStore } from './settingsStore';
 import { captureLegacySettings } from '../lib/vaultSettings';
 import { resolveOpenEdits } from '../lib/openEdits';
-import { lockVault } from '../lib/vaultKeys';
-import { ensureVaultReady } from './vaultKeyStore';
+import { keyErrorOf, lockVault } from '../lib/vaultKeys';
+import { ensureVaultReady, VAULT_KEY_CANCELLED } from './vaultKeyStore';
 
 interface VaultStore {
   vaults: Vault[];
@@ -57,6 +57,11 @@ export function hasActiveVault(state: Pick<VaultStore, 'vaults' | 'activeVaultId
   return state.vaults.some((v) => v.id === state.activeVaultId);
 }
 
+/** The open vault's record, if there is one. */
+export function activeVault(state: Pick<VaultStore, 'vaults' | 'activeVaultId'>): Vault | undefined {
+  return state.vaults.find((v) => v.id === state.activeVaultId);
+}
+
 /**
  * Opens the active vault's database and refills every store.
  *
@@ -71,8 +76,7 @@ async function openActiveVault(): Promise<void> {
   await resetDbCache();
   // Entsperren oder — bei einem neuen Vault — das Passwort festlegen. Wer
   // hier abbricht, landet im Fehlerzweig des Aufrufers.
-  const { vaults, activeVaultId } = useVaultStore.getState();
-  const active = vaults.find((v) => v.id === activeVaultId);
+  const active = activeVault(useVaultStore.getState());
   if (active) await ensureVaultReady(active);
   // Vor getDb(): die Migrationen beim Öffnen brauchen schon die Sprache des
   // neuen Vaults (siehe `loadForVault`). Ein fehlender Vault-Ordner scheitert
@@ -145,6 +149,9 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       } else {
         detachVaultPrefs();
       }
+      // Entsperrt und dann doch nicht geöffnet (etwa eine scheiternde
+      // Migration): der Schlüssel bleibt nicht im Speicher liegen.
+      void lockVault(id).catch((e) => console.warn('[vault] lock failed', e));
       throw err;
     }
     // Der verlassene Vault wird gesperrt: sein Schlüssel bleibt nicht im
@@ -195,6 +202,9 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     if (deleteFiles && wasActive) await withDbClosed(removeFromFile);
     else await removeFromFile();
     forgetVaultPrefs(id);
+    // Ein entfernter Vault ist auch gesperrt — mit den Dateien hat Rust den
+    // Schlüssel schon vergessen, ohne sie bliebe er sonst im Speicher.
+    void lockVault(id).catch((e) => console.warn('[vault] lock failed', e));
 
     // Position und Restliste beide frisch: zwischen dem Eintritt und hier
     // liegen mehrere awaits, in denen ein `addVault` die Liste verlaengert
@@ -227,7 +237,16 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     // in der Liste, das Vault-Modal bleibt stehen und zeigt den Fehler, und von
     // dort aus laesst er sich neu verorten oder ein anderer waehlen. Auf ''
     // zurueckzufallen hiesse, den Nutzer wortlos in die Einrichtung zu werfen.
-    await openActiveVault();
+    // Anders, wenn der Nutzer selbst das Entsperren des Nachfolgers abbricht:
+    // dann ist kein Vault offen, und die Einrichtung ist die ehrliche Antwort.
+    try {
+      await openActiveVault();
+    } catch (err) {
+      if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) throw err;
+      set({ activeVaultId: '' });
+      await useSettingsStore.getState().clear();
+      detachVaultPrefs();
+    }
     return dirRemoved;
   },
 }));

@@ -699,7 +699,8 @@ export const IMAGE_FIELDS: {
 
 /**
  * Spiegelt `is_valid_image_name` in `src-tauri/src/images.rs`: ein gespeichertes
- * Bild heisst nach dem SHA-256 seines eigenen Inhalts.
+ * Bild heisst nach einem Hash seines eigenen Inhalts — SHA-256, in einem
+ * verschluesselten Vault ein mit dem Vault-Schluessel gebildeter.
  *
  * Das Format ist eine Eigenschaft der Spalten, nicht der Oberflaeche — deshalb
  * steht es hier und nicht in `images.ts`, das es nur re-exportiert. `db.ts`

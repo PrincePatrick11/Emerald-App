@@ -618,7 +618,7 @@
     "remember": "Remember on this device",
     "rememberHint": "The key is kept in the operating system's keychain and the vault opens without a password. The files in the vault folder stay encrypted.",
     "createTitle": "Password for “{{name}}”",
-    "createHint": "Everything in this vault is encrypted: entries, images and backups. Without the password or the recovery key you are about to receive, none of it can be read – not even by you.",
+    "createHint": "Everything in this vault is encrypted: entries, images and backups. Without the password or the recovery key you are about to receive, none of it can be read — not even by you.",
     "newPassword": "New password",
     "repeatPassword": "Repeat password",
     "createSubmit": "Encrypt",
@@ -628,7 +628,7 @@
     "recoverSubmit": "Set new password",
     "back": "Back",
     "recoveryTitle": "Your recovery key",
-    "recoveryHint": "This key gets you into your vault if you forget the password. It is shown only this once. Write it down or keep it in a password manager – not in the vault itself.",
+    "recoveryHint": "This key gets you into your vault if you forget the password. It is shown only this once. Write it down or keep it in a password manager — not in the vault itself.",
     "copy": "Copy",
     "copied": "Copied",
     "stored": "I have stored the key safely",
@@ -637,7 +637,12 @@
     "mismatch": "The passwords do not match.",
     "wrongPassword": "Wrong password.",
     "wrongRecoveryKey": "This recovery key does not belong to this vault.",
-    "failed": "That did not work. Please try again."
+    "unlockFailed": "Could not unlock the vault. Please try again.",
+    "recoverFailed": "Could not set the new password. Please try again.",
+    "createFailed": "Could not encrypt the vault. Please try again.",
+    "rememberUnavailable": "This system has no keychain to remember the key in.",
+    "rememberFailed": "The operating system's keychain refused to remember the key. The vault is open, but Emerald will ask for the password again next time.",
+    "continue": "Continue"
   },
   "settings": {
     "language": "Language",

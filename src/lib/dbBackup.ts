@@ -54,6 +54,8 @@ import { legacyDisplayName, type LegacyCategoryTable } from './categories';
 import i18n from '../i18n';
 import { generateId, isValidHexColor, nowIso } from './helpers';
 import { useVaultStore } from '../store/vaultStore';
+import { VAULT_KEY_CANCELLED } from '../store/vaultKeyStore';
+import { keyErrorOf } from './vaultKeys';
 import { reloadAllStores } from '../store/moduleWiring';
 import { useUIStore } from '../store/uiStore';
 import { clearAllDrafts, flushDrafts } from '../store/draftStore';
@@ -1765,7 +1767,14 @@ export async function importDatabase(
     // bevor der Import begann (`BackupPage`). Käme sie hier noch einmal und
     // hieße die Antwort „weiter bearbeiten", bliebe der alte Vault aktiv —
     // und Schritt 4 füllte ihn statt des neuen.
-    const switched = await useVaultStore.getState().switchVault(vaultId, { editsResolved: true });
+    // Bricht der Nutzer beim Passwort des neuen Vaults ab, ist der Import
+    // abgebrochen — und der eben angelegte, leere Vault kommt wieder weg.
+    const switched = await useVaultStore.getState().switchVault(vaultId, { editsResolved: true }).catch(async (err: unknown) => {
+      if (keyErrorOf(err) === VAULT_KEY_CANCELLED) {
+        await useVaultStore.getState().removeVault(vaultId).catch((e: unknown) => console.warn('[backup] could not remove the new vault', e));
+      }
+      throw err;
+    });
     if (!switched || useVaultStore.getState().activeVaultId !== vaultId) {
       throw new Error('could not switch to the new vault');
     }

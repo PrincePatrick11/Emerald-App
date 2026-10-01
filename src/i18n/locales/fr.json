@@ -645,7 +645,12 @@
     "mismatch": "Les mots de passe ne correspondent pas.",
     "wrongPassword": "Mot de passe incorrect.",
     "wrongRecoveryKey": "Cette clé de récupération n’appartient pas à ce coffre.",
-    "failed": "Cela n’a pas fonctionné. Réessaie."
+    "unlockFailed": "Impossible de déverrouiller le coffre. Réessaie.",
+    "recoverFailed": "Impossible de définir le nouveau mot de passe. Réessaie.",
+    "createFailed": "Impossible de chiffrer le coffre. Réessaie.",
+    "rememberUnavailable": "Ce système n’a pas de trousseau où mémoriser la clé.",
+    "rememberFailed": "Le trousseau du système d’exploitation a refusé de mémoriser la clé. Le coffre est ouvert, mais Emerald redemandera le mot de passe la prochaine fois.",
+    "continue": "Continuer"
   },
   "settings": {
     "language": "Langue",

@@ -824,6 +824,7 @@ pub fn run() {
             db::db_execute,
             db::db_select,
             keys::vault_key_status,
+            keys::keychain_available,
             keys::vault_create_key,
             keys::vault_unlock,
             keys::vault_unlock_remembered,

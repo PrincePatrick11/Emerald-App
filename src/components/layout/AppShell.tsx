@@ -3,7 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { useTranslation } from 'react-i18next';
 import { isAltarFullscreen, useUIStore } from '../../store/uiStore';
 import { reloadAllStores } from '../../store/moduleWiring';
-import { hasActiveVault, useVaultStore } from '../../store/vaultStore';
+import { activeVault, hasActiveVault, useVaultStore } from '../../store/vaultStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { invoke } from '@tauri-apps/api/core';
 import { computeMenuEnabledState, runMenuAction, SELF_CONTAINED_MENU_ACTIONS } from '../../lib/menuActions';
@@ -127,8 +127,8 @@ export default function AppShell() {
       // liesse. Der erste Vault wird ueber `switchVault` aktiviert, und das
       // endet in `reloadAllStores()` — dieser Effekt laeuft dafuer nicht erneut.
       const vaultState = useVaultStore.getState();
-      if (!hasActiveVault(vaultState)) return;
-      const active = vaultState.vaults.find((v) => v.id === vaultState.activeVaultId)!;
+      const active = activeVault(vaultState);
+      if (!active) return;
       // Vor allem anderen: ein verschlüsselter Vault muss entsperrt sein, bevor
       // Entwürfe oder Datenbank gelesen werden. Wer abbricht, wählt im
       // Vault-Fenster einen anderen — der gespeicherte aktive Vault bleibt, bis

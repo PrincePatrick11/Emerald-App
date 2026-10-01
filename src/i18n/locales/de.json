@@ -637,7 +637,12 @@
     "mismatch": "Die Passwörter stimmen nicht überein.",
     "wrongPassword": "Falsches Passwort.",
     "wrongRecoveryKey": "Dieser Wiederherstellungsschlüssel passt nicht zu diesem Vault.",
-    "failed": "Das hat nicht geklappt. Bitte versuche es noch einmal."
+    "unlockFailed": "Der Vault konnte nicht entsperrt werden. Bitte versuche es noch einmal.",
+    "recoverFailed": "Das neue Passwort konnte nicht gesetzt werden. Bitte versuche es noch einmal.",
+    "createFailed": "Der Vault konnte nicht verschlüsselt werden. Bitte versuche es noch einmal.",
+    "rememberUnavailable": "Auf diesem System gibt es keinen Schlüsselbund, in dem sich der Schlüssel merken ließe.",
+    "rememberFailed": "Der Schlüsselbund des Betriebssystems hat das Merken abgelehnt. Der Vault ist offen, beim nächsten Start fragt Emerald aber wieder nach dem Passwort.",
+    "continue": "Weiter"
   },
   "settings": {
     "language": "Sprache",

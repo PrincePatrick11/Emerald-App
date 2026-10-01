@@ -13,18 +13,29 @@
 //! Like the plugin, each pool hands every statement to whichever connection is
 //! free — a transaction only holds within a single `execute` string.
 //!
-//! An encrypted vault's databases open with its key as SQLCipher's raw key
-//! (`PRAGMA key = "x'…'"`), which sqlx runs first on every connection of the
-//! pool. A locked vault does not open at all.
+//! An encrypted vault's databases open with a key derived from the vault key
+//! as SQLCipher's raw key (`PRAGMA key = "x'…'"`), which sqlx runs first on
+//! every connection of the pool. A locked vault does not open at all, and only
+//! an encrypted vault may create a database: a plain one would have to exist
+//! already.
+//!
+//! Every connection also gets an authorizer ([`authorize`]) that refuses
+//! SQLCipher's key pragmas and `sqlcipher_export` — the webview runs arbitrary
+//! SQL here, and those would let it re-key the vault out from under `vault.key`
+//! or write a plaintext copy anywhere.
 
 use indexmap::IndexMap;
 use serde_json::Value as JsonValue;
 use sqlx::query::Query;
-use sqlx::sqlite::{Sqlite, SqliteArguments, SqliteConnectOptions, SqlitePool, SqliteValueRef};
-use sqlx::{Column, Executor, Row, TypeInfo, Value, ValueRef};
+use sqlx::sqlite::{Sqlite, SqliteArguments, SqliteConnectOptions, SqlitePool, SqlitePoolOptions, SqliteValueRef};
+use sqlx::{Column, ConnectOptions, Executor, Row, TypeInfo, Value, ValueRef};
 use std::collections::HashMap;
+use std::ffi::{c_char, c_int, c_void, CStr};
+use tauri::Manager;
 use tokio::sync::RwLock;
+use zeroize::Zeroizing;
 
+use crate::crypto::{self, Purpose};
 use crate::{keys, vault};
 
 /// The open pools, by handle (`{vaultId}/{file}`).
@@ -65,33 +76,116 @@ pub async fn db_load(
     vault_id: String,
     file: DbFile,
 ) -> Result<String, String> {
-    let path = vault::vault_dir(&app, &vault_id)?.join(file.name());
-    let mut options = SqliteConnectOptions::new()
-        .filename(&path)
-        .create_if_missing(true);
-    if let Some(key) = keys::key_for(&app, &vault_id)? {
-        options = options.pragma("key", sqlcipher_key(&key));
+    let dir = vault::vault_dir(&app, &vault_id)?;
+    let vault_key = keys::key_for(&app, &vault_id)?;
+    if let Some(vault_key) = &vault_key {
+        // Der Schlüssel im Speicher muss zu diesem Ordner gehören: zeigt die
+        // Id inzwischen woandershin, entstünde sonst eine Datenbank unter einem
+        // Schlüssel, den dessen `vault.key` nicht kennt.
+        let accepted = keys::read_key_file(&dir)?.is_some_and(|file| file.accepts(vault_key));
+        if !accepted {
+            return Err(keys::VAULT_LOCKED.to_string());
+        }
     }
-    let pool = SqlitePool::connect_with(options).await.map_err(|e| e.to_string())?;
+    let mut options = SqliteConnectOptions::new()
+        .filename(dir.join(file.name()))
+        .create_if_missing(vault_key.is_some())
+        .disable_statement_logging();
+    if let Some(vault_key) = &vault_key {
+        let key = crypto::subkey(vault_key, Purpose::Database);
+        options = options.pragma("key", sqlcipher_key(&key).to_string());
+    }
+    let pool = connect(options).await?;
 
-    let key = handle(&vault_id, file);
-    let previous = dbs.0.write().await.insert(key.clone(), pool);
+    let handle = handle(&vault_id, file);
+    let mut map = dbs.0.write().await;
+    // Unter der Sperre noch einmal: ein `vault_lock` während des Verbindens
+    // hat den Schlüssel entfernt, und dieser Pool überlebte es sonst.
+    if vault_key.is_some() && app.state::<keys::VaultKeys>().get(&vault_id).is_none() {
+        drop(map);
+        pool.close().await;
+        return Err(keys::VAULT_LOCKED.to_string());
+    }
+    let previous = map.insert(handle.clone(), pool);
+    drop(map);
     if let Some(previous) = previous {
         previous.close().await;
     }
-    Ok(key)
+    Ok(handle)
 }
 
-/// The vault key as SQLCipher's raw-key pragma value. Raw means SQLCipher
-/// skips its own PBKDF2 — the key is already random.
-fn sqlcipher_key(key: &crate::crypto::Key) -> String {
-    let hex: String = key.iter().map(|b| format!("{b:02X}")).collect();
-    format!("\"x'{hex}'\"")
+/// A pool whose every connection carries [`authorize`].
+async fn connect(options: SqliteConnectOptions) -> Result<SqlitePool, String> {
+    SqlitePoolOptions::new()
+        .after_connect(|conn, _| {
+            Box::pin(async move {
+                let mut handle = conn.lock_handle().await?;
+                // SAFETY: the handle is locked for the duration of the call,
+                // and the callback is a plain function that touches no state.
+                unsafe {
+                    libsqlite3_sys::sqlite3_set_authorizer(handle.as_raw_handle().as_ptr(), Some(authorize), std::ptr::null_mut());
+                }
+                Ok(())
+            })
+        })
+        .connect_with(options)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Refuses what would let SQL from the webview undo the encryption: the key
+/// pragmas (`key`, `rekey` and their variants), SQLCipher's settings pragmas
+/// (`cipher_*`, `kdf_iter`, …) and `sqlcipher_export`. `cipher_version` only
+/// reads, and stays allowed.
+unsafe extern "C" fn authorize(
+    _: *mut c_void,
+    action: c_int,
+    arg1: *const c_char,
+    arg2: *const c_char,
+    _: *const c_char,
+    _: *const c_char,
+) -> c_int {
+    let name = |p: *const c_char| {
+        if p.is_null() {
+            String::new()
+        } else {
+            // SAFETY: SQLite passes NUL-terminated strings or NULL.
+            unsafe { CStr::from_ptr(p) }.to_string_lossy().to_ascii_lowercase()
+        }
+    };
+    let denied = match action {
+        libsqlite3_sys::SQLITE_PRAGMA => {
+            let pragma = name(arg1);
+            matches!(
+                pragma.as_str(),
+                "key" | "rekey" | "hexkey" | "hexrekey" | "textkey" | "textrekey" | "kdf_iter" | "fast_kdf_iter"
+            ) || pragma.starts_with("hmac_")
+                || (pragma.starts_with("cipher") && pragma != "cipher_version")
+        }
+        libsqlite3_sys::SQLITE_FUNCTION => name(arg2) == "sqlcipher_export",
+        _ => false,
+    };
+    if denied {
+        libsqlite3_sys::SQLITE_DENY
+    } else {
+        libsqlite3_sys::SQLITE_OK
+    }
+}
+
+/// The key as SQLCipher's raw-key pragma value. Raw means SQLCipher skips its
+/// own PBKDF2 — the key is already random.
+fn sqlcipher_key(key: &crypto::Key) -> Zeroizing<String> {
+    let mut value = Zeroizing::new(String::with_capacity(70));
+    value.push_str("\"x'");
+    for b in key.iter() {
+        value.push_str(&format!("{b:02X}"));
+    }
+    value.push_str("'\"");
+    value
 }
 
 /// Closes every pool of one vault — when it is locked.
 pub async fn close_vault(app: &tauri::AppHandle, vault_id: &str) {
-    use tauri::Manager;
     let prefix = format!("{vault_id}/");
     let pools: Vec<SqlitePool> = {
         let dbs = app.state::<Databases>();
@@ -225,6 +319,23 @@ mod tests {
             .unwrap()
     }
 
+    fn scratch_dir() -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("emerald-db-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn keyed(file: &std::path::Path, key: &crypto::Key) -> SqliteConnectOptions {
+        SqliteConnectOptions::new()
+            .filename(file)
+            .create_if_missing(true)
+            .pragma("key", sqlcipher_key(key).to_string())
+    }
+
+    fn is_plain_sqlite(file: &std::path::Path) -> bool {
+        std::fs::read(file).unwrap().starts_with(b"SQLite format 3")
+    }
+
     #[tokio::test]
     async fn values_bind_and_decode_like_the_plugin() {
         let pool = memory_pool().await;
@@ -275,7 +386,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("keyed.db");
         let key = crate::crypto::random_key();
-        let keyed = SqliteConnectOptions::new().filename(&file).create_if_missing(true).pragma("key", sqlcipher_key(&key));
+        let keyed = keyed(&file, &key);
 
         let pool = SqlitePool::connect_with(keyed.clone()).await.unwrap();
         execute_on(&pool, "CREATE TABLE t (s TEXT)", vec![]).await.unwrap();
@@ -290,12 +401,64 @@ mod tests {
         assert_eq!(select_on(&pool, "SELECT s FROM t", vec![]).await.unwrap()[0]["s"], serde_json::json!("GEHEIM-1234"));
         pool.close().await;
 
-        let other = SqliteConnectOptions::new().filename(&file).pragma("key", sqlcipher_key(&crate::crypto::random_key()));
+        let other = SqliteConnectOptions::new().filename(&file).pragma("key", sqlcipher_key(&crate::crypto::random_key()).to_string());
         let failed = match SqlitePool::connect_with(other).await {
             Ok(pool) => select_on(&pool, "SELECT s FROM t", vec![]).await.is_err(),
             Err(_) => true,
         };
         assert!(failed, "opened with the wrong key");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn copies_of_a_keyed_database_stay_encrypted() {
+        // `backupDatabaseFile` and the import staging copy are `VACUUM INTO`;
+        // the import swap `ATTACH`es the copy without a KEY clause.
+        let dir = scratch_dir();
+        let key = crypto::random_key();
+        let pool = connect(keyed(&dir.join("main.db"), &key)).await.unwrap();
+        execute_on(&pool, "CREATE TABLE t (s TEXT)", vec![]).await.unwrap();
+        execute_on(&pool, "INSERT INTO t VALUES ('x')", vec![]).await.unwrap();
+        let copy = dir.join("copy.db");
+        execute_on(&pool, &format!("VACUUM INTO '{}'", copy.display()), vec![]).await.unwrap();
+        assert!(!is_plain_sqlite(&copy));
+
+        let attached = dir.join("attached.db");
+        execute_on(&pool, &format!("ATTACH DATABASE '{}' AS a; CREATE TABLE a.u (s TEXT); INSERT INTO a.u VALUES ('y'); DETACH DATABASE a", attached.display()), vec![]).await.unwrap();
+        pool.close().await;
+        assert!(!is_plain_sqlite(&attached));
+
+        let reopened = connect(keyed(&copy, &key)).await.unwrap();
+        assert_eq!(select_on(&reopened, "SELECT s FROM t", vec![]).await.unwrap()[0]["s"], json!("x"));
+        reopened.close().await;
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn the_authorizer_keeps_the_key_out_of_reach() {
+        let dir = scratch_dir();
+        let key = crypto::random_key();
+        let pool = connect(keyed(&dir.join("main.db"), &key)).await.unwrap();
+        execute_on(&pool, "CREATE TABLE t (s TEXT)", vec![]).await.unwrap();
+        for sql in [
+            "PRAGMA rekey = 'other'",
+            "PRAGMA key = 'other'",
+            "PRAGMA hexrekey = '00'",
+            "PRAGMA cipher_plaintext_header_size = 32",
+            "PRAGMA kdf_iter = 1",
+        ] {
+            assert!(execute_on(&pool, sql, vec![]).await.is_err(), "{sql} went through");
+        }
+        let plain = dir.join("plain.db");
+        let export = format!("ATTACH DATABASE '{}' AS p KEY ''; SELECT sqlcipher_export('p')", plain.display());
+        assert!(execute_on(&pool, &export, vec![]).await.is_err());
+        // Das ATTACH darf die Datei anlegen — gefüllt wird sie nicht.
+        assert!(!plain.exists() || !is_plain_sqlite(&plain));
+        // Was erlaubt bleibt.
+        assert!(select_on(&pool, "PRAGMA cipher_version", vec![]).await.is_ok());
+        assert!(select_on(&pool, "PRAGMA table_info(t)", vec![]).await.is_ok());
+        assert!(execute_on(&pool, "PRAGMA foreign_keys = ON", vec![]).await.is_ok());
+        pool.close().await;
         std::fs::remove_dir_all(&dir).ok();
     }
 

@@ -13,7 +13,7 @@ Thanks for your interest in contributing!
 
 **Prerequisites:** Node.js, Rust toolchain, [Tauri prerequisites](https://tauri.app/start/prerequisites/)
 
-The database is SQLCipher, built together with OpenSSL from source, and that build needs Perl. macOS and Linux ship one; on Windows install [Strawberry Perl](https://strawberryperl.com/) (`winget install StrawberryPerl.StrawberryPerl`) — the Perl that comes with Git does not work. The first build takes several minutes longer because of OpenSSL.
+The database is SQLCipher, built together with OpenSSL from source, and that build needs Perl and `make`. macOS and Debian/Ubuntu ship both; Fedora/RHEL need `dnf install perl-core make`; on Windows install [Strawberry Perl](https://strawberryperl.com/) (`winget install StrawberryPerl.StrawberryPerl`) — the Perl that comes with Git does not work. The first build takes several minutes longer because of OpenSSL.
 
 ```bash
 npm install --cache /tmp/npm-emerald-cache

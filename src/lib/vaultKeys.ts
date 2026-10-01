@@ -5,6 +5,10 @@
  * Vault entsperrt ist, und alles, was ihn braucht, nennt nur die Vault-Id.
  * Hier herein reichen nur Passwort und Wiederherstellungsschlüssel — und der
  * Wiederherstellungsschlüssel kommt genau einmal heraus, beim Anlegen.
+ *
+ * `rememberKey`: ob der Schlüssel im Schlüsselbund des Betriebssystems liegen
+ * soll. `undefined` heißt „nicht angefasst" — dann bleibt der Schlüsselbund,
+ * wie er ist. Die Befehle antworten jeweils, ob er danach dort liegt.
  */
 import { invoke } from '@tauri-apps/api/core';
 
@@ -13,15 +17,12 @@ export interface VaultKeyStatus {
   hasDatabase: boolean;
   encrypted: boolean;
   unlocked: boolean;
-  /** Der Schlüssel liegt im Schlüsselbund des Betriebssystems. */
-  remembered: boolean;
 }
 
 /** Fehlertexte aus `keys.rs`, die das Frontend unterscheidet. */
 export const KEY_ERRORS = {
   wrongPassword: 'WRONG_PASSWORD',
   wrongRecoveryKey: 'WRONG_RECOVERY_KEY',
-  locked: 'VAULT_LOCKED',
   passwordTooShort: 'PASSWORD_TOO_SHORT',
 } as const;
 
@@ -36,12 +37,21 @@ export function vaultKeyStatus(vaultId: string): Promise<VaultKeyStatus> {
   return invoke('vault_key_status', { vaultId });
 }
 
-/** Legt `vault.key` an und entsperrt. Liefert den Wiederherstellungsschlüssel. */
-export function createVaultKey(vaultId: string, password: string, rememberKey: boolean): Promise<string> {
+/** Ob es einen Schlüsselbund gibt, in dem sich ein Schlüssel merken lässt. */
+export function keychainAvailable(): Promise<boolean> {
+  return invoke('keychain_available');
+}
+
+/** Legt `vault.key` für einen neuen Vault an und entsperrt ihn. */
+export function createVaultKey(
+  vaultId: string,
+  password: string,
+  rememberKey: boolean | undefined,
+): Promise<{ recoveryKey: string; remembered: boolean }> {
   return invoke('vault_create_key', { vaultId, password, rememberKey });
 }
 
-export function unlockVault(vaultId: string, password: string, rememberKey: boolean): Promise<void> {
+export function unlockVault(vaultId: string, password: string, rememberKey: boolean | undefined): Promise<boolean> {
   return invoke('vault_unlock', { vaultId, password, rememberKey });
 }
 
@@ -50,16 +60,13 @@ export function unlockRemembered(vaultId: string): Promise<boolean> {
   return invoke('vault_unlock_remembered', { vaultId });
 }
 
-export function recoverVault(vaultId: string, recoveryKey: string, newPassword: string, rememberKey: boolean): Promise<void> {
+export function recoverVault(
+  vaultId: string,
+  recoveryKey: string,
+  newPassword: string,
+  rememberKey: boolean | undefined,
+): Promise<boolean> {
   return invoke('vault_recover', { vaultId, recoveryKey, newPassword, rememberKey });
-}
-
-export function changeVaultPassword(vaultId: string, currentPassword: string, newPassword: string): Promise<void> {
-  return invoke('vault_change_password', { vaultId, currentPassword, newPassword });
-}
-
-export function setVaultRemembered(vaultId: string, rememberKey: boolean): Promise<void> {
-  return invoke('vault_set_remembered', { vaultId, rememberKey });
 }
 
 export function lockVault(vaultId: string): Promise<void> {

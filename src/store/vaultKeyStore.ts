@@ -11,8 +11,6 @@ export type VaultKeyRequest = {
   kind: 'create' | 'unlock';
   vaultId: string;
   vaultName: string;
-  /** Ob „Abbrechen" angeboten wird. */
-  cancellable: boolean;
 };
 
 interface VaultKeyStore {
@@ -71,21 +69,25 @@ function ask(request: VaultKeyRequest): Promise<void> {
  *
  * Ein neuer Vault (noch keine `emerald.db`) bekommt hier sein Passwort, ein
  * gesperrter wird mit dem gemerkten Schlüssel entsperrt oder fragt nach dem
- * Passwort. Endet mit {@link VAULT_KEY_CANCELLED}, wenn der Nutzer abbricht.
+ * Passwort. Endet mit {@link VAULT_KEY_CANCELLED}, wenn der Nutzer abbricht;
+ * ein fehlender Vault-Ordner scheitert schon an der Statusabfrage.
  *
  * Start, Wechsel, Anlegen, Öffnen und der Import als neuer Vault laufen alle
  * hier durch, weil sie alle in `openActiveVault` bzw. dem Start in `AppShell`
- * münden.
+ * münden. Rust sichert dasselbe ab: ohne Schlüssel legt `db_load` keine
+ * Datenbank an.
  */
-export async function ensureVaultReady(vault: { id: string; name: string }, cancellable = true): Promise<void> {
+export async function ensureVaultReady(vault: { id: string; name: string }): Promise<void> {
   const status = await vaultKeyStatus(vault.id);
   if (status.encrypted) {
     if (status.unlocked) return;
-    if (status.remembered && (await unlockRemembered(vault.id).catch(() => false))) return;
-    return ask({ kind: 'unlock', vaultId: vault.id, vaultName: vault.name, cancellable });
+    // Ein Schlüsselbund, der nicht antwortet, ist kein Grund zum Scheitern —
+    // dann eben das Passwort.
+    if (await unlockRemembered(vault.id).catch(() => false)) return;
+    return ask({ kind: 'unlock', vaultId: vault.id, vaultName: vault.name });
   }
   if (!status.hasDatabase) {
-    return ask({ kind: 'create', vaultId: vault.id, vaultName: vault.name, cancellable });
+    return ask({ kind: 'create', vaultId: vault.id, vaultName: vault.name });
   }
   // Ein bestehender, unverschlüsselter Vault öffnet vorerst wie bisher.
 }

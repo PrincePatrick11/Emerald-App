@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import Button from './Button';
@@ -17,6 +17,14 @@ interface ModalProps {
   dismissible?: boolean;
 }
 
+/**
+ * Die offenen Modals, das zuletzt geöffnete oben. Escape gehört nur dem
+ * obersten — sonst schlösse ein Druck über einem zweiten Modal (das
+ * Entsperren über dem Vault-Fenster) beide. Ein nicht schließbares oberes
+ * Modal schluckt Escape: das darunter darf dann auch nicht gehen.
+ */
+const openModals: symbol[] = [];
+
 export default function Modal({
   title,
   onClose,
@@ -27,14 +35,23 @@ export default function Modal({
   className,
   dismissible = true,
 }: ModalProps) {
+  const [self] = useState(() => Symbol('modal'));
+  useEffect(() => {
+    openModals.push(self);
+    return () => {
+      const at = openModals.lastIndexOf(self);
+      if (at !== -1) openModals.splice(at, 1);
+    };
+  }, [self]);
+
   useEffect(() => {
     if (!dismissible) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && openModals[openModals.length - 1] === self) onClose();
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [onClose, dismissible]);
+  }, [onClose, dismissible, self]);
 
   // Ein Modal ohne Ausweg darf die Titelleiste nicht verdecken. Auf Windows
   // und Linux laeuft das Fenster ohne Systemdekoration — die Leiste *ist* dort

@@ -645,7 +645,12 @@
     "mismatch": "Las contraseñas no coinciden.",
     "wrongPassword": "Contraseña incorrecta.",
     "wrongRecoveryKey": "Esta clave de recuperación no pertenece a esta bóveda.",
-    "failed": "No ha funcionado. Inténtalo de nuevo."
+    "unlockFailed": "No se pudo desbloquear la bóveda. Inténtalo de nuevo.",
+    "recoverFailed": "No se pudo establecer la nueva contraseña. Inténtalo de nuevo.",
+    "createFailed": "No se pudo cifrar la bóveda. Inténtalo de nuevo.",
+    "rememberUnavailable": "Este sistema no tiene un llavero en el que recordar la clave.",
+    "rememberFailed": "El llavero del sistema operativo no ha aceptado recordar la clave. La bóveda está abierta, pero Emerald volverá a pedir la contraseña la próxima vez.",
+    "continue": "Continuar"
   },
   "settings": {
     "language": "Idioma",

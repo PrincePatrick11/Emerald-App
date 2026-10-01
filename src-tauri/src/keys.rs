@@ -15,8 +15,6 @@
 //! webview; commands take a vault id and look the key up.
 
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
-use hmac::{Hmac, Mac};
-use sha2::Sha256;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
@@ -40,6 +38,7 @@ pub const WRONG_RECOVERY_KEY: &str = "WRONG_RECOVERY_KEY";
 pub const VAULT_LOCKED: &str = "VAULT_LOCKED";
 pub const VAULT_ALREADY_ENCRYPTED: &str = "VAULT_ALREADY_ENCRYPTED";
 pub const VAULT_NOT_ENCRYPTED: &str = "VAULT_NOT_ENCRYPTED";
+pub const VAULT_NOT_NEW: &str = "VAULT_NOT_NEW";
 pub const PASSWORD_TOO_SHORT: &str = "PASSWORD_TOO_SHORT";
 
 /// The frontend asks for more; this is the floor no caller gets under.
@@ -61,12 +60,17 @@ pub struct KdfParams {
 pub const DEFAULT_KDF: KdfParams = KdfParams { memory_kib: 64 * 1024, iterations: 3, parallelism: 1 };
 
 /// A file from elsewhere must not be able to make unlocking take minutes or
-/// gigabytes. Anything above this is refused as damaged.
-const MAX_KDF_MEMORY_KIB: u32 = 1024 * 1024;
-const MAX_KDF_ITERATIONS: u32 = 16;
+/// gigabytes. Anything above this is refused as damaged — well above the
+/// default, so it can still grow.
+const MAX_KDF_MEMORY_KIB: u32 = 256 * 1024;
+const MAX_KDF_ITERATIONS: u32 = 8;
+const MAX_KDF_PARALLELISM: u32 = 4;
 
 fn derive_key(password: &str, salt: &[u8], params: KdfParams) -> Result<Key, String> {
-    if params.memory_kib > MAX_KDF_MEMORY_KIB || params.iterations > MAX_KDF_ITERATIONS || params.parallelism > 16 {
+    if params.memory_kib > MAX_KDF_MEMORY_KIB
+        || params.iterations > MAX_KDF_ITERATIONS
+        || params.parallelism > MAX_KDF_PARALLELISM
+    {
         return Err("vault.key: key derivation parameters out of range".into());
     }
     let argon = argon2::Argon2::new(
@@ -160,9 +164,7 @@ pub struct KeyFile {
 
 /// The `check` value for a vault key.
 fn key_check(key: &Key) -> String {
-    let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(key.as_ref()).expect("any key length");
-    mac.update(CHECK_LABEL);
-    B64.encode(mac.finalize().into_bytes())
+    B64.encode(crypto::keyed_hash(key, CHECK_LABEL))
 }
 
 fn check_password(password: &str) -> Result<(), String> {
@@ -220,13 +222,14 @@ impl KeyFile {
             .ok_or_else(|| WRONG_RECOVERY_KEY.to_string())
     }
 
-    /// The same file with a new password wrap. The recovery wrap stays.
+    /// The same file with a new password wrap, under today's parameters — not
+    /// the file's, which may come from anywhere. The recovery wrap stays.
     pub fn with_password(&self, vault_key: &Key, password: &str) -> Result<KeyFile, String> {
         check_password(password)?;
         let salt: [u8; 16] = crypto::random_bytes();
-        let kek = derive_key(password, &salt, DEFAULT_KDF.max_with(self.kdf))?;
+        let kek = derive_key(password, &salt, DEFAULT_KDF)?;
         Ok(KeyFile {
-            kdf: DEFAULT_KDF.max_with(self.kdf),
+            kdf: DEFAULT_KDF,
             salt: B64.encode(salt),
             password: wrap(&kek, vault_key),
             ..self.clone()
@@ -253,17 +256,6 @@ impl KeyFile {
     }
 }
 
-impl KdfParams {
-    /// Never weaker than what a file already used.
-    fn max_with(self, other: KdfParams) -> KdfParams {
-        KdfParams {
-            memory_kib: self.memory_kib.max(other.memory_kib).min(MAX_KDF_MEMORY_KIB),
-            iterations: self.iterations.max(other.iterations).min(MAX_KDF_ITERATIONS),
-            parallelism: self.parallelism.max(other.parallelism),
-        }
-    }
-}
-
 /// Reads `vault.key` from a vault directory. `Ok(None)` when there is none —
 /// an unencrypted vault.
 pub fn read_key_file(dir: &Path) -> Result<Option<KeyFile>, String> {
@@ -283,9 +275,11 @@ fn write_key_file(dir: &Path, file: &KeyFile) -> Result<(), String> {
     vault::write_atomic(dir, KEY_FILE, KEY_TEMP_FILE, file.to_json().as_bytes())
 }
 
-/// Whether a vault directory holds an encrypted vault.
+/// Whether a vault directory holds an encrypted vault. Like [`read_key_file`],
+/// a link does not count as `vault.key` — but it does not count as "no key"
+/// either, so it is not followed and still reads as encrypted.
 pub fn is_encrypted_dir(dir: &Path) -> bool {
-    dir.join(KEY_FILE).exists()
+    std::fs::symlink_metadata(dir.join(KEY_FILE)).is_ok()
 }
 
 // ── Keys held while vaults are unlocked ──────────────────────────────────────
@@ -312,8 +306,9 @@ impl VaultKeys {
     }
 }
 
-/// The key a vault's files are encrypted with: `Ok(None)` for an unencrypted
-/// vault, [`VAULT_LOCKED`] for an encrypted one that is not unlocked.
+/// The vault key of a vault: `Ok(None)` for an unencrypted vault,
+/// [`VAULT_LOCKED`] for an encrypted one that is not unlocked. Callers derive
+/// what they need from it with [`crypto::subkey`].
 pub fn key_for(app: &tauri::AppHandle, vault_id: &str) -> Result<Option<Key>, String> {
     let dir = vault::vault_dir(app, vault_id)?;
     if !is_encrypted_dir(&dir) {
@@ -351,11 +346,20 @@ pub fn forget(vault_id: &str) -> Result<(), String> {
     }
 }
 
-fn apply_remember(vault_id: &str, key: &Key, wanted: bool) -> Result<(), String> {
-    if wanted {
-        remember(vault_id, key)
-    } else {
-        forget(vault_id)
+/// Applies the "remember on this device" switch. `None`: the user left it
+/// alone, so the keychain is not touched — a keychain that failed to answer
+/// once must not cost a valid entry. Returns whether the key is remembered
+/// afterwards, so the dialog can say when the keychain refused.
+fn apply_remember(vault_id: &str, key: &Key, wanted: Option<bool>) -> bool {
+    match wanted {
+        None => false,
+        Some(true) => remember(vault_id, key)
+            .map_err(|e| eprintln!("[keys] keychain: {e}"))
+            .is_ok(),
+        Some(false) => {
+            forget(vault_id).unwrap_or_else(|e| eprintln!("[keys] keychain: {e}"));
+            false
+        }
     }
 }
 
@@ -375,44 +379,74 @@ pub struct KeyStatus {
     has_database: bool,
     encrypted: bool,
     unlocked: bool,
-    remembered: bool,
 }
 
+/// Where a vault stands. Never touches the keychain — that is
+/// [`vault_unlock_remembered`]'s job, once, when it matters. Fails like the
+/// other storage commands when the vault's folder is gone.
 #[tauri::command]
 pub fn vault_key_status(app: tauri::AppHandle, vault_id: String) -> Result<KeyStatus, String> {
     let dir = vault::vault_dir(&app, &vault_id)?;
+    vault::directory_state(&dir)?;
     let encrypted = is_encrypted_dir(&dir);
     Ok(KeyStatus {
         has_database: dir.join(vault::DB_FILE).is_file(),
         encrypted,
         unlocked: encrypted && app.state::<VaultKeys>().get(&vault_id).is_some(),
-        remembered: encrypted && remembered(&vault_id).is_some(),
     })
 }
 
-/// Creates `vault.key` for a vault without one and unlocks it. Returns the
-/// recovery key — the only time it ever leaves Rust.
+/// Whether this system has a keychain to remember keys in. A Linux desktop
+/// without a Secret Service has none; the dialog then does not offer it.
+#[tauri::command]
+pub async fn keychain_available() -> bool {
+    tauri::async_runtime::spawn_blocking(|| {
+        let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, "probe") else {
+            return false;
+        };
+        matches!(entry.get_password(), Ok(_) | Err(keyring::Error::NoEntry))
+    })
+    .await
+    .unwrap_or(false)
+}
+
+/// Serialises key creation: between "is there a key or a database?" and
+/// writing `vault.key`, nothing else may create either.
+static CREATE_LOCK: Mutex<()> = Mutex::new(());
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreatedKey {
+    /// The recovery key — the only time it ever leaves Rust.
+    recovery_key: Zeroizing<String>,
+    remembered: bool,
+}
+
+/// Creates `vault.key` for a new vault and unlocks it. Refuses a vault that is
+/// encrypted already, and one that has a database: that database is plain,
+/// and a key would only make it unopenable.
 #[tauri::command]
 pub async fn vault_create_key(
     app: tauri::AppHandle,
     vault_id: String,
     password: Zeroizing<String>,
-    remember_key: bool,
-) -> Result<Zeroizing<String>, String> {
+    remember_key: Option<bool>,
+) -> Result<CreatedKey, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let dir = vault::vault_dir(&app, &vault_id)?;
         vault::directory_state(&dir)?;
+        let _guard = CREATE_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         if is_encrypted_dir(&dir) {
             return Err(VAULT_ALREADY_ENCRYPTED.to_string());
         }
-        let (file, vault_key, recovery) = KeyFile::create(&password, DEFAULT_KDF)?;
-        write_key_file(&dir, &file)?;
-        if remember_key {
-            // The vault is usable without it; the user is asked again next time.
-            remember(&vault_id, &vault_key).unwrap_or_else(|e| eprintln!("[keys] keychain: {e}"));
+        if dir.join(vault::DB_FILE).exists() {
+            return Err(VAULT_NOT_NEW.to_string());
         }
+        let (file, vault_key, recovery_key) = KeyFile::create(&password, DEFAULT_KDF)?;
+        write_key_file(&dir, &file)?;
+        let remembered = apply_remember(&vault_id, &vault_key, remember_key);
         app.state::<VaultKeys>().insert(&vault_id, vault_key);
-        Ok(recovery)
+        Ok(CreatedKey { recovery_key, remembered })
     })
     .await
     .map_err(|e| e.to_string())?
@@ -424,19 +458,20 @@ fn load_key_file(app: &tauri::AppHandle, vault_id: &str) -> Result<(std::path::P
     Ok((dir, file))
 }
 
+/// Unlocks with the password. Returns whether the key is now remembered.
 #[tauri::command]
 pub async fn vault_unlock(
     app: tauri::AppHandle,
     vault_id: String,
     password: Zeroizing<String>,
-    remember_key: bool,
-) -> Result<(), String> {
+    remember_key: Option<bool>,
+) -> Result<bool, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let (_, file) = load_key_file(&app, &vault_id)?;
         let key = file.unlock_with_password(&password)?;
-        apply_remember(&vault_id, &key, remember_key).unwrap_or_else(|e| eprintln!("[keys] keychain: {e}"));
+        let remembered = apply_remember(&vault_id, &key, remember_key);
         app.state::<VaultKeys>().insert(&vault_id, key);
-        Ok(())
+        Ok(remembered)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -444,38 +479,44 @@ pub async fn vault_unlock(
 
 /// Unlocks with the key remembered in the OS keychain. `false` when there is
 /// none or it does not fit this vault (the stale entry is then removed).
+/// Off the main thread: a keychain may ask the user first.
 #[tauri::command]
-pub fn vault_unlock_remembered(app: tauri::AppHandle, vault_id: String) -> Result<bool, String> {
-    let (_, file) = load_key_file(&app, &vault_id)?;
-    match remembered(&vault_id) {
-        Some(key) if file.accepts(&key) => {
-            app.state::<VaultKeys>().insert(&vault_id, key);
-            Ok(true)
+pub async fn vault_unlock_remembered(app: tauri::AppHandle, vault_id: String) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let (_, file) = load_key_file(&app, &vault_id)?;
+        match remembered(&vault_id) {
+            Some(key) if file.accepts(&key) => {
+                app.state::<VaultKeys>().insert(&vault_id, key);
+                Ok(true)
+            }
+            Some(_) => {
+                forget(&vault_id).ok();
+                Ok(false)
+            }
+            None => Ok(false),
         }
-        Some(_) => {
-            forget(&vault_id).ok();
-            Ok(false)
-        }
-        None => Ok(false),
-    }
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
-/// Sets a new password with the recovery key and unlocks the vault.
+/// Sets a new password with the recovery key and unlocks the vault. Returns
+/// whether the key is now remembered.
 #[tauri::command]
 pub async fn vault_recover(
     app: tauri::AppHandle,
     vault_id: String,
     recovery_key: Zeroizing<String>,
     new_password: Zeroizing<String>,
-    remember_key: bool,
-) -> Result<(), String> {
+    remember_key: Option<bool>,
+) -> Result<bool, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let (dir, file) = load_key_file(&app, &vault_id)?;
         let key = file.unlock_with_recovery_key(&recovery_key)?;
         write_key_file(&dir, &file.with_password(&key, &new_password)?)?;
-        apply_remember(&vault_id, &key, remember_key).unwrap_or_else(|e| eprintln!("[keys] keychain: {e}"));
+        let remembered = apply_remember(&vault_id, &key, remember_key);
         app.state::<VaultKeys>().insert(&vault_id, key);
-        Ok(())
+        Ok(remembered)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -497,19 +538,24 @@ pub async fn vault_change_password(
     .map_err(|e| e.to_string())?
 }
 
-/// Turns "remember on this device" on or off for an unlocked vault.
+/// Turns "remember on this device" on or off for an unlocked vault. Returns
+/// whether the key is remembered afterwards.
 #[tauri::command]
-pub fn vault_set_remembered(app: tauri::AppHandle, vault_id: String, remember_key: bool) -> Result<(), String> {
+pub async fn vault_set_remembered(app: tauri::AppHandle, vault_id: String, remember_key: bool) -> Result<bool, String> {
     let key = app.state::<VaultKeys>().get(&vault_id).ok_or_else(|| VAULT_LOCKED.to_string())?;
-    apply_remember(&vault_id, &key, remember_key)
+    tauri::async_runtime::spawn_blocking(move || apply_remember(&vault_id, &key, Some(remember_key)))
+        .await
+        .map_err(|e| e.to_string())
 }
 
-/// Drops the vault's key from memory and closes its databases. The
-/// remembered key, if any, stays — locking is not forgetting.
+/// Drops the vault's key from memory and closes its databases. The key goes
+/// first: a `db_load` racing this one then fails instead of opening a pool
+/// that outlives the lock (`db_load` checks again before it keeps its pool).
+/// The remembered key, if any, stays — locking is not forgetting.
 #[tauri::command]
 pub async fn vault_lock(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
-    crate::db::close_vault(&app, &vault_id).await;
     app.state::<VaultKeys>().remove(&vault_id);
+    crate::db::close_vault(&app, &vault_id).await;
     Ok(())
 }
 

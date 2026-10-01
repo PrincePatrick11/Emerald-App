@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Copy, KeyRound, Loader2, Smartphone } from 'lucide-react';
+import { Check, Copy, KeyRound, Loader2, ShieldCheck, Smartphone } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { SwitchRow } from '../ui/Switch';
 import { useVaultKeyStore, type VaultKeyRequest } from '../../store/vaultKeyStore';
 import {
-  KEY_ERRORS, MIN_PASSWORD_LENGTH, createVaultKey, keyErrorOf, recoverVault, unlockVault,
+  KEY_ERRORS, MIN_PASSWORD_LENGTH, createVaultKey, keyErrorOf, keychainAvailable, recoverVault, unlockVault,
 } from '../../lib/vaultKeys';
 import { hideSplash } from '../../lib/splash';
 
@@ -24,7 +24,14 @@ export default function VaultKeyDialog() {
   return <VaultKeyDialogBody key={`${request.kind}:${request.vaultId}`} request={request} />;
 }
 
-type Step = 'unlock' | 'recover' | 'create' | 'showRecovery';
+/** `rememberFailed`: entsperrt, aber der Schlüsselbund hat das Merken abgelehnt. */
+type Step = 'unlock' | 'recover' | 'create' | 'showRecovery' | 'rememberFailed';
+
+const FAILED_KEY = {
+  unlock: 'vaultKey.unlockFailed',
+  recover: 'vaultKey.recoverFailed',
+  create: 'vaultKey.createFailed',
+} as const;
 
 function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   const { t } = useTranslation();
@@ -36,10 +43,13 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   const [repeat, setRepeat] = useState('');
   const [recoveryInput, setRecoveryInput] = useState('');
   // Beim Anlegen an — der übliche Wunsch auf dem eigenen Rechner. Beim
-  // Entsperren aus: wäre der Schlüssel gemerkt, wäre der Dialog gar nicht
-  // erschienen, also hat sich hier jemand dagegen entschieden.
+  // Entsperren aus, aber nur angezeigt: solange niemand den Schalter bewegt,
+  // bleibt der Schlüsselbund, wie er ist (`rememberTouched`).
   const [remember, setRemember] = useState(request.kind === 'create');
+  const [rememberTouched, setRememberTouched] = useState(request.kind === 'create');
+  const [keychain, setKeychain] = useState(true);
   const [recoveryKey, setRecoveryKey] = useState('');
+  const [rememberRefused, setRememberRefused] = useState(false);
   const [stored, setStored] = useState(false);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -49,8 +59,16 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   // der läge sonst über der Frage.
   useEffect(hideSplash, []);
 
+  useEffect(() => {
+    let live = true;
+    keychainAvailable().then((available) => { if (live) setKeychain(available); }, () => {});
+    return () => { live = false; };
+  }, []);
+
   // Beim Wechsel zwischen den Schritten keine Fehlermeldung des vorigen mitnehmen.
   useEffect(() => { setError(''); }, [step]);
+
+  const rememberWish = keychain && rememberTouched ? remember : undefined;
 
   const newPasswordError = (): string => {
     if (password.length < MIN_PASSWORD_LENGTH) return t('vaultKey.tooShort', { count: MIN_PASSWORD_LENGTH });
@@ -58,7 +76,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
     return '';
   };
 
-  async function attempt(action: () => Promise<void>) {
+  async function attempt(kind: keyof typeof FAILED_KEY, action: () => Promise<void>) {
     if (busy) return;
     setBusy(true);
     setError('');
@@ -71,30 +89,36 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
       else if (code === KEY_ERRORS.passwordTooShort) setError(t('vaultKey.tooShort', { count: MIN_PASSWORD_LENGTH }));
       else {
         console.error('[vault-key]', err);
-        setError(t('vaultKey.failed'));
+        setError(t(FAILED_KEY[kind]));
       }
     } finally {
       setBusy(false);
     }
   }
 
-  const submitUnlock = () => attempt(async () => {
+  /** Nach dem Entsperren: weiter — oder erst sagen, dass das Merken nicht ging. */
+  const unlocked = (remembered: boolean) => {
+    if (rememberWish && !remembered) setStep('rememberFailed');
+    else finish();
+  };
+
+  const submitUnlock = () => attempt('unlock', async () => {
     if (!password) return;
-    await unlockVault(request.vaultId, password, remember);
-    finish();
+    unlocked(await unlockVault(request.vaultId, password, rememberWish));
   });
 
-  const submitRecover = () => attempt(async () => {
+  const submitRecover = () => attempt('recover', async () => {
     const problem = newPasswordError();
     if (problem) { setError(problem); return; }
-    await recoverVault(request.vaultId, recoveryInput, password, remember);
-    finish();
+    unlocked(await recoverVault(request.vaultId, recoveryInput, password, rememberWish));
   });
 
-  const submitCreate = () => attempt(async () => {
+  const submitCreate = () => attempt('create', async () => {
     const problem = newPasswordError();
     if (problem) { setError(problem); return; }
-    setRecoveryKey(await createVaultKey(request.vaultId, password, remember));
+    const created = await createVaultKey(request.vaultId, password, rememberWish);
+    setRecoveryKey(created.recoveryKey);
+    setRememberRefused(Boolean(rememberWish) && !created.remembered);
     setPassword('');
     setRepeat('');
     setStep('showRecovery');
@@ -110,7 +134,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   }
 
   const onEnter = (submit: () => void) => (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') submit();
+    if (e.key === 'Enter' && !e.nativeEvent.isComposing) submit();
   };
 
   const title = {
@@ -118,22 +142,29 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
     recover: t('vaultKey.recoverTitle'),
     create: t('vaultKey.createTitle', { name: request.vaultName }),
     showRecovery: t('vaultKey.recoveryTitle'),
+    rememberFailed: t('vaultKey.unlockTitle', { name: request.vaultName }),
   }[step];
 
-  // Nach dem Anlegen ist der Vault schon verschlüsselt — Abbrechen hieße dann
-  // nur noch, den Wiederherstellungsschlüssel ungesehen wegzuklicken.
-  const canCancel = request.cancellable && step !== 'showRecovery';
+  // Abbrechen geht nur, solange noch nichts geschehen ist: nach dem Anlegen
+  // hieße es, den Wiederherstellungsschlüssel ungesehen wegzuklicken, und
+  // während eine Aktion läuft, käme Rust mit ihr trotzdem durch.
+  const cancelShown = step === 'unlock' || step === 'recover' || step === 'create';
+
+  const busyIcon = busy ? <Loader2 size={16} className="animate-spin" /> : null;
 
   const rememberRow = (
     <SwitchRow
       variant="panel"
       icon={Smartphone}
       label={t('vaultKey.remember')}
-      hint={t('vaultKey.rememberHint')}
-      checked={remember}
-      onChange={setRemember}
+      hint={keychain ? t('vaultKey.rememberHint') : t('vaultKey.rememberUnavailable')}
+      checked={keychain && remember}
+      disabled={!keychain || busy}
+      onChange={(next) => { setRemember(next); setRememberTouched(true); }}
     />
   );
+
+  const errorLine = error ? <p className="text-xs text-danger" role="alert">{error}</p> : null;
 
   const passwordFields = (submit: () => void, autoFocus: boolean) => (
     <>
@@ -144,6 +175,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
           autoComplete="new-password"
           className="input-field settings-field"
           value={password}
+          disabled={busy}
           onChange={(e) => setPassword(e.target.value)}
           onKeyDown={onEnter(submit)}
         />
@@ -154,6 +186,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
           autoComplete="new-password"
           className="input-field settings-field"
           value={repeat}
+          disabled={busy}
           onChange={(e) => setRepeat(e.target.value)}
           onKeyDown={onEnter(submit)}
         />
@@ -175,21 +208,26 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
             autoComplete="current-password"
             className="input-field settings-field"
             value={password}
+            disabled={busy}
+            aria-invalid={Boolean(error) || undefined}
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={onEnter(submitUnlock)}
           />
         </Field>
         {rememberRow}
         <div>
-          <Button variant="ghost" className="text-xs" onClick={() => setStep('recover')}>
+          {/* Ein Link, kein Knopf: bündig mit den Feldern statt um die
+              Innenabstände von `.btn-ghost` eingerückt. */}
+          <Button variant="ghost" className="text-xs -ml-1.5" disabled={busy} onClick={() => setStep('recover')}>
             {t('vaultKey.forgot')}
           </Button>
         </div>
+        {errorLine}
       </>
     );
     actions = (
-      <Button variant="primary" disabled={!password || busy} onClick={submitUnlock}>
-        {busy ? <Loader2 size={16} className="animate-spin" /> : <KeyRound size={16} />}
+      <Button tone="jade" disabled={!password || busy} onClick={submitUnlock}>
+        {busyIcon ?? <KeyRound size={14} />}
         {t('vaultKey.unlock')}
       </Button>
     );
@@ -204,18 +242,20 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
             spellCheck={false}
             className="input-field settings-field font-mono resize-none"
             value={recoveryInput}
+            disabled={busy}
             onChange={(e) => setRecoveryInput(e.target.value)}
           />
         </Field>
         {passwordFields(submitRecover, false)}
         {rememberRow}
+        {errorLine}
       </>
     );
     actions = (
       <>
-        <Button variant="secondary" onClick={() => setStep('unlock')}>{t('vaultKey.back')}</Button>
-        <Button variant="primary" disabled={!recoveryInput.trim() || !password || busy} onClick={submitRecover}>
-          {busy && <Loader2 size={16} className="animate-spin" />}
+        <Button tone="neutral" disabled={busy} onClick={() => setStep('unlock')}>{t('vaultKey.back')}</Button>
+        <Button tone="jade" disabled={!recoveryInput.trim() || !password || busy} onClick={submitRecover}>
+          {busyIcon}
           {t('vaultKey.recoverSubmit')}
         </Button>
       </>
@@ -226,27 +266,30 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
         <p className="text-sm text-secondary">{t('vaultKey.createHint')}</p>
         {passwordFields(submitCreate, true)}
         {rememberRow}
+        {errorLine}
       </>
     );
     actions = (
-      <Button variant="primary" disabled={!password || busy} onClick={submitCreate}>
-        {busy && <Loader2 size={16} className="animate-spin" />}
+      <Button tone="jade" disabled={!password || busy} onClick={submitCreate}>
+        {busyIcon}
         {t('vaultKey.createSubmit')}
       </Button>
     );
-  } else {
+  } else if (step === 'showRecovery') {
     body = (
       <>
         <p className="text-sm text-secondary">{t('vaultKey.recoveryHint')}</p>
-        <div className="settings-row font-mono text-sm select-all break-all">{recoveryKey}</div>
+        <div className="input-field settings-field font-mono select-all break-all">{recoveryKey}</div>
         <div>
           <Button variant="secondary" onClick={copyRecoveryKey}>
             {copied ? <Check size={14} /> : <Copy size={14} />}
             {copied ? t('vaultKey.copied') : t('vaultKey.copy')}
           </Button>
         </div>
+        {rememberRefused && <p className="text-xs text-secondary" role="status">{t('vaultKey.rememberFailed')}</p>}
         <SwitchRow
           variant="panel"
+          icon={ShieldCheck}
           label={t('vaultKey.stored')}
           checked={stored}
           onChange={setStored}
@@ -254,8 +297,15 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
       </>
     );
     actions = (
-      <Button variant="primary" disabled={!stored} onClick={finish}>
+      <Button tone="jade" disabled={!stored} onClick={finish}>
         {t('vaultKey.done')}
+      </Button>
+    );
+  } else {
+    body = <p className="text-sm text-secondary" role="status">{t('vaultKey.rememberFailed')}</p>;
+    actions = (
+      <Button tone="jade" autoFocus onClick={finish}>
+        {t('vaultKey.continue')}
       </Button>
     );
   }
@@ -264,14 +314,13 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
     <Modal
       title={title}
       onClose={cancel}
-      dismissible={canCancel}
+      dismissible={cancelShown && !busy}
       widthClassName="w-[440px]"
       bodyClassName="px-5 py-4 space-y-4"
     >
       {body}
-      {error && <p className="text-xs text-danger">{error}</p>}
       <div className="flex justify-end gap-2 pt-1">
-        {canCancel && <Button variant="secondary" onClick={cancel}>{t('vault.cancel')}</Button>}
+        {cancelShown && <Button tone="neutral" disabled={busy} onClick={cancel}>{t('common.cancel')}</Button>}
         {actions}
       </div>
     </Modal>

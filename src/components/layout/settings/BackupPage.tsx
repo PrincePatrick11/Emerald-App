@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { VAULT_KEY_CANCELLED } from '../../../store/vaultKeyStore';
+import { keyErrorOf } from '../../../lib/vaultKeys';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Download, FolderOpen, Upload } from 'lucide-react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
@@ -171,7 +173,8 @@ export default function BackupPage() {
       setImportDone(true);
       setImportedFile(null);
     } catch (err) {
-      setImportError(String(err));
+      // Beim Passwort des neuen Vaults abgebrochen: kein Fehler, nur kein Import.
+      if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) setImportError(String(err));
     } finally {
       setImporting(false);
     }
