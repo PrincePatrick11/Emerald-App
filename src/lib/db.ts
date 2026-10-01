@@ -1264,7 +1264,7 @@ export const MIGRATIONS: Migration[] = [
     // Spalten: Rechner, Zeichnung und Ladung werden Blöcke im Inhalt, die
     // Zeichnung eine Bilddatei. Vorher eine Sicherung — die Zeichnungen
     // wandern aus der Datenbank in Dateien. Ablauf in `migrateLegacySigils.ts`;
-    // was hier am Speichern scheitert, holt `getDb` bei jedem Öffnen nach.
+    // was hier am Speichern scheitert, holt v49 (`unifyEntries.ts`) nach.
     version: 42,
     name: 'sigils_to_blocks',
     up: async (db) => {

@@ -16,8 +16,8 @@ import { GroupDivider } from '../ui/Dashboard';
 import EmptyState from '../ui/EmptyState';
 import { AltarItemTile } from './AltarItemTile';
 
-/** Der Abschnitt als Ganzes ist eine Einstellung, keine Arbeitsgeste — anders
- *  als die Kategorien darin (useCollapsedSet, bewusst nicht persistiert). */
+/** Der Abschnitt als Ganzes klappt mit einem eigenen Schalter zu, unabhängig
+ *  von den Kategorien darin (useCollapsedSet); beide bleiben je Vault erhalten. */
 const SECTION_COLLAPSED_KEY = 'altar-library-collapsed';
 
 interface Props {

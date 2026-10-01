@@ -8,11 +8,6 @@
 //! and call `createPDFWithConfiguration:completionHandler:`. The
 //! completion handler runs on a background queue; we bridge it back to
 //! async with a second oneshot wrapped in `Arc<Mutex<Option<_>>>`.
-//!
-//! ⚠️  Untested in this session — written blind. The Windows path is
-//! tested; this one needs a real Mac to verify the AppKit threading
-//! assumptions and the exact `objc2-web-kit` API surface for the
-//! `createPDFWithConfiguration:` call.
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

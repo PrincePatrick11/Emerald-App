@@ -913,9 +913,10 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 }
 
-/* Unlayered on purpose: in Parchment a base-layer rule paints border-color on
-   every element, and an unlayered declaration beats a layered one regardless of
-   specificity — inside @layer components the accent edge below never rendered. */
+/* Outside @layer on purpose: Tailwind 3 hoists @layer components to the top of
+   the output, so the unlayered theme overrides further down would win over the
+   accent edge at equal specificity. Here it comes after them (design.md,
+   Specificity Traps). */
 .vault-card.vault-card-active {
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
