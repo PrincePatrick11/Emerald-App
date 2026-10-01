@@ -111,13 +111,9 @@ function resolveInternalLinkIcons(html: string): string {
  * the visible chip elements (icon `<img>` or `<span>` + label `<span>`) and
  * strips the now-redundant `data-icon` / `data-label` attributes.
  *
- * This used to run as an inline `<script>` in the export HTML
- * (`TRANSFORM_LINKS_JS`). The native-webview PDF path drives the app's own
- * webview, which applies the app CSP — `script-src 'self'` blocks inline
- * scripts. Doing the transformation in TypeScript here keeps the rendered
- * chip identical to the live app and lets us drop the inline script (and
- * the `img.emoji` rasterization CSS that came with the old wkhtmltopdf
- * path) entirely.
+ * Runs in TypeScript before the HTML is handed to `export_pdf`, so the
+ * export document needs no script of its own: it is loaded over `file://`,
+ * where the app CSP does not apply, and stays script-free on purpose.
  */
 function transformInternalLinks(html: string): string {
   const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -313,13 +309,6 @@ const PRINT_CSS = `
   }
 `;
 
-// JS that used to run in the print window to transform internal link
-// nodes into chips. Removed in Phase 4 of the native-webview migration —
-// the equivalent transformation now runs in TypeScript via
-// `transformInternalLinks` before the HTML is handed to the backend,
-// because the new webview's CSP blocks inline scripts. The function is
-// kept (translated to TS) so the rendered chip matches the live app.
-
 // ── PDF export ──────────────────────────────────────────────────────────────
 //
 // Direct PDF write via the platform's own webview. The user picks where
@@ -330,10 +319,8 @@ const PRINT_CSS = `
 export async function exportAsPDF(data: ExportData): Promise<void> {
   const resolvedContent  = resolveInternalLinkIcons(data.content);
   const embeddedContent  = await embedImages(resolvedContent);
-  // Pre-render the internal-link chips in TS — the new webview's CSP
-  // (`script-src 'self'`) blocks inline scripts, so the JS that used to
-  // live in `TRANSFORM_LINKS_JS` now has to run before we hand the HTML
-  // to the backend.
+  // Pre-render the internal-link chips here, so the export document stays
+  // script-free (see `transformInternalLinks`).
   const transformedContent = transformInternalLinks(embeddedContent);
 
   const topBarHtml = buildTopBar(data);

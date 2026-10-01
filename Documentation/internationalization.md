@@ -53,7 +53,7 @@ Skipping step 3 is the most common mistake: the fallback to English makes the om
 
 ## Built-in Category Names
 
-Wiki, Operations, Tasks, and Altar items share one `categories` table (see [`database.md`](database.md#categories)). Only two rows are true built-ins (`is_builtin = 1`): `other` (the fallback) and `sigils` (a new operation in it starts with the sigil blocks). Their `name` column holds a fixed English seed value that must never be displayed directly — the display name always goes through the shared helper:
+Wiki, Operations, Tasks, and Altar items share one `categories` table (see [`database.md`](database.md#categories)). Only one row is a true built-in (`is_builtin = 1`): `sigils` (a new operation in it starts with the sigil blocks). Its `name` column holds a fixed English seed value that must never be displayed directly — the display name always goes through the shared helper:
 
 ```tsx
 // correct — the one rule for all four modules

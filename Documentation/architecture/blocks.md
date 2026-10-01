@@ -76,7 +76,7 @@ The right sidebar and the main area are sibling trees, so `BlockStack` publishes
 
 ### User-built blocks
 
-**Copies, not live links.** The Blocks view (`views/BlocksView.tsx`, on the rail) is a `Dashboard` of `block_definitions` rows (`blockDefinitionStore`) with a read-only "Built-in blocks" section (`BLOCK_PRESETS`) below. `{ type: 'blocks', id }` renders `BlockDefinitionEditor`, a page shaped like an entry in edit mode, its sidebar parts portalled via `SidebarPortal` (see [List Header Portal](editing.md#list-header-portal)); page shell and draft lifecycle (`LibraryPageFrame`, `useDraftPage`) are shared with [Templates](templates.md#templates). The icon is an emoji or an image shrunk to 64px (`useShrunkIcon`), since it travels inside every copy; `BlockGlyph` renders either.
+**Copies, not live links.** The Blocks view (`views/BlocksView.tsx`, on the rail) is a `Dashboard` of `block_definitions` rows (`blockDefinitionStore`) with a read-only "Built-in blocks" section (`BLOCK_PRESETS`) below. `{ type: 'blocks', id }` renders `BlockDefinitionEditor`, a page shaped like an entry in edit mode, its sidebar parts portalled via `SidebarPortal` (see [List Header Portal](editing.md#list-header-portal)); page shell and draft lifecycle (`LibraryPageFrame`, `useDraftPage`) are shared with [the template page](templates.md#the-dashboard-and-the-template-page). The icon is an emoji or an image shrunk to 64px (`useShrunkIcon`), since it travels inside every copy; `BlockGlyph` renders either.
 
 **Definition:** name, icon, elements, display rules (`readHideEmpty`, `readOnly`, plus `showTitle`, which becomes the instance attribute on insert) and a `revision` that rises when something a copy inherits changes (`sameShape`). An element's `defaultValue` and `showTitle` don't count — they only affect copies not yet created.
 
@@ -92,7 +92,7 @@ The right sidebar and the main area are sibling trees, so `BlockStack` publishes
 
 ### Drafts
 
-A block page edits a **draft**; only Done calls `updateDefinition`, so typing in the name doesn't bump every copy's revision. The draft is mirrored into `useBlockDraftStore` (`store/draftStore.ts`, see [Templates](templates.md#templates)) rather than view state, since `MainArea` unmounts a view on module switch; the list reads it for its "Unsaved" marker.
+A block page edits a **draft**; only Done calls `updateDefinition`, so typing in the name doesn't bump every copy's revision. The draft is mirrored into `useBlockDraftStore` (`store/draftStore.ts`, see [the template page](templates.md#the-dashboard-and-the-template-page)) rather than view state, since `MainArea` unmounts a view on module switch; the list reads it for its "Unsaved" marker.
 
 Drafts are written along into the vault's `drafts.json` (debounced, `write_vault_drafts`), so a crash loses nothing that was typed.
 

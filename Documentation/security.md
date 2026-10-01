@@ -44,7 +44,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 | Command | Defined in | Notes |
 |---|---|---|
 | `write_file`, `read_file`, `export_image` | `lib.rs` | path-taking; confined by `guarded_write_target` / `guarded_read_path` (see [Path Confinement](#path-confinement)) |
-| `export_pdf` | `pdf_export/` | hidden-window PDF render, per-platform |
+| `export_pdf` | `lib.rs` → `pdf_export/` | hidden-window PDF render, per-platform |
 | `ensure_app_storage_dirs` | `lib.rs` | creates the app's own data and config dirs; takes no path |
 | `save_image` | `images.rs` | decodes a data-URL in Rust and writes it into the active vault's `images/`, named by the SHA-256 of its bytes; extension from the MIME type, `png` fallback. No backend size cap — the frontend's upload limits are the only bound |
 | `copy_image_file`, `read_image_as_base64`, `read_image_file` | `images.rs` | see [Path Confinement](#path-confinement) |

@@ -50,7 +50,7 @@ The list opens with a collapsible "Your blocks" section; below it, laid out like
 
 **Prefill.** Every field kind can be prefilled: tick "Prefill" on a field in the builder and give it a starting value — a checklist with its points, yes/no set to "Yes", a link or altar pointing at a chosen entry, an image — and every new copy starts with it. Existing copies are unaffected, and a copy created before the prefill was added keeps its own value when the block updates.
 
-**Sigil parts.** A block can also hold the three sigil parts — calculator, drawing and charge — which work exactly like the standalone sigil blocks (see [Sigil Workflow](#sigil-workflow)). The builder lets a calculator choose how it reaches its letter bank (automatic, manual, or both — the default), a drawing preset its starting brush colour and size, and a charge preset its lock and which of the block's calculators and drawings it covers. A copy holding a loaded sigil, as a full block or as one of these parts, is never touched by "Update block" or "Update all" and never removed by "Also remove it from entries" — it is reported as skipped, so it keeps hiding what it charged. Duplicating a block that a charge hides or locks isn't offered, since the copy wouldn't be covered by that charge.
+**Sigil parts.** A block can also hold the three sigil parts — calculator, drawing and charge — which work exactly like the standalone sigil blocks (see [Sigil Workflow](#sigil-workflow)). The builder lets a calculator choose how it reaches its letter bank (automatic, manual, or both — the default), a drawing preset its starting brush colour and size, and a charge preset its lock and which of the block's calculators and drawings it covers. A copy holding a loaded sigil, as a full block or as one of these parts, is never touched by "Update block" or "Update all" and never removed by "Also remove it from entries" — it is reported as skipped, so it keeps hiding what it charged. Duplicating a block that a charge hides or locks makes a copy that charge covers too, just as loaded.
 
 **Moon phase.** A journal entry's lunar phase is never stored — it is worked out from the entry's creation date whenever it is shown. Settings → Entries decides whether journal entries show it at all, for every entry, old ones included. On, it appears as the entry's icon, as a read-only row in the Properties sidebar and in exports, and the Journal list offers the phase filter and grouping; off, all of that is gone. It is not something you choose: a duplicate gets today's phase, an imported entry the phase of the file's date.
 
@@ -140,7 +140,7 @@ Adding, editing and deleting items happens in a modal. Deleting moves the item t
 
 **Library in the dashboard.** The Altar dashboard also shows the library below the altars, to browse and edit items without opening an altar.
 
-- An "Altar Library" divider with a chevron collapses the whole section; that state survives restarts (the category groups under it reset on restart like everywhere else).
+- An "Altar Library" divider with a chevron collapses the whole section; that state, like the category groups under it, is remembered per vault.
 - It has its own sort (A→Z, Z→A, newest first) and Grouping toggle, next to the altar list's controls in the dashboard header. Grouped, each category header shows a count and a "+" that opens the add-item dialog set to that category; only categories that hold an item are shown. Ungrouped, every matching item shows in one grid.
 - Clicking a tile opens the same edit modal as in the editor; a button next to "New altar" adds an item directly.
 - The dashboard's search matches item names too: if only items match, the altar list shows "No results" while the library shows its matches.
@@ -171,7 +171,7 @@ Adding, editing and deleting items happens in a modal. Deleting moves the item t
 
 Exporting the altar as an image or PDF is done from the application menu — see [Export and Import](#export-and-import).
 
-**Sidebar in edit mode.** The full editor — Canvas Options, Background, Overlay Options, Grid Options, Favicon and Placed Elements — shows only in edit mode. Each section collapses with a chevron; which ones are open is remembered per vault (the same for every altar) and defaults to open.
+**Sidebar in edit mode.** The full editor — Favicon, Canvas Options, Background, Overlay Options, Grid Options and Placed Elements — shows only in edit mode. Each section collapses with a chevron; which ones are open is remembered per vault (the same for every altar) and defaults to open.
 
 **Canvas resolution.** In edit mode, the "Canvas Options" section offers six aspect ratios (16:9, 4:3, 3:2, 1:1, 2:3, 9:16); the canvas then fills the available space at that proportion. An altar with a fixed pixel size (e.g. 1920 × 1080) renders at that size, scaled to fit. Dashboard cards reflect each altar's aspect ratio.
 
@@ -225,7 +225,7 @@ The same applies to an altar and to the page of one of your own blocks or a temp
 
 An **altar** saves every canvas action the moment it happens, so its Cancel puts it back as it was when Edit was pressed — placements, background, overlay, grid, format, icon and title, along with its preview and its place in the list. A change to a library item is not taken back, since items belong to every altar.
 
-**List header, split between the main area and the sidebar.** While a list view is showing — Home, Journal, Wiki, Operations, Tasks, the Altar dashboard, Trash or Categories — its title and search sit above the list in the main area. Everything else lives in the right sidebar while it is open: the view's actions (a labelled "+ New …" button — on the Altar with an "add item" button beside it; Trash shows select-all and bulk delete instead), then view and sort as two rows of icon toggles, then the always-visible filter panel. Closing the sidebar hides those parts and gives the list the width back. Tags has no second part, so the sidebar there shows its placeholder.
+**List header, split between the main area and the sidebar.** While a list view is showing — Home, Journal, Wiki, Operations, Tasks, the Altar dashboard, Trash, Categories, Tags, or the Blocks, Templates and Lexicon lists — its title and search sit above the list in the main area. Everything else lives in the right sidebar while it is open: the view's actions (a labelled "+ New …" button — on the Altar with an "add item" button beside it; Trash shows select-all and bulk delete instead), then view and sort as two rows of icon toggles, then the always-visible filter panel. Closing the sidebar hides those parts and gives the list the width back.
 
 **Internal link chips.** Links inserted with `[[` render as chips in both edit and view mode. A link can point at a Journal entry, Wiki article, Operation, Task or Altar — offered by the `[[` popup, the link picker (the toolbar's link button), and by dragging a row from the left entry list. Only Journal, Wiki and Operations can hold links; Tasks and Altars have no editor. Clicking a Task chip opens the Tasks view and highlights the task; clicking an Altar chip opens the altar. The link picker's tabs (All/Journal/Tasks/Operations/Wiki/Altar) are icons in the rail's order, each with its match count.
 
@@ -291,7 +291,7 @@ Routines from older vaults and `.emeralddb` backups are converted into templates
 
 ## Tasks
 
-The Tasks module is a hierarchical task manager with categories, priorities, and links to Journal entries, Wiki articles and Operations.
+The Tasks module is a hierarchical task manager with categories, priorities, and links to any entry, task or altar.
 
 **Categories.** Tasks use the shared category list — see [Categories](#categories). None is built in on the Tasks side. Category headers show the emoji, name and a task count.
 
@@ -299,7 +299,7 @@ The Tasks module is a hierarchical task manager with categories, priorities, and
 
 **Priorities.** Low, Medium or High, shown as a coloured flag (green, yellow, red) and changed from a dropdown on each row.
 
-**Links.** A task can link to Journal entries, Wiki articles and Operations. Linked entries show as clickable chips on the row. A link whose target was deleted for good reads "Deleted".
+**Links.** A task can link to journal entries, wiki articles, operations, other tasks and altars — the same link picker the editor uses. Linked entries show as clickable chips on the row. A link whose target was deleted for good reads "Deleted".
 
 **Toolbar.** Search, a sort ("Created · newest/oldest", "Name · A → Z/Z → A") and a separate Grouping switch (by category, or ungrouped). Only the List view is available.
 
@@ -379,7 +379,7 @@ Tags, categories, your own blocks, templates and the Lexicon's languages also go
 
 ## Vaults
 
-A vault is a **folder** you choose, holding its own database and its own images — see [Multi-Vault System in `database.md`](database.md#multi-vault-system) for the on-disk layout. Because nothing inside it refers to a location, a vault folder can be copied to another machine and opened there. A vault can carry its own icon — any emoji, shown on its card and on the Vault rail button while it is active; without one, both show the plain vault glyph.
+A vault is a **folder** you choose, holding its own database and its own images — see [Vault Layout](architecture/storage.md#vault-layout) for the on-disk layout. Because nothing inside it refers to a location, a vault folder can be copied to another machine and opened there. A vault can carry its own icon — any emoji, shown on its card and on the Vault rail button while it is active; without one, both show the plain vault glyph.
 
 **First start.** A new installation has no vault. Emerald opens straight into the vault modal below — with no way to close it — until you create or open one. An installation from before multi-vault support has its existing database adopted as a vault named "Emerald".
 
@@ -409,7 +409,7 @@ A native save dialog asks for the destination and the PDF is written directly �
 
 ### Altar PDF Export
 
-With an altar open in reading view, **Export → Export as PDF…** renders it like the image export (full native resolution) and places it on a single PDF page. The page follows the altar's proportions — long edge 11", so a portrait altar gives a portrait page and a landscape altar a landscape page. This custom page size works on Windows; on macOS and Linux the PDF export is untested on real hardware and uses the platform's default page size. A dialog shows the saved path afterwards.
+With an altar open in reading view, **Export → Export as PDF…** renders it like the image export (full native resolution) and places it on a single PDF page. The page follows the altar's proportions — long edge 11", so a portrait altar gives a portrait page and a landscape altar a landscape page. This custom page size works on Windows; on macOS and Linux the PDF uses the platform's default page size. A dialog shows the saved path afterwards.
 
 ### Altar Image Export
 
@@ -462,7 +462,7 @@ The whole vault can be backed up and restored as one self-contained file (`.emer
 - A "What to include" chip row picks the content: Journal, Wiki, Operations, Altars, Tasks, Tags, Lexicon and Settings. Templates and your own blocks travel whenever Journal, Wiki or Operations is included.
 - The Settings chip (on by default) exports the vault's settings — language, theme, fonts, sizes, trash retention, sidebar, emoji defaults, image limits, tag rule, template rule — independently of the content chips.
 - Optional from/to dates restrict entries to those created in that window (tags, categories, blocks, templates, languages and settings are not date-filtered).
-- Trashed items are left out unless **Include deleted** is ticked — tags never include trashed ones.
+- Trashed items are left out unless **Include deleted** is ticked — tags included, since trashed entries carry their ids.
 - Images referenced by exported entries are embedded.
 - The save dialog opens in the vault's own **`backup/` folder** (recreated if it went missing), so backups travel with the vault folder — deleting the vault's files leaves a non-empty `backup/` standing. Any other location can be picked; for a vault outside the allowed storage locations (see [`security.md`](security.md)) the dialog just suggests a filename. Cancelling the dialog reports nothing.
 
@@ -486,7 +486,7 @@ A vault from before per-vault image folders has its images copied into its own f
 
 ## Image Upload Validation
 
-Every image upload accepts only **PNG**, **JPEG**, **GIF**, **WebP** and **SVG**; anything else is rejected before processing. This covers altar backgrounds, icons and library item images; icons and cover images of articles and operations; template and block icons; and images inserted into the editor via the toolbar, paste, or drag-and-drop from the file manager.
+Every image upload accepts only **PNG**, **JPEG**, **GIF**, **WebP** and **SVG**; anything else is rejected before processing. This covers altar backgrounds, icons and library item images; icons and cover images of articles and operations; template and block icons; and images inserted into the editor via the toolbar, paste, or drag-and-drop from the file manager. Icons (of entries, templates, blocks and altars) refuse SVG on top of that.
 
 A rejected file from a file picker shows an inline error near the control, cleared after 2.5 seconds. When every file dragged into the editor has an unsupported format, a dialog lists the allowed formats instead of silently ignoring the drop.
 

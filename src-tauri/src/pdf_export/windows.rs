@@ -12,11 +12,10 @@
 //!   4. On success, the PDF is at `path`. Close the hidden window.
 //!   5. On any failure, surface the COM error message to the caller.
 //!
-//! The CSP from `tauri.conf.json` is applied to this window. The export
-//! HTML's inline `<style>` is fine (`style-src 'unsafe-inline'`), but
-//! inline `<script>` is blocked (`script-src 'self'`). The frontend must
-//! pre-transform internal link spans into chips before passing the HTML
-//! here — see `lib/export.ts`.
+//! The page is a `file://` URL, so the app CSP from `tauri.conf.json` does
+//! not reach it. The export HTML carries no script: the frontend escapes and
+//! sanitizes it and pre-renders internal link chips before passing it here —
+//! see `lib/export.ts` and security.md (Content Security Policy).
 
 use std::sync::{Arc, Mutex};
 use tokio::sync::oneshot;

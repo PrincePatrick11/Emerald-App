@@ -84,7 +84,7 @@ The left sidebar is two independent components side by side in `AppShell`'s `app
 - Every view button comes from `viewButton(type, meta)`, which marks the button of the open view `active` — the accent border `.sidebar-item.active` uses in the entry lists.
 - The rail has no panel toggles: all three sidebars are toggled from the *View* menu (`useTitleBarMenus.ts` on Windows/Linux, native on macOS; `menu.rail`/`menu.entryList`/ `menu.properties`). Since Settings and Vault live only in the rail, hiding it hides them too.
 - The update check (the dot on the gear) runs once per app start: its promise and "dot shown" flag are module-level, because the rail remounts when the Altar's full-window mode ends.
-- Logo, back/forward and the search shortcut are in the title bar (see [Window Chrome](shell.md#window-chrome)), the logo centred in a `RAIL_WIDTH`-wide box above the rail.
+- Logo, back/forward and the search button are in the title bar (see [Window Chrome](shell.md#window-chrome)), the logo centred in a `RAIL_WIDTH`-wide box above the rail.
 - Home's target is not a content view (`isContentView` is false), so it overwrites the active tab instead of opening a new one.
 - lucide's `Home` is an alias of `House`, so its SVG has the class `.lucide-house`, not `.lucide-home`.
 

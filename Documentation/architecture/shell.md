@@ -23,7 +23,7 @@ The logo (`EmeraldMark`, an inline SVG) is not a control. Its wrapper carries `d
 | Application menu | `TitleBarMenuButton` (HTML, `usesHtmlMenuBar`) | Native, in the system menu bar |
 | Title bar left inset | none | 5rem, reserved for the traffic lights |
 
-Per-platform window settings live in `src-tauri/tauri.{windows,linux,macos}.conf.json`, which Tauri merges over `tauri.conf.json`. The merge is RFC 7396, which **replaces arrays wholesale**, so each file repeats the complete window object. `tauri.dev.conf.json` merges last (via `--config`) and must never gain an `app.windows` key, or it would wipe the platform settings. All four files set `minWidth` 720 and `minHeight` 600.
+Per-platform window settings live in `src-tauri/tauri.{windows,linux,macos}.conf.json`, which Tauri merges over `tauri.conf.json` — each repeats the complete window object, and `tauri.dev.conf.json` must never gain an `app.windows` key (why: [Per-platform Tauri configs](../build.md#per-platform-tauri-configs)). All four files set `minWidth` 720 and `minHeight` 600.
 
 **Altar full-window mode.** The predicate is `isAltarFullscreen` in `uiStore`, shared by `AppShell` (hides the sidebars) and `TitleBar` (drops tabs, navigation and the magnifier), so the two cannot drift apart. The title bar itself stays: on Windows and Linux it holds the only way to close or move the window, *and* the only route to the altar's image export, which is usually why that mode was entered — so the menu button and Export/Import stay. `TitleBar` closes the search modal itself when the magnifier disappears (entering full-window mode, or the last vault closing), rather than leaving it open with nothing to reopen it.
 
@@ -133,7 +133,7 @@ All three platforms share that shape, with a 30 s page-load and a 120 s print ti
 
 ### Frontend responsibilities
 
-The hidden webview inherits the app CSP (`script-src 'self'`, see `tauri.conf.json`), so it cannot run inline scripts. The frontend therefore prepares the HTML completely before handing it to Rust:
+The hidden webview loads the HTML from a `file://` URL, which carries no CSP and which the `emerald-img` scheme does not reach (see [`security.md` → Content Security Policy](../security.md#content-security-policy)). The frontend therefore prepares the HTML completely before handing it to Rust:
 
 - `transformInternalLinks(html)` in `src/lib/export.ts` bakes every `<span data-type="internalLink">` into a static chip (icon `<img>`/`<span>` + label `<span>`).
 - `embedImages(html)` resolves every stored image to a base64 data-URL via `read_image_as_base64`; the hidden webview runs on a `file://` URL the `emerald-img` scheme does not reach.

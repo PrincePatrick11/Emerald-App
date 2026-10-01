@@ -81,7 +81,7 @@ Two traps shape every rebuild after v33:
 
 v49 and v51 avoid the rename and need no marker: v49 copies per old table, skips ids already in `entries` and drops an old table only once every row is there; v51 adds `settings`, fills rows still at `'{}'`, then drops the old columns (a `DROP TABLE altars` would cascade into `altar_placements`).
 
-Before v33, v38, v39, v42, v44, v49, v51 and v53 rewrite anything (v42 and v44 only when there is something to convert), they write a full copy of the database via `VACUUM INTO` (`backupDatabaseFile` in `dbRebuild.ts`) to `{vaultDir}/emerald.db.pre-v33.bak`, `.pre-v38.bak` and so on — the escape hatch if a migration that rewrites every table goes wrong. On image-heavy vaults the file can be sizeable. `prune_migration_backups` keeps only the newest; it touches only regular files named exactly `emerald.db.pre-v<number>.bak` in the registered vault folder — a symlink, a folder or any other name stays.
+Before v33, v38, v39, v42, v44, v49, v51 and v53 rewrite anything (v42 and v44 only when there is something to convert), they write a full copy of the database via `VACUUM INTO` (`backupDatabaseFile` in `dbRebuild.ts`) to `{vaultDir}/emerald.db.pre-v33.bak`, `.pre-v38.bak` and so on — the escape hatch if a migration that rewrites every table goes wrong. On image-heavy vaults the file can be sizeable. `prune_migration_backups` keeps only the newest (what it may delete: [`security.md`](security.md#vault-directories-as-a-trust-boundary)).
 
 ### Frozen history, and why failures used to be swallowed
 
@@ -131,13 +131,13 @@ These are exactly the places where orphans accumulate. Three things stand in for
 - **`sweepDanglingTaskLinks(db)`** in `db.ts` deletes `task_links` rows whose target does not exist **with the matching type** (`LINK_TARGET_EXISTS`: `entries` by `id` and `type`, plus `tasks` and `altars`). Its rule and `checkIntegrity`'s map of target types are kept in step by hand. Soft-deleted targets count as valid — trashed content isn't an orphan yet. It runs in the periodic cleanup, when the trash is emptied, and at the end of every backup import (a partial restore or an imported link row can point at something the import didn't bring).
 - **Permanent deletes clean up directly.** `altarStore.permanentlyDeleteAltar` deletes the rows pointing *at* the altar; `taskStore.permanentlyDeleteTask` (which takes every subtask in the Trash along) deletes both directions. A task's *soft* delete removes no `task_links` row — `taskStore` only loads the links of tasks outside the Trash, and restoring the task brings them back.
 
-`lib/entryTypeChange.ts` (see [Changing an entry's type](architecture/editing.md#changing-an-entrys-type)) changes a Journal/Wiki/Operation entry's kind with one `UPDATE` of `type`, `entry_number` and category on the same row (`retypeRow`). It is the one place allowed to rewrite `target_type` on existing `task_links` rows, and does so in the same step, so the sweep never has a reason to remove them.
+`lib/entryTypeChange.ts` (see [Changing an entry's type](architecture/editing.md#changing-an-entrys-type)) changes a Journal/Wiki/Operation entry's kind with one `UPDATE` of the same row (`retypeRow`). It is the one place allowed to rewrite `target_type` on existing `task_links` rows, and does so in the same step, so the sweep never has a reason to remove them.
 
 ### Deleting a category never deletes its content
 
 `RESTRICT` deletes nothing; it refuses a delete that would leave a dangling reference. `reassignCategoryContent(db, categoryId)` in `schema.ts` is the other half: it sets `category_id` to `NULL` across `CATEGORIZED_TABLES` (`entries`, `tasks`, `altar_items`) so the delete becomes permissible, and calls `dropCategoryFromTemplates`, which strips the category out of every template's `assignments` (trashed ones too). A template isn't content and doesn't become "Uncategorized" — it simply stops offering itself for a combination that no longer exists. `templateStore`'s `dropCategoriesFromTemplatesInMemory` mirrors that trim in the loaded store.
 
-When a category is merged into a namesake instead (`reassignCategoryContent(db, from, to)`, from `categoryStore.restoreCategory`), content and assignments move to `to` (`moveCategoryInTemplates`): a template holding both keeps one, and a default star moves along only where no active template already holds one for that entry type and `to` — a trashed template loses its star there.
+When a category is merged into a namesake instead (`reassignCategoryContent(db, from, to)`, via `mergeCategory` from `categoryStore.restoreCategory` and `updateCategory`), content and assignments move to `to` (`moveCategoryInTemplates`): a template holding both keeps one, and a default star moves along only where no active template already holds one for that entry type and `to` — a trashed template loses its star there.
 
 Only a **permanent** deletion reassigns: `categoryStore.permanentlyDeleteCategory`, `trashStore.emptyTrash`, and the periodic cleanup for an expired category (`purgeCategory`). That is why `categories` is **not in `CLEANUP_TABLES`** — it is purged separately, after its content is released. A *soft* delete never reassigns: content keeps pointing at the trashed category, the UI groups it under "Uncategorized", and restoring the category brings everything back. `reassignCategoriesInMemory` in `categoryStore.ts` applies the same move to the loaded content stores, so an in-memory row doesn't write back a `category_id` the foreign key would reject.
 
@@ -296,7 +296,7 @@ Indexes: `idx_entries_type` on `(type, deleted_at)` (every module loads its live
 
 ### Moon phase
 
-Not stored. `entryMoonPhase` / `journalIcon` in `src/lib/moonPhase.ts` derive a journal entry's phase from its `created_at`. The vault setting `journal.moonPhase` therefore means "show the phase on journal entries" and applies to every entry, old ones included; with it off, the Journal view has no phase filter or grouping.
+Not stored — derived from a journal entry's `created_at`; see [Moon Phase](architecture/modules.md#moon-phase).
 
 ### altar_items
 
@@ -318,7 +318,7 @@ Index: `idx_altar_items_deleted` (`ALTAR_ITEMS_INDEX_DDL`).
 
 Deleting a library element moves it to the Trash (`altarStore.deleteItem`, trash kind `altarItem`) with an Undo toast and no confirmation. Its placements stay in the database but out of sight: `altarStore` loads only items without `deleted_at` and only placements whose item is live (`LIVE_PLACEMENTS`, a join on `altar_items`), and `restoreItem` brings the element back to the same spots. Deleting it for good deletes the row, and `ON DELETE CASCADE` takes its placements along.
 
-An altar edit's Cancel leaves alone the placements of elements that were already trashed when the edit began (`snapshot.trashedItemIds`, passed to `restoreAltarSnapshot`), and `duplicateAltar` copies every placement, trashed elements' included, so the copy matches once they return.
+How an altar edit's Cancel and `duplicateAltar` treat the placements of trashed elements: [The altar's snapshot](architecture/editing.md#the-altars-snapshot) and [Store](architecture/altar.md#store).
 
 `category_id` holds the id, so renaming a category touches nothing else. A `"1"` backup still carries the category *name* there, which import resolves to an id.
 
@@ -423,12 +423,7 @@ Handled natively in `src-tauri/src/images.rs`. Images live in `{vaultDir}/images
 
 **The database stores the bare filename** — `{sha256}.{ext}`, no directory and no drive letter. Rendering goes through the `emerald-img` URI scheme rather than IPC; the details are in [Image Storage System](architecture/storage.md#image-storage-system).
 
-| Command | Behaviour |
-|---|---|
-| `save_image(data_url, vault_id)` | Decodes base64, writes into the vault's `images/`, skips if present. Returns the filename |
-| `copy_image_file(source, vault_id)` | Copies an existing file in, same dedupe. Returns the filename |
-| `read_image_as_base64(filename, vault_id)` | Returns a data-URL — only for the PDF export and the backup writer |
-| `adopt_legacy_images` / `list_image_files` / `delete_image_files` | Migration v35 and the *Unused images* cleanup |
+The image commands (`save_image`, `copy_image_file`, `read_image_as_base64`, `adopt_legacy_images`, `list_image_files`, `delete_image_files`) are listed in [IPC Command Surface](architecture.md#ipc-command-surface).
 
 ## Multi-Vault System
 
@@ -481,7 +476,7 @@ Full vault snapshots are exported and imported via Settings → Backup. The code
 | 11 | v49 | one `data.entries` array with `type` | A `"11"`+ file is split back into journal/wiki/operation arrays (`splitEntries`; unknown `type` dropped), so the import paths work on three arrays; `entryRowsForInsert` projects them onto `entries`, de-duplicating ids (journal, wiki, operation wins) |
 | 10 | v46 | altars carry `deleted_at` | Nothing; an older build would revive trashed altars, so it must refuse |
 | 9 | v45 | `languages`, `lexiconEntries` | Nothing |
-| 8 | v43 | `templates` | A file's `routines` stays standing and becomes templates at import time, after the type filters (`withRoutinesAsTemplates`, see [Templates](architecture/templates.md#templates)) |
+| 8 | v43 | `templates` | A file's `routines` stays standing and becomes templates at import time, after the type filters (`withRoutinesAsTemplates`, see [Routines converted to templates](architecture/templates.md#routines-converted-to-templates)) |
 | 7 | v42 | sigils as blocks | Sigil columns are converted before insertion (`liftLegacySigilRows`); empty `sigils` operations get the sigil blocks only from files below `"7"` |
 | 6 | v40 | `blockDefinitions` | Nothing |
 | 5 | v39 | `category_id` may be `null` | Nothing; an older build has a `NOT NULL` column and must refuse |

@@ -66,7 +66,7 @@ The entry keeps its id and its row in `entries`. `changeEntryType`:
 
 Since the row never leaves its table, the entry never exists twice or not at all. Wiki and Operation keep category, icon and cover image across the move; converting to Journal drops them, and `typeChangeDropsProperties` makes the field ask first via `InlineConfirm` when any is set.
 
-The content is left alone: a default template applies only when an entry is created (see [Templates](templates.md#templates)).
+The content is left alone: a default template applies only when an entry is created (see [Defaulting on create](templates.md#defaulting-on-create)).
 
 ## Right Sidebar Action Bar
 
@@ -84,7 +84,7 @@ The optional fourth handler, `flush`, is for a sidebar action that needs the *cu
 
 ## List Header Portal
 
-In list views (every module, plus Home, Categories, Tags and the library views Blocks, Templates and Lexicon), `Dashboard`'s header — actions, toolbar, filter panel — lives **only** in the right sidebar; there is no inline fallback above the list. `RightSidebar.tsx` hands its host `<div>` to `uiStore.listHeaderHost` through a ref callback (`setListHeaderHost`); `SidebarPortal` (`src/components/ui/SidebarPortal.tsx`) `createPortal`s its children into it whenever it is non-null. `Dashboard` renders its header through one; a library page (block, template, language — `LibraryPageFrame`) renders its sidebar content (Done/Delete/Cancel, settings, usage) through another.
+In list views (every module, plus Home, Categories, Tags, Trash and the library views Blocks, Templates and Lexicon), `Dashboard`'s header — actions, toolbar, filter panel — lives **only** in the right sidebar; there is no inline fallback above the list. `RightSidebar.tsx` hands its host `<div>` to `uiStore.listHeaderHost` through a ref callback (`setListHeaderHost`); `SidebarPortal` (`src/components/ui/SidebarPortal.tsx`) `createPortal`s its children into it whenever it is non-null. `Dashboard` renders its header through one; a library page (block, template, language — `LibraryPageFrame`) renders its sidebar content (Done/Delete/Cancel, settings, usage) through another.
 
 Invariant: exactly one writer (the ref callback) and at most one reader at a time — `MainArea` renders one view, so only one thing portals into the host. `listHeaderHost` is a DOM node and is not persisted.
 
@@ -123,7 +123,7 @@ The chips in `content` are the only record of what links where — there is no l
 
 **Sidebar ↔ editor.** The field has no reference to the open view's TipTap instance, so it talks to it through three `document`-level custom events in `lib/links.ts`: `requestEntryLinkAppend`/`requestEntryLinkReveal`/`requestEntryLinkRemove`, answered via `subscribeEntryLinkRequest` on the `BlockStack` side, which routes them to the right text block (see [Content Blocks](blocks.md#content-blocks)). A request resolves to `true` only when an editable, mounted editor accepted it via `preventDefault()`; otherwise the field falls back (e.g. `reveal` navigates to the target). `isValidLinkTarget` guards all three and the navigate-on-click handler, since the events are reachable by any script in the WebView.
 
-**Appending** a link (from the field, the `[[` picker, or a routine converted to a template — see [Templates](templates.md#templates)) always adds a full block — a horizontal rule, the target's category as an `<h3>`, then the chip — never merging into an existing block. `internalLinkBlockHtml` is the one definition of that shape, shared by the editor's `appendEntryLink`, migrations v36/v37 and the import's legacy bridge (below). In a completely empty entry (`isBlankContent`, regex like `extractInternalLinks`) the block goes in without its leading rule (the `separator` option) — there is no text above to separate. `plainBlockHtml` renders the same shape without a chip, for a legacy value that resolves to nothing in this vault.
+**Appending** a link (from the field, the `[[` picker, or a routine converted to a template — see [Routines converted to templates](templates.md#routines-converted-to-templates)) always adds a full block — a horizontal rule, the target's category as an `<h3>`, then the chip — never merging into an existing block. `internalLinkBlockHtml` is the one definition of that shape, shared by the editor's `appendEntryLink`, migrations v36/v37 and the import's legacy bridge (below). In a completely empty entry (`isBlankContent`, regex like `extractInternalLinks`) the block goes in without its leading rule (the `separator` option) — there is no text above to separate. `plainBlockHtml` renders the same shape without a chip, for a legacy value that resolves to nothing in this vault.
 
 Appending then jumps to and highlights the new block (`revealEntryLink` with `caretAtBlockEnd`, a frame later so the node view exists), leaving the caret at the end ready to type; revealing an existing chip selects the chip itself as a node.
 
