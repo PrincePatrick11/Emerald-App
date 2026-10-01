@@ -874,7 +874,8 @@ console.log('\n6. Vorlagen: Zuweisung, Standard, Einsetzen\n');
   // Titel und Tags beim Ablösen einer Vorlage („Andere Vorlage").
   const journalStd = { ...sigilTpl, id: 'journal-std', title: 'Tagebuch', tags: ['tag-j'], assignments: [{ entryType: 'journal', category: '*', isDefault: true }] };
 
-  const cleared = fieldsWithoutTemplate({ title: 'Tagebuch', tags: ['eigen', 'TAG-J'] }, journalStd);
+  // Tags sind IDs: dieselbe ID ist derselbe Tag, eine andere Schreibweise gibt es nicht.
+  const cleared = fieldsWithoutTemplate({ title: 'Tagebuch', tags: ['eigen', 'tag-j'] }, journalStd);
   check('Felder ohne Vorlage: Titel wieder leer, ihre Tags weg',
     cleared.title === '' && cleared.tags.join() === 'eigen', cleared);
   const withNew = fieldsWithTemplate(cleared, { title: ' Artikel ', tags: ['eigen', 'neu'] }, { title: 'ifUntitled', tags: true });
@@ -898,7 +899,7 @@ console.log('\n6. Vorlagen: Zuweisung, Standard, Einsetzen\n');
     start.title === 'Ritual' && start.tags.join() === 'a' && start.content.includes('data-template-origin="sigil-tpl"'), start);
   check('Start ohne Vorlage: leer, auch der Titel',
     JSON.stringify(templateStart(null)) === JSON.stringify({ title: '', content: '', tags: [], templateId: null }));
-  check('Tags zusammenführen ohne Doppelte (Groß/Klein egal)', mergeTemplateTags(['A', 'b'], ['a', 'c']).join() === 'A,b,c');
+  check('Tags zusammenführen ohne doppelte IDs', mergeTemplateTags(['a', 'b'], ['a', 'c']).join() === 'a,b,c');
 
   // Zuweisungen einer Bearbeitung auf einen inzwischen geänderten Stand legen.
   const j = { entryType: 'journal', category: '*', isDefault: false };

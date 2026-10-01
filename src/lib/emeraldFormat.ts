@@ -7,7 +7,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { useUIStore } from '../store/uiStore';
 import { useEntryStore } from '../store/entryStore';
-import { useTagStore } from '../store/tagStore';
+import { liveTagNames, useTagStore } from '../store/tagStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { entryMoonPhase } from './moonPhase';
 import { useAltarStore } from '../store/altarStore';
@@ -403,7 +403,7 @@ export async function exportAsEmerald(): Promise<void> {
     // Nur zur Information: der Import rechnet die Phase aus `createdAt` neu.
     meta.moonPhase = entryMoonPhase(entry, useSettingsStore.getState().settings.journal.moonPhase) ?? undefined;
 
-    meta.tags = (entry.tags ?? []) as string[];
+    meta.tags = liveTagNames(entry.tags);
 
   } else if (view.type === 'wiki') {
     const article = articles.find(a => a.id === view.id);
@@ -421,7 +421,7 @@ export async function exportAsEmerald(): Promise<void> {
     // nicht geladen, und der Import würde aus der UUID einen Namen machen.
     meta.wikiCategoryName = cat?.name;
     meta.icon             = article.icon ?? undefined;
-    meta.tags             = (article.tags ?? []) as string[];
+    meta.tags             = liveTagNames(article.tags);
 
   } else if (view.type === 'operations') {
     const op = operations.find(o => o.id === view.id);
@@ -436,7 +436,7 @@ export async function exportAsEmerald(): Promise<void> {
     meta.categoryEmoji  = cat?.emoji;
     meta.opCategoryName = cat?.name;
     meta.icon      = op.icon ?? undefined;
-    meta.tags      = (op.tags ?? []) as string[];
+    meta.tags      = liveTagNames(op.tags);
   }
 
   // Eine geladene, noch verborgene Sigille geht nicht hinaus — Sigillen-Blöcke
@@ -506,7 +506,7 @@ export async function buildTemplateEmeraldFile(templateId: string): Promise<Emer
   const content = withoutConcealed(template.content, todayIso());
   const meta: EmeraldMeta = {
     icon: template.icon,
-    tags: template.tags,
+    tags: liveTagNames(template.tags),
     newEntryTitle: template.title,
     templateAssignments: await exportedAssignments(template.assignments),
     contentLinks: collectContentLinks(content),
@@ -661,20 +661,18 @@ async function withImportedStatus(content: string, status: LegacyStatus): Promis
 
 // ── Import helpers ───────────────────────────────────────────────────────────
 
-/** Ensures each tag name exists in the tags table and returns the names as the
- *  table spells them. entry.tags stores tag NAMES (not IDs), and ensureTag
- *  matches case-insensitively — an imported "foo" for an existing "Foo" must
- *  become "Foo", or renaming/deleting that tag would miss this entry.
- *  Like typing into the tag field, a vault that may not create tags that way
- *  (`tags.createInline` off) keeps only names that already are tags. */
-async function ensureTagNames(names: string[]): Promise<string[]> {
+/** Die Tag-IDs zu den Namen der Datei — die Datei trägt Namen, der Eintrag IDs.
+ *  ensureTag findet „foo" auch als „Foo". Wie beim Eintippen ins Tag-Feld
+ *  bleiben ohne Anlegen-Erlaubnis (`tags.createInline`) nur Namen, die schon
+ *  Tags sind. */
+async function ensureTagIds(names: string[]): Promise<string[]> {
   const createInline = useSettingsStore.getState().settings.tags.createInline;
   const result: string[] = [];
   for (const name of names) {
     const known = useTagStore.getState().getByName(name);
     if (!known && !createInline) continue;
-    const { name: canonical } = known ?? await useTagStore.getState().ensureTag(name);
-    if (!result.includes(canonical)) result.push(canonical);
+    const { id } = known ?? await useTagStore.getState().ensureTag(name);
+    if (!result.includes(id)) result.push(id);
   }
   return result;
 }
@@ -770,16 +768,16 @@ export async function importFromEmerald(): Promise<void> {
         is_active: file.meta.isActive, end_date: file.meta.endDate, version: file.meta.version,
       }))
     : file.type === 'journal' ? appendLegacyLinks(html, items, legacyJournalTargets(file)) : html);
-  const tagNames = await importedTags(file.meta);
+  const tagIds = await importedTags(file.meta);
 
   let newId: string;
   try {
     if (file.type === 'journal') {
-      newId = await importJournalEntry(file, content, tagNames);
+      newId = await importJournalEntry(file, content, tagIds);
     } else if (file.type === 'wiki') {
-      newId = await importWikiArticle(file, content, tagNames);
+      newId = await importWikiArticle(file, content, tagIds);
     } else {
-      newId = await importOperationEntry(file, content, tagNames);
+      newId = await importOperationEntry(file, content, tagIds);
     }
     // Nach dem Eintrag: scheitert der, bleibt keine Definition verwaist
     // zurück. Die Kopien im Inhalt brauchen sie nicht, um zu funktionieren.
@@ -828,9 +826,9 @@ function sanitizeImportedHtml(html: string): string {
   });
 }
 
-/** Die Tags der Datei, so geschrieben wie in diesem Vault — nur Zeichenketten, die Datei ist fremd. */
+/** Die Tags der Datei als IDs dieses Vaults — nur Zeichenketten, die Datei ist fremd. */
 async function importedTags(meta: EmeraldMeta): Promise<string[]> {
-  return ensureTagNames(Array.isArray(meta.tags) ? meta.tags.filter((t): t is string => typeof t === 'string') : []);
+  return ensureTagIds(Array.isArray(meta.tags) ? meta.tags.filter((t): t is string => typeof t === 'string') : []);
 }
 
 /**
@@ -857,7 +855,7 @@ const MAX_IMPORTED_CATEGORIES = 20;
  * welche Vorlage neue Einträge füllt, entscheidet dieser Vault, nicht eine
  * fremde Datei. `parseAssignments` prüft Typen, Journal und Doppelte.
  */
-async function createImportedTemplate(file: EmeraldFile, content: string, tagNames: string[]): Promise<string> {
+async function createImportedTemplate(file: EmeraldFile, content: string, tagIds: string[]): Promise<string> {
   const { meta } = file;
   const raw = Array.isArray(meta.templateAssignments) ? meta.templateAssignments.slice(0, MAX_ASSIGNMENTS) : [];
   const resolvedByName = new Map<string, string | null>();
@@ -872,7 +870,7 @@ async function createImportedTemplate(file: EmeraldFile, content: string, tagNam
     icon: text(meta.icon) || undefined,
     title: text(meta.newEntryTitle),
     content,
-    tags: tagNames,
+    tags: tagIds,
     assignments: parseAssignments(assignments),
   });
   return created.id;
@@ -984,12 +982,12 @@ function legacyJournalTargets(file: EmeraldFile): Parameters<typeof appendLegacy
   ];
 }
 
-async function importJournalEntry(file: EmeraldFile, content: string, tagNames: string[]): Promise<string> {
+async function importJournalEntry(file: EmeraldFile, content: string, tagIds: string[]): Promise<string> {
   const { createEntry, updateEntry } = useEntryStore.getState();
   // Die Mondphase folgt aus dem Erstelldatum der Datei (`entryMoonPhase`).
   const createdAt = importedCreatedAt(file);
   const entry = await createEntry('journal', { blank: true, createdAt });
-  await updateEntry(entry.id, { title: importedTitle(file), content, tags: tagNames }, importedStamp(createdAt));
+  await updateEntry(entry.id, { title: importedTitle(file), content, tags: tagIds }, importedStamp(createdAt));
   return entry.id;
 }
 
@@ -1053,7 +1051,7 @@ function legacyWikiCategory(meta: EmeraldMeta): { name: string | undefined; emoj
   return { name: meta.wikiCategoryName, emoji: undefined };
 }
 
-async function importWikiArticle(file: EmeraldFile, content: string, tagNames: string[]): Promise<string> {
+async function importWikiArticle(file: EmeraldFile, content: string, tagIds: string[]): Promise<string> {
   const { createEntry, updateEntry } = useEntryStore.getState();
 
   const legacy = legacyWikiCategory(file.meta);
@@ -1068,13 +1066,13 @@ async function importWikiArticle(file: EmeraldFile, content: string, tagNames: s
     title: importedTitle(file),
     content,
     category_id: categoryId,
-    tags: tagNames,
+    tags: tagIds,
     icon: file.meta.icon ?? undefined,
   }, importedStamp(createdAt));
   return article.id;
 }
 
-async function importOperationEntry(file: EmeraldFile, content: string, tagNames: string[]): Promise<string> {
+async function importOperationEntry(file: EmeraldFile, content: string, tagIds: string[]): Promise<string> {
   const { createEntry, updateEntry } = useEntryStore.getState();
 
   const categoryId = await ensureCategoryByName(
@@ -1088,7 +1086,7 @@ async function importOperationEntry(file: EmeraldFile, content: string, tagNames
     title: importedTitle(file),
     content,
     category_id: categoryId,
-    tags: tagNames,
+    tags: tagIds,
     icon: file.meta.icon ?? undefined,
   }, importedStamp(createdAt));
   return op.id;
@@ -1317,18 +1315,18 @@ export async function importFromMarkdown(): Promise<void> {
     type = chosen;
   }
 
-  const tagNames = await ensureTagNames(
+  const tagIds = await ensureTagIds(
     (frontMeta['tags'] ?? '').split(',').map(t => t.trim()).filter(Boolean),
   );
 
   let newId: string;
   try {
     if (type === 'journal') {
-      newId = await importJournalFromMarkdown(title, html, tagNames, frontMeta);
+      newId = await importJournalFromMarkdown(title, html, tagIds, frontMeta);
     } else if (type === 'wiki') {
-      newId = await importWikiFromMarkdown(title, html, tagNames, frontMeta);
+      newId = await importWikiFromMarkdown(title, html, tagIds, frontMeta);
     } else {
-      newId = await importOperationFromMarkdown(title, html, tagNames, frontMeta);
+      newId = await importOperationFromMarkdown(title, html, tagIds, frontMeta);
     }
   } catch (e) {
     await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
@@ -1341,7 +1339,7 @@ export async function importFromMarkdown(): Promise<void> {
 }
 
 async function importJournalFromMarkdown(
-  title: string, html: string, tagNames: string[],
+  title: string, html: string, tagIds: string[],
   meta: Record<string, string>,
 ): Promise<string> {
   const { createEntry, updateEntry } = useEntryStore.getState();
@@ -1398,12 +1396,12 @@ async function importJournalFromMarkdown(
 
   // Ohne Datum in der Datei entsteht der Eintrag heute — mit der Mondphase von heute.
   const entry = await createEntry('journal', { blank: true });
-  await updateEntry(entry.id, { title, content, tags: tagNames });
+  await updateEntry(entry.id, { title, content, tags: tagIds });
   return entry.id;
 }
 
 async function importWikiFromMarkdown(
-  title: string, html: string, tagNames: string[],
+  title: string, html: string, tagIds: string[],
   meta: Record<string, string>,
 ): Promise<string> {
   const { createEntry, updateEntry } = useEntryStore.getState();
@@ -1412,12 +1410,12 @@ async function importWikiFromMarkdown(
   const categoryId = await ensureCategoryByName(categoryName, '📄');
 
   const article = await createEntry('wiki', { categoryId, blank: true });
-  await updateEntry(article.id, { title, content: sanitizeImportedHtml(html), category_id: categoryId, tags: tagNames });
+  await updateEntry(article.id, { title, content: sanitizeImportedHtml(html), category_id: categoryId, tags: tagIds });
   return article.id;
 }
 
 async function importOperationFromMarkdown(
-  title: string, html: string, tagNames: string[],
+  title: string, html: string, tagIds: string[],
   meta: Record<string, string>,
 ): Promise<string> {
   const { createEntry, updateEntry } = useEntryStore.getState();
@@ -1433,6 +1431,6 @@ async function importOperationFromMarkdown(
     version: meta['version'] ?? null,
   }));
   const op = await createEntry('operation', { categoryId, blank: true });
-  await updateEntry(op.id, { title, content, category_id: categoryId, tags: tagNames });
+  await updateEntry(op.id, { title, content, category_id: categoryId, tags: tagIds });
   return op.id;
 }

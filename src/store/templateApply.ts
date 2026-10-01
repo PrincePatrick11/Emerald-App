@@ -11,7 +11,7 @@
 import { useEntryStore } from './entryStore';
 import { useTemplateStore } from './templateStore';
 import { useBlockSessionStore } from './blockSessionStore';
-import { createMissingTags, withUsableTags } from '../lib/templateTags';
+import { withUsableTags } from '../lib/templateTags';
 import { serializeBlocks } from '../lib/blocks/blockHtml';
 import {
   contentForTemplate, fieldsWithoutTemplate, fieldsWithTemplate,
@@ -67,9 +67,7 @@ export async function applyTemplateFields(
 ): Promise<void> {
   const fields = entryFields(entryType, id);
   if (!fields) return;
-  const usable = withUsableTags(template);
-  await createMissingTags(usable.tags);
-  await writeChangedFields(id, fields, fieldsWithTemplate(fields, usable, options));
+  await writeChangedFields(id, fields, fieldsWithTemplate(fields, withUsableTags(template), options));
 }
 
 /**

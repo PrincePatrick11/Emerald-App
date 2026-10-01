@@ -119,7 +119,8 @@ writeFileSync(
    export { invalidateVaultCache } from '${process.cwd().replace(/\\/g, '/')}/src/lib/vaultManager';
    export { convertLegacySigils, needsSigilConversion, sigilRowToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLegacySigils';
    export { linkedIdsToContent, rowsLinkSource } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLinkedIdsToContent';
-   export { journalFieldsToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateJournalFieldsToContent';`
+   export { journalFieldsToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateJournalFieldsToContent';
+   export { stripTagIds, replaceTagId } from '${process.cwd().replace(/\\/g, '/')}/src/lib/tagRefs';`
 );
 
 const bundlePath = join(workDir, 'bundle.mjs');
@@ -158,6 +159,7 @@ const {
   collectUsedImageFilenames, invalidateVaultCache, copyTable, ddlBeforeV49,
   assertPayloadReferencesResolve, convertLegacySigils, migrateBackupPayload, withRoutinesAsTemplates,
   needsSigilConversion, sigilRowToContent, linkedIdsToContent, rowsLinkSource, journalFieldsToContent,
+  stripTagIds, replaceTagId,
 } = await import(pathToFileURL(bundlePath).href);
 
 /* ------------------------------------------------------------------ *
@@ -745,8 +747,14 @@ console.log('\n3b. Migration v44: Routinen werden Vorlagen\n');
   const [routineTable] = await seeded.select("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name='routines'");
   const [tpl] = await seeded.select("SELECT * FROM templates WHERE id='r1-routine'");
   check('die Tabelle routines ist weg', routineTable.n === 0);
+  // Seit v53 trägt die Vorlage die ID des Tags „ritual" — v53 hat ihn angelegt.
+  const tagNamesOf = async (db, json) => {
+    const names = [];
+    for (const id of JSON.parse(json ?? '[]')) names.push((await db.select('SELECT name FROM tags WHERE id=?1', [id]))[0]?.name);
+    return names.join(',');
+  };
   check('die Routine ist eine Vorlage mit Name, Emoji, Tags und ohne Zuweisung',
-    tpl && tpl.name === 'Morgenritual' && tpl.icon === '🌅' && tpl.tags === '["ritual"]' && tpl.assignments === '[]',
+    tpl && tpl.name === 'Morgenritual' && tpl.icon === '🌅' && (await tagNamesOf(seeded, tpl.tags)) === 'ritual' && tpl.assignments === '[]',
     JSON.stringify(tpl));
   check('Markdown wird formatiert, rohes HTML maskiert',
     tpl && tpl.content.includes('<strong>Atmen</strong>') && !tpl.content.includes('<script>') && tpl.content.includes('&lt;script&gt;'),
@@ -1916,7 +1924,8 @@ console.log('\n8n. Migration v49: drei Eintragstabellen werden entries\n');
     'Typ, Nummer, Kategorie, Icon, Titelbild und Tags bleiben',
     rows.w1?.type === 'wiki' && rows.w1.entry_number === 3 && rows.w1.category_id === 'sigils' &&
       rows.w1.icon === '🌿' && rows.w1.cover_image === 'bild.png' &&
-      rows.o1?.type === 'operation' && rows.o1.entry_number === 12 && rows.o1.tags === '["b"]' &&
+      rows.o1?.type === 'operation' && rows.o1.entry_number === 12 &&
+      (await db.select('SELECT name FROM tags WHERE id=?1', [JSON.parse(rows.o1.tags)[0]]))[0]?.name === 'b' &&
       rows.j1?.type === 'journal' && rows.j1.entry_number === 7 && rows.j1.content === '<p>J</p>',
     JSON.stringify(rows)
   );
@@ -2111,6 +2120,92 @@ console.log('\n8q. Migration v52: Altar-Elemente bekommen einen Papierkorb\n');
   migrateBackupPayload(backup);
   check("Import einer '11': ein Altar-Element bekommt updated_at = created_at",
     backup.data.altarItems[0].updated_at === '2024-02-02');
+}
+
+console.log('\n8r. Migration v53: Tags per ID\n');
+
+{
+  const db = await buildViaChain('v53.db', undefined, 52);
+  const at = '2026-01-02T03:04:05.000Z';
+  await db.execute(
+    `INSERT INTO tags (id, name, color, deleted_at, affected_ids) VALUES
+       ('tLive','Ritual','#111111',NULL,'[]'),
+       ('tGone','Mond','#222222',$1,'[{"id":"e2","type":"journal"},{"id":"e3","type":"wiki"},{"id":"weg","type":"wiki"}]'),
+       ('tTwin','alt','#333333',$1,'[{"id":"e4","type":"journal"}]'),
+       ('tTwinLive','ALT','#444444',NULL,'[]')`,
+    [at]
+  );
+  const entry = (id, type, tags, deleted = null) =>
+    db.execute(
+      `INSERT INTO entries (id, type, title, content, tags, created_at, updated_at, deleted_at) VALUES ($1,$2,'','',$3,$4,$4,$5)`,
+      [id, type, JSON.stringify(tags), at, deleted]
+    );
+  await entry('e1', 'journal', ['ritual', 'Ritual', 'Verwaist']);  // Schreibweisen + ein Name ohne Tag
+  await entry('e2', 'journal', ['Ritual']);                         // verlor „Mond" beim Löschen
+  await entry('e3', 'wiki', [], at);                               // im Papierkorb, verlor „Mond"
+  await entry('e4', 'journal', ['alt']);                            // trägt den lebenden Namensvetter „ALT"
+  await entry('e5', 'operation', ['Mond'], at);                     // im Papierkorb, behielt den Namen
+  await db.execute(
+    `INSERT INTO templates (id, name, tags, created_at, updated_at) VALUES ('tp','Vorlage','["verwaist"]',$1,$1)`, [at]
+  );
+
+  const v53 = MIGRATIONS.find((m) => m.version === 53);
+  await v53.up(db);
+  await v53.up(db);
+  const tagsOf = async (table, id) => JSON.parse((await db.select(`SELECT tags FROM ${table} WHERE id=?1`, [id]))[0].tags);
+  const orphanId = (await db.select("SELECT id FROM tags WHERE name='Verwaist'"))[0]?.id;
+  check('v53: affected_ids ist weg, auch beim zweiten Lauf',
+    !(await db.select('PRAGMA table_info(tags)')).some((c) => c.name === 'affected_ids'));
+  check('v53: Schreibweisen werden eine ID, ein Name ohne Tag bekommt einen neuen',
+    !!orphanId && JSON.stringify(await tagsOf('entries', 'e1')) === JSON.stringify(['tLive', orphanId])
+      && (await db.select("SELECT COUNT(*) AS n FROM tags WHERE lower(name)='verwaist'"))[0].n === 1,
+    JSON.stringify(await tagsOf('entries', 'e1')));
+  check('v53: die Vorlage findet denselben neuen Tag', JSON.stringify(await tagsOf('templates', 'tp')) === JSON.stringify([orphanId]));
+  check('v53: der Tag im Papierkorb steht wieder in den Zeilen, die ihn verloren — auch im Papierkorb',
+    JSON.stringify(await tagsOf('entries', 'e2')) === JSON.stringify(['tLive', 'tGone'])
+      && JSON.stringify(await tagsOf('entries', 'e3')) === JSON.stringify(['tGone']));
+  check('v53: nicht, wo inzwischen ein gleichnamiger lebender steht',
+    JSON.stringify(await tagsOf('entries', 'e4')) === JSON.stringify(['tTwinLive']), JSON.stringify(await tagsOf('entries', 'e4')));
+  check('v53: ein Name im Papierkorb wird die ID des Tags im Papierkorb',
+    JSON.stringify(await tagsOf('entries', 'e5')) === JSON.stringify(['tGone']));
+  check('v53: checkIntegrity findet keine Tag-Waisen',
+    !(await checkIntegrity(db)).some((o) => o.column === 'tags'), JSON.stringify(await checkIntegrity(db)));
+
+  // Ein Tag geht endgültig: erst aus jeder Liste.
+  await stripTagIds(db, ['tGone']);
+  check('stripTagIds nimmt die ID aus jeder Liste, auch im Papierkorb',
+    JSON.stringify(await tagsOf('entries', 'e2')) === JSON.stringify(['tLive']) && (await tagsOf('entries', 'e3')).length === 0);
+  await replaceTagId(db, 'tTwinLive', 'tLive');
+  check('replaceTagId ersetzt ohne Doppelte', JSON.stringify(await tagsOf('entries', 'e4')) === JSON.stringify(['tLive']));
+  await db.execute(`UPDATE entries SET tags='["gibtsnicht"]' WHERE id='e5'`);
+  check('checkIntegrity meldet eine Tag-ID ohne Tag',
+    (await checkIntegrity(db)).some((o) => o.column === 'tags' && o.id === 'e5'));
+  db.close();
+
+  // Eine Sicherung bis Format 11 trägt Namen.
+  const backup = {
+    version: '11',
+    data: {
+      tags: [
+        { id: 'bt1', name: 'Ritual', color: '#111111', deleted_at: null, affected_ids: '[]' },
+        { id: 'bt2', name: 'Mond', color: '#222222', deleted_at: at, affected_ids: '[{"id":"bj2","type":"journal"}]' },
+      ],
+      entries: [
+        { id: 'bj1', type: 'journal', title: '', tags: '["ritual","Neu"]' },
+        { id: 'bj2', type: 'journal', title: '', tags: '[]' },
+      ],
+      templates: [{ id: 'btp', name: 'V', tags: '["Ritual"]' }],
+      routines: [{ id: 'br', name: 'R', tags: '["Mond"]' }],
+    },
+  };
+  migrateBackupPayload(backup);
+  const fresh = backup.data.tags.find((t) => t.name === 'Neu');
+  const j = Object.fromEntries(backup.data.journalEntries.map((r) => [r.id, JSON.parse(r.tags)]));
+  check("Import einer '11': Namen werden IDs, ein Name ohne Tag bekommt einen in der Datei",
+    !!fresh && JSON.stringify(j.bj1) === JSON.stringify(['bt1', fresh.id]) && JSON.stringify(j.bj2) === JSON.stringify(['bt2'])
+      && backup.data.templates[0].tags === '["bt1"]' && backup.data.routines[0].tags === '["bt2"]'
+      && backup.data.tags.every((t) => !('affected_ids' in t)),
+    JSON.stringify(backup.data));
 }
 
 /* ------------------------------------------------------------------ *

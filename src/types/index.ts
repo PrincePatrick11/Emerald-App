@@ -23,6 +23,7 @@ export interface Entry {
   category_id: string | null;
   created_at: string;
   updated_at: string;
+  /** Tag-IDs (`lib/tagRefs.ts`) — die von Tags im Papierkorb bleiben stehen, unsichtbar. */
   tags: string[];
   deleted_at: string | null;
   entry_number?: number;

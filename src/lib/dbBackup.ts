@@ -47,6 +47,7 @@ import { linkedIdsToContent, rowsLinkSource } from './migrateLinkedIdsToContent'
 import { journalFieldsToContent } from './migrateJournalFieldsToContent';
 import { IMAGE_FIELDS, imageColumns } from './schema';
 import { ALTAR_SETTING_KEYS, altarSettingsJson, parseAltarSettings } from './altarSettings';
+import { isTagId, rewriteTagRefs, tagIdList, tagNameResolver, type LegacyTagRow } from './tagRefs';
 import { categoryKey, mergeCategoryRows, type CategorySource } from './categoryMerge';
 import { legacyDisplayName, type LegacyCategoryTable } from './categories';
 import i18n from '../i18n';
@@ -143,8 +144,9 @@ type Row = Record<string, any>;
  * `data.lexiconEntries`, '10' = seit v46 tragen Altäre `deleted_at`, '11' =
  * seit v49 stehen Journal, Wiki und Operationen als `data.entries` in einem
  * Array, jede Zeile mit `type` und ohne die Spalten, die es nicht mehr gibt,
- * '12' = seit v51 tragen Altäre ihre Darstellung als JSON-Spalte `settings`
- * und seit v52 Altar-Elemente `updated_at`/`deleted_at`.
+ * '12' = seit v51 tragen Altäre ihre Darstellung als JSON-Spalte `settings`,
+ * seit v52 Altar-Elemente `updated_at`/`deleted_at` und seit v53 Einträge und
+ * Vorlagen Tag-IDs statt Tag-Namen.
  *
  * Die '12' braucht es, weil ein älterer Build die zwölf Einzelspalten sucht:
  * `insertRows` ließe `settings` fallen, und jeder Altar käme mit den
@@ -322,6 +324,7 @@ export function migrateBackupPayload(backup: BackupFile): void {
       for (const key of ALTAR_SETTING_KEYS) delete row[key];
     }
     for (const row of data.altarItems ?? []) row.updated_at ??= row.created_at;
+    tagNamesToIds(data);
   }
 
   // Routinen (Dateien von vor v44) bleiben hier liegen: sie werden erst beim
@@ -329,6 +332,83 @@ export function migrateBackupPayload(backup: BackupFile): void {
   // zeigten ihre Links auf Einträge, die gar nicht mitkommen.
   backup.sourceVersion = version;
   backup.version = BACKUP_VERSION;
+}
+
+/**
+ * Tag-Namen einer Datei bis Format 11 werden Tag-IDs — dieselbe Regel wie
+ * Migration v53 (`tagNameResolver`): Namen ohne Tag bekommen einen neuen in
+ * `data.tags`, ein Tag im Papierkorb kommt zurück in die Zeilen, die er beim
+ * Löschen verlor. Auch die Routinen, die erst beim Import Vorlagen werden.
+ */
+function tagNamesToIds(data: BackupFile['data']): void {
+  const tags = (data.tags ?? []).filter((t) => isTagId(t.id) && typeof t.name === 'string') as unknown as LegacyTagRow[];
+  const resolver = tagNameResolver(tags, generateId);
+  const lists = [data.journalEntries, data.wikiArticles, data.operations, data.templates, data.routines];
+  for (const rows of lists) {
+    for (const row of rows ?? []) {
+      row.tags = JSON.stringify(resolver.withAffected(String(row.id), resolver.idsFor(row.tags)));
+    }
+  }
+  data.tags = [
+    ...(data.tags ?? []).map(({ affected_ids: _affected, ...tag }) => tag),
+    ...resolver.created.map((t) => ({ id: t.id, name: t.name, deleted_at: null })),
+  ];
+}
+
+/**
+ * Die Tags einer Sicherung in diesem Vault — beim Ersetzen wie beim
+ * Zusammenführen. Ein Tag mit derselben ID ist derselbe; sonst gehört ein Name
+ * einem Tag, ohne Rücksicht auf Groß-/Kleinschreibung (`tagStore`): ein
+ * gleichnamiger lokaler wird benutzt — liegt er im Papierkorb und der aus der
+ * Datei nicht, kommt er zurück. Was bleibt, kommt mit seiner ID dazu.
+ * Danach tragen die Zeilen der Datei lokale IDs; eine, die die Datei nicht
+ * auflöst (Tags abgewählt), fällt weg.
+ */
+async function withLocalTagIds(db: Awaited<ReturnType<typeof getDb>>, d: BackupFile['data']): Promise<BackupFile['data']> {
+  const local = await db.select<{ id: string; name: string; deleted_at: string | null }[]>('SELECT id, name, deleted_at FROM tags');
+  const byId = new Map(local.map((t) => [t.id, t]));
+  const byName = new Map(local.map((t) => [t.name.toLowerCase(), t]));
+  const idMap = new Map<string, string>();
+  for (const row of d.tags ?? []) {
+    const id = row.id;
+    const name = typeof row.name === 'string' ? row.name.trim() : '';
+    if (!isTagId(id) || !name) continue;
+    const hit = byId.get(id) ?? byName.get(name.toLowerCase());
+    if (hit) {
+      if (hit.deleted_at && !row.deleted_at) {
+        await db.execute('UPDATE tags SET deleted_at=NULL WHERE id=$1', [hit.id]);
+        hit.deleted_at = null;
+      }
+      idMap.set(id, hit.id);
+      continue;
+    }
+    const tag = { id, name, deleted_at: row.deleted_at == null ? null : String(row.deleted_at) };
+    await db.execute(
+      'INSERT INTO tags (id, name, color, deleted_at) VALUES ($1, $2, $3, $4)',
+      [id, name, typeof row.color === 'string' ? row.color : '#8347ff', tag.deleted_at],
+    );
+    byId.set(id, tag);
+    byName.set(name.toLowerCase(), tag);
+    idMap.set(id, id);
+  }
+  const remap = (rows: Row[] | undefined) => rows?.map((row) => ({
+    ...row,
+    tags: JSON.stringify(tagIdList(row.tags).flatMap((id) => idMap.get(id) ?? [])),
+  }));
+  return {
+    ...d,
+    tags: [],
+    journalEntries: remap(d.journalEntries),
+    wikiArticles: remap(d.wikiArticles),
+    operations: remap(d.operations),
+    templates: remap(d.templates),
+  };
+}
+
+/** Nach dem Import: Tag-IDs ohne Tag-Zeile fallen aus jeder Liste. */
+async function dropUnknownTagIds(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
+  const known = new Set((await db.select<{ id: string }[]>('SELECT id FROM tags')).map((r) => r.id));
+  await rewriteTagRefs(db, (ids) => ids.filter((id) => known.has(id)));
 }
 
 /** Teilt `data.entries` (Datei ab '11') in die Listen, mit denen der Import arbeitet. */
@@ -601,8 +681,9 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
   }
 
   // ── Tags ─────────────────────────────────────────────────────────────────
+  // Mit dem Papierkorb auch die Tags darin: Einträge tragen ihre IDs weiter.
   if (options.includeTags) {
-    data.tags = await db.select<Row[]>(`SELECT * FROM tags WHERE deleted_at IS NULL`);
+    data.tags = await db.select<Row[]>(`SELECT * FROM tags WHERE 1=1 ${deletedClause}`);
   }
 
   // ── Tasks ────────────────────────────────────────────────────────────────
@@ -1168,26 +1249,6 @@ function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFi
  * ist seit v38 modulübergreifend, und ein Teil-Replace (nur Wiki) darf den
  * Aufgaben nicht die Kategorien unter den Füßen wegziehen.
  */
-/**
- * Die Tags einer Sicherung, die beim Zusammenführen neu dazukommen. Ein Name
- * gehört einem Tag, ohne Rücksicht auf Groß-/Kleinschreibung (`tagStore`):
- * einen gleichnamigen lokalen gibt es schon — liegt er im Papierkorb, kommt
- * er zurück —, und eine andere Schreibweise wird kein zweiter.
- */
-async function newMergedTags(db: Awaited<ReturnType<typeof getDb>>, rows: Row[]): Promise<Row[]> {
-  const local = await db.select<{ id: string; name: string; deleted_at: string | null }[]>(
-    'SELECT id, name, deleted_at FROM tags'
-  );
-  const byName = new Map(local.map((t) => [t.name.toLowerCase(), t]));
-  const fresh: Row[] = [];
-  for (const row of rows) {
-    const hit = byName.get(String(row.name).toLowerCase());
-    if (!hit) fresh.push(row);
-    else if (hit.deleted_at) await db.execute("UPDATE tags SET deleted_at=NULL, affected_ids='[]' WHERE id=$1", [hit.id]);
-  }
-  return fresh;
-}
-
 async function resolveImportedCategories(
   db: Awaited<ReturnType<typeof getDb>>,
   rows: Row[],
@@ -1338,7 +1399,9 @@ export async function withRoutinesAsTemplates(db: Awaited<ReturnType<typeof getD
 
 async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
   const pathMap = await restoreImages(backup);
-  const d = await liftLegacyJournalRows(db, await withRoutinesAsTemplates(db, backup.data));
+  // Tags werden nicht ersetzt, sondern zusammengeführt: Einträge, die diese
+  // Datei nicht ersetzt, tragen die IDs der vorhandenen.
+  const d = await withLocalTagIds(db, await liftLegacyJournalRows(db, await withRoutinesAsTemplates(db, backup.data)));
 
   await assertPayloadReferencesResolve(db, d);
 
@@ -1379,7 +1442,6 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   const entryTypes = presentEntryTypes(d);
   const hasAltars = (d.altars?.length ?? 0) > 0;
   const hasTasks = (d.tasks?.length ?? 0) > 0;
-  const hasAny = entryTypes.length > 0 || hasTasks;
 
   // Die Bibliothek hängt an `hasAltars`, obwohl der Export sie inzwischen
   // unabhängig von den Altären mitnimmt: `altar_placements.item_id` ist
@@ -1405,12 +1467,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
     const chunk = entries.slice(i, i + IN_CHUNK).map((r) => String(r.id));
     await db.execute(`DELETE FROM entries WHERE id IN (${chunk.map((_, n) => `$${n + 1}`).join(',')})`, chunk);
   }
-  // Wie die Inhalte oben nur, wenn die Datei welche bringt: abgewählte Tags
-  // kommen als `[]` an, und das ist wahr.
-  if (hasAny && d.tags?.length) await db.execute('DELETE FROM tags');
-
   // Re-insert
-  if (d.tags) await insertRows(db, 'tags', d.tags, true);
   await insertRows(db, 'entries', entries);
   await insertRows(db, 'altars', altars);
   // OR IGNORE, wenn oben nicht geleert wurde: die Datei kann eine Bibliothek
@@ -1429,6 +1486,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   // gerade ersetzte Ziele verwaisen lassen — und importierte task_links
   // können auf abgewählte Typen zeigen. Gleicher Sweep wie beim Papierkorb.
   await sweepDanglingTaskLinks(db);
+  await dropUnknownTagIds(db);
   // Eine Sicherung von vor v48 bringt die englischen Standardtitel mit.
   await clearLegacyUntitledTitles(db);
 }
@@ -1439,7 +1497,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
 
 async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
   const pathMap = await restoreImages(backup);
-  const d = await liftLegacyJournalRows(db, await withRoutinesAsTemplates(db, backup.data));
+  const d = await withLocalTagIds(db, await liftLegacyJournalRows(db, await withRoutinesAsTemplates(db, backup.data)));
 
   // Merge loescht zwar nichts, bricht aber mitten im Einfuegen ab, wenn eine
   // Kategorie fehlt — vorher pruefen, damit die Meldung sagt, welche.
@@ -1579,9 +1637,8 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     target_id: remapId(r.target_id),
   }));
 
-  // Kategorien sind schon aufgelöst (resolveImportedCategories oben). Tags
-  // ohne Präfix — geteilt über den Namen, nach der Regel des Tag-Stores.
-  if (d.tags) await insertRows(db, 'tags', await newMergedTags(db, d.tags), true);
+  // Kategorien und Tags sind schon aufgelöst (resolveImportedCategories,
+  // withLocalTagIds oben).
   // Ohne Präfix: die Kopien im Inhalt nennen ihre Definition über genau diese ID.
   // Link-Vorgaben zeigen wie die Chips im Inhalt auf die umbenannten Einträge.
   await insertBlockDefinitions(db, await withStatusDefinition(
@@ -1606,6 +1663,7 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   // Importierte task_links können auf Ziele zeigen, die der Typ-Filter
   // gerade abgewählt hat — wie in doReplace ausfegen.
   await sweepDanglingTaskLinks(db);
+  await dropUnknownTagIds(db);
   await clearLegacyUntitledTitles(db);
 }
 

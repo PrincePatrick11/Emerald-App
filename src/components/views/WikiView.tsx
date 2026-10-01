@@ -24,6 +24,7 @@ import { useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEditActions } from '../../hooks/useEditActions';
 import { guardKey } from '../../store/leaveGuardStore';
 import { useEntryStore } from '../../store/entryStore';
+import { useTagMap, visibleTags } from '../../store/tagStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
@@ -33,6 +34,7 @@ import { useSessionState } from '../../store/sessionStore';
 
 export default function WikiView() {
   const { t } = useTranslation();
+  const tagMap = useTagMap();
   const { activeView, setActiveView, wikiPrefs, setWikiPrefs } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, wikiPrefs: s.wikiPrefs, setWikiPrefs: s.setWikiPrefs }))
   );
@@ -206,7 +208,7 @@ export default function WikiView() {
     const searchFiltered = search
       ? articles.filter((a) =>
           a.title.toLowerCase().includes(search.toLowerCase()) ||
-          a.tags?.some((tag) => tag.toLowerCase().includes(search.toLowerCase()))
+          visibleTags(a.tags, tagMap).some((tag) => tag.name.toLowerCase().includes(search.toLowerCase()))
         )
       : articles;
 

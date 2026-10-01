@@ -179,6 +179,9 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
   if (!q) return [];
 
   const hits: SearchHit[] = [];
+  // Einträge tragen Tag-IDs; gesucht wird im Namen der lebenden Tags.
+  const tagNames = new Map(corpus.tags.map((tag) => [tag.id, tag.name]));
+  const namesOf = (ids: string[] | undefined) => (ids ?? []).flatMap((id) => tagNames.get(id) ?? []);
 
   const push = (
     kind: SearchKind,
@@ -213,21 +216,21 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
 
   for (const entry of corpus.journal.filter(notDeleted)) {
     push('journal', entry.id, displayTitle(i18n.t, 'journal', entry.title),
-      matchRecord(q, displayTitle(i18n.t, 'journal', entry.title), entry.tags,
+      matchRecord(q, displayTitle(i18n.t, 'journal', entry.title), namesOf(entry.tags),
         () => [visibleText(entry.id, entry.updated_at, entry.content)]),
       { updatedAt: entry.updated_at, entryNumber: entry.entry_number });
   }
 
   for (const article of corpus.wiki.filter(notDeleted)) {
     push('wiki', article.id, displayTitle(i18n.t, 'wiki', article.title),
-      matchRecord(q, displayTitle(i18n.t, 'wiki', article.title), article.tags,
+      matchRecord(q, displayTitle(i18n.t, 'wiki', article.title), namesOf(article.tags),
         () => [visibleText(article.id, article.updated_at, article.content)]),
       { updatedAt: article.updated_at, categoryId: article.category_id, entryNumber: article.entry_number });
   }
 
   for (const op of corpus.operations.filter(notDeleted)) {
     push('operation', op.id, displayTitle(i18n.t, 'operation', op.title),
-      matchRecord(q, displayTitle(i18n.t, 'operation', op.title), op.tags, () => [visibleText(op.id, op.updated_at, op.content)]),
+      matchRecord(q, displayTitle(i18n.t, 'operation', op.title), namesOf(op.tags), () => [visibleText(op.id, op.updated_at, op.content)]),
       { updatedAt: op.updated_at, categoryId: op.category_id, entryNumber: op.entry_number });
   }
 

@@ -20,6 +20,7 @@ import { isCardView } from '../../lib/viewMode';
 import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY, countByCategory } from '../../lib/groupBy';
 import { useUIStore } from '../../store/uiStore';
 import { useEntryStore } from '../../store/entryStore';
+import { useTagMap, visibleTags } from '../../store/tagStore';
 import type { Entry } from '../../types';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
@@ -33,6 +34,7 @@ import { useSessionState } from '../../store/sessionStore';
 
 export default function OperationsView() {
   const { t } = useTranslation();
+  const tagMap = useTagMap();
   const { activeView, setActiveView, operationsPrefs, setOperationsPrefs } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, operationsPrefs: s.operationsPrefs, setOperationsPrefs: s.setOperationsPrefs }))
   );
@@ -207,7 +209,7 @@ export default function OperationsView() {
     const searchFiltered = search
       ? operations.filter((o) =>
           o.title.toLowerCase().includes(search.toLowerCase()) ||
-          o.tags?.some((tag) => tag.toLowerCase().includes(search.toLowerCase()))
+          visibleTags(o.tags, tagMap).some((tag) => tag.name.toLowerCase().includes(search.toLowerCase()))
         )
       : operations;
 

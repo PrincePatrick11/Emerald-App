@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { getDb, sweepDanglingTaskLinks } from '../lib/db';
 import { purgeCategory } from '../lib/schema';
 import { trashWiring } from './moduleWiring';
+import { useTagStore } from './tagStore';
 import { selectTrashedTaskRoots } from './taskStore';
 import { reassignCategoriesInMemory } from './categoryStore';
 import { definitionLabel, templateLabel } from '../lib/blocks/blockAttrs';
@@ -116,7 +117,8 @@ export const useTrashStore = create<TrashState>((set, get) => ({
   emptyTrash: async () => {
     const db = await getDb();
     await db.execute(`DELETE FROM entries WHERE deleted_at IS NOT NULL`);
-    await db.execute(`DELETE FROM tags WHERE deleted_at IS NOT NULL`);
+    // Tags hängen per ID an Einträgen — erst aus jeder Liste, dann die Zeilen.
+    await useTagStore.getState().purgeTrashedTags();
     await db.execute(`DELETE FROM task_links WHERE task_id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL)`);
     await db.execute(`DELETE FROM tasks WHERE deleted_at IS NOT NULL`);
     // Kopien in Einträgen kommen ohne ihre Definition aus — nichts nachzuziehen.

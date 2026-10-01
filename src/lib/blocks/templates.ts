@@ -50,6 +50,7 @@ export interface Template {
   title: string;
   /** Der Blockstapel, im selben Format wie der Inhalt eines Eintrags. */
   content: string;
+  /** Tag-IDs, wie bei Einträgen. */
   tags: string[];
   assignments: TemplateAssignment[];
   sort_order: number;
@@ -341,16 +342,9 @@ export function templateOriginsOf(blocks: readonly BlockInstance[]): string[] {
   return [...ids];
 }
 
-/** Tags der Vorlage an eine Liste anhängen — ohne doppelte Namen (Groß/Klein egal). */
+/** Tags (IDs) der Vorlage an eine Liste anhängen — ohne doppelte. */
 export function mergeTemplateTags(tags: readonly string[], added: readonly string[]): string[] {
-  const seen = new Set(tags.map((t) => t.toLowerCase()));
-  const out = [...tags];
-  for (const tag of added) {
-    if (seen.has(tag.toLowerCase())) continue;
-    seen.add(tag.toLowerCase());
-    out.push(tag);
-  }
-  return out;
+  return [...new Set([...tags, ...added])];
 }
 
 /** Titel und Tags eines Eintrags — was eine Vorlage außer den Blöcken berührt. */
@@ -393,9 +387,9 @@ export function fieldsWithoutTemplate(
   fields: TemplateFields,
   template: Pick<Template, 'title' | 'tags'>,
 ): TemplateFields {
-  const removed = new Set(template.tags.map((tag) => tag.toLowerCase()));
+  const removed = new Set(template.tags);
   return {
     title: template.title.trim() && fields.title === template.title.trim() ? '' : fields.title,
-    tags: fields.tags.filter((tag) => !removed.has(tag.toLowerCase())),
+    tags: fields.tags.filter((tag) => !removed.has(tag)),
   };
 }

@@ -119,8 +119,7 @@ function TagEditRow({
  * Köpfe sind die Übersicht (Farbe, Name, wo er vorkommt), aufgeklappt stehen
  * die getaggten Einträge darunter.
  *
- * Einträge speichern Tag-*Namen*, keine ids. Gezählt und gruppiert wird darum
- * nach Namen; geklappt nach id, damit ein umbenannter Tag offen bleibt.
+ * Einträge tragen Tag-IDs: gezählt, gruppiert und geklappt wird nach ID.
  */
 export default function TagsView() {
   const { t } = useTranslation();
@@ -166,14 +165,14 @@ export default function TagsView() {
     },
   });
 
-  /** Tag-Name → getaggte Einträge, in Modul-Reihenfolge, darin nach Titel. */
+  /** Tag-ID → getaggte Einträge, in Modul-Reihenfolge, darin nach Titel. */
   const itemsByTag = useMemo(() => {
     const map = new Map<string, TaggedItem[]>();
-    const add = (tagNames: string[] | undefined, item: TaggedItem) => {
-      for (const tagName of tagNames ?? []) {
-        const list = map.get(tagName);
+    const add = (tagIds: string[] | undefined, item: TaggedItem) => {
+      for (const tagId of tagIds ?? []) {
+        const list = map.get(tagId);
         if (list) list.push(item);
-        else map.set(tagName, [item]);
+        else map.set(tagId, [item]);
       }
     };
     for (const e of entries) add(e.tags, { module: 'journal', id: e.id, title: e.title, updated_at: e.updated_at });
@@ -188,18 +187,18 @@ export default function TagsView() {
 
   const usageByTag = useMemo(() => {
     const map = new Map<string, TagUsage>();
-    for (const [tagName, items] of itemsByTag) {
+    for (const [tagId, items] of itemsByTag) {
       const usage = emptyUsage();
       for (const item of items) usage[item.module]++;
-      map.set(tagName, usage);
+      map.set(tagId, usage);
     }
     return map;
   }, [itemsByTag]);
 
-  /** Tag-Name → Anzahl Vorlagen, die ihn tragen. Ein Tag nur dort ist nicht unbenutzt. */
+  /** Tag-ID → Anzahl Vorlagen, die ihn tragen. Ein Tag nur dort ist nicht unbenutzt. */
   const templateUsage = useMemo(() => {
     const map = new Map<string, number>();
-    for (const template of templates) for (const tagName of template.tags) map.set(tagName, (map.get(tagName) ?? 0) + 1);
+    for (const template of templates) for (const tagId of template.tags) map.set(tagId, (map.get(tagId) ?? 0) + 1);
     return map;
   }, [templates]);
 
@@ -209,8 +208,8 @@ export default function TagsView() {
   /** Was die Suche von einem Tag übrig lässt: passt sein Name, alle seine
    *  Einträge, sonst die, deren Titel passt. Liste und Modul-Anzahlen teilen
    *  diese eine Regel, damit die Zahlen zur Liste passen. */
-  const matchTag = useCallback((tag: { name: string }) => {
-    const all = itemsByTag.get(tag.name) ?? [];
+  const matchTag = useCallback((tag: { id: string; name: string }) => {
+    const all = itemsByTag.get(tag.id) ?? [];
     const nameMatches = !query || tag.name.toLowerCase().includes(query);
     return { nameMatches, items: nameMatches ? all : all.filter((item) => item.title.toLowerCase().includes(query)) };
   }, [itemsByTag, query]);
@@ -226,7 +225,7 @@ export default function TagsView() {
     const sortedTags = sortItems(tags, sort, {
       date: () => '',
       title: (tag) => tag.name,
-      count: (tag) => itemsByTag.get(tag.name)?.length ?? 0,
+      count: (tag) => itemsByTag.get(tag.id)?.length ?? 0,
       tiebreak: (a, b) => a.name.localeCompare(b.name),
     });
     const result: DashboardGroup<TaggedItem>[] = [];
@@ -305,7 +304,7 @@ export default function TagsView() {
 
   /** Ohne Rückfrage in den Papierkorb, wie alles andere — der Hinweis bietet Rückgängig. */
   const handleDelete = async (tag: Tag) => {
-    await deleteTag(tag.name);
+    await deleteTag(tag.id);
     pushUndo({
       id: generateId(),
       description: t('undo.tagDeleted'),
@@ -331,7 +330,7 @@ export default function TagsView() {
         <div data-tag-id={tag.id}>{editRow}</div>
       );
     }
-    const usage = usageByTag.get(tag.name);
+    const usage = usageByTag.get(tag.id);
     return (
       <div
         data-tag-id={tag.id}
@@ -345,7 +344,7 @@ export default function TagsView() {
           meta={usage
             ? <ModuleCounts modules={TAG_MODULE_IDS} counts={usage} />
             : <span className="text-xs text-stone-600">
-                {templateUsage.has(tag.name) ? t('tags.onlyInTemplates') : t('tags.unused')}
+                {templateUsage.has(tag.id) ? t('tags.onlyInTemplates') : t('tags.unused')}
               </span>}
           actions={
             // Dauerhaft sichtbar wie in der Kategorien-Ansicht.

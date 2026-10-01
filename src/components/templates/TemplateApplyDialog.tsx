@@ -7,6 +7,7 @@ import { templateLabel } from '../../lib/blocks/blockAttrs';
 import type { Template } from '../../lib/blocks/templates';
 import type { TemplateApplyOptions } from '../../store/templateApply';
 import { usableTemplateTags } from '../../lib/templateTags';
+import { useTagMap, visibleTags } from '../../store/tagStore';
 
 /**
  * Eine Vorlage in einen Eintrag, der schon Inhalt hat: anhängen oder den
@@ -21,8 +22,8 @@ export default function TemplateApplyDialog({ template, onApply, onClose }: {
   const { t } = useTranslation();
   const [mode, setMode] = useState<TemplateApplyOptions['mode']>('append');
   const hasTitle = !!template.title.trim();
-  // Nur, was wirklich ankommt — ohne Anlegen-Erlaubnis fallen unbekannte Tags weg.
-  const shownTags = usableTemplateTags(template.tags);
+  // Nur, was wirklich ankommt — ein Tag im Papierkorb bleibt in der Vorlage.
+  const shownTags = visibleTags(usableTemplateTags(template.tags), useTagMap()).map((tag) => tag.name);
   const hasTags = shownTags.length > 0;
   const [title, setTitle] = useState(false);
   const [tags, setTags] = useState(hasTags);

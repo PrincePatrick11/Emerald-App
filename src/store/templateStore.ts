@@ -30,7 +30,7 @@ import {
 } from '../lib/blocks/templates';
 import i18n from '../i18n';
 import { useSettingsStore } from './settingsStore';
-import { createMissingTags, withUsableTags } from '../lib/templateTags';
+import { withUsableTags } from '../lib/templateTags';
 
 export type TemplatePatch = Partial<Pick<Template, 'name' | 'icon' | 'title' | 'content' | 'tags' | 'assignments'>>;
 
@@ -182,9 +182,6 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
  * der Vault Standards nicht von selbst einsetzt (Einstellung). Für die
  * `create*`-Aktionen der Inhalts-Stores; Importe und Duplikate übergeben
  * `blank`, sie überschreiben den Inhalt ohnehin.
- *
- * Nebenher legt es die Tags der Vorlage an, die es noch nicht gibt
- * (`createMissingTags`) — der Eintrag trägt die Namen sofort, die Tag-Liste folgt.
  */
 export function startOfNewEntry(
   entryType: TemplateEntryType,
@@ -193,9 +190,7 @@ export function startOfNewEntry(
 ): EntryStart {
   const apply = !blank && useSettingsStore.getState().settings.templates.applyDefault;
   const template = !apply ? null : resolveDefaultTemplate(useTemplateStore.getState().templates, entryType, categoryId);
-  const start = withUsableTags(templateStart(template));
-  if (start.tags.length) void createMissingTags(start.tags).catch(console.error);
-  return start;
+  return withUsableTags(templateStart(template));
 }
 
 /** Eine gerade automatisch eingesetzte Vorlage — der Blockstapel des Eintrags zeigt dazu Rückgängig und „Andere Vorlage". */

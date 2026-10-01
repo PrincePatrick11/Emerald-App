@@ -9,6 +9,7 @@ import { useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEditActions } from '../../hooks/useEditActions';
 import { guardKey } from '../../store/leaveGuardStore';
 import { useEntryStore } from '../../store/entryStore';
+import { useTagMap, visibleTags } from '../../store/tagStore';
 import { useUndoStore } from '../../store/undoStore';
 import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
@@ -32,6 +33,7 @@ import { useSessionState } from '../../store/sessionStore';
 
 export default function JournalView() {
   const { t } = useTranslation();
+  const tagMap = useTagMap();
   const saveAsTemplateAction = useSaveAsTemplateAction();
   const { activeView, setActiveView, journalPrefs, setJournalPrefs } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, journalPrefs: s.journalPrefs, setJournalPrefs: s.setJournalPrefs }))
@@ -184,7 +186,7 @@ export default function JournalView() {
     const searchFiltered = search
       ? entries.filter((e) =>
           e.title.toLowerCase().includes(search.toLowerCase()) ||
-          e.tags?.some((tag) => tag.toLowerCase().includes(search.toLowerCase()))
+          visibleTags(e.tags, tagMap).some((tag) => tag.name.toLowerCase().includes(search.toLowerCase()))
         )
       : entries;
 
@@ -264,10 +266,10 @@ export default function JournalView() {
                 ? renameInput('text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1')
                 : <div className="text-sm font-medium text-stone-200 truncate mb-1">{displayTitle(t, 'journal', e.title)}</div>}
               <div className="text-xs text-parchment-500/70">{formatEntryDate(e.created_at)}</div>
-              {!renaming && e.tags?.length > 0 && (
+              {!renaming && visibleTags(e.tags, tagMap).length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
-                  {e.tags.slice(0, 3).map((tag) => (
-                    <span key={tag} className="px-1.5 py-0.5 rounded text-xs bg-stone-700/60 text-stone-500">{tag}</span>
+                  {visibleTags(e.tags, tagMap).slice(0, 3).map((tag) => (
+                    <span key={tag.id} className="px-1.5 py-0.5 rounded text-xs bg-stone-700/60 text-stone-500">{tag.name}</span>
                   ))}
                 </div>
               )}

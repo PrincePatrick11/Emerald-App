@@ -21,7 +21,7 @@ import type Database from '@tauri-apps/plugin-sql';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 52;
+export const BASELINE_VERSION = 53;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
@@ -60,12 +60,13 @@ export const TABLE_DDL: Record<TableName, string> = {
       applied_at TEXT NOT NULL
     )`,
 
+  // Einträge und Vorlagen tragen Tag-IDs als JSON (seit v53, vorher Namen;
+  // `lib/tagRefs.ts`). Ein Tag im Papierkorb bleibt in ihren Listen stehen.
   tags: `
     CREATE TABLE tags (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL UNIQUE,
       color TEXT NOT NULL DEFAULT '#8347ff',
-      affected_ids TEXT NOT NULL DEFAULT '[]',
       deleted_at TEXT
     )`,
 
@@ -510,8 +511,9 @@ export interface Orphan {
 
 /**
  * Prüft die Beziehungen, für die kein Foreign Key deklarierbar ist: die
- * polymorphe `task_links` und die Kategorie-IDs im JSON der Vorlagen. Foreign
- * Keys decken den Rest ab, das prüft `PRAGMA foreign_key_check`.
+ * polymorphe `task_links`, die Kategorie-IDs im JSON der Vorlagen und die
+ * Tag-IDs in Einträgen und Vorlagen. Foreign Keys decken den Rest ab, das
+ * prüft `PRAGMA foreign_key_check`.
  *
  * Nur für Verifikation und Diagnose gedacht, nicht für den Produktionspfad —
  * die Abfragen scannen mehrere Tabellen vollständig.
@@ -562,11 +564,29 @@ export async function checkIntegrity(db: Database): Promise<Orphan[]> {
     }
   }
 
+  // Tag-IDs, auch die im Papierkorb: eine ID ohne Zeile in `tags` zeigt ins Leere.
+  const tagIds = await idsOf('tags');
+  for (const table of ['entries', 'templates'] as const) {
+    const rows = await db.select<{ id: string; tags: string }[]>(`SELECT id, tags FROM ${table} WHERE tags != '[]'`);
+    for (const r of rows) {
+      for (const tag of rawJsonList(r.tags) ?? []) {
+        if (typeof tag !== 'string' || !tagIds.has(tag)) {
+          orphans.push({ table, column: 'tags', id: r.id, missingTarget: `tags.${String(tag)}` });
+        }
+      }
+    }
+  }
+
   return orphans;
 }
 
 /** Das rohe `assignments`-JSON einer Vorlagenzeile als Liste — `null`, wenn es keine ist. */
 function rawAssignments(json: string | null): unknown[] | null {
+  return rawJsonList(json);
+}
+
+/** Ein JSON-Array aus einer Spalte — `null`, wenn es keins ist. */
+function rawJsonList(json: string | null): unknown[] | null {
   try {
     const parsed: unknown = JSON.parse(json ?? '[]');
     return Array.isArray(parsed) ? parsed : null;

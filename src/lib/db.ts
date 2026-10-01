@@ -15,6 +15,8 @@ import { migrateOperationStatusToBlocks } from './migrateOperationStatusToBlocks
 import { convertLegacySigils, hasLegacySigilRows } from './migrateLegacySigils';
 import { IMAGE_FIELDS_V48, TITLED_TABLES_V48 } from './schemaV48';
 import { unifyEntries } from './unifyEntries';
+import { tagsById } from './tagsById';
+import { stripTagIds } from './tagRefs';
 import { ALTAR_SETTING_KEYS, altarSettingsJson, parseAltarSettings } from './altarSettings';
 import type { EntryType } from '../types';
 import { makeCategoryOptional } from './nullableCategory';
@@ -312,6 +314,12 @@ async function runPeriodicCleanup(db: Database, retentionDays: number | null): P
   // Papierkorb-Inhalte älter als die eingestellte Frist endgültig löschen — „nie" überspringt das.
   if (retentionDays !== null) {
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+    // Tags hängen per ID an Einträgen: wer geht, geht vorher aus jeder Liste.
+    const expiredTags = await db.select<{ id: string }[]>(
+      'SELECT id FROM tags WHERE deleted_at IS NOT NULL AND deleted_at < $1',
+      [cutoff]
+    );
+    await stripTagIds(db, expiredTags.map((t) => t.id));
     for (const table of CLEANUP_TABLES) {
       await db.execute(
         `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
@@ -1360,6 +1368,12 @@ export const MIGRATIONS: Migration[] = [
       await db.execute("UPDATE altar_items SET updated_at = created_at WHERE updated_at = ''");
       await createIndexesIfMissing(db, [ALTAR_ITEMS_INDEX_DDL]);
     },
+  },
+  {
+    // Tags per ID statt per Name (`tagsById.ts`).
+    version: 53,
+    name: 'tags_by_id',
+    up: tagsById,
   },
 ];
 

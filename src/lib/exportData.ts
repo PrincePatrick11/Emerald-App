@@ -1,4 +1,5 @@
 import { useEntryStore } from '../store/entryStore';
+import { liveTagNames } from '../store/tagStore';
 import { renderBlocksForExport, type ExportText } from './blocks/exportRender';
 import { blockLabel, fieldFallbackText } from './blocks/blockAttrs';
 import { formatIsoDateLong } from './formatDate';
@@ -64,7 +65,6 @@ export async function collectExportData(): Promise<ExportData | null> {
 
   const { journal: entries, wiki: articles, operation: operations } = useEntryStore.getState().entries;
   const { categories } = useCategoryStore.getState();
-  // entry.tags stores tag names directly (not IDs)
 
   // ── Journal ──────────────────────────────────────────────────────────────
   if (view.type === 'journal') {
@@ -81,7 +81,7 @@ export async function collectExportData(): Promise<ExportData | null> {
       content: renderBlocksForExport(entry.content, exportText()),
       createdAt: entry.created_at,
       moonPhase,
-      tagNames: (entry.tags ?? []) as string[],
+      tagNames: liveTagNames(entry.tags),
     };
   }
 
@@ -100,7 +100,7 @@ export async function collectExportData(): Promise<ExportData | null> {
       createdAt: article.created_at,
       category: cat ? { label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,
       entryIcon: article.icon || undefined,
-      tagNames: (article.tags ?? []) as string[],
+      tagNames: liveTagNames(article.tags),
     };
   }
 
@@ -119,7 +119,7 @@ export async function collectExportData(): Promise<ExportData | null> {
       createdAt: op.created_at,
       category: cat ? { label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,
       entryIcon: op.icon || undefined,
-      tagNames: (op.tags ?? []) as string[],
+      tagNames: liveTagNames(op.tags),
     };
   }
 

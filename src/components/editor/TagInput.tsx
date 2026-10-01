@@ -2,12 +2,13 @@ import { useState, useRef } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Tag, X } from 'lucide-react';
-import { useTagStore } from '../../store/tagStore';
+import { useTagMap, useTagStore, visibleTags } from '../../store/tagStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useUIStore } from '../../store/uiStore';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 
 interface TagInputProps {
+  /** Tag-IDs. Die von Tags im Papierkorb bleiben unsichtbar in der Liste stehen. */
   tags: string[];
   onChange: (tags: string[]) => void;
   readOnly?: boolean;
@@ -21,6 +22,7 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
   const { tags: allTags, ensureTag, getByName } = useTagStore(
     useShallow((s) => ({ tags: s.tags, ensureTag: s.ensureTag, getByName: s.getByName }))
   );
+  const shown = visibleTags(tags, useTagMap());
   const createInline = useSettingsStore((s) => s.settings.tags.createInline);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const [input, setInput] = useState('');
@@ -30,7 +32,7 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
   const suggestions = allTags.filter(
     (t) =>
       t.name.toLowerCase().includes(input.toLowerCase()) &&
-      !tags.includes(t.name)
+      !tags.includes(t.id)
   );
 
   const trimmedInput = input.trim();
@@ -38,28 +40,27 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
 
   const addTag = async (name: string) => {
     const trimmed = name.trim();
-    if (!trimmed || tags.includes(trimmed)) { setInput(''); return; }
+    if (!trimmed) { setInput(''); return; }
     // Ohne Anlegen-Erlaubnis nur vorhandene Tags; der Hinweis im Menü darunter
     // sagt, wo neue entstehen.
     if (!createInline && !getByName(trimmed)) { setOpen(true); return; }
-    // Die Schreibweise des Tags, nicht die getippte: ensureTag findet „foo"
-    // auch als „Foo", und Umbenennen/Löschen suchen den Namen exakt.
-    const { name: canonical } = await ensureTag(trimmed);
-    if (!tags.includes(canonical)) onChange([...tags, canonical]);
+    // ensureTag findet „foo" auch als „Foo".
+    const { id } = await ensureTag(trimmed);
+    if (!tags.includes(id)) onChange([...tags, id]);
     setInput('');
     setOpen(false);
   };
 
-  const removeTag = (name: string) => {
-    onChange(tags.filter((t) => t !== name));
+  const removeTag = (id: string) => {
+    onChange(tags.filter((t) => t !== id));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
       if (input.trim()) addTag(input);
-    } else if (e.key === 'Backspace' && !input && tags.length > 0) {
-      removeTag(tags[tags.length - 1]);
+    } else if (e.key === 'Backspace' && !input && shown.length > 0) {
+      removeTag(shown[shown.length - 1].id);
     } else if (e.key === 'Escape') {
       setOpen(false);
     }
@@ -71,25 +72,18 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
   useOutsideClick(open, () => setOpen(false), { refs: [wrapperRef] });
 
   if (readOnly) {
-    if (tags.length === 0) return null;
+    if (shown.length === 0) return null;
     return (
       <div className="flex flex-wrap gap-1.5">
-        {tags.map((name) => {
-          const tag = getByName(name);
-          return (
-            <span
-              key={name}
-              className={`px-2 rounded-full text-xs font-medium ${chipSize === 'row' ? 'h-6 inline-flex items-center' : 'py-0.5'}`}
-              style={{
-                backgroundColor: tag ? `${tag.color}20` : '#ffffff10',
-                color: tag?.color ?? '#a8a29e',
-                border: `1px solid ${tag ? `${tag.color}40` : '#ffffff20'}`,
-              }}
-            >
-              {name}
-            </span>
-          );
-        })}
+        {shown.map((tag) => (
+          <span
+            key={tag.id}
+            className={`px-2 rounded-full text-xs font-medium ${chipSize === 'row' ? 'h-6 inline-flex items-center' : 'py-0.5'}`}
+            style={{ backgroundColor: `${tag.color}20`, color: tag.color, border: `1px solid ${tag.color}40` }}
+          >
+            {tag.name}
+          </span>
+        ))}
       </div>
     );
   }
@@ -131,33 +125,26 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
   // mit rundem „×") stehen für sich, darunter das Feld „Tag hinzufügen …".
   return (
     <div ref={wrapperRef} className="relative flex flex-col gap-1">
-      {tags.length > 0 && (
+      {shown.length > 0 && (
         <div className="flex flex-wrap gap-1.5 pl-2.5 pr-3 pt-0.5 pb-1">
-          {tags.map((name) => {
-            const tag = getByName(name);
-            return (
-              <span
-                key={name}
-                className="h-6 inline-flex items-center gap-0.5 pl-2.5 pr-1 rounded-full text-xs font-medium max-w-full"
-                style={{
-                  backgroundColor: tag ? `${tag.color}20` : '#ffffff10',
-                  color: tag?.color ?? '#a8a29e',
-                  border: `1px solid ${tag ? `${tag.color}40` : '#ffffff20'}`,
-                }}
+          {shown.map((tag) => (
+            <span
+              key={tag.id}
+              className="h-6 inline-flex items-center gap-0.5 pl-2.5 pr-1 rounded-full text-xs font-medium max-w-full"
+              style={{ backgroundColor: `${tag.color}20`, color: tag.color, border: `1px solid ${tag.color}40` }}
+            >
+              <span className="min-w-0 truncate">{tag.name}</span>
+              <button
+                type="button"
+                onClick={() => removeTag(tag.id)}
+                className="tag-chip-remove flex-shrink-0"
+                title={t('properties.removeTag')}
+                aria-label={`${t('properties.removeTag')}: ${tag.name}`}
               >
-                <span className="min-w-0 truncate">{name}</span>
-                <button
-                  type="button"
-                  onClick={() => removeTag(name)}
-                  className="tag-chip-remove flex-shrink-0"
-                  title={t('properties.removeTag')}
-                  aria-label={`${t('properties.removeTag')}: ${name}`}
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            );
-          })}
+                <X size={12} />
+              </button>
+            </span>
+          ))}
         </div>
       )}
       {/* Eingerückt wie die Zeilen der Seitenleiste, nicht wie ihre Überschriften. */}
