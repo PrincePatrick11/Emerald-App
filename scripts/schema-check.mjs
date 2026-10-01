@@ -1767,8 +1767,8 @@ console.log('\n8k. Migration v46: Altaere bekommen einen Papierkorb\n');
   );
 
   await db.execute(
-    `INSERT INTO altars (id,title,background_preset,created_at,updated_at)
-     VALUES ('a1','Altar','midnight',?1,?1)`,
+    `INSERT INTO altars (id,title,created_at,updated_at)
+     VALUES ('a1','Altar',?1,?1)`,
     [now]
   );
   await db.execute(`INSERT INTO altar_items (id,name,emoji,note,created_at) VALUES ('i1','Kerze','x','',?1)`, [now]);
@@ -1963,7 +1963,7 @@ console.log('\n8n. Migration v49: drei Eintragstabellen werden entries\n');
   );
   let rejected = false;
   try {
-    migrateBackupPayload({ ...backup, version: '12', data: {} });
+    migrateBackupPayload({ ...backup, version: '99', data: {} });
   } catch {
     rejected = true;
   }
@@ -2037,6 +2037,49 @@ console.log('\n8o. Migration v50: tote Spalten gehen\n');
     altar?.title === 'Altar' && altar?.grid_size === 40 && placements.n === 1
       && (await db.select("SELECT title FROM tasks WHERE id='t1'"))[0]?.title === 'Aufgabe');
   db.close();
+}
+
+console.log('\n8p. Migration v51: die Darstellung eines Altars wird JSON\n');
+
+{
+  const db = await buildViaChain('v51.db', undefined, 50);
+  await db.execute(
+    `INSERT INTO altars (id, title, background_preset, background_image_data, grid_enabled, grid_size, grid_color,
+       snap_to_grid, rotation_snap_angle, resolution, created_at, updated_at)
+     VALUES ('a1','Altar','forest','bg.png',1,48,'#112233',1,30,'4:3',$1,$1), ('a2','Standard','midnight',NULL,0,32,'#dce8e2',0,15,'1920x1080',$1,$1)`,
+    [now]
+  );
+  await db.execute(`INSERT INTO altar_items (id, name, created_at) VALUES ('i1','Kerze',$1)`, [now]);
+  await db.execute(`INSERT INTO altar_placements (id, altar_id, item_id) VALUES ('p1','a1','i1')`);
+  const v51 = MIGRATIONS.find((m) => m.version === 51);
+  await v51.up(db);
+  await v51.up(db);
+  const cols = (await db.select('PRAGMA table_info(altars)')).map((c) => c.name);
+  check('v51: settings ist da, die zwölf Einzelspalten sind weg, auch beim zweiten Lauf',
+    cols.includes('settings') && !cols.includes('grid_size') && !cols.includes('resolution') && !cols.includes('background_preset'),
+    cols.join(','));
+  const [a1] = await db.select("SELECT settings, background_image_data FROM altars WHERE id='a1'");
+  const s1 = JSON.parse(a1.settings);
+  check('v51: die Werte stehen in settings, das Hintergrundbild bleibt Spalte',
+    s1.background_preset === 'forest' && s1.grid_enabled === true && s1.grid_size === 48 && s1.grid_color === '#112233'
+      && s1.snap_to_grid === true && s1.rotation_snap_angle === 30 && s1.resolution === '4:3' && a1.background_image_data === 'bg.png',
+    a1.settings);
+  check('v51: die Platzierungen bleiben',
+    (await db.select('SELECT COUNT(*) AS n FROM altar_placements'))[0].n === 1);
+  db.close();
+
+  // Eine Sicherung bis Format 11 trägt die Einzelspalten.
+  const backup = {
+    version: '11',
+    data: { altars: [{ id: 'a', title: 'A', grid_size: 64, snap_to_grid: 1, background_overlay: 0.5, resolution: 'kaputt' }] },
+  };
+  migrateBackupPayload(backup);
+  const row = backup.data.altars[0];
+  const s = JSON.parse(row.settings);
+  check("Import einer '11': die Einzelspalten werden settings, Kaputtes fällt auf den Standard",
+    s.grid_size === 64 && s.snap_to_grid === true && s.background_overlay === 0.5 && s.resolution === '1920x1080'
+      && !('grid_size' in row) && row.title === 'A',
+    JSON.stringify(row));
 }
 
 /* ------------------------------------------------------------------ *

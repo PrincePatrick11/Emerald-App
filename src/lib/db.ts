@@ -10,11 +10,12 @@ import { adoptLegacyImages, rewriteImageRefs } from './images';
 import { migrateLinkedIdsToContent } from './migrateLinkedIdsToContent';
 import { migrateJournalFieldsToContent } from './migrateJournalFieldsToContent';
 import { mergeCategoryTables } from './mergeCategoryTables';
-import { backupDatabaseFile, createIndexesIfMissing, dropColumnsIfPresent } from './dbRebuild';
+import { backupDatabaseFile, columnNames, createIndexesIfMissing, dropColumnsIfPresent } from './dbRebuild';
 import { migrateOperationStatusToBlocks } from './migrateOperationStatusToBlocks';
 import { convertLegacySigils, hasLegacySigilRows } from './migrateLegacySigils';
 import { IMAGE_FIELDS_V48, TITLED_TABLES_V48 } from './schemaV48';
 import { unifyEntries } from './unifyEntries';
+import { ALTAR_SETTING_KEYS, altarSettingsJson, parseAltarSettings } from './altarSettings';
 import type { EntryType } from '../types';
 import { makeCategoryOptional } from './nullableCategory';
 import { seedSigilTemplate } from './templateRows';
@@ -1334,7 +1335,30 @@ export const MIGRATIONS: Migration[] = [
       await dropColumnsIfPresent(db, 'altars', ['intention']);
     },
   },
+  {
+    // Die zwölf Darstellungsspalten eines Altars werden eine JSON-Spalte
+    // `settings` (`lib/altarSettings.ts`). Ohne Neubau der Tabelle — ein DROP
+    // TABLE risse über ON DELETE CASCADE die Platzierungen mit. Wiederholbar:
+    // gefüllt wird nur, wo `settings` noch leer ist, und weg geht erst danach.
+    version: 51,
+    name: 'altar_settings',
+    up: altarSettingsToJson,
+  },
 ];
+
+async function altarSettingsToJson(db: Database): Promise<void> {
+  const columns = await columnNames(db, 'altars');
+  if (!ALTAR_SETTING_KEYS.some((key) => columns.has(key))) return;
+  await backupDatabaseFile(db, 'v51');
+  if (!columns.has('settings')) {
+    await db.execute("ALTER TABLE altars ADD COLUMN settings TEXT NOT NULL DEFAULT '{}'");
+  }
+  const rows = await db.select<Record<string, unknown>[]>("SELECT * FROM altars WHERE settings = '{}'");
+  for (const row of rows) {
+    await db.execute('UPDATE altars SET settings=$1 WHERE id=$2', [altarSettingsJson(parseAltarSettings(row)), row.id]);
+  }
+  await dropColumnsIfPresent(db, 'altars', ALTAR_SETTING_KEYS);
+}
 
 /** Die Tabellen, deren Zeilen einen Titel tragen, der leer sein darf. */
 const TITLED_TABLES = ['entries', 'tasks', 'altars'] as const;

@@ -21,7 +21,7 @@ import type Database from '@tauri-apps/plugin-sql';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 50;
+export const BASELINE_VERSION = 51;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
@@ -134,28 +134,20 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
+  // `settings` (seit v51) ist JSON: Hintergrund, Raster, Einrasten und
+  // Auflösung (`lib/altarSettings.ts`) — vorher zwölf eigene Spalten. Die
+  // Bildspalten bleiben Spalten, das Bild-Aufräumen sucht dort.
   altars: `
     CREATE TABLE altars (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL DEFAULT 'Untitled Altar',
-      background_preset TEXT NOT NULL DEFAULT 'midnight',
       background_image_data TEXT,
-      background_overlay REAL NOT NULL DEFAULT 0.2,
-      background_overlay_color TEXT NOT NULL DEFAULT 'dark',
-      grid_enabled INTEGER NOT NULL DEFAULT 0,
-      grid_size REAL NOT NULL DEFAULT 32,
-      grid_opacity REAL NOT NULL DEFAULT 0.06,
-      grid_color TEXT NOT NULL DEFAULT '#dce8e2',
-      snap_to_grid INTEGER NOT NULL DEFAULT 0,
-      rotation_snap_enabled INTEGER NOT NULL DEFAULT 0,
-      rotation_snap_angle REAL NOT NULL DEFAULT 15,
-      snap_scale_to_grid INTEGER NOT NULL DEFAULT 0,
-      resolution TEXT NOT NULL DEFAULT '1920x1080',
       thumbnail_data TEXT,
       icon_data TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
-      deleted_at TEXT
+      deleted_at TEXT,
+      settings TEXT NOT NULL DEFAULT '{}'
     )`,
 
   // Journal-Einträge, Wiki-Artikel und Operationen in einer Tabelle (seit v49;

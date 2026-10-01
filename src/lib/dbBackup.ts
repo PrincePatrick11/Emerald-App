@@ -46,6 +46,7 @@ import { needsSigilConversion, sigilRowToContent, type LegacySigilRow } from './
 import { linkedIdsToContent, rowsLinkSource } from './migrateLinkedIdsToContent';
 import { journalFieldsToContent } from './migrateJournalFieldsToContent';
 import { IMAGE_FIELDS, imageColumns } from './schema';
+import { ALTAR_SETTING_KEYS, altarSettingsJson, parseAltarSettings } from './altarSettings';
 import { categoryKey, mergeCategoryRows, type CategorySource } from './categoryMerge';
 import { legacyDisplayName, type LegacyCategoryTable } from './categories';
 import i18n from '../i18n';
@@ -141,7 +142,12 @@ type Row = Record<string, any>;
  * `data.templates` mit, '9' = seit v45 das Lexikon als `data.languages` und
  * `data.lexiconEntries`, '10' = seit v46 tragen Altäre `deleted_at`, '11' =
  * seit v49 stehen Journal, Wiki und Operationen als `data.entries` in einem
- * Array, jede Zeile mit `type` und ohne die Spalten, die es nicht mehr gibt.
+ * Array, jede Zeile mit `type` und ohne die Spalten, die es nicht mehr gibt,
+ * '12' = seit v51 tragen Altäre ihre Darstellung als JSON-Spalte `settings`.
+ *
+ * Die '12' braucht es, weil ein älterer Build die zwölf Einzelspalten sucht:
+ * `insertRows` ließe `settings` fallen, und jeder Altar käme mit den
+ * Standardwerten an. Mit der '12' lehnt er die Datei ab.
  *
  * Die '11' braucht es, weil ein älterer Build die Einträge unter
  * `journalEntries`/`wikiArticles`/`operations` sucht: er fände dort nichts und
@@ -159,7 +165,7 @@ type Row = Record<string, any>;
  * Prüfung „neuer als ich" (`backup.version > BACKUP_VERSION`) die Datei ehrlich
  * ab, bevor irgendetwas passiert.
  */
-const BACKUP_VERSION = '11' as const;
+const BACKUP_VERSION = '12' as const;
 
 /** Die vier Kategorie-Arrays von Sicherungen bis Version 3. */
 interface LegacyCategoryArrays {
@@ -307,6 +313,14 @@ export function migrateBackupPayload(backup: BackupFile): void {
   // mit unbekanntem Typ fällt weg — in `entries` gäbe es für sie kein Modul.
   if (version >= 11) splitEntries(data);
 
+  // v11 → v12: die Einzelspalten der Altäre werden `settings`.
+  if (version < 12) {
+    for (const row of data.altars ?? []) {
+      row.settings = altarSettingsJson(parseAltarSettings(row));
+      for (const key of ALTAR_SETTING_KEYS) delete row[key];
+    }
+  }
+
   // Routinen (Dateien von vor v44) bleiben hier liegen: sie werden erst beim
   // Import Vorlagen (`withRoutinesAsTemplates`), nach den Filtern — sonst
   // zeigten ihre Links auf Einträge, die gar nicht mitkommen.
@@ -387,7 +401,7 @@ function presentEntryTypes(d: BackupFile['data']): EntryType[] {
 }
 
 interface BackupFile {
-  version: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11';
+  version: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12';
   /** Die Version, mit der die Datei geschrieben wurde — `migrateBackupPayload` setzt `version` auf die aktuelle. */
   sourceVersion?: number;
   type: 'backup';

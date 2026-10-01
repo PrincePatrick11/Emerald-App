@@ -32,6 +32,7 @@ import {
 } from './blocks/definitions';
 import { DEFAULT_TEMPLATE_ICON, parseAssignments, type Template } from './blocks/templates';
 import { DEFAULT_LANGUAGE_ICON, parseAlphabet } from './lexicon';
+import { parseAltarSettings } from './altarSettings';
 
 /** Eine rohe Zeile, wie sie aus `db.select` kommt. */
 export type DbRow = Record<string, unknown>;
@@ -198,21 +199,10 @@ export const fromRow = {
     return {
       id: str(r.id),
       title: str(r.title),
-      background_preset: str(r.background_preset),
+      ...parseAltarSettings(r.settings),
       background_image_data: nullableStr(r.background_image_data),
-      background_overlay: num(r.background_overlay, 0.2),
-      background_overlay_color: str(r.background_overlay_color),
       created_at: str(r.created_at),
       updated_at: str(r.updated_at),
-      grid_enabled: bool(r.grid_enabled),
-      grid_size: num(r.grid_size, 32),
-      grid_opacity: num(r.grid_opacity, 0.06),
-      grid_color: str(r.grid_color),
-      snap_to_grid: bool(r.snap_to_grid),
-      rotation_snap_enabled: bool(r.rotation_snap_enabled),
-      rotation_snap_angle: num(r.rotation_snap_angle, 15),
-      snap_scale_to_grid: bool(r.snap_scale_to_grid),
-      resolution: str(r.resolution),
       thumbnail_data: nullableStr(r.thumbnail_data),
       icon_data: nullableStr(r.icon_data),
       deleted_at: nullableStr(r.deleted_at),

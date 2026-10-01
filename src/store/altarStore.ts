@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { saveImage } from '../lib/images';
 import { getDb } from '../lib/db';
-import { ALTAR_RATIOS, DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY, DEFAULT_OVERLAY_COLOR, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE, isRatioFormat, parseResolution } from '../lib/altarConstants';
+import { ALTAR_RATIOS, isRatioFormat, parseResolution } from '../lib/altarConstants';
+import { altarSettingsJson, parseAltarSettings } from '../lib/altarSettings';
 import { generateId, isValidHexColor, nowIso } from '../lib/helpers';
 import { needsWrite, stampFor, type WriteOptions } from '../lib/stamp';
 import { serialKey, serialized } from '../lib/serialize';
@@ -33,8 +34,8 @@ function filterEachPreview(
 async function insertAltarRow(altar: AltarRecord): Promise<void> {
   const db = await getDb();
   await db.execute(
-    'INSERT INTO altars (id, title, background_preset, background_image_data, background_overlay, background_overlay_color, created_at, updated_at, grid_enabled, grid_size, grid_opacity, grid_color, snap_to_grid, rotation_snap_enabled, rotation_snap_angle, snap_scale_to_grid, resolution, thumbnail_data, icon_data) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)',
-    [altar.id, altar.title, altar.background_preset, altar.background_image_data, altar.background_overlay, altar.background_overlay_color, altar.created_at, altar.updated_at, toInt(altar.grid_enabled), altar.grid_size, altar.grid_opacity, altar.grid_color, toInt(altar.snap_to_grid), toInt(altar.rotation_snap_enabled), altar.rotation_snap_angle, toInt(altar.snap_scale_to_grid), altar.resolution, altar.thumbnail_data ?? null, altar.icon_data ?? null],
+    'INSERT INTO altars (id, title, settings, background_image_data, created_at, updated_at, thumbnail_data, icon_data) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+    [altar.id, altar.title, altarSettingsJson(altar), altar.background_image_data, altar.created_at, altar.updated_at, altar.thumbnail_data ?? null, altar.icon_data ?? null],
   );
 }
 
@@ -80,19 +81,8 @@ async function fetchPlacementsForAltar(altarId: string, items: AltarItem[]): Pro
 function normalizeAltar(altar: AltarRecord): AltarRecord {
   return {
     ...altar,
-    background_preset: altar.background_preset || DEFAULT_ALTAR_BACKGROUND,
+    ...parseAltarSettings(altar),
     background_image_data: altar.background_image_data ?? null,
-    background_overlay: altar.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY,
-    background_overlay_color: altar.background_overlay_color ?? DEFAULT_OVERLAY_COLOR,
-    grid_enabled: Boolean(altar.grid_enabled),
-    grid_size: altar.grid_size ?? DEFAULT_GRID_SIZE,
-    grid_opacity: altar.grid_opacity ?? DEFAULT_GRID_OPACITY,
-    grid_color: isValidHexColor(altar.grid_color) ? altar.grid_color : DEFAULT_GRID_COLOR,
-    snap_to_grid: Boolean(altar.snap_to_grid),
-    rotation_snap_enabled: Boolean(altar.rotation_snap_enabled),
-    rotation_snap_angle: altar.rotation_snap_angle ?? 15,
-    snap_scale_to_grid: Boolean(altar.snap_scale_to_grid),
-    resolution: (/^\d+x\d+$/.test(altar.resolution ?? '') || isRatioFormat(altar.resolution ?? '')) ? altar.resolution : DEFAULT_ALTAR_RESOLUTION,
     thumbnail_data: altar.thumbnail_data ?? null,
   };
 }
@@ -246,21 +236,11 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       id: generateId(),
       // Leer — angezeigt wird „Unbenannter Altar" (`displayTitle`).
       title: '',
-      background_preset: DEFAULT_ALTAR_BACKGROUND,
+      // Ohne Vorgabe: lauter Standardwerte.
+      ...parseAltarSettings({}),
       background_image_data: null,
-      background_overlay: DEFAULT_BACKGROUND_OVERLAY,
-      background_overlay_color: DEFAULT_OVERLAY_COLOR,
       created_at: createdAt ?? now,
       updated_at: now,
-      grid_enabled: false,
-      grid_size: DEFAULT_GRID_SIZE,
-      grid_opacity: DEFAULT_GRID_OPACITY,
-      grid_color: DEFAULT_GRID_COLOR,
-      snap_to_grid: false,
-      rotation_snap_enabled: false,
-      rotation_snap_angle: 15,
-      snap_scale_to_grid: false,
-      resolution: DEFAULT_ALTAR_RESOLUTION,
     };
     await insertAltarRow(altar);
     set((s) => ({
@@ -283,21 +263,10 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const copy: AltarRecord = {
       id: newId,
       title: displayTitle(i18n.t, 'altar', source.title) + i18n.t('common.copySuffix'),
-      background_preset: source.background_preset || DEFAULT_ALTAR_BACKGROUND,
+      ...parseAltarSettings(source),
       background_image_data: source.background_image_data ?? null,
-      background_overlay: source.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY,
-      background_overlay_color: source.background_overlay_color ?? DEFAULT_OVERLAY_COLOR,
       created_at: now,
       updated_at: now,
-      grid_enabled: source.grid_enabled,
-      grid_size: source.grid_size,
-      grid_opacity: source.grid_opacity,
-      grid_color: source.grid_color,
-      snap_to_grid: source.snap_to_grid,
-      rotation_snap_enabled: source.rotation_snap_enabled,
-      rotation_snap_angle: source.rotation_snap_angle,
-      snap_scale_to_grid: source.snap_scale_to_grid,
-      resolution: source.resolution ?? DEFAULT_ALTAR_RESOLUTION,
       thumbnail_data: source.thumbnail_data ?? null,
       icon_data: source.icon_data ?? null,
     };
@@ -357,8 +326,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const db = await getDb();
     const updated: AltarRecord = { ...altar, ...patch, updated_at: stampFor(altar.updated_at, touch) };
     await db.execute(
-      'UPDATE altars SET title=$1, background_preset=$2, background_image_data=$3, background_overlay=$4, background_overlay_color=$5, updated_at=$6, thumbnail_data=$7, icon_data=$8 WHERE id=$9',
-      [updated.title, updated.background_preset || DEFAULT_ALTAR_BACKGROUND, updated.background_image_data ?? null, updated.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY, updated.background_overlay_color ?? DEFAULT_OVERLAY_COLOR, updated.updated_at, updated.thumbnail_data ?? null, updated.icon_data ?? null, id]
+      'UPDATE altars SET title=$1, settings=$2, background_image_data=$3, updated_at=$4, thumbnail_data=$5, icon_data=$6 WHERE id=$7',
+      [updated.title, altarSettingsJson(parseAltarSettings(updated)), updated.background_image_data ?? null, updated.updated_at, updated.thumbnail_data ?? null, updated.icon_data ?? null, id]
     );
     set((s) => {
       const cur = s.altars.find(e => e.id === id);
@@ -387,8 +356,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const db = await getDb();
     const next: AltarRecord = { ...altar, ...grid, updated_at: stampFor(altar.updated_at) };
     await db.execute(
-      'UPDATE altars SET grid_enabled=$1, grid_size=$2, grid_opacity=$3, grid_color=$4, snap_to_grid=$5, rotation_snap_enabled=$6, rotation_snap_angle=$7, snap_scale_to_grid=$8, updated_at=$9 WHERE id=$10',
-      [toInt(next.grid_enabled), next.grid_size, next.grid_opacity, next.grid_color, toInt(next.snap_to_grid), toInt(next.rotation_snap_enabled), next.rotation_snap_angle, toInt(next.snap_scale_to_grid), next.updated_at, id]
+      'UPDATE altars SET settings=$1, updated_at=$2 WHERE id=$3',
+      [altarSettingsJson(next), next.updated_at, id]
     );
     set((s) => ({
       altars: s.altars.map((entry) => (entry.id === id ? next : entry)).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
@@ -410,7 +379,10 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const updated_at = stampFor(altar.updated_at);
     // Das Vorschaubild bleibt: „Fertig" und das Verlassen rechnen es ohnehin
     // neu, und ein Import brächte sonst sein passendes nicht mit.
-    await db.execute('UPDATE altars SET resolution=$1, updated_at=$2 WHERE id=$3', [safeRes, updated_at, id]);
+    await db.execute(
+      'UPDATE altars SET settings=$1, updated_at=$2 WHERE id=$3',
+      [altarSettingsJson({ ...altar, resolution: safeRes }), updated_at, id],
+    );
     set((s) => ({
       altars: s.altars
         .map((entry) => (entry.id === id ? { ...entry, resolution: safeRes, updated_at } : entry))
@@ -461,17 +433,11 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     if (!get().altars.some((entry) => entry.id === altar.id)) return;
     await db.execute(
       `UPDATE altars SET
-        title=$1, background_preset=$2, background_image_data=$3, background_overlay=$4,
-        background_overlay_color=$5, grid_enabled=$6, grid_size=$7, grid_opacity=$8, grid_color=$9,
-        snap_to_grid=$10, rotation_snap_enabled=$11, rotation_snap_angle=$12, snap_scale_to_grid=$13,
-        resolution=$14, thumbnail_data=$15, icon_data=$16, updated_at=$17
-       WHERE id=$18`,
+        title=$1, settings=$2, background_image_data=$3, thumbnail_data=$4, icon_data=$5, updated_at=$6
+       WHERE id=$7`,
       [
-        altar.title, altar.background_preset || DEFAULT_ALTAR_BACKGROUND, altar.background_image_data ?? null,
-        altar.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY, altar.background_overlay_color ?? DEFAULT_OVERLAY_COLOR,
-        toInt(altar.grid_enabled), altar.grid_size, altar.grid_opacity, altar.grid_color,
-        toInt(altar.snap_to_grid), toInt(altar.rotation_snap_enabled), altar.rotation_snap_angle, toInt(altar.snap_scale_to_grid),
-        altar.resolution, altar.thumbnail_data ?? null, altar.icon_data ?? null, altar.updated_at,
+        altar.title, altarSettingsJson(parseAltarSettings(altar)), altar.background_image_data ?? null,
+        altar.thumbnail_data ?? null, altar.icon_data ?? null, altar.updated_at,
         altar.id,
       ],
     );
