@@ -1,37 +1,22 @@
 # Components
 
-The app's shared building blocks and the rules for when to use them. This file is a
-**specification**, not an inventory — it answers "does this already exist?" and "may I
-deviate here?".
+The app's shared building blocks and the rules for when to use them. This file is a **specification**, not an inventory — it answers "does this already exist?" and "may I deviate here?".
 
-For the *look* of these building blocks (colour values, radius, icon sizes, theme classes)
-see [`design.md`](design.md). For their place in the module tree see
-[`architecture.md`](architecture.md). What is recorded here is the contract only: what a
-building block encapsulates and what the caller supplies.
+For the *look* of these building blocks (colour values, radius, icon sizes, theme classes) see [`design.md`](design.md). For their place in the module tree see [`architecture.md`](architecture.md). What is recorded here is the contract only: what a building block encapsulates and what the caller supplies.
 
 ## Rule
 
-**Search first, then build.** Before every new component, every new Tailwind class-chain
-recipe and every new utility function: check the catalogue below.
+**Search first, then build.** Before every new component, every new Tailwind class-chain recipe and every new utility function: check the catalogue below.
 
-**A deviation needs a reason in the code.** Not in a commit message and not in this file,
-but as a comment at the place that deviates. Whoever trips over it in a year reads the
-code, not the history. The sections [When Deviating Is Right](#when-deviating-is-right) and
-[Known Duplication](#known-duplication) are the exceptions that already have this scrutiny
-behind them.
+**A deviation needs a reason in the code.** Not in a commit message and not in this file, but as a comment at the place that deviates. Whoever trips over it in a year reads the code, not the history. The sections [When Deviating Is Right](#when-deviating-is-right) and [Known Duplication](#known-duplication) are the exceptions that already have this scrutiny behind them.
 
-**A third copy means centralise.** Two similar places are not yet duplication — at the
-third it is established that this is a pattern and not a coincidence. Abstracting earlier
-produces a component that fits nobody.
+**A third copy means centralise.** Two similar places are not yet duplication — at the third it is established that this is a pattern and not a coincidence. Abstracting earlier produces a component that fits nobody.
 
 ## Chrome Principle
 
-Every shared building block here standardises **the shell, not the content**: frame,
-surface, position, open/close, keyboard behaviour. What goes inside stays the caller's
-business.
+Every shared building block here standardises **the shell, not the content**: frame, surface, position, open/close, keyboard behaviour. What goes inside stays the caller's business.
 
-The escape hatch is therefore **part of the contract, not a loophole**. Using it does not
-bypass the component — it uses it as intended:
+The escape hatch is therefore **part of the contract, not a loophole**. Using it does not bypass the component — it uses it as intended:
 
 | Building block | Escape hatch | Intended for |
 | --- | --- | --- |
@@ -44,9 +29,7 @@ bypass the component — it uses it as intended:
 | `EntryDetailFrame` | `children` plus the `meta`/`aboveTitle`/`belowTitle` slots | everything below the shared header-row/title/tag shell — the entry's own body and per-module extras |
 | `Button` | `className` is **appended**, not replaced | layout and spacing per call site |
 
-The converse holds too: a shell you end up overriding completely is the wrong shell. If
-`className` on a `Button` undoes half the variant, a variant is missing — and it belongs in
-`Button`, not in the caller.
+The converse holds too: a shell you end up overriding completely is the wrong shell. If `className` on a `Button` undoes half the variant, a variant is missing — and it belongs in `Button`, not in the caller.
 
 ## Catalogue
 
@@ -56,767 +39,241 @@ Each entry: what it is and when to use it, then its extension points (*Ext.*).
 
 **Actions and confirmation**
 
-- **`Button`** — **every** action button. Five variants (`primary`/`primaryDanger`/
-  `secondary`/`ghost`/`danger`; `primaryDanger` is `primary`'s shape in red, from the
-  `--danger-solid-*` tokens) plus a tinted row-action mode (`tone`: `jade`/`amber`/
-  `danger`/`neutral`). *Ext.:* `className` (appended), `compact`, `small` (tone mode only —
-  24px instead of 30px for dense rows such as category headers; its icon belongs on the 12px
-  step), `fill`, `active`.
-- **`InlineConfirm`** — the "Sure? Yes, delete / Cancel" confirmation in place of a row's
-  actions. When it shows is the caller's business (a `confirming…` state); `onConfirm` only
-  executes. Use it where nothing can be undone (Trash, the entry type's dropped properties,
-  the Blocks page's "Update all"); deletes that land in the Trash with an undo toast
-  (Categories, Tags, altar library items) need no confirmation. *Ext.:* `message`,
-  `confirmLabel`, `tone` (`danger` default, `jade` for a confirmation that changes rather
-  than deletes), `small` (24px buttons), `wrap` (for the right sidebar's narrow column),
-  `variant: 'banner'` (full-width strip on the `--danger-bg`/`--danger-border` tokens for
-  dialogs; always a delete; currently no caller).
+- **`Button`** — **every** action button. Five variants (`primary`/`primaryDanger`/ `secondary`/`ghost`/`danger`; `primaryDanger` is `primary`'s shape in red, from the `--danger-solid-*` tokens) plus a tinted row-action mode (`tone`: `jade`/`amber`/ `danger`/`neutral`). *Ext.:* `className` (appended), `compact`, `small` (tone mode only — 24px instead of 30px for dense rows such as category headers; its icon belongs on the 12px step), `fill`, `active`.
+- **`InlineConfirm`** — the "Sure? Yes, delete / Cancel" confirmation in place of a row's actions. When it shows is the caller's business (a `confirming…` state); `onConfirm` only executes. Use it where nothing can be undone (Trash, the entry type's dropped properties, the Blocks page's "Update all"); deletes that land in the Trash with an undo toast (Categories, Tags, altar library items) need no confirmation. *Ext.:* `message`, `confirmLabel`, `tone` (`danger` default, `jade` for a confirmation that changes rather than deletes), `small` (24px buttons), `wrap` (for the right sidebar's narrow column), `variant: 'banner'` (full-width strip on the `--danger-bg`/`--danger-border` tokens for dialogs; always a delete; currently no caller).
 
 **Overlays and menus**
 
-- **`Modal`** — overlay, card, header with close X, `createPortal`, escape-to-close.
-  *Ext.:* `children`; `dismissible={false}` removes all three ways to close at once;
-  `className`/`bodyClassName`/`widthClassName`/`maxHeightClassName`.
-- **`ContextMenu`** — right-click menu: portal, edge logic, closes on click and Escape in
-  the capture phase, so a menu above a `Modal` doesn't also close the modal (whose Escape
-  handler hangs off the same `document`). A row's `onMouseDown` cancels default, so an
-  existing text selection survives the click (needed for `EditContextMenu`'s Cut/Copy). The
-  menu is `w-max`, so it never shrinks against the window edge while being measured.
-  *Ext.:* `actions: ContextMenuAction[]` (each with `icon`, `danger`, `disabled` — dimmed
-  via opacity), `align="right"` (`x` is the right edge — the edit sidebar's value-button
-  menus), `minWidth` (default 160).
-- **`EditContextMenu`** — the app's own right-click menu for text, built on `ContextMenu`:
-  Cut/Copy/Paste/Select all in an editable field, Copy on selected read-only text. The
-  native menu stays for the rich-text editor (spell-check suggestions can't be reproduced
-  from JS) and for any element whose own handler called `preventDefault`. Rendered once in
-  `App.tsx`, beside `AppShell` rather than inside it, because `AppShell` returns early for
-  the first-run vault-setup screen. Reuses the title bar's `editCommands.ts` and the
-  `menu.*` i18n keys. *Ext.:* none.
-- **`EmojiPicker`** — emoji popover: open/close, portal, search across the full localised
-  emoji set, outside click, Escape in the capture phase. *Ext.:* `trigger` render prop,
-  `emojis` (default: the vault's own set from Settings → Entries, falling back to
-  `DEFAULT_EMOJI_PICKER_EMOJIS`; pass it explicitly to bypass the vault's set, e.g. the vault
-  modal's icon picker), `align`, `size`.
-- **`Dropdown`** — generic themed dropdown menu (Home's section toolbar, `CategorySelect`,
-  `TaskRow`'s priority menu, block field values, …). *Ext.:* `trigger` render prop (the
-  `EmojiPicker` convention), `portal` (fixed position, opens upward when short on room —
-  needed inside the right sidebar's overflow container), `label`, option `emoji`/`icon`/
-  `className`, option `disabled`/`title`, `align`.
-- **`FieldDropdown`** — a `Dropdown` in the properties-field look: full width, field-frame
-  border, trailing chevron, always portalled (the sidebars scroll). Used by
-  `CategorySelect`'s `field` variant and `SortSelect`. *Ext.:* `value`/`options`/
-  `onChange`, `triggerText`, `align`, `variant="sidebar"` (selected option's `icon` leads,
-  13px text, `ChevronsUpDown` — lines up with the `SwitchRow`s below), `ariaLabel`.
-- **`CategorySelect`** — the themed category picker, built on `Dropdown`. Its list opens
-  with "Uncategorized", a real value (`null`): what a new entry carries, and picking it
-  clears an assignment. *Ext.:* `variant` (`field` — portals, e.g. `AltarItemModal`;
-  `chip` — `TaskRow`), `align`, `title`.
+- **`Modal`** — overlay, card, header with close X, `createPortal`, escape-to-close. *Ext.:* `children`; `dismissible={false}` removes all three ways to close at once; `className`/`bodyClassName`/`widthClassName`/`maxHeightClassName`.
+- **`ContextMenu`** — right-click menu: portal, edge logic, closes on click and Escape in the capture phase, so a menu above a `Modal` doesn't also close the modal (whose Escape handler hangs off the same `document`). A row's `onMouseDown` cancels default, so an existing text selection survives the click (needed for `EditContextMenu`'s Cut/Copy). The menu is `w-max`, so it never shrinks against the window edge while being measured. *Ext.:* `actions: ContextMenuAction[]` (each with `icon`, `danger`, `disabled` — dimmed via opacity), `align="right"` (`x` is the right edge — the edit sidebar's value-button menus), `minWidth` (default 160).
+- **`EditContextMenu`** — the app's own right-click menu for text, built on `ContextMenu`: Cut/Copy/Paste/Select all in an editable field, Copy on selected read-only text. The native menu stays for the rich-text editor (spell-check suggestions can't be reproduced from JS) and for any element whose own handler called `preventDefault`. Rendered once in `App.tsx`, beside `AppShell` rather than inside it, because `AppShell` returns early for the first-run vault-setup screen. Reuses the title bar's `editCommands.ts` and the `menu.*` i18n keys. *Ext.:* none.
+- **`EmojiPicker`** — emoji popover: open/close, portal, search across the full localised emoji set, outside click, Escape in the capture phase. *Ext.:* `trigger` render prop, `emojis` (default: the vault's own set from Settings → Entries, falling back to `DEFAULT_EMOJI_PICKER_EMOJIS`; pass it explicitly to bypass the vault's set, e.g. the vault modal's icon picker), `align`, `size`.
+- **`Dropdown`** — generic themed dropdown menu (Home's section toolbar, `CategorySelect`, `TaskRow`'s priority menu, block field values, …). *Ext.:* `trigger` render prop (the `EmojiPicker` convention), `portal` (fixed position, opens upward when short on room — needed inside the right sidebar's overflow container), `label`, option `emoji`/`icon`/ `className`, option `disabled`/`title`, `align`.
+- **`FieldDropdown`** — a `Dropdown` in the properties-field look: full width, field-frame border, trailing chevron, always portalled (the sidebars scroll). Used by `CategorySelect`'s `field` variant and `SortSelect`. *Ext.:* `value`/`options`/ `onChange`, `triggerText`, `align`, `variant="sidebar"` (selected option's `icon` leads, 13px text, `ChevronsUpDown` — lines up with the `SwitchRow`s below), `ariaLabel`.
+- **`CategorySelect`** — the themed category picker, built on `Dropdown`. Its list opens with "Uncategorized", a real value (`null`): what a new entry carries, and picking it clears an assignment. *Ext.:* `variant` (`field` — portals, e.g. `AltarItemModal`; `chip` — `TaskRow`), `align`, `title`.
 
 **Global singletons** — rendered once in `AppShell`; never add them per view.
 
-- **`UndoToast`** — global undo toast, fed from `undoStore`. The store holds **one**
-  action, the latest; a new `push` replaces it (older deletions are restored from the
-  Trash). `dismiss()` also runs on a vault switch, because the action restores rows by id in
-  whichever database is open.
-- **`layout/LeaveGuardModal`** — the question when a page with unsaved edits is left (Keep
-  editing / Discard / Save), fed from `store/leaveGuardStore.ts`. A page takes part by
-  registering a guard (`useEditActions`' `guard`, or `useDraftPage`), never by rendering its
-  own dialog.
+- **`UndoToast`** — global undo toast, fed from `undoStore`. The store holds **one** action, the latest; a new `push` replaces it (older deletions are restored from the Trash). `dismiss()` also runs on a vault switch, because the action restores rows by id in whichever database is open.
+- **`layout/LeaveGuardModal`** — the question when a page with unsaved edits is left (Keep editing / Discard / Save), fed from `store/leaveGuardStore.ts`. A page takes part by registering a guard (`useEditActions`' `guard`, or `useDraftPage`), never by rendering its own dialog.
 - **`ImportDestinationModal`** — destination picker on import.
-- **`ImageNoticeModal`** — the one notice for an image insert that didn't happen (wrong
-  format, or too large after scaling to the vault's limits), fed from `imageNoticeStore`.
-  Covers every insert path without a notice line of its own (paste, drop, toolbar, a field
-  block's image slot). Call sites use `useImageNoticeStore.getState().show(notice)` or
-  `reportImageError(err, context)`.
+- **`ImageNoticeModal`** — the one notice for an image insert that didn't happen (wrong format, or too large after scaling to the vault's limits), fed from `imageNoticeStore`. Covers every insert path without a notice line of its own (paste, drop, toolbar, a field block's image slot). Call sites use `useImageNoticeStore.getState().show(notice)` or `reportImageError(err, context)`.
 
 **Dashboards**
 
-- **`Dashboard`** — chrome of the overview screens: the six modules plus Blocks, Home and
-  Categories (both via `grouping: 'custom'`, for the header alone) and Tags (`category`
-  mode, one group per tag). Owns title, search, actions, toolbar, filter, grouping, empty
-  state.
-  - *Layout:* title (`DashboardTitle`, the title alone — no icon, no count) and search
-    (`ListSearchField`) sit inline in one row above the content. Actions, `ListToolbar` and
-    `FilterPanel` live only in the right sidebar, portalled via `SidebarPortal`; closing the
-    sidebar removes those, while title and search stay — see
-    [Architecture → List Header Portal](architecture/editing.md#list-header-portal).
-  - *Header:* `title`; `headerLeft` replaces the whole title row (Trash: `DashboardTitle`
-    plus its "select all" toggle as `children`). `view`/`sort`/`onView`/`onSort` are
-    optional — a view with neither axis (`CategoriesView`) gets no toolbar row.
-  - *Items and grouping:* `renderItem`; `grouping` (`flat`/`timeline`/`category`/
-    `custom`); category mode's `isGroupCollapsed` (a collapsed group renders only its
-    header; the chevron lives in the caller's `renderGroupHeader`). Category mode drops
-    empty groups centrally; `keepEmptyGroups` opts out for groups that matter in their own
-    right (Tags, where an unused tag must stay visible to be managed), and only then is
-    `renderEmptyGroup` reached. `sortModes` narrows or extends the sort choice; `groupBy`
-    (`{ value: GroupingMode, onChange, label? }`) adds the grouping axis, independent of
-    `sort`.
-  - *Actions:* `primaryAction` (`DashboardPrimaryAction`: a labelled button filling the
-    `SidebarActionBar` — jade with "+" by default; `danger` makes it the red
-    `btn-primary-danger`, `icon` replaces the "+", `disabled`). Trash's "Empty trash"/
-    "Delete selected" confirm there: the label turns into "Yes, …", clicks within 400 ms of
-    arming are ignored so a double-click can't pass it, and a cancel X joins via
-    `extraActions`. `extraActions` are compact icon-only `neutral` buttons beside it (label
-    in a tooltip), for a secondary area of the same module — e.g. Altar's "add item".
-  - *Sections:* `contentHeader` / `contentFooter` render above/below the content, also in
-    the empty and no-results states — a heading for the main list, or a second area of the
-    module (the Altar library, Blocks' read-only built-in blocks). The exported
-    `GroupDivider` (label, optional `collapsed`/`onToggleCollapse`, deliberately no count,
-    so every section heading reads the same) is the timeline groups' divider and these
-    sections' heading.
-  - *Grids:* `cardsClassName`/`wideCardsClassName` — separate props, since a module may fill
-    the wide card differently (Altar's taller preview).
-  - *Empty and no results:* `emptyState` renders `EmptyState`, its icon the view's rail icon
-    (`MODULES[id].icon` / `AUX_VIEWS[id].icon`); `hasNoResults` and a category mode with no
-    surviving group render `NoResults`, using `search`/`onSearch` and `filters.onClearAll`.
-- **`DashboardItem`** — a clickable item inside a `Dashboard`: the `panel-interactive`
-  frame (`layout: 'row' | 'card'`); click opens `view` via `setActiveView`, middle-click via
-  `openViewInNewTab`. With `editing` it renders the same frame as a plain `div` without its
-  handlers, for in-place renaming with `RenameField`. Used by every dashboard's item
-  rendering, the altar cards and Home. `.panel-interactive` carries its own `:focus-visible`
-  ring in both theme blocks. *Ext.:* `view`, `layout`, `onContextMenu`, `editing`,
-  `children`.
-- **`EmptyState`** — the one empty state of a dashboard or one of its sections (designer's
-  pattern "1b"): no box, a 44px icon tile, an 18px title in the entry-title font, one 13px
-  sentence saying what belongs here (not that it is empty), a 30px neutral "+ New …"
-  button. Placed at the top of the content, not vertically centred, so nothing jumps when
-  the first item appears. Texts live under `emptyState.<view>.title/description`. A
-  dashboard's other sections stay visible when it is empty. Rendered by `Dashboard` and
-  directly by custom-mode views and sections with their own empty case (Tasks, Trash, Home's
-  sections, the Altar library, the Lexicon's translate panel). The left entry list has its
-  own two-line version in place of the first row. *Ext.:* `icon`, `title`, `description`,
-  `actionLabel` + `onAction` (both or no button), `actionIcon` (default `Plus`),
-  `className`.
-  - **`NoResults`** (same file) — the same layout for "search/filters left nothing":
-    `SearchX`, a sentence naming the query, "Reset filters" clearing search and filters at
-    once. *Ext.:* `query`, `filtered`, `onReset`.
-- **`ListToolbar`** — the view/sort/grouping sections of `Dashboard`'s sidebar header, each
-  under a `label-xs` heading. Every axis is optional; with none, it renders nothing.
-  View: `IconToggleGroup` with `fill` (List/Cards/Cards-wide/Timeline). Sort: `SortSelect`;
-  in the Timeline a blocked sort (name/count) shows as newest first while the stored sort
-  stays and applies again when the layout is left. Grouping: a `SwitchRow` "Group by
-  {label}" (default "category"; en/es/fr lowercase it via the `lowercase` i18n formatter),
-  greyed out in Timeline. *Ext.:* `sortModes` (default the four date/name modes;
-  `count_desc` for Tags and Blocks), `sortDate` (`SortDateField`: `created`/`updated`/
-  `deleted`), `sortLabel` (replaces the sort heading — Altar).
-- **`SortSelect`** (exported from `ListToolbar.tsx`) — the full-width sort select of the
-  dashboard sidebar, the selected mode's icon and label in the trigger, a `FieldDropdown`
-  with `variant="sidebar"`; also the Altar library's own sort. *Ext.:* `label`, `value`,
-  `modes`, `onChange`, `dateField`, `isDisabled` + `disabledHint`.
-- **`ListSearchField`** (exported from `ListToolbar.tsx`) — a dashboard's search field,
-  rendered by `Dashboard` in the main area beside the title. *Ext.:* `value`/`onChange`,
-  `placeholder`, `className` (width — `Dashboard` passes `w-[260px]`).
-- **`FilterPanel`** — the always-visible filter column under `ListToolbar`. Order:
-  `extraGroups` (labelled groups for controls that are neither filters nor display toggles
-  — the Altar library's sort and grouping), `displayToggles` (`{ label, icon, checked,
-  onChange }[]` as `SwitchRow`s under "Display" — view preferences, not counted in
-  `activeFilterCount` and left alone by a reset), the primary `FilterList` (`chips`,
-  `chipLabel`, `onAllChips` + `allChipsCount`), a second one (`statusChips`, `statusLabel`,
-  `onAllStatus` + `allStatusCount` — Tasks' priorities). No "clear all": each list's "All"
-  row clears it. *Ext.:* `FilterPanelProps`, passed through as `filters.panelProps`;
-  `activeFilterCount`/`onClearAll` sit beside it on `filters` and only back the no-results
-  reset.
-- **`FilterList`** — a filter as a vertical list: icon or emoji, label, count; an "All" row
-  on top (`Asterisk`, total). Multi-select; "All" is active while nothing is selected and
-  clears the selection. Rows are `.filter-row`, counts dimmed at 0. *Ext.:* `chips:
-  FilterChip[]` (`{ value, label, emoji?, icon?, count? }` — count over the list after
-  search but without this filter, so it holds still while toggling), `selected`,
-  `onToggle`, `onAll`, `allCount`, `label`.
-- **`IconToggleGroup`** — a bordered row of icon buttons, one segment per option, active
-  one filled, no visible label (aria-label and tooltips). The dashboard view row, the
-  entry-type picker, the cells of a template's assignment grid. *Ext.:* `fill` (full width,
-  equal segments), `isDisabled` + `disabledHint`, `value: null` for a mixed state.
-- **`TabIconButton`** — active/idle toggle behind `IconToggleGroup`'s segments. *Ext.:*
-  `active`, `compact` (26px instead of 30px), `disabled` (with `title` — deliberately keeps
-  pointer events so the tooltip still shows).
-- **`Switch` / `SwitchRow`** — an on/off switch (`role="switch"`, `.switch`, thumb colours
-  `--switch-thumb`/`--switch-thumb-on`; on is a muted jade track, not the full accent) and a
-  row of icon, label and switch where the whole row is the label. For settings that take
-  effect immediately (dashboard sidebar toggles, a block page's "Display", the Settings
-  window's Entries page). A block's yes/no field (`ToggleSwitch` in `FieldValueEditor`)
-  stays separate: there the value is content, not a control. *Ext.:* `checked`, `onChange`,
-  `disabled`, `title`; `SwitchRow` adds `icon`, `label`, `hint` (a wrapping muted line; the
-  switch aligns with the first text line), `variant` (`sidebar`: indented like the edit
-  sidebar's rows, hover surface; `panel`: flush with the fields above, no hover).
-- **`CollapsibleGroupHeader`** — the **one** group header: chevron, fixed `w-5` emoji
-  column, label, `count`/`meta`/`actions` slots, and a jade "+" that creates an entry in
-  that group. Category groups in Wiki/Operations/Tasks/Altar, their "Uncategorized" buckets
-  (no "+" — nothing can be created in a trashed category), Journal's moon-phase groups, the
-  tag groups in `TagsView`. It manages nothing itself: `TagsView` hands its colour dot and
-  rename/delete buttons in. *Ext.:* `onToggleCollapse` (omit for a non-collapsible header),
-  `collapsed`, `emoji`, `leading` (a node in the emoji column), `count` (renders "(n)"),
-  `add` (`{ title, onClick }` — one prop so the icon button cannot lack an accessible name;
-  `Button`'s tone mode at 24px), `meta`, `actions`.
+- **`Dashboard`** — chrome of the overview screens: the six modules plus Blocks, Home and Categories (both via `grouping: 'custom'`, for the header alone) and Tags (`category` mode, one group per tag). Owns title, search, actions, toolbar, filter, grouping, empty state.
+  - *Layout:* title (`DashboardTitle`, the title alone — no icon, no count) and search (`ListSearchField`) sit inline in one row above the content. Actions, `ListToolbar` and `FilterPanel` live only in the right sidebar, portalled via `SidebarPortal`; closing the sidebar removes those, while title and search stay — see [Architecture → List Header Portal](architecture/editing.md#list-header-portal).
+  - *Header:* `title`; `headerLeft` replaces the whole title row (Trash: `DashboardTitle` plus its "select all" toggle as `children`). `view`/`sort`/`onView`/`onSort` are optional — a view with neither axis (`CategoriesView`) gets no toolbar row.
+  - *Items and grouping:* `renderItem`; `grouping` (`flat`/`timeline`/`category`/ `custom`); category mode's `isGroupCollapsed` (a collapsed group renders only its header; the chevron lives in the caller's `renderGroupHeader`). Category mode drops empty groups centrally; `keepEmptyGroups` opts out for groups that matter in their own right (Tags, where an unused tag must stay visible to be managed), and only then is `renderEmptyGroup` reached. `sortModes` narrows or extends the sort choice; `groupBy` (`{ value: GroupingMode, onChange, label? }`) adds the grouping axis, independent of `sort`.
+  - *Actions:* `primaryAction` (`DashboardPrimaryAction`: a labelled button filling the `SidebarActionBar` — jade with "+" by default; `danger` makes it the red `btn-primary-danger`, `icon` replaces the "+", `disabled`). Trash's "Empty trash"/ "Delete selected" confirm there: the label turns into "Yes, …", clicks within 400 ms of arming are ignored so a double-click can't pass it, and a cancel X joins via `extraActions`. `extraActions` are compact icon-only `neutral` buttons beside it (label in a tooltip), for a secondary area of the same module — e.g. Altar's "add item".
+  - *Sections:* `contentHeader` / `contentFooter` render above/below the content, also in the empty and no-results states — a heading for the main list, or a second area of the module (the Altar library, Blocks' read-only built-in blocks). The exported `GroupDivider` (label, optional `collapsed`/`onToggleCollapse`, deliberately no count, so every section heading reads the same) is the timeline groups' divider and these sections' heading.
+  - *Grids:* `cardsClassName`/`wideCardsClassName` — separate props, since a module may fill the wide card differently (Altar's taller preview).
+  - *Empty and no results:* `emptyState` renders `EmptyState`, its icon the view's rail icon (`MODULES[id].icon` / `AUX_VIEWS[id].icon`); `hasNoResults` and a category mode with no surviving group render `NoResults`, using `search`/`onSearch` and `filters.onClearAll`.
+- **`DashboardItem`** — a clickable item inside a `Dashboard`: the `panel-interactive` frame (`layout: 'row' | 'card'`); click opens `view` via `setActiveView`, middle-click via `openViewInNewTab`. With `editing` it renders the same frame as a plain `div` without its handlers, for in-place renaming with `RenameField`. Used by every dashboard's item rendering, the altar cards and Home. `.panel-interactive` carries its own `:focus-visible` ring in both theme blocks. *Ext.:* `view`, `layout`, `onContextMenu`, `editing`, `children`.
+- **`EmptyState`** — the one empty state of a dashboard or one of its sections (designer's pattern "1b"): no box, a 44px icon tile, an 18px title in the entry-title font, one 13px sentence saying what belongs here (not that it is empty), a 30px neutral "+ New …" button. Placed at the top of the content, not vertically centred, so nothing jumps when the first item appears. Texts live under `emptyState.<view>.title/description`. A dashboard's other sections stay visible when it is empty. Rendered by `Dashboard` and directly by custom-mode views and sections with their own empty case (Tasks, Trash, Home's sections, the Altar library, the Lexicon's translate panel). The left entry list has its own two-line version in place of the first row. *Ext.:* `icon`, `title`, `description`, `actionLabel` + `onAction` (both or no button), `actionIcon` (default `Plus`), `className`.
+  - **`NoResults`** (same file) — the same layout for "search/filters left nothing": `SearchX`, a sentence naming the query, "Reset filters" clearing search and filters at once. *Ext.:* `query`, `filtered`, `onReset`.
+- **`ListToolbar`** — the view/sort/grouping sections of `Dashboard`'s sidebar header, each under a `label-xs` heading. Every axis is optional; with none, it renders nothing. View: `IconToggleGroup` with `fill` (List/Cards/Cards-wide/Timeline). Sort: `SortSelect`; in the Timeline a blocked sort (name/count) shows as newest first while the stored sort stays and applies again when the layout is left. Grouping: a `SwitchRow` "Group by {label}" (default "category"; en/es/fr lowercase it via the `lowercase` i18n formatter), greyed out in Timeline. *Ext.:* `sortModes` (default the four date/name modes; `count_desc` for Tags and Blocks), `sortDate` (`SortDateField`: `created`/`updated`/ `deleted`), `sortLabel` (replaces the sort heading — Altar).
+- **`SortSelect`** (exported from `ListToolbar.tsx`) — the full-width sort select of the dashboard sidebar, the selected mode's icon and label in the trigger, a `FieldDropdown` with `variant="sidebar"`; also the Altar library's own sort. *Ext.:* `label`, `value`, `modes`, `onChange`, `dateField`, `isDisabled` + `disabledHint`.
+- **`ListSearchField`** (exported from `ListToolbar.tsx`) — a dashboard's search field, rendered by `Dashboard` in the main area beside the title. *Ext.:* `value`/`onChange`, `placeholder`, `className` (width — `Dashboard` passes `w-[260px]`).
+- **`FilterPanel`** — the always-visible filter column under `ListToolbar`. Order: `extraGroups` (labelled groups for controls that are neither filters nor display toggles — the Altar library's sort and grouping), `displayToggles` (`{ label, icon, checked, onChange }[]` as `SwitchRow`s under "Display" — view preferences, not counted in `activeFilterCount` and left alone by a reset), the primary `FilterList` (`chips`, `chipLabel`, `onAllChips` + `allChipsCount`), a second one (`statusChips`, `statusLabel`, `onAllStatus` + `allStatusCount` — Tasks' priorities). No "clear all": each list's "All" row clears it. *Ext.:* `FilterPanelProps`, passed through as `filters.panelProps`; `activeFilterCount`/`onClearAll` sit beside it on `filters` and only back the no-results reset.
+- **`FilterList`** — a filter as a vertical list: icon or emoji, label, count; an "All" row on top (`Asterisk`, total). Multi-select; "All" is active while nothing is selected and clears the selection. Rows are `.filter-row`, counts dimmed at 0. *Ext.:* `chips: FilterChip[]` (`{ value, label, emoji?, icon?, count? }` — count over the list after search but without this filter, so it holds still while toggling), `selected`, `onToggle`, `onAll`, `allCount`, `label`.
+- **`IconToggleGroup`** — a bordered row of icon buttons, one segment per option, active one filled, no visible label (aria-label and tooltips). The dashboard view row, the entry-type picker, the cells of a template's assignment grid. *Ext.:* `fill` (full width, equal segments), `isDisabled` + `disabledHint`, `value: null` for a mixed state.
+- **`TabIconButton`** — active/idle toggle behind `IconToggleGroup`'s segments. *Ext.:* `active`, `compact` (26px instead of 30px), `disabled` (with `title` — deliberately keeps pointer events so the tooltip still shows).
+- **`Switch` / `SwitchRow`** — an on/off switch (`role="switch"`, `.switch`, thumb colours `--switch-thumb`/`--switch-thumb-on`; on is a muted jade track, not the full accent) and a row of icon, label and switch where the whole row is the label. For settings that take effect immediately (dashboard sidebar toggles, a block page's "Display", the Settings window's Entries page). A block's yes/no field (`ToggleSwitch` in `FieldValueEditor`) stays separate: there the value is content, not a control. *Ext.:* `checked`, `onChange`, `disabled`, `title`; `SwitchRow` adds `icon`, `label`, `hint` (a wrapping muted line; the switch aligns with the first text line), `variant` (`sidebar`: indented like the edit sidebar's rows, hover surface; `panel`: flush with the fields above, no hover).
+- **`CollapsibleGroupHeader`** — the **one** group header: chevron, fixed `w-5` emoji column, label, `count`/`meta`/`actions` slots, and a jade "+" that creates an entry in that group. Category groups in Wiki/Operations/Tasks/Altar, their "Uncategorized" buckets (no "+" — nothing can be created in a trashed category), Journal's moon-phase groups, the tag groups in `TagsView`. It manages nothing itself: `TagsView` hands its colour dot and rename/delete buttons in. *Ext.:* `onToggleCollapse` (omit for a non-collapsible header), `collapsed`, `emoji`, `leading` (a node in the emoji column), `count` (renders "(n)"), `add` (`{ title, onClick }` — one prop so the icon button cannot lack an accessible name; `Button`'s tone mode at 24px), `meta`, `actions`.
 - **`CollapseChevron`** — the one collapse/expand arrow. *Ext.:* `collapsed`, `onToggle`.
-- **`ModuleCounts`** — per-module usage counters: module icon plus number, dimmed at 0,
-  module name in the tooltip (`CategoriesView` rows, `TagsView` group headers). *Ext.:*
-  `modules` (fixed column order, so numbers line up), `counts`.
+- **`ModuleCounts`** — per-module usage counters: module icon plus number, dimmed at 0, module name in the tooltip (`CategoriesView` rows, `TagsView` group headers). *Ext.:* `modules` (fixed column order, so numbers line up), `counts`.
 
 **Entry list, detail frames, renaming**
 
-- **`EntryListTab`** — rows of the left entry list: search (a borderless `h-14` row on the
-  frame), empty state, inline rename, drag start, context menu. The module's own dashboard
-  carries the "New …" action. *Ext.:* `getId`/`getTitle`/`getEditTitle`/`getIcon`/
-  `getDateStr`, `onDragStart` (all-or-nothing per config — every module is a link target),
-  `contextMenuActions`, `renderRow`. `getTitle` is what a row shows (`displayTitle`);
-  `getEditTitle` is what renaming starts from (the stored title) and defaults to `getTitle`,
-  so a caller with untitled entries must pass it or Enter would save the placeholder.
-- **`EntryDetailFrame`** — the detail-view frame of Journal, Wiki and Operations: header row
-  (`EntryHeaderRow` — back link plus date, or `EntryStatus` while editing/unsaved), title
-  block (input ↔ `h1` showing `displayTitle`, placeholder from the registry's `untitledKey`,
-  both on `ENTRY_TITLE_HEADING_CLASSES`), optional read-only tag row, and a body that always
-  scrolls in the frame (`BlockStack`'s sticky toolbar needs the frame to be the scroll
-  container). Edit mode is entered only via the right sidebar's Edit button. `EntryHeaderRow`,
-  `EntryStatus` and `ENTRY_TITLE_HEADING_CLASSES` are exported for `LibraryPageFrame` and
-  `AltarView`. *Ext.:* `meta`, `aboveTitle`, `belowTitle` slots.
-- **`LibraryPageFrame`** — the detail-view frame of a library page (a user-built block, a
-  template, a language): the same `EntryHeaderRow` shell, name-as-title input, scrolling
-  body, and the right sidebar's column portalled via `SidebarColumn`. The frame owns the
-  shell; what stands in the sidebar's action bar is the page's business. *Ext.:* `draft`
-  (`{dirty, busy, onDone, onCancel, onDelete}` — a page that saves only on "Done": adds the
-  "Unsaved" status, `EditActionBar`, and Done/Cancel above the title while the sidebar is
-  closed) **or** `actions` (a page that saves immediately brings its own bar content);
-  `backLabel`/`onBack`, `name`/`nameLabel`/`namePlaceholder`/`onNameChange`, `sidebar`,
-  `children`.
-- **`RenameField`** — the in-place rename input: Enter and blur commit, Escape cancels. The
-  content of a `DashboardItem` with `editing`. `EntryListTab`, `LeftSidebarEntryList` and
-  `TaskRow` still carry their own copy. *Ext.:* `value`/`onChange`, `onCommit`/`onCancel`,
-  `className` (the caller's type styles).
-- **`InlineNameEditor`** — body of a one-line name editor: input (Enter saves, Escape
-  cancels), error text, jade Save and neutral Cancel icon buttons. A bare fragment —
-  `CategoryEditRow` and `TagEditRow` wrap it with their own leading glyph. *Ext.:* `value`/
-  `onChange`, `error`, `onSave`/`onCancel`, `placeholder`.
+- **`EntryListTab`** — rows of the left entry list: search (a borderless `h-14` row on the frame), empty state, inline rename, drag start, context menu. The module's own dashboard carries the "New …" action. *Ext.:* `getId`/`getTitle`/`getEditTitle`/`getIcon`/ `getDateStr`, `onDragStart` (all-or-nothing per config — every module is a link target), `contextMenuActions`, `renderRow`. `getTitle` is what a row shows (`displayTitle`); `getEditTitle` is what renaming starts from (the stored title) and defaults to `getTitle`, so a caller with untitled entries must pass it or Enter would save the placeholder.
+- **`EntryDetailFrame`** — the detail-view frame of Journal, Wiki and Operations: header row (`EntryHeaderRow` — back link plus date, or `EntryStatus` while editing/unsaved), title block (input ↔ `h1` showing `displayTitle`, placeholder from the registry's `untitledKey`, both on `ENTRY_TITLE_HEADING_CLASSES`), optional read-only tag row, and a body that always scrolls in the frame (`BlockStack`'s sticky toolbar needs the frame to be the scroll container). Edit mode is entered only via the right sidebar's Edit button. `EntryHeaderRow`, `EntryStatus` and `ENTRY_TITLE_HEADING_CLASSES` are exported for `LibraryPageFrame` and `AltarView`. *Ext.:* `meta`, `aboveTitle`, `belowTitle` slots.
+- **`LibraryPageFrame`** — the detail-view frame of a library page (a user-built block, a template, a language): the same `EntryHeaderRow` shell, name-as-title input, scrolling body, and the right sidebar's column portalled via `SidebarColumn`. The frame owns the shell; what stands in the sidebar's action bar is the page's business. *Ext.:* `draft` (`{dirty, busy, onDone, onCancel, onDelete}` — a page that saves only on "Done": adds the "Unsaved" status, `EditActionBar`, and Done/Cancel above the title while the sidebar is closed) **or** `actions` (a page that saves immediately brings its own bar content); `backLabel`/`onBack`, `name`/`nameLabel`/`namePlaceholder`/`onNameChange`, `sidebar`, `children`.
+- **`RenameField`** — the in-place rename input: Enter and blur commit, Escape cancels. The content of a `DashboardItem` with `editing`. `EntryListTab`, `LeftSidebarEntryList` and `TaskRow` still carry their own copy. *Ext.:* `value`/`onChange`, `onCommit`/`onCancel`, `className` (the caller's type styles).
+- **`InlineNameEditor`** — body of a one-line name editor: input (Enter saves, Escape cancels), error text, jade Save and neutral Cancel icon buttons. A bare fragment — `CategoryEditRow` and `TagEditRow` wrap it with their own leading glyph. *Ext.:* `value`/ `onChange`, `error`, `onSave`/`onCancel`, `placeholder`.
 
 **Right sidebar shell**
 
-- **`SidebarColumn`** — the shell of a right-sidebar column: a `bar` on top, the scrolling
-  `p-3` body below. The one place the column's horizontal inset is set — a panel adding its
-  own `px-*` would misalign its rows against the bar's `px-3`. Used by `RightSidebar`,
-  `Dashboard`'s header and the library pages. *Ext.:* `bar`, `bodyClassName` (appended).
-- **`SidebarActionBar` / `EditActionBar`** (in `SidebarColumn.tsx`) — the 56px bar at the
-  top of a `SidebarColumn`, the same height as the entry list's search row so both sidebars
-  line up, but the only one of the two with a divider under it (`.sidebar-divider` on
-  `--sheet-border`): it sits on the sheet, the search row on the frame. `SidebarActionBar`
-  is the bare `px-3` row; `EditActionBar` is Done/Delete/Cancel inside one (edit mode and
-  every draft library page): "Done" is the one filled primary action (`.edit-bar-done`,
-  `--control-h` tall), Delete and Cancel are squares beside it (`.edit-bar-icon`). *Ext.:*
-  `children`; `onDone`, `onDelete` (omit for no Delete), `onCancel`, `busy`.
-- **`SidebarGroup`** (in `SidebarColumn.tsx`) — a labelled section of the sidebar body:
-  `label-xs` heading, `role="group"`. *Ext.:* `label`, `children`.
-- **`SidebarPortal`** — renders into `uiStore.listHeaderHost`, or nothing if the sidebar is
-  closed. Read by `Dashboard` and the library pages; `MainArea` renders one view at a time,
-  so only one is ever mounted. *Ext.:* `children`.
-- **`RailButton`** — icon buttons of the left rail and the title bar, a thin wrapper around
-  `.btn-ghost`. *Ext.:* full `ButtonHTMLAttributes`, plus `active` (`.rail-button.active` and
-  `aria-current="page"`).
+- **`SidebarColumn`** — the shell of a right-sidebar column: a `bar` on top, the scrolling `p-3` body below. The one place the column's horizontal inset is set — a panel adding its own `px-*` would misalign its rows against the bar's `px-3`. Used by `RightSidebar`, `Dashboard`'s header and the library pages. *Ext.:* `bar`, `bodyClassName` (appended).
+- **`SidebarActionBar` / `EditActionBar`** (in `SidebarColumn.tsx`) — the 56px bar at the top of a `SidebarColumn`, the same height as the entry list's search row so both sidebars line up, but the only one of the two with a divider under it (`.sidebar-divider` on `--sheet-border`): it sits on the sheet, the search row on the frame. `SidebarActionBar` is the bare `px-3` row; `EditActionBar` is Done/Delete/Cancel inside one (edit mode and every draft library page): "Done" is the one filled primary action (`.edit-bar-done`, `--control-h` tall), Delete and Cancel are squares beside it (`.edit-bar-icon`). *Ext.:* `children`; `onDone`, `onDelete` (omit for no Delete), `onCancel`, `busy`.
+- **`SidebarGroup`** (in `SidebarColumn.tsx`) — a labelled section of the sidebar body: `label-xs` heading, `role="group"`. *Ext.:* `label`, `children`.
+- **`SidebarPortal`** — renders into `uiStore.listHeaderHost`, or nothing if the sidebar is closed. Read by `Dashboard` and the library pages; `MainArea` renders one view at a time, so only one is ever mounted. *Ext.:* `children`.
+- **`RailButton`** — icon buttons of the left rail and the title bar, a thin wrapper around `.btn-ghost`. *Ext.:* full `ButtonHTMLAttributes`, plus `active` (`.rail-button.active` and `aria-current="page"`).
 
 **Settings window** (`layout/settings/`)
 
-- **`SettingsSection`** — a Settings page's section heading: icon plus title on
-  `.label-xs`, optional one-sentence `description`. *Ext.:* `icon`, `title`, `description`,
-  `children`.
-- **`SettingsDescription`** (same file) — the explanatory sentence under a section or a
-  choice row, `text-xs text-muted`. *Ext.:* `children`, `className`.
-- **`SettingsStatus`** (same file) — the feedback line for an action: icon plus one
-  sentence. *Ext.:* `tone` (`success` / `error` / `muted` — an outcome that isn't a defect;
-  picks the icon too), `icon`, `children`, `className`.
-- **`SettingsCheckboxGrid`** (same file) — a labelled two-column grid of `BlockCheckbox`
-  rows (the backup page's include/merge lists). A tick outside the grid's concern (e.g. a
-  toned one that widens what the action touches) goes next to it, not inside. *Ext.:*
-  `label`, `children`.
-- **`SettingsChoiceButton`** — the Settings choice-button state chain
-  (`.settings-choice-btn*`, values and focus ring for both themes in the stylesheet): theme,
-  language, size/limit pickers, the Sidebar page's toggles, the backup page's import-mode
-  cards. *Ext.:* `active`, `layout` (`chip` default; `card` leaves padding to the caller).
+- **`SettingsSection`** — a Settings page's section heading: icon plus title on `.label-xs`, optional one-sentence `description`. *Ext.:* `icon`, `title`, `description`, `children`.
+- **`SettingsDescription`** (same file) — the explanatory sentence under a section or a choice row, `text-xs text-muted`. *Ext.:* `children`, `className`.
+- **`SettingsStatus`** (same file) — the feedback line for an action: icon plus one sentence. *Ext.:* `tone` (`success` / `error` / `muted` — an outcome that isn't a defect; picks the icon too), `icon`, `children`, `className`.
+- **`SettingsCheckboxGrid`** (same file) — a labelled two-column grid of `BlockCheckbox` rows (the backup page's include/merge lists). A tick outside the grid's concern (e.g. a toned one that widens what the action touches) goes next to it, not inside. *Ext.:* `label`, `children`.
+- **`SettingsChoiceButton`** — the Settings choice-button state chain (`.settings-choice-btn*`, values and focus ring for both themes in the stylesheet): theme, language, size/limit pickers, the Sidebar page's toggles, the backup page's import-mode cards. *Ext.:* `active`, `layout` (`chip` default; `card` leaves padding to the caller).
 - **`SettingsChoiceRow`** (same file) — the wrapping flex row such buttons sit in.
 
 **Other**
 
-- **`VaultLocationRow`** (in `layout/VaultModal.tsx`) — choose-folder button plus the folder
-  a new vault will land in, the path in full on its own wrapping line. The vault modal's
-  create row and the Settings add-vault import.
-- **`IconField`** (`sidebar/fields/`) — the icon row of a language's page: "Icon" heading
-  over `Favicon`, with a remove that falls back to the module's default icon. *Ext.:*
-  `value`/`onChange`, `fallback`.
-- **`EmeraldMark`** — the static brand mark: the title bar's logo (20px) and the About
-  card's header (30px). Colours are class names in `src/index.css` (`.emerald-mark*`), not
-  `var()` on the SVG — a presentation-attribute `var()` silently falls back to black on
-  engines that don't substitute it (the trap `public/splash.css` avoids too). The
-  coordinates are kept identical to the loading screen's gem and the two
-  `src-tauri/icons/source/*.svg` templates, none of which can import this component —
-  changing the cut means updating all four by hand. *Ext.:* `size` (required), `className`.
+- **`VaultLocationRow`** (in `layout/VaultModal.tsx`) — choose-folder button plus the folder a new vault will land in, the path in full on its own wrapping line. The vault modal's create row and the Settings add-vault import.
+- **`IconField`** (`sidebar/fields/`) — the icon row of a language's page: "Icon" heading over `Favicon`, with a remove that falls back to the module's default icon. *Ext.:* `value`/`onChange`, `fallback`.
+- **`EmeraldMark`** — the static brand mark: the title bar's logo (20px) and the About card's header (30px). Colours are class names in `src/index.css` (`.emerald-mark*`), not `var()` on the SVG — a presentation-attribute `var()` silently falls back to black on engines that don't substitute it (the trap `public/splash.css` avoids too). The coordinates are kept identical to the loading screen's gem and the two `src-tauri/icons/source/*.svg` templates, none of which can import this component — changing the cut means updating all four by hand. *Ext.:* `size` (required), `className`.
 
-`Button` is the building block most likely to be bypassed. A raw `<button>` is only right
-when it is not an action button at all: menu entries, list rows, chips, tabs and nav items
-are structurally something else and have classes of their own. An action button with a
-hand-written Tailwind chain, by contrast, is always a mistake — it only themes in Emerald
-Parchment for as long as someone remembers to maintain an override for it.
+`Button` is the building block most likely to be bypassed. A raw `<button>` is only right when it is not an action button at all: menu entries, list rows, chips, tabs and nav items are structurally something else and have classes of their own. An action button with a hand-written Tailwind chain, by contrast, is always a mistake — it only themes in Emerald Parchment for as long as someone remembers to maintain an override for it.
 
 ### `src/components/blocks/` — Content Blocks
 
-See [`architecture.md` → Content Blocks](architecture/blocks.md#content-blocks) for the
-stored format.
+See [`architecture.md` → Content Blocks](architecture/blocks.md#content-blocks) for the stored format.
 
-- **`BlockStack`** — an entry's body as a stack of blocks (Journal, Wiki, Operations). Owns
-  everything that may exist only once per open entry: the sticky `EditorToolbar`,
-  `LinkPickerModal`, the `lib/links.ts` link requests, chip navigation, file and pointer
-  drops, the drag ghost. *Ext.:* `initialContent` (initial value only — remount via `key`),
-  `isEditing`, `placeholder`, `onChange(content)`.
-- **`BlockFrame`** — a block's shell: invisible in read mode; in edit mode a subtle frame
-  with grip, type label and "…" menu, plus a "Newer version" pill on an outdated copy of a
-  user-built block. Keeps its body at one tree position across modes, so a mode switch never
-  remounts a block. *Ext.:* `icon`, `label`, `outdated`, `onGripPointerDown`, `onOpenMenu`,
-  `children`.
-- **`blockViews.ts`** — type → component (`BLOCK_VIEWS`). Every view gets `block`, `blocks`
-  (all of the entry's blocks, for a type that points at others), `isEditing`,
-  `onHtmlChange`/`onBlockChange`/`onPersist`, the entry's `sigil` state, and `part` (only
-  for a sigil part rendered through `SigilPart`). Imported only by `BlockStack` — the text
-  block pulls in TipTap. *Ext.:* new block types register here, their metadata in
-  `lib/blocks/blockTypes.ts`.
-- **`blockSidebarViews.ts`** — type → `{ Read?, Edit? }` settings a block type brings,
-  looked up by the *resolved* type (a too-new data version gets none); only `Edit` receives
-  `setAttr`. Must not import TipTap (the sidebar is eager). *Ext.:* new types register their
-  settings here.
-- **`UnknownBlock`** — fallback for a type this version can't render: inner HTML through
-  DOMPurify with a tight allowlist (no `style`/`class`/forms), links opened via `openUrl`
-  only for http(s), read-only.
-- **`BlockErrorBoundary`** — wraps every block's view: a block whose render throws falls
-  back to `UnknownBlock` instead of blanking the app (which would repeat on every start,
-  since the open tab is restored). Retries when the block is replaced. *Ext.:* `block`,
-  `children`.
-- **`BlockSidebarArea`** — the right sidebar's block manager, fed by `blockSessionStore`:
-  reorderable rows (same states as `PlacedElementRow` via `sidebarRowStateClasses`,
-  reordered through `usePointerReorder`) with eye, rename, "show title in read mode",
-  duplicate, remove, "+ Add block"; selecting a row jumps to the block and opens the type's
-  settings below it; a jump-to outline in read mode.
-- **`blockActions.tsx`** — the context-menu entries stack and sidebar share:
-  `addBlockActions` (presets, then the user's own blocks) and `commonBlockActions`
-  (duplicate — not for unknown types — and remove). *Ext.:* each menu prepends its own
-  entries.
-- **`BlockGlyph`** — a block's icon: a lucide icon, or a user-built block's emoji or image
-  in the same box. *Ext.:* `icon` (`GlyphSource`), `size`.
-- **`BlockCheckbox`** — the app's one checkbox: label + `.block-checkbox` + optional hint.
-  Drawn entirely from theme variables, not the native checkbox, so it themes in both
-  palettes without an `accent-color` override. *Ext.:* `checked`, `onChange`, `label`,
-  `hint`, `title`, `tone` (`warning` | `danger` — for a tick that widens what an action
-  touches), `disabled`.
-- **`OptionsEditor`** — a choice element's options (rename, remove, add; values store the
-  option id), shared by `FieldsSidebarEdit` and the builder. *Ext.:* `options`, `onChange`,
-  `variant="panel"`.
+- **`BlockStack`** — an entry's body as a stack of blocks (Journal, Wiki, Operations). Owns everything that may exist only once per open entry: the sticky `EditorToolbar`, `LinkPickerModal`, the `lib/links.ts` link requests, chip navigation, file and pointer drops, the drag ghost. *Ext.:* `initialContent` (initial value only — remount via `key`), `isEditing`, `placeholder`, `onChange(content)`.
+- **`BlockFrame`** — a block's shell: invisible in read mode; in edit mode a subtle frame with grip, type label and "…" menu, plus a "Newer version" pill on an outdated copy of a user-built block. Keeps its body at one tree position across modes, so a mode switch never remounts a block. *Ext.:* `icon`, `label`, `outdated`, `onGripPointerDown`, `onOpenMenu`, `children`.
+- **`blockViews.ts`** — type → component (`BLOCK_VIEWS`). Every view gets `block`, `blocks` (all of the entry's blocks, for a type that points at others), `isEditing`, `onHtmlChange`/`onBlockChange`/`onPersist`, the entry's `sigil` state, and `part` (only for a sigil part rendered through `SigilPart`). Imported only by `BlockStack` — the text block pulls in TipTap. *Ext.:* new block types register here, their metadata in `lib/blocks/blockTypes.ts`.
+- **`blockSidebarViews.ts`** — type → `{ Read?, Edit? }` settings a block type brings, looked up by the *resolved* type (a too-new data version gets none); only `Edit` receives `setAttr`. Must not import TipTap (the sidebar is eager). *Ext.:* new types register their settings here.
+- **`UnknownBlock`** — fallback for a type this version can't render: inner HTML through DOMPurify with a tight allowlist (no `style`/`class`/forms), links opened via `openUrl` only for http(s), read-only.
+- **`BlockErrorBoundary`** — wraps every block's view: a block whose render throws falls back to `UnknownBlock` instead of blanking the app (which would repeat on every start, since the open tab is restored). Retries when the block is replaced. *Ext.:* `block`, `children`.
+- **`BlockSidebarArea`** — the right sidebar's block manager, fed by `blockSessionStore`: reorderable rows (same states as `PlacedElementRow` via `sidebarRowStateClasses`, reordered through `usePointerReorder`) with eye, rename, "show title in read mode", duplicate, remove, "+ Add block"; selecting a row jumps to the block and opens the type's settings below it; a jump-to outline in read mode.
+- **`blockActions.tsx`** — the context-menu entries stack and sidebar share: `addBlockActions` (presets, then the user's own blocks) and `commonBlockActions` (duplicate — not for unknown types — and remove). *Ext.:* each menu prepends its own entries.
+- **`BlockGlyph`** — a block's icon: a lucide icon, or a user-built block's emoji or image in the same box. *Ext.:* `icon` (`GlyphSource`), `size`.
+- **`BlockCheckbox`** — the app's one checkbox: label + `.block-checkbox` + optional hint. Drawn entirely from theme variables, not the native checkbox, so it themes in both palettes without an `accent-color` override. *Ext.:* `checked`, `onChange`, `label`, `hint`, `title`, `tone` (`warning` | `danger` — for a tick that widens what an action touches), `disabled`.
+- **`OptionsEditor`** — a choice element's options (rename, remove, add; values store the option id), shared by `FieldsSidebarEdit` and the builder. *Ext.:* `options`, `onChange`, `variant="panel"`.
 
 **Fields block**
 
-- **`FieldsBlock`** — the fields block (`core.fields`): read mode a quiet label/value list
-  in the editor font; edit mode `FieldValueEditor`/`FieldSlotEditor` per element. Sigil
-  elements render through `SigilPart`; a `text` element renders `RichEditor` directly,
-  registered with the stack under `<blockId>:<elementId>`. Controlled — writes through
-  `onBlockChange`/`onPersist`.
-- **`FieldValueEditor`** — the input for a kind whose value lives in the block's data JSON
-  (text/number/date, `Dropdown` for choice and moon phase, `ToggleSwitch` for yes/no, a
-  checklist). Shared with the builder's "Prefill". *Ext.:* `element`, `value`, `onChange`.
-- **`FieldSlotEditor`** — the input for a kind whose value lives in the block's markup slot
-  (`LinkEditor` for `link`, `AltarFieldEditor` for `altar`, an image picker for `image`).
-  Shared with the builder's "Prefill". *Ext.:* `element`, `slot`, `onChange`.
-- **`AltarField`** — the `altar` kind: `AltarFieldEditor` (an altar-only `LinkEditor` plus
-  the altar's picture) and `AltarFieldReader` (the picture as a button that opens the
-  altar). The picture is the altar's saved thumbnail, falling back to `AltarCardPreview`'s
-  live render; read from `altarStore`, not stored on the element, since it changes with the
-  altar. *Ext.:* `slot`/`onChange`.
-- **`BlockLink`** — `LinkEditor` (chosen entry with ×, else the search; `entryType` narrows
-  it) and `LinkTarget` (a live chip that opens the entry), for a link stored as a chip in a
-  block's markup — the link element, `AltarField`, the charge's charging technique. *Ext.:*
-  `slot`/`onChange`/`entryType`/`placeholder`, `target`/`onRemove`.
-- **`FieldsSidebarEdit`** — the fields block's sidebar settings: per-element label, choice
-  options, "hide in read mode when empty" (not for kinds `canBeEmpty` excludes); "fully
-  read-only" for the block. On a copy of one of your own blocks whose definition still
-  exists, the section is a disabled `<fieldset>` under `blocks.fields.fromDefinition`:
-  settings change in the definition, and "Update block" brings them here.
-- **`useFieldFallbackText`** — the localized texts `serializeFields` writes the readable
-  fallback with; one source for block and sidebar.
-- **`BlockDefinitionEditor`** — the builder of a user-built block in `views/BlocksView.tsx`:
-  emoji, name, fields (add by kind, label, reorder, remove — archived once saved,
-  restorable), display rules, and a per-field "Prefill" (`FieldValueEditor`/
-  `FieldSlotEditor`, or `SigilPartSettings` for a sigil part). Edits a draft that only
-  "Save" writes, so the revision rises once per save. Shows usage with "Update all"
-  (`updateAllCopies`, reporting entries skipped because a loaded sigil holds their copy) and
-  the two-step delete (keep copies by default; removing them from entries needs a second
-  confirmation, with the same skip-and-report).
+- **`FieldsBlock`** — the fields block (`core.fields`): read mode a quiet label/value list in the editor font; edit mode `FieldValueEditor`/`FieldSlotEditor` per element. Sigil elements render through `SigilPart`; a `text` element renders `RichEditor` directly, registered with the stack under `<blockId>:<elementId>`. Controlled — writes through `onBlockChange`/`onPersist`.
+- **`FieldValueEditor`** — the input for a kind whose value lives in the block's data JSON (text/number/date, `Dropdown` for choice and moon phase, `ToggleSwitch` for yes/no, a checklist). Shared with the builder's "Prefill". *Ext.:* `element`, `value`, `onChange`.
+- **`FieldSlotEditor`** — the input for a kind whose value lives in the block's markup slot (`LinkEditor` for `link`, `AltarFieldEditor` for `altar`, an image picker for `image`). Shared with the builder's "Prefill". *Ext.:* `element`, `slot`, `onChange`.
+- **`AltarField`** — the `altar` kind: `AltarFieldEditor` (an altar-only `LinkEditor` plus the altar's picture) and `AltarFieldReader` (the picture as a button that opens the altar). The picture is the altar's saved thumbnail, falling back to `AltarCardPreview`'s live render; read from `altarStore`, not stored on the element, since it changes with the altar. *Ext.:* `slot`/`onChange`.
+- **`BlockLink`** — `LinkEditor` (chosen entry with ×, else the search; `entryType` narrows it) and `LinkTarget` (a live chip that opens the entry), for a link stored as a chip in a block's markup — the link element, `AltarField`, the charge's charging technique. *Ext.:* `slot`/`onChange`/`entryType`/`placeholder`, `target`/`onRemove`.
+- **`FieldsSidebarEdit`** — the fields block's sidebar settings: per-element label, choice options, "hide in read mode when empty" (not for kinds `canBeEmpty` excludes); "fully read-only" for the block. On a copy of one of your own blocks whose definition still exists, the section is a disabled `<fieldset>` under `blocks.fields.fromDefinition`: settings change in the definition, and "Update block" brings them here.
+- **`useFieldFallbackText`** — the localized texts `serializeFields` writes the readable fallback with; one source for block and sidebar.
+- **`BlockDefinitionEditor`** — the builder of a user-built block in `views/BlocksView.tsx`: emoji, name, fields (add by kind, label, reorder, remove — archived once saved, restorable), display rules, and a per-field "Prefill" (`FieldValueEditor`/ `FieldSlotEditor`, or `SigilPartSettings` for a sigil part). Edits a draft that only "Save" writes, so the revision rises once per save. Shows usage with "Update all" (`updateAllCopies`, reporting entries skipped because a loaded sigil holds their copy) and the two-step delete (keep copies by default; removing them from entries needs a second confirmation, with the same skip-and-report).
 
 **Sigils**
 
-- **`SigilCalcBlock`** — intention, manual/automatic reduction to the letter bank,
-  implemented letters; read-only while charged, hidden while concealed. Its `part` restricts
-  which reduction modes are offered.
-- **`SigilCanvasBlock`** — the drawing: `SigilDrawingCanvas` with pen/eraser, brush,
-  colours, undo/redo/clear (history in memory); each stroke saved as an image file, the
-  block keeps only the name. Its `part` supplies the starting brush.
-- **`SigilChargeBlock`** — reveal date (optional — without one, loading hides what it
-  covers until unload), charging technique (`BlockLink`), lock scope, and — with more than
-  one calculator/drawing — which of them it covers (`chargeCovers`); in read mode load
-  (optional timer) and unload, each with an inline confirmation.
-- **`SigilPart`** — a sigil element inside a user-built block, rendered through the matching
-  standalone component on a virtual block (`sigilPartBlock`); writes go back into the fields
-  block's model (`withSigilPart`). *Ext.:* `element`, `block`, `model`, `write`, `persist`.
-- **`SigilPartSettings`** — what the builder lets a sigil element configure: letter-bank
-  mode, optional starting brush, optional lock-and-coverage preset (`ChargeDefault`) over
-  the block's own visible calculators/drawings. *Ext.:* `element`, `siblings`, `onPatch`.
-- **`SigilBrushControls`** — `SigilColorSwatches` and `SigilBrushSize`, shared by the
-  drawing surface and `SigilPartSettings`' brush preset. *Ext.:* `value`/`onChange`.
-- **`SigilDrawingCanvas`** — the 1200×800 drawing surface; reports a data URL after each
-  stroke. `initialData` must be a data URL — an `emerald-img:` image would taint it. *Ext.:*
-  `initialData`, `mode`, `brushColor`, `brushSize`, `clearVersion`, `editable`, `onChange`.
+- **`SigilCalcBlock`** — intention, manual/automatic reduction to the letter bank, implemented letters; read-only while charged, hidden while concealed. Its `part` restricts which reduction modes are offered.
+- **`SigilCanvasBlock`** — the drawing: `SigilDrawingCanvas` with pen/eraser, brush, colours, undo/redo/clear (history in memory); each stroke saved as an image file, the block keeps only the name. Its `part` supplies the starting brush.
+- **`SigilChargeBlock`** — reveal date (optional — without one, loading hides what it covers until unload), charging technique (`BlockLink`), lock scope, and — with more than one calculator/drawing — which of them it covers (`chargeCovers`); in read mode load (optional timer) and unload, each with an inline confirmation.
+- **`SigilPart`** — a sigil element inside a user-built block, rendered through the matching standalone component on a virtual block (`sigilPartBlock`); writes go back into the fields block's model (`withSigilPart`). *Ext.:* `element`, `block`, `model`, `write`, `persist`.
+- **`SigilPartSettings`** — what the builder lets a sigil element configure: letter-bank mode, optional starting brush, optional lock-and-coverage preset (`ChargeDefault`) over the block's own visible calculators/drawings. *Ext.:* `element`, `siblings`, `onPatch`.
+- **`SigilBrushControls`** — `SigilColorSwatches` and `SigilBrushSize`, shared by the drawing surface and `SigilPartSettings`' brush preset. *Ext.:* `value`/`onChange`.
+- **`SigilDrawingCanvas`** — the 1200×800 drawing surface; reports a data URL after each stroke. `initialData` must be a data URL — an `emerald-img:` image would taint it. *Ext.:* `initialData`, `mode`, `brushColor`, `brushSize`, `clearVersion`, `editable`, `onChange`.
 - **`SigilConcealed`** — the quiet "hidden until …" line. *Ext.:* `revealDate`.
 
-The editor helpers `BlockStack` composes live in `src/components/editor/`:
-`editorCommands.ts` (`appendEntryLink`/`removeEntryLink`/`revealEntryLink`/
-`findEntryLinkPos`, `insertImageFromDataUrl`, `insertInternalLinkChip`),
-`useEditorFileDrop`, `useEditorPointerDrops`, `useInternalLinkNavigation`, `DragGhost`.
-Image inserts report failures through `ImageNoticeModal` (above). `RichEditor` is a text
-block's writing surface only; its `onEditorReady` reports the instance to the stack.
+The editor helpers `BlockStack` composes live in `src/components/editor/`: `editorCommands.ts` (`appendEntryLink`/`removeEntryLink`/`revealEntryLink`/ `findEntryLinkPos`, `insertImageFromDataUrl`, `insertInternalLinkChip`), `useEditorFileDrop`, `useEditorPointerDrops`, `useInternalLinkNavigation`, `DragGhost`. Image inserts report failures through `ImageNoticeModal` (above). `RichEditor` is a text block's writing surface only; its `onEditorReady` reports the instance to the stack.
 
 ### `src/components/sidebar/fields/` — Property Panel Building Blocks
 
 **Read and edit sections**
 
-- **`SidebarSection`** — a collapsible section of the right sidebar, in read and edit mode
-  alike (Properties, Linked entries, Tags, Blocks, the Altar's Elements, a block page's
-  Display/Usage, a template's Assignments/Usage). Read and edit share each section's
-  `storageKey`, so a section closed while reading stays closed while editing; open/closed
-  is `usePersistedFlag(storageKey)`. The header sits `pl-1 pr-1.5` inside the edge; rows'
-  icons start at the middle of the heading's chevron (`pl-[9px]`), and the content's
-  `mr-0.5` plus the rows' `pr-3` end values where the heading's count begins — a commented
-  exception to the padding rule below. *Ext.:* `storageKey`, `label`, `count`. Also exports:
-  - `SidebarPropertyRow` — icon, label, value (`muted` for "None"/"Off"; the label
-    truncates first, the value is capped at 65%).
-  - `SidebarItemRow` — a clickable row (icon, label, right-aligned `meta`); `active` marks
-    the selected one; `action` appends a button (e.g. `SidebarRowRemove`, the 24px "×").
+- **`SidebarSection`** — a collapsible section of the right sidebar, in read and edit mode alike (Properties, Linked entries, Tags, Blocks, the Altar's Elements, a block page's Display/Usage, a template's Assignments/Usage). Read and edit share each section's `storageKey`, so a section closed while reading stays closed while editing; open/closed is `usePersistedFlag(storageKey)`. The header sits `pl-1 pr-1.5` inside the edge; rows' icons start at the middle of the heading's chevron (`pl-[9px]`), and the content's `mr-0.5` plus the rows' `pr-3` end values where the heading's count begins — a commented exception to the padding rule below. *Ext.:* `storageKey`, `label`, `count`. Also exports:
+  - `SidebarPropertyRow` — icon, label, value (`muted` for "None"/"Off"; the label truncates first, the value is capped at 65%).
+  - `SidebarItemRow` — a clickable row (icon, label, right-aligned `meta`); `active` marks the selected one; `action` appends a button (e.g. `SidebarRowRemove`, the 24px "×").
   - `RowIcon` (the fixed 16px icon column), `SidebarEmpty` (a section's empty line).
-- **`SidebarSectionHeader`** — the collapsible heading itself: chevron plus small uppercase
-  label on `.sidebar-section-title`, optional count. Controlled, because callers keep open
-  state differently (`SidebarSection`; the altar panel per altar). *Ext.:* `label`, `open`,
-  `onToggle`, `count`, `className` (spacing only).
-- **`EntryReadSections`** — Journal/Wiki/Operations' read-mode sidebar body:
-  `PropertiesSection` (omitted when no `properties` are passed), `LinkedEntriesSection`,
-  `TagsSection`. Also exports `CategoryPropertyRow` (a trashed category shows "None", not
-  its raw id). *Ext.:* `properties`, `content`, `tags`.
-- **`LinkedEntriesSection`** / **`LinkedEntriesField`** (`LinkedEntriesField.tsx`) — the
-  "Linked entries" section, read and edit, sharing `useLinkedEntries`. Rows are sorted by
-  `categoryLabel`, category right-aligned. Links are read out of the entry's own `content`
-  (`extractInternalLinks`, see [`database.md`](database.md#entries)), not an id array. In
-  read mode a click reveals the link in the text, or opens the target when the text doesn't
-  hold it. In edit mode each row gets a remove "×" and below sits the inset "Link entry …"
-  search; adding appends a link block into the editor and removing asks the editor to
-  delete it — both via the `lib/links.ts` event protocol, since the field has no reference
-  to the TipTap instance. Suggestions are sorted by `updatedAt`, newest first. *Ext.:*
-  `content`.
-- **`TagsSection`** / **`TagsField`** (`TagsField.tsx`) — the "Tags" section: read mode a
-  read-only `TagInput` (`chipSize="row"`) or `SidebarEmpty`; edit mode an editable
-  `TagInput` with 24px chips, a round "×" and the inset "Add tag …" field, whose suggestions
-  create tags inline or point at the Tags dashboard. *Ext.:* `tags`, `onChange`.
-- **`AltarReadingSummary`** — the altar's read-mode sidebar: a `PropertiesSection` (format,
-  background, overlay, grid) and the visible placements as `SidebarItemRow`s, top-most
-  first; a click selects the element on the canvas.
+- **`SidebarSectionHeader`** — the collapsible heading itself: chevron plus small uppercase label on `.sidebar-section-title`, optional count. Controlled, because callers keep open state differently (`SidebarSection`; the altar panel per altar). *Ext.:* `label`, `open`, `onToggle`, `count`, `className` (spacing only).
+- **`EntryReadSections`** — Journal/Wiki/Operations' read-mode sidebar body: `PropertiesSection` (omitted when no `properties` are passed), `LinkedEntriesSection`, `TagsSection`. Also exports `CategoryPropertyRow` (a trashed category shows "None", not its raw id). *Ext.:* `properties`, `content`, `tags`.
+- **`LinkedEntriesSection`** / **`LinkedEntriesField`** (`LinkedEntriesField.tsx`) — the "Linked entries" section, read and edit, sharing `useLinkedEntries`. Rows are sorted by `categoryLabel`, category right-aligned. Links are read out of the entry's own `content` (`extractInternalLinks`, see [`database.md`](database.md#entries)), not an id array. In read mode a click reveals the link in the text, or opens the target when the text doesn't hold it. In edit mode each row gets a remove "×" and below sits the inset "Link entry …" search; adding appends a link block into the editor and removing asks the editor to delete it — both via the `lib/links.ts` event protocol, since the field has no reference to the TipTap instance. Suggestions are sorted by `updatedAt`, newest first. *Ext.:* `content`.
+- **`TagsSection`** / **`TagsField`** (`TagsField.tsx`) — the "Tags" section: read mode a read-only `TagInput` (`chipSize="row"`) or `SidebarEmpty`; edit mode an editable `TagInput` with 24px chips, a round "×" and the inset "Add tag …" field, whose suggestions create tags inline or point at the Tags dashboard. *Ext.:* `tags`, `onChange`.
+- **`AltarReadingSummary`** — the altar's read-mode sidebar: a `PropertiesSection` (format, background, overlay, grid) and the visible placements as `SidebarItemRow`s, top-most first; a click selects the element on the canvas.
 
 **Edit-mode controls**
 
-- **`EditProperties`** (`EditProperties.tsx`) — the edit-mode counterpart of
-  `SidebarPropertyRow`: the same row with a control as its value.
+- **`EditProperties`** (`EditProperties.tsx`) — the edit-mode counterpart of `SidebarPropertyRow`: the same row with a control as its value.
   - `EditPropertyRow` — 36px, the label never truncates. *Ext.:* `icon`, `label`.
-  - `PropertySelect` — a value button with chevron (`.prop-value-btn`, max 130px), its
-    `Dropdown` portalled and right-aligned. *Ext.:* `value`/`options`/`onChange`, `text`,
-    `muted`, `ariaLabel`.
-  - `MediaPropertyRow` — icon or cover image: the button shows a thumbnail, the emoji or "+
-    Add"; a click opens Choose image / Emoji / Remove, an empty cover goes straight to the
-    file dialog; icons go through `readIconFile` (`lib/imageLimits.ts`). *Ext.:*
-    `rowIcon`, `label`, `kind` (`icon`/`cover`), `value`, `onChange`, `onRemove` or
-    `fallback` (templates and blocks: "Remove" resets to the default icon).
+  - `PropertySelect` — a value button with chevron (`.prop-value-btn`, max 130px), its `Dropdown` portalled and right-aligned. *Ext.:* `value`/`options`/`onChange`, `text`, `muted`, `ariaLabel`.
+  - `MediaPropertyRow` — icon or cover image: the button shows a thumbnail, the emoji or "+ Add"; a click opens Choose image / Emoji / Remove, an empty cover goes straight to the file dialog; icons go through `readIconFile` (`lib/imageLimits.ts`). *Ext.:* `rowIcon`, `label`, `kind` (`icon`/`cover`), `value`, `onChange`, `onRemove` or `fallback` (templates and blocks: "Remove" resets to the default icon).
   - `EditSidebarBody` — a library page's sidebar body.
-- **`EntryTypeField`** — the entry type as the first edit-mode property row: a segmented
-  control (`.prop-segments`) over `MODULE_LIST` filtered to `usesBlocks`, wired to
-  `changeEntryType` (see [Changing an Entry's Type](architecture/editing.md#changing-an-entrys-type));
-  the drop-properties `InlineConfirm` appears under it. Only for the three convertible
-  types. *Ext.:* `id`, `type`, `properties` (`category_id`/`icon`/`cover_image`; passing it
-  is what triggers the confirmation on a switch to Journal).
-- **`CategoryIconCoverRows`** — Category, Icon and Cover image as edit-mode rows (Wiki,
-  Operations); a category change saves at once. *Ext.:* `entry`, `update`.
-- **`LinkedEntryPicker`** — the chrome behind `LinkedEntriesField` and `BlockLink`: search
-  input, result menu portalled `fixed`/`z-9999` to `document.body` (an absolute menu would
-  be clipped by the sidebar's `overflow-y-auto`), outside-click, empty state, flip-up. Also
-  exports `LinkedEntryChip` and `LinkItemIcon` (a link target's icon: image, emoji or the
-  type's default). *Ext.:* `results`/`resultKey`/`renderResult`, `fieldIcon` (renders the
-  input inside `.sidebar-add-field`).
-- **`Favicon`** — emoji-or-image picker including upload, as a row of buttons. A bare
-  fragment — callers supply heading, wrapper and "None" fallback (`IconField`, the altar
-  panel). Also exports `FaviconGlyph`, just the glyph (default 20px; `className` overrides).
-- **`PropertiesEditView`** — layout shell of a language page's sidebar; entries, templates
-  and blocks use `SidebarSection` + `EditSidebarBody` instead.
-- **`PlacedElementRow`** / **`PlacedElementInspector`** — a placed altar element's row with
-  its actions (*Ext.:* the callbacks), and the inline X/Y/Rot/Scale inspector under a
-  selected row.
+- **`EntryTypeField`** — the entry type as the first edit-mode property row: a segmented control (`.prop-segments`) over `MODULE_LIST` filtered to `usesBlocks`, wired to `changeEntryType` (see [Changing an Entry's Type](architecture/editing.md#changing-an-entrys-type)); the drop-properties `InlineConfirm` appears under it. Only for the three convertible types. *Ext.:* `id`, `type`, `properties` (`category_id`/`icon`/`cover_image`; passing it is what triggers the confirmation on a switch to Journal).
+- **`CategoryIconCoverRows`** — Category, Icon and Cover image as edit-mode rows (Wiki, Operations); a category change saves at once. *Ext.:* `entry`, `update`.
+- **`LinkedEntryPicker`** — the chrome behind `LinkedEntriesField` and `BlockLink`: search input, result menu portalled `fixed`/`z-9999` to `document.body` (an absolute menu would be clipped by the sidebar's `overflow-y-auto`), outside-click, empty state, flip-up. Also exports `LinkedEntryChip` and `LinkItemIcon` (a link target's icon: image, emoji or the type's default). *Ext.:* `results`/`resultKey`/`renderResult`, `fieldIcon` (renders the input inside `.sidebar-add-field`).
+- **`Favicon`** — emoji-or-image picker including upload, as a row of buttons. A bare fragment — callers supply heading, wrapper and "None" fallback (`IconField`, the altar panel). Also exports `FaviconGlyph`, just the glyph (default 20px; `className` overrides).
+- **`PropertiesEditView`** — layout shell of a language page's sidebar; entries, templates and blocks use `SidebarSection` + `EditSidebarBody` instead.
+- **`PlacedElementRow`** / **`PlacedElementInspector`** — a placed altar element's row with its actions (*Ext.:* the callbacks), and the inline X/Y/Rot/Scale inspector under a selected row.
 
-**Horizontal padding has exactly one source in the right sidebar** — `SidebarColumn`'s
-scrolling body. No panel and no field here adds a `px-*` of its own (the read view's
-footnote carries a cosmetic `px-1`, which is alignment, not padding); see
-[`design.md`](design.md#heights-and-spacing). `SidebarSection`'s `mr-0.5` and its rows'
-`pl-[9px]`/`pr-3` are the one deliberate exception, commented in place: they line the rows'
-icons up with the heading's chevron and their values up with the heading's count.
+**Horizontal padding has exactly one source in the right sidebar** — `SidebarColumn`'s scrolling body. No panel and no field here adds a `px-*` of its own (the read view's footnote carries a cosmetic `px-1`, which is alignment, not padding); see [`design.md`](design.md#heights-and-spacing). `SidebarSection`'s `mr-0.5` and its rows' `pl-[9px]`/`pr-3` are the one deliberate exception, commented in place: they line the rows' icons up with the heading's chevron and their values up with the heading's count.
 
 ### `src/hooks/` and `src/lib/` — Shared Logic
 
 **Hooks**
 
-- **`useEntryEditor`** — the editor lifecycle: debounced auto-save, save-on-navigate,
-  save-on-unmount, parameterised over `buildPatch()`/`update()`.
-- **`useEditActions`** — registers a view's Save/Cancel/Delete into the right sidebar's
-  action bar while `active`, ref-latched so the sidebar never calls a stale closure.
-- **`useDraftPage`** — the draft lifecycle of a `LibraryPageFrame` page: opens from a
-  `DraftStore<T>` entry or the saved row, mirrors every change back (so edits survive
-  `MainArea` unmounting the view), and on "Done" saves only the fields changed since opening.
-  "Cancel" discards the draft, or, for a page just created (`onCancelNew`), deletes it into
-  the Trash with Undo; the leave guard's "Discard" runs the same. *Ext.:* `store`, `id`,
-  `saved`, `save(id, patch, base)`, `onClose`, `onCancelNew?`, `logTag`.
-- **`useShrunkIcon`** — shrinks an image icon to 64px before it lands in a draft, passing
-  an emoji straight through; the last call to resolve wins. *Ext.:* `apply`, `logTag`.
-- **`useSaveAsTemplateAction`** — the "Save as template" context-menu entry for every entry
-  with a block stack. *Ext.:* `entryType`, `id`.
-- **`useOpenInNewTabAction`** — the "Open in New Tab" `ContextMenuAction` for an
-  `ActiveView`; the menu counterpart to `DashboardItem`'s middle-click.
-- **`useDeepLink`** — the global search's deep link for a view without a detail page:
-  `{ type, id }` runs the caller's `onOpen(target)` once (clear search/filters, expand
-  groups), then scrolls the row carrying `rowAttribute` into view. Latches on the
-  `activeView` object (fresh per navigation), so `items` can be a dependency without later
-  mutations resetting the user's filters. Returns `scrollTo(id)`. Used by Tasks, Categories
-  and Tags.
-- **`useOutsideClick`** — the mousedown-outside(-plus-Escape) dismiss pattern. *Ext.:*
-  `refs` (plural — a portalled popover is no DOM descendant of its trigger), `escape`
-  (`true`, or `'capture'` to beat a surrounding `Modal`'s handler), `capture` (where Tauri's
-  `drag.js` stops propagation on a drag region before bubble listeners see the click),
-  `delay` (skip the opening mousedown itself).
-- **`useEmojiSearchData`** — the emoji search dataset for `EmojiPicker`: `null` until
-  loaded, not fetched while `enabled` is false. Wraps `lib/emojiSearch.ts`.
-- **`useLinkItems`** — the store-subscribed half of `buildLinkItems`: every linkable entry
-  across all five modules in one memoised list (`[[` suggestions, `LinkPickerModal`,
-  `LinkedEntriesField`); with `linkItemsByKey` also the source of a link chip's icon/label.
-- **`useGlobalSearch`** — assembles the search corpus from the stores and runs the query;
-  backs `SearchModal`.
-- **`usePointerReorder(items, onDrop)`** — drag-to-reorder by grip without animation:
-  pointer events on `document`, no HTML5 drag. Returns `listRef` (each direct child is one
-  row wrapper, measured at its first child), `visualItems`, `draggingId`, `startDrag(e, id)`;
-  `onDrop(ordered)` fires only when the order changed. Used by the altar's placed elements
-  and the block manager; `CategoriesView` still has its own copy (it measures whole rows and
-  drags the unfiltered list).
-- **`usePersistedFlag(key, fallback?)`** — an on/off preference that survives a restart,
-  per vault (`uiStore.flags`, saved via `store/vaultPrefs.ts`), returned as `[value,
-  toggle]`. A vault without the key falls back to the app-wide `localStorage` value under the
-  same key, then to `fallback`. For preferences, not working state.
-- **`useSessionState(key, initial)`** — `useState` for working state that should outlive a
-  module switch but not the session (search, filters, the Trash selection;
-  `store/sessionStore.ts`). Keys look like `wiki.search`; `closeAllTabs` clears them.
-- **`useCollapsedSet(scope, { defaultCollapsed? })`** — collapse state for a group list:
-  `isCollapsed(id)`, `toggle(id)`, `expand(...ids)` (for deep links). `defaultCollapsed`
-  starts every group closed (Tags); the stored set then holds the opened ids. Lives in
-  `uiStore.collapsedGroups` per `scope`, not in view state, because `MainArea` unmounts views
-  on a module switch; remembered per vault. Scopes: the category groups of Wiki, Operations,
-  Tasks, Journal's moon phases, Tags and the Altar library (`'altar-library'`, distinct from
-  the section's own persisted collapse — see
-  [Altar UI Composition](architecture/altar.md#altar-ui-composition)).
+- **`useEntryEditor`** — the editor lifecycle: debounced auto-save, save-on-navigate, save-on-unmount, parameterised over `buildPatch()`/`update()`.
+- **`useEditActions`** — registers a view's Save/Cancel/Delete into the right sidebar's action bar while `active`, ref-latched so the sidebar never calls a stale closure.
+- **`useDraftPage`** — the draft lifecycle of a `LibraryPageFrame` page: opens from a `DraftStore<T>` entry or the saved row, mirrors every change back (so edits survive `MainArea` unmounting the view), and on "Done" saves only the fields changed since opening. "Cancel" discards the draft, or, for a page just created (`onCancelNew`), deletes it into the Trash with Undo; the leave guard's "Discard" runs the same. *Ext.:* `store`, `id`, `saved`, `save(id, patch, base)`, `onClose`, `onCancelNew?`, `logTag`.
+- **`useShrunkIcon`** — shrinks an image icon to 64px before it lands in a draft, passing an emoji straight through; the last call to resolve wins. *Ext.:* `apply`, `logTag`.
+- **`useSaveAsTemplateAction`** — the "Save as template" context-menu entry for every entry with a block stack. *Ext.:* `entryType`, `id`.
+- **`useOpenInNewTabAction`** — the "Open in New Tab" `ContextMenuAction` for an `ActiveView`; the menu counterpart to `DashboardItem`'s middle-click.
+- **`useDeepLink`** — the global search's deep link for a view without a detail page: `{ type, id }` runs the caller's `onOpen(target)` once (clear search/filters, expand groups), then scrolls the row carrying `rowAttribute` into view. Latches on the `activeView` object (fresh per navigation), so `items` can be a dependency without later mutations resetting the user's filters. Returns `scrollTo(id)`. Used by Tasks, Categories and Tags.
+- **`useOutsideClick`** — the mousedown-outside(-plus-Escape) dismiss pattern. *Ext.:* `refs` (plural — a portalled popover is no DOM descendant of its trigger), `escape` (`true`, or `'capture'` to beat a surrounding `Modal`'s handler), `capture` (where Tauri's `drag.js` stops propagation on a drag region before bubble listeners see the click), `delay` (skip the opening mousedown itself).
+- **`useEmojiSearchData`** — the emoji search dataset for `EmojiPicker`: `null` until loaded, not fetched while `enabled` is false. Wraps `lib/emojiSearch.ts`.
+- **`useLinkItems`** — the store-subscribed half of `buildLinkItems`: every linkable entry across all five modules in one memoised list (`[[` suggestions, `LinkPickerModal`, `LinkedEntriesField`); with `linkItemsByKey` also the source of a link chip's icon/label.
+- **`useGlobalSearch`** — assembles the search corpus from the stores and runs the query; backs `SearchModal`.
+- **`usePointerReorder(items, onDrop)`** — drag-to-reorder by grip without animation: pointer events on `document`, no HTML5 drag. Returns `listRef` (each direct child is one row wrapper, measured at its first child), `visualItems`, `draggingId`, `startDrag(e, id)`; `onDrop(ordered)` fires only when the order changed. Used by the altar's placed elements and the block manager; `CategoriesView` still has its own copy (it measures whole rows and drags the unfiltered list).
+- **`usePersistedFlag(key, fallback?)`** — an on/off preference that survives a restart, per vault (`uiStore.flags`, saved via `store/vaultPrefs.ts`), returned as `[value, toggle]`. A vault without the key falls back to the app-wide `localStorage` value under the same key, then to `fallback`. For preferences, not working state.
+- **`useSessionState(key, initial)`** — `useState` for working state that should outlive a module switch but not the session (search, filters, the Trash selection; `store/sessionStore.ts`). Keys look like `wiki.search`; `closeAllTabs` clears them.
+- **`useCollapsedSet(scope, { defaultCollapsed? })`** — collapse state for a group list: `isCollapsed(id)`, `toggle(id)`, `expand(...ids)` (for deep links). `defaultCollapsed` starts every group closed (Tags); the stored set then holds the opened ids. Lives in `uiStore.collapsedGroups` per `scope`, not in view state, because `MainArea` unmounts views on a module switch; remembered per vault. Scopes: the category groups of Wiki, Operations, Tasks, Journal's moon phases, Tags and the Altar library (`'altar-library'`, distinct from the section's own persisted collapse — see [Altar UI Composition](architecture/altar.md#altar-ui-composition)).
 
 **Module registry and wiring**
 
-- **`lib/modules.ts`** — the module registry, one source of truth for "which modules exist
-  and what belongs to each": `ENTRY_MODULE_IDS`, `ViewId`, `LeftListTabId`, `MODULES` (icon,
-  nav label key, untitled key, `entryType`, `usesEditorSidebar`, `usesBlocks`),
-  `AUX_VIEWS`, `TRASH_KINDS`/`TRASH_KIND_ICONS`, `isViewId`, `moduleMeta`,
-  `viewTypeForEntryType` (data model `operation` → view `operations`).
-  `entryIcon(type, entry, category)` is the one icon rule for a wiki article or operation
-  (own icon, else category emoji, else `DEFAULT_ENTRY_EMOJI[type]`). `DEFAULT_ENTRY_EMOJI`
-  lives here because `lib/` down to `db.ts` needs it and nothing under `lib/` may import a
-  component (`SuggestionList` re-exports it). **Import rule:** lucide-react and types only —
-  no stores, no components. `store/moduleWiring.ts` wires the stores and
-  `components/layout/moduleViews.ts` the lazy views, keeping this file cycle-free and out of
-  bundles that don't need a view chunk.
-- **`store/moduleWiring.ts`** — the store half of the registry: `moduleWiring` (each
-  module's reload), `trashWiring` (restore/permanently-delete per `TrashKind`), and
-  `reloadAllStores`/`reloadModules` (the startup/vault-switch/import reload sequence: tags
-  and categories, then content). **Import rule:** content stores only, never
-  `uiStore`/`vaultStore`/`trashStore`.
+- **`lib/modules.ts`** — the module registry, one source of truth for "which modules exist and what belongs to each": `ENTRY_MODULE_IDS`, `ViewId`, `LeftListTabId`, `MODULES` (icon, nav label key, untitled key, `entryType`, `usesEditorSidebar`, `usesBlocks`), `AUX_VIEWS`, `TRASH_KINDS`/`TRASH_KIND_ICONS`, `isViewId`, `moduleMeta`, `viewTypeForEntryType` (data model `operation` → view `operations`). `entryIcon(type, entry, category)` is the one icon rule for a wiki article or operation (own icon, else category emoji, else `DEFAULT_ENTRY_EMOJI[type]`). `DEFAULT_ENTRY_EMOJI` lives here because `lib/` down to `db.ts` needs it and nothing under `lib/` may import a component (`SuggestionList` re-exports it). **Import rule:** lucide-react and types only — no stores, no components. `store/moduleWiring.ts` wires the stores and `components/layout/moduleViews.ts` the lazy views, keeping this file cycle-free and out of bundles that don't need a view chunk.
+- **`store/moduleWiring.ts`** — the store half of the registry: `moduleWiring` (each module's reload), `trashWiring` (restore/permanently-delete per `TrashKind`), and `reloadAllStores`/`reloadModules` (the startup/vault-switch/import reload sequence: tags and categories, then content). **Import rule:** content stores only, never `uiStore`/`vaultStore`/`trashStore`.
 
 **Content stores**
 
-- **`store/entryStore.ts`** — the one store for Journal, Wiki and Operations
-  (`entries: Record<EntryType, Entry[]>`) with `createEntry(type, …)`/`updateEntry`/
-  `duplicateEntry`/`deleteEntry`/`restoreEntry`/`permanentlyDeleteEntry`/`getEntry` and the
-  helpers `ENTRY_TYPES`, `allEntries`, `findEntry`, `mapEntries`, `withAddedEntry` — see
-  [Entry Store](architecture/modules.md#entry-store). Code that needs all three lists uses
-  the helpers.
-- **`store/templateStore.ts`** — the templates' data — see
-  [Templates](architecture/templates.md#templates). `startOfNewEntry` (what a new entry
-  begins with) and `useTemplateNoticeStore` (the one "template applied" notice) live here,
-  since the content stores that call them may not import a component.
-- **`store/blockDefinitionStore.ts`** — the user-built blocks (`block_definitions`): create,
-  update (raises `revision` when name, icon, elements or display change),
-  soft-delete/restore/purge, `importDefinitions` (by id, never overwriting). Touches no
-  entry.
-- **`store/blockCopies.ts`** — what happens to copies in entries and templates, only on
-  explicit request: `copyUsage`, `templateEntries`, `updateAllCopies`, `removeAllCopies` —
-  skipping an entry open in edit mode or a template with its page open or an unsaved draft.
-- **`store/blockSessionStore.ts`** — the bridge from the open entry's `BlockStack` to the
-  block manager: current block structure plus a stable `BlockStackApi`. In memory only;
-  `clear(api)` only removes the caller's own session.
-- **`store/draftStore.ts`** — `createDraftStore<T>()`, the unsaved-drafts-by-id store behind
-  a `LibraryPageFrame` page (`useBlockDraftStore`, `useTemplateDraftStore`), written into the
-  vault's `drafts.json` (`restoreDrafts`, `flushDrafts`, `detachDrafts`); `clearAllDrafts()`
-  on a replace-mode restore.
-- **`store/vaultPrefs.ts`** — per-vault preferences: loads `uiStore`'s preference fields when
-  a vault opens (`loadVaultPrefs`), writes changes to `localStorage` under
-  `vault-prefs:<vaultId>`, drops them with the vault (`forgetVaultPrefs`) — see
-  [Tabs and Workspace State](architecture/navigation.md#tabs-and-workspace-state).
-- **`store/settingsStore.ts`** — the open vault's settings: `loadForVault(vaultId)` (runs
-  before the database opens, since migration v39 needs the language), `clear()`,
-  `replaceSettings(settings)` (backup import), `update(group, patch)`. Appearance (theme,
-  fonts, interface size, editor text size) applies immediately and is mirrored into the
-  `localStorage` keys the boot script and `main.tsx` read before a vault is open; writes to
-  `settings.json` are serialized through `lib/serialize.ts`.
-- **`store/imageNoticeStore.ts`** — the store behind `ImageNoticeModal`;
-  `reportImageError(err, context)` shows the size notice for an `ImageTooLargeError` and
-  otherwise logs, so a call site needs no try/catch branching.
+- **`store/entryStore.ts`** — the one store for Journal, Wiki and Operations (`entries: Record<EntryType, Entry[]>`) with `createEntry(type, …)`/`updateEntry`/ `duplicateEntry`/`deleteEntry`/`restoreEntry`/`permanentlyDeleteEntry`/`getEntry` and the helpers `ENTRY_TYPES`, `allEntries`, `findEntry`, `mapEntries`, `withAddedEntry` — see [Entry Store](architecture/modules.md#entry-store). Code that needs all three lists uses the helpers.
+- **`store/templateStore.ts`** — the templates' data — see [Templates](architecture/templates.md#templates). `startOfNewEntry` (what a new entry begins with) and `useTemplateNoticeStore` (the one "template applied" notice) live here, since the content stores that call them may not import a component.
+- **`store/blockDefinitionStore.ts`** — the user-built blocks (`block_definitions`): create, update (raises `revision` when name, icon, elements or display change), soft-delete/restore/purge, `importDefinitions` (by id, never overwriting). Touches no entry.
+- **`store/blockCopies.ts`** — what happens to copies in entries and templates, only on explicit request: `copyUsage`, `templateEntries`, `updateAllCopies`, `removeAllCopies` — skipping an entry open in edit mode or a template with its page open or an unsaved draft.
+- **`store/blockSessionStore.ts`** — the bridge from the open entry's `BlockStack` to the block manager: current block structure plus a stable `BlockStackApi`. In memory only; `clear(api)` only removes the caller's own session.
+- **`store/draftStore.ts`** — `createDraftStore<T>()`, the unsaved-drafts-by-id store behind a `LibraryPageFrame` page (`useBlockDraftStore`, `useTemplateDraftStore`), written into the vault's `drafts.json` (`restoreDrafts`, `flushDrafts`, `detachDrafts`); `clearAllDrafts()` on a replace-mode restore.
+- **`store/vaultPrefs.ts`** — per-vault preferences: loads `uiStore`'s preference fields when a vault opens (`loadVaultPrefs`), writes changes to `localStorage` under `vault-prefs:<vaultId>`, drops them with the vault (`forgetVaultPrefs`) — see [Tabs and Workspace State](architecture/navigation.md#tabs-and-workspace-state).
+- **`store/settingsStore.ts`** — the open vault's settings: `loadForVault(vaultId)` (runs before the database opens, since migration v39 needs the language), `clear()`, `replaceSettings(settings)` (backup import), `update(group, patch)`. Appearance (theme, fonts, interface size, editor text size) applies immediately and is mirrored into the `localStorage` keys the boot script and `main.tsx` read before a vault is open; writes to `settings.json` are serialized through `lib/serialize.ts`.
+- **`store/imageNoticeStore.ts`** — the store behind `ImageNoticeModal`; `reportImageError(err, context)` shows the size notice for an `ImageTooLargeError` and otherwise logs, so a call site needs no try/catch branching.
 
 **Links**
 
-- **`lib/linkItems.ts`** — `buildLinkItems(sources, t)`: the one source of a link target's
-  icon, label and category across all five modules (`SuggestionItem[]`); `linkItemKey`/
-  `linkItemsByKey` (the `entryType:id` key). `emeraldFormat.ts` calls it directly with a
-  `getState()` snapshot — `LinkItemSources` is the extension point that makes that possible.
-- **`lib/internalLinkHtml.ts`** — reading and writing an internal link chip's stored HTML,
-  deliberately DOM-optional: `extractInternalLinks` (regex-based — runs on the database
-  path, in migrations and the schema-check Node harness, where there is no browser) and
-  `isValidLinkTarget`; `remapInternalLinks`/`internalLinkChipHtml`/`internalLinkBlockHtml`
-  need a real DOM (backup merge, `.emerald` import/export, the editor). `internalLinkBlockHtml`
-  is the one definition of an appended link block (divider, category heading, chip).
-- **`lib/links.ts`** — the event protocol behind "Linked entries" (see
-  [Internal Links](architecture/editing.md#internal-links)):
-  `requestEntryLinkAppend`/`requestEntryLinkReveal`/`requestEntryLinkRemove` with
-  `subscribeEntryLinkRequest` — `document`-level custom events, since the sidebar field has
-  no reference to the TipTap instance. A request resolves to `true` only if an editable,
-  listening editor accepted it (`preventDefault`); the field falls back accordingly.
+- **`lib/linkItems.ts`** — `buildLinkItems(sources, t)`: the one source of a link target's icon, label and category across all five modules (`SuggestionItem[]`); `linkItemKey`/ `linkItemsByKey` (the `entryType:id` key). `emeraldFormat.ts` calls it directly with a `getState()` snapshot — `LinkItemSources` is the extension point that makes that possible.
+- **`lib/internalLinkHtml.ts`** — reading and writing an internal link chip's stored HTML, deliberately DOM-optional: `extractInternalLinks` (regex-based — runs on the database path, in migrations and the schema-check Node harness, where there is no browser) and `isValidLinkTarget`; `remapInternalLinks`/`internalLinkChipHtml`/`internalLinkBlockHtml` need a real DOM (backup merge, `.emerald` import/export, the editor). `internalLinkBlockHtml` is the one definition of an appended link block (divider, category heading, chip).
+- **`lib/links.ts`** — the event protocol behind "Linked entries" (see [Internal Links](architecture/editing.md#internal-links)): `requestEntryLinkAppend`/`requestEntryLinkReveal`/`requestEntryLinkRemove` with `subscribeEntryLinkRequest` — `document`-level custom events, since the sidebar field has no reference to the TipTap instance. A request resolves to `true` only if an editable, listening editor accepted it (`preventDefault`); the field falls back accordingly.
 
 **Blocks and templates**
 
-- **`lib/blocks/`** — the pure half of the content-block registry. **Import rule:** types,
-  `lucide-react` and pure `lib` only.
-  - `types.ts` (`BlockInstance`, `TEXT_BLOCK_TYPE`), `blockTypes.ts` (`resolveBlockType` —
-    `undefined` for an unknown type or too-new data version).
-  - `blockHtml.ts` — `parseBlocks`/`serializeBlocks`/`createTextBlock`, `DOMParser`-free,
-    tested by `npm run check:blocks`.
-  - `blockAttrs.ts` — instance-attribute and naming rules for stack, sidebar and export
-    (`isBlockHidden`, `customBlockTitle`, `showsTitleInRead`, `withBlockAttr`,
-    `blockLabel`/`blockTypeLabel`/`elementLabel`, …).
-  - `exportRender.ts` — `renderBlocksForExport`, one serializer per type, by the read-mode
-    rules.
-  - `fields.ts` — the fields block (`parseFields`/`serializeFields`/`createFieldsBlock`,
-    `isElementEmpty`/`isHiddenInRead`, `linkFromSlot`/`imageFromSlot`).
-  - `presets.ts` — `BLOCK_PRESETS` (what "add block" offers), `createFromPreset` (including
-    `def:<id>`), `ELEMENT_KIND_ICONS`, `blockIcon`.
-  - `definitions.ts` — user-built blocks (`instantiateDefinition`, `blockOrigin`,
-    `isOutdatedCopy`, `updateInstanceToDefinition`, `updateCopiesInContent`/
-    `removeCopiesFromContent`).
-  - `entrySummary.ts` — `entryBlockSummary`: copies and field values per entry plus the
-    sigil summary, cached per content and day; the base for list filters.
-  - `sigil.ts` (the three sigil blocks and their state helpers), `legacyStatus.ts` (the v40
-    status converter), `templates.ts` (a template's shape and assignment rules — see
-    [Templates](architecture/templates.md#templates)).
-- **`lib/templateTags.ts`** — `usableTemplateTags(ids)`: the tag ids a template hands to a
-  new entry — only live tags; a template never creates a tag (`withUsableTags`).
-  `registerTagLookup` lets `tagStore` supply the is-live check without this module importing
-  it back (that import would cycle).
+- **`lib/blocks/`** — the pure half of the content-block registry. **Import rule:** types, `lucide-react` and pure `lib` only.
+  - `types.ts` (`BlockInstance`, `TEXT_BLOCK_TYPE`), `blockTypes.ts` (`resolveBlockType` — `undefined` for an unknown type or too-new data version).
+  - `blockHtml.ts` — `parseBlocks`/`serializeBlocks`/`createTextBlock`, `DOMParser`-free, tested by `npm run check:blocks`.
+  - `blockAttrs.ts` — instance-attribute and naming rules for stack, sidebar and export (`isBlockHidden`, `customBlockTitle`, `showsTitleInRead`, `withBlockAttr`, `blockLabel`/`blockTypeLabel`/`elementLabel`, …).
+  - `exportRender.ts` — `renderBlocksForExport`, one serializer per type, by the read-mode rules.
+  - `fields.ts` — the fields block (`parseFields`/`serializeFields`/`createFieldsBlock`, `isElementEmpty`/`isHiddenInRead`, `linkFromSlot`/`imageFromSlot`).
+  - `presets.ts` — `BLOCK_PRESETS` (what "add block" offers), `createFromPreset` (including `def:<id>`), `ELEMENT_KIND_ICONS`, `blockIcon`.
+  - `definitions.ts` — user-built blocks (`instantiateDefinition`, `blockOrigin`, `isOutdatedCopy`, `updateInstanceToDefinition`, `updateCopiesInContent`/ `removeCopiesFromContent`).
+  - `entrySummary.ts` — `entryBlockSummary`: copies and field values per entry plus the sigil summary, cached per content and day; the base for list filters.
+  - `sigil.ts` (the three sigil blocks and their state helpers), `legacyStatus.ts` (the v40 status converter), `templates.ts` (a template's shape and assignment rules — see [Templates](architecture/templates.md#templates)).
+- **`lib/templateTags.ts`** — `usableTemplateTags(ids)`: the tag ids a template hands to a new entry — only live tags; a template never creates a tag (`withUsableTags`). `registerTagLookup` lets `tagStore` supply the is-live check without this module importing it back (that import would cycle).
 
 **Categories, titles, dates, sorting, grouping**
 
-- **`lib/categories.ts`** — `categoryLabel(t, cat, fallback)`: the one builtin-vs-custom
-  display-name rule (a builtin via `categories.builtin.<id>`, else its stored name).
-  `categoriesUsedBy(all, items)`: the categories a view renders — everything an item points
-  at, plus the fallback; a just-created category reaches a module only once an entry points
-  at it. `categoryUsageCounts`/`dominantCategoryModule`: entries per module per category
-  (`CategoriesView`'s columns, the search's module hint). `hasUncategorized(all, items)`:
-  whether any item's category no longer resolves (moved to Trash). The `legacy*` exports
-  serve only migrations v36–v38 and importing pre-v38 files.
-- **`lib/entryTitle.ts`** — the one title rule: new entries are stored with an empty title,
-  and `displayTitle(t, type, title)` is what every list, card, tab, search result, chip,
-  drag label and export shows (the title, or the translated "Untitled …").
-  `hasOwnTitle(title)` tests for an own title (never compare against the English default).
-  `isLegacyUntitled`/`LEGACY_UNTITLED_TITLES` recognise old English defaults where data
-  comes in — see [`database.md`](database.md#key-conventions).
-- **`lib/formatDate.ts`** — `formatEntryDate`/`formatIsoDateLong`/`formatMonthGroup`/
-  `formatDayHeading`/`formatTimeDistance`: the only source of locale-aware date formatting,
-  wired into `changeAppLanguage` (date-fns locales lazy-load per language). `lib/export.ts`
-  and `lib/emeraldFormat.ts` deliberately don't use it — file exports stay
-  locale-independent.
-- **`lib/sortItems.ts`** — the one `SortMode` comparator for every dashboard: date/title
-  getters plus an optional tiebreak. Grouping is a separate axis (`GroupingMode`). `title`
-  is required only when the item type has no `title` field (`TitleOption<T>` — the Altar
-  library sorts by `name`). An optional `count` getter backs `count_desc`.
-- **`lib/groupBy.ts`** — `groupBy(items, keyFn)`, `groupByMonth` (via `formatMonthGroup`),
-  `groupByCategory(...)` — one group per category plus a trailing `UNCATEGORIZED_KEY` group,
-  only when there are orphans (Journal passes the moon phases as synthetic categories).
-  `countBy`/`countByCategory` (same orphan rule) feed the sidebar's `FilterList` counts.
-- **`lib/viewMode.ts`** — `isCardView(view)` (`cards` or `cards_wide`) and
-  `isWideCardView(view)`. Views branch on `isCardView`, never `view === 'cards'`, so
-  `cards_wide` lands in the same branch everywhere.
+- **`lib/categories.ts`** — `categoryLabel(t, cat, fallback)`: the one builtin-vs-custom display-name rule (a builtin via `categories.builtin.<id>`, else its stored name). `categoriesUsedBy(all, items)`: the categories a view renders — everything an item points at, plus the fallback; a just-created category reaches a module only once an entry points at it. `categoryUsageCounts`/`dominantCategoryModule`: entries per module per category (`CategoriesView`'s columns, the search's module hint). `hasUncategorized(all, items)`: whether any item's category no longer resolves (moved to Trash). The `legacy*` exports serve only migrations v36–v38 and importing pre-v38 files.
+- **`lib/entryTitle.ts`** — the one title rule: new entries are stored with an empty title, and `displayTitle(t, type, title)` is what every list, card, tab, search result, chip, drag label and export shows (the title, or the translated "Untitled …"). `hasOwnTitle(title)` tests for an own title (never compare against the English default). `isLegacyUntitled`/`LEGACY_UNTITLED_TITLES` recognise old English defaults where data comes in — see [`database.md`](database.md#key-conventions).
+- **`lib/formatDate.ts`** — `formatEntryDate`/`formatIsoDateLong`/`formatMonthGroup`/ `formatDayHeading`/`formatTimeDistance`: the only source of locale-aware date formatting, wired into `changeAppLanguage` (date-fns locales lazy-load per language). `lib/export.ts` and `lib/emeraldFormat.ts` deliberately don't use it — file exports stay locale-independent.
+- **`lib/sortItems.ts`** — the one `SortMode` comparator for every dashboard: date/title getters plus an optional tiebreak. Grouping is a separate axis (`GroupingMode`). `title` is required only when the item type has no `title` field (`TitleOption<T>` — the Altar library sorts by `name`). An optional `count` getter backs `count_desc`.
+- **`lib/groupBy.ts`** — `groupBy(items, keyFn)`, `groupByMonth` (via `formatMonthGroup`), `groupByCategory(...)` — one group per category plus a trailing `UNCATEGORIZED_KEY` group, only when there are orphans (Journal passes the moon phases as synthetic categories). `countBy`/`countByCategory` (same orphan rule) feed the sidebar's `FilterList` counts.
+- **`lib/viewMode.ts`** — `isCardView(view)` (`cards` or `cards_wide`) and `isWideCardView(view)`. Views branch on `isCardView`, never `view === 'cards'`, so `cards_wide` lands in the same branch everywhere.
 
 **Infrastructure**
 
-- **`lib/serialize.ts`** — `serialized(serialKey(domain, id), task)` chains same-key async
-  tasks, so a store's read-merge-write update never runs against a stale snapshot.
-  `drainSerialized()` awaits every queued chain (vault switch, replace/add-vault import).
-  See [Store Write Serialization](architecture.md#store-write-serialization).
-- **`lib/reveal.ts`** — `scrollIntoViewCentered(el)` (reduced-motion aware) and
-  `flashReveal(el, className, ms)`: the "here it is" scroll-and-flash of the link chip and
-  the block stack's jump-to.
-- **`lib/motion.ts`** — `REORDER_SPRING`, the one spring for framer-motion `Reorder` lists
-  (tab bar, block stack, the builder's field list). The block manager and the altar's
-  placed elements reorder without animation via `usePointerReorder`.
-- **`lib/dragChannel.ts`** — `createDragChannel<T>()`, the set/get/subscribe pub-sub behind
-  `dragState`/`altarDragState`.
-- **`lib/thumbnail.ts`** — `canvasToCappedThumbnail` (WebP quality ladder under
-  `THUMBNAIL_MAX_BYTES`, JPEG/PNG fallback) and `THUMBNAIL_W` (640px), for the altar cards.
-- **`lib/styleClasses.ts`** — repeated Tailwind chains. **The established home for them** —
-  extend it rather than bypassing it.
-- **`lib/platform.ts`** — `isMacOS`, `isWindows`, `platformName`, `isTauri`,
-  `usesCustomWindowControls`, `usesHtmlMenuBar`. The **only** permitted source of platform
-  detection; everything else branches through `html[data-platform]` in CSS, never through
-  scattered `navigator.userAgent` checks.
+- **`lib/serialize.ts`** — `serialized(serialKey(domain, id), task)` chains same-key async tasks, so a store's read-merge-write update never runs against a stale snapshot. `drainSerialized()` awaits every queued chain (vault switch, replace/add-vault import). See [Store Write Serialization](architecture.md#store-write-serialization).
+- **`lib/reveal.ts`** — `scrollIntoViewCentered(el)` (reduced-motion aware) and `flashReveal(el, className, ms)`: the "here it is" scroll-and-flash of the link chip and the block stack's jump-to.
+- **`lib/motion.ts`** — `REORDER_SPRING`, the one spring for framer-motion `Reorder` lists (tab bar, block stack, the builder's field list). The block manager and the altar's placed elements reorder without animation via `usePointerReorder`.
+- **`lib/dragChannel.ts`** — `createDragChannel<T>()`, the set/get/subscribe pub-sub behind `dragState`/`altarDragState`.
+- **`lib/thumbnail.ts`** — `canvasToCappedThumbnail` (WebP quality ladder under `THUMBNAIL_MAX_BYTES`, JPEG/PNG fallback) and `THUMBNAIL_W` (640px), for the altar cards.
+- **`lib/styleClasses.ts`** — repeated Tailwind chains. **The established home for them** — extend it rather than bypassing it.
+- **`lib/platform.ts`** — `isMacOS`, `isWindows`, `platformName`, `isTauri`, `usesCustomWindowControls`, `usesHtmlMenuBar`. The **only** permitted source of platform detection; everything else branches through `html[data-platform]` in CSS, never through scattered `navigator.userAgent` checks.
 - **`lib/tabs.ts`** — tab ids, per-tab navigation history, `isContentView`.
-- **`lib/helpers.ts`** — `generateId`, `nowIso`, `isImageIcon`, `iconTitle`,
-  `isValidHexColor`, `hexToRgb`, `formatBytes`, `ACCEPTED_IMAGE_MIME`,
-  `isAcceptedImageFile`, `readFileAsDataUrl`, `oneOf(raw, options, fallback)` (for values
-  read back from a file or `localStorage` that must land on one of a fixed set).
-- **`lib/vaultSettings.ts`** — the vault-settings model: `VaultSettings` and its groups
-  (`SETTINGS_GROUPS`), `DEFAULT_VAULT_SETTINGS`, `normalizeVaultSettings` (field by field,
-  unknown keys left standing so a newer build gets them back after a detour through an
-  older one), `importableSettings` (the same but *dropping* unknown keys — a backup file is
-  untrusted input), `withSettingsGroups` (a Merge import's per-group pick),
-  `readVaultSettings`/`writeVaultSettings`, and the one-time app-wide-to-per-vault migration
-  (`captureLegacySettings`, `initialSettingsFor`, `readAppearanceMirror`).
-- **`lib/imageLimits.ts`** — applies the vault's image settings to an inserted image:
-  `prepareImageDataUrl(dataUrl, { capBytes? })` scales to the max edge (GIF/SVG excepted —
-  scaling would lose the animation or the vectors), then checks the max file size (and an
-  optional caller cap; the smaller wins), throwing `ImageTooLargeError`; `hasImageLimits()`;
-  `readIconFile`; `dataUrlBytes`/`imageSizeLabel` (a rounded "N MB", deliberately not
-  `formatBytes`, which would drop to KB at exactly the sizes these settings offer).
-- **`lib/emojiSearch.ts`** — `DEFAULT_EMOJI_PICKER_EMOJIS`, the per-locale search data
-  (`emojiSearchLocale`/`cachedEmojiSearchData`/`loadEmojiSearchData`, lazy `import()`,
-  module-level cache), `searchEmojis(data, query)`. Separate from `EmojiPicker.tsx` so
-  `useEmojiSearchData` can load it without importing the component.
-- **`lib/altarConstants.ts`** — altar defaults and geometry; `getAltarBackgroundStyle` and
-  `resolveResolutionPixels` are the sole sources of truth.
+- **`lib/helpers.ts`** — `generateId`, `nowIso`, `isImageIcon`, `iconTitle`, `isValidHexColor`, `hexToRgb`, `formatBytes`, `ACCEPTED_IMAGE_MIME`, `isAcceptedImageFile`, `readFileAsDataUrl`, `oneOf(raw, options, fallback)` (for values read back from a file or `localStorage` that must land on one of a fixed set).
+- **`lib/vaultSettings.ts`** — the vault-settings model: `VaultSettings` and its groups (`SETTINGS_GROUPS`), `DEFAULT_VAULT_SETTINGS`, `normalizeVaultSettings` (field by field, unknown keys left standing so a newer build gets them back after a detour through an older one), `importableSettings` (the same but *dropping* unknown keys — a backup file is untrusted input), `withSettingsGroups` (a Merge import's per-group pick), `readVaultSettings`/`writeVaultSettings`, and the one-time app-wide-to-per-vault migration (`captureLegacySettings`, `initialSettingsFor`, `readAppearanceMirror`).
+- **`lib/imageLimits.ts`** — applies the vault's image settings to an inserted image: `prepareImageDataUrl(dataUrl, { capBytes? })` scales to the max edge (GIF/SVG excepted — scaling would lose the animation or the vectors), then checks the max file size (and an optional caller cap; the smaller wins), throwing `ImageTooLargeError`; `hasImageLimits()`; `readIconFile`; `dataUrlBytes`/`imageSizeLabel` (a rounded "N MB", deliberately not `formatBytes`, which would drop to KB at exactly the sizes these settings offer).
+- **`lib/emojiSearch.ts`** — `DEFAULT_EMOJI_PICKER_EMOJIS`, the per-locale search data (`emojiSearchLocale`/`cachedEmojiSearchData`/`loadEmojiSearchData`, lazy `import()`, module-level cache), `searchEmojis(data, query)`. Separate from `EmojiPicker.tsx` so `useEmojiSearchData` can load it without importing the component.
+- **`lib/altarConstants.ts`** — altar defaults and geometry; `getAltarBackgroundStyle` and `resolveResolutionPixels` are the sole sources of truth.
 
-The Zustand stores and the hooks are the shared state and behaviour layer. Holding data in
-a component that two views need means the wrong place was chosen.
+The Zustand stores and the hooks are the shared state and behaviour layer. Holding data in a component that two views need means the wrong place was chosen.
 
 ### Semantic CSS Classes in `src/index.css`
 
-They exist so that raw Tailwind chains do not get copied around. A new class here is the
-right move as soon as the same chain shows up for the third time.
+They exist so that raw Tailwind chains do not get copied around. A new class here is the right move as soon as the same chain shows up for the third time.
 
 | Class group | For |
 | --- | --- |
@@ -848,61 +305,26 @@ right move as soon as the same chain shows up for the third time.
 
 ## When Deviating Is Right
 
-Three cases that have been examined and settled. They are not sloppiness and should not be
-"tidied up".
+Three cases that have been examined and settled. They are not sloppiness and should not be "tidied up".
 
-**`.vault-card` instead of `.panel`.** The vault picker deliberately rebuilds the panel
-look, because `.panel` demonstrably does not work here: theme overrides beat modifier
-classes, and unlayered rules come later in the output than `@layer components`. Both traps are described in
-[`design.md`](design.md#specificity-traps) — they hit **every** new "active" variant on an
-existing `.panel` card, not just the vault picker.
+**`.vault-card` instead of `.panel`.** The vault picker deliberately rebuilds the panel look, because `.panel` demonstrably does not work here: theme overrides beat modifier classes, and unlayered rules come later in the output than `@layer components`. Both traps are described in [`design.md`](design.md#specificity-traps) — they hit **every** new "active" variant on an existing `.panel` card, not just the vault picker.
 
-**`MenuDropdown` alongside `ContextMenu`.** Two dropdown implementations, on purpose.
-`ContextMenu` positions itself at a cursor coordinate, has a timing trick to survive the
-right-click that opened it, and knows disabled entries but no submenus. The title bar's menu
-buttons need submenus too.
+**`MenuDropdown` alongside `ContextMenu`.** Two dropdown implementations, on purpose. `ContextMenu` positions itself at a cursor coordinate, has a timing trick to survive the right-click that opened it, and knows disabled entries but no submenus. The title bar's menu buttons need submenus too.
 
-**The `EmojiPicker`'s trigger stays free.** A large image/emoji button with a label in the
-altar item dialog and a bare emoji glyph in a category row have nothing in common but their
-function. What is unified is the popover, not the trigger.
+**The `EmojiPicker`'s trigger stays free.** A large image/emoji button with a label in the altar item dialog and a bare emoji glyph in a category row have nothing in common but their function. What is unified is the popover, not the trigger.
 
-What is **not** a valid deviation: "it was faster this way", "just this one place", "looks
-almost the same". What the three cases above have in common is that the shared variant
-*would not have worked technically* or is *structurally something else*.
+What is **not** a valid deviation: "it was faster this way", "just this one place", "looks almost the same". What the three cases above have in common is that the shared variant *would not have worked technically* or is *structurally something else*.
 
 ## Known Duplication
 
 Open, deliberately recorded, and not an excuse for further copies.
 
-1. **Two surface class sets for dropdowns.** `.menu-surface`/`.menu-item`/`.menu-separator`
-   for the title bar's menus, `.context-menu*` for the context menu. Colours are unified
-   (`.menu-item` shares selector groups with `.context-menu-item-default` in both themes)
-   and the row height matches; the structural classes are still doubled.
-2. **`ContextMenu` uses raw values instead of theme variables** (`border-stone-700/60`,
-   `shadow-2xl` instead of `--menu-border`/`--menu-shadow`). Resolving 1 and 2 is the same
-   job: reduce `ContextMenu` to `.menu-surface`/`.menu-item` plus its `danger` variant.
-3. **`LinkPickerModal` is raw on the inside.** Only the outer shell runs through `Modal`;
-   the search field uses raw `stone-*` utilities, and its six icon-only tabs are a
-   hand-written toggle rather than `TabIconButton`, whose active state is the stone tone
-   while the picker needs jade (see [design.md Open Points](design.md#open-points)).
-4. **`AltarItemTile`** (the library tile of `AltarLibraryStrip` and `AltarLibrarySection`)
-   rebuilds the panel look raw (`rounded-md border border-stone-700/60 bg-stone-900/40`)
-   instead of using `.panel` — unlike the vault picker, without a technical reason.
-5. **The altar's ratio and overlay-colour toggles** (`AltarSidebarPanel`) hand-write an
-   active/inactive chain as raw Tailwind in a file that uses `Button`. The inactive half is
-   `neutral`, the active half jade, so it shadows `Button`'s `tone` mode with `active` — off
-   by a step in several values (`border-jade-600/70` against `/60`, `border-stone-700/60`
-   against `border-stone-600/70`). Whether they belong in `Button` is open: they are
-   selection toggles, structurally closer to a chip than to an action button.
-6. **A third dropdown row class**, `linked-entry-menu-item` (`LinkedEntryPicker`), with its
-   own raw chain rather than `.menu-item`/`.context-menu-item-*`.
-7. **Three separate "emoji or image" glyph renderers.** `BlockGlyph` and `FaviconGlyph` both
-   branch on `isImageIcon` (`lib/helpers.ts`) but each writes its own `<img>` — different
-   rounding, border and `object-contain` vs. `-cover`. `TabBar`'s private `renderIconValue`
-   (and its `AltarTabIcon`) repeat the check by hand (also accepting `http`) and write a
-   third `<img>`. None of the three render at the same size or framing.
-   *Cost: one glyph component parameterised on size/framing, `renderIconValue` switched onto
-   `isImageIcon`, then the two smaller components retired.*
+1. **Two surface class sets for dropdowns.** `.menu-surface`/`.menu-item`/`.menu-separator` for the title bar's menus, `.context-menu*` for the context menu. Colours are unified (`.menu-item` shares selector groups with `.context-menu-item-default` in both themes) and the row height matches; the structural classes are still doubled.
+2. **`ContextMenu` uses raw values instead of theme variables** (`border-stone-700/60`, `shadow-2xl` instead of `--menu-border`/`--menu-shadow`). Resolving 1 and 2 is the same job: reduce `ContextMenu` to `.menu-surface`/`.menu-item` plus its `danger` variant.
+3. **`LinkPickerModal` is raw on the inside.** Only the outer shell runs through `Modal`; the search field uses raw `stone-*` utilities, and its six icon-only tabs are a hand-written toggle rather than `TabIconButton`, whose active state is the stone tone while the picker needs jade (see [design.md Open Points](design.md#open-points)).
+4. **`AltarItemTile`** (the library tile of `AltarLibraryStrip` and `AltarLibrarySection`) rebuilds the panel look raw (`rounded-md border border-stone-700/60 bg-stone-900/40`) instead of using `.panel` — unlike the vault picker, without a technical reason.
+5. **The altar's ratio and overlay-colour toggles** (`AltarSidebarPanel`) hand-write an active/inactive chain as raw Tailwind in a file that uses `Button`. The inactive half is `neutral`, the active half jade, so it shadows `Button`'s `tone` mode with `active` — off by a step in several values (`border-jade-600/70` against `/60`, `border-stone-700/60` against `border-stone-600/70`). Whether they belong in `Button` is open: they are selection toggles, structurally closer to a chip than to an action button.
+6. **A third dropdown row class**, `linked-entry-menu-item` (`LinkedEntryPicker`), with its own raw chain rather than `.menu-item`/`.context-menu-item-*`.
+7. **Three separate "emoji or image" glyph renderers.** `BlockGlyph` and `FaviconGlyph` both branch on `isImageIcon` (`lib/helpers.ts`) but each writes its own `<img>` — different rounding, border and `object-contain` vs. `-cover`. `TabBar`'s private `renderIconValue` (and its `AltarTabIcon`) repeat the check by hand (also accepting `http`) and write a third `<img>`. None of the three render at the same size or framing. *Cost: one glyph component parameterised on size/framing, `renderIconValue` switched onto `isImageIcon`, then the two smaller components retired.*
 
-Whoever touches one of these places anyway clears it up along the way. New entries in this
-list need a reason why resolving it was not possible right away.
+Whoever touches one of these places anyway clears it up along the way. New entries in this list need a reason why resolving it was not possible right away.

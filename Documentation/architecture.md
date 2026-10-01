@@ -2,8 +2,7 @@
 
 Emerald is a desktop app built on Tauri v2 (Rust backend) and React 19 (TypeScript frontend). The two sides communicate through Tauri's IPC bridge: the frontend calls Rust commands via `invoke()`, and Rust emits events the frontend subscribes to.
 
-This file is the overview: tech stack, module map, data flow and the IPC surface. The
-patterns behind individual areas each have their own file:
+This file is the overview: tech stack, module map, data flow and the IPC surface. The patterns behind individual areas each have their own file:
 
 | File | Covers |
 |---|---|
@@ -38,9 +37,7 @@ patterns behind individual areas each have their own file:
 
 ## Module Map
 
-Where things live. What the shared building blocks do and when to use them is in
-[`components.md`](components.md); how an area works is in the `architecture/*.md` file named
-in the table above.
+Where things live. What the shared building blocks do and when to use them is in [`components.md`](components.md); how an area works is in the `architecture/*.md` file named in the table above.
 
 ```
 src/
@@ -138,8 +135,7 @@ src-tauri/src/
     └── windows.rs, macos.rs, linux.rs
 ```
 
-Only `en` ships in the start bundle; de/es/fr load on demand through `changeAppLanguage` —
-always use that instead of `i18n.changeLanguage`.
+Only `en` ships in the start bundle; de/es/fr load on demand through `changeAppLanguage` — always use that instead of `i18n.changeLanguage`.
 
 ## Data Flow
 

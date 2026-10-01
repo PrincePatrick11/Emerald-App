@@ -486,8 +486,8 @@ Full vault snapshots are exported and imported via Settings → Backup. The code
 | 6 | v40 | `blockDefinitions` | Nothing |
 | 5 | v39 | `category_id` may be `null` | Nothing; an older build has a `NOT NULL` column and must refuse |
 | 4 | v38 | one `categories` array | `mergeLegacyCategoryArrays` merges the four per-module arrays by the v38 rule ([categories](#categories)), translating built-in names via `legacyDisplayName`, and remaps every row's `category_id` |
-| 3 | — | images referenced by filename | Nothing: `restoreImages` maps whatever keys the file carries (absolute paths in v1/v2) onto the filenames it wrote, and `remapPaths` substitutes them |
-| 2 | — | category references by id | A `"1"` file's `wiki_articles.category` becomes `category_id`, `altar_items.category` is resolved from name to id against the file's own categories, and null `linked_*_ids` become `'[]'` |
+| 3 | v35 | images referenced by filename | Nothing: `restoreImages` maps whatever keys the file carries (absolute paths in v1/v2) onto the filenames it wrote, and `remapPaths` substitutes them |
+| 2 | v33 | category references by id | A `"1"` file's `wiki_articles.category` becomes `category_id`, `altar_items.category` is resolved from name to id against the file's own categories, and null `linked_*_ids` become `'[]'` |
 
 Independently of the version, journal rows with the old fields go through `liftLegacyJournalRows` (link ids and paradigm/banishing/meditation fields → blocks, looking up link targets in the file and falling back to the vault), and operations with `is_active = 0`, an `end_date` or a `version` through `convertLegacyStatusRows` (the v41 converter: the Status block is prepended to `content`; the copies follow the vault's own "Status" definition if there is one, even in the trash, else the file's, else a new one at the end of the list). `vaultRoutineLinkSource` (resolving old routines' link targets) reads `entries`. A file from before v47 may carry a `links` array; import ignores it. A pre-v54 file's `description` values are dropped by `insertRows`' column filter.
 

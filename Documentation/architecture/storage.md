@@ -72,8 +72,7 @@ Tauri derives `app_data_dir()`/`app_config_dir()` from the app's `identifier`, `
 
 Before per-vault directories, vaults were flat files — `emerald.db` and `emerald-{uuid}.db` side by side in the app directory, sharing one `images/` folder. Two steps convert them:
 
-1. **`migrate_vault_layout`**, triggered from `loadVaultsFile()` for a record that carries `dbName` instead of `path`. It moves the database into `{appDataDir}/vaults/{id}/` and returns the directory. Not a SQL migration — the file moves before anything opens it. Idempotent; `vaults.json` is rewritten only once the move succeeded.
-   The two legacy locations differ by platform: `tauri-plugin-sql` joined onto **`app_config_dir`**, the image pool onto **`app_data_dir`**. Windows and macOS resolve both to one directory; on Linux they are `~/.config/…` and `~/.local/share/…`, so both are searched.
+1. **`migrate_vault_layout`**, triggered from `loadVaultsFile()` for a record that carries `dbName` instead of `path`. It moves the database into `{appDataDir}/vaults/{id}/` and returns the directory. Not a SQL migration — the file moves before anything opens it. Idempotent; `vaults.json` is rewritten only once the move succeeded. The two legacy locations differ by platform: `tauri-plugin-sql` joined onto **`app_config_dir`**, the image pool onto **`app_data_dir`**. Windows and macOS resolve both to one directory; on Linux they are `~/.config/…` and `~/.local/share/…`, so both are searched.
 2. **Migration v35 `vault_scoped_images`**, once the database is open. It copies the referenced images out of the shared pool (`adopt_legacy_images`) and rewrites every absolute path down to its filename, in the `html` and `plain` columns of `IMAGE_FIELDS_V48`, not the `legacy` ones. If a copy fails the rewrite still happens — the handler's legacy fallback keeps the image visible; the reverse would lose it.
 
 ## Vault Settings
