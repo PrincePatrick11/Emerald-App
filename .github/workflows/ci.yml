@@ -36,6 +36,9 @@ jobs:
       - name: Check blocks
         run: npm run check:blocks
 
+      - name: Check docs
+        run: npm run check:docs
+
       # `npm run build` ist tsc + vite — der Typecheck steckt darin.
       - name: Typecheck and build
         run: npm run build

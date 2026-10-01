@@ -22,7 +22,8 @@ Two jobs, on every push to every branch and on every pull request. `cancel-in-pr
 1. `npm run check:schema` (needs `esbuild` from `devDependencies`)
 2. `npm run check:i18n` — the four locale files carry the same keys and `{{placeholder}}`s, see [`internationalization.md`](internationalization.md)
 3. `npm run check:blocks` (`scripts/check-blocks.mjs`) — the stored block format in `src/lib/blocks/blockHtml.ts` round-trips and runs under Node without a DOM
-4. `npm run build` — `tsc && vite build --configLoader runner`, so it carries the typecheck
+4. `npm run check:docs` (`scripts/check-docs.mjs`) — every relative link in `README.md`, `CONTRIBUTING.md`, `CHANGELOG.md` and `Documentation/` points to an existing file and, with `#anchor`, to an existing heading
+5. `npm run build` — `tsc && vite build --configLoader runner`, so it carries the typecheck
 
 **`rust`** (matrix: `ubuntu-22.04`, `macos-14`, `windows-latest`): `cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets`.
 
