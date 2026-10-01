@@ -22,7 +22,7 @@ The dev build uses a separate database and app identity (`com.emerald.app.dev`) 
 
 ## Guidelines
 
-- Follow the conventions described in `Documentation/architecture.md`
+- Follow the conventions described in `Documentation/architecture.md` and the per-area files in `Documentation/architecture/`
 - Add i18n keys to **all four** locale files (`src/i18n/locales/en.json`, `de.json`, `es.json`, `fr.json`)
 - Keep Zustand selectors specific: `useStore((s) => s.field)`, never bare `useStore()`
 - All hooks (`useState`, `useEffect`, `useMemo`, `useRef`) must appear **before** any early `return` in a component
@@ -31,7 +31,7 @@ The dev build uses a separate database and app identity (`com.emerald.app.dev`) 
 ## Continuous Integration
 
 Every push and pull request runs `ci.yml`: a frontend job (`npm run check:schema`,
-then the typecheck-carrying `npm run build`) and a `cargo check --locked
+`check:i18n` and `check:blocks`, then the typecheck-carrying `npm run build`) and a `cargo check --locked
 --all-targets` matrix across Linux, macOS, and Windows, since parts of the Rust
 side are platform-gated and only actually compile on their own OS. See
 `Documentation/build.md` for the full pipeline, including what CI does *not*

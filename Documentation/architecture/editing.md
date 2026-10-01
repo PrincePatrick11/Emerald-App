@@ -2,318 +2,357 @@
 
 ## Edit Mode Architecture
 
-The main content area renders only the title and body. All metadata — tags, category, icon, cover image — is edited exclusively in the right sidebar's Properties panel. The sidebar writes directly to the relevant store; the main area subscribes to the same store fields and updates accordingly.
+The main content area renders only the title and body. All metadata — tags, category, icon, cover
+image — is edited in the right sidebar's Properties panel, which writes straight to the store; the
+main area subscribes to the same fields.
 
-Unlike earlier versions, the Properties panel itself is now gated by the entry's edit state (`activeView.mode === 'edit'`): each panel renders a read-only summary (`EntryReadSections`, built from collapsible `SidebarSection`s — see [`components.md`](../components.md)) while viewing, and swaps to the same sections with editable values (`EditPropertyRow`, `PropertySelect`, `MediaPropertyRow` — see [`components.md`](../components.md)) only once the entry is opened for editing. Entering/leaving edit mode is triggered from the sidebar's own action bar, not from the main content area — there is no double-click-to-edit gesture on the entry itself; `EntryDetailFrame` has no `onEnterEditMode` prop.
+The Properties panel is gated by `activeView.mode === 'edit'`: while viewing, each panel renders a
+read-only summary (`EntryReadSections`, built from collapsible `SidebarSection`s); in edit mode the
+same sections show editable values (`EditPropertyRow`, `PropertySelect`, `MediaPropertyRow`) — see
+[`components.md`](../components.md). Edit mode is entered and left only through the sidebar's
+action bar; there is no double-click-to-edit on the entry itself.
 
 ## Cancel: discarding new entries and reverting autosaved edits
 
-`ActiveView.isNew` marks an entry that was just created by a "New" action (Journal, Wiki,
-Operations, Altar — every handler that calls `setActiveView({ ..., mode: 'edit' })` for a
-freshly created row sets it) and never confirmed with Done. It is a session-only flag,
-deliberately kept out of persisted state: `stripSessionFlags` (`src/lib/tabs.ts`) drops it
-before a view is written into any history — `normalizeSavedTab` uses it when restoring tabs
-from localStorage, and `pushHistory`/`normalizeSavedHistory` use it whenever a view is pushed
-onto a tab's own back/forward history (see [Navigation History](navigation.md#navigation-history) below) —
-all for the same reason, so that returning to the entry later (a restart, or Back) can never
-make Cancel treat an entry that has lived past its creation session as still-discardable. When Cancel fires on a still-`isNew` entry, Journal, Wiki and Operations run their own Delete
-handler: the entry goes to Trash with the usual undo toast, the same as any deleted entry —
-whatever was typed into it is never lost outright. `AltarView`'s Cancel does the same for a
-new altar, since v46 gave altars a soft delete of their own. Templates and blocks follow the rule too: "New template" / "New block" open the page with `isNew`, `useDraftPage` gets `onCancelNew` (the page's own delete), and Cancel then puts the page in the Trash with Undo instead of discarding the draft — Done keeps it as before. Tasks have no Cancel: Escape on a task that was just created and never named (`freshTaskIds` in `TasksView`, session-only) puts it in the Trash with Undo.
+`ActiveView.isNew` marks an entry just created by a "New" action and not yet confirmed with Done.
+It is session-only: `stripSessionFlags` (`src/lib/tabs.ts`) drops it before a view enters any
+history — restored tabs (`normalizeSavedTab`) and a tab's back/forward history (`pushHistory`,
+`normalizeSavedHistory`, see [Navigation History](navigation.md#navigation-history)). Otherwise a
+restart or Back could make Cancel treat an entry that outlived its creation session as
+discardable.
 
-For an entry that *was* confirmed before, Cancel cannot simply restore "the store's current
-state" — Journal, Wiki, and Operations all autosave the title/body a short
-debounce after typing stops, so by the time Cancel is pressed the store already holds the
-edited values. `useEntryEditor` (`src/hooks/useEntryEditor.ts`) instead captures a baseline of
-the whole entry (`buildRestorePatch` — title, content and tags for Journal; Wiki and Operations
-add category, icon and cover image) the moment edit mode is entered, and `restoreOnCancel()`
-writes that baseline back on Cancel, together with the `updated_at` the entry had when editing
-began (skipping the write if nothing changed) — the autosaves in between leave no trace in the
-lists. The baseline is wider than `buildPatch` on purpose: the
-Properties panel saves its fields straight to the store, so the autosave never carries them,
-but Cancel takes them back along with the text — one rule, "Cancel restores the entry as it
-was when editing began". The one thing Cancel does not undo is a change of type: that moves
-the entry into another module, where editing continues with a fresh baseline.
-Sigils need no variant of their own: since v42 they are blocks in `content`, so the
-same baseline covers intention, letters, drawing and charge.
+Cancel on a still-`isNew` entry runs the page's own Delete: the entry goes to the Trash with the
+usual undo toast, so nothing typed is lost outright. This holds for Journal, Wiki, Operations and
+the altar, and for templates and blocks: "New template" / "New block" open the page with `isNew`,
+`useDraftPage` gets `onCancelNew` (the page's delete), and Done keeps the page. Tasks have no
+Cancel: Escape on a task that was just created and never named (`freshTaskIds` in `TasksView`,
+session-only) puts it in the Trash with Undo.
 
-The type toggle below is the one thing outside the baseline: it writes through
-`changeEntryType` the moment it's picked, the new module's view mounts in edit mode and
-captures a fresh baseline, so Cancel afterwards goes back to how the entry looked right after
-the move and leaves it under its new type.
+### Reverting a confirmed entry
 
-The baseline outlives the view: `useEntryEditor` keeps it in a module-level map keyed by view
-type and entry id, not in a ref, so looking into another tab in the middle of editing and
-coming back continues the same edit — Cancel still goes back to where it began. A baseline
-lives as long as some tab shows the entry in edit mode; a subscription on `uiStore` drops it
-once none does, which covers Done, Cancel, Delete and closing the tab. It is memory only:
-after a restart, a restored edit-mode tab starts a new baseline from what is stored.
+Journal, Wiki and Operations autosave the title/body shortly after typing stops, so by the time
+Cancel is pressed the store already holds the edited values. `useEntryEditor`
+(`src/hooks/useEntryEditor.ts`) therefore captures a **baseline** when edit mode is entered
+(`buildRestorePatch` — title, content and tags; Wiki and Operations add category, icon and cover
+image), and `restoreOnCancel()` writes it back together with the `updated_at` the entry had then
+(skipped if nothing changed), so the autosaves leave no trace in the lists.
 
-The altar has no editor buffer to fall back on — placing, dragging, backgrounds, grid and
-format all write through at once — so `store/altarEdit.ts` keeps a **snapshot** instead: the
-altar's record and its placements as they were when edit mode was entered (`beginAltarEdit`,
-called by `AltarView`). Cancel writes it back through `altarStore.restoreAltarSnapshot`,
-including `updated_at` and the thumbnail, so the altar sits in the lists where it sat. The
-write is an upsert per placement followed by a delete of what does not belong — there is no
-transaction to lean on, so it is built to be repeatable: if it fails, the snapshot stays and
-the next Edit and Cancel finish it. Cancel switches to read mode *first* and restores behind
-it — `restoreAltarEdit` takes hold of the snapshot before its first `await`, since the change
-of view would otherwise prune it while the write is still waiting. A vault switch and a
-replace-mode restore drop every snapshot (`clearAltarEdits`), held ones included: the ids of
-a replaced vault come back, and Cancel would write the old altar over the restored one. An Edit pressed right
-after Cancel waits for that write (`beginAltarEdit`), so that it starts from a snapshot of
-its own. `altarEditDirty` is what both the altar's leave guard and the
-probe for background tabs ask. The snapshot has the baseline's lifetime: kept across a tab
-switch, dropped once no tab shows the altar in edit mode. The title is the one field the
-altar does not write at once; leaving the view without Done saves it, so that the edit can
-continue in the other tab, and Cancel takes it back with the rest. Writes that run outside
-the serialized chains — Done's title and thumbnail, the thumbnail taken when the view is
-left — are tracked (`trackAltarWrite`), and both a new snapshot and Cancel wait for them.
-Library items are not part of the snapshot: they belong to every altar. The snapshot does
-record which elements were in the Trash when the edit began (`trashedItemIds`): their
-placements are in no snapshot (the store hides them), so Cancel's delete leaves them alone
-even if such an element came back from the Trash during the edit.
+The baseline is wider than `buildPatch` on purpose: the Properties panel saves its fields directly,
+so the autosave never carries them, but Cancel takes them back with the text — one rule, "Cancel
+restores the entry as it was when editing began". Sigils are blocks in `content`, so the same
+baseline covers them.
+
+The one exception is a type change (see [Changing an entry's type](#changing-an-entrys-type)): it
+writes at once, the new module's view mounts in edit mode and captures a fresh baseline, so Cancel
+afterwards returns to the state right after the move and leaves the entry under its new type.
+
+The baseline outlives the view: it lives in a module-level map keyed by view type and entry id, so
+looking into another tab mid-edit and coming back continues the same edit. A `uiStore`
+subscription drops it once no tab shows the entry in edit mode (Done, Cancel, Delete, closing the
+tab). It is memory only; after a restart a restored edit-mode tab starts a new baseline.
+
+### The altar's snapshot
+
+The altar writes every action through at once (placing, dragging, backgrounds, grid, format), so
+`store/altarEdit.ts` keeps a **snapshot** instead: the altar record and its placements as they were
+when edit mode was entered (`beginAltarEdit`, called by `AltarView`). Cancel writes it back through
+`altarStore.restoreAltarSnapshot`, including `updated_at` and the thumbnail, so the altar keeps its
+place in the lists.
+
+- **Repeatable write.** An upsert per placement, then a delete of what does not belong — there is
+  no transaction, so if it fails the snapshot stays and the next Edit and Cancel finish it.
+- **Ordering.** Cancel switches to read mode first and restores behind it; `restoreAltarEdit`
+  takes hold of the snapshot before its first `await`, since the view change would otherwise prune
+  it. An Edit pressed right after Cancel waits for that write, so it starts from its own snapshot.
+- **Untracked writes.** Writes outside the serialized chains — Done's title and thumbnail, the
+  thumbnail taken when the view is left — go through `trackAltarWrite`; a new snapshot and Cancel
+  both wait for them.
+- **Vault switch / replace restore** drop every snapshot (`clearAltarEdits`), held ones included:
+  the ids of a replaced vault come back, and Cancel would write the old altar over the restored one.
+- **Title.** The one field not written at once; leaving the view without Done saves it so the edit
+  can continue in another tab, and Cancel takes it back with the rest.
+- **Library items** are not in the snapshot — they belong to every altar. The snapshot records
+  which items were trashed when the edit began (`trashedItemIds`): their placements are in no
+  snapshot (the store hides them), so Cancel's delete leaves them alone even if an item came back
+  from the Trash during the edit.
+
+`altarEditDirty` answers both the altar's leave guard and the background-tab probe. The snapshot
+has the baseline's lifetime: kept across a tab switch, dropped once no tab shows the altar in edit
+mode.
 
 ## Leaving an edit
 
-An edit ends with Done or Cancel and nothing else. Leaving a page that is being edited *and
-has changes* any other way asks first — save, discard, or keep editing — instead of silently
-keeping what was typed, which is what navigating away used to do.
+An edit ends with Done or Cancel and nothing else. Leaving a page that is being edited *and has
+changes* any other way asks first — save, discard, or keep editing.
 
-`store/leaveGuardStore.ts` holds the one **guard** of the page that is open: a key
-(`guardKey(viewType, id)`), a title for the question, `isDirty()`, and `save`/`discard`, which
-are the page's own Done and Cancel. Entries register theirs through `useEditActions` (the
-views pass `guard`; dirty means the stored state differs from Cancel's baseline, an autosave
-is pending, or the entry is new and unconfirmed), a block's or template's page through
-`useDraftPage` (dirty means a draft exists in its draft store). `confirmLeave()` raises the
-question — `LeaveGuardModal`, rendered once in `AppShell` — and runs the answer; Escape, the X
-and a click beside the modal all mean "keep editing".
+`store/leaveGuardStore.ts` holds the one **guard** of the open page: a key (`guardKey(viewType,
+id)`), a title for the question, `isDirty()`, and `save`/`discard`, which are the page's own Done
+and Cancel. Entries register theirs through `useEditActions` (`guard`; dirty means the stored state
+differs from the baseline, an autosave is pending, or the entry is new and unconfirmed); block and
+template pages through `useDraftPage` (dirty means a draft exists). `confirmLeave()` raises the
+question — `LeaveGuardModal`, rendered once in `AppShell` — and runs the answer; Escape, the X and a
+click beside the modal all mean "keep editing".
 
 What asks:
 
 - `uiStore.setActiveView`, `navigateBack`/`navigateForward` and `closeTab` run through
   `whenLeaveConfirmed`: immediately when nothing is dirty, otherwise after the answer.
-  Back/Forward step from the history *as it was before the question* (`stepGuarded`), because
-  Save and Discard navigate themselves (back to the list) and would otherwise shift the step
-  by one.
-- Closing a tab in the background that holds changes goes through `uiStore.askInTab`: it
-  switches to the tab, waits for its view to register its guard (`guardRegistered` — the view
-  may have to load), and asks; then the tab closes and the one it was closed from comes back.
-- `lib/openEdits.ts`'s `resolveOpenEdits()` asks for every open edit in turn — the open page,
-  then each background tab through the same `askInTab` — and is what a vault switch
-  (`vaultStore.switchVault`) and a replace or add-vault import (`BackupPage`) call before they
-  do anything. `settleBeforeExit()` adds waiting for the writes still under way
-  (`drainSerialized`, `flushDrafts`) — for an update install (`UpdatesPage`) and closing the
-  window (`AppShell`, Tauri's `onCloseRequested`), after which nothing gets another chance.
+  Back/Forward step from the history *as it was before the question* (`stepGuarded`), because Save
+  and Discard navigate themselves and would otherwise shift the step by one.
+- Closing a background tab that holds changes goes through `uiStore.askInTab`: it switches to the
+  tab, waits for its view to register its guard (`guardRegistered` — the view may have to load),
+  asks, then closes the tab and returns to the one it was closed from.
+- `resolveOpenEdits()` (`lib/openEdits.ts`) asks for every open edit in turn — the open page, then
+  each background tab via `askInTab`. A vault switch (`vaultStore.switchVault`) and a replace or
+  add-vault import (`BackupPage`) call it first. `settleBeforeExit()` adds waiting for writes still
+  under way (`drainSerialized`, `flushDrafts`) — for an update install (`UpdatesPage`) and closing
+  the window (`AppShell`, Tauri's `onCloseRequested`), after which nothing gets another chance.
 
-What does not ask: switching to another tab (the edit continues there, see the baseline
-above), and Done, Cancel and Delete themselves — `useEditActions` wraps them in
-`withoutLeaveGuard(key, …)`, which exempts that one page while its handler runs, not the
-others.
+What does not ask: switching to another tab (the edit continues there), and Done, Cancel and Delete
+themselves — `useEditActions` wraps them in `withoutLeaveGuard(key, …)`, which exempts that one
+page while its handler runs.
 
-Whether a *background* tab holds changes is answered without mounting it:
-`holdsOpenEdit(view)` asks the **probes** that `draftStore` (a draft exists) and
-`useEntryEditor` (the stored state differs from the baseline, or the entry is new) register.
-Only a tab that does is switched to; an unchanged edit-mode tab closes without a flicker.
+Whether a *background* tab holds changes is answered without mounting it: `holdsOpenEdit(view)`
+asks the **probes** registered by `draftStore` (a draft exists), `useEntryEditor` (stored state
+differs from the baseline, or the entry is new) and `altarEdit` (`altarEditDirty`). Only such a tab
+is switched to; an unchanged edit-mode tab closes without a flicker.
 
-Whoever answers "keep editing" wants to be in the entry: the Settings and Vaults windows
-close on that answer (`useCloseOnKeepEditing`, fed by the `stays` counter in
-`leaveGuardStore`), whether they asked themselves or the window's close button did.
-`switchVault` resolves to `false` when the user chose to keep editing. The add-vault import
-asks *before* it starts and then passes `editsResolved`, so its own switch never asks again:
-a second question answered "keep editing" would leave the old vault active, and the import
-would fill it instead of the new one.
+Whoever answers "keep editing" wants to be in the entry: the Settings and Vaults windows close on
+that answer (`useCloseOnKeepEditing`, fed by the `stays` counter in `leaveGuardStore`), whether they
+asked themselves or the window's close button did. `switchVault` resolves to `false` when the user
+keeps editing. The add-vault import asks *before* it starts and then passes `editsResolved`, so its
+own switch never asks again: a second "keep editing" would leave the old vault active, and the
+import would fill it instead of the new one.
 
 ## Changing an entry's type
 
-`EntryTypeField` (Journal/Wiki/Operation Properties sections, the first row — above Category,
-or above the moon phase for Journal) renders the three module icons from `MODULE_LIST` filtered by
-`usesBlocks` as a segmented control; picking one calls `changeEntryType(id, from, to)`
-(`src/lib/entryTypeChange.ts`). Tasks and Altar have a different data model and aren't
-convertible, so they get no field and no entry in `ConvertibleEntryType`.
+`EntryTypeField` — the first row of the Journal/Wiki/Operation edit-mode Properties section —
+renders the modules from `MODULE_LIST` filtered by `usesBlocks` as a segmented control; picking one
+calls `changeEntryType(id, from, to)` (`src/lib/entryTypeChange.ts`). Tasks and Altar have a
+different data model and aren't convertible.
 
-The entry keeps its id and its row: `changeEntryType` first flushes the source view's
-pending autosave (the new optional `EditActions.flush`, set via `useEditActions`'s
-`flushAutoSave` — see Right Sidebar Action Bar below, needed since the store may still hold
-stale content at the moment the toggle is clicked), then, serialized under the entry's write
-key, runs one `UPDATE` of `type`, `entry_number` (a fresh one for the target type) and category
-(`retypeRow`) — an empty title stays empty, the new type's "Untitled …" shows by itself —
-rewrites every chip pointing at the id to the new `data-entry-type` across all entries —
-trashed rows included, so a restored entry doesn't come back with a stale
-chip — and templates (`retypeInternalLinks`, see Internal Links below), remaps the id inside
-any `block_definitions` link default that targeted it (`remapDefinitionDefaults`'s resolver may
-now hand back an `entryType` alongside `id`/`label`), and updates `task_links.target_type`.
-Since the row never leaves its table, there is no window in which the entry exists twice or
-not at all. Wiki and
-Operation keep category, icon and cover image across the move; converting either to Journal
-drops them (a journal entry has no category), and `typeChangeDropsProperties` tells the field to ask first via `InlineConfirm`
-when any of the three is actually set.
+The entry keeps its id and its row in `entries`. `changeEntryType`:
 
-The move leaves the content alone: a default template applies when an entry is created, never
-afterwards (see [Templates](templates.md#templates)). Once the row exists under the new type,
-`uiStore.retypeEntryViews(id, from, to)` rewrites every tab's `view`, every tab's history, and
-the tabless history in one `set()` — no open tab is ever left pointing at a type/id pair that
-briefly doesn't exist, since the row is updated and the store moved across types in one step.
+1. flushes the source view's pending autosave (`EditActions.flush`, see
+   [Right Sidebar Action Bar](#right-sidebar-action-bar)) — the store may still hold stale content
+   when the toggle is clicked;
+2. serialized under the entry's write key, runs one `UPDATE` of `type`, `entry_number` (a fresh one
+   in the target type's count), category, icon and cover image (`retypeRow`); an untitled entry
+   stays untitled and shows the new type's "Untitled …";
+3. rewrites every chip pointing at the id to the new `data-entry-type` in `entries` (trashed rows
+   included, so a restored entry doesn't come back with a stale chip) and `templates`
+   (`retypeInternalLinks`, see [Internal Links](#internal-links)), remaps link defaults in
+   `block_definitions` that target it (`remapDefinitionDefaults`), and updates
+   `task_links.target_type`;
+4. puts the converted entry into the store, calls `uiStore.retypeEntryViews(id, from, to)` — which
+   rewrites every tab's `view`, every tab's history and the tabless history in one `set()` — and
+   only then removes the entry from its old type, so no open tab ever points at a type/id pair that
+   doesn't exist.
+
+Since the row never leaves its table, the entry never exists twice or not at all. Wiki and
+Operation keep category, icon and cover image across the move; converting to Journal drops them,
+and `typeChangeDropsProperties` makes the field ask first via `InlineConfirm` when any is set.
+
+The content is left alone: a default template applies only when an entry is created (see
+[Templates](templates.md#templates)).
 
 ## Right Sidebar Action Bar
 
-`RightSidebar.tsx` renders a `RightSidebarActionBar` pinned above the scrollable Properties content, replacing what used to be separate Edit/Save/Cancel/Delete buttons duplicated in every entry view's header. The bar reads `uiStore.editActions` (set via `setEditActions({ onSave, onCancel, onDelete? })`) to know what to call — in edit mode it shows Done/Delete/Cancel; in view mode it shows Edit (plus a Fullscreen toggle for Altar); an entry whose loaded sigil locks the whole entry keeps the Edit button in place, disabled, with a tooltip saying why (`editor.lockedBySigil`; the tooltip sits on a wrapper `<span>`, because a disabled tone `Button` takes no pointer events).
+`RightSidebar.tsx` renders a `RightSidebarActionBar` pinned above the scrollable Properties content.
+It reads `uiStore.editActions` (set via `setEditActions`): in edit mode it shows Done/Delete/Cancel,
+in view mode Edit (plus a Fullscreen toggle for the altar). An entry whose loaded sigil locks it
+keeps the Edit button in place, disabled, with a tooltip (`editor.lockedBySigil`) on a wrapper
+`<span>`, because a disabled tone `Button` takes no pointer events.
 
-Each of the five entry views registers its handlers through the shared `useEditActions(active, handlers)` hook (`src/hooks/useEditActions.ts`) — previously each view carried its own copy of the same ref-latched effect:
+Each entry view registers its handlers through `useEditActions(active, handlers)`
+(`src/hooks/useEditActions.ts`):
 
 ```ts
 useEditActions(isEditing, { onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete });
 ```
 
-Inside the hook, the handlers are kept in a ref that is overwritten on every render, and the effect itself only depends on `active`: `setEditActions` only needs to run when edit mode flips, not on every keystroke, but the handlers it registers must still see the latest `title`/`content`/etc. at call time. An earlier, pre-hook version of this effect had no dependency array and called `setEditActions` unconditionally on every render, which combined with a whole-store `useUIStore()` subscription in the same component to produce an infinite render loop (each `setEditActions` call re-rendered the subscriber, which re-ran the effect, which called `setEditActions` again) and a blank screen on startup. Keep sidebar-consuming components on per-field selectors (see Store Selectors above) to avoid reintroducing it — the hook itself already scopes its effect to `[active]`.
+The handlers live in a ref overwritten on every render, and the effect depends only on `active`
+(and the guard key): `setEditActions` needs to run when edit mode flips, not per keystroke, yet the
+handlers must see the latest `title`/`content` at call time. Calling `setEditActions` on every
+render, combined with a whole-store `useUIStore()` subscription, produces an infinite render loop
+and a blank screen — keep sidebar-consuming components on per-field selectors (see
+[Store Selectors](modules.md#store-selectors)).
 
-`EditActions` gained an optional fourth handler, `flush`, alongside `onSave`/`onCancel`/`onDelete` — Journal/Wiki/Operations pass their `flushAutoSave` from `useEntryEditor`. It exists for a sidebar action that needs the *current* store row before it acts rather than whatever the last debounced autosave already wrote: `changeEntryType` (see above) calls `useUIStore.getState().editActions?.flush?.()` before reading the entry out of its store.
+The optional fourth handler, `flush`, is for a sidebar action that needs the *current* row rather
+than what the last debounced autosave wrote: Journal/Wiki/Operations pass `flushAutoSave` from
+`useEntryEditor`, and `changeEntryType` calls `editActions?.flush?.()` before reading the entry.
 
 ## List Header Portal
 
-In list views (every module, plus Home, Categories, Tags and Blocks), `Dashboard`'s whole
-header — title row, toolbar, and filter panel — lives **only** in the right sidebar; there
-is no inline fallback above the list. `RightSidebar.tsx` mounts a host `<div>` and hands its
-DOM node to `uiStore.listHeaderHost` through a ref callback (`setListHeaderHost`);
-`SidebarPortal` (`src/components/ui/SidebarPortal.tsx`) reads the field back and, whenever it
-is non-null, `createPortal`s its `children` into it — `Dashboard` renders its header through
-one, and the page of a user-built block (below) renders its own sidebar content through
-another; `MainArea` only ever renders one view, so at most one of the two is ever mounted at
-a time. Closing the right sidebar has nothing to fall back to — the header disappears along
-with the sidebar and the list gets the full height back, deliberately: `AppShell` keeps the
-sidebar mounted (`inert`) for the 200ms collapse animation described above, so the header
-stays visible inside it for that stretch and vanishes once `RightSidebar` actually unmounts
-and its ref callback clears `listHeaderHost`.
+In list views (every module, plus Home, Categories, Tags and the library views Blocks, Templates and
+Lexicon), `Dashboard`'s header — actions, toolbar, filter panel — lives **only** in the right
+sidebar; there is no inline fallback above the list. `RightSidebar.tsx` hands its host `<div>` to
+`uiStore.listHeaderHost` through a ref callback (`setListHeaderHost`); `SidebarPortal`
+(`src/components/ui/SidebarPortal.tsx`) `createPortal`s its children into it whenever it is
+non-null. `Dashboard` renders its header through one; a library page (block, template, language —
+`LibraryPageFrame`) renders its sidebar content (Done/Delete/Cancel, settings, usage) through
+another.
+
+Invariant: exactly one writer (the ref callback) and at most one reader at a time — `MainArea`
+renders one view, so only one thing portals into the host. `listHeaderHost` is a DOM node and is
+not persisted.
+
+Closing the right sidebar has nothing to fall back to: the header disappears with it and the list
+gets the room back. `AppShell` keeps the sidebar mounted (`inert`) for the collapse animation (see
+[Left Sidebar](navigation.md#left-sidebar-rail--entry-list)), so the header stays visible for that
+stretch and vanishes once the ref callback clears `listHeaderHost`.
 
 `RightSidebar` decides whether to offer the host from `uiStore.dashboardMounted`, not from
-`activeView.id`. `Dashboard` announces itself in a `useLayoutEffect`
-(`setDashboardMounted(true)`/`(false)` on mount/unmount — a layout effect rather than a
-passive one, so opening an entry switches the sidebar over to the action bar before the
-first paint instead of a frame late) and `RightSidebar` renders the host whenever a
-`Dashboard` is mounted. Guessing from `activeView.id` used to get this wrong twice: Tasks
-carries an id even while showing its list (a jump target from the left list or global
-search, not an open entry), and a stale id left behind by a just-deleted Journal/Wiki/
-Operations entry falls back to that module's `Dashboard` too — both used to land on the
-entry action bar instead, complete with a meaningless Edit button. `VIEWS_WITHOUT_ENTRIES`
-(`home`/`tags`/`categories`/`blocks`) and a missing `activeView.id` still offer the host up
-front too, alongside `dashboardMounted`, so it exists before a lazily-loaded list view's
-chunk has finished loading and `Dashboard` has had a chance to mount. Home, Categories, Tags
-and Blocks have no entries of their own, but all four go through `Dashboard` for their list
-precisely so their title and primary action portal like everyone else's — Home and
-Categories through `grouping: 'custom'`, Tags through `category` mode with one collapsible
-group per tag, Blocks through `flat` mode. There is no placeholder text left for a view
-without a dashboard, because there is no longer a view without one: opening a block (a
-`{ type: 'blocks', id }` view) replaces the list with `BlockDefinitionEditor`, which portals
-its own sidebar content — Done/Delete/Cancel, icon, display rules, usage — into the same
-host the way `Dashboard` does, rather than falling back to a placeholder.
+`activeView.id`. `Dashboard` announces itself in a `useLayoutEffect` (`setDashboardMounted`) — a
+layout effect, so opening an entry switches the sidebar to the action bar before the first paint.
+Guessing from `activeView.id` gets it wrong: Tasks carries an id while showing its list (a jump
+target, not an open entry), and a stale id of a just-deleted entry falls back to that module's
+`Dashboard` — both would show the entry action bar with a meaningless Edit button.
+`VIEWS_WITHOUT_ENTRIES` (`home`/`tags`/`categories` plus the library views) and a missing
+`activeView.id` also offer the host up front, so it exists before a lazily loaded list view has
+mounted its `Dashboard`. Home, Categories and Tags have no entries but go through `Dashboard` so
+their header portals like everyone else's.
 
-Invariant: exactly one writer (the host div's ref callback) and, at a time, one reader
-(`SidebarPortal`, mounted by either `Dashboard` or `BlockDefinitionEditor`) — `MainArea`
-only ever renders one view, so at most one thing ever portals into the host.
-`listHeaderHost` deliberately isn't persisted; it's a DOM node.
+### Header contents
 
-`groupBy` (`{ value, onChange, label? }`) carries the grouping axis — independent of `sort`
-since a session change split "group by category" out of `SortMode` into its own
-`GroupingMode`; a module that has nothing to group (Altar's altars) simply omits it, and the
-toolbar then shows only view and sort. `headerRight` is gone: Trash's actions go through
-`primaryAction` like every other dashboard — `danger: true` renders it as the red
-`btn-primary-danger`, and its confirmation swaps the button's label for the "yes" and adds
-a cancel X via `extraActions`. `Dashboard`'s `toolbarExtraActions` prop and
-`FilterPanelProps.extraPanelContent` slot were removed in an earlier pass — Tasks' priority
-filter moved into `FilterPanel`'s own `statusChips`/`statusLabel` instead of a bespoke extra
-slot.
+The props and sections are documented in [`components.md`](../components.md) (`Dashboard`,
+`ListToolbar`, `FilterPanel`); the rules that matter here:
 
-`extraActions` (compact icon buttons right of `primaryAction`, on the same row — the
-labelled button fills that row and they keep their square size beside it) and
-`contentFooter` (rendered below the content in the normal, empty, and no-results states
-alike) exist for a module's own secondary area rather than another module-wide pattern — so
-far the Altar dashboard's library section is the only user of either, see [Altar UI
-Composition](altar.md#altar-ui-composition) below.
-
-`ListToolbar` and `FilterPanel` now have only this one, sidebar-column presentation — no
-horizontal strip variant and no filter-toggle button; `FilterPanel` stands permanently
-visible under the toolbar instead of behind one. Search sits on its own full-width row in
-the main area next to the title (`ListSearchField`, see above), not in `ListToolbar` at all.
-`ListToolbar` renders each axis under its own `SidebarGroup` heading: View is an
-`IconToggleGroup` with `fill` (four modes, full-width segments); Sort is `SortSelect`
-(exported from `ListToolbar.tsx`), a `FieldDropdown` with `variant="sidebar"` naming what it
-sorts by and by which date ("Created · newest", "Name · A → Z" — `sortDate` picks whether
-the date modes compare `created`/`updated`/`deleted`, and `sortLabel` overrides the
-heading, e.g. Altar's "Sort · Altars"); Grouping is a `SwitchRow` ("Group by {label}",
-`groupBy.label` lowercased via the `lowercase` i18n formatter), greyed out in Timeline.
-`Dropdown` itself is unrelated to this header now, used only by `CategorySelect`, `TaskRow`'s
-priority menu, and `HomeView`'s own per-section toolbar. The disabled predicate for Timeline
-(`sortBlockedInTimeline` in `ListToolbar.tsx`) is unchanged: A→Z, Z→A and Category sorting
-are disabled with an explanatory tooltip, since the timeline already orders its entries by
-date and ignores those modes regardless of what's picked; the Grouping switch is disabled
-there too, since Timeline always groups by month on its own. Choosing Timeline does not overwrite the stored sort: the select just *shows* newest first while a blocked sort is stored, and `groupByMonth` orders by date on its own (ascending only if the list already is), so the stored sort applies again when another layout is picked.
-
-`FilterPanel` stacks, in order: `extraGroups` (controls that are neither filters nor display
-toggles, e.g. the Altar library's own sort and grouping), `displayToggles` (`SwitchRow`s
-under a "Display" heading — a view preference like Tasks' "Show completed" or the Altar
-preview, not counted in the active-filter badge and untouched by a reset), the primary
-`FilterList` (a vertical list — icon/emoji, label, count, an "All" row on top — replacing the
-old horizontal filter chips), and a second `FilterList` for Tasks' priorities. There is no
-"Clear all" button any more; each list's own "All" row clears it, and a "Reset filters"
-button (in the shared no-results state) is the only remaining way to clear search and every
-filter at once.
+- `groupBy` (`{ value, onChange, label? }`) is the grouping axis, independent of `sort`
+  (`GroupingMode` vs. `SortMode`). A module with nothing to group omits it.
+- Every dashboard's main action is `primaryAction`; `danger: true` renders the red
+  `btn-primary-danger` (Trash). `extraActions` are compact icon buttons on the same row;
+  `contentFooter` renders below the content in every state, for a module's second area (Altar
+  library, Blocks' built-in blocks, Templates' defaults overview, Lexicon's translate panel).
+- `ListToolbar` and `FilterPanel` have only the sidebar-column presentation; `FilterPanel` is always
+  visible. Search sits in the main area next to the title (`ListSearchField`).
+- **Timeline.** `sortBlockedInTimeline` disables every non-date sort, and the grouping switch, with
+  an explanatory tooltip — the timeline orders and groups by month on its own. The stored sort is
+  not overwritten: the select *shows* newest first, `groupByMonth` orders by date (ascending only
+  if the list already is), and the stored sort applies again with another layout.
+- `FilterPanel`'s `displayToggles` (view preferences like Tasks' "Show completed") are not counted
+  in the active-filter badge and untouched by a reset. Each `FilterList`'s "All" row clears it;
+  "Reset filters" in the shared no-results state clears search and every filter at once.
 
 ## Auto-Save (the `useEntryEditor` hook)
 
-Debounced auto-save (1.5s), save-on-navigate and save-on-unmount live in
-`src/hooks/useEntryEditor.ts`, used by JournalView, WikiView and
-OperationsView — each of which used to carry its own ~80-line copy of the
-same machinery, with quietly drifting details. The hook takes a
-`buildPatch()` closure and an `update(id, patch)` action; it keeps the
-latest closure in a ref, so the navigate-away save still reads the
-*previous* entry's local state (the views' load effects run after the
-hook's effects — the hook call sits above them in the component body).
+Debounced auto-save (1.5 s), save-on-navigate and save-on-unmount live in
+`src/hooks/useEntryEditor.ts`, shared by JournalView, WikiView and OperationsView. The hook takes a
+`buildPatch()` closure and an `update(id, patch)` action and keeps the latest closure in a ref, so
+the navigate-away save still reads the *previous* entry's local state (the views' load effects run
+after the hook's — the hook call sits above them).
 
-The editor content itself is mirrored into a `pendingHtmlRef` on each
-keystroke rather than into React state: a state update would re-render the
-whole view per keystroke. `BlockStack`'s `initialContent` (and each
-`RichEditor`'s) is consequently an **initial value only** — the old effect
-that compared `editor.getHTML()` against the prop on every render (a second
-full-document serialisation per keystroke) is gone. Switching entries remounts
-the stack via its `key` (`` `${id}:${editorEpoch}` ``), and Cancel bumps
-`editorEpoch` to remount from the restored baseline. Since the whole block
-stack serialises into that one `content` string, Cancel's
-baseline reverts every block change of the session — sigil blocks included, since v42.
+The editor content is mirrored into a ref (`contentRef`) on each keystroke rather than into React
+state, which would re-render the whole view per keystroke. `BlockStack`'s `initialContent` (and each
+`RichEditor`'s) is therefore an **initial value only**. Switching entries remounts the stack via its
+`key` (`` `${id}:${editorEpoch}` ``), and Cancel bumps `editorEpoch` to remount from the restored
+baseline. Since the whole block stack serialises into one `content` string, the baseline reverts
+every block change of the session, sigil blocks included.
 
-Two guards protect these save paths: `ready` (the view's `loadedEntryId`
-gate) arms the navigate/unmount saves only after local state is hydrated,
-so a StrictMode double-mount in edit mode cannot write empty fields; and
-`src/lib/editorLock.ts` suspends all automatic editor saves while a
-replace/add-vault backup import runs — without it, the unmount triggered
-by the import's own navigation would write the pre-import content over
-the freshly restored rows.
+Two guards protect the save paths:
+
+- `ready` (the view's `loadedEntryId` gate) arms the navigate/unmount saves only after local state
+  is hydrated, so a StrictMode double-mount in edit mode cannot write empty fields.
+- `src/lib/editorLock.ts` suspends all automatic editor saves while a replace/add-vault backup
+  import runs — otherwise the unmount triggered by the import's own navigation would write the
+  pre-import content over the restored rows.
 
 ## Internal Links
 
-`createInternalLinkExtension(getItems, getIcon, getLabel)` creates a TipTap extension that renders linked entries as inline chips. Callbacks are typed via the `InternalLinkOptions` interface (no `as any` cast) and are ref-backed so they always see the current store state. Each chip stores `data-type="internalLink"`, `data-id`, `data-entry-type`, `data-label`, and `data-icon` attributes.
+`createInternalLinkExtension(getItems, getIcon, getLabel)` renders linked entries as inline chips;
+its callbacks are ref-backed so they always see current store state. Each chip stores
+`data-type="internalLink"`, `data-id`, `data-entry-type`, `data-label` and `data-icon`. Chips
+render identically in edit and view mode; the node view reads `editor.isEditable` at event time.
 
-Chips are rendered identically in both edit mode and view mode — the `[[Label(id)]]` raw-text edit representation was removed. The node view no longer tracks `editor.isEditable` via `useState`/`useEffect`; editability checks (e.g. click handling) read `editor.isEditable` directly at event time.
+The chips in `content` are the only record of what links where — there is no links table.
 
-The chips in `content` are the only record of what links where. Until v47 a `links` table mirrored them on every save, for a backlinks panel that was never mounted; nothing read it, and migration v47 dropped it.
+**What an entry links** — the "Linked entries" field (`LinkedEntriesField`) of Journal, Wiki and
+Operations — is read straight out of the content via `extractInternalLinks`
+(`src/lib/internalLinkHtml.ts`). Reading is deliberately `DOMParser`-free (regex over the opening
+`<span>` tag): it sits on the database path, where migrations and the Node check scripts run it
+outside a browser. Writing/remapping a chip's markup (`remapInternalLinks`) uses a real
+`DOMParser`, since correctness matters more there than portability.
 
-**What an entry links** — Journal, Wiki and Operations' right-sidebar "Linked entries" field (`LinkedEntriesField`) — is read straight out of the same content, via `extractInternalLinks` (`src/lib/internalLinkHtml.ts`), rather than tracked as its own list. That file is deliberately `DOMParser`-free for reading (regex over the opening `<span>` tag): it sits on the database path too — migration v36 and the schema-check Node harness call it outside a browser — while writing/remapping a chip's markup (`remapInternalLinks`) does use a real `DOMParser`, since correctness there matters more than portability.
+**Sidebar ↔ editor.** The field has no reference to the open view's TipTap instance, so it talks to
+it through three `document`-level custom events in `lib/links.ts`:
+`requestEntryLinkAppend`/`requestEntryLinkReveal`/`requestEntryLinkRemove`, answered via
+`subscribeEntryLinkRequest` on the `BlockStack` side, which routes them to the right text block
+(see [Content Blocks](blocks.md#content-blocks)). A request resolves to `true` only when an
+editable, mounted editor accepted it via `preventDefault()`; otherwise the field falls back (e.g.
+`reveal` navigates to the target). `isValidLinkTarget` guards all three and the navigate-on-click
+handler, since the events are reachable by any script in the WebView.
 
-The sidebar field has no reference to the TipTap instance of whichever view happens to be open, so it talks to it through three `document`-level custom events defined in `lib/links.ts`: `requestEntryLinkAppend`/`requestEntryLinkReveal`/`requestEntryLinkRemove`, each paired with `subscribeEntryLinkRequest` on the `BlockStack` side, which routes the request to the right text block (see [Content Blocks](blocks.md#content-blocks)). A request resolves to `true` only when an editable, currently-mounted editor accepted it via `preventDefault()`; the field falls back accordingly — `reveal`, for instance, navigates to the target view instead of jumping to it in text when nothing answered. `isValidLinkTarget` guards all three (and the pre-existing navigate-on-click handler), since the events are reachable by any script in the WebView.
+**Appending** a link (from the field, the `[[` picker, or a routine converted to a template — see
+[Templates](templates.md#templates)) always adds a full block — a horizontal rule, the target's
+category as an `<h3>`, then the chip — never merging into an existing block.
+`internalLinkBlockHtml` is the one definition of that shape, shared by the editor's
+`appendEntryLink`, migrations v36/v37 and the import's legacy bridge (below). In a completely empty
+entry (`isBlankContent`, regex like `extractInternalLinks`) the block goes in without its leading
+rule (the `separator` option) — there is no text above to separate. `plainBlockHtml` renders the
+same shape without a chip, for a legacy value that resolves to nothing in this vault.
 
-Appending a link (from the field, from `[[`-picker selection, or from a routine converted to a template, whose linked operations/wiki articles become the same shape — see [Templates](templates.md#templates)) always adds a full block — a horizontal rule, the target's category as an `<h3>`, then the chip — never merges into an existing block; `internalLinkBlockHtml` is the one definition of that shape, shared by the editor's `appendEntryLink`, migrations v36/v37, and `.emerald`/Markdown import's legacy-column bridge (below). Removing a link deletes that whole block if the chip is the sole content of one of these appended blocks (`removeEntryLink` checks for the preceding rule/heading before treating it as one), or just the chip if it sits inline in text the user wrote around it. Appending also jumps to the new block and briefly highlights it via `revealEntryLink`, run a frame later so the chip's node view has actually rendered — the same function the `reveal`-on-click path already used, but with its `caretAtBlockEnd` option set: appending leaves a text selection at the end of the chip's paragraph, ready to keep typing, where clicking an existing chip (`reveal`-on-click, and the field's own "jump to it" navigation) still selects the chip itself as a node, since there "this one" is the point being made. `internalLink` is an inline atom, so its parent is always a textblock — there is no other case to branch on, and the position math no longer pretends there is.
+Appending then jumps to and highlights the new block (`revealEntryLink` with `caretAtBlockEnd`, a
+frame later so the node view exists), leaving the caret at the end ready to type; revealing an
+existing chip selects the chip itself as a node.
 
-If the entry was completely empty (`<p></p>`), the block goes in without its leading horizontal rule — a rule separates the link from the text above it, and there is no text yet. `isBlankContent` (`src/lib/internalLinkHtml.ts`) decides this the same way `extractInternalLinks` decides what's a link: regex over the HTML, no `DOMParser`, since migrations v36/v37 and the schema-check Node harness need to ask the same question outside a browser. `internalLinkBlockHtml` takes a `separator` option for this, and `plainBlockHtml` renders the same shape without a chip, for a legacy value that no longer resolves to anything in this vault (see the v37 note below) — text alone rather than a dead link.
+**Removing** a link deletes the whole block if the chip is the sole content of an appended block
+(`removeEntryLink` checks for the preceding rule/heading), or just the chip if it sits inline in the
+user's own text. `internalLink` is an inline atom, so its parent is always a textblock.
 
-**Cross-vault import.** A link chip's `data-id` is only meaningful inside the vault it was written in. `.emerald` export now carries `meta.contentLinks` — id, entry type, and title for every chip in the exported content — so importing into a *different* vault can re-resolve each chip: by id first (same vault, or an id that happens to already match), then by the title recorded in `contentLinks`, then by the chip's own embedded `data-label` for files exported before this field existed. A chip that resolves to nothing becomes its own display text rather than a dead link (`remapInternalLinks`'s `null` case). This remap must run *before* DOMPurify, not after — it parses and re-serialises the HTML, and that round-trip is not allowed to happen on content DOMPurify has already cleared. `sanitizeImportedHtml` is therefore the *last* step of every import that writes HTML — `.emerald` (after `beforeSanitize`, where a legacy Journal entry's links are appended as chips) and Markdown alike; anything added after it would skip the filter. The creation date comes along too: `importedCreatedAt(file)` hands the file's `createdAt` to `createEntry`/`createArticle`/`createOperation`/`createAltar` (`opts.createdAt`) so an import sits at its place in the timeline; only a parseable date with a four-digit year passes (dates sort as text, and `+010000-…` would sort before 2024), anything else falls back to now. `updated_at` is always now.
+**Cross-vault import.** A chip's `data-id` is only meaningful in its own vault. `.emerald` export
+carries `meta.contentLinks` — id, entry type and title for every chip — so import can re-resolve
+each chip: by id first, then by the recorded title, then by the chip's own `data-label` for files
+without `contentLinks`. A chip that resolves to nothing becomes its display text
+(`remapInternalLinks`'s `null` case). The remap must run *before* DOMPurify: it parses and
+re-serialises the HTML, and that round-trip must not happen on content the sanitizer has already
+cleared. `sanitizeImportedHtml` is therefore the *last* step of every import that writes HTML —
+`.emerald` (after `beforeSanitize`, where legacy Journal links are appended as chips) and Markdown
+alike.
 
-**A chip's own type, rewritten in place.** `retypeInternalLinks(html, id, entryType)` (`src/lib/internalLinkHtml.ts`) sets `data-entry-type` on every chip pointing at `id` to a new value, for an entry that changed which of Journal/Wiki/Operation it is (see Edit Mode Architecture below) — the id stays the same, so only that one attribute needs to change. Like `extractInternalLinks`/`isBlankContent`, it stays regex-over-the-tag rather than `DOMParser`-based: `entryTypeChange.ts` runs it over every stored row across all three content tables plus `templates`, and a full parse-and-reserialise of each would rewrite content nobody actually touched.
+The import also keeps the file's creation date: `importedCreatedAt(file)` passes it to
+`createEntry`/`createAltar` (`createdAt` option) so the entry sits at its place in the timeline.
+Only a parseable date with a four-digit year passes (dates sort as text, and `+010000-…` would sort
+before 2024); otherwise it falls back to now. `updated_at` is set to the same date
+(`importedStamp`), since an import is not an edit.
 
-**Pre-v36 legacy bridge.** Journal entries used to carry two dedicated columns, `linked_operation_ids`/`linked_wiki_ids`, shown as their own chip rows under the title. Migration v36 rewrites them into content blocks the same way described above and empties the columns (see [`database.md`](../database.md#entries)); `.emerald`/Markdown import of a file written before that migration append the same blocks instead of writing to the columns. The columns are gone since v49 (`entries` has no `linked_*` columns); import converts an older backup's values into chips row by row before inserting (`linkedIdsToContent`, `tablesLinkSource`/`rowsLinkSource` in `migrateLinkedIdsToContent.ts`), so the `legacyIds` bridge in `LinkedEntriesField`, `EntryReadSections` and `JournalPropertiesPanel` no longer exists.
+**A chip's own type, rewritten in place.** `retypeInternalLinks(html, id, entryType)` sets
+`data-entry-type` on every chip pointing at `id`, for an entry that changed type (see
+[Changing an entry's type](#changing-an-entrys-type)) — the id stays, so only that attribute
+changes. It is regex-based like `extractInternalLinks`: `entryTypeChange.ts` runs it over every
+matching row of `entries` and `templates`, and a full parse-and-reserialise would rewrite content
+nobody touched.
 
-**Pre-v37 legacy bridge.** Journal also used to carry three fixed properties — Paradigm, Banishing, Meditation — each a dropdown tied to one wiki article, plus a meditation-duration number field. `JournalPropertiesPanel` no longer has any of the four; migration v37 (`migrateJournalFieldsToContent.ts`) rewrites the six columns behind them into the same kind of content block, once, and clears all six. The meditation duration has no link target, so it becomes plain text appended after its chip (`"(20 min)"`, via `internalLinkBlockHtml`'s `suffix` option); `is_bannung`/`is_meditation` could be set without an article attached (the checkbox predates the dropdown), which becomes a `plainBlockHtml` text paragraph naming the category instead of vanishing outright. `.emerald`/Markdown import applies the same conversion to files written before v37, through `appendLegacyLinks`/`legacyFieldTargets` in `emeraldFormat.ts` — the one place that also decides the plain-text fallback when a referenced article doesn't exist in the importing vault. Since v49 the six columns no longer exist; a backup that still carries them is converted row by row before insert (`journalFieldsToContent`, see [`database.md`](../database.md#entries)).
+**Pre-v36 legacy bridge.** Old Journal backups carry `linked_operation_ids`/`linked_wiki_ids`.
+Migration v36 rewrote them into content blocks of the shape above (see
+[`database.md`](../database.md#entries)); `entries` has no such columns. Import converts an older
+backup's values into chips row by row before inserting (`linkedIdsToContent`,
+`tablesLinkSource`/`rowsLinkSource` in `migrateLinkedIdsToContent.ts`), and `.emerald`/Markdown
+import of a pre-v36 file appends the same blocks.
+
+**Pre-v37 legacy bridge.** Old Journal data carries three fixed properties — Paradigm, Banishing,
+Meditation, each tied to one wiki article — plus a meditation duration. Migration v37
+(`migrateJournalFieldsToContent.ts`) rewrote these six columns into the same kind of content block;
+a backup that still carries them is converted row by row before insert (`journalFieldsToContent`,
+see [`database.md`](../database.md#entries)). The duration has no link target and becomes plain text
+after its chip (`"(20 min)"`, via `internalLinkBlockHtml`'s `suffix` option); a set
+`is_bannung`/`is_meditation` flag without an article becomes a `plainBlockHtml` paragraph naming the
+category. `.emerald`/Markdown import of pre-v37 files applies the same conversion through
+`appendLegacyLinks`/`legacyFieldTargets` in `emeraldFormat.ts`, which also decides the plain-text
+fallback when a referenced article doesn't exist in the importing vault.
 
 ## Text and Image Alignment
 
-`RichEditor` configures `@tiptap/extension-text-align` for `heading` and `paragraph` only (the type list is `TEXT_ALIGN_TYPES`, exported from `EditorToolbar.tsx` so the extension config and the toolbar's own disabled-state check read from one list instead of two that could drift). Left alignment is deliberately the *absence* of the `textAlign` attribute rather than an explicit `"left"` value: the installed extension serialises whatever value it is given, `left` included, and leaving it unset keeps a freshly-typed paragraph's HTML free of a redundant attribute.
+`RichEditor` configures `@tiptap/extension-text-align` for `heading` and `paragraph` only
+(`TEXT_ALIGN_TYPES`, exported from `EditorToolbar.tsx` so the extension config and the toolbar's
+disabled-state check share one list). Left alignment is the *absence* of the `textAlign` attribute,
+not an explicit `"left"`: the extension serialises whatever value it is given, and leaving it unset
+keeps a fresh paragraph's HTML free of a redundant attribute.
 
-An image aligns through its own `align` attribute on the custom node in `ResizableImageExtension.tsx` instead — a paragraph's `text-align` never reaches it, since the image is a block node with its own width. `align` (`'left' | 'center' | 'right'`, exported as the `Alignment` type — it names both the text and the image case, since the toolbar's three buttons drive both) serialises as `data-align` plus inline `margin-left`/`margin-right` (`alignMargins()`); `alignFromLegacyStyle()` reads the alignment back out of the margins alone for images stored before `data-align` existed. `data-align` is allowlisted in the DOMPurify config for `.emerald` import (`src/lib/emeraldFormat.ts`) but deliberately not for PDF export's sanitisation — nothing in that path reads the attribute, and alignment survives PDF export through the inline margins regardless.
+An image aligns through its own `align` attribute on the custom node in
+`ResizableImageExtension.tsx` — a paragraph's `text-align` never reaches it, since the image is a
+block node with its own width. `align` (the `Alignment` type, shared with text since the toolbar's
+three buttons drive both) serialises as `data-align` plus inline `margin-left`/`margin-right`
+(`alignMargins()`); `alignFromLegacyStyle()` reads the alignment from the margins alone for images
+stored without `data-align`. `data-align` is allowlisted in the `.emerald` import's DOMPurify config
+(`src/lib/emeraldFormat.ts`) but not in PDF export's sanitisation — nothing there reads it, and the
+inline margins carry the alignment regardless.

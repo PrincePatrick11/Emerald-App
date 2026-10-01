@@ -120,8 +120,10 @@ The dev build uses a separate app identity (`com.emerald.app.dev`) and database,
 | Document | Description |
 |---|---|
 | [Documentation/features.md](Documentation/features.md) | Full feature guide |
-| [Documentation/architecture.md](Documentation/architecture.md) | Architecture, patterns, and data flow |
+| [Documentation/architecture.md](Documentation/architecture.md) | Architecture overview: module map, data flow, IPC |
+| [Documentation/architecture/](Documentation/architecture/) | Per-area patterns: modules, editing, blocks, templates, navigation, altar, storage, appearance, window shell |
 | [Documentation/design.md](Documentation/design.md) | Design tokens, component patterns, and known inconsistencies |
+| [Documentation/components.md](Documentation/components.md) | Shared UI building blocks and when to use them |
 | [Documentation/database.md](Documentation/database.md) | SQLite schema and conventions |
 | [Documentation/internationalization.md](Documentation/internationalization.md) | Adding and managing translations |
 | [Documentation/security.md](Documentation/security.md) | Capability model and sandboxing |

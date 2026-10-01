@@ -2,101 +2,258 @@
 
 ## Global Search
 
-The title bar's search field searches every module by title, tag, and body text. It is a pure in-memory filter, not a database query: `useGlobalSearch` (`src/hooks/useGlobalSearch.ts`) assembles a `SearchCorpus` from the Zustand stores `AppShell` already loads at startup, and `searchCorpus()` (`src/lib/globalSearch.ts`) scores and sorts it. There is no FTS5 table and no migration — the stores are already the single source of truth (see [Data Flow](../architecture.md#data-flow) above), and duplicating them into a second searchable copy would only be a second place to keep in sync.
+The title bar's search field searches every module by title, tag and body text. It is a pure
+in-memory filter: `useGlobalSearch` (`src/hooks/useGlobalSearch.ts`) builds a `SearchCorpus` from
+the Zustand stores `AppShell` already loads, and `searchCorpus()` (`src/lib/globalSearch.ts`)
+scores and sorts it. There is no FTS5 table — the stores are the single source of truth (see
+[Data Flow](../architecture.md#data-flow)), and a second searchable copy would be one more thing
+to keep in sync.
 
-`globalSearch.ts` is deliberately free of JSX: it decides *what* matched and with what score, not how a hit looks or which icon it gets — that's `SearchResultList.tsx`'s job. Matching runs per record through `matchRecord()`: a title match wins outright (prefix beats substring), then a tag match, then — only once the query is at least two characters — a full-text match against a thunk that is only invoked when the cheaper checks fail. For Journal/Wiki/Operations that thunk parses the entry's stored HTML into plain text via `plainTextFor()` (`src/lib/searchText.ts`), cached per `(id, updated_at)` so a keystroke doesn't re-parse the whole vault; the cache is cleared on vault switch (`vaultStore.ts`) and on a `.emeralddb` import (`dbBackup.ts`), since both can leave stale ids or reused id/timestamp pairs behind.
+`globalSearch.ts` has no JSX: it decides *what* matched and how well; how a hit looks is
+`SearchResultList.tsx`'s job. `matchRecord()` tries, per record:
 
-`searchText.ts`'s `htmlToText()` uses `DOMParser` rather than assigning to `innerHTML` on a detached `<div>` — the parsed document is inert, so an `<img onerror>` that arrived through an import never executes when the search re-parses it (see [Security → Search Text Extraction](../security.md#search-text-extraction)). `foldTypography()` reverses TipTap's `Typography` extension (curly quotes, en/em dashes) back to keyboard characters, one character for one character, so a search for `don't` finds an entry stored with a curly apostrophe; the query and the result-row highlighting run through the same folding via the shared `comparable()` helper, so the two never disagree about what matched.
+1. the title (prefix beats substring),
+2. then the tags,
+3. then — only for queries of two or more characters — the full text, through a thunk that only
+   runs when the cheaper checks fail.
 
-`searchCorpus()` itself does not cap anything — it scores the whole corpus and returns every `SearchHit`, best first. Capping is `useGlobalSearch`'s job, split into two memos: one runs `searchCorpus()` again only when the corpus or the query changes, the other slices that result to `limit` and only depends on `limit` itself. Paging ("Show more" in the result list, `SearchModal.tsx`) just grows `limit` by its `PAGE_SIZE` (50), which re-slices the already-scored array instead of re-scoring the corpus — the point of splitting the two memos in the first place, given that the search already reruns on every keystroke. A hit's `key` is `${kind}:${id}` — before v38, when the four category tables (Wiki/Operations/Tasks/Altar) still shared built-in ids (`other`, `herb`, `deity`, …), a category hit's module had to be folded into the key to keep it unique; with one `categories` list there is only one id space and the module suffix is gone. A category hit's `module` field (still present on `SearchHit`, now optional) is the module holding most of that category's entries, resolved when the corpus is built through the shared `categoryUsageCounts`/`dominantCategoryModule` pair. Since categories got a view of their own it is no longer a destination, only the hint shown beside the hit — and a category nothing uses is now openable like any other, where it used to be a dead result. Templates are not part of the corpus — the templates dashboard is a library like Blocks, not a searchable entry type (see [Templates](templates.md#templates)). The Lexicon is the exception among the three libraries: being a library governs its page shell (`LIBRARY_VIEW_IDS`), not whether it's searchable, and a language you keep yourself is closer to Journal/Wiki content than to a block or template definition — so languages and their words are in the corpus (see [Lexicon](modules.md#lexicon)).
+For Journal/Wiki/Operations the thunk turns the stored HTML into plain text via `plainTextFor()`
+(`src/lib/searchText.ts`), cached per `(id, updated_at)` so a keystroke doesn't re-parse the
+vault. `clearSearchTextCache()` runs on vault switch (`vaultStore.ts`) and `.emeralddb` import
+(`dbBackup.ts`), since both can leave stale ids or reused id/timestamp pairs behind.
 
-`viewForSearchHit()` maps a hit to an `ActiveView`. Tasks, tags and categories have no page per record — the hit opens their view addressed by the record's id, and `TasksView`/`TagsView`/`CategoriesView` each run an effect keyed on the `activeView` *object* itself (not the id inside it, which stays the same if the same result is opened twice) that clears search/filters/collapsed state and scrolls the matching row into view; `CategoriesView` has no selection to set, so it highlights the row for two seconds instead. A `handledView` ref stops a later store mutation from re-triggering that scroll-and-clear and from overwriting filters the user has since changed themselves.
+`htmlToText()` uses `DOMParser` rather than `innerHTML` on a detached `<div>`: the parsed document
+is inert, so an imported `<img onerror>` never runs (see [Security → Search Text
+Extraction](../security.md#search-text-extraction)). `foldTypography()` maps TipTap's
+`Typography` output (curly quotes, en/em dashes) back to keyboard characters, one for one, so
+`don't` finds a curly apostrophe. Query and result highlighting share the same folding through
+`comparable()`, so they never disagree about what matched.
 
-Those three deep links carry an id into a view that has no *entries* — `{ type: 'categories', id }` (or `'tags'`/`'home'`) must never reach the entry action bar and its Edit button, which sets `mode: 'edit'` on a view with no editor. `RightSidebar` avoids that by offering the list-header host whenever `activeView.type` is in `VIEWS_WITHOUT_ENTRIES`, regardless of whether `activeView.id` is set — see [List Header Portal](editing.md#list-header-portal) above.
+`searchCorpus()` returns every `SearchHit`, best first; capping is `useGlobalSearch`'s job, in two
+memos. One re-scores only when corpus or query change, the other slices to `limit`. "Show more"
+(`SearchModal.tsx`) grows `limit` by `PAGE_SIZE` (50), which re-slices instead of re-scoring —
+the point of the split, since the search already reruns on every keystroke.
+
+A hit's `key` is `${kind}:${id}` (categories share one id space). A category hit's optional
+`module` is the module holding most of its entries (`categoryUsageCounts`/
+`dominantCategoryModule`), shown as a hint beside the hit; the hit opens the categories view.
+
+Templates are not in the corpus — the templates dashboard is a library like Blocks, not an entry
+type (see [Templates](templates.md#templates)). The Lexicon is the exception among the libraries:
+being a library governs its page shell (`LIBRARY_VIEW_IDS`), not searchability, and a language
+you keep yourself is closer to Journal/Wiki content than to a definition — so languages and their
+words are searchable (see [Lexicon](modules.md#lexicon)).
+
+`viewForSearchHit()` maps a hit to an `ActiveView`. Tasks, tags and categories have no page per
+record: the hit opens their view with the record's id, and `TasksView`/`TagsView`/
+`CategoriesView` react through the shared `useDeepLink` hook (`src/hooks/useDeepLink.ts`). It is
+keyed on the `activeView` *object*, not the id inside it, so opening the same result twice still
+works; it clears search/filters/collapsed state, then scrolls the row into view a frame later.
+A `handledView` ref keeps a later store change from re-triggering it and overwriting filters the
+user has since changed. `TagsView` also selects the tag; `CategoriesView`, with no selection,
+highlights the row for two seconds.
+
+These deep links carry an id into a view that has no *entries*, so `{ type: 'categories', id }`
+(or `'tags'`/`'home'`) must never reach the entry action bar, whose Edit button would set
+`mode: 'edit'` on a view without an editor. `RightSidebar` offers the list-header host whenever
+`activeView.type` is in `VIEWS_WITHOUT_ENTRIES`, id or not — see [List Header
+Portal](editing.md#list-header-portal).
 
 ## Drag and Drop
 
-Tauri's WKWebView does not pass HTML5 drag events to JavaScript. All drag-and-drop uses Pointer Events:
+Tauri's WKWebView does not pass HTML5 drag events to JavaScript, so all drag-and-drop uses
+Pointer Events:
 
-1. `onPointerDown` on the draggable element calls a setter in a module-level drag state module (e.g. `dragState.ts`, `altarDragState.ts`).
-2. The drop target registers `pointermove` and `pointerup` listeners on `document` while a drag is in progress.
+1. `onPointerDown` on the draggable element sets the item in a module-level drag state
+   (`dragState.ts`, `altarDragState.ts` — thin adapters over `createDragChannel()` in
+   `src/lib/dragChannel.ts`, which holds the item and notifies subscribers).
+2. The drop target registers `pointermove` and `pointerup` listeners on `document` while a drag
+   is in progress.
 3. On `pointerup`, the target reads the drag state and applies the drop.
 
-Drops into an entry's text register exactly one such listener per open entry
+Drops into an entry's text use exactly one such listener per open entry
 (`useEditorPointerDrops`, mounted by `BlockStack`): it hit-tests the text blocks' editors and
-clears the drag whether or not one was hit. One listener per text block would let the first
-clear the drag before the block under the pointer saw it.
+clears the drag whether or not one was hit. One listener per text block would let the first clear
+the drag before the block under the pointer saw it.
 
 ## Tabs and Workspace State
 
-Emerald uses browser-like tabs to keep multiple pieces of content open at the same time. The tab state is managed in `uiStore`:
+Browser-like tabs keep several pieces of content open at once. `uiStore` holds `tabs` and
+`activeTabId`; each tab carries an `ActiveView` (an entry, an altar, a library page or a
+top-level view). `setActiveView()` updates the active tab's view, opening in a new tab creates a
+tab with its own view, and selecting a tab restores its view into the main area. Tabs are the
+workspace; [navigation history](#navigation-history) is back/forward movement inside each tab.
 
-- `tabs` stores the list of open tabs.
-- `activeTabId` stores which tab is currently selected.
-- Each tab contains an `ActiveView`, so a tab can represent a journal entry, wiki article, operation, altar, or a top-level view.
+Tab ids, `isContentView` and the history helpers live in `src/lib/tabs.ts`.
+`viewTypeForEntryType()` (`src/lib/modules.ts`, a reverse lookup over `MODULES` — see [Module
+Registry](modules.md#module-registry)) is the one place that translates the data model's
+`operation` (as carried by `task_links.target_type`, the drag payload and the internal-link mark)
+into `ActiveView`'s `operations`, named after the module.
 
-Tab IDs, `isContentView`, and the per-tab navigation-history helpers (see [Navigation
-History](#navigation-history) below) live in `src/lib/tabs.ts`. `viewTypeForEntryType()` — the one place that translates the data model's `operation` (singular — what `task_links.target_type`, the drag payload, and the internal-link mark all carry) into `ActiveView`'s `operations` (plural, named after the module rather than the record) — now lives in `src/lib/modules.ts` as part of the module registry (see [Module Registry](modules.md#module-registry) above), a reverse lookup over `MODULES` rather than its own mapping. The mapping used to be copied at each call site; `RichEditor.tsx`, `HomeView.tsx`, `TasksView.tsx`, and `globalSearch.ts` (see [Global Search](#global-search) below) now call the shared function instead.
-
-Tabs are persisted in `localStorage` using:
-
-- `open-tabs`
-- `active-tab-id`
-
-This keeps the user's workspace available after restarting the app without adding database tables or migrations.
+Tabs and their histories persist in `localStorage` (`open-tabs`, `active-tab-id`), so the
+workspace survives a restart without database tables.
 
 **What is remembered where.** Four places, each for one kind of thing:
 
-- **Settings** — `settings.json` in the vault folder (`lib/vaultSettings.ts`), travels with backups.
-- **Preferences** — per vault, in `localStorage` under `vault-prefs:<vaultId>` (`store/vaultPrefs.ts`): every `ListPrefs` field, the three Home sections, `tagsSort`, `altarShowPreview`, `altarLibraryPrefs`, `collapsedGroups` and `flags` (what `usePersistedFlag` toggles — collapsed sections, Tasks' "Show completed"). They live in `uiStore` as before; `loadVaultPrefs` fills them when a vault opens (boot, `openActiveVault`, a failed switch's rollback) and a store subscription writes every change back. Fields are validated on load, and a vault without saved preferences starts from the store's defaults plus the app-wide values that preceded per-vault preferences (`altar-show-preview`, `altar-library-sort`/`-grouping`, and for flags the old raw key). `forgetVaultPrefs` drops them with the vault.
-- **Working state** — search, filters, the Trash selection: `useSessionState(key, initial)` (`store/sessionStore.ts`), keyed like `wiki.search`. Survives a module switch (which unmounts the view), not a restart; `closeAllTabs` clears it, so a vault switch or replace import starts clean.
-- **Window layout** — tabs, the three sidebars' open state, their widths, the Altar library strip's height: app-wide `localStorage`, whatever vault is open.
+- **Settings** — `settings.json` in the vault folder (`lib/vaultSettings.ts`), travels with
+  backups.
+- **Preferences** — per vault, in `localStorage` under `vault-prefs:<vaultId>`
+  (`store/vaultPrefs.ts`): every `ListPrefs` field, the three Home sections, `tagsSort`,
+  `altarShowPreview`, `altarLibraryPrefs`, `collapsedGroups` and `flags` (what `usePersistedFlag`
+  toggles — collapsed sections such as the Altar's `altar-edit-*-open`, Tasks' "Show
+  completed"). They live in `uiStore`; `loadVaultPrefs` fills them when a vault opens (boot,
+  `openActiveVault`, a failed switch's rollback) and a store subscription writes changes back.
+  Fields are validated on load. A vault without saved preferences starts from the store defaults
+  plus the older app-wide keys (`altar-show-preview`, `altar-library-sort`/`-grouping`, raw flag
+  keys). `forgetVaultPrefs` drops them with the vault.
+- **Working state** — search, filters, the Trash selection: `useSessionState(key, initial)`
+  (`store/sessionStore.ts`), keyed like `wiki.search`. Survives a module switch (which unmounts
+  the view), not a restart; `closeAllTabs` clears it, so a vault switch or replace import starts
+  clean.
+- **Window layout** — tabs, the three sidebars' open state and widths, the Altar library strip's
+  height: app-wide `localStorage`, whatever vault is open.
 
-The Altar's edit-sidebar sections are plain flags in the preferences above (`altar-edit-*-open`), like every other collapsible section.
+**Vault switches and a Replace-mode `.emeralddb` import reset the whole workspace.**
+`closeAllTabs()` clears `tabs` and `activeTabId`, resets `tablessHistory` to a fresh Home
+history and saves the empty tab list — every open tab and its history carry row ids that no
+longer exist. A Merge import only adds rows, so it keeps the tabs. Tabs are not remembered per
+vault. `openActiveVault()` (`vaultStore.ts`) calls `closeAllTabs()` on a switch and when the
+active vault is deleted, but not at startup, so relaunching restores the previous tabs.
 
-**Vault switches and a Replace-mode `.emeralddb` import reset the whole workspace, not just the active tab.** `closeAllTabs()` in `uiStore` clears `tabs` and `activeTabId`, and resets `tablessHistory` to a fresh Home history, persisting the empty tab list (`saveTabs([], null)`) — every open tab (and, with it, its own back/forward history) carries row ids from the vault (or the pre-import data) that no longer exists. A Merge import does not call it: merge only adds rows, so the ids behind existing tabs stay valid. Tabs are closed rather than remembered per vault — nothing keeps a vault's own tab set around to restore when switching back to it. `openActiveVault()` in `vaultStore.ts` calls `closeAllTabs()` on `switchVault` and when the active vault is deleted, but not on the app's own startup path, so restoring the previous session's tabs on relaunch (above) is unaffected.
+Each tab's title and icon come from a per-tab `TabButton` (`TabBar.tsx`) that selects its own
+entity out of the relevant store (`s.entries.find(...)`, and so on per type) rather than through a
+stable getter like `getEntry`. A getter's identity never changes, so subscribing to it would not
+re-render on a rename; selecting the object re-renders just that tab when its entity changes.
 
-Each tab's title and icon are rendered by a per-tab `TabButton` (`TabBar.tsx`) that selects its own entity directly out of the relevant store (`s.entries.find((e) => e.id === id)`, and so on for articles/operations/tasks/altars/block definitions/templates/languages) rather than through a store's stable getter function (`getEntry`, `getArticle`, …). A stable getter's own identity never changes, so subscribing to it alone doesn't cause a re-render when the entry it reads changes — a rename only reached the tab bar once something else forced the whole bar to re-render. Selecting the object itself re-renders only that `TabButton` when its entity changes, so a rename shows up in the tab immediately.
+Reordering uses Framer Motion (`LazyMotion`, `Reorder.Group`, `Reorder.Item`). `onReorder`
+passes the new id list to `uiStore.setTabsOrder(ids)`, which validates length and uniqueness
+before rebuilding and saving the array, so the order persists.
 
-Tab reordering is implemented in `src/components/layout/TabBar.tsx` with Framer Motion (`LazyMotion`, `Reorder.Group`, `Reorder.Item`). `Reorder.Group` emits the reordered tab ID list via `onReorder`, and `uiStore.setTabsOrder(ids)` validates the payload (length and uniqueness) before rebuilding the tab array and saving it through `saveTabs(...)`. Because `saveTabs` writes the full `tabs` array to `open-tabs`, tab order persists across restarts.
+An overflowing tab bar scrolls horizontally on a vertical wheel. `TabBar` attaches a native
+`wheel` listener with `{ passive: false }` to the `Reorder.Group`'s `<ul>` — React's `onWheel` is
+passive, so `preventDefault()` there would not stop the page scrolling too. It acts only when the
+tabs overflow and `|deltaY| > |deltaX|` (so horizontal trackpad scrolling isn't redirected), then
+adds `deltaY` to `scrollLeft`.
 
-An overflowing tab bar scrolls horizontally on a vertical mouse-wheel gesture. `TabBar` holds a `ref` on the `Reorder.Group` element (it renders a `<ul>`) and, in a `useEffect`, attaches a native `wheel` listener with `{ passive: false }` — React's synthetic `onWheel` is passive, so `preventDefault()` there would not stop the page from also scrolling. The handler only acts when `scrollWidth > clientWidth` (tabs actually overflow) and `|deltaY| > |deltaX|` (so horizontal trackpad scrolling isn't also redirected into `scrollLeft`), then adds `deltaY` onto `el.scrollLeft`.
-
-Closing a tab with a middle-click needs a second handler, not just `onAuxClick`: Chromium enters its native autoscroll/pan mode on a middle-click's `mousedown`, before `auxclick` ever fires, which felt like the close was fighting the pointer. Each tab's select button also calls `event.preventDefault()` on `onMouseDown` when `event.button === 1`, suppressing that native mode so the click purely closes the tab.
-
-When `setActiveView()` is called while a tab is active, the current tab's view is updated. Opening content in a new tab creates a new tab with its own `ActiveView`. Selecting a tab restores that tab's view into the main area.
-
-Tabs and navigation history are related but separate:
-
-- Tabs represent the user's current workspace.
-- Navigation history represents back/forward movement within that workspace.
-
-This means users can keep several entries open while still using back/forward navigation inside the active tab context.
+Middle-click closes a tab via `onAuxClick`, but each tab also calls `preventDefault()` in
+`onMouseDown` for `button === 1`: Chromium enters native autoscroll on the middle `mousedown`,
+before `auxclick` fires, which made the close feel like it fought the pointer.
 
 ## Navigation History
 
-Each tab carries its own back/forward history — there is no single history for the whole window. `OpenTab.history` (`NavHistory`, `src/lib/tabs.ts`) is `{ views, index }`; the helpers that build and update it live there too:
+Each tab has its own back/forward history; there is none for the whole window. `OpenTab.history`
+(`NavHistory` in `src/lib/tabs.ts`) is `{ views, index }`, maintained by helpers there:
 
-- `pushHistory(history, view)` appends `view` past the current index and truncates whatever was ahead of it (a step taken after going Back drops the old "future"), capped at `MAX_HISTORY_LENGTH` (50) steps. Pushing the same page — same `type` and `id`, e.g. switching a tab between read and edit mode — is not recorded as a new step.
-- `stripSessionFlags(view)` drops `isNew` (see [Cancel](editing.md#cancel-discarding-new-entries-and-reverting-autosaved-edits) above) before a view enters any history.
-- `freshHistory(view)` starts a new one-entry history at `view` — used for a brand-new tab (`addTab`, `openViewInNewTab`) and whenever a tab's history can no longer be trusted (vault switch, invalid saved data).
-- `normalizeSavedHistory(raw, view)` restores a tab's history from `localStorage`; a missing/malformed shape, a view type no longer recognized (`isViewId`), or an index that ends up out of range after filtering falls back to `freshHistory` ending at the tab's current view.
+- `pushHistory(history, view)` appends past the current index and drops whatever was ahead (a step
+  after Back discards the old "future"), capped at `MAX_HISTORY_LENGTH` (50). The same page again
+  (same `type` and `id`, e.g. switching read/edit mode) is not a new step.
+- `stripSessionFlags(view)` drops `isNew` (see
+  [Cancel](editing.md#cancel-discarding-new-entries-and-reverting-autosaved-edits)) before a view
+  enters any history.
+- `freshHistory(view)` starts a one-entry history — for a new tab (`addTab`, `openViewInNewTab`)
+  and whenever a history can't be trusted (vault switch, invalid saved data).
+- `normalizeSavedHistory(raw, view)` restores a saved history; a malformed shape, an unknown view
+  type (`isViewId`) or an out-of-range index falls back to `freshHistory` at the tab's view.
 
-`uiStore.tablessHistory` holds the history used while no tab is open (e.g. before anything has been opened yet); `selectActiveHistory(state)` returns the active tab's `history`, or `tablessHistory` when `activeTabId` is null — every place that reads "the current history" (`TitleBar`'s Back/Forward buttons, `navigateBack`/`navigateForward`) goes through this selector rather than reading a field directly. `setActiveView` pushes onto whichever history is active via `pushHistory`; selecting a different tab is *not* a navigation step, since it only changes which tab's history is active, not the history itself. The tab that gets auto-created when a content view opens with no tabs yet inherits `tablessHistory` (via `pushHistory`) rather than starting fresh, so Back from it returns to wherever the view was opened from; `tablessHistory` itself then resets to a fresh Home history. Closing a tab drops its history with it (see above); closing the last tab, `closeAllTabs()`, and a vault switch all reset `tablessHistory` to fresh Home.
+`uiStore.tablessHistory` is used while no tab is open. `selectActiveHistory(state)` returns the
+active tab's history, or `tablessHistory` when `activeTabId` is null; everything that reads "the
+current history" (`TitleBar`'s Back/Forward, `navigateBack`/`navigateForward`) goes through it.
+`setActiveView` pushes onto the active history; selecting another tab is *not* a step.
 
-`navigateBack`/`navigateForward` both go through `stepHistory(state, delta)`, which moves the active history's index, and — when a tab is active — writes the stepped view back into that tab and persists it via `saveTabs`. Mouse back/forward buttons are handled by a macOS NSEvent local monitor in `lib.rs` that emits `navigate-back` and `navigate-forward` Tauri events; `AppShell` listens for these and calls `uiStore.navigateBack()` / `navigateForward()`. History is persisted together with the tabs (`open-tabs` in `localStorage`), so it survives a restart.
+The tab auto-created when a content view opens with no tabs inherits `tablessHistory`, so Back
+returns to where the view was opened from; `tablessHistory` then resets to fresh Home, as it does
+when the last tab closes, on `closeAllTabs()` and on a vault switch. Closing a tab drops its
+history.
+
+`navigateBack`/`navigateForward` go through `stepHistory(state, delta)`, which moves the index
+and, with a tab active, writes the stepped view into the tab and saves it. Mouse back/forward
+buttons are caught by a macOS NSEvent monitor in `lib.rs`, which emits `navigate-back`/
+`navigate-forward`; `AppShell` calls the store actions.
 
 ## Left Sidebar (Rail + Entry List)
 
-The left sidebar is two independent components rendered side by side inside `AppShell`'s `app-sidebar-left` container:
+The left sidebar is two independent components side by side in `AppShell`'s `app-sidebar-left`
+container.
 
-- **`LeftSidebarRail`** (`src/components/layout/LeftSidebarRail.tsx`) — a fixed-width (44px, `RAIL_WIDTH`, defined and exported here and imported by `AppShell` and `TitleBar`) icon column: the top group's navigation icons (Home/Journal/Tasks/Operations/Wiki/Lexicon/Altar — Lexicon is not a module and is spliced in between Wiki and Altar while looping `MODULE_LIST`, rather than living in the registry's own order; the rest come from that loop over `MODULE_LIST`/`AUX_VIEWS`, see [Module Registry](modules.md#module-registry) above), and a bottom group, top to bottom: Templates/Blocks/Categories/Tags/Trash, then Vault (opens `VaultModal`) and Settings — no divider between the two bottom groups any more, just `gap-1`. Every button is built by the rail's own `viewButton(type, meta)` helper, which also compares `type` against `useUIStore(s => s.activeView.type)` and passes the result as `RailButton`'s `active` prop — so the button for whatever view is open (including with an entry inside it open) gets the accent border, the same visual language `.sidebar-item.active` uses in the entry lists. The rail carries no panel-toggle buttons of its own: all three sidebars (rail, entry list, right sidebar) are toggled from the *View* menu (`useTitleBarMenus.ts` on Windows/Linux, native on macOS; `menu.rail`/`menu.entryList`/`menu.properties`) instead — a pair of rail buttons (`PanelToggleIcon`, mirrored left/right) duplicated that same control for the other two and were removed. Since Settings and the Vault button live only in the rail, hiding it also hides them until the rail is reopened from the View menu. The update check on start (the dot on the gear) runs once per app start: its promise and the "dot already shown" flag live at module level, because the rail is remounted when the Altar's full-window mode ends and would otherwise ask again. The app logo, back/forward and the search shortcut are *not* here either; they moved into the title bar (see [Window Chrome](shell.md#window-chrome)), where the logo sits centred in a box `RAIL_WIDTH` wide so it lines up with the rail's icons underneath. Home is the one whose target is not a content view: `isContentView` is false for it, so it overwrites the active tab rather than opening a new one. Note that lucide exports `Home` as an alias of `House`, so its SVG carries the class `.lucide-house`, not `.lucide-home` — relevant to anything selecting the rail icons by class.
-- **`LeftSidebarEntryList`** (`src/components/layout/LeftSidebarEntryList.tsx`) — the adjoining panel, shown only while `uiStore.leftListOpen` is true. It no longer has tabs of its own: which single list it shows — every module's items together, or one module's — is the vault setting `leftList.list` (Settings → Sidebar), and switching modules happens via the rail as usual. `TAB_LISTS` maps each `LeftListTabId` to its component: five per-module lists (`JournalList`, `TasksList`, `OperationsList`, `WikiList`, `AltarList`) plus `AllList`, which combines all five into one list sorted by `updated_at` descending. Each per-module list is a one-line `<EntryListTab {...config} />` wrapper around a `use*Config()` hook (`useJournalConfig`, `useTasksConfig`, `useOperationsConfig`, `useWikiConfig`, `useAltarConfig`) returning an `EntryListTabProps<T>` object; `AllList` calls all five hooks and flattens their configs through `toAllRows()` into type-erased `AllRow` objects, so the combined list reuses each module's real handlers (duplicate, delete-with-undo, rename, context menu) rather than reimplementing them. `EntryListTabProps<T>` itself is the shared contract with `EntryListTab<T>` (`src/components/ui/EntryListTab.tsx`), which owns search filtering, inline rename, drag-start wiring, and the right-click `ContextMenu` — no "+" quick-create any more; a list's own dashboard carries the primary "New …" action now, in its right-sidebar action bar. Callers supply accessor functions (`getId`/`getTitle`/`getEditTitle`/`getIcon`/`getDateStr`) and the action list; `getTitle` returns the `displayTitle`, `getEditTitle` the stored title that renaming starts from. Tasks is the one caller that needs a materially different row (an independent checkbox toggle) and opts out via the `renderRow` render-prop instead of the accessor props — which also means `renderRow` cannot survive `toAllRows()`'s type erasure, so Tasks fall back to the plain accessor-based row inside `AllList`. `EntryListTab` also takes an optional `canDrag(item)` gate so a mixed list can withhold the grab cursor from rows that aren't drag sources (Tasks, Altar) while still allowing it for the rest.
+**`LeftSidebarRail`** (`src/components/layout/LeftSidebarRail.tsx`) is a fixed 44px icon column
+(`RAIL_WIDTH`, exported for `AppShell` and `TitleBar`):
 
-`AppShell` owns the width/resize logic: the rail's own width never changes — only whether it shows at all — while the entry-list panel's width (`entry-list-width` in `localStorage`, `ENTRY_LIST_MIN` = 180) is user-resizable via the same drag-handle pattern used for the right sidebar. The outer `<aside>` width is computed as `(railOpen ? RAIL_WIDTH : 0) + (leftListOpen ? entryListWidth : 0)`, and the resize handle only renders while the list is open. Hiding the rail slides it out via a negative `margin-left` on the inner container that holds both rail and list — so the list moves flush to the window edge — and animates a `padding-left` on `.app-sheet-frame` so the sheet gains its own left inset only once nothing sits beside it (see [Shell Layout](../design.md) in design.md) — rather than unmounting the rail; it stays mounted throughout, marked `inert`/`aria-hidden` while hidden, so its own effects don't need to be torn down and restarted on every toggle. The `<aside>`'s right border is dropped only when both rail and list are closed, since a 1px line would otherwise remain standing at zero width.
+- Top group: Home, then the modules from `MODULE_LIST`, with Lexicon (an `AUX_VIEWS` entry, not a
+  module) inserted before Altar (see [Module Registry](modules.md#module-registry)). Bottom
+  group: Templates/Blocks/Categories/Tags/Trash, then Vault (opens `VaultModal`) and Settings.
+- Every view button comes from `viewButton(type, meta)`, which marks the button of the open view
+  `active` — the accent border `.sidebar-item.active` uses in the entry lists.
+- The rail has no panel toggles: all three sidebars are toggled from the *View* menu
+  (`useTitleBarMenus.ts` on Windows/Linux, native on macOS; `menu.rail`/`menu.entryList`/
+  `menu.properties`). Since Settings and Vault live only in the rail, hiding it hides them too.
+- The update check (the dot on the gear) runs once per app start: its promise and "dot shown"
+  flag are module-level, because the rail remounts when the Altar's full-window mode ends.
+- Logo, back/forward and the search shortcut are in the title bar (see [Window
+  Chrome](shell.md#window-chrome)), the logo centred in a `RAIL_WIDTH`-wide box above the rail.
+- Home's target is not a content view (`isContentView` is false), so it overwrites the active tab
+  instead of opening a new one.
+- lucide's `Home` is an alias of `House`, so its SVG has the class `.lucide-house`, not
+  `.lucide-home`.
 
-**Both defaults are fixed literals now**, not derived from a tab strip that no longer exists: `ENTRY_LIST_DEFAULT` is 226px — chosen so the entry list plus the 44px rail together stay wider than the title bar's own tool group on Windows/Linux (logo box, menu, the three navigation buttons and the two Export/Import buttons, roughly 238px), so the tabs still start flush with the sheet below. `RIGHT_DEFAULT` is `RAIL_WIDTH + ENTRY_LIST_DEFAULT` (270px), so the right sidebar still matches the whole left side rather than an unrelated round number. Both keys are only ever written on drag-end, so an installation that never resized has no key at all and picks the defaults up on its own; one that did resize keeps the width it was dragged to.
+**`LeftSidebarEntryList`** (`src/components/layout/LeftSidebarEntryList.tsx`) is the adjoining
+panel, shown while `uiStore.leftListOpen` is true. Which single list it shows — all modules
+together or one module — is the vault setting `leftList.list` (Settings → Sidebar). `TAB_LISTS`
+maps each `LeftListTabId` to a component: five per-module lists (`JournalList`, `TasksList`,
+`OperationsList`, `WikiList`, `AltarList`) and `AllList`, all five combined and sorted by
+`updated_at` descending.
 
-Opening and closing either sidebar animates `width` (200ms) via the `.app-sidebar-animated` CSS class in `index.css` — a class rather than an inline `transition` style, so the `prefers-reduced-motion` override sitting right after it in the stylesheet can win by source order instead of losing to inline specificity. `AppShell`'s `resizing` state removes the class for the duration of a drag so the edge cannot lag the pointer. Both asides are `overflow-hidden` and their content keeps its pixel width inside them — the left row is sized `RAIL_WIDTH + entryListWidth`, the right content is `absolute right-0` at `rightWidth` — so the content is clipped rather than squeezed instead of visibly compressing mid-animation. The right sidebar's divider line sits on that content element, not on the `<aside>`, or it would remain as a 1px stripe at the window edge when collapsed to zero. `useDeferredUnmount` keeps each panel mounted for the length of the animation and drops it afterwards (a timeout, not `transitionend`, so it still fires when `prefers-reduced-motion` removes the transition) — `AllList` calls all five module config hooks and `AltarSidebarPanel` brings its own effects and drag listeners, neither of which should run while invisible. While a panel is closed but still mounted for the animation, its wrapper carries `inert` and `aria-hidden` so it stays out of both focus order and the accessibility tree — `inert` alone is a no-op on older WebKit, hence both.
+Each per-module list is `<EntryListTab {...config} />` around a `use*Config()` hook returning
+`EntryListTabProps<T>`. `AllList` calls all five hooks and flattens them through `toAllRows()`
+into type-erased `AllRow`s, so the combined list reuses each module's real handlers (duplicate,
+delete-with-undo, rename, context menu, drag start).
 
-**All three sidebars remember their open state.** `railOpen`, `leftListOpen` and `rightSidebarOpen` are each persisted to `localStorage` (`rail-open`, `left-list-open`, `right-sidebar-open` in `uiStore.ts`, via shared `loadOpenFlag`/`saveOpenFlag` helpers; `'1'`/`'0'`, defaulting to open when the key is absent) and restored before the first render, so the app reopens exactly as it was left. Only an explicit user toggle writes the flag — the forced-open case below does not. `viewNeedsSidebar(view)` (the rule that Save/Cancel/Delete need the right sidebar, so entering edit mode must not leave it closed — see [Edit Mode Architecture](editing.md#edit-mode-architecture)) is also applied once at startup: `rightSidebarOpen`'s initial value is `loadOpenFlag(...) || viewNeedsSidebar(initialView)`, so a restored tab that was left in edit mode (or a library page, e.g. a Block or Template being edited) opens the sidebar even if it was stored closed.
+`EntryListTab<T>` (`src/components/ui/EntryListTab.tsx`) owns search filtering, inline rename,
+drag-start wiring and the right-click `ContextMenu`; creating items is the dashboards' job.
+Callers supply accessors (`getId`/`getTitle`/`getEditTitle`/`getIcon`/`getDateStr`) and actions;
+`getTitle` returns the display title, `getEditTitle` the stored title renaming starts from. Tasks
+need a different row (a checkbox) and use the `renderRow` render prop, which can't survive
+`toAllRows()`'s type erasure — so in `AllList` tasks get the plain accessor row.
+
+`AppShell` owns widths and resizing. The rail's width is fixed; the entry list's
+(`entry-list-width` in `localStorage`, min `ENTRY_LIST_MIN` = 180) is resizable with the same
+drag handle as the right sidebar, which renders only while the list is open. The `<aside>` is
+`(railOpen ? RAIL_WIDTH : 0) + (leftListOpen ? entryListWidth : 0)` wide; its right border is
+dropped when both are closed, or a 1px line would remain at zero width.
+
+Hiding the rail slides it out with a negative `margin-left` on the container holding rail and
+list, so the list moves flush to the window edge, and animates a `padding-left` on
+`.app-sheet-frame` so the sheet gets its own left inset only once nothing sits beside it (see
+[Shell Layout](../design.md#shell-layout)). The rail stays mounted, `inert`/`aria-hidden` while
+hidden, so its effects aren't torn down and restarted on every toggle.
+
+**Default widths.** `ENTRY_LIST_DEFAULT` is 226px, so list plus rail stay wider than the title
+bar's tool group on Windows/Linux (logo box, menu, three navigation buttons, Export/Import —
+about 238px) and the tabs start flush with the sheet below. `RIGHT_DEFAULT` is `RAIL_WIDTH +
+ENTRY_LIST_DEFAULT` (270px), matching the whole left side. Widths are written only on drag-end,
+so an installation that never resized follows the defaults.
+
+**Open/close animation.** Both sidebars animate `width` (200ms) via `.app-sidebar-animated` in
+`index.css` — a class rather than an inline `transition`, so the `prefers-reduced-motion`
+override after it wins by source order. `AppShell`'s `resizing` state removes the class during a
+drag so the edge doesn't lag the pointer.
+
+- Both asides are `overflow-hidden` and their content keeps its pixel width (left row
+  `RAIL_WIDTH + entryListWidth`, right content `absolute right-0` at `rightWidth`), so content is
+  clipped rather than squeezed mid-animation. The right sidebar's divider sits on that content,
+  not the `<aside>`, or it would remain as a 1px stripe when collapsed.
+- `useDeferredUnmount` keeps a panel mounted for the animation and drops it afterwards (a
+  timeout, not `transitionend`, which never fires under `prefers-reduced-motion`) — `AllList`
+  and `AltarSidebarPanel` run hooks, effects and drag listeners that shouldn't run while
+  invisible.
+- A closed but still-mounted panel's wrapper carries both `inert` and `aria-hidden`, since `inert`
+  alone is a no-op on older WebKit.
+
+**All three sidebars remember their open state.** `railOpen`, `leftListOpen` and
+`rightSidebarOpen` persist to `localStorage` (`rail-open`, `left-list-open`, `right-sidebar-open`
+via `loadOpenFlag`/`saveOpenFlag` in `uiStore.ts`; `'1'`/`'0'`, open when absent) and are
+restored before the first render. Only an explicit toggle writes the flag. `viewNeedsSidebar(view)`
+— Save/Cancel/Delete need the right sidebar, so edit mode must not leave it closed (see [Edit Mode
+Architecture](editing.md#edit-mode-architecture)) — also applies at startup:
+`rightSidebarOpen` starts as `loadOpenFlag(...) || viewNeedsSidebar(initialView)`, so a restored
+tab in edit mode (or a library page) opens the sidebar even if it was stored closed; that forced
+open is not written back.
