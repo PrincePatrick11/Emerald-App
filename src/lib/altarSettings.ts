@@ -69,7 +69,11 @@ export function parseAltarSettings(raw: unknown): AltarSettings {
   };
 }
 
-/** Der Inhalt von `altars.settings` — immer alle Schlüssel, in fester Reihenfolge. */
-export function altarSettingsJson(altar: AltarSettings): string {
-  return JSON.stringify(Object.fromEntries(ALTAR_SETTING_KEYS.map((key) => [key, altar[key]])));
+/**
+ * Der Inhalt von `altars.settings` — geprüft wie beim Lesen, immer alle
+ * Schlüssel in fester Reihenfolge. Nimmt einen Altar, eine Zeile mit den alten
+ * Einzelspalten oder einen JSON-Text.
+ */
+export function altarSettingsJson(source: unknown): string {
+  return JSON.stringify(parseAltarSettings(source));
 }

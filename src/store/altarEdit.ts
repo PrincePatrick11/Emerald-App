@@ -2,6 +2,7 @@ import { useAltarStore } from './altarStore';
 import { isInEdit, useUIStore } from './uiStore';
 import { registerEditProbe } from './leaveGuardStore';
 import { drainSerialized } from '../lib/serialize';
+import { getDb } from '../lib/db';
 import type { AltarPlacement, AltarRecord } from '../types';
 
 /**
@@ -22,6 +23,12 @@ import type { AltarPlacement, AltarRecord } from '../types';
 interface AltarSnapshot {
   altar: AltarRecord;
   placements: AltarPlacement[];
+  /**
+   * Die Elemente, die beim Betreten im Papierkorb lagen. Ihre Platzierungen
+   * stehen in keinem Stand — kommt eines während der Bearbeitung zurück, darf
+   * Cancel sie trotzdem nicht wegräumen.
+   */
+  trashedItemIds: string[];
 }
 
 const snapshots = new Map<string, AltarSnapshot>();
@@ -85,7 +92,11 @@ export async function beginAltarEdit(id: string): Promise<void> {
   if (snapshots.has(id) || !isEditingAltar(id)) return;
   const altar = useAltarStore.getState().altars.find((entry) => entry.id === id);
   if (!altar) return;
-  snapshots.set(id, { altar, placements: currentPlacements(id) });
+  const placements = currentPlacements(id);
+  const db = await getDb();
+  const trashed = await db.select<{ id: string }[]>('SELECT id FROM altar_items WHERE deleted_at IS NOT NULL');
+  if (snapshots.has(id) || !isEditingAltar(id)) return;
+  snapshots.set(id, { altar, placements, trashedItemIds: trashed.map((r) => r.id) });
 }
 
 /**
@@ -183,7 +194,7 @@ async function writeBack(id: string, snapshot: AltarSnapshot): Promise<void> {
   const untouched = !!altar && !altarEditChanged(id)
     && altar.updated_at === snapshot.altar.updated_at
     && (altar.thumbnail_data ?? null) === (snapshot.altar.thumbnail_data ?? null);
-  if (!untouched) await useAltarStore.getState().restoreAltarSnapshot(snapshot.altar, snapshot.placements);
+  if (!untouched) await useAltarStore.getState().restoreAltarSnapshot(snapshot.altar, snapshot.placements, snapshot.trashedItemIds);
   endAltarEdit(id);
 }
 

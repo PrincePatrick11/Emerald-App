@@ -34,12 +34,12 @@ export const moduleWiring: Record<EntryModuleId, { reload: () => Promise<void> }
 };
 
 /**
- * Nach dem Wiederherstellen: Namen von Tags, die inzwischen gelöscht sind,
- * fallen weg (`dropDeletedTags`) — für alles, was Tags trägt.
+ * Nach dem Wiederherstellen: IDs von Tags, die es nicht mehr gibt, fallen weg
+ * (`dropUnknownTagIds`) — für alles, was Tags trägt.
  */
 async function withLiveTags(type: TaggedType, id: string, restored: Promise<void>): Promise<void> {
   await restored;
-  await useTagStore.getState().dropDeletedTags(type, id);
+  await useTagStore.getState().dropUnknownTagIds(type, id);
 }
 
 export const trashWiring: Record<TrashKind, {

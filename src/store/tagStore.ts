@@ -5,7 +5,7 @@ import { registerTagLookup } from '../lib/templateTags';
 import { AS_A_CONSEQUENCE } from '../lib/stamp';
 import { getDb } from '../lib/db';
 import { fromRow, type DbRow } from '../lib/row';
-import { replaceTagId, stripTagIds } from '../lib/tagRefs';
+import { replaceTagId, stripTagIds, tagNameKey } from '../lib/tagRefs';
 import { useEntryStore, findEntry, mapEntries } from './entryStore';
 import { useTemplateStore } from './templateStore';
 import { generateId, nowIso } from '../lib/helpers';
@@ -31,7 +31,7 @@ const byName = (a: Tag, b: Tag) => a.name.localeCompare(b.name);
 
 export type TaggedType = EntryType | 'template';
 
-const sameName = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+const sameName = (a: string, b: string) => tagNameKey(a) === tagNameKey(b);
 
 /**
  * Schreibt Tag-Listen in der Datenbank um (`rewriteTagRefs`) und zieht die
@@ -108,7 +108,7 @@ interface TagState {
    * mehr gibt, fallen weg. Die eines Tags im Papierkorb bleiben — er kann
    * zurückkommen.
    */
-  dropDeletedTags: (type: TaggedType, id: string) => Promise<void>;
+  dropUnknownTagIds: (type: TaggedType, id: string) => Promise<void>;
   getByName: (name: string) => Tag | undefined;
 }
 
@@ -223,7 +223,7 @@ export const useTagStore = create<TagState>((set, get) => {
       await purgeTags(rows.map((r) => r.id));
     },
 
-    dropDeletedTags: async (type, id) => {
+    dropUnknownTagIds: async (type, id) => {
       const item = type === 'template'
         ? useTemplateStore.getState().templates.find((t) => t.id === id)
         : findEntry(useEntryStore.getState().entries, id, type);

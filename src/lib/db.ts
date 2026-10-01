@@ -16,8 +16,8 @@ import { convertLegacySigils, hasLegacySigilRows } from './migrateLegacySigils';
 import { IMAGE_FIELDS_V48, TITLED_TABLES_V48 } from './schemaV48';
 import { unifyEntries } from './unifyEntries';
 import { tagsById } from './tagsById';
-import { stripTagIds } from './tagRefs';
-import { ALTAR_SETTING_KEYS, altarSettingsJson, parseAltarSettings } from './altarSettings';
+import { rewriteTagRefs, stripTagIds } from './tagRefs';
+import { ALTAR_SETTING_KEYS, altarSettingsJson } from './altarSettings';
 import type { EntryType } from '../types';
 import { makeCategoryOptional } from './nullableCategory';
 import { seedSigilTemplate } from './templateRows';
@@ -336,6 +336,17 @@ async function runPeriodicCleanup(db: Database, retentionDays: number | null): P
   }
 
   await sweepDanglingTaskLinks(db);
+  await sweepDanglingTagIds(db);
+}
+
+/**
+ * Nimmt Tag-IDs ohne Tag-Zeile aus jeder Liste. Entstehen kann so eine, wenn
+ * ein Tag endgültig geht, während ein Entwurf oder ein offener Eintrag die
+ * alte Liste noch hält und danach speichert.
+ */
+async function sweepDanglingTagIds(db: Database): Promise<void> {
+  const known = new Set((await db.select<{ id: string }[]>('SELECT id FROM tags')).map((r) => r.id));
+  await rewriteTagRefs(db, (ids) => ids.filter((id) => known.has(id)));
 }
 
 /**
@@ -1386,7 +1397,7 @@ async function altarSettingsToJson(db: Database): Promise<void> {
   }
   const rows = await db.select<Record<string, unknown>[]>("SELECT * FROM altars WHERE settings = '{}'");
   for (const row of rows) {
-    await db.execute('UPDATE altars SET settings=$1 WHERE id=$2', [altarSettingsJson(parseAltarSettings(row)), row.id]);
+    await db.execute('UPDATE altars SET settings=$1 WHERE id=$2', [altarSettingsJson(row), row.id]);
   }
   await dropColumnsIfPresent(db, 'altars', ALTAR_SETTING_KEYS);
 }

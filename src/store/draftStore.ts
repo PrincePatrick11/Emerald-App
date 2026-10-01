@@ -6,6 +6,7 @@ import { parseAssignments } from '../lib/blocks/templates';
 import type { BlockDefinitionPatch } from './blockDefinitionStore';
 import type { TemplatePatch } from './templateStore';
 import type { VaultFileRead } from '../lib/vaultSettings';
+import { tagNameKey } from '../lib/tagRefs';
 
 /** Was die Seite eines eigenen Blocks bearbeitet — genau das, was `updateDefinition` annimmt. */
 export type DefinitionDraft = Required<BlockDefinitionPatch>;
@@ -60,7 +61,8 @@ const stores: { kind: DraftKind; store: DraftStore<unknown>; normalize: Normaliz
  * schreibende Speicher des WebViews könnte das nicht zusagen), und der Inhalt
  * eines Vaults bleibt in seinem Ordner.
  */
-const DRAFTS_VERSION = 1;
+/** 2 seit v53: Vorlagen-Entwürfe tragen Tag-IDs statt Namen (eine 1 wird beim Lesen umgesetzt). */
+const DRAFTS_VERSION = 2;
 const PERSIST_DELAY_MS = 400;
 
 
@@ -136,6 +138,28 @@ function readKind(raw: unknown, normalize: Normalize<unknown>): Record<string, D
 }
 
 /**
+ * Eine Datei von vor v53: die Vorlagen-Entwürfe tragen Tag-Namen. Sie werden
+ * IDs der Tags dieses Vaults (ohne Rücksicht auf Groß-/Kleinschreibung); ein
+ * Name ohne Tag fällt weg.
+ */
+async function withTemplateTagIds(file: Record<string, unknown>): Promise<Record<string, unknown>> {
+  if (!isPlainObject(file.templates)) return file;
+  const { getDb } = await import('../lib/db');
+  const rows = await (await getDb()).select<{ id: string; name: string }[]>('SELECT id, name FROM tags');
+  const byName = new Map(rows.map((r) => [tagNameKey(r.name), r.id]));
+  const toIds = (side: unknown) => {
+    if (!isPlainObject(side) || !Array.isArray(side.tags)) return side;
+    const ids = side.tags.flatMap((name) => (typeof name === 'string' ? byName.get(tagNameKey(name)) ?? [] : []));
+    return { ...side, tags: [...new Set(ids)] };
+  };
+  const templates = Object.fromEntries(Object.entries(file.templates).map(([id, entry]) => [
+    id,
+    isPlainObject(entry) ? { ...entry, base: toIds(entry.base), draft: toIds(entry.draft) } : entry,
+  ]));
+  return { ...file, templates };
+}
+
+/**
  * Was in der Datei steht. `foreign`: sie stammt von einer neueren Version —
  * dann liest dieser Build sie nicht und rührt sie auch nicht an.
  */
@@ -146,6 +170,7 @@ async function readDraftsFile(vaultId: string): Promise<{ drafts: Record<string,
     const parsed: unknown = JSON.parse(read.contents);
     if (!isPlainObject(parsed)) return { drafts: {}, foreign: false };
     if (parsed.version === DRAFTS_VERSION) return { drafts: parsed, foreign: false };
+    if (parsed.version === 1) return { drafts: await withTemplateTagIds(parsed), foreign: false };
     return { drafts: {}, foreign: typeof parsed.version === 'number' && parsed.version > DRAFTS_VERSION };
   } catch (err) {
     console.warn('[drafts] could not read drafts', err);

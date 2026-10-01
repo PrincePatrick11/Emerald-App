@@ -9,8 +9,7 @@ import { jsonArray } from './row';
  * verschwindet (endgültig gelöscht, Frist abgelaufen) oder in einem anderen
  * aufgeht, werden die Listen umgeschrieben (`rewriteTagRefs`).
  *
- * Rein und DOM-frei: die Migration v53 und der Import alter Sicherungen
- * benutzen es, und `scripts/schema-check.mjs` prüft beides in node.
+ * DOM-frei und ohne Stores — es läuft auch in node (`scripts/schema-check.mjs`).
  */
 
 /** Die Tabellen, deren Zeilen Tags tragen — auch die im Papierkorb. */
@@ -59,7 +58,12 @@ export function replaceTagId(db: Database, from: string, to: string): Promise<Ma
   return rewriteTagRefs(db, (list) => list.map((id) => (id === from ? to : id)));
 }
 
-/** Eine Zeile aus `tags`, wie Migration und Sicherungen bis v52 sie kennen. */
+/** Gilt ein Name als derselbe Tag? Ohne Rücksicht auf Groß-/Kleinschreibung und Leerraum am Rand. */
+export function tagNameKey(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+/** Eine Zeile aus `tags`, wie die Datenbank bis v52 und Sicherungen bis Format 11 sie kennen. */
 export interface LegacyTagRow {
   id: string;
   name: string;
@@ -68,8 +72,6 @@ export interface LegacyTagRow {
   /** JSON: `{ id, type }` je Eintrag, dem der Tag beim Löschen genommen wurde. */
   affected_ids?: unknown;
 }
-
-const nameKey = (name: string) => name.trim().toLowerCase();
 
 /**
  * Macht aus den Tag-*Namen* einer Zeile (Stand bis v52) Tag-IDs — dieselbe
@@ -89,7 +91,7 @@ export function tagNameResolver(tags: readonly LegacyTagRow[], makeId: () => str
   const byName = new Map<string, LegacyTagRow>();
   // Lebende zuerst, damit sie bei gleichem Namen gewinnen.
   for (const tag of [...tags].sort((a, b) => Number(!!a.deleted_at) - Number(!!b.deleted_at))) {
-    const key = nameKey(tag.name);
+    const key = tagNameKey(tag.name);
     if (!byName.has(key)) byName.set(key, tag);
   }
   const affected = new Map<string, LegacyTagRow[]>();
@@ -105,12 +107,12 @@ export function tagNameResolver(tags: readonly LegacyTagRow[], makeId: () => str
   function idFor(value: unknown): string | undefined {
     if (typeof value !== 'string' || !value.trim()) return undefined;
     if (byId.has(value)) return value;
-    const hit = byName.get(nameKey(value));
+    const hit = byName.get(tagNameKey(value));
     if (hit) return hit.id;
     const tag: LegacyTagRow = { id: makeId(), name: value.trim(), deleted_at: null };
     created.push(tag);
     byId.set(tag.id, tag);
-    byName.set(nameKey(tag.name), tag);
+    byName.set(tagNameKey(tag.name), tag);
     return tag.id;
   }
 
@@ -123,7 +125,7 @@ export function tagNameResolver(tags: readonly LegacyTagRow[], makeId: () => str
     withAffected(rowId: string, ids: string[]): string[] {
       const out = [...ids];
       for (const tag of affected.get(rowId) ?? []) {
-        const sameName = out.some((id) => nameKey(byId.get(id)?.name ?? '') === nameKey(tag.name));
+        const sameName = out.some((id) => tagNameKey(byId.get(id)?.name ?? '') === tagNameKey(tag.name));
         if (!sameName) out.push(tag.id);
       }
       return out;

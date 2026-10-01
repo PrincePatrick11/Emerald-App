@@ -115,7 +115,7 @@ writeFileSync(
    export { TABLES, TABLE_DDL, ddlIfNotExists, checkIntegrity, reassignCategoryContent, collectUsedImageFilenames } from '${process.cwd().replace(/\\/g, '/')}/src/lib/schema';
    export { copyTable } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbRebuild';
    export { ddlBeforeV49 } from '${process.cwd().replace(/\\/g, '/')}/src/lib/schemaV48';
-   export { assertPayloadReferencesResolve, entryRowsForInsert, migrateBackupPayload, withRoutinesAsTemplates } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbBackup';
+   export { assertPayloadReferencesResolve, dropUnknownTagIds, entryRowsForInsert, importTagsAndRemap, migrateBackupPayload, withRoutinesAsTemplates } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbBackup';
    export { invalidateVaultCache } from '${process.cwd().replace(/\\/g, '/')}/src/lib/vaultManager';
    export { convertLegacySigils, needsSigilConversion, sigilRowToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLegacySigils';
    export { linkedIdsToContent, rowsLinkSource } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLinkedIdsToContent';
@@ -159,7 +159,7 @@ const {
   collectUsedImageFilenames, invalidateVaultCache, copyTable, ddlBeforeV49,
   assertPayloadReferencesResolve, convertLegacySigils, migrateBackupPayload, withRoutinesAsTemplates,
   needsSigilConversion, sigilRowToContent, linkedIdsToContent, rowsLinkSource, journalFieldsToContent,
-  stripTagIds, replaceTagId,
+  stripTagIds, replaceTagId, importTagsAndRemap, dropUnknownTagIds,
 } = await import(pathToFileURL(bundlePath).href);
 
 /* ------------------------------------------------------------------ *
@@ -2200,12 +2200,44 @@ console.log('\n8r. Migration v53: Tags per ID\n');
   };
   migrateBackupPayload(backup);
   const fresh = backup.data.tags.find((t) => t.name === 'Neu');
+  const sameList = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const j = Object.fromEntries(backup.data.journalEntries.map((r) => [r.id, JSON.parse(r.tags)]));
   check("Import einer '11': Namen werden IDs, ein Name ohne Tag bekommt einen in der Datei",
     !!fresh && JSON.stringify(j.bj1) === JSON.stringify(['bt1', fresh.id]) && JSON.stringify(j.bj2) === JSON.stringify(['bt2'])
       && backup.data.templates[0].tags === '["bt1"]' && backup.data.routines[0].tags === '["bt2"]'
       && backup.data.tags.every((t) => !('affected_ids' in t)),
     JSON.stringify(backup.data));
+
+  // Die Tags einer Datei in einen Vault, der schon welche hat.
+  const vault = await buildViaChain('v53-import.db');
+  await vault.execute(
+    `INSERT INTO tags (id, name, color, deleted_at) VALUES ('same','Gleich','#111111',NULL), ('local','Ritual','#222222',NULL),
+       ('trashed','Mond','#333333',$1)`,
+    [at]
+  );
+  await vault.execute(`INSERT INTO entries (id, type, title, content, tags, created_at, updated_at) VALUES ('alt','journal','','','["same","weg"]',$1,$1)`, [at]);
+  const remapped = await importTagsAndRemap(vault, {
+    tags: [
+      { id: 'same', name: 'Anders benannt', color: '#000000' },   // dieselbe ID → derselbe Tag
+      { id: 'fileRitual', name: 'RITUAL', color: '#abcdef' },     // gleicher Name → der lokale
+      { id: 'fileMond', name: 'mond', color: 'url(x)' },          // lokal im Papierkorb → kommt zurück
+      { id: 'fileNeu', name: 'Neu', color: 'kaputt' },            // neu, kaputte Farbe → eine aus der Palette
+      { id: 'bad id!', name: 'Böse' },                            // keine gültige ID → fällt weg
+    ],
+    journalEntries: [{ id: 'f1', tags: '["same","fileRitual","fileMond","fileNeu","bad id!","abgewählt"]' }],
+  });
+  check('Import: Tags nach ID, Name, Papierkorb und neu — unbekannte fallen aus der Zeile',
+    sameList(JSON.parse(remapped.journalEntries[0].tags), ['same', 'local', 'trashed', 'fileNeu']) && remapped.tags.length === 0,
+    remapped.journalEntries[0].tags);
+  const tagRows = Object.fromEntries((await vault.select('SELECT id, name, color, deleted_at FROM tags')).map((t) => [t.id, t]));
+  check('Import: der lokale Tag behält Name und Farbe, der aus dem Papierkorb lebt wieder, der neue hat eine gültige Farbe',
+    tagRows.same.name === 'Gleich' && tagRows.trashed.deleted_at === null && /^#[0-9a-f]{6}$/i.test(tagRows.fileNeu.color)
+      && !tagRows['bad id!'],
+    JSON.stringify(tagRows));
+  await dropUnknownTagIds(vault);
+  check('Import: danach fällt jede Tag-ID ohne Tag aus den Listen',
+    (await vault.select("SELECT tags FROM entries WHERE id='alt'"))[0].tags === '["same"]');
+  vault.close();
 }
 
 /* ------------------------------------------------------------------ *

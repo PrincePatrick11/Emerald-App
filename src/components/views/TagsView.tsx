@@ -208,7 +208,7 @@ export default function TagsView() {
   /** Was die Suche von einem Tag übrig lässt: passt sein Name, alle seine
    *  Einträge, sonst die, deren Titel passt. Liste und Modul-Anzahlen teilen
    *  diese eine Regel, damit die Zahlen zur Liste passen. */
-  const matchTag = useCallback((tag: { id: string; name: string }) => {
+  const matchTag = useCallback((tag: Tag) => {
     const all = itemsByTag.get(tag.id) ?? [];
     const nameMatches = !query || tag.name.toLowerCase().includes(query);
     return { nameMatches, items: nameMatches ? all : all.filter((item) => item.title.toLowerCase().includes(query)) };

@@ -46,12 +46,13 @@ import { needsSigilConversion, sigilRowToContent, type LegacySigilRow } from './
 import { linkedIdsToContent, rowsLinkSource } from './migrateLinkedIdsToContent';
 import { journalFieldsToContent } from './migrateJournalFieldsToContent';
 import { IMAGE_FIELDS, imageColumns } from './schema';
-import { ALTAR_SETTING_KEYS, altarSettingsJson, parseAltarSettings } from './altarSettings';
-import { isTagId, rewriteTagRefs, tagIdList, tagNameResolver, type LegacyTagRow } from './tagRefs';
+import { ALTAR_SETTING_KEYS, altarSettingsJson } from './altarSettings';
+import { isTagId, rewriteTagRefs, stripTagIds, tagIdList, tagNameKey, tagNameResolver, type LegacyTagRow } from './tagRefs';
+import { randomTagColor } from '../store/tagStore';
 import { categoryKey, mergeCategoryRows, type CategorySource } from './categoryMerge';
 import { legacyDisplayName, type LegacyCategoryTable } from './categories';
 import i18n from '../i18n';
-import { generateId, nowIso } from './helpers';
+import { generateId, isValidHexColor, nowIso } from './helpers';
 import { useVaultStore } from '../store/vaultStore';
 import { reloadAllStores } from '../store/moduleWiring';
 import { useUIStore } from '../store/uiStore';
@@ -320,7 +321,7 @@ export function migrateBackupPayload(backup: BackupFile): void {
   // Altar-Elemente bekommen ein `updated_at`.
   if (version < 12) {
     for (const row of data.altars ?? []) {
-      row.settings = altarSettingsJson(parseAltarSettings(row));
+      row.settings = altarSettingsJson(row);
       for (const key of ALTAR_SETTING_KEYS) delete row[key];
     }
     for (const row of data.altarItems ?? []) row.updated_at ??= row.created_at;
@@ -341,7 +342,7 @@ export function migrateBackupPayload(backup: BackupFile): void {
  * Löschen verlor. Auch die Routinen, die erst beim Import Vorlagen werden.
  */
 function tagNamesToIds(data: BackupFile['data']): void {
-  const tags = (data.tags ?? []).filter((t) => isTagId(t.id) && typeof t.name === 'string') as unknown as LegacyTagRow[];
+  const tags = (data.tags ?? []).filter((t) => isTagId(t.id) && typeof t.name === 'string') as LegacyTagRow[];
   const resolver = tagNameResolver(tags, generateId);
   const lists = [data.journalEntries, data.wikiArticles, data.operations, data.templates, data.routines];
   for (const rows of lists) {
@@ -355,27 +356,34 @@ function tagNamesToIds(data: BackupFile['data']): void {
   ];
 }
 
+/** Höchstlänge eines Tag-Namens aus fremder Quelle. */
+const TAG_NAME_MAX = 100;
+
 /**
- * Die Tags einer Sicherung in diesem Vault — beim Ersetzen wie beim
- * Zusammenführen. Ein Tag mit derselben ID ist derselbe; sonst gehört ein Name
- * einem Tag, ohne Rücksicht auf Groß-/Kleinschreibung (`tagStore`): ein
- * gleichnamiger lokaler wird benutzt — liegt er im Papierkorb und der aus der
- * Datei nicht, kommt er zurück. Was bleibt, kommt mit seiner ID dazu.
- * Danach tragen die Zeilen der Datei lokale IDs; eine, die die Datei nicht
- * auflöst (Tags abgewählt), fällt weg.
+ * Schreibt die Tags einer Sicherung in den Vault und hängt die Zeilen der
+ * Datei auf lokale IDs um — beim Ersetzen wie beim Zusammenführen. Ein Tag mit
+ * derselben ID ist derselbe; sonst gehört ein Name einem Tag (`tagNameKey`):
+ * ein gleichnamiger lokaler wird benutzt — liegt er im Papierkorb und der aus
+ * der Datei nicht, kommt er zurück, wie beim Eintippen ohne die Einträge, die
+ * ihn noch trugen (`tagStore`). Was bleibt, kommt mit seiner ID dazu. Eine ID
+ * ohne Tag in der Datei (Tags abgewählt) bleibt, wenn es den Tag hier gibt —
+ * sonst fällt sie aus der Zeile.
+ * Läuft in der Arbeitskopie (`importViaStaging`): scheitert der Import danach,
+ * bleibt auch von den Tags nichts.
  */
-async function withLocalTagIds(db: Awaited<ReturnType<typeof getDb>>, d: BackupFile['data']): Promise<BackupFile['data']> {
+export async function importTagsAndRemap(db: Awaited<ReturnType<typeof getDb>>, d: BackupFile['data']): Promise<BackupFile['data']> {
   const local = await db.select<{ id: string; name: string; deleted_at: string | null }[]>('SELECT id, name, deleted_at FROM tags');
   const byId = new Map(local.map((t) => [t.id, t]));
-  const byName = new Map(local.map((t) => [t.name.toLowerCase(), t]));
+  const byName = new Map(local.map((t) => [tagNameKey(t.name), t]));
   const idMap = new Map<string, string>();
   for (const row of d.tags ?? []) {
     const id = row.id;
-    const name = typeof row.name === 'string' ? row.name.trim() : '';
+    const name = typeof row.name === 'string' ? row.name.trim().slice(0, TAG_NAME_MAX) : '';
     if (!isTagId(id) || !name) continue;
-    const hit = byId.get(id) ?? byName.get(name.toLowerCase());
+    const hit = byId.get(id) ?? byName.get(tagNameKey(name));
     if (hit) {
       if (hit.deleted_at && !row.deleted_at) {
+        await stripTagIds(db, [hit.id]);
         await db.execute('UPDATE tags SET deleted_at=NULL WHERE id=$1', [hit.id]);
         hit.deleted_at = null;
       }
@@ -385,15 +393,15 @@ async function withLocalTagIds(db: Awaited<ReturnType<typeof getDb>>, d: BackupF
     const tag = { id, name, deleted_at: row.deleted_at == null ? null : String(row.deleted_at) };
     await db.execute(
       'INSERT INTO tags (id, name, color, deleted_at) VALUES ($1, $2, $3, $4)',
-      [id, name, typeof row.color === 'string' ? row.color : '#8347ff', tag.deleted_at],
+      [id, name, typeof row.color === 'string' && isValidHexColor(row.color) ? row.color : randomTagColor(), tag.deleted_at],
     );
     byId.set(id, tag);
-    byName.set(name.toLowerCase(), tag);
+    byName.set(tagNameKey(name), tag);
     idMap.set(id, id);
   }
   const remap = (rows: Row[] | undefined) => rows?.map((row) => ({
     ...row,
-    tags: JSON.stringify(tagIdList(row.tags).flatMap((id) => idMap.get(id) ?? [])),
+    tags: JSON.stringify(tagIdList(row.tags).flatMap((id) => idMap.get(id) ?? (byId.has(id) ? [id] : []))),
   }));
   return {
     ...d,
@@ -406,7 +414,7 @@ async function withLocalTagIds(db: Awaited<ReturnType<typeof getDb>>, d: BackupF
 }
 
 /** Nach dem Import: Tag-IDs ohne Tag-Zeile fallen aus jeder Liste. */
-async function dropUnknownTagIds(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
+export async function dropUnknownTagIds(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
   const known = new Set((await db.select<{ id: string }[]>('SELECT id FROM tags')).map((r) => r.id));
   await rewriteTagRefs(db, (ids) => ids.filter((id) => known.has(id)));
 }
@@ -1401,7 +1409,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   const pathMap = await restoreImages(backup);
   // Tags werden nicht ersetzt, sondern zusammengeführt: Einträge, die diese
   // Datei nicht ersetzt, tragen die IDs der vorhandenen.
-  const d = await withLocalTagIds(db, await liftLegacyJournalRows(db, await withRoutinesAsTemplates(db, backup.data)));
+  const d = await importTagsAndRemap(db, await liftLegacyJournalRows(db, await withRoutinesAsTemplates(db, backup.data)));
 
   await assertPayloadReferencesResolve(db, d);
 
@@ -1497,7 +1505,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
 
 async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
   const pathMap = await restoreImages(backup);
-  const d = await withLocalTagIds(db, await liftLegacyJournalRows(db, await withRoutinesAsTemplates(db, backup.data)));
+  const d = await importTagsAndRemap(db, await liftLegacyJournalRows(db, await withRoutinesAsTemplates(db, backup.data)));
 
   // Merge loescht zwar nichts, bricht aber mitten im Einfuegen ab, wenn eine
   // Kategorie fehlt — vorher pruefen, damit die Meldung sagt, welche.
@@ -1638,7 +1646,7 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   }));
 
   // Kategorien und Tags sind schon aufgelöst (resolveImportedCategories,
-  // withLocalTagIds oben).
+  // importTagsAndRemap oben).
   // Ohne Präfix: die Kopien im Inhalt nennen ihre Definition über genau diese ID.
   // Link-Vorgaben zeigen wie die Chips im Inhalt auf die umbenannten Einträge.
   await insertBlockDefinitions(db, await withStatusDefinition(

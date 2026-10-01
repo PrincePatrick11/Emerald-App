@@ -44,9 +44,11 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
     // Ohne Anlegen-Erlaubnis nur vorhandene Tags; der Hinweis im Menü darunter
     // sagt, wo neue entstehen.
     if (!createInline && !getByName(trimmed)) { setOpen(true); return; }
-    // ensureTag findet „foo" auch als „Foo".
+    // ensureTag findet „foo" auch als „Foo". Immer schreiben: holt es einen
+    // Tag aus dem Papierkorb, nimmt es ihn auch aus diesem Eintrag, und die
+    // Liste hier wäre dann veraltet.
     const { id } = await ensureTag(trimmed);
-    if (!tags.includes(id)) onChange([...tags, id]);
+    onChange([...new Set([...tags, id])]);
     setInput('');
     setOpen(false);
   };

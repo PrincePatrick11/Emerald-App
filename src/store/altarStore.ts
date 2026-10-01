@@ -82,14 +82,6 @@ async function fetchPlacementsForAltar(altarId: string, items: AltarItem[]): Pro
   return mapPlacementRows(rows, items);
 }
 
-function normalizeAltar(altar: AltarRecord): AltarRecord {
-  return {
-    ...altar,
-    ...parseAltarSettings(altar),
-    background_image_data: altar.background_image_data ?? null,
-    thumbnail_data: altar.thumbnail_data ?? null,
-  };
-}
 
 function clampPlacementPatch(patch: Partial<Pick<AltarPlacement, 'x' | 'y' | 'z_index' | 'width' | 'height' | 'rotation' | 'opacity' | 'locked' | 'hidden'>>): Partial<AltarPlacement> {
   const next: Partial<AltarPlacement> = { ...patch };
@@ -130,7 +122,8 @@ interface AltarState {
    * Zeitstempel und Vorschaubild, damit er in den Listen steht, wo er stand.
    * Wirft, wenn das Schreiben scheitert; ein zweiter Aufruf bringt es zu Ende.
    */
-  restoreAltarSnapshot: (altar: AltarRecord, placements: readonly AltarPlacement[]) => Promise<void>;
+  /** `untouchedItemIds`: Elemente, deren Platzierungen nicht zum Stand gehören und bleiben. */
+  restoreAltarSnapshot: (altar: AltarRecord, placements: readonly AltarPlacement[], untouchedItemIds?: readonly string[]) => Promise<void>;
   permanentlyDeleteAltar: (id: string) => Promise<void>;
 
   /** `createdAt` nur für den Import, der das Datum der Datei übernimmt;
@@ -168,10 +161,15 @@ async function dropThumbnailsShowing(db: Awaited<ReturnType<typeof getDb>>, item
   return ids;
 }
 
+/** Die Altäre, deren Vorschaubild `stale` verworfen hat (`dropThumbnailsShowing`). */
+function withoutThumbnails(altars: AltarRecord[], stale: Set<string>): AltarRecord[] {
+  return stale.size ? altars.map((a) => (stale.has(a.id) ? { ...a, thumbnail_data: null } : a)) : altars;
+}
+
 /** Der Store ohne das Element `id` und seine Platzierungen; `stale` = Altäre ohne gültiges Vorschaubild. */
 function withoutItem(s: AltarState, id: string, stale: Set<string>): Partial<AltarState> {
   return {
-    altars: s.altars.map((a) => (stale.has(a.id) ? { ...a, thumbnail_data: null } : a)),
+    altars: withoutThumbnails(s.altars, stale),
     items: s.items.filter((i) => i.id !== id),
     placements: s.placements.filter((p) => p.item_id !== id),
     previewPlacements: filterEachPreview(s.previewPlacements, (p) => p.item_id !== id),
@@ -202,7 +200,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const itemRows = await db.select<DbRow[]>('SELECT * FROM altar_items WHERE deleted_at IS NULL ORDER BY name ASC');
     const items = itemRows.map(fromRow.altarItem);
     const altarRows = await db.select<DbRow[]>('SELECT * FROM altars WHERE deleted_at IS NULL ORDER BY updated_at DESC, created_at DESC');
-    const altars = altarRows.map(fromRow.altar).map(normalizeAltar);
+    const altars = altarRows.map(fromRow.altar);
     for (const altar of altars) {
       if (!altar.background_image_data?.startsWith('data:')) continue;
       try {
@@ -304,8 +302,9 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       locked: number | null;
       hidden: number | null;
     }[]>(
-      `SELECT p.item_id, p.x, p.y, p.z_index, p.width, p.height, p.rotation, p.opacity, p.locked, p.hidden
-         FROM (${LIVE_PLACEMENTS}) p WHERE p.altar_id=$1`,
+      // Alle, auch die von Elementen im Papierkorb: kommt eines zurück, steht
+      // es auf der Kopie wie auf dem Original.
+      'SELECT item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden FROM altar_placements WHERE altar_id=$1',
       [id],
     );
 
@@ -349,7 +348,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const updated: AltarRecord = { ...altar, ...patch, updated_at: stampFor(altar.updated_at, touch) };
     await db.execute(
       'UPDATE altars SET title=$1, settings=$2, background_image_data=$3, updated_at=$4, thumbnail_data=$5, icon_data=$6 WHERE id=$7',
-      [updated.title, altarSettingsJson(parseAltarSettings(updated)), updated.background_image_data ?? null, updated.updated_at, updated.thumbnail_data ?? null, updated.icon_data ?? null, id]
+      [updated.title, altarSettingsJson(updated), updated.background_image_data ?? null, updated.updated_at, updated.thumbnail_data ?? null, updated.icon_data ?? null, id]
     );
     set((s) => {
       const cur = s.altars.find(e => e.id === id);
@@ -441,7 +440,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     // Stand eines anderen zurück, der gerade bearbeitet wird.
     const rows = await db.select<DbRow[]>('SELECT * FROM altars WHERE id=$1', [id]);
     if (!rows.length) return;
-    const altar = normalizeAltar(fromRow.altar(rows[0]));
+    const altar = fromRow.altar(rows[0]);
     const placements = await fetchPlacementsForAltar(id, get().items);
     set((s) => ({
       altars: [altar, ...s.altars.filter((entry) => entry.id !== id)]
@@ -450,7 +449,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     }));
   },
 
-  restoreAltarSnapshot: (altar, placements) => serialized(serialKey('altar', altar.id), async () => {
+  restoreAltarSnapshot: (altar, placements, untouchedItemIds = []) => serialized(serialKey('altar', altar.id), async () => {
     const db = await getDb();
     if (!get().altars.some((entry) => entry.id === altar.id)) return;
     await db.execute(
@@ -458,7 +457,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
         title=$1, settings=$2, background_image_data=$3, thumbnail_data=$4, icon_data=$5, updated_at=$6
        WHERE id=$7`,
       [
-        altar.title, altarSettingsJson(parseAltarSettings(altar)), altar.background_image_data ?? null,
+        altar.title, altarSettingsJson(altar), altar.background_image_data ?? null,
         altar.thumbnail_data ?? null, altar.icon_data ?? null, altar.updated_at,
         altar.id,
       ],
@@ -491,12 +490,17 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       );
     }
     // Die Platzierungen von Elementen im Papierkorb gehören nicht zum
-    // gemerkten Stand, und doch zum Altar: sie bleiben.
-    const kept = restored.map((_, i) => `$${i + 2}`).join(', ');
+    // gemerkten Stand, und doch zum Altar: sie bleiben — auch die eines
+    // Elements, das beim Betreten dort lag und inzwischen zurück ist.
+    const keptIds = restored.map((p) => p.id);
+    const params = [altar.id, ...keptIds, ...untouchedItemIds];
+    const ph = (from: number, n: number) => Array.from({ length: n }, (_, i) => `$${from + i}`).join(', ');
     await db.execute(
       `DELETE FROM altar_placements WHERE altar_id=$1
-         AND item_id IN (SELECT id FROM altar_items WHERE deleted_at IS NULL)${restored.length ? ` AND id NOT IN (${kept})` : ''}`,
-      [altar.id, ...restored.map((p) => p.id)],
+         AND item_id IN (SELECT id FROM altar_items WHERE deleted_at IS NULL)`
+        + (keptIds.length ? ` AND id NOT IN (${ph(2, keptIds.length)})` : '')
+        + (untouchedItemIds.length ? ` AND item_id NOT IN (${ph(2 + keptIds.length, untouchedItemIds.length)})` : ''),
+      params,
     );
 
     set((s) => ({
@@ -546,7 +550,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const looksDifferent = updated.emoji !== item.emoji || (updated.image_data ?? null) !== (item.image_data ?? null);
     const stale = looksDifferent ? await dropThumbnailsShowing(db, id) : new Set<string>();
     set((s) => ({
-      altars: stale.size ? s.altars.map((a) => (stale.has(a.id) ? { ...a, thumbnail_data: null } : a)) : s.altars,
+      altars: withoutThumbnails(s.altars, stale),
       items: s.items.map((i) => (i.id === id ? updated : i)).sort((a, b) => a.name.localeCompare(b.name)),
       placements: s.placements.map((p) => (p.item_id === id ? { ...p, name: updated.name, emoji: updated.emoji, category_id: updated.category_id, image_data: updated.image_data } : p)),
       previewPlacements: mapEachPreview(s.previewPlacements, (p) => p.item_id === id ? { ...p, name: updated.name, emoji: updated.emoji, category_id: updated.category_id, image_data: updated.image_data } : p),
@@ -561,6 +565,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   },
 
   restoreItem: async (id) => {
+    // Schon zurück (Rückgängig und Papierkorb nacheinander).
+    if (get().items.some((i) => i.id === id)) return;
     const db = await getDb();
     await db.execute('UPDATE altar_items SET deleted_at=NULL WHERE id=$1', [id]);
     const rows = await db.select<DbRow[]>('SELECT * FROM altar_items WHERE id=$1', [id]);
@@ -576,12 +582,11 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     set((s) => {
       const previewPlacements = { ...s.previewPlacements };
       for (const p of back) {
-        const list = p.altar_id ? previewPlacements[p.altar_id] : undefined;
-        if (list && p.altar_id) previewPlacements[p.altar_id] = [...list, p];
+        if (p.altar_id && previewPlacements[p.altar_id]) previewPlacements[p.altar_id] = [...previewPlacements[p.altar_id], p];
       }
       return {
         items: [...s.items.filter((i) => i.id !== id), item].sort((a, b) => a.name.localeCompare(b.name)),
-        altars: s.altars.map((a) => (stale.has(a.id) ? { ...a, thumbnail_data: null } : a)),
+        altars: withoutThumbnails(s.altars, stale),
         previewPlacements,
         placements: [...s.placements, ...back.filter((p) => p.altar_id === s.activeAltarId)],
       };
