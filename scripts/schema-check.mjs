@@ -838,8 +838,8 @@ console.log('\n5. Kategorie löschen verliert keine Einträge\n');
   );
   // Dieselbe Kategorie hält seit v38 auch Inhalte der anderen Module.
   await db.execute(
-    `INSERT INTO tasks (id,title,description,category_id,created_at,updated_at,tags)
-     VALUES ('a1t','Aufgabe','','temporaer',$1,$1,'[]')`,
+    `INSERT INTO tasks (id,title,description,category_id,created_at,updated_at)
+     VALUES ('a1t','Aufgabe','','temporaer',$1,$1)`,
     [now]
   );
 
@@ -933,8 +933,8 @@ console.log('\n6. Einfügereihenfolge beim Import\n');
   try {
     for (const t of kind) {
       await db.execute(
-        `INSERT INTO tasks (id,title,description,category_id,parent_task_id,created_at,updated_at,tags)
-         VALUES ($1,$2,'',NULL,$3,$4,$4,'[]')`,
+        `INSERT INTO tasks (id,title,description,category_id,parent_task_id,created_at,updated_at)
+         VALUES ($1,$2,'',NULL,$3,$4,$4)`,
         [t.id, t.title, t.parent_task_id, now]
       );
     }
@@ -946,8 +946,8 @@ console.log('\n6. Einfügereihenfolge beim Import\n');
   await db.execute('DELETE FROM tasks');
   for (const t of kind) {
     await db.execute(
-      `INSERT INTO tasks (id,title,description,category_id,parent_task_id,created_at,updated_at,tags)
-       VALUES ($1,$2,'',NULL,NULL,$3,$3,'[]')`,
+      `INSERT INTO tasks (id,title,description,category_id,parent_task_id,created_at,updated_at)
+       VALUES ($1,$2,'',NULL,NULL,$3,$3)`,
       [t.id, t.title, now]
     );
   }
@@ -1767,8 +1767,8 @@ console.log('\n8k. Migration v46: Altaere bekommen einen Papierkorb\n');
   );
 
   await db.execute(
-    `INSERT INTO altars (id,title,intention,background_preset,created_at,updated_at)
-     VALUES ('a1','Altar','','midnight',?1,?1)`,
+    `INSERT INTO altars (id,title,background_preset,created_at,updated_at)
+     VALUES ('a1','Altar','midnight',?1,?1)`,
     [now]
   );
   await db.execute(`INSERT INTO altar_items (id,name,emoji,note,created_at) VALUES ('i1','Kerze','x','',?1)`, [now]);
@@ -2010,6 +2010,32 @@ console.log('\n8n. Migration v49: drei Eintragstabellen werden entries\n');
   await runMigrations(db);
   const [s1] = await db.select("SELECT content FROM entries WHERE id='s1'");
   check('beim nächsten Versuch wird sie Block und v49 läuft durch', s1?.content.includes('core.sigil.canvas'), s1?.content);
+  db.close();
+}
+
+console.log('\n8o. Migration v50: tote Spalten gehen\n');
+
+{
+  const db = await buildViaChain('v50.db', undefined, 49);
+  await db.execute(
+    `INSERT INTO tasks (id, title, tags, created_at, updated_at) VALUES ('t1','Aufgabe','["x"]',$1,$1)`, [now]
+  );
+  await db.execute(
+    `INSERT INTO altars (id, title, intention, grid_size, created_at, updated_at) VALUES ('a1','Altar','alt',40,$1,$1)`, [now]
+  );
+  await db.execute(`INSERT INTO altar_items (id, name, created_at) VALUES ('i1','Kerze',$1)`, [now]);
+  await db.execute(`INSERT INTO altar_placements (id, altar_id, item_id) VALUES ('p1','a1','i1')`);
+  const v50 = MIGRATIONS.find((m) => m.version === 50);
+  await v50.up(db);
+  await v50.up(db);
+  const cols = async (t) => (await db.select(`PRAGMA table_info(${t})`)).map((c) => c.name);
+  check('v50 nimmt tasks.tags und altars.intention weg, auch beim zweiten Lauf',
+    !(await cols('tasks')).includes('tags') && !(await cols('altars')).includes('intention'));
+  const [altar] = await db.select("SELECT title, grid_size FROM altars WHERE id='a1'");
+  const [placements] = await db.select('SELECT COUNT(*) AS n FROM altar_placements');
+  check('Zeilen, übrige Spalten und Platzierungen bleiben',
+    altar?.title === 'Altar' && altar?.grid_size === 40 && placements.n === 1
+      && (await db.select("SELECT title FROM tasks WHERE id='t1'"))[0]?.title === 'Aufgabe');
   db.close();
 }
 

@@ -21,7 +21,7 @@ import type Database from '@tauri-apps/plugin-sql';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 49;
+export const BASELINE_VERSION = 50;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
@@ -138,7 +138,6 @@ export const TABLE_DDL: Record<TableName, string> = {
     CREATE TABLE altars (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL DEFAULT 'Untitled Altar',
-      intention TEXT NOT NULL DEFAULT '',
       background_preset TEXT NOT NULL DEFAULT 'midnight',
       background_image_data TEXT,
       background_overlay REAL NOT NULL DEFAULT 0.2,
@@ -211,7 +210,6 @@ export const TABLE_DDL: Record<TableName, string> = {
       completed INTEGER NOT NULL DEFAULT 0,
       completed_at TEXT,
       sort_order INTEGER NOT NULL DEFAULT 0,
-      tags TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       deleted_at TEXT

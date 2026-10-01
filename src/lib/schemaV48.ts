@@ -1,20 +1,64 @@
 /**
- * Eingefrorenes Schema, Stand v48 — die drei Eintragstabellen, bevor v49
- * (`unifyEntries.ts`) sie zu `entries` zusammenlegt.
+ * Eingefrorenes Schema, Stand v48 — jede Tabelle, die eine spätere Migration
+ * noch umgebaut hat: die drei Eintragstabellen, bevor v49 (`unifyEntries.ts`)
+ * sie zu `entries` zusammenlegt, und `tasks`, `altar_items` und `tags`, bevor
+ * v50, v52 und v53 Spalten wegnehmen oder dazutun.
  *
  * Die Migrationen davor bauen oder lesen diese Tabellen noch: v33 legt
- * `journal_entries` an (`schemaV37.ts` holt sie von hier), v38 und v39 bauen
- * `wiki_articles` und `operations` neu, v35 läuft über ihre Bildspalten, v48
- * über ihre Titel. Aus dem lebenden `schema.ts` sind sie seit v49
- * verschwunden — also stehen sie hier, wie sie bis dahin aussahen.
+ * `journal_entries` und `tags` an (`schemaV37.ts` holt sie von hier), v38 und
+ * v39 bauen `wiki_articles`, `operations`, `tasks` und `altar_items` neu, v35
+ * läuft über ihre Bildspalten, v48 über ihre Titel. Im lebenden `schema.ts`
+ * sehen sie anders aus oder fehlen — also stehen sie hier, wie sie bis dahin
+ * aussahen.
  * **Nichts hier ändern:** `scripts/schema-check.mjs` beweist, dass die Kette
  * über diesen Stand beim selben Schema landet wie ein frischer Vault.
  */
 import { TABLE_DDL, type TableName } from './schema';
 
-export type V48EntryTable = 'journal_entries' | 'wiki_articles' | 'operations';
+export type V48Table = 'journal_entries' | 'wiki_articles' | 'operations' | 'tasks' | 'altar_items' | 'tags';
 
-export const V48_TABLE_DDL: Record<V48EntryTable, string> = {
+export const V48_TABLE_DDL: Record<V48Table, string> = {
+  // `affected_ids`: wem ein Tag im Papierkorb beim Wiederherstellen
+  // zurückgegeben wird — bis v53 hingen Tags per Name an den Einträgen.
+  tags: `
+    CREATE TABLE tags (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      color TEXT NOT NULL DEFAULT '#8347ff',
+      affected_ids TEXT NOT NULL DEFAULT '[]',
+      deleted_at TEXT
+    )`,
+
+  altar_items: `
+    CREATE TABLE altar_items (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      emoji TEXT NOT NULL DEFAULT '✨',
+      category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
+      note TEXT NOT NULL DEFAULT '',
+      image_data TEXT,
+      created_at TEXT NOT NULL
+    )`,
+
+  // `tags` wurde nie gelesen oder geschrieben (v50 nimmt sie weg).
+  tasks: `
+    CREATE TABLE tasks (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL DEFAULT 'Untitled Task',
+      description TEXT NOT NULL DEFAULT '',
+      category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
+      parent_task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
+      priority TEXT NOT NULL DEFAULT 'medium',
+      due_date TEXT,
+      completed INTEGER NOT NULL DEFAULT 0,
+      completed_at TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      tags TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT
+    )`,
+
   // paradigm_id, bannung_type_wiki_id, meditation_type_wiki_id und die beiden
   // linked_*_ids-Arrays verweisen auf Wiki-Artikel bzw. Operationen (seit
   // v36/v37 geleert und ungelesen).

@@ -10,7 +10,7 @@ import { adoptLegacyImages, rewriteImageRefs } from './images';
 import { migrateLinkedIdsToContent } from './migrateLinkedIdsToContent';
 import { migrateJournalFieldsToContent } from './migrateJournalFieldsToContent';
 import { mergeCategoryTables } from './mergeCategoryTables';
-import { backupDatabaseFile, createIndexesIfMissing } from './dbRebuild';
+import { backupDatabaseFile, createIndexesIfMissing, dropColumnsIfPresent } from './dbRebuild';
 import { migrateOperationStatusToBlocks } from './migrateOperationStatusToBlocks';
 import { convertLegacySigils, hasLegacySigilRows } from './migrateLegacySigils';
 import { IMAGE_FIELDS_V48, TITLED_TABLES_V48 } from './schemaV48';
@@ -1322,6 +1322,17 @@ export const MIGRATIONS: Migration[] = [
     version: 49,
     name: 'unify_entries',
     up: unifyEntries,
+  },
+  {
+    // Zwei Spalten, die nie jemand las: `tasks.tags` (Aufgaben hatten nie
+    // Tags) und `altars.intention` (das Feld aus der Zeit vor den Altären mit
+    // Hintergrund; v33 füllte es zuletzt). Wiederholbar.
+    version: 50,
+    name: 'drop_dead_columns',
+    up: async (db) => {
+      await dropColumnsIfPresent(db, 'tasks', ['tags']);
+      await dropColumnsIfPresent(db, 'altars', ['intention']);
+    },
   },
 ];
 

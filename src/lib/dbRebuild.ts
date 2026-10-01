@@ -23,6 +23,20 @@ export async function columnNames(db: Database, table: string): Promise<Set<stri
   return new Set(rows.map((r) => r.name));
 }
 
+/**
+ * `ALTER TABLE … DROP COLUMN` für jede der Spalten, die es noch gibt — so
+ * setzt eine abgebrochene Migration einfach wieder an. Ohne Neubau: die
+ * Foreign Keys anderer Tabellen *auf* `table` bleiben unberührt (ein DROP TABLE
+ * risse über ON DELETE CASCADE ihre Zeilen mit). Die Spalte darf in keinem
+ * Index, Fremdschlüssel oder CHECK stehen; SQLite lehnt das sonst ab.
+ */
+export async function dropColumnsIfPresent(db: Database, table: string, columns: readonly string[]): Promise<void> {
+  const present = await columnNames(db, table);
+  for (const column of columns) {
+    if (present.has(column)) await db.execute(`ALTER TABLE ${table} DROP COLUMN ${column}`);
+  }
+}
+
 /** Die Tabellen, auf die Foreign Keys von `table` zeigen. */
 export async function referencedTables(db: Database, table: string): Promise<Set<string>> {
   const rows = await db.select<{ table: string }[]>(`PRAGMA foreign_key_list(${table})`);
