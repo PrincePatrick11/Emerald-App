@@ -23,6 +23,8 @@ import { useUndoStore } from './undoStore';
 import { useSettingsStore } from './settingsStore';
 import { captureLegacySettings } from '../lib/vaultSettings';
 import { resolveOpenEdits } from '../lib/openEdits';
+import { lockVault } from '../lib/vaultKeys';
+import { ensureVaultReady } from './vaultKeyStore';
 
 interface VaultStore {
   vaults: Vault[];
@@ -67,6 +69,11 @@ async function openActiveVault(): Promise<void> {
   await drainSerialized();
   // Drop cached connections so getDb() loads the vault that is active now.
   await resetDbCache();
+  // Entsperren oder — bei einem neuen Vault — das Passwort festlegen. Wer
+  // hier abbricht, landet im Fehlerzweig des Aufrufers.
+  const { vaults, activeVaultId } = useVaultStore.getState();
+  const active = vaults.find((v) => v.id === activeVaultId);
+  if (active) await ensureVaultReady(active);
   // Vor getDb(): die Migrationen beim Öffnen brauchen schon die Sprache des
   // neuen Vaults (siehe `loadForVault`). Ein fehlender Vault-Ordner scheitert
   // bereits hier.
@@ -140,6 +147,9 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       }
       throw err;
     }
+    // Der verlassene Vault wird gesperrt: sein Schlüssel bleibt nicht im
+    // Speicher, solange ein anderer offen ist.
+    if (previous) void lockVault(previous).catch((e) => console.warn('[vault] lock failed', e));
     return true;
   },
 

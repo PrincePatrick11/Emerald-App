@@ -12,6 +12,10 @@
 //! [`bind_all`] and [`to_json`]). Hundreds of call sites rely on exactly that.
 //! Like the plugin, each pool hands every statement to whichever connection is
 //! free — a transaction only holds within a single `execute` string.
+//!
+//! An encrypted vault's databases open with its key as SQLCipher's raw key
+//! (`PRAGMA key = "x'…'"`), which sqlx runs first on every connection of the
+//! pool. A locked vault does not open at all.
 
 use indexmap::IndexMap;
 use serde_json::Value as JsonValue;
@@ -21,7 +25,7 @@ use sqlx::{Column, Executor, Row, TypeInfo, Value, ValueRef};
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 
-use crate::vault;
+use crate::{keys, vault};
 
 /// The open pools, by handle (`{vaultId}/{file}`).
 #[derive(Default)]
@@ -62,9 +66,12 @@ pub async fn db_load(
     file: DbFile,
 ) -> Result<String, String> {
     let path = vault::vault_dir(&app, &vault_id)?.join(file.name());
-    let options = SqliteConnectOptions::new()
+    let mut options = SqliteConnectOptions::new()
         .filename(&path)
         .create_if_missing(true);
+    if let Some(key) = keys::key_for(&app, &vault_id)? {
+        options = options.pragma("key", sqlcipher_key(&key));
+    }
     let pool = SqlitePool::connect_with(options).await.map_err(|e| e.to_string())?;
 
     let key = handle(&vault_id, file);
@@ -73,6 +80,28 @@ pub async fn db_load(
         previous.close().await;
     }
     Ok(key)
+}
+
+/// The vault key as SQLCipher's raw-key pragma value. Raw means SQLCipher
+/// skips its own PBKDF2 — the key is already random.
+fn sqlcipher_key(key: &crate::crypto::Key) -> String {
+    let hex: String = key.iter().map(|b| format!("{b:02X}")).collect();
+    format!("\"x'{hex}'\"")
+}
+
+/// Closes every pool of one vault — when it is locked.
+pub async fn close_vault(app: &tauri::AppHandle, vault_id: &str) {
+    use tauri::Manager;
+    let prefix = format!("{vault_id}/");
+    let pools: Vec<SqlitePool> = {
+        let dbs = app.state::<Databases>();
+        let mut map = dbs.0.write().await;
+        let handles: Vec<String> = map.keys().filter(|h| h.starts_with(&prefix)).cloned().collect();
+        handles.iter().filter_map(|h| map.remove(h)).collect()
+    };
+    for pool in pools {
+        pool.close().await;
+    }
 }
 
 /// Closes one pool. An unknown handle is an error, as it was in the plugin.
@@ -238,6 +267,36 @@ mod tests {
         execute_on(&pool, "CREATE TABLE t (a TEXT)", vec![]).await.unwrap();
         let err = execute_on(&pool, "ALTER TABLE t ADD COLUMN a TEXT", vec![]).await.unwrap_err();
         assert!(err.contains("duplicate column name"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn a_keyed_database_is_unreadable_without_its_key() {
+        let dir = std::env::temp_dir().join(format!("emerald-db-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("keyed.db");
+        let key = crate::crypto::random_key();
+        let keyed = SqliteConnectOptions::new().filename(&file).create_if_missing(true).pragma("key", sqlcipher_key(&key));
+
+        let pool = SqlitePool::connect_with(keyed.clone()).await.unwrap();
+        execute_on(&pool, "CREATE TABLE t (s TEXT)", vec![]).await.unwrap();
+        execute_on(&pool, "INSERT INTO t VALUES ('GEHEIM-1234')", vec![]).await.unwrap();
+        pool.close().await;
+
+        let bytes = std::fs::read(&file).unwrap();
+        assert!(!bytes.starts_with(b"SQLite format 3"));
+        assert!(!bytes.windows(11).any(|w| w == b"GEHEIM-1234"));
+
+        let pool = SqlitePool::connect_with(keyed).await.unwrap();
+        assert_eq!(select_on(&pool, "SELECT s FROM t", vec![]).await.unwrap()[0]["s"], serde_json::json!("GEHEIM-1234"));
+        pool.close().await;
+
+        let other = SqliteConnectOptions::new().filename(&file).pragma("key", sqlcipher_key(&crate::crypto::random_key()));
+        let failed = match SqlitePool::connect_with(other).await {
+            Ok(pool) => select_on(&pool, "SELECT s FROM t", vec![]).await.is_err(),
+            Err(_) => true,
+        };
+        assert!(failed, "opened with the wrong key");
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[tokio::test]

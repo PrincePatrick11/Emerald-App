@@ -14,6 +14,9 @@ import LeftSidebarEntryList from './LeftSidebarEntryList';
 import RightSidebar from './RightSidebar';
 import MainArea from './MainArea';
 import VaultModal from './VaultModal';
+import VaultKeyDialog from './VaultKeyDialog';
+import { ensureVaultReady, VAULT_KEY_CANCELLED } from '../../store/vaultKeyStore';
+import { keyErrorOf } from '../../lib/vaultKeys';
 import UndoToast from '../ui/UndoToast';
 import ImageNoticeModal from '../ui/ImageNoticeModal';
 import LeaveGuardModal from './LeaveGuardModal';
@@ -125,13 +128,23 @@ export default function AppShell() {
       // endet in `reloadAllStores()` — dieser Effekt laeuft dafuer nicht erneut.
       const vaultState = useVaultStore.getState();
       if (!hasActiveVault(vaultState)) return;
-      // Wie in `openActiveVault`: die Einstellungen vor der Datenbank. Davor,
-      // was ein Absturz an Entwürfen übrig gelassen hat — bevor eine Seite sie
-      // sucht —, und wie die Listen dieses Vaults aussehen sollen.
-      loadVaultPrefs(vaultState.activeVaultId);
-      return restoreDrafts(vaultState.activeVaultId)
-        .then(() => useSettingsStore.getState().loadForVault(vaultState.activeVaultId))
-        .then(reloadAllStores);
+      const active = vaultState.vaults.find((v) => v.id === vaultState.activeVaultId)!;
+      // Vor allem anderen: ein verschlüsselter Vault muss entsperrt sein, bevor
+      // Entwürfe oder Datenbank gelesen werden. Wer abbricht, wählt im
+      // Vault-Fenster einen anderen — der gespeicherte aktive Vault bleibt, bis
+      // dort gewechselt wird.
+      return ensureVaultReady(active).then(() => {
+        // Wie in `openActiveVault`: die Einstellungen vor der Datenbank. Davor,
+        // was ein Absturz an Entwürfen übrig gelassen hat — bevor eine Seite
+        // sie sucht —, und wie die Listen dieses Vaults aussehen sollen.
+        loadVaultPrefs(vaultState.activeVaultId);
+        return restoreDrafts(vaultState.activeVaultId)
+          .then(() => useSettingsStore.getState().loadForVault(vaultState.activeVaultId))
+          .then(reloadAllStores);
+      }, (err: unknown) => {
+        if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) throw err;
+        useVaultStore.setState({ activeVaultId: '' });
+      });
     })
       // Ohne `catch` bliebe der Fehler eine unbehandelte Rejection in der
       // Konsole — sichtbar nur, wenn jemand hinschaut.
@@ -303,6 +316,7 @@ export default function AppShell() {
     <div className="app-shell flex flex-col h-screen w-screen overflow-hidden relative">
       <TitleBar />
       {children}
+      <VaultKeyDialog />
     </div>
   );
 
@@ -443,6 +457,7 @@ export default function AppShell() {
       <ImageNoticeModal />
       <LeaveGuardModal />
       <ImportDestinationModal />
+      <VaultKeyDialog />
     </div>
   );
 }

@@ -7,6 +7,8 @@ import Button from '../ui/Button';
 import EmojiPicker from '../ui/EmojiPicker';
 import { DEFAULT_EMOJI_PICKER_EMOJIS } from '../../lib/emojiSearch';
 import { hasActiveVault, useVaultStore } from '../../store/vaultStore';
+import { VAULT_KEY_CANCELLED } from '../../store/vaultKeyStore';
+import { keyErrorOf } from '../../lib/vaultKeys';
 import { useCloseOnKeepEditing } from '../../hooks/useCloseOnKeepEditing';
 import {
   DB_FILE,
@@ -422,6 +424,9 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
     try {
       await action();
     } catch (e) {
+      // Anlegen und Öffnen enden im Wechsel — abgebrochen beim Passwort ist
+      // kein Fehler.
+      if (keyErrorOf(e) === VAULT_KEY_CANCELLED) return;
       console.error(`[vault] ${label} failed`, e);
       setError(t('vault.saveFailed'));
     }
@@ -493,8 +498,11 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
       await switchVault(id);
       onClose();
     } catch (e) {
-      console.error('[vault] switch failed', e);
-      setError(t('vault.switchFailed'));
+      // Abgebrochen ist kein Fehler: der Nutzer wollte das Passwort nicht eingeben.
+      if (keyErrorOf(e) !== VAULT_KEY_CANCELLED) {
+        console.error('[vault] switch failed', e);
+        setError(t('vault.switchFailed'));
+      }
     } finally {
       setSwitchingId(null);
     }

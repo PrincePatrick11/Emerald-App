@@ -26,6 +26,10 @@ mod images;
 mod vault;
 /// The SQLite pools the frontend runs its SQL through, opened by vault id.
 mod db;
+/// Authenticated encryption for a vault's files.
+mod crypto;
+/// `vault.key`, unlocking, and the keys of unlocked vaults.
+mod keys;
 /// Der In-App-Updater: variable Quelle, Pruefung, Installation.
 mod updates;
 
@@ -801,6 +805,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(vault::VaultRegistry::default())
         .manage(db::Databases::default())
+        .manage(keys::VaultKeys::default())
         .manage(updates::PendingUpdate::default())
         .manage(CloseWatch::default())
         .on_window_event(|window, event| {
@@ -818,6 +823,14 @@ pub fn run() {
             db::db_close,
             db::db_execute,
             db::db_select,
+            keys::vault_key_status,
+            keys::vault_create_key,
+            keys::vault_unlock,
+            keys::vault_unlock_remembered,
+            keys::vault_recover,
+            keys::vault_change_password,
+            keys::vault_set_remembered,
+            keys::vault_lock,
             images::save_image,
             images::copy_image_file,
             images::read_image_file,

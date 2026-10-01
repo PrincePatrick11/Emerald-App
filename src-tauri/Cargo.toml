@@ -43,12 +43,19 @@ tokio = { version = "1", features = ["rt", "time", "sync"] }
 sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio", "json"] }
 libsqlite3-sys = { version = "0.30", features = ["bundled-sqlcipher-vendored-openssl"] }
 indexmap = { version = "2", features = ["serde"] }
+# Vault encryption (`crypto.rs`, `keys.rs`): XChaCha20-Poly1305 for files,
+# Argon2id for the password, the OS keychain for "remember on this device".
+chacha20poly1305 = "0.10"
+argon2 = "0.5"
+hmac = "0.12"
+zeroize = { version = "1", features = ["serde"] }
 
 [dev-dependencies]
 # `#[tokio::test]` for the async tests in `db.rs`.
 tokio = { version = "1", features = ["macros", "rt"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
 objc = "0.2"
 block = "0.1"
 # objc2 family is already pulled in transitively by Tauri 2; we promote it
@@ -62,6 +69,7 @@ objc2-core-foundation = "0.3"
 block2 = "0.6"
 
 [target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
 # webview2-com + windows let us drive the same WebView2 the app already
 # uses to render the PDF via `ICoreWebView2_7::PrintToPdf` (see
 # `pdf_export::windows`). Versions are pinned to whatever Tauri 2
@@ -75,9 +83,17 @@ windows = { version = "0.61", features = [
 ] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
+# The Secret Service (GNOME Keyring, KWallet) over D-Bus, pure-Rust crypto.
+keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }
 # webkit2gtk + gtk drive the app's own WebKit webview via
 # `WebKitPrintOperation` to render PDFs (see `pdf_export/linux.rs`).
 # Versions match what Tauri 2 itself pulls in (see Cargo.lock).
 webkit2gtk = "2.0"
 gtk = "0.18"
 javascriptcore-rs = "1.1"
+
+# Argon2id unoptimised takes many seconds per unlock; dev builds get it fast.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3

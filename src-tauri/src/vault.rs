@@ -78,7 +78,7 @@ pub struct VaultProbe {
 pub const ACCESS_DENIED: &str = "VAULT_ACCESS_DENIED";
 
 /// Tells "not there" apart from "not allowed". `is_dir()` collapses the two.
-fn directory_state(dir: &Path) -> Result<(), String> {
+pub(crate) fn directory_state(dir: &Path) -> Result<(), String> {
     match std::fs::metadata(dir) {
         Ok(md) if md.is_dir() => Ok(()),
         Ok(_) => Err(format!("not a directory: {}", dir.display())),
@@ -811,9 +811,11 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
         std::fs::remove_dir(&images).ok();
     }
 
-    for name in [SETTINGS_FILE, SETTINGS_TEMP_FILE, DRAFTS_FILE, DRAFTS_TEMP_FILE] {
+    for name in [SETTINGS_FILE, SETTINGS_TEMP_FILE, DRAFTS_FILE, DRAFTS_TEMP_FILE, crate::keys::KEY_FILE, crate::keys::KEY_TEMP_FILE] {
         std::fs::remove_file(dir.join(name)).ok();
     }
+    // Mit den Dateien ist der Schlüssel wertlos — auch der gemerkte.
+    crate::keys::discard(&app, &vault_id);
 
     // Ein *leerer* `backup/` — seit `create_vault_dirs` ihn mit anlegt, der
     // Normalfall ohne Export — soll das Entfernen des Ordners nicht
@@ -951,8 +953,6 @@ fn read_json_in(dir: &Path, name: &str, max_bytes: u64) -> VaultFileRead {
 /// Writes `contents` under `name`, through `temp_name`. Only well-formed JSON
 /// objects, and nothing above `max_bytes`.
 fn write_json_in(dir: &Path, name: &str, temp_name: &str, max_bytes: u64, contents: &str) -> Result<(), String> {
-    use std::io::Write;
-
     if contents.len() as u64 > max_bytes {
         return Err(format!("{name} too large"));
     }
@@ -960,6 +960,14 @@ fn write_json_in(dir: &Path, name: &str, temp_name: &str, max_bytes: u64, conten
         Ok(serde_json::Value::Object(_)) => {}
         _ => return Err(format!("{name} must be a JSON object")),
     }
+    write_atomic(dir, name, temp_name, contents.as_bytes())
+}
+
+/// Writes `bytes` to `dir/name` through `dir/temp_name` and a rename, so a
+/// crash leaves either the old file or the new one, never half of either.
+pub(crate) fn write_atomic(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
+    use std::io::Write;
+
     // Was unter dem Temp-Namen liegt — Rest eines Absturzes oder ein
     // untergeschobener Link —, weg damit (ein Link verschwindet, sein Ziel
     // bleibt). `create_new` scheitert, falls dazwischen wieder etwas auftaucht,
@@ -970,7 +978,7 @@ fn write_json_in(dir: &Path, name: &str, temp_name: &str, max_bytes: u64, conten
         .write(true)
         .create_new(true)
         .open(&temp)
-        .and_then(|mut file| file.write_all(contents.as_bytes()));
+        .and_then(|mut file| file.write_all(bytes));
     if let Err(e) = written {
         std::fs::remove_file(&temp).ok();
         return Err(format!("write {}: {e}", temp.display()));
