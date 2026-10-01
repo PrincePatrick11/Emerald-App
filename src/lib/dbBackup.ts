@@ -143,7 +143,8 @@ type Row = Record<string, any>;
  * `data.lexiconEntries`, '10' = seit v46 tragen Altäre `deleted_at`, '11' =
  * seit v49 stehen Journal, Wiki und Operationen als `data.entries` in einem
  * Array, jede Zeile mit `type` und ohne die Spalten, die es nicht mehr gibt,
- * '12' = seit v51 tragen Altäre ihre Darstellung als JSON-Spalte `settings`.
+ * '12' = seit v51 tragen Altäre ihre Darstellung als JSON-Spalte `settings`
+ * und seit v52 Altar-Elemente `updated_at`/`deleted_at`.
  *
  * Die '12' braucht es, weil ein älterer Build die zwölf Einzelspalten sucht:
  * `insertRows` ließe `settings` fallen, und jeder Altar käme mit den
@@ -313,12 +314,14 @@ export function migrateBackupPayload(backup: BackupFile): void {
   // mit unbekanntem Typ fällt weg — in `entries` gäbe es für sie kein Modul.
   if (version >= 11) splitEntries(data);
 
-  // v11 → v12: die Einzelspalten der Altäre werden `settings`.
+  // v11 → v12: die Einzelspalten der Altäre werden `settings`, und
+  // Altar-Elemente bekommen ein `updated_at`.
   if (version < 12) {
     for (const row of data.altars ?? []) {
       row.settings = altarSettingsJson(parseAltarSettings(row));
       for (const key of ALTAR_SETTING_KEYS) delete row[key];
     }
+    for (const row of data.altarItems ?? []) row.updated_at ??= row.created_at;
   }
 
   // Routinen (Dateien von vor v44) bleiben hier liegen: sie werden erst beim
@@ -581,14 +584,17 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
     // vorher komplett leert, waren sie danach weg. Deshalb vollständig,
     // unabhängig vom Datumsfilter der Altäre und auch dann, wenn gar kein
     // Altar übrig bleibt.
-    data.altarItems = await db.select<Row[]>('SELECT * FROM altar_items');
-    // Platzierungen bleiben an ihre Altäre gebunden — ohne Altar kein Ort.
+    // Elemente im Papierkorb nur, wenn der Papierkorb mitkommt — wie alles andere.
+    data.altarItems = await db.select<Row[]>(`SELECT * FROM altar_items WHERE 1=1 ${deletedClause}`);
+    // Platzierungen bleiben an ihre Altäre gebunden — ohne Altar kein Ort —
+    // und an ihr Element: ohne es scheiterte das Einfügen am Fremdschlüssel.
+    const exportedItems = new Set(data.altarItems.map((r) => String(r.id)));
     data.altarPlacements = data.altars.length
-      ? await selectWhereIn(
+      ? (await selectWhereIn(
           db,
           (ph) => `SELECT * FROM altar_placements WHERE altar_id IN (${ph})`,
           data.altars,
-        )
+        )).filter((p) => exportedItems.has(String(p.item_id)))
       : [];
     collectImageRefs('altars', data.altars, allImagePaths);
     collectImageRefs('altar_items', data.altarItems, allImagePaths);

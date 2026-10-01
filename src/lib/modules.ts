@@ -25,6 +25,7 @@ import {
   LayoutList,
   Library,
   ListTodo,
+  Sparkles,
   Tag,
   Trash2,
   Wand2,
@@ -200,6 +201,7 @@ export function entryTypeForView(viewType: string): EntryType | undefined {
 /** Alle Papierkorb-Eintragstypen (`TrashedItem['type']`). */
 export const TRASH_KINDS = [
   'journal', 'wiki', 'tag', 'operation', 'task', 'category', 'blockDefinition', 'template', 'language', 'altar',
+  'altarItem',
 ] as const;
 export type TrashKind = (typeof TRASH_KINDS)[number];
 
@@ -216,4 +218,5 @@ export const TRASH_KIND_ICONS: Record<TrashKind, LucideIcon> = {
   template: CopyPlus,
   language: Languages,
   altar: Flame,
+  altarItem: Sparkles,
 };

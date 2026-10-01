@@ -21,7 +21,7 @@ import type Database from '@tauri-apps/plugin-sql';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 51;
+export const BASELINE_VERSION = 52;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
@@ -179,6 +179,9 @@ export const TABLE_DDL: Record<TableName, string> = {
   // category_id hielt bis v33 den Kategorie-*Namen* statt der ID — die einzige
   // namensbasierte Referenz im ganzen Schema. Deshalb musste v23 ein Rename
   // über zwei Tabellen kaskadieren.
+  // `updated_at`/`deleted_at` seit v52: ein gelöschtes Element liegt im
+  // Papierkorb, seine Platzierungen bleiben stehen und kommen mit ihm zurück.
+  // Endgültig weg nimmt ON DELETE CASCADE sie mit.
   altar_items: `
     CREATE TABLE altar_items (
       id TEXT PRIMARY KEY,
@@ -187,7 +190,9 @@ export const TABLE_DDL: Record<TableName, string> = {
       category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
       note TEXT NOT NULL DEFAULT '',
       image_data TEXT,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT '',
+      deleted_at TEXT
     )`,
 
   tasks: `
@@ -323,6 +328,9 @@ export const LEXICON_INDEX_DDL: readonly string[] = [
 /** Der Index des Altar-Papierkorbs (v46) — getrennt wie die darüber. */
 export const ALTARS_INDEX_DDL = 'CREATE INDEX idx_altars_deleted ON altars(deleted_at)';
 
+/** Der Index des Papierkorbs der Altar-Elemente (v52). */
+export const ALTAR_ITEMS_INDEX_DDL = 'CREATE INDEX idx_altar_items_deleted ON altar_items(deleted_at)';
+
 /**
  * Die Indizes von `entries` (v49). `type` samt `deleted_at`, weil jedes Modul
  * seine lebenden Einträge so lädt; `deleted_at` allein für den Bereichsscan
@@ -337,7 +345,7 @@ export const ENTRIES_INDEX_DDL: readonly string[] = [
 /** Alle Indizes des aktuellen Schemas — was ein frischer Vault bekommt. */
 export const INDEX_DDL: readonly string[] = [
   ...KEPT_INDEX_DDL_V38, BLOCK_DEFINITIONS_INDEX_DDL, TEMPLATES_INDEX_DDL, ...LEXICON_INDEX_DDL, ALTARS_INDEX_DDL,
-  ...ENTRIES_INDEX_DDL,
+  ...ENTRIES_INDEX_DDL, ALTAR_ITEMS_INDEX_DDL,
 ];
 
 /**

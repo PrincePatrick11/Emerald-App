@@ -78,6 +78,7 @@
     "blockDefinitionDeleted": "Bloque eliminado",
     "templateDeleted": "Plantilla eliminada",
     "languageDeleted": "Idioma eliminado",
+    "altarItemDeleted": "Elemento eliminado",
     "altarDeleted": "Altar eliminado",
     "wordDeleted": "Palabra eliminada",
     "placementRemoved": "Elemento retirado del altar"
@@ -186,8 +187,6 @@
     "unlock": "Desbloquear",
     "duplicateElement": "Duplicar elemento",
     "removeElement": "Eliminar elemento",
-    "deleteElementConfirm": "¿Eliminar? Desaparece de {{count}} altar.",
-    "deleteElementConfirm_other": "¿Eliminar? Desaparece de {{count}} altares.",
     "rotate": "Rotar",
     "scale": "Escala",
     "backgrounds": {
@@ -807,6 +806,7 @@
     "blockDefinitions": "Bloques",
     "templates": "Plantillas",
     "languages": "Idiomas",
+    "altarItems": "Elementos del altar",
     "deleteSelected": "Eliminar seleccionados ({{count}})",
     "confirmDeleteSelected": "Sí, eliminar {{count}}",
     "retentionNoteNever": "Los elementos se quedan hasta que los elimines definitivamente."

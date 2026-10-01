@@ -2082,6 +2082,37 @@ console.log('\n8p. Migration v51: die Darstellung eines Altars wird JSON\n');
     JSON.stringify(row));
 }
 
+console.log('\n8q. Migration v52: Altar-Elemente bekommen einen Papierkorb\n');
+
+{
+  const db = await buildViaChain('v52.db', undefined, 51);
+  await db.execute(`INSERT INTO altars (id, title, created_at, updated_at) VALUES ('a1','Altar',$1,$1)`, [now]);
+  await db.execute(`INSERT INTO altar_items (id, name, created_at) VALUES ('i1','Kerze','2025-01-01T00:00:00.000Z')`);
+  await db.execute(`INSERT INTO altar_placements (id, altar_id, item_id) VALUES ('p1','a1','i1')`);
+  const v52 = MIGRATIONS.find((m) => m.version === 52);
+  await v52.up(db);
+  await v52.up(db);
+  const [item] = await db.select("SELECT updated_at, deleted_at FROM altar_items WHERE id='i1'");
+  check('v52: updated_at = created_at, deleted_at leer, auch beim zweiten Lauf',
+    item?.updated_at === '2025-01-01T00:00:00.000Z' && item?.deleted_at === null, JSON.stringify(item));
+  check('v52: der Index auf deleted_at ist da',
+    (await db.select("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_altar_items_deleted'")).length === 1);
+
+  // Der Papierkorb lässt die Platzierungen stehen; die Frist nimmt sie mit.
+  await db.execute("UPDATE altar_items SET deleted_at='2000-01-01T00:00:00.000Z' WHERE id='i1'");
+  check('v52: die Platzierung überlebt den Papierkorb ihres Elements',
+    (await db.select('SELECT COUNT(*) AS n FROM altar_placements'))[0].n === 1);
+  await db.execute("DELETE FROM altar_items WHERE deleted_at IS NOT NULL AND deleted_at < '2001-01-01'");
+  check('v52: endgültig gelöscht geht die Platzierung per CASCADE mit',
+    (await db.select('SELECT COUNT(*) AS n FROM altar_placements'))[0].n === 0);
+  db.close();
+
+  const backup = { version: '11', data: { altarItems: [{ id: 'i', name: 'I', created_at: '2024-02-02' }] } };
+  migrateBackupPayload(backup);
+  check("Import einer '11': ein Altar-Element bekommt updated_at = created_at",
+    backup.data.altarItems[0].updated_at === '2024-02-02');
+}
+
 /* ------------------------------------------------------------------ *
  * Konstanten, die es zweimal gibt — einmal in TypeScript, einmal in Rust
  * ------------------------------------------------------------------ */

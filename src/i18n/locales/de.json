@@ -78,6 +78,7 @@
     "blockDefinitionDeleted": "Block gelöscht",
     "templateDeleted": "Vorlage gelöscht",
     "languageDeleted": "Sprache gelöscht",
+    "altarItemDeleted": "Element gelöscht",
     "altarDeleted": "Altar gelöscht",
     "wordDeleted": "Vokabel gelöscht",
     "placementRemoved": "Element vom Altar genommen"
@@ -186,8 +187,6 @@
     "unlock": "Entsperren",
     "duplicateElement": "Element duplizieren",
     "removeElement": "Element entfernen",
-    "deleteElementConfirm": "Löschen? Es verschwindet von {{count}} Altar.",
-    "deleteElementConfirm_other": "Löschen? Es verschwindet von {{count}} Altären.",
     "rotate": "Drehen",
     "scale": "Skalieren",
     "backgrounds": {
@@ -807,6 +806,7 @@
     "blockDefinitions": "Blöcke",
     "templates": "Vorlagen",
     "languages": "Sprachen",
+    "altarItems": "Altar-Elemente",
     "deleteSelected": "Ausgewählte löschen ({{count}})",
     "confirmDeleteSelected": "Ja, {{count}} löschen",
     "retentionNoteNever": "Elemente bleiben, bis du sie endgültig löschst."

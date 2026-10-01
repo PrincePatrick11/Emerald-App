@@ -78,6 +78,7 @@
     "blockDefinitionDeleted": "Bloc supprimé",
     "templateDeleted": "Modèle supprimé",
     "languageDeleted": "Langue supprimée",
+    "altarItemDeleted": "Élément supprimé",
     "altarDeleted": "Autel supprimé",
     "wordDeleted": "Mot supprimé",
     "placementRemoved": "Élément retiré de l'autel"
@@ -186,8 +187,6 @@
     "unlock": "Déverrouiller",
     "duplicateElement": "Dupliquer l'élément",
     "removeElement": "Supprimer l'élément",
-    "deleteElementConfirm": "Supprimer ? Il disparaît de {{count}} autel.",
-    "deleteElementConfirm_other": "Supprimer ? Il disparaît de {{count}} autels.",
     "rotate": "Rotation",
     "scale": "Échelle",
     "backgrounds": {
@@ -807,6 +806,7 @@
     "blockDefinitions": "Blocs",
     "templates": "Modèles",
     "languages": "Langues",
+    "altarItems": "Éléments d'autel",
     "deleteSelected": "Supprimer la sélection ({{count}})",
     "confirmDeleteSelected": "Oui, supprimer {{count}}",
     "retentionNoteNever": "Les éléments restent jusqu'à ce que vous les supprimiez définitivement."

@@ -105,6 +105,7 @@ export interface AltarItem {
   /** Nur für die Sortierung der Bibliothek — die Spalte gab es in
    *  `altar_items` schon, sie kam bloß nie im Typ an. */
   created_at: string;
+  updated_at: string;
 }
 
 export interface AltarPlacement {

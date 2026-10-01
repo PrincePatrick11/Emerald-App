@@ -54,6 +54,9 @@ export const useTrashStore = create<TrashState>((set, get) => ({
       const altars = await db.select<{ id: string; title: string; deleted_at: string }[]>(
         `SELECT id, title, deleted_at FROM altars WHERE deleted_at IS NOT NULL`
       );
+      const altarItems = await db.select<{ id: string; name: string; emoji: string; deleted_at: string }[]>(
+        `SELECT id, name, emoji, deleted_at FROM altar_items WHERE deleted_at IS NOT NULL`
+      );
       const items: TrashedItem[] = [
         // Ohne eigenen Titel „Unbenannt…", wie überall (`displayTitle`).
         ...entries.map((r) => ({
@@ -85,6 +88,12 @@ export const useTrashStore = create<TrashState>((set, get) => ({
           type: 'language' as const,
         })),
         ...altars.map((r) => ({ ...r, title: displayTitle(i18n.t, 'altar', r.title), type: 'altar' as const })),
+        ...altarItems.map((r) => ({
+          id: r.id,
+          title: iconTitle(r.emoji, r.name),
+          deleted_at: r.deleted_at,
+          type: 'altarItem' as const,
+        })),
       ].sort((a, b) => b.deleted_at.localeCompare(a.deleted_at));
       set({ items });
     } finally {
@@ -118,6 +127,8 @@ export const useTrashStore = create<TrashState>((set, get) => ({
     await db.execute(`DELETE FROM languages WHERE deleted_at IS NOT NULL`);
     // Die Platzierungen ebenso; die Verknüpfungen auf den Altar fegt `sweepDanglingTaskLinks` unten.
     await db.execute(`DELETE FROM altars WHERE deleted_at IS NOT NULL`);
+    // Ebenso die eines Elements.
+    await db.execute(`DELETE FROM altar_items WHERE deleted_at IS NOT NULL`);
 
     // Kategorien zuletzt, und erst nachdem ihre verbliebenen Inhalte umgehängt
     // sind. Früher wurden die Zeilen einfach gelöscht und alles, was noch auf

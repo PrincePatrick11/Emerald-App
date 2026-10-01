@@ -281,6 +281,7 @@ export default function TrashView() {
     const templates  = sorted.filter((i) => i.type === 'template');
     const languages  = sorted.filter((i) => i.type === 'language');
     const altars     = sorted.filter((i) => i.type === 'altar');
+    const altarItems = sorted.filter((i) => i.type === 'altarItem');
 
     const renderItems = (subset: TrashedItem[]) =>
       viewMode === 'list'
@@ -335,6 +336,12 @@ export default function TrashView() {
           <>
             <SectionHeader label={t('nav.altar')} count={altars.length} />
             {renderItems(altars)}
+          </>
+        )}
+        {altarItems.length > 0 && (
+          <>
+            <SectionHeader label={t('trash.altarItems')} count={altarItems.length} />
+            {renderItems(altarItems)}
           </>
         )}
         {tags.length > 0 && (

@@ -91,6 +91,10 @@ export const trashWiring: Record<TrashKind, {
       useTaskStore.setState((s) => ({ links: s.links.filter((link) => link.target_id !== id) }));
     },
   },
+  altarItem: {
+    restore: (id) => useAltarStore.getState().restoreItem(id),
+    permanentlyDelete: (id) => useAltarStore.getState().permanentlyDeleteItem(id),
+  },
 };
 
 /**

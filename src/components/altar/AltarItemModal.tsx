@@ -3,15 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
 import { ImagePlus, Trash2 } from 'lucide-react';
 import { useAltarStore } from '../../store/altarStore';
+import { useUndoStore } from '../../store/undoStore';
 import { categoryLabel } from '../../lib/categories';
-import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
+import { readFileAsDataUrl, ACCEPTED_IMAGE_MIME, generateId, isAcceptedImageFile } from '../../lib/helpers';
 import { ImageTooLargeError, imageSizeLabel, prepareImageDataUrl } from '../../lib/imageLimits';
 import { imageSrc } from '../../lib/images';
 import type { AltarItem, Category } from '../../types';
 import Modal from '../ui/Modal';
 import EmojiPicker from '../ui/EmojiPicker';
 import Button from '../ui/Button';
-import InlineConfirm from '../ui/InlineConfirm';
 import CategorySelect from '../ui/CategorySelect';
 
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
@@ -33,14 +33,14 @@ export function AltarItemModal({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const { addItem, updateItem, deleteItem } = useAltarStore(
-    useShallow((s) => ({ addItem: s.addItem, updateItem: s.updateItem, deleteItem: s.deleteItem })),
+  const { addItem, updateItem, deleteItem, restoreItem } = useAltarStore(
+    useShallow((s) => ({ addItem: s.addItem, updateItem: s.updateItem, deleteItem: s.deleteItem, restoreItem: s.restoreItem })),
   );
+  const pushUndo = useUndoStore((s) => s.push);
   const [editName, setEditName] = useState(item?.name ?? '');
   const [editEmoji, setEditEmoji] = useState(item?.emoji ?? '');
   const [editCategory, setEditCategory] = useState<string | null>(item?.category_id ?? defaultCategory);
   const [editImageData, setEditImageData] = useState<string | null>(item?.image_data ?? null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -98,15 +98,12 @@ export function AltarItemModal({
     onClose();
   };
 
-  // Die Rückfrage sagt, was mitgeht: das Element verschwindet von jedem Altar, auf dem es liegt.
-  const altarsShowingItem = useAltarStore((s) => (item
-    ? Object.values(s.previewPlacements).filter((list) => list.some((p) => p.item_id === item.id)).length
-    : 0));
-
+  // In den Papierkorb, ohne Rückfrage: von jedem Altar verschwunden, kommt es
+  // mit Rückgängig oder aus dem Papierkorb an dieselben Stellen zurück.
   const doDelete = async () => {
     if (!item) return;
-    if (!confirmDelete) { setConfirmDelete(true); return; }
     await deleteItem(item.id);
+    pushUndo({ id: generateId(), description: t('undo.altarItemDeleted'), undo: () => restoreItem(item.id) });
     onClose();
   };
 
@@ -147,26 +144,17 @@ export function AltarItemModal({
             variant="field"
           />
         </div>
-        {item && confirmDelete ? (
-          <InlineConfirm
-            variant="banner"
-            message={altarsShowingItem ? t('altar.deleteElementConfirm', { count: altarsShowingItem }) : t('common.deleteConfirm')}
-            onConfirm={doDelete}
-            onCancel={() => setConfirmDelete(false)}
-          />
-        ) : (
-          <div className="flex items-center justify-between gap-2">
-            {item ? (
-              <Button tone="danger" onClick={doDelete} title={t('common.delete')}>
-                <Trash2 size={12} /> {t('common.delete')}
-              </Button>
-            ) : <span />}
-            <span className="flex items-center gap-2">
-              <Button tone="neutral" onClick={onClose}>{t('common.cancel')}</Button>
-              <Button tone="jade" onClick={save} disabled={!editName.trim()}>{t('common.save')}</Button>
-            </span>
-          </div>
-        )}
+        <div className="flex items-center justify-between gap-2">
+          {item ? (
+            <Button tone="danger" onClick={doDelete} title={t('common.delete')}>
+              <Trash2 size={12} /> {t('common.delete')}
+            </Button>
+          ) : <span />}
+          <span className="flex items-center gap-2">
+            <Button tone="neutral" onClick={onClose}>{t('common.cancel')}</Button>
+            <Button tone="jade" onClick={save} disabled={!editName.trim()}>{t('common.save')}</Button>
+          </span>
+        </div>
     </Modal>
   );
 }

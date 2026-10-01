@@ -218,6 +218,7 @@ export const fromRow = {
       note: str(r.note),
       image_data: r.image_data == null ? undefined : String(r.image_data),
       created_at: str(r.created_at),
+      updated_at: str(r.updated_at),
     };
   },
 

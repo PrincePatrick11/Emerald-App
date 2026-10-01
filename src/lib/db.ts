@@ -2,7 +2,7 @@ import Database from '@tauri-apps/plugin-sql';
 import { invoke } from '@tauri-apps/api/core';
 import { getActiveDbConnectionString, getActiveVaultId } from './vaultManager';
 import {
-  ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, LEXICON_INDEX_DDL, TABLE_DDL,
+  ALTAR_ITEMS_INDEX_DDL, ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, LEXICON_INDEX_DDL, TABLE_DDL,
   TEMPLATES_INDEX_DDL, createSchema, ddlIfNotExists, purgeCategory, seedBuiltins, storedImageName,
 } from './schema';
 import { normalizeSchema } from './normalizeSchema';
@@ -261,6 +261,8 @@ const CLEANUP_TABLES = [
   'languages',
   // Ebenso die Platzierungen eines Altars; was auf ihn zeigte, fegt `sweepDanglingTaskLinks`.
   'altars',
+  // Und die eines Elements.
+  'altar_items',
 ] as const;
 
 /**
@@ -1343,6 +1345,21 @@ export const MIGRATIONS: Migration[] = [
     version: 51,
     name: 'altar_settings',
     up: altarSettingsToJson,
+  },
+  {
+    // Altar-Elemente bekommen einen Papierkorb — bisher war ein gelöschtes
+    // sofort weg, von jedem Altar. Additiv und wiederholbar.
+    version: 52,
+    name: 'altar_items_soft_delete',
+    up: async (db) => {
+      const columns = await columnNames(db, 'altar_items');
+      if (!columns.has('updated_at')) {
+        await db.execute("ALTER TABLE altar_items ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''");
+      }
+      if (!columns.has('deleted_at')) await db.execute('ALTER TABLE altar_items ADD COLUMN deleted_at TEXT');
+      await db.execute("UPDATE altar_items SET updated_at = created_at WHERE updated_at = ''");
+      await createIndexesIfMissing(db, [ALTAR_ITEMS_INDEX_DDL]);
+    },
   },
 ];
 
