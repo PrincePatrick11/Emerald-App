@@ -1,6 +1,6 @@
 # Internationalisation
 
-Emerald supports four languages: English (`en`), German (`de`), Spanish (`es`), and French (`fr`). The language is a **per-vault setting** now (Settings → General → Language, part of `appearance` in the vault's `settings.json` — see [`database.md`](database.md#multi-vault-system) and [`architecture.md`](architecture.md#theming-system)), applied through `settingsStore.loadForVault`/`update`. It is additionally mirrored into `localStorage` (`app-language`) as a boot-time starting point only: `main.tsx` and `index.html`'s boot script read that mirror before any vault is open, so the app doesn't flash English while the vault's own settings are still loading; once a vault has loaded, its `settings.json` is authoritative.
+Emerald supports four languages: English (`en`), German (`de`), Spanish (`es`), and French (`fr`). The language is a **per-vault setting** now (Settings → General → Language, part of `appearance` in the vault's `settings.json` — see [`database.md`](database.md#multi-vault-system) and [`architecture.md`](architecture/appearance.md#theming-system)), applied through `settingsStore.loadForVault`/`update`. It is additionally mirrored into `localStorage` (`app-language`) as a boot-time starting point only: `main.tsx` and `index.html`'s boot script read that mirror before any vault is open, so the app doesn't flash English while the vault's own settings are still loading; once a vault has loaded, its `settings.json` is authoritative.
 
 ## Setup
 

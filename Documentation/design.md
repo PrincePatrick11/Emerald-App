@@ -12,7 +12,7 @@ addition to this file.
 For the *components* (which shared building blocks exist, when to use them) see
 [`components.md`](components.md). For the *architecture* of the theming system
 (CSS custom property tiers, normalisation flow, Tailwind bridge) see
-[`architecture.md`](architecture.md#theming-system).
+[`architecture.md`](architecture/appearance.md#theming-system).
 
 ---
 
@@ -57,7 +57,7 @@ not via a per-site red treatment of its own.
   `package.json`, **and** the font list in `theme.ts` — all three or none.
   `index.html`'s `<head>` otherwise keeps only one deliberately render-blocking `<link>`:
   `public/splash.css`, the startup loading
-  screen's styles (see [Loading Screen and Boot Order](architecture.md#loading-screen-and-boot-order)
+  screen's styles (see [Loading Screen and Boot Order](architecture/shell.md#loading-screen-and-boot-order)
   in `architecture.md`). Its `--splash-bg` / `--splash-gem` / `--splash-text` are hand-kept
   copies of `--shell-bg` / `--accent` / `--text-subtle` from `src/themes/*.css` — change one,
   update the other. `--splash-bg` is copied a second time, as the literal `backgroundColor`
