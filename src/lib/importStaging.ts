@@ -2,8 +2,8 @@
  * Ein Backup-Import, der den Vault nie halb geändert zurücklässt.
  *
  * `doReplace` und `doMerge` schreiben über viele einzelne Anweisungen. Eine
- * Transaktion darum geht nicht: `tauri-plugin-sql` verteilt jede Anweisung auf
- * eine beliebige Verbindung seines Pools (siehe `normalizeSchema.ts`). Brach der
+ * Transaktion darum geht nicht: die SQL-Schicht (`db.rs`) verteilt jede
+ * Anweisung auf eine beliebige Verbindung ihres Pools (siehe `normalizeSchema.ts`). Brach der
  * Import mittendrin ab — eine kaputte Datei, ein Absturz —, war beim Ersetzen
  * der alte Inhalt gelöscht und der neue unvollständig, beim Zusammenführen ein
  * Teil der Datei im Vault und der Rest nicht.
@@ -24,11 +24,11 @@
  * direkt in den Vault — nach einem Abbruch liegen sie unbenutzt dort, bis die
  * Aufräum-Aktion sie findet.
  */
-import Database from '@tauri-apps/plugin-sql';
+import Database from './sqlite';
 import { invoke } from '@tauri-apps/api/core';
 import { resetDbCache } from './db';
 import { TABLES } from './schema';
-import { getActiveImportStagingFile, getActiveVaultId, sqliteConnectionString } from './vaultManager';
+import { getActiveImportStagingFile, getActiveVaultId } from './vaultManager';
 
 /** Name, unter dem die Kopie im Austausch angehängt wird. */
 const STAGING_SCHEMA = 'import_staging';
@@ -83,13 +83,12 @@ export async function importViaStaging(db: Database, fill: (staging: Database) =
   await db.execute(`VACUUM INTO ${sqlString(stagingFile)}`);
 
   try {
-    const staging = await Database.load(sqliteConnectionString(stagingFile));
+    const staging = await Database.load(vaultId, 'importStaging');
     try {
       await fill(staging);
     } finally {
-      // Mit Namen: ohne schließt das Plugin *alle* Pools, auch den des Vaults.
       // Ein Fehler beim Schließen soll den des Imports nicht überdecken.
-      await staging.close(staging.path).catch((err: unknown) => console.warn('[backup] Arbeitskopie nicht geschlossen:', err));
+      await staging.close().catch((err: unknown) => console.warn('[backup] Arbeitskopie nicht geschlossen:', err));
     }
     await swapIn(db, stagingFile);
   } finally {

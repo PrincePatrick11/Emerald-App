@@ -24,6 +24,8 @@ mod images;
 /// Vault directories and the id → path registry every storage command
 /// resolves against.
 mod vault;
+/// The SQLite pools the frontend runs its SQL through, opened by vault id.
+mod db;
 /// Der In-App-Updater: variable Quelle, Pruefung, Installation.
 mod updates;
 
@@ -794,11 +796,11 @@ pub fn run() {
         )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_sql::Builder::new().build())
         // Wird nur aus `updates.rs` benutzt, nie aus dem Frontend — deshalb
         // steht keine `updater:`-Berechtigung in der Capability.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(vault::VaultRegistry::default())
+        .manage(db::Databases::default())
         .manage(updates::PendingUpdate::default())
         .manage(CloseWatch::default())
         .on_window_event(|window, event| {
@@ -812,6 +814,10 @@ pub fn run() {
 
     images::register(builder)
         .invoke_handler(tauri::generate_handler![
+            db::db_load,
+            db::db_close,
+            db::db_execute,
+            db::db_select,
             images::save_image,
             images::copy_image_file,
             images::read_image_file,

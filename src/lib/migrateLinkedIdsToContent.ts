@@ -1,4 +1,4 @@
-import type Database from '@tauri-apps/plugin-sql';
+import type Database from './sqlite';
 import i18n from '../i18n';
 import { categoryLabel, legacyCategoryLabel, legacyWikiCategoryEmoji } from './categories';
 import { DEFAULT_ENTRY_EMOJI } from './modules';

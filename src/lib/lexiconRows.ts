@@ -1,4 +1,4 @@
-import type Database from '@tauri-apps/plugin-sql';
+import type Database from './sqlite';
 import { fromRow, type DbRow } from './row';
 import { alphabetToJson } from './lexicon';
 import type { Language, LexiconEntry } from '../types';

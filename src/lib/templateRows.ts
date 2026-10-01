@@ -1,4 +1,4 @@
-import type Database from '@tauri-apps/plugin-sql';
+import type Database from './sqlite';
 import type { TFunction } from 'i18next';
 import { nowIso } from './helpers';
 import { fromRow, type DbRow } from './row';

@@ -310,35 +310,12 @@ export async function getActiveVaultPath(): Promise<string> {
 }
 
 /**
- * The active vault's database file, as an absolute path.
- *
- * `tauri-plugin-sql` joins its connection string onto the app directory with
- * `PathBuf::push`, which an absolute path replaces outright — so a full path
- * here lands exactly where it says (`path_mapper` in the plugin's
- * `wrapper.rs`).
+ * The active vault's database file, as an absolute path — for SQL that names a
+ * file (`VACUUM INTO`, `ATTACH`). Opening the database goes by vault id
+ * (`Database.load`).
  */
 export async function getActiveDbFile(): Promise<string> {
   return joinPath(await getActiveVaultPath(), DB_FILE);
-}
-
-/**
- * Derselbe Pfad, aber als `sqlite:`-Connection-String.
- *
- * `tauri-plugin-sql` reicht den String an sqlx weiter, und sqlx liest ihn als
- * URL: `?` beginnt die Query, `#` das Fragment, und `%XY` wird dekodiert
- * (`sqlx-sqlite/src/options/parse.rs`: „% decode to allow for `?` or `#` in
- * the filename"). Ein Ordner namens `50%` wuerde sonst als `P` geoeffnet.
- * Kodiert wird deshalb hier, dekodiert von sqlx.
- */
-export async function getActiveDbConnectionString(): Promise<string> {
-  return sqliteConnectionString(await getActiveDbFile());
-}
-
-/** Ein beliebiger Datenbankpfad als `sqlite:`-Connection-String, kodiert wie oben. */
-export function sqliteConnectionString(file: string): string {
-  // `%` zuerst, sonst kodiert der naechste Schritt die eigene Kodierung mit.
-  const encoded = file.replace(/%/g, '%25').replace(/\?/g, '%3F').replace(/#/g, '%23');
-  return `sqlite:${encoded}`;
 }
 
 /** Die Arbeitskopie eines Backup-Imports im aktiven Vault (`importStaging.ts`). */

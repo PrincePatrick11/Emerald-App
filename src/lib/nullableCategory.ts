@@ -38,7 +38,7 @@
  * für `altar_items` und die Platzierungen. Die Marke sagt „ab hier nur noch
  * aufräumen".
  */
-import type Database from '@tauri-apps/plugin-sql';
+import type Database from './sqlite';
 import i18n, { savedAppLanguage } from '../i18n';
 // INDEX_DDL_V38, nicht INDEX_DDL: in der Kette fehlen hier noch die Tabellen
 // späterer Migrationen (`block_definitions` kommt mit v40).

@@ -1,4 +1,4 @@
-import type Database from '@tauri-apps/plugin-sql';
+import type Database from './sqlite';
 import { fromRow, type DbRow } from './row';
 import { definitionToRow, type BlockDefinition } from './blocks/definitions';
 

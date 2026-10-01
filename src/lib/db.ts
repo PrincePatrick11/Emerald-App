@@ -1,6 +1,6 @@
-import Database from '@tauri-apps/plugin-sql';
+import Database from './sqlite';
 import { invoke } from '@tauri-apps/api/core';
-import { getActiveDbConnectionString, getActiveVaultId } from './vaultManager';
+import { getActiveVaultId } from './vaultManager';
 import {
   ALTAR_ITEMS_INDEX_DDL, ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, LEXICON_INDEX_DDL, TABLE_DDL,
   TEMPLATES_INDEX_DDL, createSchema, ddlIfNotExists, purgeCategory, seedBuiltins, storedImageName,
@@ -26,7 +26,7 @@ import i18n from '../i18n';
 import { LEGACY_UNTITLED_TITLES } from './entryTitle';
 import { useSettingsStore } from '../store/settingsStore';
 
-// Per-vault DB cache: SQLite identifier → Database instance
+// Per-vault DB cache: vault id → Database instance
 const _dbCache = new Map<string, Database>();
 // Serialises the first-load for each vault to avoid duplicate runMigrations calls
 const _initPromises = new Map<string, Promise<Database>>();
@@ -35,7 +35,7 @@ const _initPromises = new Map<string, Promise<Database>>();
  * Close and drop all cached connections. Call before switching vaults.
  *
  * Dropping the JavaScript reference is not enough: the connection pool lives in
- * `tauri-plugin-sql`, and an open pool keeps the file locked. On Windows that
+ * Rust (`db.rs`), and an open pool keeps the file locked. On Windows that
  * means the vault's folder cannot be moved, relocated, or deleted for the rest
  * of the session — which is exactly what the vault modal's "delete files"
  * checkbox tries to do.
@@ -85,28 +85,27 @@ export async function withDbClosed<T>(fn: () => Promise<T>): Promise<T> {
 export async function getDb(): Promise<Database> {
   if (_blocked) throw new Error('DB_CLOSED');
   const vaultId = await getActiveVaultId();
-  const identifier = await getActiveDbConnectionString();
 
-  if (_dbCache.has(identifier)) return _dbCache.get(identifier)!;
-  if (_initPromises.has(identifier)) return _initPromises.get(identifier)!;
+  if (_dbCache.has(vaultId)) return _dbCache.get(vaultId)!;
+  if (_initPromises.has(vaultId)) return _initPromises.get(vaultId)!;
 
   const promise = (async () => {
     // SQLite does not create a directory for its own file, so the vault folder
     // has to exist before the load.
     await invoke('ensure_vault_dirs', { vaultId });
-    const db = await Database.load(identifier);
+    const db = await Database.load(vaultId);
     await runMigrations(db);
     // Von den Sicherungen vor einem Umbau (`backupDatabaseFile`) bleibt nur die
     // jüngste. Scheitern darf das Öffnen daran nicht.
     await invoke('prune_migration_backups', { vaultId })
       .catch((e: unknown) => console.warn('[db] migration backups:', e));
     await runPeriodicCleanup(db, trashRetentionFor(vaultId));
-    _dbCache.set(identifier, db);
-    _initPromises.delete(identifier);
+    _dbCache.set(vaultId, db);
+    _initPromises.delete(vaultId);
     return db;
   })();
 
-  _initPromises.set(identifier, promise);
+  _initPromises.set(vaultId, promise);
   return promise;
 }
 

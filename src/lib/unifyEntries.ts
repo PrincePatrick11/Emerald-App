@@ -27,7 +27,7 @@
  * Zeile war eine Kopie desselben Eintrags; sie bleibt in der Sicherung
  * `.pre-v49.bak` und wird im Log genannt.
  */
-import type Database from '@tauri-apps/plugin-sql';
+import type Database from './sqlite';
 import { ENTRIES_INDEX_DDL, TABLE_DDL, ddlIfNotExists } from './schema';
 import { assertForeignKeysIntact, backupDatabaseFile, createIndexesIfMissing, tableExists } from './dbRebuild';
 import { convertLegacySigils } from './migrateLegacySigils';

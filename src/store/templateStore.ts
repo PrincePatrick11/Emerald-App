@@ -16,7 +16,7 @@
  * betrifft immer mehrere Zeilen.
  */
 import { create } from 'zustand';
-import type Database from '@tauri-apps/plugin-sql';
+import type Database from '../lib/sqlite';
 import { getDb } from '../lib/db';
 import { generateId, nowIso } from '../lib/helpers';
 import { needsWrite, stampFor, type WriteOptions } from '../lib/stamp';

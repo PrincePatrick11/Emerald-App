@@ -22,7 +22,7 @@
  * Import-Regel wie `dbBackup`: liest und schreibt die Stores von außen; keiner
  * von ihnen importiert zurück.
  */
-import type Database from '@tauri-apps/plugin-sql';
+import type Database from './sqlite';
 import { getDb, nextEntryNumber } from './db';
 import { nowIso } from './helpers';
 import { retypeInternalLinks } from './internalLinkHtml';

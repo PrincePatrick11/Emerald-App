@@ -17,7 +17,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getActiveVaultId, getActiveVaultIdSync } from './vaultManager';
 import { isWindows } from './platform';
 import { collectUsedImageFilenames, storedImageName } from './schema';
-import type Database from '@tauri-apps/plugin-sql';
+import type Database from './sqlite';
 
 // Das Namensformat ist eine Eigenschaft der Spalten, nicht der Oberflaeche —
 // deshalb steht es in `schema.ts`. Hier nur weitergereicht, damit die UI eine

@@ -14,7 +14,7 @@
  * da und eine geschriebene Liste trägt bekannte IDs — ein zweiter Lauf lässt
  * beides stehen.
  */
-import type Database from '@tauri-apps/plugin-sql';
+import type Database from './sqlite';
 import { backupDatabaseFile, columnNames, dropColumnsIfPresent } from './dbRebuild';
 import { generateId } from './helpers';
 import { TAGGED_TABLES, tagNameResolver, type LegacyTagRow } from './tagRefs';

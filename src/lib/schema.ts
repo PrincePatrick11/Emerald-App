@@ -15,7 +15,7 @@
  * Migration eine Tabelle neu, die v33, v38 oder v39 ebenfalls anfassen, bekommen
  * die ihren alten Stand eingefroren (siehe `schemaV37.ts` und `schemaV48.ts`).
  */
-import type Database from '@tauri-apps/plugin-sql';
+import type Database from './sqlite';
 
 /**
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim

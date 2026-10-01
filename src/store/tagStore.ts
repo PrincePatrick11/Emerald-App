@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { create } from 'zustand';
-import type Database from '@tauri-apps/plugin-sql';
+import type Database from '../lib/sqlite';
 import { registerTagLookup } from '../lib/templateTags';
 import { AS_A_CONSEQUENCE } from '../lib/stamp';
 import { getDb } from '../lib/db';

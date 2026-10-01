@@ -1,4 +1,4 @@
-import type Database from '@tauri-apps/plugin-sql';
+import type Database from './sqlite';
 import { isStoredImage, saveImage } from './images';
 import { internalLinkChipHtml } from './internalLinkHtml';
 import { isImageIcon } from './helpers';

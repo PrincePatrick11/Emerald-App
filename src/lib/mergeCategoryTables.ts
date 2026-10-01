@@ -35,7 +35,7 @@
  * aus dem ebenfalls fertigen `task_links`. Ist die Map schon weg (Abbruch
  * ganz am Ende), verrät der Foreign Key von `wiki_articles` den Stand.
  */
-import type Database from '@tauri-apps/plugin-sql';
+import type Database from './sqlite';
 import i18n from '../i18n';
 // INDEX_DDL_V38, nicht INDEX_DDL: in der Kette fehlen hier noch die Tabellen späterer Migrationen.
 import { TABLE_DDL, INDEX_DDL_V38, FALLBACK_CATEGORY_ID, insertCategoryRows } from './schema';

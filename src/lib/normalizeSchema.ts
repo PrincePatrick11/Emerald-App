@@ -3,8 +3,8 @@
  * v37 bringt (`schemaV37.ts`; bis v37 war das dasselbe wie `schema.ts`).
  *
  * Warum das nicht die übliche 12-Schritt-Prozedur aus der SQLite-Doku ist:
- * `tauri-plugin-sql` fährt einen sqlx-Connection-Pool (`Pool::connect`,
- * Default 10 Verbindungen). `PRAGMA foreign_keys = OFF` und `BEGIN` treffen
+ * Die SQL-Schicht (`db.rs`) fährt einen sqlx-Connection-Pool (Default 10
+ * Verbindungen). `PRAGMA foreign_keys = OFF` und `BEGIN` treffen
  * jeweils nur *eine* Verbindung, und welche die nächste Anweisung bedient, ist
  * nicht steuerbar. Beides ist hier also nicht verlässlich verfügbar.
  *
@@ -33,7 +33,7 @@
  * gegen die bereits umbenannte Spalte und der Vault ließe sich nie wieder
  * öffnen.
  */
-import type Database from '@tauri-apps/plugin-sql';
+import type Database from './sqlite';
 import { V37_TABLES, V37_TABLE_DDL, V37_INDEX_DDL } from './schemaV37';
 import {
   assertForeignKeysIntact,

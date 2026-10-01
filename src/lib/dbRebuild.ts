@@ -7,7 +7,7 @@
  * `PRAGMA foreign_keys = OFF` auskommen muss, steht im Kopf von
  * `normalizeSchema.ts`.
  */
-import type Database from '@tauri-apps/plugin-sql';
+import type Database from './sqlite';
 import { getActiveDbFile } from './vaultManager';
 
 export async function tableExists(db: Database, name: string): Promise<boolean> {

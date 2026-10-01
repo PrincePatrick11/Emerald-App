@@ -15,7 +15,7 @@
  * Import-Regel wie `blockDefinitionStore`: keine Inhalts-Stores.
  */
 import { create } from 'zustand';
-import type Database from '@tauri-apps/plugin-sql';
+import type Database from '../lib/sqlite';
 import { getDb } from '../lib/db';
 import { generateId, nowIso } from '../lib/helpers';
 import { needsWrite, stampFor } from '../lib/stamp';

@@ -27,7 +27,6 @@ tauri = { version = "2", features = [] }
 url = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
-tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -36,6 +35,18 @@ sha2 = "0.10"
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "1", features = ["rt", "time", "sync"] }
+# The SQL layer the frontend talks to (`db.rs`). sqlx is the driver
+# `tauri-plugin-sql` used before; libsqlite3-sys is named only for its feature:
+# feature unification swaps the bundled SQLite under sqlx for SQLCipher, with
+# OpenSSL built from source. On Windows that build needs a native Perl
+# (Strawberry Perl) — see CONTRIBUTING.md.
+sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio", "json"] }
+libsqlite3-sys = { version = "0.30", features = ["bundled-sqlcipher-vendored-openssl"] }
+indexmap = { version = "2", features = ["serde"] }
+
+[dev-dependencies]
+# `#[tokio::test]` for the async tests in `db.rs`.
+tokio = { version = "1", features = ["macros", "rt"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"
