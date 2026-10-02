@@ -4,27 +4,29 @@
 
 Images are content-addressed, stored outside SQLite, and belong to one vault.
 
-- **Location**: `{vaultDir}/images/{sha256}.{ext}` — see [Vault Layout](#vault-layout).
+- **Location**: `{vaultDir}/images/{hash}.{ext}` — see [Vault Layout](#vault-layout). The hash is a keyed hash of the image bytes, and the file is sealed ([`encryption.md`](encryption.md#sealed-files)); the name is 64 hex digits either way.
 - **What the database stores**: the bare filename, no directory or drive letter. That is what makes a vault folder copyable to another machine.
-- **Insert path**: `save_image` (data-URL) and `copy_image_file` (a file on disk) decode, hash, write into the active vault's folder if absent, and return the filename. Both are reached through `src/lib/images.ts`, never invoked directly.
-- **Display path**: the `emerald-img` URI scheme. `imageSrc(filename)` builds `emerald-img://localhost/{vaultId}/{filename}` — on Windows `http://emerald-img.localhost/{vaultId}/{filename}`, since WebView2 serves custom schemes over `http` — and the webview fetches the bytes itself: no IPC round trip, no base64, no in-memory cache. See [`security.md`](../security.md#the-emerald-img-uri-scheme).
-- **Caching**: the handler answers with `Cache-Control: max-age=31536000, immutable`. The filename *is* the content hash, so a URL can never return anything else.
+- **Insert path**: `save_image` (data-URL) and `copy_image_file` (a file on disk) decode, hash, seal, write into the active vault's folder if absent, and return the filename. Both are reached through `src/lib/images.ts`, never invoked directly.
+- **Display path**: the `emerald-img` URI scheme. `imageSrc(filename)` builds `emerald-img://localhost/{vaultId}/{filename}` — on Windows `http://emerald-img.localhost/{vaultId}/{filename}`, since WebView2 serves custom schemes over `http` — and the webview fetches the bytes itself: no IPC round trip, no base64, no in-memory cache. The handler opens the sealed file before answering. See [`security.md`](../security.md#the-emerald-img-uri-scheme).
+- **Caching**: the handler answers with `Cache-Control: no-store`, so decrypted images do not land in the WebView's disk cache, in the clear and outside the vault. The filename is the content's keyed hash, so a name never returns anything else — the cache would be safe, but not private.
 - **Canvas access**: the altar export and thumbnail read a canvas back with `toBlob()`, which fails once anything foreign is drawn on it — and custom-scheme images are foreign. That path uses `canvasImageSrc()`, which fetches the bytes as a data-URL (one IPC round trip per image, on export and capture only). The handler's `Access-Control-Allow-Origin: *` is not relied on: wry registers the scheme as secure but not CORS-enabled, whether WebKitGTK and WKWebView honour the header for it is unverified, and a failure would be a silently empty export.
 - **Deduplication**: per vault. The same image in two vaults is two files — isolation is worth more than the bytes.
 - **Cleanup**: Settings → Storage → *Unused images*, on demand. `findUnusedImages()` diffs `list_image_files` (the vault's own folder) against `collectUsedImageFilenames(db)`. Deliberately not automatic: an image that so far exists only in an unsaved editor buffer would count as unused. The check is safe because folder and used-set come from the same vault.
-- **Legacy pool**: `{appDataDir}/images/` holds images written before the per-vault layout. Migration v35 copies each referenced file into its vault, and the protocol handler falls back to the pool for anything it missed. Nothing writes there, and the cleanup never proposes deleting from it — vaults not opened since the migration still read from it.
+- **Legacy pool**: `{appDataDir}/images/` holds images written before the per-vault layout. Migration v35 copies each referenced file into its vault — sealed, under the old SHA-256 name, since the content refers to that name — and the protocol handler falls back to the pool for anything it missed. Nothing writes there, and the cleanup never proposes deleting from it — vaults not opened since the migration still read from it. Such an image keeps its SHA-256 name until the next password change re-encrypts the vault.
 
 ## Vault Layout
 
 A vault is a directory holding:
 
-- `emerald.db`
-- `images/`
+- `emerald.db` — the SQLCipher database
+- `vault.key` — the vault key, wrapped by the password and by the recovery key, see [`encryption.md`](encryption.md#keys)
+- `images/` — sealed image files
 - `backup/`
-- `settings.json` — the vault's settings, see [Vault Settings](#vault-settings)
-- `drafts.json` — only while a block or template page holds unsaved edits
+- `settings.json` — the vault's settings, see [Vault Settings](#vault-settings); the only file in the folder that is not encrypted
+- `drafts.json` — only while a block or template page holds unsaved edits; sealed
 - `emerald.db.pre-vNN.bak` — the full copy a rebuilding migration takes first; `prune_migration_backups` keeps only the newest once the vault has opened
 - `emerald.db.import` — transient: a backup import `VACUUM INTO`s a working copy here while it fills and checks it, then removes it whether the import succeeds or fails. A copy left by a crash is cleared before the next import (`discard_import_staging`, see [DB Backup / Restore](../database.md#db-backup--restore-emeralddb)).
+- `vault.key.pending`, `emerald.db.reencrypting`, `images.reencrypting/`, `drafts.json.reencrypting`, `vault.reencrypting` — transient: a re-encryption builds its copy here and swaps it in; `vault_key_status` finishes or discards what a crash left, see [Re-encrypting a vault](encryption.md#re-encrypting-a-vault).
 
 The user picks where the vault lives — Documents, a synced folder, another drive.
 
@@ -47,7 +49,7 @@ A fresh installation starts with an **empty** vault list. `readVaultsFile()` syn
 - **`resolve_allowed_roots()`** deliberately leaves the registered directories out — see [`security.md`](../security.md#vault-directories-as-a-trust-boundary). Vault storage resolves by id and never consults those roots, so a vault outside `~` works in full; only writing a *document* into such a folder is out of reach, and since `document_dir()` is itself an allowed root, that only affects a vault placed outside the default location.
 - **Creating vs. opening**: `create_vault_dirs` builds the tree, once, from `addVault`. `ensure_vault_dirs`, called on every `getDb()`, deliberately does *not* create — SQLite would happily put a fresh empty database into a recreated folder, so a vault on an unplugged drive would come back empty instead of as an error.
 - **Not there vs. not allowed**: `directory_state()` separates the two, because `is_dir()` collapses them. On macOS a folder under `~/Documents`, `~/Desktop` or iCloud is readable only after the user grants access (TCC), and since the app is not sandboxed, picking it in a dialog grants nothing. `probe_vault_dir` reports that as `denied`, and the vault modal says "no access" ("allow it") rather than "not found" ("look elsewhere").
-- **The `.db` path**: `getDb()` loads `sqlite:{vaultDir}/emerald.db`. `tauri-plugin-sql` joins its connection string onto the app directory with `PathBuf::push`, and an absolute path replaces the base outright.
+- **The `.db` path**: `getDb()` opens the database by vault id (`Database.load(vaultId)`); Rust resolves `{vaultDir}/emerald.db` through the registry. The webview never names the file. `getActiveDbFile()` exists only for SQL that has to spell a path (`VACUUM INTO`, `ATTACH`).
 - **Where a new vault defaults to**: `new_vault_base_dir` returns `{documentDir}/Emerald Vaults` (or `{appDataDir}/vaults` without a documents folder), and the vault modal — like the `add-vault` backup import, via `newVaultTarget`/`probeNewVaultTarget` — joins the vault's name onto it. Deliberately not `default_dir_for`/`default_vault_dir`: that is the migration target and must keep pointing at `{appDataDir}/vaults/{id}`, an id-named folder that can never collide.
 - **Folder names**: `vaultFolderName()` strips separators, `..` and the Windows-reserved characters, and suffixes reserved device names. The device check runs on the stem before the first dot (`CON.txt` is caught like `CON`) and includes `CONIN$`/`CONOUT$`. The result is capped at 200 UTF-8 bytes without splitting a character: ext4 and APFS limit a path component in bytes, NTFS in UTF-16 units, and an emoji name crosses the byte limit long before the character limit.
 - **Opening and relocating go through the `.db` file, not the folder.** A folder dialog lists no files, so nothing shows whether a folder holds a vault; a dialog filtered to `.db` does. The vault's directory is the file's parent. Choosing a file inside a TCC-protected folder does not grant access to *list* it, so the same `denied` case applies.

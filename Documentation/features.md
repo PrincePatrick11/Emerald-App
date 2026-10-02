@@ -379,21 +379,45 @@ Tags, categories, your own blocks, templates and the Lexicon's languages also go
 
 ## Vaults
 
-A vault is a **folder** you choose, holding its own database and its own images — see [Vault Layout](architecture/storage.md#vault-layout) for the on-disk layout. Because nothing inside it refers to a location, a vault folder can be copied to another machine and opened there. A vault can carry its own icon — any emoji, shown on its card and on the Vault rail button while it is active; without one, both show the plain vault glyph.
+A vault is a **folder** you choose, holding its own encrypted database and its own images — see [Vault Layout](architecture/storage.md#vault-layout) for the on-disk layout and [Vault Encryption](#vault-encryption) for the password. Because nothing inside it refers to a location, a vault folder can be copied to another machine and opened there. A vault can carry its own icon — any emoji, shown on its card and on the Vault rail button while it is active; without one, both show the plain vault glyph.
 
 **First start.** A new installation has no vault. Emerald opens straight into the vault modal below — with no way to close it — until you create or open one. An installation from before multi-vault support has its existing database adopted as a vault named "Emerald".
 
 Vault management lives in its own modal, opened from the Vault icon in the left rail (above Settings):
 
 - Each vault is a card with its name and folder. Clicking a card switches to that vault; the active vault's card is disabled and highlighted.
-- **New Vault** creates an empty one. Give it a name and optionally an icon; the row shows live where it will land — by default `Documents/Emerald Vaults/{name}`, with a folder picker to choose elsewhere and a reset button. The target folder has to be empty: sharing it with unrelated files would make deleting them ambiguous later.
+- **New Vault** creates an empty one. Give it a name and optionally an icon; the row shows live where it will land — by default `Documents/Emerald Vaults/{name}`, with a folder picker to choose elsewhere and a reset button. The target folder has to be empty: sharing it with unrelated files would make deleting them ambiguous later. Opening the new vault asks for its password.
 - **Open vault** adds a vault that already exists on disk: pick its `emerald.db` file (not the folder — a folder dialog can't show whether one is there), and it joins the list under its folder's name. This is how you take over a vault from another machine or re-add one you removed.
-- **Edit** and **Delete** are inline states on the card. Edit changes name and icon together. Delete asks for confirmation and offers **"Delete the files as well"** (off by default, showing the folder). It removes the vault's own files — database, its journal, images, and an empty `backup/` — but leaves anything else (an exported backup, a stray system file) and with it the folder; the modal then says so, making clear the database is gone either way. A folder that stayed can't host a *new* vault until it is emptied. Any vault can be deleted, including the active one (Emerald switches to another) and the last one (back to vault setup).
+- **Edit** and **Delete** are inline states on the card. Edit changes name and icon together. Delete asks for confirmation and offers **"Delete the files as well"** (off by default, showing the folder). It removes the vault's own files — database, its journal, images, the key file, and an empty `backup/` — but leaves anything else (an exported backup, a stray system file) and with it the folder; the modal then says so, making clear the database is gone either way. A folder that stayed can't host a *new* vault until it is emptied. Any vault can be deleted, including the active one (Emerald switches to another) and the last one (back to vault setup).
 - A vault whose folder moved or is on a disconnected drive is marked **Folder not found** and can't be switched to; a folder button lets you point it at the new location (again via its `emerald.db`). Emerald deliberately doesn't recreate a missing folder — SQLite would put a fresh, empty database in it, and the vault would come back looking empty instead of telling you something is wrong.
 - A vault Emerald is not *allowed* to read is marked **No access** and gets no relocate button — the folder is where you left it. On macOS this is what `~/Documents`, `~/Desktop` and iCloud folders look like until you grant access in System Settings › Privacy & Security; picking the `.db` file in the open dialog does not grant it.
 - A vault in iCloud Drive, Dropbox or OneDrive works, but SQLite in a synchronised folder can be damaged if the sync client touches the file mid-write.
 
 New vaults are not switched to automatically — except during first-start setup, where the first one becomes active. Importing a `.emeralddb` backup in Add Vault mode also creates a vault, filled from the backup — see [Vault Backup](#vault-backup-emeralddb).
+
+## Vault Encryption
+
+Every vault is encrypted: entries, images, drafts and backups are unreadable without the vault's password. Someone who gets hold of the vault folder — a lost laptop, a cloud folder, a copied backup drive — sees nothing of your practice. Settings (theme, fonts, limits) are the one thing left readable; they hold no content.
+
+**A new vault** asks for a password (at least eight characters, entered twice) before it opens, and then shows its **recovery key**. The recovery key is the only way back in if the password is forgotten. It is shown once; write it down or keep it in a password manager — not inside the vault itself — and tick the box that says it is stored before continuing.
+
+**An existing vault from before encryption** is encrypted the first time it opens: Emerald asks for a password, builds an encrypted copy, checks it, and only then replaces the original. A vault is never opened unencrypted. Depending on its size this takes a moment, and an interruption — a crash, a power cut — leaves the vault usable and finishes or discards the work on the next start. Old plain backups inside the vault's `backup/` folder are encrypted along with it; the original files are deleted.
+
+**Unlocking.** Opening or switching to a vault asks for its password. Leaving a vault locks it. If you forgot the password, **Forgot your password?** takes the recovery key and a new password, and gives you a new recovery key; the old one stops working.
+
+**Remember on this device** (a switch in the password dialog and in Settings → Security) keeps the vault's key in the operating system's keychain, so the vault opens without a password on this computer. The files in the vault folder stay encrypted either way. The switch is missing where the system has no keychain.
+
+**Settings → Security** covers three things for the open vault:
+
+- **Remember on this device** — on or off.
+- **Lock now** — closes the vault and asks for the password again, even if it is remembered. While the password is asked, no content stays on screen.
+- **Change password** — enter the current password and a new one. The vault is re-encrypted under a new key and you get a new recovery key. Open tabs close, and the window stays open until the new recovery key is confirmed. Backups made earlier still open with the password they were made with.
+
+**What encryption does not do.**
+
+- While a vault is unlocked, its content is in the computer's memory. Encryption protects a vault at rest, not a running session.
+- Files that already left the vault stay as they are: backups exported before encryption and kept elsewhere, Markdown, PDF and `.emerald` exports, and old versions kept by a cloud service. Deleted files can sometimes be recovered from an SSD — only an encrypted disk (BitLocker, FileVault) closes that gap.
+- The password cannot be recovered. Without the password and the recovery key, the vault is gone.
 
 ## Export and Import
 
@@ -464,13 +488,15 @@ The whole vault can be backed up and restored as one self-contained file (`.emer
 - Optional from/to dates restrict entries to those created in that window (tags, categories, blocks, templates, languages and settings are not date-filtered).
 - Trashed items are left out unless **Include deleted** is ticked — tags included, since trashed entries carry their ids.
 - Images referenced by exported entries are embedded.
+- A backup is **encrypted**. It opens with the password the vault has now — also on another computer, and also after the password is changed later: a backup is tied to the password it was made with, not to the current one.
 - The save dialog opens in the vault's own **`backup/` folder** (recreated if it went missing), so backups travel with the vault folder — deleting the vault's files leaves a non-empty `backup/` standing. Any other location can be picked; for a vault outside the allowed storage locations (see [`security.md`](security.md)) the dialog just suggests a filename. Cancelling the dialog reports nothing.
 
 **Import.**
 
+- Choosing a backup first opens it. If it belongs to a vault that is unlocked right now, that is automatic. Otherwise Emerald asks for the password the backup was made with, or its recovery key from that time, and asks again after a wrong answer. Backups from before encryption are plain files and open without a question.
 - A preview line counts the file's contents per type (templates include an older file's routines, which convert into templates). The same chip row picks what to apply.
 - Three modes, from least to most invasive: **Add Vault** (into a new vault, then switch to it — the default, since it can't touch existing data), **Merge** (imported items get new ids, so nothing existing is overwritten), and **Replace** (overwrite the selected content in the current vault, with a warning).
-- Add Vault asks for the new vault's name **and folder**, with the same folder row as creating a vault (default `Documents/Emerald Vaults/{name}`). The folder is checked before anything is touched: it must be empty or not exist yet, must not hold a vault, and must be readable.
+- Add Vault asks for the new vault's name **and folder**, with the same folder row as creating a vault (default `Documents/Emerald Vaults/{name}`). The folder is checked before anything is touched: it must be empty or not exist yet, must not hold a vault, and must be readable. The new vault then asks for its own password; cancelling that cancels the import and removes the empty vault.
 - A failed import — a corrupt file, a crash partway — leaves the vault exactly as it was: every mode fills a hidden copy of the database and swaps it in only once the import succeeded.
 - If the file carries settings, Add Vault and Replace apply them; Merge lists them as checkboxes (appearance, trash, sidebar, emoji, images, tag rule, templates) so only the ticked groups come in.
 
@@ -506,11 +532,12 @@ Right-click any entry in the left sidebar or in any list view (List, Cards, Card
 
 ## Settings
 
-Settings are **per vault** — stored in the vault's own `settings.json`. Switching vaults switches the whole configuration, and a vault folder copied to another machine keeps its settings; a new vault starts with the defaults. The window has seven pages:
+Settings are **per vault** — stored in the vault's own `settings.json`. Switching vaults switches the whole configuration, and a vault folder copied to another machine keeps its settings; a new vault starts with the defaults. The window has eight pages:
 
 - **General** — language, theme, the two fonts, interface size and editor text size (see [Language](#language), [Typography](#typography), [Sizing](#sizing), [Theming](#theming)).
 - **Sidebar** — which list the left entry list shows (all items together, or one module's own), and how many entries it lists before "Show more".
 - **Entries** — the emoji picker's default set, size limits for inserted images, whether new tags may appear on the spot (typed, from a template, from an import), whether a new entry starts with its default template, **Automatic formatting** (Markdown shortcuts such as `# ` or `**bold**`; typography such as curly quotes, dashes, arrows and fractions; auto-links for typed or pasted addresses — each its own switch, applying to editors opened afterwards), and whether journal entries show their **moon phase** (see [Journal](#journal)).
+- **Security** — remember on this device, lock now, change password (see [Vault Encryption](#vault-encryption)).
 - **Backup** — see [Vault Backup](#vault-backup-emeralddb).
 - **Storage** — how long the Trash keeps deleted items, and the unused-images cleanup (see [Image Storage and Cleanup](#image-storage-and-cleanup)).
 - **Updates** — see [Updates](#updates). The one page that is *not* per vault: the update source and the check on start belong to the installation (see [In-App Updates](security.md#in-app-updates)).

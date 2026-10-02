@@ -68,7 +68,7 @@ The earliest step is `adopt_previous_identifier_dirs` (see [Adopting a previous 
 The loading screen's markup (`#splash` in `index.html`) and styles (`public/splash.css`, linked from `<head>`) live outside the React tree on purpose: until the bundle has loaded and `main.tsx` has run the window would be blank, and a render-blocking `<link>` plus inline markup is the only way to show something in the first frame. `src/lib/splash.ts` owns everything after that:
 
 - **`initSplash()`** runs at the top level of `main.tsx`, while `#splash` is still in the DOM. It clones `#splash` for `showSplash()` and arms a 10 s fallback timer that calls `hideSplash()` regardless.
-- **`hideSplash()`** is called from `AppShell`'s initial-load effect once the vault's data has loaded (or vault setup is showing) — success or failure, so a failed load still uncovers a usable screen. It keeps the screen up at least 900 ms so a fast load doesn't just flash it, fades it out, then removes it. Idempotent, since both the effect and the fallback timer call it.
+- **`hideSplash()`** is called from `AppShell`'s initial-load effect once the vault's data has loaded (or vault setup is showing) — success or failure, so a failed load still uncovers a usable screen. `VaultKeyDialog` calls it on mount as well: the password question comes before the load, and the loading screen would otherwise cover it until the fallback timer fires. It keeps the screen up at least 900 ms so a fast load doesn't just flash it, fades it out, then removes it. Idempotent, since both the effect and the fallback timer call it.
 - **`showSplash()`** shows a fresh clone as a preview, dismissed by click or Escape — the View menu's **Show Loading Screen** (`show-splash`).
 
 The initial-load effect loads the active vault's settings (`loadForVault`) *before* `reloadAllStores()` — the trash purge needs the retention setting and migration v39 the language — and `AppShell` renders its content only after that (`bootSettled`), so nothing calls `getDb()` on a vault whose settings haven't loaded (a restored tab pointing straight at Trash, for one).
@@ -95,7 +95,7 @@ frontend save() dialog → user picks destination path
 src-tauri/src/lib.rs:export_pdf
     ↓  pdf_export::export_pdf(&app, html, path, None).await
 src-tauri/src/pdf_export/{windows,macos,linux}.rs
-    ↓  write HTML to a unique temp file (file:// URL)
+    ↓  write HTML to a unique temp file (file:// URL; `TempHtml` in `pdf_export/mod.rs`)
     ↓  build a hidden WebviewWindow pointing at that file
     ↓  wait for PageLoadEvent::Finished via tokio::sync::oneshot
     ↓  with_webview(...) → call platform's native PDF API
@@ -119,7 +119,7 @@ src-tauri/src/lib.rs:export_pdf
     ↓   custom print media size, macOS/Linux currently ignore it — see below)
 ```
 
-All three platforms share that shape, with a 30 s page-load and a 120 s print timeout and cleanup in a guard; they differ only in the native API and in whether `page_size` is honoured.
+All three platforms share that shape, with a 30 s page-load and a 120 s print timeout and cleanup in a guard. The temp file holds the entry in plain text outside the vault, so `TempHtml` owns it: readable by its user only on Unix, never logged by path, deleted when dropped however the export ends, and `sweep_leftovers` removes `emerald-export-*.html` older than an hour at startup (see [`encryption.md`](encryption.md#leftovers-outside-the-vault)). The platforms differ only in the native API and in whether `page_size` is honoured.
 
 ### Per-platform implementations
 

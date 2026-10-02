@@ -99,7 +99,7 @@ Migration 1 still creates `custom_properties` and migration 11 still alters it �
 
 ## Foreign Keys
 
-Foreign keys are **enforced on every connection**: `tauri-plugin-sql` runs an sqlx pool, and sqlx sets `foreign_keys = ON` as a default pragma on each connection it opens. No application code turns them on.
+Foreign keys are **enforced on every connection**: the SQL layer (`db.rs`) runs an sqlx pool, and sqlx sets `foreign_keys = ON` as a default pragma on each connection it opens. No application code turns them on.
 
 Two consequences shape how this schema is changed:
 
@@ -419,28 +419,28 @@ The entry's state comes from the charge block (`sigilState`). Charged and before
 
 ## Image Storage
 
-Handled natively in `src-tauri/src/images.rs`. Images live in `{vaultDir}/images/` and are named after the SHA-256 of their own bytes, so the same image is stored once per vault however many entries reference it.
+Handled natively in `src-tauri/src/images.rs`. Images live in `{vaultDir}/images/`, sealed, and are named after a keyed hash of their own bytes (HMAC under a key derived from the vault key), so the same image is stored once per vault however many entries reference it. The plain SHA-256 would let anyone holding a known picture confirm it is in the vault.
 
-**The database stores the bare filename** — `{sha256}.{ext}`, no directory and no drive letter. Rendering goes through the `emerald-img` URI scheme rather than IPC; the details are in [Image Storage System](architecture/storage.md#image-storage-system).
+**The database stores the bare filename** — `{hash}.{ext}` (64 hex digits), no directory and no drive letter. Rendering goes through the `emerald-img` URI scheme rather than IPC; the details are in [Image Storage System](architecture/storage.md#image-storage-system).
 
 The image commands (`save_image`, `copy_image_file`, `read_image_as_base64`, `adopt_legacy_images`, `list_image_files`, `delete_image_files`) are listed in [IPC Command Surface](architecture.md#ipc-command-surface).
 
 ## Multi-Vault System
 
-A vault is a **directory** holding `emerald.db`, `images/`, `backup/`, `settings.json` (the vault's own settings, read and written by `read_vault_settings`/`write_vault_settings`) and, while a block or template page holds unsaved edits, `drafts.json`. Vault metadata lives outside SQLite in `{appDataDir}/vaults.json`. The directory layout, `vaults.json`'s shape, first-launch behaviour, the default location for new vaults and the migrations of older installations are described in [Vault Layout](architecture/storage.md#vault-layout); what matters for the database:
+A vault is a **directory** holding `emerald.db` (SQLCipher), `vault.key`, `images/`, `backup/`, `settings.json` (the vault's own settings, read and written by `read_vault_settings`/`write_vault_settings`) and, while a block or template page holds unsaved edits, `drafts.json`. Vault metadata lives outside SQLite in `{appDataDir}/vaults.json`. The directory layout, `vaults.json`'s shape, first-launch behaviour, the default location for new vaults and the migrations of older installations are described in [Vault Layout](architecture/storage.md#vault-layout); what matters for the database:
 
-- `getDb()` builds its connection string via `getActiveDbConnectionString()` in `vaultManager.ts`, which percent-encodes the vault path (`?`, `#`, `%` in folder names would otherwise be parsed as URL syntax). It throws `NO_ACTIVE_VAULT` rather than fall back to another vault.
+- `getDb()` opens the database by vault id (`Database.load(vaultId)` in `src/lib/sqlite.ts`); Rust resolves the path, so folder names with `?`, `#` or `%` need no encoding. It throws `NO_ACTIVE_VAULT` rather than fall back to another vault, and Rust refuses to open a vault whose key is not unlocked — the gate in front of `getDb()` is described in [`architecture/encryption.md`](architecture/encryption.md#the-unlock-gate). All data is encrypted at rest; there is no unencrypted database.
 - Every write to `vaults.json` calls `register_vaults`, mirroring `id → path` into Rust. Storage commands resolve a vault *id* against that registry and never accept a path — see [`security.md`](security.md).
-- `resetDbCache()` in `db.ts` must be called before switching vaults; it clears the per-vault `Map<identifier, Database>` cache. It first awaits any load still in flight: `getDb()` only caches a connection once `Database.load` resolves, so a reset racing a load could otherwise leak that connection unclosed, keeping the file locked on Windows.
+- `resetDbCache()` in `db.ts` must be called before switching vaults; it clears the per-vault `Map<vaultId, Database>` cache. It first awaits any load still in flight: `getDb()` only caches a connection once `Database.load` resolves, so a reset racing a load could otherwise leak that connection unclosed, keeping the file locked on Windows.
 - `withDbClosed(fn)` runs `fn` with every connection closed and blocks `getDb()` for its duration (throwing `DB_CLOSED`); vault deletion uses it so a debounced autosave can't reopen the very file being removed.
 - `runMigrations()` runs on every `getDb()` cache miss and is safe on existing and empty files. A new vault's `.db` file is only written the first time the app switches to it, which is why `newVaultRecord(name)` does not create it up front. All vaults share the same schema.
 - `newVaultRecord(name, opts?)` in `vaultManager.ts` is the single place that builds a new vault's record; the vault modal (see [Vaults](features.md#vaults)) and the add-vault import both use it. `addVault`/`updateVault`/`removeVault`/`setActiveVaultId`/`relocateVault` read-modify-write `vaults.json` by copying, never mutating the cached object before the write lands. `removeVault` hands off the active role in the same write that removes the record, so `vaults.json` never names an active vault missing from its own list.
 
 ## DB Backup / Restore (`.emeralddb`)
 
-Full vault snapshots are exported and imported via Settings → Backup. The code is `src/lib/dbBackup.ts`.
+Full vault snapshots are exported and imported via Settings → Backup. The code is `src/lib/dbBackup.ts` for the content and `src-tauri/src/backup.rs` for the encrypted container.
 
-**File format** — self-contained JSON:
+**File format** — self-contained JSON, sealed in the container described below:
 
 ```json
 {
@@ -463,6 +463,8 @@ Full vault snapshots are exported and imported via Settings → Backup. The code
 ```
 
 **Settings.** `settings` is an optional top-level field, outside `data` and not gated by `BACKUP_VERSION`, since it is independent of every date and type filter. Export writes the vault's current settings when `includeSettings` is ticked. Replace import applies them outright (`replaceSettings`); add-vault writes them into the new vault before switching to it, so it opens with the backup's language and appearance; Merge applies only the settings groups picked in the import dialog (`withSettingsGroups(current, incoming, groups)` in `vaultSettings.ts`), so merging a backup from elsewhere doesn't overwrite local settings nobody asked to change. A file without `settings` leaves the target's settings untouched. Reading them goes through `importableSettings()`, which discards any key the current build doesn't recognise.
+
+**Container.** On disk the JSON is sealed under the vault key and prefixed with a copy of the vault's `vault.key`, so the file opens with the password (or recovery key) the vault had when the backup was made, even after a later password change and on another machine. Layout, and how a backup is opened, are in [Encrypted backups](architecture/encryption.md#encrypted-backups). The container is not part of the backup version: a file without it is plain JSON of the same format, and still imports.
 
 ### Backup versions
 
@@ -500,11 +502,13 @@ ID lists for `IN (...)` clauses are bound as parameters, never concatenated into
 
 ### Import
 
+**Opening the file** asks for a secret only when no unlocked vault's key fits the backup. Everything below runs on the decrypted JSON.
+
 **The import runs against a staging copy of the vault, never the vault itself** (`importViaStaging` in `src/lib/importStaging.ts`). `doReplace` and `doMerge` write over many separate statements, which a transaction cannot wrap (see [Foreign Keys](#foreign-keys)), so they write into a copy:
 
 1. Discard any copy a crashed import left behind — `discard_import_staging(vaultId)` in `vault.rs`, scoped to that vault's directory and the fixed filename `emerald.db.import` (`IMPORT_STAGING_FILE`, mirrored in `vaultManager.ts`).
 2. `VACUUM INTO` that filename, next to `emerald.db`.
-3. Open the copy as its own `plugin-sql` connection and run `doReplace`/`doMerge` against it. The live vault is untouched, however far the import gets.
+3. Open the copy as its own connection (`Database.load(vaultId, 'importStaging')`, keyed like the vault) and run `doReplace`/`doMerge` against it. The live vault is untouched, however far the import gets.
 4. Swap the copy in with one multi-statement `execute()` on the vault's connection: `ATTACH DATABASE`, `BEGIN IMMEDIATE`, `PRAGMA defer_foreign_keys = ON` (the vault is briefly empty mid-swap), `DELETE FROM` every table in `TABLES` except `schema_version` (children first), `INSERT INTO … SELECT` with explicit columns (parents first), `COMMIT`, `DETACH DATABASE`. One `execute()` stays on one pooled connection, so this is a real transaction that survives a crash. If the string aborts after `BEGIN`, `resetDbCache()` closes the whole pool, which makes SQLite roll back and detach — the connection would otherwise sit in the pool with an open transaction and lock every later write.
 5. Delete the staging copy, on success and on failure.
 
@@ -566,5 +570,5 @@ The `legacy` group is why the list has to be complete: `collectUsedImageFilename
 - New references: name them `<thing>_id`, store the id and never the name, declare the foreign key, and index the column.
 - New image-backed fields: reuse the file pipeline through `src/lib/images.ts` (`saveImage` / `copyImageFile`), store the returned **filename**, and add the column to the `plain` (or `html`) group of `IMAGE_FIELDS` in `schema.ts` so migration and cleanup both see it. Do not store base64 in SQLite, and do not store a path.
 - Never use the retired `try { ALTER TABLE … ADD COLUMN … } catch {}` pattern, and never rely on the `legacy` error-swallowing — new migrations must fail loudly.
-- **`$N` placeholders must appear in ascending order in the SQL text.** SQLite treats `$N` as a *named* parameter and assigns bind indexes by order of first appearance, not by the digit — `SELECT $21, $23, $22` binds them as 1, 2, 3 (verified against the SQLite C API). `tauri-plugin-sql` binds the values array purely positionally, so a `$23` written before a `$22` silently swaps two values. Every query in this codebase works only because its placeholders ascend; reusing a placeholder (`WHERE id IN ($1, $3)`) is fine, skipping ahead is not.
+- **`$N` placeholders must appear in ascending order in the SQL text.** SQLite treats `$N` as a *named* parameter and assigns bind indexes by order of first appearance, not by the digit — `SELECT $21, $23, $22` binds them as 1, 2, 3 (verified against the SQLite C API). `db.rs` binds the values array purely positionally, so a `$23` written before a `$22` silently swaps two values. Every query in this codebase works only because its placeholders ascend; reusing a placeholder (`WHERE id IN ($1, $3)`) is fine, skipping ahead is not.
 - If a change alters the shape of exported rows, bump `BACKUP_VERSION` in `dbBackup.ts` and extend `migrateBackupPayload` so older files still import.

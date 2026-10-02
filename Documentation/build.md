@@ -136,6 +136,15 @@ The eight selectable typefaces are `@fontsource/*` packages in `dependencies`, n
 
 A new typeface or weight: add it to `FONTS` in the script, install the package, run `npm run fonts`, and add the font to `src/themes/theme.ts`. The CSP allows no remote origin for any of it (see [`security.md`](security.md#content-security-policy)).
 
+## Native build requirements
+
+The database is SQLCipher, built from source together with OpenSSL (`libsqlite3-sys` with `bundled-sqlcipher-vendored-openssl`), so no system SQLite or OpenSSL is used. That adds requirements beyond Tauri's own, and a few minutes to the first build:
+
+- **Perl and `make`** on every platform. macOS and Debian/Ubuntu ship both; Fedora/RHEL need `perl-core` and `make`. On Windows the Perl that comes with Git does not work — install Strawberry Perl (`CONTRIBUTING.md` has the command).
+- **NASM** on Windows release builds. Without it OpenSSL builds without its assembler code: no AES-NI, slower, and not constant-time. `release.yml` and `manual-desktop-builds.yml` install it (`ilammy/setup-nasm`); `ci.yml` only compiles, so it does not.
+- **`libdbus-1-dev` and `pkg-config`** on Linux, for the Secret Service keychain (`keyring`'s D-Bus client). They are in the apt list of every Linux job.
+- **Argon2 in dev builds.** `Cargo.toml` compiles `argon2` and `blake2` with `opt-level = 3` under `[profile.dev]`: unoptimised, Argon2id would take many seconds per unlock.
+
 ## Signing
 
 macOS signing and notarisation are wired up but optional. The release step reads `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD` and `APPLE_TEAM_ID` from repository secrets and skips itself when `APPLE_CERTIFICATE` is unset — the current state, and why `README.md` tells macOS users how to get past Gatekeeper.
@@ -181,6 +190,6 @@ Delete this section once that release is out.
 - Nothing proves the update path automatically. Checking it means publishing a prerelease and driving it from an installed build (see [Testing the updater](#testing-the-updater)).
 - The changelog extraction cannot fail — an empty section yields an empty release body silently.
 - Nothing runs clippy, and warnings do not fail a build. (`src-tauri/Cargo.toml` declares an empty `cargo-clippy` feature so that a manual clippy run compiles; CI does not use it.)
-- Little is covered by automated tests. The Rust tests in `vault.rs` cover the adoption of a previous identifier's data, the vault's own JSON files (`settings.json`, `drafts.json`) and pruning of migration backups; those in `lib.rs` cover the watchdog behind closing the window. `rust-tests.yml` runs them on all three platforms. The frontend has only the `check:*` scripts in CI. Everything else is verified by running the app by hand.
+- Little is covered by automated tests. The Rust tests in `vault.rs` cover the adoption of a previous identifier's data, the vault's own JSON files (`settings.json`, `drafts.json`) and pruning of migration backups; those in `lib.rs` cover the watchdog behind closing the window; those in `db.rs` cover the SQL authorizer and the value round trip, in `crypto.rs` the sealed format and its context binding, in `keys.rs` the key file, recovery key and unlock paths, in `reencrypt.rs` the re-encryption and its crash recovery, and in `backup.rs` the backup container. `rust-tests.yml` runs them on all three platforms. The frontend has only the `check:*` scripts in CI. Everything else is verified by running the app by hand.
 - **What `rust-tests.yml` does not prove:** `vault.rs` has no `cfg(target_os)` at all, so its tests are the same everywhere. The matrix buys the three path parsers and `rename` semantics against each other — plus the Rust side being *linked* on a push, not only checked. It does **not** cover the Linux case that shaped the adoption, because that lives in Tauri's startup order rather than in our code. Only a real start on Linux shows it, which is why the [release checklist](#once-for-the-first-release-that-carries-the-new-identifier) still asks for one.
-- The apt package list for Linux exists in four workflow files. Adding a system dependency in `ci.yml` alone leaves the others red on Linux only.
+- The apt package list for Linux exists in four workflow files. Adding a system dependency in `ci.yml` alone leaves the others red on Linux only. The keychain needs a running Secret Service on the user's machine, not in CI: nothing there exercises "remember on this device".

@@ -20,11 +20,7 @@ Tauri 2 uses capability files to declare which permissions each window receives.
     "dialog:allow-save",
     "dialog:allow-open",
     "dialog:allow-message",
-    "opener:default",
-    "sql:allow-load",
-    "sql:allow-execute",
-    "sql:allow-select",
-    "sql:allow-close"
+    "opener:default"
   ]
 }
 ```
@@ -33,20 +29,24 @@ Tauri 2 uses capability files to declare which permissions each window receives.
 - **`allow-destroy`, `allow-unminimize`, `allow-set-focus`** serve the question about unsaved edits (see [Leaving an edit](architecture/editing.md#leaving-an-edit)). The last two make sure the question, asked while the window is minimised, is seen. `allow-destroy` is needed because with an `onCloseRequested` handler registered (`AppShell.tsx`), Tauri's JS API closes the window through `destroy()` once the handler returns without preventing it. `destroy` reaches the same windows `close` does and only skips the close-requested event — nothing a frontend that may already `close` could not do.
 - **`core:webview:allow-set-webview-zoom`** backs the interface-size setting: `applyUIScale()` in `src/themes/theme.ts` calls `getCurrentWebview().setZoom(scale / 100)`. It only scales rendering — no data access.
 - **`dialog:allow-message`** backs the native success/error popups (`message()` from `@tauri-apps/plugin-dialog`) that export/import report through (`src/lib/export.ts`, `src/lib/emeraldFormat.ts`, `src/lib/altarExport.ts`).
-- **SQLite permissions must be declared explicitly.** `sql:default` alone grants read-only access; writing needs `sql:allow-execute` in addition to `sql:allow-select`. A missing permission fails silently at runtime.
+- **No SQL permissions.** The database is reached through the app's own commands (`db_*`), which need no capability entry, not through a plugin. What the webview can do with SQL is bounded in Rust instead: by vault id instead of path, and by an authorizer on every connection (see [Vault Encryption](#vault-encryption)).
 
 PDF export renders in a hidden window that the per-platform `export_pdf` command builds and tears down in Rust; no extra capability entry is required.
 
 ## Command Surface
 
-`src-tauri/src/lib.rs` registers **37 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
+`src-tauri/src/lib.rs` registers **54 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
 
 | Command | Defined in | Notes |
 |---|---|---|
+| `db_load`, `db_close`, `db_execute`, `db_select` | `db.rs` | SQL by vault id and a fixed `DbFile`, never by path; every connection carries the authorizer — see [Vault Encryption](#vault-encryption) |
+| `vault_key_status`, `keychain_available`, `vault_create_key`, `vault_unlock`, `vault_unlock_remembered`, `vault_set_remembered`, `vault_is_remembered`, `vault_lock` | `keys.rs` | the key lifecycle. Take a vault id and, for unlocking, a password; none returns a key. `vault_create_key` only works on a vault with no `vault.key` and no database |
+| `vault_encrypt_existing`, `vault_change_password`, `vault_recover` | `reencrypt.rs` | put a vault under a new key; each returns the new recovery key. They need the current password or recovery key — an unlocked session alone is not enough to change the password |
+| `write_backup_file`, `read_backup_file` | `backup.rs` | the only way to write or read a `.emeralddb`; take an extension check and the same path guards as `write_file`/`read_file` |
 | `write_file`, `read_file`, `export_image` | `lib.rs` | path-taking; confined by `guarded_write_target` / `guarded_read_path` (see [Path Confinement](#path-confinement)) |
 | `export_pdf` | `lib.rs` → `pdf_export/` | hidden-window PDF render, per-platform |
 | `ensure_app_storage_dirs` | `lib.rs` | creates the app's own data and config dirs; takes no path |
-| `save_image` | `images.rs` | decodes a data-URL in Rust and writes it into the active vault's `images/`, named by the SHA-256 of its bytes; extension from the MIME type, `png` fallback. No backend size cap — the frontend's upload limits are the only bound |
+| `save_image` | `images.rs` | decodes a data-URL in Rust and writes it, sealed, into the active vault's `images/`, named by a keyed hash of its bytes; extension from the MIME type, `png` fallback. No backend size cap — the frontend's upload limits are the only bound |
 | `copy_image_file`, `read_image_as_base64`, `read_image_file` | `images.rs` | see [Path Confinement](#path-confinement) |
 | `list_image_files`, `adopt_legacy_images` | `images.rs` | enumerate the vault's `images/` / copy from the pre-per-vault shared pool into it |
 | `delete_image_files` | `images.rs` | **a delete primitive** — takes filenames, skips any that fail `is_valid_image_name`, resolves them only against the vault's `images/`. Used by Settings → Storage cleanup |
@@ -85,6 +85,34 @@ Everything runs in Rust, including the download, so the [Content Security Policy
 
 It also refuses on an install method that cannot be replaced, and on Linux that test is deliberately strict. `APPIMAGE` is an ordinary environment variable **inherited by child processes**: a `.deb`-installed Emerald started from a terminal or editor that is itself an AppImage sees that foreign path, and the plugin would take it as the install target — overwriting an unrelated application. `install_supported()` therefore also requires the running executable to sit under `{temp}/.mount_…`, where an AppImage actually runs from (the same probe `tauri-utils` uses, though it only warns). A hand-extracted AppImage counts as "not replaceable", which is correct: there is no single file to swap.
 
+## Vault Encryption
+
+The mechanics are in [`architecture/encryption.md`](architecture/encryption.md); this section is what they are for and where they stop.
+
+**What is protected.** Everything a vault keeps on disk except `settings.json`: the database (SQLCipher, AES-256), images and drafts (XChaCha20-Poly1305), and `.emeralddb` backups. Someone who gets the vault folder — a stolen laptop, a synced cloud folder, a backup drive, a copy shared by mistake — reads nothing without the password or the recovery key. Image names are keyed hashes, so even the presence of a known picture cannot be confirmed.
+
+**Passwords and keys.**
+
+- The password is stretched with Argon2id (64 MiB, three passes), so guessing is slow per attempt. There is no attempt counter or lock-out: an attacker with the folder guesses offline anyway, and a counter would only guard the app's own dialog. The minimum is eight characters; a weak password stays weak.
+- The vault key is random, so changing the password replaces the key as well (a full re-encryption) rather than only the wrap. An old copy of `vault.key` plus the old password — from cloud version history, say — then opens nothing written afterwards.
+- The recovery key is a second, independent way in and as sensitive as the password. It is shown once, after every operation that creates a key, and the dialog does not close until the user says it is stored. Using it ("forgot password") issues a new one; the old one is spent.
+- The key lives only in Rust memory (`Zeroizing`, wiped on drop) while the vault is unlocked, and no command returns it. Leaving a vault locks it, and **Settings → Security → Lock now** locks the open one and asks for the password even when it is remembered.
+- **Remember on this device** puts the vault key in the OS keychain: whoever can read that keychain entry — the logged-in user, malware running as them — opens the vault. It is not offered where there is no keychain (a Linux desktop without a Secret Service). The service name carries the app identifier so installations do not touch each other's entries.
+
+**The SQL boundary.** The webview runs arbitrary SQL, so the authorizer on every connection is a security control, not a convenience. It denies the key pragmas, `cipher_*` settings and `sqlcipher_export` — any of which could re-key the vault behind `vault.key`'s back or write a plaintext copy anywhere — and permits `ATTACH` only for the vault's own import staging copy and migration backups. Pools are opened by vault id and a fixed file name, and `db_load` refuses a vault without `vault.key`, so there is no way to open a database in the clear through the app. `VAULT_LOCKED` is returned for an encrypted vault that is not unlocked.
+
+**Interrupted re-encryption.** The original stays untouched until a complete copy has passed `integrity_check` and a row-count comparison; a marker file decides, after a crash, whether to throw the copy away or finish the swap. Encrypting a vault deletes its plain database, plain images and old migration backups after the swap, and seals plain `.emeralddb` files in the vault's `backup/` folder.
+
+**Known limitations**, stated plainly:
+
+- **Data is in memory while a vault is unlocked.** The decrypted content sits in the WebView and the stores; a memory dump, a swap file or a hibernation image of a running session can contain it. Encryption protects the vault at rest.
+- **Plaintext that left the vault is not recalled.** Backups exported before encryption and kept outside the vault folder, exports (`.emerald`, Markdown, PDF), and earlier copies in cloud version history stay as they are. Deleted plain files may be recoverable from an SSD or a snapshot; only full-disk encryption (BitLocker, FileVault, LUKS) closes that gap.
+- **Legacy images keep their old names.** An image adopted from the pre-per-vault shared pool into an encrypted vault is sealed but keeps its SHA-256 name until the next password change.
+- **No cross-process lock.** Two Emerald processes on one vault — the release build and a dev build, say — are not coordinated; a password change in one while the other has the vault open is unsupported.
+- **macOS builds are unsigned.** After an update the keychain may ask whether the app may read its entry again; the choice is the user's.
+- **Windows keychain entries are written with `CRED_PERSIST_ENTERPRISE`**, the `keyring` crate's setting, so on a domain profile with roaming enabled they may roam with the profile.
+- **`settings.json` is plain**, deliberately: it holds no content and is read before any vault is unlocked.
+
 ## Vault Directories as a Trust Boundary
 
 A vault is a directory the user picks, and it may sit outside every fixed user root — another drive, an external disk.
@@ -101,7 +129,10 @@ The fixed roots include `document_dir()` and `app_data_dir()`, so a vault at its
 
 1. `emerald.db` and its journal,
 2. files in `images/` whose names pass `is_valid_image_name`,
-3. `settings.json`, `drafts.json` and their `.tmp` write-companions.
+3. `settings.json`, `drafts.json`, `vault.key` and their `.tmp` write-companions,
+4. what is useless without the key: the import staging copy, every `emerald.db.pre-vNN.bak`, and the leftovers of an interrupted re-encryption.
+
+With the files gone, the vault's key is forgotten in memory and in the OS keychain.
 
 The directories go last with plain `remove_dir`, which fails while anything else is inside — and that failure is the *answer*, not an error. A folder that also holds an exported backup in `backup/` or a stray `desktop.ini` stays standing (an *empty* `backup/` counts as the vault's own and goes too), and the command returns `false` so the UI can say so. A half-deleted vault cannot resurrect as an empty one: the caller drops it from `vaults.json` after every `Ok`, and an `Err` only occurs while the database itself could not be removed.
 
@@ -117,9 +148,9 @@ The directories go last with plain `remove_dir`, which fails while anything else
 
 ### Vault JSON files
 
-`settings.json` and `drafts.json` are read and written by vault id, through the same registry, never by path.
+`settings.json` and `drafts.json` are read and written by vault id, through the same registry, never by path. `drafts.json` is sealed in an encrypted vault ([Vault Encryption](#vault-encryption)); `settings.json` is plain.
 
-- **Writes** accept only a JSON object, at most 256 KB for settings (`SETTINGS_MAX_BYTES`, far above what the settings page produces — a guard against a runaway write) and 4 MiB for drafts (`DRAFTS_MAX_BYTES`). They write a `.tmp` file and `rename` it over the real one, so a crash mid-write leaves the previous file. A symlink is never followed under either name: the temp name is cleared and opened with `create_new`, and `rename` replaces a link at the target without following it. An empty drafts object removes `drafts.json` instead.
+- **Writes** accept only a JSON object, at most 256 KB for settings (`SETTINGS_MAX_BYTES`, far above what the settings page produces — a guard against a runaway write) and 4 MiB for drafts (`DRAFTS_MAX_BYTES`). They write a `.tmp` file, `fsync` it and `rename` it over the real one, so a crash mid-write leaves the previous file (`vault.key` is written the same way). A symlink is never followed under either name: the temp name is cleared and opened with `create_new`, and `rename` replaces a link at the target without following it. An empty drafts object removes `drafts.json` instead.
 - **Reads** use `symlink_metadata` (matching `guarded_read_path`) and return a tagged `Missing`/`Found`/`Unreadable` result. Only "the vault directory itself is gone" is an error: a file that exists but isn't a plain, readable, size-capped file must not block opening the vault, so the frontend falls back to defaults and leaves it alone.
 - **Drafts are untrusted on the way back in.** Every draft passes the parsers a database row passes (`draftStore.ts`), ids are checked, and a file of another version is ignored. A draft's content renders and saves through the same block path as a stored template's, so it gains nothing a stored one could not do.
 
@@ -135,6 +166,7 @@ That does not widen what a vault path can be: `vaults.json` always holds arbitra
 
 Images are served to the webview over a custom scheme instead of through IPC. The request path is `/{vaultId}/{filename}`, and both segments are attacker-reachable in principle: the filename comes from stored HTML content, which may have arrived in an imported backup.
 
+- **The handler decrypts**, in Rust, with the key of the vault named in the URL; a locked vault, a wrong key or a damaged file is a 404. The response carries `Cache-Control: no-store` so the WebView does not keep decrypted images on disk.
 - **The filename is validated before any path is built** (`is_valid_image_name`): exactly 64 lowercase hex digits, a dot, and one of `png` / `jpg` / `jpeg` / `gif` / `webp` / `svg`. Rejecting everything outside that alphabet means percent-encoded traversal never has to be decoded — it simply fails the check.
 - **The vault id is resolved through the registry**, so the directory is one the user authorised; an unknown id yields 404. The file is looked up in that vault's `images/`, then in the pre-per-vault shared pool.
 - **Reads happen off the main thread** (`register_asynchronous_uri_scheme_protocol`), so a large file cannot stall the UI.
@@ -160,7 +192,8 @@ On top of the guards, each command allowlists extensions and returns `"unsupport
 
 | Command | Extensions | Notes |
 |---|---|---|
-| `write_file`, `read_file` | `.md`, `.emerald`, `.emeralddb`, `.json`, `.txt` | keeps them from being a general filesystem read/write primitive |
+| `write_file`, `read_file` | `.md`, `.emerald`, `.json`, `.txt` | keeps them from being a general filesystem read/write primitive. `.emeralddb` is not on the list: a backup is written and read only through `write_backup_file`/`read_backup_file`, so none can be written in the clear by accident |
+| `write_backup_file`, `read_backup_file` | `.emeralddb` | the same path guards |
 | `export_image` | `.png`, `.jpg`, `.jpeg`, `.webp` | the base64 payload is decoded in Rust before writing, so no text encoding or newline handling can alter the bytes |
 | `copy_image_file`, `read_image_file` | `png`, `jpg`, `jpeg`, `gif`, `webp`, `svg` | shared helper `checked_image_source` |
 
@@ -236,7 +269,7 @@ The eight typefaces ship with the app (`@fontsource` woff2 files bundled by Vite
 
 **Inline styles.** Tauri gives each `<style>` element a nonce, and a nonce in `style-src` makes CSP3 ignore `'unsafe-inline'` — which would silently block every `style={{…}}` attribute in the app (the sidebar widths in `AppShell`, among others) in a packaged build. That is why the loading screen's CSS lives in `public/splash.css`, loaded via `<link>`, rather than a `<style>` block in `index.html`.
 
-**PDF export.** The export HTML is written to a unique file in the OS temp directory and loaded by a hidden webview over a `file://` URL. That document carries **no CSP at all** — a `file://` document has nothing to inherit it from. What controls that path is `htmlEscape` and `DOMPurify.sanitize` in `src/lib/export.ts` (see [HTML Escaping in Exports](#html-escaping-in-exports) and [HTML Sanitisation](#html-sanitisation)), and the export file is removed as soon as the export finishes. The internal-link chip transformation (`transformInternalLinks`) is pre-rendered in TypeScript as a convenience, not a CSP necessity.
+**PDF export.** The export HTML is written to a unique file in the OS temp directory and loaded by a hidden webview over a `file://` URL. That document carries **no CSP at all** — a `file://` document has nothing to inherit it from. What controls that path is `htmlEscape` and `DOMPurify.sanitize` in `src/lib/export.ts` (see [HTML Escaping in Exports](#html-escaping-in-exports) and [HTML Sanitisation](#html-sanitisation)), and the export file — the entry in plain text, outside the vault — is removed as soon as the export ends, however it ends (a drop guard), is created readable by its user only on Unix, is never logged by path, and any that a crash left behind are swept at startup once they are an hour old. The internal-link chip transformation (`transformInternalLinks`) is pre-rendered in TypeScript as a convenience, not a CSP necessity.
 
 ## File Dialog Safety
 

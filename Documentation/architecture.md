@@ -13,6 +13,7 @@ This file is the overview: tech stack, module map, data flow and the IPC surface
 | [`architecture/navigation.md`](architecture/navigation.md) | Global search, drag and drop, tabs, navigation history, left sidebar |
 | [`architecture/altar.md`](architecture/altar.md) | Altar UI composition |
 | [`architecture/storage.md`](architecture/storage.md) | Image storage, vault layout, vault settings |
+| [`architecture/encryption.md`](architecture/encryption.md) | Vault keys, sealed files, the SQL layer, the unlock gate, re-encryption, encrypted backups |
 | [`architecture/appearance.md`](architecture/appearance.md) | Theming and fonts |
 | [`architecture/shell.md`](architecture/shell.md) | Window chrome, boot order, PDF export |
 
@@ -26,7 +27,8 @@ This file is the overview: tech stack, module map, data flow and the IPC surface
 | Styling | Tailwind CSS 3 |
 | Rich text editor | TipTap v2 |
 | State management | Zustand |
-| Database | SQLite via `tauri-plugin-sql` |
+| Database | SQLite encrypted with SQLCipher, through an own SQL layer (`db.rs`, sqlx) |
+| Encryption | XChaCha20-Poly1305, Argon2id, OS keychain (`keyring`) |
 | Internationalisation | react-i18next |
 | Icons | lucide-react |
 | UI motion / drag reordering | framer-motion |
@@ -48,6 +50,7 @@ src/
 │   │   ├── LeftSidebarRail, LeftSidebarEntryList   rail and entry list
 │   │   ├── RightSidebar                        properties panels, edit action bar
 │   │   ├── LeaveGuardModal, VaultModal         leave-an-edit question, vault manager
+│   │   ├── VaultKeyDialog, BackupUnlockDialog, RecoveryKeyBox, vaultKeyParts   password, unlock, recovery key
 │   │   ├── moduleViews.ts                      ViewId → lazy view (MainArea only)
 │   │   ├── settings/                           SettingsModal, one *Page per tab, sections
 │   │   └── titlebar/                           custom title bar, menus, SearchModal
@@ -77,6 +80,8 @@ src/
 │   ├── vaultPrefs.ts            per-vault list and layout preferences
 │   ├── settingsStore.ts         the open vault's settings.json
 │   ├── vaultStore.ts, trashStore.ts, undoStore.ts, importStore.ts
+│   ├── vaultKeyStore.ts         the unlock gate (`ensureVaultReady`)
+│   ├── backupSecretStore.ts     asks for an encrypted backup's password
 │   ├── imageNoticeStore.ts      "image not inserted" notice
 │   └── moduleWiring.ts          per-module reload, trash wiring, startup reload
 ├── hooks/
@@ -89,7 +94,9 @@ src/
 │   ├── useOpenInNewTabAction.tsx, useSaveAsTemplateAction.tsx
 │   └── useDisplayedAltar.ts, useShrunkIcon.ts, useEmojiSearchData.ts
 ├── lib/
+│   ├── sqlite.ts                the SQL interface over the `db_*` commands
 │   ├── db.ts                    connection and migration chain
+│   ├── vaultKeys.ts             wrappers for the key commands in `keys.rs`
 │   ├── schema.ts                live DDL, builtin/starter seed
 │   ├── row.ts                   SQLite row ↔ TypeScript type conversion
 │   ├── serialize.ts             per-entity write serialization
@@ -127,6 +134,11 @@ src/
 src-tauri/src/
 ├── main.rs             entry point, delegates to lib.rs
 ├── lib.rs              command registration, path guards, native menu
+├── db.rs               SQLCipher pools, `db_*` commands, SQL authorizer
+├── crypto.rs           sealed-file format, subkeys, keyed hash
+├── keys.rs             vault.key, unlocking, OS keychain, `VaultKeys`
+├── reencrypt.rs        encrypting a vault, changing the password, crash recovery
+├── backup.rs           encrypted .emeralddb files
 ├── images.rs           image commands + emerald-img scheme
 ├── vault.rs            vault registry and vault directory commands
 ├── updates.rs          in-app updater
@@ -149,7 +161,7 @@ Components (render)
     ↓  user edits
 Store actions (updateEntry, updateTask, …)
     ↓  toInt / toJson (row.ts)
-    ↓  db.execute / db.select
+    ↓  db.execute / db.select  (src/lib/sqlite.ts → db_* commands in db.rs)
 SQLite (persisted)
 ```
 
@@ -184,20 +196,27 @@ A serialized task must never await another task under its own key — it would w
 
 ## IPC Command Surface
 
-All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from TypeScript with `invoke()`; most are *defined* in `images.rs`, `vault.rs` and `updates.rs`.
+All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from TypeScript with `invoke()`; most are *defined* in `db.rs`, `keys.rs`, `reencrypt.rs`, `backup.rs`, `images.rs`, `vault.rs` and `updates.rs`.
 
-**File commands run off the main thread.** `write_file`, `read_file`, `export_image`, `ensure_app_storage_dirs` and all seven commands in `images.rs` are `async` and wrap their `std::fs` work in `tauri::async_runtime::spawn_blocking`, so a multi-megabyte `.emeralddb` doesn't block the window. `async fn` alone would not do: the blocking call would still run on a runtime worker and could starve the SQL plugin, PDF export and IPC replies on a machine with few cores. The `emerald-img` scheme handler uses `spawn_blocking` as well. The four native-menu commands stay synchronous on purpose — they mutate `NSMenu`, which is main-thread-only on macOS.
+**File commands run off the main thread.** `write_file`, `read_file`, `export_image`, `ensure_app_storage_dirs` and all seven commands in `images.rs` are `async` and wrap their `std::fs` work in `tauri::async_runtime::spawn_blocking`, so a multi-megabyte `.emeralddb` doesn't block the window. `async fn` alone would not do: the blocking call would still run on a runtime worker and could starve the SQL pools, PDF export and IPC replies on a machine with few cores. The `emerald-img` scheme handler uses `spawn_blocking` as well. The four native-menu commands stay synchronous on purpose — they mutate `NSMenu`, which is main-thread-only on macOS.
 
 - A static `IMAGE_WRITE_LOCK` in `images.rs` serializes the image folder's writes and deletes; without it, a storage cleanup could delete a file whose hash a concurrent `save_image` had just judged "already exists".
 - `resolve_allowed_roots()` caches its result in a `OnceLock` once every root canonicalizes, and re-resolves on every call while any root fails (a not-yet-existing directory, an unmounted drive), so a transient failure heals on the next call.
 
 | Command | Purpose |
 |---|---|
-| `save_image(data_url, vault_id)` | Decode a data-URL, write `{sha256}.{ext}` into the vault's `images/`, skip if it exists. Returns the **filename**. |
-| `copy_image_file(source, vault_id)` | Copy a file from an arbitrary path into the vault's `images/` under its SHA-256 name. png/jpg/jpeg/gif/webp/svg only; rejects symlinks, canonicalizes the source and confines it to the allowed storage roots. Returns the filename. |
-| `read_image_as_base64(filename, vault_id)` | A stored image as a data-URL — only for the PDF export (renders in a `file://` webview) and the backup writer (embeds bytes in JSON); everything else uses the `emerald-img` scheme. |
+| `db_load(vault_id, file)` / `db_close(db)` | Open / close the pool of one of the vault's databases (`file` is `main` or `importStaging`, never a path). `db_load` returns the handle the other two take and refuses a vault without `vault.key`. See [`architecture/encryption.md`](architecture/encryption.md#the-sql-layer). |
+| `db_execute(db, query, values)` / `db_select(db, query, values)` | Run a statement on a pool / read rows. `execute` returns `(rowsAffected, lastInsertId)`. Every connection carries an authorizer that refuses key and export pragmas. |
+| `vault_key_status(vault_id)` | `{hasDatabase, encrypted, unlocked}`; first finishes an interrupted re-encryption. The unlock gate's first question. |
+| `vault_create_key` / `vault_unlock` / `vault_unlock_remembered` / `vault_lock` | Create a new vault's key, unlock with the password, unlock from the OS keychain, forget the key held in memory. |
+| `vault_encrypt_existing` / `vault_change_password` / `vault_recover` | Re-encrypt a plain vault, change the password, or set a new one from the recovery key; all three build a copy under a new key and return the new recovery key. See [Re-encrypting a vault](architecture/encryption.md#re-encrypting-a-vault). |
+| `vault_set_remembered` / `vault_is_remembered` / `keychain_available` | The "remember on this device" switch, its state, and whether the system has a keychain. |
+| `write_backup_file(vault_id, path, content)` / `read_backup_file(path, password?, recovery_key?)` | Write a `.emeralddb` sealed under the vault key / open one with an unlocked vault's key, a password or a recovery key (`BACKUP_LOCKED` when none fits). |
+| `save_image(data_url, vault_id)` | Decode a data-URL, write it into the vault's `images/` — sealed and named by a keyed hash in an encrypted vault. Skips if it exists. Returns the **filename**. |
+| `copy_image_file(source, vault_id)` | Copy a file from an arbitrary path into the vault's `images/` under its content name. png/jpg/jpeg/gif/webp/svg only; rejects symlinks, canonicalizes the source and confines it to the allowed storage roots. Returns the filename. |
+| `read_image_as_base64(filename, vault_id)` | A stored image, opened if sealed, as a data-URL — only for the PDF export (renders in a `file://` webview) and the backup writer (embeds bytes in JSON); everything else uses the `emerald-img` scheme. |
 | `read_image_file(source)` | An *external* image file as a data-URL, without storing it, so the frontend can scale it to the vault's image limits before `save_image`. Same checks as `copy_image_file` (`checked_image_source`), plus a 64 MB source cap. |
-| `read_vault_drafts(vault_id)` / `write_vault_drafts(vault_id, contents)` | The vault's `drafts.json` — unsaved drafts of block and template pages (`store/draftStore.ts`). An empty object removes the file. `async`, since it is written after every pause in typing; a rename or remove that fails is retried briefly, since on Windows a scanner or sync client may hold the file. |
+| `read_vault_drafts(vault_id)` / `write_vault_drafts(vault_id, contents)` | The vault's `drafts.json` — unsaved drafts of block and template pages (`store/draftStore.ts`), sealed in an encrypted vault. An empty object removes the file. `async`, since it is written after every pause in typing; a rename or remove that fails is retried briefly, since on Windows a scanner or sync client may hold the file. |
 | `read_vault_settings(vault_id)` / `write_vault_settings(vault_id, contents)` | The vault's `settings.json` — see [Vault Settings](architecture/storage.md#vault-settings) and [`security.md`](security.md#vault-json-files) for atomicity and symlink handling. |
 | `adopt_legacy_images(vault_id, filenames)` | Copy images from the pre-per-vault shared pool into a vault's own folder. Migration v35 only. |
 | `list_image_files(vault_id)` / `delete_image_files(vault_id, filenames)` | Back the *Unused images* cleanup. Confined to the vault's folder; reject any name that is not 64 hex digits plus a known extension. |
@@ -212,7 +231,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `prune_migration_backups(vault_id)` | Deletes every migration backup but the newest (written by `backupDatabaseFile` in `dbRebuild.ts`; name rule in [`security.md`](security.md#vault-directories-as-a-trust-boundary)). Returns the count. Called by `getDb()` after `runMigrations`; failure is only logged. |
 | `ensure_backup_dir(vault_id)` | The vault's `backup/` folder, the database export's default destination; recreated on demand, refused outside the allowed storage roots. |
 | `export_image(path, data_url)` | Write a data-URL's image bytes to a user-chosen `.png`/`.jpg`/`.jpeg`/`.webp` path. Same path checks as `write_file`. |
-| `write_file(path, content)` | Write UTF-8 text to a user-selected `.md`/`.emerald`/`.emeralddb`/`.json`/`.txt` path. Rejects symlinks; the path must resolve within the allowed storage roots. |
+| `write_file(path, content)` | Write UTF-8 text to a user-selected `.md`/`.emerald`/`.json`/`.txt` path. Rejects symlinks; the path must resolve within the allowed storage roots. |
 | `read_file(path)` | Read a file as UTF-8. Same allowlist and confinement as `write_file`. |
 | `ensure_app_storage_dirs()` | Create the app data and config directories before vault metadata is written or SQLite opens. |
 | `export_pdf(html, path, page_size?)` | Render HTML to a PDF at a path the frontend obtained from the `dialog` plugin, by driving the app's own webview. `page_size` (inches) overrides the default Letter page — used by the Altar export only. See [PDF Export](architecture/shell.md#pdf-export). |
