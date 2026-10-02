@@ -25,6 +25,11 @@ export default defineConfig(async () => ({
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
+          // React vor Tiptap: @tiptap/react importiert react-dom, und ohne
+          // eigene Regel zog Rollup react-dom in den tiptap-Chunk — den lud
+          // der Start dann mit, obwohl nur Editor und BlockStack (beide lazy)
+          // Tiptap brauchen.
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return "react";
           if (id.includes("@tiptap") || id.includes("prosemirror")) return "tiptap";
           if (id.includes("@tauri-apps")) return "tauri";
           if (id.includes("i18next")) return "i18n";

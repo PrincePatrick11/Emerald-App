@@ -8,11 +8,6 @@
  * noch entfernt und für die Vorschau wieder eingehängt.
  */
 
-/** Mindeststandzeit. Ist die Datenbank schneller da — bei lokalem SQLite der
- *  Normalfall —, würde der Bildschirm sonst nur kurz aufblitzen, und das liest
- *  sich als Fehler, nicht als Ladevorgang. */
-const MIN_VISIBLE_MS = 900;
-
 /** Kommt es nie zum regulären Abräumen — Render wirft, Datenbank hängt —,
  *  soll trotzdem irgendwann die Oberfläche zu sehen sein statt einer ewig
  *  kreisenden Animation. Ein zweites, härteres Netz für den Fall, dass schon
@@ -28,9 +23,9 @@ let template: HTMLElement | null = null;
  *  Ebene stapelt. */
 let openPreview: HTMLElement | null = null;
 
-/** Ob das Original schon behandelt wurde. Das DOM taugt dafür nicht: die
- *  Klasse `is-hiding` fällt erst nach der Mindeststandzeit, ein Zweitaufruf
- *  davor käme daran vorbei und zöge ein zweites Paar Timer auf. */
+/** Ob das Original schon behandelt wurde. Das DOM taugt dafür nicht: während
+ *  des Ausblendens steht `#splash` noch im DOM, ein Zweitaufruf fände es und
+ *  zöge ein zweites Ausblenden auf. */
 let dismissed = false;
 
 /**
@@ -70,12 +65,9 @@ export function hideSplash(): void {
   const splash = document.getElementById('splash');
   if (!splash) return;
   dismissed = true;
-
-  // `performance.now()` zählt ab Navigationsbeginn, also etwas vor dem ersten
-  // Frame des Ladebildschirms — die Mindeststandzeit fällt dadurch minimal
-  // kürzer aus als MIN_VISIBLE_MS. Genau genug für den Zweck.
-  const remaining = Math.max(0, MIN_VISIBLE_MS - performance.now());
-  setTimeout(() => fadeOutAndRemove(splash), remaining);
+  // Keine Mindeststandzeit: der Ladebildschirm steht genau so lange, wie
+  // tatsächlich geladen wird.
+  fadeOutAndRemove(splash);
 }
 
 /**

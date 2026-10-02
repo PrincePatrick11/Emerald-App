@@ -157,6 +157,11 @@ export default function RichEditor({
     enablePasteRules: format.enablePasteRules,
     content: initialContent || '',
     editable,
+    // Sonst rendert @tiptap/react diese Komponente bei jeder Transaktion
+    // (jedem Tastendruck, jeder Cursorbewegung) neu. Nichts hier liest im
+    // Render Editor-Zustand: das Link-Popup hört auf `selectionUpdate`, die
+    // Werkzeugleiste in BlockStack selbst auf `transaction`.
+    shouldRerenderOnTransaction: false,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },

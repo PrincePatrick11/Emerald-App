@@ -99,3 +99,12 @@ javascriptcore-rs = "1.1"
 opt-level = 3
 [profile.dev.package.blake2]
 opt-level = 3
+
+# Release: ein Binary statt Bibliotheksgrenzen — SQLCipher, OpenSSL und
+# Argon2 werden über Crates hinweg optimiert, Symbole fliegen raus.
+# Kein `panic = "abort"`: das Verhalten bei einem Panic bleibt wie im
+# Dev-Build (Abwickeln statt sofortigem Prozessende).
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
