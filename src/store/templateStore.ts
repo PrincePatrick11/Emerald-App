@@ -71,9 +71,9 @@ async function clearDefaults(db: Database, others: readonly Template[], keys: Re
   for (const other of others) {
     const assignments = withoutDefaultsFor(other.assignments, keys);
     if (assignments.every((a, i) => a === other.assignments[i])) continue;
-    await db.execute('UPDATE templates SET assignments=$1 WHERE id=$2', [templateToRow({ ...other, assignments }).assignments, other.id]);
     changed.push({ ...other, assignments });
   }
+  await db.batch(changed.map((t) => ['UPDATE templates SET assignments=$1 WHERE id=$2', [templateToRow(t).assignments, t.id]] as const));
   return changed;
 }
 

@@ -937,10 +937,16 @@ async function insertRows(
   if (!cols.length) return;
   const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ');
   const sql = `INSERT ${orIgnore ? 'OR IGNORE ' : ''}INTO ${table} (${cols.join(', ')}) VALUES (${placeholders})`;
-  for (const row of rows) {
-    await db.execute(sql, cols.map((c) => row[c]));
+  // Je Stück eine Transaktion statt einer je Zeile — sonst schreibt SQLite die
+  // Datei für jede Zeile einmal fest. Stücke, damit keine IPC-Nachricht den
+  // ganzen Inhalt eines großen Backups trägt.
+  for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
+    await db.batch(rows.slice(i, i + INSERT_CHUNK).map((row) => [sql, cols.map((c) => row[c])] as const));
   }
 }
+
+/** Zeilen je `batch` in `insertRows`. */
+const INSERT_CHUNK = 500;
 
 /**
  * Die eigenen Blöcke einer Sicherung: nach ID, `INSERT OR IGNORE` — eine
@@ -1242,12 +1248,10 @@ async function insertTasks(
 
   await insertRows(db, 'tasks', rows.map((r) => ({ ...r, parent_task_id: null })));
 
-  for (const [id, parentId] of parents) {
-    await db.execute(
-      'UPDATE tasks SET parent_task_id=$1 WHERE id=$2 AND EXISTS (SELECT 1 FROM tasks WHERE id=$1)',
-      [parentId, id],
-    );
-  }
+  await db.batch(parents.map(([id, parentId]) => [
+    'UPDATE tasks SET parent_task_id=$1 WHERE id=$2 AND EXISTS (SELECT 1 FROM tasks WHERE id=$1)',
+    [parentId, id],
+  ] as const));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

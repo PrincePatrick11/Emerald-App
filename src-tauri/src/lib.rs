@@ -831,6 +831,7 @@ pub fn run() {
             db::db_close,
             db::db_execute,
             db::db_select,
+            db::db_batch,
             keys::vault_key_status,
             keys::keychain_available,
             reencrypt::vault_encrypt_existing,

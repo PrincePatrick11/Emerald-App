@@ -314,6 +314,34 @@ async fn execute_on(pool: &SqlitePool, query: &str, values: Vec<JsonValue>) -> R
     Ok((result.rows_affected(), result.last_insert_rowid()))
 }
 
+/// Several statements as one transaction on one connection — all of them or
+/// none. A loop of `db_execute` calls commits (and syncs the file) once per
+/// statement, and a `BEGIN` sent on its own may land on another connection of
+/// the pool than the statements after it. Returns the rows affected in all.
+#[tauri::command]
+pub async fn db_batch(
+    dbs: tauri::State<'_, Databases>,
+    db: String,
+    statements: Vec<(String, Vec<JsonValue>)>,
+) -> Result<u64, String> {
+    batch_on(&pool(&dbs, &db).await?, statements).await
+}
+
+async fn batch_on(pool: &SqlitePool, statements: Vec<(String, Vec<JsonValue>)>) -> Result<u64, String> {
+    let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
+    let mut affected = 0;
+    for (query, values) in statements {
+        // Ein Fehler lässt `tx` ungenutzt fallen — sqlx rollt dann zurück.
+        affected += bind_all(sqlx::query(&query), values)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| e.to_string())?
+            .rows_affected();
+    }
+    tx.commit().await.map_err(|e| e.to_string())?;
+    Ok(affected)
+}
+
 #[tauri::command]
 pub async fn db_select(
     dbs: tauri::State<'_, Databases>,
@@ -429,6 +457,25 @@ mod tests {
         assert_eq!(rows[0]["xy"], json!("xy"));
         assert_eq!(rows[0]["half"], json!(0.5));
         assert_eq!(rows[0]["empty"], JsonValue::Null);
+    }
+
+    #[tokio::test]
+    async fn a_batch_commits_all_or_nothing() {
+        let pool = memory_pool().await;
+        execute_on(&pool, "CREATE TABLE t (a TEXT UNIQUE)", vec![]).await.unwrap();
+        let insert = |v: &str| ("INSERT INTO t VALUES ($1)".to_string(), vec![json!(v)]);
+
+        let affected = batch_on(&pool, vec![insert("x"), insert("y")]).await.unwrap();
+        assert_eq!(affected, 2);
+
+        // The duplicate fails the third statement: the first two roll back with it.
+        let err = batch_on(&pool, vec![insert("z"), insert("w"), insert("x")]).await.unwrap_err();
+        assert!(err.contains("UNIQUE"), "{err}");
+        let rows = select_on(&pool, "SELECT a FROM t ORDER BY a", vec![]).await.unwrap();
+        assert_eq!(rows.iter().map(|r| r["a"].clone()).collect::<Vec<_>>(), [json!("x"), json!("y")]);
+
+        // The connection is usable again afterwards.
+        assert_eq!(batch_on(&pool, vec![insert("z")]).await.unwrap(), 1);
     }
 
     #[tokio::test]

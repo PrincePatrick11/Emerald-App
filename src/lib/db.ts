@@ -319,12 +319,11 @@ async function runPeriodicCleanup(db: Database, retentionDays: number | null): P
       [cutoff]
     );
     await stripTagIds(db, expiredTags.map((t) => t.id));
-    for (const table of CLEANUP_TABLES) {
-      await db.execute(
-        `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
-        [cutoff]
-      );
-    }
+    // Eine Transaktion statt eines Commits je Tabelle — das läuft bei jedem Öffnen.
+    await db.batch(CLEANUP_TABLES.map((table) => [
+      `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
+      [cutoff],
+    ] as const));
     // Die Kategorien zuletzt, nachdem ihre Inhalte kategorielos sind. Hier
     // reicht die Datenbank: die Stores laden erst nach `getDb()`.
     const expired = await db.select<{ id: string }[]>(

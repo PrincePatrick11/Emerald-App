@@ -189,9 +189,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const idsToDelete = collectDescendantIds(get().tasks, id);
 
     // Ein Stempel für alle: an ihm erkennt `restoreTask`, was zusammen ging.
-    for (const tid of idsToDelete) {
-      await db.execute('UPDATE tasks SET deleted_at=$1 WHERE id=$2', [now, tid]);
-    }
+    await db.batch(idsToDelete.map((tid) => ['UPDATE tasks SET deleted_at=$1 WHERE id=$2', [now, tid]] as const));
     // Die Verknüpfungen bleiben in der Datenbank, für den Rückweg; endgültig
     // räumen sie permanentlyDeleteTask, das Leeren des Papierkorbs und — per
     // ON DELETE CASCADE — `runPeriodicCleanup` ab.
@@ -207,15 +205,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     // Schon zurück — über ihre Oberaufgabe oder ein zweites Rückgängig.
     if (!row?.deleted_at) return;
     // Mit den Unteraufgaben, die mit ihr gingen.
-    for (const tid of await selectTrashedSubtree(db, id, row.deleted_at)) {
-      await db.execute('UPDATE tasks SET deleted_at=NULL WHERE id=$1', [tid]);
-    }
-    // Liegt die Oberaufgabe noch im Papierkorb, rückt die Aufgabe nach oben —
-    // unter einer unsichtbaren Oberaufgabe bliebe sie selbst unsichtbar.
-    await db.execute(
-      'UPDATE tasks SET parent_task_id=NULL WHERE id=$1 AND parent_task_id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL)',
-      [id]
-    );
+    const subtree = await selectTrashedSubtree(db, id, row.deleted_at);
+    await db.batch([
+      ...subtree.map((tid) => ['UPDATE tasks SET deleted_at=NULL WHERE id=$1', [tid]] as const),
+      // Liegt die Oberaufgabe noch im Papierkorb, rückt die Aufgabe nach oben —
+      // unter einer unsichtbaren Oberaufgabe bliebe sie selbst unsichtbar.
+      ['UPDATE tasks SET parent_task_id=NULL WHERE id=$1 AND parent_task_id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL)', [id]],
+    ]);
     set({ tasks: await selectAllTasks(db), links: await selectLiveLinks(db) });
   },
 
@@ -225,10 +221,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     // schon vorher für sich gingen — ohne ihre Oberaufgabe wären sie Wurzeln.
     const idsToDelete = await selectTrashedSubtree(db, id);
 
-    for (const tid of idsToDelete) {
-      await db.execute('DELETE FROM task_links WHERE task_id=$1 OR target_id=$1', [tid]);
-      await db.execute('DELETE FROM tasks WHERE id=$1', [tid]);
-    }
+    await db.batch(idsToDelete.flatMap((tid) => [
+      ['DELETE FROM task_links WHERE task_id=$1 OR target_id=$1', [tid]] as const,
+      ['DELETE FROM tasks WHERE id=$1', [tid]] as const,
+    ]));
     set((s) => ({
       tasks: s.tasks.filter((t) => !idsToDelete.includes(t.id)),
       links: s.links.filter((l) => !idsToDelete.includes(l.task_id) && !idsToDelete.includes(l.target_id)),

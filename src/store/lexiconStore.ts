@@ -23,7 +23,7 @@ import { fromRow, type DbRow } from '../lib/row';
 import { serialized, serialKey } from '../lib/serialize';
 import { DEFAULT_LANGUAGE_ICON, alphabetToJson } from '../lib/lexicon';
 import {
-  insertEntryRow, insertLanguageRow, languageById, nextEntrySortOrder, nextLanguageSortOrder,
+  insertEntryRow, insertEntryStatement, insertLanguageRow, languageById, nextEntrySortOrder, nextLanguageSortOrder,
 } from '../lib/lexiconRows';
 import i18n from '../i18n';
 import type { Language, LexiconEntry } from '../types';
@@ -136,7 +136,7 @@ export const useLexiconStore = create<LexiconState>((set, get) => ({
     const entries = get().entries
       .filter((e) => e.language_id === id)
       .map<LexiconEntry>((e) => ({ ...e, id: generateId(), language_id: copy.id, created_at: now, updated_at: now }));
-    for (const entry of entries) await insertEntryRow(db, entry);
+    await db.batch(entries.map(insertEntryStatement));
     set((s) => ({ entries: [...s.entries, ...entries] }));
     return copy;
   },

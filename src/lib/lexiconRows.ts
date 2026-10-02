@@ -37,7 +37,12 @@ export async function insertLanguageRow(db: Database, language: Language): Promi
 }
 
 export async function insertEntryRow(db: Database, entry: LexiconEntry): Promise<void> {
-  await db.execute(
+  await db.execute(...insertEntryStatement(entry));
+}
+
+/** Das INSERT einer Vokabel — für `insertEntryRow` und für viele auf einmal (`db.batch`). */
+export function insertEntryStatement(entry: LexiconEntry): [string, unknown[]] {
+  return [
     `INSERT INTO lexicon_entries
        (id, language_id, term, translation, pronunciation, note, sort_order, created_at, updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
@@ -45,7 +50,7 @@ export async function insertEntryRow(db: Database, entry: LexiconEntry): Promise
       entry.id, entry.language_id, entry.term, entry.translation, entry.pronunciation, entry.note,
       entry.sort_order, entry.created_at, entry.updated_at,
     ],
-  );
+  ];
 }
 
 /** Eine Sprache nach ID — auch aus dem Papierkorb, anders als der Store, der nur die aktiven hält. */

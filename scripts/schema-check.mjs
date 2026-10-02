@@ -54,6 +54,20 @@ class HarnessDb {
     return stmt.all(...params);
   }
 
+  /** Wie `db_batch`: eine Transaktion, alle oder keine. */
+  async batch(statements) {
+    let affected = 0;
+    this.raw.exec('BEGIN');
+    try {
+      for (const [sql, params = []] of statements) affected += (await this.execute(sql, params)).rowsAffected;
+      this.raw.exec('COMMIT');
+    } catch (err) {
+      this.raw.exec('ROLLBACK');
+      throw err;
+    }
+    return affected;
+  }
+
   close() {
     this.raw.close();
   }

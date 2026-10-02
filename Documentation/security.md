@@ -39,7 +39,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 
 | Command | Defined in | Notes |
 |---|---|---|
-| `db_load`, `db_close`, `db_execute`, `db_select` | `db.rs` | SQL by vault id and a fixed `DbFile`, never by path; every connection carries the authorizer — see [Vault Encryption](#vault-encryption) |
+| `db_load`, `db_close`, `db_execute`, `db_select`, `db_batch` | `db.rs` | SQL by vault id and a fixed `DbFile`, never by path; every connection carries the authorizer — see [Vault Encryption](#vault-encryption) |
 | `vault_key_status`, `keychain_available`, `vault_create_key`, `vault_unlock`, `vault_unlock_remembered`, `vault_set_remembered`, `vault_is_remembered`, `vault_lock` | `keys.rs` | the key lifecycle. Take a vault id and, for unlocking, a password; none returns a key. `vault_create_key` only works on a vault with no `vault.key` and no database |
 | `vault_encrypt_existing`, `vault_change_password`, `vault_recover` | `reencrypt.rs` | put a vault under a new key; each returns the new recovery key. They need the current password or recovery key — an unlocked session alone is not enough to change the password |
 | `write_backup_file`, `read_backup_file` | `backup.rs` | the only way to write or read a `.emeralddb`; take an extension check and the same path guards as `write_file`/`read_file` |

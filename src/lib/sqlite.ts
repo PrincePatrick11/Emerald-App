@@ -42,6 +42,19 @@ export default class Database {
     return { rowsAffected, lastInsertId };
   }
 
+  /**
+   * Mehrere Anweisungen als eine Transaktion auf einer Verbindung
+   * (`db_batch`) — alle oder keine. Eine Schleife über `execute` schriebe die
+   * Datei je Anweisung einmal fest. Liefert die betroffenen Zeilen insgesamt.
+   */
+  async batch(statements: ReadonlyArray<readonly [query: string, bindValues?: readonly unknown[]]>): Promise<number> {
+    if (!statements.length) return 0;
+    return invoke<number>('db_batch', {
+      db: this.path,
+      statements: statements.map(([query, values]) => [query, values ?? []]),
+    });
+  }
+
   async select<T>(query: string, bindValues?: unknown[]): Promise<T> {
     return invoke<T>('db_select', { db: this.path, query, values: bindValues ?? [] });
   }

@@ -35,13 +35,17 @@ export async function rewriteTagRefs(db: Database, fn: (ids: string[]) => string
   const changed = new Map<string, string[]>();
   for (const table of TAGGED_TABLES) {
     const rows = await db.select<{ id: string; tags: string }[]>(`SELECT id, tags FROM ${table} WHERE tags != '[]'`);
+    const updates: [string, unknown[]][] = [];
     for (const row of rows) {
       const before = jsonArray<string>(row.tags);
       const after = [...new Set(fn(before))];
       if (after.length === before.length && after.every((id, i) => id === before[i])) continue;
-      await db.execute(`UPDATE ${table} SET tags=$1 WHERE id=$2`, [JSON.stringify(after), row.id]);
+      updates.push([`UPDATE ${table} SET tags=$1 WHERE id=$2`, [JSON.stringify(after), row.id]]);
       changed.set(row.id, after);
     }
+    // Eine Transaktion je Tabelle: ein Tag auf hunderten Einträgen wären sonst
+    // hunderte Commits.
+    await db.batch(updates);
   }
   return changed;
 }

@@ -161,7 +161,7 @@ Components (render)
     ↓  user edits
 Store actions (updateEntry, updateTask, …)
     ↓  toInt / toJson (row.ts)
-    ↓  db.execute / db.select  (src/lib/sqlite.ts → db_* commands in db.rs)
+    ↓  db.execute / db.select / db.batch  (src/lib/sqlite.ts → db_* commands in db.rs)
 SQLite (persisted)
 ```
 
@@ -207,6 +207,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 |---|---|
 | `db_load(vault_id, file)` / `db_close(db)` | Open / close the pool of one of the vault's databases (`file` is `main` or `importStaging`, never a path). `db_load` returns the handle the other two take and refuses a vault without `vault.key`. See [`architecture/encryption.md`](architecture/encryption.md#the-sql-layer). |
 | `db_execute(db, query, values)` / `db_select(db, query, values)` | Run a statement on a pool / read rows. `execute` returns `(rowsAffected, lastInsertId)`. Every connection carries an authorizer that refuses key and export pragmas. |
+| `db_batch(db, statements)` | Run several `(query, values)` statements as one transaction on one connection — all or none — and return the rows affected in all. `Database.batch` in `sqlite.ts`. |
 | `vault_key_status(vault_id)` | `{hasDatabase, encrypted, unlocked}`; first finishes an interrupted re-encryption. The unlock gate's first question. |
 | `vault_create_key` / `vault_unlock` / `vault_unlock_remembered` / `vault_lock` | Create a new vault's key, unlock with the password, unlock from the OS keychain, forget the key held in memory. |
 | `vault_encrypt_existing` / `vault_change_password` / `vault_recover` | Re-encrypt a plain vault, change the password, or set a new one from the recovery key; all three build a copy under a new key and return the new recovery key. See [Re-encrypting a vault](architecture/encryption.md#re-encrypting-a-vault). |

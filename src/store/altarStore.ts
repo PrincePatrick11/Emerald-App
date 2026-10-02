@@ -157,7 +157,7 @@ async function dropThumbnailsShowing(db: Awaited<ReturnType<typeof getDb>>, item
     'SELECT DISTINCT altar_id FROM altar_placements WHERE item_id=$1', [itemId]
   );
   const ids = new Set(rows.map((r) => r.altar_id));
-  for (const id of ids) await db.execute('UPDATE altars SET thumbnail_data=NULL WHERE id=$1', [id]);
+  await db.batch([...ids].map((id) => ['UPDATE altars SET thumbnail_data=NULL WHERE id=$1', [id]] as const));
   return ids;
 }
 
@@ -308,25 +308,23 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       [id],
     );
 
-    for (const placement of sourcePlacements) {
-      await db.execute(
-        'INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
-        [
-          generateId(),
-          copy.id,
-          placement.item_id,
-          placement.x,
-          placement.y,
-          placement.z_index ?? 0,
-          placement.width ?? DEFAULT_PLACEMENT_SIZE,
-          placement.height ?? DEFAULT_PLACEMENT_SIZE,
-          placement.rotation ?? 0,
-          placement.opacity ?? 1,
-          placement.locked ?? 0,
-          placement.hidden ?? 0,
-        ]
-      );
-    }
+    await db.batch(sourcePlacements.map((placement) => [
+      'INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
+      [
+        generateId(),
+        copy.id,
+        placement.item_id,
+        placement.x,
+        placement.y,
+        placement.z_index ?? 0,
+        placement.width ?? DEFAULT_PLACEMENT_SIZE,
+        placement.height ?? DEFAULT_PLACEMENT_SIZE,
+        placement.rotation ?? 0,
+        placement.opacity ?? 1,
+        placement.locked ?? 0,
+        placement.hidden ?? 0,
+      ],
+    ] as const));
 
     // Samt den Platzierungen: ohne sie zeigte die Karte die Kopie leer, und
     // wer sie dort nachschlägt (`altarEdit.ts`), hielte sie für leer.
@@ -474,34 +472,35 @@ export const useAltarStore = create<AltarState>((set, get) => ({
         const item = itemsById.get(placement.item_id)!;
         return { ...placement, name: item.name, emoji: item.emoji, category_id: item.category_id, image_data: item.image_data };
       });
-    // Ohne Transaktion, deshalb so, dass ein abgebrochener Lauf sich
-    // wiederholen lässt: erst jede gemerkte Platzierung anlegen oder auf ihren
-    // Stand bringen, dann weg, was nicht dazugehört. Nie steht der Altar
-    // dazwischen ohne die Platzierungen da, die er hatte.
-    for (const p of restored) {
-      await db.execute(
-        `INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-         ON CONFLICT(id) DO UPDATE SET
-           altar_id=excluded.altar_id, item_id=excluded.item_id, x=excluded.x, y=excluded.y, z_index=excluded.z_index,
-           width=excluded.width, height=excluded.height, rotation=excluded.rotation, opacity=excluded.opacity,
-           locked=excluded.locked, hidden=excluded.hidden`,
-        [p.id, altar.id, p.item_id, p.x, p.y, p.z_index, p.width, p.height, p.rotation, p.opacity, toInt(p.locked), toInt(p.hidden)],
-      );
-    }
+    // In einer Transaktion (`batch`): erst jede gemerkte Platzierung anlegen
+    // oder auf ihren Stand bringen, dann weg, was nicht dazugehört. Die
+    // Reihenfolge hält es auch wiederholbar — nie steht der Altar dazwischen
+    // ohne die Platzierungen da, die er hatte.
+    const upserts = restored.map((p) => [
+      `INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       ON CONFLICT(id) DO UPDATE SET
+         altar_id=excluded.altar_id, item_id=excluded.item_id, x=excluded.x, y=excluded.y, z_index=excluded.z_index,
+         width=excluded.width, height=excluded.height, rotation=excluded.rotation, opacity=excluded.opacity,
+         locked=excluded.locked, hidden=excluded.hidden`,
+      [p.id, altar.id, p.item_id, p.x, p.y, p.z_index, p.width, p.height, p.rotation, p.opacity, toInt(p.locked), toInt(p.hidden)],
+    ] as const);
     // Die Platzierungen von Elementen im Papierkorb gehören nicht zum
     // gemerkten Stand, und doch zum Altar: sie bleiben — auch die eines
     // Elements, das beim Betreten dort lag und inzwischen zurück ist.
     const keptIds = restored.map((p) => p.id);
     const params = [altar.id, ...keptIds, ...untouchedItemIds];
     const ph = (from: number, n: number) => Array.from({ length: n }, (_, i) => `$${from + i}`).join(', ');
-    await db.execute(
-      `DELETE FROM altar_placements WHERE altar_id=$1
-         AND item_id IN (SELECT id FROM altar_items WHERE deleted_at IS NULL)`
-        + (keptIds.length ? ` AND id NOT IN (${ph(2, keptIds.length)})` : '')
-        + (untouchedItemIds.length ? ` AND item_id NOT IN (${ph(2 + keptIds.length, untouchedItemIds.length)})` : ''),
-      params,
-    );
+    await db.batch([
+      ...upserts,
+      [
+        `DELETE FROM altar_placements WHERE altar_id=$1
+           AND item_id IN (SELECT id FROM altar_items WHERE deleted_at IS NULL)`
+          + (keptIds.length ? ` AND id NOT IN (${ph(2, keptIds.length)})` : '')
+          + (untouchedItemIds.length ? ` AND item_id NOT IN (${ph(2 + keptIds.length, untouchedItemIds.length)})` : ''),
+        params,
+      ],
+    ]);
 
     set((s) => ({
       altars: s.altars
