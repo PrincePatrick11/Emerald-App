@@ -383,6 +383,8 @@ export async function exportAsEmerald(): Promise<void> {
     await message('Please open a journal entry, wiki article, or operation first.', { title: 'Export', kind: 'info' });
     return;
   }
+  // Direkt nach dem Start kann der Inhalt des offenen Eintrags noch ausstehen.
+  await useEntryStore.getState().ensureEntryContent(view.id);
 
   const { journal: entries, wiki: articles, operation: operations } = useEntryStore.getState().entries;
   const { categories }  = useCategoryStore.getState();

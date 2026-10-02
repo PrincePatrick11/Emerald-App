@@ -30,7 +30,7 @@ import { serialKey, serialized } from './serialize';
 import { viewTypeForEntryType } from './modules';
 import { remapDefinitionDefaults } from './blocks/definitions';
 import { hasOwnTitle } from './entryTitle';
-import { mapEntries, useEntryStore, withAddedEntry } from '../store/entryStore';
+import { mapEntries, useEntryStore, withAddedEntry, withoutIds } from '../store/entryStore';
 import { useTaskStore } from '../store/taskStore';
 import { useTemplateStore } from '../store/templateStore';
 import { useBlockDefinitionStore } from '../store/blockDefinitionStore';
@@ -161,6 +161,9 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
         const next = withContent(list, entryContent);
         return type === from ? next.filter((e) => e.id !== id) : next;
       }),
+      // Die umgeschriebenen Inhalte sind der neueste Stand: ein noch laufendes
+      // Nachladen (`fetchEntries`) darf sie nicht mit seinem älteren ersetzen.
+      pendingContent: s.pendingContent && withoutIds(s.pendingContent, entryContent.keys()),
     }));
     useTemplateStore.setState((s) => ({ templates: withContent(s.templates, templateContent) }));
     useTaskStore.setState((s) => ({

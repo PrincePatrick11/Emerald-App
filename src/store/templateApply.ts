@@ -91,6 +91,8 @@ export async function undoTemplateFields(
  * lebende Inhalt seines Stapels, nicht der letzte Autosave.
  */
 export async function saveEntryAsTemplate(entryType: TemplateEntryType, id: string): Promise<Template | undefined> {
+  // Auch aus dem Kontextmenü, für einen seit dem Start nie geöffneten Eintrag.
+  await useEntryStore.getState().ensureEntryContent(id);
   const entry = entryFields(entryType, id);
   if (!entry) return undefined;
   const session = useBlockSessionStore.getState().session;

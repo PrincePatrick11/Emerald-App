@@ -62,6 +62,8 @@ function moonLabel(phase: string): string {
 export async function collectExportData(): Promise<ExportData | null> {
   const view = useUIStore.getState().activeView;
   if (!view.id) return null;
+  // Direkt nach dem Start kann der Inhalt des offenen Eintrags noch ausstehen.
+  await useEntryStore.getState().ensureEntryContent(view.id);
 
   const { journal: entries, wiki: articles, operation: operations } = useEntryStore.getState().entries;
   const { categories } = useCategoryStore.getState();

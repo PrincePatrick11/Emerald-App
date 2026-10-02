@@ -32,7 +32,12 @@ interface EntryState {
    */
   pendingContent: ReadonlySet<string> | null;
 
-  fetchEntries: () => Promise<void>;
+  /**
+   * Lädt alle Einträge neu. `keepLoaded`: Einträge, deren Inhalt schon geladen
+   * ist, behalten ihn — nach einem Import (`reloadModules`), der nur über diesen
+   * Store schrieb. Ein Vault-Wechsel oder Backup-Import lädt alles neu.
+   */
+  fetchEntries: (options?: { keepLoaded?: boolean }) => Promise<void>;
   /** Lädt den Inhalt eines Eintrags sofort, falls er noch aussteht. */
   ensureEntryContent: (id: string) => Promise<void>;
   /** Mit dem Standard der Kombination (Vorlagen) — außer `blank`. Das Journal hat keine Kategorie. */
@@ -84,12 +89,20 @@ let loadGeneration = 0;
 /** Einträge je Abfrage der zweiten Stufe. */
 const CONTENT_CHUNK = 1000;
 
+/** `pending` ohne die `ids` — `null`, wenn danach keiner mehr aussteht. */
+export function withoutIds(pending: ReadonlySet<string>, ids: Iterable<string>): ReadonlySet<string> | null {
+  const next = new Set(pending);
+  for (const id of ids) next.delete(id);
+  return next.size ? next : null;
+}
+
 /**
  * Trägt die Inhalte nach — nur bei Einträgen, die noch ausstehen. Ein Eintrag,
  * den `ensureEntryContent` schon geholt und der Autosave seitdem geschrieben
  * hat, behielte sonst den älteren Stand dieser Abfrage.
  */
 async function loadAllContent(generation: number): Promise<void> {
+  if (generation !== loadGeneration || !useEntryStore.getState().pendingContent) return;
   const db = await getDb();
   // In Stücken: ein überholter Ladevorgang (Vault-Wechsel, neu geladene
   // Seite) hört nach dem laufenden Stück auf, statt noch alle Inhalte über
@@ -118,9 +131,31 @@ async function loadAllContent(generation: number): Promise<void> {
   });
 }
 
-/** Erfüllt sich, sobald jeder Eintrag seinen Inhalt hat — für alles, was über alle Inhalte geht. */
+/** Einmal nachgefasst: ein einzelner Fehler soll nicht für die ganze Sitzung leere Inhalte hinterlassen. */
+async function loadAllContentWithRetry(generation: number): Promise<void> {
+  try {
+    await loadAllContent(generation);
+  } catch (err) {
+    console.warn('[entries] loading content failed, retrying', err);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await loadAllContent(generation);
+  }
+}
+
+/**
+ * Erfüllt sich, sobald jeder Eintrag seinen Inhalt hat — für alles, was über
+ * alle Inhalte geht. Scheitert das Nachladen, wirft es.
+ *
+ * `contentLoad` wird gesetzt, sobald `fetchEntries` beginnt: nach dem Warten
+ * ist entweder alles da, oder ein neuerer Ladevorgang hat übernommen — dann
+ * auf den. Ohne den Vergleich drehte die Schleife über einem schon erfüllten
+ * Promise nur in Microtasks, und die IPC-Antwort käme nie an die Reihe.
+ */
 export async function whenEntryContentLoaded(): Promise<void> {
-  while (useEntryStore.getState().pendingContent) await contentLoad;
+  for (let load = contentLoad; useEntryStore.getState().pendingContent; load = contentLoad) {
+    await load;
+    if (load === contentLoad) return;
+  }
 }
 
 /** Alle Einträge in einer Liste — Journal, Wiki, Operationen. */
@@ -164,17 +199,32 @@ export const useEntryStore = create<EntryState>((set, get) => ({
   loading: false,
   pendingContent: null,
 
-  fetchEntries: async () => {
-    set({ loading: true });
+  fetchEntries: ({ keepLoaded = false } = {}) => {
     const generation = ++loadGeneration;
-    try {
-      const entries = await selectLiveEntries();
-      set({ entries, pendingContent: new Set(allEntries(entries).map((e) => e.id)) });
-    } finally {
-      set({ loading: false });
-    }
-    contentLoad = loadAllContent(generation);
+    const metadata = (async () => {
+      set({ loading: true });
+      try {
+        const fresh = await selectLiveEntries();
+        if (generation !== loadGeneration) return;
+        const s = get();
+        const loaded = new Map<string, string>();
+        if (keepLoaded) {
+          for (const e of allEntries(s.entries)) if (!s.pendingContent?.has(e.id)) loaded.set(e.id, e.content);
+        }
+        const entries = mapEntries(fresh, (list) => list.map((e) => {
+          const content = loaded.get(e.id);
+          return content === undefined ? e : { ...e, content };
+        }));
+        const pending = allEntries(entries).filter((e) => !loaded.has(e.id)).map((e) => e.id);
+        set({ entries, pendingContent: pending.length ? new Set(pending) : null });
+      } finally {
+        set({ loading: false });
+      }
+    })();
+    // Sofort, nicht erst nach den Metadaten — siehe `whenEntryContentLoaded`.
+    contentLoad = metadata.then(() => loadAllContentWithRetry(generation));
     contentLoad.catch((err: unknown) => console.error('[entries] loading content failed', err));
+    return metadata;
   },
 
   ensureEntryContent: async (id) => {
@@ -184,12 +234,10 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     set((s) => {
       // Inzwischen kam die zweite Stufe — oder ein anderer Aufruf — zuvor.
       if (!s.pendingContent?.has(id)) return {};
-      const pending = new Set(s.pendingContent);
-      pending.delete(id);
       const entry = findEntry(s.entries, id);
       const content = rows[0]?.content ?? '';
       return {
-        pendingContent: pending,
+        pendingContent: withoutIds(s.pendingContent, [id]),
         ...(entry && { entries: withEntry(s.entries, entry.type, (list) => list.map((e) => (e.id === id ? { ...e, content } : e))) }),
       };
     });
@@ -306,6 +354,8 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     const entry = fromRow.entry(rows[0]);
     set((s) => ({
       entries: withEntry(s.entries, entry.type, (list) => [...list.filter((e) => e.id !== id), entry].sort(ORDER[entry.type].sort)),
+      // Die volle Zeile ist da — auch, wenn die zweite Stufe noch läuft.
+      pendingContent: s.pendingContent && withoutIds(s.pendingContent, [id]),
     }));
   },
 

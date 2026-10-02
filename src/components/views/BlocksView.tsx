@@ -4,6 +4,7 @@ import { Trash2 } from 'lucide-react';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import { copyUsage, useBlockContentRows, type CopyUsage } from '../../store/blockCopies';
 import { useTemplateStore } from '../../store/templateStore';
+import { allEntries, useEntryStore, whenEntryContentLoaded } from '../../store/entryStore';
 import { useUIStore, type SortMode } from '../../store/uiStore';
 import { useBlockDraftStore } from '../../store/draftStore';
 import { useUndoStore } from '../../store/undoStore';
@@ -64,7 +65,12 @@ export default function BlocksView() {
    * entfernt werden sollen.
    */
   const remove = async (def: BlockDefinition) => {
-    const used = usage.get(def.id);
+    // Solange Inhalte nachladen (Start), zählt `usage` zu wenig Kopien — und
+    // ohne Kopien käme keine Rückfrage. Dann erst warten und frisch zählen.
+    const fresh = useEntryStore.getState().pendingContent
+      ? (await whenEntryContentLoaded(), copyUsage(allEntries(useEntryStore.getState().entries), useTemplateStore.getState().templates, definitions))
+      : usage;
+    const used = fresh.get(def.id);
     if ((used?.entries ?? 0) + (used?.templates ?? 0) > 0) {
       setDeleting(def);
       return;

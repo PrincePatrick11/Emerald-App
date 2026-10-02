@@ -23,9 +23,12 @@ import { ENTRY_MODULE_IDS, type EntryModuleId, type TrashKind } from '../lib/mod
  * Operationen teilen sich einen Store und damit dieselbe Funktion — die
  * Reload-Helfer unten rufen sie je Aufruf nur einmal.
  */
-const reloadEntries = () => useEntryStore.getState().fetchEntries();
+const reloadEntries = (options?: ReloadOptions) => useEntryStore.getState().fetchEntries(options);
 
-export const moduleWiring: Record<EntryModuleId, { reload: () => Promise<void> }> = {
+/** `keepLoaded`: schon geladene Inhalte bleiben (`fetchEntries`) — nur nach einem Import. */
+type ReloadOptions = { keepLoaded?: boolean };
+
+export const moduleWiring: Record<EntryModuleId, { reload: (options?: ReloadOptions) => Promise<void> }> = {
   journal: { reload: reloadEntries },
   tasks: { reload: () => useTaskStore.getState().fetchAll() },
   operations: { reload: reloadEntries },
@@ -132,11 +135,12 @@ export async function reloadModules(ids: readonly EntryModuleId[]): Promise<void
     useTemplateStore.getState().fetchTemplates(),
     useLexiconStore.getState().fetchLexicon(),
   ]);
-  await reloadEach(ids);
+  // Ein Import schreibt über die Stores: was an Inhalten schon geladen ist, stimmt.
+  await reloadEach(ids, { keepLoaded: true });
 }
 
 /** Lädt die Module neu — Journal, Wiki und Operationen teilen sich dabei eine Abfrage. */
-function reloadEach(ids: readonly EntryModuleId[]): Promise<unknown> {
+function reloadEach(ids: readonly EntryModuleId[], options?: ReloadOptions): Promise<unknown> {
   const reloads = new Set(ids.map((id) => moduleWiring[id].reload));
-  return Promise.all([...reloads].map((reload) => reload()));
+  return Promise.all([...reloads].map((reload) => reload(options)));
 }
