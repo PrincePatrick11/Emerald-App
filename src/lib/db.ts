@@ -2,7 +2,7 @@ import Database from './sqlite';
 import { invoke } from '@tauri-apps/api/core';
 import { getActiveVaultId } from './vaultManager';
 import {
-  ALTAR_ITEMS_INDEX_DDL, ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, LEXICON_INDEX_DDL, TABLE_DDL,
+  ALTAR_ITEMS_INDEX_DDL, ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, ENTRIES_INDEX_DDL, LEXICON_INDEX_DDL, TABLE_DDL,
   TEMPLATES_INDEX_DDL, createSchema, ddlIfNotExists, purgeCategory, seedBuiltins, storedImageName,
 } from './schema';
 import { normalizeSchema } from './normalizeSchema';
@@ -1395,6 +1395,17 @@ export const MIGRATIONS: Migration[] = [
       await dropColumnsIfPresent(db, 'tasks', ['description', 'due_date']);
       await dropColumnsIfPresent(db, 'block_definitions', ['description']);
       await dropColumnsIfPresent(db, 'templates', ['description']);
+    },
+  },
+  {
+    // Die Listen-Spalten als Index (`idx_entries_list`, siehe `ENTRIES_INDEX_DDL`):
+    // der Start las sie sonst durch die Überlaufseiten jedes Inhalts.
+    // `idx_entries_deleted` geht darin auf. Wiederholbar.
+    version: 55,
+    name: 'entries_list_index',
+    up: async (db) => {
+      await db.execute('DROP INDEX IF EXISTS idx_entries_deleted');
+      await createIndexesIfMissing(db, ENTRIES_INDEX_DDL);
     },
   },
 ];

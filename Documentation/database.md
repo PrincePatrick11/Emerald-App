@@ -32,7 +32,7 @@ Because the baseline and the chain must produce the same schema, `npm run check:
 - **Fresh file** — no tables at all (checked in `sqlite_master`, not `schema_version`: a database old enough to predate the version table has tables but no version row and must run the chain). It runs the DDL from `schema.ts`, seeds the built-in category, the starter categories and the `core-sigil` template — in the language active at first open, since `main.tsx` waits for the stored language before anything touches the database — and stamps one `baseline` row at `BASELINE_VERSION`.
 - **Existing file** — the ordered `MIGRATIONS` array runs from the highest applied version upward, each step stamping `schema_version` with version, name and ISO timestamp. Every vault reaches the same schema as a fresh one; there is no cut-off past which an old database stops being upgradable.
 
-`BASELINE_VERSION` in `schema.ts` must equal the last entry in `MIGRATIONS`; `runMigrations` throws at startup otherwise. The current version is **54**. **Version 24 does not exist** — the runner tolerates gaps and only requires each version to be above the last applied one. The three block migrations were first numbered v39–v41 on their development branch; `renumberBlockMigrations` restamps such a vault once by name and catches up on v39.
+`BASELINE_VERSION` in `schema.ts` must equal the last entry in `MIGRATIONS`; `runMigrations` throws at startup otherwise. The current version is **55**. **Version 24 does not exist** — the runner tolerates gaps and only requires each version to be above the last applied one. The three block migrations were first numbered v39–v41 on their development branch; `renumberBlockMigrations` restamps such a vault once by name and catches up on v39.
 
 After the migrations, every open runs:
 
@@ -67,6 +67,7 @@ Per-migration detail lives in the code and in `CHANGELOG.md`. In short:
 | 52 | `altar_items_soft_delete` | Additive: `altar_items.updated_at`/`deleted_at` |
 | 53 | `tags_by_id` | Tag lists hold ids instead of names; `tags.affected_ids` dropped ([tags](#tags)) |
 | 54 | `drop_unused_descriptions` | Drops `tasks.description`/`due_date`, `block_definitions.description`, `templates.description` |
+| 55 | `entries_list_index` | `idx_entries_list` (the list columns) and the partial `idx_entries_decorated` replace `idx_entries_deleted` |
 
 Column drops go through `dropColumnsIfPresent` (`dbRebuild.ts`), which skips columns already gone, so they are repeatable. Where a migration converts data, the same converter also runs on rows from an older `.emeralddb` file at import time — see [DB Backup / Restore](#db-backup--restore-emeralddb).
 
@@ -290,7 +291,7 @@ Journal entries, wiki articles and operations in one table. What distinguishes t
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active |
 
-Indexes: `idx_entries_type` on `(type, deleted_at)` (every module loads its live entries that way), `idx_entries_category`, `idx_entries_deleted`.
+Indexes: `idx_entries_type` on `(type, deleted_at)` (every module loads its live entries that way), `idx_entries_category`, `idx_entries_list` on `(deleted_at, type, title, category_id, entry_number, tags, created_at, updated_at, id)` and the partial `idx_entries_decorated` on `deleted_at` `WHERE icon IS NOT NULL OR cover_image IS NOT NULL`. In the row, `tags`, `created_at` and the rest come after `content`, so reading them walked every entry's overflow pages — under SQLCipher that decrypted nearly the whole file. `idx_entries_list` answers the start-up list query (`fetchEntries`, first stage) and the tag sweep on open from the index alone; icon and cover can be data URLs and stay out of it, the few entries carrying one are found through `idx_entries_decorated`, which a query only uses with that exact condition in its WHERE.
 
 **Old rows (v49 and pre-`"11"` backups).** The three old tables carried columns the app no longer reads — `slug`, `moon_phase`, journal `mood`/`paradigm_id`/banishing/meditation/`linked_*_ids` fields, operation status, sigil and `description` columns. Their content was converted into blocks and link chips by v36, v37, v41 and v42; v49 then copies only the shared columns. An id that sat in two old tables (a type change interrupted in an earlier version) keeps the first one (journal, wiki, operation) and the others are logged; they remain in `.pre-v49.bak`. Before copying, v49 retries the sigil drawings v42 could not save, and aborts until that succeeds — the column they wait in is about to go. Older backups go through the same converters on import, row by row (see [DB Backup / Restore](#db-backup--restore-emeralddb)).
 

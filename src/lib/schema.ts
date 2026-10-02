@@ -21,7 +21,7 @@ import type Database from './sqlite';
  * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
  * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
  */
-export const BASELINE_VERSION = 54;
+export const BASELINE_VERSION = 55;
 
 /**
  * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
@@ -329,14 +329,25 @@ export const ALTARS_INDEX_DDL = 'CREATE INDEX idx_altars_deleted ON altars(delet
 export const ALTAR_ITEMS_INDEX_DDL = 'CREATE INDEX idx_altar_items_deleted ON altar_items(deleted_at)';
 
 /**
- * Die Indizes von `entries` (v49). `type` samt `deleted_at`, weil jedes Modul
- * seine lebenden Einträge so lädt; `deleted_at` allein für den Bereichsscan
- * von `runPeriodicCleanup`.
+ * Die Indizes von `entries`. `type` samt `deleted_at`, weil jedes Modul seine
+ * lebenden Einträge so lädt.
+ *
+ * `idx_entries_list` (v55) trägt jede Spalte, die die Listen beim Start lesen
+ * (`fetchEntries`, erste Stufe), und die Tags (`rewriteTagRefs` beim Öffnen).
+ * In der Zeile liegen `tags`, `created_at` … hinter `content`: ohne den Index
+ * las SQLite dafür die Überlaufseiten jedes Eintrags — und SQLCipher
+ * entschlüsselte dafür fast die ganze Datei. Mit ihm reicht der Index allein.
+ * `deleted_at` führt, so dient er auch dem Bereichsscan von
+ * `runPeriodicCleanup`. Icon und Titelbild fehlen bewusst: sie können
+ * Data-URLs sein. Die wenigen Einträge, die eins tragen, findet der Teilindex
+ * `idx_entries_decorated` — eine Abfrage nutzt ihn nur mit genau dieser
+ * Bedingung im WHERE.
  */
 export const ENTRIES_INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_entries_type ON entries(type, deleted_at)',
   'CREATE INDEX idx_entries_category ON entries(category_id)',
-  'CREATE INDEX idx_entries_deleted ON entries(deleted_at)',
+  'CREATE INDEX idx_entries_list ON entries(deleted_at, type, title, category_id, entry_number, tags, created_at, updated_at, id)',
+  'CREATE INDEX idx_entries_decorated ON entries(deleted_at) WHERE icon IS NOT NULL OR cover_image IS NOT NULL',
 ];
 
 /** Alle Indizes des aktuellen Schemas — was ein frischer Vault bekommt. */

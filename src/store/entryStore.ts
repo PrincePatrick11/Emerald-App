@@ -67,13 +67,28 @@ const ORDER: Record<EntryType, { sort: (a: Entry, b: Entry) => number; newAtEnd:
 
 const emptyEntries = (): EntriesByType => ({ journal: [], wiki: [], operation: [] });
 
-/** Alles außer `content` — die erste Stufe von `fetchEntries`. */
-const META_COLUMNS = 'id, type, title, category_id, entry_number, icon, cover_image, tags, created_at, updated_at, deleted_at';
+/** Die Spalten von `idx_entries_list` — die Abfrage liest nur den Index (`ENTRIES_INDEX_DDL`). */
+const LIST_COLUMNS = 'id, type, title, category_id, entry_number, tags, created_at, updated_at, deleted_at';
 
-/** Die lebenden Einträge aus der Datenbank, je Typ sortiert — ohne Inhalt. */
+/**
+ * Die lebenden Einträge aus der Datenbank, je Typ sortiert — ohne Inhalt, die
+ * erste Stufe von `fetchEntries`. Icon und Titelbild stehen nicht im Index
+ * (Data-URLs): sie kommen für die wenigen Einträge, die eins tragen, über
+ * `idx_entries_decorated` — dafür steht dessen Bedingung wörtlich im WHERE.
+ */
 async function selectLiveEntries(): Promise<EntriesByType> {
   const db = await getDb();
-  const rows = await db.select<DbRow[]>(`SELECT ${META_COLUMNS} FROM entries WHERE deleted_at IS NULL`);
+  const [rows, decorated] = await Promise.all([
+    db.select<DbRow[]>(`SELECT ${LIST_COLUMNS} FROM entries WHERE deleted_at IS NULL`),
+    db.select<DbRow[]>(
+      'SELECT id, icon, cover_image FROM entries WHERE deleted_at IS NULL AND (icon IS NOT NULL OR cover_image IS NOT NULL)',
+    ),
+  ]);
+  const decorationById = new Map(decorated.map((d) => [d.id, d]));
+  for (const row of rows) {
+    const d = decorationById.get(row.id);
+    if (d) Object.assign(row, { icon: d.icon, cover_image: d.cover_image });
+  }
   const byType = emptyEntries();
   for (const row of rows) {
     const entry = fromRow.entry(row);
