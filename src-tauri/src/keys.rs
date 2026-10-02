@@ -407,6 +407,8 @@ pub struct KeyStatus {
 /// thread: it finishes an interrupted re-encryption first, which moves files.
 #[tauri::command]
 pub async fn vault_key_status(app: tauri::AppHandle, vault_id: String) -> Result<KeyStatus, String> {
+    #[cfg(debug_assertions)]
+    crate::reencrypt::dev_seed(&app, &vault_id).await;
     tauri::async_runtime::spawn_blocking(move || {
         let dir = vault::vault_dir(&app, &vault_id)?;
         vault::directory_state(&dir)?;

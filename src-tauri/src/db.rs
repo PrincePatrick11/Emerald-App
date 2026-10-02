@@ -129,7 +129,7 @@ fn attach_scope(dir: &Path) -> &'static String {
     leaked
 }
 
-fn normalize_path(path: &str) -> String {
+pub(crate) fn normalize_path(path: &str) -> String {
     path.replace('\\', "/").trim_end_matches('/').to_lowercase()
 }
 

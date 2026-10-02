@@ -682,6 +682,42 @@ pub async fn vault_change_password(
     rekey_command(&app, &vault_id, old_key, &new_password, None).await
 }
 
+/// Dev builds only: the seed vault of an Emerald-Devtools MCP slot opens
+/// without a person at the keyboard. The launcher names the vault folder and a
+/// test password (`EMERALD_DEV_SEED_VAULT`, `EMERALD_DEV_SEED_PASSWORD`); the
+/// plain seed it provisions is encrypted with that password on first sight,
+/// and unlocked with it afterwards. Any other folder, and every release
+/// build, goes through the normal password dialog.
+#[cfg(debug_assertions)]
+pub async fn dev_seed(app: &tauri::AppHandle, vault_id: &str) {
+    use tauri::Manager;
+    let (Ok(seed), Ok(password)) = (std::env::var("EMERALD_DEV_SEED_VAULT"), std::env::var("EMERALD_DEV_SEED_PASSWORD")) else {
+        return;
+    };
+    let Ok(dir) = vault::vault_dir(app, vault_id) else { return };
+    if crate::db::normalize_path(&dir.to_string_lossy()) != crate::db::normalize_path(&seed) {
+        return;
+    }
+    let _guard = RUNNING.lock().await;
+    recover_interrupted(&dir).ok();
+    let vault_keys = app.state::<keys::VaultKeys>();
+    if !keys::is_encrypted_dir(&dir) {
+        if is_regular_file(&dir.join(vault::DB_FILE)) {
+            match encrypt_dir(&dir, &password, keys::DEFAULT_KDF).await {
+                Ok(done) => vault_keys.insert(vault_id, done.vault_key),
+                Err(e) => eprintln!("[dev-seed] could not encrypt the seed vault: {e}"),
+            }
+        }
+        return;
+    }
+    if vault_keys.get(vault_id).is_none() {
+        match keys::read_key_file(&dir).and_then(|file| file.ok_or_else(|| "no key file".to_string())?.unlock_with_password(&password)) {
+            Ok(key) => vault_keys.insert(vault_id, key),
+            Err(e) => eprintln!("[dev-seed] seed vault does not open with the test password: {e}"),
+        }
+    }
+}
+
 /// "Forgot password": opens with the recovery key and, like a password
 /// change, moves the vault to a new key — a leaked old password together with
 /// an old `vault.key` copy must not open what is written from now on. Returns
