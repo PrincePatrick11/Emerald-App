@@ -1,10 +1,13 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Search } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import ContextMenu, { type ContextMenuAction } from './ContextMenu';
+
+/** Zeilen je Schritt, wenn die Liste ohne Limit („alle") läuft. */
+const RENDER_STEP = 100;
 
 export interface RenderRowArgs<T> {
   item: T;
@@ -54,12 +57,35 @@ export default function EntryListTab<T>({
   // je ein Limit nach. Ein Tab-Wechsel montiert die Liste neu und beginnt von vorn.
   const limit = useSettingsStore((s) => s.settings.leftList.limit);
   const [pages, setPages] = useState(1);
+  // Ohne Limit („alle") wird trotzdem nicht alles auf einmal gezeichnet: erst
+  // ein Stück, der Rest, sobald die Liste dorthin gescrollt wird. Tausende
+  // Zeilen kosteten sonst bei jedem Klick (neue `activeView`) und beim Start
+  // ein spürbares Neuzeichnen.
+  const [rendered, setRendered] = useState(RENDER_STEP);
   // Ein neues Limit oder eine neue Suche beginnt wieder bei der ersten Seite.
-  useEffect(() => setPages(1), [limit, searchQuery]);
+  useEffect(() => { setPages(1); setRendered(RENDER_STEP); }, [limit, searchQuery]);
 
-  const matching = items.filter((item) => getTitle(item).toLowerCase().includes(searchQuery.toLowerCase()));
-  const visible = limit === null ? matching : matching.slice(0, limit * pages);
-  const hiddenCount = matching.length - visible.length;
+  const query = searchQuery.toLowerCase();
+  const matching = query ? items.filter((item) => getTitle(item).toLowerCase().includes(query)) : items;
+  const visible = matching.slice(0, limit === null ? rendered : limit * pages);
+  const hiddenCount = limit === null ? 0 : matching.length - visible.length;
+  const hasUnrendered = limit === null && visible.length < matching.length;
+
+  const navRef = useRef<HTMLElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  // Neu bei jedem Wachsen: ein frischer Observer meldet sofort, ob der Rand
+  // noch sichtbar ist — so füllt sich auch ein hoher Bildschirm, ohne dass
+  // erst gescrollt werden muss.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!hasUnrendered || !sentinel) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry?.isIntersecting) setRendered((n) => n + RENDER_STEP); },
+      { root: navRef.current, rootMargin: '600px 0px' },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasUnrendered, rendered]);
 
   const openCtxMenu = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
@@ -98,7 +124,7 @@ export default function EntryListTab<T>({
         </div>
       </div>
 
-      <nav className="entry-list-nav flex-1 overflow-y-auto py-2 px-2">
+      <nav ref={navRef} className="entry-list-nav flex-1 overflow-y-auto py-2 px-2">
         {matching.length === 0 ? (
           // Zwei Zeilen an der Stelle des ersten Eintrags, ohne Icon und Knopf —
           // das Dashboard daneben trägt den großen Leer-Zustand.
@@ -193,6 +219,7 @@ export default function EntryListTab<T>({
                 {t('sidebar.showMore', { count: Math.min(limit, hiddenCount) })}
               </button>
             )}
+            {hasUnrendered && <div ref={sentinelRef} aria-hidden className="h-px" />}
           </div>
         )}
       </nav>

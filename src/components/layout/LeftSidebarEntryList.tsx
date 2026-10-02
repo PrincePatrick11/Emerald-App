@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from 'react';
+import type { ComponentType } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { formatEntryDate } from '../../lib/formatDate';
@@ -18,7 +18,6 @@ import { generateId, isImageIcon } from '../../lib/helpers';
 import { journalIcon } from '../../lib/moonPhase';
 import type { AltarRecord, Entry, Task } from '../../types';
 import EntryListTab, { type EntryListTabProps } from '../ui/EntryListTab';
-import type { ContextMenuAction } from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 
@@ -69,23 +68,22 @@ function ActiveList({ list }: { list: LeftListTabId }) {
 
 type EntryKind = 'journal' | 'task' | 'operation' | 'wiki' | 'altar';
 
+/** Die Config einer Liste, typ-gelöscht: ihre Funktionen bekommen nur Items
+ *  derselben Config zurück (`AllRow.item`), der Cast in `toAllRows` ist also
+ *  sicher. */
+interface AllSource {
+  kindLabel: string;
+  cfg: EntryListTabProps<unknown>;
+}
+
+/** Bewusst schlank: Titel, Datum und Icon rechnet die Liste erst für die
+ *  Zeilen aus, die sie auch zeichnet — bei tausenden Einträgen wäre das sonst
+ *  bei jedem Klick (neue `activeView`) die ganze Liste. */
 interface AllRow {
   id: string;
-  title: string;
-  /** Der gespeicherte Titel, mit dem das Umbenennen beginnt. */
-  editTitle: string;
   sortDate: string;
-  icon: ReactNode;
-  dateStr: string;
-  active: boolean;
-  open: () => void;
-  /** Absent for Tasks, which have no standalone view to open in a tab. */
-  openNewTab?: () => void;
-  /** Optional nur wegen der Typ-Erasure über EntryListTabProps — inzwischen
-   *  liefern alle fünf Configs ein onDragStart. */
-  dragStart?: () => void;
-  rename: (title: string) => void | Promise<void>;
-  actions: (startRename: () => void) => ContextMenuAction[];
+  item: unknown;
+  src: AllSource;
 }
 
 function toAllRows<T>(
@@ -94,23 +92,8 @@ function toAllRows<T>(
   cfg: EntryListTabProps<T>,
   getSortDate: (item: T) => string,
 ): AllRow[] {
-  const { onOpen, onOpenNewTab, onDragStart } = cfg;
-  return cfg.items.map((item) => ({
-    id: `${kind}:${cfg.getId(item)}`,
-    title: cfg.getTitle(item),
-    editTitle: (cfg.getEditTitle ?? cfg.getTitle)(item),
-    sortDate: getSortDate(item),
-    icon: cfg.getIcon?.(item),
-    // Reuse the tab's own subtitle so an entry never shows one date here and
-    // another there; the kind label is what "All" adds on top.
-    dateStr: [kindLabel, cfg.getDateStr?.(item)].filter(Boolean).join(' · '),
-    active: cfg.isActive?.(item) ?? false,
-    open: () => onOpen?.(item),
-    openNewTab: onOpenNewTab && (() => onOpenNewTab(item)),
-    dragStart: onDragStart && (() => onDragStart(item)),
-    rename: (title: string) => cfg.onRename(item, title),
-    actions: (startRename: () => void) => cfg.contextMenuActions(item, startRename),
-  }));
+  const src: AllSource = { kindLabel, cfg: cfg as unknown as EntryListTabProps<unknown> };
+  return cfg.items.map((item) => ({ id: `${kind}:${cfg.getId(item)}`, sortDate: getSortDate(item), item, src }));
 }
 
 function AllList() {
@@ -133,16 +116,18 @@ function AllList() {
     <EntryListTab
       items={rows}
       getId={(r) => r.id}
-      getTitle={(r) => r.title}
-      getEditTitle={(r) => r.editTitle}
-      getDateStr={(r) => r.dateStr}
-      getIcon={(r) => r.icon}
-      isActive={(r) => r.active}
-      onOpen={(r) => r.open()}
-      onOpenNewTab={(r) => r.openNewTab?.()}
-      onDragStart={(r) => r.dragStart?.()}
-      onRename={(r, title) => r.rename(title)}
-      contextMenuActions={(r, startRename) => r.actions(startRename)}
+      getTitle={(r) => r.src.cfg.getTitle(r.item)}
+      getEditTitle={(r) => (r.src.cfg.getEditTitle ?? r.src.cfg.getTitle)(r.item)}
+      // Reuse the tab's own subtitle so an entry never shows one date here and
+      // another there; the kind label is what "All" adds on top.
+      getDateStr={(r) => [r.src.kindLabel, r.src.cfg.getDateStr?.(r.item)].filter(Boolean).join(' · ')}
+      getIcon={(r) => r.src.cfg.getIcon?.(r.item)}
+      isActive={(r) => r.src.cfg.isActive?.(r.item) ?? false}
+      onOpen={(r) => r.src.cfg.onOpen?.(r.item)}
+      onOpenNewTab={(r) => r.src.cfg.onOpenNewTab?.(r.item)}
+      onDragStart={(r) => r.src.cfg.onDragStart?.(r.item)}
+      onRename={(r, title) => r.src.cfg.onRename(r.item, title)}
+      contextMenuActions={(r, startRename) => r.src.cfg.contextMenuActions(r.item, startRename)}
       emptyMessage={t('sidebar.allEmpty')}
     />
   );
