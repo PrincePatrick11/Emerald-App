@@ -23,7 +23,7 @@ import { useUndoStore } from './undoStore';
 import { useSettingsStore } from './settingsStore';
 import { captureLegacySettings } from '../lib/vaultSettings';
 import { resolveOpenEdits } from '../lib/openEdits';
-import { keyErrorOf, lockVault } from '../lib/vaultKeys';
+import { changeVaultPassword, keyErrorOf, lockVault } from '../lib/vaultKeys';
 import { ensureVaultReady, VAULT_KEY_CANCELLED } from './vaultKeyStore';
 
 interface VaultStore {
@@ -44,6 +44,19 @@ interface VaultStore {
   /** Resolves to whether the vault's folder is gone — `false` when it stayed
    *  because something else still lies in it (see `delete_vault_files`). */
   removeVault: (id: string, deleteFiles?: boolean) => Promise<boolean>;
+  /**
+   * Gesperrt und noch nicht wieder entsperrt — `AppShell` zeigt dann nur den
+   * Rahmen, damit hinter der Passwortfrage kein Inhalt stehen bleibt.
+   */
+  locked: boolean;
+  /**
+   * Neues Passwort, neuer Vault-Schlüssel (`reencrypt.rs`). Danach ist alles
+   * neu geladen — die Bilder heißen anders. `null`, wenn eine laufende
+   * Bearbeitung weitergehen soll.
+   */
+  changePassword: (currentPassword: string, newPassword: string) => Promise<{ recoveryKey: string; remembered: boolean } | null>;
+  /** Sperrt den offenen Vault und fragt sofort nach dem Passwort — auch wenn er gemerkt ist. */
+  lockActive: () => Promise<void>;
 }
 
 /**
@@ -68,7 +81,7 @@ export function activeVault(state: Pick<VaultStore, 'vaults' | 'activeVaultId'>)
  * The caller has already made it the active one; where to go when it cannot be
  * opened is the caller's decision — switching goes back, deleting cannot.
  */
-async function openActiveVault(): Promise<void> {
+async function openActiveVault({ askPassword = false }: { askPassword?: boolean } = {}): Promise<void> {
   // Eingereihte Store-Writes des alten Vaults zu Ende bringen, bevor die
   // Verbindung darunter geschlossen wird.
   await drainSerialized();
@@ -77,7 +90,7 @@ async function openActiveVault(): Promise<void> {
   // Entsperren oder — bei einem neuen Vault — das Passwort festlegen. Wer
   // hier abbricht, landet im Fehlerzweig des Aufrufers.
   const active = activeVault(useVaultStore.getState());
-  if (active) await ensureVaultReady(active);
+  if (active) await ensureVaultReady(active, { askPassword });
   // Vor getDb(): die Migrationen beim Öffnen brauchen schon die Sprache des
   // neuen Vaults (siehe `loadForVault`). Ein fehlender Vault-Ordner scheitert
   // bereits hier.
@@ -108,6 +121,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   // nicht als eine Id tarnen, die die Registry vielleicht gar nicht kennt.
   activeVaultId: '',
   loaded: false,
+  locked: false,
 
   loadVaults: async () => {
     const data = await loadVaultsFile();
@@ -248,5 +262,45 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       detachVaultPrefs();
     }
     return dirRemoved;
+  },
+
+  changePassword: async (currentPassword, newPassword) => {
+    const id = get().activeVaultId;
+    // Wie ein Wechsel: offene Bearbeitungen klären, Entwürfe wegschreiben —
+    // die Neuverschlüsselung schreibt sie unter neuem Schlüssel neu.
+    if (!(await resolveOpenEdits())) return null;
+    await drainSerialized();
+    await detachDrafts();
+    let result: { recoveryKey: string; remembered: boolean };
+    try {
+      result = await withDbClosed(() => changeVaultPassword(id, currentPassword, newPassword));
+    } catch (err) {
+      // Falsches Passwort oder ein Fehler vor dem Tausch: der Vault ist, wie
+      // er war, und öffnet beim nächsten `getDb()` mit dem alten Schlüssel.
+      await restoreDrafts(id);
+      throw err;
+    }
+    await openActiveVault();
+    return result;
+  },
+
+  lockActive: async () => {
+    if (!(await resolveOpenEdits())) return;
+    await drainSerialized();
+    await detachDrafts();
+    const id = get().activeVaultId;
+    set({ locked: true });
+    try {
+      await withDbClosed(() => lockVault(id));
+      await openActiveVault({ askPassword: true });
+    } catch (err) {
+      if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) throw err;
+      // Nicht entsperrt: kein Vault ist offen, das Vault-Fenster übernimmt.
+      set({ activeVaultId: '' });
+      await useSettingsStore.getState().clear();
+      detachVaultPrefs();
+    } finally {
+      set({ locked: false });
+    }
   },
 }));

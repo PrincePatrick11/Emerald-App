@@ -649,6 +649,30 @@
     "encrypting": "Verschlüssele …",
     "encryptFailed": "Der Vault konnte nicht verschlüsselt werden. Er ist unverändert – bitte versuche es noch einmal."
   },
+  "security": {
+    "page": "Sicherheit",
+    "rememberHint": "Liegt der Schlüssel im Schlüsselbund des Betriebssystems, öffnet sich der Vault ohne Passwort. Die Dateien im Vault-Ordner bleiben in jedem Fall verschlüsselt.",
+    "rememberLabel": "Diesen Vault auf diesem Gerät merken",
+    "rememberError": "Der Schlüsselbund hat die Änderung nicht übernommen.",
+    "changeTitle": "Passwort ändern",
+    "changeHint": "Mit dem Passwort wechselt auch der Schlüssel: Emerald verschlüsselt den Vault neu und zeigt dir einen neuen Wiederherstellungsschlüssel – der alte gilt danach nicht mehr. Ältere Backups öffnen weiter mit dem Passwort, das bei ihrer Erstellung galt. Offene Tabs werden dabei geschlossen.",
+    "currentPassword": "Aktuelles Passwort",
+    "changeSubmit": "Passwort ändern",
+    "changed": "Passwort geändert, der Vault ist unter einem neuen Schlüssel verschlüsselt.",
+    "changeFailed": "Das Passwort konnte nicht geändert werden. Der Vault ist unverändert.",
+    "lockTitle": "Vault sperren",
+    "lockHint": "Schließt den Vault sofort. Zum Weiterarbeiten fragt Emerald wieder nach dem Passwort – auch wenn der Vault auf diesem Gerät gemerkt ist.",
+    "lockTooltip": "Vault schließen und Passwort verlangen",
+    "lockNow": "Jetzt sperren"
+  },
+  "backupKey": {
+    "title": "Backup öffnen",
+    "hint": "Dieses Backup ist verschlüsselt und gehört nicht zum offenen Vault – oder stammt aus der Zeit vor einem Passwortwechsel. Gib das Passwort ein, das der Vault beim Erstellen des Backups hatte, oder seinen Wiederherstellungsschlüssel von damals.",
+    "password": "Passwort des Backups",
+    "useRecovery": "Wiederherstellungsschlüssel verwenden",
+    "usePassword": "Passwort verwenden",
+    "open": "Öffnen"
+  },
   "settings": {
     "language": "Sprache",
     "about": "Über",

@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Copy, KeyRound, Loader2, ShieldCheck, Smartphone } from 'lucide-react';
+import { KeyRound, Loader2, Smartphone } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { SwitchRow } from '../ui/Switch';
+import RecoveryKeyBox from './RecoveryKeyBox';
+import { KeyField, NewPasswordFields, keyErrorText, newPasswordProblem, onEnter } from './vaultKeyParts';
 import { useVaultKeyStore, type VaultKeyRequest } from '../../store/vaultKeyStore';
-import {
-  KEY_ERRORS, MIN_PASSWORD_LENGTH, createVaultKey, encryptExistingVault, keyErrorOf, keychainAvailable, recoverVault,
-  unlockVault,
-} from '../../lib/vaultKeys';
+import { createVaultKey, encryptExistingVault, keychainAvailable, recoverVault, unlockVault } from '../../lib/vaultKeys';
 import { hideSplash } from '../../lib/splash';
 
 /**
@@ -54,7 +53,6 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   const [recoveryKey, setRecoveryKey] = useState('');
   const [rememberRefused, setRememberRefused] = useState(false);
   const [stored, setStored] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -73,12 +71,6 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
 
   const rememberWish = keychain && rememberTouched ? remember : undefined;
 
-  const newPasswordError = (): string => {
-    if (password.length < MIN_PASSWORD_LENGTH) return t('vaultKey.tooShort', { count: MIN_PASSWORD_LENGTH });
-    if (password !== repeat) return t('vaultKey.mismatch');
-    return '';
-  };
-
   async function attempt(kind: keyof typeof FAILED_KEY, action: () => Promise<void>) {
     if (busy) return;
     setBusy(true);
@@ -86,14 +78,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
     try {
       await action();
     } catch (err) {
-      const code = keyErrorOf(err);
-      if (code === KEY_ERRORS.wrongPassword) setError(t('vaultKey.wrongPassword'));
-      else if (code === KEY_ERRORS.wrongRecoveryKey) setError(t('vaultKey.wrongRecoveryKey'));
-      else if (code === KEY_ERRORS.passwordTooShort) setError(t('vaultKey.tooShort', { count: MIN_PASSWORD_LENGTH }));
-      else {
-        console.error('[vault-key]', err);
-        setError(t(FAILED_KEY[kind]));
-      }
+      setError(keyErrorText(t, err, FAILED_KEY[kind]));
     } finally {
       setBusy(false);
     }
@@ -111,14 +96,14 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   });
 
   const submitRecover = () => attempt('recover', async () => {
-    const problem = newPasswordError();
+    const problem = newPasswordProblem(t, password, repeat);
     if (problem) { setError(problem); return; }
     unlocked(await recoverVault(request.vaultId, recoveryInput, password, rememberWish));
   });
 
   /** Neuer Vault oder Verschlüsselung eines alten — beide enden beim Wiederherstellungsschlüssel. */
   const submitNewKey = (kind: 'create' | 'encrypt') => attempt(kind, async () => {
-    const problem = newPasswordError();
+    const problem = newPasswordProblem(t, password, repeat);
     if (problem) { setError(problem); return; }
     const make = kind === 'create' ? createVaultKey : encryptExistingVault;
     const created = await make(request.vaultId, password, rememberWish);
@@ -128,19 +113,6 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
     setRepeat('');
     setStep('showRecovery');
   });
-
-  async function copyRecoveryKey() {
-    try {
-      await navigator.clipboard.writeText(recoveryKey);
-      setCopied(true);
-    } catch (err) {
-      console.error('[vault-key] copy failed', err);
-    }
-  }
-
-  const onEnter = (submit: () => void) => (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.nativeEvent.isComposing) submit();
-  };
 
   const title = {
     unlock: t('vaultKey.unlockTitle', { name: request.vaultName }),
@@ -173,31 +145,16 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   const errorLine = error ? <p className="text-xs text-danger" role="alert">{error}</p> : null;
 
   const passwordFields = (submit: () => void, autoFocus: boolean) => (
-    <>
-      <Field label={t('vaultKey.newPassword')}>
-        <input
-          type="password"
-          autoFocus={autoFocus}
-          autoComplete="new-password"
-          className="input-field settings-field"
-          value={password}
-          disabled={busy}
-          onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={onEnter(submit)}
-        />
-      </Field>
-      <Field label={t('vaultKey.repeatPassword')}>
-        <input
-          type="password"
-          autoComplete="new-password"
-          className="input-field settings-field"
-          value={repeat}
-          disabled={busy}
-          onChange={(e) => setRepeat(e.target.value)}
-          onKeyDown={onEnter(submit)}
-        />
-      </Field>
-    </>
+    <NewPasswordFields
+      t={t}
+      password={password}
+      repeat={repeat}
+      onPassword={setPassword}
+      onRepeat={setRepeat}
+      disabled={busy}
+      autoFocus={autoFocus}
+      onSubmit={submit}
+    />
   );
 
   let body: React.ReactNode;
@@ -207,7 +164,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
     body = (
       <>
         <p className="text-sm text-secondary">{t('vaultKey.unlockHint')}</p>
-        <Field label={t('vaultKey.password')}>
+        <KeyField label={t('vaultKey.password')}>
           <input
             type="password"
             autoFocus
@@ -219,7 +176,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={onEnter(submitUnlock)}
           />
-        </Field>
+        </KeyField>
         {rememberRow}
         <div>
           {/* Ein Link, kein Knopf: bündig mit den Feldern statt um die
@@ -241,7 +198,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
     body = (
       <>
         <p className="text-sm text-secondary">{t('vaultKey.recoverHint')}</p>
-        <Field label={t('vaultKey.recoveryKey')}>
+        <KeyField label={t('vaultKey.recoveryKey')}>
           <textarea
             autoFocus
             rows={2}
@@ -251,7 +208,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
             disabled={busy}
             onChange={(e) => setRecoveryInput(e.target.value)}
           />
-        </Field>
+        </KeyField>
         {passwordFields(submitRecover, false)}
         {rememberRow}
         {errorLine}
@@ -302,22 +259,8 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   } else if (step === 'showRecovery') {
     body = (
       <>
-        <p className="text-sm text-secondary">{t('vaultKey.recoveryHint')}</p>
-        <div className="input-field settings-field font-mono select-all break-all">{recoveryKey}</div>
-        <div>
-          <Button variant="secondary" onClick={copyRecoveryKey}>
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-            {copied ? t('vaultKey.copied') : t('vaultKey.copy')}
-          </Button>
-        </div>
+        <RecoveryKeyBox recoveryKey={recoveryKey} stored={stored} onStoredChange={setStored} />
         {rememberRefused && <p className="text-xs text-secondary" role="status">{t('vaultKey.rememberFailed')}</p>}
-        <SwitchRow
-          variant="panel"
-          icon={ShieldCheck}
-          label={t('vaultKey.stored')}
-          checked={stored}
-          onChange={setStored}
-        />
       </>
     );
     actions = (
@@ -348,14 +291,5 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
         {actions}
       </div>
     </Modal>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="label-xs block mb-2">{label}</span>
-      {children}
-    </label>
   );
 }

@@ -84,3 +84,26 @@ export function recoverVault(
 export function lockVault(vaultId: string): Promise<void> {
   return invoke('vault_lock', { vaultId });
 }
+
+/**
+ * Neues Passwort — und damit ein neuer Vault-Schlüssel und ein neuer
+ * Wiederherstellungsschlüssel (`reencrypt.rs`). Die Verbindungen zum Vault
+ * müssen zu sein; Bildnamen ändern sich, also danach alles neu laden.
+ */
+export function changeVaultPassword(
+  vaultId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ recoveryKey: string; remembered: boolean }> {
+  return invoke('vault_change_password', { vaultId, currentPassword, newPassword });
+}
+
+/** Ob der Schlüssel dieses Vaults im Schlüsselbund liegt. */
+export function isVaultRemembered(vaultId: string): Promise<boolean> {
+  return invoke('vault_is_remembered', { vaultId });
+}
+
+/** „Auf diesem Gerät merken" an oder aus. Antwortet, ob er danach dort liegt. */
+export function setVaultRemembered(vaultId: string, rememberKey: boolean): Promise<boolean> {
+  return invoke('vault_set_remembered', { vaultId, rememberKey });
+}

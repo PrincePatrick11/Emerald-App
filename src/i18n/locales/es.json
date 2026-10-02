@@ -657,6 +657,30 @@
     "encrypting": "Cifrando…",
     "encryptFailed": "No se pudo cifrar la bóveda. No ha cambiado; inténtalo de nuevo."
   },
+  "security": {
+    "page": "Seguridad",
+    "rememberHint": "Con la clave en el llavero del sistema operativo, la bóveda se abre sin contraseña. Los archivos de la carpeta de la bóveda siguen cifrados en cualquier caso.",
+    "rememberLabel": "Recordar esta bóveda en este dispositivo",
+    "rememberError": "El llavero no ha aceptado el cambio.",
+    "changeTitle": "Cambiar contraseña",
+    "changeHint": "Con la contraseña cambia también la clave: Emerald vuelve a cifrar la bóveda y te muestra una nueva clave de recuperación; la anterior deja de valer. Las copias de seguridad antiguas se siguen abriendo con la contraseña vigente cuando se crearon. Las pestañas abiertas se cierran.",
+    "currentPassword": "Contraseña actual",
+    "changeSubmit": "Cambiar contraseña",
+    "changed": "Contraseña cambiada; la bóveda está cifrada con una nueva clave.",
+    "changeFailed": "No se pudo cambiar la contraseña. La bóveda no ha cambiado.",
+    "lockTitle": "Bloquear bóveda",
+    "lockHint": "Cierra la bóveda de inmediato. Para seguir, Emerald vuelve a pedir la contraseña, aunque la bóveda esté recordada en este dispositivo.",
+    "lockTooltip": "Cerrar la bóveda y exigir la contraseña",
+    "lockNow": "Bloquear ahora"
+  },
+  "backupKey": {
+    "title": "Abrir copia de seguridad",
+    "hint": "Esta copia está cifrada y no pertenece a la bóveda abierta, o es de antes de un cambio de contraseña. Introduce la contraseña que tenía la bóveda al crear la copia, o su clave de recuperación de entonces.",
+    "password": "Contraseña de la copia",
+    "useRecovery": "Usar clave de recuperación",
+    "usePassword": "Usar contraseña",
+    "open": "Abrir"
+  },
   "settings": {
     "language": "Idioma",
     "about": "Acerca de",

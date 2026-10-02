@@ -30,8 +30,11 @@ mod db;
 mod crypto;
 /// `vault.key`, unlocking, and the keys of unlocked vaults.
 mod keys;
-/// Encrypting a vault from before encryption, resumable after a crash.
-mod encrypt_existing;
+/// Putting a vault under a new key — encrypting an old one, changing the
+/// password —, resumable after a crash.
+mod reencrypt;
+/// Encrypted `.emeralddb` backups.
+mod backup;
 /// Der In-App-Updater: variable Quelle, Pruefung, Installation.
 mod updates;
 
@@ -123,7 +126,7 @@ pub(crate) fn is_within_allowed_roots(path: &Path, allowed_roots: &[PathBuf]) ->
 /// symlink at the target is refused — including a dangling one, which is the
 /// shape that used to slip past — so a prepared link cannot redirect the write
 /// out of the allowed roots.
-fn guarded_write_target(app: &tauri::AppHandle, path: &str) -> Result<PathBuf, String> {
+pub(crate) fn guarded_write_target(app: &tauri::AppHandle, path: &str) -> Result<PathBuf, String> {
     let allowed_roots = resolve_allowed_roots(app)?;
     let target = PathBuf::from(path);
     let parent = target.parent().ok_or("invalid path")?;
@@ -196,12 +199,14 @@ pub(crate) fn guarded_read_path(app: &tauri::AppHandle, path: &str) -> Result<Pa
 // mutieren NSMenu, und das ist auf macOS Main-Thread-only.
 
 /// Writes text content to a user-selected file path.
-/// Only .md, .emerald, .emeralddb, .json, and .txt extensions are permitted.
+/// Only .md, .emerald, .json, and .txt extensions are permitted. Backups
+/// (.emeralddb) go through `backup::write_backup_file`, which encrypts them —
+/// none may be written in the clear by accident.
 #[tauri::command]
 async fn write_file(app: tauri::AppHandle, path: String, content: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let ext = ext_for_path(&path);
-        if !matches!(ext.as_str(), "md" | "emerald" | "emeralddb" | "json" | "txt") {
+        if !matches!(ext.as_str(), "md" | "emerald" | "json" | "txt") {
             return Err("unsupported file type".to_string());
         }
 
@@ -239,12 +244,13 @@ async fn export_image(app: tauri::AppHandle, path: String, data_url: String) -> 
 }
 
 /// Reads a text file and returns its contents as a UTF-8 string.
-/// Only .md, .emerald, .emeralddb, .json, and .txt extensions are permitted.
+/// Only .md, .emerald, .json, and .txt extensions are permitted; backups are
+/// read through `backup::read_backup_file`.
 #[tauri::command]
 async fn read_file(app: tauri::AppHandle, path: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let ext = ext_for_path(&path);
-        if !matches!(ext.as_str(), "md" | "emerald" | "emeralddb" | "json" | "txt") {
+        if !matches!(ext.as_str(), "md" | "emerald" | "json" | "txt") {
             return Err("unsupported file type".to_string());
         }
 
@@ -827,13 +833,16 @@ pub fn run() {
             db::db_select,
             keys::vault_key_status,
             keys::keychain_available,
-            encrypt_existing::vault_encrypt_existing,
+            reencrypt::vault_encrypt_existing,
+            reencrypt::vault_change_password,
+            backup::write_backup_file,
+            backup::read_backup_file,
             keys::vault_create_key,
             keys::vault_unlock,
             keys::vault_unlock_remembered,
             keys::vault_recover,
-            keys::vault_change_password,
             keys::vault_set_remembered,
+            keys::vault_is_remembered,
             keys::vault_lock,
             images::save_image,
             images::copy_image_file,
@@ -874,6 +883,9 @@ pub fn run() {
             updates::install_update,
         ])
         .setup(|_app| {
+            // Was ein abgestürzter PDF-Export im Temp-Ordner liegen ließ — dort
+            // stünde ein Eintrag im Klartext.
+            tauri::async_runtime::spawn_blocking(pdf_export::sweep_leftovers);
             // Both of these are macOS-only; `_app` keeps the parameter from
             // reading as unused on the platforms where the block is empty.
             #[cfg(target_os = "macos")]

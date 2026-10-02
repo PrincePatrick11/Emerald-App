@@ -649,6 +649,30 @@
     "encrypting": "Encrypting…",
     "encryptFailed": "Could not encrypt the vault. It is unchanged — please try again."
   },
+  "security": {
+    "page": "Security",
+    "rememberHint": "With the key in the operating system's keychain, the vault opens without a password. The files in the vault folder stay encrypted either way.",
+    "rememberLabel": "Remember this vault on this device",
+    "rememberError": "The keychain did not accept the change.",
+    "changeTitle": "Change password",
+    "changeHint": "The key changes with the password: Emerald re-encrypts the vault and shows you a new recovery key — the old one stops working. Older backups still open with the password that was in place when they were made. Open tabs are closed in the process.",
+    "currentPassword": "Current password",
+    "changeSubmit": "Change password",
+    "changed": "Password changed; the vault is encrypted under a new key.",
+    "changeFailed": "Could not change the password. The vault is unchanged.",
+    "lockTitle": "Lock vault",
+    "lockHint": "Closes the vault right away. To carry on, Emerald asks for the password again — even if the vault is remembered on this device.",
+    "lockTooltip": "Close the vault and require the password",
+    "lockNow": "Lock now"
+  },
+  "backupKey": {
+    "title": "Open backup",
+    "hint": "This backup is encrypted and does not belong to the open vault — or dates from before a password change. Enter the password the vault had when the backup was made, or its recovery key from that time.",
+    "password": "Backup password",
+    "useRecovery": "Use recovery key",
+    "usePassword": "Use password",
+    "open": "Open"
+  },
   "settings": {
     "language": "Language",
     "about": "About",

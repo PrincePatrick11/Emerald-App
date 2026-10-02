@@ -55,7 +55,8 @@ import i18n from '../i18n';
 import { generateId, isValidHexColor, nowIso } from './helpers';
 import { useVaultStore } from '../store/vaultStore';
 import { VAULT_KEY_CANCELLED } from '../store/vaultKeyStore';
-import { keyErrorOf } from './vaultKeys';
+import { KEY_ERRORS, keyErrorOf } from './vaultKeys';
+import { askBackupSecret, BACKUP_UNLOCK_CANCELLED, type BackupSecret } from '../store/backupSecretStore';
 import { reloadAllStores } from '../store/moduleWiring';
 import { useUIStore } from '../store/uiStore';
 import { clearAllDrafts, flushDrafts } from '../store/draftStore';
@@ -787,8 +788,38 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
   });
   if (!savePath) return false;
 
-  await invoke('write_file', { path: savePath, content: JSON.stringify(backup) });
+  // Versiegelt unter dem Schlüssel des Vaults, mit seinem `vault.key` im Kopf
+  // (`backup.rs`) — öffnet mit dem Passwort, das jetzt gilt.
+  await invoke('write_backup_file', { vaultId: await getActiveVaultId(), path: savePath, content: JSON.stringify(backup) });
   return true;
+}
+
+/**
+ * Der JSON-Text eines Backups. Ein verschlüsseltes öffnet Rust mit dem
+ * Schlüssel eines offenen Vaults, wenn er passt; sonst wird nach Passwort oder
+ * Wiederherstellungsschlüssel gefragt — so lange, bis es passt oder der Nutzer
+ * abbricht (`null`).
+ */
+async function readBackupText(path: string): Promise<string | null> {
+  let secret: BackupSecret | null = null;
+  for (;;) {
+    try {
+      return await invoke<string>('read_backup_file', { path, ...(secret ?? {}) });
+    } catch (err) {
+      const code = keyErrorOf(err);
+      const retry = code === 'BACKUP_LOCKED' ? null
+        : code === KEY_ERRORS.wrongPassword ? i18n.t('vaultKey.wrongPassword')
+        : code === KEY_ERRORS.wrongRecoveryKey ? i18n.t('vaultKey.wrongRecoveryKey')
+        : undefined;
+      if (retry === undefined) throw err;
+      try {
+        secret = await askBackupSecret(retry);
+      } catch (cancelled) {
+        if (keyErrorOf(cancelled) === BACKUP_UNLOCK_CANCELLED) return null;
+        throw cancelled;
+      }
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -803,7 +834,8 @@ export async function openBackupFile(): Promise<{ path: string; backup: BackupFi
   if (!selected) return null;
   const filePath = typeof selected === 'string' ? selected : selected[0];
 
-  const raw = await invoke<string>('read_file', { path: filePath });
+  const raw = await readBackupText(filePath);
+  if (raw === null) return null;
   const backup = JSON.parse(raw) as BackupFile;
   if (backup.type !== 'backup') throw new Error('Not an Emerald backup file');
   migrateBackupPayload(backup);

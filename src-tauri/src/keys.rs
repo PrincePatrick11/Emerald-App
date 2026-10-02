@@ -167,7 +167,7 @@ fn key_check(key: &Key) -> String {
     B64.encode(crypto::keyed_hash(key, CHECK_LABEL))
 }
 
-fn check_password(password: &str) -> Result<(), String> {
+pub(crate) fn check_password(password: &str) -> Result<(), String> {
     if password.chars().count() < MIN_PASSWORD_CHARS {
         return Err(PASSWORD_TOO_SHORT.into());
     }
@@ -293,6 +293,11 @@ impl VaultKeys {
         self.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
+    /// The keys of every unlocked vault — for a backup that may be from any of them.
+    pub(crate) fn all(&self) -> Vec<Key> {
+        self.lock_map().values().cloned().collect()
+    }
+
     pub fn get(&self, vault_id: &str) -> Option<Key> {
         self.lock_map().get(vault_id).cloned()
     }
@@ -329,6 +334,11 @@ fn keyring_entry(vault_id: &str) -> Result<keyring::Entry, String> {
 fn remember(vault_id: &str, key: &Key) -> Result<(), String> {
     let encoded = Zeroizing::new(B64.encode(key.as_ref()));
     keyring_entry(vault_id)?.set_password(&encoded).map_err(|e| e.to_string())
+}
+
+/// Whether the keychain holds a key for this vault — not whether it fits.
+pub(crate) fn is_remembered(vault_id: &str) -> bool {
+    remembered(vault_id).is_some()
 }
 
 fn remembered(vault_id: &str) -> Option<Key> {
@@ -389,7 +399,7 @@ pub fn vault_key_status(app: tauri::AppHandle, vault_id: String) -> Result<KeySt
     let dir = vault::vault_dir(&app, &vault_id)?;
     vault::directory_state(&dir)?;
     // Eine abgebrochene Verschlüsselung erst zu Ende bringen oder zurücknehmen.
-    crate::encrypt_existing::recover_interrupted(&dir)?;
+    crate::reencrypt::recover_interrupted(&dir)?;
     let encrypted = is_encrypted_dir(&dir);
     Ok(KeyStatus {
         has_database: dir.join(vault::DB_FILE).is_file(),
@@ -524,20 +534,13 @@ pub async fn vault_recover(
     .map_err(|e| e.to_string())?
 }
 
+/// Whether the keychain holds this vault's key. Off the main thread: a
+/// keychain may ask the user first.
 #[tauri::command]
-pub async fn vault_change_password(
-    app: tauri::AppHandle,
-    vault_id: String,
-    current_password: Zeroizing<String>,
-    new_password: Zeroizing<String>,
-) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let (dir, file) = load_key_file(&app, &vault_id)?;
-        let key = file.unlock_with_password(&current_password)?;
-        write_key_file(&dir, &file.with_password(&key, &new_password)?)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+pub async fn vault_is_remembered(vault_id: String) -> bool {
+    tauri::async_runtime::spawn_blocking(move || is_remembered(&vault_id))
+        .await
+        .unwrap_or(false)
 }
 
 /// Turns "remember on this device" on or off for an unlocked vault. Returns

@@ -657,6 +657,30 @@
     "encrypting": "Chiffrement…",
     "encryptFailed": "Impossible de chiffrer le coffre. Il est inchangé – réessaie."
   },
+  "security": {
+    "page": "Sécurité",
+    "rememberHint": "Avec la clé dans le trousseau du système d’exploitation, le coffre s’ouvre sans mot de passe. Les fichiers du dossier du coffre restent chiffrés dans tous les cas.",
+    "rememberLabel": "Mémoriser ce coffre sur cet appareil",
+    "rememberError": "Le trousseau n’a pas accepté la modification.",
+    "changeTitle": "Changer le mot de passe",
+    "changeHint": "La clé change avec le mot de passe : Emerald rechiffre le coffre et t’affiche une nouvelle clé de récupération – l’ancienne ne vaut plus. Les anciennes sauvegardes s’ouvrent toujours avec le mot de passe en vigueur lors de leur création. Les onglets ouverts sont fermés.",
+    "currentPassword": "Mot de passe actuel",
+    "changeSubmit": "Changer le mot de passe",
+    "changed": "Mot de passe changé ; le coffre est chiffré sous une nouvelle clé.",
+    "changeFailed": "Impossible de changer le mot de passe. Le coffre est inchangé.",
+    "lockTitle": "Verrouiller le coffre",
+    "lockHint": "Ferme le coffre immédiatement. Pour continuer, Emerald redemande le mot de passe – même si le coffre est mémorisé sur cet appareil.",
+    "lockTooltip": "Fermer le coffre et exiger le mot de passe",
+    "lockNow": "Verrouiller maintenant"
+  },
+  "backupKey": {
+    "title": "Ouvrir la sauvegarde",
+    "hint": "Cette sauvegarde est chiffrée et n’appartient pas au coffre ouvert – ou date d’avant un changement de mot de passe. Saisis le mot de passe qu’avait le coffre lors de sa création, ou sa clé de récupération de l’époque.",
+    "password": "Mot de passe de la sauvegarde",
+    "useRecovery": "Utiliser la clé de récupération",
+    "usePassword": "Utiliser le mot de passe",
+    "open": "Ouvrir"
+  },
   "settings": {
     "language": "Langue",
     "about": "À propos",

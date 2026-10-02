@@ -15,6 +15,7 @@ import RightSidebar from './RightSidebar';
 import MainArea from './MainArea';
 import VaultModal from './VaultModal';
 import VaultKeyDialog from './VaultKeyDialog';
+import BackupUnlockDialog from './BackupUnlockDialog';
 import { ensureVaultReady, VAULT_KEY_CANCELLED } from '../../store/vaultKeyStore';
 import { keyErrorOf } from '../../lib/vaultKeys';
 import UndoToast from '../ui/UndoToast';
@@ -81,6 +82,7 @@ export default function AppShell() {
   const vaultsLoaded = useVaultStore((s) => s.loaded);
   const vaults = useVaultStore((s) => s.vaults);
   const activeVaultId = useVaultStore((s) => s.activeVaultId);
+  const vaultLocked = useVaultStore((s) => s.locked);
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const leftListOpen = useUIStore((s) => s.leftListOpen);
   const railOpen = useUIStore((s) => s.railOpen);
@@ -338,6 +340,8 @@ export default function AppShell() {
     );
   }
   if (!bootSettled) return chrome(<main className="app-main flex-1 min-h-0" />);
+  // Gesperrt: nichts vom Inhalt bleibt hinter der Passwortfrage stehen.
+  if (vaultLocked) return chrome(<main className="app-main flex-1 min-h-0" />);
 
   const leftSidebarWidth = (railOpen ? RAIL_WIDTH : 0) + (leftListOpen ? entryListWidth : 0);
   // Ohne etwas links davon haelt das Blatt auch dort Abstand zum Fensterrand —
@@ -458,6 +462,7 @@ export default function AppShell() {
       <LeaveGuardModal />
       <ImportDestinationModal />
       <VaultKeyDialog />
+      <BackupUnlockDialog />
     </div>
   );
 }

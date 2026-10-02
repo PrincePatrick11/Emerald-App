@@ -116,12 +116,8 @@ pub async fn export_pdf(
 
     // Write the export HTML to a temp file. Tauri 2's `WebviewUrl` enum
     // has no `Html` variant, so we serve the document via a `file://`
-    // URL. The file is removed at the end (success or error).
-    let temp_html = std::env::temp_dir()
-        .join(format!("emerald-export-{}.html", uuid::Uuid::new_v4()));
-    std::fs::write(&temp_html, html.as_bytes())
-        .map_err(|e| format!("write temp html: {e}"))?;
-    eprintln!("emerald pdf-export (webkitgtk): wrote temp html to {}", temp_html.display());
+    // URL. `TempHtml` removes it however the export ends — also on an early error.
+    let temp_html = super::TempHtml::write(&html)?;
 
     // 1. Build the hidden window. The `on_page_load` callback signals a
     //    oneshot when the page finishes loading so we don't race the
@@ -129,8 +125,8 @@ pub async fn export_pdf(
     let (page_tx, page_rx) = oneshot::channel::<()>();
     let page_tx = Arc::new(Mutex::new(Some(page_tx)));
 
-    let url = url::Url::from_file_path(&temp_html)
-        .map_err(|_| format!("could not build file:// URL for {}", temp_html.display()))?;
+    let url = url::Url::from_file_path(temp_html.path())
+        .map_err(|_| format!("could not build file:// URL for {}", temp_html.path().display()))?;
 
     let win = WebviewWindowBuilder::new(app, "pdf-export", WebviewUrl::External(url))
         .visible(false)
@@ -205,8 +201,8 @@ pub async fn export_pdf(
     if let Err(e) = win.close() {
         eprintln!("emerald pdf-export (webkitgtk): warning — close hidden window: {e}");
     }
-    // Always clean up the temp html, success or not.
-    let _ = std::fs::remove_file(&temp_html);
+    // Gone before anything else can fail.
+    drop(temp_html);
 
     // Verify the PDF actually landed on disk. `WebKitPrintOperation`
     // can succeed at the API level but still produce a zero-byte file

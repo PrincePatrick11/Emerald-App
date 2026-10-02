@@ -79,13 +79,17 @@ function ask(request: VaultKeyRequest): Promise<void> {
  * hier durch, weil sie alle in `openActiveVault` bzw. dem Start in `AppShell`
  * münden. Rust sichert dasselbe ab: ohne Schlüssel öffnet `db_load` nichts.
  */
-export async function ensureVaultReady(vault: { id: string; name: string }): Promise<void> {
+export async function ensureVaultReady(
+  vault: { id: string; name: string },
+  { askPassword = false }: { askPassword?: boolean } = {},
+): Promise<void> {
   const status = await vaultKeyStatus(vault.id);
   if (status.encrypted) {
     if (status.unlocked) return;
     // Ein Schlüsselbund, der nicht antwortet, ist kein Grund zum Scheitern —
-    // dann eben das Passwort.
-    if (await unlockRemembered(vault.id).catch(() => false)) return;
+    // dann eben das Passwort. `askPassword`: ausdrücklich gesperrt, also nicht
+    // gleich wieder still entsperren.
+    if (!askPassword && (await unlockRemembered(vault.id).catch(() => false))) return;
     return ask({ kind: 'unlock', vaultId: vault.id, vaultName: vault.name });
   }
   return ask({ kind: status.hasDatabase ? 'encrypt' : 'create', vaultId: vault.id, vaultName: vault.name });
