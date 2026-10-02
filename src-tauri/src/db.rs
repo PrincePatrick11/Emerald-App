@@ -94,7 +94,13 @@ pub async fn db_load(
         .filename(dir.join(file.name()))
         .create_if_missing(true)
         .disable_statement_logging()
-        .pragma("key", sqlcipher_key(&key).to_string());
+        .pragma("key", sqlcipher_key(&key).to_string())
+        // SQLCipher entschlüsselt eine Seite, wenn sie in den Seiten-Cache
+        // kommt. Mit SQLites 2 MB verdrängt ein Durchlauf über `entries` seine
+        // eigenen Seiten, und jeder weitere entschlüsselt alles neu (gemessen:
+        // 2000 Einträge 238 statt 40 ms). 32 MB pro Verbindung; belegt wird
+        // nur, was gelesen wurde.
+        .pragma("cache_size", "-32768");
     let pool = connect(options, &dir).await?;
 
     let handle = handle(&vault_id, file);
@@ -152,6 +158,9 @@ fn may_attach(scope: &str, filename: &str) -> bool {
 async fn connect(options: SqliteConnectOptions, vault_dir: &Path) -> Result<SqlitePool, String> {
     let scope = attach_scope(vault_dir);
     SqlitePoolOptions::new()
+        // Jede Verbindung hat ihren eigenen Seiten-Cache; wenige Verbindungen
+        // heißen wärmere Caches und begrenzten Speicher.
+        .max_connections(4)
         .after_connect(move |conn, _| {
             Box::pin(async move {
                 let mut handle = conn.lock_handle().await?;

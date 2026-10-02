@@ -66,7 +66,7 @@ pub struct KdfParams {
     pub parallelism: u32,
 }
 
-/// 64 MiB, three passes: around half a second on a current laptop. The
+/// 64 MiB, three passes: about 0.15 s on a current machine (release build). The
 /// parameters travel in the file, so raising them later leaves existing
 /// vaults readable.
 pub const DEFAULT_KDF: KdfParams = KdfParams { memory_kib: 64 * 1024, iterations: 3, parallelism: 1 };
