@@ -42,6 +42,7 @@ export interface ReencryptProgress {
 
 /** Fortschritt der Neuverschlüsselung von `vaultId`: Verschlüsseln, Passwortwechsel, „Passwort vergessen". */
 export function onReencryptProgress(vaultId: string, handler: (p: ReencryptProgress) => void): Promise<UnlistenFn> {
+  // Derselbe Name wie `PROGRESS_EVENT` in `reencrypt.rs`.
   return listen<ReencryptProgress>('vault-reencrypt-progress', (e) => {
     if (e.payload.vaultId === vaultId) handler(e.payload);
   });

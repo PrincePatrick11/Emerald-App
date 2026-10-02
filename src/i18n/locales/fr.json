@@ -658,6 +658,7 @@
     "encryptFailed": "Impossible de chiffrer le vault. Il est inchangé – réessaie.",
     "progressDatabase": "Chiffrement de la base de données…",
     "progressImages": "Images : {{done}} sur {{total}}",
+    "progressImagesPhase": "Chiffrement des images…",
     "progressChecking": "Vérification de la copie…",
     "notEnoughSpace": "Pas assez d’espace disque libre : il faut temporairement {{needed}} de plus, et {{free}} sont libres. Rien n’a été modifié."
   },

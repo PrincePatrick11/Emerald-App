@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import i18n from '../../i18n';
+import { isWindows } from '../../lib/platform';
 import ProgressBar from '../ui/ProgressBar';
 import {
   KEY_ERRORS, MIN_PASSWORD_LENGTH, keyErrorOf, onReencryptProgress, spaceShortfall, type ReencryptProgress,
@@ -87,14 +88,20 @@ export function keyErrorText(t: TFunction, err: unknown, fallbackKey: string): s
   return t(fallbackKey);
 }
 
-/** Plattengröße in MB oder GB, in der Schreibweise der Sprache („1,5 GB", „1,5 Go"). */
+/**
+ * Plattengröße in MB oder GB, in der Schreibweise der Sprache („1,5 GB", „1,5 Go").
+ * Nicht `formatBytes`: das hört bei MB auf, und hier geht es um Gigabytes.
+ */
 function diskSize(bytes: number): string {
-  const gb = bytes >= 1024 ** 3;
+  // Wie der Dateimanager daneben rechnet: Explorer in 1024ern, Finder und
+  // GNOME Files in 1000ern — sonst stimmen die Zahlen nicht überein.
+  const base = isWindows ? 1024 : 1000;
+  const gb = bytes >= base ** 3;
   return new Intl.NumberFormat(i18n.language, {
     style: 'unit',
     unit: gb ? 'gigabyte' : 'megabyte',
     maximumFractionDigits: gb ? 1 : 0,
-  }).format(bytes / (gb ? 1024 ** 3 : 1024 ** 2));
+  }).format(bytes / (gb ? base ** 3 : base ** 2));
 }
 
 /**
@@ -102,12 +109,20 @@ function diskSize(bytes: number): string {
  * einem großen Vault dauert sie Minuten; ohne Anzeige sähe das aus wie ein
  * hängendes Programm.
  */
+const STATIC_PROGRESS_LABEL = {
+  database: 'vaultKey.progressDatabase',
+  checking: 'vaultKey.progressChecking',
+} as const;
+
 export function ReencryptProgressLine({ vaultId, active }: { vaultId: string; active: boolean }) {
   const { t } = useTranslation();
   const [progress, setProgress] = useState<ReencryptProgress | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!active) { setProgress(null); return; }
+    // Auf der Sicherheitsseite steht die Zeile unter dem Formular — ins Bild damit.
+    ref.current?.scrollIntoView({ block: 'nearest' });
     let unlisten: (() => void) | undefined;
     let live = true;
     void onReencryptProgress(vaultId, setProgress).then((off) => {
@@ -116,18 +131,23 @@ export function ReencryptProgressLine({ vaultId, active }: { vaultId: string; ac
     return () => { live = false; unlisten?.(); };
   }, [vaultId, active]);
 
-  if (!active || !progress) return null;
+  if (!active) return null;
+  // Vor dem ersten Ereignis schon da, damit die Knöpfe darunter nicht springen.
+  const phase = progress?.phase ?? 'database';
   const number = (n: number) => n.toLocaleString(i18n.language);
-  const label = progress.phase === 'images'
-    ? t('vaultKey.progressImages', { done: number(progress.done), total: number(progress.total) })
-    : t(progress.phase === 'database' ? 'vaultKey.progressDatabase' : 'vaultKey.progressChecking');
-  const percent = progress.phase === 'images' && progress.total > 0
+  const phaseLabel = t(phase === 'images' ? 'vaultKey.progressImages' : STATIC_PROGRESS_LABEL[phase], {
+    done: number(progress?.done ?? 0),
+    total: number(progress?.total ?? 0),
+  });
+  const percent = progress?.phase === 'images' && progress.total > 0
     ? Math.round((progress.done / progress.total) * 100)
     : null;
   return (
-    <div className="space-y-1.5" role="status">
-      <p className="text-xs text-secondary">{label}</p>
-      <ProgressBar percent={percent} label={percent !== null ? `${percent}%` : undefined} />
+    <div ref={ref} className="space-y-1.5">
+      {/* Vorgelesen wird nur der Wechsel der Phase, nicht jedes einzelne Bild. */}
+      <p className="sr-only" role="status">{t(phase === 'images' ? 'vaultKey.progressImagesPhase' : STATIC_PROGRESS_LABEL[phase])}</p>
+      <p className="text-xs text-secondary" aria-hidden="true">{phaseLabel}</p>
+      <ProgressBar percent={percent} label={percent !== null ? `${percent}%` : undefined} ariaLabel={phaseLabel} />
     </div>
   );
 }

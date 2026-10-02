@@ -66,7 +66,7 @@ fn remove_db_file(dir: &Path, name: &str) {
 /// check have no steps to count (`done` 0 of 1); images count one by one.
 #[derive(Clone, Copy, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Progress {
+struct Progress {
     phase: Phase,
     done: usize,
     total: usize,
@@ -80,12 +80,13 @@ enum Phase {
     Checking,
 }
 
-pub type OnProgress<'a> = &'a (dyn Fn(Progress) + Send + Sync);
+type OnProgress<'a> = &'a (dyn Fn(Progress) + Send + Sync);
 
 /// For runs no one watches.
-pub(crate) fn quiet(_: Progress) {}
+fn quiet(_: Progress) {}
 
-/// The event the frontend listens to; `vaultId` says which run.
+/// The event the frontend listens to (`onReencryptProgress` in
+/// `src/lib/vaultKeys.ts`); `vaultId` says which run.
 const PROGRESS_EVENT: &str = "vault-reencrypt-progress";
 
 #[derive(Clone, serde::Serialize)]
@@ -123,7 +124,7 @@ pub const NOT_ENOUGH_SPACE: &str = "NOT_ENOUGH_SPACE";
 /// minutes of work for nothing. Where free space cannot be read, the run
 /// goes ahead and a full disk fails it as any write error would.
 fn check_space(dir: &Path) -> Result<(), String> {
-    let size = |path: &Path| std::fs::symlink_metadata(path).map_or(0, |m| if m.is_file() { m.len() } else { 0 });
+    let size = |path: &Path| std::fs::symlink_metadata(path).map_or(0, |m| if m.is_file() { local_need(&m) } else { 0 });
     let images = dir.join(vault::IMAGES_SUBDIR);
     let copy = size(&dir.join(vault::DB_FILE))
         + size(&dir.join(vault::DRAFTS_FILE))
@@ -131,10 +132,56 @@ fn check_space(dir: &Path) -> Result<(), String> {
     // Etwas Luft: der Kopf jeder versiegelten Datei, die Seitenstruktur der
     // neuen Datenbank, das Journal beim Umschreiben der Bildnamen.
     let needed = copy + copy / 20 + 64 * 1024 * 1024;
-    match fs4::available_space(dir) {
-        Ok(free) if free < needed => Err(format!("{NOT_ENOUGH_SPACE}:{needed}:{free}")),
+    match free_space(dir) {
+        Some(free) if free < needed => Err(format!("{NOT_ENOUGH_SPACE}:{needed}:{free}")),
         _ => Ok(()),
     }
+}
+
+/// What a file takes on the local disk during a run: its size, and twice that
+/// for a cloud-only placeholder (OneDrive Files On-Demand), which reading it
+/// downloads first.
+fn local_need(meta: &std::fs::Metadata) -> u64 {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_OFFLINE: u32 = 0x1000;
+        const FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS: u32 = 0x0040_0000;
+        if meta.file_attributes() & (FILE_ATTRIBUTE_OFFLINE | FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS) != 0 {
+            return meta.len() * 2;
+        }
+    }
+    meta.len()
+}
+
+/// Free space for `dir`, or `None` where it cannot be told. Some FUSE file
+/// systems (GVFS network mounts) answer with zeros instead of an error — a
+/// volume of size 0 is "unknown", not "full".
+fn free_space(dir: &Path) -> Option<u64> {
+    let stats = fs4::statvfs(dir).ok()?;
+    if stats.total_space() == 0 {
+        return None;
+    }
+    let free = stats.available_space();
+    // APFS leaves purgeable space (local snapshots, iCloud caches) out of
+    // `statvfs`; the system frees it on demand. Finder counts it, so do we.
+    #[cfg(target_os = "macos")]
+    let free = free.max(important_free_space(dir).unwrap_or(0));
+    Some(free)
+}
+
+#[cfg(target_os = "macos")]
+fn important_free_space(dir: &Path) -> Option<u64> {
+    use objc2::rc::Retained;
+    use objc2::runtime::AnyObject;
+    use objc2_foundation::{NSNumber, NSString, NSURLVolumeAvailableCapacityForImportantUsageKey, NSURL};
+    let url = NSURL::fileURLWithPath(&NSString::from_str(dir.to_str()?));
+    let mut value: Option<Retained<AnyObject>> = None;
+    // SAFETY: `value` receives an autoreleased object or nil; the key is a
+    // Foundation constant.
+    unsafe { url.getResourceValue_forKey_error(&mut value, NSURLVolumeAvailableCapacityForImportantUsageKey) }.ok()?;
+    let number = value?.downcast::<NSNumber>().ok()?;
+    u64::try_from(number.longLongValue()).ok()
 }
 
 /// The image files in `dir` — only names an image can have.
@@ -511,9 +558,8 @@ async fn prepare(dir: &Path, source: Source<'_>, new_key: &Key, progress: OnProg
     let mut keep = Vec::new();
     let names = image_names(&images);
     let total = names.len();
-    progress(Progress { phase: Phase::Images, done: 0, total });
     for (index, name) in names.into_iter().enumerate() {
-        progress(Progress { phase: Phase::Images, done: index + 1, total });
+        progress(Progress { phase: Phase::Images, done: index, total });
         let bytes = std::fs::read(images.join(&name)).map_err(|e| format!("read {name}: {e}"))?;
         let Some(bytes) = plaintext(bytes, source, Context::Image(&name)) else {
             // Bleibt, wie es ist — öffnen lässt es sich so wenig wie vorher.
@@ -529,6 +575,7 @@ async fn prepare(dir: &Path, source: Source<'_>, new_key: &Key, progress: OnProg
         }
         renamed.insert(name, new_name);
     }
+    progress(Progress { phase: Phase::Images, done: total, total });
     sync_dir(&staged);
 
     // Die Verweise in der Kopie, dann die Prüfung.

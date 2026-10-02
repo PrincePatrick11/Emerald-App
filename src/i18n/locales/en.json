@@ -650,6 +650,7 @@
     "encryptFailed": "Could not encrypt the vault. It is unchanged — please try again.",
     "progressDatabase": "Encrypting the database …",
     "progressImages": "Images: {{done}} of {{total}}",
+    "progressImagesPhase": "Encrypting the images …",
     "progressChecking": "Checking the copy …",
     "notEnoughSpace": "Not enough free disk space: this temporarily needs {{needed}} more, and {{free}} is free. Nothing was changed."
   },

@@ -658,6 +658,7 @@
     "encryptFailed": "No se pudo cifrar el vault. No ha cambiado; inténtalo de nuevo.",
     "progressDatabase": "Cifrando la base de datos…",
     "progressImages": "Imágenes: {{done}} de {{total}}",
+    "progressImagesPhase": "Cifrando las imágenes…",
     "progressChecking": "Comprobando la copia…",
     "notEnoughSpace": "No hay suficiente espacio libre: hacen falta temporalmente {{needed}} más y hay {{free}} libres. No se ha cambiado nada."
   },

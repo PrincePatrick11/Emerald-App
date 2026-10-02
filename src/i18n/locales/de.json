@@ -650,6 +650,7 @@
     "encryptFailed": "Der Vault konnte nicht verschlüsselt werden. Er ist unverändert – bitte versuche es noch einmal.",
     "progressDatabase": "Datenbank wird verschlüsselt …",
     "progressImages": "Bilder: {{done}} von {{total}}",
+    "progressImagesPhase": "Bilder werden verschlüsselt …",
     "progressChecking": "Kopie wird geprüft …",
     "notEnoughSpace": "Zu wenig freier Speicherplatz: Dafür braucht der Vault vorübergehend {{needed}} zusätzlich, frei sind {{free}}. Es wurde nichts verändert."
   },
