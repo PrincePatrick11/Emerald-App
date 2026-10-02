@@ -49,6 +49,8 @@ chacha20poly1305 = "0.10"
 argon2 = "0.5"
 hmac = "0.12"
 zeroize = { version = "1", features = ["serde"] }
+# Free space before a re-encryption writes its copy (`reencrypt.rs`).
+fs4 = { version = "0.13", features = ["sync"] }
 
 [dev-dependencies]
 # `#[tokio::test]` for the async tests in `db.rs`.

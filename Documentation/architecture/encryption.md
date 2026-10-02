@@ -72,7 +72,10 @@ Leaving a vault locks it (`vault_lock`): its key does not stay in memory while a
 
 `reencrypt.rs` puts a vault under a new key. Two things need it: encrypting a vault from before encryption, and changing the password — which replaces the vault key as well, so that an old copy of `vault.key` (cloud version history) plus the old password opens nothing written since. Rewrapping alone would not give that.
 
-Nothing in the vault is touched until a complete, checked copy under the new key sits next to it:
+Nothing in the vault is touched until a complete, checked copy under the new key sits next to it. So a run first checks free space (`fs4::available_space`): database, drafts and images once more, plus 5 % and 64 MB. Too little fails with `NOT_ENOUGH_SPACE:<needed>:<free>` before anything is written, and the dialog names both sizes. Where free space cannot be read, the run goes ahead.
+
+A run reports progress as the event `vault-reencrypt-progress` (`vaultId`, `phase` `database`/`images`/`checking`, `done`, `total`), at most ten a second. `ReencryptProgressLine` (`vaultKeyParts.tsx`) shows it in `VaultKeyDialog` while encrypting or recovering, and on the Security page while the password changes. On a large vault a run takes minutes, and without it the app would look hung.
+
 
 1. **Prepare.** `vault.key.pending`; the database exported into `emerald.db.reencrypting` with `sqlcipher_export`; every image sealed under its new keyed name into `images.reencrypting/`; every image name inside the copy rewritten; `drafts.json.reencrypting`. Image names are rewritten in every text column of every table — a name is 64 hex digits plus an image extension, unique enough that no schema knowledge is needed. The copy is then verified: `integrity_check` and the same row count in every table as the original.
 2. **Commit.** The marker `vault.reencrypting` is written, naming the new key by its `check` value and the images to keep. Then database, `vault.key`, drafts and images are swapped in.

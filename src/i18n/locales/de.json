@@ -647,7 +647,11 @@
     "encryptTitle": "„{{name}}“ verschlüsseln",
     "encryptHint": "Dieser Vault stammt aus der Zeit vor der Verschlüsselung. Ab jetzt ist jeder Vault verschlüsselt: Wähle ein Passwort, dann verschlüsselt Emerald Einträge, Bilder und Entwürfe. Das dauert je nach Größe einen Moment, und bis alles geprüft ist, bleibt das Original unangetastet.",
     "encryptNote": "Früher exportierte Backups (.emeralddb) bleiben unverschlüsselt, bis du sie löschst. Auf SSDs lassen sich gelöschte Dateien unter Umständen noch eine Weile wiederherstellen – ganz sicher bist du erst mit einer verschlüsselten Festplatte (BitLocker, FileVault).",
-    "encryptFailed": "Der Vault konnte nicht verschlüsselt werden. Er ist unverändert – bitte versuche es noch einmal."
+    "encryptFailed": "Der Vault konnte nicht verschlüsselt werden. Er ist unverändert – bitte versuche es noch einmal.",
+    "progressDatabase": "Datenbank wird verschlüsselt …",
+    "progressImages": "Bilder: {{done}} von {{total}}",
+    "progressChecking": "Kopie wird geprüft …",
+    "notEnoughSpace": "Zu wenig freier Speicherplatz: Dafür braucht der Vault vorübergehend {{needed}} zusätzlich, frei sind {{free}}. Es wurde nichts verändert."
   },
   "security": {
     "rememberHint": "Legt den Schlüssel in den Schlüsselbund des Systems, damit der Vault ohne Passwort öffnet.",

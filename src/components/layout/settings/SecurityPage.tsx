@@ -4,7 +4,9 @@ import { KeyRound, Loader2, Lock, Smartphone } from 'lucide-react';
 import Button from '../../ui/Button';
 import { SwitchRow } from '../../ui/Switch';
 import RecoveryKeyBox from '../RecoveryKeyBox';
-import { KeyField, NewPasswordFields, keyErrorText, newPasswordProblem, onEnter } from '../vaultKeyParts';
+import {
+  KeyField, NewPasswordFields, ReencryptProgressLine, keyErrorText, newPasswordProblem, onEnter,
+} from '../vaultKeyParts';
 import { isVaultRemembered, keychainAvailable, setVaultRemembered } from '../../../lib/vaultKeys';
 import { useVaultStore } from '../../../store/vaultStore';
 import SettingsSection, { SettingsStatus } from './SettingsSection';
@@ -160,6 +162,7 @@ export default function SecurityPage({ onClose, onBlockClose }: {
               onSubmit={submitPassword}
             />
             {error && <SettingsStatus tone="error">{error}</SettingsStatus>}
+            <ReencryptProgressLine vaultId={vaultId} active={busy} />
             <div className="flex justify-end">
               <Button
                 tone="jade"

@@ -647,7 +647,11 @@
     "encryptTitle": "Encrypt “{{name}}”",
     "encryptHint": "This vault dates from before encryption. From now on every vault is encrypted: choose a password and Emerald encrypts entries, images and drafts. Depending on the size this takes a moment, and the original stays untouched until everything has been checked.",
     "encryptNote": "Backups you exported earlier (.emeralddb) stay unencrypted until you delete them. On SSDs, deleted files can sometimes be recovered for a while — only an encrypted disk (BitLocker, FileVault) closes that gap.",
-    "encryptFailed": "Could not encrypt the vault. It is unchanged — please try again."
+    "encryptFailed": "Could not encrypt the vault. It is unchanged — please try again.",
+    "progressDatabase": "Encrypting the database …",
+    "progressImages": "Images: {{done}} of {{total}}",
+    "progressChecking": "Checking the copy …",
+    "notEnoughSpace": "Not enough free disk space: this temporarily needs {{needed}} more, and {{free}} is free. Nothing was changed."
   },
   "security": {
     "rememberHint": "Keeps the key in the system keychain so the vault opens without a password.",

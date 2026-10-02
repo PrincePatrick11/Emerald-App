@@ -655,7 +655,11 @@
     "encryptTitle": "Cifrar «{{name}}»",
     "encryptHint": "Este vault es de antes del cifrado. A partir de ahora todos los vaults están cifrados: elige una contraseña y Emerald cifrará las entradas, las imágenes y los borradores. Según el tamaño tarda un momento, y el original no se toca hasta que todo esté comprobado.",
     "encryptNote": "Las copias de seguridad que exportaste antes (.emeralddb) siguen sin cifrar hasta que las borres. En los SSD, los archivos borrados a veces se pueden recuperar durante un tiempo; solo un disco cifrado (BitLocker, FileVault) cierra ese hueco.",
-    "encryptFailed": "No se pudo cifrar el vault. No ha cambiado; inténtalo de nuevo."
+    "encryptFailed": "No se pudo cifrar el vault. No ha cambiado; inténtalo de nuevo.",
+    "progressDatabase": "Cifrando la base de datos…",
+    "progressImages": "Imágenes: {{done}} de {{total}}",
+    "progressChecking": "Comprobando la copia…",
+    "notEnoughSpace": "No hay suficiente espacio libre: hacen falta temporalmente {{needed}} más y hay {{free}} libres. No se ha cambiado nada."
   },
   "security": {
     "rememberHint": "Guarda la clave en el llavero del sistema para que el vault se abra sin contraseña.",

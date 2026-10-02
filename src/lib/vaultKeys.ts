@@ -12,6 +12,7 @@
  * wie er ist. Die Befehle antworten jeweils, ob er danach dort liegt.
  */
 import { invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 
 export interface VaultKeyStatus {
   /** `emerald.db` liegt schon da — ohne ist der Vault neu. */
@@ -27,7 +28,31 @@ export const KEY_ERRORS = {
   passwordTooShort: 'PASSWORD_TOO_SHORT',
   /** Ein verschlüsseltes Backup, das keiner der offenen Vaults öffnet. */
   backupLocked: 'BACKUP_LOCKED',
+  /** Zu wenig Platz für die Kopie; danach `:<nötig>:<frei>` in Bytes. */
+  notEnoughSpace: 'NOT_ENOUGH_SPACE',
 } as const;
+
+/** Wie weit eine Neuverschlüsselung ist (`reencrypt.rs`, `Progress`). */
+export interface ReencryptProgress {
+  vaultId: string;
+  phase: 'database' | 'images' | 'checking';
+  done: number;
+  total: number;
+}
+
+/** Fortschritt der Neuverschlüsselung von `vaultId`: Verschlüsseln, Passwortwechsel, „Passwort vergessen". */
+export function onReencryptProgress(vaultId: string, handler: (p: ReencryptProgress) => void): Promise<UnlistenFn> {
+  return listen<ReencryptProgress>('vault-reencrypt-progress', (e) => {
+    if (e.payload.vaultId === vaultId) handler(e.payload);
+  });
+}
+
+/** Bei `NOT_ENOUGH_SPACE`: wie viel nötig und wie viel frei ist, in Bytes. */
+export function spaceShortfall(err: unknown): { needed: number; free: number } | null {
+  const [code, needed, free] = keyErrorOf(err).split(':');
+  if (code !== KEY_ERRORS.notEnoughSpace) return null;
+  return { needed: Number(needed), free: Number(free) };
+}
 
 /** Was beim Anlegen eines Schlüssels herauskommt. */
 export interface CreatedKey {

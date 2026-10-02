@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download, Globe, RefreshCw, RotateCcw } from 'lucide-react';
+import ProgressBar from '../../ui/ProgressBar';
 import Button from '../../ui/Button';
 import BlockCheckbox from '../../blocks/BlockCheckbox';
 import SettingsSection, { SettingsDescription, SettingsStatus } from './SettingsSection';
@@ -229,24 +230,10 @@ export default function UpdatesPage() {
               ) : (
                 <>
                   {status === 'installing' && (
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="flex-1 h-1 rounded-full overflow-hidden"
-                        style={{ backgroundColor: 'color-mix(in srgb, var(--accent) 18%, transparent)' }}
-                      >
-                        {/* Ohne bekannte Gesamtgröße bleibt der Balken leer statt
-                            zu lügen — die Byte-Zahl daneben zeigt, dass es läuft. */}
-                        <div
-                          className="h-full transition-[width] duration-200"
-                          style={{ width: `${percent ?? 0}%`, backgroundColor: 'var(--accent)' }}
-                        />
-                      </div>
-                      <span className="text-xs text-muted tabular-nums shrink-0">
-                        {percent !== null
-                          ? `${percent}%`
-                          : progress && formatBytes(progress.downloaded, byteUnits)}
-                      </span>
-                    </div>
+                    <ProgressBar
+                      percent={percent}
+                      label={percent !== null ? `${percent}%` : progress && formatBytes(progress.downloaded, byteUnits)}
+                    />
                   )}
 
                   <SettingsDescription className="mb-0">{t('settings.updateRestartHint')}</SettingsDescription>

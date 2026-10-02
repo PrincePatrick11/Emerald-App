@@ -655,7 +655,11 @@
     "encryptTitle": "Chiffrer « {{name}} »",
     "encryptHint": "Ce vault date d’avant le chiffrement. Désormais, tous les vaults sont chiffrés : choisis un mot de passe et Emerald chiffre les entrées, les images et les brouillons. Selon la taille, cela prend un moment, et l’original reste intact jusqu’à ce que tout soit vérifié.",
     "encryptNote": "Les sauvegardes exportées auparavant (.emeralddb) restent non chiffrées jusqu’à ce que tu les supprimes. Sur les SSD, des fichiers supprimés peuvent parfois être récupérés pendant un temps – seul un disque chiffré (BitLocker, FileVault) comble cette faille.",
-    "encryptFailed": "Impossible de chiffrer le vault. Il est inchangé – réessaie."
+    "encryptFailed": "Impossible de chiffrer le vault. Il est inchangé – réessaie.",
+    "progressDatabase": "Chiffrement de la base de données…",
+    "progressImages": "Images : {{done}} sur {{total}}",
+    "progressChecking": "Vérification de la copie…",
+    "notEnoughSpace": "Pas assez d’espace disque libre : il faut temporairement {{needed}} de plus, et {{free}} sont libres. Rien n’a été modifié."
   },
   "security": {
     "rememberHint": "Garde la clé dans le trousseau du système pour que le vault s’ouvre sans mot de passe.",

@@ -5,7 +5,9 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { SwitchRow } from '../ui/Switch';
 import RecoveryKeyBox from './RecoveryKeyBox';
-import { KeyField, NewPasswordFields, keyErrorText, newPasswordProblem, onEnter } from './vaultKeyParts';
+import {
+  KeyField, NewPasswordFields, ReencryptProgressLine, keyErrorText, newPasswordProblem, onEnter,
+} from './vaultKeyParts';
 import { useVaultKeyStore, type VaultKeyRequest } from '../../store/vaultKeyStore';
 import {
   createVaultKey, encryptExistingVault, keychainAvailable, recoverVault, unlockVault, type CreatedKey,
@@ -276,6 +278,8 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
       bodyClassName="px-5 py-4 space-y-4"
     >
       {body}
+      {/* Verschlüsseln und „Passwort vergessen" schreiben den ganzen Vault neu. */}
+      <ReencryptProgressLine vaultId={request.vaultId} active={busy && (step === 'encrypt' || step === 'recover')} />
       <div className="flex justify-end gap-2 pt-1">
         {cancelShown && <Button tone="neutral" disabled={busy} onClick={cancel}>{t('common.cancel')}</Button>}
         {actions}

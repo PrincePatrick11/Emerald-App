@@ -62,6 +62,81 @@ fn remove_db_file(dir: &Path, name: &str) {
     }
 }
 
+/// Where a run is, for the dialog waiting on it. The database export and the
+/// check have no steps to count (`done` 0 of 1); images count one by one.
+#[derive(Clone, Copy, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Progress {
+    phase: Phase,
+    done: usize,
+    total: usize,
+}
+
+#[derive(Clone, Copy, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+enum Phase {
+    Database,
+    Images,
+    Checking,
+}
+
+pub type OnProgress<'a> = &'a (dyn Fn(Progress) + Send + Sync);
+
+/// For runs no one watches.
+pub(crate) fn quiet(_: Progress) {}
+
+/// The event the frontend listens to; `vaultId` says which run.
+const PROGRESS_EVENT: &str = "vault-reencrypt-progress";
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProgressEvent<'a> {
+    vault_id: &'a str,
+    #[serde(flatten)]
+    progress: Progress,
+}
+
+/// Reports progress as events — at most ten a second, but always the start of
+/// a phase and its last step.
+fn progress_events(app: &tauri::AppHandle, vault_id: &str) -> impl Fn(Progress) + Send + Sync {
+    use tauri::Emitter;
+    let (app, vault_id) = (app.clone(), vault_id.to_string());
+    let last = std::sync::Mutex::new(None::<std::time::Instant>);
+    move |progress: Progress| {
+        let mut last = last.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let edge = progress.done == 0 || progress.done == progress.total;
+        if !edge && last.is_some_and(|at| at.elapsed() < std::time::Duration::from_millis(100)) {
+            return;
+        }
+        *last = Some(std::time::Instant::now());
+        app.emit(PROGRESS_EVENT, ProgressEvent { vault_id: &vault_id, progress }).ok();
+    }
+}
+
+/// Not enough free space for the copy; the error carries `:<needed>:<free>`
+/// in bytes.
+pub const NOT_ENOUGH_SPACE: &str = "NOT_ENOUGH_SPACE";
+
+/// A run writes a full copy of database, images and drafts next to the vault
+/// before it deletes anything. Checked first, so a full disk does not end a
+/// long run halfway — the original would survive that, but only after
+/// minutes of work for nothing. Where free space cannot be read, the run
+/// goes ahead and a full disk fails it as any write error would.
+fn check_space(dir: &Path) -> Result<(), String> {
+    let size = |path: &Path| std::fs::symlink_metadata(path).map_or(0, |m| if m.is_file() { m.len() } else { 0 });
+    let images = dir.join(vault::IMAGES_SUBDIR);
+    let copy = size(&dir.join(vault::DB_FILE))
+        + size(&dir.join(vault::DRAFTS_FILE))
+        + image_names(&images).iter().map(|name| size(&images.join(name))).sum::<u64>();
+    // Etwas Luft: der Kopf jeder versiegelten Datei, die Seitenstruktur der
+    // neuen Datenbank, das Journal beim Umschreiben der Bildnamen.
+    let needed = copy + copy / 20 + 64 * 1024 * 1024;
+    match fs4::available_space(dir) {
+        Ok(free) if free < needed => Err(format!("{NOT_ENOUGH_SPACE}:{needed}:{free}")),
+        _ => Ok(()),
+    }
+}
+
 /// The image files in `dir` — only names an image can have.
 fn image_names(dir: &Path) -> Vec<String> {
     let Ok(entries) = std::fs::read_dir(dir) else {
@@ -403,8 +478,10 @@ fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 
 /// Step 1: everything next to the vault, nothing in it. Returns the names of
 /// the images the vault keeps.
-async fn prepare(dir: &Path, source: Source<'_>, new_key: &Key) -> Result<Vec<String>, String> {
+async fn prepare(dir: &Path, source: Source<'_>, new_key: &Key, progress: OnProgress<'_>) -> Result<Vec<String>, String> {
     let db_key = crypto::subkey(new_key, Purpose::Database);
+
+    progress(Progress { phase: Phase::Database, done: 0, total: 1 });
 
     // Die Datenbank.
     let new_file = dir.join(DB_NEW);
@@ -432,7 +509,11 @@ async fn prepare(dir: &Path, source: Source<'_>, new_key: &Key) -> Result<Vec<St
     std::fs::create_dir_all(&staged).map_err(|e| format!("create {IMAGES_NEW}: {e}"))?;
     let mut renamed = HashMap::new();
     let mut keep = Vec::new();
-    for name in image_names(&images) {
+    let names = image_names(&images);
+    let total = names.len();
+    progress(Progress { phase: Phase::Images, done: 0, total });
+    for (index, name) in names.into_iter().enumerate() {
+        progress(Progress { phase: Phase::Images, done: index + 1, total });
         let bytes = std::fs::read(images.join(&name)).map_err(|e| format!("read {name}: {e}"))?;
         let Some(bytes) = plaintext(bytes, source, Context::Image(&name)) else {
             // Bleibt, wie es ist — öffnen lässt es sich so wenig wie vorher.
@@ -451,6 +532,7 @@ async fn prepare(dir: &Path, source: Source<'_>, new_key: &Key) -> Result<Vec<St
     sync_dir(&staged);
 
     // Die Verweise in der Kopie, dann die Prüfung.
+    progress(Progress { phase: Phase::Checking, done: 0, total: 1 });
     let mut new_db = open_keyed(&new_file, &db_key).await?;
     let checked = async {
         rewrite_database(&mut new_db, &renamed).await?;
@@ -531,14 +613,15 @@ struct Reencrypted {
 /// the next open finishes it ([`recover_if_idle`]). So from there on the new
 /// key and the recovery key are returned in any case — losing the recovery
 /// key of a vault that is going to use it would be the worst outcome.
-async fn reencrypt(dir: &Path, source: Source<'_>, password: &str, kdf: KdfParams) -> Result<Reencrypted, String> {
+async fn reencrypt(dir: &Path, source: Source<'_>, password: &str, kdf: KdfParams, progress: OnProgress<'_>) -> Result<Reencrypted, String> {
     if !is_regular_file(&dir.join(vault::DB_FILE)) {
         return Err("no database to encrypt".into());
     }
+    check_space(dir)?;
     let (key_file, vault_key, recovery_key) = KeyFile::create(password, kdf)?;
     vault::write_atomic(dir, PENDING_KEY, PENDING_KEY_TEMP, key_file.to_json().as_bytes())?;
 
-    let keep = match prepare(dir, source, &vault_key).await {
+    let keep = match prepare(dir, source, &vault_key, progress).await {
         Ok(keep) => keep,
         Err(e) => {
             recover_interrupted(dir).ok();
@@ -559,24 +642,24 @@ async fn reencrypt(dir: &Path, source: Source<'_>, password: &str, kdf: KdfParam
 }
 
 /// Encrypts an existing plain vault in `dir`.
-async fn encrypt_dir(dir: &Path, password: &str, kdf: KdfParams) -> Result<Reencrypted, String> {
+async fn encrypt_dir(dir: &Path, password: &str, kdf: KdfParams, progress: OnProgress<'_>) -> Result<Reencrypted, String> {
     recover_interrupted(dir)?;
     if keys::is_encrypted_dir(dir) {
         return Err(keys::VAULT_ALREADY_ENCRYPTED.into());
     }
-    let done = reencrypt(dir, Source::Plain, password, kdf).await?;
+    let done = reencrypt(dir, Source::Plain, password, kdf, progress).await?;
     seal_plain_backups(dir, &done.key_file, &done.vault_key);
     Ok(done)
 }
 
 /// Moves an encrypted vault in `dir` from `old_key` to a new vault key under
 /// `password`. The recovery key is new as well.
-async fn rekey_dir(dir: &Path, old_key: &Key, password: &str, kdf: KdfParams) -> Result<Reencrypted, String> {
+async fn rekey_dir(dir: &Path, old_key: &Key, password: &str, kdf: KdfParams, progress: OnProgress<'_>) -> Result<Reencrypted, String> {
     recover_interrupted(dir)?;
     if !keys::read_key_file(dir)?.is_some_and(|file| file.accepts(old_key)) {
         return Err(keys::VAULT_LOCKED.into());
     }
-    reencrypt(dir, Source::Key(old_key), password, kdf).await
+    reencrypt(dir, Source::Key(old_key), password, kdf, progress).await
 }
 
 /// One re-encryption at a time — across awaits, so not the `std` mutex.
@@ -627,7 +710,7 @@ pub async fn vault_encrypt_existing(
     let _guard = RUNNING.lock().await;
     let dir = vault_dir_checked(&app, &vault_id)?;
     crate::db::close_vault(&app, &vault_id).await;
-    let done = encrypt_dir(&dir, &password, keys::DEFAULT_KDF).await?;
+    let done = encrypt_dir(&dir, &password, keys::DEFAULT_KDF, &progress_events(&app, &vault_id)).await?;
     // Bilder, die vorher angezeigt wurden, liegen im Klartext im Platten-Cache
     // der WebView — damals noch mit `immutable` ausgeliefert. Weg damit; der
     // Preis sind die übrigen Browserdaten (Spaltenbreiten, offene Tabs).
@@ -650,7 +733,7 @@ async fn rekey_command(app: &tauri::AppHandle, vault_id: &str, old_key: Key, new
     let was_unlocked = app.state::<keys::VaultKeys>().get(vault_id).is_some();
     app.state::<keys::VaultKeys>().remove(vault_id);
     crate::db::close_vault(app, vault_id).await;
-    match rekey_dir(&dir, &old_key, new_password, keys::DEFAULT_KDF).await {
+    match rekey_dir(&dir, &old_key, new_password, keys::DEFAULT_KDF, &progress_events(app, vault_id)).await {
         Ok(done) => Ok(adopt(app, vault_id, done, wanted).await),
         Err(e) => {
             if was_unlocked {
@@ -703,7 +786,7 @@ pub async fn dev_seed(app: &tauri::AppHandle, vault_id: &str) {
     let vault_keys = app.state::<keys::VaultKeys>();
     if !keys::is_encrypted_dir(&dir) {
         if is_regular_file(&dir.join(vault::DB_FILE)) {
-            match encrypt_dir(&dir, &password, keys::DEFAULT_KDF).await {
+            match encrypt_dir(&dir, &password, keys::DEFAULT_KDF, &quiet).await {
                 Ok(done) => vault_keys.insert(vault_id, done.vault_key),
                 Err(e) => eprintln!("[dev-seed] could not encrypt the seed vault: {e}"),
             }
@@ -811,7 +894,7 @@ mod tests {
     #[tokio::test]
     async fn a_plain_vault_ends_up_fully_encrypted() {
         let (dir, image) = plain_vault().await;
-        let Reencrypted { vault_key, recovery_key: recovery, .. } = encrypt_dir(&dir, "correct horse", TEST_KDF).await.unwrap();
+        let Reencrypted { vault_key, recovery_key: recovery, .. } = encrypt_dir(&dir, "correct horse", TEST_KDF, &quiet).await.unwrap();
 
         // vault.key opens with password and recovery key alike.
         let file = keys::read_key_file(&dir).unwrap().unwrap();
@@ -853,11 +936,11 @@ mod tests {
     #[tokio::test]
     async fn a_new_password_means_a_new_key_for_everything() {
         let (dir, _) = plain_vault().await;
-        let Reencrypted { vault_key: old_key, recovery_key: old_recovery, .. } = encrypt_dir(&dir, "correct horse", TEST_KDF).await.unwrap();
+        let Reencrypted { vault_key: old_key, recovery_key: old_recovery, .. } = encrypt_dir(&dir, "correct horse", TEST_KDF, &quiet).await.unwrap();
         let old_file = keys::read_key_file(&dir).unwrap().unwrap();
         let old_image = stored_images(&dir).remove(0);
 
-        let Reencrypted { vault_key: new_key, recovery_key: new_recovery, .. } = rekey_dir(&dir, &old_key, "battery staple", TEST_KDF).await.unwrap();
+        let Reencrypted { vault_key: new_key, recovery_key: new_recovery, .. } = rekey_dir(&dir, &old_key, "battery staple", TEST_KDF, &quiet).await.unwrap();
         assert_ne!(*new_key, *old_key);
         assert_no_leftovers(&dir);
 
@@ -884,7 +967,7 @@ mod tests {
         let (dir, image) = plain_vault().await;
         let (file, new_key, _) = KeyFile::create("correct horse", TEST_KDF).unwrap();
         vault::write_atomic(&dir, PENDING_KEY, PENDING_KEY_TEMP, file.to_json().as_bytes()).unwrap();
-        prepare(&dir, Source::Plain, &new_key).await.unwrap();
+        prepare(&dir, Source::Plain, &new_key, &quiet).await.unwrap();
         // Absturz hier: kein Marker. Beim nächsten Öffnen wird aufgeräumt.
         recover_interrupted(&dir).unwrap();
         assert!(!keys::is_encrypted_dir(&dir));
@@ -892,7 +975,7 @@ mod tests {
         assert_eq!(stored_images(&dir), vec![image]);
         assert!(contains(&dir.join(vault::DB_FILE), "GEHEIM-MIGRATION"));
         // Und es lässt sich danach ganz normal verschlüsseln.
-        encrypt_dir(&dir, "correct horse", TEST_KDF).await.unwrap();
+        encrypt_dir(&dir, "correct horse", TEST_KDF, &quiet).await.unwrap();
         assert!(keys::is_encrypted_dir(&dir));
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -908,7 +991,7 @@ mod tests {
         let (dir, _) = plain_vault().await;
         let (file, new_key, _) = KeyFile::create("correct horse", TEST_KDF).unwrap();
         vault::write_atomic(&dir, PENDING_KEY, PENDING_KEY_TEMP, file.to_json().as_bytes()).unwrap();
-        let keep = prepare(&dir, Source::Plain, &new_key).await.unwrap();
+        let keep = prepare(&dir, Source::Plain, &new_key, &quiet).await.unwrap();
         write_marker(&dir, &file, &keep);
         // Absturz mitten im Tausch: die Datenbank ist schon beiseite gelegt.
         std::fs::rename(dir.join(vault::DB_FILE), dir.join(DB_OLD)).unwrap();
@@ -932,7 +1015,7 @@ mod tests {
         let (dir, image) = plain_vault().await;
         let (file, new_key, _) = KeyFile::create("correct horse", TEST_KDF).unwrap();
         vault::write_atomic(&dir, PENDING_KEY, PENDING_KEY_TEMP, file.to_json().as_bytes()).unwrap();
-        let keep = prepare(&dir, Source::Plain, &new_key).await.unwrap();
+        let keep = prepare(&dir, Source::Plain, &new_key, &quiet).await.unwrap();
         std::fs::remove_file(dir.join(PENDING_KEY)).unwrap();
         write_marker(&dir, &file, &keep);
         assert!(recover_interrupted(&dir).is_err());
@@ -955,7 +1038,7 @@ mod tests {
         let (dir, _) = plain_vault().await;
         let (file, new_key, _) = KeyFile::create("correct horse", TEST_KDF).unwrap();
         vault::write_atomic(&dir, PENDING_KEY, PENDING_KEY_TEMP, file.to_json().as_bytes()).unwrap();
-        prepare(&dir, Source::Plain, &new_key).await.unwrap();
+        prepare(&dir, Source::Plain, &new_key, &quiet).await.unwrap();
         {
             let _running = RUNNING.lock().await;
             recover_if_idle(&dir).unwrap();
@@ -970,11 +1053,11 @@ mod tests {
     #[tokio::test]
     async fn a_foreign_sealed_image_does_not_block_a_new_key() {
         let (dir, _) = plain_vault().await;
-        let done = encrypt_dir(&dir, "correct horse", TEST_KDF).await.unwrap();
+        let done = encrypt_dir(&dir, "correct horse", TEST_KDF, &quiet).await.unwrap();
         let foreign = format!("{}.png", "c".repeat(64));
         let sealed = crypto::seal(&crypto::random_key(), Context::Image(&foreign), b"from elsewhere");
         std::fs::write(dir.join(vault::IMAGES_SUBDIR).join(&foreign), sealed).unwrap();
-        rekey_dir(&dir, &done.vault_key, "battery staple", TEST_KDF).await.unwrap();
+        rekey_dir(&dir, &done.vault_key, "battery staple", TEST_KDF, &quiet).await.unwrap();
         assert!(stored_images(&dir).contains(&foreign));
         assert_eq!(stored_images(&dir).len(), 2);
         std::fs::remove_dir_all(&dir).ok();
@@ -987,7 +1070,7 @@ mod tests {
         std::fs::create_dir_all(&backups).unwrap();
         std::fs::write(backups.join("old.emeralddb"), r#"{"type":"backup","secret":"GEHEIM-ALTBACKUP"}"#).unwrap();
         std::fs::write(backups.join("notes.txt"), "left alone").unwrap();
-        encrypt_dir(&dir, "correct horse", TEST_KDF).await.unwrap();
+        encrypt_dir(&dir, "correct horse", TEST_KDF, &quiet).await.unwrap();
         let sealed = std::fs::read(backups.join("old.emeralddb")).unwrap();
         assert!(sealed.starts_with(crate::backup::MAGIC));
         assert!(!contains(&backups.join("old.emeralddb"), "GEHEIM-ALTBACKUP"));
