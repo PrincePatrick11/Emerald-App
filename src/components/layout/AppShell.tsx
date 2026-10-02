@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useTranslation } from 'react-i18next';
 import { isAltarFullscreen, useUIStore } from '../../store/uiStore';
@@ -9,10 +9,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { computeMenuEnabledState, runMenuAction, SELF_CONTAINED_MENU_ACTIONS } from '../../lib/menuActions';
 import { hideSplash } from '../../lib/splash';
 import TitleBar from './titlebar/TitleBar';
-import LeftSidebarRail, { RAIL_WIDTH } from './LeftSidebarRail';
-import LeftSidebarEntryList from './LeftSidebarEntryList';
-import RightSidebar from './RightSidebar';
-import MainArea from './MainArea';
+import LeftSidebarRailBase, { RAIL_WIDTH } from './LeftSidebarRail';
+import LeftSidebarEntryListBase from './LeftSidebarEntryList';
+import RightSidebarBase from './RightSidebar';
+import MainAreaBase from './MainArea';
 import VaultModal from './VaultModal';
 import VaultKeyDialog from './VaultKeyDialog';
 import BackupUnlockDialog from './BackupUnlockDialog';
@@ -27,6 +27,14 @@ import { hasOpenEdits, settleBeforeExit } from '../../lib/openEdits';
 import { restoreDrafts } from '../../store/draftStore';
 import { loadVaultPrefs } from '../../store/vaultPrefs';
 import ImportDestinationModal from '../ui/ImportDestinationModal';
+
+// Ohne Props, alles über eigene Store-Abos: `memo` hält sie aus dem Neuzeichnen
+// der Shell heraus — sonst liefe beim Ziehen einer Seitenleiste jede
+// Mausbewegung durch Liste, Blatt samt Editoren und rechte Leiste.
+const LeftSidebarRail = memo(LeftSidebarRailBase);
+const LeftSidebarEntryList = memo(LeftSidebarEntryListBase);
+const RightSidebar = memo(RightSidebarBase);
+const MainArea = memo(MainAreaBase);
 
 const ENTRY_LIST_MIN = 180;
 /** Zusammen mit der Rail (44) breiter als die Werkzeuggruppe der Titelleiste
