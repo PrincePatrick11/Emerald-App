@@ -541,7 +541,7 @@ pub fn register_vaults(app: tauri::AppHandle, vaults: Vec<VaultEntry>) -> Result
         .0
         .lock()
         .map_err(|_| "vault registry unavailable".to_string())?;
-    map.clear();
+    let previous = std::mem::take(&mut *map);
     for entry in vaults {
         let path = PathBuf::from(&entry.path);
         // Ein relativer Pfad wuerde gegen das Arbeitsverzeichnis des Prozesses
@@ -551,6 +551,16 @@ pub fn register_vaults(app: tauri::AppHandle, vaults: Vec<VaultEntry>) -> Result
             continue;
         }
         map.insert(entry.id, path);
+    }
+    // Ein Schlüssel im Speicher gehört zu dem Ordner, in dem er entsperrt
+    // wurde. Zeigt die Id jetzt woandershin (oder gibt es sie nicht mehr),
+    // wird er vergessen — sonst würden Bilder und Entwürfe im neuen Ordner
+    // unter einem Schlüssel versiegelt, den dessen `vault.key` nicht kennt.
+    let vault_keys = app.state::<crate::keys::VaultKeys>();
+    for (id, old_path) in &previous {
+        if map.get(id) != Some(old_path) {
+            vault_keys.remove(id);
+        }
     }
     Ok(())
 }
