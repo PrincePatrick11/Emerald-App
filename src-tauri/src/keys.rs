@@ -297,7 +297,7 @@ impl VaultKeys {
         self.lock_map().get(vault_id).cloned()
     }
 
-    fn insert(&self, vault_id: &str, key: Key) {
+    pub(crate) fn insert(&self, vault_id: &str, key: Key) {
         self.lock_map().insert(vault_id.to_string(), key);
     }
 
@@ -350,7 +350,7 @@ pub fn forget(vault_id: &str) -> Result<(), String> {
 /// alone, so the keychain is not touched — a keychain that failed to answer
 /// once must not cost a valid entry. Returns whether the key is remembered
 /// afterwards, so the dialog can say when the keychain refused.
-fn apply_remember(vault_id: &str, key: &Key, wanted: Option<bool>) -> bool {
+pub(crate) fn apply_remember(vault_id: &str, key: &Key, wanted: Option<bool>) -> bool {
     match wanted {
         None => false,
         Some(true) => remember(vault_id, key)
@@ -388,6 +388,8 @@ pub struct KeyStatus {
 pub fn vault_key_status(app: tauri::AppHandle, vault_id: String) -> Result<KeyStatus, String> {
     let dir = vault::vault_dir(&app, &vault_id)?;
     vault::directory_state(&dir)?;
+    // Eine abgebrochene Verschlüsselung erst zu Ende bringen oder zurücknehmen.
+    crate::encrypt_existing::recover_interrupted(&dir)?;
     let encrypted = is_encrypted_dir(&dir);
     Ok(KeyStatus {
         has_database: dir.join(vault::DB_FILE).is_file(),
@@ -418,8 +420,8 @@ static CREATE_LOCK: Mutex<()> = Mutex::new(());
 #[serde(rename_all = "camelCase")]
 pub struct CreatedKey {
     /// The recovery key — the only time it ever leaves Rust.
-    recovery_key: Zeroizing<String>,
-    remembered: bool,
+    pub(crate) recovery_key: Zeroizing<String>,
+    pub(crate) remembered: bool,
 }
 
 /// Creates `vault.key` for a new vault and unlocks it. Refuses a vault that is

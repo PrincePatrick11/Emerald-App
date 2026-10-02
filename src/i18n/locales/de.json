@@ -642,7 +642,12 @@
     "createFailed": "Der Vault konnte nicht verschlüsselt werden. Bitte versuche es noch einmal.",
     "rememberUnavailable": "Auf diesem System gibt es keinen Schlüsselbund, in dem sich der Schlüssel merken ließe.",
     "rememberFailed": "Der Schlüsselbund des Betriebssystems hat das Merken abgelehnt. Der Vault ist offen, beim nächsten Start fragt Emerald aber wieder nach dem Passwort.",
-    "continue": "Weiter"
+    "continue": "Weiter",
+    "encryptTitle": "„{{name}}“ verschlüsseln",
+    "encryptHint": "Dieser Vault stammt aus der Zeit vor der Verschlüsselung. Ab jetzt ist jeder Vault verschlüsselt: Wähle ein Passwort, dann verschlüsselt Emerald Einträge, Bilder und Entwürfe. Das dauert je nach Größe einen Moment, und bis alles geprüft ist, bleibt das Original unangetastet.",
+    "encryptNote": "Früher exportierte Backups (.emeralddb) bleiben unverschlüsselt, bis du sie löschst. Auf SSDs lassen sich gelöschte Dateien unter Umständen noch eine Weile wiederherstellen – ganz sicher bist du erst mit einer verschlüsselten Festplatte (BitLocker, FileVault).",
+    "encrypting": "Verschlüssele …",
+    "encryptFailed": "Der Vault konnte nicht verschlüsselt werden. Er ist unverändert – bitte versuche es noch einmal."
   },
   "settings": {
     "language": "Sprache",

@@ -29,7 +29,7 @@ pub type Key = Zeroizing<[u8; 32]>;
 const MAGIC: &[u8; 4] = b"EMRC";
 const VERSION: u8 = 1;
 const NONCE_LEN: usize = 24;
-const HEADER_LEN: usize = MAGIC.len() + 1 + NONCE_LEN;
+pub(crate) const HEADER_LEN: usize = MAGIC.len() + 1 + NONCE_LEN;
 
 /// What a sealed blob is. Authenticated, never stored.
 #[derive(Clone, Copy)]

@@ -650,7 +650,12 @@
     "createFailed": "Impossible de chiffrer le coffre. Réessaie.",
     "rememberUnavailable": "Ce système n’a pas de trousseau où mémoriser la clé.",
     "rememberFailed": "Le trousseau du système d’exploitation a refusé de mémoriser la clé. Le coffre est ouvert, mais Emerald redemandera le mot de passe la prochaine fois.",
-    "continue": "Continuer"
+    "continue": "Continuer",
+    "encryptTitle": "Chiffrer « {{name}} »",
+    "encryptHint": "Ce coffre date d’avant le chiffrement. Désormais, tous les coffres sont chiffrés : choisis un mot de passe et Emerald chiffre les entrées, les images et les brouillons. Selon la taille, cela prend un moment, et l’original reste intact jusqu’à ce que tout soit vérifié.",
+    "encryptNote": "Les sauvegardes exportées auparavant (.emeralddb) restent non chiffrées jusqu’à ce que tu les supprimes. Sur les SSD, des fichiers supprimés peuvent parfois être récupérés pendant un temps – seul un disque chiffré (BitLocker, FileVault) comble cette faille.",
+    "encrypting": "Chiffrement…",
+    "encryptFailed": "Impossible de chiffrer le coffre. Il est inchangé – réessaie."
   },
   "settings": {
     "language": "Langue",

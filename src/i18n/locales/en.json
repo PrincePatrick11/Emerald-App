@@ -642,7 +642,12 @@
     "createFailed": "Could not encrypt the vault. Please try again.",
     "rememberUnavailable": "This system has no keychain to remember the key in.",
     "rememberFailed": "The operating system's keychain refused to remember the key. The vault is open, but Emerald will ask for the password again next time.",
-    "continue": "Continue"
+    "continue": "Continue",
+    "encryptTitle": "Encrypt “{{name}}”",
+    "encryptHint": "This vault dates from before encryption. From now on every vault is encrypted: choose a password and Emerald encrypts entries, images and drafts. Depending on the size this takes a moment, and the original stays untouched until everything has been checked.",
+    "encryptNote": "Backups you exported earlier (.emeralddb) stay unencrypted until you delete them. On SSDs, deleted files can sometimes be recovered for a while — only an encrypted disk (BitLocker, FileVault) closes that gap.",
+    "encrypting": "Encrypting…",
+    "encryptFailed": "Could not encrypt the vault. It is unchanged — please try again."
   },
   "settings": {
     "language": "Language",

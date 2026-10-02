@@ -77,31 +77,30 @@ pub async fn db_load(
     file: DbFile,
 ) -> Result<String, String> {
     let dir = vault::vault_dir(&app, &vault_id)?;
-    let vault_key = keys::key_for(&app, &vault_id)?;
-    if let Some(vault_key) = &vault_key {
-        // Der Schlüssel im Speicher muss zu diesem Ordner gehören: zeigt die
-        // Id inzwischen woandershin, entstünde sonst eine Datenbank unter einem
-        // Schlüssel, den dessen `vault.key` nicht kennt.
-        let accepted = keys::read_key_file(&dir)?.is_some_and(|file| file.accepts(vault_key));
-        if !accepted {
-            return Err(keys::VAULT_LOCKED.to_string());
-        }
+    // Nur verschlüsselte Vaults: ein Vault ohne `vault.key` wird erst
+    // verschlüsselt (`encrypt_existing.rs`), nie im Klartext geöffnet — auch
+    // dann nicht, wenn jemand `vault.key` gelöscht und eine Klartext-Datenbank
+    // untergeschoben hat.
+    let vault_key = keys::key_for(&app, &vault_id)?.ok_or_else(|| keys::VAULT_NOT_ENCRYPTED.to_string())?;
+    // Der Schlüssel im Speicher muss zu diesem Ordner gehören: zeigt die Id
+    // inzwischen woandershin, entstünde sonst eine Datenbank unter einem
+    // Schlüssel, den dessen `vault.key` nicht kennt.
+    if !keys::read_key_file(&dir)?.is_some_and(|file| file.accepts(&vault_key)) {
+        return Err(keys::VAULT_LOCKED.to_string());
     }
-    let mut options = SqliteConnectOptions::new()
+    let key = crypto::subkey(&vault_key, Purpose::Database);
+    let options = SqliteConnectOptions::new()
         .filename(dir.join(file.name()))
-        .create_if_missing(vault_key.is_some())
-        .disable_statement_logging();
-    if let Some(vault_key) = &vault_key {
-        let key = crypto::subkey(vault_key, Purpose::Database);
-        options = options.pragma("key", sqlcipher_key(&key).to_string());
-    }
+        .create_if_missing(true)
+        .disable_statement_logging()
+        .pragma("key", sqlcipher_key(&key).to_string());
     let pool = connect(options).await?;
 
     let handle = handle(&vault_id, file);
     let mut map = dbs.0.write().await;
     // Unter der Sperre noch einmal: ein `vault_lock` während des Verbindens
     // hat den Schlüssel entfernt, und dieser Pool überlebte es sonst.
-    if vault_key.is_some() && app.state::<keys::VaultKeys>().get(&vault_id).is_none() {
+    if app.state::<keys::VaultKeys>().get(&vault_id).is_none() {
         drop(map);
         pool.close().await;
         return Err(keys::VAULT_LOCKED.to_string());
@@ -174,7 +173,7 @@ unsafe extern "C" fn authorize(
 
 /// The key as SQLCipher's raw-key pragma value. Raw means SQLCipher skips its
 /// own PBKDF2 — the key is already random.
-fn sqlcipher_key(key: &crypto::Key) -> Zeroizing<String> {
+pub(crate) fn sqlcipher_key(key: &crypto::Key) -> Zeroizing<String> {
     let mut value = Zeroizing::new(String::with_capacity(70));
     value.push_str("\"x'");
     for b in key.iter() {

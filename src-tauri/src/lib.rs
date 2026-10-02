@@ -30,6 +30,8 @@ mod db;
 mod crypto;
 /// `vault.key`, unlocking, and the keys of unlocked vaults.
 mod keys;
+/// Encrypting a vault from before encryption, resumable after a crash.
+mod encrypt_existing;
 /// Der In-App-Updater: variable Quelle, Pruefung, Installation.
 mod updates;
 
@@ -825,6 +827,7 @@ pub fn run() {
             db::db_select,
             keys::vault_key_status,
             keys::keychain_available,
+            encrypt_existing::vault_encrypt_existing,
             keys::vault_create_key,
             keys::vault_unlock,
             keys::vault_unlock_remembered,

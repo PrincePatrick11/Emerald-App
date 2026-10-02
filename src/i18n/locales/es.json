@@ -650,7 +650,12 @@
     "createFailed": "No se pudo cifrar la bóveda. Inténtalo de nuevo.",
     "rememberUnavailable": "Este sistema no tiene un llavero en el que recordar la clave.",
     "rememberFailed": "El llavero del sistema operativo no ha aceptado recordar la clave. La bóveda está abierta, pero Emerald volverá a pedir la contraseña la próxima vez.",
-    "continue": "Continuar"
+    "continue": "Continuar",
+    "encryptTitle": "Cifrar «{{name}}»",
+    "encryptHint": "Esta bóveda es de antes del cifrado. A partir de ahora todas las bóvedas están cifradas: elige una contraseña y Emerald cifrará las entradas, las imágenes y los borradores. Según el tamaño tarda un momento, y el original no se toca hasta que todo esté comprobado.",
+    "encryptNote": "Las copias de seguridad que exportaste antes (.emeralddb) siguen sin cifrar hasta que las borres. En los SSD, los archivos borrados a veces se pueden recuperar durante un tiempo; solo un disco cifrado (BitLocker, FileVault) cierra ese hueco.",
+    "encrypting": "Cifrando…",
+    "encryptFailed": "No se pudo cifrar la bóveda. No ha cambiado; inténtalo de nuevo."
   },
   "settings": {
     "language": "Idioma",

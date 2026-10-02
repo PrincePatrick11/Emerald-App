@@ -6,7 +6,8 @@ import Button from '../ui/Button';
 import { SwitchRow } from '../ui/Switch';
 import { useVaultKeyStore, type VaultKeyRequest } from '../../store/vaultKeyStore';
 import {
-  KEY_ERRORS, MIN_PASSWORD_LENGTH, createVaultKey, keyErrorOf, keychainAvailable, recoverVault, unlockVault,
+  KEY_ERRORS, MIN_PASSWORD_LENGTH, createVaultKey, encryptExistingVault, keyErrorOf, keychainAvailable, recoverVault,
+  unlockVault,
 } from '../../lib/vaultKeys';
 import { hideSplash } from '../../lib/splash';
 
@@ -25,12 +26,13 @@ export default function VaultKeyDialog() {
 }
 
 /** `rememberFailed`: entsperrt, aber der Schlüsselbund hat das Merken abgelehnt. */
-type Step = 'unlock' | 'recover' | 'create' | 'showRecovery' | 'rememberFailed';
+type Step = 'unlock' | 'recover' | 'create' | 'encrypt' | 'showRecovery' | 'rememberFailed';
 
 const FAILED_KEY = {
   unlock: 'vaultKey.unlockFailed',
   recover: 'vaultKey.recoverFailed',
   create: 'vaultKey.createFailed',
+  encrypt: 'vaultKey.encryptFailed',
 } as const;
 
 function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
@@ -42,11 +44,12 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   const [password, setPassword] = useState('');
   const [repeat, setRepeat] = useState('');
   const [recoveryInput, setRecoveryInput] = useState('');
-  // Beim Anlegen an — der übliche Wunsch auf dem eigenen Rechner. Beim
-  // Entsperren aus, aber nur angezeigt: solange niemand den Schalter bewegt,
-  // bleibt der Schlüsselbund, wie er ist (`rememberTouched`).
-  const [remember, setRemember] = useState(request.kind === 'create');
-  const [rememberTouched, setRememberTouched] = useState(request.kind === 'create');
+  // Beim Anlegen und Verschlüsseln an — der übliche Wunsch auf dem eigenen
+  // Rechner. Beim Entsperren aus, aber nur angezeigt: solange niemand den
+  // Schalter bewegt, bleibt der Schlüsselbund, wie er ist (`rememberTouched`).
+  const newKey = request.kind !== 'unlock';
+  const [remember, setRemember] = useState(newKey);
+  const [rememberTouched, setRememberTouched] = useState(newKey);
   const [keychain, setKeychain] = useState(true);
   const [recoveryKey, setRecoveryKey] = useState('');
   const [rememberRefused, setRememberRefused] = useState(false);
@@ -113,10 +116,12 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
     unlocked(await recoverVault(request.vaultId, recoveryInput, password, rememberWish));
   });
 
-  const submitCreate = () => attempt('create', async () => {
+  /** Neuer Vault oder Verschlüsselung eines alten — beide enden beim Wiederherstellungsschlüssel. */
+  const submitNewKey = (kind: 'create' | 'encrypt') => attempt(kind, async () => {
     const problem = newPasswordError();
     if (problem) { setError(problem); return; }
-    const created = await createVaultKey(request.vaultId, password, rememberWish);
+    const make = kind === 'create' ? createVaultKey : encryptExistingVault;
+    const created = await make(request.vaultId, password, rememberWish);
     setRecoveryKey(created.recoveryKey);
     setRememberRefused(Boolean(rememberWish) && !created.remembered);
     setPassword('');
@@ -141,6 +146,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
     unlock: t('vaultKey.unlockTitle', { name: request.vaultName }),
     recover: t('vaultKey.recoverTitle'),
     create: t('vaultKey.createTitle', { name: request.vaultName }),
+    encrypt: t('vaultKey.encryptTitle', { name: request.vaultName }),
     showRecovery: t('vaultKey.recoveryTitle'),
     rememberFailed: t('vaultKey.unlockTitle', { name: request.vaultName }),
   }[step];
@@ -148,7 +154,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   // Abbrechen geht nur, solange noch nichts geschehen ist: nach dem Anlegen
   // hieße es, den Wiederherstellungsschlüssel ungesehen wegzuklicken, und
   // während eine Aktion läuft, käme Rust mit ihr trotzdem durch.
-  const cancelShown = step === 'unlock' || step === 'recover' || step === 'create';
+  const cancelShown = step === 'unlock' || step === 'recover' || step === 'create' || step === 'encrypt';
 
   const busyIcon = busy ? <Loader2 size={16} className="animate-spin" /> : null;
 
@@ -261,18 +267,36 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
       </>
     );
   } else if (step === 'create') {
+    const submit = () => submitNewKey('create');
     body = (
       <>
         <p className="text-sm text-secondary">{t('vaultKey.createHint')}</p>
-        {passwordFields(submitCreate, true)}
+        {passwordFields(submit, true)}
         {rememberRow}
         {errorLine}
       </>
     );
     actions = (
-      <Button tone="jade" disabled={!password || busy} onClick={submitCreate}>
+      <Button tone="jade" disabled={!password || busy} onClick={submit}>
         {busyIcon}
         {t('vaultKey.createSubmit')}
+      </Button>
+    );
+  } else if (step === 'encrypt') {
+    const submit = () => submitNewKey('encrypt');
+    body = (
+      <>
+        <p className="text-sm text-secondary">{t('vaultKey.encryptHint')}</p>
+        <p className="text-xs text-muted">{t('vaultKey.encryptNote')}</p>
+        {passwordFields(submit, true)}
+        {rememberRow}
+        {errorLine}
+      </>
+    );
+    actions = (
+      <Button tone="jade" disabled={!password || busy} onClick={submit}>
+        {busyIcon}
+        {busy ? t('vaultKey.encrypting') : t('vaultKey.createSubmit')}
       </Button>
     );
   } else if (step === 'showRecovery') {

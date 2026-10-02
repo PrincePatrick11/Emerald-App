@@ -51,6 +51,18 @@ export function createVaultKey(
   return invoke('vault_create_key', { vaultId, password, rememberKey });
 }
 
+/**
+ * Verschlüsselt einen bestehenden Klartext-Vault (`encrypt_existing.rs`) und
+ * entsperrt ihn. Die Verbindungen zu ihm müssen zu sein.
+ */
+export function encryptExistingVault(
+  vaultId: string,
+  password: string,
+  rememberKey: boolean | undefined,
+): Promise<{ recoveryKey: string; remembered: boolean }> {
+  return invoke('vault_encrypt_existing', { vaultId, password, rememberKey });
+}
+
 export function unlockVault(vaultId: string, password: string, rememberKey: boolean | undefined): Promise<boolean> {
   return invoke('vault_unlock', { vaultId, password, rememberKey });
 }

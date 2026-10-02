@@ -1081,7 +1081,7 @@ pub fn discard_import_staging(app: tauri::AppHandle, vault_id: String) -> Result
 /// Die Versionsnummer einer Migrations-Sicherung (`emerald.db.pre-v42.bak`,
 /// angelegt von `backupDatabaseFile` in `dbRebuild.ts`) — `None` für jeden
 /// anderen Namen.
-fn migration_backup_version(name: &str) -> Option<u32> {
+pub(crate) fn migration_backup_version(name: &str) -> Option<u32> {
     name.strip_prefix(DB_FILE)?
         .strip_prefix(".pre-v")?
         .strip_suffix(".bak")?

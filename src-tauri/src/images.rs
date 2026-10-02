@@ -55,6 +55,18 @@ fn image_name(keys: Option<&ImageKeys>, bytes: &[u8], ext: &str) -> String {
     format!("{digest}.{ext}")
 }
 
+/// An image as an encrypted vault stores it: its name and the sealed bytes.
+/// For encrypting a vault that has plain images (`encrypt_existing.rs`).
+pub(crate) fn seal_for_vault(vault_key: &Key, bytes: &[u8], ext: &str) -> (String, Vec<u8>) {
+    let keys = ImageKeys {
+        files: crypto::subkey(vault_key, Purpose::Files),
+        names: crypto::subkey(vault_key, Purpose::ImageNames),
+    };
+    let name = image_name(Some(&keys), bytes, ext);
+    let sealed = crypto::seal(&keys.files, Context::Image(&name), bytes);
+    (name, sealed)
+}
+
 /// Writes an image into the vault — sealed in an encrypted one — unless a file
 /// of that name is there already. Returns the name.
 fn store(app: &tauri::AppHandle, vault_id: &str, bytes: &[u8], ext: &str) -> Result<String, String> {

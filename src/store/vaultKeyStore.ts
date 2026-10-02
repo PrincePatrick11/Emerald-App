@@ -5,10 +5,11 @@ import { unlockRemembered, vaultKeyStatus } from '../lib/vaultKeys';
  * Was `VaultKeyDialog` gerade fragt.
  *
  * - `create`: ein neuer Vault bekommt sein Passwort.
+ * - `encrypt`: ein Vault aus der Zeit vor der Verschlüsselung wird verschlüsselt.
  * - `unlock`: ein verschlüsselter Vault ist gesperrt.
  */
 export type VaultKeyRequest = {
-  kind: 'create' | 'unlock';
+  kind: 'create' | 'encrypt' | 'unlock';
   vaultId: string;
   vaultName: string;
 };
@@ -64,18 +65,19 @@ function ask(request: VaultKeyRequest): Promise<void> {
 }
 
 /**
- * Das eine Tor vor jeder Datenbank: danach ist der Vault entsperrt — oder er
- * ist ein alter, noch unverschlüsselter.
+ * Das eine Tor vor jeder Datenbank: danach ist der Vault verschlüsselt und
+ * entsperrt.
  *
  * Ein neuer Vault (noch keine `emerald.db`) bekommt hier sein Passwort, ein
- * gesperrter wird mit dem gemerkten Schlüssel entsperrt oder fragt nach dem
- * Passwort. Endet mit {@link VAULT_KEY_CANCELLED}, wenn der Nutzer abbricht;
- * ein fehlender Vault-Ordner scheitert schon an der Statusabfrage.
+ * alter, unverschlüsselter wird verschlüsselt — Pflicht, Rust öffnet keinen
+ * Vault ohne `vault.key` —, und ein gesperrter wird mit dem gemerkten
+ * Schlüssel entsperrt oder fragt nach dem Passwort. Endet mit
+ * {@link VAULT_KEY_CANCELLED}, wenn der Nutzer abbricht; ein fehlender
+ * Vault-Ordner scheitert schon an der Statusabfrage.
  *
  * Start, Wechsel, Anlegen, Öffnen und der Import als neuer Vault laufen alle
  * hier durch, weil sie alle in `openActiveVault` bzw. dem Start in `AppShell`
- * münden. Rust sichert dasselbe ab: ohne Schlüssel legt `db_load` keine
- * Datenbank an.
+ * münden. Rust sichert dasselbe ab: ohne Schlüssel öffnet `db_load` nichts.
  */
 export async function ensureVaultReady(vault: { id: string; name: string }): Promise<void> {
   const status = await vaultKeyStatus(vault.id);
@@ -86,8 +88,5 @@ export async function ensureVaultReady(vault: { id: string; name: string }): Pro
     if (await unlockRemembered(vault.id).catch(() => false)) return;
     return ask({ kind: 'unlock', vaultId: vault.id, vaultName: vault.name });
   }
-  if (!status.hasDatabase) {
-    return ask({ kind: 'create', vaultId: vault.id, vaultName: vault.name });
-  }
-  // Ein bestehender, unverschlüsselter Vault öffnet vorerst wie bisher.
+  return ask({ kind: status.hasDatabase ? 'encrypt' : 'create', vaultId: vault.id, vaultName: vault.name });
 }
