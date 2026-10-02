@@ -80,7 +80,9 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
-            libssl-dev
+            libssl-dev \
+            libdbus-1-dev \
+            pkg-config
 
       - run: npm ci
 

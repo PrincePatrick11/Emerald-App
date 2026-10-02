@@ -101,6 +101,10 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # OpenSSL (unter SQLCipher) baut ohne NASM ohne Assembler — also ohne
+      # AES-NI, langsamer und nicht in konstanter Zeit.
+      - uses: ilammy/setup-nasm@v1
+
       - name: Build Windows bundle
         env:
           # Seit `createUpdaterArtifacts` in der Config steht, bricht der
@@ -157,7 +161,9 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
-            libssl-dev
+            libssl-dev \
+            libdbus-1-dev \
+            pkg-config
 
       - name: Install frontend dependencies
         run: npm ci

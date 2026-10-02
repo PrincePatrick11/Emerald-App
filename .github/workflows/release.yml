@@ -179,6 +179,10 @@ jobs:
         shell: bash
         run: rm -rf "src-tauri/target/x86_64-pc-windows-msvc/release/bundle"
 
+      # OpenSSL (unter SQLCipher) baut ohne NASM ohne Assembler — also ohne
+      # AES-NI, langsamer und nicht in konstanter Zeit.
+      - uses: ilammy/setup-nasm@v1
+
       - name: Build
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -234,7 +238,9 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
-            libssl-dev
+            libssl-dev \
+            libdbus-1-dev \
+            pkg-config
 
       - name: Install dependencies
         run: npm ci
