@@ -144,6 +144,7 @@ The database is SQLCipher, built from source together with OpenSSL (`libsqlite3-
 - **NASM** on Windows release builds. Without it OpenSSL builds without its assembler code: no AES-NI, slower, and not constant-time. `release.yml` and `manual-desktop-builds.yml` install it (`ilammy/setup-nasm`); `ci.yml` only compiles, so it does not.
 - **`libdbus-1-dev` and `pkg-config`** on Linux, for the Secret Service keychain (`keyring`'s D-Bus client). They are in the apt list of every Linux job.
 - **Argon2 in dev builds.** `Cargo.toml` compiles `argon2` and `blake2` with `opt-level = 3` under `[profile.dev]`: unoptimised, Argon2id would take many seconds per unlock.
+- **Release profile.** `[profile.release]` sets `lto = true`, `codegen-units = 1` and `strip = true`: a smaller, faster binary at the price of a slower release compile (CI only; dev builds are unaffected).
 
 ## Signing
 
