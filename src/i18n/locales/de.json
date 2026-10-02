@@ -611,6 +611,7 @@
   },
   "vaultKey": {
     "unlockTitle": "„{{name}}“ entsperren",
+    "rememberFailedTitle": "„{{name}}“ ist entsperrt",
     "unlockHint": "Dieser Vault ist verschlüsselt. Gib sein Passwort ein, um ihn zu öffnen.",
     "password": "Passwort",
     "unlock": "Entsperren",

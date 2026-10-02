@@ -124,7 +124,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
     create: t('vaultKey.createTitle', { name: request.vaultName }),
     encrypt: t('vaultKey.encryptTitle', { name: request.vaultName }),
     showRecovery: t('vaultKey.recoveryTitle'),
-    rememberFailed: t('vaultKey.unlockTitle', { name: request.vaultName }),
+    rememberFailed: t('vaultKey.rememberFailedTitle', { name: request.vaultName }),
   }[step];
 
   // Abbrechen geht nur, solange noch nichts geschehen ist: nach dem Anlegen
