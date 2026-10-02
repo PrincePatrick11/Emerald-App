@@ -114,8 +114,13 @@ pub async fn db_load(
     }
     let previous = map.insert(handle.clone(), pool);
     drop(map);
+    // Im Hintergrund: `close` wartet, bis jede laufende Abfrage des alten
+    // Pools fertig ist — nach einem Neuladen der Seite etwa das Nachladen
+    // aller Einträge (`fetchEntries`, zweite Stufe). Der neue Pool braucht den
+    // alten nicht zu, und wer die Dateien wirklich frei braucht, schließt
+    // ausdrücklich (`db_close`, `close_vault`).
     if let Some(previous) = previous {
-        previous.close().await;
+        tauri::async_runtime::spawn(async move { previous.close().await });
     }
     Ok(handle)
 }

@@ -26,6 +26,7 @@ import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { useEntryEditor } from '../../hooks/useEntryEditor';
+import { useEntryContentReady } from '../../hooks/useEntryContentReady';
 import { useEditActions } from '../../hooks/useEditActions';
 import { guardKey } from '../../store/leaveGuardStore';
 import BlockStack from '../blocks/BlockStack';
@@ -47,6 +48,9 @@ export default function OperationsView() {
   const pushUndo = useUndoStore((s) => s.push);
 
   const operation = activeView.id ? getEntry(activeView.id, 'operation') : null;
+  // Der Start lädt Inhalte nach den Listen: bis dieser da ist, steht der
+  // Rahmen mit Titel, der Blockstapel montiert erst mit dem echten Inhalt.
+  const contentReady = useEntryContentReady(operation?.id);
   // Eine geladene Sigille mit Sperre „ganzer Eintrag" öffnet nie im
   // Bearbeitungsmodus — gleich, woher der kommt (Seitenleiste, Home, Tab).
   const locked = !!operation && !!entryBlockSummary(operation.id, operation.content).sigil?.lockEntry;
@@ -93,7 +97,7 @@ export default function OperationsView() {
   });
 
   useEffect(() => {
-    if (operation) {
+    if (operation && contentReady) {
       setTitle(operation.title);
       contentRef.current = operation.content;
       setTags(operation.tags ?? []);
@@ -101,7 +105,7 @@ export default function OperationsView() {
     } else {
       setLoadedOperationId(null);
     }
-  }, [operation?.id]);
+  }, [operation?.id, contentReady]);
 
   // Sync from store (also during editing — sidebar changes must apply)
   useEffect(() => {

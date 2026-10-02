@@ -105,6 +105,8 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
   if (from === to) return;
   // Vor der Kette unten: der Flush läuft selbst unter dem Schlüssel des Eintrags.
   await useUIStore.getState().editActions?.flush?.();
+  // Der Inhalt zieht mit — auch bei einem Eintrag, der seit dem Start nie offen war.
+  await useEntryStore.getState().ensureEntryContent(id);
 
   await serialized(serialKey('entry', id), async () => {
     const source = useEntryStore.getState().getEntry(id, from);

@@ -21,6 +21,7 @@ import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY, countByCategory } fro
 
 import { useUIStore } from '../../store/uiStore';
 import { useEntryEditor } from '../../hooks/useEntryEditor';
+import { useEntryContentReady } from '../../hooks/useEntryContentReady';
 import { useEditActions } from '../../hooks/useEditActions';
 import { guardKey } from '../../store/leaveGuardStore';
 import { useEntryStore } from '../../store/entryStore';
@@ -47,6 +48,9 @@ export default function WikiView() {
   const pushUndo = useUndoStore((s) => s.push);
 
   const article = activeView.id ? getEntry(activeView.id, 'wiki') : null;
+  // Der Start lädt Inhalte nach den Listen: bis dieser da ist, steht der
+  // Rahmen mit Titel, der Blockstapel montiert erst mit dem echten Inhalt.
+  const contentReady = useEntryContentReady(article?.id);
   // Eine geladene Sigille mit Sperre „ganzer Eintrag" öffnet nie im Bearbeitungsmodus.
   const locked = !!article && !!entryBlockSummary(article.id, article.content).sigil?.lockEntry;
   const isEditing = activeView.mode === 'edit' && !locked;
@@ -94,7 +98,7 @@ export default function WikiView() {
   });
 
   useEffect(() => {
-    if (article) {
+    if (article && contentReady) {
       setTitle(article.title);
       contentRef.current = article.content;
       setTags(article.tags ?? []);
@@ -103,7 +107,7 @@ export default function WikiView() {
     } else {
       setLoadedArticleId(null);
     }
-  }, [article?.id]);
+  }, [article?.id, contentReady]);
 
   // Sync from store (also during editing — sidebar changes must apply)
   useEffect(() => {

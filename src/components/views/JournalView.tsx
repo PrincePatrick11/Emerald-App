@@ -30,6 +30,7 @@ import { useSettingsStore } from '../../store/settingsStore';
 import type { Entry, MoonPhase } from '../../types';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import { useSessionState } from '../../store/sessionStore';
+import { useEntryContentReady } from '../../hooks/useEntryContentReady';
 
 export default function JournalView() {
   const { t } = useTranslation();
@@ -44,6 +45,9 @@ export default function JournalView() {
   const pushUndo = useUndoStore((s) => s.push);
 
   const entry = activeView.id ? getEntry(activeView.id, 'journal') : null;
+  // Der Start lädt Inhalte nach den Listen: bis dieser da ist, steht der
+  // Rahmen mit Titel, der Blockstapel montiert erst mit dem echten Inhalt.
+  const contentReady = useEntryContentReady(entry?.id);
   // Eine geladene Sigille mit Sperre „ganzer Eintrag" öffnet nie im Bearbeitungsmodus.
   const locked = !!entry && !!entryBlockSummary(entry.id, entry.content).sigil?.lockEntry;
   const isEditing = activeView.mode === 'edit' && !locked;
@@ -82,7 +86,7 @@ export default function JournalView() {
   });
 
   useEffect(() => {
-    if (entry) {
+    if (entry && contentReady) {
       setTitle(entry.title);
       contentRef.current = entry.content;
       setTags(entry.tags ?? []);
@@ -90,7 +94,7 @@ export default function JournalView() {
     } else {
       setLoadedEntryId(null);
     }
-  }, [entry?.id]);
+  }, [entry?.id, contentReady]);
 
   // Sync tags from store (also during editing — sidebar changes must apply)
   useEffect(() => {

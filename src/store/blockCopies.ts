@@ -27,7 +27,7 @@
  * lesen dieselbe Liste.
  */
 import { useMemo } from 'react';
-import { useEntryStore, allEntries } from './entryStore';
+import { useEntryStore, allEntries, whenEntryContentLoaded } from './entryStore';
 import { AS_A_CONSEQUENCE } from '../lib/stamp';
 import { useBlockSessionStore } from './blockSessionStore';
 import { useTemplateStore } from './templateStore';
@@ -143,6 +143,9 @@ async function rewriteAll(defId: string, transform: (content: string) => string 
   const result: CopyRunResult = { changed: 0, changedTemplates: 0, skippedEditing: 0, skippedDrafts: 0, skippedLocked: 0, failed: 0 };
   // Ein Backup-Import tauscht gerade den Vault aus.
   if (editorSavesSuspended()) return result;
+  // Über alle Inhalte: ein noch nicht nachgeladener (`pendingContent`) ist
+  // leer und enthielte scheinbar keine Kopie.
+  await whenEntryContentLoaded();
   const session = useBlockSessionStore.getState().session;
   const editingId = session?.isEditing ? session.entryId : null;
   const templateDrafts = useTemplateDraftStore.getState().drafts;

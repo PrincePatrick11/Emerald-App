@@ -23,8 +23,18 @@ export type EntriesByType = Record<EntryType, Entry[]>;
 interface EntryState {
   entries: EntriesByType;
   loading: boolean;
+  /**
+   * Einträge, deren `content` noch nicht geladen ist — `null`, sobald alle da
+   * sind. `fetchEntries` lädt in zwei Stufen: erst die Metadaten (die Listen
+   * stehen sofort), die Inhalte im Hintergrund. Bis dahin ist `content` dieser
+   * Einträge leer; wer ihn braucht, wartet mit `ensureEntryContent` bzw.
+   * `whenEntryContentLoaded`.
+   */
+  pendingContent: ReadonlySet<string> | null;
 
   fetchEntries: () => Promise<void>;
+  /** Lädt den Inhalt eines Eintrags sofort, falls er noch aussteht. */
+  ensureEntryContent: (id: string) => Promise<void>;
   /** Mit dem Standard der Kombination (Vorlagen) — außer `blank`. Das Journal hat keine Kategorie. */
   createEntry: (type: EntryType, opts?: { categoryId?: string | null; blank?: boolean; createdAt?: string }) => Promise<Entry>;
   duplicateEntry: (id: string) => Promise<Entry | undefined>;
@@ -52,10 +62,13 @@ const ORDER: Record<EntryType, { sort: (a: Entry, b: Entry) => number; newAtEnd:
 
 const emptyEntries = (): EntriesByType => ({ journal: [], wiki: [], operation: [] });
 
-/** Die lebenden Einträge aus der Datenbank, je Typ sortiert. */
+/** Alles außer `content` — die erste Stufe von `fetchEntries`. */
+const META_COLUMNS = 'id, type, title, category_id, entry_number, icon, cover_image, tags, created_at, updated_at, deleted_at';
+
+/** Die lebenden Einträge aus der Datenbank, je Typ sortiert — ohne Inhalt. */
 async function selectLiveEntries(): Promise<EntriesByType> {
   const db = await getDb();
-  const rows = await db.select<DbRow[]>('SELECT * FROM entries WHERE deleted_at IS NULL');
+  const rows = await db.select<DbRow[]>(`SELECT ${META_COLUMNS} FROM entries WHERE deleted_at IS NULL`);
   const byType = emptyEntries();
   for (const row of rows) {
     const entry = fromRow.entry(row);
@@ -63,6 +76,51 @@ async function selectLiveEntries(): Promise<EntriesByType> {
   }
   for (const type of ENTRY_TYPES) byType[type].sort(ORDER[type].sort);
   return byType;
+}
+
+/** Die laufende zweite Stufe von `fetchEntries`; ein neuer Ladevorgang macht eine ältere wirkungslos. */
+let contentLoad: Promise<void> = Promise.resolve();
+let loadGeneration = 0;
+/** Einträge je Abfrage der zweiten Stufe. */
+const CONTENT_CHUNK = 1000;
+
+/**
+ * Trägt die Inhalte nach — nur bei Einträgen, die noch ausstehen. Ein Eintrag,
+ * den `ensureEntryContent` schon geholt und der Autosave seitdem geschrieben
+ * hat, behielte sonst den älteren Stand dieser Abfrage.
+ */
+async function loadAllContent(generation: number): Promise<void> {
+  const db = await getDb();
+  // In Stücken: ein überholter Ladevorgang (Vault-Wechsel, neu geladene
+  // Seite) hört nach dem laufenden Stück auf, statt noch alle Inhalte über
+  // die IPC zu schieben — und keine einzelne Antwort wird zig Megabyte groß.
+  const contentById = new Map<string, string>();
+  for (let after = -1; ;) {
+    const rows = await db.select<{ rid: number; id: string; content: string | null }[]>(
+      'SELECT rowid AS rid, id, content FROM entries WHERE deleted_at IS NULL AND rowid > $1 ORDER BY rowid LIMIT $2',
+      [after, CONTENT_CHUNK],
+    );
+    if (generation !== loadGeneration) return;
+    for (const r of rows) contentById.set(r.id, r.content ?? '');
+    if (rows.length < CONTENT_CHUNK) break;
+    after = rows[rows.length - 1].rid;
+  }
+  useEntryStore.setState((s) => {
+    const pending = s.pendingContent;
+    if (!pending) return {};
+    return {
+      entries: mapEntries(s.entries, (list) => list.map((e) => {
+        const content = pending.has(e.id) ? contentById.get(e.id) : undefined;
+        return content === undefined ? e : { ...e, content };
+      })),
+      pendingContent: null,
+    };
+  });
+}
+
+/** Erfüllt sich, sobald jeder Eintrag seinen Inhalt hat — für alles, was über alle Inhalte geht. */
+export async function whenEntryContentLoaded(): Promise<void> {
+  while (useEntryStore.getState().pendingContent) await contentLoad;
 }
 
 /** Alle Einträge in einer Liste — Journal, Wiki, Operationen. */
@@ -104,14 +162,37 @@ function withEntry(entries: EntriesByType, type: EntryType, map: (list: Entry[])
 export const useEntryStore = create<EntryState>((set, get) => ({
   entries: emptyEntries(),
   loading: false,
+  pendingContent: null,
 
   fetchEntries: async () => {
     set({ loading: true });
+    const generation = ++loadGeneration;
     try {
-      set({ entries: await selectLiveEntries() });
+      const entries = await selectLiveEntries();
+      set({ entries, pendingContent: new Set(allEntries(entries).map((e) => e.id)) });
     } finally {
       set({ loading: false });
     }
+    contentLoad = loadAllContent(generation);
+    contentLoad.catch((err: unknown) => console.error('[entries] loading content failed', err));
+  },
+
+  ensureEntryContent: async (id) => {
+    if (!get().pendingContent?.has(id)) return;
+    const db = await getDb();
+    const rows = await db.select<{ content: string | null }[]>('SELECT content FROM entries WHERE id = $1', [id]);
+    set((s) => {
+      // Inzwischen kam die zweite Stufe — oder ein anderer Aufruf — zuvor.
+      if (!s.pendingContent?.has(id)) return {};
+      const pending = new Set(s.pendingContent);
+      pending.delete(id);
+      const entry = findEntry(s.entries, id);
+      const content = rows[0]?.content ?? '';
+      return {
+        pendingContent: pending,
+        ...(entry && { entries: withEntry(s.entries, entry.type, (list) => list.map((e) => (e.id === id ? { ...e, content } : e))) }),
+      };
+    });
   },
 
   createEntry: async (type, { categoryId = null, blank = false, createdAt } = {}) => {
@@ -151,6 +232,7 @@ export const useEntryStore = create<EntryState>((set, get) => ({
    * aufgezählt — ein neues Feld fehlte dann still an einzelnen Stellen.
    */
   duplicateEntry: async (id) => {
+    await get().ensureEntryContent(id);
     const src = get().getEntry(id);
     if (!src) return undefined;
     const copy = await get().createEntry(src.type, { categoryId: src.category_id, blank: true });
@@ -171,24 +253,36 @@ export const useEntryStore = create<EntryState>((set, get) => ({
   // Typ — ein Typwechsel läuft unter demselben (`entryTypeChange`).
   updateEntry: (id, patch, { touch } = {}) => serialized(serialKey('entry', id), async () => {
     const entry = get().getEntry(id);
-    if (!entry || !needsWrite(entry, patch, touch)) return;
+    if (!entry) return;
+    // Ein noch nicht geladener Inhalt ist leer, nicht der gespeicherte — was
+    // ihn mitschickt, kann ihn nicht gelesen haben. Der Editor montiert erst
+    // mit Inhalt; das hier fängt jeden anderen Weg ab.
+    if (patch.content !== undefined && get().pendingContent?.has(id)) {
+      console.warn('[entries] content of', id, 'not loaded yet — left as stored');
+      const { content: _dropped, ...rest } = patch;
+      patch = rest;
+    }
+    if (!needsWrite(entry, patch, touch)) return;
     const db = await getDb();
     // Den Typ ändert nur `entryTypeChange`.
     const merged: Entry = { ...entry, ...patch, type: entry.type, updated_at: stampFor(entry.updated_at, touch) };
 
+    // `content` nur, wenn er sich ändern soll: er ist das mit Abstand größte
+    // Feld, und ein Titel- oder Tag-Wechsel muss ihn nicht neu verschlüsseln.
+    const writesContent = patch.content !== undefined;
     await db.execute(
       `UPDATE entries
-          SET title=$1, content=$2, category_id=$3, updated_at=$4, tags=$5, cover_image=$6, icon=$7
-        WHERE id=$8`,
+          SET title=$1, category_id=$2, updated_at=$3, tags=$4, cover_image=$5, icon=$6${writesContent ? ', content=$8' : ''}
+        WHERE id=$7`,
       [
         merged.title,
-        merged.content,
         merged.category_id,
         merged.updated_at,
         JSON.stringify(merged.tags),
         merged.cover_image ?? null,
         merged.icon ?? null,
         id,
+        ...(writesContent ? [merged.content] : []),
       ]
     );
     set((s) => ({
@@ -206,8 +300,13 @@ export const useEntryStore = create<EntryState>((set, get) => ({
   restoreEntry: async (id) => {
     const db = await getDb();
     await db.execute('UPDATE entries SET deleted_at=NULL WHERE id=$1', [id]);
-    // Neu laden, damit der Eintrag an seiner Stelle in der Liste auftaucht.
-    set({ entries: await selectLiveEntries() });
+    // Nur diese Zeile, einsortiert wie beim Laden.
+    const rows = await db.select<DbRow[]>('SELECT * FROM entries WHERE id = $1', [id]);
+    if (!rows[0]) return;
+    const entry = fromRow.entry(rows[0]);
+    set((s) => ({
+      entries: withEntry(s.entries, entry.type, (list) => [...list.filter((e) => e.id !== id), entry].sort(ORDER[entry.type].sort)),
+    }));
   },
 
   permanentlyDeleteEntry: async (id) => {
