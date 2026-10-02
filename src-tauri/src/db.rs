@@ -318,6 +318,10 @@ async fn execute_on(pool: &SqlitePool, query: &str, values: Vec<JsonValue>) -> R
 /// none. A loop of `db_execute` calls commits (and syncs the file) once per
 /// statement, and a `BEGIN` sent on its own may land on another connection of
 /// the pool than the statements after it. Returns the rows affected in all.
+///
+/// The transaction is deferred: it takes the write lock with its first
+/// write. Every batch so far starts with one; a batch that read first could
+/// meet `SQLITE_BUSY` when it upgrades, so start such a batch with its write.
 #[tauri::command]
 pub async fn db_batch(
     dbs: tauri::State<'_, Databases>,

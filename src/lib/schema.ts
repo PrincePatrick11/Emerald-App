@@ -329,6 +329,17 @@ export const ALTARS_INDEX_DDL = 'CREATE INDEX idx_altars_deleted ON altars(delet
 export const ALTAR_ITEMS_INDEX_DDL = 'CREATE INDEX idx_altar_items_deleted ON altar_items(deleted_at)';
 
 /**
+ * Die Indizes von `entries`, wie v49 sie anlegte — eingefroren für
+ * `unifyEntries`, damit die Kette bei v55 denselben Umbau sieht wie ein echter
+ * v54-Vault. v55 ersetzt `idx_entries_deleted` (`ENTRIES_INDEX_DDL`).
+ */
+export const ENTRIES_INDEX_DDL_V49: readonly string[] = [
+  'CREATE INDEX idx_entries_type ON entries(type, deleted_at)',
+  'CREATE INDEX idx_entries_category ON entries(category_id)',
+  'CREATE INDEX idx_entries_deleted ON entries(deleted_at)',
+];
+
+/**
  * Die Indizes von `entries`. `type` samt `deleted_at`, weil jedes Modul seine
  * lebenden Einträge so lädt.
  *

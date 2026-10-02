@@ -28,7 +28,7 @@
  * `.pre-v49.bak` und wird im Log genannt.
  */
 import type Database from './sqlite';
-import { ENTRIES_INDEX_DDL, TABLE_DDL, ddlIfNotExists } from './schema';
+import { ENTRIES_INDEX_DDL_V49, TABLE_DDL, ddlIfNotExists } from './schema';
 import { assertForeignKeysIntact, backupDatabaseFile, createIndexesIfMissing, tableExists } from './dbRebuild';
 import { convertLegacySigils } from './migrateLegacySigils';
 import type { EntryType } from '../types';
@@ -89,6 +89,6 @@ export async function unifyEntries(db: Database): Promise<void> {
     }
   }
 
-  await createIndexesIfMissing(db, ENTRIES_INDEX_DDL);
+  await createIndexesIfMissing(db, ENTRIES_INDEX_DDL_V49);
   await assertForeignKeysIntact(db, 'v49');
 }

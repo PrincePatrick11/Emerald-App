@@ -3,7 +3,9 @@
  *
  * `doReplace` und `doMerge` schreiben über viele einzelne Anweisungen. Eine
  * Transaktion darum geht nicht: die SQL-Schicht (`db.rs`) verteilt jede
- * Anweisung auf eine beliebige Verbindung ihres Pools (siehe `normalizeSchema.ts`). Brach der
+ * Anweisung auf eine beliebige Verbindung ihres Pools (siehe `normalizeSchema.ts`),
+ * und `db.batch` fasst nur eine fertige Liste — der Import baut seine
+ * Anweisungen aus Abfragen dazwischen. Brach der
  * Import mittendrin ab — eine kaputte Datei, ein Absturz —, war beim Ersetzen
  * der alte Inhalt gelöscht und der neue unvollständig, beim Zusammenführen ein
  * Teil der Datei im Vault und der Rest nicht.

@@ -1959,6 +1959,9 @@ console.log('\n8n. Migration v49: drei Eintragstabellen werden entries\n');
   );
   await MIGRATIONS.find((m) => m.version === 49).up(db);
   check('v49 ist wiederholbar', (await db.select('SELECT COUNT(*) n FROM entries'))[0].n === 5);
+  // v49 legt seine eigenen (eingefrorenen) Indizes an; wie nach einem
+  // abgebrochenen Lauf zieht die Kette danach v55 nach.
+  await MIGRATIONS.find((m) => m.version === 55).up(db);
   check('v49: Schema identisch mit der Baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
   db.close();
 }
@@ -2272,6 +2275,35 @@ console.log('\n8r. Migration v53: Tags per ID\n');
 /* ------------------------------------------------------------------ *
  * Konstanten, die es zweimal gibt — einmal in TypeScript, einmal in Rust
  * ------------------------------------------------------------------ */
+
+console.log('\n8s. Migration v55: Listen-Index statt idx_entries_deleted\n');
+
+{
+  const db = await buildViaChain('v55.db', undefined, 54);
+  const indexNames = async () => (await db.select(
+    "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='entries' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+  )).map((r) => r.name).join(',');
+  const before = await indexNames();
+  check('vor v55 steht idx_entries_deleted', before.includes('idx_entries_deleted'), before);
+  await runMigrations(db);
+  const after = await indexNames();
+  check(
+    'v55 ersetzt idx_entries_deleted durch idx_entries_list und idx_entries_decorated',
+    after === 'idx_entries_category,idx_entries_decorated,idx_entries_list,idx_entries_type',
+    after
+  );
+  await MIGRATIONS.find((m) => m.version === 55).up(db);
+  check('v55 ist wiederholbar', (await indexNames()) === after, await indexNames());
+  const plan = async (sql) => (await db.select(`EXPLAIN QUERY PLAN ${sql}`)).map((r) => r.detail).join(' | ');
+  const list = await plan('SELECT id, type, title, category_id, entry_number, tags, created_at, updated_at, deleted_at FROM entries WHERE deleted_at IS NULL');
+  check('die Listenabfrage liest nur den Index', list.includes('COVERING INDEX idx_entries_list'), list);
+  const decorated = await plan('SELECT id, icon, cover_image FROM entries WHERE deleted_at IS NULL AND (icon IS NOT NULL OR cover_image IS NOT NULL)');
+  check('Icon und Titelbild kommen über den Teilindex', decorated.includes('idx_entries_decorated'), decorated);
+  const chunk = await plan('SELECT rowid AS rid, id, content FROM entries WHERE +deleted_at IS NULL AND rowid > 1 ORDER BY rowid LIMIT 1000');
+  check('die Inhalts-Stücke laufen die rowid entlang, ohne Sortierung', !chunk.includes('TEMP B-TREE'), chunk);
+  check('v55: Schema identisch mit der Baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
+  db.close();
+}
 
 console.log('\n9. Gespiegelte Konstanten\n');
 

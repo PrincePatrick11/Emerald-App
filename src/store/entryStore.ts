@@ -78,6 +78,9 @@ const LIST_COLUMNS = 'id, type, title, category_id, entry_number, tags, created_
  */
 async function selectLiveEntries(): Promise<EntriesByType> {
   const db = await getDb();
+  // Zwei Verbindungen, also nicht derselbe Stand: ein Schreiben genau
+  // dazwischen kann ein älteres Icon an neuere Listenspalten hängen — nur
+  // Anzeige, und der nächste Ladevorgang richtet es.
   const [rows, decorated] = await Promise.all([
     db.select<DbRow[]>(`SELECT ${LIST_COLUMNS} FROM entries WHERE deleted_at IS NULL`),
     db.select<DbRow[]>(
@@ -124,8 +127,11 @@ async function loadAllContent(generation: number): Promise<void> {
   // die IPC zu schieben — und keine einzelne Antwort wird zig Megabyte groß.
   const contentById = new Map<string, string>();
   for (let after = -1; ;) {
+    // `+deleted_at`: kein Index für diesen Term. Sonst nähme SQLite
+    // `idx_entries_list` und sortierte für jedes Stück den Inhalt aller
+    // übrigen Zeilen nach rowid — so läuft es die rowid entlang.
     const rows = await db.select<{ rid: number; id: string; content: string | null }[]>(
-      'SELECT rowid AS rid, id, content FROM entries WHERE deleted_at IS NULL AND rowid > $1 ORDER BY rowid LIMIT $2',
+      'SELECT rowid AS rid, id, content FROM entries WHERE +deleted_at IS NULL AND rowid > $1 ORDER BY rowid LIMIT $2',
       [after, CONTENT_CHUNK],
     );
     if (generation !== loadGeneration) return;

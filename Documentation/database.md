@@ -105,7 +105,7 @@ Foreign keys are **enforced on every connection**: the SQL layer (`db.rs`) runs 
 Two consequences shape how this schema is changed:
 
 - A constraint takes effect the moment it is declared. There is no grace period.
-- `PRAGMA foreign_keys = OFF` and `BEGIN` are **not usable across separate `execute()` calls** — each call reaches one pooled connection, and which one serves the next call is not controllable. That rules out the SQLite documentation's table-rebuild recipe (see [Rebuilding a table](#rebuilding-a-table)). A *single* call is different: sqlx runs the `;`-separated statements of one string in order on the one connection it picked, so one multi-statement `execute()` can hold a real `BEGIN … COMMIT`. `importStaging.ts`'s `swapIn` is the one place that does this — see [DB Backup / Restore](#db-backup--restore-emeralddb).
+- `PRAGMA foreign_keys = OFF` and `BEGIN` are **not usable across separate `execute()` calls** — each call reaches one pooled connection, and which one serves the next call is not controllable. That rules out the SQLite documentation's table-rebuild recipe (see [Rebuilding a table](#rebuilding-a-table)). A *single* call is different: sqlx runs the `;`-separated statements of one string in order on the one connection it picked, so one multi-statement `execute()` can hold a real `BEGIN … COMMIT`. `importStaging.ts`'s `swapIn` does this — see [DB Backup / Restore](#db-backup--restore-emeralddb). The other way is `Database.batch` (`db_batch` in `db.rs`): a list of statements with bound values, run as one transaction on one connection, all or none. Write loops use it; it cannot wrap a whole import, whose statements are built from reads in between.
 
 Eight relations are declared, each with a deliberately chosen delete behaviour:
 
@@ -378,7 +378,7 @@ A task in the Trash keeps its rows, so restoring it brings its links back; `task
 
 ## Indexes
 
-Declared in `INDEX_DDL` in `schema.ts`: one on every foreign-key column, one on each side of `task_links`, one on every `deleted_at` column, and `idx_entries_type` on `entries(type, deleted_at)`.
+Declared in `INDEX_DDL` in `schema.ts`: one on every foreign-key column, one on each side of `task_links`, one on every `deleted_at` column (for `entries` the leading column of `idx_entries_list`), `idx_entries_type` on `entries(type, deleted_at)`, and the list indexes `idx_entries_list` and `idx_entries_decorated` — see [entries](#entries).
 
 The `deleted_at` indexes matter because `runPeriodicCleanup` runs a range scan across every soft-delete table each time a vault is opened.
 
@@ -505,7 +505,7 @@ ID lists for `IN (...)` clauses are bound as parameters, never concatenated into
 
 **Opening the file** asks for a secret only when no unlocked vault's key fits the backup. Everything below runs on the decrypted JSON.
 
-**The import runs against a staging copy of the vault, never the vault itself** (`importViaStaging` in `src/lib/importStaging.ts`). `doReplace` and `doMerge` write over many separate statements, which a transaction cannot wrap (see [Foreign Keys](#foreign-keys)), so they write into a copy:
+**The import runs against a staging copy of the vault, never the vault itself** (`importViaStaging` in `src/lib/importStaging.ts`). `doReplace` and `doMerge` write over many separate statements, built from reads in between, which a transaction cannot wrap — `batch` covers only a prepared list (see [Foreign Keys](#foreign-keys)) — so they write into a copy:
 
 1. Discard any copy a crashed import left behind — `discard_import_staging(vaultId)` in `vault.rs`, scoped to that vault's directory and the fixed filename `emerald.db.import` (`IMPORT_STAGING_FILE`, mirrored in `vaultManager.ts`).
 2. `VACUUM INTO` that filename, next to `emerald.db`.
