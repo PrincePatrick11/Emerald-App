@@ -401,7 +401,7 @@ Every vault is encrypted: entries, images, drafts and backups are unreadable wit
 
 **A new vault** asks for a password (at least eight characters, entered twice) before it opens, and then shows its **recovery key**. The recovery key is the only way back in if the password is forgotten. It is shown once; write it down or keep it in a password manager — not inside the vault itself — and tick the box that says it is stored before continuing.
 
-**An existing vault from before encryption** is encrypted the first time it opens: Emerald asks for a password, builds an encrypted copy, checks it, and only then replaces the original. A vault is never opened unencrypted. Depending on its size this takes a moment, and an interruption — a crash, a power cut — leaves the vault usable and finishes or discards the work on the next start. Old plain backups inside the vault's `backup/` folder are encrypted along with it; the original files are deleted.
+**An existing vault from before encryption** is encrypted the first time it opens: Emerald asks for a password, builds an encrypted copy, checks it, and only then replaces the original. A vault is never opened unencrypted. Depending on its size this takes a moment; a progress bar in the dialog shows how far it is, and if the volume does not have enough free space for the copy, Emerald says how much is needed and how much is free before it writes anything. An interruption — a crash, a power cut — leaves the vault usable and finishes or discards the work on the next start. Old plain backups inside the vault's `backup/` folder are encrypted along with it; the original files are deleted.
 
 **Unlocking.** Opening or switching to a vault asks for its password. Leaving a vault locks it. If you forgot the password, **Forgot your password?** takes the recovery key and a new password, and gives you a new recovery key; the old one stops working.
 
@@ -411,7 +411,7 @@ Every vault is encrypted: entries, images, drafts and backups are unreadable wit
 
 - **Remember on this device** — on or off.
 - **Lock now** — closes the vault and asks for the password again, even if it is remembered. While the password is asked, no content stays on screen.
-- **Change password** — enter the current password and a new one. The vault is re-encrypted under a new key and you get a new recovery key. Open tabs close, and the window stays open until the new recovery key is confirmed. Backups made earlier still open with the password they were made with.
+- **Change password** — enter the current password and a new one. The vault is re-encrypted under a new key (with a progress bar and the same free-space check as the first encryption) and you get a new recovery key. Open tabs close, and the window stays open until the new recovery key is confirmed. Backups made earlier still open with the password they were made with.
 
 **What encryption does not do.**
 

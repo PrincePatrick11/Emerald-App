@@ -6,6 +6,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] (targeting v0.2.0)
 
 ### Changed
+- **Encrypting a vault and changing its password show progress and check the space first.** A bar in the dialog (and on Settings → Security) follows the re-encryption of the database and images; if the volume lacks room for the copy, Emerald says how much is needed and how much is free instead of failing midway.
+- **Encrypted vaults read faster.** A larger page cache makes repeated reads of many entries several times quicker.
 - **Backups (`.emeralddb`) are encrypted.** A backup opens with the password the vault had when it was made, on any computer, and also after the password was changed since. Opening one asks for that password or its recovery key unless it belongs to a vault that is unlocked right now. Backups from before encryption are still read. Plain `.emeralddb` files in a vault's `backup/` folder are encrypted when the vault is.
 - **Opening a vault asks for its password.** Switching to a vault, starting Emerald, opening an existing folder and importing a backup as a new vault all go through the password question; leaving a vault locks it. "Remember on this device" skips the question on a computer you trust.
 - **Images in an encrypted vault have new file names** — a keyed hash instead of the plain SHA-256 — so a known picture cannot be recognised in the folder. Names change when a vault is encrypted and again with every password change; nothing in the app shows them.

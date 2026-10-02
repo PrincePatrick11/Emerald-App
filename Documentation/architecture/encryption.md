@@ -21,6 +21,8 @@ The vault key is not used by any cipher directly. `crypto::subkey` derives one k
 
 "Remember on this device" stores the vault key in the OS keychain (`keyring` crate: Credential Manager, macOS Keychain, Secret Service) under the service `Emerald (<app identifier>)` and the account `vault:<id>`. The identifier is part of the service because the release build, the dev build and every MCP slot are separate apps whose vault ids (`default`) repeat — a shared name would let one overwrite, or wrongly delete, another's entry.
 
+A key held in memory belongs to the folder it was unlocked in: `register_vaults` forgets it when its id now points at another folder or is gone, so images and drafts are never sealed under a key the new folder's `vault.key` does not know.
+
 A remembered key is checked against `check` before it is used, and a keychain that does not answer is not an error: the password dialog follows. `vault_key_status` never touches the keychain; `vault_unlock_remembered` does, once, when it matters. The `rememberKey` argument of the unlock and create commands is tri-state — `undefined` leaves the keychain alone, so a keychain that failed to answer once cannot cost a valid entry. Every command that changes a key answers whether the key is remembered afterwards, so the dialog can say when the keychain refused. Deleting a vault's files forgets its key too.
 
 ## Sealed files

@@ -99,7 +99,7 @@ Migration 1 still creates `custom_properties` and migration 11 still alters it â
 
 ## Foreign Keys
 
-Foreign keys are **enforced on every connection**: the SQL layer (`db.rs`) runs an sqlx pool, and sqlx sets `foreign_keys = ON` as a default pragma on each connection it opens. No application code turns them on.
+Foreign keys are **enforced on every connection**: the SQL layer (`db.rs`) runs an sqlx pool, and sqlx sets `foreign_keys = ON` as a default pragma on each connection it opens. No application code turns them on. Each connection also gets `cache_size = -32768` (32 MB): SQLCipher decrypts a page whenever it enters the page cache, and with SQLite's default of 2 MB a scan over `entries` evicts its own pages, so every repeat decrypts everything again (repeat full scans run about six times faster with the larger cache). The pool is capped at 4 connections, since every connection has its own cache; memory is only used for pages actually read.
 
 Two consequences shape how this schema is changed:
 
