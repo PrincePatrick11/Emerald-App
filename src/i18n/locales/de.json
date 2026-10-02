@@ -623,7 +623,7 @@
     "repeatPassword": "Passwort wiederholen",
     "createSubmit": "Verschlüsseln",
     "recoverTitle": "Mit Wiederherstellungsschlüssel öffnen",
-    "recoverHint": "Gib den Wiederherstellungsschlüssel ein, den du beim Anlegen des Vaults bekommen hast, und wähle ein neues Passwort.",
+    "recoverHint": "Gib den Wiederherstellungsschlüssel ein und wähle ein neues Passwort. Danach bekommst du einen neuen Wiederherstellungsschlüssel – der alte gilt dann nicht mehr.",
     "recoveryKey": "Wiederherstellungsschlüssel",
     "recoverSubmit": "Neues Passwort setzen",
     "back": "Zurück",
@@ -646,28 +646,29 @@
     "encryptTitle": "„{{name}}“ verschlüsseln",
     "encryptHint": "Dieser Vault stammt aus der Zeit vor der Verschlüsselung. Ab jetzt ist jeder Vault verschlüsselt: Wähle ein Passwort, dann verschlüsselt Emerald Einträge, Bilder und Entwürfe. Das dauert je nach Größe einen Moment, und bis alles geprüft ist, bleibt das Original unangetastet.",
     "encryptNote": "Früher exportierte Backups (.emeralddb) bleiben unverschlüsselt, bis du sie löschst. Auf SSDs lassen sich gelöschte Dateien unter Umständen noch eine Weile wiederherstellen – ganz sicher bist du erst mit einer verschlüsselten Festplatte (BitLocker, FileVault).",
-    "encrypting": "Verschlüssele …",
     "encryptFailed": "Der Vault konnte nicht verschlüsselt werden. Er ist unverändert – bitte versuche es noch einmal."
   },
   "security": {
-    "page": "Sicherheit",
-    "rememberHint": "Liegt der Schlüssel im Schlüsselbund des Betriebssystems, öffnet sich der Vault ohne Passwort. Die Dateien im Vault-Ordner bleiben in jedem Fall verschlüsselt.",
-    "rememberLabel": "Diesen Vault auf diesem Gerät merken",
+    "rememberHint": "Legt den Schlüssel in den Schlüsselbund des Systems, damit der Vault ohne Passwort öffnet.",
     "rememberError": "Der Schlüsselbund hat die Änderung nicht übernommen.",
     "changeTitle": "Passwort ändern",
-    "changeHint": "Mit dem Passwort wechselt auch der Schlüssel: Emerald verschlüsselt den Vault neu und zeigt dir einen neuen Wiederherstellungsschlüssel – der alte gilt danach nicht mehr. Ältere Backups öffnen weiter mit dem Passwort, das bei ihrer Erstellung galt. Offene Tabs werden dabei geschlossen.",
+    "changeHint": "Neues Passwort und neuer Wiederherstellungsschlüssel; der Vault wird neu verschlüsselt, offene Tabs schließen sich.",
     "currentPassword": "Aktuelles Passwort",
     "changeSubmit": "Passwort ändern",
     "changed": "Passwort geändert, der Vault ist unter einem neuen Schlüssel verschlüsselt.",
     "changeFailed": "Das Passwort konnte nicht geändert werden. Der Vault ist unverändert.",
     "lockTitle": "Vault sperren",
-    "lockHint": "Schließt den Vault sofort. Zum Weiterarbeiten fragt Emerald wieder nach dem Passwort – auch wenn der Vault auf diesem Gerät gemerkt ist.",
+    "lockHint": "Schließt den Vault sofort; danach braucht es wieder das Passwort, auch wenn er gemerkt ist.",
     "lockTooltip": "Vault schließen und Passwort verlangen",
-    "lockNow": "Jetzt sperren"
+    "lockNow": "Jetzt sperren",
+    "rememberTooltip": "Die Dateien im Vault-Ordner bleiben trotzdem verschlüsselt.",
+    "changeTooltip": "Ältere Backups öffnen weiter mit dem Passwort, das bei ihrer Erstellung galt.",
+    "currentPasswordTooltip": "Das Passwort, mit dem du diesen Vault entsperrst",
+    "reopenFailed": "Der Vault konnte danach nicht neu geladen werden. Starte Emerald neu – er öffnet mit dem neuen Passwort."
   },
   "backupKey": {
     "title": "Backup öffnen",
-    "hint": "Dieses Backup ist verschlüsselt und gehört nicht zum offenen Vault – oder stammt aus der Zeit vor einem Passwortwechsel. Gib das Passwort ein, das der Vault beim Erstellen des Backups hatte, oder seinen Wiederherstellungsschlüssel von damals.",
+    "hint": "Dieses Backup ist verschlüsselt. Gib das Passwort ein, das beim Erstellen galt, oder den Wiederherstellungsschlüssel von damals.",
     "password": "Passwort des Backups",
     "useRecovery": "Wiederherstellungsschlüssel verwenden",
     "usePassword": "Passwort verwenden",
@@ -837,7 +838,8 @@
     "importDbHint": "Holt eine .emeralddb-Datei zurück — als neuer Vault, zusätzlich zu den vorhandenen Einträgen oder als Ersatz für alles. Nach der Dateiwahl erscheinen die Optionen.",
     "storageHint": "Bilder im Vault-Ordner, die kein Eintrag mehr benutzt. „Suchen“ zeigt, wie viel Platz sie belegen, „Entfernen“ löscht sie endgültig.",
     "updatesDesc": "Prüft, ob eine neuere Version von Emerald vorliegt, und installiert sie.",
-    "updateErrorInstall": "Die Installation ist fehlgeschlagen."
+    "updateErrorInstall": "Die Installation ist fehlgeschlagen.",
+    "pageSecurity": "Sicherheit"
   },
   "home": {
     "viewAll": "Alle anzeigen",

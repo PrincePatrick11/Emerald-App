@@ -623,7 +623,7 @@
     "repeatPassword": "Repeat password",
     "createSubmit": "Encrypt",
     "recoverTitle": "Open with recovery key",
-    "recoverHint": "Enter the recovery key you received when the vault was created, and choose a new password.",
+    "recoverHint": "Enter the recovery key and choose a new password. You then get a new recovery key — the old one stops working.",
     "recoveryKey": "Recovery key",
     "recoverSubmit": "Set new password",
     "back": "Back",
@@ -646,28 +646,29 @@
     "encryptTitle": "Encrypt “{{name}}”",
     "encryptHint": "This vault dates from before encryption. From now on every vault is encrypted: choose a password and Emerald encrypts entries, images and drafts. Depending on the size this takes a moment, and the original stays untouched until everything has been checked.",
     "encryptNote": "Backups you exported earlier (.emeralddb) stay unencrypted until you delete them. On SSDs, deleted files can sometimes be recovered for a while — only an encrypted disk (BitLocker, FileVault) closes that gap.",
-    "encrypting": "Encrypting…",
     "encryptFailed": "Could not encrypt the vault. It is unchanged — please try again."
   },
   "security": {
-    "page": "Security",
-    "rememberHint": "With the key in the operating system's keychain, the vault opens without a password. The files in the vault folder stay encrypted either way.",
-    "rememberLabel": "Remember this vault on this device",
+    "rememberHint": "Keeps the key in the system keychain so the vault opens without a password.",
     "rememberError": "The keychain did not accept the change.",
     "changeTitle": "Change password",
-    "changeHint": "The key changes with the password: Emerald re-encrypts the vault and shows you a new recovery key — the old one stops working. Older backups still open with the password that was in place when they were made. Open tabs are closed in the process.",
+    "changeHint": "A new password and a new recovery key; the vault is re-encrypted and open tabs close.",
     "currentPassword": "Current password",
     "changeSubmit": "Change password",
     "changed": "Password changed; the vault is encrypted under a new key.",
     "changeFailed": "Could not change the password. The vault is unchanged.",
     "lockTitle": "Lock vault",
-    "lockHint": "Closes the vault right away. To carry on, Emerald asks for the password again — even if the vault is remembered on this device.",
+    "lockHint": "Closes the vault now; the password is needed again, even if it is remembered.",
     "lockTooltip": "Close the vault and require the password",
-    "lockNow": "Lock now"
+    "lockNow": "Lock now",
+    "rememberTooltip": "The files in the vault folder stay encrypted either way.",
+    "changeTooltip": "Older backups still open with the password they were made with.",
+    "currentPasswordTooltip": "The password you unlock this vault with",
+    "reopenFailed": "The vault could not be reloaded afterwards. Restart Emerald — it opens with the new password."
   },
   "backupKey": {
     "title": "Open backup",
-    "hint": "This backup is encrypted and does not belong to the open vault — or dates from before a password change. Enter the password the vault had when the backup was made, or its recovery key from that time.",
+    "hint": "This backup is encrypted. Enter the password it was made with, or the recovery key from that time.",
     "password": "Backup password",
     "useRecovery": "Use recovery key",
     "usePassword": "Use password",
@@ -837,7 +838,8 @@
     "importDbHint": "Brings back an .emeralddb file — as a new vault, alongside the existing entries, or replacing everything. The options appear once a file is picked.",
     "storageHint": "Images in the vault folder that no entry uses anymore. “Scan” shows how much space they take, “Remove” deletes them for good.",
     "updatesDesc": "Checks whether a newer version of Emerald exists, and installs it.",
-    "updateErrorInstall": "The installation failed."
+    "updateErrorInstall": "The installation failed.",
+    "pageSecurity": "Security"
   },
   "home": {
     "viewAll": "View all",

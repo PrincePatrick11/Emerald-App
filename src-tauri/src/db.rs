@@ -30,6 +30,7 @@ use sqlx::query::Query;
 use sqlx::sqlite::{Sqlite, SqliteArguments, SqliteConnectOptions, SqlitePool, SqlitePoolOptions, SqliteValueRef};
 use sqlx::{Column, ConnectOptions, Executor, Row, TypeInfo, Value, ValueRef};
 use std::collections::HashMap;
+use std::path::Path;
 use std::ffi::{c_char, c_int, c_void, CStr};
 use tauri::Manager;
 use tokio::sync::RwLock;
@@ -78,7 +79,7 @@ pub async fn db_load(
 ) -> Result<String, String> {
     let dir = vault::vault_dir(&app, &vault_id)?;
     // Nur verschlüsselte Vaults: ein Vault ohne `vault.key` wird erst
-    // verschlüsselt (`encrypt_existing.rs`), nie im Klartext geöffnet — auch
+    // verschlüsselt (`reencrypt.rs`), nie im Klartext geöffnet — auch
     // dann nicht, wenn jemand `vault.key` gelöscht und eine Klartext-Datenbank
     // untergeschoben hat.
     let vault_key = keys::key_for(&app, &vault_id)?.ok_or_else(|| keys::VAULT_NOT_ENCRYPTED.to_string())?;
@@ -94,7 +95,7 @@ pub async fn db_load(
         .create_if_missing(true)
         .disable_statement_logging()
         .pragma("key", sqlcipher_key(&key).to_string());
-    let pool = connect(options).await?;
+    let pool = connect(options, &dir).await?;
 
     let handle = handle(&vault_id, file);
     let mut map = dbs.0.write().await;
@@ -113,16 +114,55 @@ pub async fn db_load(
     Ok(handle)
 }
 
-/// A pool whose every connection carries [`authorize`].
-async fn connect(options: SqliteConnectOptions) -> Result<SqlitePool, String> {
+/// The vault folder an authorizer allows `ATTACH` in, as a lowercase string
+/// with `/` separators. One leaked allocation per vault folder for the life
+/// of the process — SQLite holds the pointer as long as a connection lives.
+fn attach_scope(dir: &Path) -> &'static String {
+    static SCOPES: std::sync::Mutex<Vec<&'static String>> = std::sync::Mutex::new(Vec::new());
+    let normal = normalize_path(&dir.to_string_lossy());
+    let mut scopes = SCOPES.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some(found) = scopes.iter().find(|s| ***s == normal) {
+        return found;
+    }
+    let leaked: &'static String = Box::leak(Box::new(normal));
+    scopes.push(leaked);
+    leaked
+}
+
+fn normalize_path(path: &str) -> String {
+    path.replace('\\', "/").trim_end_matches('/').to_lowercase()
+}
+
+/// The copies of its own database SQL may attach: the backup import's
+/// working copy, and the migration backups `VACUUM INTO` writes (SQLite
+/// attaches its target internally). Both stay under the vault key — an
+/// `ATTACH` without `KEY` inherits it.
+fn may_attach(scope: &str, filename: &str) -> bool {
+    // `VACUUM` ohne Ziel hängt eine leere, temporäre Datenbank an.
+    if filename.is_empty() {
+        return true;
+    }
+    let file = normalize_path(filename);
+    let Some((parent, name)) = file.rsplit_once('/') else { return false };
+    parent == scope
+        && (name == vault::IMPORT_STAGING_FILE || vault::migration_backup_version(name).is_some())
+}
+
+/// A pool whose every connection carries [`authorize`], scoped to `vault_dir`.
+async fn connect(options: SqliteConnectOptions, vault_dir: &Path) -> Result<SqlitePool, String> {
+    let scope = attach_scope(vault_dir);
     SqlitePoolOptions::new()
-        .after_connect(|conn, _| {
+        .after_connect(move |conn, _| {
             Box::pin(async move {
                 let mut handle = conn.lock_handle().await?;
-                // SAFETY: the handle is locked for the duration of the call,
-                // and the callback is a plain function that touches no state.
+                // SAFETY: the handle is locked for the duration of the call;
+                // the user data is a `'static` string the callback only reads.
                 unsafe {
-                    libsqlite3_sys::sqlite3_set_authorizer(handle.as_raw_handle().as_ptr(), Some(authorize), std::ptr::null_mut());
+                    libsqlite3_sys::sqlite3_set_authorizer(
+                        handle.as_raw_handle().as_ptr(),
+                        Some(authorize),
+                        scope as *const String as *mut c_void,
+                    );
                 }
                 Ok(())
             })
@@ -134,10 +174,12 @@ async fn connect(options: SqliteConnectOptions) -> Result<SqlitePool, String> {
 
 /// Refuses what would let SQL from the webview undo the encryption: the key
 /// pragmas (`key`, `rekey` and their variants), SQLCipher's settings pragmas
-/// (`cipher_*`, `kdf_iter`, …) and `sqlcipher_export`. `cipher_version` only
-/// reads, and stays allowed.
+/// (`cipher_*`, `kdf_iter`, …), `sqlcipher_export`, and `ATTACH` of anything
+/// but the vault's own copies ([`may_attach`]) — an `ATTACH … KEY ''` would
+/// otherwise take a plaintext copy anywhere. `cipher_version` only reads, and
+/// stays allowed.
 unsafe extern "C" fn authorize(
-    _: *mut c_void,
+    scope: *mut c_void,
     action: c_int,
     arg1: *const c_char,
     arg2: *const c_char,
@@ -162,6 +204,11 @@ unsafe extern "C" fn authorize(
                 || (pragma.starts_with("cipher") && pragma != "cipher_version")
         }
         libsqlite3_sys::SQLITE_FUNCTION => name(arg2) == "sqlcipher_export",
+        libsqlite3_sys::SQLITE_ATTACH => {
+            // SAFETY: `connect` passes a `&'static String` as user data.
+            let scope = unsafe { &*(scope as *const String) };
+            !may_attach(scope, &name(arg1))
+        }
         _ => false,
     };
     if denied {
@@ -415,19 +462,19 @@ mod tests {
         // the import swap `ATTACH`es the copy without a KEY clause.
         let dir = scratch_dir();
         let key = crypto::random_key();
-        let pool = connect(keyed(&dir.join("main.db"), &key)).await.unwrap();
+        let pool = connect(keyed(&dir.join("main.db"), &key), &dir).await.unwrap();
         execute_on(&pool, "CREATE TABLE t (s TEXT)", vec![]).await.unwrap();
         execute_on(&pool, "INSERT INTO t VALUES ('x')", vec![]).await.unwrap();
-        let copy = dir.join("copy.db");
+        let copy = dir.join("emerald.db.pre-v99.bak");
         execute_on(&pool, &format!("VACUUM INTO '{}'", copy.display()), vec![]).await.unwrap();
         assert!(!is_plain_sqlite(&copy));
 
-        let attached = dir.join("attached.db");
+        let attached = dir.join(vault::IMPORT_STAGING_FILE);
         execute_on(&pool, &format!("ATTACH DATABASE '{}' AS a; CREATE TABLE a.u (s TEXT); INSERT INTO a.u VALUES ('y'); DETACH DATABASE a", attached.display()), vec![]).await.unwrap();
         pool.close().await;
         assert!(!is_plain_sqlite(&attached));
 
-        let reopened = connect(keyed(&copy, &key)).await.unwrap();
+        let reopened = connect(keyed(&copy, &key), &dir).await.unwrap();
         assert_eq!(select_on(&reopened, "SELECT s FROM t", vec![]).await.unwrap()[0]["s"], json!("x"));
         reopened.close().await;
         std::fs::remove_dir_all(&dir).ok();
@@ -437,8 +484,13 @@ mod tests {
     async fn the_authorizer_keeps_the_key_out_of_reach() {
         let dir = scratch_dir();
         let key = crypto::random_key();
-        let pool = connect(keyed(&dir.join("main.db"), &key)).await.unwrap();
+        let pool = connect(keyed(&dir.join("main.db"), &key), &dir).await.unwrap();
         execute_on(&pool, "CREATE TABLE t (s TEXT)", vec![]).await.unwrap();
+        // Ein ATTACH außerhalb der eigenen Kopien, verschlüsselt oder nicht.
+        let elsewhere = dir.join("anywhere.db");
+        assert!(execute_on(&pool, &format!("ATTACH DATABASE '{}' AS p KEY ''", elsewhere.display()), vec![]).await.is_err());
+        assert!(execute_on(&pool, &format!("VACUUM INTO '{}'", elsewhere.display()), vec![]).await.is_err());
+        assert!(execute_on(&pool, "VACUUM", vec![]).await.is_ok());
         for sql in [
             "PRAGMA rekey = 'other'",
             "PRAGMA key = 'other'",

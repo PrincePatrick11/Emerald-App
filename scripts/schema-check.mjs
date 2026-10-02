@@ -21,11 +21,11 @@ import { pathToFileURL } from 'node:url';
 const workDir = mkdtempSync(join(tmpdir(), 'emerald-schema-'));
 
 /* ------------------------------------------------------------------ *
- * Adapter: node:sqlite hinter der Schnittstelle von tauri-plugin-sql
+ * Adapter: node:sqlite hinter der Schnittstelle von src/lib/sqlite.ts
  * ------------------------------------------------------------------ */
 
 /**
- * Das Plugin benutzt `$1`-Platzhalter. node:sqlite bindet die nicht positionell
+ * Die App benutzt `$1`-Platzhalter. node:sqlite bindet die nicht positionell
  * ("column index out of range"), SQLites eigene `?1`-Form dagegen schon — auch
  * wenn derselbe Platzhalter mehrfach vorkommt, wie in `trashStore.emptyTrash`.
  */
@@ -64,12 +64,11 @@ class HarnessDb {
  * ------------------------------------------------------------------ */
 
 const STUBS = {
-  '@tauri-apps/plugin-sql': `
-    export default class Database {
-      static async load() { throw new Error('Database.load wird im Harness nicht benutzt'); }
-    }`,
   '@tauri-apps/api/core': `
     export async function invoke(cmd, args) {
+      // Die Datenbank ist hier HarnessDb. Ein Pfad, der sie doch über die
+      // App-Schicht (src/lib/sqlite.ts) öffnen will, soll laut scheitern.
+      if (String(cmd).startsWith('db_')) throw new Error(cmd + ' wird im Harness nicht benutzt');
       // vaultManager liest vaults.json und legt es beim ersten Fehlschlag an.
       if (cmd === 'read_file') throw new Error('ENOENT (Harness)');
       // Migration v42 speichert Sigillen-Zeichnungen als Datei: ein fester

@@ -33,10 +33,20 @@ const TEMP_SUFFIX: &str = ".html";
 pub(crate) struct TempHtml(PathBuf);
 
 impl TempHtml {
+    /// A new file only this user can read — under Linux `/tmp` is shared.
     pub(crate) fn write(html: &str) -> Result<Self, String> {
+        use std::io::Write;
         let path = std::env::temp_dir().join(format!("{TEMP_PREFIX}{}{TEMP_SUFFIX}", uuid::Uuid::new_v4()));
-        std::fs::write(&path, html.as_bytes()).map_err(|e| format!("write temp html: {e}"))?;
-        Ok(TempHtml(path))
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+        let guard = TempHtml(path);
+        options
+            .open(&guard.0)
+            .and_then(|mut file| file.write_all(html.as_bytes()))
+            .map_err(|e| format!("write temp html: {e}"))?;
+        Ok(guard)
     }
 
     pub(crate) fn path(&self) -> &Path {

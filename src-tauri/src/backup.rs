@@ -20,7 +20,7 @@ use zeroize::Zeroizing;
 use crate::crypto::{self, Context, Key, Purpose};
 use crate::keys::{self, KeyFile};
 
-const MAGIC: &[u8; 4] = b"EMRB";
+pub(crate) const MAGIC: &[u8; 4] = b"EMRB";
 const VERSION: u8 = 1;
 const PREFIX_LEN: usize = MAGIC.len() + 1 + 4;
 /// A key file is well under a kilobyte; anything near this is not one.
@@ -36,7 +36,7 @@ struct Header {
     key_file: KeyFile,
 }
 
-fn seal(key_file: &KeyFile, vault_key: &Key, json: &str) -> Vec<u8> {
+pub(crate) fn seal(key_file: &KeyFile, vault_key: &Key, json: &str) -> Vec<u8> {
     let header = serde_json::to_vec(&Header { key_file: key_file.clone() }).expect("serialisable");
     let files_key = crypto::subkey(vault_key, Purpose::Files);
     let payload = crypto::seal(&files_key, Context::Backup, json.as_bytes());

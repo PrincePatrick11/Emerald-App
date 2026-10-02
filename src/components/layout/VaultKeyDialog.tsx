@@ -7,7 +7,9 @@ import { SwitchRow } from '../ui/Switch';
 import RecoveryKeyBox from './RecoveryKeyBox';
 import { KeyField, NewPasswordFields, keyErrorText, newPasswordProblem, onEnter } from './vaultKeyParts';
 import { useVaultKeyStore, type VaultKeyRequest } from '../../store/vaultKeyStore';
-import { createVaultKey, encryptExistingVault, keychainAvailable, recoverVault, unlockVault } from '../../lib/vaultKeys';
+import {
+  createVaultKey, encryptExistingVault, keychainAvailable, recoverVault, unlockVault, type CreatedKey,
+} from '../../lib/vaultKeys';
 import { hideSplash } from '../../lib/splash';
 
 /**
@@ -95,24 +97,26 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
     unlocked(await unlockVault(request.vaultId, password, rememberWish));
   });
 
-  const submitRecover = () => attempt('recover', async () => {
+  /**
+   * Alles, was einen neuen Schlüssel macht — neuer Vault, Verschlüsselung
+   * eines alten, „Passwort vergessen" — endet beim neuen
+   * Wiederherstellungsschlüssel.
+   */
+  const submitNewKey = (kind: 'create' | 'encrypt' | 'recover') => attempt(kind, async () => {
     const problem = newPasswordProblem(t, password, repeat);
     if (problem) { setError(problem); return; }
-    unlocked(await recoverVault(request.vaultId, recoveryInput, password, rememberWish));
-  });
-
-  /** Neuer Vault oder Verschlüsselung eines alten — beide enden beim Wiederherstellungsschlüssel. */
-  const submitNewKey = (kind: 'create' | 'encrypt') => attempt(kind, async () => {
-    const problem = newPasswordProblem(t, password, repeat);
-    if (problem) { setError(problem); return; }
-    const make = kind === 'create' ? createVaultKey : encryptExistingVault;
-    const created = await make(request.vaultId, password, rememberWish);
+    let created: CreatedKey;
+    if (kind === 'recover') created = await recoverVault(request.vaultId, recoveryInput, password, rememberWish);
+    else if (kind === 'create') created = await createVaultKey(request.vaultId, password, rememberWish);
+    else created = await encryptExistingVault(request.vaultId, password, rememberWish);
     setRecoveryKey(created.recoveryKey);
     setRememberRefused(Boolean(rememberWish) && !created.remembered);
     setPassword('');
     setRepeat('');
+    setRecoveryInput('');
     setStep('showRecovery');
   });
+  const submitRecover = () => submitNewKey('recover');
 
   const title = {
     unlock: t('vaultKey.unlockTitle', { name: request.vaultName }),
@@ -128,7 +132,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   // während eine Aktion läuft, käme Rust mit ihr trotzdem durch.
   const cancelShown = step === 'unlock' || step === 'recover' || step === 'create' || step === 'encrypt';
 
-  const busyIcon = busy ? <Loader2 size={16} className="animate-spin" /> : null;
+  const busyIcon = busy ? <Loader2 size={14} className="animate-spin" /> : null;
 
   const rememberRow = (
     <SwitchRow
@@ -223,11 +227,14 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
         </Button>
       </>
     );
-  } else if (step === 'create') {
-    const submit = () => submitNewKey('create');
+  } else if (step === 'create' || step === 'encrypt') {
+    // Dasselbe Formular; ein alter Vault bekommt dazu den Hinweis auf seine
+    // früheren Backups.
+    const submit = () => submitNewKey(step);
     body = (
       <>
-        <p className="text-sm text-secondary">{t('vaultKey.createHint')}</p>
+        <p className="text-sm text-secondary">{t(step === 'create' ? 'vaultKey.createHint' : 'vaultKey.encryptHint')}</p>
+        {step === 'encrypt' && <p className="text-xs text-muted">{t('vaultKey.encryptNote')}</p>}
         {passwordFields(submit, true)}
         {rememberRow}
         {errorLine}
@@ -237,23 +244,6 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
       <Button tone="jade" disabled={!password || busy} onClick={submit}>
         {busyIcon}
         {t('vaultKey.createSubmit')}
-      </Button>
-    );
-  } else if (step === 'encrypt') {
-    const submit = () => submitNewKey('encrypt');
-    body = (
-      <>
-        <p className="text-sm text-secondary">{t('vaultKey.encryptHint')}</p>
-        <p className="text-xs text-muted">{t('vaultKey.encryptNote')}</p>
-        {passwordFields(submit, true)}
-        {rememberRow}
-        {errorLine}
-      </>
-    );
-    actions = (
-      <Button tone="jade" disabled={!password || busy} onClick={submit}>
-        {busyIcon}
-        {busy ? t('vaultKey.encrypting') : t('vaultKey.createSubmit')}
       </Button>
     );
   } else if (step === 'showRecovery') {

@@ -631,7 +631,7 @@
     "repeatPassword": "Repetir contraseña",
     "createSubmit": "Cifrar",
     "recoverTitle": "Abrir con la clave de recuperación",
-    "recoverHint": "Introduce la clave de recuperación que recibiste al crear la bóveda y elige una nueva contraseña.",
+    "recoverHint": "Introduce la clave de recuperación y elige una nueva contraseña. Después recibirás una nueva clave de recuperación; la anterior dejará de valer.",
     "recoveryKey": "Clave de recuperación",
     "recoverSubmit": "Establecer nueva contraseña",
     "back": "Atrás",
@@ -654,28 +654,29 @@
     "encryptTitle": "Cifrar «{{name}}»",
     "encryptHint": "Esta bóveda es de antes del cifrado. A partir de ahora todas las bóvedas están cifradas: elige una contraseña y Emerald cifrará las entradas, las imágenes y los borradores. Según el tamaño tarda un momento, y el original no se toca hasta que todo esté comprobado.",
     "encryptNote": "Las copias de seguridad que exportaste antes (.emeralddb) siguen sin cifrar hasta que las borres. En los SSD, los archivos borrados a veces se pueden recuperar durante un tiempo; solo un disco cifrado (BitLocker, FileVault) cierra ese hueco.",
-    "encrypting": "Cifrando…",
     "encryptFailed": "No se pudo cifrar la bóveda. No ha cambiado; inténtalo de nuevo."
   },
   "security": {
-    "page": "Seguridad",
-    "rememberHint": "Con la clave en el llavero del sistema operativo, la bóveda se abre sin contraseña. Los archivos de la carpeta de la bóveda siguen cifrados en cualquier caso.",
-    "rememberLabel": "Recordar esta bóveda en este dispositivo",
+    "rememberHint": "Guarda la clave en el llavero del sistema para que la bóveda se abra sin contraseña.",
     "rememberError": "El llavero no ha aceptado el cambio.",
     "changeTitle": "Cambiar contraseña",
-    "changeHint": "Con la contraseña cambia también la clave: Emerald vuelve a cifrar la bóveda y te muestra una nueva clave de recuperación; la anterior deja de valer. Las copias de seguridad antiguas se siguen abriendo con la contraseña vigente cuando se crearon. Las pestañas abiertas se cierran.",
+    "changeHint": "Nueva contraseña y nueva clave de recuperación; la bóveda se vuelve a cifrar y las pestañas abiertas se cierran.",
     "currentPassword": "Contraseña actual",
     "changeSubmit": "Cambiar contraseña",
     "changed": "Contraseña cambiada; la bóveda está cifrada con una nueva clave.",
     "changeFailed": "No se pudo cambiar la contraseña. La bóveda no ha cambiado.",
     "lockTitle": "Bloquear bóveda",
-    "lockHint": "Cierra la bóveda de inmediato. Para seguir, Emerald vuelve a pedir la contraseña, aunque la bóveda esté recordada en este dispositivo.",
+    "lockHint": "Cierra la bóveda ahora; después hace falta de nuevo la contraseña, aunque esté recordada.",
     "lockTooltip": "Cerrar la bóveda y exigir la contraseña",
-    "lockNow": "Bloquear ahora"
+    "lockNow": "Bloquear ahora",
+    "rememberTooltip": "Los archivos de la carpeta de la bóveda siguen cifrados en cualquier caso.",
+    "changeTooltip": "Las copias de seguridad antiguas se siguen abriendo con la contraseña con la que se crearon.",
+    "currentPasswordTooltip": "La contraseña con la que desbloqueas esta bóveda",
+    "reopenFailed": "No se pudo volver a cargar la bóveda. Reinicia Emerald: se abrirá con la nueva contraseña."
   },
   "backupKey": {
     "title": "Abrir copia de seguridad",
-    "hint": "Esta copia está cifrada y no pertenece a la bóveda abierta, o es de antes de un cambio de contraseña. Introduce la contraseña que tenía la bóveda al crear la copia, o su clave de recuperación de entonces.",
+    "hint": "Esta copia de seguridad está cifrada. Introduce la contraseña con la que se creó o la clave de recuperación de entonces.",
     "password": "Contraseña de la copia",
     "useRecovery": "Usar clave de recuperación",
     "usePassword": "Usar contraseña",
@@ -845,7 +846,8 @@
     "importDbHint": "Recupera un archivo .emeralddb — como vault nuevo, junto a las entradas existentes o reemplazándolo todo. Las opciones aparecen al elegir un archivo.",
     "storageHint": "Imágenes de la carpeta del vault que ya no usa ninguna entrada. «Buscar» muestra cuánto ocupan, «Eliminar» las borra definitivamente.",
     "updatesDesc": "Comprueba si existe una versión más reciente de Emerald y la instala.",
-    "updateErrorInstall": "La instalación ha fallado."
+    "updateErrorInstall": "La instalación ha fallado.",
+    "pageSecurity": "Seguridad"
   },
   "contextMenu": {
     "openInNewTab": "Abrir en nueva pestaña",

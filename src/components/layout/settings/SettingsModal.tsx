@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Archive, FileText, HardDrive, Info, PanelLeft, RefreshCw, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import Modal from '../../ui/Modal';
@@ -18,7 +18,7 @@ const PAGES = [
   { id: 'general', labelKey: 'settings.pageGeneral', Icon: SlidersHorizontal },
   { id: 'sidebar', labelKey: 'settings.pageSidebar', Icon: PanelLeft },
   { id: 'entries', labelKey: 'settings.pageEntries', Icon: FileText },
-  { id: 'security', labelKey: 'security.page', Icon: ShieldCheck },
+  { id: 'security', labelKey: 'settings.pageSecurity', Icon: ShieldCheck },
   { id: 'backup', labelKey: 'settings.backup', Icon: Archive },
   { id: 'storage', labelKey: 'settings.storage', Icon: HardDrive },
   { id: 'updates', labelKey: 'settings.updates', Icon: RefreshCw },
@@ -35,6 +35,10 @@ interface Props {
 export default function SettingsModal({ onClose, initialPage = 'general' }: Props) {
   const { t } = useTranslation();
   const [page, setPage] = useState<SettingsPage>(initialPage);
+  // Eine Seite, die gerade nicht verlassen werden darf — die Sicherheitsseite
+  // mit einem neuen Wiederherstellungsschlüssel, der noch nicht gesichert ist.
+  const [closeBlocked, setCloseBlocked] = useState(false);
+  const blockClose = useCallback((blocked: boolean) => setCloseBlocked(blocked), []);
   // Ein Import oder Update, das an einer laufenden Bearbeitung hängen blieb.
   useCloseOnKeepEditing(onClose);
 
@@ -42,6 +46,7 @@ export default function SettingsModal({ onClose, initialPage = 'general' }: Prop
     <Modal
       title={t('nav.settings')}
       onClose={onClose}
+      dismissible={!closeBlocked}
       widthClassName="w-[680px]"
       // Feste Hoehe statt max-h: die drei Bereiche sind unterschiedlich hoch,
       // und eine mitwachsende Karte springt bei jedem Wechsel — dasselbe
@@ -65,6 +70,7 @@ export default function SettingsModal({ onClose, initialPage = 'general' }: Prop
             id={`settings-tab-${id}`}
             role="tab"
             aria-selected={page === id}
+            disabled={closeBlocked && page !== id}
             onClick={() => setPage(id)}
             // `border border-transparent` als Grundzustand, weil die
             // Theme-Regel dem aktiven Eintrag einen 1px-Rahmen gibt: ohne den
@@ -94,7 +100,7 @@ export default function SettingsModal({ onClose, initialPage = 'general' }: Prop
         {page === 'general' && <GeneralPage />}
         {page === 'sidebar' && <SidebarPage />}
         {page === 'entries' && <EntriesPage />}
-        {page === 'security' && <SecurityPage onClose={onClose} />}
+        {page === 'security' && <SecurityPage onClose={onClose} onBlockClose={blockClose} />}
         {page === 'backup' && <BackupPage />}
         {page === 'storage' && <StoragePage />}
         {page === 'updates' && <UpdatesPage />}

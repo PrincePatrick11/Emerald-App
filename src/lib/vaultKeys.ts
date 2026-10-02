@@ -3,8 +3,9 @@
  *
  * Der Vault-Schlüssel selbst kommt nie hier an: Rust hält ihn, solange der
  * Vault entsperrt ist, und alles, was ihn braucht, nennt nur die Vault-Id.
- * Hier herein reichen nur Passwort und Wiederherstellungsschlüssel — und der
- * Wiederherstellungsschlüssel kommt genau einmal heraus, beim Anlegen.
+ * Hier herein reichen nur Passwort und Wiederherstellungsschlüssel. Ein
+ * Wiederherstellungsschlüssel kommt genau einmal heraus — wenn er entsteht:
+ * beim Anlegen, Verschlüsseln, Passwortwechsel und nach „Passwort vergessen".
  *
  * `rememberKey`: ob der Schlüssel im Schlüsselbund des Betriebssystems liegen
  * soll. `undefined` heißt „nicht angefasst" — dann bleibt der Schlüsselbund,
@@ -24,7 +25,16 @@ export const KEY_ERRORS = {
   wrongPassword: 'WRONG_PASSWORD',
   wrongRecoveryKey: 'WRONG_RECOVERY_KEY',
   passwordTooShort: 'PASSWORD_TOO_SHORT',
+  /** Ein verschlüsseltes Backup, das keiner der offenen Vaults öffnet. */
+  backupLocked: 'BACKUP_LOCKED',
 } as const;
+
+/** Was beim Anlegen eines Schlüssels herauskommt. */
+export interface CreatedKey {
+  recoveryKey: string;
+  /** Liegt der neue Schlüssel im Schlüsselbund? */
+  remembered: boolean;
+}
 
 /** Muss zu `MIN_PASSWORD_CHARS` in `keys.rs` passen. */
 export const MIN_PASSWORD_LENGTH = 8;
@@ -47,19 +57,19 @@ export function createVaultKey(
   vaultId: string,
   password: string,
   rememberKey: boolean | undefined,
-): Promise<{ recoveryKey: string; remembered: boolean }> {
+): Promise<CreatedKey> {
   return invoke('vault_create_key', { vaultId, password, rememberKey });
 }
 
 /**
- * Verschlüsselt einen bestehenden Klartext-Vault (`encrypt_existing.rs`) und
+ * Verschlüsselt einen bestehenden Klartext-Vault (`reencrypt.rs`) und
  * entsperrt ihn. Die Verbindungen zu ihm müssen zu sein.
  */
 export function encryptExistingVault(
   vaultId: string,
   password: string,
   rememberKey: boolean | undefined,
-): Promise<{ recoveryKey: string; remembered: boolean }> {
+): Promise<CreatedKey> {
   return invoke('vault_encrypt_existing', { vaultId, password, rememberKey });
 }
 
@@ -72,12 +82,17 @@ export function unlockRemembered(vaultId: string): Promise<boolean> {
   return invoke('vault_unlock_remembered', { vaultId });
 }
 
+/**
+ * „Passwort vergessen": öffnet mit dem Wiederherstellungsschlüssel und setzt
+ * den Vault wie beim Passwortwechsel unter einen neuen Schlüssel — mit einem
+ * neuen Wiederherstellungsschlüssel; der benutzte ist danach verbraucht.
+ */
 export function recoverVault(
   vaultId: string,
   recoveryKey: string,
   newPassword: string,
   rememberKey: boolean | undefined,
-): Promise<boolean> {
+): Promise<CreatedKey> {
   return invoke('vault_recover', { vaultId, recoveryKey, newPassword, rememberKey });
 }
 
@@ -94,7 +109,7 @@ export function changeVaultPassword(
   vaultId: string,
   currentPassword: string,
   newPassword: string,
-): Promise<{ recoveryKey: string; remembered: boolean }> {
+): Promise<CreatedKey> {
   return invoke('vault_change_password', { vaultId, currentPassword, newPassword });
 }
 

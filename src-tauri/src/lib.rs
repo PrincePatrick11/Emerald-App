@@ -835,12 +835,12 @@ pub fn run() {
             keys::keychain_available,
             reencrypt::vault_encrypt_existing,
             reencrypt::vault_change_password,
+            reencrypt::vault_recover,
             backup::write_backup_file,
             backup::read_backup_file,
             keys::vault_create_key,
             keys::vault_unlock,
             keys::vault_unlock_remembered,
-            keys::vault_recover,
             keys::vault_set_remembered,
             keys::vault_is_remembered,
             keys::vault_lock,
@@ -883,6 +883,7 @@ pub fn run() {
             updates::install_update,
         ])
         .setup(|_app| {
+            keys::init_keychain(&_app.config().identifier);
             // Was ein abgestürzter PDF-Export im Temp-Ordner liegen ließ — dort
             // stünde ein Eintrag im Klartext.
             tauri::async_runtime::spawn_blocking(pdf_export::sweep_leftovers);

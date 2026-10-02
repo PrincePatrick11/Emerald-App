@@ -814,6 +814,19 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
     for name in [SETTINGS_FILE, SETTINGS_TEMP_FILE, DRAFTS_FILE, DRAFTS_TEMP_FILE, crate::keys::KEY_FILE, crate::keys::KEY_TEMP_FILE] {
         std::fs::remove_file(dir.join(name)).ok();
     }
+    // Was ohne den Schlüssel nichts mehr taugt: Arbeitskopien, Sicherungen
+    // vor Migrationen, Reste einer abgebrochenen Neuverschlüsselung.
+    for suffix in ["", "-journal", "-wal", "-shm"] {
+        std::fs::remove_file(dir.join(format!("{IMPORT_STAGING_FILE}{suffix}"))).ok();
+    }
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            if entry.file_name().to_str().and_then(migration_backup_version).is_some() {
+                std::fs::remove_file(entry.path()).ok();
+            }
+        }
+    }
+    crate::reencrypt::remove_leftovers(&dir);
     // Mit den Dateien ist der Schlüssel wertlos — auch der gemerkte.
     crate::keys::discard(&app, &vault_id);
 
@@ -970,7 +983,7 @@ fn write_settings_in(dir: &Path, contents: &str) -> Result<(), String> {
 /// doubles each time (30 ms up to 480 ms, just under a second in all): a sync
 /// client in a OneDrive or Dropbox folder holds on longer than a scanner. A
 /// missing file is an answer, not a failure to retry.
-fn patiently<T>(mut op: impl FnMut() -> std::io::Result<T>) -> std::io::Result<T> {
+pub(crate) fn patiently<T>(mut op: impl FnMut() -> std::io::Result<T>) -> std::io::Result<T> {
     const ATTEMPTS: u32 = 6;
     let mut wait_ms = 30;
     let mut attempt = 1;

@@ -1,7 +1,8 @@
 /**
  * Stored images.
  *
- * The database holds a bare filename — `{sha256}.{ext}` — and nothing else. No
+ * The database holds a bare filename — `{hash}.{ext}`, the hash of the bytes
+ * (keyed in an encrypted vault) — and nothing else. No
  * directory, no drive letter, which is what lets a vault folder be copied to
  * another machine and still render.
  *

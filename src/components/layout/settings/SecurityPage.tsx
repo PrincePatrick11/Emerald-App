@@ -10,13 +10,17 @@ import { useVaultStore } from '../../../store/vaultStore';
 import SettingsSection, { SettingsStatus } from './SettingsSection';
 
 /**
- * Der Schlüssel des offenen Vaults: merken, Passwort ändern, sperren.
+ * Der Schlüssel des offenen Vaults: merken, sperren, Passwort ändern.
  *
  * Das Passwort zu ändern verschlüsselt den Vault unter einem neuen Schlüssel
- * neu und bringt einen neuen Wiederherstellungsschlüssel — der wird hier
- * gezeigt, solange, bis bestätigt ist, dass er aufbewahrt ist.
+ * neu und bringt einen neuen Wiederherstellungsschlüssel. Der wird hier
+ * gezeigt, bis bestätigt ist, dass er aufbewahrt ist — so lange, und solange
+ * die Änderung läuft, hält `onBlockClose` das Einstellungsfenster offen.
  */
-export default function SecurityPage({ onClose }: { onClose: () => void }) {
+export default function SecurityPage({ onClose, onBlockClose }: {
+  onClose: () => void;
+  onBlockClose: (blocked: boolean) => void;
+}) {
   const { t } = useTranslation();
   const vaultId = useVaultStore((s) => s.activeVaultId);
   const changePassword = useVaultStore((s) => s.changePassword);
@@ -33,6 +37,7 @@ export default function SecurityPage({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [recoveryKey, setRecoveryKey] = useState('');
+  const [reopenFailed, setReopenFailed] = useState(false);
   const [stored, setStored] = useState(false);
 
   useEffect(() => {
@@ -41,6 +46,14 @@ export default function SecurityPage({ onClose }: { onClose: () => void }) {
     isVaultRemembered(vaultId).then((value) => { if (live) setRemembered(value); }, () => {});
     return () => { live = false; };
   }, [vaultId]);
+
+  // Weder während der Neuverschlüsselung noch mit einem ungesicherten
+  // Wiederherstellungsschlüssel darf das Fenster zugehen.
+  const holding = busy || Boolean(recoveryKey);
+  useEffect(() => {
+    onBlockClose(holding);
+    return () => onBlockClose(false);
+  }, [holding, onBlockClose]);
 
   async function toggleRemember(next: boolean) {
     setRememberBusy(true);
@@ -68,6 +81,7 @@ export default function SecurityPage({ onClose }: { onClose: () => void }) {
       if (!result) return;
       setRecoveryKey(result.recoveryKey);
       setRemembered(result.remembered);
+      setReopenFailed(Boolean(result.reopenFailed));
       setCurrent('');
       setPassword('');
       setRepeat('');
@@ -81,6 +95,7 @@ export default function SecurityPage({ onClose }: { onClose: () => void }) {
   function finishRecovery() {
     setRecoveryKey('');
     setStored(false);
+    setReopenFailed(false);
   }
 
   return (
@@ -88,7 +103,8 @@ export default function SecurityPage({ onClose }: { onClose: () => void }) {
       <SettingsSection icon={<Smartphone size={14} />} title={t('vaultKey.remember')} description={t('security.rememberHint')}>
         <SwitchRow
           variant="panel"
-          label={t('security.rememberLabel')}
+          label={t('vaultKey.remember')}
+          title={t('security.rememberTooltip')}
           hint={keychain ? undefined : t('vaultKey.rememberUnavailable')}
           checked={keychain && remembered}
           disabled={!keychain || rememberBusy}
@@ -97,10 +113,23 @@ export default function SecurityPage({ onClose }: { onClose: () => void }) {
         {rememberError && <SettingsStatus tone="error" className="mt-2">{t('security.rememberError')}</SettingsStatus>}
       </SettingsSection>
 
+      <SettingsSection icon={<Lock size={14} />} title={t('security.lockTitle')} description={t('security.lockHint')}>
+        <Button
+          tone="neutral"
+          title={t('security.lockTooltip')}
+          disabled={holding}
+          onClick={() => { onClose(); void lockActive(); }}
+        >
+          <Lock size={14} />
+          {t('security.lockNow')}
+        </Button>
+      </SettingsSection>
+
       <SettingsSection icon={<KeyRound size={14} />} title={t('security.changeTitle')} description={t('security.changeHint')}>
         {recoveryKey ? (
           <div className="space-y-4">
             <SettingsStatus tone="success">{t('security.changed')}</SettingsStatus>
+            {reopenFailed && <SettingsStatus tone="error">{t('security.reopenFailed')}</SettingsStatus>}
             <RecoveryKeyBox recoveryKey={recoveryKey} stored={stored} onStoredChange={setStored} />
             <div className="flex justify-end">
               <Button tone="jade" disabled={!stored} onClick={finishRecovery}>{t('vaultKey.done')}</Button>
@@ -112,6 +141,7 @@ export default function SecurityPage({ onClose }: { onClose: () => void }) {
               <input
                 type="password"
                 autoComplete="current-password"
+                title={t('security.currentPasswordTooltip')}
                 className="input-field settings-field"
                 value={current}
                 disabled={busy}
@@ -131,25 +161,18 @@ export default function SecurityPage({ onClose }: { onClose: () => void }) {
             />
             {error && <SettingsStatus tone="error">{error}</SettingsStatus>}
             <div className="flex justify-end">
-              <Button tone="jade" disabled={busy || !current || !password} onClick={submitPassword}>
+              <Button
+                tone="jade"
+                title={t('security.changeTooltip')}
+                disabled={busy || !current || !password}
+                onClick={submitPassword}
+              >
                 {busy && <Loader2 size={14} className="animate-spin" />}
-                {busy ? t('vaultKey.encrypting') : t('security.changeSubmit')}
+                {t('security.changeSubmit')}
               </Button>
             </div>
           </div>
         )}
-      </SettingsSection>
-
-      <SettingsSection icon={<Lock size={14} />} title={t('security.lockTitle')} description={t('security.lockHint')}>
-        <Button
-          tone="neutral"
-          title={t('security.lockTooltip')}
-          disabled={busy}
-          onClick={() => { onClose(); void lockActive(); }}
-        >
-          <Lock size={14} />
-          {t('security.lockNow')}
-        </Button>
       </SettingsSection>
     </>
   );

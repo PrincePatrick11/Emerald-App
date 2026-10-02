@@ -33,7 +33,7 @@ export default function RecoveryKeyBox({ recoveryKey, stored, onStoredChange }: 
       <p className="text-sm text-secondary">{t('vaultKey.recoveryHint')}</p>
       <div className="input-field settings-field font-mono select-all break-all">{recoveryKey}</div>
       <div>
-        <Button variant="secondary" onClick={copy}>
+        <Button tone="neutral" onClick={copy}>
           {copied ? <Check size={14} /> : <Copy size={14} />}
           {copied ? t('vaultKey.copied') : t('vaultKey.copy')}
         </Button>

@@ -631,7 +631,7 @@
     "repeatPassword": "Répéter le mot de passe",
     "createSubmit": "Chiffrer",
     "recoverTitle": "Ouvrir avec la clé de récupération",
-    "recoverHint": "Saisis la clé de récupération reçue à la création du coffre et choisis un nouveau mot de passe.",
+    "recoverHint": "Saisis la clé de récupération et choisis un nouveau mot de passe. Tu recevras ensuite une nouvelle clé de récupération – l’ancienne ne vaudra plus.",
     "recoveryKey": "Clé de récupération",
     "recoverSubmit": "Définir le nouveau mot de passe",
     "back": "Retour",
@@ -654,28 +654,29 @@
     "encryptTitle": "Chiffrer « {{name}} »",
     "encryptHint": "Ce coffre date d’avant le chiffrement. Désormais, tous les coffres sont chiffrés : choisis un mot de passe et Emerald chiffre les entrées, les images et les brouillons. Selon la taille, cela prend un moment, et l’original reste intact jusqu’à ce que tout soit vérifié.",
     "encryptNote": "Les sauvegardes exportées auparavant (.emeralddb) restent non chiffrées jusqu’à ce que tu les supprimes. Sur les SSD, des fichiers supprimés peuvent parfois être récupérés pendant un temps – seul un disque chiffré (BitLocker, FileVault) comble cette faille.",
-    "encrypting": "Chiffrement…",
     "encryptFailed": "Impossible de chiffrer le coffre. Il est inchangé – réessaie."
   },
   "security": {
-    "page": "Sécurité",
-    "rememberHint": "Avec la clé dans le trousseau du système d’exploitation, le coffre s’ouvre sans mot de passe. Les fichiers du dossier du coffre restent chiffrés dans tous les cas.",
-    "rememberLabel": "Mémoriser ce coffre sur cet appareil",
+    "rememberHint": "Garde la clé dans le trousseau du système pour que le coffre s’ouvre sans mot de passe.",
     "rememberError": "Le trousseau n’a pas accepté la modification.",
     "changeTitle": "Changer le mot de passe",
-    "changeHint": "La clé change avec le mot de passe : Emerald rechiffre le coffre et t’affiche une nouvelle clé de récupération – l’ancienne ne vaut plus. Les anciennes sauvegardes s’ouvrent toujours avec le mot de passe en vigueur lors de leur création. Les onglets ouverts sont fermés.",
+    "changeHint": "Nouveau mot de passe et nouvelle clé de récupération ; le coffre est rechiffré et les onglets ouverts se ferment.",
     "currentPassword": "Mot de passe actuel",
     "changeSubmit": "Changer le mot de passe",
     "changed": "Mot de passe changé ; le coffre est chiffré sous une nouvelle clé.",
     "changeFailed": "Impossible de changer le mot de passe. Le coffre est inchangé.",
     "lockTitle": "Verrouiller le coffre",
-    "lockHint": "Ferme le coffre immédiatement. Pour continuer, Emerald redemande le mot de passe – même si le coffre est mémorisé sur cet appareil.",
+    "lockHint": "Ferme le coffre maintenant ; le mot de passe est de nouveau requis, même s’il est mémorisé.",
     "lockTooltip": "Fermer le coffre et exiger le mot de passe",
-    "lockNow": "Verrouiller maintenant"
+    "lockNow": "Verrouiller maintenant",
+    "rememberTooltip": "Les fichiers du dossier du coffre restent chiffrés dans tous les cas.",
+    "changeTooltip": "Les anciennes sauvegardes s’ouvrent toujours avec le mot de passe de leur création.",
+    "currentPasswordTooltip": "Le mot de passe avec lequel tu déverrouilles ce coffre",
+    "reopenFailed": "Le coffre n’a pas pu être rechargé. Redémarre Emerald : il s’ouvrira avec le nouveau mot de passe."
   },
   "backupKey": {
     "title": "Ouvrir la sauvegarde",
-    "hint": "Cette sauvegarde est chiffrée et n’appartient pas au coffre ouvert – ou date d’avant un changement de mot de passe. Saisis le mot de passe qu’avait le coffre lors de sa création, ou sa clé de récupération de l’époque.",
+    "hint": "Cette sauvegarde est chiffrée. Saisis le mot de passe de sa création, ou la clé de récupération de l’époque.",
     "password": "Mot de passe de la sauvegarde",
     "useRecovery": "Utiliser la clé de récupération",
     "usePassword": "Utiliser le mot de passe",
@@ -845,7 +846,8 @@
     "importDbHint": "Restaure un fichier .emeralddb — comme nouveau vault, en plus des entrées existantes ou en remplaçant tout. Les options apparaissent une fois le fichier choisi.",
     "storageHint": "Images du dossier du vault qu'aucune entrée n'utilise plus. « Rechercher » montre la place occupée, « Supprimer » les efface définitivement.",
     "updatesDesc": "Vérifie s'il existe une version plus récente d'Emerald et l'installe.",
-    "updateErrorInstall": "L'installation a échoué."
+    "updateErrorInstall": "L'installation a échoué.",
+    "pageSecurity": "Sécurité"
   },
   "contextMenu": {
     "openInNewTab": "Ouvrir dans un nouvel onglet",

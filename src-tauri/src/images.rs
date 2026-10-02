@@ -1,6 +1,6 @@
 //! Image storage, scoped to a vault.
 //!
-//! Files live in `{vaultDir}/images/{sha256}.{ext}`. The database stores the
+//! Files live in `{vaultDir}/images/{hash}.{ext}`. The database stores the
 //! bare filename — no directory, no drive letter — which is what makes a vault
 //! directory copyable to another machine.
 //!
@@ -56,7 +56,7 @@ fn image_name(keys: Option<&ImageKeys>, bytes: &[u8], ext: &str) -> String {
 }
 
 /// An image as an encrypted vault stores it: its name and the sealed bytes.
-/// For encrypting a vault that has plain images (`encrypt_existing.rs`).
+/// For putting a vault's images under a new key (`reencrypt.rs`).
 pub(crate) fn seal_for_vault(vault_key: &Key, bytes: &[u8], ext: &str) -> (String, Vec<u8>) {
     let keys = ImageKeys {
         files: crypto::subkey(vault_key, Purpose::Files),

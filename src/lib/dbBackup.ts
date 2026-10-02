@@ -56,7 +56,7 @@ import { generateId, isValidHexColor, nowIso } from './helpers';
 import { useVaultStore } from '../store/vaultStore';
 import { VAULT_KEY_CANCELLED } from '../store/vaultKeyStore';
 import { KEY_ERRORS, keyErrorOf } from './vaultKeys';
-import { askBackupSecret, BACKUP_UNLOCK_CANCELLED, type BackupSecret } from '../store/backupSecretStore';
+import { askBackupSecret, BACKUP_UNLOCK_CANCELLED, endBackupSecret, type BackupSecret } from '../store/backupSecretStore';
 import { reloadAllStores } from '../store/moduleWiring';
 import { useUIStore } from '../store/uiStore';
 import { clearAllDrafts, flushDrafts } from '../store/draftStore';
@@ -802,23 +802,28 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
  */
 async function readBackupText(path: string): Promise<string | null> {
   let secret: BackupSecret | null = null;
-  for (;;) {
-    try {
-      return await invoke<string>('read_backup_file', { path, ...(secret ?? {}) });
-    } catch (err) {
-      const code = keyErrorOf(err);
-      const retry = code === 'BACKUP_LOCKED' ? null
-        : code === KEY_ERRORS.wrongPassword ? i18n.t('vaultKey.wrongPassword')
-        : code === KEY_ERRORS.wrongRecoveryKey ? i18n.t('vaultKey.wrongRecoveryKey')
-        : undefined;
-      if (retry === undefined) throw err;
+  try {
+    for (;;) {
+      let message: string | null;
       try {
-        secret = await askBackupSecret(retry);
+        return await invoke<string>('read_backup_file', { path, ...(secret ?? {}) });
+      } catch (err) {
+        const code = keyErrorOf(err);
+        if (code === KEY_ERRORS.backupLocked) message = null;
+        else if (code === KEY_ERRORS.wrongPassword) message = i18n.t('vaultKey.wrongPassword');
+        else if (code === KEY_ERRORS.wrongRecoveryKey) message = i18n.t('vaultKey.wrongRecoveryKey');
+        else throw err;
+      }
+      try {
+        secret = await askBackupSecret(message);
       } catch (cancelled) {
         if (keyErrorOf(cancelled) === BACKUP_UNLOCK_CANCELLED) return null;
         throw cancelled;
       }
     }
+  } finally {
+    // Offen, verworfen oder gescheitert — die Frage ist erledigt.
+    endBackupSecret();
   }
 }
 

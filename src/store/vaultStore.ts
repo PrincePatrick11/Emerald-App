@@ -23,7 +23,7 @@ import { useUndoStore } from './undoStore';
 import { useSettingsStore } from './settingsStore';
 import { captureLegacySettings } from '../lib/vaultSettings';
 import { resolveOpenEdits } from '../lib/openEdits';
-import { changeVaultPassword, keyErrorOf, lockVault } from '../lib/vaultKeys';
+import { changeVaultPassword, keyErrorOf, lockVault, type CreatedKey } from '../lib/vaultKeys';
 import { ensureVaultReady, VAULT_KEY_CANCELLED } from './vaultKeyStore';
 
 interface VaultStore {
@@ -54,7 +54,7 @@ interface VaultStore {
    * neu geladen — die Bilder heißen anders. `null`, wenn eine laufende
    * Bearbeitung weitergehen soll.
    */
-  changePassword: (currentPassword: string, newPassword: string) => Promise<{ recoveryKey: string; remembered: boolean } | null>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<(CreatedKey & { reopenFailed?: true }) | null>;
   /** Sperrt den offenen Vault und fragt sofort nach dem Passwort — auch wenn er gemerkt ist. */
   lockActive: () => Promise<void>;
 }
@@ -112,6 +112,17 @@ async function openActiveVault({ askPassword = false }: { askPassword?: boolean 
   clearSearchTextCache();
   clearEntrySummaryCache();
   await reloadAllStores();
+}
+
+/**
+ * Kein Vault ist offen: das Vault-Fenster übernimmt, Einstellungen und
+ * Listen gelten wieder als Standard. `vaults.json` behält den aktiven Vault —
+ * der nächste Start fragt wieder nach ihm.
+ */
+async function closeToSetup(): Promise<void> {
+  useVaultStore.setState({ activeVaultId: '' });
+  await useSettingsStore.getState().clear();
+  detachVaultPrefs();
 }
 
 export const useVaultStore = create<VaultStore>((set, get) => ({
@@ -257,9 +268,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       await openActiveVault();
     } catch (err) {
       if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) throw err;
-      set({ activeVaultId: '' });
-      await useSettingsStore.getState().clear();
-      detachVaultPrefs();
+      await closeToSetup();
     }
     return dirRemoved;
   },
@@ -271,17 +280,26 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     if (!(await resolveOpenEdits())) return null;
     await drainSerialized();
     await detachDrafts();
-    let result: { recoveryKey: string; remembered: boolean };
+    let result: CreatedKey;
     try {
       result = await withDbClosed(() => changeVaultPassword(id, currentPassword, newPassword));
     } catch (err) {
-      // Falsches Passwort oder ein Fehler vor dem Tausch: der Vault ist, wie
-      // er war, und öffnet beim nächsten `getDb()` mit dem alten Schlüssel.
+      // Ein Fehler kommt nur vor dem Commit (danach liefert Rust den neuen
+      // Schlüssel in jedem Fall): der Vault ist, wie er war, und öffnet beim
+      // nächsten `getDb()` mit dem alten Schlüssel.
       await restoreDrafts(id);
       throw err;
     }
-    await openActiveVault();
-    return result;
+    // Der neue Wiederherstellungsschlüssel geht in jedem Fall zurück — auch
+    // wenn das Neuladen scheitert: der Vault steht ab jetzt unter ihm.
+    try {
+      await openActiveVault();
+      return result;
+    } catch (err) {
+      console.error('[vault] reopen after password change failed', err);
+      if (keyErrorOf(err) === VAULT_KEY_CANCELLED) await closeToSetup();
+      return { ...result, reopenFailed: true };
+    }
   },
 
   lockActive: async () => {
@@ -294,11 +312,10 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       await withDbClosed(() => lockVault(id));
       await openActiveVault({ askPassword: true });
     } catch (err) {
-      if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) throw err;
-      // Nicht entsperrt: kein Vault ist offen, das Vault-Fenster übernimmt.
-      set({ activeVaultId: '' });
-      await useSettingsStore.getState().clear();
-      detachVaultPrefs();
+      // Nicht entsperrt — abgebrochen oder gescheitert: kein Vault ist offen,
+      // das Vault-Fenster übernimmt. Nie zurück zum alten Inhalt ohne Datenbank.
+      if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) console.error('[vault] lock failed', err);
+      await closeToSetup();
     } finally {
       set({ locked: false });
     }

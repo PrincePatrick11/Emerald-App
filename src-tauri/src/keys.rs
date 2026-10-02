@@ -29,8 +29,20 @@ pub const KEY_TEMP_FILE: &str = "vault.key.tmp";
 const KEY_FILE_VERSION: u32 = 1;
 const KEY_FILE_MAX_BYTES: u64 = 16 * 1024;
 const CHECK_LABEL: &[u8] = b"emerald/key-check";
-/// The service name under which a remembered key sits in the OS keychain.
-const KEYRING_SERVICE: &str = "Emerald";
+/// The service name under which a remembered key sits in the OS keychain:
+/// "Emerald" plus the app's identifier, set at start ([`init_keychain`]).
+/// The release, the dev build and every MCP slot are separate apps — and
+/// vault ids like `default` repeat between them, so a shared name would let
+/// one overwrite or, finding it stale, delete the other's entry.
+static KEYRING_SERVICE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+pub fn init_keychain(identifier: &str) {
+    KEYRING_SERVICE.get_or_init(|| format!("Emerald ({identifier})"));
+}
+
+fn keyring_service() -> &'static str {
+    KEYRING_SERVICE.get().map(String::as_str).unwrap_or("Emerald")
+}
 
 /// Errors the frontend tells apart by their text.
 pub const WRONG_PASSWORD: &str = "WRONG_PASSWORD";
@@ -222,18 +234,10 @@ impl KeyFile {
             .ok_or_else(|| WRONG_RECOVERY_KEY.to_string())
     }
 
-    /// The same file with a new password wrap, under today's parameters — not
-    /// the file's, which may come from anywhere. The recovery wrap stays.
-    pub fn with_password(&self, vault_key: &Key, password: &str) -> Result<KeyFile, String> {
-        check_password(password)?;
-        let salt: [u8; 16] = crypto::random_bytes();
-        let kek = derive_key(password, &salt, DEFAULT_KDF)?;
-        Ok(KeyFile {
-            kdf: DEFAULT_KDF,
-            salt: B64.encode(salt),
-            password: wrap(&kek, vault_key),
-            ..self.clone()
-        })
+    /// The public check value — what the re-encryption marker names its new
+    /// key by (`reencrypt.rs`).
+    pub fn check(&self) -> &str {
+        &self.check
     }
 
     /// Whether `key` is this vault's key.
@@ -259,13 +263,19 @@ impl KeyFile {
 /// Reads `vault.key` from a vault directory. `Ok(None)` when there is none —
 /// an unencrypted vault.
 pub fn read_key_file(dir: &Path) -> Result<Option<KeyFile>, String> {
-    let file = dir.join(KEY_FILE);
+    read_key_file_named(dir, KEY_FILE)
+}
+
+/// A key file under another name — `vault.key.pending` during a
+/// re-encryption. Links and oversized files are refused.
+pub(crate) fn read_key_file_named(dir: &Path, name: &str) -> Result<Option<KeyFile>, String> {
+    let file = dir.join(name);
     match std::fs::symlink_metadata(&file) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(format!("read {KEY_FILE}: {e}")),
-        Ok(md) if !md.is_file() || md.len() > KEY_FILE_MAX_BYTES => Err(format!("{KEY_FILE} is not a key file")),
+        Err(e) => Err(format!("read {name}: {e}")),
+        Ok(md) if !md.is_file() || md.len() > KEY_FILE_MAX_BYTES => Err(format!("{name} is not a key file")),
         Ok(_) => {
-            let text = std::fs::read_to_string(&file).map_err(|e| format!("read {KEY_FILE}: {e}"))?;
+            let text = std::fs::read_to_string(&file).map_err(|e| format!("read {name}: {e}"))?;
             KeyFile::from_json(&text).map(Some)
         }
     }
@@ -306,7 +316,7 @@ impl VaultKeys {
         self.lock_map().insert(vault_id.to_string(), key);
     }
 
-    fn remove(&self, vault_id: &str) {
+    pub(crate) fn remove(&self, vault_id: &str) {
         self.lock_map().remove(vault_id);
     }
 }
@@ -328,7 +338,7 @@ pub fn key_for(app: &tauri::AppHandle, vault_id: &str) -> Result<Option<Key>, St
 // ── OS keychain ──────────────────────────────────────────────────────────────
 
 fn keyring_entry(vault_id: &str) -> Result<keyring::Entry, String> {
-    keyring::Entry::new(KEYRING_SERVICE, &format!("vault:{vault_id}")).map_err(|e| e.to_string())
+    keyring::Entry::new(keyring_service(), &format!("vault:{vault_id}")).map_err(|e| e.to_string())
 }
 
 fn remember(vault_id: &str, key: &Key) -> Result<(), String> {
@@ -393,19 +403,32 @@ pub struct KeyStatus {
 
 /// Where a vault stands. Never touches the keychain — that is
 /// [`vault_unlock_remembered`]'s job, once, when it matters. Fails like the
-/// other storage commands when the vault's folder is gone.
+/// other storage commands when the vault's folder is gone. Off the main
+/// thread: it finishes an interrupted re-encryption first, which moves files.
 #[tauri::command]
-pub fn vault_key_status(app: tauri::AppHandle, vault_id: String) -> Result<KeyStatus, String> {
-    let dir = vault::vault_dir(&app, &vault_id)?;
-    vault::directory_state(&dir)?;
-    // Eine abgebrochene Verschlüsselung erst zu Ende bringen oder zurücknehmen.
-    crate::reencrypt::recover_interrupted(&dir)?;
-    let encrypted = is_encrypted_dir(&dir);
-    Ok(KeyStatus {
-        has_database: dir.join(vault::DB_FILE).is_file(),
-        encrypted,
-        unlocked: encrypted && app.state::<VaultKeys>().get(&vault_id).is_some(),
+pub async fn vault_key_status(app: tauri::AppHandle, vault_id: String) -> Result<KeyStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = vault::vault_dir(&app, &vault_id)?;
+        vault::directory_state(&dir)?;
+        crate::reencrypt::recover_if_idle(&dir)?;
+        let encrypted = is_encrypted_dir(&dir);
+        // Ein Schlüssel im Speicher, der nicht zu diesem Ordner passt — der
+        // Vault wurde neu verortet, oder ein Tausch wurde erst jetzt fertig —,
+        // ist keiner: weg damit, dann fragt das Frontend neu.
+        let keys = app.state::<VaultKeys>();
+        let unlocked = encrypted
+            && match keys.get(&vault_id) {
+                Some(key) if read_key_file(&dir)?.is_some_and(|file| file.accepts(&key)) => true,
+                Some(_) => {
+                    keys.remove(&vault_id);
+                    false
+                }
+                None => false,
+            };
+        Ok(KeyStatus { has_database: dir.join(vault::DB_FILE).is_file(), encrypted, unlocked })
     })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Whether this system has a keychain to remember keys in. A Linux desktop
@@ -413,7 +436,7 @@ pub fn vault_key_status(app: tauri::AppHandle, vault_id: String) -> Result<KeySt
 #[tauri::command]
 pub async fn keychain_available() -> bool {
     tauri::async_runtime::spawn_blocking(|| {
-        let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, "probe") else {
+        let Ok(entry) = keyring::Entry::new(keyring_service(), "probe") else {
             return false;
         };
         matches!(entry.get_password(), Ok(_) | Err(keyring::Error::NoEntry))
@@ -512,28 +535,6 @@ pub async fn vault_unlock_remembered(app: tauri::AppHandle, vault_id: String) ->
     .map_err(|e| e.to_string())?
 }
 
-/// Sets a new password with the recovery key and unlocks the vault. Returns
-/// whether the key is now remembered.
-#[tauri::command]
-pub async fn vault_recover(
-    app: tauri::AppHandle,
-    vault_id: String,
-    recovery_key: Zeroizing<String>,
-    new_password: Zeroizing<String>,
-    remember_key: Option<bool>,
-) -> Result<bool, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let (dir, file) = load_key_file(&app, &vault_id)?;
-        let key = file.unlock_with_recovery_key(&recovery_key)?;
-        write_key_file(&dir, &file.with_password(&key, &new_password)?)?;
-        let remembered = apply_remember(&vault_id, &key, remember_key);
-        app.state::<VaultKeys>().insert(&vault_id, key);
-        Ok(remembered)
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
 /// Whether the keychain holds this vault's key. Off the main thread: a
 /// keychain may ask the user first.
 #[tauri::command]
@@ -594,15 +595,6 @@ mod tests {
         assert_eq!(file.unlock_with_recovery_key(&other).unwrap_err(), WRONG_RECOVERY_KEY);
         assert_eq!(file.unlock_with_recovery_key("ABCD").unwrap_err(), WRONG_RECOVERY_KEY);
         assert_eq!(file.unlock_with_recovery_key("not base32 at all!").unwrap_err(), WRONG_RECOVERY_KEY);
-    }
-
-    #[test]
-    fn new_password_keeps_key_and_recovery() {
-        let (file, key, recovery) = KeyFile::create("correct horse", TEST_KDF).unwrap();
-        let changed = file.with_password(&key, "battery staple").unwrap();
-        assert_eq!(changed.unlock_with_password("correct horse").unwrap_err(), WRONG_PASSWORD);
-        assert_eq!(*changed.unlock_with_password("battery staple").unwrap(), *key);
-        assert_eq!(*changed.unlock_with_recovery_key(&recovery).unwrap(), *key);
     }
 
     #[test]
