@@ -103,6 +103,26 @@ export function carryBaseline(id: string, from: EntryType, to: EntryType, source
   });
 }
 
+/**
+ * Die Einträge, deren Bearbeitung Cancel gerade verwirft. Was eine View jetzt
+ * noch speichern würde — der Debounce, der Save beim Wegnavigieren oder beim
+ * Abbau —, schriebe die verworfene Eingabe über den wiederhergestellten
+ * Eintrag. Je Eintrag und nicht je View: nimmt Cancel einen Typwechsel zurück,
+ * wird nicht nur die View abgebaut, in der es gedrückt wurde.
+ */
+const discarding = new Set<string>();
+
+export const isDiscarding = (id: string): boolean => discarding.has(id);
+
+/** Cancel beginnt. `endDiscard` hebt es auf — spätestens die nächste Bearbeitung des Eintrags. */
+export function beginDiscard(id: string): void {
+  discarding.add(id);
+}
+
+export function endDiscard(id: string): void {
+  discarding.delete(id);
+}
+
 useUIStore.subscribe((s) => {
   for (const [key, { scope, id }] of baselines) {
     if (!isInEdit(s, scope, id)) baselines.delete(key);

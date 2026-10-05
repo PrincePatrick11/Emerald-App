@@ -3,7 +3,9 @@ import { editorSavesSuspended } from '../lib/editorLock';
 import { entryTypeForView, type ViewId } from '../lib/modules';
 import { revertEntryType } from '../lib/entryTypeChange';
 import { serialKey, serialized } from '../lib/serialize';
-import { baselineKey, baselineOf, baselines, editIsDirty, type BaselineFields } from '../store/entryEdit';
+import {
+  baselineKey, baselineOf, baselines, beginDiscard, editIsDirty, endDiscard, isDiscarding, type BaselineFields,
+} from '../store/entryEdit';
 import type { WriteOptions } from '../lib/stamp';
 
 /**
@@ -92,13 +94,6 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevRef = useRef<{ id: string; isEditing: boolean } | null>(null);
-  /**
-   * Cancel läuft: was jetzt noch getippt oder beim Abbau der View gespeichert
-   * würde, ist verworfen — es schriebe sich sonst über den wiederhergestellten
-   * Eintrag. Bleibt gesetzt, wenn der Eintrag die Ansicht verlassen hat
-   * (`REVERTED`); die nächste Bearbeitung hebt es auf.
-   */
-  const discardingRef = useRef(false);
 
   // Der Editor-Inhalt wird pro Tastendruck in diesen Ref gespiegelt statt in
   // State — ein State-Update haette die komplette View pro Anschlag neu
@@ -125,7 +120,7 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
     const id = idRef.current;
     timer.current = setTimeout(() => {
       timer.current = null;
-      if (!isEditingRef.current || !id || editorSavesSuspended() || discardingRef.current) return;
+      if (!isEditingRef.current || !id || editorSavesSuspended() || isDiscarding(id)) return;
       // Fire-and-forget: waehrend `withDbClosed` laeuft (Vault-Dateien werden
       // geloescht) lehnt `getDb()` ab, und die Aenderung gehoert ohnehin zu
       // dem Vault, der gerade verschwindet.
@@ -150,7 +145,8 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
     (buildRestorePatchRef.current ?? (buildPatchRef.current as unknown as (c: string) => TRestore))(content);
   useEffect(() => {
     if (!isEditing || !ready || !entityId) return;
-    discardingRef.current = false;
+    // Eine neue Bearbeitung: ein Cancel davor ist vorbei, auch eines, das den Typ zurücknahm.
+    endDiscard(entityId);
     const key = baselineKey(scope, entityId);
     const running = baselines.get(key);
     if (running) {
@@ -191,7 +187,8 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
     const id = idRef.current;
     if (!id) return null;
     const movedAway = () => readStoredRef.current(id) === null;
-    discardingRef.current = true;
+    // Ab hier speichert keine View mehr für diesen Eintrag (`isDiscarding`).
+    beginDiscard(id);
     let result: TRestore | typeof REVERTED | null = null;
     try {
       // Ein Typwechsel, der noch schreibt, gehört schon zur Bearbeitung: erst
@@ -206,13 +203,18 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
       } else if (baseline) {
         await updateRef.current(id, baseline.patch as TRestore, { touch: baseline.stamp ?? true });
         result = movedAway() ? REVERTED : baseline.patch as TRestore;
-      } else if (movedAway()) {
-        result = REVERTED;
+      } else {
+        // Kein Stand mehr: ein Cancel davor hat die Bearbeitung schon beendet.
+        // Was gespeichert ist, ist dann der wiederhergestellte Eintrag — nicht
+        // das, was die View beim Klick noch vor sich hatte.
+        result = movedAway() ? REVERTED : readStoredRef.current(id);
       }
     } catch (e) {
       console.error('[useEntryEditor] restore on cancel failed:', e);
     } finally {
-      if (result !== REVERTED) discardingRef.current = false;
+      // Nach einer Rücknahme werden die Views erst noch abgebaut — dort hebt
+      // es die nächste Bearbeitung auf.
+      if (result !== REVERTED) endDiscard(id);
     }
     // Ein Tastendruck während des Awaits hätte den Timer neu scharf gemacht.
     cancelAutoSave();
@@ -231,13 +233,17 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
 
   useEffect(() => {
     const prev = prevRef.current;
-    if (prev?.isEditing && !editorSavesSuspended() && !discardingRef.current) {
+    if (prev?.isEditing && !editorSavesSuspended()) {
+      // Verwirft Cancel den Eintrag gerade, entfällt nur das Schreiben: Timer
+      // und `prevRef` werden trotzdem geräumt — sonst schriebe ein späterer
+      // Durchlauf den State des NÄCHSTEN Eintrags unter der alten id.
+      const discarded = isDiscarding(prev.id);
       if (prev.id !== entityId) {
         // Wegnavigiert waehrend des Editierens: die id hat in diesem Render
         // bereits gewechselt, buildPatch liest aber noch den State des
         // vorherigen Eintrags (siehe Kopfkommentar).
         cancelAutoSave();
-        void updateRef.current(prev.id, buildPatchRef.current(contentRef.current)).catch(console.error);
+        if (!discarded) void updateRef.current(prev.id, buildPatchRef.current(contentRef.current)).catch(console.error);
         prevRef.current = null;
       } else if (!isEditing && timer.current !== null) {
         // Edit-Modus verlassen ohne Done/Cancel — seit dem Waechter
@@ -247,7 +253,7 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
         // und bis zu debounceMs an Tipparbeit verwerfen. Done/Cancel
         // entschaerfen den Timer vorher — fuer die ist das hier ein No-op.
         cancelAutoSave();
-        void updateRef.current(prev.id, buildPatchRef.current(contentRef.current)).catch(console.error);
+        if (!discarded) void updateRef.current(prev.id, buildPatchRef.current(contentRef.current)).catch(console.error);
       }
     }
     if (ready && entityId) {
@@ -266,7 +272,7 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
     return () => {
       cancelAutoSave();
       const prev = prevRef.current;
-      if (prev?.isEditing && !editorSavesSuspended() && !discardingRef.current) {
+      if (prev?.isEditing && !editorSavesSuspended() && !isDiscarding(prev.id)) {
         void updateRef.current(prev.id, buildPatchRef.current(contentRef.current)).catch(console.error);
       }
     };

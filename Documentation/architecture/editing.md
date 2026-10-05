@@ -76,7 +76,7 @@ The type field only exists in edit mode, so every type change happens inside an 
 
 - **Category, icon and cover image** dropped by a move to Journal come back: Wiki's and Operations' baselines hold them, and the baseline is what travels.
 - **The number.** The entry gets its old `entry_number` back unless another entry of that type took it meanwhile (`formerEntryNumber`); then it gets the next one. The same applies when the user switches back to the original type by hand — the origin is then dropped and the edit is an ordinary one again.
-- **No save on the way out.** While Cancel runs, the hook's debounce, unmount and navigate-away saves are off (`discardingRef`); they would write the discarded text over the restored entry.
+- **No save on the way out.** While Cancel runs, the debounce, unmount and navigate-away saves are off for that entry (`isDiscarding` in `store/entryEdit.ts`); they would write the discarded text over the restored entry. The mark is per entry, not per view: a revert unmounts more than the view Cancel was pressed in. After a revert it stays until the entry's next edit begins.
 - **Back/Forward with "Discard".** `stepGuarded` steps from the history as it was before the question; `retypeEntryViews` rewrites that held copy too (`heldHistory`), or it would keep the entry under the discarded type.
 - **A new, unconfirmed entry** is not reverted: Cancel puts it in the Trash under the type it has.
 
