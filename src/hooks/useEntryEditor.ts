@@ -145,8 +145,6 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
     (buildRestorePatchRef.current ?? (buildPatchRef.current as unknown as (c: string) => TRestore))(content);
   useEffect(() => {
     if (!isEditing || !ready || !entityId) return;
-    // Eine neue Bearbeitung: ein Cancel davor ist vorbei, auch eines, das den Typ zurücknahm.
-    endDiscard(entityId);
     const key = baselineKey(scope, entityId);
     const running = baselines.get(key);
     if (running) {
@@ -156,6 +154,10 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
       running.stored = () => readStoredRef.current(entityId);
       return;
     }
+    // Eine neue Bearbeitung: ein Cancel davor ist vorbei, auch eines, das den
+    // Typ zurücknahm. Nicht oben — die View, die zwischen einem Typwechsel und
+    // seiner Rücknahme montiert, findet einen Stand vor und soll nichts speichern.
+    endDiscard(entityId);
     const patch = restoreFields(contentRef.current);
     baselines.set(key, {
       scope,
