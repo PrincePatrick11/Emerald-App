@@ -142,7 +142,7 @@ export function guardRegistered(key: string, timeoutMs = 3000): Promise<boolean>
 /**
  * Trägt eine Seite, die gerade nicht offen ist, ungesicherte Änderungen? Wer
  * Bearbeitungen außerhalb der Ansicht aufbewahrt, meldet hier eine Probe an
- * (`draftStore`: es gibt einen Entwurf; `useEntryEditor`: der gespeicherte
+ * (`draftStore`: es gibt einen Entwurf; `entryEdit`: der gespeicherte
  * Stand weicht vom Ausgangsstand ab). So muss ein Tab im Hintergrund nicht
  * erst geöffnet werden, nur um festzustellen, dass es nichts zu fragen gibt.
  */

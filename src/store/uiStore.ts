@@ -300,7 +300,11 @@ function withActiveHistory(s: UIState, history: NavHistory): UIState {
   return { ...s, tabs: s.tabs.map((tab) => (tab.id === s.activeTabId ? { ...tab, history } : tab)) };
 }
 
-/** Der Verlauf, von dem das letzte Zurück/Vor ausgeht (`stepGuarded`) — über die Rückfrage hinweg. */
+/**
+ * Der Verlauf, von dem ein Zurück/Vor ausgeht (`stepGuarded`), solange seine
+ * Rückfrage offen ist. Bei „Weiter bearbeiten" bleibt er stehen, bis der
+ * nächste Schritt ihn ersetzt — gelesen wird er nur von dem, der ihn gesetzt hat.
+ */
 let heldHistory: NavHistory | null = null;
 
 /**
@@ -316,9 +320,11 @@ let heldHistory: NavHistory | null = null;
 function stepGuarded(delta: -1 | 1): void {
   const tabId = useUIStore.getState().activeTabId;
   heldHistory = selectActiveHistory(useUIStore.getState());
-  whenLeaveConfirmed(true, () => useUIStore.setState((s) => (
-    s.activeTabId === tabId && heldHistory ? stepHistory(withActiveHistory(s, heldHistory), delta) : {}
-  )));
+  whenLeaveConfirmed(true, () => {
+    const before = heldHistory;
+    heldHistory = null;
+    useUIStore.setState((s) => (s.activeTabId === tabId && before ? stepHistory(withActiveHistory(s, before), delta) : {}));
+  });
 }
 
 /** Schließt den Tab, ohne zu fragen — das Fragen erledigt `closeTab`. */
@@ -460,23 +466,25 @@ export const useUIStore = create<UIState>((set, get) => ({
     });
   },
 
-  retypeEntryViews: (id, from, to, { endEdit = false } = {}) => set((s) => {
-    const retype = (view: ActiveView): ActiveView => (view.type === from && view.id === id ? { ...view, type: to } : view);
+  retypeEntryViews: (id, from, to, { endEdit = false } = {}) => {
+    const isEntry = (view: ActiveView) => view.type === from && view.id === id;
+    const retype = (view: ActiveView): ActiveView => (isEntry(view) ? { ...view, type: to } : view);
     const retypeHistory = (history: NavHistory): NavHistory => ({ ...history, views: history.views.map(retype) });
-    // Nur die offene Seite, und nur wenn sie dieser Eintrag ist.
-    const open = (view: ActiveView): ActiveView => {
-      const next = retype(view);
-      return endEdit && next !== view ? { type: to, id, mode: 'view' } : next;
-    };
-    const tabs = s.tabs.map((tab) => ({
-      ...tab,
-      view: tab.id === s.activeTabId ? open(tab.view) : retype(tab.view),
-      history: retypeHistory(tab.history),
-    }));
-    saveTabs(tabs, s.activeTabId);
+    // Die offene Seite: mit `endEdit` zugleich ins Lesen, wenn sie dieser Eintrag ist.
+    const retypeOpenPage = (view: ActiveView): ActiveView => (
+      endEdit && isEntry(view) ? { type: to, id, mode: 'view' } : retype(view)
+    );
     if (heldHistory) heldHistory = retypeHistory(heldHistory);
-    return { tabs, activeView: open(s.activeView), tablessHistory: retypeHistory(s.tablessHistory) };
-  }),
+    set((s) => {
+      const tabs = s.tabs.map((tab) => ({
+        ...tab,
+        view: tab.id === s.activeTabId ? retypeOpenPage(tab.view) : retype(tab.view),
+        history: retypeHistory(tab.history),
+      }));
+      saveTabs(tabs, s.activeTabId);
+      return { tabs, activeView: retypeOpenPage(s.activeView), tablessHistory: retypeHistory(s.tablessHistory) };
+    });
+  },
 
   // Ein neuer Tab beginnt mit einem frischen Verlauf.
   openViewInNewTab: (view) => set((s) => {

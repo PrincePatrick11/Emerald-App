@@ -194,7 +194,7 @@ The editor helpers `BlockStack` composes live in `src/components/editor/`: `edit
 
 **Hooks**
 
-- **`useEntryEditor`** — the editor lifecycle: debounced auto-save, save-on-navigate, save-on-unmount, parameterised over `buildPatch()`/`update()`.
+- **`useEntryEditor`** — the editor lifecycle: debounced auto-save, save-on-navigate, save-on-unmount and Cancel (`restoreOnCancel`, which answers `REVERTED` when it took a type change back), parameterised over `buildPatch()`/`update()`. The baselines it restores from live in `store/entryEdit.ts`.
 - **`useEditActions`** — registers a view's Save/Cancel/Delete into the right sidebar's action bar while `active`, ref-latched so the sidebar never calls a stale closure.
 - **`useDraftPage`** — the draft lifecycle of a `LibraryPageFrame` page: opens from a `DraftStore<T>` entry or the saved row, mirrors every change back (so edits survive `MainArea` unmounting the view), and on "Done" saves only the fields changed since opening. "Cancel" discards the draft, or, for a page just created (`onCancelNew`), deletes it into the Trash with Undo; the leave guard's "Discard" runs the same. *Ext.:* `store`, `id`, `saved`, `save(id, patch, base)`, `onClose`, `onCancelNew?`, `logTag`.
 - **`useShrunkIcon`** — shrinks an image icon to 64px before it lands in a draft, passing an emoji straight through; the last call to resolve wins. *Ext.:* `apply`, `logTag`.

@@ -1,7 +1,8 @@
 import { viewTypeForEntryType, type ViewId } from '../lib/modules';
 import { isInEdit, useUIStore } from './uiStore';
 import { guardKey, registerEditProbe } from './leaveGuardStore';
-import type { EntryType } from '../types';
+import { useEntryStore } from './entryStore';
+import type { Entry, EntryType } from '../types';
 
 /**
  * Die Ausgangsstände der laufenden Bearbeitungen, je Ansicht und Eintrag — wie
@@ -23,7 +24,7 @@ import type { EntryType } from '../types';
 export interface EditBaseline {
   scope: ViewId;
   id: string;
-  patch: unknown;
+  patch: BaselineFields;
   /** „Zuletzt geändert" beim Betreten — Cancel stellt ihn mit dem Rest wieder her. */
   stamp: string | undefined;
   /** Der gespeicherte Stand, in der Form von `patch` — `null`, wenn es den Eintrag nicht mehr gibt. */
@@ -31,6 +32,9 @@ export interface EditBaseline {
   /** Nur nach einem Typwechsel: was der Eintrag beim Betreten war. `patch` hat dann die Form jener Ansicht. */
   origin?: EditOrigin;
 }
+
+/** Was ein Ausgangsstand festhält: ein Ausschnitt des Eintrags — das Journal nur die ersten drei Felder. */
+export type BaselineFields = Partial<Pick<Entry, 'title' | 'content' | 'tags' | 'category_id' | 'icon' | 'cover_image'>>;
 
 /** Typ und Nummer eines Eintrags, bevor er während der Bearbeitung den Typ wechselte. */
 export interface EditOrigin {
@@ -55,8 +59,20 @@ export function editIsDirty(stored: unknown, baseline: EditBaseline | undefined,
   return baseline !== undefined && JSON.stringify(stored) !== JSON.stringify(baseline.patch);
 }
 
+/**
+ * Der Ausgangsstand der Bearbeitung von `id` — unter welcher Ansicht er auch
+ * gerade liegt: nach einem Typwechsel ist das nicht mehr die, in der
+ * „Bearbeiten" gedrückt wurde.
+ */
+export function baselineOf(id: string): EditBaseline | undefined {
+  for (const baseline of baselines.values()) {
+    if (baseline.id === id) return baseline;
+  }
+  return undefined;
+}
+
 /** Woher der Eintrag kam, wenn er in dieser Bearbeitung schon den Typ gewechselt hat. */
-export function editOrigin(id: string, type: EntryType): EditOrigin | undefined {
+export function originOfEdit(id: string, type: EntryType): EditOrigin | undefined {
   return baselines.get(baselineKey(viewTypeForEntryType(type), id))?.origin;
 }
 
@@ -66,6 +82,11 @@ export function editOrigin(id: string, type: EntryType): EditOrigin | undefined 
  * dorthin zurück, ist es wieder eine gewöhnliche Bearbeitung. Muss laufen,
  * bevor die Tabs umziehen (`retypeEntryViews`) — der Abgleich unten räumte den
  * Stand sonst weg.
+ *
+ * `stored` las bisher über die alte Ansicht und fände den Eintrag dort nicht
+ * mehr („gelöscht"). Bis die neue Ansicht montiert und ihren Leser einsetzt
+ * (`useEntryEditor`), sagt er nur, ob es den Eintrag gibt — in einem Tab, der
+ * vorher in den Hintergrund ging, bleibt es dabei.
  */
 export function carryBaseline(id: string, from: EntryType, to: EntryType, source: EditOrigin): void {
   const fromKey = baselineKey(viewTypeForEntryType(from), id);
@@ -74,7 +95,12 @@ export function carryBaseline(id: string, from: EntryType, to: EntryType, source
   const origin = baseline.origin ?? source;
   const scope = viewTypeForEntryType(to);
   baselines.delete(fromKey);
-  baselines.set(baselineKey(scope, id), { ...baseline, scope, origin: origin.type === to ? undefined : origin });
+  baselines.set(baselineKey(scope, id), {
+    ...baseline,
+    scope,
+    origin: origin.type === to ? undefined : origin,
+    stored: () => (useEntryStore.getState().getEntry(id, to) ? {} : null),
+  });
 }
 
 useUIStore.subscribe((s) => {

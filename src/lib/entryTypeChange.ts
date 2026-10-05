@@ -34,8 +34,8 @@ import { serialKey, serialized } from './serialize';
 import { viewTypeForEntryType } from './modules';
 import { remapDefinitionDefaults } from './blocks/definitions';
 import { hasOwnTitle } from './entryTitle';
-import { carryBaseline, editOrigin, type EditOrigin } from '../store/entryEdit';
-import { mapEntries, useEntryStore, withAddedEntry, withoutIds } from '../store/entryStore';
+import { carryBaseline, originOfEdit, type BaselineFields, type EditOrigin } from '../store/entryEdit';
+import { mapEntries, useEntryStore, withAddedEntry, withSortedEntry, withoutIds } from '../store/entryStore';
 import { useTaskStore } from '../store/taskStore';
 import { useTemplateStore } from '../store/templateStore';
 import { useBlockDefinitionStore } from '../store/blockDefinitionStore';
@@ -57,13 +57,10 @@ export function typeChangeDropsProperties(entry: Pick<EntryCore, 'category_id' |
   return to === 'journal' && !!(entry.category_id || entry.icon || entry.cover_image);
 }
 
-/** Was Cancel aus dem Ausgangsstand einer Bearbeitung zurückschreibt — das Journal hält nur die ersten drei. */
-export type RevertFields = Partial<Pick<Entry, 'title' | 'content' | 'tags' | 'category_id' | 'icon' | 'cover_image'>>;
-
 /** Die Rücknahme eines Typwechsels: wohin, und mit welchem Stand. */
 interface Revert {
   origin: EditOrigin;
-  fields: RevertFields;
+  fields: BaselineFields;
   /** „Zuletzt geändert" vom Beginn der Bearbeitung. */
   stamp: string | undefined;
 }
@@ -83,26 +80,17 @@ async function formerEntryNumber(db: Database, type: ConvertibleEntryType, id: s
   return nextEntryNumber(db, type);
 }
 
-/**
- * Gibt der Zeile den neuen Typ — samt den Feldern aus `core` und einer Nummer
- * in dessen Zählung: der von `former`, wenn der Eintrag dorthin zurückkehrt.
- */
+/** Gibt der Zeile den neuen Typ — samt den Feldern aus `core`, der Nummer in dessen Zählung und dem Stempel. */
 async function retypeRow(
-  db: Database, to: ConvertibleEntryType, core: EntryCore, former?: EditOrigin, stamp?: string,
+  db: Database, to: ConvertibleEntryType, core: EntryCore, entryNumber: number, updatedAt: string,
 ): Promise<Entry> {
-  const entry: Entry = {
-    ...core,
-    type: to,
-    entry_number: former ? await formerEntryNumber(db, to, core.id, former.entry_number) : await nextEntryNumber(db, to),
-    updated_at: stamp ?? nowIso(),
-    deleted_at: null,
-  };
+  const entry: Entry = { ...core, type: to, entry_number: entryNumber, updated_at: updatedAt, deleted_at: null };
   await db.execute(
     `UPDATE entries
-        SET type=$1, entry_number=$2, title=$3, content=$4, category_id=$5, icon=$6, cover_image=$7, updated_at=$8, tags=$10
-      WHERE id=$9`,
+        SET type=$1, entry_number=$2, title=$3, content=$4, category_id=$5, icon=$6, cover_image=$7, updated_at=$8, tags=$9
+      WHERE id=$10`,
     [to, entry.entry_number, entry.title, entry.content, entry.category_id, entry.icon ?? null, entry.cover_image ?? null,
-      entry.updated_at, entry.id, JSON.stringify(entry.tags)]
+      entry.updated_at, JSON.stringify(entry.tags), entry.id]
   );
   return entry;
 }
@@ -154,7 +142,7 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
  * wird ja verworfen. `false`, wenn es den Eintrag unter `from` nicht mehr gibt.
  */
 export function revertEntryType(
-  id: string, from: ConvertibleEntryType, origin: EditOrigin, fields: RevertFields, stamp: string | undefined,
+  id: string, from: ConvertibleEntryType, origin: EditOrigin, fields: BaselineFields, stamp: string | undefined,
 ): Promise<boolean> {
   return retypeEntry(id, from, origin.type, { origin, fields, stamp });
 }
@@ -170,26 +158,29 @@ function retypeEntry(id: string, from: ConvertibleEntryType, to: ConvertibleEntr
     if (!source) return false;
     const db = await getDb();
 
-    const kept = { ...source, ...revert?.fields };
+    const fields = { ...source, ...revert?.fields };
     const core: EntryCore = {
       id: source.id,
-      tags: kept.tags,
+      tags: fields.tags,
       created_at: source.created_at,
-      category_id: kept.category_id,
-      icon: kept.icon,
-      cover_image: kept.cover_image,
+      category_id: fields.category_id,
+      icon: fields.icon,
+      cover_image: fields.cover_image,
       // Ein unbenannter Eintrag heißt danach wie ein unbenannter des neuen Typs.
       // Ohne eigenen Titel bleibt er leer — „Unbenannt…" zeigt die neue Art von selbst.
       // Der Ausgangsstand dagegen kommt zurück, wie er war.
-      title: (revert || hasOwnTitle(kept.title)) ? kept.title : '',
+      title: (revert || hasOwnTitle(fields.title)) ? fields.title : '',
       // Ein Link des Eintrags auf sich selbst zieht mit.
-      content: retypeInternalLinks(kept.content, id, to),
+      content: retypeInternalLinks(fields.content, id, to),
       ...(to === 'journal' ? { category_id: null, icon: undefined, cover_image: undefined } : {}),
     };
     // Zurück zum Typ vom Beginn der Bearbeitung — über Cancel oder von Hand —
     // bekommt der Eintrag seine Nummer von damals wieder.
-    const origin = revert?.origin ?? editOrigin(id, from);
-    const converted = await retypeRow(db, to, core, origin?.type === to ? origin : undefined, revert?.stamp);
+    const origin = revert?.origin ?? originOfEdit(id, from);
+    const entryNumber = origin?.type === to
+      ? await formerEntryNumber(db, to, id, origin.entry_number)
+      : await nextEntryNumber(db, to);
+    const converted = await retypeRow(db, to, core, entryNumber, revert?.stamp ?? nowIso());
 
     const entryContent = await retypeContentColumn(db, 'entries', id, to);
     const templateContent = await retypeContentColumn(db, 'templates', id, to);
@@ -216,7 +207,8 @@ function retypeEntry(id: string, from: ConvertibleEntryType, to: ConvertibleEntr
     // Ohne await dazwischen: der neue Typ steht im Store, bevor die Ansicht
     // wechselt, und der alte verschwindet erst mit ihr — kein Frame, in dem
     // der offene Tab auf einen Eintrag zeigt, den es nicht gibt.
-    useEntryStore.setState((s) => ({ entries: withAddedEntry(s.entries, converted) }));
+    // Zurückgenommen steht der Eintrag wieder an seinem Platz, nicht vorn wie ein neuer.
+    useEntryStore.setState((s) => ({ entries: (revert ? withSortedEntry : withAddedEntry)(s.entries, converted) }));
     // Der Ausgangsstand der Bearbeitung zieht mit, bevor die Tabs es tun; nach
     // einer Rücknahme ist sie zu Ende, und er verfällt mit dem Wechsel ins Lesen.
     if (!revert) carryBaseline(id, from, to, { type: from, entry_number: source.entry_number });
