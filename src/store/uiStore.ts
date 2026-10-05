@@ -124,8 +124,11 @@ interface UIState {
   setFlag: (key: string, value: boolean) => void;
   closeAllTabs: () => void;
   /** Ein Eintrag hat den Typ gewechselt: jeder Tab und jeder Verlauf, der ihn
-   *  unter `from` öffnet, öffnet ihn jetzt unter `to` — dieselbe id. */
-  retypeEntryViews: (id: string, from: EntryModuleId, to: EntryModuleId) => void;
+   *  unter `from` öffnet, öffnet ihn jetzt unter `to` — dieselbe id. Mit
+   *  `endEdit` steht die offene Seite danach im Lesen: Cancel nimmt einen
+   *  Typwechsel zurück, und die Ansicht des alten Typs soll gar nicht erst im
+   *  Bearbeiten erscheinen. Andere Tabs behalten ihren Modus. */
+  retypeEntryViews: (id: string, from: EntryModuleId, to: EntryModuleId, options?: { endEdit?: boolean }) => void;
   openViewInNewTab: (view: ActiveView) => void;
   addTab: (view?: ActiveView) => void;
   selectTab: (id: string) => void;
@@ -297,17 +300,24 @@ function withActiveHistory(s: UIState, history: NavHistory): UIState {
   return { ...s, tabs: s.tabs.map((tab) => (tab.id === s.activeTabId ? { ...tab, history } : tab)) };
 }
 
+/** Der Verlauf, von dem das letzte Zurück/Vor ausgeht (`stepGuarded`) — über die Rückfrage hinweg. */
+let heldHistory: NavHistory | null = null;
+
 /**
  * Zurück oder Vor. Der Schritt geht vom Verlauf aus, wie er vor der Frage war:
  * „Speichern" und „Verwerfen" wechseln selbst die Seite (zurück zur Liste)
  * und hätten ihn sonst um genau diesen Schritt verschoben — man stünde wieder
  * auf der Seite, die man verlassen wollte.
+ *
+ * Er liegt in `heldHistory`, nicht in der Closure: nimmt „Verwerfen" einen
+ * Typwechsel zurück, schreibt `retypeEntryViews` ihn mit um — sonst führte
+ * er den Eintrag weiter unter dem verworfenen Typ.
  */
 function stepGuarded(delta: -1 | 1): void {
   const tabId = useUIStore.getState().activeTabId;
-  const before = selectActiveHistory(useUIStore.getState());
+  heldHistory = selectActiveHistory(useUIStore.getState());
   whenLeaveConfirmed(true, () => useUIStore.setState((s) => (
-    s.activeTabId === tabId ? stepHistory(withActiveHistory(s, before), delta) : {}
+    s.activeTabId === tabId && heldHistory ? stepHistory(withActiveHistory(s, heldHistory), delta) : {}
   )));
 }
 
@@ -450,12 +460,22 @@ export const useUIStore = create<UIState>((set, get) => ({
     });
   },
 
-  retypeEntryViews: (id, from, to) => set((s) => {
+  retypeEntryViews: (id, from, to, { endEdit = false } = {}) => set((s) => {
     const retype = (view: ActiveView): ActiveView => (view.type === from && view.id === id ? { ...view, type: to } : view);
     const retypeHistory = (history: NavHistory): NavHistory => ({ ...history, views: history.views.map(retype) });
-    const tabs = s.tabs.map((tab) => ({ ...tab, view: retype(tab.view), history: retypeHistory(tab.history) }));
+    // Nur die offene Seite, und nur wenn sie dieser Eintrag ist.
+    const open = (view: ActiveView): ActiveView => {
+      const next = retype(view);
+      return endEdit && next !== view ? { type: to, id, mode: 'view' } : next;
+    };
+    const tabs = s.tabs.map((tab) => ({
+      ...tab,
+      view: tab.id === s.activeTabId ? open(tab.view) : retype(tab.view),
+      history: retypeHistory(tab.history),
+    }));
     saveTabs(tabs, s.activeTabId);
-    return { tabs, activeView: retype(s.activeView), tablessHistory: retypeHistory(s.tablessHistory) };
+    if (heldHistory) heldHistory = retypeHistory(heldHistory);
+    return { tabs, activeView: open(s.activeView), tablessHistory: retypeHistory(s.tablessHistory) };
   }),
 
   // Ein neuer Tab beginnt mit einem frischen Verlauf.

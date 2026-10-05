@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Trash2, Copy, Pencil } from 'lucide-react';
 import ContextMenu from '../ui/ContextMenu';
 import { useUIStore } from '../../store/uiStore';
-import { useEntryEditor } from '../../hooks/useEntryEditor';
+import { REVERTED, useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEditActions } from '../../hooks/useEditActions';
 import { guardKey } from '../../store/leaveGuardStore';
 import { useEntryStore } from '../../store/entryStore';
@@ -155,7 +155,10 @@ export default function JournalView() {
       // Betreten des Edit-Modus gemerkten Stand des Eintrags zurück; die Setter
       // hier fangen den Fall vor dem ersten Autosave ab (Store unverändert,
       // Sync-Effekte laufen nicht).
-      const from = (await restoreOnCancel()) ?? fieldsOf(entry);
+      const restored = await restoreOnCancel();
+      // Ein Typwechsel ist zurückgenommen: der Eintrag steht wieder in seinem Modul, schon im Lesen.
+      if (restored === REVERTED) return;
+      const from = restored ?? fieldsOf(entry);
       setTitle(from.title);
       setTags(from.tags);
       contentRef.current = from.content;

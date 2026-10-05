@@ -14,6 +14,10 @@
  * Der Inhalt bleibt, wie er ist: ein Standard greift nur beim Anlegen. Die
  * Vorlagen des neuen Typs stehen danach zum Einsetzen von Hand bereit.
  *
+ * Ein Wechsel mitten im Bearbeiten gehört zur Bearbeitung: ihr Ausgangsstand
+ * zieht mit (`store/entryEdit.ts`), und Cancel bringt den Eintrag auf demselben
+ * Weg zurück (`revertEntryType`) — in sein Modul, mit seiner alten Nummer.
+ *
  * Ohne Transaktion (siehe `normalizeSchema.ts`): erst die Zeile, dann die
  * Verweise. Bricht es dazwischen ab, zeigen schlimmstenfalls einzelne Chips
  * noch den alten Typ — der Eintrag selbst ist nie doppelt und nie weg (bis v48
@@ -30,6 +34,7 @@ import { serialKey, serialized } from './serialize';
 import { viewTypeForEntryType } from './modules';
 import { remapDefinitionDefaults } from './blocks/definitions';
 import { hasOwnTitle } from './entryTitle';
+import { carryBaseline, editOrigin, type EditOrigin } from '../store/entryEdit';
 import { mapEntries, useEntryStore, withAddedEntry, withoutIds } from '../store/entryStore';
 import { useTaskStore } from '../store/taskStore';
 import { useTemplateStore } from '../store/templateStore';
@@ -52,21 +57,52 @@ export function typeChangeDropsProperties(entry: Pick<EntryCore, 'category_id' |
   return to === 'journal' && !!(entry.category_id || entry.icon || entry.cover_image);
 }
 
-/** Gibt der Zeile den neuen Typ — samt Nummer in dessen Zählung und den Feldern aus `core`. */
-async function retypeRow(db: Database, to: ConvertibleEntryType, core: EntryCore): Promise<Entry> {
+/** Was Cancel aus dem Ausgangsstand einer Bearbeitung zurückschreibt — das Journal hält nur die ersten drei. */
+export type RevertFields = Partial<Pick<Entry, 'title' | 'content' | 'tags' | 'category_id' | 'icon' | 'cover_image'>>;
+
+/** Die Rücknahme eines Typwechsels: wohin, und mit welchem Stand. */
+interface Revert {
+  origin: EditOrigin;
+  fields: RevertFields;
+  /** „Zuletzt geändert" vom Beginn der Bearbeitung. */
+  stamp: string | undefined;
+}
+
+/**
+ * Die Nummer, die ein Eintrag in `type` schon einmal hatte — oder die nächste,
+ * wenn sie inzwischen ein anderer trägt (`nextEntryNumber` zählt vom höchsten
+ * Wert weiter, und der war vielleicht dieser Eintrag).
+ */
+async function formerEntryNumber(db: Database, type: ConvertibleEntryType, id: string, former: number | undefined): Promise<number> {
+  if (former !== undefined) {
+    const taken = await db.select<{ id: string }[]>(
+      'SELECT id FROM entries WHERE type=$1 AND entry_number=$2 AND id<>$3 LIMIT 1', [type, former, id]
+    );
+    if (!taken.length) return former;
+  }
+  return nextEntryNumber(db, type);
+}
+
+/**
+ * Gibt der Zeile den neuen Typ — samt den Feldern aus `core` und einer Nummer
+ * in dessen Zählung: der von `former`, wenn der Eintrag dorthin zurückkehrt.
+ */
+async function retypeRow(
+  db: Database, to: ConvertibleEntryType, core: EntryCore, former?: EditOrigin, stamp?: string,
+): Promise<Entry> {
   const entry: Entry = {
     ...core,
     type: to,
-    entry_number: await nextEntryNumber(db, to),
-    updated_at: nowIso(),
+    entry_number: former ? await formerEntryNumber(db, to, core.id, former.entry_number) : await nextEntryNumber(db, to),
+    updated_at: stamp ?? nowIso(),
     deleted_at: null,
   };
   await db.execute(
     `UPDATE entries
-        SET type=$1, entry_number=$2, title=$3, content=$4, category_id=$5, icon=$6, cover_image=$7, updated_at=$8
+        SET type=$1, entry_number=$2, title=$3, content=$4, category_id=$5, icon=$6, cover_image=$7, updated_at=$8, tags=$10
       WHERE id=$9`,
     [to, entry.entry_number, entry.title, entry.content, entry.category_id, entry.icon ?? null, entry.cover_image ?? null,
-      entry.updated_at, entry.id]
+      entry.updated_at, entry.id, JSON.stringify(entry.tags)]
   );
   return entry;
 }
@@ -107,27 +143,53 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
   await useUIStore.getState().editActions?.flush?.();
   // Der Inhalt zieht mit — auch bei einem Eintrag, der seit dem Start nie offen war.
   await useEntryStore.getState().ensureEntryContent(id);
+  await retypeEntry(id, from, to);
+}
 
-  await serialized(serialKey('entry', id), async () => {
+/**
+ * Nimmt die Typwechsel einer Bearbeitung zurück: der Eintrag `id`, gerade vom
+ * Typ `from`, wird wieder, was er beim Betreten war — Typ und Nummer aus
+ * `origin`, die Felder aus dem Ausgangsstand, „Zuletzt geändert" eingeschlossen.
+ * Die offene Seite steht danach im Lesen. Ohne Flush: die laufende Eingabe
+ * wird ja verworfen. `false`, wenn es den Eintrag unter `from` nicht mehr gibt.
+ */
+export function revertEntryType(
+  id: string, from: ConvertibleEntryType, origin: EditOrigin, fields: RevertFields, stamp: string | undefined,
+): Promise<boolean> {
+  return retypeEntry(id, from, origin.type, { origin, fields, stamp });
+}
+
+/**
+ * Der eine Weg in beide Richtungen: die Zeile, dann alles, was den Eintrag
+ * über `(id, Typ)` adressiert. Mit `revert` kommen die Felder aus dem
+ * Ausgangsstand statt aus dem Store, und die Bearbeitung endet.
+ */
+function retypeEntry(id: string, from: ConvertibleEntryType, to: ConvertibleEntryType, revert?: Revert): Promise<boolean> {
+  return serialized(serialKey('entry', id), async () => {
     const source = useEntryStore.getState().getEntry(id, from);
-    if (!source) return;
+    if (!source) return false;
     const db = await getDb();
 
+    const kept = { ...source, ...revert?.fields };
     const core: EntryCore = {
       id: source.id,
-      tags: source.tags,
+      tags: kept.tags,
       created_at: source.created_at,
-      category_id: source.category_id,
-      icon: source.icon,
-      cover_image: source.cover_image,
+      category_id: kept.category_id,
+      icon: kept.icon,
+      cover_image: kept.cover_image,
       // Ein unbenannter Eintrag heißt danach wie ein unbenannter des neuen Typs.
       // Ohne eigenen Titel bleibt er leer — „Unbenannt…" zeigt die neue Art von selbst.
-      title: hasOwnTitle(source.title) ? source.title : '',
+      // Der Ausgangsstand dagegen kommt zurück, wie er war.
+      title: (revert || hasOwnTitle(kept.title)) ? kept.title : '',
       // Ein Link des Eintrags auf sich selbst zieht mit.
-      content: retypeInternalLinks(source.content, id, to),
+      content: retypeInternalLinks(kept.content, id, to),
       ...(to === 'journal' ? { category_id: null, icon: undefined, cover_image: undefined } : {}),
     };
-    const converted = await retypeRow(db, to, core);
+    // Zurück zum Typ vom Beginn der Bearbeitung — über Cancel oder von Hand —
+    // bekommt der Eintrag seine Nummer von damals wieder.
+    const origin = revert?.origin ?? editOrigin(id, from);
+    const converted = await retypeRow(db, to, core, origin?.type === to ? origin : undefined, revert?.stamp);
 
     const entryContent = await retypeContentColumn(db, 'entries', id, to);
     const templateContent = await retypeContentColumn(db, 'templates', id, to);
@@ -155,7 +217,10 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
     // wechselt, und der alte verschwindet erst mit ihr — kein Frame, in dem
     // der offene Tab auf einen Eintrag zeigt, den es nicht gibt.
     useEntryStore.setState((s) => ({ entries: withAddedEntry(s.entries, converted) }));
-    useUIStore.getState().retypeEntryViews(id, viewTypeForEntryType(from), viewTypeForEntryType(to));
+    // Der Ausgangsstand der Bearbeitung zieht mit, bevor die Tabs es tun; nach
+    // einer Rücknahme ist sie zu Ende, und er verfällt mit dem Wechsel ins Lesen.
+    if (!revert) carryBaseline(id, from, to, { type: from, entry_number: source.entry_number });
+    useUIStore.getState().retypeEntryViews(id, viewTypeForEntryType(from), viewTypeForEntryType(to), { endEdit: !!revert });
     useEntryStore.setState((s) => ({
       entries: mapEntries(s.entries, (list, type) => {
         const next = withContent(list, entryContent);
@@ -170,5 +235,6 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
       links: s.links.map((link) => (link.target_id === id ? { ...link, target_type: to } : link)),
     }));
     if (definitionsChanged) void useBlockDefinitionStore.getState().fetchDefinitions();
+    return true;
   });
 }
