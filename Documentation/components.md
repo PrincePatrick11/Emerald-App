@@ -259,7 +259,7 @@ The editor helpers `BlockStack` composes live in `src/components/editor/`: `edit
 
 **Infrastructure**
 
-- **`lib/serialize.ts`** — `serialized(serialKey(domain, id), task)` chains same-key async tasks, so a store's read-merge-write update never runs against a stale snapshot. `drainSerialized()` awaits every queued chain (vault switch, replace/add-vault import). See [Store Write Serialization](architecture.md#store-write-serialization).
+- **`lib/serialize.ts`** — `serialized(serialKey(domain, id), task)` chains same-key async tasks, so a store's read-merge-write update never runs against a stale snapshot. `drainSerialized()` awaits every queued chain (vault switch, replace/add-vault import, each automatic backup run). See [Store Write Serialization](architecture.md#store-write-serialization).
 - **`lib/reveal.ts`** — `scrollIntoViewCentered(el)` (reduced-motion aware) and `flashReveal(el, className, ms)`: the "here it is" scroll-and-flash of the link chip and the block stack's jump-to.
 - **`lib/motion.ts`** — `REORDER_SPRING`, the one spring for framer-motion `Reorder` lists (tab bar, block stack, the builder's field list). The block manager and the altar's placed elements reorder without animation via `usePointerReorder`.
 - **`lib/dragChannel.ts`** — `createDragChannel<T>()`, the set/get/subscribe pub-sub behind `dragState`/`altarDragState`.

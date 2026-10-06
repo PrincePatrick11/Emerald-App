@@ -491,7 +491,7 @@ Independently of the version, journal rows with the old fields go through `liftL
 
 ### Export
 
-`buildBackup(options)` builds the payload; `exportDatabase()` wraps it for the manual export, and the automatic backup calls it with `FULL_BACKUP_OPTIONS` (every module, the Trash and settings, no date range) — see [Automatic Backup](architecture/storage.md#automatic-backup).
+`buildBackup(options)` builds the payload; `exportDatabase()` wraps it for the manual export, and the automatic backup calls it with `FULL_BACKUP_OPTIONS` (every module, the Trash and settings, no date range) — see [Automatic Backup](architecture/storage.md#automatic-backup). A `category_id` whose category is missing from the categories list read in the same run is exported as `null`: deleting or merging a category runs over several statements, and a payload caught in between would be refused on import.
 
 **Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Altars / Tasks / Tags / Lexicon`, `dateFrom`, `dateTo`, `includeDeleted`, `includeSettings`. There is no templates toggle. The seven content-type keys and their labels are `CONTENT_TYPES` in `dbBackup.ts`, shared by the export and the import page.
 

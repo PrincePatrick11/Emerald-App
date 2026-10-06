@@ -192,7 +192,7 @@ Every content-store update method (`updateEntry`, `updateTask`/`toggleComplete`,
 
 Deliberately not serialized, each with a comment at its definition: `bumpAltarUpdatedAt` (writes only `updated_at`) and `updateCategory` (writes only the columns passed in, no snapshot merge).
 
-A serialized task must never await another task under its own key — it would wait on itself — and the chain carries no timeout, so a task that never settles occupies its key permanently. `drainSerialized()` resolves once every currently-queued chain has settled. `vaultStore.openActiveVault`, `dbBackup.importDatabase` (all modes) and `resolveOpenEdits` (`lib/openEdits.ts`) await it before swapping the database underneath the stores: the editor lock ([`editing.md`](architecture/editing.md#auto-save-the-useentryeditor-hook)) only stops *future* saves, so writes already in flight must finish first.
+A serialized task must never await another task under its own key — it would wait on itself — and the chain carries no timeout, so a task that never settles occupies its key permanently. `drainSerialized()` resolves once every currently-queued chain has settled. `vaultStore.openActiveVault`, `dbBackup.importDatabase` (all modes), `autoBackup.runAutoBackup` (before it reads the database) and `resolveOpenEdits` (`lib/openEdits.ts`) await it before swapping the database underneath the stores: the editor lock ([`editing.md`](architecture/editing.md#auto-save-the-useentryeditor-hook)) only stops *future* saves, so writes already in flight must finish first.
 
 ### Code splitting
 
