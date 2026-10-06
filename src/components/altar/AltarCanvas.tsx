@@ -23,6 +23,7 @@ import type { AltarItem, AltarPlacement, AltarRecord } from '../../types';
 import { AltarItemVisual } from './AltarItemVisual';
 import { canvasImageSrc } from '../../lib/images';
 import { THUMBNAIL_W, canvasToCappedThumbnail } from '../../lib/thumbnail';
+import { isHistoryButton } from '../../lib/mouseButtons';
 
 const BASE_SIZE = 40;
 /** Ab so viel Weg wird aus einem Druck auf ein Element ein Ziehen. */
@@ -456,8 +457,7 @@ export function AltarCanvas({
       ref={canvasRef}
       className="w-full h-full relative overflow-hidden select-none"
       style={{ background: getBackgroundStyle(altar, backgroundSrc) }}
-      // Die Daumentasten der Maus (3/4) blättern im Verlauf und greifen hier nichts.
-      onMouseDown={(e) => { if (e.button <= 2) selectPlacement(null); }}
+      onMouseDown={(e) => { if (!isHistoryButton(e)) selectPlacement(null); }}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
@@ -548,7 +548,7 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rot
   const tooltipTopOffset = -Math.round(75 / safeScale);
 
   const startRotate = (event: React.MouseEvent) => {
-    if (!editable || placement.locked) return;
+    if (!editable || placement.locked || isHistoryButton(event)) return;
     event.preventDefault();
     event.stopPropagation();
     onSelect(placement.id);
@@ -581,7 +581,7 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rot
   };
 
   const startResize = (event: React.MouseEvent) => {
-    if (!editable || placement.locked) return;
+    if (!editable || placement.locked || isHistoryButton(event)) return;
     event.preventDefault();
     event.stopPropagation();
     onSelect(placement.id);
@@ -623,7 +623,7 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rot
       }}
       onMouseDown={(e) => {
         e.stopPropagation();
-        if (placement.locked || e.button > 2) return;
+        if (placement.locked || isHistoryButton(e)) return;
         onSelect(placement.id);
         if (!editable) return;
         e.preventDefault();

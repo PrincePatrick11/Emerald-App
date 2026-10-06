@@ -10,6 +10,7 @@ import type { AltarItem } from '../../types';
 import Button from '../ui/Button';
 import { AltarItemModal } from './AltarItemModal';
 import { AltarItemTile } from './AltarItemTile';
+import { isHistoryButton } from '../../lib/mouseButtons';
 
 const LIBRARY_DEFAULT_HEIGHT = 240;
 
@@ -61,6 +62,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
   const openEditModal = (item: AltarItem) => { setEditingItem(item); setIsItemModalOpen(true); };
 
   const startResize = (event: React.MouseEvent) => {
+    if (isHistoryButton(event)) return;
     event.preventDefault();
     setIsResizing(true);
     document.body.style.cursor = 'ns-resize';

@@ -340,8 +340,8 @@ let heldHistory: NavHistory | null = null;
  * er den Eintrag weiter unter dem verworfenen Typ.
  */
 function stepGuarded(delta: -1 | 1): void {
-  // Ein Schritt ins Leere fragt auch nicht: die Pfeile sind dort grau, die
-  // Maustasten kommen trotzdem an.
+  // Ein Schritt ins Leere fragt nicht nach ungesicherten Änderungen: die
+  // Pfeile sind dort grau, die Maustasten kommen trotzdem an.
   const { views, index } = selectActiveHistory(useUIStore.getState());
   if (index + delta < 0 || index + delta >= views.length) return;
   const tabId = useUIStore.getState().activeTabId;

@@ -92,6 +92,7 @@ src/
 │   ├── useDraftPage.ts          draft lifecycle of block/template pages
 │   ├── useGlobalSearch.ts, useDeepLink.ts, useLinkItems.ts
 │   ├── useOutsideClick.ts, useCloseOnKeepEditing.ts
+│   ├── useMouseNavigation.ts    mouse back/forward buttons, browser keys
 │   ├── useCollapsedSet.ts, usePersistedFlag.ts, usePointerReorder.ts
 │   ├── useOpenInNewTabAction.tsx, useSaveAsTemplateAction.tsx
 │   └── useDisplayedAltar.ts, useShrunkIcon.ts, useEmojiSearchData.ts

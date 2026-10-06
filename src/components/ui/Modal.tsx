@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import Button from './Button';
 import { usesCustomWindowControls } from '../../lib/platform';
+import { isHistoryButton } from '../../lib/mouseButtons';
 
 interface ModalProps {
   title: string;
@@ -69,7 +70,8 @@ export default function Modal({
     <div
       className={`fixed inset-x-0 bottom-0 ${clearsTitleBar ? 'top-10' : 'top-0'} z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4`}
       onMouseDown={(e) => {
-        if (dismissible && e.target === e.currentTarget) onClose();
+        // Eine Daumentaste schlösse sonst das Modal — und blätterte beim Loslassen.
+        if (dismissible && !isHistoryButton(e) && e.target === e.currentTarget) onClose();
       }}
     >
       <div

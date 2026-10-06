@@ -1,11 +1,10 @@
 import { useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { isMacOS, isTauri } from '../lib/platform';
+import { HISTORY_BUTTON_STEPS, isHistoryButton } from '../lib/mouseButtons';
 import { hasOpenModal } from '../components/ui/Modal';
 import { isAltarFullscreen, useUIStore } from '../store/uiStore';
 
-/** `MouseEvent.button` der Daumentasten: 3 ist zurück, 4 ist vor. */
-const MOUSE_STEPS: Partial<Record<number, -1 | 1>> = { 3: -1, 4: 1 };
 /** Multimedia-Tastaturen — und Maustreiber, die statt eines Klicks diese Tasten senden. */
 const KEY_STEPS: Partial<Record<string, -1 | 1>> = { BrowserBack: -1, BrowserForward: 1 };
 
@@ -29,6 +28,9 @@ function step(delta: -1 | 1): void {
  * an `auxclick` oder `pointerup`. macOS meldet sie aus Rust
  * (`install_mouse_nav_monitor`): Treiber wie Logi Options+ machen dort
  * Wischgesten aus den Tasten, die als DOM-Ereignis nie ankommen.
+ *
+ * Dazu die Tasten „Browser zurück/vor" der Tastatur, auf jeder Plattform. Kein
+ * Weg blättert über einem Modal oder im Vollfenster des Altars.
  */
 export function useMouseNavigation(): void {
   useEffect(() => {
@@ -61,15 +63,15 @@ export function useMouseNavigation(): void {
     // Strich auf der Sigille. Nur anhalten, nicht `preventDefault`: das nähme
     // dem Druck die Mausereignisse, an denen der Schritt hängt.
     const onPointerDown = (e: PointerEvent) => {
-      if (MOUSE_STEPS[e.button]) e.stopPropagation();
+      if (isHistoryButton(e)) e.stopPropagation();
     };
-    // Auch der Druck selbst wird geschluckt: er setzte sonst den Fokus um, und
-    // der WebView ginge beim Loslassen in seinem eigenen Verlauf zurück.
+    // Der Druck abgebrochen, damit er den Fokus nicht umsetzt; das Loslassen,
+    // damit der WebView nicht in seinem eigenen Verlauf zurückgeht.
     const onMouseDown = (e: MouseEvent) => {
-      if (MOUSE_STEPS[e.button]) e.preventDefault();
+      if (isHistoryButton(e)) e.preventDefault();
     };
     const onMouseUp = (e: MouseEvent) => {
-      const delta = MOUSE_STEPS[e.button];
+      const delta = HISTORY_BUTTON_STEPS[e.button];
       if (!delta) return;
       e.preventDefault();
       step(delta);
