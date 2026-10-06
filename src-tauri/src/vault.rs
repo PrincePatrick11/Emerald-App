@@ -1068,11 +1068,16 @@ fn sync_refusal_is_harmless(error: &std::io::Error) -> bool {
     // ENOTTY: was ein Dateisystem antwortet, das den Flush-Aufruf nicht kennt.
     // Dieselbe Zahl unter Linux und macOS; unter Windows hieße 25 etwas anderes.
     const ENOTTY: i32 = 25;
+    // macOS: ENOTSUP (45) ist dort nicht EOPNOTSUPP (102), und std bildet nur
+    // EOPNOTSUPP und ENOSYS auf `Unsupported` ab. So antwortet F_FULLFSYNC —
+    // das ist `sync_all` unter macOS — auf einer SMB-Freigabe.
+    const MACOS_ENOTSUP: i32 = 45;
     // ERROR_INVALID_FUNCTION, ERROR_NOT_SUPPORTED.
     const WINDOWS_NOT_SUPPORTED: [i32; 2] = [1, 50];
     // InvalidInput: EINVAL — so antwortet `fsync`, wenn das Ziel kein Synchronisieren kennt.
     matches!(error.kind(), ErrorKind::Unsupported | ErrorKind::InvalidInput)
         || (cfg!(unix) && error.raw_os_error() == Some(ENOTTY))
+        || (cfg!(target_os = "macos") && error.raw_os_error() == Some(MACOS_ENOTSUP))
         || (cfg!(windows) && error.raw_os_error().is_some_and(|code| WINDOWS_NOT_SUPPORTED.contains(&code)))
 }
 
@@ -1511,6 +1516,27 @@ mod tests {
         assert!(sync_refusal_is_harmless(&Error::from(ErrorKind::InvalidInput)));
         for kind in [ErrorKind::StorageFull, ErrorKind::QuotaExceeded, ErrorKind::PermissionDenied, ErrorKind::Other] {
             assert!(!sync_refusal_is_harmless(&Error::from(kind)), "{kind:?}");
+        }
+
+        // Die Betriebssystem-Codes selbst — sie hängen daran, wie std sie auf
+        // `ErrorKind` abbildet, und das soll hier rot werden, nicht beim Nutzer.
+        let harmless = |code: i32| sync_refusal_is_harmless(&Error::from_raw_os_error(code));
+        #[cfg(unix)]
+        {
+            // ENOTTY, EINVAL — und nicht: EIO, ENOSPC.
+            assert!(harmless(25) && harmless(22));
+            assert!(!harmless(5) && !harmless(28));
+        }
+        #[cfg(target_os = "macos")]
+        assert!(harmless(45) && harmless(102)); // ENOTSUP, EOPNOTSUPP
+        #[cfg(target_os = "linux")]
+        assert!(harmless(95) && harmless(38)); // EOPNOTSUPP, ENOSYS
+        #[cfg(windows)]
+        {
+            // ERROR_INVALID_FUNCTION, ERROR_NOT_SUPPORTED, ERROR_CALL_NOT_IMPLEMENTED —
+            // und nicht: ERROR_DISK_FULL, ERROR_NETNAME_DELETED.
+            assert!(harmless(1) && harmless(50) && harmless(120));
+            assert!(!harmless(112) && !harmless(64));
         }
     }
 

@@ -35,7 +35,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 
 ## Command Surface
 
-`src-tauri/src/lib.rs` registers **58 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
+`src-tauri/src/lib.rs` registers **59 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
 
 | Command | Defined in | Notes |
 |---|---|---|
@@ -124,7 +124,7 @@ A vault is a directory the user picks, and it may sit outside every fixed user r
 
 The cost: `write_file` / `read_file` / `export_image` / `copy_image_file` stay confined to the fixed roots, so a manually saved backup file or Markdown export cannot be written into — or read out of — a vault folder outside them. The automatic backup is the deliberate exception, see [Automatic Backups](#automatic-backups). Opening, using and deleting such a vault works in full.
 
-The fixed roots include `document_dir()` and `app_data_dir()`, so a vault at its default location (`{documentDir}/Emerald Vaults/{name}`, see [Vault Layout](architecture/storage.md#vault-layout)) and its `backup/` folder sit *inside* them, as does the migration target `{appDataDir}/vaults/{id}`. For a vault *outside* the roots, `ensure_backup_dir` refuses up front — offering a default there would only have `write_file` refuse the write a moment later — and the export dialog falls back to a plain filename.
+The fixed roots include `document_dir()` and `app_data_dir()`, so a vault at its default location (`{documentDir}/Emerald Vaults/{name}`, see [Vault Layout](architecture/storage.md#vault-layout)) and its `backup/` folder sit *inside* them, as does the migration target `{appDataDir}/vaults/{id}`. For a vault *outside* the roots — and likewise for one inside the app data directory but outside `vaults/` — `ensure_backup_dir` refuses up front — offering a default there would only have `write_file` refuse the write a moment later — and the export dialog falls back to a plain filename.
 
 ### Automatic Backups
 

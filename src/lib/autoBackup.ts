@@ -16,8 +16,9 @@ import { useAutoBackupStore, type AutoBackupError, type AutoBackupStatus } from 
  * Einen Hintergrunddienst gibt es nicht — geprüft wird, während die App offen
  * und der Vault entsperrt ist: kurz nach dem Öffnen eines Vaults, nach jeder
  * Änderung der Einstellung oder des Ordners, danach stündlich — und noch
- * einmal, wenn ein Versuch auf einen laufenden Lauf oder Import traf. Wohin geschrieben wird und
- * unter welchem Namen, entscheidet allein `auto_backup.rs`; von hier geht nie
+ * einmal, wenn ein Versuch auf einen laufenden Lauf, einen Import oder einen
+ * Typwechsel traf. Wohin geschrieben wird und unter welchem Namen, entscheidet
+ * allein `auto_backup.rs`; von hier geht nie
  * ein Pfad hinüber.
  */
 
@@ -125,7 +126,8 @@ export async function runAutoBackup({ force = false }: { force?: boolean } = {})
   if (useAutoBackupStore.getState().running || editorSavesSuspended()) return 'busy';
   // Ein Typwechsel oder ein Abbrechen, das einen zurücknimmt, schreibt über
   // mehrere Tabellen und reiht das erst nach eigenen awaits ein — `drainSerialized`
-  // unten sähe es noch nicht. Die Bearbeitungssperre deckt die ganze Strecke.
+  // unten sähe es noch nicht. Die Bearbeitungssperre deckt die ganze Strecke
+  // (sie hält jedes Abbrechen, auch das einfache).
   if (useUIStore.getState().editLocked) return 'busy';
 
   // Zählt jedes Schließen oder Ersetzen der Datenbank mit (`dbEpoch`): ein Passwortwechsel
@@ -133,12 +135,15 @@ export async function runAutoBackup({ force = false }: { force?: boolean } = {})
   // und das Backup enthielte nur, was vor dem Austausch gelesen wurde.
   const epoch = dbEpoch();
   const lockEpoch = editLockEpoch();
-  /** Der Vault ist noch derselbe und nichts hat die Datenbank unter dem Lauf ausgetauscht. */
+  /** Der Vault ist noch derselbe, und was gelesen wurde, ist aus einem Guss. */
   const stillCurrent = () => {
     const now = useVaultStore.getState();
-    return now.activeVaultId === vaultId && !now.locked && !editorSavesSuspended() && dbEpoch() === epoch
-      // Auch eine Sperre, die mitten im Lauf begann und endete: der Stand wäre halb umgeschrieben.
-      && !useUIStore.getState().editLocked && editLockEpoch() === lockEpoch;
+    const sameVault = now.activeVaultId === vaultId && !now.locked;
+    const sameDb = !editorSavesSuspended() && dbEpoch() === epoch;
+    // Der Zähler ist die eigentliche Probe: er fängt auch eine Sperre, die mitten
+    // im Lauf begann und endete — der Stand wäre dann halb umgeschrieben.
+    const noEditLock = !useUIStore.getState().editLocked && editLockEpoch() === lockEpoch;
+    return sameVault && sameDb && noEditLock;
   };
 
   useAutoBackupStore.setState({ running: true });
@@ -162,8 +167,8 @@ export async function runAutoBackup({ force = false }: { force?: boolean } = {})
     await refreshAutoBackupStatus(vaultId);
     return 'done';
   } catch (err) {
-    // Gesperrt, gewechselt, mitten im Import oder Passwortwechsel: kein Fehler,
-    // der nächste Versuch findet wieder eine Datenbank vor.
+    // Vault gesperrt oder gewechselt, mitten im Import, Passwort- oder
+    // Typwechsel: kein Fehler, der nächste Versuch liest wieder einen ruhigen Stand.
     if (!stillCurrent() || keyErrorOf(err).includes(DB_CLOSED)) return 'busy';
     console.error('[auto-backup] failed', err);
     setError(vaultId, keyErrorOf(err).includes(DIR_MISSING) ? 'dirMissing' : 'failed');
@@ -200,8 +205,8 @@ export function startAutoBackup(): () => void {
     clearTimeout(timer);
     timer = setTimeout(check, SETTLE_MS);
   };
-  // Ein Auslöser, der auf einen laufenden Lauf oder einen Import trifft, ginge
-  // sonst verloren — bis zur nächsten vollen Stunde.
+  // Ein Auslöser, der auf einen laufenden Lauf, einen Import oder einen
+  // Typwechsel trifft, ginge sonst verloren — bis zur nächsten vollen Stunde.
   const check = () => void runAutoBackup().then((outcome) => { if (outcome === 'busy') schedule(); });
   const unsubscribe = useSettingsStore.subscribe((state, prev) => {
     if (state.vaultId !== prev.vaultId || state.settings.backup !== prev.settings.backup) schedule();

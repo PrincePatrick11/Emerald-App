@@ -734,6 +734,18 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
     options.includeJournal || options.includeWiki || options.includeOperations || options.includeTasks || options.includeAltars
   ) {
     data.categories = await db.select<Row[]>(`SELECT * FROM categories`);
+    // Die Kategorien werden nach ihren Inhalten gelesen, und das Löschen oder
+    // Zusammenführen einer Kategorie läuft über mehrere Anweisungen ohne
+    // Transaktion. Fiele es genau dazwischen, trüge ein Inhalt eine Kategorie,
+    // die in der Datei fehlt — und der Import lehnte die ganze Sicherung ab
+    // (`assertPayloadReferencesResolve`). „Ohne Kategorie" ist das, was das
+    // Löschen aus diesen Zeilen ohnehin macht.
+    const known = new Set(data.categories.map((c) => String(c.id)));
+    for (const rows of [data.entries, data.altars, data.altarItems, data.tasks]) {
+      for (const row of rows ?? []) {
+        if (row.category_id != null && !known.has(String(row.category_id))) row.category_id = null;
+      }
+    }
   }
 
   // ── Eigene Blöcke ────────────────────────────────────────────────────────
