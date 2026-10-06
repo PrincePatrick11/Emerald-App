@@ -4,6 +4,7 @@ import { Fragment, Suspense, lazy, useEffect, useState } from 'react';
 import { AUX_VIEWS, MODULE_LIST, type ViewId } from '../../lib/modules';
 import { useUIStore } from '../../store/uiStore';
 import { useVaultStore } from '../../store/vaultStore';
+import { useAutoBackupStore } from '../../store/autoBackupStore';
 import { asUpdateError, checkForUpdate, updateSettings } from '../../lib/updates';
 import VaultModal, { VaultGlyph } from './VaultModal';
 
@@ -60,12 +61,16 @@ export default function LeftSidebarRail() {
   // Selector auf ein Primitiv, nicht auf den Vault-Datensatz: `find` liefert
   // sonst bei jedem Store-Update ein Objekt, das zustand als geaendert liest.
   const activeVaultIcon = useVaultStore((s) => s.vaults.find((v) => v.id === s.activeVaultId)?.icon);
+  const activeVaultId = useVaultStore((s) => s.activeVaultId);
 
   // Die Pruefung beim Start haengt hier und nicht in App.tsx, weil ihr einziges
   // sichtbares Ergebnis der Punkt am Zahnrad darunter ist. Gefunden oder nicht:
   // sie meldet sich nie von selbst — ein Fenster, das ungefragt aufgeht, waere
   // die Art Unterbrechung, die eine lokale App nicht haben soll.
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+  // Ein gescheitertes automatisches Backup meldet sich am selben Punkt: still
+  // scheitern dürfte es am wenigsten. Das Update geht vor, es ist die seltenere Nachricht.
+  const backupFailed = useAutoBackupStore((s) => s.error !== null && !s.errorSeen && s.vaultId === activeVaultId);
   useEffect(() => {
     let dead = false;
     void checkOnStart().then((version) => {
@@ -136,20 +141,25 @@ export default function LeftSidebarRail() {
           // das Fenster wieder auf „Allgemein" aufginge, weil beide
           // Zustandsaenderungen im selben Rendern landen.
           onClick={() => {
-            setSettingsPage(updateVersion ? 'updates' : 'general');
+            setSettingsPage(updateVersion ? 'updates' : backupFailed ? 'backup' : 'general');
             setSettingsOpen(true);
             setUpdateVersion(null);
             if (updateVersion) dotSeen = true;
+            else if (backupFailed) useAutoBackupStore.setState({ errorSeen: true });
           }}
-          title={updateVersion ? t('settings.updateFound', { version: updateVersion }) : t('nav.settings')}
+          title={
+            updateVersion ? t('settings.updateFound', { version: updateVersion })
+              : backupFailed ? t('settings.autoBackupFailedDot')
+                : t('nav.settings')
+          }
           className="relative"
         >
           <Settings size={18} />
-          {updateVersion && (
+          {(updateVersion || backupFailed) && (
             <span
               aria-hidden
               className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: 'var(--accent)' }}
+              style={{ backgroundColor: updateVersion ? 'var(--accent)' : 'var(--danger-text)' }}
             />
           )}
         </RailButton>

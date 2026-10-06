@@ -21,7 +21,7 @@ A vault is a directory holding:
 - `emerald.db` — the SQLCipher database
 - `vault.key` — the vault key, wrapped by the password and by the recovery key, see [`encryption.md`](encryption.md#keys)
 - `images/` — sealed image files
-- `backup/`
+- `backup/` — where the export dialog opens and where automatic backups go unless another folder was picked
 - `settings.json` — the vault's settings, see [Vault Settings](#vault-settings); the only file in the folder that is not encrypted
 - `drafts.json` — only while a block or template page holds unsaved edits; sealed
 - `emerald.db.pre-vNN.bak` — the full copy a rebuilding migration takes first; `prune_migration_backups` keeps only the newest once the vault has opened
@@ -81,11 +81,21 @@ Before per-vault directories, vaults were flat files — `emerald.db` and `emera
 
 Settings are **per vault**, in the vault's `settings.json`; a new vault starts with factory defaults. How settings travel in a backup is in [`database.md` → DB Backup / Restore](../database.md#db-backup--restore-emeralddb); the settings-page building blocks are in [`components.md`](../components.md).
 
-- **`lib/vaultSettings.ts`** defines `VaultSettings` as independent groups (`appearance`, `trash`, `leftList`, `emojis`, `images`, `tags`, `templates`, `editor`, `journal`) and `normalizeVaultSettings()`, which turns any JSON (the file, a backup) into a trusted value: unknown keys are kept for newer builds, invalid values fall back to their default.
+- **`lib/vaultSettings.ts`** defines `VaultSettings` as independent groups (`appearance`, `trash`, `leftList`, `emojis`, `images`, `tags`, `templates`, `editor`, `journal`, `backup`) and `normalizeVaultSettings()`, which turns any JSON (the file, a backup) into a trusted value: unknown keys are kept for newer builds, invalid values fall back to their default.
 - **`editor`** is what `RichEditor` formats on its own, read once when an editor is created: `Typography` is left out when off, `enableInputRules`/`enablePasteRules` narrow to what stays on, and `Link` loses `autolink`, `linkOnPaste` and its paste rule. **`journal.moonPhase`** decides whether journal entries show their (computed) moon phase — in the list, exports and link chips.
+- **`backup`** is the automatic backup: `auto`, `interval` (`daily`/`weekly`/`monthly`), `weekday` and `keep` (`null` = all). The target folder is deliberately *not* part of it — see [Automatic Backup](#automatic-backup).
 - **`store/settingsStore.ts`** holds the open vault's settings and is the only writer of `settings.json`. `loadForVault(vaultId)` runs **before** `getDb()` opens the database, because migration v39 needs the language that `applyAppearance()` writes into the boot mirror. An unreadable file falls back to defaults but with trash retention "never", so a purge nobody chose cannot run. `clear()` resets to defaults whenever no vault is open. Writes are serialized (`lib/serialize.ts`).
 - **Rust side**: `read_vault_settings`/`write_vault_settings` in `src-tauri/src/vault.rs` move the file's *text* only; the frontend owns the JSON shape. Atomic write (temp file + rename) and symlink handling: see [`security.md`](../security.md#vault-json-files).
 - **The `localStorage` boot mirror** (`APPEARANCE_MIRROR_KEYS` in `vaultSettings.ts`: `app-language`, `theme-id`, `ui-font-id`, `editor-font-id`, `ui-scale`, `editor-font-size`) is what `index.html`'s inline boot script and `main.tsx` read before any vault is open. `applyAppearance()` writes it as a side effect; once a vault has loaded, its settings are the source of truth.
 - **Backups carry the settings** in a separate `settings` field of the `.emeralddb` payload, not gated by `BACKUP_VERSION` since it is not a content shape. See [`database.md` → DB Backup / Restore](../database.md#db-backup--restore-emeralddb).
+
+## Automatic Backup
+
+There is no background service: a backup can only run while the app is open and the vault unlocked.
+
+- **`lib/autoBackup.ts`** — `startAutoBackup()` is started once by `AppShell`. It checks a few seconds after a vault's settings load (`settingsStore` is the trigger, so the start itself is not slowed), after every change of the `backup` group, and hourly for sessions that stay open across midnight. `isBackupDue(settings, newest, today)` works on local calendar days: due means no backup exists since the last scheduled day, so a missed one is caught up and a vault without any backup gets one at once.
+- **The run** (`runAutoBackup`) skips silently unless the active vault is unlocked, its settings are the loaded ones, no import is running (`editorSavesSuspended`) and no other run is under way. It drains pending writes, builds the full payload with `buildBackup(FULL_BACKUP_OPTIONS)` from `lib/dbBackup.ts` (every module, the Trash, settings — loaded dynamically so `dbBackup` stays out of the main chunk), checks that the vault is still the same, and hands the JSON to `write_auto_backup`.
+- **`src-tauri/src/auto_backup.rs`** owns everything about *where*: the target folder (the vault's `backup/`, or the folder picked through its own dialog and kept in `{appDataDir}/auto-backup.json`), the file name `emerald-auto-{vault id prefix}-{YYYY-MM-DD}.emeralddb` — one file per day, a second run replaces it — and pruning down to `keep`. "Last backup" is read from the newest such file in the folder; no timestamp is stored that could disagree with it. The trust reasoning is in [`security.md`](../security.md#automatic-backups).
+- **`store/autoBackupStore.ts`** holds the status, whether a run is under way, and the last failure as a code (`dirMissing`, `failed`). The Backup settings page shows it; the settings gear in the rail carries a dot until the failure has been seen.
 
 List view preferences (sort, grouping, collapsed groups) are not settings: they are kept per vault in `localStorage` by `store/vaultPrefs.ts`, so a click on "Sort" is not a file write.

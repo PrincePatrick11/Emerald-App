@@ -99,20 +99,27 @@ fn backup_path_ok(path: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// The vault's backup `content` (its JSON export), sealed under the vault key.
+/// Fails for a vault that is locked or not encrypted.
+pub(crate) fn seal_for_vault(app: &tauri::AppHandle, vault_id: &str, content: &str) -> Result<Vec<u8>, String> {
+    let dir = crate::vault::vault_dir(app, vault_id)?;
+    let vault_key = keys::key_for(app, vault_id)?.ok_or_else(|| keys::VAULT_NOT_ENCRYPTED.to_string())?;
+    let key_file = keys::read_key_file(&dir)?.ok_or_else(|| keys::VAULT_NOT_ENCRYPTED.to_string())?;
+    if !key_file.accepts(&vault_key) {
+        return Err(keys::VAULT_LOCKED.to_string());
+    }
+    Ok(seal(&key_file, &vault_key, content))
+}
+
 /// Writes the vault's backup `content` (its JSON export) to `path`, sealed
 /// under the vault key.
 #[tauri::command]
 pub async fn write_backup_file(app: tauri::AppHandle, vault_id: String, path: String, content: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         backup_path_ok(&path)?;
-        let dir = crate::vault::vault_dir(&app, &vault_id)?;
-        let vault_key = keys::key_for(&app, &vault_id)?.ok_or_else(|| keys::VAULT_NOT_ENCRYPTED.to_string())?;
-        let key_file = keys::read_key_file(&dir)?.ok_or_else(|| keys::VAULT_NOT_ENCRYPTED.to_string())?;
-        if !key_file.accepts(&vault_key) {
-            return Err(keys::VAULT_LOCKED.to_string());
-        }
+        let sealed = seal_for_vault(&app, &vault_id, &content)?;
         let target = crate::guarded_write_target(&app, &path)?;
-        std::fs::write(target, seal(&key_file, &vault_key, &content)).map_err(|e| e.to_string())
+        std::fs::write(target, sealed).map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| e.to_string())?

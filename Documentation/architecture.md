@@ -73,6 +73,7 @@ src/
 │   ├── templateStore.ts, templateApply.ts   templates; applying one
 │   ├── lexiconStore.ts          languages and their words
 │   ├── draftStore.ts            unsaved block/template page drafts
+│   ├── autoBackupStore.ts       what the automatic backup did last
 │   ├── altarEdit.ts             altar snapshot for Cancel
 │   ├── leaveGuardStore.ts       edit guards, "save / discard / keep editing"
 │   ├── uiStore.ts               tabs, active view, panels
@@ -118,6 +119,7 @@ src/
 │   ├── images.ts, imageLimits.ts, shrinkImage.ts, thumbnail.ts
 │   ├── export.ts, exportData.ts, emeraldFormat.ts, altarExport.ts
 │   ├── dbBackup.ts, importStaging.ts   .emeralddb backup and restore
+│   ├── autoBackup.ts            automatic backup: when one is due, the run
 │   ├── vaultManager.ts, vaultSettings.ts
 │   ├── altarConstants.ts        altar sizes, backgrounds, candle check
 │   ├── altarSettings.ts         an altar's `settings` JSON
@@ -139,6 +141,7 @@ src-tauri/src/
 ├── keys.rs             vault.key, unlocking, OS keychain, `VaultKeys`
 ├── reencrypt.rs        encrypting a vault, changing the password, crash recovery
 ├── backup.rs           encrypted .emeralddb files
+├── auto_backup.rs      automatic backups: target folder, file name, pruning
 ├── images.rs           image commands + emerald-img scheme
 ├── vault.rs            vault registry and vault directory commands
 ├── updates.rs          in-app updater
@@ -196,7 +199,7 @@ A serialized task must never await another task under its own key — it would w
 
 ## IPC Command Surface
 
-All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from TypeScript with `invoke()`; most are *defined* in `db.rs`, `keys.rs`, `reencrypt.rs`, `backup.rs`, `images.rs`, `vault.rs` and `updates.rs`.
+All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from TypeScript with `invoke()`; most are *defined* in `db.rs`, `keys.rs`, `reencrypt.rs`, `backup.rs`, `auto_backup.rs`, `images.rs`, `vault.rs` and `updates.rs`.
 
 **File commands run off the main thread.** `write_file`, `read_file`, `export_image`, `ensure_app_storage_dirs` and all seven commands in `images.rs` are `async` and wrap their `std::fs` work in `tauri::async_runtime::spawn_blocking`, so a multi-megabyte `.emeralddb` doesn't block the window. `async fn` alone would not do: the blocking call would still run on a runtime worker and could starve the SQL pools, PDF export and IPC replies on a machine with few cores. The `emerald-img` scheme handler uses `spawn_blocking` as well. The four native-menu commands stay synchronous on purpose — they mutate `NSMenu`, which is main-thread-only on macOS.
 
@@ -213,6 +216,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `vault_encrypt_existing` / `vault_change_password` / `vault_recover` | Re-encrypt a plain vault, change the password, or set a new one from the recovery key; all three build a copy under a new key and return the new recovery key. See [Re-encrypting a vault](architecture/encryption.md#re-encrypting-a-vault). |
 | `vault_set_remembered` / `vault_is_remembered` / `keychain_available` | The "remember on this device" switch, its state, and whether the system has a keychain. |
 | `write_backup_file(vault_id, path, content)` / `read_backup_file(path, password?, recovery_key?)` | Write a `.emeralddb` sealed under the vault key / open one with an unlocked vault's key, a password or a recovery key (`BACKUP_LOCKED` when none fits). |
+| `auto_backup_status(vault_id)` / `pick_auto_backup_dir(vault_id)` / `reset_auto_backup_dir(vault_id)` / `write_auto_backup(vault_id, content, keep?)` | The automatic backup: target folder and newest backup / native folder dialog, opened in Rust / back to the vault's `backup/` / write today's sealed backup and prune beyond `keep`. No path crosses IPC — see [`security.md`](security.md#automatic-backups). |
 | `save_image(data_url, vault_id)` | Decode a data-URL, write it into the vault's `images/` — sealed and named by a keyed hash in an encrypted vault. Skips if it exists. Returns the **filename**. |
 | `copy_image_file(source, vault_id)` | Copy a file from an arbitrary path into the vault's `images/` under its content name. png/jpg/jpeg/gif/webp/svg only; rejects symlinks, canonicalizes the source and confines it to the allowed storage roots. Returns the filename. |
 | `read_image_as_base64(filename, vault_id)` | A stored image, opened if sealed, as a data-URL — only for the PDF export (renders in a `file://` webview) and the backup writer (embeds bytes in JSON); everything else uses the `emerald-img` scheme. |

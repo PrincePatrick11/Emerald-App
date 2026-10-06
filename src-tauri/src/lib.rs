@@ -35,6 +35,8 @@ mod keys;
 mod reencrypt;
 /// Encrypted `.emeralddb` backups.
 mod backup;
+/// Automatic backups: the target folder, the file name, what gets pruned.
+mod auto_backup;
 /// Der In-App-Updater: variable Quelle, Pruefung, Installation.
 mod updates;
 
@@ -839,6 +841,10 @@ pub fn run() {
             reencrypt::vault_recover,
             backup::write_backup_file,
             backup::read_backup_file,
+            auto_backup::auto_backup_status,
+            auto_backup::pick_auto_backup_dir,
+            auto_backup::reset_auto_backup_dir,
+            auto_backup::write_auto_backup,
             keys::vault_create_key,
             keys::vault_unlock,
             keys::vault_unlock_remembered,

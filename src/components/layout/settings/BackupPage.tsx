@@ -27,6 +27,7 @@ import {
 } from '../../../lib/dbBackup';
 import { SETTINGS_GROUPS, type SettingsGroup } from '../../../lib/vaultSettings';
 import { resolveOpenEdits } from '../../../lib/openEdits';
+import AutoBackupSection from './AutoBackupSection';
 import SettingsChoiceButton from './SettingsChoiceButton';
 import SettingsSection, { SettingsCheckboxGrid, SettingsStatus } from './SettingsSection';
 
@@ -55,6 +56,7 @@ const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {
   templates: 'settings.groupTemplates',
   editor: 'settings.groupEditor',
   journal: 'settings.groupJournal',
+  backup: 'settings.groupBackup',
 };
 
 /**
@@ -187,6 +189,8 @@ export default function BackupPage() {
 
   return (
     <>
+      <AutoBackupSection />
+
       <SettingsSection icon={<Download size={14} />} title={t('settings.exportDb')} description={t('settings.exportDbHint')}>
         <div className="space-y-3">
           {/* Packliste = Haken, Einzelwahl = Auswahlknopf (unten die drei

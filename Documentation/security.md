@@ -42,6 +42,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 | `db_load`, `db_close`, `db_execute`, `db_select`, `db_batch` | `db.rs` | SQL by vault id and a fixed `DbFile`, never by path; every connection carries the authorizer — see [Vault Encryption](#vault-encryption) |
 | `vault_key_status`, `keychain_available`, `vault_create_key`, `vault_unlock`, `vault_unlock_remembered`, `vault_set_remembered`, `vault_is_remembered`, `vault_lock` | `keys.rs` | the key lifecycle. Take a vault id and, for unlocking, a password; none returns a key. `vault_create_key` only works on a vault with no `vault.key` and no database |
 | `vault_encrypt_existing`, `vault_change_password`, `vault_recover` | `reencrypt.rs` | put a vault under a new key; each returns the new recovery key. They need the current password or recovery key — an unlocked session alone is not enough to change the password |
+| `auto_backup_status`, `pick_auto_backup_dir`, `reset_auto_backup_dir`, `write_auto_backup` | `auto_backup.rs` | take a vault id and never a path; see [Automatic Backups](#automatic-backups) |
 | `write_backup_file`, `read_backup_file` | `backup.rs` | the only way to write or read a `.emeralddb`; take an extension check and the same path guards as `write_file`/`read_file` |
 | `write_file`, `read_file`, `export_image` | `lib.rs` | path-taking; confined by `guarded_write_target` / `guarded_read_path` (see [Path Confinement](#path-confinement)) |
 | `export_pdf` | `lib.rs` → `pdf_export/` | hidden-window PDF render, per-platform |
@@ -121,9 +122,19 @@ A vault is a directory the user picks, and it may sit outside every fixed user r
 
 **No storage command accepts a path.** They take a vault *id* and resolve it through `vault_dir()` against the registry; an unknown id is an error, and ids must match `[A-Za-z0-9-]{1,64}` before they can become a path segment. `register_vaults` itself accepts only absolute paths. A path arriving over IPC, or read out of stored HTML content, never becomes a destination.
 
-The cost: `write_file` / `read_file` / `export_image` / `copy_image_file` stay confined to the fixed roots, so a backup file or Markdown export cannot be written into — or read out of — a vault folder outside them. Opening, using and deleting such a vault works in full.
+The cost: `write_file` / `read_file` / `export_image` / `copy_image_file` stay confined to the fixed roots, so a manually saved backup file or Markdown export cannot be written into — or read out of — a vault folder outside them. The automatic backup is the deliberate exception, see [Automatic Backups](#automatic-backups). Opening, using and deleting such a vault works in full.
 
 The fixed roots include `document_dir()` and `app_data_dir()`, so a vault at its default location (`{documentDir}/Emerald Vaults/{name}`, see [Vault Layout](architecture/storage.md#vault-layout)) and its `backup/` folder sit *inside* them, as does the migration target `{appDataDir}/vaults/{id}`. For a vault *outside* the roots, `ensure_backup_dir` refuses up front — offering a default there would only have `write_file` refuse the write a moment later — and the export dialog falls back to a plain filename.
+
+### Automatic Backups
+
+The automatic backup is the one place where Emerald writes a document outside the fixed roots, and it does so without any command taking a path (`auto_backup.rs`).
+
+- **The target folder is never an IPC argument.** It is either the vault's own `backup/` folder — resolved from the registry like the database next to it, so it also works for a vault outside the roots — or a folder the user picked. `pick_auto_backup_dir` opens the native folder dialog *in Rust* and stores the result itself; the frontend receives the path for display only and has no command to set one.
+- **The picked folder belongs to the installation.** It is kept per vault id in `{appDataDir}/auto-backup.json`, not in the vault's `settings.json`: settings travel in backups, and an imported backup must not be able to bring a write target along. What *is* in `settings.json` (on/off, interval, weekday, how many to keep) names no location.
+- **The file name is built in Rust**: `emerald-auto-{first 8 characters of the vault id}-{YYYY-MM-DD}.emeralddb`, the date from the local clock. The content is sealed like every backup, and written through a temp file and a rename, which replaces a link under the target name instead of following it.
+- **A picked folder is never created.** One that is gone — an unplugged disk — is reported as `AUTO_BACKUP_DIR_MISSING` rather than silently replaced by a new folder on whatever now answers to that path.
+- **Pruning deletes by exact name only.** Regular files matching this vault's own pattern, oldest first, and never the newest; a manual `emerald-backup-…` file, another vault's automatic backups and anything else in the folder are not candidates.
 
 **`delete_vault_files`** removes only the vault's own artefacts **by name**, never with `remove_dir_all`: the app puts its database into whatever folder the user chose, so a vault created straight in Documents would otherwise take Documents with it. It refuses unless the folder contains an `emerald.db` (`not a vault directory: no database found`), then deletes:
 

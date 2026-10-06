@@ -635,9 +635,24 @@ async function selectWhereIn(
 // Export
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Resolves to `false` when the save dialog was cancelled — nichts wurde
- *  geschrieben, und die Oberflaeche darf dann auch keinen Erfolg melden. */
-export async function exportDatabase(options: BackupOptions): Promise<boolean> {
+/** Alles, was im Vault liegt — samt Papierkorb und Einstellungen. Die Auswahl
+ *  des automatischen Backups: eines mit Lücken wäre eine Falle. */
+export const FULL_BACKUP_OPTIONS: BackupOptions = {
+  includeJournal: true,
+  includeWiki: true,
+  includeOperations: true,
+  includeAltars: true,
+  includeTasks: true,
+  includeTags: true,
+  includeLexicon: true,
+  dateFrom: '',
+  dateTo: '',
+  includeDeleted: true,
+  includeSettings: true,
+};
+
+/** Der Inhalt einer Sicherung nach `options`, Bilder eingebettet. Schreibt nichts. */
+export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
   const db = await getDb();
   const data: BackupFile['data'] = {};
   const allImagePaths = new Set<string>();
@@ -761,7 +776,7 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
     }
   }
 
-  const backup: BackupFile = {
+  return {
     version: BACKUP_VERSION,
     type: 'backup',
     exportedAt: new Date().toISOString(),
@@ -770,6 +785,12 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
     images,
     ...(options.includeSettings && { settings: useSettingsStore.getState().settings }),
   };
+}
+
+/** Resolves to `false` when the save dialog was cancelled — nichts wurde
+ *  geschrieben, und die Oberflaeche darf dann auch keinen Erfolg melden. */
+export async function exportDatabase(options: BackupOptions): Promise<boolean> {
+  const backup = await buildBackup(options);
 
   // Der Dialog oeffnet im `backup/`-Ordner des aktiven Vaults — bei Bedarf
   // eben angelegt. Scheitert das (Vault-Ordner gerade nicht erreichbar),
