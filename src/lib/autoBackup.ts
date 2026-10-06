@@ -178,7 +178,8 @@ export async function runAutoBackup({ force = false }: { force?: boolean } = {})
   }
 }
 
-/** Wie lange „Jetzt sichern" auf einen Import, Typwechsel oder laufenden Lauf wartet. */
+/** Wie lange „Jetzt sichern" auf einen Import, Typwechsel oder laufenden Lauf
+ *  wartet: 30 Versuche im Abstand von einer Sekunde. */
 const NOW_RETRY_MS = 1_000;
 const NOW_ATTEMPTS = 30;
 
@@ -189,14 +190,23 @@ const NOW_ATTEMPTS = 30;
  * es nach einer halben Minute immer noch nicht ging.
  */
 export async function backUpNow(): Promise<void> {
+  // Im Store und nicht im Knopf: der Auftrag überlebt ein geschlossenes
+  // Einstellungsfenster, und ein zweiter Klick startet keinen zweiten.
+  if (useAutoBackupStore.getState().requested) return;
   const vaultId = useVaultStore.getState().activeVaultId;
-  for (let attempt = 0; attempt < NOW_ATTEMPTS; attempt++) {
-    if ((await runAutoBackup({ force: true })) === 'done') return;
-    // Ein anderer Vault inzwischen: der Auftrag galt dem alten.
-    if (useVaultStore.getState().activeVaultId !== vaultId) return;
-    await new Promise((resolve) => setTimeout(resolve, NOW_RETRY_MS));
+  // Ein anderer Vault inzwischen: der Auftrag galt dem alten — weder ihn sichern noch ihm einen Fehler melden.
+  const sameVault = () => useVaultStore.getState().activeVaultId === vaultId;
+  useAutoBackupStore.setState({ requested: true });
+  try {
+    for (let attempt = 0; attempt < NOW_ATTEMPTS; attempt++) {
+      if (!sameVault()) return;
+      if ((await runAutoBackup({ force: true })) === 'done') return;
+      await new Promise((resolve) => setTimeout(resolve, NOW_RETRY_MS));
+    }
+    if (sameVault()) setError(vaultId, 'failed');
+  } finally {
+    useAutoBackupStore.setState({ requested: false });
   }
-  setError(vaultId, 'failed');
 }
 
 /** Der Auslöser der laufenden Sitzung, solange `startAutoBackup` aktiv ist. */

@@ -54,8 +54,8 @@ export default function AutoBackupSection() {
   const [folderFailed, setFolderFailed] = useState(false);
   // „Jetzt sichern" wartet, wenn gerade ein Import oder Typwechsel schreibt —
   // solange zeigt der Knopf, dass der Klick angekommen ist.
-  const [requested, setRequested] = useState(false);
-  const busy = running || requested;
+  const requested = useAutoBackupStore((s) => s.requested);
+  const pending = running || requested;
 
   useEffect(() => {
     if (!vaultId) return;
@@ -172,15 +172,12 @@ export default function AutoBackupSection() {
               <Button
                 variant="secondary"
                 className="shrink-0"
-                disabled={busy}
-                onClick={() => {
-                  setRequested(true);
-                  void backUpNow().finally(() => setRequested(false));
-                }}
+                disabled={pending}
+                onClick={() => void backUpNow()}
                 title={t('settings.autoBackupNowHint')}
               >
                 <DatabaseBackup size={14} />
-                {busy ? t('settings.autoBackupRunning') : t('settings.autoBackupNow')}
+                {pending ? t('settings.autoBackupRunning') : t('settings.autoBackupNow')}
               </Button>
             </div>
 

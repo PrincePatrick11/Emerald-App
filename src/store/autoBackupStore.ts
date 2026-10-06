@@ -20,6 +20,8 @@ interface AutoBackupState {
   vaultId: string | null;
   status: AutoBackupStatus | null;
   running: boolean;
+  /** „Jetzt sichern" wurde geklickt und wartet noch auf seinen Lauf (`backUpNow`). */
+  requested: boolean;
   error: AutoBackupError | null;
   /** Der Punkt am Zahnrad hat seine Aufgabe erfüllt; ein neuer Fehler nach einem Erfolg zeigt ihn wieder. */
   errorSeen: boolean;
@@ -35,6 +37,7 @@ export const useAutoBackupStore = create<AutoBackupState>(() => ({
   vaultId: null,
   status: null,
   running: false,
+  requested: false,
   error: null,
   errorSeen: false,
 }));
