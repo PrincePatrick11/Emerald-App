@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { LEFT_LIST_TAB_IDS, type LeftListTabId } from './modules';
 import { oneOf } from './helpers';
+import type { Weekday } from './formatDate';
 import { LANGUAGE_OPTIONS, LANGUAGE_STORAGE_KEY, type AppLanguage } from '../i18n';
 import {
   DEFAULT_EDITOR_FONT_ID, DEFAULT_EDITOR_FONT_SIZE, DEFAULT_THEME_ID, DEFAULT_UI_FONT_ID, DEFAULT_UI_SCALE,
@@ -99,10 +100,9 @@ export interface JournalSettings {
 /** Wie oft das automatische Backup läuft — nur volle Tage, der Dateiname trägt das Datum. */
 export const BACKUP_INTERVAL_OPTIONS = ['daily', 'weekly', 'monthly'] as const;
 export type BackupInterval = (typeof BACKUP_INTERVAL_OPTIONS)[number];
-/** Wochentag wie `Date.getDay()`: 0 = Sonntag. */
-export const BACKUP_WEEKDAY_OPTIONS = [0, 1, 2, 3, 4, 5, 6] as const;
-export type BackupWeekday = (typeof BACKUP_WEEKDAY_OPTIONS)[number];
-/** Wie viele automatische Backups liegen bleiben; `null` = alle. */
+export const BACKUP_WEEKDAY_OPTIONS = [0, 1, 2, 3, 4, 5, 6] as const satisfies readonly Weekday[];
+/** Wie viele automatische Backups liegen bleiben; `null` = alle. Die Zahlen
+ *  prüft `KEEP_CHOICES` in `auto_backup.rs` noch einmal — beide zusammen ändern. */
 export const BACKUP_KEEP_OPTIONS = [3, 5, 10, 30, null] as const;
 export type BackupKeep = (typeof BACKUP_KEEP_OPTIONS)[number];
 
@@ -113,7 +113,7 @@ export interface BackupSettings {
   auto: boolean;
   interval: BackupInterval;
   /** Gilt nur für `weekly`. */
-  weekday: BackupWeekday;
+  weekday: Weekday;
   keep: BackupKeep;
 }
 

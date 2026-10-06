@@ -37,8 +37,10 @@ const TAG_LEN: usize = 8;
 /// The picked folder is not there right now — an unplugged disk, most likely.
 const DIR_MISSING: &str = "AUTO_BACKUP_DIR_MISSING";
 
-/// What the settings page offers for "keep". Checked here as well: a caller
-/// that could pass `1` would wipe the history with a single call.
+/// What the settings page offers for "keep" — mirrors `BACKUP_KEEP_OPTIONS` in
+/// `src/lib/vaultSettings.ts`, without its `null` (= all); change both
+/// together. Checked here as well: a caller that could pass `1` would wipe the
+/// history with a single call.
 const KEEP_CHOICES: [u32; 4] = [3, 5, 10, 30];
 
 /// Serialises read-modify-write of [`STATE_FILE`].
@@ -247,8 +249,13 @@ pub async fn pick_auto_backup_dir(
 /// Back to the vault's own `backup/` folder.
 #[tauri::command(async)]
 pub fn reset_auto_backup_dir(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
-    // Nur eine registrierte Vault-Id, wie beim Wählen.
-    vault::vault_dir(&app, &vault_id)?;
+    // Nur die Form der Id, nicht die Registry: ein Vault wird erst entfernt und
+    // dann hier vergessen — andersherum stünde er nach einem gescheiterten
+    // Entfernen ohne seinen Ordner da. Einen Eintrag zu streichen, den es nicht
+    // gibt, ändert nichts.
+    if !vault::is_valid_vault_id(&vault_id) {
+        return Err("invalid vault id".to_string());
+    }
     update_state(&app, |state| {
         state.dirs.remove(&vault_id);
     })

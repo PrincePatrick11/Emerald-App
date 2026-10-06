@@ -74,7 +74,7 @@ The key lives in `plugins.updater.pubkey` in `tauri.conf.json` and is compiled i
 
 **A signature alone is not enough.** The manifest is not signed, only the artifact it points at. A hijacked manifest could pair a high version number with the URL *and genuine signature* of an older release — every check passes, and the user is downgraded onto a version with publicly known weaknesses. `requireSignedVersion: true` closes that: `@tauri-apps/cli` ≥ 2.11.5 records the app version in the signature's trusted comment, which minisign covers, and the plugin refuses any response whose announced version disagrees. The flag and the CLI floor belong together — the flag against older signatures rejects *every* update. With both in place, the worst a wrong, hijacked or mistyped source can do is deliver nothing, or deliver something that does not verify.
 
-The source is `{appDataDir}/update.json`, next to `vaults.json`, and deliberately **not** in the per-vault settings: which server an installation asks belongs to the installation, not its content. Vault settings travel inside `.emeralddb` backups; an imported backup must not be able to point the updater anywhere.
+The source is `{appDataDir}/update.json`, next to `vaults.json`, and deliberately **not** in the per-vault settings: which server an installation asks belongs to the installation, not its content. No path-taking command can write the file: `guarded_write_target` allows only `vaults.json` and `vaults/` in that directory. Vault settings travel inside `.emeralddb` backups; an imported backup must not be able to point the updater anywhere.
 
 `set_update_settings` rejects anything that is not a complete **`https`** URL. The signature check would catch a tampered manifest served over `http`, but not an attacker who keeps answering with an old manifest — enough to pin an installation to a known-vulnerable version indefinitely. Refusing at the command, rather than storing, means a bad URL cannot survive a restart and break every later check.
 
@@ -128,9 +128,9 @@ The fixed roots include `document_dir()` and `app_data_dir()`, so a vault at its
 
 ### Automatic Backups
 
-The automatic backup is the one place where Emerald writes a document outside the fixed roots, and it does so without any command taking a path (`auto_backup.rs`).
+The automatic backup is the one place where a backup is written outside the fixed roots, and it does so without any command taking a path (`auto_backup.rs`).
 
-- **The target folder is never an IPC argument.** It is either the vault's own `backup/` folder — resolved from the registry like the database next to it, so it also works for a vault outside the roots — or a folder the user picked. `pick_auto_backup_dir` opens the native folder dialog *in Rust* and stores the result itself; the frontend receives the path for display only and has no command to set one. That includes `write_file`: `guarded_write_target` refuses the reserved state files of the app data directory (`auto-backup.json`, its temp name, and `update.json`), compared case-insensitively, so the stored folder cannot be planted either. A stored path that is not absolute counts as missing.
+- **The target folder is never an IPC argument.** It is either the vault's own `backup/` folder — resolved from the registry like the database next to it, so it also works for a vault outside the roots — or a folder the user picked. `pick_auto_backup_dir` opens the native folder dialog *in Rust* and stores the result itself; the frontend receives the path for display only and has no command to set one. That includes `write_file`: directly below the app data directory `guarded_write_target` lets a path-taking command write only `vaults.json` and into `vaults/` (see [Path Confinement](#path-confinement)), so the stored folder cannot be planted either. A stored path that is not absolute counts as missing.
 - **The picked folder belongs to the installation.** It is kept per vault id in `{appDataDir}/auto-backup.json`, not in the vault's `settings.json`: settings travel in backups, and an imported backup must not be able to bring a write target along. What *is* in `settings.json` (on/off, interval, weekday, how many to keep) names no location.
 - **The file name is built in Rust**: `emerald-auto-{first 8 characters of the vault id}-{YYYY-MM-DD}.emeralddb`, the date from the local clock. The content is sealed like every backup, and written through a temp file and a rename, which replaces a link under the target name instead of following it.
 - **A picked folder is never created.** One that is gone — an unplugged disk — is reported as `AUTO_BACKUP_DIR_MISSING` rather than silently replaced by a new folder on whatever now answers to that path.
@@ -197,6 +197,7 @@ Both guards check against the fixed roots from `resolve_allowed_roots`: home, do
 1. Canonicalizes the deepest already-existing ancestor of the target and checks it against the roots **before** creating anything, so a denied write leaves no directories behind outside the boundary.
 2. Creates the parent directories, canonicalizes the parent and checks it again.
 3. Calls `symlink_metadata` on the target unconditionally and refuses any symlink — resolvable or dangling. (`target.exists()` would follow the link and report `false` for a broken one, letting `fs::write` create the file at the link's target outside the roots.) An existing target is also canonicalized and checked.
+4. Refuses a target in the app data directory unless it is `vaults.json` itself or lies below `vaults/` (`access denied: reserved for the app`) — checked on the resolved path before any folder is created, and again on the final target. Everything else there is the state of a Rust module (`auto-backup.json`, `update.json`) and is written by that module alone. It is an allow-list because a case-folding or Unicode-normalising file system knows more spellings of a reserved name than a comparison could; a spelling of an allowed name is merely refused.
 
 **`guarded_read_path`** refuses a symlink (`symlink_metadata`), canonicalizes the path and checks it against the roots.
 
@@ -204,7 +205,7 @@ On top of the guards, each command allowlists extensions and returns `"unsupport
 
 | Command | Extensions | Notes |
 |---|---|---|
-| `write_file`, `read_file` | `.md`, `.emerald`, `.json`, `.txt` | keeps them from being a general filesystem read/write primitive. `.emeralddb` is not on the list: a backup is written and read only through `write_backup_file`/`read_backup_file`, so none can be written in the clear by accident |
+| `write_file`, `read_file` | `.md`, `.emerald`, `.json`, `.txt` | keeps them from being a general filesystem read/write primitive. `.emeralddb` is not on the list: a backup is written only through `write_backup_file` and `write_auto_backup` and read only through `read_backup_file`, so none can be written in the clear by accident |
 | `write_backup_file`, `read_backup_file` | `.emeralddb` | the same path guards |
 | `export_image` | `.png`, `.jpg`, `.jpeg`, `.webp` | the base64 payload is decoded in Rust before writing, so no text encoding or newline handling can alter the bytes |
 | `copy_image_file`, `read_image_file` | `png`, `jpg`, `jpeg`, `gif`, `webp`, `svg` | shared helper `checked_image_source` |

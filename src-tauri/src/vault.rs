@@ -91,7 +91,7 @@ pub(crate) fn directory_state(dir: &Path) -> Result<(), String> {
 
 /// Ids are `crypto.randomUUID()` output plus the literal `default`. Anything
 /// outside that alphabet is refused before it can become a path segment.
-fn is_valid_vault_id(id: &str) -> bool {
+pub(crate) fn is_valid_vault_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
         && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
@@ -1044,17 +1044,29 @@ fn write_json_in(dir: &Path, name: &str, temp_name: &str, max_bytes: u64, conten
 /// Writes `bytes` to `dir/name` through `dir/temp_name` and a rename, so a
 /// crash leaves either the old file or the new one, never half of either.
 pub(crate) fn write_atomic(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
-    write_atomic_synced(dir, name, temp_name, bytes, true)
+    write_atomic_with(dir, name, temp_name, bytes, true)
 }
 
 /// [`write_atomic`] for a folder that is not the vault's: a volume that cannot
 /// flush to disk — some network shares refuse it — still gets the file. For a
-/// backup that is the better answer; for `vault.key` it would not be.
+/// backup that is the better answer; for `vault.key` it would not be. A flush
+/// that fails because the data did not arrive still fails the write.
 pub(crate) fn write_atomic_anywhere(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
-    write_atomic_synced(dir, name, temp_name, bytes, false)
+    write_atomic_with(dir, name, temp_name, bytes, false)
 }
 
-fn write_atomic_synced(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must_sync: bool) -> Result<(), String> {
+/// On a network volume a full disk, an exhausted quota or a failing medium
+/// only shows when the data is flushed — `write` has filled a cache by then.
+/// These are never "this volume cannot flush".
+fn sync_error_means_data_loss(error: &std::io::Error) -> bool {
+    use std::io::ErrorKind;
+    const EIO: i32 = 5;
+    matches!(error.kind(), ErrorKind::StorageFull | ErrorKind::QuotaExceeded)
+        || (cfg!(unix) && error.raw_os_error() == Some(EIO))
+}
+
+/// `must_sync`: whether a flush the volume refuses fails the write.
+fn write_atomic_with(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must_sync: bool) -> Result<(), String> {
     use std::io::Write;
 
     // Was unter dem Temp-Namen liegt — Rest eines Absturzes oder ein
@@ -1069,11 +1081,12 @@ fn write_atomic_synced(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], mu
         .open(&temp)
         // Erst auf der Platte, dann umbenennen: sonst kann nach einem
         // Stromausfall eine leere Datei unter dem Zielnamen stehen — bei
-        // `vault.key` hieße das, der Vault ist verloren.
+        // `vault.key` hieße das, der Vault ist verloren. Ohne `must_sync` zählt
+        // der Versuch — es sei denn, der Fehler sagt, dass die Daten fehlen.
         .and_then(|mut file| {
             file.write_all(bytes)?;
             match file.sync_all() {
-                Err(e) if must_sync => Err(e),
+                Err(e) if must_sync || sync_error_means_data_loss(&e) => Err(e),
                 _ => Ok(()),
             }
         });

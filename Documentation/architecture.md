@@ -245,7 +245,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `set_view_menu_checked(rail, left_list, right_sidebar)` | Mirror sidebar visibility onto the View menu's check items, on every change (not only menu-triggered ones). macOS only in effect. |
 | `set_export_menu_enabled(entry, pdf, emerald)` | Enable/disable the native "Export as …" items for the current view (`computeMenuEnabledState`). macOS only in effect. |
 | `set_altar_export_menu_enabled(enabled)` | Enable/disable the native "Export as Image" submenu. macOS only in effect. |
-| `update_settings()` / `set_update_settings(endpoint, auto_check)` | Read/write `{appDataDir}/update.json`, the one installation-level setting; the endpoint must be a complete `https` URL. See [`security.md` → In-App Updates](security.md#in-app-updates). |
+| `update_settings()` / `set_update_settings(endpoint, auto_check)` | Read/write `{appDataDir}/update.json`, an installation-level setting like the automatic backup's `auto-backup.json`; the endpoint must be a complete `https` URL. See [`security.md` → In-App Updates](security.md#in-app-updates). |
 | `check_for_update()` / `install_update()` | The only commands that reach the network — `tauri-plugin-updater`, driven from `updates.rs` rather than the plugin's JS API so the CSP needs no update host. `install_update` installs only the result `check_for_update` holds, then restarts. See [`security.md` → In-App Updates](security.md#in-app-updates). |
 
 Tauri menu events (not `invoke`) come from the native menu and are received in `AppShell` via `listen()`. On Windows and Linux there is no native menu — the HTML title-bar menus call the same actions directly through `src/lib/menuActions.ts`, so both run one implementation:

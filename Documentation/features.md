@@ -481,16 +481,6 @@ Reads a Markdown file exported by Emerald (or with the same structure). The `# T
 
 The whole vault can be backed up and restored as one self-contained file (`.emeralddb`), separate from per-entry exports. The Backup page in **Settings** offers two manual flows and, below them, an automatic backup.
 
-**Automatic backup.**
-
-- Off by default. Switched on, Emerald saves the whole vault — every module, the Trash, images and settings — on a schedule: **daily**, **weekly** on a chosen weekday, or **monthly** on the 1st.
-- It runs while Emerald is open and the vault is unlocked; there is no background service. A backup that was due while the app was closed is made the next time the vault opens, and the first one is made right after switching the option on.
-- Files are named `emerald-auto-…-YYYY-MM-DD.emeralddb`, one per day. **Keep** (3, 5, 10, 30 or all; default 10) decides how many stay — older automatic backups are deleted, backups saved by hand never are.
-- The **folder** is the vault's own `backup/` folder or any folder picked in the dialog, including one on another drive. The choice belongs to this computer, not to the vault: on another machine the vault's own folder applies again.
-- The section shows the date of the last backup and has **Back up now**. If a backup fails — the picked folder's drive is not connected, say — the section says so and the settings gear in the rail shows a dot.
-- An automatic backup is an ordinary encrypted `.emeralddb` and is restored through Import below. Import only reads from the user's own folders (see [`security.md`](security.md#automatic-backups)): a backup in a picked folder on another drive has to be copied there first.
-- The file name carries the start of the vault's id on this computer. A vault folder that is removed and opened again — or opened on another computer — gets a new id: its earlier automatic backups stay where they are, but are no longer counted or pruned.
-
 **Export.**
 
 - A "What to include" chip row picks the content: Journal, Wiki, Operations, Altars, Tasks, Tags, Lexicon and Settings. Templates and your own blocks travel whenever Journal, Wiki or Operations is included.
@@ -509,6 +499,16 @@ The whole vault can be backed up and restored as one self-contained file (`.emer
 - Add Vault asks for the new vault's name **and folder**, with the same folder row as creating a vault (default `Documents/Emerald Vaults/{name}`). The folder is checked before anything is touched: it must be empty or not exist yet, must not hold a vault, and must be readable. The new vault then asks for its own password; cancelling that cancels the import and removes the empty vault.
 - A failed import — a corrupt file, a crash partway — leaves the vault exactly as it was: every mode fills a hidden copy of the database and swaps it in only once the import succeeded.
 - If the file carries settings, Add Vault and Replace apply them; Merge lists them as checkboxes (appearance, trash, sidebar, emoji, images, tag rule, templates, automatic formatting, journal, automatic backup) so only the ticked groups come in.
+
+**Automatic backup.**
+
+- Off by default. Switched on, Emerald saves the whole vault — every module, the Trash, images and settings — on a schedule: **daily**, **weekly** on a chosen weekday, or **monthly** on the 1st.
+- It runs while Emerald is open and the vault is unlocked; there is no background service. A backup that was due while the app was closed is made the next time the vault opens, and the first one is made right after switching the option on.
+- Files are named `emerald-auto-…-YYYY-MM-DD.emeralddb`, one per day. **Keep** (3, 5, 10, 30 or all; default 10) decides how many stay — older automatic backups are deleted, backups saved by hand never are.
+- The **folder** is the vault's own `backup/` folder or any folder picked in the dialog, including one on another drive. The choice belongs to this computer, not to the vault: on another machine the vault's own folder applies again.
+- The section shows the date of the last backup and has **Back up now**. If a backup fails — the picked folder's drive is not connected, say — the section says so and the settings gear in the rail shows a dot.
+- An automatic backup is an ordinary encrypted `.emeralddb` and is restored through Import below. Import only reads from the user's own folders (see [`security.md`](security.md#automatic-backups)): a backup in a picked folder on another drive has to be copied there first.
+- The file name carries the start of the vault's id on this computer. A vault folder that is removed and opened again — or opened on another computer — gets a new id: its earlier automatic backups stay where they are, but are no longer counted or pruned.
 
 For the file structure and per-mode semantics, see [DB Backup / Restore (`.emeralddb`) in `database.md`](database.md#db-backup--restore-emeralddb).
 

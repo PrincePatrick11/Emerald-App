@@ -4,7 +4,9 @@ import { CalendarClock, DatabaseBackup, Folder, History, Layers } from 'lucide-r
 import Button from '../../ui/Button';
 import { SwitchRow } from '../../ui/Switch';
 import { VaultLocationRow } from '../VaultModal';
-import { pickAutoBackupDir, refreshAutoBackupStatus, resetAutoBackupDir, runAutoBackup } from '../../../lib/autoBackup';
+import {
+  pickAutoBackupDir, refreshAutoBackupStatus, requestAutoBackupCheck, resetAutoBackupDir, runAutoBackup,
+} from '../../../lib/autoBackup';
 import { formatIsoDateLong, formatWeekday, weekdaysInLocaleOrder } from '../../../lib/formatDate';
 import {
   BACKUP_INTERVAL_OPTIONS, BACKUP_KEEP_OPTIONS,
@@ -61,8 +63,10 @@ export default function AutoBackupSection() {
     setFolderFailed(false);
     try {
       if ((await change()) === false) return;
-      // Der neue Ordner ist leer oder trägt einen anderen Stand — gleich prüfen, ob etwas fällig ist.
-      void runAutoBackup();
+      // Der neue Ordner ist leer oder trägt einen anderen Stand — prüfen, ob
+      // etwas fällig ist. Über den Planer: der versucht es erneut, falls gerade
+      // noch ein Lauf in den alten Ordner schreibt.
+      requestAutoBackupCheck();
     } catch (e) {
       console.error('[auto-backup] folder change failed', e);
       setFolderFailed(true);

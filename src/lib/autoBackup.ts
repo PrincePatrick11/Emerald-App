@@ -14,13 +14,15 @@ import { useAutoBackupStore, type AutoBackupError, type AutoBackupStatus } from 
  *
  * Einen Hintergrunddienst gibt es nicht — geprüft wird, während die App offen
  * und der Vault entsperrt ist: kurz nach dem Öffnen eines Vaults, nach jeder
- * Änderung der Einstellung und danach stündlich. Wohin geschrieben wird und
+ * Änderung der Einstellung oder des Ordners, danach stündlich — und noch
+ * einmal, wenn ein Versuch auf einen laufenden Lauf oder Import traf. Wohin geschrieben wird und
  * unter welchem Namen, entscheidet allein `auto_backup.rs`; von hier geht nie
  * ein Pfad hinüber.
  */
 
 /** Abstand zum Öffnen des Vaults und zur letzten Änderung der Einstellung: der
- *  Start gehört dem Laden, und wer Knöpfe durchprobiert, löst nur einen Lauf aus. */
+ *  Start gehört dem Laden, und wer Knöpfe durchprobiert, löst nur einen Lauf aus.
+ *  Auch der Abstand, nach dem ein `'busy'` neu versucht wird. */
 const SETTLE_MS = 5_000;
 /** Für Sitzungen, die über einen Tageswechsel offen bleiben. */
 const RECHECK_MS = 60 * 60 * 1000;
@@ -48,8 +50,8 @@ export function isBackupDue(settings: Pick<BackupSettings, 'interval' | 'weekday
   return newest < localIsoDay(day);
 }
 
-// `errorSeen` bedeutet nur etwas, solange `error` gesetzt ist — deshalb werden
-// beide nur hier und nur zusammen geschrieben.
+// `errorSeen` bedeutet nur etwas, solange `error` gesetzt ist — deshalb schreibt
+// nur diese Datei die beiden, und `error` nie ohne `errorSeen`.
 
 function setError(vaultId: string, error: AutoBackupError): void {
   useAutoBackupStore.setState((s) => {
@@ -102,8 +104,12 @@ export async function resetAutoBackupDir(vaultId: string): Promise<void> {
 /**
  * Schreibt ein Backup des offenen Vaults, wenn eines fällig ist — mit `force`
  * auch sonst („Jetzt sichern"). Tut still nichts, solange kein Vault offen
- * und entsperrt ist. `'busy'`, wenn es gerade nicht ging — ein Lauf ist
- * unterwegs oder ein Import hält die Datenbank — und sich ein neuer Versuch lohnt.
+ * und entsperrt ist.
+ *
+ * `'done'`: für jetzt erledigt — geschrieben, nicht fällig, nicht zuständig oder
+ * gescheitert (der Fehler steht dann im Store). `'busy'`: es ging gerade nicht —
+ * ein Lauf ist unterwegs, ein Import hält die Datenbank, oder sie wurde
+ * während des Laufs geschlossen oder ersetzt — und ein neuer Versuch lohnt sich.
  */
 export async function runAutoBackup({ force = false }: { force?: boolean } = {}): Promise<'done' | 'busy'> {
   const vaultState = useVaultStore.getState();
@@ -114,6 +120,7 @@ export async function runAutoBackup({ force = false }: { force?: boolean } = {})
   if (settingsState.vaultId !== vaultId) return 'done';
   const { backup } = settingsState.settings;
   if (!force && !backup.auto) return 'done';
+  // `editorSavesSuspended`: ein Import läuft (siehe `editorLock.ts`).
   if (useAutoBackupStore.getState().running || editorSavesSuspended()) return 'busy';
 
   // Zählt jedes Schließen der Datenbank mit: ein Passwortwechsel oder Import,
@@ -158,6 +165,17 @@ export async function runAutoBackup({ force = false }: { force?: boolean } = {})
   }
 }
 
+/** Der Auslöser der laufenden Sitzung, solange `startAutoBackup` aktiv ist. */
+let scheduleCheck: (() => void) | null = null;
+
+/**
+ * Prüft in ein paar Sekunden, ob ein Backup fällig ist — für Auslöser von
+ * außerhalb (ein neuer Ordner), die auf einen laufenden Lauf treffen können.
+ */
+export function requestAutoBackupCheck(): void {
+  scheduleCheck?.();
+}
+
 /**
  * Startet die Prüfung für die Dauer der Sitzung; die Rückgabe beendet sie.
  * Der Auslöser ist der Einstellungs-Store: er meldet jeden geöffneten Vault
@@ -165,7 +183,10 @@ export async function runAutoBackup({ force = false }: { force?: boolean } = {})
  */
 export function startAutoBackup(): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let stopped = false;
   const schedule = () => {
+    // Ein Lauf, der erst nach dem Beenden zurückkommt, stellt keinen Timer mehr.
+    if (stopped) return;
     clearTimeout(timer);
     timer = setTimeout(check, SETTLE_MS);
   };
@@ -176,8 +197,11 @@ export function startAutoBackup(): () => void {
     if (state.vaultId !== prev.vaultId || state.settings.backup !== prev.settings.backup) schedule();
   });
   const interval = setInterval(check, RECHECK_MS);
+  scheduleCheck = schedule;
   schedule();
   return () => {
+    stopped = true;
+    if (scheduleCheck === schedule) scheduleCheck = null;
     clearTimeout(timer);
     clearInterval(interval);
     unsubscribe();
