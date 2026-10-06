@@ -327,6 +327,13 @@ export default function AppShell() {
     setResizing(false);
   };
 
+  // Die Sperre nimmt den Ziehgriff weg — ein Ziehen, das gerade läuft, endet
+  // damit, sonst liefe es ohne Griff weiter, bis irgendwo losgelassen wird.
+  useEffect(() => {
+    if (viewLocked) onPointerUp();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewLocked]);
+
   // Fensterrahmen und Titelleiste — alles, was auch ohne offenen Vault steht.
   const chrome = (children: React.ReactNode) => (
     <div className="app-shell flex flex-col h-screen w-screen overflow-hidden relative">
