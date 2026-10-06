@@ -135,13 +135,13 @@ export default function AutoBackupSection() {
 
             <div>
               <p className="label-xs mb-2">{t('settings.autoBackupFolder')}</p>
-              <SettingsDescription>{t('settings.autoBackupFolderHint')}</SettingsDescription>
               <VaultLocationRow
                 target={status?.dir ?? null}
                 customPath={status?.customDir ?? null}
                 onPickFolder={() => void changeFolder(() => pickAutoBackupDir(vaultId))}
                 onResetFolder={() => void changeFolder(() => resetAutoBackupDir(vaultId))}
               />
+              <SettingsDescription className="mt-2">{t('settings.autoBackupFolderHint')}</SettingsDescription>
             </div>
 
             <div className="settings-row">

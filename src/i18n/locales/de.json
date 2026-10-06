@@ -748,7 +748,7 @@
     "autoBackupNone": "Noch kein automatisches Backup",
     "autoBackupNow": "Jetzt sichern",
     "autoBackupNowHint": "Schreibt das Backup von heute sofort. Ein Backup von früher am Tag wird ersetzt.",
-    "autoBackupRunning": "Sicherung läuft…",
+    "autoBackupRunning": "Sichert…",
     "autoBackupErrorDirMissing": "Der Backup-Ordner ist nicht erreichbar. Schließe das Laufwerk an oder wähle einen anderen Ordner.",
     "autoBackupErrorFailed": "Das letzte automatische Backup ist fehlgeschlagen. Prüfe den Ordner und versuche es erneut.",
     "autoBackupErrorFolder": "Der Ordner konnte nicht festgelegt werden.",
