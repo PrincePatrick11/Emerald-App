@@ -72,7 +72,7 @@ Each tab has its own back/forward history; there is none for the whole window. `
 
 The tab auto-created when a content view opens with no tabs inherits `tablessHistory`, so Back returns to where the view was opened from; `tablessHistory` then resets to fresh Home, as it does when the last tab closes, on `closeAllTabs()` and on a vault switch. Closing a tab drops its history.
 
-`navigateBack`/`navigateForward` go through `stepHistory(state, delta)`, which moves the index and, with a tab active, writes the stepped view into the tab and saves it. A step past either end of the history does nothing — it does not ask the leave question either.
+`navigateBack`/`navigateForward` go through `stepHistory(state, delta)`, which moves the index and, with a tab active, writes the stepped view into the tab and saves it. A step past either end of the history does nothing — `uiStore.stepGuarded` returns before the leave question, so Back on the first view of a tab does not ask about unsaved changes when there is nowhere to go.
 
 The mouse's back/forward buttons take the same two actions, through `useMouseNavigation` (`src/hooks/useMouseNavigation.ts`, mounted by `AppShell`). They arrive by one of two routes:
 
@@ -80,6 +80,8 @@ The mouse's back/forward buttons take the same two actions, through `useMouseNav
 - **Windows and Linux** — mouse events with `button` 3 (back) and 4 (forward): WebView2 delivers them itself, on Linux wry swallows the native press and injects `mousedown`/`mouseup` — only those two, which is why the step hangs on `mouseup` and not on `auxclick` or `pointerup`. Capture-phase listeners on `window` step on `mouseup`, cancel the `mousedown` (no focus change, nothing for the WebView's own history) and stop the `pointerdown` from propagating, so no drag or sigil stroke starts with a thumb button; it is stopped rather than cancelled, because a cancelled `pointerdown` would take the mouse events with it. These listeners are off on macOS, where the injected events would count twice beside the monitor. The altar canvas ignores buttons above 2 in its own `mousedown` handlers for the same reason.
 
 The `BrowserBack`/`BrowserForward` keys (multimedia keyboards, and mouse drivers that send keys instead of clicks) step too, on every platform. No route steps while a modal is open (`hasOpenModal()` in `Modal.tsx`) — the page behind it is not visible, so the step would go unnoticed until the modal closes — or in the Altar's full-window mode, where the title bar has no arrows either.
+
+Known limit, found by reading wry and not yet tried on a Linux machine: wry injects its synthetic mouse events through `elementFromPoint` with unscaled coordinates, so with a UI size above 100 % the buttons are probably dead in the right and bottom strip of the window. macOS and Linux have not been run with a physical mouse; the Windows route was checked with simulated button events only.
 
 ## Left Sidebar (Rail + Entry List)
 

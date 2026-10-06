@@ -254,7 +254,7 @@ Emerald has browser-like tabs, so you can keep several things open at once — f
 - Open an entry in a new tab with middle-click.
 - Create a new empty tab from the tab bar.
 - Reopen the app and continue with the same tabs in the same order.
-- Use Back/Forward per tab — every tab has its own history. The mouse's back and forward buttons (and a keyboard's browser back/forward keys) do the same as the two arrows in the title bar; while a dialog is open they do nothing.
+- Use Back/Forward per tab — every tab has its own history. The mouse's back and forward buttons (and a keyboard's browser back/forward keys) do the same as the two arrows in the title bar; while a dialog is open, or while an altar fills the whole window, they do nothing. Back or Forward at the end of the history does nothing, and does not ask about unsaved changes.
 
 Opening an item in a new tab (middle-click, "Open in new tab", Ctrl/Cmd+Enter in the search) always makes a new tab, even if the item is open elsewhere.
 
