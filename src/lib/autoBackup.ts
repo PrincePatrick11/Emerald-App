@@ -20,7 +20,7 @@ import { useAutoBackupStore, type AutoBackupError, type AutoBackupStatus } from 
  * ein Pfad hinüber.
  */
 
-/** Abstand zum Öffnen des Vaults und zur letzten Änderung der Einstellung: der
+/** Abstand zum Öffnen des Vaults und zur letzten Änderung der Einstellung oder des Ordners: der
  *  Start gehört dem Laden, und wer Knöpfe durchprobiert, löst nur einen Lauf aus.
  *  Auch der Abstand, nach dem ein `'busy'` neu versucht wird. */
 const SETTLE_MS = 5_000;
@@ -123,8 +123,8 @@ export async function runAutoBackup({ force = false }: { force?: boolean } = {})
   // `editorSavesSuspended`: ein Import läuft (siehe `editorLock.ts`).
   if (useAutoBackupStore.getState().running || editorSavesSuspended()) return 'busy';
 
-  // Zählt jedes Schließen der Datenbank mit: ein Passwortwechsel oder Import,
-  // der mitten im Lauf beginnt *und* endet, sähe am Schluss sonst aus wie Ruhe —
+  // Zählt jedes Schließen oder Ersetzen der Datenbank mit (`dbEpoch`): ein Passwortwechsel
+  // oder Import, der mitten im Lauf beginnt *und* endet, sähe am Schluss sonst aus wie Ruhe —
   // und das Backup enthielte nur, was vor dem Austausch gelesen wurde.
   const epoch = dbEpoch();
   /** Der Vault ist noch derselbe und nichts hat die Datenbank unter dem Lauf ausgetauscht. */
@@ -171,6 +171,7 @@ let scheduleCheck: (() => void) | null = null;
 /**
  * Prüft in ein paar Sekunden, ob ein Backup fällig ist — für Auslöser von
  * außerhalb (ein neuer Ordner), die auf einen laufenden Lauf treffen können.
+ * Ohne laufende Sitzung (`startAutoBackup`) geschieht nichts.
  */
 export function requestAutoBackupCheck(): void {
   scheduleCheck?.();
@@ -201,6 +202,7 @@ export function startAutoBackup(): () => void {
   schedule();
   return () => {
     stopped = true;
+    // Nur den eigenen: ein späterer Start hat ihn womöglich schon ersetzt.
     if (scheduleCheck === schedule) scheduleCheck = null;
     clearTimeout(timer);
     clearInterval(interval);

@@ -125,14 +125,16 @@ pub(crate) fn is_within_allowed_roots(path: &Path, allowed_roots: &[PathBuf]) ->
 /// for updates (`update.json`) — and is written by that module alone. An
 /// allow-list rather than a list of those names: a file system that folds case
 /// or normalises Unicode (APFS, NTFS) knows more spellings of a name than a
-/// comparison here could, and a spelling of an allowed name is merely refused.
+/// comparison here could; another spelling of an *allowed* name (`VAULTS.JSON`)
+/// is refused, which costs nothing.
 const APP_DATA_WRITABLE_FILE: &str = "vaults.json";
+/// See [`APP_DATA_WRITABLE_FILE`].
 const APP_DATA_WRITABLE_DIR: &str = "vaults";
 
 /// `path` with its deepest existing ancestor canonicalized and the rest
 /// appended as written — the shape a path has before its folders exist.
 /// `None` when the rest is not plain names (`..`), or nothing of it exists.
-fn resolve_existing_part(path: &Path) -> Option<PathBuf> {
+pub(crate) fn resolve_existing_part(path: &Path) -> Option<PathBuf> {
     let mut existing = path;
     while !existing.exists() {
         existing = existing.parent()?;
@@ -159,16 +161,15 @@ fn app_data_write_allowed(target: &Path, app_data_dir: &Path) -> bool {
 }
 
 /// Refuses `target` when it lies in the app data directory outside the two
-/// allowed entries. Without an app data directory there is nothing to protect:
-/// the modules that keep their state there cannot read it either.
-fn check_app_data_write(app: &tauri::AppHandle, target: &Path) -> Result<(), String> {
-    let allowed = app
-        .path()
-        .app_data_dir()
-        .ok()
-        .and_then(|dir| resolve_existing_part(&dir))
-        .is_none_or(|dir| app_data_write_allowed(target, &dir));
-    if allowed {
+/// allowed entries.
+pub(crate) fn check_app_data_write(app: &tauri::AppHandle, target: &Path) -> Result<(), String> {
+    let Some(app_data_dir) = app.path().app_data_dir().ok().and_then(|dir| resolve_existing_part(&dir)) else {
+        // Kein App-Datenordner, oder keiner, der sich auflösen lässt: dann
+        // löst sich auch kein Ziel darin auf, und die Module, die ihren
+        // Zustand dort halten, lesen ihn ebenso wenig. Nichts zu schützen.
+        return Ok(());
+    };
+    if app_data_write_allowed(target, &app_data_dir) {
         Ok(())
     } else {
         Err("access denied: reserved for the app".to_string())
@@ -186,7 +187,8 @@ fn check_app_data_write(app: &tauri::AppHandle, target: &Path) -> Result<(), Str
 /// allowed root?" means anything, so everything is canonicalized first. Any
 /// symlink at the target is refused — including a dangling one, which is the
 /// shape that used to slip past — so a prepared link cannot redirect the write
-/// out of the allowed roots.
+/// out of the allowed roots. A `..` behind a folder that does not exist yet is
+/// refused: such a path cannot be resolved before it is created.
 pub(crate) fn guarded_write_target(app: &tauri::AppHandle, path: &str) -> Result<PathBuf, String> {
     let allowed_roots = resolve_allowed_roots(app)?;
     let target = PathBuf::from(path);
@@ -229,6 +231,8 @@ pub(crate) fn guarded_write_target(app: &tauri::AppHandle, path: &str) -> Result
             if !is_within_allowed_roots(&canonical_target, &allowed_roots) {
                 return Err("access denied: path outside allowed directories".to_string());
             }
+            // Noch einmal am endgültigen Pfad: zurückgegeben wird dieser, nicht
+            // der vor dem Anlegen der Ordner aufgelöste.
             check_app_data_write(app, &canonical_target)?;
             Ok(canonical_target)
         }
