@@ -7,6 +7,7 @@ import { keyErrorOf, vaultKeyStatus } from './vaultKeys';
 import type { BackupSettings } from './vaultSettings';
 import { useSettingsStore } from '../store/settingsStore';
 import { hasActiveVault, useVaultStore } from '../store/vaultStore';
+import { editLockEpoch, useUIStore } from '../store/uiStore';
 import { useAutoBackupStore, type AutoBackupError, type AutoBackupStatus } from '../store/autoBackupStore';
 
 /**
@@ -108,8 +109,8 @@ export async function resetAutoBackupDir(vaultId: string): Promise<void> {
  *
  * `'done'`: für jetzt erledigt — geschrieben, nicht fällig, nicht zuständig oder
  * gescheitert (der Fehler steht dann im Store). `'busy'`: es ging gerade nicht —
- * ein Lauf ist unterwegs, ein Import hält die Datenbank, oder sie wurde
- * während des Laufs geschlossen oder ersetzt — und ein neuer Versuch lohnt sich.
+ * ein Lauf ist unterwegs, ein Import hält die Datenbank, ein Typwechsel schreibt,
+ * oder sie wurde während des Laufs geschlossen oder ersetzt — und ein neuer Versuch lohnt sich.
  */
 export async function runAutoBackup({ force = false }: { force?: boolean } = {}): Promise<'done' | 'busy'> {
   const vaultState = useVaultStore.getState();
@@ -122,15 +123,22 @@ export async function runAutoBackup({ force = false }: { force?: boolean } = {})
   if (!force && !backup.auto) return 'done';
   // `editorSavesSuspended`: ein Import läuft (siehe `editorLock.ts`).
   if (useAutoBackupStore.getState().running || editorSavesSuspended()) return 'busy';
+  // Ein Typwechsel oder ein Abbrechen, das einen zurücknimmt, schreibt über
+  // mehrere Tabellen und reiht das erst nach eigenen awaits ein — `drainSerialized`
+  // unten sähe es noch nicht. Die Bearbeitungssperre deckt die ganze Strecke.
+  if (useUIStore.getState().editLocked) return 'busy';
 
   // Zählt jedes Schließen oder Ersetzen der Datenbank mit (`dbEpoch`): ein Passwortwechsel
   // oder Import, der mitten im Lauf beginnt *und* endet, sähe am Schluss sonst aus wie Ruhe —
   // und das Backup enthielte nur, was vor dem Austausch gelesen wurde.
   const epoch = dbEpoch();
+  const lockEpoch = editLockEpoch();
   /** Der Vault ist noch derselbe und nichts hat die Datenbank unter dem Lauf ausgetauscht. */
   const stillCurrent = () => {
     const now = useVaultStore.getState();
-    return now.activeVaultId === vaultId && !now.locked && !editorSavesSuspended() && dbEpoch() === epoch;
+    return now.activeVaultId === vaultId && !now.locked && !editorSavesSuspended() && dbEpoch() === epoch
+      // Auch eine Sperre, die mitten im Lauf begann und endete: der Stand wäre halb umgeschrieben.
+      && !useUIStore.getState().editLocked && editLockEpoch() === lockEpoch;
   };
 
   useAutoBackupStore.setState({ running: true });
@@ -180,7 +188,8 @@ export function requestAutoBackupCheck(): void {
 /**
  * Startet die Prüfung für die Dauer der Sitzung; die Rückgabe beendet sie.
  * Der Auslöser ist der Einstellungs-Store: er meldet jeden geöffneten Vault
- * (`loadForVault`) und jede Änderung der Backup-Einstellung.
+ * (`loadForVault`) und jede Änderung der Backup-Einstellung; ein neuer Ordner
+ * kommt über `requestAutoBackupCheck`.
  */
 export function startAutoBackup(): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined;

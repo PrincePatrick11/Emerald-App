@@ -491,9 +491,9 @@ Independently of the version, journal rows with the old fields go through `liftL
 
 ### Export
 
-**Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Altars / Tasks / Tags / Lexicon`, `dateFrom`, `dateTo`, `includeDeleted`, `includeSettings`. There is no templates toggle. The seven content-type keys and their labels are `CONTENT_TYPES` in `dbBackup.ts`, shared by the export and the import page.
-
 `buildBackup(options)` builds the payload; `exportDatabase()` wraps it for the manual export, and the automatic backup calls it with `FULL_BACKUP_OPTIONS` (every module, the Trash and settings, no date range) — see [Automatic Backup](architecture/storage.md#automatic-backup).
+
+**Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Altars / Tasks / Tags / Lexicon`, `dateFrom`, `dateTo`, `includeDeleted`, `includeSettings`. There is no templates toggle. The seven content-type keys and their labels are `CONTENT_TYPES` in `dbBackup.ts`, shared by the export and the import page.
 
 - Entries, altars and tasks are date-filtered on `created_at`. Entries are one `SELECT` with a `type` filter for the ticked kinds.
 - The "library" tables travel complete, trashed rows included and without a date filter: `categories` (whenever any of Journal, Wiki, Operations, Tasks or Altars is ticked — trashed categories too, or their exported content could not be restored), `block_definitions` and `templates` (whenever Journal, Wiki or Operations is ticked, since a template's assignments can reference any of the three), `languages` and `lexicon_entries` (with `includeLexicon`; a word is nothing without its language).

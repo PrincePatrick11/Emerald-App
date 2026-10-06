@@ -1070,6 +1070,7 @@ fn sync_refusal_is_harmless(error: &std::io::Error) -> bool {
     const ENOTTY: i32 = 25;
     // ERROR_INVALID_FUNCTION, ERROR_NOT_SUPPORTED.
     const WINDOWS_NOT_SUPPORTED: [i32; 2] = [1, 50];
+    // InvalidInput: EINVAL — so antwortet `fsync`, wenn das Ziel kein Synchronisieren kennt.
     matches!(error.kind(), ErrorKind::Unsupported | ErrorKind::InvalidInput)
         || (cfg!(unix) && error.raw_os_error() == Some(ENOTTY))
         || (cfg!(windows) && error.raw_os_error().is_some_and(|code| WINDOWS_NOT_SUPPORTED.contains(&code)))

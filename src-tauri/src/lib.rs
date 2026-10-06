@@ -134,7 +134,7 @@ const APP_DATA_WRITABLE_DIR: &str = "vaults";
 /// `path` with its deepest existing ancestor canonicalized and the rest
 /// appended as written — the shape a path has before its folders exist.
 /// `None` when the rest is not plain names (`..`), or nothing of it exists.
-pub(crate) fn resolve_existing_part(path: &Path) -> Option<PathBuf> {
+fn resolve_existing_part(path: &Path) -> Option<PathBuf> {
     let mut existing = path;
     while !existing.exists() {
         existing = existing.parent()?;
