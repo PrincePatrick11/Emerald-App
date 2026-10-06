@@ -125,8 +125,11 @@ export default function BackupPage() {
       setVaultBaseDir(await newVaultBaseDir().catch(() => null));
       setImportTypeFilters(allTypesIncluded());
       setSettingsGroups([]);
-    } catch {
-      setImportError(t('settings.importErrorInvalid'));
+    } catch (err) {
+      // Außerhalb der eigenen Ordner liest Emerald nichts (`guarded_read_path`) —
+      // ein automatisches Backup auf einem anderen Laufwerk ist deshalb kein
+      // kaputtes, und die Meldung sagt, was zu tun ist.
+      setImportError(t(keyErrorOf(err).includes('access denied') ? 'settings.importErrorOutside' : 'settings.importErrorInvalid'));
     }
   }
 

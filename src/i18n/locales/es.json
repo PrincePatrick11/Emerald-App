@@ -763,6 +763,7 @@
     "autoBackupFailedDot": "La copia automática ha fallado.",
     "importDone": "Importación completada.",
     "importErrorInvalid": "El archivo no es una copia de seguridad válida de Emerald.",
+    "importErrorOutside": "Emerald solo puede abrir copias de tus propias carpetas (carpeta personal, Documentos, Escritorio, Descargas). Copia primero el archivo allí.",
     "previewContains": "Contiene:",
     "appearance": "Apariencia",
     "uiFont": "Fuente de la interfaz",

@@ -178,6 +178,27 @@ export async function runAutoBackup({ force = false }: { force?: boolean } = {})
   }
 }
 
+/** Wie lange „Jetzt sichern" auf einen Import, Typwechsel oder laufenden Lauf wartet. */
+const NOW_RETRY_MS = 1_000;
+const NOW_ATTEMPTS = 30;
+
+/**
+ * „Jetzt sichern": schreibt das Backup von heute, auch wenn keines fällig ist.
+ * Trifft der Klick auf einen Import, einen Typwechsel oder einen laufenden
+ * Lauf, wartet er das ab, statt zu verpuffen — und meldet einen Fehler, wenn
+ * es nach einer halben Minute immer noch nicht ging.
+ */
+export async function backUpNow(): Promise<void> {
+  const vaultId = useVaultStore.getState().activeVaultId;
+  for (let attempt = 0; attempt < NOW_ATTEMPTS; attempt++) {
+    if ((await runAutoBackup({ force: true })) === 'done') return;
+    // Ein anderer Vault inzwischen: der Auftrag galt dem alten.
+    if (useVaultStore.getState().activeVaultId !== vaultId) return;
+    await new Promise((resolve) => setTimeout(resolve, NOW_RETRY_MS));
+  }
+  setError(vaultId, 'failed');
+}
+
 /** Der Auslöser der laufenden Sitzung, solange `startAutoBackup` aktiv ist. */
 let scheduleCheck: (() => void) | null = null;
 

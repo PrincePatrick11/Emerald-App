@@ -755,6 +755,7 @@
     "autoBackupFailedDot": "Das automatische Backup ist fehlgeschlagen.",
     "importDone": "Import abgeschlossen.",
     "importErrorInvalid": "Datei ist kein gültiges Emerald-Backup.",
+    "importErrorOutside": "Emerald kann Backups nur aus deinen eigenen Ordnern öffnen (Benutzerordner, Dokumente, Desktop, Downloads). Kopiere die Datei zuerst dorthin.",
     "previewContains": "Enthält:",
     "appearance": "Erscheinungsbild",
     "uiFont": "UI-Schriftart",

@@ -507,7 +507,7 @@ The whole vault can be backed up and restored as one self-contained file (`.emer
 - Files are named `emerald-auto-…-YYYY-MM-DD.emeralddb`, one per day. **Keep** (3, 5, 10, 30 or all; default 10) decides how many stay — older automatic backups are deleted, backups saved by hand never are.
 - The **folder** is the vault's own `backup/` folder or any folder picked in the dialog, including one on another drive. The choice belongs to this computer, not to the vault: on another machine the vault's own folder applies again.
 - The section shows the date of the last backup and has **Back up now**. If a backup fails — the picked folder's drive is not connected, say — the section says so and the settings gear in the rail shows a dot.
-- An automatic backup is an ordinary encrypted `.emeralddb` and is restored through Import below. Import only reads from the user's own folders (see [`security.md`](security.md#automatic-backups)): a backup in a picked folder on another drive has to be copied there first.
+- An automatic backup is an ordinary encrypted `.emeralddb` and is restored through Import below. Import only reads from the user's own folders (see [`security.md`](security.md#automatic-backups)): a backup in a picked folder on another drive has to be copied there first, and Browse says so instead of calling the file invalid.
 - The file name carries the start of the vault's id on this computer. A vault folder that is removed and opened again — or opened on another computer — gets a new id: its earlier automatic backups stay where they are, but are no longer counted or pruned.
 
 For the file structure and per-mode semantics, see [DB Backup / Restore (`.emeralddb`) in `database.md`](database.md#db-backup--restore-emeralddb).

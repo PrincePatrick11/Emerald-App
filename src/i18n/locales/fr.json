@@ -763,6 +763,7 @@
     "autoBackupFailedDot": "La sauvegarde automatique a échoué.",
     "importDone": "Import terminé.",
     "importErrorInvalid": "Le fichier n'est pas une sauvegarde Emerald valide.",
+    "importErrorOutside": "Emerald ne peut ouvrir que les sauvegardes situées dans vos propres dossiers (dossier personnel, Documents, Bureau, Téléchargements). Copiez d'abord le fichier à cet endroit.",
     "previewContains": "Contient :",
     "appearance": "Apparence",
     "uiFont": "Police de l'interface",

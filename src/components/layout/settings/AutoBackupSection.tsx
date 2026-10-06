@@ -5,7 +5,7 @@ import Button from '../../ui/Button';
 import { SwitchRow } from '../../ui/Switch';
 import { VaultLocationRow } from '../VaultModal';
 import {
-  pickAutoBackupDir, refreshAutoBackupStatus, requestAutoBackupCheck, resetAutoBackupDir, runAutoBackup,
+  backUpNow, pickAutoBackupDir, refreshAutoBackupStatus, requestAutoBackupCheck, resetAutoBackupDir,
 } from '../../../lib/autoBackup';
 import { formatIsoDateLong, formatWeekday, weekdaysInLocaleOrder } from '../../../lib/formatDate';
 import {
@@ -52,6 +52,10 @@ export default function AutoBackupSection() {
   const running = useAutoBackupStore((s) => s.running);
   // Nur für den Ordner-Dialog: was der Lauf selbst meldet, steht im Store.
   const [folderFailed, setFolderFailed] = useState(false);
+  // „Jetzt sichern" wartet, wenn gerade ein Import oder Typwechsel schreibt —
+  // solange zeigt der Knopf, dass der Klick angekommen ist.
+  const [requested, setRequested] = useState(false);
+  const busy = running || requested;
 
   useEffect(() => {
     if (!vaultId) return;
@@ -168,12 +172,15 @@ export default function AutoBackupSection() {
               <Button
                 variant="secondary"
                 className="shrink-0"
-                disabled={running}
-                onClick={() => void runAutoBackup({ force: true })}
+                disabled={busy}
+                onClick={() => {
+                  setRequested(true);
+                  void backUpNow().finally(() => setRequested(false));
+                }}
                 title={t('settings.autoBackupNowHint')}
               >
                 <DatabaseBackup size={14} />
-                {running ? t('settings.autoBackupRunning') : t('settings.autoBackupNow')}
+                {busy ? t('settings.autoBackupRunning') : t('settings.autoBackupNow')}
               </Button>
             </div>
 
