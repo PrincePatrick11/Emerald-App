@@ -20,6 +20,12 @@ export function nowIso(): string {
   return new Date().toISOString();
 }
 
+/** Ein Tag als `YYYY-MM-DD` in lokaler Zeit — `toISOString()` wäre UTC und nachts der falsche Tag. */
+export function localIsoDay(date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 export function isValidHexColor(s: string): boolean {
   return /^#[0-9a-fA-F]{6}$/.test(s);
 }

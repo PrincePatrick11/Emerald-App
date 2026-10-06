@@ -22,6 +22,7 @@ import {
   type BackupFile,
   type BackupPreview,
   exportDatabase,
+  FULL_BACKUP_OPTIONS,
   openBackupFile,
   importDatabase,
 } from '../../../lib/dbBackup';
@@ -31,19 +32,8 @@ import AutoBackupSection from './AutoBackupSection';
 import SettingsChoiceButton from './SettingsChoiceButton';
 import SettingsSection, { SettingsCheckboxGrid, SettingsStatus } from './SettingsSection';
 
-const DEFAULT_EXPORT_OPTIONS: BackupOptions = {
-  includeJournal: true,
-  includeWiki: true,
-  includeOperations: true,
-  includeAltars: true,
-  includeTasks: true,
-  includeTags: true,
-  includeLexicon: true,
-  dateFrom: '',
-  dateTo: '',
-  includeDeleted: false,
-  includeSettings: true,
-};
+/** Alles wie beim automatischen Backup — bis auf den Papierkorb, den nimmt man von Hand dazu. */
+const DEFAULT_EXPORT_OPTIONS: BackupOptions = { ...FULL_BACKUP_OPTIONS, includeDeleted: false };
 
 /** Record statt Liste: eine neue Einstellungs-Gruppe ohne Beschriftung ist ein Typfehler. */
 const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {

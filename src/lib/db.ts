@@ -41,6 +41,7 @@ const _initPromises = new Map<string, Promise<Database>>();
  * checkbox tries to do.
  */
 export async function resetDbCache(): Promise<void> {
+  _epoch++;
   // Erst die laufenden Ladevorgaenge abwarten, dann leeren. Ein `getDb()`
   // traegt seine Verbindung erst *nach* `Database.load` in den Cache ein — wer
   // nur leert, uebersieht genau die: sie landet danach in der frisch geleerten
@@ -72,6 +73,17 @@ let _blocked = false;
  * und fangen das ab — die verlorene Änderung gehört zu dem Vault, der gerade
  * gelöscht wird.
  */
+/**
+ * Zählt jedes Schließen der Verbindungen. Wer über mehrere awaits hinweg liest
+ * (das automatische Backup), merkt daran, dass die Datenbank zwischendurch
+ * ausgetauscht wurde — auch wenn am Ende wieder alles aussieht wie vorher.
+ */
+let _epoch = 0;
+
+export function dbEpoch(): number {
+  return _epoch;
+}
+
 export async function withDbClosed<T>(fn: () => Promise<T>): Promise<T> {
   _blocked = true;
   try {

@@ -35,7 +35,11 @@ const NAME_SUFFIX: &str = ".emeralddb";
 const TAG_LEN: usize = 8;
 
 /// The picked folder is not there right now — an unplugged disk, most likely.
-pub const DIR_MISSING: &str = "AUTO_BACKUP_DIR_MISSING";
+const DIR_MISSING: &str = "AUTO_BACKUP_DIR_MISSING";
+
+/// What the settings page offers for "keep". Checked here as well: a caller
+/// that could pass `1` would wipe the history with a single call.
+const KEEP_CHOICES: [u32; 4] = [3, 5, 10, 30];
 
 /// Serialises read-modify-write of [`STATE_FILE`].
 static STATE_LOCK: Mutex<()> = Mutex::new(());
@@ -136,7 +140,7 @@ fn write_in(dir: &Path, tag: &str, date: &str, bytes: &[u8]) -> Result<PathBuf, 
         return Err("invalid backup date".to_string());
     }
     let name = file_name(tag, date);
-    vault::write_atomic(dir, &name, &format!("{name}.tmp"), bytes)?;
+    vault::write_atomic_anywhere(dir, &name, &format!("{name}.tmp"), bytes)?;
     Ok(dir.join(name))
 }
 
@@ -155,9 +159,10 @@ struct Target {
 /// folder on whatever now answers to that path.
 fn target(app: &tauri::AppHandle, vault_id: &str) -> Result<Target, String> {
     let vault_dir = vault::vault_dir(app, vault_id)?;
-    if let Some(custom) = load_state(app).dirs.remove(vault_id) {
+    if let Some(custom) = load_state(app).dirs.get(vault_id).cloned() {
         let dir = PathBuf::from(&custom);
-        let missing = !dir.is_dir();
+        // Der Dialog liefert nur absolute Pfade; alles andere stand nicht von hier in der Datei.
+        let missing = !dir.is_absolute() || !dir.is_dir();
         return Ok(Target { custom: Some(custom), dir, missing });
     }
     vault::directory_state(&vault_dir)?;
@@ -185,21 +190,27 @@ pub struct AutoBackupStatus {
     today: String,
 }
 
-#[tauri::command(async)]
-pub fn auto_backup_status(app: tauri::AppHandle, vault_id: String) -> Result<AutoBackupStatus, String> {
-    let target = target(&app, &vault_id)?;
-    let newest = if target.missing {
-        None
-    } else {
-        own_backups(&target.dir, vault_tag(&vault_id))?.pop().map(|(date, _)| date)
-    };
-    Ok(AutoBackupStatus {
-        custom_dir: target.custom,
-        dir: target.dir.to_string_lossy().into_owned(),
-        missing: target.missing,
-        newest,
-        today: today(),
+/// On the blocking pool: the folder may be a share that takes its time to
+/// answer, or never does.
+#[tauri::command]
+pub async fn auto_backup_status(app: tauri::AppHandle, vault_id: String) -> Result<AutoBackupStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let target = target(&app, &vault_id)?;
+        let newest = if target.missing {
+            None
+        } else {
+            own_backups(&target.dir, vault_tag(&vault_id))?.pop().map(|(date, _)| date)
+        };
+        Ok(AutoBackupStatus {
+            custom_dir: target.custom,
+            dir: target.dir.to_string_lossy().into_owned(),
+            missing: target.missing,
+            newest,
+            today: today(),
+        })
     })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Opens the folder dialog and remembers the choice for this vault. `None`
@@ -211,6 +222,7 @@ pub async fn pick_auto_backup_dir(
     window: tauri::WebviewWindow,
     vault_id: String,
 ) -> Result<Option<String>, String> {
+    // Nur eine registrierte Vault-Id bekommt einen Ordner.
     vault::vault_dir(&app, &vault_id)?;
     tauri::async_runtime::spawn_blocking(move || {
         let Some(picked) = app.dialog().file().set_parent(&window).blocking_pick_folder() else {
@@ -220,7 +232,9 @@ pub async fn pick_auto_backup_dir(
         if !dir.is_absolute() || !dir.is_dir() {
             return Err(DIR_MISSING.to_string());
         }
-        let path = dir.to_string_lossy().into_owned();
+        // Ein Name, der kein UTF-8 ist, käme verlustbehaftet in die Datei und
+        // passte danach nie wieder auf den Ordner.
+        let path = dir.to_str().ok_or("folder name is not valid UTF-8")?.to_string();
         update_state(&app, |state| {
             state.dirs.insert(vault_id, path.clone());
         })?;
@@ -233,18 +247,11 @@ pub async fn pick_auto_backup_dir(
 /// Back to the vault's own `backup/` folder.
 #[tauri::command(async)]
 pub fn reset_auto_backup_dir(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
+    // Nur eine registrierte Vault-Id, wie beim Wählen.
     vault::vault_dir(&app, &vault_id)?;
     update_state(&app, |state| {
         state.dirs.remove(&vault_id);
     })
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AutoBackupWritten {
-    path: String,
-    date: String,
-    pruned: u32,
 }
 
 /// Writes today's automatic backup of the vault — `content` is its JSON
@@ -256,25 +263,25 @@ pub async fn write_auto_backup(
     vault_id: String,
     content: String,
     keep: Option<u32>,
-) -> Result<AutoBackupWritten, String> {
+) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
+        if keep.is_some_and(|keep| !KEEP_CHOICES.contains(&keep)) {
+            return Err("invalid keep count".to_string());
+        }
         let sealed = crate::backup::seal_for_vault(&app, &vault_id, &content)?;
         let target = target(&app, &vault_id)?;
         if target.missing {
             return Err(DIR_MISSING.to_string());
         }
         let tag = vault_tag(&vault_id);
-        let date = today();
-        let path = write_in(&target.dir, tag, &date, &sealed)?;
+        write_in(&target.dir, tag, &today(), &sealed)?;
         // Das Backup steht. Scheitert das Aufräumen, ist das kein gescheitertes Backup.
-        let pruned = match keep {
-            Some(keep) => prune_in(&target.dir, tag, keep).unwrap_or_else(|e| {
+        if let Some(keep) = keep {
+            if let Err(e) = prune_in(&target.dir, tag, keep) {
                 eprintln!("[auto-backup] prune failed: {e}");
-                0
-            }),
-            None => 0,
-        };
-        Ok(AutoBackupWritten { path: path.to_string_lossy().into_owned(), date, pruned })
+            }
+        }
+        Ok(())
     })
     .await
     .map_err(|e| e.to_string())?

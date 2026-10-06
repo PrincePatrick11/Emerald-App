@@ -1,7 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
+import { dbEpoch } from './db';
 import { drainSerialized } from './serialize';
 import { editorSavesSuspended } from './editorLock';
-import { vaultKeyStatus } from './vaultKeys';
+import { localIsoDay } from './helpers';
+import { keyErrorOf, vaultKeyStatus } from './vaultKeys';
 import type { BackupSettings } from './vaultSettings';
 import { useSettingsStore } from '../store/settingsStore';
 import { hasActiveVault, useVaultStore } from '../store/vaultStore';
@@ -17,18 +19,16 @@ import { useAutoBackupStore, type AutoBackupError, type AutoBackupStatus } from 
  * ein Pfad hinüber.
  */
 
-/** Abstand zum Öffnen des Vaults: der Start gehört dem Laden, nicht dem Backup. */
+/** Abstand zum Öffnen des Vaults und zur letzten Änderung der Einstellung: der
+ *  Start gehört dem Laden, und wer Knöpfe durchprobiert, löst nur einen Lauf aus. */
 const SETTLE_MS = 5_000;
 /** Für Sitzungen, die über einen Tageswechsel offen bleiben. */
 const RECHECK_MS = 60 * 60 * 1000;
 
 /** Erwartet von `auto_backup.rs`, wenn der gewählte Ordner fehlt. */
 const DIR_MISSING = 'AUTO_BACKUP_DIR_MISSING';
-
-function isoDay(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
+/** Wirft `getDb()`, solange die Datenbank bewusst geschlossen ist (`withDbClosed`). */
+const DB_CLOSED = 'DB_CLOSED';
 
 /**
  * Ob ein Backup ansteht. `newest` und `today` sind lokale Tage (`YYYY-MM-DD`),
@@ -39,26 +39,44 @@ function isoDay(date: Date): string {
 export function isBackupDue(settings: Pick<BackupSettings, 'interval' | 'weekday'>, newest: string | null, today: string): boolean {
   if (!newest) return true;
   if (settings.interval === 'daily') return newest < today;
+  // Der Erste dieses Monats.
   if (settings.interval === 'monthly') return newest < `${today.slice(0, 8)}01`;
   // Der letzte gewählte Wochentag, heute eingeschlossen.
   const [y, m, d] = today.split('-').map(Number);
   const day = new Date(y, m - 1, d);
   day.setDate(day.getDate() - ((day.getDay() - settings.weekday + 7) % 7));
-  return newest < isoDay(day);
+  return newest < localIsoDay(day);
 }
 
-function errorCode(err: unknown): AutoBackupError {
-  return String(err instanceof Error ? err.message : err).includes(DIR_MISSING) ? 'dirMissing' : 'failed';
+// `errorSeen` bedeutet nur etwas, solange `error` gesetzt ist — deshalb werden
+// beide nur hier und nur zusammen geschrieben.
+
+function setError(vaultId: string, error: AutoBackupError): void {
+  useAutoBackupStore.setState((s) => {
+    // Der Stand eines anderen Vaults gehört nicht neben diesen Fehler.
+    if (s.vaultId !== vaultId) return { vaultId, status: null, error, errorSeen: false };
+    // Derselbe Fehler bei der stündlichen Wiederholung holt den Punkt nicht zurück.
+    return { error, errorSeen: s.error === error ? s.errorSeen : false };
+  });
 }
 
-function setError(error: AutoBackupError): void {
-  // Derselbe Fehler bei der stündlichen Wiederholung holt den Punkt nicht zurück.
-  useAutoBackupStore.setState((s) => ({ error, errorSeen: s.error === error ? s.errorSeen : false }));
+function clearError(vaultId: string): void {
+  if (useAutoBackupStore.getState().vaultId === vaultId) useAutoBackupStore.setState({ error: null, errorSeen: false });
 }
 
-/** Liest Zielordner und jüngstes Backup des Vaults neu in den Store. */
+/** Der Punkt am Zahnrad hat seine Aufgabe erfüllt. */
+export function markAutoBackupErrorSeen(): void {
+  useAutoBackupStore.setState({ errorSeen: true });
+}
+
+/**
+ * Liest Zielordner und jüngstes Backup des Vaults neu in den Store. Ist
+ * inzwischen ein anderer Vault offen, bleibt der Store, wie er ist — sonst
+ * überschriebe das Ende eines Laufs den Stand des Nachfolgers.
+ */
 export async function refreshAutoBackupStatus(vaultId: string): Promise<AutoBackupStatus> {
   const status = await invoke<AutoBackupStatus>('auto_backup_status', { vaultId });
+  if (useVaultStore.getState().activeVaultId !== vaultId) return status;
   useAutoBackupStore.setState((s) => {
     if (s.vaultId !== vaultId) return { vaultId, status, error: null, errorSeen: false };
     // Der Ordner ist wieder da oder ein anderer gewählt: die Meldung dazu hat sich erledigt.
@@ -84,50 +102,57 @@ export async function resetAutoBackupDir(vaultId: string): Promise<void> {
 /**
  * Schreibt ein Backup des offenen Vaults, wenn eines fällig ist — mit `force`
  * auch sonst („Jetzt sichern"). Tut still nichts, solange kein Vault offen
- * und entsperrt ist, ein Import läuft oder schon ein Lauf unterwegs ist.
+ * und entsperrt ist. `'busy'`, wenn es gerade nicht ging — ein Lauf ist
+ * unterwegs oder ein Import hält die Datenbank — und sich ein neuer Versuch lohnt.
  */
-export async function runAutoBackup({ force = false }: { force?: boolean } = {}): Promise<void> {
-  if (useAutoBackupStore.getState().running) return;
+export async function runAutoBackup({ force = false }: { force?: boolean } = {}): Promise<'done' | 'busy'> {
   const vaultState = useVaultStore.getState();
   const vaultId = vaultState.activeVaultId;
-  if (!hasActiveVault(vaultState) || vaultState.locked) return;
+  if (!hasActiveVault(vaultState) || vaultState.locked) return 'done';
   // Die Einstellungen eines anderen Vaults dürfen diesen nie sichern (wie `trashRetentionFor`).
   const settingsState = useSettingsStore.getState();
-  if (settingsState.vaultId !== vaultId) return;
+  if (settingsState.vaultId !== vaultId) return 'done';
   const { backup } = settingsState.settings;
-  if (!force && !backup.auto) return;
-  if (editorSavesSuspended()) return;
+  if (!force && !backup.auto) return 'done';
+  if (useAutoBackupStore.getState().running || editorSavesSuspended()) return 'busy';
 
-  /** Der Vault ist noch derselbe und nichts tauscht gerade die Datenbank unter ihm aus. */
+  // Zählt jedes Schließen der Datenbank mit: ein Passwortwechsel oder Import,
+  // der mitten im Lauf beginnt *und* endet, sähe am Schluss sonst aus wie Ruhe —
+  // und das Backup enthielte nur, was vor dem Austausch gelesen wurde.
+  const epoch = dbEpoch();
+  /** Der Vault ist noch derselbe und nichts hat die Datenbank unter dem Lauf ausgetauscht. */
   const stillCurrent = () => {
     const now = useVaultStore.getState();
-    return now.activeVaultId === vaultId && !now.locked && !editorSavesSuspended();
+    return now.activeVaultId === vaultId && !now.locked && !editorSavesSuspended() && dbEpoch() === epoch;
   };
 
   useAutoBackupStore.setState({ running: true });
   try {
-    if (!(await vaultKeyStatus(vaultId)).unlocked) return;
+    if (!(await vaultKeyStatus(vaultId)).unlocked) return 'done';
     const status = await refreshAutoBackupStatus(vaultId);
     if (status.missing) {
-      setError('dirMissing');
-      return;
+      setError(vaultId, 'dirMissing');
+      return 'done';
     }
-    if (!force && !isBackupDue(backup, status.newest, status.today)) return;
+    if (!force && !isBackupDue(backup, status.newest, status.today)) return 'done';
 
     await drainSerialized();
     // Dynamisch: `dbBackup` soll nicht in den Haupt-Chunk (siehe LeftSidebarRail).
     const { buildBackup, FULL_BACKUP_OPTIONS } = await import('./dbBackup');
     const content = JSON.stringify(await buildBackup(FULL_BACKUP_OPTIONS));
-    if (!stillCurrent()) return;
+    if (!stillCurrent()) return 'busy';
 
     await invoke('write_auto_backup', { vaultId, content, keep: backup.keep });
-    useAutoBackupStore.setState({ error: null, errorSeen: false });
+    clearError(vaultId);
     await refreshAutoBackupStatus(vaultId);
+    return 'done';
   } catch (err) {
-    // Gesperrt, gewechselt oder mitten im Import: kein Fehler, der nächste Takt versucht es wieder.
-    if (!stillCurrent()) return;
+    // Gesperrt, gewechselt, mitten im Import oder Passwortwechsel: kein Fehler,
+    // der nächste Versuch findet wieder eine Datenbank vor.
+    if (!stillCurrent() || keyErrorOf(err).includes(DB_CLOSED)) return 'busy';
     console.error('[auto-backup] failed', err);
-    setError(errorCode(err));
+    setError(vaultId, keyErrorOf(err).includes(DIR_MISSING) ? 'dirMissing' : 'failed');
+    return 'done';
   } finally {
     useAutoBackupStore.setState({ running: false });
   }
@@ -142,12 +167,15 @@ export function startAutoBackup(): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const schedule = () => {
     clearTimeout(timer);
-    timer = setTimeout(() => void runAutoBackup(), SETTLE_MS);
+    timer = setTimeout(check, SETTLE_MS);
   };
+  // Ein Auslöser, der auf einen laufenden Lauf oder einen Import trifft, ginge
+  // sonst verloren — bis zur nächsten vollen Stunde.
+  const check = () => void runAutoBackup().then((outcome) => { if (outcome === 'busy') schedule(); });
   const unsubscribe = useSettingsStore.subscribe((state, prev) => {
     if (state.vaultId !== prev.vaultId || state.settings.backup !== prev.settings.backup) schedule();
   });
-  const interval = setInterval(() => void runAutoBackup(), RECHECK_MS);
+  const interval = setInterval(check, RECHECK_MS);
   schedule();
   return () => {
     clearTimeout(timer);

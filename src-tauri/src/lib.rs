@@ -116,6 +116,34 @@ pub(crate) fn is_within_allowed_roots(path: &Path, allowed_roots: &[PathBuf]) ->
     allowed_roots.iter().any(|root| path.starts_with(root))
 }
 
+/// Files in the app data directory that only their own Rust module may write:
+/// what they hold decides where the app writes or what it trusts, and
+/// `write_file` reaches that directory. `vaults.json` is not among them — the
+/// frontend owns it.
+const RESERVED_STATE_FILES: [&str; 3] = ["auto-backup.json", "auto-backup.json.tmp", "update.json"];
+
+/// Case-insensitive, like the file systems of Windows and macOS.
+fn is_reserved_state_file(target: &Path, app_data_dir: &Path) -> bool {
+    target.parent() == Some(app_data_dir)
+        && target
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| RESERVED_STATE_FILES.iter().any(|reserved| reserved.eq_ignore_ascii_case(name)))
+}
+
+fn refuse_reserved_state_file(app: &tauri::AppHandle, target: PathBuf) -> Result<PathBuf, String> {
+    let reserved = app
+        .path()
+        .app_data_dir()
+        .ok()
+        .and_then(|dir| std::fs::canonicalize(dir).ok())
+        .is_some_and(|dir| is_reserved_state_file(&target, &dir));
+    if reserved {
+        return Err("access denied: reserved file".to_string());
+    }
+    Ok(target)
+}
+
 /// Resolves a user-chosen destination and returns the path that may be written.
 ///
 /// `write_file` and `export_image` ran the same sequence side by side, and the
@@ -166,11 +194,11 @@ pub(crate) fn guarded_write_target(app: &tauri::AppHandle, path: &str) -> Result
             if !is_within_allowed_roots(&canonical_target, &allowed_roots) {
                 return Err("access denied: path outside allowed directories".to_string());
             }
-            Ok(canonical_target)
+            refuse_reserved_state_file(app, canonical_target)
         }
         Err(_) => {
             let filename = target.file_name().ok_or("invalid path")?;
-            Ok(canonical_parent.join(filename))
+            refuse_reserved_state_file(app, canonical_parent.join(filename))
         }
     }
 }
@@ -905,6 +933,25 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod reserved_state_file_tests {
+    use super::*;
+
+    #[test]
+    fn only_the_reserved_names_in_the_app_data_dir_are_refused() {
+        let data = Path::new("/home/u/.local/share/emerald");
+        for name in ["auto-backup.json", "AUTO-BACKUP.JSON", "auto-backup.json.tmp", "update.json", "Update.Json"] {
+            assert!(is_reserved_state_file(&data.join(name), data), "{name}");
+        }
+        for name in ["vaults.json", "auto-backup.json.bak", "notes.json"] {
+            assert!(!is_reserved_state_file(&data.join(name), data), "{name}");
+        }
+        // Derselbe Name anderswo ist eine gewöhnliche Datei.
+        assert!(!is_reserved_state_file(&data.join("vaults").join("update.json"), data));
+        assert!(!is_reserved_state_file(Path::new("/home/u/Documents/auto-backup.json"), data));
+    }
 }
 
 #[cfg(test)]

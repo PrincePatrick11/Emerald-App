@@ -35,7 +35,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 
 ## Command Surface
 
-`src-tauri/src/lib.rs` registers **54 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
+`src-tauri/src/lib.rs` registers **58 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
 
 | Command | Defined in | Notes |
 |---|---|---|
@@ -43,7 +43,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 | `vault_key_status`, `keychain_available`, `vault_create_key`, `vault_unlock`, `vault_unlock_remembered`, `vault_set_remembered`, `vault_is_remembered`, `vault_lock` | `keys.rs` | the key lifecycle. Take a vault id and, for unlocking, a password; none returns a key. `vault_create_key` only works on a vault with no `vault.key` and no database |
 | `vault_encrypt_existing`, `vault_change_password`, `vault_recover` | `reencrypt.rs` | put a vault under a new key; each returns the new recovery key. They need the current password or recovery key — an unlocked session alone is not enough to change the password |
 | `auto_backup_status`, `pick_auto_backup_dir`, `reset_auto_backup_dir`, `write_auto_backup` | `auto_backup.rs` | take a vault id and never a path; see [Automatic Backups](#automatic-backups) |
-| `write_backup_file`, `read_backup_file` | `backup.rs` | the only way to write or read a `.emeralddb`; take an extension check and the same path guards as `write_file`/`read_file` |
+| `write_backup_file`, `read_backup_file` | `backup.rs` | the only way to write a `.emeralddb` to a chosen path, or to read one (`write_auto_backup` is the second writer, sealing through the same `seal_for_vault`); take an extension check and the same path guards as `write_file`/`read_file` |
 | `write_file`, `read_file`, `export_image` | `lib.rs` | path-taking; confined by `guarded_write_target` / `guarded_read_path` (see [Path Confinement](#path-confinement)) |
 | `export_pdf` | `lib.rs` → `pdf_export/` | hidden-window PDF render, per-platform |
 | `ensure_app_storage_dirs` | `lib.rs` | creates the app's own data and config dirs; takes no path |
@@ -130,11 +130,12 @@ The fixed roots include `document_dir()` and `app_data_dir()`, so a vault at its
 
 The automatic backup is the one place where Emerald writes a document outside the fixed roots, and it does so without any command taking a path (`auto_backup.rs`).
 
-- **The target folder is never an IPC argument.** It is either the vault's own `backup/` folder — resolved from the registry like the database next to it, so it also works for a vault outside the roots — or a folder the user picked. `pick_auto_backup_dir` opens the native folder dialog *in Rust* and stores the result itself; the frontend receives the path for display only and has no command to set one.
+- **The target folder is never an IPC argument.** It is either the vault's own `backup/` folder — resolved from the registry like the database next to it, so it also works for a vault outside the roots — or a folder the user picked. `pick_auto_backup_dir` opens the native folder dialog *in Rust* and stores the result itself; the frontend receives the path for display only and has no command to set one. That includes `write_file`: `guarded_write_target` refuses the reserved state files of the app data directory (`auto-backup.json`, its temp name, and `update.json`), compared case-insensitively, so the stored folder cannot be planted either. A stored path that is not absolute counts as missing.
 - **The picked folder belongs to the installation.** It is kept per vault id in `{appDataDir}/auto-backup.json`, not in the vault's `settings.json`: settings travel in backups, and an imported backup must not be able to bring a write target along. What *is* in `settings.json` (on/off, interval, weekday, how many to keep) names no location.
 - **The file name is built in Rust**: `emerald-auto-{first 8 characters of the vault id}-{YYYY-MM-DD}.emeralddb`, the date from the local clock. The content is sealed like every backup, and written through a temp file and a rename, which replaces a link under the target name instead of following it.
 - **A picked folder is never created.** One that is gone — an unplugged disk — is reported as `AUTO_BACKUP_DIR_MISSING` rather than silently replaced by a new folder on whatever now answers to that path.
-- **Pruning deletes by exact name only.** Regular files matching this vault's own pattern, oldest first, and never the newest; a manual `emerald-backup-…` file, another vault's automatic backups and anything else in the folder are not candidates.
+- **Reading is not widened.** `read_backup_file` still goes through `guarded_read_path`: an automatic backup in a picked folder outside the fixed roots has to be copied into a user folder before Import can open it.
+- **Pruning deletes by exact name only.** Regular files matching this vault's own pattern, oldest first, and never the newest — `keep` must be one of the offered counts (3, 5, 10, 30) or absent, so no single call can wipe the history; a manual `emerald-backup-…` file, another vault's automatic backups and anything else in the folder are not candidates.
 
 **`delete_vault_files`** removes only the vault's own artefacts **by name**, never with `remove_dir_all`: the app puts its database into whatever folder the user chose, so a vault created straight in Documents would otherwise take Documents with it. It refuses unless the folder contains an `emerald.db` (`not a vault directory: no database found`), then deletes:
 
@@ -229,7 +230,7 @@ Validation rules against malformed, oversized, or untrusted data, mostly in the 
 
 `.emeralddb` backup files are untrusted input — they can be hand-edited or come from another machine. `insertRows()` in `src/lib/dbBackup.ts` (used by every import mode) builds each `INSERT`'s column list by intersecting the row's keys with `PRAGMA table_info(<table>)` of the real, hardcoded target table. A crafted backup can at worst contribute an extra key that is silently dropped (or, if no valid column remains, cause the row to be skipped) — it can never inject SQL through the column list. Row *values* go through parameterised placeholders (`$1, $2, …`).
 
-An imported row's *id* is a value too, and stays untrusted after the import — it can resurface in an unrelated later export. `exportDatabase()` scopes related tables with `IN (...)` clauses (e.g. `altar_items` to the placements of the exported altars). sqlx splits a statement on `;` and executes each part, so an id like `'; DROP TABLE …; --` concatenated into the SQL would run as a second statement during a harmless-looking export. `selectWhereIn()` therefore binds every id as a parameter, chunked at 400 per query (`IN_CHUNK`) so the statement stays independent of vault size.
+An imported row's *id* is a value too, and stays untrusted after the import — it can resurface in an unrelated later export. `buildBackup()` (behind `exportDatabase()` and the automatic backup) scopes related tables with `IN (...)` clauses (e.g. `altar_items` to the placements of the exported altars). sqlx splits a statement on `;` and executes each part, so an id like `'; DROP TABLE …; --` concatenated into the SQL would run as a second statement during a harmless-looking export. `selectWhereIn()` therefore binds every id as a parameter, chunked at 400 per query (`IN_CHUNK`) so the statement stays independent of vault size.
 
 ## HTML Escaping in Exports
 

@@ -93,17 +93,23 @@ export function formatIsoDateLong(iso: string): string {
   return formatEntryDateLong(date);
 }
 
+/** Wochentag wie `Date.getDay()`: 0 = Sonntag. */
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
 /**
  * Der Name eines Wochentags (`Date.getDay()`: 0 = Sonntag) in der App-Sprache —
  * `short` für Auswahlknöpfe („Mo"), `long` für deren Tooltip („Montag").
  */
-export function formatWeekday(day: number, width: 'short' | 'long'): string {
+export function formatWeekday(day: Weekday, width: 'short' | 'long'): string {
   // Der 1. Januar 2023 war ein Sonntag.
-  return format(new Date(2023, 0, 1 + day), width === 'short' ? 'EEEEEE' : 'EEEE', { locale: activeLocale });
+  const name = format(new Date(2023, 0, 1 + day), width === 'short' ? 'EEEEEE' : 'EEEE', { locale: activeLocale });
+  // date-fns schreibt Wochentage auf Spanisch und Französisch klein („lu"); als
+  // Beschriftung eines Knopfes stehen sie für sich und beginnen groß.
+  return name.charAt(0).toLocaleUpperCase() + name.slice(1);
 }
 
 /** Die sieben Wochentage, beginnend mit dem ersten der App-Sprache (enUS: Sonntag, sonst Montag). */
-export function weekdaysInLocaleOrder(): number[] {
+export function weekdaysInLocaleOrder(): Weekday[] {
   const first = activeLocale.options?.weekStartsOn ?? 0;
-  return Array.from({ length: 7 }, (_, i) => (first + i) % 7);
+  return Array.from({ length: 7 }, (_, i) => ((first + i) % 7) as Weekday);
 }

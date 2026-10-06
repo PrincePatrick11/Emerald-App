@@ -8,7 +8,7 @@ import { pickAutoBackupDir, refreshAutoBackupStatus, resetAutoBackupDir, runAuto
 import { formatIsoDateLong, formatWeekday, weekdaysInLocaleOrder } from '../../../lib/formatDate';
 import {
   BACKUP_INTERVAL_OPTIONS, BACKUP_KEEP_OPTIONS,
-  type BackupInterval, type BackupWeekday,
+  type BackupInterval,
 } from '../../../lib/vaultSettings';
 import { useAutoBackupStore, type AutoBackupError } from '../../../store/autoBackupStore';
 import { useSettingsStore } from '../../../store/settingsStore';
@@ -56,10 +56,11 @@ export default function AutoBackupSection() {
     refreshAutoBackupStatus(vaultId).catch((e: unknown) => console.error('[auto-backup] status failed', e));
   }, [vaultId]);
 
-  async function changeFolder(change: () => Promise<unknown>) {
+  /** `change` meldet `false`, wenn nichts geändert wurde (Dialog abgebrochen). */
+  async function changeFolder(change: () => Promise<boolean | void>) {
     setFolderFailed(false);
     try {
-      await change();
+      if ((await change()) === false) return;
       // Der neue Ordner ist leer oder trägt einen anderen Stand — gleich prüfen, ob etwas fällig ist.
       void runAutoBackup();
     } catch (e) {
@@ -105,7 +106,7 @@ export default function AutoBackupSection() {
                     <SettingsChoiceButton
                       key={day}
                       active={backup.weekday === day}
-                      onClick={() => update('backup', { weekday: day as BackupWeekday })}
+                      onClick={() => update('backup', { weekday: day })}
                       title={formatWeekday(day, 'long')}
                     >
                       {formatWeekday(day, 'short')}

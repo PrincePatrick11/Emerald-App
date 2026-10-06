@@ -5,6 +5,8 @@ import { AUX_VIEWS, MODULE_LIST, type ViewId } from '../../lib/modules';
 import { useUIStore } from '../../store/uiStore';
 import { useVaultStore } from '../../store/vaultStore';
 import { useAutoBackupStore } from '../../store/autoBackupStore';
+import { useSettingsStore } from '../../store/settingsStore';
+import { markAutoBackupErrorSeen } from '../../lib/autoBackup';
 import { asUpdateError, checkForUpdate, updateSettings } from '../../lib/updates';
 import VaultModal, { VaultGlyph } from './VaultModal';
 
@@ -68,9 +70,6 @@ export default function LeftSidebarRail() {
   // sie meldet sich nie von selbst — ein Fenster, das ungefragt aufgeht, waere
   // die Art Unterbrechung, die eine lokale App nicht haben soll.
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
-  // Ein gescheitertes automatisches Backup meldet sich am selben Punkt: still
-  // scheitern dürfte es am wenigsten. Das Update geht vor, es ist die seltenere Nachricht.
-  const backupFailed = useAutoBackupStore((s) => s.error !== null && !s.errorSeen && s.vaultId === activeVaultId);
   useEffect(() => {
     let dead = false;
     void checkOnStart().then((version) => {
@@ -78,6 +77,14 @@ export default function LeftSidebarRail() {
     });
     return () => { dead = true; };
   }, []);
+
+  // Ein gescheitertes automatisches Backup meldet sich am selben Punkt: still
+  // scheitern dürfte es am wenigsten. Nur solange es eingeschaltet ist — sonst
+  // führte der Punkt auf eine Seite, die nichts dazu zeigt.
+  const backupOn = useSettingsStore((s) => s.settings.backup.auto);
+  const backupFailed = useAutoBackupStore((s) => s.error !== null && !s.errorSeen && s.vaultId === activeVaultId) && backupOn;
+  // Was das Zahnrad gerade meldet. Das Update geht vor, es ist die seltenere Nachricht.
+  const notice = updateVersion ? 'update' : backupFailed ? 'backup' : null;
 
   // Ein Knopf pro Ansicht; hervorgehoben ist er, solange seine Ansicht offen
   // ist — auch mit einem geoeffneten Eintrag darin.
@@ -141,25 +148,25 @@ export default function LeftSidebarRail() {
           // das Fenster wieder auf „Allgemein" aufginge, weil beide
           // Zustandsaenderungen im selben Rendern landen.
           onClick={() => {
-            setSettingsPage(updateVersion ? 'updates' : backupFailed ? 'backup' : 'general');
+            setSettingsPage(notice === 'update' ? 'updates' : notice === 'backup' ? 'backup' : 'general');
             setSettingsOpen(true);
             setUpdateVersion(null);
-            if (updateVersion) dotSeen = true;
-            else if (backupFailed) useAutoBackupStore.setState({ errorSeen: true });
+            if (notice === 'update') dotSeen = true;
+            if (notice === 'backup') markAutoBackupErrorSeen();
           }}
           title={
-            updateVersion ? t('settings.updateFound', { version: updateVersion })
-              : backupFailed ? t('settings.autoBackupFailedDot')
+            notice === 'update' ? t('settings.updateFound', { version: updateVersion })
+              : notice === 'backup' ? t('settings.autoBackupFailedDot')
                 : t('nav.settings')
           }
           className="relative"
         >
           <Settings size={18} />
-          {(updateVersion || backupFailed) && (
+          {notice && (
             <span
               aria-hidden
               className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: updateVersion ? 'var(--accent)' : 'var(--danger-text)' }}
+              style={{ backgroundColor: notice === 'update' ? 'var(--accent)' : 'var(--danger-text)' }}
             />
           )}
         </RailButton>

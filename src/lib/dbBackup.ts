@@ -637,7 +637,7 @@ async function selectWhereIn(
 
 /** Alles, was im Vault liegt — samt Papierkorb und Einstellungen. Die Auswahl
  *  des automatischen Backups: eines mit Lücken wäre eine Falle. */
-export const FULL_BACKUP_OPTIONS: BackupOptions = {
+export const FULL_BACKUP_OPTIONS: Required<BackupOptions> = {
   includeJournal: true,
   includeWiki: true,
   includeOperations: true,

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { invoke } from '@tauri-apps/api/core';
 import {
   type Vault,
   loadVaultsFile,
@@ -208,6 +209,11 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     // Vor dem Entfernen: ein aufgeschobenes Mitschreiben legte sonst eine
     // `drafts.json` in den Ordner, der gerade verschwinden soll.
     if (wasActive) await detachDrafts();
+    // Der für das automatische Backup gewählte Ordner gehört zur Installation
+    // (`auto_backup.rs`) und bliebe sonst für immer stehen. Vor dem Entfernen:
+    // danach kennt Rust die Id nicht mehr. Scheitern darf das Entfernen daran nicht.
+    await invoke('reset_auto_backup_dir', { vaultId: id })
+      .catch((e: unknown) => console.warn('[vault] forget backup folder failed', e));
 
     // Der Aktivwechsel gehoert in denselben Schreibvorgang wie das Entfernen:
     // dazwischen stuende in `vaults.json` sonst ein aktiver Vault, der nicht

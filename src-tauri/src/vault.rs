@@ -1044,6 +1044,17 @@ fn write_json_in(dir: &Path, name: &str, temp_name: &str, max_bytes: u64, conten
 /// Writes `bytes` to `dir/name` through `dir/temp_name` and a rename, so a
 /// crash leaves either the old file or the new one, never half of either.
 pub(crate) fn write_atomic(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
+    write_atomic_synced(dir, name, temp_name, bytes, true)
+}
+
+/// [`write_atomic`] for a folder that is not the vault's: a volume that cannot
+/// flush to disk — some network shares refuse it — still gets the file. For a
+/// backup that is the better answer; for `vault.key` it would not be.
+pub(crate) fn write_atomic_anywhere(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
+    write_atomic_synced(dir, name, temp_name, bytes, false)
+}
+
+fn write_atomic_synced(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must_sync: bool) -> Result<(), String> {
     use std::io::Write;
 
     // Was unter dem Temp-Namen liegt — Rest eines Absturzes oder ein
@@ -1059,7 +1070,13 @@ pub(crate) fn write_atomic(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]
         // Erst auf der Platte, dann umbenennen: sonst kann nach einem
         // Stromausfall eine leere Datei unter dem Zielnamen stehen — bei
         // `vault.key` hieße das, der Vault ist verloren.
-        .and_then(|mut file| file.write_all(bytes).and_then(|()| file.sync_all()));
+        .and_then(|mut file| {
+            file.write_all(bytes)?;
+            match file.sync_all() {
+                Err(e) if must_sync => Err(e),
+                _ => Ok(()),
+            }
+        });
     if let Err(e) = written {
         std::fs::remove_file(&temp).ok();
         return Err(format!("write {}: {e}", temp.display()));
