@@ -18,6 +18,7 @@ export type MenuActionId =
   | 'toggle-rail'
   | 'toggle-left-list'
   | 'toggle-right-sidebar'
+  | 'toggle-view-lock'
   | 'show-splash'
   | 'export-pdf'
   | 'export-markdown'
@@ -42,6 +43,7 @@ const SELF_CONTAINED: Record<SelfContainedMenuActionId, true> = {
   'toggle-rail': true,
   'toggle-left-list': true,
   'toggle-right-sidebar': true,
+  'toggle-view-lock': true,
   'show-splash': true,
   'export-pdf': true,
   'export-markdown': true,
@@ -57,7 +59,7 @@ export const SELF_CONTAINED_MENU_ACTIONS = Object.keys(SELF_CONTAINED) as SelfCo
 
 /** Runs a menu action. Errors surface as native dialogs, matching the previous behaviour. */
 export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void> {
-  // Diese drei brauchen keinen Vault und stehen deshalb vor der Sperre
+  // Diese vier brauchen keinen Vault und stehen deshalb vor der Sperre
   // unten. Sie muessen es sogar: muda, Tauris Menue-Crate, kippt das Haekchen
   // eines nativen Check-Eintrags selbst, bevor es das Event schickt — ein
   // frueher Rueckkehren liesse auf macOS ein Haekchen ohne Zustand dahinter
@@ -72,6 +74,9 @@ export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void
       return;
     case 'toggle-right-sidebar':
       useUIStore.getState().toggleRightSidebar();
+      return;
+    case 'toggle-view-lock':
+      useUIStore.getState().toggleViewLock();
       return;
     // Zeigt den Ladebildschirm noch einmal an, bis irgendwo hingeklickt wird.
     // Steht hier oben bei den Toggles, weil er wie sie keinen Vault

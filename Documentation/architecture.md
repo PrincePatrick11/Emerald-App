@@ -239,7 +239,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `export_pdf(html, path, page_size?)` | Render HTML to a PDF at a path the frontend obtained from the `dialog` plugin, by driving the app's own webview. `page_size` (inches) overrides the default Letter page — used by the Altar export only. See [PDF Export](architecture/shell.md#pdf-export). |
 | `close_request_seen()` | The frontend's acknowledgement of a close request — see [Closing the window](architecture/shell.md#closing-the-window). |
 | `update_menu_labels(...)` | Translate the native menu's labels. macOS only in effect — see [Window Chrome](architecture/shell.md#window-chrome). |
-| `set_view_menu_checked(rail, left_list, right_sidebar)` | Mirror sidebar visibility onto the View menu's check items, on every change (not only menu-triggered ones). macOS only in effect. |
+| `set_view_menu_checked(rail, left_list, right_sidebar, view_locked)` | Mirror sidebar visibility and the view lock onto the View menu's check items, on every change (not only menu-triggered ones). macOS only in effect. |
 | `set_export_menu_enabled(entry, pdf, emerald)` | Enable/disable the native "Export as …" items for the current view (`computeMenuEnabledState`). macOS only in effect. |
 | `set_altar_export_menu_enabled(enabled)` | Enable/disable the native "Export as Image" submenu. macOS only in effect. |
 | `update_settings()` / `set_update_settings(endpoint, auto_check)` | Read/write `{appDataDir}/update.json`, the one installation-level setting; the endpoint must be a complete `https` URL. See [`security.md` → In-App Updates](security.md#in-app-updates). |
@@ -259,10 +259,11 @@ Tauri menu events (not `invoke`) come from the native menu and are received in `
 | `toggle-left-list` | View > Entry List |
 | `toggle-right-sidebar` | View > Properties |
 | `reset-sidebar-widths` | View > Reset View — resets the entry-list and right-sidebar widths and the altar library height, leaves the altar's full-window mode, **and** brings back a hidden rail, entry list and right sidebar (`uiStore.showAllPanels`; with the rail hidden, Settings and the Vault button would otherwise be unreachable) |
+| `toggle-view-lock` | View > Lock View — while on (`uiStore.viewLocked`, kept in localStorage), `AppShell` renders no resize handle on either sidebar; hiding and showing them and Reset View still work |
 | `show-splash` | View > Show Loading Screen |
 | `navigate-back` | Mouse back button (macOS NSEvent monitor) |
 | `navigate-forward` | Mouse forward button (macOS NSEvent monitor) |
 
 Only `reset-sidebar-widths` is emitted from the frontend as well — the HTML menu re-emits it so `AppShell`'s listener handles it identically on both platforms; the other menu actions run directly through `runMenuAction`.
 
-The three sidebar toggles and `show-splash` are handled at the very top of `runMenuAction`, above its no-active-vault guard: none touches a database, and the loading screen should be viewable during vault setup too. For the toggles there is a second reason: muda (Tauri's menu crate) flips a native check item's tick *itself* before emitting the event, and falling through to the guard would leave macOS showing a tick with no state behind it, which the visibility-keyed sync effect would never correct.
+The three sidebar toggles, `toggle-view-lock` and `show-splash` are handled at the very top of `runMenuAction`, above its no-active-vault guard: none touches a database, and the loading screen should be viewable during vault setup too. For the toggles there is a second reason: muda (Tauri's menu crate) flips a native check item's tick *itself* before emitting the event, and falling through to the guard would leave macOS showing a tick with no state behind it, which the visibility-keyed sync effect would never correct.

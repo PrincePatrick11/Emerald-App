@@ -902,6 +902,7 @@
     "entryList": "Eintragsliste",
     "properties": "Eigenschaften",
     "resetView": "Ansicht zurücksetzen",
+    "lockView": "Ansicht sperren",
     "showSplash": "Ladebildschirm anzeigen",
     "exportPdf": "Als PDF exportieren…",
     "exportMarkdown": "Als Markdown exportieren…",

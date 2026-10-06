@@ -31,6 +31,7 @@ export function useTitleBarMenus() {
   const railOpen = useUIStore((s) => s.railOpen);
   const leftListOpen = useUIStore((s) => s.leftListOpen);
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
+  const viewLocked = useUIStore((s) => s.viewLocked);
   const enabled = computeMenuEnabledState(activeView);
 
   const edit: TitleBarMenu = {
@@ -51,6 +52,7 @@ export function useTitleBarMenus() {
       { kind: 'item', label: t('menu.properties'), checked: rightSidebarOpen, onSelect: () => dispatchMenuAction('toggle-right-sidebar') },
       { kind: 'separator' },
       { kind: 'item', label: t('menu.resetView'), onSelect: () => dispatchMenuAction('reset-sidebar-widths') },
+      { kind: 'item', label: t('menu.lockView'), checked: viewLocked, onSelect: () => dispatchMenuAction('toggle-view-lock') },
       { kind: 'item', label: t('menu.showSplash'), onSelect: () => dispatchMenuAction('show-splash') },
     ],
   };

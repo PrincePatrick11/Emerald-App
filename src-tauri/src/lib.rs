@@ -376,6 +376,16 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
         true,
         None::<&str>,
     )?;
+    // Starts unchecked, the frontend's default; `set_view_menu_checked`
+    // corrects it on the first render like the three above.
+    let lock_view_item = CheckMenuItem::with_id(
+        app,
+        "toggle-view-lock",
+        "Lock View",
+        true,
+        false,
+        None::<&str>,
+    )?;
     // Zeigt den Ladebildschirm noch einmal, bis irgendwo hingeklickt wird.
     // Kein Check-Eintrag: es gibt keinen Zustand, der sichtbar bliebe — die
     // Vorschau schliesst sich selbst und meldet das dem Menue nicht zurueck.
@@ -392,6 +402,7 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
         &toggle_right_item,
         &PredefinedMenuItem::separator(app)?,
         &reset_item,
+        &lock_view_item,
         &show_splash_item,
     ])?;
     // Export items start disabled — the frontend enables them once a
@@ -492,6 +503,7 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
             "toggle-rail"          => { app.emit("toggle-rail", ()).ok(); }
             "toggle-left-list"     => { app.emit("toggle-left-list", ()).ok(); }
             "toggle-right-sidebar" => { app.emit("toggle-right-sidebar", ()).ok(); }
+            "toggle-view-lock"     => { app.emit("toggle-view-lock", ()).ok(); }
             "export-pdf"           => { app.emit("export-pdf", ()).ok(); }
             "export-markdown"      => { app.emit("export-markdown", ()).ok(); }
             "export-emerald"       => { app.emit("export-emerald", ()).ok(); }
@@ -591,11 +603,11 @@ fn set_export_menu_enabled(app: tauri::AppHandle, entry_enabled: bool, pdf_enabl
     }
 }
 
-/// Mirrors the frontend's sidebar visibility onto the View menu's check
-/// items. Called on every change, because the rail's own toggle buttons can
+/// Mirrors the frontend's sidebar visibility and view lock onto the View
+/// menu's check items. Called on every change, because the rail's own toggle buttons can
 /// flip the same state without the menu ever being opened.
 #[tauri::command]
-fn set_view_menu_checked(app: tauri::AppHandle, rail: bool, left_list: bool, right_sidebar: bool) {
+fn set_view_menu_checked(app: tauri::AppHandle, rail: bool, left_list: bool, right_sidebar: bool, view_locked: bool) {
     use tauri::menu::MenuItemKind;
     let Some(menu) = app.menu() else { return };
 
@@ -608,6 +620,7 @@ fn set_view_menu_checked(app: tauri::AppHandle, rail: bool, left_list: bool, rig
                         "toggle-rail" => { item.set_checked(rail).ok(); }
                         "toggle-left-list" => { item.set_checked(left_list).ok(); }
                         "toggle-right-sidebar" => { item.set_checked(right_sidebar).ok(); }
+                        "toggle-view-lock" => { item.set_checked(view_locked).ok(); }
                         _ => {}
                     }
                 }
@@ -653,6 +666,7 @@ fn update_menu_labels(
     export: String,
     import: String,
     reset_view: String,
+    lock_view: String,
     show_splash: String,
     rail: String,
     entry_list: String,
@@ -695,6 +709,7 @@ fn update_menu_labels(
                         "toggle-rail" => Some(rail.as_str()),
                         "toggle-left-list" => Some(entry_list.as_str()),
                         "toggle-right-sidebar" => Some(properties.as_str()),
+                        "toggle-view-lock" => Some(lock_view.as_str()),
                         _ => None,
                     };
                     if let Some(text) = new_check_text {

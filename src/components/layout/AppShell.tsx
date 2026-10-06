@@ -94,6 +94,7 @@ export default function AppShell() {
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const leftListOpen = useUIStore((s) => s.leftListOpen);
   const railOpen = useUIStore((s) => s.railOpen);
+  const viewLocked = useUIStore((s) => s.viewLocked);
   const activeView = useUIStore((s) => s.activeView);
   const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
   const navigateBack = useUIStore((s) => s.navigateBack);
@@ -210,6 +211,7 @@ export default function AppShell() {
       export:          t('menu.export'),
       import:          t('menu.import'),
       resetView:       t('menu.resetView'),
+      lockView:        t('menu.lockView'),
       showSplash:      t('menu.showSplash'),
       rail:            t('menu.rail'),
       entryList:       t('menu.entryList'),
@@ -246,9 +248,9 @@ export default function AppShell() {
   // without the menu ever being opened (`setActiveView` opens the right
   // sidebar for edit mode).
   useEffect(() => {
-    invoke('set_view_menu_checked', { rail: railOpen, leftList: leftListOpen, rightSidebar: rightSidebarOpen })
+    invoke('set_view_menu_checked', { rail: railOpen, leftList: leftListOpen, rightSidebar: rightSidebarOpen, viewLocked })
       .catch(() => {/* desktop-only, ignore in browser preview */});
-  }, [railOpen, leftListOpen, rightSidebarOpen]);
+  }, [railOpen, leftListOpen, rightSidebarOpen, viewLocked]);
 
   useEffect(() => {
     const unlistenBack = listen('navigate-back', () => navigateBack());
@@ -410,7 +412,7 @@ export default function AppShell() {
                 {leftListMounted && <LeftSidebarEntryList />}
               </div>
             </div>
-            {leftListOpen && (
+            {leftListOpen && !viewLocked && (
               <div
                 onPointerDown={onLeftPointerDown}
                 className="absolute top-0 right-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"
@@ -442,8 +444,9 @@ export default function AppShell() {
             style={{ width: rightSidebarOpen ? rightWidth : 0 }}
           >
             {/* Resize handle — bei geschlossener Leiste saesse er sonst als
-                Streifen am Rand des Hauptbereichs. */}
-            {rightSidebarOpen && (
+                Streifen am Rand des Hauptbereichs. Mit „Ansicht sperren" gibt
+                es ihn auf beiden Seiten nicht. */}
+            {rightSidebarOpen && !viewLocked && (
               <div
                 onPointerDown={onRightPointerDown}
                 className="absolute top-0 left-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"

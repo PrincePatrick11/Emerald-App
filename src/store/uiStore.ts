@@ -90,6 +90,9 @@ interface UIState {
   /** Die Rail ganz links. Dauerhaft (localStorage), wie `leftListOpen`. */
   railOpen: boolean;
   leftListOpen: boolean;
+  /** „Ansicht sperren": die Breiten der Seitenleisten lassen sich nicht mehr
+   *  ziehen. Dauerhaft (localStorage), wie die Breiten selbst. */
+  viewLocked: boolean;
   searchQuery: string;
   journalPrefs: ListPrefs;
   wikiPrefs: ListPrefs;
@@ -152,6 +155,7 @@ interface UIState {
   endEditInTab: (tabId: string | null, id: string) => void;
   toggleRail: () => void;
   toggleLeftList: () => void;
+  toggleViewLock: () => void;
   /** Blendet Rail, linke Liste und rechte Leiste wieder ein — Teil von „Ansicht zurücksetzen". */
   showAllPanels: () => void;
   setSearchQuery: (q: string) => void;
@@ -176,6 +180,7 @@ interface UIState {
 const RAIL_OPEN_KEY = 'rail-open';
 const LEFT_LIST_OPEN_KEY = 'left-list-open';
 const RIGHT_SIDEBAR_OPEN_KEY = 'right-sidebar-open';
+const VIEW_LOCKED_KEY = 'view-locked';
 
 /** Die drei Seitenleisten starten offen, solange nichts anderes gespeichert ist. */
 function loadOpenFlag(key: string): boolean {
@@ -384,6 +389,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   editLocked: false,
   railOpen: loadOpenFlag(RAIL_OPEN_KEY),
   leftListOpen: loadOpenFlag(LEFT_LIST_OPEN_KEY),
+  // Anders als die Leisten: aus, solange nichts gespeichert ist.
+  viewLocked: localStorage.getItem(VIEW_LOCKED_KEY) === '1',
   searchQuery: '',
   // Wo „Kategorie" bisher der Sortiermodus war (Wiki, Operationen,
   // Aufgaben), steht jetzt `grouping: 'grouped'` — dieselbe Ansicht wie
@@ -593,6 +600,11 @@ export const useUIStore = create<UIState>((set, get) => ({
     const leftListOpen = !s.leftListOpen;
     saveOpenFlag(LEFT_LIST_OPEN_KEY, leftListOpen);
     return { leftListOpen };
+  }),
+  toggleViewLock: () => set((s) => {
+    const viewLocked = !s.viewLocked;
+    localStorage.setItem(VIEW_LOCKED_KEY, viewLocked ? '1' : '0');
+    return { viewLocked };
   }),
   showAllPanels: () => {
     saveOpenFlag(RAIL_OPEN_KEY, true);
