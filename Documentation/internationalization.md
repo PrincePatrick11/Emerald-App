@@ -12,6 +12,8 @@ Translations are managed with `react-i18next`; the setup lives in `src/i18n/inde
 
 **Always switch languages through `changeAppLanguage(lang)`.** It loads the bundle (and the matching date-fns locale) before calling `i18n.changeLanguage`, then writes the `localStorage` mirror and `<html lang>`, and lets the last of two racing switches win. A direct `i18n.changeLanguage` would switch to a not-yet-registered locale and render the English fallback. The callers are `settingsStore`'s `applyAppearance` and the startup path in `main.tsx`.
 
+Weekday names (the automatic backup's weekday chips) come from `formatWeekday` and `weekdaysInLocaleOrder` in `lib/formatDate.ts`, i.e. from the date-fns locale, so they need no keys of their own.
+
 Code without hook access (stores, migrations, importers — e.g. the duplicate actions' `common.copySuffix`) reads translations through the default `i18n` export.
 
 Translation files:
