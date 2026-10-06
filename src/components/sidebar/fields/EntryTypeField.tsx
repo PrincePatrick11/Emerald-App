@@ -5,6 +5,7 @@ import InlineConfirm from '../../ui/InlineConfirm';
 import { MODULE_LIST } from '../../../lib/modules';
 import { changeEntryType, typeChangeDropsProperties, type ConvertibleEntryType } from '../../../lib/entryTypeChange';
 import { EditPropertyRow } from './EditProperties';
+import { useUIStore } from '../../../store/uiStore';
 
 // Die Module mit Blockstapel, in Rail-Reihenfolge und mit ihren Rail-Glyphen — Journal, Operationen, Wiki.
 const TYPE_MODULES = MODULE_LIST.filter((meta) => meta.usesBlocks);
@@ -26,18 +27,21 @@ export default function EntryTypeField({ id, type, properties }: {
 }) {
   const { t } = useTranslation();
   const [pending, setPending] = useState<ConvertibleEntryType | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState(false);
+  // Auch, was ein anderes Exemplar dieser Zeile gestartet hat: nach dem Wechsel
+  // zeichnet die Seitenleiste des neuen Moduls sie neu, während er noch schreibt.
+  const busy = useUIStore((s) => s.editLocked) || running;
 
   const run = (to: ConvertibleEntryType) => {
     setPending(null);
-    setBusy(true);
+    setRunning(true);
     changeEntryType(id, type, to)
       .catch((e: unknown) => console.error('[EntryTypeField] type change failed:', e))
-      .finally(() => setBusy(false));
+      .finally(() => setRunning(false));
   };
 
   const select = (to: ConvertibleEntryType) => {
-    if (to === type || busy) return;
+    if (to === type || busy || useUIStore.getState().editLocked) return;
     if (properties && typeChangeDropsProperties(properties, to)) setPending(to);
     else run(to);
   };
@@ -74,7 +78,7 @@ export default function EntryTypeField({ id, type, properties }: {
             small
             message={t('properties.typeDropsProperties')}
             confirmLabel={t('properties.changeType')}
-            onConfirm={() => run(pending)}
+            onConfirm={() => { if (!useUIStore.getState().editLocked) run(pending); }}
             onCancel={() => setPending(null)}
           />
         </div>
