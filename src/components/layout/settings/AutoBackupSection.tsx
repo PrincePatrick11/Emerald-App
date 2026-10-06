@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DatabaseBackup, History } from 'lucide-react';
+import { CalendarClock, DatabaseBackup, Folder, History, Layers } from 'lucide-react';
 import Button from '../../ui/Button';
 import { SwitchRow } from '../../ui/Switch';
 import { VaultLocationRow } from '../VaultModal';
@@ -14,7 +14,7 @@ import { useAutoBackupStore, type AutoBackupError } from '../../../store/autoBac
 import { useSettingsStore } from '../../../store/settingsStore';
 import { useVaultStore } from '../../../store/vaultStore';
 import SettingsChoiceButton, { SettingsChoiceRow } from './SettingsChoiceButton';
-import SettingsSection, { SettingsDescription, SettingsStatus } from './SettingsSection';
+import SettingsSection, { SettingsStatus } from './SettingsSection';
 
 const INTERVAL_LABEL_KEYS: Record<BackupInterval, string> = {
   daily: 'settings.autoBackupDaily',
@@ -82,66 +82,77 @@ export default function AutoBackupSection() {
 
         {backup.auto && (
           <>
+            {/* Was die einzelnen Wahlen bedeuten, steht im Tooltip — wie bei den
+                Bildgrenzen: eine Zeile Erklärung je Gruppe machte den Abschnitt
+                doppelt so hoch wie jeden anderen des Fensters. */}
             <div>
-              <p className="label-xs mb-2">{t('settings.autoBackupInterval')}</p>
+              <p className="label-xs flex items-center gap-2 mb-2">
+                <CalendarClock size={14} />
+                {t('settings.autoBackupInterval')}
+              </p>
               <SettingsChoiceRow>
                 {BACKUP_INTERVAL_OPTIONS.map((interval) => (
                   <SettingsChoiceButton
                     key={interval}
                     active={backup.interval === interval}
                     onClick={() => update('backup', { interval })}
+                    title={t(INTERVAL_HINT_KEYS[interval])}
                   >
                     {t(INTERVAL_LABEL_KEYS[interval])}
                   </SettingsChoiceButton>
                 ))}
               </SettingsChoiceRow>
-              <SettingsDescription className="mt-2">{t(INTERVAL_HINT_KEYS[backup.interval])}</SettingsDescription>
+              {/* Der Wochentag gehört zur Wahl „Wöchentlich" und steht ohne
+                  eigene Überschrift direkt darunter. */}
+              {backup.interval === 'weekly' && (
+                <div className="mt-2" role="group" aria-label={t('settings.autoBackupWeekday')}>
+                  <SettingsChoiceRow>
+                    {weekdaysInLocaleOrder().map((day) => (
+                      <SettingsChoiceButton
+                        key={day}
+                        active={backup.weekday === day}
+                        onClick={() => update('backup', { weekday: day })}
+                        title={formatWeekday(day, 'long')}
+                      >
+                        {formatWeekday(day, 'short')}
+                      </SettingsChoiceButton>
+                    ))}
+                  </SettingsChoiceRow>
+                </div>
+              )}
             </div>
 
-            {backup.interval === 'weekly' && (
-              <div>
-                <p className="label-xs mb-2">{t('settings.autoBackupWeekday')}</p>
-                <SettingsChoiceRow>
-                  {weekdaysInLocaleOrder().map((day) => (
-                    <SettingsChoiceButton
-                      key={day}
-                      active={backup.weekday === day}
-                      onClick={() => update('backup', { weekday: day })}
-                      title={formatWeekday(day, 'long')}
-                    >
-                      {formatWeekday(day, 'short')}
-                    </SettingsChoiceButton>
-                  ))}
-                </SettingsChoiceRow>
-              </div>
-            )}
-
             <div>
-              <p className="label-xs mb-2">{t('settings.autoBackupKeep')}</p>
+              <p className="label-xs flex items-center gap-2 mb-2">
+                <Layers size={14} />
+                {t('settings.autoBackupKeep')}
+              </p>
               <SettingsChoiceRow>
                 {BACKUP_KEEP_OPTIONS.map((keep) => (
                   <SettingsChoiceButton
                     key={keep ?? 'all'}
                     active={backup.keep === keep}
                     onClick={() => update('backup', { keep })}
+                    title={t('settings.autoBackupKeepHint')}
                     className="tabular-nums"
                   >
                     {keep ?? t('settings.autoBackupKeepAll')}
                   </SettingsChoiceButton>
                 ))}
               </SettingsChoiceRow>
-              <SettingsDescription className="mt-2">{t('settings.autoBackupKeepHint')}</SettingsDescription>
             </div>
 
-            <div>
-              <p className="label-xs mb-2">{t('settings.autoBackupFolder')}</p>
+            <div title={t('settings.autoBackupFolderHint')}>
+              <p className="label-xs flex items-center gap-2 mb-2">
+                <Folder size={14} />
+                {t('settings.autoBackupFolder')}
+              </p>
               <VaultLocationRow
                 target={status?.dir ?? null}
                 customPath={status?.customDir ?? null}
                 onPickFolder={() => void changeFolder(() => pickAutoBackupDir(vaultId))}
                 onResetFolder={() => void changeFolder(() => resetAutoBackupDir(vaultId))}
               />
-              <SettingsDescription className="mt-2">{t('settings.autoBackupFolderHint')}</SettingsDescription>
             </div>
 
             <div className="settings-row">

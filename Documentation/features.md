@@ -479,7 +479,7 @@ Reads a Markdown file exported by Emerald (or with the same structure). The `# T
 
 ### Vault Backup (`.emeralddb`)
 
-The whole vault can be backed up and restored as one self-contained file (`.emeralddb`), separate from per-entry exports. The Backup page in **Settings** offers an automatic backup and two manual flows.
+The whole vault can be backed up and restored as one self-contained file (`.emeralddb`), separate from per-entry exports. The Backup page in **Settings** offers two manual flows and, below them, an automatic backup.
 
 **Automatic backup.**
 

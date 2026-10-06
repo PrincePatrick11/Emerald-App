@@ -179,8 +179,6 @@ export default function BackupPage() {
 
   return (
     <>
-      <AutoBackupSection />
-
       <SettingsSection icon={<Download size={14} />} title={t('settings.exportDb')} description={t('settings.exportDbHint')}>
         <div className="space-y-3">
           {/* Packliste = Haken, Einzelwahl = Auswahlknopf (unten die drei
@@ -443,6 +441,10 @@ export default function BackupPage() {
           {importError && <SettingsStatus tone="error">{importError}</SettingsStatus>}
         </div>
       </SettingsSection>
+
+      {/* Unter Export und Import: die beiden sind das, wofür man die Seite
+          öffnet; das automatische Backup stellt man einmal ein. */}
+      <AutoBackupSection />
     </>
   );
 }
