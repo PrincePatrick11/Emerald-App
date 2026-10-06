@@ -267,9 +267,7 @@ function stepHistory(s: UIState, delta: -1 | 1): Partial<UIState> {
  * Knopf.
  */
 function whenLeaveConfirmed(leaves: boolean, run: () => void): void {
-  // Solange die Seite gesperrt ist (`editLocked`), entfällt der Schritt wie ein
-  // Klick auf einen gesperrten Knopf: die Frage ginge an eine Ansicht, die
-  // gerade abgebaut wird.
+  // Die Frage ginge an eine Ansicht, die gerade abgebaut wird.
   if (leaves && useUIStore.getState().editLocked) return;
   if (!leaves || !leaveNeedsConfirm()) {
     run();

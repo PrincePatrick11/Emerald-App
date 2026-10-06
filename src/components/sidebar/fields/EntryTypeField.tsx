@@ -32,8 +32,7 @@ export default function EntryTypeField({ id, type, properties }: {
   // neuen Moduls diese Zeile neu, während er noch schreibt.
   const locked = useUIStore((s) => s.editLocked);
   // Am Store gefragt, nicht am gezeichneten Stand: die Sperre gilt ab dem Klick.
-  // Ebenso, solange „Fertig" oder „Löschen" dieser Seite noch schreibt — ihr
-  // Schritt ins Lesen oder zurück in die Liste fiele sonst in die Sperre.
+  // Ebenso, solange die Seite gerade endet (`isEnding`).
   const mayChange = () => !useUIStore.getState().editLocked && !isEnding(guardKey(viewTypeForEntryType(type), id));
 
   const run = (to: ConvertibleEntryType) => {

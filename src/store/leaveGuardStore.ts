@@ -82,7 +82,9 @@ export async function withoutLeaveGuard<T>(key: string, run: () => T | Promise<T
 /**
  * Läuft auf der Seite `key` gerade „Fertig", „Abbrechen" oder „Löschen"? Wer
  * sie dabei unter sich wegzöge — ein Typwechsel —, wartet das ab: ihr Schritt
- * zurück in die Liste oder ins Lesen träfe sonst die falsche Seite.
+ * zurück in die Liste oder ins Lesen fiele sonst in dessen Sperre
+ * (`uiStore.editLocked`) und entfiele, oder träfe danach ein Paar aus Typ und
+ * id, das es nicht mehr gibt.
  */
 export const isEnding = (key: string): boolean => ending.has(key);
 
