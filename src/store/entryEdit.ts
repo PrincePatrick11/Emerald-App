@@ -2,6 +2,7 @@ import { viewTypeForEntryType, type ViewId } from '../lib/modules';
 import { isInEdit, useUIStore } from './uiStore';
 import { guardKey, registerEditProbe } from './leaveGuardStore';
 import { useEntryStore } from './entryStore';
+import { retypeInternalLinks } from '../lib/internalLinkHtml';
 import type { Entry, EntryType } from '../types';
 
 /**
@@ -101,6 +102,34 @@ export function carryBaseline(id: string, from: EntryType, to: EntryType, source
     origin: origin.type === to ? undefined : origin,
     stored: () => (useEntryStore.getState().getEntry(id, to) ? {} : null),
   });
+}
+
+/**
+ * Ein Eintrag hat den Typ gewechselt: die Chips auf ihn in den Ausgangsständen
+ * ANDERER laufender Bearbeitungen ziehen mit. Die gespeicherten Inhalte
+ * schreibt `entryTypeChange` um; ein Cancel dort schriebe sonst den Chip mit
+ * dem alten Typ zurück — und der führt nirgends mehr hin.
+ */
+export function retypeBaselineLinks(id: string, to: EntryType): void {
+  for (const baseline of baselines.values()) {
+    const content = baseline.patch.content;
+    if (baseline.id === id || !content) continue;
+    const next = retypeInternalLinks(content, id, to);
+    if (next !== content) baseline.patch = { ...baseline.patch, content: next };
+  }
+}
+
+/**
+ * Kategorien wurden zusammengelegt oder endgültig gelöscht: was die
+ * Ausgangsstände noch auf sie zeigen lassen, zieht mit (`null` = ohne
+ * Kategorie). Cancel schriebe sonst eine Kategorie zurück, die es nicht mehr
+ * gibt, und scheiterte am Fremdschlüssel.
+ */
+export function reassignBaselineCategories(ids: ReadonlySet<string>, to: string | null): void {
+  for (const baseline of baselines.values()) {
+    const category = baseline.patch.category_id;
+    if (category && ids.has(category)) baseline.patch = { ...baseline.patch, category_id: to };
+  }
 }
 
 /**

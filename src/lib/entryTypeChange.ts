@@ -34,7 +34,9 @@ import { serialKey, serialized } from './serialize';
 import { viewTypeForEntryType } from './modules';
 import { remapDefinitionDefaults } from './blocks/definitions';
 import { hasOwnTitle } from './entryTitle';
-import { carryBaseline, originOfEdit, type BaselineFields, type EditOrigin } from '../store/entryEdit';
+import { carryBaseline, originOfEdit, retypeBaselineLinks, type BaselineFields, type EditOrigin } from '../store/entryEdit';
+import { useBlockDraftStore, useTemplateDraftStore } from '../store/draftStore';
+import { parseDefinitionElements } from './blocks/definitions';
 import { mapEntries, useEntryStore, withAddedEntry, withSortedEntry, withoutIds } from '../store/entryStore';
 import { useTaskStore } from '../store/taskStore';
 import { useTemplateStore } from '../store/templateStore';
@@ -127,11 +129,60 @@ function withContent<T extends { id: string; content: string }>(items: T[], chan
  */
 export async function changeEntryType(id: string, from: ConvertibleEntryType, to: ConvertibleEntryType): Promise<void> {
   if (from === to) return;
-  // Vor der Kette unten: der Flush läuft selbst unter dem Schlüssel des Eintrags.
-  await useUIStore.getState().editActions?.flush?.();
-  // Der Inhalt zieht mit — auch bei einem Eintrag, der seit dem Start nie offen war.
-  await useEntryStore.getState().ensureEntryContent(id);
-  await retypeEntry(id, from, to);
+  // Fertig und Abbrechen warten: sie gehören der Ansicht, die gleich abgebaut
+  // wird, und führten nach dem Wechsel auf ein Paar aus Typ und id, das es
+  // nicht mehr gibt.
+  const { setEditLocked } = useUIStore.getState();
+  setEditLocked(true);
+  try {
+    // Vor der Kette unten: der Flush läuft selbst unter dem Schlüssel des Eintrags.
+    await useUIStore.getState().editActions?.flush?.();
+    // Der Inhalt zieht mit — auch bei einem Eintrag, der seit dem Start nie offen war.
+    await useEntryStore.getState().ensureEntryContent(id);
+    await retypeEntry(id, from, to);
+  } finally {
+    setEditLocked(false);
+  }
+}
+
+/**
+ * Was noch nicht gespeichert ist und trotzdem auf den Eintrag zeigt: die
+ * Ausgangsstände anderer Bearbeitungen und die Entwürfe von Vorlagen und
+ * eigenen Blöcken (`base` wie `draft` — „Fertig" speichert nur den Unterschied).
+ * Ohne das käme der alte Typ mit dem nächsten Cancel oder Fertig dort zurück.
+ */
+function retypeUnsavedLinks(id: string, to: ConvertibleEntryType): void {
+  retypeBaselineLinks(id, to);
+
+  const templateDrafts = useTemplateDraftStore.getState().drafts;
+  for (const [draftId, entry] of Object.entries(templateDrafts)) {
+    const base = retypeInternalLinks(entry.base.content, id, to);
+    const draft = retypeInternalLinks(entry.draft.content, id, to);
+    if (base === entry.base.content && draft === entry.draft.content) continue;
+    useTemplateDraftStore.getState().saveDraft(draftId, {
+      base: { ...entry.base, content: base },
+      draft: { ...entry.draft, content: draft },
+    });
+  }
+
+  const blockDrafts = useBlockDraftStore.getState().drafts;
+  for (const [draftId, entry] of Object.entries(blockDrafts)) {
+    let hit = false;
+    const retyped = (elements: typeof entry.base.elements) => parseDefinitionElements(
+      remapDefinitionDefaults(elements, (name) => name, (target) => {
+        if (target.id !== id) return target;
+        hit = true;
+        return { ...target, entryType: to };
+      }),
+    );
+    const base = retyped(entry.base.elements);
+    const draft = retyped(entry.draft.elements);
+    if (!hit) continue;
+    useBlockDraftStore.getState().saveDraft(draftId, {
+      base: { ...entry.base, elements: base },
+      draft: { ...entry.draft, elements: draft },
+    });
+  }
 }
 
 /**
@@ -227,6 +278,7 @@ function retypeEntry(id: string, from: ConvertibleEntryType, to: ConvertibleEntr
       links: s.links.map((link) => (link.target_id === id ? { ...link, target_type: to } : link)),
     }));
     if (definitionsChanged) void useBlockDefinitionStore.getState().fetchDefinitions();
+    retypeUnsavedLinks(id, to);
     return true;
   });
 }

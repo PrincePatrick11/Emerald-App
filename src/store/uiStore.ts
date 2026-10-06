@@ -82,6 +82,10 @@ interface UIState {
    *  Wiki und Operationen ebenfalls auf ihr Dashboard zurueckfallen. */
   dashboardMounted: boolean;
   editActions: EditActions | null;
+  /** Fertig, Löschen und Abbrechen des offenen Eintrags sind gesperrt: ein
+   *  Typwechsel oder ein Abbrechen schreibt gerade. Ein Klick dazwischen träfe
+   *  die Ansicht, die dabei abgebaut wird. */
+  editLocked: boolean;
   /** Die Rail ganz links. Dauerhaft (localStorage), wie `leftListOpen`. */
   railOpen: boolean;
   leftListOpen: boolean;
@@ -141,6 +145,11 @@ interface UIState {
   setListHeaderHost: (el: HTMLElement | null) => void;
   setDashboardMounted: (mounted: boolean) => void;
   setEditActions: (actions: EditActions | null) => void;
+  setEditLocked: (locked: boolean) => void;
+  /** Beendet das Bearbeiten des Eintrags `id` in genau diesem Tab (`null` = die
+   *  Ansicht ohne Tab) — für ein Abbrechen, dessen Tab beim Zurückschreiben
+   *  nicht mehr der offene ist. Kein Schritt im Verlauf. */
+  endEditInTab: (tabId: string | null, id: string) => void;
   toggleRail: () => void;
   toggleLeftList: () => void;
   /** Blendet Rail, linke Liste und rechte Leiste wieder ein — Teil von „Ansicht zurücksetzen". */
@@ -364,6 +373,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   listHeaderHost: null,
   dashboardMounted: false,
   editActions: null,
+  editLocked: false,
   railOpen: loadOpenFlag(RAIL_OPEN_KEY),
   leftListOpen: loadOpenFlag(LEFT_LIST_OPEN_KEY),
   searchQuery: '',
@@ -558,6 +568,15 @@ export const useUIStore = create<UIState>((set, get) => ({
   setListHeaderHost: (el) => set((s) => (s.listHeaderHost === el ? s : { listHeaderHost: el })),
   setDashboardMounted: (mounted) => set((s) => (s.dashboardMounted === mounted ? s : { dashboardMounted: mounted })),
   setEditActions: (actions) => set({ editActions: actions }),
+  setEditLocked: (locked) => set((s) => (s.editLocked === locked ? s : { editLocked: locked })),
+  endEditInTab: (tabId, id) => set((s) => {
+    const end = (view: ActiveView): ActiveView => (
+      view.id === id && view.mode === 'edit' ? stripSessionFlags({ ...view, mode: 'view' }) : view
+    );
+    const tabs = s.tabs.map((tab) => (tab.id === tabId ? { ...tab, view: end(tab.view) } : tab));
+    saveTabs(tabs, s.activeTabId);
+    return { tabs, activeView: s.activeTabId === tabId ? end(s.activeView) : s.activeView };
+  }),
   toggleRail: () => set((s) => {
     const railOpen = !s.railOpen;
     saveOpenFlag(RAIL_OPEN_KEY, railOpen);

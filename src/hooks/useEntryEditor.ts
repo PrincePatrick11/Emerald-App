@@ -6,13 +6,17 @@ import { serialKey, serialized } from '../lib/serialize';
 import {
   baselineKey, baselineOf, baselines, beginDiscard, editIsDirty, endDiscard, isDiscarding, type BaselineFields,
 } from '../store/entryEdit';
+import { useUIStore } from '../store/uiStore';
 import type { WriteOptions } from '../lib/stamp';
 
 /**
- * Was `restoreOnCancel` statt eines Stands meldet, wenn der Eintrag nicht mehr
- * in dieser Ansicht liegt — in aller Regel, weil Cancel einen Typwechsel
- * zurückgenommen hat. Die View darf dann nichts mehr tun: ihr eigenes
- * `setActiveView(…)` zeigte auf ein Paar aus Typ und id, das es nicht mehr gibt.
+ * Was `restoreOnCancel` statt eines Stands meldet, wenn die View nicht mehr
+ * diesen Eintrag zeigt: Cancel hat einen Typwechsel zurückgenommen, oder man
+ * ist während des Zurückschreibens in einen anderen Tab gegangen. Die View
+ * darf dann nichts mehr tun — ihr eigenes `setActiveView(…)` zeigte auf ein
+ * Paar aus Typ und id, das es nicht mehr gibt, oder führte den FALSCHEN Tab
+ * dorthin, und ihr lokaler State gehört schon dem nächsten Eintrag. Das
+ * Bearbeiten ist dann bereits beendet.
  */
 export const REVERTED = 'reverted';
 
@@ -180,17 +184,27 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
    * Hat der Eintrag in dieser Bearbeitung den Typ gewechselt, geht er mit dem
    * Einstiegs-Stand zurück in sein Modul und steht dort schon im Lesen
    * (`revertEntryType`). Das Ergebnis ist dann `REVERTED` — wie immer, wenn
-   * der Eintrag am Ende nicht mehr in dieser Ansicht liegt (ein zweites
-   * Cancel hinter dem ersten): die View wird abgebaut und darf nicht mehr
-   * selbst navigieren.
+   * die offene Seite am Ende nicht mehr dieser Eintrag in dieser Ansicht ist
+   * (ein zweites Cancel hinter dem ersten, ein Tabwechsel währenddessen): die
+   * View darf dann nicht mehr selbst navigieren, und das Bearbeiten im Tab,
+   * in dem Cancel gedrückt wurde, beendet der Hook (`endEditInTab`).
+   *
+   * Solange es läuft, sind Fertig, Löschen und Abbrechen gesperrt
+   * (`uiStore.editLocked`).
    */
   const restoreOnCancel = useCallback(async (): Promise<TRestore | typeof REVERTED | null> => {
     cancelAutoSave();
     const id = idRef.current;
     if (!id) return null;
     const movedAway = () => readStoredRef.current(id) === null;
+    const tabId = useUIStore.getState().activeTabId;
+    const stillOpen = () => {
+      const s = useUIStore.getState();
+      return s.activeTabId === tabId && s.activeView.type === scope && s.activeView.id === id;
+    };
     // Ab hier speichert keine View mehr für diesen Eintrag (`isDiscarding`).
     beginDiscard(id);
+    useUIStore.getState().setEditLocked(true);
     let result: TRestore | typeof REVERTED | null = null;
     try {
       // Ein Typwechsel, der noch schreibt, gehört schon zur Bearbeitung: erst
@@ -217,11 +231,16 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
       // Nach einer Rücknahme werden die Views erst noch abgebaut — dort hebt
       // es die nächste Bearbeitung auf.
       if (result !== REVERTED) endDiscard(id);
+      useUIStore.getState().setEditLocked(false);
     }
     // Ein Tastendruck während des Awaits hätte den Timer neu scharf gemacht.
     cancelAutoSave();
+    if (!stillOpen()) {
+      useUIStore.getState().endEditInTab(tabId, id);
+      return REVERTED;
+    }
     return result;
-  }, [cancelAutoSave]);
+  }, [cancelAutoSave, scope]);
 
   /**
    * Trägt die laufende Bearbeitung Änderungen (`editIsDirty`)? Danach fragt
@@ -239,7 +258,10 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
       // Verwirft Cancel den Eintrag gerade, entfällt nur das Schreiben: Timer
       // und `prevRef` werden trotzdem geräumt — sonst schriebe ein späterer
       // Durchlauf den State des NÄCHSTEN Eintrags unter der alten id.
-      const discarded = isDiscarding(prev.id);
+      // Ebenso, wenn der Eintrag nicht mehr dieser Ansicht gehört: nach einem
+      // Typwechsel hat `changeEntryType` vorher gespeichert, und der State
+      // hier trägt noch die Chips mit dem alten Typ.
+      const discarded = isDiscarding(prev.id) || readStoredRef.current(prev.id) === null;
       if (prev.id !== entityId) {
         // Wegnavigiert waehrend des Editierens: die id hat in diesem Render
         // bereits gewechselt, buildPatch liest aber noch den State des
@@ -274,7 +296,7 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
     return () => {
       cancelAutoSave();
       const prev = prevRef.current;
-      if (prev?.isEditing && !editorSavesSuspended() && !isDiscarding(prev.id)) {
+      if (prev?.isEditing && !editorSavesSuspended() && !isDiscarding(prev.id) && readStoredRef.current(prev.id) !== null) {
         void updateRef.current(prev.id, buildPatchRef.current(contentRef.current)).catch(console.error);
       }
     };

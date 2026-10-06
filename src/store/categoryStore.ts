@@ -17,6 +17,7 @@ import { generateId, nowIso } from '../lib/helpers';
 import { fromRow, type DbRow } from '../lib/row';
 import type { Category } from '../types';
 import { useEntryStore } from './entryStore';
+import { reassignBaselineCategories } from './entryEdit';
 import { useTaskStore } from './taskStore';
 import { useAltarStore } from './altarStore';
 import { dropCategoriesFromTemplatesInMemory, useTemplateStore } from './templateStore';
@@ -73,6 +74,8 @@ export function reassignCategoriesInMemory(ids: ReadonlySet<string>, to: string 
       Object.entries(s.previewPlacements).map(([k, list]) => [k, list.map(move)])
     ),
   }));
+  // Auch, was eine laufende Bearbeitung mit Cancel zurückschriebe.
+  reassignBaselineCategories(ids, to);
   if (!to) dropCategoriesFromTemplatesInMemory(ids);
 }
 
