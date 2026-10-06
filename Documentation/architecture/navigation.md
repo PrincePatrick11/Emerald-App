@@ -72,14 +72,14 @@ Each tab has its own back/forward history; there is none for the whole window. `
 
 The tab auto-created when a content view opens with no tabs inherits `tablessHistory`, so Back returns to where the view was opened from; `tablessHistory` then resets to fresh Home, as it does when the last tab closes, on `closeAllTabs()` and on a vault switch. Closing a tab drops its history.
 
-`navigateBack`/`navigateForward` go through `stepHistory(state, delta)`, which moves the index and, with a tab active, writes the stepped view into the tab and saves it. 
+`navigateBack`/`navigateForward` go through `stepHistory(state, delta)`, which moves the index and, with a tab active, writes the stepped view into the tab and saves it. A step past either end of the history does nothing — it does not ask the leave question either.
 
 The mouse's back/forward buttons take the same two actions, through `useMouseNavigation` (`src/hooks/useMouseNavigation.ts`, mounted by `AppShell`). They arrive by one of two routes:
 
-- **macOS** — an NSEvent monitor in `lib.rs` emits `navigate-back`/`navigate-forward`, because WKWebView does not reliably hand these buttons to the page.
-- **Windows and Linux** — the WebView delivers them as ordinary mouse events with `button` 3 (back) and 4 (forward). Capture-phase listeners on `window` step on `mouseup` and cancel the `mousedown` too, so the press neither moves focus nor reaches the WebView's own history. The `BrowserBack`/`BrowserForward` keys (multimedia keyboards, and mouse drivers that send keys instead of clicks) do the same. These listeners are off on macOS, where a delivered event would count twice beside the monitor.
+- **macOS** — an NSEvent monitor in `lib.rs` emits `navigate-back`/`navigate-forward`. wry does inject these buttons into the page as well, but drivers such as Logi Options+ turn them into swipe gestures that reach no DOM event, so the monitor covers both; it steps on the press.
+- **Windows and Linux** — mouse events with `button` 3 (back) and 4 (forward): WebView2 delivers them itself, on Linux wry swallows the native press and injects `mousedown`/`mouseup` — only those two, which is why the step hangs on `mouseup` and not on `auxclick` or `pointerup`. Capture-phase listeners on `window` step on `mouseup`, cancel the `mousedown` (no focus change, nothing for the WebView's own history) and stop the `pointerdown` from propagating, so no drag or sigil stroke starts with a thumb button; it is stopped rather than cancelled, because a cancelled `pointerdown` would take the mouse events with it. These listeners are off on macOS, where the injected events would count twice beside the monitor. The altar canvas ignores buttons above 2 in its own `mousedown` handlers for the same reason.
 
-Neither route steps while a modal is open (`hasOpenModal()` in `Modal.tsx`): the page behind it is not visible, so the step would go unnoticed until the modal closes.
+The `BrowserBack`/`BrowserForward` keys (multimedia keyboards, and mouse drivers that send keys instead of clicks) step too, on every platform. No route steps while a modal is open (`hasOpenModal()` in `Modal.tsx`) — the page behind it is not visible, so the step would go unnoticed until the modal closes — or in the Altar's full-window mode, where the title bar has no arrows either.
 
 ## Left Sidebar (Rail + Entry List)
 

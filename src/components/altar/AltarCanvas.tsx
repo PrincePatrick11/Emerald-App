@@ -456,7 +456,8 @@ export function AltarCanvas({
       ref={canvasRef}
       className="w-full h-full relative overflow-hidden select-none"
       style={{ background: getBackgroundStyle(altar, backgroundSrc) }}
-      onMouseDown={() => selectPlacement(null)}
+      // Die Daumentasten der Maus (3/4) blättern im Verlauf und greifen hier nichts.
+      onMouseDown={(e) => { if (e.button <= 2) selectPlacement(null); }}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
@@ -622,7 +623,7 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rot
       }}
       onMouseDown={(e) => {
         e.stopPropagation();
-        if (placement.locked) return;
+        if (placement.locked || e.button > 2) return;
         onSelect(placement.id);
         if (!editable) return;
         e.preventDefault();

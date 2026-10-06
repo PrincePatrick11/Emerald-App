@@ -25,7 +25,7 @@ interface ModalProps {
  */
 const openModals: symbol[] = [];
 
-/** Für alles, was über einem Modal nicht auf die Seite dahinter wirken soll. */
+/** Ob gerade mindestens ein `Modal` offen ist — Menüs, Dropdowns und Picker zählen nicht. */
 export function hasOpenModal(): boolean {
   return openModals.length > 0;
 }
