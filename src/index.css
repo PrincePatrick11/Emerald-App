@@ -1169,6 +1169,7 @@ button.sidebar-section-title:focus-visible {
 .edit-bar-icon:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* Der Wert einer Eigenschaft als Knopf: Auswahl (mit Chevron) oder Medium
