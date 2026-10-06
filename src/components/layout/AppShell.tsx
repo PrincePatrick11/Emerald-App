@@ -23,6 +23,7 @@ import ImageNoticeModal from '../ui/ImageNoticeModal';
 import LeaveGuardModal from './LeaveGuardModal';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { isTauri } from '../../lib/platform';
+import { useMouseNavigation } from '../../hooks/useMouseNavigation';
 import { hasOpenEdits, settleBeforeExit } from '../../lib/openEdits';
 import { restoreDrafts } from '../../store/draftStore';
 import { loadVaultPrefs } from '../../store/vaultPrefs';
@@ -98,8 +99,6 @@ export default function AppShell() {
   const viewLocked = useUIStore((s) => s.viewLocked);
   const activeView = useUIStore((s) => s.activeView);
   const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
-  const navigateBack = useUIStore((s) => s.navigateBack);
-  const navigateForward = useUIStore((s) => s.navigateForward);
   const isAltarWindowFullscreen = useUIStore(isAltarFullscreen);
 
   const [entryListWidth, setEntryListWidth] = useState(() =>
@@ -256,14 +255,7 @@ export default function AppShell() {
       .catch(() => {/* desktop-only, ignore in browser preview */});
   }, [railOpen, leftListOpen, rightSidebarOpen, viewLocked]);
 
-  useEffect(() => {
-    const unlistenBack = listen('navigate-back', () => navigateBack());
-    const unlistenFwd  = listen('navigate-forward', () => navigateForward());
-    return () => {
-      unlistenBack.then(fn => fn());
-      unlistenFwd.then(fn => fn());
-    };
-  }, [navigateBack, navigateForward]);
+  useMouseNavigation();
 
   useEffect(() => {
     const unlisten = listen('reset-sidebar-widths', () => {

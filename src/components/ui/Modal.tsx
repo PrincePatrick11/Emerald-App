@@ -25,6 +25,11 @@ interface ModalProps {
  */
 const openModals: symbol[] = [];
 
+/** Für alles, was über einem Modal nicht auf die Seite dahinter wirken soll. */
+export function hasOpenModal(): boolean {
+  return openModals.length > 0;
+}
+
 export default function Modal({
   title,
   onClose,

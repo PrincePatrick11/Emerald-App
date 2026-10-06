@@ -265,8 +265,8 @@ Tauri menu events (not `invoke`) come from the native menu and are received in `
 | `reset-sidebar-widths` | View > Reset View — resets the entry-list and right-sidebar widths and the altar library height, leaves the altar's full-window mode, **and** brings back a hidden rail, entry list and right sidebar (`uiStore.showAllPanels`; with the rail hidden, Settings and the Vault button would otherwise be unreachable) |
 | `toggle-view-lock` | View > Lock View — while on (`uiStore.viewLocked`, kept in localStorage), `AppShell` renders no resize handle on either sidebar; hiding and showing them and Reset View still work |
 | `show-splash` | View > Show Loading Screen |
-| `navigate-back` | Mouse back button (macOS NSEvent monitor) |
-| `navigate-forward` | Mouse forward button (macOS NSEvent monitor) |
+| `navigate-back` | Mouse back button (macOS NSEvent monitor; Windows and Linux read the button in the page — see [Navigation History](architecture/navigation.md#navigation-history)) |
+| `navigate-forward` | Mouse forward button (same) |
 
 Only `reset-sidebar-widths` is emitted from the frontend as well — the HTML menu re-emits it so `AppShell`'s listener handles it identically on both platforms; the other menu actions run directly through `runMenuAction`.
 

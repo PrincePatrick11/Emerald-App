@@ -72,7 +72,14 @@ Each tab has its own back/forward history; there is none for the whole window. `
 
 The tab auto-created when a content view opens with no tabs inherits `tablessHistory`, so Back returns to where the view was opened from; `tablessHistory` then resets to fresh Home, as it does when the last tab closes, on `closeAllTabs()` and on a vault switch. Closing a tab drops its history.
 
-`navigateBack`/`navigateForward` go through `stepHistory(state, delta)`, which moves the index and, with a tab active, writes the stepped view into the tab and saves it. Mouse back/forward buttons are caught by a macOS NSEvent monitor in `lib.rs`, which emits `navigate-back`/ `navigate-forward`; `AppShell` calls the store actions.
+`navigateBack`/`navigateForward` go through `stepHistory(state, delta)`, which moves the index and, with a tab active, writes the stepped view into the tab and saves it. 
+
+The mouse's back/forward buttons take the same two actions, through `useMouseNavigation` (`src/hooks/useMouseNavigation.ts`, mounted by `AppShell`). They arrive by one of two routes:
+
+- **macOS** — an NSEvent monitor in `lib.rs` emits `navigate-back`/`navigate-forward`, because WKWebView does not reliably hand these buttons to the page.
+- **Windows and Linux** — the WebView delivers them as ordinary mouse events with `button` 3 (back) and 4 (forward). Capture-phase listeners on `window` step on `mouseup` and cancel the `mousedown` too, so the press neither moves focus nor reaches the WebView's own history. The `BrowserBack`/`BrowserForward` keys (multimedia keyboards, and mouse drivers that send keys instead of clicks) do the same. These listeners are off on macOS, where a delivered event would count twice beside the monitor.
+
+Neither route steps while a modal is open (`hasOpenModal()` in `Modal.tsx`): the page behind it is not visible, so the step would go unnoticed until the modal closes.
 
 ## Left Sidebar (Rail + Entry List)
 
