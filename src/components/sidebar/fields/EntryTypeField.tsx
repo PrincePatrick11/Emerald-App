@@ -27,21 +27,20 @@ export default function EntryTypeField({ id, type, properties }: {
 }) {
   const { t } = useTranslation();
   const [pending, setPending] = useState<ConvertibleEntryType | null>(null);
-  const [running, setRunning] = useState(false);
-  // Auch, was ein anderes Exemplar dieser Zeile gestartet hat: nach dem Wechsel
-  // zeichnet die Seitenleiste des neuen Moduls sie neu, während er noch schreibt.
-  const busy = useUIStore((s) => s.editLocked) || running;
+  // Die Sperre der Bearbeitung, nicht eigener State: nach dem Wechsel zeichnet
+  // die Seitenleiste des neuen Moduls diese Zeile neu, während er noch schreibt.
+  const busy = useUIStore((s) => s.editLocked);
 
   const run = (to: ConvertibleEntryType) => {
+    // Am Store gefragt: die Sperre gilt ab dem Klick, nicht erst ab dem nächsten Zeichnen.
+    if (useUIStore.getState().editLocked) return;
     setPending(null);
-    setRunning(true);
     changeEntryType(id, type, to)
-      .catch((e: unknown) => console.error('[EntryTypeField] type change failed:', e))
-      .finally(() => setRunning(false));
+      .catch((e: unknown) => console.error('[EntryTypeField] type change failed:', e));
   };
 
   const select = (to: ConvertibleEntryType) => {
-    if (to === type || busy || useUIStore.getState().editLocked) return;
+    if (to === type || useUIStore.getState().editLocked) return;
     if (properties && typeChangeDropsProperties(properties, to)) setPending(to);
     else run(to);
   };
@@ -78,7 +77,7 @@ export default function EntryTypeField({ id, type, properties }: {
             small
             message={t('properties.typeDropsProperties')}
             confirmLabel={t('properties.changeType')}
-            onConfirm={() => { if (!useUIStore.getState().editLocked) run(pending); }}
+            onConfirm={() => run(pending)}
             onCancel={() => setPending(null)}
           />
         </div>

@@ -82,9 +82,10 @@ interface UIState {
    *  Wiki und Operationen ebenfalls auf ihr Dashboard zurueckfallen. */
   dashboardMounted: boolean;
   editActions: EditActions | null;
-  /** Fertig, Löschen und Abbrechen des offenen Eintrags sind gesperrt: ein
-   *  Typwechsel oder ein Abbrechen schreibt gerade. Ein Klick dazwischen träfe
-   *  die Ansicht, die dabei abgebaut wird. */
+  /** Ein Typwechsel oder ein Abbrechen schreibt gerade (`withEditLock`): Fertig,
+   *  Löschen, Abbrechen und der Typ-Schalter des offenen Eintrags sind gesperrt,
+   *  und die Seite lässt sich nicht verlassen — ein Klick dazwischen träfe die
+   *  Ansicht, die dabei abgebaut wird, und die Rückfrage gälte ihr. */
   editLocked: boolean;
   /** Die Rail ganz links. Dauerhaft (localStorage), wie `leftListOpen`. */
   railOpen: boolean;
@@ -145,7 +146,6 @@ interface UIState {
   setListHeaderHost: (el: HTMLElement | null) => void;
   setDashboardMounted: (mounted: boolean) => void;
   setEditActions: (actions: EditActions | null) => void;
-  setEditLocked: (locked: boolean) => void;
   /** Beendet das Bearbeiten des Eintrags `id` in genau diesem Tab (`null` = die
    *  Ansicht ohne Tab) — für ein Abbrechen, dessen Tab beim Zurückschreiben
    *  nicht mehr der offene ist. Kein Schritt im Verlauf. */
@@ -263,6 +263,10 @@ function stepHistory(s: UIState, delta: -1 | 1): Partial<UIState> {
  * bearbeiten" entfällt `run`.
  */
 function whenLeaveConfirmed(leaves: boolean, run: () => void): void {
+  // Solange die Seite gesperrt ist (`editLocked`), entfällt der Schritt wie ein
+  // Klick auf einen gesperrten Knopf: die Frage ginge an eine Ansicht, die
+  // gerade abgebaut wird.
+  if (leaves && useUIStore.getState().editLocked) return;
   if (!leaves || !leaveNeedsConfirm()) {
     run();
     return;
@@ -568,7 +572,6 @@ export const useUIStore = create<UIState>((set, get) => ({
   setListHeaderHost: (el) => set((s) => (s.listHeaderHost === el ? s : { listHeaderHost: el })),
   setDashboardMounted: (mounted) => set((s) => (s.dashboardMounted === mounted ? s : { dashboardMounted: mounted })),
   setEditActions: (actions) => set({ editActions: actions }),
-  setEditLocked: (locked) => set((s) => (s.editLocked === locked ? s : { editLocked: locked })),
   endEditInTab: (tabId, id) => set((s) => {
     const end = (view: ActiveView): ActiveView => (
       view.id === id && view.mode === 'edit' ? stripSessionFlags({ ...view, mode: 'view' }) : view
@@ -611,3 +614,19 @@ export const useUIStore = create<UIState>((set, get) => ({
   setHomeOpsPrefs:     (p) => set((s) => ({ homeOpsPrefs:     { ...s.homeOpsPrefs,     ...p } })),
   setHomeWikiPrefs:    (p) => set((s) => ({ homeWikiPrefs:    { ...s.homeWikiPrefs,    ...p } })),
 }));
+
+/**
+ * Sperrt die offene Bearbeitung, solange `run` schreibt (`editLocked`). Gezählt,
+ * nicht geschaltet: ein Abbrechen kann auf einen Typwechsel warten, der noch
+ * läuft — wer zuerst fertig ist, gibt die Sperre des anderen nicht frei.
+ */
+let editLocks = 0;
+
+export async function withEditLock<T>(run: () => Promise<T>): Promise<T> {
+  if (++editLocks === 1) useUIStore.setState({ editLocked: true });
+  try {
+    return await run();
+  } finally {
+    if (--editLocks === 0) useUIStore.setState({ editLocked: false });
+  }
+}

@@ -20,7 +20,7 @@ import { isCardView } from '../../lib/viewMode';
 import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY, countByCategory } from '../../lib/groupBy';
 
 import { useUIStore } from '../../store/uiStore';
-import { REVERTED, useEntryEditor } from '../../hooks/useEntryEditor';
+import { EDIT_ENDED, useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEntryContentReady } from '../../hooks/useEntryContentReady';
 import { useEditActions } from '../../hooks/useEditActions';
 import { guardKey } from '../../store/leaveGuardStore';
@@ -141,8 +141,8 @@ export default function WikiView() {
       // hier fangen den Fall vor dem ersten Autosave ab (Store unverändert,
       // Sync-Effekte laufen nicht).
       const restored = await restoreOnCancel();
-      // Ein Typwechsel ist zurückgenommen: der Eintrag steht wieder in seinem Modul, schon im Lesen.
-      if (restored === REVERTED) return;
+      // Die Seite zeigt diesen Eintrag nicht mehr, das Bearbeiten ist schon beendet — nichts mehr zu tun.
+      if (restored === EDIT_ENDED) return;
       const from = restored ?? fieldsOf(article);
       setTitle(from.title);
       setTags(from.tags);

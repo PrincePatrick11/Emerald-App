@@ -2,23 +2,23 @@ import { useCallback, useEffect, useRef } from 'react';
 import { editorSavesSuspended } from '../lib/editorLock';
 import { entryTypeForView, type ViewId } from '../lib/modules';
 import { revertEntryType } from '../lib/entryTypeChange';
-import { serialKey, serialized } from '../lib/serialize';
+import { serialKey, settled } from '../lib/serialize';
 import {
   baselineKey, baselineOf, baselines, beginDiscard, editIsDirty, endDiscard, isDiscarding, type BaselineFields,
 } from '../store/entryEdit';
-import { useUIStore } from '../store/uiStore';
+import { useUIStore, withEditLock } from '../store/uiStore';
 import type { WriteOptions } from '../lib/stamp';
 
 /**
  * Was `restoreOnCancel` statt eines Stands meldet, wenn die View nicht mehr
- * diesen Eintrag zeigt: Cancel hat einen Typwechsel zurückgenommen, oder man
- * ist während des Zurückschreibens in einen anderen Tab gegangen. Die View
- * darf dann nichts mehr tun — ihr eigenes `setActiveView(…)` zeigte auf ein
- * Paar aus Typ und id, das es nicht mehr gibt, oder führte den FALSCHEN Tab
- * dorthin, und ihr lokaler State gehört schon dem nächsten Eintrag. Das
- * Bearbeiten ist dann bereits beendet.
+ * diesen Eintrag zeigt und das Bearbeiten schon beendet ist: Cancel hat einen
+ * Typwechsel zurückgenommen, man ist während des Zurückschreibens in einen
+ * anderen Tab gegangen, oder ein Cancel davor war schneller. Die View darf
+ * dann nichts mehr tun — ihr eigenes `setActiveView(…)` zeigte auf ein Paar
+ * aus Typ und id, das es nicht mehr gibt, oder führte den FALSCHEN Tab
+ * dorthin, und ihr lokaler State gehört schon dem nächsten Eintrag.
  */
-export const REVERTED = 'reverted';
+export const EDIT_ENDED = 'edit-ended';
 
 /**
  * Debounce-Autosave, Speichern beim Wegnavigieren und Speichern beim Unmount —
@@ -177,69 +177,63 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
    * Eintrags zurück in Store und DB, „Zuletzt geändert" eingeschlossen — ob
    * überhaupt geschrieben werden muss, entscheidet der Store (`needsWrite`). Gibt die
    * Baseline zurück, damit die View ihren lokalen State daraus setzt; null,
-   * wenn es keine Baseline gab oder der Schreibzugriff scheiterte (auch der
-   * einer Rücknahme) — dann fällt die View auf den Store-Stand zurück und
-   * verlässt den Edit-Modus trotzdem.
+   * wenn der Schreibzugriff scheiterte — dann fällt die View auf den
+   * Store-Stand zurück und verlässt den Edit-Modus trotzdem.
    *
    * Hat der Eintrag in dieser Bearbeitung den Typ gewechselt, geht er mit dem
-   * Einstiegs-Stand zurück in sein Modul und steht dort schon im Lesen
-   * (`revertEntryType`). Das Ergebnis ist dann `REVERTED` — wie immer, wenn
-   * die offene Seite am Ende nicht mehr dieser Eintrag in dieser Ansicht ist
-   * (ein zweites Cancel hinter dem ersten, ein Tabwechsel währenddessen): die
-   * View darf dann nicht mehr selbst navigieren, und das Bearbeiten im Tab,
-   * in dem Cancel gedrückt wurde, beendet der Hook (`endEditInTab`).
+   * Einstiegs-Stand zurück in sein Modul (`revertEntryType`). Zeigt die offene
+   * Seite am Ende nicht mehr diesen Eintrag in dieser Ansicht, ist das
+   * Ergebnis `EDIT_ENDED` (siehe dort).
    *
-   * Solange es läuft, sind Fertig, Löschen und Abbrechen gesperrt
-   * (`uiStore.editLocked`).
+   * Solange es schreibt, ist die Bearbeitung gesperrt (`withEditLock`) und
+   * keine View speichert mehr für diesen Eintrag (`isDiscarding`).
    */
-  const restoreOnCancel = useCallback(async (): Promise<TRestore | typeof REVERTED | null> => {
+  const restoreOnCancel = useCallback(async (): Promise<TRestore | typeof EDIT_ENDED | null> => {
     cancelAutoSave();
     const id = idRef.current;
     if (!id) return null;
-    const movedAway = () => readStoredRef.current(id) === null;
     const tabId = useUIStore.getState().activeTabId;
-    const stillOpen = () => {
-      const s = useUIStore.getState();
-      return s.activeTabId === tabId && s.activeView.type === scope && s.activeView.id === id;
-    };
-    // Ab hier speichert keine View mehr für diesen Eintrag (`isDiscarding`).
     beginDiscard(id);
-    useUIStore.getState().setEditLocked(true);
-    let result: TRestore | typeof REVERTED | null = null;
+    let restored = null as TRestore | null;
+    let reverted = false as boolean;
     try {
-      // Ein Typwechsel, der noch schreibt, gehört schon zur Bearbeitung: erst
-      // hinter ihm steht fest, unter welcher Ansicht ihr Ausgangsstand liegt.
-      await serialized(serialKey('entry', id), async () => {});
-      const baseline = baselineOf(id);
-      // Nur Journal, Wiki und Operationen wechseln den Typ — `type` gibt es dann immer.
-      const type = baseline && entryTypeForView(baseline.scope);
-      if (baseline?.origin && type) {
-        const reverted = await revertEntryType(id, type, baseline.origin, baseline.patch, baseline.stamp);
-        result = reverted || movedAway() ? REVERTED : null;
-      } else if (baseline) {
-        await updateRef.current(id, baseline.patch as TRestore, { touch: baseline.stamp ?? true });
-        result = movedAway() ? REVERTED : baseline.patch as TRestore;
-      } else {
-        // Kein Stand mehr: ein Cancel davor hat die Bearbeitung schon beendet.
-        // Was gespeichert ist, ist dann der wiederhergestellte Eintrag — nicht
-        // das, was die View beim Klick noch vor sich hatte.
-        result = movedAway() ? REVERTED : readStoredRef.current(id);
-      }
+      await withEditLock(async () => {
+        // Ein Typwechsel, der noch schreibt, gehört schon zur Bearbeitung: erst
+        // hinter ihm steht fest, unter welcher Ansicht ihr Ausgangsstand liegt.
+        await settled(serialKey('entry', id));
+        const baseline = baselineOf(id);
+        // Nur Journal, Wiki und Operationen wechseln den Typ — `type` gibt es dann immer.
+        const type = baseline && entryTypeForView(baseline.scope);
+        if (baseline?.origin && type) {
+          reverted = await revertEntryType(id, type, baseline.origin, baseline.patch, baseline.stamp);
+        } else if (baseline) {
+          await updateRef.current(id, baseline.patch as TRestore, { touch: baseline.stamp ?? true });
+          restored = baseline.patch as TRestore;
+        } else {
+          // Kein Stand mehr: ein Cancel davor hat die Bearbeitung schon beendet.
+          // Was gespeichert ist, ist dann der wiederhergestellte Eintrag — nicht
+          // das, was die View beim Klick noch vor sich hatte.
+          restored = readStoredRef.current(id);
+        }
+      });
     } catch (e) {
       console.error('[useEntryEditor] restore on cancel failed:', e);
-    } finally {
-      // Nach einer Rücknahme werden die Views erst noch abgebaut — dort hebt
-      // es die nächste Bearbeitung auf.
-      if (result !== REVERTED) endDiscard(id);
-      useUIStore.getState().setEditLocked(false);
     }
     // Ein Tastendruck während des Awaits hätte den Timer neu scharf gemacht.
     cancelAutoSave();
-    if (!stillOpen()) {
-      useUIStore.getState().endEditInTab(tabId, id);
-      return REVERTED;
+
+    // Der Eintrag gehört dieser Ansicht nicht mehr: zurückgenommen (auch von
+    // einem Cancel davor) oder gelöscht. Dann werden Views erst noch abgebaut —
+    // die Marke bleibt, bis die nächste Bearbeitung sie aufhebt.
+    const leftView = reverted || readStoredRef.current(id) === null;
+    if (!leftView) endDiscard(id);
+    const ui = useUIStore.getState();
+    const stillOpen = ui.activeTabId === tabId && ui.activeView.type === scope && ui.activeView.id === id;
+    if (leftView || !stillOpen) {
+      ui.endEditInTab(tabId, id);
+      return EDIT_ENDED;
     }
-    return result;
+    return restored;
   }, [cancelAutoSave, scope]);
 
   /**

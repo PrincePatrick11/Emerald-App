@@ -3,8 +3,8 @@
  * (Tabelle `categories`, seit v38). Vorher hielt jeder der vier Stores seinen
  * eigenen Slice mit denselben fünf Aktionen.
  *
- * Import-Regel: Dieser Store darf die Inhalts-Stores und den Vorlagen-Store
- * importieren (er hängt nach dem endgültigen Löschen einer Kategorie deren
+ * Import-Regel: Dieser Store darf die Inhalts-Stores, den Vorlagen-Store und
+ * `entryEdit` (die Ausgangsstände laufender Bearbeitungen) importieren (er hängt nach dem endgültigen Löschen einer Kategorie deren
  * Inhalte und Vorlagen-Zuweisungen auch im Speicher um); keiner von ihnen
  * importiert zurück. Alle Zugriffe laufen zur Laufzeit
  * über `getState()`.

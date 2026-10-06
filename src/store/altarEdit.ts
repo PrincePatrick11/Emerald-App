@@ -11,7 +11,7 @@ import type { AltarPlacement, AltarRecord } from '../types';
  * sofort (Platzieren, Ziehen, Hintergrund, Raster …); ohne diesen Stand gäbe
  * es für Cancel nichts, wohin es zurück könnte.
  *
- * Wie der Ausgangsstand der Einträge (`useEntryEditor`) außerhalb der
+ * Wie der Ausgangsstand der Einträge (`entryEdit`) außerhalb der
  * Komponente: die Bearbeitung überlebt den Blick in einen anderen Tab. Ein
  * Stand lebt, solange irgendein Tab den Altar im Bearbeiten zeigt — das liest
  * der Abgleich unten am `uiStore` ab. Nur im Speicher.

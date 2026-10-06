@@ -38,6 +38,11 @@ export function drainSerialized(): Promise<void> {
   return Promise.all([...tails.values()]).then(() => undefined);
 }
 
+/** Wartet, bis alles durch ist, was unter `key` gerade eingereiht ist — ohne selbst etwas zu schreiben. */
+export function settled(key: string): Promise<void> {
+  return serialized(key, async () => {});
+}
+
 export function serialized<T>(key: string, task: () => Promise<T>): Promise<T> {
   // Das gemerkte Kettenende ist fehlerbehandelt — ein gescheitertes Update darf
   // die Nachfolger nicht mitreißen. Geloggt wird hier trotzdem: viele Aufrufer

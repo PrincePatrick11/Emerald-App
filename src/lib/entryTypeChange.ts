@@ -32,16 +32,15 @@ import { nowIso } from './helpers';
 import { retypeInternalLinks } from './internalLinkHtml';
 import { serialKey, serialized } from './serialize';
 import { viewTypeForEntryType } from './modules';
-import { remapDefinitionDefaults } from './blocks/definitions';
+import { parseDefinitionElements, remapDefinitionDefaults } from './blocks/definitions';
 import { hasOwnTitle } from './entryTitle';
 import { carryBaseline, originOfEdit, retypeBaselineLinks, type BaselineFields, type EditOrigin } from '../store/entryEdit';
 import { useBlockDraftStore, useTemplateDraftStore } from '../store/draftStore';
-import { parseDefinitionElements } from './blocks/definitions';
 import { mapEntries, useEntryStore, withAddedEntry, withSortedEntry, withoutIds } from '../store/entryStore';
 import { useTaskStore } from '../store/taskStore';
 import { useTemplateStore } from '../store/templateStore';
 import { useBlockDefinitionStore } from '../store/blockDefinitionStore';
-import { useUIStore } from '../store/uiStore';
+import { useUIStore, withEditLock } from '../store/uiStore';
 import type { Entry, EntryType } from '../types';
 
 /** Die Typen, zwischen denen ein Eintrag wechseln kann — die Module mit Blockstapel. */
@@ -132,17 +131,24 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
   // Fertig und Abbrechen warten: sie gehören der Ansicht, die gleich abgebaut
   // wird, und führten nach dem Wechsel auf ein Paar aus Typ und id, das es
   // nicht mehr gibt.
-  const { setEditLocked } = useUIStore.getState();
-  setEditLocked(true);
-  try {
+  await withEditLock(async () => {
     // Vor der Kette unten: der Flush läuft selbst unter dem Schlüssel des Eintrags.
     await useUIStore.getState().editActions?.flush?.();
     // Der Inhalt zieht mit — auch bei einem Eintrag, der seit dem Start nie offen war.
     await useEntryStore.getState().ensureEntryContent(id);
     await retypeEntry(id, from, to);
-  } finally {
-    setEditLocked(false);
-  }
+  });
+}
+
+/** Stellt die Link-Vorgaben eigener Blöcke, die auf `id` zeigen, auf den Typ `to` — `hit`, wenn es eine gab. */
+function retypeDefinitionTargets(elements: unknown, id: string, to: ConvertibleEntryType): { next: unknown; hit: boolean } {
+  let hit = false;
+  const next = remapDefinitionDefaults(elements, (name) => name, (target) => {
+    if (target.id !== id) return target;
+    hit = true;
+    return { ...target, entryType: to };
+  });
+  return { next, hit };
 }
 
 /**
@@ -167,20 +173,12 @@ function retypeUnsavedLinks(id: string, to: ConvertibleEntryType): void {
 
   const blockDrafts = useBlockDraftStore.getState().drafts;
   for (const [draftId, entry] of Object.entries(blockDrafts)) {
-    let hit = false;
-    const retyped = (elements: typeof entry.base.elements) => parseDefinitionElements(
-      remapDefinitionDefaults(elements, (name) => name, (target) => {
-        if (target.id !== id) return target;
-        hit = true;
-        return { ...target, entryType: to };
-      }),
-    );
-    const base = retyped(entry.base.elements);
-    const draft = retyped(entry.draft.elements);
-    if (!hit) continue;
+    const base = retypeDefinitionTargets(entry.base.elements, id, to);
+    const draft = retypeDefinitionTargets(entry.draft.elements, id, to);
+    if (!base.hit && !draft.hit) continue;
     useBlockDraftStore.getState().saveDraft(draftId, {
-      base: { ...entry.base, elements: base },
-      draft: { ...entry.draft, elements: draft },
+      base: { ...entry.base, elements: parseDefinitionElements(base.next) },
+      draft: { ...entry.draft, elements: parseDefinitionElements(draft.next) },
     });
   }
 }
@@ -241,13 +239,8 @@ function retypeEntry(id: string, from: ConvertibleEntryType, to: ConvertibleEntr
     );
     let definitionsChanged = false;
     for (const row of definitionRows) {
-      let hit = false;
       // Ohne Revisionssprung: die Kopien in den Einträgen hat `retypeContentColumn` schon umgeschrieben.
-      const next = remapDefinitionDefaults(row.elements, (name) => name, (target) => {
-        if (target.id !== id) return target;
-        hit = true;
-        return { ...target, entryType: to };
-      });
+      const { next, hit } = retypeDefinitionTargets(row.elements, id, to);
       if (!hit) continue;
       await db.execute('UPDATE block_definitions SET elements=$1 WHERE id=$2', [next, row.id]);
       definitionsChanged = true;

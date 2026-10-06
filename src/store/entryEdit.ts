@@ -100,6 +100,7 @@ export function carryBaseline(id: string, from: EntryType, to: EntryType, source
     ...baseline,
     scope,
     origin: origin.type === to ? undefined : origin,
+    // `{}` gleicht keinem Stand — mit `origin` zählt die Bearbeitung ohnehin als geändert.
     stored: () => (useEntryStore.getState().getEntry(id, to) ? {} : null),
   });
 }
