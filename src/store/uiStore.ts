@@ -261,6 +261,10 @@ function stepHistory(s: UIState, delta: -1 | 1): Partial<UIState> {
  * Führt `run` aus — sofort, oder erst nach der Frage, wenn die offene Seite
  * ungesicherte Änderungen trägt und `leaves` sie verlässt. Bei „Weiter
  * bearbeiten" entfällt `run`.
+ *
+ * Ist die Bearbeitung gerade gesperrt (`editLocked`), entfällt ein Schritt, der
+ * die Seite verließe, ganz — ohne Frage, wie ein Klick auf einen gesperrten
+ * Knopf.
  */
 function whenLeaveConfirmed(leaves: boolean, run: () => void): void {
   // Solange die Seite gesperrt ist (`editLocked`), entfällt der Schritt wie ein
@@ -299,6 +303,8 @@ export async function askInTab(tabId: string): Promise<boolean> {
   // ist gespeichert (Autosave) oder mitgeschrieben (Entwurf).
   if (!registered) return true;
   if (useLeaveGuardStore.getState().guard?.key !== key) return false;
+  // Gesperrt (`editLocked`): die Frage ginge an eine Seite, die gerade abgebaut wird.
+  if (useUIStore.getState().editLocked) return false;
   return confirmLeave();
 }
 
@@ -315,8 +321,8 @@ function withActiveHistory(s: UIState, history: NavHistory): UIState {
 
 /**
  * Der Verlauf, von dem ein Zurück/Vor ausgeht (`stepGuarded`), solange seine
- * Rückfrage offen ist. Bei „Weiter bearbeiten" bleibt er stehen, bis der
- * nächste Schritt ihn ersetzt — gelesen wird er nur von dem, der ihn gesetzt hat.
+ * Rückfrage offen ist. Bei „Weiter bearbeiten" — und bei einem Schritt, der in
+ * die Sperre fiel — bleibt er stehen, bis der nächste Schritt ihn ersetzt — gelesen wird er nur von dem, der ihn gesetzt hat.
  */
 let heldHistory: NavHistory | null = null;
 
@@ -615,13 +621,15 @@ export const useUIStore = create<UIState>((set, get) => ({
   setHomeWikiPrefs:    (p) => set((s) => ({ homeWikiPrefs:    { ...s.homeWikiPrefs,    ...p } })),
 }));
 
-/**
- * Sperrt die offene Bearbeitung, solange `run` schreibt (`editLocked`). Gezählt,
- * nicht geschaltet: ein Abbrechen kann auf einen Typwechsel warten, der noch
- * läuft — wer zuerst fertig ist, gibt die Sperre des anderen nicht frei.
- */
+/** Wie viele `withEditLock` gerade laufen. */
 let editLocks = 0;
 
+/**
+ * Sperrt die Bearbeitung, solange `run` schreibt (`editLocked`): die Leiste,
+ * den Typ-Schalter und das Verlassen der Seite. Gezählt, nicht geschaltet: ein
+ * Abbrechen kann auf einen Typwechsel warten, der noch läuft — wer zuerst
+ * fertig ist, gibt die Sperre des anderen nicht frei.
+ */
 export async function withEditLock<T>(run: () => Promise<T>): Promise<T> {
   if (++editLocks === 1) useUIStore.setState({ editLocked: true });
   try {

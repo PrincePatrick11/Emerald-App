@@ -177,8 +177,9 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
    * Eintrags zurück in Store und DB, „Zuletzt geändert" eingeschlossen — ob
    * überhaupt geschrieben werden muss, entscheidet der Store (`needsWrite`). Gibt die
    * Baseline zurück, damit die View ihren lokalen State daraus setzt; null,
-   * wenn der Schreibzugriff scheiterte — dann fällt die View auf den
-   * Store-Stand zurück und verlässt den Edit-Modus trotzdem.
+   * wenn es nichts zurückzugeben gibt (kein Eintrag offen, der Schreibzugriff
+   * oder die Rücknahme gescheitert) — dann fällt die View auf den Store-Stand
+   * zurück und verlässt den Edit-Modus trotzdem.
    *
    * Hat der Eintrag in dieser Bearbeitung den Typ gewechselt, geht er mit dem
    * Einstiegs-Stand zurück in sein Modul (`revertEntryType`). Zeigt die offene
@@ -194,31 +195,29 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
     if (!id) return null;
     const tabId = useUIStore.getState().activeTabId;
     beginDiscard(id);
-    let restored = null as TRestore | null;
-    let reverted = false as boolean;
-    try {
-      await withEditLock(async () => {
-        // Ein Typwechsel, der noch schreibt, gehört schon zur Bearbeitung: erst
-        // hinter ihm steht fest, unter welcher Ansicht ihr Ausgangsstand liegt.
-        await settled(serialKey('entry', id));
-        const baseline = baselineOf(id);
-        // Nur Journal, Wiki und Operationen wechseln den Typ — `type` gibt es dann immer.
-        const type = baseline && entryTypeForView(baseline.scope);
-        if (baseline?.origin && type) {
-          reverted = await revertEntryType(id, type, baseline.origin, baseline.patch, baseline.stamp);
-        } else if (baseline) {
-          await updateRef.current(id, baseline.patch as TRestore, { touch: baseline.stamp ?? true });
-          restored = baseline.patch as TRestore;
-        } else {
-          // Kein Stand mehr: ein Cancel davor hat die Bearbeitung schon beendet.
-          // Was gespeichert ist, ist dann der wiederhergestellte Eintrag — nicht
-          // das, was die View beim Klick noch vor sich hatte.
-          restored = readStoredRef.current(id);
-        }
-      });
-    } catch (e) {
+    type Outcome = { restored: TRestore | null; reverted: boolean };
+    const { restored, reverted } = await withEditLock(async (): Promise<Outcome> => {
+      // Ein Typwechsel, der noch schreibt, gehört schon zur Bearbeitung: erst
+      // hinter ihm steht fest, unter welcher Ansicht ihr Ausgangsstand liegt.
+      await settled(serialKey('entry', id));
+      const baseline = baselineOf(id);
+      // Nur Journal, Wiki und Operationen wechseln den Typ — `type` gibt es dann immer.
+      const type = baseline && entryTypeForView(baseline.scope);
+      if (baseline?.origin && type) {
+        return { restored: null, reverted: await revertEntryType(id, type, baseline.origin, baseline.patch, baseline.stamp) };
+      }
+      if (baseline) {
+        await updateRef.current(id, baseline.patch as TRestore, { touch: baseline.stamp ?? true });
+        return { restored: baseline.patch as TRestore, reverted: false };
+      }
+      // Kein Stand mehr: ein Cancel davor hat die Bearbeitung schon beendet.
+      // Was gespeichert ist, ist dann der wiederhergestellte Eintrag — nicht
+      // das, was die View beim Klick noch vor sich hatte.
+      return { restored: readStoredRef.current(id), reverted: false };
+    }).catch((e: unknown): Outcome => {
       console.error('[useEntryEditor] restore on cancel failed:', e);
-    }
+      return { restored: null, reverted: false };
+    });
     // Ein Tastendruck während des Awaits hätte den Timer neu scharf gemacht.
     cancelAutoSave();
 

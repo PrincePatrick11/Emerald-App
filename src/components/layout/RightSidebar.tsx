@@ -62,14 +62,14 @@ function RightSidebarActionBar() {
     if (!editActions) return null;
     // Die Sperre gilt ab dem Klick, der sie auslöst — nicht erst, wenn die
     // Knöpfe als gesperrt gezeichnet sind: deshalb fragt jeder Griff den Store.
-    const unlessLocked = (run?: () => void | Promise<void>) => run && (() => {
+    const unlessLocked = (run: () => void | Promise<void>) => () => {
       if (!useUIStore.getState().editLocked) void run();
-    });
+    };
     return (
       <EditActionBar
-        onDone={unlessLocked(editActions.onSave)!}
-        onDelete={unlessLocked(editActions.onDelete)}
-        onCancel={unlessLocked(editActions.onCancel)!}
+        onDone={unlessLocked(editActions.onSave)}
+        onDelete={editActions.onDelete && unlessLocked(editActions.onDelete)}
+        onCancel={unlessLocked(editActions.onCancel)}
         locked={editLocked}
       />
     );

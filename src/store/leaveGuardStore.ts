@@ -79,6 +79,13 @@ export async function withoutLeaveGuard<T>(key: string, run: () => T | Promise<T
   }
 }
 
+/**
+ * Läuft auf der Seite `key` gerade „Fertig", „Abbrechen" oder „Löschen"? Wer
+ * sie dabei unter sich wegzöge — ein Typwechsel —, wartet das ab: ihr Schritt
+ * zurück in die Liste oder ins Lesen träfe sonst die falsche Seite.
+ */
+export const isEnding = (key: string): boolean => ending.has(key);
+
 /** Müsste vor dem Verlassen der offenen Seite gefragt werden? */
 export function leaveNeedsConfirm(): boolean {
   const guard = useLeaveGuardStore.getState().guard;

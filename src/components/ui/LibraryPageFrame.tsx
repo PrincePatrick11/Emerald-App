@@ -60,6 +60,7 @@ export default function LibraryPageFrame({
 }: Props) {
   const { t } = useTranslation();
   const sidebarOpen = useUIStore((s) => s.rightSidebarOpen);
+  const editLocked = useUIStore((s) => s.editLocked);
 
   return (
     <div className="h-full flex flex-col">
@@ -73,11 +74,11 @@ export default function LibraryPageFrame({
       {draft && !sidebarOpen && (
         <div className="flex items-center px-6 pt-4 flex-shrink-0">
           <div className="ml-auto flex items-center gap-1.5">
-            <Button tone="jade" small disabled={draft.busy} onClick={draft.onDone}>
+            <Button tone="jade" small disabled={draft.busy || editLocked} onClick={draft.onDone}>
               <Check size={12} />
               <span>{t('editor.done')}</span>
             </Button>
-            <Button tone="neutral" compact small title={t('editor.cancel')} aria-label={t('editor.cancel')} onClick={draft.onCancel}>
+            <Button tone="neutral" compact small disabled={editLocked} title={t('editor.cancel')} aria-label={t('editor.cancel')} onClick={draft.onCancel}>
               <X size={12} />
             </Button>
           </div>
@@ -99,7 +100,7 @@ export default function LibraryPageFrame({
       <SidebarPortal>
         <SidebarColumn
           bar={draft
-            ? <EditActionBar onDone={draft.onDone} onDelete={draft.onDelete} onCancel={draft.onCancel} busy={draft.busy} />
+            ? <EditActionBar onDone={draft.onDone} onDelete={draft.onDelete} onCancel={draft.onCancel} busy={draft.busy} locked={editLocked} />
             : actions && <SidebarActionBar>{actions}</SidebarActionBar>}
         >
           {sidebar}

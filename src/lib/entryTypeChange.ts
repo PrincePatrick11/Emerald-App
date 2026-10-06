@@ -128,9 +128,9 @@ function withContent<T extends { id: string; content: string }>(items: T[], chan
  */
 export async function changeEntryType(id: string, from: ConvertibleEntryType, to: ConvertibleEntryType): Promise<void> {
   if (from === to) return;
-  // Fertig und Abbrechen warten: sie gehören der Ansicht, die gleich abgebaut
-  // wird, und führten nach dem Wechsel auf ein Paar aus Typ und id, das es
-  // nicht mehr gibt.
+  // Gesperrt, solange es schreibt: Fertig und Abbrechen gehören der Ansicht,
+  // die gleich abgebaut wird, und führten nach dem Wechsel auf ein Paar aus
+  // Typ und id, das es nicht mehr gibt.
   await withEditLock(async () => {
     // Vor der Kette unten: der Flush läuft selbst unter dem Schlüssel des Eintrags.
     await useUIStore.getState().editActions?.flush?.();

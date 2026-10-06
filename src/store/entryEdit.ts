@@ -134,7 +134,9 @@ export function reassignBaselineCategories(ids: ReadonlySet<string>, to: string 
 }
 
 /**
- * Die Einträge, deren Bearbeitung Cancel gerade verwirft. Was eine View jetzt
+ * Die Einträge, deren Bearbeitung Cancel gerade verwirft — nach einer
+ * Rücknahme des Typs auch darüber hinaus, bis ihre nächste Bearbeitung
+ * beginnt: die Views werden dann erst noch abgebaut. Was eine View jetzt
  * noch speichern würde — der Debounce, der Save beim Wegnavigieren oder beim
  * Abbau —, schriebe die verworfene Eingabe über den wiederhergestellten
  * Eintrag. Je Eintrag und nicht je View: nimmt Cancel einen Typwechsel zurück,
