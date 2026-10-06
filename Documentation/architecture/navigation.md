@@ -68,7 +68,7 @@ Each tab has its own back/forward history; there is none for the whole window. `
 - `freshHistory(view)` starts a one-entry history — for a new tab (`addTab`, `openViewInNewTab`) and whenever a history can't be trusted (vault switch, invalid saved data).
 - `normalizeSavedHistory(raw, view)` restores a saved history; a malformed shape, an unknown view type (`isViewId`) or an out-of-range index falls back to `freshHistory` at the tab's view.
 
-`uiStore.tablessHistory` is used while no tab is open. `selectActiveHistory(state)` returns the active tab's history, or `tablessHistory` when `activeTabId` is null; everything that reads "the current history" (`TitleBar`'s Back/Forward, `navigateBack`/`navigateForward`) goes through it. `setActiveView` pushes onto the active history; selecting another tab is *not* a step.
+`uiStore.tablessHistory` is used while no tab is open. `selectActiveHistory(state)` returns the active tab's history, or `tablessHistory` when `activeTabId` is null; everything that reads "the current history" (`TitleBar`'s Back/Forward, `navigateBack`/`navigateForward`) goes through it. `setActiveView` pushes onto the active history; selecting another tab is *not* a step. A step that leaves a page being edited asks first, and is dropped altogether while the edit is locked — see [Leaving an edit](editing.md#leaving-an-edit) and [Cancel after a type change](editing.md#cancel-after-a-type-change).
 
 The tab auto-created when a content view opens with no tabs inherits `tablessHistory`, so Back returns to where the view was opened from; `tablessHistory` then resets to fresh Home, as it does when the last tab closes, on `closeAllTabs()` and on a vault switch. Closing a tab drops its history.
 

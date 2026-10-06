@@ -210,6 +210,14 @@ export function withAddedEntry(entries: EntriesByType, entry: Entry): EntriesByT
   return withEntry(entries, entry.type, (list) => (ORDER[entry.type].newAtEnd ? [...list, entry] : [entry, ...list]));
 }
 
+/**
+ * Fügt einen Eintrag in die Liste seines Typs ein, einsortiert wie beim Laden —
+ * für einen, der an seinen alten Platz zurückkehrt (`revertEntryType`).
+ */
+export function withSortedEntry(entries: EntriesByType, entry: Entry): EntriesByType {
+  return withEntry(entries, entry.type, (list) => [...list.filter((e) => e.id !== entry.id), entry].sort(ORDER[entry.type].sort));
+}
+
 /** Ersetzt oder entfernt einen Eintrag in seinem Typ — die anderen Arrays bleiben dieselben. */
 function withEntry(entries: EntriesByType, type: EntryType, map: (list: Entry[]) => Entry[]): EntriesByType {
   return { ...entries, [type]: map(entries[type]) };

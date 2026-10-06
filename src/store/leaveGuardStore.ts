@@ -79,6 +79,15 @@ export async function withoutLeaveGuard<T>(key: string, run: () => T | Promise<T
   }
 }
 
+/**
+ * Läuft auf der Seite `key` gerade „Fertig", „Abbrechen" oder „Löschen"? Wer
+ * sie dabei unter sich wegzöge — ein Typwechsel —, wartet das ab: ihr Schritt
+ * zurück in die Liste oder ins Lesen fiele sonst in dessen Sperre
+ * (`uiStore.editLocked`) und entfiele, oder träfe danach ein Paar aus Typ und
+ * id, das es nicht mehr gibt.
+ */
+export const isEnding = (key: string): boolean => ending.has(key);
+
 /** Müsste vor dem Verlassen der offenen Seite gefragt werden? */
 export function leaveNeedsConfirm(): boolean {
   const guard = useLeaveGuardStore.getState().guard;
@@ -142,7 +151,7 @@ export function guardRegistered(key: string, timeoutMs = 3000): Promise<boolean>
 /**
  * Trägt eine Seite, die gerade nicht offen ist, ungesicherte Änderungen? Wer
  * Bearbeitungen außerhalb der Ansicht aufbewahrt, meldet hier eine Probe an
- * (`draftStore`: es gibt einen Entwurf; `useEntryEditor`: der gespeicherte
+ * (`draftStore`: es gibt einen Entwurf; `entryEdit`: der gespeicherte
  * Stand weicht vom Ausgangsstand ab). So muss ein Tab im Hintergrund nicht
  * erst geöffnet werden, nur um festzustellen, dass es nichts zu fragen gibt.
  */

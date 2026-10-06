@@ -1,61 +1,24 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { editorSavesSuspended } from '../lib/editorLock';
-import type { ViewId } from '../lib/modules';
-import { isInEdit, useUIStore } from '../store/uiStore';
-import { guardKey, registerEditProbe } from '../store/leaveGuardStore';
+import { entryTypeForView, type ViewId } from '../lib/modules';
+import { revertEntryType } from '../lib/entryTypeChange';
+import { serialKey, settled } from '../lib/serialize';
+import {
+  baselineKey, baselineOf, baselines, beginDiscard, editIsDirty, endDiscard, isDiscarding, type BaselineFields,
+} from '../store/entryEdit';
+import { useUIStore, withEditLock } from '../store/uiStore';
 import type { WriteOptions } from '../lib/stamp';
 
 /**
- * Die Ausgangsstände der laufenden Bearbeitungen, je Ansicht und Eintrag — wie
- * der Eintrag aussah, als „Bearbeiten" gedrückt wurde. Außerhalb der
- * Komponente, weil eine Bearbeitung ihre View überlebt: wer mittendrin in
- * einen anderen Tab schaut, kommt in dieselbe Bearbeitung zurück, und Cancel
- * geht dann bis zu ihrem Anfang, nicht nur bis zum Tabwechsel.
- *
- * Ein Stand lebt, solange irgendein Tab den Eintrag im Bearbeiten zeigt.
- * „Fertig", Cancel, Löschen, das Schließen des Tabs und ein Wechsel der Seite
- * im selben Tab beenden die Bearbeitung — das liest der Abgleich unten am
- * `uiStore` ab, keine View muss es melden. Nur im Speicher: ein Neustart
- * beginnt mit dem, was gespeichert ist.
+ * Was `restoreOnCancel` statt eines Stands meldet, wenn die View nicht mehr
+ * diesen Eintrag zeigt und das Bearbeiten schon beendet ist: Cancel hat einen
+ * Typwechsel zurückgenommen, man ist während des Zurückschreibens in einen
+ * anderen Tab gegangen, oder ein Cancel davor war schneller. Die View darf
+ * dann nichts mehr tun — ihr eigenes `setActiveView(…)` zeigte auf ein Paar
+ * aus Typ und id, das es nicht mehr gibt, oder führte den FALSCHEN Tab
+ * dorthin, und ihr lokaler State gehört schon dem nächsten Eintrag.
  */
-const baselines = new Map<string, {
-  scope: ViewId;
-  id: string;
-  patch: unknown;
-  /** „Zuletzt geändert" beim Betreten — Cancel stellt ihn mit dem Rest wieder her. */
-  stamp: string | undefined;
-  /** Der gespeicherte Stand, in der Form von `patch` — `null`, wenn es den Eintrag nicht mehr gibt. */
-  stored: () => unknown;
-}>();
-
-const baselineKey = guardKey;
-
-/**
- * Trägt eine Bearbeitung Änderungen? Die eine Regel für den Wächter der
- * offenen Seite und die Probe im Hintergrund: ein gelöschter Eintrag
- * (`stored === null`) hat nichts mehr zu sichern, ein neuer, nie bestätigter
- * oder einer mit ausstehendem Autosave immer; sonst zählt, ob der gespeicherte
- * Stand vom Ausgangsstand abweicht.
- */
-function editIsDirty(stored: unknown, patch: unknown, isNew: boolean, pending = false): boolean {
-  if (stored === null) return false;
-  if (isNew || pending) return true;
-  return patch !== undefined && JSON.stringify(stored) !== JSON.stringify(patch);
-}
-
-useUIStore.subscribe((s) => {
-  for (const [key, { scope, id }] of baselines) {
-    if (!isInEdit(s, scope, id)) baselines.delete(key);
-  }
-});
-
-// Für Tabs im Hintergrund: trägt die Bearbeitung dort Änderungen? Beim
-// Wegschalten hat der Editor gespeichert, der gespeicherte Stand sagt also alles.
-registerEditProbe((view) => {
-  if (view.mode !== 'edit' || !view.id) return false;
-  const baseline = baselines.get(baselineKey(view.type, view.id));
-  return !!baseline && editIsDirty(baseline.stored(), baseline.patch, !!view.isNew);
-});
+export const EDIT_ENDED = 'edit-ended';
 
 /**
  * Debounce-Autosave, Speichern beim Wegnavigieren und Speichern beim Unmount —
@@ -75,7 +38,7 @@ registerEditProbe((view) => {
  * Gate schriebe ein Mount direkt im Edit-Modus (StrictMode-Doppelmount, per
  * localStorage restaurierter Edit-Tab) den noch leeren Titel in die DB.
  */
-interface UseEntryEditorOptions<TPatch, TRestore = TPatch> {
+interface UseEntryEditorOptions<TPatch extends BaselineFields, TRestore extends BaselineFields = TPatch> {
   /** Die Ansicht, der die Einträge gehören — unterscheidet die Ausgangsstände (`baselines`). */
   scope: ViewId;
   entityId: string | undefined;
@@ -106,7 +69,7 @@ interface UseEntryEditorOptions<TPatch, TRestore = TPatch> {
   debounceMs?: number;
 }
 
-export function useEntryEditor<TPatch, TRestore = TPatch>({
+export function useEntryEditor<TPatch extends BaselineFields, TRestore extends BaselineFields = TPatch>({
   scope,
   entityId,
   isEditing,
@@ -134,6 +97,7 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
   idRef.current = entityId;
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevRef = useRef<{ id: string; isEditing: boolean } | null>(null);
 
   // Der Editor-Inhalt wird pro Tastendruck in diesen Ref gespiegelt statt in
   // State — ein State-Update haette die komplette View pro Anschlag neu
@@ -160,7 +124,7 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
     const id = idRef.current;
     timer.current = setTimeout(() => {
       timer.current = null;
-      if (!isEditingRef.current || !id || editorSavesSuspended()) return;
+      if (!isEditingRef.current || !id || editorSavesSuspended() || isDiscarding(id)) return;
       // Fire-and-forget: waehrend `withDbClosed` laeuft (Vault-Dateien werden
       // geloescht) lehnt `getDb()` ab, und die Aenderung gehoert ohnehin zu
       // dem Vault, der gerade verschwindet.
@@ -186,7 +150,18 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
   useEffect(() => {
     if (!isEditing || !ready || !entityId) return;
     const key = baselineKey(scope, entityId);
-    if (baselines.has(key)) return;
+    const running = baselines.get(key);
+    if (running) {
+      // Die Bearbeitung läuft schon. Den gespeicherten Stand liest ab jetzt
+      // diese View: nach einem Typwechsel kam der Stand aus einer anderen
+      // Ansicht mit, und deren Leser fände den Eintrag nicht mehr.
+      running.stored = () => readStoredRef.current(entityId);
+      return;
+    }
+    // Eine neue Bearbeitung: ein Cancel davor ist vorbei, auch eines, das den
+    // Typ zurücknahm. Nicht oben — die View, die zwischen einem Typwechsel und
+    // seiner Rücknahme montiert, findet einen Stand vor und soll nichts speichern.
+    endDiscard(entityId);
     const patch = restoreFields(contentRef.current);
     baselines.set(key, {
       scope,
@@ -201,26 +176,63 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
    * Der Cancel-Pfad: entschärft den Timer und schreibt den Einstiegs-Stand des
    * Eintrags zurück in Store und DB, „Zuletzt geändert" eingeschlossen — ob
    * überhaupt geschrieben werden muss, entscheidet der Store (`needsWrite`). Gibt die
-   * Baseline zurück, damit die View ihren lokalen State daraus setzt; null nur,
-   * wenn es keine Baseline gab oder der Schreibzugriff scheiterte — dann fällt
-   * die View auf den Store-Stand zurück und verlässt den Edit-Modus trotzdem.
+   * Baseline zurück, damit die View ihren lokalen State daraus setzt; null,
+   * wenn es nichts zurückzugeben gibt (kein Eintrag offen, der Schreibzugriff
+   * oder die Rücknahme gescheitert) — dann fällt die View auf den Store-Stand
+   * zurück und verlässt den Edit-Modus trotzdem.
+   *
+   * Hat der Eintrag in dieser Bearbeitung den Typ gewechselt, geht er mit dem
+   * Einstiegs-Stand zurück in sein Modul (`revertEntryType`). Zeigt die offene
+   * Seite am Ende nicht mehr diesen Eintrag in dieser Ansicht, ist das
+   * Ergebnis `EDIT_ENDED` (siehe dort).
+   *
+   * Solange es schreibt, ist die Bearbeitung gesperrt (`withEditLock`) und
+   * keine View speichert mehr für diesen Eintrag (`isDiscarding`).
    */
-  const restoreOnCancel = useCallback(async (): Promise<TRestore | null> => {
+  const restoreOnCancel = useCallback(async (): Promise<TRestore | typeof EDIT_ENDED | null> => {
     cancelAutoSave();
     const id = idRef.current;
-    const baseline = id
-      ? baselines.get(baselineKey(scope, id)) as { id: string; patch: TRestore; stamp: string | undefined } | undefined
-      : undefined;
-    if (!baseline) return null;
-    try {
-      await updateRef.current(baseline.id, baseline.patch, { touch: baseline.stamp ?? true });
-    } catch (e) {
+    if (!id) return null;
+    const tabId = useUIStore.getState().activeTabId;
+    beginDiscard(id);
+    type Outcome = { restored: TRestore | null; reverted: boolean };
+    const { restored, reverted } = await withEditLock(async (): Promise<Outcome> => {
+      // Ein Typwechsel, der noch schreibt, gehört schon zur Bearbeitung: erst
+      // hinter ihm steht fest, unter welcher Ansicht ihr Ausgangsstand liegt.
+      await settled(serialKey('entry', id));
+      const baseline = baselineOf(id);
+      // Nur Journal, Wiki und Operationen wechseln den Typ — `type` gibt es dann immer.
+      const type = baseline && entryTypeForView(baseline.scope);
+      if (baseline?.origin && type) {
+        return { restored: null, reverted: await revertEntryType(id, type, baseline.origin, baseline.patch, baseline.stamp) };
+      }
+      if (baseline) {
+        await updateRef.current(id, baseline.patch as TRestore, { touch: baseline.stamp ?? true });
+        return { restored: baseline.patch as TRestore, reverted: false };
+      }
+      // Kein Stand mehr: ein Cancel davor hat die Bearbeitung schon beendet.
+      // Was gespeichert ist, ist dann der wiederhergestellte Eintrag — nicht
+      // das, was die View beim Klick noch vor sich hatte.
+      return { restored: readStoredRef.current(id), reverted: false };
+    }).catch((e: unknown): Outcome => {
       console.error('[useEntryEditor] restore on cancel failed:', e);
-      return null;
-    }
+      return { restored: null, reverted: false };
+    });
     // Ein Tastendruck während des Awaits hätte den Timer neu scharf gemacht.
     cancelAutoSave();
-    return baseline.patch;
+
+    // Der Eintrag gehört dieser Ansicht nicht mehr: zurückgenommen (auch von
+    // einem Cancel davor) oder gelöscht. Dann werden Views erst noch abgebaut —
+    // die Marke bleibt, bis die nächste Bearbeitung sie aufhebt.
+    const leftView = reverted || readStoredRef.current(id) === null;
+    if (!leftView) endDiscard(id);
+    const ui = useUIStore.getState();
+    const stillOpen = ui.activeTabId === tabId && ui.activeView.type === scope && ui.activeView.id === id;
+    if (leftView || !stillOpen) {
+      ui.endEditInTab(tabId, id);
+      return EDIT_ENDED;
+    }
+    return restored;
   }, [cancelAutoSave, scope]);
 
   /**
@@ -230,20 +242,25 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
   const isDirty = useCallback((isNew: boolean): boolean => {
     const id = idRef.current;
     if (!id) return false;
-    return editIsDirty(readStoredRef.current(id), baselines.get(baselineKey(scope, id))?.patch, isNew, timer.current !== null);
+    return editIsDirty(readStoredRef.current(id), baselines.get(baselineKey(scope, id)), isNew, timer.current !== null);
   }, [scope]);
-
-  const prevRef = useRef<{ id: string; isEditing: boolean } | null>(null);
 
   useEffect(() => {
     const prev = prevRef.current;
     if (prev?.isEditing && !editorSavesSuspended()) {
+      // Verwirft Cancel den Eintrag gerade, entfällt nur das Schreiben: Timer
+      // und `prevRef` werden trotzdem geräumt — sonst schriebe ein späterer
+      // Durchlauf den State des NÄCHSTEN Eintrags unter der alten id.
+      // Ebenso, wenn der Eintrag nicht mehr dieser Ansicht gehört: nach einem
+      // Typwechsel hat `changeEntryType` vorher gespeichert, und der State
+      // hier trägt noch die Chips mit dem alten Typ.
+      const discarded = isDiscarding(prev.id) || readStoredRef.current(prev.id) === null;
       if (prev.id !== entityId) {
         // Wegnavigiert waehrend des Editierens: die id hat in diesem Render
         // bereits gewechselt, buildPatch liest aber noch den State des
         // vorherigen Eintrags (siehe Kopfkommentar).
         cancelAutoSave();
-        void updateRef.current(prev.id, buildPatchRef.current(contentRef.current)).catch(console.error);
+        if (!discarded) void updateRef.current(prev.id, buildPatchRef.current(contentRef.current)).catch(console.error);
         prevRef.current = null;
       } else if (!isEditing && timer.current !== null) {
         // Edit-Modus verlassen ohne Done/Cancel — seit dem Waechter
@@ -253,7 +270,7 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
         // und bis zu debounceMs an Tipparbeit verwerfen. Done/Cancel
         // entschaerfen den Timer vorher — fuer die ist das hier ein No-op.
         cancelAutoSave();
-        void updateRef.current(prev.id, buildPatchRef.current(contentRef.current)).catch(console.error);
+        if (!discarded) void updateRef.current(prev.id, buildPatchRef.current(contentRef.current)).catch(console.error);
       }
     }
     if (ready && entityId) {
@@ -272,7 +289,7 @@ export function useEntryEditor<TPatch, TRestore = TPatch>({
     return () => {
       cancelAutoSave();
       const prev = prevRef.current;
-      if (prev?.isEditing && !editorSavesSuspended()) {
+      if (prev?.isEditing && !editorSavesSuspended() && !isDiscarding(prev.id) && readStoredRef.current(prev.id) !== null) {
         void updateRef.current(prev.id, buildPatchRef.current(contentRef.current)).catch(console.error);
       }
     };

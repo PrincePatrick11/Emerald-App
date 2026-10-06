@@ -25,7 +25,7 @@ import type { Entry } from '../../types';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
-import { useEntryEditor } from '../../hooks/useEntryEditor';
+import { EDIT_ENDED, useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEntryContentReady } from '../../hooks/useEntryContentReady';
 import { useEditActions } from '../../hooks/useEditActions';
 import { guardKey } from '../../store/leaveGuardStore';
@@ -174,7 +174,10 @@ export default function OperationsView() {
       // Betreten des Edit-Modus gemerkten Stand der Operation zurück; die Setter
       // hier fangen den Fall vor dem ersten Autosave ab (Store unverändert,
       // Sync-Effekte laufen nicht).
-      const from = (await restoreOnCancel()) ?? fieldsOf(operation);
+      const restored = await restoreOnCancel();
+      // Die Seite zeigt diesen Eintrag nicht mehr, das Bearbeiten ist schon beendet — nichts mehr zu tun.
+      if (restored === EDIT_ENDED) return;
+      const from = restored ?? fieldsOf(operation);
       setTitle(from.title);
       setTags(from.tags);
       contentRef.current = from.content;

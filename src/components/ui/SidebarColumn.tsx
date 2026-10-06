@@ -26,31 +26,33 @@ export function SidebarActionBar({ children }: { children?: ReactNode }) {
  * Eintrag (RightSidebar) und die Seiten der Bibliothek. „Fertig" ist die eine
  * gefüllte Primäraktion, Löschen und Abbrechen sind 30px-Quadrate daneben
  * (`.edit-bar-*`). Ohne `onDelete` fehlt der Löschen-Knopf; `busy` sperrt
- * Fertig, solange gespeichert wird.
+ * Fertig, solange gespeichert wird, `locked` alle drei — solange etwas
+ * schreibt, das die Seite gleich austauscht (`uiStore.editLocked`).
  *
  * Eigene Klassen statt `Button`: dessen tone-Stufen sind getönte Knöpfe mit
  * 11px-Schrift für Zeilenaktionen; die Leiste des Bearbeitens hat genau eine
  * gefüllte Primäraktion mit 13px-Schrift. Die Höhe ist dieselbe (`--control-h`).
  */
-export function EditActionBar({ onDone, onDelete, onCancel, busy }: {
+export function EditActionBar({ onDone, onDelete, onCancel, busy, locked }: {
   onDone: () => void;
   onDelete?: () => void;
   onCancel: () => void;
   busy?: boolean;
+  locked?: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <SidebarActionBar>
-      <button type="button" className="edit-bar-done" disabled={busy} title={t('editor.done')} onClick={onDone}>
+      <button type="button" className="edit-bar-done" disabled={busy || locked} title={t('editor.done')} onClick={onDone}>
         <Check size={14} />
         <span className="truncate">{t('editor.done')}</span>
       </button>
       {onDelete && (
-        <button type="button" className="edit-bar-icon edit-bar-icon--danger" title={t('editor.delete')} aria-label={t('editor.delete')} onClick={onDelete}>
+        <button type="button" className="edit-bar-icon edit-bar-icon--danger" disabled={locked} title={t('editor.delete')} aria-label={t('editor.delete')} onClick={onDelete}>
           <Trash2 size={14} />
         </button>
       )}
-      <button type="button" className="edit-bar-icon" title={t('editor.cancel')} aria-label={t('editor.cancel')} onClick={onCancel}>
+      <button type="button" className="edit-bar-icon" disabled={locked} title={t('editor.cancel')} aria-label={t('editor.cancel')} onClick={onCancel}>
         <X size={14} />
       </button>
     </SidebarActionBar>

@@ -48,6 +48,7 @@ function RightSidebarActionBar() {
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const editActions = useUIStore((s) => s.editActions);
+  const editLocked = useUIStore((s) => s.editLocked);
   const altarWindowFullscreen = useUIStore((s) => s.altarWindowFullscreen);
   const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
   // Der Inhalt des offenen Eintrags — für die Sperre einer geladenen Sigille.
@@ -59,7 +60,19 @@ function RightSidebarActionBar() {
 
   if (isEditing) {
     if (!editActions) return null;
-    return <EditActionBar onDone={editActions.onSave} onDelete={editActions.onDelete} onCancel={editActions.onCancel} />;
+    // Die Sperre gilt ab dem Klick, der sie auslöst — nicht erst, wenn die
+    // Knöpfe als gesperrt gezeichnet sind: deshalb fragt jeder Griff den Store.
+    const unlessLocked = (run: () => void | Promise<void>) => () => {
+      if (!useUIStore.getState().editLocked) void run();
+    };
+    return (
+      <EditActionBar
+        onDone={unlessLocked(editActions.onSave)}
+        onDelete={editActions.onDelete && unlessLocked(editActions.onDelete)}
+        onCancel={unlessLocked(editActions.onCancel)}
+        locked={editLocked}
+      />
+    );
   }
 
   // Eine geladene Sigille mit Sperre „ganzer Eintrag" lässt sich nicht

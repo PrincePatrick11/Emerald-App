@@ -3,10 +3,11 @@
  * (Tabelle `categories`, seit v38). Vorher hielt jeder der vier Stores seinen
  * eigenen Slice mit denselben fünf Aktionen.
  *
- * Import-Regel: Dieser Store darf die Inhalts-Stores und den Vorlagen-Store
- * importieren (er hängt nach dem endgültigen Löschen einer Kategorie deren
- * Inhalte und Vorlagen-Zuweisungen auch im Speicher um); keiner von ihnen
- * importiert zurück. Alle Zugriffe laufen zur Laufzeit
+ * Import-Regel: Dieser Store darf die Inhalts-Stores, den Vorlagen-Store und
+ * `entryEdit` importieren — er hängt nach dem endgültigen Löschen einer
+ * Kategorie deren Inhalte, Vorlagen-Zuweisungen und die Ausgangsstände
+ * laufender Bearbeitungen auch im Speicher um; keiner von ihnen importiert
+ * zurück. Alle Zugriffe laufen zur Laufzeit
  * über `getState()`.
  */
 import { create } from 'zustand';
@@ -17,6 +18,7 @@ import { generateId, nowIso } from '../lib/helpers';
 import { fromRow, type DbRow } from '../lib/row';
 import type { Category } from '../types';
 import { useEntryStore } from './entryStore';
+import { reassignBaselineCategories } from './entryEdit';
 import { useTaskStore } from './taskStore';
 import { useAltarStore } from './altarStore';
 import { dropCategoriesFromTemplatesInMemory, useTemplateStore } from './templateStore';
@@ -73,6 +75,8 @@ export function reassignCategoriesInMemory(ids: ReadonlySet<string>, to: string 
       Object.entries(s.previewPlacements).map(([k, list]) => [k, list.map(move)])
     ),
   }));
+  // Auch, was eine laufende Bearbeitung mit Cancel zurückschriebe.
+  reassignBaselineCategories(ids, to);
   if (!to) dropCategoriesFromTemplatesInMemory(ids);
 }
 

@@ -82,6 +82,11 @@ interface UIState {
    *  Wiki und Operationen ebenfalls auf ihr Dashboard zurueckfallen. */
   dashboardMounted: boolean;
   editActions: EditActions | null;
+  /** Ein Typwechsel oder ein Abbrechen schreibt gerade (`withEditLock`): Fertig,
+   *  Löschen, Abbrechen und der Typ-Schalter des offenen Eintrags sind gesperrt,
+   *  und die Seite lässt sich nicht verlassen — ein Klick dazwischen träfe die
+   *  Ansicht, die dabei abgebaut wird, und die Rückfrage gälte ihr. */
+  editLocked: boolean;
   /** Die Rail ganz links. Dauerhaft (localStorage), wie `leftListOpen`. */
   railOpen: boolean;
   leftListOpen: boolean;
@@ -124,8 +129,11 @@ interface UIState {
   setFlag: (key: string, value: boolean) => void;
   closeAllTabs: () => void;
   /** Ein Eintrag hat den Typ gewechselt: jeder Tab und jeder Verlauf, der ihn
-   *  unter `from` öffnet, öffnet ihn jetzt unter `to` — dieselbe id. */
-  retypeEntryViews: (id: string, from: EntryModuleId, to: EntryModuleId) => void;
+   *  unter `from` öffnet, öffnet ihn jetzt unter `to` — dieselbe id. Mit
+   *  `endEdit` steht die offene Seite danach im Lesen: Cancel nimmt einen
+   *  Typwechsel zurück, und die Ansicht des alten Typs soll gar nicht erst im
+   *  Bearbeiten erscheinen. Andere Tabs behalten ihren Modus. */
+  retypeEntryViews: (id: string, from: EntryModuleId, to: EntryModuleId, options?: { endEdit?: boolean }) => void;
   openViewInNewTab: (view: ActiveView) => void;
   addTab: (view?: ActiveView) => void;
   selectTab: (id: string) => void;
@@ -138,6 +146,10 @@ interface UIState {
   setListHeaderHost: (el: HTMLElement | null) => void;
   setDashboardMounted: (mounted: boolean) => void;
   setEditActions: (actions: EditActions | null) => void;
+  /** Beendet das Bearbeiten des Eintrags `id` in genau diesem Tab (`null` = die
+   *  Ansicht ohne Tab) — für ein Abbrechen, dessen Tab beim Zurückschreiben
+   *  nicht mehr der offene ist. Kein Schritt im Verlauf. */
+  endEditInTab: (tabId: string | null, id: string) => void;
   toggleRail: () => void;
   toggleLeftList: () => void;
   /** Blendet Rail, linke Liste und rechte Leiste wieder ein — Teil von „Ansicht zurücksetzen". */
@@ -249,8 +261,14 @@ function stepHistory(s: UIState, delta: -1 | 1): Partial<UIState> {
  * Führt `run` aus — sofort, oder erst nach der Frage, wenn die offene Seite
  * ungesicherte Änderungen trägt und `leaves` sie verlässt. Bei „Weiter
  * bearbeiten" entfällt `run`.
+ *
+ * Ist die Bearbeitung gerade gesperrt (`editLocked`), entfällt ein Schritt, der
+ * die Seite verließe, ganz — ohne Frage, wie ein Klick auf einen gesperrten
+ * Knopf.
  */
 function whenLeaveConfirmed(leaves: boolean, run: () => void): void {
+  // Die Frage ginge an eine Ansicht, die gerade abgebaut wird.
+  if (leaves && useUIStore.getState().editLocked) return;
   if (!leaves || !leaveNeedsConfirm()) {
     run();
     return;
@@ -283,6 +301,8 @@ export async function askInTab(tabId: string): Promise<boolean> {
   // ist gespeichert (Autosave) oder mitgeschrieben (Entwurf).
   if (!registered) return true;
   if (useLeaveGuardStore.getState().guard?.key !== key) return false;
+  // Gesperrt (`editLocked`): die Frage ginge an eine Seite, die gerade abgebaut wird.
+  if (useUIStore.getState().editLocked) return false;
   return confirmLeave();
 }
 
@@ -298,17 +318,30 @@ function withActiveHistory(s: UIState, history: NavHistory): UIState {
 }
 
 /**
+ * Der Verlauf, von dem ein Zurück/Vor ausgeht (`stepGuarded`), solange seine
+ * Rückfrage offen ist. Bei „Weiter bearbeiten" — und bei einem Schritt, der in
+ * die Sperre fiel — bleibt er stehen, bis der nächste Schritt ihn ersetzt — gelesen wird er nur von dem, der ihn gesetzt hat.
+ */
+let heldHistory: NavHistory | null = null;
+
+/**
  * Zurück oder Vor. Der Schritt geht vom Verlauf aus, wie er vor der Frage war:
  * „Speichern" und „Verwerfen" wechseln selbst die Seite (zurück zur Liste)
  * und hätten ihn sonst um genau diesen Schritt verschoben — man stünde wieder
  * auf der Seite, die man verlassen wollte.
+ *
+ * Er liegt in `heldHistory`, nicht in der Closure: nimmt „Verwerfen" einen
+ * Typwechsel zurück, schreibt `retypeEntryViews` ihn mit um — sonst führte
+ * er den Eintrag weiter unter dem verworfenen Typ.
  */
 function stepGuarded(delta: -1 | 1): void {
   const tabId = useUIStore.getState().activeTabId;
-  const before = selectActiveHistory(useUIStore.getState());
-  whenLeaveConfirmed(true, () => useUIStore.setState((s) => (
-    s.activeTabId === tabId ? stepHistory(withActiveHistory(s, before), delta) : {}
-  )));
+  heldHistory = selectActiveHistory(useUIStore.getState());
+  whenLeaveConfirmed(true, () => {
+    const before = heldHistory;
+    heldHistory = null;
+    useUIStore.setState((s) => (s.activeTabId === tabId && before ? stepHistory(withActiveHistory(s, before), delta) : {}));
+  });
 }
 
 /** Schließt den Tab, ohne zu fragen — das Fragen erledigt `closeTab`. */
@@ -348,6 +381,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   listHeaderHost: null,
   dashboardMounted: false,
   editActions: null,
+  editLocked: false,
   railOpen: loadOpenFlag(RAIL_OPEN_KEY),
   leftListOpen: loadOpenFlag(LEFT_LIST_OPEN_KEY),
   searchQuery: '',
@@ -450,13 +484,25 @@ export const useUIStore = create<UIState>((set, get) => ({
     });
   },
 
-  retypeEntryViews: (id, from, to) => set((s) => {
-    const retype = (view: ActiveView): ActiveView => (view.type === from && view.id === id ? { ...view, type: to } : view);
+  retypeEntryViews: (id, from, to, { endEdit = false } = {}) => {
+    const isEntry = (view: ActiveView) => view.type === from && view.id === id;
+    const retype = (view: ActiveView): ActiveView => (isEntry(view) ? { ...view, type: to } : view);
     const retypeHistory = (history: NavHistory): NavHistory => ({ ...history, views: history.views.map(retype) });
-    const tabs = s.tabs.map((tab) => ({ ...tab, view: retype(tab.view), history: retypeHistory(tab.history) }));
-    saveTabs(tabs, s.activeTabId);
-    return { tabs, activeView: retype(s.activeView), tablessHistory: retypeHistory(s.tablessHistory) };
-  }),
+    // Die offene Seite: mit `endEdit` zugleich ins Lesen, wenn sie dieser Eintrag ist.
+    const retypeOpenPage = (view: ActiveView): ActiveView => (
+      endEdit && isEntry(view) ? { type: to, id, mode: 'view' } : retype(view)
+    );
+    if (heldHistory) heldHistory = retypeHistory(heldHistory);
+    set((s) => {
+      const tabs = s.tabs.map((tab) => ({
+        ...tab,
+        view: tab.id === s.activeTabId ? retypeOpenPage(tab.view) : retype(tab.view),
+        history: retypeHistory(tab.history),
+      }));
+      saveTabs(tabs, s.activeTabId);
+      return { tabs, activeView: retypeOpenPage(s.activeView), tablessHistory: retypeHistory(s.tablessHistory) };
+    });
+  },
 
   // Ein neuer Tab beginnt mit einem frischen Verlauf.
   openViewInNewTab: (view) => set((s) => {
@@ -530,6 +576,14 @@ export const useUIStore = create<UIState>((set, get) => ({
   setListHeaderHost: (el) => set((s) => (s.listHeaderHost === el ? s : { listHeaderHost: el })),
   setDashboardMounted: (mounted) => set((s) => (s.dashboardMounted === mounted ? s : { dashboardMounted: mounted })),
   setEditActions: (actions) => set({ editActions: actions }),
+  endEditInTab: (tabId, id) => set((s) => {
+    const end = (view: ActiveView): ActiveView => (
+      view.id === id && view.mode === 'edit' ? stripSessionFlags({ ...view, mode: 'view' }) : view
+    );
+    const tabs = s.tabs.map((tab) => (tab.id === tabId ? { ...tab, view: end(tab.view) } : tab));
+    saveTabs(tabs, s.activeTabId);
+    return { tabs, activeView: s.activeTabId === tabId ? end(s.activeView) : s.activeView };
+  }),
   toggleRail: () => set((s) => {
     const railOpen = !s.railOpen;
     saveOpenFlag(RAIL_OPEN_KEY, railOpen);
@@ -564,3 +618,21 @@ export const useUIStore = create<UIState>((set, get) => ({
   setHomeOpsPrefs:     (p) => set((s) => ({ homeOpsPrefs:     { ...s.homeOpsPrefs,     ...p } })),
   setHomeWikiPrefs:    (p) => set((s) => ({ homeWikiPrefs:    { ...s.homeWikiPrefs,    ...p } })),
 }));
+
+/** Wie viele `withEditLock` gerade laufen. */
+let editLocks = 0;
+
+/**
+ * Sperrt die Bearbeitung, solange `run` schreibt (`editLocked`): die Leiste,
+ * den Typ-Schalter und das Verlassen der Seite. Gezählt, nicht geschaltet: ein
+ * Abbrechen kann auf einen Typwechsel warten, der noch läuft — wer zuerst
+ * fertig ist, gibt die Sperre des anderen nicht frei.
+ */
+export async function withEditLock<T>(run: () => Promise<T>): Promise<T> {
+  if (++editLocks === 1) useUIStore.setState({ editLocked: true });
+  try {
+    return await run();
+  } finally {
+    if (--editLocks === 0) useUIStore.setState({ editLocked: false });
+  }
+}

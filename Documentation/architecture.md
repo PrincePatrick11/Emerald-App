@@ -75,6 +75,7 @@ src/
 │   ├── draftStore.ts            unsaved block/template page drafts
 │   ├── autoBackupStore.ts       what the automatic backup did last
 │   ├── altarEdit.ts             altar snapshot for Cancel
+│   ├── entryEdit.ts             entry baselines for Cancel, carried across a type change
 │   ├── leaveGuardStore.ts       edit guards, "save / discard / keep editing"
 │   ├── uiStore.ts               tabs, active view, panels
 │   ├── sessionStore.ts          per-view search/filter state (session only)
@@ -86,7 +87,7 @@ src/
 │   ├── imageNoticeStore.ts      "image not inserted" notice
 │   └── moduleWiring.ts          per-module reload, trash wiring, startup reload
 ├── hooks/
-│   ├── useEntryEditor.ts        auto-save and edit baseline
+│   ├── useEntryEditor.ts        auto-save, Cancel
 │   ├── useEditActions.ts        registers Done/Cancel/Delete in the sidebar
 │   ├── useDraftPage.ts          draft lifecycle of block/template pages
 │   ├── useGlobalSearch.ts, useDeepLink.ts, useLinkItems.ts
