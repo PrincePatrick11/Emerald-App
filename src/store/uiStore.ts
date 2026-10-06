@@ -633,6 +633,17 @@ export const useUIStore = create<UIState>((set, get) => ({
 
 /** Wie viele `withEditLock` gerade laufen. */
 let editLocks = 0;
+/** Wie viele je begonnen haben. */
+let editLocksStarted = 0;
+
+/**
+ * Zählt jede begonnene Sperre. Wer über mehrere awaits hinweg liest (das
+ * automatische Backup), merkt daran, dass dazwischen ein Typwechsel oder ein
+ * Abbrechen geschrieben hat — auch wenn `editLocked` am Ende wieder aus ist.
+ */
+export function editLockEpoch(): number {
+  return editLocksStarted;
+}
 
 /**
  * Sperrt die Bearbeitung, solange `run` schreibt (`editLocked`): die Leiste,
@@ -641,6 +652,7 @@ let editLocks = 0;
  * fertig ist, gibt die Sperre des anderen nicht frei.
  */
 export async function withEditLock<T>(run: () => Promise<T>): Promise<T> {
+  editLocksStarted++;
   if (++editLocks === 1) useUIStore.setState({ editLocked: true });
   try {
     return await run();

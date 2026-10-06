@@ -73,6 +73,7 @@ src/
 │   ├── templateStore.ts, templateApply.ts   templates; applying one
 │   ├── lexiconStore.ts          languages and their words
 │   ├── draftStore.ts            unsaved block/template page drafts
+│   ├── autoBackupStore.ts       what the automatic backup did last
 │   ├── altarEdit.ts             altar snapshot for Cancel
 │   ├── entryEdit.ts             entry baselines for Cancel, carried across a type change
 │   ├── leaveGuardStore.ts       edit guards, "save / discard / keep editing"
@@ -119,6 +120,7 @@ src/
 │   ├── images.ts, imageLimits.ts, shrinkImage.ts, thumbnail.ts
 │   ├── export.ts, exportData.ts, emeraldFormat.ts, altarExport.ts
 │   ├── dbBackup.ts, importStaging.ts   .emeralddb backup and restore
+│   ├── autoBackup.ts            automatic backup: when one is due, the run
 │   ├── vaultManager.ts, vaultSettings.ts
 │   ├── altarConstants.ts        altar sizes, backgrounds, candle check
 │   ├── altarSettings.ts         an altar's `settings` JSON
@@ -140,6 +142,7 @@ src-tauri/src/
 ├── keys.rs             vault.key, unlocking, OS keychain, `VaultKeys`
 ├── reencrypt.rs        encrypting a vault, changing the password, crash recovery
 ├── backup.rs           encrypted .emeralddb files
+├── auto_backup.rs      automatic backups: target folder, file name, pruning
 ├── images.rs           image commands + emerald-img scheme
 ├── vault.rs            vault registry and vault directory commands
 ├── updates.rs          in-app updater
@@ -189,7 +192,7 @@ Every content-store update method (`updateEntry`, `updateTask`/`toggleComplete`,
 
 Deliberately not serialized, each with a comment at its definition: `bumpAltarUpdatedAt` (writes only `updated_at`) and `updateCategory` (writes only the columns passed in, no snapshot merge).
 
-A serialized task must never await another task under its own key — it would wait on itself — and the chain carries no timeout, so a task that never settles occupies its key permanently. `drainSerialized()` resolves once every currently-queued chain has settled. `vaultStore.openActiveVault`, `dbBackup.importDatabase` (all modes) and `resolveOpenEdits` (`lib/openEdits.ts`) await it before swapping the database underneath the stores: the editor lock ([`editing.md`](architecture/editing.md#auto-save-the-useentryeditor-hook)) only stops *future* saves, so writes already in flight must finish first.
+A serialized task must never await another task under its own key — it would wait on itself — and the chain carries no timeout, so a task that never settles occupies its key permanently. `drainSerialized()` resolves once every currently-queued chain has settled. `vaultStore.openActiveVault`, `dbBackup.importDatabase` (all modes) and `resolveOpenEdits` (`lib/openEdits.ts`) await it before swapping the database underneath the stores: the editor lock ([`editing.md`](architecture/editing.md#auto-save-the-useentryeditor-hook)) only stops *future* saves, so writes already in flight must finish first. `autoBackup.runAutoBackup` awaits it too, though it only reads: a write still queued would otherwise be missing from the payload.
 
 ### Code splitting
 
@@ -197,7 +200,7 @@ A serialized task must never await another task under its own key — it would w
 
 ## IPC Command Surface
 
-All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from TypeScript with `invoke()`; most are *defined* in `db.rs`, `keys.rs`, `reencrypt.rs`, `backup.rs`, `images.rs`, `vault.rs` and `updates.rs`.
+All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from TypeScript with `invoke()`; most are *defined* in `db.rs`, `keys.rs`, `reencrypt.rs`, `backup.rs`, `auto_backup.rs`, `images.rs`, `vault.rs` and `updates.rs`.
 
 **File commands run off the main thread.** `write_file`, `read_file`, `export_image`, `ensure_app_storage_dirs` and all seven commands in `images.rs` are `async` and wrap their `std::fs` work in `tauri::async_runtime::spawn_blocking`, so a multi-megabyte `.emeralddb` doesn't block the window. `async fn` alone would not do: the blocking call would still run on a runtime worker and could starve the SQL pools, PDF export and IPC replies on a machine with few cores. The `emerald-img` scheme handler uses `spawn_blocking` as well. The four native-menu commands stay synchronous on purpose — they mutate `NSMenu`, which is main-thread-only on macOS.
 
@@ -214,6 +217,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `vault_encrypt_existing` / `vault_change_password` / `vault_recover` | Re-encrypt a plain vault, change the password, or set a new one from the recovery key; all three build a copy under a new key and return the new recovery key. See [Re-encrypting a vault](architecture/encryption.md#re-encrypting-a-vault). |
 | `vault_set_remembered` / `vault_is_remembered` / `keychain_available` | The "remember on this device" switch, its state, and whether the system has a keychain. |
 | `write_backup_file(vault_id, path, content)` / `read_backup_file(path, password?, recovery_key?)` | Write a `.emeralddb` sealed under the vault key / open one with an unlocked vault's key, a password or a recovery key (`BACKUP_LOCKED` when none fits). |
+| `auto_backup_status(vault_id)` / `pick_auto_backup_dir(vault_id)` / `reset_auto_backup_dir(vault_id)` / `write_auto_backup(vault_id, content, keep?)` | The automatic backup: target folder and newest backup / native folder dialog, opened in Rust / back to the vault's `backup/` / write today's sealed backup and prune beyond `keep`. No path crosses IPC — see [`security.md`](security.md#automatic-backups). |
 | `save_image(data_url, vault_id)` | Decode a data-URL, write it into the vault's `images/` — sealed and named by a keyed hash in an encrypted vault. Skips if it exists. Returns the **filename**. |
 | `copy_image_file(source, vault_id)` | Copy a file from an arbitrary path into the vault's `images/` under its content name. png/jpg/jpeg/gif/webp/svg only; rejects symlinks, canonicalizes the source and confines it to the allowed storage roots. Returns the filename. |
 | `read_image_as_base64(filename, vault_id)` | A stored image, opened if sealed, as a data-URL — only for the PDF export (renders in a `file://` webview) and the backup writer (embeds bytes in JSON); everything else uses the `emerald-img` scheme. |
@@ -231,9 +235,9 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `delete_vault_files(vault_id)` | Removes only the vault's own artefacts by name, never `remove_dir_all`; returns whether the vault folder is gone, so the UI can say "the folder stayed". What it deletes: [`security.md`](security.md#vault-directories-as-a-trust-boundary). |
 | `discard_import_staging(vault_id)` | Removes a backup import's staging copy (`emerald.db.import` plus `-journal`/`-wal`/`-shm`). Run before and after every import; a missing file is not an error. See [DB Backup / Restore](database.md#db-backup--restore-emeralddb). |
 | `prune_migration_backups(vault_id)` | Deletes every migration backup but the newest (written by `backupDatabaseFile` in `dbRebuild.ts`; name rule in [`security.md`](security.md#vault-directories-as-a-trust-boundary)). Returns the count. Called by `getDb()` after `runMigrations`; failure is only logged. |
-| `ensure_backup_dir(vault_id)` | The vault's `backup/` folder, the database export's default destination; recreated on demand, refused outside the allowed storage roots. |
+| `ensure_backup_dir(vault_id)` | The vault's `backup/` folder, the database export's default destination; recreated on demand, refused outside the allowed storage roots and, inside the app data directory, outside `vaults/` — wherever the write command would refuse the export afterwards. |
 | `export_image(path, data_url)` | Write a data-URL's image bytes to a user-chosen `.png`/`.jpg`/`.jpeg`/`.webp` path. Same path checks as `write_file`. |
-| `write_file(path, content)` | Write UTF-8 text to a user-selected `.md`/`.emerald`/`.json`/`.txt` path. Rejects symlinks; the path must resolve within the allowed storage roots. |
+| `write_file(path, content)` | Write UTF-8 text to a user-selected `.md`/`.emerald`/`.json`/`.txt` path. Rejects symlinks; the path must resolve within the allowed storage roots, and inside the app data directory only `vaults.json` and `vaults/` are writable (see [Path Confinement](security.md#path-confinement)). |
 | `read_file(path)` | Read a file as UTF-8. Same allowlist and confinement as `write_file`. |
 | `ensure_app_storage_dirs()` | Create the app data and config directories before vault metadata is written or SQLite opens. |
 | `export_pdf(html, path, page_size?)` | Render HTML to a PDF at a path the frontend obtained from the `dialog` plugin, by driving the app's own webview. `page_size` (inches) overrides the default Letter page — used by the Altar export only. See [PDF Export](architecture/shell.md#pdf-export). |
@@ -242,7 +246,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `set_view_menu_checked(rail, left_list, right_sidebar, view_locked)` | Mirror sidebar visibility and the view lock onto the View menu's check items, on every change (not only menu-triggered ones). macOS only in effect. |
 | `set_export_menu_enabled(entry, pdf, emerald)` | Enable/disable the native "Export as …" items for the current view (`computeMenuEnabledState`). macOS only in effect. |
 | `set_altar_export_menu_enabled(enabled)` | Enable/disable the native "Export as Image" submenu. macOS only in effect. |
-| `update_settings()` / `set_update_settings(endpoint, auto_check)` | Read/write `{appDataDir}/update.json`, the one installation-level setting; the endpoint must be a complete `https` URL. See [`security.md` → In-App Updates](security.md#in-app-updates). |
+| `update_settings()` / `set_update_settings(endpoint, auto_check)` | Read/write `{appDataDir}/update.json`, an installation-level setting like the automatic backup's `auto-backup.json`; the endpoint must be a complete `https` URL. See [`security.md` → In-App Updates](security.md#in-app-updates). |
 | `check_for_update()` / `install_update()` | The only commands that reach the network — `tauri-plugin-updater`, driven from `updates.rs` rather than the plugin's JS API so the CSP needs no update host. `install_update` installs only the result `check_for_update` holds, then restarts. See [`security.md` → In-App Updates](security.md#in-app-updates). |
 
 Tauri menu events (not `invoke`) come from the native menu and are received in `AppShell` via `listen()`. On Windows and Linux there is no native menu — the HTML title-bar menus call the same actions directly through `src/lib/menuActions.ts`, so both run one implementation:

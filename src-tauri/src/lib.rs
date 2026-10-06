@@ -35,6 +35,8 @@ mod keys;
 mod reencrypt;
 /// Encrypted `.emeralddb` backups.
 mod backup;
+/// Automatic backups: the target folder, the file name, what gets pruned.
+mod auto_backup;
 /// Der In-App-Updater: variable Quelle, Pruefung, Installation.
 mod updates;
 
@@ -114,6 +116,66 @@ pub(crate) fn is_within_allowed_roots(path: &Path, allowed_roots: &[PathBuf]) ->
     allowed_roots.iter().any(|root| path.starts_with(root))
 }
 
+/// The only entries directly below the app data directory that a path-taking
+/// command may write: the registry the frontend owns, and the folder of the
+/// vaults that live there.
+///
+/// Everything else in that directory is the state of a Rust module — which
+/// folder automatic backups go to (`auto-backup.json`), which server is asked
+/// for updates (`update.json`) — and is written by that module alone. An
+/// allow-list rather than a list of those names: a file system that folds case
+/// or normalises Unicode (APFS, NTFS) knows more spellings of a name than a
+/// comparison here could; another spelling of an *allowed* name (`VAULTS.JSON`)
+/// is refused, which costs nothing.
+const APP_DATA_WRITABLE_FILE: &str = "vaults.json";
+/// See [`APP_DATA_WRITABLE_FILE`].
+const APP_DATA_WRITABLE_DIR: &str = "vaults";
+
+/// `path` with its deepest existing ancestor canonicalized and the rest
+/// appended as written — the shape a path has before its folders exist.
+/// `None` when the rest is not plain names (`..`), or nothing of it exists.
+fn resolve_existing_part(path: &Path) -> Option<PathBuf> {
+    let mut existing = path;
+    while !existing.exists() {
+        existing = existing.parent()?;
+    }
+    let rest = path.strip_prefix(existing).ok()?;
+    if !rest.components().all(|part| matches!(part, std::path::Component::Normal(_))) {
+        return None;
+    }
+    Some(std::fs::canonicalize(existing).ok()?.join(rest))
+}
+
+/// Whether a path-taking command may write `target`, as far as the app data
+/// directory is concerned. Both paths resolved the same way.
+fn app_data_write_allowed(target: &Path, app_data_dir: &Path) -> bool {
+    let Ok(below) = target.strip_prefix(app_data_dir) else {
+        return true;
+    };
+    let mut parts = below.components();
+    match parts.next().and_then(|first| first.as_os_str().to_str()) {
+        Some(APP_DATA_WRITABLE_FILE) => parts.next().is_none(),
+        Some(APP_DATA_WRITABLE_DIR) => true,
+        _ => false,
+    }
+}
+
+/// Refuses `target` when it lies in the app data directory outside the two
+/// allowed entries.
+pub(crate) fn check_app_data_write(app: &tauri::AppHandle, target: &Path) -> Result<(), String> {
+    let Some(app_data_dir) = app.path().app_data_dir().ok().and_then(|dir| resolve_existing_part(&dir)) else {
+        // Kein App-Datenordner, oder keiner, der sich auflösen lässt: dann
+        // löst sich auch kein Ziel darin auf, und die Module, die ihren
+        // Zustand dort halten, lesen ihn ebenso wenig. Nichts zu schützen.
+        return Ok(());
+    };
+    if app_data_write_allowed(target, &app_data_dir) {
+        Ok(())
+    } else {
+        Err("access denied: reserved for the app".to_string())
+    }
+}
+
 /// Resolves a user-chosen destination and returns the path that may be written.
 ///
 /// `write_file` and `export_image` ran the same sequence side by side, and the
@@ -125,7 +187,8 @@ pub(crate) fn is_within_allowed_roots(path: &Path, allowed_roots: &[PathBuf]) ->
 /// allowed root?" means anything, so everything is canonicalized first. Any
 /// symlink at the target is refused — including a dangling one, which is the
 /// shape that used to slip past — so a prepared link cannot redirect the write
-/// out of the allowed roots.
+/// out of the allowed roots. A `..` behind a folder that does not exist yet is
+/// refused: such a path cannot be resolved before it is created.
 pub(crate) fn guarded_write_target(app: &tauri::AppHandle, path: &str) -> Result<PathBuf, String> {
     let allowed_roots = resolve_allowed_roots(app)?;
     let target = PathBuf::from(path);
@@ -143,6 +206,10 @@ pub(crate) fn guarded_write_target(app: &tauri::AppHandle, path: &str) -> Result
     if !is_within_allowed_roots(&canonical_existing, &allowed_roots) {
         return Err("access denied: path outside allowed directories".to_string());
     }
+    // Ebenfalls vor dem Anlegen: sonst entstünde im App-Datenordner ein Ordner
+    // unter dem Namen einer Zustandsdatei, und deren Modul könnte sie nie mehr schreiben.
+    let resolved = resolve_existing_part(&target).ok_or("invalid path")?;
+    check_app_data_write(app, &resolved)?;
 
     std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     let canonical_parent = std::fs::canonicalize(parent).map_err(|_| "invalid path".to_string())?;
@@ -164,11 +231,16 @@ pub(crate) fn guarded_write_target(app: &tauri::AppHandle, path: &str) -> Result
             if !is_within_allowed_roots(&canonical_target, &allowed_roots) {
                 return Err("access denied: path outside allowed directories".to_string());
             }
+            // Noch einmal am endgültigen Pfad: zurückgegeben wird dieser, nicht
+            // der vor dem Anlegen der Ordner aufgelöste.
+            check_app_data_write(app, &canonical_target)?;
             Ok(canonical_target)
         }
         Err(_) => {
             let filename = target.file_name().ok_or("invalid path")?;
-            Ok(canonical_parent.join(filename))
+            let resolved_target = canonical_parent.join(filename);
+            check_app_data_write(app, &resolved_target)?;
+            Ok(resolved_target)
         }
     }
 }
@@ -854,6 +926,10 @@ pub fn run() {
             reencrypt::vault_recover,
             backup::write_backup_file,
             backup::read_backup_file,
+            auto_backup::auto_backup_status,
+            auto_backup::pick_auto_backup_dir,
+            auto_backup::reset_auto_backup_dir,
+            auto_backup::write_auto_backup,
             keys::vault_create_key,
             keys::vault_unlock,
             keys::vault_unlock_remembered,
@@ -914,6 +990,50 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod app_data_write_tests {
+    use super::*;
+
+    #[test]
+    fn only_the_registry_and_the_vaults_folder_are_writable_in_the_app_data_dir() {
+        let data = Path::new("/home/u/.local/share/emerald");
+        for allowed in ["vaults.json", "vaults/1a2b/backup/emerald-backup-2026-10-06.emeralddb", "vaults/update.json"] {
+            assert!(app_data_write_allowed(&data.join(allowed), data), "{allowed}");
+        }
+        for refused in [
+            "auto-backup.json",
+            "auto-backup.json.tmp",
+            "update.json",
+            // Schreibweisen, die ein Dateisystem auf denselben Namen abbildet.
+            "AUTO-BACKUP.JSON",
+            "auto-bac\u{212A}up.json",
+            // Ein Ordner unter dem Namen einer Zustandsdatei.
+            "auto-backup.json/x.json",
+            "vaults.json/x.json",
+            "notes.json",
+            "VAULTS.JSON",
+        ] {
+            assert!(!app_data_write_allowed(&data.join(refused), data), "{refused}");
+        }
+        assert!(!app_data_write_allowed(data, data));
+        // Außerhalb des App-Datenordners gilt die Regel nicht.
+        assert!(app_data_write_allowed(Path::new("/home/u/Documents/auto-backup.json"), data));
+        assert!(app_data_write_allowed(Path::new("/home/u/.local/share/emerald-other/update.json"), data));
+    }
+
+    #[test]
+    fn a_path_resolves_through_its_existing_part() {
+        let dir = std::env::temp_dir().join(format!("emerald-resolve-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let canonical = std::fs::canonicalize(&dir).unwrap();
+        assert_eq!(resolve_existing_part(&dir.join("a").join("b.json")), Some(canonical.join("a").join("b.json")));
+        assert_eq!(resolve_existing_part(&dir), Some(canonical));
+        // `..` hinter etwas, das es nicht gibt, lässt sich nicht auflösen.
+        assert_eq!(resolve_existing_part(&dir.join("a").join("b").join("..").join("c.json")), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
 
 #[cfg(test)]

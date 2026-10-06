@@ -91,7 +91,7 @@ pub(crate) fn directory_state(dir: &Path) -> Result<(), String> {
 
 /// Ids are `crypto.randomUUID()` output plus the literal `default`. Anything
 /// outside that alphabet is refused before it can become a path segment.
-fn is_valid_vault_id(id: &str) -> bool {
+pub(crate) fn is_valid_vault_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
         && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
@@ -625,6 +625,10 @@ pub fn ensure_backup_dir(app: tauri::AppHandle, vault_id: String) -> Result<Stri
     if !crate::is_within_allowed_roots(&canonical, &allowed) {
         return Err("vault outside allowed storage roots".to_string());
     }
+    // Dasselbe für die zweite Regel des Schreibbefehls: im App-Datenordner
+    // nimmt er nur `vaults/` an. Ein Vault, der dort daneben liegt, bekäme
+    // sonst ein Ziel angeboten, das anschliessend verweigert wird.
+    crate::check_app_data_write(&app, &canonical.join(BACKUP_SUBDIR))?;
 
     let dir = vault.join(BACKUP_SUBDIR);
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -1044,6 +1048,41 @@ fn write_json_in(dir: &Path, name: &str, temp_name: &str, max_bytes: u64, conten
 /// Writes `bytes` to `dir/name` through `dir/temp_name` and a rename, so a
 /// crash leaves either the old file or the new one, never half of either.
 pub(crate) fn write_atomic(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
+    write_atomic_with(dir, name, temp_name, bytes, true)
+}
+
+/// [`write_atomic`] for a folder that is not the vault's: a volume that cannot
+/// flush to disk — some network shares refuse it — still gets the file. For a
+/// backup that is the better answer; for `vault.key` it would not be. A flush
+/// that fails for any other reason still fails the write.
+pub(crate) fn write_atomic_anywhere(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
+    write_atomic_with(dir, name, temp_name, bytes, false)
+}
+
+/// Whether a failed flush only says "this volume cannot flush" — the one
+/// answer a backup may ignore. Everything else fails the write: on a network
+/// volume a full disk, an exhausted quota or a failing medium only shows when
+/// the data is flushed, because `write` has merely filled a cache by then.
+fn sync_refusal_is_harmless(error: &std::io::Error) -> bool {
+    use std::io::ErrorKind;
+    // ENOTTY: was ein Dateisystem antwortet, das den Flush-Aufruf nicht kennt.
+    // Dieselbe Zahl unter Linux und macOS; unter Windows hieße 25 etwas anderes.
+    const ENOTTY: i32 = 25;
+    // macOS: ENOTSUP (45) ist dort nicht EOPNOTSUPP (102), und std bildet nur
+    // EOPNOTSUPP und ENOSYS auf `Unsupported` ab. So antwortet F_FULLFSYNC —
+    // das ist `sync_all` unter macOS — auf einer SMB-Freigabe.
+    const MACOS_ENOTSUP: i32 = 45;
+    // ERROR_INVALID_FUNCTION, ERROR_NOT_SUPPORTED.
+    const WINDOWS_NOT_SUPPORTED: [i32; 2] = [1, 50];
+    // InvalidInput: EINVAL — so antwortet `fsync`, wenn das Ziel kein Synchronisieren kennt.
+    matches!(error.kind(), ErrorKind::Unsupported | ErrorKind::InvalidInput)
+        || (cfg!(unix) && error.raw_os_error() == Some(ENOTTY))
+        || (cfg!(target_os = "macos") && error.raw_os_error() == Some(MACOS_ENOTSUP))
+        || (cfg!(windows) && error.raw_os_error().is_some_and(|code| WINDOWS_NOT_SUPPORTED.contains(&code)))
+}
+
+/// `must_sync`: whether a flush the volume refuses fails the write.
+fn write_atomic_with(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must_sync: bool) -> Result<(), String> {
     use std::io::Write;
 
     // Was unter dem Temp-Namen liegt — Rest eines Absturzes oder ein
@@ -1058,8 +1097,15 @@ pub(crate) fn write_atomic(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]
         .open(&temp)
         // Erst auf der Platte, dann umbenennen: sonst kann nach einem
         // Stromausfall eine leere Datei unter dem Zielnamen stehen — bei
-        // `vault.key` hieße das, der Vault ist verloren.
-        .and_then(|mut file| file.write_all(bytes).and_then(|()| file.sync_all()));
+        // `vault.key` hieße das, der Vault ist verloren. Ohne `must_sync` darf
+        // ein Volume den Flush ablehnen — jeder andere Fehler dabei zählt.
+        .and_then(|mut file| {
+            file.write_all(bytes)?;
+            match file.sync_all() {
+                Err(e) if must_sync || !sync_refusal_is_harmless(&e) => Err(e),
+                _ => Ok(()),
+            }
+        });
     if let Err(e) = written {
         std::fs::remove_file(&temp).ok();
         return Err(format!("write {}: {e}", temp.display()));
@@ -1461,6 +1507,37 @@ mod tests {
         );
         assert!(current.join("images").join("a.jpg").is_file());
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn only_a_volume_that_cannot_flush_is_forgiven() {
+        use std::io::{Error, ErrorKind};
+        assert!(sync_refusal_is_harmless(&Error::from(ErrorKind::Unsupported)));
+        assert!(sync_refusal_is_harmless(&Error::from(ErrorKind::InvalidInput)));
+        for kind in [ErrorKind::StorageFull, ErrorKind::QuotaExceeded, ErrorKind::PermissionDenied, ErrorKind::Other] {
+            assert!(!sync_refusal_is_harmless(&Error::from(kind)), "{kind:?}");
+        }
+
+        // Die Betriebssystem-Codes selbst — sie hängen daran, wie std sie auf
+        // `ErrorKind` abbildet, und das soll hier rot werden, nicht beim Nutzer.
+        let harmless = |code: i32| sync_refusal_is_harmless(&Error::from_raw_os_error(code));
+        #[cfg(unix)]
+        {
+            // ENOTTY, EINVAL — und nicht: EIO, ENOSPC.
+            assert!(harmless(25) && harmless(22));
+            assert!(!harmless(5) && !harmless(28));
+        }
+        #[cfg(target_os = "macos")]
+        assert!(harmless(45) && harmless(102)); // ENOTSUP, EOPNOTSUPP
+        #[cfg(target_os = "linux")]
+        assert!(harmless(95) && harmless(38)); // EOPNOTSUPP, ENOSYS
+        #[cfg(windows)]
+        {
+            // ERROR_INVALID_FUNCTION, ERROR_NOT_SUPPORTED, ERROR_CALL_NOT_IMPLEMENTED —
+            // und nicht: ERROR_DISK_FULL, ERROR_NETNAME_DELETED.
+            assert!(harmless(1) && harmless(50) && harmless(120));
+            assert!(!harmless(112) && !harmless(64));
+        }
     }
 
     #[test]

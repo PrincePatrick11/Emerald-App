@@ -32,6 +32,24 @@ const _dbCache = new Map<string, Database>();
 const _initPromises = new Map<string, Promise<Database>>();
 
 /**
+ * Zählt jedes Mal, wenn die Datenbank unter ihren Lesern ausgetauscht wird: jedes
+ * Schließen der Verbindungen (`resetDbCache`) und jeder eingetauschte Import
+ * (`markDbReplaced`). Wer über mehrere awaits hinweg liest (das automatische
+ * Backup), merkt daran, dass sein Stand nicht mehr aus einem Guss ist — auch
+ * wenn am Ende wieder alles aussieht wie vorher.
+ */
+let _epoch = 0;
+
+export function dbEpoch(): number {
+  return _epoch;
+}
+
+/** Der Inhalt wurde ersetzt, die Verbindung blieb — nach dem Eintauschen eines Imports. */
+export function markDbReplaced(): void {
+  _epoch++;
+}
+
+/**
  * Close and drop all cached connections. Call before switching vaults.
  *
  * Dropping the JavaScript reference is not enough: the connection pool lives in
@@ -41,6 +59,7 @@ const _initPromises = new Map<string, Promise<Database>>();
  * checkbox tries to do.
  */
 export async function resetDbCache(): Promise<void> {
+  _epoch++;
   // Erst die laufenden Ladevorgaenge abwarten, dann leeren. Ein `getDb()`
   // traegt seine Verbindung erst *nach* `Database.load` in den Cache ein — wer
   // nur leert, uebersieht genau die: sie landet danach in der frisch geleerten

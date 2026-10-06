@@ -635,9 +635,24 @@ async function selectWhereIn(
 // Export
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Resolves to `false` when the save dialog was cancelled — nichts wurde
- *  geschrieben, und die Oberflaeche darf dann auch keinen Erfolg melden. */
-export async function exportDatabase(options: BackupOptions): Promise<boolean> {
+/** Alles, was im Vault liegt — samt Papierkorb und Einstellungen. Die Auswahl
+ *  des automatischen Backups: eines mit Lücken wäre eine Falle. */
+export const FULL_BACKUP_OPTIONS: Required<BackupOptions> = {
+  includeJournal: true,
+  includeWiki: true,
+  includeOperations: true,
+  includeAltars: true,
+  includeTasks: true,
+  includeTags: true,
+  includeLexicon: true,
+  dateFrom: '',
+  dateTo: '',
+  includeDeleted: true,
+  includeSettings: true,
+};
+
+/** Der Inhalt einer Sicherung nach `options`, Bilder eingebettet. Schreibt nichts. */
+export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
   const db = await getDb();
   const data: BackupFile['data'] = {};
   const allImagePaths = new Set<string>();
@@ -719,6 +734,20 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
     options.includeJournal || options.includeWiki || options.includeOperations || options.includeTasks || options.includeAltars
   ) {
     data.categories = await db.select<Row[]>(`SELECT * FROM categories`);
+    // Die Kategorien werden nach ihren Inhalten gelesen, und das Löschen oder
+    // Zusammenführen einer Kategorie läuft über mehrere Anweisungen ohne
+    // Transaktion. Fiele es genau dazwischen, trüge ein Inhalt eine Kategorie,
+    // die in der Datei fehlt — und der Import lehnte die ganze Sicherung ab
+    // (`assertPayloadReferencesResolve`). „Ohne Kategorie" ist das, was das
+    // Löschen aus diesen Zeilen ohnehin macht. Beim Zusammenführen verliert die
+    // Sicherung für diese Zeilen die Zuordnung zur Zielkategorie — hingenommen,
+    // das Fenster ist ein paar Anweisungen breit. Die Tabellen: `CATEGORIZED_TABLES`.
+    const known = new Set(data.categories.map((c) => String(c.id)));
+    for (const rows of [data.entries, data.altarItems, data.tasks]) {
+      for (const row of rows ?? []) {
+        if (row.category_id != null && !known.has(String(row.category_id))) row.category_id = null;
+      }
+    }
   }
 
   // ── Eigene Blöcke ────────────────────────────────────────────────────────
@@ -761,7 +790,7 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
     }
   }
 
-  const backup: BackupFile = {
+  return {
     version: BACKUP_VERSION,
     type: 'backup',
     exportedAt: new Date().toISOString(),
@@ -770,6 +799,12 @@ export async function exportDatabase(options: BackupOptions): Promise<boolean> {
     images,
     ...(options.includeSettings && { settings: useSettingsStore.getState().settings }),
   };
+}
+
+/** Resolves to `false` when the save dialog was cancelled — nichts wurde
+ *  geschrieben, und die Oberflaeche darf dann auch keinen Erfolg melden. */
+export async function exportDatabase(options: BackupOptions): Promise<boolean> {
+  const backup = await buildBackup(options);
 
   // Der Dialog oeffnet im `backup/`-Ordner des aktiven Vaults — bei Bedarf
   // eben angelegt. Scheitert das (Vault-Ordner gerade nicht erreichbar),

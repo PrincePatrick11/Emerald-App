@@ -22,27 +22,18 @@ import {
   type BackupFile,
   type BackupPreview,
   exportDatabase,
+  FULL_BACKUP_OPTIONS,
   openBackupFile,
   importDatabase,
 } from '../../../lib/dbBackup';
 import { SETTINGS_GROUPS, type SettingsGroup } from '../../../lib/vaultSettings';
 import { resolveOpenEdits } from '../../../lib/openEdits';
+import AutoBackupSection from './AutoBackupSection';
 import SettingsChoiceButton from './SettingsChoiceButton';
 import SettingsSection, { SettingsCheckboxGrid, SettingsStatus } from './SettingsSection';
 
-const DEFAULT_EXPORT_OPTIONS: BackupOptions = {
-  includeJournal: true,
-  includeWiki: true,
-  includeOperations: true,
-  includeAltars: true,
-  includeTasks: true,
-  includeTags: true,
-  includeLexicon: true,
-  dateFrom: '',
-  dateTo: '',
-  includeDeleted: false,
-  includeSettings: true,
-};
+/** Alles wie beim automatischen Backup — bis auf den Papierkorb, den nimmt man von Hand dazu. */
+const DEFAULT_EXPORT_OPTIONS: BackupOptions = { ...FULL_BACKUP_OPTIONS, includeDeleted: false };
 
 /** Record statt Liste: eine neue Einstellungs-Gruppe ohne Beschriftung ist ein Typfehler. */
 const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {
@@ -55,6 +46,7 @@ const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {
   templates: 'settings.groupTemplates',
   editor: 'settings.groupEditor',
   journal: 'settings.groupJournal',
+  backup: 'settings.groupBackup',
 };
 
 /**
@@ -133,8 +125,11 @@ export default function BackupPage() {
       setVaultBaseDir(await newVaultBaseDir().catch(() => null));
       setImportTypeFilters(allTypesIncluded());
       setSettingsGroups([]);
-    } catch {
-      setImportError(t('settings.importErrorInvalid'));
+    } catch (err) {
+      // Außerhalb der eigenen Ordner liest Emerald nichts (`guarded_read_path`) —
+      // ein automatisches Backup auf einem anderen Laufwerk ist deshalb kein
+      // kaputtes, und die Meldung sagt, was zu tun ist.
+      setImportError(t(keyErrorOf(err).includes('access denied') ? 'settings.importErrorOutside' : 'settings.importErrorInvalid'));
     }
   }
 
@@ -449,6 +444,10 @@ export default function BackupPage() {
           {importError && <SettingsStatus tone="error">{importError}</SettingsStatus>}
         </div>
       </SettingsSection>
+
+      {/* Unter Export und Import: die beiden sind das, wofür man die Seite
+          öffnet; das automatische Backup stellt man einmal ein. */}
+      <AutoBackupSection />
     </>
   );
 }

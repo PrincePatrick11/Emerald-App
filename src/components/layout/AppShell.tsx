@@ -26,6 +26,7 @@ import { isTauri } from '../../lib/platform';
 import { hasOpenEdits, settleBeforeExit } from '../../lib/openEdits';
 import { restoreDrafts } from '../../store/draftStore';
 import { loadVaultPrefs } from '../../store/vaultPrefs';
+import { startAutoBackup } from '../../lib/autoBackup';
 import ImportDestinationModal from '../ui/ImportDestinationModal';
 
 // Ohne Props, alles über eigene Store-Abos: `memo` hält sie aus dem Neuzeichnen
@@ -202,6 +203,9 @@ export default function AppShell() {
     });
     return () => { void unlisten.then((stop) => stop()); };
   }, []);
+
+  // Das automatische Backup prüft für die Dauer der Sitzung, ob eines fällig ist.
+  useEffect(() => (isTauri ? startAutoBackup() : undefined), []);
 
   // Sync menu bar labels with the current language
   useEffect(() => {

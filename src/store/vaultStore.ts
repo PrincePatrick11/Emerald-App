@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { invoke } from '@tauri-apps/api/core';
 import {
   type Vault,
   loadVaultsFile,
@@ -227,6 +228,12 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     if (deleteFiles && wasActive) await withDbClosed(removeFromFile);
     else await removeFromFile();
     forgetVaultPrefs(id);
+    // Der für das automatische Backup gewählte Ordner gehört zur Installation
+    // (`auto_backup.rs`) und bliebe sonst für immer stehen. Erst jetzt: scheitert
+    // das Entfernen, behält der Vault seinen Ordner. Direkt und nicht über
+    // `resetAutoBackupDir` — dessen Status-Abfrage gälte einem Vault, den es nicht mehr gibt.
+    void invoke('reset_auto_backup_dir', { vaultId: id })
+      .catch((e: unknown) => console.warn('[vault] forget backup folder failed', e));
     // Ein entfernter Vault ist auch gesperrt — mit den Dateien hat Rust den
     // Schlüssel schon vergessen, ohne sie bliebe er sonst im Speicher.
     void lockVault(id).catch((e) => console.warn('[vault] lock failed', e));

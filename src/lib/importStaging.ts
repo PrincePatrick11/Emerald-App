@@ -28,7 +28,7 @@
  */
 import Database from './sqlite';
 import { invoke } from '@tauri-apps/api/core';
-import { resetDbCache } from './db';
+import { resetDbCache, markDbReplaced } from './db';
 import { TABLES } from './schema';
 import { getActiveImportStagingFile, getActiveVaultId } from './vaultManager';
 
@@ -93,6 +93,8 @@ export async function importViaStaging(db: Database, fill: (staging: Database) =
       await staging.close().catch((err: unknown) => console.warn('[backup] Arbeitskopie nicht geschlossen:', err));
     }
     await swapIn(db, stagingFile);
+    // Wer gerade über mehrere Abfragen hinweg liest, hat jetzt einen gemischten Stand (`dbEpoch`).
+    markDbReplaced();
   } finally {
     // Nach Erfolg nur noch Platz auf der Platte — ein Fehler hier darf den
     // Import nicht nachträglich scheitern lassen. Schritt 1 holt es nach.

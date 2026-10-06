@@ -92,7 +92,7 @@ Images adopted from the legacy shared pool (migration v35) into an encrypted vau
 
 ## Encrypted backups
 
-`backup.rs` writes and reads `.emeralddb` files; `write_file` and `read_file` refuse that extension, so no backup can be written in the clear by accident.
+`backup.rs` writes and reads `.emeralddb` files (`auto_backup.rs` writes the automatic ones, sealed through the same `seal_for_vault`); `write_file` and `read_file` refuse that extension, so no backup can be written in the clear by accident.
 
 ```text
 "EMRB" | version (1 byte) | header length (u32 LE) | header JSON {keyFile} | sealed JSON

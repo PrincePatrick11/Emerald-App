@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { LEFT_LIST_TAB_IDS, type LeftListTabId } from './modules';
 import { oneOf } from './helpers';
+import type { Weekday } from './formatDate';
 import { LANGUAGE_OPTIONS, LANGUAGE_STORAGE_KEY, type AppLanguage } from '../i18n';
 import {
   DEFAULT_EDITOR_FONT_ID, DEFAULT_EDITOR_FONT_SIZE, DEFAULT_THEME_ID, DEFAULT_UI_FONT_ID, DEFAULT_UI_SCALE,
@@ -96,6 +97,26 @@ export interface JournalSettings {
   moonPhase: boolean;
 }
 
+/** Wie oft das automatische Backup läuft — nur volle Tage, der Dateiname trägt das Datum. */
+export const BACKUP_INTERVAL_OPTIONS = ['daily', 'weekly', 'monthly'] as const;
+export type BackupInterval = (typeof BACKUP_INTERVAL_OPTIONS)[number];
+export const BACKUP_WEEKDAY_OPTIONS = [0, 1, 2, 3, 4, 5, 6] as const satisfies readonly Weekday[];
+/** Wie viele automatische Backups liegen bleiben; `null` = alle. Die Zahlen
+ *  prüft `KEEP_CHOICES` in `auto_backup.rs` noch einmal — beide zusammen ändern. */
+export const BACKUP_KEEP_OPTIONS = [3, 5, 10, 30, null] as const;
+export type BackupKeep = (typeof BACKUP_KEEP_OPTIONS)[number];
+
+/** Das automatische Backup. Der Zielordner steht bewusst nicht hier: er gehört
+ *  zur Installation (`auto_backup.rs`), nicht zum Vault — sonst brächte eine
+ *  importierte Sicherung einen fremden Pfad mit. */
+export interface BackupSettings {
+  auto: boolean;
+  interval: BackupInterval;
+  /** Gilt nur für `weekly`. */
+  weekday: Weekday;
+  keep: BackupKeep;
+}
+
 export interface VaultSettings {
   /** Nicht gelesen, wie `version` in `vaults.json`: erst eine Form, die eine
    *  Umrechnung braucht, zählt ihn hoch. Eine höhere Zahl aus einem neueren
@@ -111,6 +132,7 @@ export interface VaultSettings {
   templates: TemplateSettings;
   editor: EditorSettings;
   journal: JournalSettings;
+  backup: BackupSettings;
 }
 
 export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
@@ -118,7 +140,7 @@ export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
 /** Jede Gruppe genau einmal — der Record erzwingt, dass eine neue nicht fehlt. */
 const GROUP_SET: Record<SettingsGroup, true> = {
   appearance: true, trash: true, leftList: true, emojis: true, images: true, tags: true, templates: true,
-  editor: true, journal: true,
+  editor: true, journal: true, backup: true,
 };
 export const SETTINGS_GROUPS = Object.keys(GROUP_SET) as SettingsGroup[];
 
@@ -159,6 +181,12 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
   },
   journal: {
     moonPhase: true,
+  },
+  backup: {
+    auto: false,
+    interval: 'weekly',
+    weekday: 1,
+    keep: 10,
   },
 };
 
@@ -209,6 +237,7 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const templates = asRecord(root.templates);
   const editor = asRecord(root.editor);
   const journal = asRecord(root.journal);
+  const backup = asRecord(root.backup);
   const flag = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
   const version = typeof root.version === 'number' && Number.isInteger(root.version) && root.version > 1
     ? root.version
@@ -260,6 +289,13 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
     journal: {
       ...journal,
       moonPhase: flag(journal.moonPhase, DEFAULT_VAULT_SETTINGS.journal.moonPhase),
+    },
+    backup: {
+      ...backup,
+      auto: flag(backup.auto, DEFAULT_VAULT_SETTINGS.backup.auto),
+      interval: oneOf(backup.interval, BACKUP_INTERVAL_OPTIONS, DEFAULT_VAULT_SETTINGS.backup.interval),
+      weekday: oneOf(backup.weekday, BACKUP_WEEKDAY_OPTIONS, DEFAULT_VAULT_SETTINGS.backup.weekday),
+      keep: oneOf(backup.keep, BACKUP_KEEP_OPTIONS, DEFAULT_VAULT_SETTINGS.backup.keep),
     },
   };
 }
