@@ -25,6 +25,7 @@ How to use it from a coding assistant is in [`Documentation/mcp.md`](../../Docum
 - **`dialogs.py`** — file pickers and message boxes are windows of the app's process, not part of the WebView, and are found and answered through the window system.
 - **`instance.py`** — works out which checkout the session belongs to and derives port, identifier and paths from it.
 - **`launcher.py`**, **`start_emerald_mcp.bat`** — start the app when a tool needs it and nothing answers on the port.
+- **`seed/`** — gives a new instance a vault of test data.
 - **`tauri_config.py`**, **`window.py`** — generate the Tauri overlay and move the window off-screen, so a run does not put a window in front of whoever is using the machine.
 
 ## The instance
@@ -40,7 +41,7 @@ It builds and starts that checkout as an instance of its own, apart from the reg
 | App identifier | `com.emerald.app.dev` | `com.emerald.magical-journal.mcp` |
 | Cargo target dir | `src-tauri/target` | `%LOCALAPPDATA%\emerald-mcp-target` |
 
-The identifier of its own gives the instance its own app data and therefore its own vaults. The build directory of its own is needed because Windows refuses to overwrite an `.exe` that is running.
+The identifier of its own gives the instance its own app data and therefore its own vaults; see [Test data](#test-data). The build directory of its own is needed because Windows refuses to overwrite an `.exe` that is running.
 
 `status` reports the instance; `python instance.py` prints the same without starting anything.
 
@@ -77,7 +78,7 @@ Then point the client at the venv's Python and `server.py`, for example in Claud
 
 Nothing to do by hand. When a tool call needs the app and nothing answers on the port, the server spawns `start_emerald_mcp.bat` detached and waits for the debug port. The first build takes 5 to 15 minutes; a tool call during that time comes back with "Emerald is still starting" and is simply repeated. Once launched, the app keeps running after the MCP server exits.
 
-Set `EMERALD_AUTO_LAUNCH=0` to start it yourself. Run by hand, `start_emerald_mcp.bat` uses the checked-in `tauri.mcp.conf.json`, which leaves the window on screen.
+Set `EMERALD_AUTO_LAUNCH=0` to start it yourself. Run by hand, `start_emerald_mcp.bat` uses the checked-in `tauri.mcp.conf.json`, which leaves the window on screen, and creates no test vault.
 
 To check the debug port:
 
@@ -109,6 +110,16 @@ Every `selector` accepts three forms: a CSS selector, a ref from `snapshot`
 is in the page, so a snapshot followed by a few actions needs no selector
 guessing at all. A failed tool call is returned with `isError` set.
 
+## Test data
+
+A new instance would open on the vault setup, with nothing to test a view against. The launcher therefore gives it a vault of test data first, in `%APPDATA%\<identifier>\vaults\seed`, and registers it as the active vault.
+
+`seed/build_seed.mjs` builds the database by bundling the checkout's own `src/lib/schema.ts` and calling the real `createSchema` and `seedBuiltins`, the way `scripts/schema-check.mjs` does. A checkout whose branch changed the schema gets a vault for its schema, which a database file committed here could not offer. `seed/fixture.json` holds the data: entries across every module, categories, tags, internal links, a subtask, an altar with placements, and one trashed row per module.
+
+A plain vault is never opened, so the dev build encrypts the test vault on its first start with the test password `emerald-seed` and unlocks it with that from then on. The launcher passes folder and password as `EMERALD_DEV_SEED_VAULT` and `EMERALD_DEV_SEED_PASSWORD`; release builds do not read them, and every other vault still asks for its own password.
+
+The vault is created once. `seed/provision.mjs` stops as soon as the instance has a `vaults.json`, so an instance that has been worked in is never touched; `EMERALD_MCP_SEED=force` builds it anew. `seed/check_seed.mjs <emerald.db>` checks a built database before the app has encrypted it.
+
 ## Configuration
 
 | Var | Default | Description |
@@ -120,6 +131,7 @@ guessing at all. A failed tool call is returned with `isError` set.
 | `EMERALD_MCP_IDENTIFIER` | `com.emerald.magical-journal.mcp` | App identifier, which decides where the instance keeps its data |
 | `EMERALD_MCP_HOME` | `%LOCALAPPDATA%\emerald-mcp` | Generated Tauri config, launch logs, screenshots |
 | `CARGO_TARGET_DIR` | `%LOCALAPPDATA%\emerald-mcp-target` | The instance's build directory |
+| `EMERALD_MCP_SEED` | unset | `force` rebuilds the test vault on the next start |
 | `EMERALD_MCP_OFFSCREEN_XY` | off-screen | `40,40` keeps the window on screen, for watching a run |
 | `EMERALD_AUTO_ATTACH` | `1` | Attach to the app's main page on first use |
 | `EMERALD_AUTO_LAUNCH` | `1` | Start the app when no target is found |
@@ -168,9 +180,9 @@ Everything that looks at the DOM is in `pagelib.js`, which `cdp.py` sends along 
 - **One instance.** Port, identifier and build directory are fixed, so two
   checkouts cannot be driven at the same time without overriding them by hand,
   and two sessions on one checkout drive the same window.
-- **The database is not managed.** The instance starts on the app's own vault
-  setup the first time and keeps what is put into it. Nothing seeds it and
-  nothing resets it.
+- **The test vault is created, never reset.** It is built when the instance
+  is new and then keeps what runs put into it. A running instance's database
+  cannot be replaced from outside: the app holds `emerald.db` open.
 - **First Emerald build takes 5-15 minutes.** Pre-compiled `target/`
   artifacts are not included in this repo; you build locally. Only the first
   build into an empty MCP target dir is expensive — once warm, an unchanged

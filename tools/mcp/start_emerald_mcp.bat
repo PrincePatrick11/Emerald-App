@@ -4,11 +4,12 @@ REM Started by launcher.py, which sets these from instance.py:
 REM
 REM   EMERALD_APP_DIR           app checkout to build
 REM   EMERALD_TAURI_CONFIG      generated overlay: identifier, ports, window
+REM   EMERALD_MCP_APP_DATA      %APPDATA%\<identifier>, where vaults.json lives
 REM   EMERALD_WEBVIEW2_ARGS     debug port and the anti-throttling flags
 REM   CARGO_TARGET_DIR          the instance's build directory
 REM
 REM Run by hand with none of them set, it uses the same defaults: port 9223,
-REM the checked-in tauri.mcp.conf.json, and an on-screen window.
+REM the checked-in tauri.mcp.conf.json, an on-screen window, and no test data.
 
 setlocal
 if not defined EMERALD_BUILD_TOOLS set "EMERALD_BUILD_TOOLS=C:\BuildTools"
@@ -60,6 +61,19 @@ if not exist "node_modules\.bin\tauri.cmd" (
         echo ERROR: npm install failed
         exit /b 1
     )
+)
+
+REM Give a brand-new instance a vault with test data in it. Skips an instance
+REM that already has a vaults.json, so one you have been working in is never
+REM touched. Failure here is not fatal: the app then simply starts into its
+REM normal first-run vault setup.
+set "EMERALD_MCP_SEED_ARGS="
+if /i "%EMERALD_MCP_SEED%"=="force" set "EMERALD_MCP_SEED_ARGS=--force"
+if defined EMERALD_MCP_APP_DATA (
+    echo Provisioning seed vault ...
+    call node "%~dp0seed\provision.mjs" --checkout "%EMERALD_APP_DIR%" --app-data "%EMERALD_MCP_APP_DATA%" %EMERALD_MCP_SEED_ARGS%
+    if errorlevel 1 echo WARNING: seed provisioning failed - the app will start with its own vault setup
+    echo.
 )
 
 REM The dev build and the MCP instance both produce target\debug\emerald.exe

@@ -5,7 +5,7 @@ lifetime, tracks launch progress so concurrent _ensure_target() calls don't
 double-launch, and polls the CDP port until it comes up (or the launcher script
 exits early with a failure).
 
-Port, app identifier, Cargo target dir and checkout are handed to the script
+Port, app identifier, Cargo target dir, checkout and seed vault are handed to the script
 through the environment (see instance.py); run by hand, the script falls back
 to the same defaults. Set EMERALD_LAUNCHER_PATH to use a script of your own.
 """
@@ -27,6 +27,11 @@ from instance import Instance, browser_args
 log = logging.getLogger("emerald-launcher")
 
 REPO_ROOT = Path(__file__).resolve().parent
+
+# The password a dev build encrypts and unlocks the seed vault with. Not a
+# secret: the seed holds fixture data only, and only debug builds read it.
+SEED_PASSWORD = "emerald-seed"
+
 
 @dataclass
 class LaunchState:
@@ -71,7 +76,13 @@ def _child_env(inst: Instance) -> dict[str, str]:
     env = os.environ.copy()
     env["EMERALD_APP_DIR"] = str(inst.checkout)
     env["EMERALD_TAURI_CONFIG"] = str(inst.config_path)
+    env["EMERALD_MCP_APP_DATA"] = str(inst.app_data_dir)
     env["EMERALD_WEBVIEW2_ARGS"] = browser_args(inst)
+    # A dev build encrypts the plain seed with this password the first time it
+    # sees it, and unlocks it with it after that - no password dialog in an
+    # unattended instance. Only this folder; every other vault asks as usual.
+    env["EMERALD_DEV_SEED_VAULT"] = str(inst.seed_vault_dir)
+    env["EMERALD_DEV_SEED_PASSWORD"] = SEED_PASSWORD
     env["CARGO_TARGET_DIR"] = str(inst.target_dir)
     return env
 

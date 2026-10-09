@@ -32,9 +32,10 @@ Two things about that instance are intentional:
 - **You will not see a window.** It is moved off-screen and out of the taskbar
   so it does not sit in the user's way. Use `screenshot` to see the app. To
   watch a run, set `EMERALD_MCP_OFFSCREEN_XY=40,40` and restart the instance.
-- **It has a database of its own**, apart from the dev build and an installed
-  Emerald. It starts on the vault setup the first time and afterwards holds
-  whatever earlier runs left in it.
+- **It already contains data.** A new instance is given a vault of test
+  data - entries in every module, a few trashed items. Those are fixtures;
+  change and delete them freely. The vault is created once and not reset, so
+  it also holds what earlier runs left in it.
 
 ---
 
@@ -78,8 +79,8 @@ mcp:
    none to see.
 2. If nothing is running yet, the first tool call starts Emerald by itself. A
    reply of *"Emerald is still starting"* is that cold start, not a failure:
-   retry in 15-30s. The first start in a new checkout also runs `npm install`,
-   so allow a few minutes.
+   retry in 15-30s. The first start in a new checkout also runs `npm install`
+   and builds the test vault, so allow a few minutes.
 3. To check the port by hand, take it from `status` (9223 unless overridden):
    `curl -s http://127.0.0.1:<port>/json/version`
    should return JSON containing `"Browser": "Edg/..."`.
@@ -481,7 +482,7 @@ before running tests.
 |---|---|---|
 | `attach` fails | Emerald is not running, or `start_emerald_mcp.bat` did not source vcvars | use cmd instead of bash |
 | No window anywhere | Intended — it is off-screen. Use `screenshot`; `EMERALD_MCP_OFFSCREEN_XY=40,40` brings it back |
-| Unexpected entries in the app | Left by an earlier run — the instance's database is not reset between runs |
+| Unexpected entries in the app | Intended — the test vault's fixtures, plus what earlier runs left: it is not reset between runs |
 | Driving the wrong checkout | Check `status`: it names the checkout and how it was found; `EMERALD_APP_DIR` forces one |
 | Sidebar buttons do not react | the Settings modal is open | press Escape + click the X buttons |
 | The entry is not saved | no "Done" button → the editor is still in reader mode | click/type first, then Done |

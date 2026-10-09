@@ -28,7 +28,8 @@ There is one instance. Two checkouts cannot be driven at the same time, and two 
 
 - **There is no window to look at.** The instance's window is off-screen and out of the taskbar, so a run does not sit in the way. Read the UI with `snapshot`, and use `screenshot` when the look is the question.
 - **A native dialog is not in the page.** A file picker or message box stops the app until it is answered, and neither `snapshot` nor `screenshot` shows it. `dialog` lists and answers it. Emerald only writes below the user's own folders; a path outside them comes back as a second dialog saying so.
-- **The instance has a database of its own.** Its app identifier keeps its vaults apart from the dev build and from an installed Emerald. It opens on the vault setup the first time and afterwards holds whatever earlier runs left in it; nothing prepares test data and nothing resets it.
+- **The instance has a vault of its own, with test data in it.** Its app identifier keeps it apart from the dev build and from an installed Emerald. A new instance is given generated fixtures: entries across every module and a few trashed items. They can be changed and deleted freely. The vault is built once, from the checkout's own schema, and never reset, so it also holds what earlier runs left in it.
+- **A password dialog is a fault of the setup.** The test vault is encrypted like every vault, and a dev build unlocks it by itself with a test password that release builds do not read.
 
 ## Tools
 

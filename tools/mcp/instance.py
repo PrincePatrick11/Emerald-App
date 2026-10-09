@@ -3,7 +3,8 @@
 The server drives one instance: the app checkout the session runs in, built
 and started apart from the regular dev build so the two can run side by side.
 It has its own debug port, Vite port, app identifier - and with it its own
-app data - and Cargo target dir.
+app data, which starts out with a vault of test data (see seed/) - and Cargo
+target dir.
 
 Environment (all optional):
   EMERALD_APP_DIR              force the checkout (skips discovery)
@@ -47,6 +48,8 @@ class Instance:
     vite_port: int
     identifier: str
     product_name: str
+    app_data_dir: Path
+    seed_vault_dir: Path
     target_dir: Path
     state_dir: Path
     config_path: Path
@@ -62,6 +65,8 @@ class Instance:
             "vite_port": self.vite_port,
             "identifier": self.identifier,
             "product_name": self.product_name,
+            "app_data_dir": str(self.app_data_dir),
+            "seed_vault_dir": str(self.seed_vault_dir),
             "target_dir": str(self.target_dir),
             "state_dir": str(self.state_dir),
             "config_path": str(self.config_path),
@@ -79,6 +84,12 @@ def _local_data() -> Path:
 def mcp_home() -> Path:
     override = os.environ.get("EMERALD_MCP_HOME")
     return Path(override) if override else _local_data() / "emerald-mcp"
+
+
+def app_data_root() -> Path:
+    """Where Tauri puts app_data_dir on this platform (Windows: %APPDATA%)."""
+    roaming = os.environ.get("APPDATA")
+    return Path(roaming) if roaming else Path.home() / ".local" / "share"
 
 
 def target_dir() -> Path:
@@ -172,14 +183,18 @@ def build_instance(cwd: Path | None = None) -> Instance:
         warnings.append(str(checkout) + " does not look like an Emerald app checkout")
 
     state_dir = mcp_home()
+    identifier = os.environ.get("EMERALD_MCP_IDENTIFIER", DEFAULT_IDENTIFIER)
+    app_data_dir = app_data_root() / identifier
     return Instance(
         checkout=checkout,
         checkout_source=source,
         cdp_host=os.environ.get("EMERALD_CDP_HOST", "127.0.0.1"),
         cdp_port=_int_env("EMERALD_CDP_PORT", DEFAULT_CDP_PORT),
         vite_port=_int_env("EMERALD_MCP_VITE_PORT", DEFAULT_VITE_PORT),
-        identifier=os.environ.get("EMERALD_MCP_IDENTIFIER", DEFAULT_IDENTIFIER),
+        identifier=identifier,
         product_name=PRODUCT_NAME,
+        app_data_dir=app_data_dir,
+        seed_vault_dir=app_data_dir / "vaults" / "seed",
         target_dir=target_dir(),
         state_dir=state_dir,
         config_path=state_dir / "tauri.mcp.generated.conf.json",
