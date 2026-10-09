@@ -608,9 +608,14 @@ async def _navigate(args: dict) -> Result:
 
 async def _dialog(args: dict) -> Result:
     inst = _instance()
-    if not dialogs.IS_WINDOWS:
-        raise RuntimeError("native dialogs can only be driven on Windows")
     action = args.get("action") or "list"
+    if not dialogs.IS_WINDOWS:
+        # The app's dev bridge answers for them: it is inside the process the
+        # dialogs belong to. Asked over the open connection, since a modal
+        # dialog can keep the page itself from answering anything.
+        t = await _ensure_target()
+        request = {k: args[k] for k in ("button", "path", "index") if args.get(k) is not None}
+        return _text(await t.send("Emerald.dialogs", {"action": action, **request}))
     found = await asyncio.to_thread(dialogs.wait_for_dialogs, inst.target_dir)
     if action == "list":
         return _text({"dialogs": [d.to_dict(i) for i, d in enumerate(found)]})

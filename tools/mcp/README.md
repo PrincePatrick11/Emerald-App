@@ -176,13 +176,19 @@ Everything that looks at the DOM is in `pagelib.js`, which `cdp.py` sends along 
 
 ## Known limitations
 
-- **macOS and Linux go through the dev bridge, which does less.** Clicks,
-  typing and key presses are events dispatched in the page rather than real
-  input: the app's handlers and the editor see them, a `:hover` style does
-  not. `eval` returns the value of an expression; a list of statements runs
-  but has no value. Screenshots exist on macOS only, native dialogs cannot be
-  driven, and the window opens on screen. The Linux side compiles in CI and
-  has not been run.
+- **macOS and Linux go through the dev bridge, which does less.** A left
+  click is a real mouse event on macOS; everything else - typing, key presses,
+  hovering, and every click on Linux - is events dispatched in the page: the
+  app's handlers and the editor see them, a `:hover` style does not follow.
+  `eval` returns the value of an expression; a list of statements runs but has
+  no value. Screenshots exist on macOS only, and the window opens on screen.
+  The Linux side compiles in CI and has not been run.
+- **Dialogs on macOS and Linux are held back, not shown.** macOS lets nothing
+  outside a file dialog confirm it or choose its path, so the bridge catches
+  the page's dialog calls before a window opens and `dialog` answers those.
+  The flow the app goes through is the same; the native window is not part of
+  it. A dialog the Rust side opens is native and, on macOS, can only be
+  listed, cancelled or accepted as it stands.
 - **One instance.** Port, identifier and build directory are fixed, so two
   checkouts cannot be driven at the same time without overriding them by hand,
   and two sessions on one checkout drive the same window.
@@ -209,7 +215,7 @@ Everything that looks at the DOM is in `pagelib.js`, which `cdp.py` sends along 
   config key and reads like exactly what this needs, but its own schema says
   *Linux / Windows / Android: Unsupported*. The browser flags are the only
   lever on Windows.
-- **Native dialogs are driven through the window system, not CDP.** File
+- **On Windows, native dialogs are driven through the window system, not CDP.** File
   pickers and message boxes belong to the app's process, not to the WebView,
   so `snapshot` and `screenshot` do not show them; `dialog` does: it reads
   them, presses their buttons and fills in a file or folder path. The message

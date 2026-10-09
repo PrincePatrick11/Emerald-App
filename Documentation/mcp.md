@@ -13,12 +13,17 @@ The server speaks the Chrome DevTools Protocol. On Windows, WebView2 has a debug
 | | Windows | macOS | Linux |
 | --- | --- | --- | --- |
 | Reading the page, `eval`, console | yes | yes | yes |
-| `click`, `type_text`, `press_key`, `hover` | real input events | events dispatched in the page | events dispatched in the page |
+| `click` | real mouse events | real mouse events for the left button | events dispatched in the page |
+| `type_text`, `press_key`, `hover` | real input events | events dispatched in the page | events dispatched in the page |
 | `screenshot` | yes | yes | no |
-| `dialog` | yes | no | no |
+| `dialog` | the native dialogs | dialogs held back by the bridge | dialogs held back by the bridge |
 | Window out of sight | yes | no, it opens on screen | no, it opens on screen |
 
-Events dispatched in the page reach the app's handlers, the editor included, but a `:hover` style does not follow the pointer, and a statement list given to `eval` returns no value — wrap it in a function to get one. The Linux column is built to the same code as macOS and compiles in CI, but has not been run.
+Events dispatched in the page reach the app's handlers, the editor included, but they are not trusted events, and a `:hover` style follows the pointer only on Windows. A statement list given to `eval` returns no value through the bridge — wrap it in a function to get one.
+
+A native file dialog cannot be answered from outside on macOS, so the bridge holds back the dialogs the page asks for — file pickers, message boxes, questions — before a window opens. The app waits for the answer as it would for the dialog, and `dialog` lists and answers them the same way as on Windows; the native window itself is what does not get exercised. A dialog the Rust side opens, such as the folder picker for automatic backups, is still native: on macOS it can be listed, cancelled or accepted where it stands, but not sent to another path.
+
+The Linux column is built to the same code as macOS and compiles in CI, but has not been run.
 
 ## Registration
 
@@ -37,7 +42,7 @@ There is one instance. Two checkouts cannot be driven at the same time, and two 
 ## What to Know Before Reporting a Fault
 
 - **There is no window to look at on Windows.** The instance's window is off-screen and out of the taskbar, so a run does not sit in the way. Read the UI with `snapshot`, and use `screenshot` when the look is the question.
-- **A native dialog is not in the page.** A file picker or message box stops the app until it is answered, and neither `snapshot` nor `screenshot` shows it. `dialog` lists and answers it, on Windows; elsewhere a test that opens one cannot go on. Emerald only writes below the user's own folders; a path outside them comes back as a second dialog saying so.
+- **A native dialog is not in the page.** A file picker or message box stops the app until it is answered, and neither `snapshot` nor `screenshot` shows it. `dialog` lists and answers it. Emerald only writes below the user's own folders; a path outside them comes back as a second dialog saying so.
 - **The instance has a vault of its own, with test data in it.** Its app identifier keeps it apart from the dev build and from an installed Emerald. A new instance is given generated fixtures: entries across every module and a few trashed items. They can be changed and deleted freely. The vault is built once, from the checkout's own schema, and never reset, so it also holds what earlier runs left in it.
 - **A password dialog is a fault of the setup.** The test vault is encrypted like every vault, and a dev build unlocks it by itself with a test password that release builds do not read.
 

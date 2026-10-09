@@ -225,13 +225,23 @@ async fn dispatch(app: &AppHandle, method: &str, params: &Value) -> Result<Value
         }
         "Runtime.releaseObjectGroup" => page_call(app, "release", &json!({})).await,
         "Page.getLayoutMetrics" => page_call(app, "layoutMetrics", &json!({})).await,
-        // Only the move reaches the page. Presses do not: a dispatched press
-        // would not be a real one either, and the MCP server, seeing that
-        // nothing arrived, falls back to its own way of clicking an element.
-        "Input.dispatchMouseEvent" if params.get("type").and_then(Value::as_str) == Some("mouseMoved") => {
-            page_call(app, "mouseMoved", params).await
+        "Input.dispatchMouseEvent" => {
+            // Where the platform can hand the webview a real mouse event, it
+            // does. Where it cannot, a press does not reach the page at all,
+            // and the MCP server, seeing that nothing arrived, falls back to
+            // its own way of clicking.
+            let native = native::mouse(&main_window(app)?, params).await?;
+            // A move is dispatched in the page as well, whatever the platform
+            // did with it: WebKit drops real moves while the app is not the
+            // active one, and handlers that wait for a hover would never run.
+            if params.get("type").and_then(Value::as_str) == Some("mouseMoved") {
+                return page_call(app, "mouseMoved", params).await;
+            }
+            let _ = native;
+            Ok(json!({}))
         }
-        "Input.dispatchMouseEvent" => Ok(json!({})),
+        // Not part of the DevTools protocol.
+        "Emerald.dialogs" => dialogs(app, params).await,
         "Input.insertText" => page_call(app, "insertText", params).await,
         "Input.dispatchKeyEvent" => page_call(app, "key", params).await,
         "Page.navigate" => {
@@ -251,6 +261,46 @@ async fn dispatch(app: &AppHandle, method: &str, params: &Value) -> Result<Value
         }
         other => Err(format!("'{other}' is not available through the dev bridge")),
     }
+}
+
+/// The app's dialogs, listed or answered.
+///
+/// Two kinds, in one list: those the page asked for, which `devbridge.js`
+/// holds back so they can be answered at all, and native ones the Rust side
+/// opened, which the platform module reads from the app's own windows. The
+/// held ones come first. While a native dialog blocks the main thread the page
+/// does not answer, and the list is the native ones alone.
+async fn dialogs(app: &AppHandle, params: &Value) -> Result<Value, String> {
+    let action = params.get("action").and_then(Value::as_str).unwrap_or("list");
+    let held = match tokio::time::timeout(Duration::from_secs(2), page_call(app, "dialogs", &json!({}))).await {
+        Ok(Ok(Value::Array(held))) => held,
+        _ => Vec::new(),
+    };
+    let listing = |held: Vec<Value>, native: Vec<Value>| {
+        let all = held.into_iter().chain(native).enumerate().map(|(index, mut dialog)| {
+            dialog["index"] = json!(index);
+            dialog
+        });
+        Value::Array(all.collect())
+    };
+    if action == "list" {
+        return Ok(json!({ "dialogs": listing(held, native::list_dialogs().await?) }));
+    }
+
+    let index = params.get("index").and_then(Value::as_u64).unwrap_or(0) as usize;
+    let mut request = params.clone();
+    let mut outcome = if index < held.len() {
+        page_call(app, "answerDialog", &request).await?
+    } else {
+        request["index"] = json!(index - held.len());
+        native::answer_dialog(&request).await?
+    };
+    let held = match page_call(app, "dialogs", &json!({})).await {
+        Ok(Value::Array(held)) => held,
+        _ => Vec::new(),
+    };
+    outcome["dialogs"] = listing(held, native::list_dialogs().await?);
+    Ok(outcome)
 }
 
 fn main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
@@ -428,5 +478,365 @@ mod screenshot {
             .map_err(|_| "the webview did not deliver a screenshot in time".to_string())?
             .map_err(|_| "the screenshot was abandoned".to_string())?
             .map_err(|e| format!("screenshot failed: {e}"))
+    }
+}
+
+/// What only the platform can do: real mouse events for the webview, and the
+/// app's native dialogs.
+#[cfg(not(target_os = "macos"))]
+mod native {
+    use serde_json::Value;
+    use tauri::WebviewWindow;
+
+    pub async fn mouse(_window: &WebviewWindow, _params: &Value) -> Result<bool, String> {
+        Ok(false)
+    }
+
+    pub async fn list_dialogs() -> Result<Vec<Value>, String> {
+        Ok(Vec::new())
+    }
+
+    pub async fn answer_dialog(_params: &Value) -> Result<Value, String> {
+        Err("a dialog the app opens from its Rust side can be driven through the dev bridge on macOS only".to_string())
+    }
+}
+
+#[cfg(target_os = "macos")]
+mod native {
+    use std::ffi::c_void;
+    use std::time::Duration;
+
+    use objc2::rc::Retained;
+    use objc2::runtime::AnyObject;
+    use objc2::{class, msg_send};
+    use objc2_foundation::{NSPoint, NSRect, NSString};
+    use serde_json::{json, Value};
+    use tauri::WebviewWindow;
+    use tokio::sync::oneshot;
+
+    // NSEventType
+    const LEFT_MOUSE_DOWN: usize = 1;
+    const LEFT_MOUSE_UP: usize = 2;
+    const MOUSE_MOVED: usize = 5;
+
+    /// Hands the webview a mouse event of the kind AppKit itself would, so the
+    /// page sees a trusted event and hover states follow. Returns `false` for
+    /// what stays with the page: the right and middle buttons, whose native
+    /// handling may open a menu that holds the main thread until it is closed.
+    pub async fn mouse(window: &WebviewWindow, params: &Value) -> Result<bool, String> {
+        let text = |key: &str| params.get(key).and_then(Value::as_str).unwrap_or("");
+        let kind = match (text("type"), text("button")) {
+            ("mouseMoved", _) => MOUSE_MOVED,
+            ("mousePressed", "left") => LEFT_MOUSE_DOWN,
+            ("mouseReleased", "left") => LEFT_MOUSE_UP,
+            _ => return Ok(false),
+        };
+        let x = params.get("x").and_then(Value::as_f64).unwrap_or(0.0);
+        let y = params.get("y").and_then(Value::as_f64).unwrap_or(0.0);
+        let clicks = params.get("clickCount").and_then(Value::as_i64).unwrap_or(0) as isize;
+
+        let (done_tx, done) = oneshot::channel::<Result<(), String>>();
+        window
+            .with_webview(move |webview| {
+                let view = unsafe { &*(webview.inner() as *const AnyObject) };
+                let _ = done_tx.send(unsafe { send_mouse(view, kind, x, y, clicks) });
+            })
+            .map_err(|e| format!("with_webview: {e}"))?;
+        done.await.map_err(|_| "the mouse event was abandoned".to_string())??;
+        Ok(true)
+    }
+
+    unsafe fn send_mouse(view: &AnyObject, kind: usize, x: f64, y: f64, clicks: isize) -> Result<(), String> {
+        let ns_window: Option<Retained<AnyObject>> = msg_send![view, window];
+        let ns_window = ns_window.ok_or("the webview is in no window")?;
+        // Page coordinates are CSS pixels from the top left; the view's own
+        // are points, scaled by the page zoom, from whichever corner it uses.
+        let zoom: f64 = msg_send![view, pageZoom];
+        let flipped: bool = msg_send![view, isFlipped];
+        let bounds: NSRect = msg_send![view, bounds];
+        let in_view = NSPoint::new(x * zoom, if flipped { y * zoom } else { bounds.size.height - y * zoom });
+        let in_window: NSPoint = msg_send![view, convertPoint: in_view, toView: std::ptr::null::<AnyObject>()];
+        let window_number: isize = msg_send![&*ns_window, windowNumber];
+        let process_info: Retained<AnyObject> = msg_send![class!(NSProcessInfo), processInfo];
+        let now: f64 = msg_send![&*process_info, systemUptime];
+        let event: Option<Retained<AnyObject>> = msg_send![
+            class!(NSEvent),
+            mouseEventWithType: kind,
+            location: in_window,
+            modifierFlags: 0usize,
+            timestamp: now,
+            windowNumber: window_number,
+            context: std::ptr::null::<AnyObject>(),
+            eventNumber: 0isize,
+            clickCount: clicks,
+            pressure: if kind == LEFT_MOUSE_DOWN { 1.0f32 } else { 0.0f32 },
+        ];
+        let event = event.ok_or("AppKit made no event")?;
+        // Straight to the view rather than through the window: the instance's
+        // window is usually not the active one, and need not be.
+        match kind {
+            LEFT_MOUSE_DOWN => { let _: () = msg_send![view, mouseDown: &*event]; }
+            LEFT_MOUSE_UP => { let _: () = msg_send![view, mouseUp: &*event]; }
+            _ => { let _: () = msg_send![view, mouseMoved: &*event]; }
+        }
+        Ok(())
+    }
+
+    // ── Dialogs ──────────────────────────────────────────────────────────
+
+    const CLOSE_WAIT: Duration = Duration::from_secs(3);
+
+    #[repr(C)]
+    struct DispatchQueue {
+        _opaque: [u8; 0],
+    }
+
+    extern "C" {
+        static _dispatch_main_q: DispatchQueue;
+        fn dispatch_async_f(queue: *const DispatchQueue, context: *mut c_void, work: extern "C" fn(*mut c_void));
+    }
+
+    /// Runs `work` on the main thread through the main dispatch queue. Unlike
+    /// the app's own event loop, that queue is still served while a modal
+    /// dialog is up — which is exactly when this is needed.
+    fn on_main<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -> oneshot::Receiver<T> {
+        extern "C" fn run(context: *mut c_void) {
+            let work = unsafe { Box::from_raw(context as *mut Box<dyn FnOnce() + Send>) };
+            work();
+        }
+        let (done_tx, done) = oneshot::channel();
+        let boxed: Box<Box<dyn FnOnce() + Send>> = Box::new(Box::new(move || {
+            let _ = done_tx.send(work());
+        }));
+        unsafe { dispatch_async_f(&_dispatch_main_q, Box::into_raw(boxed) as *mut c_void, run) };
+        done
+    }
+
+    struct Button {
+        label: String,
+        default: bool,
+        cancels: bool,
+        control: Option<Retained<AnyObject>>,
+    }
+
+    /// A dialog as found on the main thread. `window` never leaves it.
+    struct Dialog {
+        window: Retained<AnyObject>,
+        number: isize,
+        title: String,
+        text: String,
+        buttons: Vec<Button>,
+        file_panel: bool,
+    }
+
+    impl Dialog {
+        fn describe(&self, index: usize) -> Value {
+            let mut out = json!({ "index": index, "title": self.title });
+            if !self.text.is_empty() {
+                out["text"] = json!(self.text);
+            }
+            out["buttons"] = json!(self.buttons.iter().map(|b| b.label.clone()).collect::<Vec<_>>());
+            if self.file_panel {
+                out["file_field"] = json!(true);
+            }
+            out
+        }
+    }
+
+    unsafe fn string(value: Option<Retained<NSString>>) -> String {
+        value.map(|s| s.to_string()).unwrap_or_default()
+    }
+
+    unsafe fn is_kind(object: &AnyObject, class: &objc2::runtime::AnyClass) -> bool {
+        msg_send![object, isKindOfClass: class]
+    }
+
+    unsafe fn items(array: Option<Retained<AnyObject>>) -> Vec<Retained<AnyObject>> {
+        let Some(array) = array else { return Vec::new() };
+        let count: usize = msg_send![&*array, count];
+        (0..count).filter_map(|i| msg_send![&*array, objectAtIndex: i]).collect()
+    }
+
+    /// The labels and push buttons below `view`, in the order they lie there.
+    unsafe fn collect(view: &AnyObject, texts: &mut Vec<String>, buttons: &mut Vec<Button>) {
+        let hidden: bool = msg_send![view, isHidden];
+        if hidden {
+            return;
+        }
+        if is_kind(view, class!(NSButton)) {
+            let label = string(msg_send![view, title]);
+            let key = string(msg_send![view, keyEquivalent]);
+            if !label.is_empty() {
+                buttons.push(Button {
+                    default: key == "\r",
+                    cancels: key == "\u{1b}",
+                    label,
+                    control: Some(Retained::retain(view as *const AnyObject as *mut AnyObject).unwrap()),
+                });
+            }
+            return;
+        }
+        if is_kind(view, class!(NSTextField)) {
+            let editable: bool = msg_send![view, isEditable];
+            let text = string(msg_send![view, stringValue]);
+            if !editable && !text.trim().is_empty() {
+                texts.push(text.trim().to_string());
+            }
+            return;
+        }
+        for child in items(msg_send![view, subviews]) {
+            collect(&child, texts, buttons);
+        }
+    }
+
+    /// Every dialog the app has open, the newest first: file panels, alerts,
+    /// and whatever else is a sheet or runs modally.
+    unsafe fn open_dialogs() -> Vec<Dialog> {
+        let app: Retained<AnyObject> = msg_send![class!(NSApplication), sharedApplication];
+        let modal: Option<Retained<AnyObject>> = msg_send![&*app, modalWindow];
+        let mut found = Vec::new();
+        for window in items(msg_send![&*app, windows]) {
+            let visible: bool = msg_send![&*window, isVisible];
+            let file_panel = is_kind(&window, class!(NSSavePanel));
+            let sheet: bool = msg_send![&*window, isSheet];
+            let is_modal = modal.as_ref().is_some_and(|m| Retained::as_ptr(m) == Retained::as_ptr(&window));
+            if !visible || !(file_panel || sheet || is_modal) {
+                continue;
+            }
+            let mut texts = Vec::new();
+            let mut buttons = Vec::new();
+            if file_panel {
+                // The panel's contents are drawn by a system service and not
+                // to be found among its views; its own properties say the same.
+                let message = string(msg_send![&*window, message]);
+                if !message.is_empty() {
+                    texts.push(message);
+                }
+                let directory: Option<Retained<AnyObject>> = msg_send![&*window, directoryURL];
+                if let Some(directory) = directory {
+                    texts.push(format!("in {}", string(msg_send![&*directory, path])));
+                }
+                let name = string(msg_send![&*window, nameFieldStringValue]);
+                if !name.is_empty() {
+                    texts.push(format!("name: {name}"));
+                }
+                buttons.push(Button { label: string(msg_send![&*window, prompt]), default: true, cancels: false, control: None });
+                buttons.push(Button { label: "Cancel".to_string(), default: false, cancels: true, control: None });
+            } else {
+                let content: Option<Retained<AnyObject>> = msg_send![&*window, contentView];
+                if let Some(content) = content {
+                    collect(&content, &mut texts, &mut buttons);
+                }
+            }
+            found.push(Dialog {
+                number: msg_send![&*window, windowNumber],
+                title: string(msg_send![&*window, title]),
+                text: texts.join("\n"),
+                buttons,
+                file_panel,
+                window,
+            });
+        }
+        found.reverse();
+        found
+    }
+
+    unsafe fn respond(dialog: &Dialog, action: &str, button: Option<&str>) -> Result<String, String> {
+        let labels = || dialog.buttons.iter().map(|b| b.label.as_str()).collect::<Vec<_>>().join(", ");
+        let chosen = match action {
+            "click" => {
+                let wanted = button.ok_or("action 'click' needs the button's label")?.trim().to_lowercase();
+                dialog
+                    .buttons
+                    .iter()
+                    .find(|b| b.label.to_lowercase() == wanted)
+                    .or_else(|| dialog.buttons.iter().find(|b| b.label.to_lowercase().starts_with(&wanted)))
+                    .ok_or_else(|| format!("no button {wanted:?} - this dialog has: {}", labels()))?
+            }
+            "accept" => dialog.buttons.iter().find(|b| b.default).ok_or_else(|| {
+                format!("cannot tell which button accepts - use action 'click' with one of: {}", labels())
+            })?,
+            "cancel" => match dialog.buttons.iter().find(|b| b.cancels) {
+                Some(button) => button,
+                None => {
+                    let _: () = msg_send![&*dialog.window, performClose: std::ptr::null::<AnyObject>()];
+                    return Ok("(closed)".to_string());
+                }
+            },
+            other => return Err(format!("unknown action {other:?} - list, accept, cancel or click")),
+        };
+        match &chosen.control {
+            Some(control) => { let _: () = msg_send![&**control, performClick: std::ptr::null::<AnyObject>()]; }
+            None if chosen.cancels => { let _: () = msg_send![&*dialog.window, cancel: std::ptr::null::<AnyObject>()]; }
+            None => confirm_panel(&dialog.window)?,
+        }
+        Ok(chosen.label.clone())
+    }
+
+    // NSModalResponseOK
+    const RESPONSE_OK: isize = 1;
+
+    /// Ends a file panel as its default button would. `-[NSSavePanel ok:]`
+    /// raises on current macOS, and the button itself is drawn by a system
+    /// service and out of reach, so the session the panel runs in is ended
+    /// with the answer that button gives.
+    unsafe fn confirm_panel(panel: &AnyObject) -> Result<(), String> {
+        let parent: Option<Retained<AnyObject>> = msg_send![panel, sheetParent];
+        if let Some(parent) = parent {
+            let _: () = msg_send![&*parent, endSheet: panel, returnCode: RESPONSE_OK];
+            return Ok(());
+        }
+        let app: Retained<AnyObject> = msg_send![class!(NSApplication), sharedApplication];
+        let modal: Option<Retained<AnyObject>> = msg_send![&*app, modalWindow];
+        if modal.is_some_and(|m| std::ptr::eq(Retained::as_ptr(&m), panel)) {
+            let _: () = msg_send![&*app, stopModalWithCode: RESPONSE_OK];
+            return Ok(());
+        }
+        Err("this file dialog is neither a sheet nor modal, and cannot be confirmed from outside".to_string())
+    }
+
+    async fn listed() -> Result<Vec<(isize, Value)>, String> {
+        on_main(|| unsafe { open_dialogs().iter().enumerate().map(|(i, d)| (d.number, d.describe(i))).collect() })
+            .await
+            .map_err(|_| "the main thread did not answer".to_string())
+    }
+
+    pub async fn list_dialogs() -> Result<Vec<Value>, String> {
+        Ok(listed().await?.into_iter().map(|(_, dialog)| dialog).collect())
+    }
+
+    pub async fn answer_dialog(params: &Value) -> Result<Value, String> {
+        let action = params.get("action").and_then(Value::as_str).unwrap_or("").to_string();
+        let index = params.get("index").and_then(Value::as_u64).unwrap_or(0) as usize;
+        let button = params.get("button").and_then(Value::as_str).map(str::to_owned);
+        if params.get("path").is_some_and(|path| !path.is_null()) {
+            // AppKit keeps a file panel's answer in the system service that
+            // draws it; `-[NSSavePanel setURL:]` raises.
+            return Err("this dialog was opened by the app's Rust side, and macOS lets nothing outside it \
+                        choose its path - cancel it, or accept the location it shows"
+                .to_string());
+        }
+
+        let (number, pressed) = on_main(move || unsafe {
+            let found = open_dialogs();
+            if found.is_empty() {
+                return Err("no native dialog is open for this instance".to_string());
+            }
+            let dialog = found.get(index).ok_or_else(|| format!("no dialog {index} - {} open", found.len()))?;
+            Ok::<_, String>((dialog.number, respond(dialog, &action, button.as_deref())?))
+        })
+        .await
+        .map_err(|_| "the main thread did not answer".to_string())??;
+
+        // A dialog that stays is not necessarily a failure: one asking a
+        // follow-up question shows up among the dialogs still open.
+        let deadline = tokio::time::Instant::now() + CLOSE_WAIT;
+        loop {
+            let closed = !listed().await?.iter().any(|(n, _)| *n == number);
+            if closed || tokio::time::Instant::now() >= deadline {
+                return Ok(json!({ "pressed": pressed, "closed": closed }));
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
     }
 }
