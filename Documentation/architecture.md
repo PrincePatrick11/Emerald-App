@@ -147,9 +147,13 @@ src-tauri/src/
 ├── images.rs           image commands + emerald-img scheme
 ├── vault.rs            vault registry and vault directory commands
 ├── updates.rs          in-app updater
+├── devbridge.rs, devbridge.js   dev only (cargo feature `devbridge`): lets the MCP server drive the app on macOS and Linux
 └── pdf_export/         native-webview PDF export
     ├── mod.rs          per-platform re-export
     └── windows.rs, macos.rs, linux.rs
+
+.claude/agents/         review agents for Claude Code, see agents.md
+tools/mcp/              MCP server that drives a running instance, see mcp.md
 ```
 
 Only `en` ships in the start bundle; de/es/fr load on demand through `changeAppLanguage` — always use that instead of `i18n.changeLanguage`.
