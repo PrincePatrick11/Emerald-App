@@ -1,8 +1,14 @@
 # Agents
 
-The repository carries review and maintenance agents for Claude Code, so every checkout and every contributor works with the same set. Claude Code loads them from `.claude/agents/` in any session inside a checkout.
+The repository carries review and maintenance agents for a coding assistant in `tools/agents/`, so every contributor works with the same set. They are written as Claude Code subagents.
 
 Two of them, `qacheck` and `designcheck`, look at the running app through the MCP server described in [`mcp.md`](mcp.md).
+
+## Setting Them Up
+
+Claude Code looks for agents in `.claude/agents/`, which this repository does not contain. `npm run agents:link` makes that folder a link to `tools/agents/` — a link and not a copy, so the installed set cannot fall behind the repository; on Windows it is a junction and needs no admin rights. `node scripts/link-agents.mjs --user` links them under your home directory instead, for every project, and `--remove` takes the link away again. A folder that is already there and is not a link is left alone.
+
+A git worktree is a checkout of its own and needs its own link, unless the agents are linked under the home directory.
 
 ## The Agents
 

@@ -20,7 +20,8 @@
 //! browser on the same machine could otherwise connect.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -45,6 +46,9 @@ pub struct Bridge {
     next_id: AtomicU64,
     pending: Mutex<HashMap<u64, oneshot::Sender<String>>>,
     events: broadcast::Sender<String>,
+    listening: AtomicBool,
+    /// Folder dialogs the Rust side asked for, waiting for the client.
+    folder_dialogs: Mutex<Vec<oneshot::Sender<Option<PathBuf>>>>,
 }
 
 impl Default for Bridge {
@@ -53,6 +57,8 @@ impl Default for Bridge {
             next_id: AtomicU64::new(1),
             pending: Mutex::new(HashMap::new()),
             events: broadcast::channel(EVENT_BACKLOG).0,
+            listening: AtomicBool::new(false),
+            folder_dialogs: Mutex::new(Vec::new()),
         }
     }
 }
@@ -68,6 +74,19 @@ pub fn devbridge_reply(bridge: State<'_, Bridge>, id: u64, payload: String) {
 pub fn devbridge_event(bridge: State<'_, Bridge>, payload: String) {
     // No receiver means no client is connected; the event is simply dropped.
     let _ = bridge.events.send(payload);
+}
+
+/// Stands in for a folder dialog opened from Rust: waits until the bridge's
+/// client names a folder or cancels. `None` when nobody is listening, and the
+/// native dialog is the one to open. Blocks, like the dialog it replaces.
+pub fn pick_folder(app: &AppHandle) -> Option<Option<PathBuf>> {
+    let bridge = app.state::<Bridge>();
+    if !bridge.listening.load(Ordering::Relaxed) {
+        return None;
+    }
+    let (answer_tx, answer) = oneshot::channel();
+    bridge.folder_dialogs.lock().unwrap().push(answer_tx);
+    Some(answer.blocking_recv().unwrap_or(None))
 }
 
 pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
@@ -93,6 +112,7 @@ pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
 
 async fn serve(app: AppHandle, port: u16) -> std::io::Result<()> {
     let listener = TcpListener::bind(("127.0.0.1", port)).await?;
+    app.state::<Bridge>().listening.store(true, Ordering::Relaxed);
     eprintln!("emerald devbridge: listening on 127.0.0.1:{port}");
     loop {
         let (stream, _) = listener.accept().await?;
@@ -265,42 +285,70 @@ async fn dispatch(app: &AppHandle, method: &str, params: &Value) -> Result<Value
 
 /// The app's dialogs, listed or answered.
 ///
-/// Two kinds, in one list: those the page asked for, which `devbridge.js`
-/// holds back so they can be answered at all, and native ones the Rust side
-/// opened, which the platform module reads from the app's own windows. The
-/// held ones come first. While a native dialog blocks the main thread the page
-/// does not answer, and the list is the native ones alone.
+/// Three kinds, in one list and in this order: those the page asked for, which
+/// `devbridge.js` holds back so they can be answered at all; folder dialogs
+/// the Rust side asked for through `pick_folder`; and native ones, which the
+/// platform module reads from the app's own windows. While a native dialog
+/// blocks the main thread the page does not answer, and its part is missing.
 async fn dialogs(app: &AppHandle, params: &Value) -> Result<Value, String> {
     let action = params.get("action").and_then(Value::as_str).unwrap_or("list");
-    let held = match tokio::time::timeout(Duration::from_secs(2), page_call(app, "dialogs", &json!({}))).await {
-        Ok(Ok(Value::Array(held))) => held,
-        _ => Vec::new(),
+    let bridge = app.state::<Bridge>();
+    let page_held = || async {
+        match tokio::time::timeout(Duration::from_secs(2), page_call(app, "dialogs", &json!({}))).await {
+            Ok(Ok(Value::Array(held))) => held,
+            _ => Vec::new(),
+        }
     };
-    let listing = |held: Vec<Value>, native: Vec<Value>| {
-        let all = held.into_iter().chain(native).enumerate().map(|(index, mut dialog)| {
+    let folder_held = || {
+        let waiting = bridge.folder_dialogs.lock().unwrap().len();
+        vec![json!({ "title": "Select Folder", "buttons": ["Open", "Cancel"], "file_field": true }); waiting]
+    };
+    let listing = |parts: [Vec<Value>; 3]| {
+        let all = parts.into_iter().flatten().enumerate().map(|(index, mut dialog)| {
             dialog["index"] = json!(index);
             dialog
         });
         Value::Array(all.collect())
     };
+    let from_page = page_held().await;
     if action == "list" {
-        return Ok(json!({ "dialogs": listing(held, native::list_dialogs().await?) }));
+        return Ok(json!({ "dialogs": listing([from_page, folder_held(), native::list_dialogs().await?]) }));
     }
 
     let index = params.get("index").and_then(Value::as_u64).unwrap_or(0) as usize;
+    let from_rust = bridge.folder_dialogs.lock().unwrap().len();
     let mut request = params.clone();
-    let mut outcome = if index < held.len() {
+    let mut outcome = if index < from_page.len() {
         page_call(app, "answerDialog", &request).await?
+    } else if index < from_page.len() + from_rust {
+        answer_folder_dialog(&bridge, index - from_page.len(), &request)?
     } else {
-        request["index"] = json!(index - held.len());
+        request["index"] = json!(index - from_page.len() - from_rust);
         native::answer_dialog(&request).await?
     };
-    let held = match page_call(app, "dialogs", &json!({})).await {
-        Ok(Value::Array(held)) => held,
-        _ => Vec::new(),
-    };
-    outcome["dialogs"] = listing(held, native::list_dialogs().await?);
+    outcome["dialogs"] = listing([page_held().await, folder_held(), native::list_dialogs().await?]);
     Ok(outcome)
+}
+
+fn answer_folder_dialog(bridge: &Bridge, index: usize, params: &Value) -> Result<Value, String> {
+    let text = |key: &str| params.get(key).and_then(Value::as_str);
+    let opens = match (text("action").unwrap_or(""), text("button").map(str::to_lowercase).as_deref()) {
+        ("accept", _) | ("click", Some("open")) => true,
+        ("cancel", _) | ("click", Some("cancel")) => false,
+        ("click", _) => return Err("this dialog has: Open, Cancel".to_string()),
+        (other, _) => return Err(format!("unknown action {other:?} - list, accept, cancel or click")),
+    };
+    let answer = match (opens, text("path")) {
+        (true, Some(path)) => Some(PathBuf::from(path)),
+        (true, None) => return Err("this dialog needs a full path - pass `path`".to_string()),
+        (false, _) => None,
+    };
+    let mut waiting = bridge.folder_dialogs.lock().unwrap();
+    if index >= waiting.len() {
+        return Err("that dialog is no longer open".to_string());
+    }
+    let _ = waiting.remove(index).send(answer);
+    Ok(json!({ "pressed": if opens { "Open" } else { "Cancel" }, "closed": true }))
 }
 
 fn main_window(app: &AppHandle) -> Result<WebviewWindow, String> {

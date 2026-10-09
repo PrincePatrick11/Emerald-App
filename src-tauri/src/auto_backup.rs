@@ -227,10 +227,23 @@ pub async fn pick_auto_backup_dir(
     // Nur eine registrierte Vault-Id bekommt einen Ordner.
     vault::vault_dir(&app, &vault_id)?;
     tauri::async_runtime::spawn_blocking(move || {
-        let Some(picked) = app.dialog().file().set_parent(&window).blocking_pick_folder() else {
+        // In a build with the dev bridge, and while it is listening, the
+        // question goes to its client instead of to a dialog: a native folder
+        // dialog cannot be answered from outside on macOS.
+        #[cfg(feature = "devbridge")]
+        let held = crate::devbridge::pick_folder(&app);
+        #[cfg(not(feature = "devbridge"))]
+        let held: Option<Option<std::path::PathBuf>> = None;
+        let picked = match held {
+            Some(answer) => answer,
+            None => match app.dialog().file().set_parent(&window).blocking_pick_folder() {
+                Some(picked) => Some(picked.into_path().map_err(|e| e.to_string())?),
+                None => None,
+            },
+        };
+        let Some(dir) = picked else {
             return Ok(None);
         };
-        let dir = picked.into_path().map_err(|e| e.to_string())?;
         if !dir.is_absolute() || !dir.is_dir() {
             return Err(DIR_MISSING.to_string());
         }

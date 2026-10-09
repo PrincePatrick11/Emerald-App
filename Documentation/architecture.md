@@ -152,7 +152,7 @@ src-tauri/src/
     ├── mod.rs          per-platform re-export
     └── windows.rs, macos.rs, linux.rs
 
-.claude/agents/         review agents for Claude Code, see agents.md
+tools/agents/           review agents for a coding assistant, see agents.md
 tools/mcp/              MCP server that drives a running instance, see mcp.md
 ```
 

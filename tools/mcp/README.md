@@ -187,7 +187,9 @@ Everything that looks at the DOM is in `pagelib.js`, which `cdp.py` sends along 
   outside a file dialog confirm it or choose its path, so the bridge catches
   the page's dialog calls before a window opens and `dialog` answers those.
   The flow the app goes through is the same; the native window is not part of
-  it. A dialog the Rust side opens is native and, on macOS, can only be
+  it. The one dialog the Rust side opens, the folder picker for automatic
+  backups, asks the bridge as well (`devbridge::pick_folder`); another one
+  added there without that would be native and, on macOS, could only be
   listed, cancelled or accepted as it stands.
 - **One instance.** Port, identifier and build directory are fixed, so two
   checkouts cannot be driven at the same time without overriding them by hand,

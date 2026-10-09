@@ -21,7 +21,7 @@ The server speaks the Chrome DevTools Protocol. On Windows, WebView2 has a debug
 
 Events dispatched in the page reach the app's handlers, the editor included, but they are not trusted events, and a `:hover` style follows the pointer only on Windows. A statement list given to `eval` returns no value through the bridge — wrap it in a function to get one.
 
-A native file dialog cannot be answered from outside on macOS, so the bridge holds back the dialogs the page asks for — file pickers, message boxes, questions — before a window opens. The app waits for the answer as it would for the dialog, and `dialog` lists and answers them the same way as on Windows; the native window itself is what does not get exercised. A dialog the Rust side opens, such as the folder picker for automatic backups, is still native: on macOS it can be listed, cancelled or accepted where it stands, but not sent to another path.
+A native file dialog cannot be answered from outside on macOS, so the bridge holds back the dialogs the page asks for — file pickers, message boxes, questions — before a window opens. The app waits for the answer as it would for the dialog, and `dialog` lists and answers them the same way as on Windows; the native window itself is what does not get exercised. The folder picker for automatic backups, which the Rust side opens, goes the same way in a build with the bridge. Any other dialog opened from Rust would be native: on macOS it can be listed, cancelled or accepted where it stands, but not sent to another path.
 
 The Linux column is built to the same code as macOS and compiles in CI, but has not been run.
 
