@@ -24,9 +24,11 @@ How to use it from a coding assistant is in [`Documentation/mcp.md`](../../Docum
 - **`cdp.py`** — a thin aiohttp client for the DevTools WebSocket. What it runs inside the page (the outline behind `snapshot`, locating elements, checking that input arrived) is `pagelib.js`.
 - **`dialogs.py`** — file pickers and message boxes are windows of the app's process, not part of the WebView, and are found and answered through the window system.
 - **`instance.py`** — works out which checkout the session belongs to and derives port, identifier and paths from it.
-- **`launcher.py`**, **`start_emerald_mcp.bat`** — start the app when a tool needs it and nothing answers on the port.
+- **`launcher.py`**, **`start_emerald_mcp.bat`**, **`start_emerald_mcp.sh`** — start the app when a tool needs it and nothing answers on the port.
 - **`seed/`** — gives a new instance a vault of test data.
-- **`tauri_config.py`**, **`window.py`** — generate the Tauri overlay and move the window off-screen, so a run does not put a window in front of whoever is using the machine.
+- **`tauri_config.py`**, **`window.py`** — generate the Tauri overlay and, on Windows, move the window off-screen, so a run does not put a window in front of whoever is using the machine.
+
+On macOS and Linux the webview has no debug port. The launcher there builds the app with the cargo feature `devbridge` and names a port in `EMERALD_DEVBRIDGE_PORT`; `src-tauri/src/devbridge.rs` then serves the target list and the part of the protocol used here from inside the app, so `cdp.py` talks to it as it would to WebView2. What it cannot do is listed under [Known limitations](#known-limitations), and how it is kept out of release builds in [`Documentation/security.md`](../../Documentation/security.md#the-dev-bridge).
 
 ## The instance
 
@@ -36,10 +38,10 @@ It builds and starts that checkout as an instance of its own, apart from the reg
 
 | | Regular dev build | MCP instance |
 | --- | --- | --- |
-| Debug port | none | 9223 |
+| Debug port | none | 9223 (macOS, Linux: the dev bridge) |
 | Vite port | 1420 | 1430 |
 | App identifier | `com.emerald.app.dev` | `com.emerald.magical-journal.mcp` |
-| Cargo target dir | `src-tauri/target` | `%LOCALAPPDATA%\emerald-mcp-target` |
+| Cargo target dir | `src-tauri/target` | `%LOCALAPPDATA%\emerald-mcp-target`, elsewhere `~/.local/share/emerald-mcp-target` |
 
 The identifier of its own gives the instance its own app data and therefore its own vaults; see [Test data](#test-data). The build directory of its own is needed because Windows refuses to overwrite an `.exe` that is running.
 
@@ -47,7 +49,7 @@ The identifier of its own gives the instance its own app data and therefore its 
 
 ## Setup
 
-**Prerequisites:** Python 3.10 or newer, and everything a dev build of Emerald needs (see [`CONTRIBUTING.md`](../../CONTRIBUTING.md)). `start_emerald_mcp.bat` expects the Visual Studio Build Tools under `C:\BuildTools`; set `EMERALD_BUILD_TOOLS` if yours are elsewhere.
+**Prerequisites:** Python 3.10 or newer, and everything a dev build of Emerald needs (see [`CONTRIBUTING.md`](../../CONTRIBUTING.md)). On Windows, `start_emerald_mcp.bat` expects the Visual Studio Build Tools under `C:\BuildTools`; set `EMERALD_BUILD_TOOLS` if yours are elsewhere.
 
 **Claude Code** needs nothing further: the `.mcp.json` at the repository root registers the server and starts it through [uv](https://github.com/astral-sh/uv), which installs the dependencies on the fly.
 
@@ -76,9 +78,9 @@ Then point the client at the venv's Python and `server.py`, for example in Claud
 
 ## Starting the app
 
-Nothing to do by hand. When a tool call needs the app and nothing answers on the port, the server spawns `start_emerald_mcp.bat` detached and waits for the debug port. The first build takes 5 to 15 minutes; a tool call during that time comes back with "Emerald is still starting" and is simply repeated. Once launched, the app keeps running after the MCP server exits.
+Nothing to do by hand. When a tool call needs the app and nothing answers on the port, the server spawns the launcher script — `start_emerald_mcp.bat` on Windows, `start_emerald_mcp.sh` elsewhere — detached and waits for the port. The first build takes 5 to 15 minutes; a tool call during that time comes back with "Emerald is still starting" and is simply repeated. Once launched, the app keeps running after the MCP server exits.
 
-Set `EMERALD_AUTO_LAUNCH=0` to start it yourself. Run by hand, `start_emerald_mcp.bat` uses the checked-in `tauri.mcp.conf.json`, which leaves the window on screen, and creates no test vault.
+Set `EMERALD_AUTO_LAUNCH=0` to start it yourself. Run by hand, the launcher script uses the checked-in `tauri.mcp.conf.json`, which leaves the window on screen, and creates no test vault.
 
 To check the debug port:
 
@@ -126,16 +128,16 @@ The vault is created once. `seed/provision.mjs` stops as soon as the instance ha
 | --- | --- | --- |
 | `EMERALD_APP_DIR` | discovered | Force the app checkout instead of deriving it from the session's directory |
 | `EMERALD_CDP_HOST` | `127.0.0.1` | Debug host |
-| `EMERALD_CDP_PORT` | `9223` | Debug port |
+| `EMERALD_CDP_PORT` | `9223` | Debug port; on macOS and Linux the port the dev bridge is told to answer on |
 | `EMERALD_MCP_VITE_PORT` | `1430` | Port of the instance's Vite dev server |
 | `EMERALD_MCP_IDENTIFIER` | `com.emerald.magical-journal.mcp` | App identifier, which decides where the instance keeps its data |
-| `EMERALD_MCP_HOME` | `%LOCALAPPDATA%\emerald-mcp` | Generated Tauri config, launch logs, screenshots |
-| `CARGO_TARGET_DIR` | `%LOCALAPPDATA%\emerald-mcp-target` | The instance's build directory |
+| `EMERALD_MCP_HOME` | `%LOCALAPPDATA%\emerald-mcp`, elsewhere `~/.local/share/emerald-mcp` | Generated Tauri config, launch logs, screenshots |
+| `CARGO_TARGET_DIR` | see above | The instance's build directory |
 | `EMERALD_MCP_SEED` | unset | `force` rebuilds the test vault on the next start |
 | `EMERALD_MCP_OFFSCREEN_XY` | off-screen | `40,40` keeps the window on screen, for watching a run |
 | `EMERALD_AUTO_ATTACH` | `1` | Attach to the app's main page on first use |
 | `EMERALD_AUTO_LAUNCH` | `1` | Start the app when no target is found |
-| `EMERALD_LAUNCHER_PATH` | `start_emerald_mcp.bat` | Launcher script |
+| `EMERALD_LAUNCHER_PATH` | the platform's `start_emerald_mcp` script | Launcher script |
 | `EMERALD_LAUNCH_TIMEOUT` | `900` | Seconds to keep waiting for a cold start before giving up |
 | `EMERALD_LAUNCH_POLL_WAIT` | `25` | Seconds one tool call waits for the port |
 | `EMERALD_LAUNCH_POLL_INTERVAL` | `1.5` | Seconds between port checks |
@@ -161,7 +163,7 @@ python instance.py            # checkout, ports, paths
 python tauri_config.py        # the Tauri overlay that would be generated
 ```
 
-Run the tests. They drive a headless Edge showing `tests/page.html`, the same engine as WebView2, so they need no Emerald build:
+Run the tests. They drive a headless Edge, Chromium or Chrome showing `tests/page.html`, the same engine as WebView2, so they need no Emerald build:
 
 ```bash
 pip install -r requirements-dev.txt
@@ -174,9 +176,13 @@ Everything that looks at the DOM is in `pagelib.js`, which `cdp.py` sends along 
 
 ## Known limitations
 
-- **Windows only.** The MCP speaks the Chrome DevTools Protocol, which only
-  WebView2 offers; WKWebView on macOS and WebKitGTK on Linux have no such
-  port. Window handling and native dialogs use the Windows API as well.
+- **macOS and Linux go through the dev bridge, which does less.** Clicks,
+  typing and key presses are events dispatched in the page rather than real
+  input: the app's handlers and the editor see them, a `:hover` style does
+  not. `eval` returns the value of an expression; a list of statements runs
+  but has no value. Screenshots exist on macOS only, native dialogs cannot be
+  driven, and the window opens on screen. The Linux side compiles in CI and
+  has not been run.
 - **One instance.** Port, identifier and build directory are fixed, so two
   checkouts cannot be driven at the same time without overriding them by hand,
   and two sessions on one checkout drive the same window.

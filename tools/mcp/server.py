@@ -9,6 +9,10 @@ Architecture:
     with real input events, wait, eval JS, capture console, screenshot.
   - Native dialogs are outside the WebView and are driven through the
     window system instead (see dialogs.py).
+  - WebView2 on Windows has the debug port the protocol needs. On macOS and
+    Linux the app is built with a bridge that serves the part of the protocol
+    used here (src-tauri/src/devbridge.rs), so everything below is the same
+    code on all three.
 
 Which Emerald it drives is not configured — it is derived. The server resolves
 the app checkout the session runs in (see instance.py) and builds and starts
@@ -35,7 +39,7 @@ Environment (all optional):
   (instance.py and window.py document the EMERALD_MCP_* knobs)
 
 If Emerald isn't running when a tool is called and EMERALD_AUTO_LAUNCH is on,
-this server spawns start_emerald_mcp.bat itself (see launcher.py) and waits
+this server spawns the launcher script itself (see launcher.py) and waits
 (bounded) for the debug port to come up, so no manual launch step is needed.
 """
 
@@ -199,8 +203,8 @@ async def _ensure_target() -> CDPTarget:
             if not AUTO_LAUNCH:
                 raise RuntimeError(
                     f"no page-type targets on {host}:{port} ({inst.checkout}) — "
-                    f"is Emerald running with --remote-debugging-port? (EMERALD_AUTO_LAUNCH is "
-                    f"disabled; start it manually with start_emerald_mcp.bat)"
+                    f"is Emerald running with its debug port open? (EMERALD_AUTO_LAUNCH is "
+                    f"disabled; start it with the start_emerald_mcp script)"
                 )
 
             # A previous launch that has since died would otherwise keep the
@@ -472,7 +476,7 @@ async def _connect(_args: dict) -> Result:
     try:
         browser = (await browser_version(inst.cdp_host, inst.cdp_port)).get("Browser", "")
         payload["browser"] = browser
-        if not browser.startswith(("Edg/", "Chrome/", "HeadlessChrome/")):
+        if not browser.startswith(("Edg/", "Chrome/", "HeadlessChrome/", "EmeraldDevBridge/")):
             payload["warning"] = (
                 f"port {inst.cdp_port} answers, but does not look like a WebView "
                 f"(Browser={browser!r}) - something else may be using it"

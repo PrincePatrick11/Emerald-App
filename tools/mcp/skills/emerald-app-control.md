@@ -18,8 +18,9 @@ metadata:
 > real paths, which is not in this repo.
 
 Drives a running **Emerald** Tauri app (https://github.com/PrincePatrick11/Emerald-App)
-through the `emerald-devtools-mcp` server, which talks to the WebView2 engine via the
-Chrome DevTools Protocol.
+through the `emerald-devtools-mcp` server, which talks to the webview via the
+Chrome DevTools Protocol - WebView2's own debug port on Windows, the app's dev
+bridge on macOS and Linux.
 
 Prerequisites:
 1. The MCP server is configured in your LLM client. It launches Emerald itself,

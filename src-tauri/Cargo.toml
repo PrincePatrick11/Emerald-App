@@ -18,6 +18,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [features]
 default = []
 cargo-clippy = []
+# Dev only: lets the MCP server in `tools/mcp` drive the app on macOS and
+# Linux, where the webview has no debug port (`devbridge.rs`). A release
+# build with it does not compile.
+devbridge = ["dep:tokio-tungstenite", "dep:futures-util", "tokio/net", "tokio/io-util", "tokio/macros"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -51,6 +55,9 @@ hmac = "0.12"
 zeroize = { version = "1", features = ["serde"] }
 # Free space before a re-encryption writes its copy (`reencrypt.rs`).
 fs4 = { version = "0.13", features = ["sync"] }
+# The WebSocket the dev bridge serves; only with the `devbridge` feature.
+tokio-tungstenite = { version = "0.26", optional = true }
+futures-util = { version = "0.3", optional = true, default-features = false, features = ["sink", "std"] }
 
 [dev-dependencies]
 # `#[tokio::test]` for the async tests in `db.rs`.

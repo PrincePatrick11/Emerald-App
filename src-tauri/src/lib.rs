@@ -39,6 +39,13 @@ mod backup;
 mod auto_backup;
 /// Der In-App-Updater: variable Quelle, Pruefung, Installation.
 mod updates;
+/// Lets the MCP server in `tools/mcp` drive the app where the webview has no
+/// debug port. Dev builds only, and only when asked for.
+#[cfg(feature = "devbridge")]
+mod devbridge;
+
+#[cfg(all(feature = "devbridge", not(debug_assertions)))]
+compile_error!("the `devbridge` feature opens the app to local scripting and must not be part of a release build");
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -912,8 +919,14 @@ pub fn run() {
             }
         });
 
-    images::register(builder)
-        .invoke_handler(tauri::generate_handler![
+    #[cfg(feature = "devbridge")]
+    let builder = builder.plugin(devbridge::plugin());
+
+    // The command list as a macro, so the dev bridge can add its two commands
+    // without the list existing twice.
+    macro_rules! commands {
+        ($($extra:tt)*) => {
+            tauri::generate_handler![
             db::db_load,
             db::db_close,
             db::db_execute,
@@ -973,7 +986,17 @@ pub fn run() {
             updates::set_update_settings,
             updates::check_for_update,
             updates::install_update,
-        ])
+            $($extra)*
+            ]
+        };
+    }
+    let builder = images::register(builder);
+    #[cfg(not(feature = "devbridge"))]
+    let builder = builder.invoke_handler(commands!());
+    #[cfg(feature = "devbridge")]
+    let builder = builder.invoke_handler(commands!(devbridge::devbridge_reply, devbridge::devbridge_event,));
+
+    builder
         .setup(|_app| {
             keys::init_keychain(&_app.config().identifier);
             // Was ein abgestürzter PDF-Export im Temp-Ordner liegen ließ — dort

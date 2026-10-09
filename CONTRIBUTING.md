@@ -36,7 +36,7 @@ Every push and pull request runs `ci.yml`: a frontend job (`npm run check:schema
 
 ## Working with a Coding Assistant
 
-The repository carries its own review agents for Claude Code, and an MCP server that drives a running Emerald instance so an assistant can check a change in the app itself. [`Documentation/agents.md`](Documentation/agents.md) lists the agents, which one fits which kind of change, and what each may do; [`Documentation/mcp.md`](Documentation/mcp.md) covers using the MCP server, which runs on Windows only.
+The repository carries its own review agents for Claude Code, and an MCP server that drives a running Emerald instance so an assistant can check a change in the app itself. [`Documentation/agents.md`](Documentation/agents.md) lists the agents, which one fits which kind of change, and what each may do; [`Documentation/mcp.md`](Documentation/mcp.md) covers using the MCP server.
 
 ## Writing Docs
 

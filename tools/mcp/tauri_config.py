@@ -76,12 +76,17 @@ def build_config(inst: Instance, base_window: dict | None = None) -> dict:
     height = float(window.get("height") or 800)
     x, y = creation_origin(width, height)
 
+    window["title"] = inst.product_name
+    window["focus"] = False
+    if sys.platform != "win32":
+        # Moving a window out of sight is only worked out for Windows (see
+        # window.py); elsewhere it stays where the app puts it.
+        return _config(inst, window)
+
     window.update({
-        "title": inst.product_name,
         "x": x,
         "y": y,
         "skipTaskbar": True,
-        "focus": False,
         "visible": True,
         # Everything below is inherited-value defence rather than a setting we
         # need. The base window object is copied verbatim, so any of these
@@ -97,6 +102,10 @@ def build_config(inst: Instance, base_window: dict | None = None) -> dict:
         "alwaysOnTop": False,
     })
 
+    return _config(inst, window)
+
+
+def _config(inst: Instance, window: dict) -> dict:
     return {
         "$schema": "https://schema.tauri.app/config/2",
         "identifier": inst.identifier,

@@ -1,6 +1,7 @@
-"""Auto-launch logic for the Emerald app (Windows).
+"""Auto-launch logic for the Emerald app.
 
-Spawns start_emerald_mcp.bat detached so it survives past the MCP server's own
+Spawns the launcher script - start_emerald_mcp.bat on Windows,
+start_emerald_mcp.sh elsewhere - detached so it survives past the MCP server's own
 lifetime, tracks launch progress so concurrent _ensure_target() calls don't
 double-launch, and polls the CDP port until it comes up (or the launcher script
 exits early with a failure).
@@ -16,6 +17,7 @@ import asyncio
 import logging
 import os
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,7 +50,8 @@ _state_lock = asyncio.Lock()
 
 
 def _default_batch_path() -> Path:
-    return Path(os.environ.get("EMERALD_LAUNCHER_PATH", str(REPO_ROOT / "start_emerald_mcp.bat")))
+    script = "start_emerald_mcp.bat" if sys.platform == "win32" else "start_emerald_mcp.sh"
+    return Path(os.environ.get("EMERALD_LAUNCHER_PATH", str(REPO_ROOT / script)))
 
 
 def launch_timeout() -> float:
@@ -77,7 +80,13 @@ def _child_env(inst: Instance) -> dict[str, str]:
     env["EMERALD_APP_DIR"] = str(inst.checkout)
     env["EMERALD_TAURI_CONFIG"] = str(inst.config_path)
     env["EMERALD_MCP_APP_DATA"] = str(inst.app_data_dir)
-    env["EMERALD_WEBVIEW2_ARGS"] = browser_args(inst)
+    if sys.platform == "win32":
+        env["EMERALD_WEBVIEW2_ARGS"] = browser_args(inst)
+    else:
+        # No debug port in WKWebView or WebKitGTK: the app is built with its
+        # dev bridge, which answers on this port in its place.
+        env["EMERALD_TAURI_FEATURES"] = "devbridge"
+        env["EMERALD_DEVBRIDGE_PORT"] = str(inst.cdp_port)
     # A dev build encrypts the plain seed with this password the first time it
     # sees it, and unlocks it with it after that - no password dialog in an
     # unattended instance. Only this folder; every other vault asks as usual.
@@ -107,8 +116,8 @@ def _creationflags(breakaway: bool) -> int:
 
 
 def spawn_script(script: Path, env: dict[str, str], log_dir: Path, prefix: str) -> tuple[subprocess.Popen, Path]:
-    """Run a batch script with no console anywhere on screen, its output going
-    to a fresh log file instead."""
+    """Run the launcher script with no console anywhere on screen, its output
+    going to a fresh log file instead."""
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"{prefix}-{int(time.time())}.log"
     logf = open(log_path, "wb")
@@ -121,6 +130,9 @@ def spawn_script(script: Path, env: dict[str, str], log_dir: Path, prefix: str) 
         close_fds=True,
     )
     try:
+        if sys.platform != "win32":
+            # A session of its own, so the app outlives the MCP server.
+            return subprocess.Popen(["bash", str(script)], start_new_session=True, **kwargs), log_path
         try:
             proc = subprocess.Popen(["cmd", "/c", str(script)], creationflags=_creationflags(True), **kwargs)
         except OSError:

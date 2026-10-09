@@ -9,7 +9,8 @@ target dir.
 Environment (all optional):
   EMERALD_APP_DIR              force the checkout (skips discovery)
   EMERALD_CDP_HOST             default 127.0.0.1
-  EMERALD_CDP_PORT             default 9223
+  EMERALD_CDP_PORT             default 9223; on macOS and Linux the port of the
+                               app's dev bridge, which stands in for a debug port
   EMERALD_MCP_VITE_PORT        default 1430
   EMERALD_MCP_IDENTIFIER       default com.emerald.magical-journal.mcp
   EMERALD_MCP_HOME             state root (generated config, logs,
@@ -26,6 +27,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -87,9 +89,12 @@ def mcp_home() -> Path:
 
 
 def app_data_root() -> Path:
-    """Where Tauri puts app_data_dir on this platform (Windows: %APPDATA%)."""
-    roaming = os.environ.get("APPDATA")
-    return Path(roaming) if roaming else Path.home() / ".local" / "share"
+    """Where Tauri puts app_data_dir on this platform."""
+    if sys.platform == "win32":
+        return Path(os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming"))
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support"
+    return Path(os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share"))
 
 
 def target_dir() -> Path:

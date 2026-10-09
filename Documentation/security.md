@@ -60,6 +60,15 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 | `update_menu_labels`, `set_export_menu_enabled`, `set_altar_export_menu_enabled`, `set_view_menu_checked` | `lib.rs` | native-menu state sync; no-ops on Windows/Linux, where no native menu is installed |
 | `update_settings`, `set_update_settings`, `check_for_update`, `install_update` | `updates.rs` | the only commands that reach the network — see [In-App Updates](#in-app-updates) |
 
+## The Dev Bridge
+
+`src-tauri/src/devbridge.rs` lets the MCP server in `tools/mcp` drive the app on macOS and Linux, where the webview has no debug port (see [`mcp.md`](mcp.md)). It opens a local port through which a client runs JavaScript in the main window, reads the console and takes screenshots — everything the webview can do, the client can do. It is therefore fenced in four ways:
+
+- **Not in a release build.** The module, its two commands (`devbridge_reply`, `devbridge_event`) and the script it injects exist only with the cargo feature `devbridge`, which is off by default, and `lib.rs` refuses to compile the feature without debug assertions. The command count above is the one of a build without it.
+- **Closed unless asked for.** A build that has the feature still listens only when `EMERALD_DEVBRIDGE_PORT` names a port. The MCP launcher sets it; `npm run tauri:dev` does not even enable the feature.
+- **Loopback only.** The listener binds `127.0.0.1`.
+- **No web pages.** A WebSocket handshake that carries an `Origin` header is refused, so a page open in a browser on the same machine cannot connect. Any other local process can, as it can to the WebView2 debug port on Windows.
+
 ## External Links
 
 The capability includes `opener:default`. In read mode, clicking an external link in the editor calls `openUrl(href)` (`RichEditor.tsx`) with an `href` from stored content — content that can arrive via an imported backup. The click handler passes only `http://` and `https://` URLs; anything else is ignored. Beyond that, the `opener` plugin's default configuration is the only filter before the URL reaches the system browser.

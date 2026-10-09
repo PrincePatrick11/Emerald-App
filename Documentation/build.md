@@ -25,7 +25,7 @@ Two jobs, on every push to every branch and on every pull request. `cancel-in-pr
 4. `npm run check:docs` (`scripts/check-docs.mjs`) — every relative link in `README.md`, `CONTRIBUTING.md`, `CHANGELOG.md` and `Documentation/` points to an existing file and, with `#anchor`, to an existing heading
 5. `npm run build` — `tsc && vite build --configLoader runner`, so it carries the typecheck
 
-**`rust`** (matrix: `ubuntu-22.04`, `macos-14`, `windows-latest`): `cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets`.
+**`rust`** (matrix: `ubuntu-22.04`, `macos-14`, `windows-latest`): `cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets`, and the same again with `--features devbridge`, since the [dev bridge](security.md#the-dev-bridge) is in no build by default and the first check never sees it.
 
 The matrix is the point of the file. `src-tauri/src/pdf_export/` holds three implementations — `windows.rs`, `macos.rs`, `linux.rs` — separated by `#[cfg(target_os = "…")]`, and `lib.rs` has several macOS-gated spots. Whoever develops on Windows never compiles the other two; without the matrix a typo in `macos.rs` stays invisible until the release build goes red in public. `--locked` additionally catches `Cargo.lock` drifting from `Cargo.toml`.
 
