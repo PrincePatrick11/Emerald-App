@@ -1,6 +1,6 @@
 ---
 name: sync-docs
-description: Run at the end of a session — updates CHANGELOG.md and Documentation/ with the session's final results. Records only what was actually implemented and stayed, not a session diary. Only run when explicitly requested (/sync-docs) — never delegate to it automatically.
+description: Run at the end of a session — updates CHANGELOG.md and Documentation/ with the session's final results. Records only what was actually implemented and stayed, not a session diary. Only run when explicitly requested — never delegate to it automatically. Tell it what the session did, or name the commit range: it does not see the conversation.
 model: sonnet
 ---
 
@@ -9,7 +9,8 @@ Your job: update `CHANGELOG.md` and `Documentation/` based on this session.
 
 ## Step 1 — Gather the sources
 
-1. Read the session history — what was implemented, decided, changed?
+1. Read what whoever started you said about the session — what was implemented, decided, changed?
+   You do not see the conversation itself, so what you were not told has to come from the code.
 2. Cross-check against the code: what actually landed? If whoever started you named a commit range
    or a base branch, that range is the change — `git log <base>..HEAD` and `git diff <base>...HEAD`.
    Otherwise run `git diff HEAD` and `git log --oneline -20`. An empty `git diff HEAD` means the work
