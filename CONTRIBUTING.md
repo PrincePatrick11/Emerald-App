@@ -34,6 +34,10 @@ The dev build uses a separate database and app identity (`com.emerald.app.dev`) 
 
 Every push and pull request runs `ci.yml`: a frontend job (`npm run check:schema`, `check:i18n`, `check:blocks` and `check:docs`, then the typecheck-carrying `npm run build`) and a `cargo check --locked --all-targets` matrix across Linux, macOS, and Windows, since parts of the Rust side are platform-gated and only actually compile on their own OS. See [`Documentation/build.md`](Documentation/build.md#ci--the-smoke-detector) for the full pipeline, including what CI does *not* cover (bundling, signing, notarisation).
 
+## Working with a Coding Assistant
+
+The repository carries its own review agents for Claude Code and OpenCode, and an MCP server that drives a running Emerald instance so an assistant can check a change in the app itself. [`Documentation/agents.md`](Documentation/agents.md) lists the agents, which one fits which kind of change, and what each may do; [`Documentation/mcp.md`](Documentation/mcp.md) covers using the MCP server, which runs on Windows only.
+
 ## Writing Docs
 
 `Documentation/` describes how Emerald works today; `CHANGELOG.md` and git record how it got there. The rules below apply to every doc file except `CHANGELOG.md`.

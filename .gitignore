@@ -53,12 +53,13 @@ credentials.json
 .DS_Store
 **/.DS_Store
 
-# Claude / AI tooling (not part of the project)
-.claude/
-.mcp.json
-.opencode/
-agents/
-AGENTS.md
+# Claude / AI tooling: the shared agents, .mcp.json and opencode.json are part
+# of the project; everything else, CLAUDE.md included, stays local
+.claude/*
+!.claude/agents/
+.opencode/*
+!.opencode/agent/
+/AGENTS.md
 AI_HANDOFF.md
 COMPONENT_PATTERNS.md
 DESIGN_SYSTEM.md

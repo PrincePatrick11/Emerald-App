@@ -1,0 +1,91 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.ENV/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Test artifacts (kept locally during development, not for the repo)
+exploration/
+*.png
+!docs/**/*.png
+ui-snapshot*.json
+live-screenshot.png
+before-save.png
+after-save.png
+after-click.png
+test_*.py
+*_test.py
+!tests/test_*.py
+tests_local/
+debug_*.py
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Coverage / profiling
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+.cache
+*.cover
+.mypy_cache/
+.ruff_cache/
+
+# MCP-specific
+*.pid
+.mcp-session
+
+# Cargo build artifacts (in case CARGO_TARGET_DIR is ever set to a relative path)
+target*/
+*.bak

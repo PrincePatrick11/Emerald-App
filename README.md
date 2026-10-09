@@ -128,6 +128,8 @@ The dev build uses a separate app identity (`com.emerald.app.dev`) and database,
 | [Documentation/internationalization.md](Documentation/internationalization.md) | Adding and managing translations |
 | [Documentation/security.md](Documentation/security.md) | Capability model and sandboxing |
 | [Documentation/build.md](Documentation/build.md) | CI, build and release pipeline |
+| [Documentation/agents.md](Documentation/agents.md) | The review agents for coding assistants and when to use which |
+| [Documentation/mcp.md](Documentation/mcp.md) | The MCP server that lets an assistant drive the running app |
 
 ---
 

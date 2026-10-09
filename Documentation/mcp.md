@@ -1,0 +1,58 @@
+# MCP Server
+
+`tools/mcp/` holds an MCP server, `emerald-devtools`, that lets a coding assistant drive a running Emerald instance: read the page, click, type, answer native dialogs, read the console, take screenshots. It is how an assistant checks that a change works in the app itself, and what the `qacheck` and `designcheck` [agents](agents.md) use.
+
+This file covers using it. Setup by hand, every environment variable, the seed vault and the internals are in [`tools/mcp/README.md`](../tools/mcp/README.md).
+
+## Requirements
+
+The server speaks the Chrome DevTools Protocol to the WebView, which only WebView2 offers. It therefore runs on **Windows only**; WKWebView on macOS and WebKitGTK on Linux have no such port.
+
+It needs Python 3.10 or newer, [uv](https://github.com/astral-sh/uv), and everything a dev build of Emerald needs, see [Native build requirements](build.md#native-build-requirements).
+
+## Registration
+
+Claude Code needs no setup. `.mcp.json` at the repository root registers the server for every session inside a checkout and starts it through uv from that checkout's own `tools/mcp/`.
+
+Other clients register `tools/mcp/server.py` themselves; [`tools/mcp/README.md`](../tools/mcp/README.md) has the entries.
+
+## Instances
+
+The server never touches the regular dev build on port 9222. It builds and starts an instance of its own, with its own port, app identifier and database, and which one that is follows from the checkout the session runs in. `status` reports slot, checkout, port and vault.
+
+- **The main checkout is slot 0**, on port 9223. Its database is long-lived and not seeded: it holds whatever has accumulated there. It is never stopped automatically and never handed to another checkout.
+- **Worktrees draw from a pool of four**, on ports 9224 to 9227, each with a freshly seeded vault of test fixtures. A worktree keeps its slot while it uses it. After two hours without a tool call the instance is stopped and another worktree can take the slot over, which wipes the vault so nobody inherits another branch's data. If all four are held and none is idle, the call fails and names the holders.
+
+The first tool call that needs the app starts the instance. A first build takes several minutes; later starts take seconds.
+
+## What to Know Before Reporting a Fault
+
+- **There is no window to look at.** The instance's window is off-screen and out of the taskbar, so a run does not sit in the way. Read the UI with `snapshot`, and use `screenshot` when the look is the question.
+- **A native dialog is not in the page.** A file picker or message box stops the app until it is answered, and neither `snapshot` nor `screenshot` shows it. `dialog` lists and answers it. Emerald only writes below the user's own folders; a path outside them comes back as a second dialog saying so.
+- **A worktree instance already holds data.** These are generated fixtures: entries across every module and a few trashed items. They can be changed and deleted freely.
+- **`reset_database` gives a clean vault** when a test needs one, at the cost of an app restart. On slot 0 it needs `allow_main`, because that database is not generated fixtures.
+
+## Tools
+
+| Tool | What it does |
+| --- | --- |
+| `status` | Which instance this session drives, whether it is running, and how a launch in progress is doing |
+| `snapshot` | The page as a compact outline, one line per element; elements that can be acted on carry a ref such as `@e7` |
+| `click`, `hover` | Real mouse input. `click` refuses an element that is disabled, hidden or covered, and names what covers it |
+| `type_text`, `press_key` | Real keyboard input, into inputs and the editor alike |
+| `wait_for` | Waits until an element is visible, attached, hidden or detached |
+| `dialog` | Lists and answers native file pickers and message boxes |
+| `eval` | Runs JavaScript as in a DevTools console |
+| `console_logs` | Console output and uncaught exceptions |
+| `screenshot` | A PNG of the window or of one element |
+| `navigate` | Loads a URL or reloads the page |
+| `connect`, `attach` | Lists the WebView targets and attaches to another than the main window |
+| `reset_database` | Replaces the instance's database with freshly seeded test data |
+
+## Selectors
+
+Every `selector` takes a CSS selector, a ref from `snapshot`, or `text=Visible text`. A ref stays valid for as long as its element is in the page, so a snapshot followed by a few actions needs no selector guessing.
+
+A selector that has to outlive the run, such as a repro step in a report, uses the lucide icon classes (`.left-sidebar-rail button:has(.lucide-book-open)`), not `title`, `innerText` or `text=…`: those are translated and break with the language. `snapshot` shows the icon as `icon=book-open`.
+
+Known selectors, how each area commits an edit, and pitfalls are collected in [`tools/mcp/skills/emerald-app-control.md`](../tools/mcp/skills/emerald-app-control.md).

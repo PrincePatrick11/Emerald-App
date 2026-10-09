@@ -1,0 +1,8 @@
+# MCP server runtime
+mcp>=1.10,<2
+# Async HTTP + WebSocket client (CDP uses WebSocket; /json endpoint is HTTP)
+aiohttp>=3.9.0
+
+# Tray app (tray.py) only; the MCP server itself does not need these.
+pystray>=0.19,<1
+Pillow>=10
