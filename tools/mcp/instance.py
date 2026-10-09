@@ -12,7 +12,7 @@ Environment (all optional):
   EMERALD_CDP_PORT             default 9223; on macOS and Linux the port of the
                                app's dev bridge, which stands in for a debug port
   EMERALD_MCP_VITE_PORT        default 1430
-  EMERALD_MCP_IDENTIFIER       default com.emerald.magical-journal.mcp
+  EMERALD_MCP_IDENTIFIER       default com.emerald.mcp
   EMERALD_MCP_HOME             state root (generated config, logs,
                                screenshots), default %LOCALAPPDATA%\\emerald-mcp
   CARGO_TARGET_DIR             build directory, default
@@ -33,7 +33,7 @@ from pathlib import Path
 
 DEFAULT_CDP_PORT = 9223
 DEFAULT_VITE_PORT = 1430
-DEFAULT_IDENTIFIER = "com.emerald.magical-journal.mcp"
+DEFAULT_IDENTIFIER = "com.emerald.mcp"
 # Also the window title, and what the window handling matches on.
 PRODUCT_NAME = "Emerald MCP"
 

@@ -40,7 +40,7 @@ It builds and starts that checkout as an instance of its own, apart from the reg
 | --- | --- | --- |
 | Debug port | none | 9223 (macOS, Linux: the dev bridge) |
 | Vite port | 1420 | 1430 |
-| App identifier | `com.emerald.app.dev` | `com.emerald.magical-journal.mcp` |
+| App identifier | `com.emerald.app.dev` | `com.emerald.mcp` |
 | Cargo target dir | `src-tauri/target` | `%LOCALAPPDATA%\emerald-mcp-target`, elsewhere `~/.local/share/emerald-mcp-target` |
 
 The identifier of its own gives the instance its own app data and therefore its own vaults; see [Test data](#test-data). The build directory of its own is needed because Windows refuses to overwrite an `.exe` that is running.
@@ -130,7 +130,7 @@ The vault is created once. `seed/provision.mjs` stops as soon as the instance ha
 | `EMERALD_CDP_HOST` | `127.0.0.1` | Debug host |
 | `EMERALD_CDP_PORT` | `9223` | Debug port; on macOS and Linux the port the dev bridge is told to answer on |
 | `EMERALD_MCP_VITE_PORT` | `1430` | Port of the instance's Vite dev server |
-| `EMERALD_MCP_IDENTIFIER` | `com.emerald.magical-journal.mcp` | App identifier, which decides where the instance keeps its data |
+| `EMERALD_MCP_IDENTIFIER` | `com.emerald.mcp` | App identifier, which decides where the instance keeps its data |
 | `EMERALD_MCP_HOME` | `%LOCALAPPDATA%\emerald-mcp`, elsewhere `~/.local/share/emerald-mcp` | Generated Tauri config, launch logs, screenshots |
 | `CARGO_TARGET_DIR` | see above | The instance's build directory |
 | `EMERALD_MCP_SEED` | unset | `force` rebuilds the test vault on the next start |

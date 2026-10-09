@@ -1,5 +1,5 @@
 {
-  "identifier": "com.emerald.magical-journal.mcp",
+  "identifier": "com.emerald.mcp",
   "productName": "Emerald MCP",
   "build": {
     "beforeDevCommand": "npm run dev -- --port 1430 --strictPort",
