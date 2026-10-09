@@ -5,12 +5,9 @@ lifetime, tracks launch progress so concurrent _ensure_target() calls don't
 double-launch, and polls the CDP port until it comes up (or the launcher script
 exits early with a failure).
 
-Everything that distinguishes one instance from another - port, app identifier,
-Cargo target dir, checkout, seed vault - is handed to the script through the
-environment (see instance.py); the script itself has no per-instance knowledge
-and falls back to slot 0's values when run by hand. Set EMERALD_LAUNCHER_PATH to
-start_emerald_dev.bat if you want auto-launch to use the regular dev
-environment instead.
+Port, app identifier, Cargo target dir and checkout are handed to the script
+through the environment (see instance.py); run by hand, the script falls back
+to the same defaults. Set EMERALD_LAUNCHER_PATH to use a script of your own.
 """
 
 from __future__ import annotations
@@ -18,27 +15,18 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import shutil
 import subprocess
-import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 import tauri_config
 from cdp import discover_targets
-import procs
-from instance import Instance, _port_in_use, browser_args, record_launcher, running_launcher
+from instance import Instance, browser_args
 
 log = logging.getLogger("emerald-launcher")
 
 REPO_ROOT = Path(__file__).resolve().parent
-
-# The password a dev build encrypts and unlocks the seed vault with (Emerald
-# checkouts with vault encryption; older ones ignore the variables). Not a
-# secret: the seed holds fixture data only, and only debug builds read it.
-SEED_PASSWORD = "emerald-seed"
-
 
 @dataclass
 class LaunchState:
@@ -48,9 +36,6 @@ class LaunchState:
     log_path: Path | None = None
     error: str | None = None
     attempt: int = 0
-    # Set instead of `proc` when the launch was started by someone else - the
-    # tray app, or another session in the same checkout - and we only wait.
-    adopted_pid: int | None = None
 
 
 _state = LaunchState()
@@ -79,66 +64,16 @@ def _tail_log(path: Path | None, n_lines: int = 40) -> str:
 
 
 def _child_env(inst: Instance) -> dict[str, str]:
-    """Everything the launcher script needs to build this instance and nothing
-    else. The generated Tauri config is written here rather than in the script
-    because it is derived from the checkout's own platform config."""
+    """Everything the launcher script needs to build this instance. The
+    generated Tauri config is written here rather than in the script because
+    it is derived from the checkout's own platform config."""
     tauri_config.write_config(inst)
     env = os.environ.copy()
-    env["EMERALD_MCP_SLOT"] = str(inst.slot)
     env["EMERALD_APP_DIR"] = str(inst.checkout)
     env["EMERALD_TAURI_CONFIG"] = str(inst.config_path)
-    env["EMERALD_MCP_APP_DATA"] = str(inst.app_data_dir)
     env["EMERALD_WEBVIEW2_ARGS"] = browser_args(inst)
     env["CARGO_TARGET_DIR"] = str(inst.target_dir)
-    # A dev build encrypts the plain seed with this password the first time it
-    # sees it, and unlocks it with it after that — no password dialog in an
-    # unattended slot. Only this folder; every other vault asks as usual.
-    env["EMERALD_DEV_SEED_VAULT"] = str(inst.seed_vault_dir)
-    env["EMERALD_DEV_SEED_PASSWORD"] = SEED_PASSWORD
-    # So the launcher script can run the prune step. It is done there rather
-    # than here because deleting several GB takes long enough to break the
-    # "still starting, retry" contract if it happened on a tool call.
-    python = Path(sys.executable)
-    if python.name.lower() == "pythonw.exe" and python.with_name("python.exe").exists():
-        # Started from the tray app. pythonw has no stdout, so the prune
-        # step's report would never reach the launch log.
-        python = python.with_name("python.exe")
-    env["EMERALD_MCP_PYTHON"] = str(python)
-    env["EMERALD_MCP_DIR"] = str(REPO_ROOT)
-    if inst.seed_from and _can_afford_target_copy(inst):
-        env["EMERALD_SEED_TARGET_FROM"] = str(inst.seed_from)
     return env
-
-
-def _target_copy_min_free() -> int:
-    """Free bytes required before copying a warm target dir into a new slot.
-
-    A fixed figure rather than the source's measured size: walking a warm
-    target tree is ~100k stat calls, and this runs on the launch path. A build
-    directory is ~5 GB, so the default leaves room for it plus headroom.
-    """
-    try:
-        return int(os.environ.get("EMERALD_MCP_MIN_FREE_BYTES", 12 * 1024 ** 3))
-    except ValueError:
-        return 12 * 1024 ** 3
-
-
-def _can_afford_target_copy(inst: Instance) -> bool:
-    probe = inst.target_dir
-    while not probe.exists() and probe.parent != probe:
-        probe = probe.parent
-    try:
-        free = shutil.disk_usage(probe).free
-    except OSError:
-        return True  # unknown is not a reason to force a cold build
-    needed = _target_copy_min_free()
-    if free >= needed:
-        return True
-    log.warning(
-        "only %.1f GB free on %s - skipping the warm target copy, this slot will build cold",
-        free / 1024 ** 3, probe,
-    )
-    return False
 
 
 def _creationflags(breakaway: bool) -> int:
@@ -162,7 +97,7 @@ def _creationflags(breakaway: bool) -> int:
 
 def spawn_script(script: Path, env: dict[str, str], log_dir: Path, prefix: str) -> tuple[subprocess.Popen, Path]:
     """Run a batch script with no console anywhere on screen, its output going
-    to a fresh log file instead. Shared by MCP instances and the dev session."""
+    to a fresh log file instead."""
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"{prefix}-{int(time.time())}.log"
     logf = open(log_path, "wb")
@@ -191,47 +126,11 @@ def _spawn(batch_path: Path, inst: Instance) -> subprocess.Popen:
     log_dir = Path(os.environ.get("EMERALD_LAUNCH_LOG_DIR", str(inst.log_dir)))
     proc, log_path = spawn_script(batch_path, _child_env(inst), log_dir, "emerald-launch")
     _state.log_path = log_path
-    # Another session reclaiming this slot needs to know which tree to end;
-    # killing emerald.exe alone would leave Vite holding the frontend port.
-    record_launcher(inst.slot, proc.pid)
     return proc
 
 
-def latest_log(inst: Instance) -> Path | None:
-    try:
-        logs = sorted(inst.log_dir.glob("emerald-launch-*.log"), key=lambda p: p.stat().st_mtime)
-    except OSError:
-        return None
-    return logs[-1] if logs else None
-
-
-def start_detached(inst: Instance) -> dict:
-    """Start an instance from outside an MCP server - the tray app's button.
-
-    Refuses when the instance is up or already building: a second launcher
-    for the same slot would fight the first over the Vite port and the Cargo
-    lock, and lose. A server that later wants this slot finds the launcher in
-    the registry and waits for it rather than starting its own.
-    """
-    if _port_in_use(inst.cdp_port, inst.cdp_host):
-        return {"started": False, "reason": "running"}
-    if running_launcher(inst.slot):
-        log_path = latest_log(inst)
-        return {"started": False, "reason": "starting", "log_path": str(log_path) if log_path else None}
-    batch_path = _default_batch_path()
-    if not batch_path.exists():
-        raise FileNotFoundError(f"launcher script not found: {batch_path}")
-    proc = _spawn(batch_path, inst)
-    log.info("started slot %s (%s) detached, pid %s", inst.slot, inst.name, proc.pid)
-    return {"started": True, "pid": proc.pid, "log_path": str(_state.log_path)}
-
-
 def _launch_exited() -> bool:
-    if _state.proc is not None:
-        return _state.proc.poll() is not None
-    if _state.adopted_pid:
-        return not procs.pid_alive(_state.adopted_pid)
-    return False
+    return _state.proc is not None and _state.proc.poll() is not None
 
 
 async def is_alive(host: str, port: int) -> bool:
@@ -262,24 +161,11 @@ async def invalidate_if_dead(host: str, port: int) -> bool:
         if await is_alive(host, port):
             return False
         log.info("instance on %s:%s is gone (was %s) - allowing a relaunch", host, port, _state.status)
-        if _state.adopted_pid and procs.pid_alive(_state.adopted_pid):
-            # Someone else's launcher, still running past the whole budget
-            # without ever opening the port. Adopting it again would only wait
-            # out another full timeout.
-            procs.stop_tree(_state.adopted_pid)
-        _state.adopted_pid = None
         _state.status = "idle"
         _state.proc = None
         _state.started_at = None
         _state.error = None
         return True
-
-
-def reset() -> None:
-    """Forget any launch in progress - the instance it was for is no longer
-    ours, so its state says nothing about the one we will launch next."""
-    global _state
-    _state = LaunchState()
 
 
 async def ensure_launching(inst: Instance) -> LaunchState:
@@ -293,19 +179,6 @@ async def ensure_launching(inst: Instance) -> LaunchState:
             _state.status = "failed"
             _state.error = f"launcher script not found: {batch_path}"
             return _state
-        # Started elsewhere and still building: wait for that one instead of
-        # launching a second, which would lose to it on the Vite port.
-        pid = running_launcher(inst.slot)
-        if pid:
-            _state.proc = None
-            _state.adopted_pid = pid
-            _state.status = "launching"
-            _state.error = None
-            _state.started_at = time.monotonic()
-            _state.log_path = latest_log(inst)
-            _state.attempt += 1
-            log.info("slot %s is already being launched (pid %s) - waiting for it", inst.slot, pid)
-            return _state
         try:
             proc = _spawn(batch_path, inst)
         except Exception as e:
@@ -315,7 +188,6 @@ async def ensure_launching(inst: Instance) -> LaunchState:
             _state.error = f"failed to spawn launcher: {type(e).__name__}: {e}"
             return _state
         _state.proc = proc
-        _state.adopted_pid = None
         _state.status = "launching"
         _state.error = None
         _state.started_at = time.monotonic()

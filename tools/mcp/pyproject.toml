@@ -16,6 +16,6 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-py-modules = ["server", "cdp", "dialogs", "instance", "launcher", "procs", "tauri_config", "window", "devsession"]
+py-modules = ["server", "cdp", "dialogs", "instance", "launcher", "tauri_config", "window"]
 # cdp.py reads pagelib.js from its own directory, so this runs from the source
 # tree or an editable install (pip install -e .), not from a built wheel.

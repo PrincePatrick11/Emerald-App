@@ -33,10 +33,10 @@ Before testing:
 
 - Check `tools/mcp/skills/emerald-app-control.md` for known selectors, per-area commit mechanics, and pitfalls (e.g. Operations require right-click → Rename instead of `blur()`; Wiki needs a ~500ms view-switch refresh after create; an open Settings panel blocks sidebar navigation) before assuming something is broken.
 
-- Call `status` first and put the instance it reports — slot, checkout, identifier — in the report header, so a run against the wrong worktree is visible in its own output rather than something to work out afterwards.
-- Confirm the app is reachable (`status`, or `connect` + `attach`) before starting. No window appears: the instance is deliberately off-screen, so read it with `snapshot`, and treat the seeded test data already in it as fixtures you may change. You cannot reset the database yourself — `reset_database` is deliberately not among your tools. If a test needs a clean vault and you were not told that one was prepared, say so and mark the case `Blocked`, so whoever started you can reset it and run you again.
+- Call `status` first and put the instance it reports — checkout, port, identifier — in the report header, so a run against the wrong checkout is visible in its own output rather than something to work out afterwards.
+- Confirm the app is reachable (`status`, or `connect` + `attach`) before starting. No window appears: the instance is deliberately off-screen, so read it with `snapshot`. The instance has a database of its own, apart from the dev build and an installed Emerald, and it holds whatever earlier runs left in it — nothing is prepared and nothing is reset between runs. Create the data a test case needs yourself, and name what you created in the report. If a test needs a clean vault and you were not told that one was prepared, say so and mark the case `Blocked`.
 
-- The seeded vault is encrypted, and a dev build unlocks it by itself with a test password. A password dialog at the start of a worktree instance is therefore a fault of the setup, to be reported as `Blocked` — do not guess at passwords. Testing the unlock, password or recovery-key dialogs themselves means creating a vault of your own in the app for it.
+- An instance that opens on the vault setup or on a password dialog has no vault ready for you. Report the run as `Blocked` and say which of the two it was — do not guess at passwords, and do not set up a vault unless the task asks for it. Testing the unlock, password or recovery-key dialogs themselves means creating a vault of your own in the app for it.
 
 - Clear the console (`console_logs` with `clear: true`) before each test case so errors can be attributed to the right step.
 

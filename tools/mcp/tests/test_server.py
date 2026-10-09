@@ -1,7 +1,6 @@
 """server.py as a client sees it: started as a stdio MCP server and pointed at
-the headless browser instead of an Emerald instance. The slot is forced and
-every state directory lives under tmp_path, so no registry is read or written
-and nothing is launched."""
+the headless browser instead of an Emerald instance. The state directory
+lives under tmp_path and nothing is launched."""
 
 import json
 import os
@@ -22,9 +21,7 @@ async def session(port: int, home: Path):
     env = {
         **os.environ,
         "EMERALD_CDP_PORT": str(port),
-        "EMERALD_MCP_SLOT": "7",
         "EMERALD_MCP_HOME": str(home / "home"),
-        "APPDATA": str(home / "appdata"),
         "EMERALD_AUTO_LAUNCH": "0",
     }
     params = StdioServerParameters(command=sys.executable, args=[str(SERVER)], env=env)
@@ -43,10 +40,9 @@ async def test_tools_are_listed_with_annotations(browser_port, tmp_path):
         tools = {t.name: t for t in (await client.list_tools()).tools}
     assert set(tools) == {
         "status", "connect", "attach", "snapshot", "click", "hover", "type_text", "press_key",
-        "wait_for", "eval", "console_logs", "screenshot", "navigate", "dialog", "reset_database",
+        "wait_for", "eval", "console_logs", "screenshot", "navigate", "dialog",
     }
     assert tools["snapshot"].annotations.readOnlyHint
-    assert tools["reset_database"].annotations.destructiveHint
     catalog = json.dumps([t.model_dump(exclude_none=True) for t in tools.values()])
     assert len(catalog) < 9000, "the catalog is sent with every session - keep it lean"
 
@@ -106,4 +102,4 @@ async def test_status_reports_the_instance(browser_port, tmp_path):
     async with session(browser_port, tmp_path) as client:
         status = json.loads(text_of(await client.call_tool("status", {})))
     assert status["port_alive"] is True
-    assert status["instance"]["slot"] == 7 and status["instance"]["cdp_port"] == browser_port
+    assert status["instance"]["cdp_port"] == browser_port

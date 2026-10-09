@@ -1,10 +1,10 @@
-"""Generates the per-instance Tauri config overlay.
+"""Generates the Tauri config overlay for the MCP instance.
 
 Two jobs, both of which have to happen at launch time rather than in a file
 checked into this repo:
 
-  1. Per-slot values (identifier, productName, Vite port) so several worktrees
-     can run at once without sharing a database or a port.
+  1. Its own identifier, productName and Vite port, so it runs next to the
+     regular dev build without sharing a database or a port.
 
   2. Moving the window off-screen and out of the taskbar, so driving the app
      from an agent does not put a window in the user's face.
@@ -12,8 +12,8 @@ checked into this repo:
 The window object is read from the app checkout's own platform config and
 copied verbatim before the overlay keys go on top. Tauri replaces the
 `app.windows` array wholesale instead of merging it (see
-Documentation/build.md), so an overlay that spelled the window out itself would silently
-drop whatever Emerald-App changed there - `decorations: false` and `shadow`
+Documentation/build.md), so an overlay that spelled the window out itself
+would silently drop whatever the app changed there - `decorations: false` and `shadow`
 on Windows today, something else tomorrow.
 
 Why off-screen and not `visible: false`: WebView2 stops producing frames for a
@@ -24,7 +24,7 @@ instance.browser_args) and screenshots keep working.
 The position written here is only where the window is *born* - one pixel inside
 the corner of the desktop - because Windows refuses a creation rectangle that
 lies entirely off-screen and silently falls back to the default cascade
-position instead. window.place_instance_windows() moves it the rest of the way
+position instead. window.hide_instance_windows() moves it the rest of the way
 once the app is up. See window.py.
 """
 
@@ -85,7 +85,7 @@ def build_config(inst: Instance, base_window: dict | None = None) -> dict:
         "visible": True,
         # Everything below is inherited-value defence rather than a setting we
         # need. The base window object is copied verbatim, so any of these
-        # appearing in Emerald-App's platform config later would quietly undo
+        # appearing in the app's platform config later would quietly undo
         # the off-screen placement: `center` overrides x/y outright, maximized
         # and fullscreen snap the window onto a monitor, `preventOverflow`
         # clamps it back into the work area, and `visible: false` is the exact

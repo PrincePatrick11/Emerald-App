@@ -22,21 +22,19 @@ through the `emerald-devtools-mcp` server, which talks to the WebView2 engine vi
 Chrome DevTools Protocol.
 
 Prerequisites:
-1. The MCP server is configured in your LLM client. It launches Emerald itself
-   and picks its own debug port, so there is nothing to start by hand.
-2. Call `status` first. It reports the instance this session resolved to -
-   slot, checkout, port, identifier, vault - and every other answer below
-   depends on which one that is. Port 9222 is the separate, manually started
+1. The MCP server is configured in your LLM client. It launches Emerald itself,
+   so there is nothing to start by hand.
+2. Call `status` first. It reports the instance this session drives -
+   checkout, port, identifier. Port 9222 is the separate, manually started
    regular dev instance; address it only deliberately.
 
-Two things about that instance are intentional and are **not** faults to
-report:
+Two things about that instance are intentional:
 - **You will not see a window.** It is moved off-screen and out of the taskbar
   so it does not sit in the user's way. Use `screenshot` to see the app. To
   watch a run, set `EMERALD_MCP_OFFSCREEN_XY=40,40` and restart the instance.
-- **It already contains data.** A fresh instance is provisioned with a seeded
-  test vault - entries in every module, a few trashed items. Those are
-  fixtures; change and delete them freely.
+- **It has a database of its own**, apart from the dev build and an installed
+  Emerald. It starts on the vault setup the first time and afterwards holds
+  whatever earlier runs left in it.
 
 ---
 
@@ -80,10 +78,10 @@ mcp:
    none to see.
 2. If nothing is running yet, the first tool call starts Emerald by itself. A
    reply of *"Emerald is still starting"* is that cold start, not a failure:
-   retry in 15-30s. The first start in a new worktree also runs `npm install`
-   and provisions the seed vault, so allow a few minutes.
-3. To check the port by hand, take it from `status` — it is 9223 plus the slot
-   number, not always 9223: `curl -s http://127.0.0.1:<port>/json/version`
+   retry in 15-30s. The first start in a new checkout also runs `npm install`,
+   so allow a few minutes.
+3. To check the port by hand, take it from `status` (9223 unless overridden):
+   `curl -s http://127.0.0.1:<port>/json/version`
    should return JSON containing `"Browser": "Edg/..."`.
 
 ---
@@ -483,8 +481,8 @@ before running tests.
 |---|---|---|
 | `attach` fails | Emerald is not running, or `start_emerald_mcp.bat` did not source vcvars | use cmd instead of bash |
 | No window anywhere | Intended — it is off-screen. Use `screenshot`; `EMERALD_MCP_OFFSCREEN_XY=40,40` brings it back |
-| Unexpected entries in the app | Intended — the seeded test vault. `status` names its path |
-| Driving the wrong checkout | Check `status`: it names the checkout the slot was derived from |
+| Unexpected entries in the app | Left by an earlier run — the instance's database is not reset between runs |
+| Driving the wrong checkout | Check `status`: it names the checkout and how it was found; `EMERALD_APP_DIR` forces one |
 | Sidebar buttons do not react | the Settings modal is open | press Escape + click the X buttons |
 | The entry is not saved | no "Done" button → the editor is still in reader mode | click/type first, then Done |
 | `Suchen...` instead of `Search...` | the language is set to German | intended, or switch back in Settings |

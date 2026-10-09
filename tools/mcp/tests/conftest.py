@@ -1,6 +1,6 @@
 """The CDP layer is tested against a headless Edge showing tests/page.html -
 the same engine as WebView2, without needing an Emerald build. Nothing here
-touches a slot, the registry or the real app."""
+touches the real app."""
 
 import asyncio
 import shutil

@@ -517,9 +517,9 @@ async def discover_targets(host: str = "127.0.0.1", port: int = 9222, timeout_se
 
 
 async def browser_version(host: str = "127.0.0.1", port: int = 9222, timeout_sec: float = 2.0) -> dict:
-    """/json/version. Worth asking before trusting a port: with one instance
-    per worktree, a slot's port can be occupied by something else entirely,
-    and 'Browser' says at a glance whether this is really a WebView."""
+    """/json/version. Worth asking before trusting a port: it can be occupied
+    by something else entirely, and 'Browser' says at a glance whether this
+    is really a WebView."""
     timeout = aiohttp.ClientTimeout(total=timeout_sec)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         async with session.get(f"http://{host}:{port}/json/version") as resp:

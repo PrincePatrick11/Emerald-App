@@ -1,6 +1,6 @@
 # Agents
 
-The repository carries review and maintenance agents for two coding assistants, so every checkout and every contributor works with the same set. Claude Code loads them from `.claude/agents/` in any session inside a checkout; OpenCode loads the same agents from `.opencode/agent/` and its commands from `opencode.json`.
+The repository carries review and maintenance agents for Claude Code, so every checkout and every contributor works with the same set. Claude Code loads them from `.claude/agents/` in any session inside a checkout.
 
 Two of them, `qacheck` and `designcheck`, look at the running app through the MCP server described in [`mcp.md`](mcp.md).
 
@@ -42,21 +42,17 @@ When several apply, the static reviewers come first, in any order, since they on
 
 ## What an Agent May Do
 
-The eight reviewers (`review`, `bugcheck`, `crosscheck`, `securitycheck`, `oscheck`, `centralize`, `i18ncheck`, `designcheck`) and `qacheck` cannot change the codebase. In Claude Code each carries a `tools:` allowlist without `Edit` or `Write`, which is what makes it safe to let them run without asking; acting on their findings is the main session's job. Bash stays on the list because they resolve the changed files through `git diff`, and each definition forbids using it to modify anything.
+The eight reviewers (`review`, `bugcheck`, `crosscheck`, `securitycheck`, `oscheck`, `centralize`, `i18ncheck`, `designcheck`) and `qacheck` cannot change the codebase. Each carries a `tools:` allowlist without `Edit` or `Write`, which is what makes it safe to let them run without asking; acting on their findings is the main session's job. Bash stays on the list because they resolve the changed files through `git diff`, and each definition forbids using it to modify anything.
 
-`qacheck` and `designcheck` additionally list the MCP tools they use, one by one. A tool added to or removed from the MCP server has to be added or removed there as well. `reset_database` is left out on purpose.
+`qacheck` and `designcheck` additionally list the MCP tools they use, one by one. A tool added to or removed from the MCP server has to be added or removed there as well.
 
 `sync-docs`, `release` and `optimize` have write access, because writing is their job. `sync-docs` and `release` are marked manual-only in their descriptions, and `optimize` waits for approval before applying a change.
 
-OpenCode has no equivalent of the allowlist in this setup, so its variants rely on the rules in their text alone.
-
 ## Models
 
-Every Claude Code agent pins a `model:`. The judgement-heavy ones (`review`, `bugcheck`, `crosscheck`, `securitycheck`, `oscheck`, `centralize`, `optimize`) use `opus`, because a wrong call there means missed data loss, false positives or needless rewrites. The reference- or procedure-driven ones (`designcheck`, `qacheck`, `i18ncheck`, `sync-docs`, `release`) use `sonnet`. The OpenCode variants pin their own model per file.
+Every agent pins a `model:`. The judgement-heavy ones (`review`, `bugcheck`, `crosscheck`, `securitycheck`, `oscheck`, `centralize`, `optimize`) use `opus`, because a wrong call there means missed data loss, false positives or needless rewrites. The reference- or procedure-driven ones (`designcheck`, `qacheck`, `i18ncheck`, `sync-docs`, `release`) use `sonnet`.
 
 ## Changing an Agent
-
-Each agent exists twice: as a Claude Code subagent in `.claude/agents/`, and as an OpenCode agent in `.opencode/agent/` or as a command in `opencode.json`. A change to one belongs in the other as well.
 
 Agent definitions are written in English, like this documentation, so the instructions and the docs they cite need no translating between each other.
 

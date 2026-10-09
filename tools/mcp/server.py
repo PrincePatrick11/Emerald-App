@@ -11,12 +11,10 @@ Architecture:
     window system instead (see dialogs.py).
 
 Which Emerald it drives is not configured — it is derived. The server resolves
-the app checkout the session runs in (see instance.py) and turns it into a
-slot: the main checkout is slot 0 and keeps the values this environment always
-had, and each worktree gets its own slot, and with it its own CDP port, Vite
-port, app identifier, database and Cargo target dir. Several worktrees can
-therefore be driven at the same time without sharing anything. `status` reports
-which instance this server ended up with.
+the app checkout the session runs in (see instance.py) and builds and starts
+it as an instance of its own, apart from the regular dev build: its own CDP
+port, Vite port, app identifier, database and Cargo target dir. `status`
+reports the instance.
 
 The window is placed off-screen and kept out of the taskbar (see
 tauri_config.py), so an agent driving the app does not put a window in the
@@ -26,22 +24,19 @@ than hidden.
 Environment (all optional):
   EMERALD_APP_DIR            force the checkout instead of discovering it
   EMERALD_CDP_HOST           default 127.0.0.1
-  EMERALD_CDP_PORT           override the slot's port — pins every worktree to
-                             one instance, so normally leave this unset
+  EMERALD_CDP_PORT           default 9223
   EMERALD_AUTO_ATTACH        default 1 — auto-attach to the main page target
   EMERALD_AUTO_LAUNCH        default 1 — launch Emerald if no target is found
   EMERALD_LAUNCHER_PATH      default <repo>/start_emerald_mcp.bat
   EMERALD_LAUNCH_TIMEOUT     default 900 (seconds) — overall give-up budget
   EMERALD_LAUNCH_POLL_WAIT   default 25 (seconds) — bounded wait per tool call
   EMERALD_LAUNCH_POLL_INTERVAL default 1.5 (seconds) — port-check interval
-  EMERALD_LAUNCH_LOG_DIR     default <instance state dir>/logs
-  (instance.py and tauri_config.py document the EMERALD_MCP_* knobs)
+  EMERALD_LAUNCH_LOG_DIR     default <state dir>/logs
+  (instance.py and window.py document the EMERALD_MCP_* knobs)
 
 If Emerald isn't running when a tool is called and EMERALD_AUTO_LAUNCH is on,
 this server spawns start_emerald_mcp.bat itself (see launcher.py) and waits
 (bounded) for the debug port to come up, so no manual launch step is needed.
-A brand-new instance is also given a vault of test data (see seed/), because
-an empty database makes for a screen with nothing on it to test.
 """
 
 from __future__ import annotations
@@ -66,8 +61,8 @@ from mcp.server import Server
 import dialogs
 import launcher
 from cdp import CDPError, CDPTarget, ConsoleBuffer, browser_version, discover_targets
-from instance import Instance, reset_vault, resolve_again, resolve_instance, still_owns, touch
-from window import place_instance_windows
+from instance import Instance, resolve_instance
+from window import hide_instance_windows
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s", stream=sys.stderr)
 log = logging.getLogger("emerald-mcp")
@@ -76,8 +71,8 @@ AUTO_ATTACH = os.environ.get("EMERALD_AUTO_ATTACH", "1") == "1"
 AUTO_LAUNCH = os.environ.get("EMERALD_AUTO_LAUNCH", "1") == "1"
 LAUNCH_POLL_WAIT = float(os.environ.get("EMERALD_LAUNCH_POLL_WAIT", "25"))
 
-# Resolving the instance touches the filesystem, runs git and takes a lock, so
-# it can fail. It must not fail at import: an exception here leaves the client
+# Resolving the instance touches the filesystem and runs git, so it can fail.
+# It must not fail at import: an exception here leaves the client
 # showing a server with no tools and the traceback only on stderr. Every tool
 # reports the problem instead.
 try:
@@ -86,10 +81,6 @@ try:
 except Exception as _e:  # noqa: BLE001 - reported through the tools
     INSTANCE, INSTANCE_ERROR = None, f"{type(_e).__name__}: {_e}"
     log.exception("could not resolve the Emerald instance for this session")
-
-# Kept apart from INSTANCE so the session can claim a new slot if its own is
-# released in the tray while it is open.
-_CHECKOUT: Path | None = INSTANCE.checkout if INSTANCE is not None else None
 
 app = Server(
     "emerald-devtools",
@@ -103,23 +94,10 @@ app = Server(
 
 
 def _instance() -> Instance:
-    global INSTANCE, INSTANCE_ERROR
-    if INSTANCE is not None and not still_owns(INSTANCE):
-        log.warning("slot %s was released from %s - claiming a slot afresh", INSTANCE.slot, INSTANCE.checkout)
-        INSTANCE = None
-        INSTANCE_ERROR = "this session's slot was released and no new one could be claimed"
-        launcher.reset()
-    if INSTANCE is None and _CHECKOUT is not None:
-        try:
-            INSTANCE = resolve_again(_CHECKOUT)
-            INSTANCE_ERROR = None
-            log.info("now on slot %s (port %s)", INSTANCE.slot, INSTANCE.cdp_port)
-        except Exception as e:  # noqa: BLE001 - reported through the tools
-            INSTANCE_ERROR = f"{type(e).__name__}: {e}"
     if INSTANCE is None:
         raise RuntimeError(
             f"could not work out which Emerald checkout this session belongs to: {INSTANCE_ERROR}. "
-            f"Set EMERALD_APP_DIR to the checkout, or check the slot registry."
+            f"Set EMERALD_APP_DIR to the checkout."
         )
     return INSTANCE
 
@@ -146,7 +124,6 @@ async def _open(chosen: dict) -> CDPTarget:
 
 def _instance_brief(inst: Instance) -> dict:
     return {
-        "slot": inst.slot,
         "checkout": str(inst.checkout),
         "identifier": inst.identifier,
         "cdp_port": inst.cdp_port,
@@ -221,7 +198,7 @@ async def _ensure_target() -> CDPTarget:
         if not page_targets:
             if not AUTO_LAUNCH:
                 raise RuntimeError(
-                    f"no page-type targets on {host}:{port} (slot {inst.slot}, {inst.checkout}) — "
+                    f"no page-type targets on {host}:{port} ({inst.checkout}) — "
                     f"is Emerald running with --remote-debugging-port? (EMERALD_AUTO_LAUNCH is "
                     f"disabled; start it manually with start_emerald_mcp.bat)"
                 )
@@ -263,7 +240,7 @@ async def _ensure_target() -> CDPTarget:
         # window whenever the Rust source changes, and the new one comes back
         # on screen. Never allowed to break a tool call.
         try:
-            place_instance_windows(inst)
+            hide_instance_windows(inst)
         except Exception:
             log.warning("could not move the window off-screen", exc_info=True)
         _target = await _open(chosen)
@@ -325,7 +302,7 @@ def _tool(name: str, description: str, properties: dict | None = None, required:
 TOOLS = [
     _tool(
         "status",
-        "Which Emerald instance this session drives (slot, checkout, ports), whether it is running "
+        "Which Emerald instance this session drives (checkout, ports), whether it is running "
         "and attached, and how a launch in progress is doing.",
         annotations=READ_ONLY,
     ),
@@ -454,14 +431,6 @@ TOOLS = [
             "index": {"type": "integer", "description": "Which dialog (default 0, the topmost)."},
         },
     ),
-    _tool(
-        "reset_database",
-        "Throw this instance's database away and restart the app on freshly seeded test data. "
-        "Worktree slots hold generated fixtures and reset freely; slot 0 is the main checkout's "
-        "long-lived database and needs allow_main.",
-        {"allow_main": {"type": "boolean", "description": "Required to reset slot 0."}},
-        annotations=types.ToolAnnotations(destructiveHint=True),
-    ),
 ]
 
 
@@ -484,7 +453,7 @@ async def _status(_args: dict) -> Result:
         "instance": inst.to_dict(),
     }
     try:
-        payload["window"] = place_instance_windows(inst)
+        payload["window"] = hide_instance_windows(inst)
     except Exception as e:
         payload["window"] = {"error": f"{type(e).__name__}: {e}"}
     if _target is not None:
@@ -498,8 +467,8 @@ async def _connect(_args: dict) -> Result:
     inst = _instance()
     targets = await discover_targets(inst.cdp_host, inst.cdp_port)
     payload: dict[str, Any] = {"instance": _instance_brief(inst), "targets": [_target_summary(t) for t in targets]}
-    # With one instance per worktree, a slot's port can be taken by something
-    # that is not a WebView at all. Say so plainly.
+    # The port can be taken by something that is not a WebView at all. Say so
+    # plainly.
     try:
         browser = (await browser_version(inst.cdp_host, inst.cdp_port)).get("Browser", "")
         payload["browser"] = browser
@@ -654,30 +623,6 @@ async def _dialog(args: dict) -> Result:
     return _text(result)
 
 
-async def _reset_database(args: dict) -> Result:
-    global _target
-    inst = _instance()
-    async with _target_lock:
-        if _target is not None:
-            with contextlib.suppress(Exception):
-                await _target.close()
-            _target = None
-    # Stopping the app shells out and can take seconds; not on the event loop.
-    result = await asyncio.to_thread(reset_vault, inst.slot, bool(args.get("allow_main")))
-    if "error" in result:
-        raise RuntimeError(result["error"])
-    _console.clear()
-    # Bring it straight back rather than leaving the caller with a stopped
-    # app; a cold-ish start still answers "retry shortly".
-    try:
-        await _ensure_target()
-        result["ready"] = True
-    except Exception as e:
-        result["ready"] = False
-        result["note"] = f"restarting: {e}"
-    return _text(result)
-
-
 HANDLERS: dict[str, Callable[[dict], Awaitable[Result]]] = {
     "status": _status,
     "connect": _connect,
@@ -693,27 +638,7 @@ HANDLERS: dict[str, Callable[[dict], Awaitable[Result]]] = {
     "screenshot": _screenshot,
     "navigate": _navigate,
     "dialog": _dialog,
-    "reset_database": _reset_database,
 }
-
-TOUCH_EVERY_SEC = 30.0
-_last_touch = 0.0
-
-
-async def _keep_slot() -> None:
-    """Make sure the slot is still ours - it may have been released in the
-    control panel - and keep it out of the idle reaper's sights.
-
-    The registry write behind touch() takes a file lock, so it happens at most
-    every TOUCH_EVERY_SEC and off the event loop. Never raises: a failed
-    re-claim is reported by whichever tool needs the instance."""
-    global _last_touch
-    with contextlib.suppress(Exception):
-        slot = _instance().slot
-        if time.monotonic() - _last_touch >= TOUCH_EVERY_SEC:
-            _last_touch = time.monotonic()
-            await asyncio.to_thread(touch, slot)
-
 
 @app.list_tools()
 async def list_tools() -> list[types.Tool]:
@@ -725,7 +650,6 @@ async def call_tool(name: str, arguments: dict) -> Result:
     handler = HANDLERS.get(name)
     if handler is None:
         raise ValueError(f"unknown tool: {name}")
-    await _keep_slot()
     try:
         return await handler(arguments or {})
     except Exception as e:
@@ -742,8 +666,8 @@ async def main() -> None:
         log.error("starting emerald-devtools MCP with no resolved instance: %s", INSTANCE_ERROR)
     else:
         log.info(
-            "starting emerald-devtools MCP (slot=%s port=%s vite=%s checkout=%s via %s)",
-            INSTANCE.slot, INSTANCE.cdp_port, INSTANCE.vite_port,
+            "starting emerald-devtools MCP (port=%s vite=%s checkout=%s via %s)",
+            INSTANCE.cdp_port, INSTANCE.vite_port,
             INSTANCE.checkout, INSTANCE.checkout_source,
         )
         for warning in INSTANCE.warnings:
