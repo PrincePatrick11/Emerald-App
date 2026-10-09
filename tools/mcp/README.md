@@ -51,7 +51,7 @@ The identifier of its own gives the instance its own app data and therefore its 
 
 **Prerequisites:** Python 3.10 or newer, and everything a dev build of Emerald needs (see [`CONTRIBUTING.md`](../../CONTRIBUTING.md)). On Windows, `start_emerald_mcp.bat` expects the Visual Studio Build Tools under `C:\BuildTools`; set `EMERALD_BUILD_TOOLS` if yours are elsewhere.
 
-**Claude Code** needs nothing further: the `.mcp.json` at the repository root registers the server and starts it through [uv](https://github.com/astral-sh/uv), which installs the dependencies on the fly.
+**Claude Code:** run `npm run mcp:register` in the checkout. It writes the entry from `mcp.example.json` into the checkout's `.mcp.json`, and Claude Code then starts the server through [uv](https://github.com/astral-sh/uv), which installs the dependencies on the fly.
 
 **Other clients** register `server.py` themselves. Install the dependencies first:
 

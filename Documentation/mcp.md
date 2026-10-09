@@ -27,7 +27,7 @@ The Linux column is built to the same code as macOS and compiles in CI, but has 
 
 ## Registration
 
-Claude Code needs no setup. `.mcp.json` at the repository root registers the server for every session inside a checkout and starts it through uv from that checkout's own `tools/mcp/`.
+`npm run mcp:register` registers the server for Claude Code: it writes the entry from `tools/mcp/mcp.example.json` into `.mcp.json` at the root of the checkout, which is not part of the repository, and leaves other servers in that file alone. Claude Code then starts the server through uv from that checkout's own `tools/mcp/`. `node scripts/register-mcp.mjs --remove` takes the entry out again. A git worktree is a checkout of its own and is registered separately.
 
 Other clients register `tools/mcp/server.py` themselves; [`tools/mcp/README.md`](../tools/mcp/README.md) has the entries.
 

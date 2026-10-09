@@ -21,6 +21,7 @@
     "check:blocks": "node scripts/check-blocks.mjs",
     "check:docs": "node scripts/check-docs.mjs",
     "agents:link": "node scripts/link-agents.mjs",
+    "mcp:register": "node scripts/register-mcp.mjs",
     "icons": "node scripts/make-icons.mjs",
     "fonts": "node scripts/make-fonts-css.mjs",
     "preview": "vite preview --configLoader runner",

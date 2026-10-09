@@ -54,8 +54,10 @@ credentials.json
 **/.DS_Store
 
 # Claude / AI tooling stays local. The shared agents live in tools/agents and
-# are linked into .claude/agents by `npm run agents:link`.
+# are linked into .claude/agents by `npm run agents:link`; `npm run mcp:register`
+# writes .mcp.json from tools/mcp/mcp.example.json.
 .claude/
+.mcp.json
 .opencode/
 /AGENTS.md
 AI_HANDOFF.md

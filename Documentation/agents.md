@@ -10,6 +10,8 @@ Claude Code looks for agents in `.claude/agents/`, which this repository does no
 
 A git worktree is a checkout of its own and needs its own link, unless the agents are linked under the home directory.
 
+Nothing assistant-specific is checked in at the root of the repository: `.claude/` and `.mcp.json` are local files, created by this step and by `npm run mcp:register` (see [`mcp.md`](mcp.md#registration)).
+
 ## The Agents
 
 | Agent | Purpose |
