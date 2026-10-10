@@ -30,9 +30,11 @@ Prerequisites:
    regular dev instance; address it only deliberately.
 
 Two things about that instance are intentional:
-- **You will not see a window.** It is moved off-screen and out of the taskbar
-  so it does not sit in the user's way. Use `screenshot` to see the app. To
-  watch a run, set `EMERALD_MCP_OFFSCREEN_XY=40,40` and restart the instance.
+- **You will not see a window.** On Windows it is moved off-screen and out of
+  the taskbar, on macOS it is invisible and has no Dock icon, so it does not
+  sit in the user's way. Use `screenshot` to see the app. To watch a run, set
+  `EMERALD_MCP_OFFSCREEN_XY=40,40` (Windows) or `EMERALD_MCP_SHOW_WINDOW=1`
+  (macOS) and restart the instance.
 - **It already contains data.** A new instance is given a vault of test
   data - entries in every module, a few trashed items. Those are fixtures;
   change and delete them freely. The vault is created once and not reset, so

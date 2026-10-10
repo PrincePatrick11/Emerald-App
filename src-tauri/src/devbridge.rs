@@ -36,6 +36,7 @@ use tokio_tungstenite::tungstenite::http::StatusCode;
 use tokio_tungstenite::tungstenite::Message;
 
 const PORT_ENV: &str = "EMERALD_DEVBRIDGE_PORT";
+const HIDE_ENV: &str = "EMERALD_DEVBRIDGE_HIDE_WINDOW";
 const PAGE_JS: &str = include_str!("devbridge.js");
 /// The client gives up on its own, usually sooner; this only keeps an answer
 /// that never comes from being waited for indefinitely.
@@ -89,11 +90,37 @@ pub fn pick_folder(app: &AppHandle) -> Option<Option<PathBuf>> {
     Some(answer.blocking_recv().unwrap_or(None))
 }
 
+/// Whether the instance keeps its windows out of the user's way: asked for by
+/// whoever starts it, and only while the bridge is what drives it.
+fn out_of_sight() -> bool {
+    std::env::var(PORT_ENV).is_ok() && std::env::var(HIDE_ENV).as_deref() == Ok("1")
+}
+
 pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
     tauri::plugin::Builder::<tauri::Wry, ()>::new("emerald-devbridge")
         .js_init_script(PAGE_JS.to_string())
+        .on_window_ready(|window| {
+            if out_of_sight() {
+                native::hide(&window);
+            }
+        })
+        .on_event(|app, event| {
+            // Runs on the main thread, as the event loop does.
+            if let tauri::RunEvent::WindowEvent { event: tauri::WindowEvent::Focused(true), .. } = event {
+                if out_of_sight() {
+                    let _ = app;
+                    native::give_focus_back();
+                }
+            }
+        })
         .setup(|app, _api| {
             app.manage(Bridge::default());
+            #[cfg(target_os = "macos")]
+            if out_of_sight() {
+                native::remember_front_app();
+                // No Dock icon and no place in the app switcher.
+                let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            }
             match std::env::var(PORT_ENV).ok().and_then(|port| port.parse::<u16>().ok()) {
                 Some(port) => {
                     let app = app.clone();
@@ -540,6 +567,11 @@ mod native {
         Ok(false)
     }
 
+    /// Putting a window out of sight is worked out for macOS only.
+    pub fn hide(_window: &tauri::Window) {}
+    pub fn remember_front_app() {}
+    pub fn give_focus_back() {}
+
     pub async fn list_dialogs() -> Result<Vec<Value>, String> {
         Ok(Vec::new())
     }
@@ -592,6 +624,63 @@ mod native {
             .map_err(|e| format!("with_webview: {e}"))?;
         done.await.map_err(|_| "the mouse event was abandoned".to_string())??;
         Ok(true)
+    }
+
+    // NSWindowCollectionBehavior: transient | stationary | ignoresCycle
+    const OUT_OF_THE_WAY: usize = (1 << 3) | (1 << 4) | (1 << 6);
+
+    /// Makes a window invisible where it stands, instead of hiding it or
+    /// moving it off the screen: WebKit stops rendering a page whose window
+    /// is not on screen, and a snapshot of it would be stale. Fully
+    /// transparent, it lets every click through to what is behind it and
+    /// stays out of Mission Control and the window cycle; the bridge hands
+    /// its own mouse events to the view directly, so those still arrive.
+    pub fn hide(window: &tauri::Window) {
+        let Ok(ns_window) = window.ns_window() else { return };
+        let ns_window = ns_window as usize;
+        let _ = window.run_on_main_thread(move || unsafe {
+            let ns_window = &*(ns_window as *const AnyObject);
+            let _: () = msg_send![ns_window, setAlphaValue: 0.0f64];
+            let _: () = msg_send![ns_window, setIgnoresMouseEvents: true];
+            let _: () = msg_send![ns_window, setHasShadow: false];
+            let _: () = msg_send![ns_window, setCollectionBehavior: OUT_OF_THE_WAY];
+        });
+    }
+
+    /// The app that was in front when this one started, as a pid.
+    static IN_FRONT_BEFORE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+
+    /// Called first thing, before AppKit puts this app in front.
+    pub fn remember_front_app() {
+        unsafe {
+            let workspace: Retained<AnyObject> = msg_send![class!(NSWorkspace), sharedWorkspace];
+            let front: Option<Retained<AnyObject>> = msg_send![&*workspace, frontmostApplication];
+            if let Some(front) = front {
+                let pid: i32 = msg_send![&*front, processIdentifier];
+                IN_FRONT_BEFORE.store(pid, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+    }
+
+    /// Starting up makes the app the active one. With nothing to see, it
+    /// would take the user's typing without their knowing, so the app that
+    /// was in front gets the keyboard back. Main thread only.
+    pub fn give_focus_back() {
+        unsafe {
+            let pid = IN_FRONT_BEFORE.load(std::sync::atomic::Ordering::Relaxed);
+            let before: Option<Retained<AnyObject>> =
+                msg_send![class!(NSRunningApplication), runningApplicationWithProcessIdentifier: pid];
+            let own: i32 = msg_send![&*{ let p: Retained<AnyObject> = msg_send![class!(NSProcessInfo), processInfo]; p }, processIdentifier];
+            match before {
+                Some(before) if pid != 0 && pid != own => {
+                    let _: bool = msg_send![&*before, activateWithOptions: 0usize];
+                }
+                _ => {
+                    let app: Retained<AnyObject> = msg_send![class!(NSApplication), sharedApplication];
+                    let _: () = msg_send![&*app, deactivate];
+                }
+            }
+        }
     }
 
     unsafe fn send_mouse(view: &AnyObject, kind: usize, x: f64, y: f64, clicks: isize) -> Result<(), String> {

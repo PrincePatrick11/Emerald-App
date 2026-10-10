@@ -67,6 +67,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 - **Not in a release build.** The module, its two commands (`devbridge_reply`, `devbridge_event`) and the script it injects exist only with the cargo feature `devbridge`, which is off by default, and `lib.rs` refuses to compile the feature without debug assertions. The command count above is the one of a build without it.
 - **Closed unless asked for.** A build that has the feature still listens only when `EMERALD_DEVBRIDGE_PORT` names a port. The MCP launcher sets it; `npm run tauri:dev` does not even enable the feature.
 - **Loopback only.** The listener binds `127.0.0.1`.
+- **Invisible only when told.** On macOS the bridge can make the app's windows transparent and keep the app out of the Dock, so an instance driven by an agent stays out of the way. It does so only while it listens and `EMERALD_DEVBRIDGE_HIDE_WINDOW=1` is set, which the MCP launcher does.
 - **No web pages.** A WebSocket handshake that carries an `Origin` header is refused, so a page open in a browser on the same machine cannot connect. Any other local process can, as it can to the WebView2 debug port on Windows.
 
 ## External Links

@@ -26,7 +26,7 @@ How to use it from a coding assistant is in [`Documentation/mcp.md`](../../Docum
 - **`instance.py`** — works out which checkout the session belongs to and derives port, identifier and paths from it.
 - **`launcher.py`**, **`start_emerald_mcp.bat`**, **`start_emerald_mcp.sh`** — start the app when a tool needs it and nothing answers on the port.
 - **`seed/`** — gives a new instance a vault of test data.
-- **`tauri_config.py`**, **`window.py`** — generate the Tauri overlay and, on Windows, move the window off-screen, so a run does not put a window in front of whoever is using the machine.
+- **`tauri_config.py`**, **`window.py`** — generate the Tauri overlay and, on Windows, move the window off-screen, so a run does not put a window in front of whoever is using the machine. On macOS the dev bridge makes the window invisible instead.
 
 On macOS and Linux the webview has no debug port. The launcher there builds the app with the cargo feature `devbridge` and names a port in `EMERALD_DEVBRIDGE_PORT`; `src-tauri/src/devbridge.rs` then serves the target list and the part of the protocol used here from inside the app, so `cdp.py` talks to it as it would to WebView2. What it cannot do is listed under [Known limitations](#known-limitations), and how it is kept out of release builds in [`Documentation/security.md`](../../Documentation/security.md#the-dev-bridge).
 
@@ -134,7 +134,8 @@ The vault is created once. `seed/provision.mjs` stops as soon as the instance ha
 | `EMERALD_MCP_HOME` | `%LOCALAPPDATA%\emerald-mcp`, elsewhere `~/.local/share/emerald-mcp` | Generated Tauri config, launch logs, screenshots |
 | `CARGO_TARGET_DIR` | see above | The instance's build directory |
 | `EMERALD_MCP_SEED` | unset | `force` rebuilds the test vault on the next start |
-| `EMERALD_MCP_OFFSCREEN_XY` | off-screen | `40,40` keeps the window on screen, for watching a run |
+| `EMERALD_MCP_OFFSCREEN_XY` | off-screen | Windows: `40,40` keeps the window on screen, for watching a run |
+| `EMERALD_MCP_SHOW_WINDOW` | unset | macOS: `1` leaves the window visible, for watching a run |
 | `EMERALD_AUTO_ATTACH` | `1` | Attach to the app's main page on first use |
 | `EMERALD_AUTO_LAUNCH` | `1` | Start the app when no target is found |
 | `EMERALD_LAUNCHER_PATH` | the platform's `start_emerald_mcp` script | Launcher script |
@@ -181,7 +182,10 @@ Everything that looks at the DOM is in `pagelib.js`, which `cdp.py` sends along 
   hovering, and every click on Linux - is events dispatched in the page: the
   app's handlers and the editor see them, a `:hover` style does not follow.
   `eval` returns the value of an expression; a list of statements runs but has
-  no value. Screenshots exist on macOS only, and the window opens on screen.
+  no value. Screenshots exist on macOS only. On macOS the bridge makes the
+  window invisible where it stands rather than moving it away - WebKit stops
+  rendering a page whose window is off the screen - and gives the keyboard
+  back to the app that was in front; on Linux the window opens on screen.
   The Linux side compiles in CI and has not been run.
 - **Dialogs on macOS and Linux are held back, not shown.** macOS lets nothing
   outside a file dialog confirm it or choose its path, so the bridge catches

@@ -87,6 +87,9 @@ def _child_env(inst: Instance) -> dict[str, str]:
         # dev bridge, which answers on this port in its place.
         env["EMERALD_TAURI_FEATURES"] = "devbridge"
         env["EMERALD_DEVBRIDGE_PORT"] = str(inst.cdp_port)
+        # Out of the user's way, as on Windows; the bridge does it where it can.
+        if os.environ.get("EMERALD_MCP_SHOW_WINDOW") != "1":
+            env["EMERALD_DEVBRIDGE_HIDE_WINDOW"] = "1"
     # A dev build encrypts the plain seed with this password the first time it
     # sees it, and unlocks it with it after that - no password dialog in an
     # unattended instance. Only this folder; every other vault asks as usual.

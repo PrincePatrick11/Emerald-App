@@ -75,7 +75,7 @@ What to check:
 
 Looking at the result:
 
-- Rules read off the code are half the review. A change can follow every rule in `design.md` and still look wrong — cramped, misaligned, heavier than its neighbours, clipped at a narrow width. So look at it: the emerald-devtools MCP drives this checkout's own app instance. Call `status` first; on Windows no window appears, the instance is off-screen on purpose, so `screenshot` is how you see it. On Linux there is no `screenshot`; say so and review from the code and `snapshot` alone.
+- Rules read off the code are half the review. A change can follow every rule in `design.md` and still look wrong — cramped, misaligned, heavier than its neighbours, clipped at a narrow width. So look at it: the emerald-devtools MCP drives this checkout's own app instance. Call `status` first; on Windows and macOS no window appears, the instance is out of sight on purpose, so `screenshot` is how you see it. On Linux there is no `screenshot`; say so and review from the code and `snapshot` alone.
 
 - Open each changed view — `snapshot` outlines the page and hands out refs (`@e7`) that `click` takes; it shows a rail button as `icon=book-open`, which holds in every language — and take a screenshot. Judge it next to a neighbouring, unchanged view of the same kind: spacing and density, alignment of edges and baselines, visual weight, truncation and wrapping, whether the new part reads as belonging there.
 
