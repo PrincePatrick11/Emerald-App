@@ -686,6 +686,9 @@ mod native {
             let app: Retained<AnyObject> = msg_send![class!(NSApplication), sharedApplication];
             let _: () = msg_send![&*app, activateIgnoringOtherApps: true];
             let _: () = msg_send![window, makeKeyAndOrderFront: std::ptr::null::<AnyObject>()];
+            // macOS may not let a background app activate itself; the window
+            // comes to the front all the same.
+            let _: () = msg_send![window, orderFrontRegardless];
         });
     }
 
