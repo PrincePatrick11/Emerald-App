@@ -107,7 +107,7 @@ pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
         .on_event(|app, event| {
             // Runs on the main thread, as the event loop does.
             if let tauri::RunEvent::WindowEvent { event: tauri::WindowEvent::Focused(true), .. } = event {
-                if out_of_sight() {
+                if out_of_sight() && !native::shown() {
                     let _ = app;
                     native::give_focus_back();
                 }
@@ -289,6 +289,17 @@ async fn dispatch(app: &AppHandle, method: &str, params: &Value) -> Result<Value
         }
         // Not part of the DevTools protocol.
         "Emerald.dialogs" => dialogs(app, params).await,
+        // An instance kept out of sight can be looked at after all, and put
+        // away again. Without `visible` it only reports.
+        "Emerald.window" => {
+            if !out_of_sight() {
+                return Ok(json!({ "visible": true, "hideable": false }));
+            }
+            if let Some(visible) = params.get("visible").and_then(Value::as_bool) {
+                native::show(&main_window(app)?, visible);
+            }
+            Ok(json!({ "visible": native::shown(), "hideable": true }))
+        }
         "Input.insertText" => page_call(app, "insertText", params).await,
         "Input.dispatchKeyEvent" => page_call(app, "key", params).await,
         "Page.navigate" => {
@@ -571,6 +582,10 @@ mod native {
     pub fn hide(_window: &tauri::Window) {}
     pub fn remember_front_app() {}
     pub fn give_focus_back() {}
+    pub fn show(_window: &tauri::WebviewWindow, _visible: bool) {}
+    pub fn shown() -> bool {
+        true
+    }
 
     pub async fn list_dialogs() -> Result<Vec<Value>, String> {
         Ok(Vec::new())
@@ -636,15 +651,50 @@ mod native {
     /// stays out of Mission Control and the window cycle; the bridge hands
     /// its own mouse events to the view directly, so those still arrive.
     pub fn hide(window: &tauri::Window) {
+        if let Ok(ns_window) = window.ns_window() {
+            let ns_window = ns_window as usize;
+            let _ = window.run_on_main_thread(move || unsafe { put_away(ns_window) });
+        }
+    }
+
+    /// Whether the user asked to see the instance, through the bridge.
+    static SHOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+    pub fn shown() -> bool {
+        SHOWN.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Brings an instance that is out of sight in front of the user, or puts
+    /// it away again. It still has no Dock icon either way.
+    pub fn show(window: &WebviewWindow, visible: bool) {
         let Ok(ns_window) = window.ns_window() else { return };
         let ns_window = ns_window as usize;
+        SHOWN.store(visible, std::sync::atomic::Ordering::Relaxed);
         let _ = window.run_on_main_thread(move || unsafe {
-            let ns_window = &*(ns_window as *const AnyObject);
-            let _: () = msg_send![ns_window, setAlphaValue: 0.0f64];
-            let _: () = msg_send![ns_window, setIgnoresMouseEvents: true];
-            let _: () = msg_send![ns_window, setHasShadow: false];
-            let _: () = msg_send![ns_window, setCollectionBehavior: OUT_OF_THE_WAY];
+            if !visible {
+                put_away(ns_window);
+                give_focus_back();
+                return;
+            }
+            // Whoever is in front now gets the keyboard back when it is put away.
+            remember_front_app();
+            let window = &*(ns_window as *const AnyObject);
+            let _: () = msg_send![window, setAlphaValue: 1.0f64];
+            let _: () = msg_send![window, setIgnoresMouseEvents: false];
+            let _: () = msg_send![window, setHasShadow: true];
+            let _: () = msg_send![window, setCollectionBehavior: 0usize];
+            let app: Retained<AnyObject> = msg_send![class!(NSApplication), sharedApplication];
+            let _: () = msg_send![&*app, activateIgnoringOtherApps: true];
+            let _: () = msg_send![window, makeKeyAndOrderFront: std::ptr::null::<AnyObject>()];
         });
+    }
+
+    unsafe fn put_away(ns_window: usize) {
+        let ns_window = &*(ns_window as *const AnyObject);
+        let _: () = msg_send![ns_window, setAlphaValue: 0.0f64];
+        let _: () = msg_send![ns_window, setIgnoresMouseEvents: true];
+        let _: () = msg_send![ns_window, setHasShadow: false];
+        let _: () = msg_send![ns_window, setCollectionBehavior: OUT_OF_THE_WAY];
     }
 
     /// The app that was in front when this one started, as a pid.
