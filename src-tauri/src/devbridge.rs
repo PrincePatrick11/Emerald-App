@@ -618,6 +618,7 @@ mod native {
     const LEFT_MOUSE_DOWN: usize = 1;
     const LEFT_MOUSE_UP: usize = 2;
     const MOUSE_MOVED: usize = 5;
+    const LEFT_MOUSE_DRAGGED: usize = 6;
 
     /// Hands the webview a mouse event of the kind AppKit itself would, so the
     /// page sees a trusted event and hover states follow. Returns `false` for
@@ -625,7 +626,11 @@ mod native {
     /// handling may open a menu that holds the main thread until it is closed.
     pub async fn mouse(window: &WebviewWindow, params: &Value) -> Result<bool, String> {
         let text = |key: &str| params.get(key).and_then(Value::as_str).unwrap_or("");
+        // A move with the left button held is a drag, which is what selects
+        // text or moves what was grabbed; DevTools says so in `buttons`.
+        let left_held = params.get("buttons").and_then(Value::as_u64).unwrap_or(0) & 1 == 1;
         let kind = match (text("type"), text("button")) {
+            ("mouseMoved", _) if left_held => LEFT_MOUSE_DRAGGED,
             ("mouseMoved", _) => MOUSE_MOVED,
             ("mousePressed", "left") => LEFT_MOUSE_DOWN,
             ("mouseReleased", "left") => LEFT_MOUSE_UP,
@@ -764,7 +769,7 @@ mod native {
             context: std::ptr::null::<AnyObject>(),
             eventNumber: 0isize,
             clickCount: clicks,
-            pressure: if kind == LEFT_MOUSE_DOWN { 1.0f32 } else { 0.0f32 },
+            pressure: if kind == LEFT_MOUSE_DOWN || kind == LEFT_MOUSE_DRAGGED { 1.0f32 } else { 0.0f32 },
         ];
         let event = event.ok_or("AppKit made no event")?;
         // Straight to the view rather than through the window: the instance's
@@ -772,6 +777,7 @@ mod native {
         match kind {
             LEFT_MOUSE_DOWN => { let _: () = msg_send![view, mouseDown: &*event]; }
             LEFT_MOUSE_UP => { let _: () = msg_send![view, mouseUp: &*event]; }
+            LEFT_MOUSE_DRAGGED => { let _: () = msg_send![view, mouseDragged: &*event]; }
             _ => { let _: () = msg_send![view, mouseMoved: &*event]; }
         }
         Ok(())
