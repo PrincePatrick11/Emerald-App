@@ -106,6 +106,13 @@ pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
         })
         .on_event(|app, event| {
             // Runs on the main thread, as the event loop does.
+            // No Dock icon and no place in the app switcher. Set once the app
+            // has finished launching: set during setup, it is overwritten by
+            // the default policy when launching completes.
+            #[cfg(target_os = "macos")]
+            if matches!(event, tauri::RunEvent::Ready) && out_of_sight() {
+                let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            }
             if let tauri::RunEvent::WindowEvent { event: tauri::WindowEvent::Focused(true), .. } = event {
                 if out_of_sight() && !native::shown() {
                     let _ = app;
@@ -118,8 +125,6 @@ pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
             #[cfg(target_os = "macos")]
             if out_of_sight() {
                 native::remember_front_app();
-                // No Dock icon and no place in the app switcher.
-                let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             }
             match std::env::var(PORT_ENV).ok().and_then(|port| port.parse::<u16>().ok()) {
                 Some(port) => {
