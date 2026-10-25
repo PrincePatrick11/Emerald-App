@@ -178,7 +178,8 @@ Everything that looks at the DOM is in `pagelib.js`, which `cdp.py` sends along 
 ## Known limitations
 
 - **macOS and Linux go through the dev bridge, which does less.** A left
-  click is a real mouse event on macOS; everything else - typing, key presses,
+  click, and a mouse move with the left button held (a drag, which selects
+  text), is a real mouse event on macOS; everything else - typing, key presses,
   hovering, and every click on Linux - is events dispatched in the page: the
   app's handlers and the editor see them, a `:hover` style does not follow.
   `eval` returns the value of an expression; a list of statements runs but has
