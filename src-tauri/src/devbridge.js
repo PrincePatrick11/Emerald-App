@@ -245,8 +245,13 @@
   }
 
   window.__emeraldBridge = {
+    // Asked once per run, right after it: whether the body parsed. Taken
+    // back as it is answered, so the answer stays the same however soon the
+    // body finishes - a reply cannot clear it first and look like a parse error.
     started: function (id) {
-      return !!started[id];
+      var ran = !!started[id];
+      delete started[id];
+      return ran;
     },
 
     probe: function (on) {
@@ -256,7 +261,6 @@
     run: function (id, options, body) {
       started[id] = true;
       var reply = function (outcome) {
-        delete started[id];
         invoke('devbridge_reply', { id: id, payload: JSON.stringify(outcome) });
       };
       Promise.resolve()

@@ -42,14 +42,18 @@ const PAGE_JS: &str = include_str!("devbridge.js");
 /// that never comes from being waited for indefinitely.
 const REPLY_TIMEOUT: Duration = Duration::from_secs(60);
 const EVENT_BACKLOG: usize = 256;
+/// A folder dialog held back for the client is cancelled after this long:
+/// a client that never answers must not keep the app waiting for good.
+const FOLDER_TIMEOUT: Duration = Duration::from_secs(300);
 
 pub struct Bridge {
     next_id: AtomicU64,
     pending: Mutex<HashMap<u64, oneshot::Sender<String>>>,
     events: broadcast::Sender<String>,
     listening: AtomicBool,
-    /// Folder dialogs the Rust side asked for, waiting for the client.
-    folder_dialogs: Mutex<Vec<oneshot::Sender<Option<PathBuf>>>>,
+    /// Folder dialogs the Rust side asked for, waiting for the client, each
+    /// under a number of its own so one that timed out can be taken back.
+    folder_dialogs: Mutex<Vec<(u64, std::sync::mpsc::Sender<Option<PathBuf>>)>>,
 }
 
 impl Default for Bridge {
@@ -78,22 +82,41 @@ pub fn devbridge_event(bridge: State<'_, Bridge>, payload: String) {
 }
 
 /// Stands in for a folder dialog opened from Rust: waits until the bridge's
-/// client names a folder or cancels. `None` when nobody is listening, and the
-/// native dialog is the one to open. Blocks, like the dialog it replaces.
+/// client names a folder or cancels, and cancels by itself after a while.
+/// `None` when there is no client to answer - none connected, or the user is
+/// looking at the instance - and the native dialog is the one to open.
+/// Blocks, like the dialog it replaces.
 pub fn pick_folder(app: &AppHandle) -> Option<Option<PathBuf>> {
     let bridge = app.state::<Bridge>();
-    if !bridge.listening.load(Ordering::Relaxed) {
+    let connected = bridge.listening.load(Ordering::Relaxed) && bridge.events.receiver_count() > 0;
+    if !connected || (out_of_sight() && native::shown()) {
         return None;
     }
-    let (answer_tx, answer) = oneshot::channel();
-    bridge.folder_dialogs.lock().unwrap().push(answer_tx);
-    Some(answer.blocking_recv().unwrap_or(None))
+    let id = bridge.next_id.fetch_add(1, Ordering::Relaxed);
+    let (answer_tx, answer) = std::sync::mpsc::channel();
+    bridge.folder_dialogs.lock().unwrap().push((id, answer_tx));
+    match answer.recv_timeout(FOLDER_TIMEOUT) {
+        Ok(folder) => Some(folder),
+        Err(_) => {
+            bridge.folder_dialogs.lock().unwrap().retain(|(waiting, _)| *waiting != id);
+            eprintln!("emerald devbridge: nobody answered the folder dialog - cancelled");
+            Some(None)
+        }
+    }
+}
+
+/// Cancels every folder dialog still held back: the last client is gone.
+fn cancel_folder_dialogs(bridge: &Bridge) {
+    for (_, waiting) in bridge.folder_dialogs.lock().unwrap().drain(..) {
+        let _ = waiting.send(None);
+    }
 }
 
 /// Whether the instance keeps its windows out of the user's way: asked for by
-/// whoever starts it, and only while the bridge is what drives it.
+/// whoever starts it, and only while the bridge is what drives it. Worked out
+/// for macOS only; elsewhere the window stays as it is.
 fn out_of_sight() -> bool {
-    std::env::var(PORT_ENV).is_ok() && std::env::var(HIDE_ENV).as_deref() == Ok("1")
+    cfg!(target_os = "macos") && std::env::var(PORT_ENV).is_ok() && std::env::var(HIDE_ENV).as_deref() == Ok("1")
 }
 
 pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
@@ -104,7 +127,7 @@ pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
                 native::hide(&window);
             }
         })
-        .on_event(|app, event| {
+        .on_event(|#[cfg_attr(not(target_os = "macos"), allow(unused_variables))] app, event| {
             // Runs on the main thread, as the event loop does.
             // No Dock icon and no place in the app switcher. Set once the app
             // has finished launching: set during setup, it is overwritten by
@@ -115,7 +138,6 @@ pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
             }
             if let tauri::RunEvent::WindowEvent { event: tauri::WindowEvent::Focused(true), .. } = event {
                 if out_of_sight() && !native::shown() {
-                    let _ = app;
                     native::give_focus_back();
                 }
             }
@@ -144,12 +166,20 @@ pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
 
 async fn serve(app: AppHandle, port: u16) -> std::io::Result<()> {
     let listener = TcpListener::bind(("127.0.0.1", port)).await?;
-    app.state::<Bridge>().listening.store(true, Ordering::Relaxed);
+    let bridge = app.state::<Bridge>();
+    bridge.listening.store(true, Ordering::Relaxed);
     eprintln!("emerald devbridge: listening on 127.0.0.1:{port}");
-    loop {
-        let (stream, _) = listener.accept().await?;
-        tauri::async_runtime::spawn(connection(app.clone(), stream, port));
-    }
+    let stopped = loop {
+        match listener.accept().await {
+            Ok((stream, _)) => {
+                tauri::async_runtime::spawn(connection(app.clone(), stream, port));
+            }
+            Err(e) => break e,
+        }
+    };
+    // No one can connect any more: dialogs go back to being native.
+    bridge.listening.store(false, Ordering::Relaxed);
+    Err(stopped)
 }
 
 async fn connection(app: AppHandle, stream: TcpStream, port: u16) {
@@ -246,6 +276,11 @@ async fn session(app: AppHandle, socket: tokio_tungstenite::WebSocketStream<TcpS
             break;
         }
     }
+    drop(events);
+    let bridge = app.state::<Bridge>();
+    if bridge.events.receiver_count() == 0 {
+        cancel_folder_dialogs(&bridge);
+    }
 }
 
 async fn answer(app: &AppHandle, text: &str) -> String {
@@ -282,14 +317,13 @@ async fn dispatch(app: &AppHandle, method: &str, params: &Value) -> Result<Value
             // does. Where it cannot, a press does not reach the page at all,
             // and the MCP server, seeing that nothing arrived, falls back to
             // its own way of clicking.
-            let native = native::mouse(&main_window(app)?, params).await?;
+            native::mouse(&main_window(app)?, params).await?;
             // A move is dispatched in the page as well, whatever the platform
             // did with it: WebKit drops real moves while the app is not the
             // active one, and handlers that wait for a hover would never run.
             if params.get("type").and_then(Value::as_str) == Some("mouseMoved") {
                 return page_call(app, "mouseMoved", params).await;
             }
-            let _ = native;
             Ok(json!({}))
         }
         // Not part of the DevTools protocol.
@@ -390,7 +424,7 @@ fn answer_folder_dialog(bridge: &Bridge, index: usize, params: &Value) -> Result
     if index >= waiting.len() {
         return Err("that dialog is no longer open".to_string());
     }
-    let _ = waiting.remove(index).send(answer);
+    let _ = waiting.remove(index).1.send(answer);
     Ok(json!({ "pressed": if opens { "Open" } else { "Cancel" }, "closed": true }))
 }
 
@@ -579,8 +613,8 @@ mod native {
     use serde_json::Value;
     use tauri::WebviewWindow;
 
-    pub async fn mouse(_window: &WebviewWindow, _params: &Value) -> Result<bool, String> {
-        Ok(false)
+    pub async fn mouse(_window: &WebviewWindow, _params: &Value) -> Result<(), String> {
+        Ok(())
     }
 
     /// Putting a window out of sight is worked out for macOS only.
@@ -621,10 +655,8 @@ mod native {
     const LEFT_MOUSE_DRAGGED: usize = 6;
 
     /// Hands the webview a mouse event of the kind AppKit itself would, so the
-    /// page sees a trusted event and hover states follow. Returns `false` for
-    /// what stays with the page: the right and middle buttons, whose native
-    /// handling may open a menu that holds the main thread until it is closed.
-    pub async fn mouse(window: &WebviewWindow, params: &Value) -> Result<bool, String> {
+    /// page sees a trusted event and hover states follow.
+    pub async fn mouse(window: &WebviewWindow, params: &Value) -> Result<(), String> {
         let text = |key: &str| params.get(key).and_then(Value::as_str).unwrap_or("");
         // A move with the left button held is a drag, which is what selects
         // text or moves what was grabbed; DevTools says so in `buttons`.
@@ -634,7 +666,9 @@ mod native {
             ("mouseMoved", _) => MOUSE_MOVED,
             ("mousePressed", "left") => LEFT_MOUSE_DOWN,
             ("mouseReleased", "left") => LEFT_MOUSE_UP,
-            _ => return Ok(false),
+            // The right and middle buttons stay with the page: their native
+            // handling may open a menu that holds the main thread until closed.
+            _ => return Ok(()),
         };
         let x = params.get("x").and_then(Value::as_f64).unwrap_or(0.0);
         let y = params.get("y").and_then(Value::as_f64).unwrap_or(0.0);
@@ -647,8 +681,7 @@ mod native {
                 let _ = done_tx.send(unsafe { send_mouse(view, kind, x, y, clicks) });
             })
             .map_err(|e| format!("with_webview: {e}"))?;
-        done.await.map_err(|_| "the mouse event was abandoned".to_string())??;
-        Ok(true)
+        done.await.map_err(|_| "the mouse event was abandoned".to_string())?
     }
 
     // NSWindowCollectionBehavior: transient | stationary | ignoresCycle
@@ -679,15 +712,18 @@ mod native {
     pub fn show(window: &WebviewWindow, visible: bool) {
         let Ok(ns_window) = window.ns_window() else { return };
         let ns_window = ns_window as usize;
-        SHOWN.store(visible, std::sync::atomic::Ordering::Relaxed);
+        let was_shown = SHOWN.swap(visible, std::sync::atomic::Ordering::Relaxed);
         let _ = window.run_on_main_thread(move || unsafe {
             if !visible {
                 put_away(ns_window);
                 give_focus_back();
                 return;
             }
-            // Whoever is in front now gets the keyboard back when it is put away.
-            remember_front_app();
+            // Whoever is in front now gets the keyboard back when it is put
+            // away - unless it is this app, shown already.
+            if !was_shown {
+                remember_front_app();
+            }
             let window = &*(ns_window as *const AnyObject);
             let _: () = msg_send![window, setAlphaValue: 1.0f64];
             let _: () = msg_send![window, setIgnoresMouseEvents: false];

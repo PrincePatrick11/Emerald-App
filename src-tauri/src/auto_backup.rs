@@ -227,9 +227,10 @@ pub async fn pick_auto_backup_dir(
     // Nur eine registrierte Vault-Id bekommt einen Ordner.
     vault::vault_dir(&app, &vault_id)?;
     tauri::async_runtime::spawn_blocking(move || {
-        // In a build with the dev bridge, and while it is listening, the
-        // question goes to its client instead of to a dialog: a native folder
-        // dialog cannot be answered from outside on macOS.
+        // In a build with the dev bridge, while a client is connected and the
+        // instance is out of sight, the question goes to that client instead
+        // of to a dialog: a native folder dialog cannot be answered from
+        // outside on macOS.
         #[cfg(feature = "devbridge")]
         let held = crate::devbridge::pick_folder(&app);
         #[cfg(not(feature = "devbridge"))]
