@@ -49,7 +49,7 @@ _state = LaunchState()
 _state_lock = asyncio.Lock()
 
 
-def _default_batch_path() -> Path:
+def _launcher_path() -> Path:
     script = "start_emerald_mcp.bat" if sys.platform == "win32" else "start_emerald_mcp.sh"
     return Path(os.environ.get("EMERALD_LAUNCHER_PATH", str(REPO_ROOT / script)))
 
@@ -87,8 +87,8 @@ def _child_env(inst: Instance) -> dict[str, str]:
         # dev bridge, which answers on this port in its place.
         env["EMERALD_TAURI_FEATURES"] = "devbridge"
         env["EMERALD_DEVBRIDGE_PORT"] = str(inst.cdp_port)
-        # Out of the user's way, as on Windows; the bridge does it where it can.
-        if os.environ.get("EMERALD_MCP_SHOW_WINDOW") != "1":
+        # Out of the user's way, as on Windows; the bridge can do it on macOS.
+        if sys.platform == "darwin" and os.environ.get("EMERALD_MCP_SHOW_WINDOW") != "1":
             env["EMERALD_DEVBRIDGE_HIDE_WINDOW"] = "1"
     # A dev build encrypts the plain seed with this password the first time it
     # sees it, and unlocks it with it after that - no password dialog in an
@@ -200,7 +200,7 @@ async def ensure_launching(inst: Instance) -> LaunchState:
     async with _state_lock:
         if _state.status in ("launching", "ready"):
             return _state
-        batch_path = _default_batch_path()
+        batch_path = _launcher_path()
         if not batch_path.exists():
             _state.status = "failed"
             _state.error = f"launcher script not found: {batch_path}"

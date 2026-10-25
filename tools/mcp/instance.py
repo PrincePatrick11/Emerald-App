@@ -15,8 +15,10 @@ Environment (all optional):
   EMERALD_MCP_IDENTIFIER       default com.emerald.mcp
   EMERALD_MCP_HOME             state root (generated config, logs,
                                screenshots), default %LOCALAPPDATA%\\emerald-mcp
+                               on Windows, ~/.local/share/emerald-mcp elsewhere
   CARGO_TARGET_DIR             build directory, default
-                               %LOCALAPPDATA%\\emerald-mcp-target
+                               %LOCALAPPDATA%\\emerald-mcp-target on Windows,
+                               ~/.local/share/emerald-mcp-target elsewhere
 
 Two checkouts driven at the same time need different ports, identifiers and
 target dirs; nothing here hands them out.
@@ -232,8 +234,10 @@ def browser_args(inst: Instance) -> str:
         are silently lost.
     """
     return " ".join([
+        # No --remote-allow-origins: the MCP server connects without an Origin
+        # header, which Chromium lets through, and a web page - which always
+        # sends one - stays out.
         "--remote-debugging-port=" + str(inst.cdp_port),
-        "--remote-allow-origins=*",
         "--disable-backgrounding-occluded-windows",
         "--disable-renderer-backgrounding",
         "--disable-background-timer-throttling",

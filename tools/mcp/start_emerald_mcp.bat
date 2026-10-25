@@ -12,28 +12,35 @@ REM Run by hand with none of them set, it uses the same defaults: port 9223,
 REM the checked-in tauri.mcp.conf.json, an on-screen window, and no test data.
 
 setlocal
-if not defined EMERALD_BUILD_TOOLS set "EMERALD_BUILD_TOOLS=C:\BuildTools"
-
-if not exist "%EMERALD_BUILD_TOOLS%\VC\Auxiliary\Build\vcvars64.bat" (
-    echo ERROR: vcvars64.bat not found at %EMERALD_BUILD_TOOLS%\VC\Auxiliary\Build\vcvars64.bat
-    echo        Set EMERALD_BUILD_TOOLS to your Build Tools installation.
-    exit /b 1
-)
 
 REM Make sure cargo is on PATH even in a fresh shell.
-set "PATH=%USERPROFILE%\.cargo\bin;%ProgramFiles(x86)%\Microsoft Visual Studio\Installer;%PATH%"
+set "PATH=%USERPROFILE%\.cargo\bin;%PATH%"
 
-call "%EMERALD_BUILD_TOOLS%\VC\Auxiliary\Build\vcvars64.bat" >nul
-if errorlevel 1 (
-    echo ERROR: vcvars64.bat failed
-    exit /b 1
-)
+REM The MSVC environment: from EMERALD_BUILD_TOOLS, or wherever the Visual
+REM Studio installer says the newest Build Tools are. Without it Cargo still
+REM looks for MSVC itself, so a missing one is a warning. No ( ) blocks
+REM around paths here: one under "Program Files (x86)" would end the block.
+if defined EMERALD_BUILD_TOOLS goto :have_tools
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if not exist "%VSWHERE%" goto :have_tools
+for /f "usebackq delims=" %%i in (`"%VSWHERE%" -latest -products * -property installationPath`) do set "EMERALD_BUILD_TOOLS=%%i"
+:have_tools
+set "VCVARS=%EMERALD_BUILD_TOOLS%\VC\Auxiliary\Build\vcvars64.bat"
+if not defined EMERALD_BUILD_TOOLS goto :no_vcvars
+if not exist "%VCVARS%" goto :no_vcvars
+call "%VCVARS%" >nul
+if errorlevel 1 goto :vcvars_failed
+goto :tools_ready
+:no_vcvars
+echo WARNING: no vcvars64.bat found ("%VCVARS%") - Cargo looks for MSVC itself.
+echo          Set EMERALD_BUILD_TOOLS to your Build Tools installation if the build fails.
+:tools_ready
 
 REM --disable-features replaces wry's defaults rather than merging with them,
 REM which is why the three ms* features are repeated here;
 REM CalculateNativeWinOcclusion is what keeps the off-screen window
 REM compositing so screenshots are not stale frames.
-if not defined EMERALD_WEBVIEW2_ARGS set "EMERALD_WEBVIEW2_ARGS=--remote-debugging-port=9223 --remote-allow-origins=* --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-background-timer-throttling --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,CalculateNativeWinOcclusion"
+if not defined EMERALD_WEBVIEW2_ARGS set "EMERALD_WEBVIEW2_ARGS=--remote-debugging-port=9223 --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-background-timer-throttling --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,CalculateNativeWinOcclusion"
 set "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=%EMERALD_WEBVIEW2_ARGS%"
 
 REM App repo location. Default is the checkout this script lives in
@@ -55,7 +62,7 @@ cd /d "%EMERALD_APP_DIR%"
 REM A fresh git worktree has no usable node_modules — `git worktree add` does
 REM not copy it — so nothing below would run without this.
 if not exist "node_modules\.bin\tauri.cmd" (
-    echo node_modules is missing or incomplete in %CD% - running npm install ...
+    echo node_modules is missing or incomplete in "%CD%" - running npm install ...
     call npm install
     if errorlevel 1 (
         echo ERROR: npm install failed
@@ -90,6 +97,10 @@ endlocal
 goto :eof
 
 :no_app
-echo ERROR: no Emerald checkout at %EMERALD_APP_DIR%
+echo ERROR: no Emerald checkout at "%EMERALD_APP_DIR%"
 echo        Override with: set "EMERALD_APP_DIR=C:\path\to\Emerald-App"
+exit /b 1
+
+:vcvars_failed
+echo ERROR: vcvars64.bat failed ("%VCVARS%")
 exit /b 1

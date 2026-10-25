@@ -192,9 +192,9 @@ class CDPTarget:
             ("Runtime.enable", {}),
             ("Page.enable", {}),
             ("Log.enable", {}),
-            # The window sits off-screen and never has the OS focus; without
-            # this the page behaves as a background tab and typed text goes
-            # nowhere.
+            # The window is out of sight (off-screen on Windows) and never has
+            # the OS focus; without this the page behaves as a background tab
+            # and typed text goes nowhere.
             ("Emulation.setFocusEmulationEnabled", {"enabled": True}),
         ]:
             with contextlib.suppress(CDPError):

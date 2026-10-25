@@ -20,10 +20,12 @@ it as an instance of its own, apart from the regular dev build: its own CDP
 port, Vite port, app identifier, database and Cargo target dir. `status`
 reports the instance.
 
-The window is placed off-screen and kept out of the taskbar (see
-tauri_config.py), so an agent driving the app does not put a window in the
-user's face; screenshots keep working because the window is off-screen rather
-than hidden.
+The window stays out of the user's face while an agent drives the app. On
+Windows it is placed off-screen and kept out of the taskbar (see
+tauri_config.py and window.py); on macOS the dev bridge makes it invisible
+where it stands (EMERALD_DEVBRIDGE_HIDE_WINDOW, set by launcher.py unless
+EMERALD_MCP_SHOW_WINDOW=1). Either way screenshots keep working, because the
+window is not hidden. On Linux it opens on screen.
 
 Environment (all optional):
   EMERALD_APP_DIR            force the checkout instead of discovering it
@@ -31,7 +33,9 @@ Environment (all optional):
   EMERALD_CDP_PORT           default 9223
   EMERALD_AUTO_ATTACH        default 1 — auto-attach to the main page target
   EMERALD_AUTO_LAUNCH        default 1 — launch Emerald if no target is found
-  EMERALD_LAUNCHER_PATH      default <repo>/start_emerald_mcp.bat
+  EMERALD_LAUNCHER_PATH      default <repo>/start_emerald_mcp.bat on Windows,
+                             start_emerald_mcp.sh elsewhere
+  EMERALD_MCP_SHOW_WINDOW    1 — macOS: leave the window visible, to watch a run
   EMERALD_LAUNCH_TIMEOUT     default 900 (seconds) — overall give-up budget
   EMERALD_LAUNCH_POLL_WAIT   default 25 (seconds) — bounded wait per tool call
   EMERALD_LAUNCH_POLL_INTERVAL default 1.5 (seconds) — port-check interval
@@ -246,7 +250,7 @@ async def _ensure_target() -> CDPTarget:
         try:
             hide_instance_windows(inst)
         except Exception:
-            log.warning("could not move the window off-screen", exc_info=True)
+            log.warning("could not put the window out of sight", exc_info=True)
         _target = await _open(chosen)
         return _target
 
@@ -307,8 +311,8 @@ TOOLS = [
     _tool(
         "status",
         "Which Emerald instance this session drives (checkout, ports), whether it is running "
-        "and attached, and how a launch in progress is doing.",
-        annotations=READ_ONLY,
+        "and attached, and how a launch in progress is doing. On Windows it also moves the "
+        "window off-screen again if it came back.",
     ),
     _tool(
         "connect",

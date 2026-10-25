@@ -32,6 +32,11 @@ echo "Features:      $EMERALD_TAURI_FEATURES"
 echo "Bridge port:   $EMERALD_DEVBRIDGE_PORT"
 echo
 
+# Started from a GUI app (an MCP client launched from the Dock), the PATH is
+# the system's bare one: neither Homebrew's node and npm nor rustup's cargo
+# are on it.
+export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+
 cd "$EMERALD_APP_DIR"
 
 # A fresh git worktree has no usable node_modules — `git worktree add` does not
