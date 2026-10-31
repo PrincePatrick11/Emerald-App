@@ -32,7 +32,7 @@ export default function SettingsChoiceButton({
       // Multiple choice like the sidebar lists needs it, single choice
       // is not harmed by it — and so all buttons in the window carry it.
       aria-pressed={active}
-      className={`settings-choice-btn rounded-lg border transition-all duration-150 ${
+      className={`settings-choice-btn rounded-lg transition-all duration-150 ${
         layout === 'chip' ? 'px-3 py-1.5 text-sm ' : ''
       }${active ? 'settings-choice-btn-active' : 'settings-choice-btn-idle'}${className ? ` ${className}` : ''}`}
       {...rest}

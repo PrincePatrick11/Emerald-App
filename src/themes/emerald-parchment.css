@@ -105,6 +105,17 @@ html[data-theme='emerald-parchment'] {
   --search-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);
   /* The entry list search: borderless on the frame. */
   --list-search-bg: rgba(130, 87, 44, 0.08);
+  /* Settings' choice buttons, and the dimming behind a modal. */
+  --choice-bg: #f6e9d3;
+  --choice-bg-hover: #f8eddc;
+  --choice-border: rgba(150, 112, 74, 0.36);
+  --choice-border-hover: rgba(132, 94, 56, 0.48);
+  --choice-text: #5f4730;
+  --choice-text-hover: #2f2114;
+  --choice-active-bg: #d6eee1;
+  --choice-active-border: rgba(0, 138, 87, 0.42);
+  --choice-active-text: #075e3d;
+  --modal-scrim: rgba(0, 0, 0, 0.5);
   /* Button's `tone` mode: tinted row actions. */
   --tone-jade-bg: #006941;
   --tone-jade-bg-hover: #00573a;

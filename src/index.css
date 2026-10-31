@@ -677,7 +677,8 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
   /* Consistent small section label (JOURNAL, PROPERTIES, etc.) */
   .label-xs {
-    @apply text-xs font-semibold uppercase tracking-wider text-stone-500;
+    @apply text-xs font-semibold uppercase tracking-wider;
+    color: var(--text-subtle);
   }
 
   .list-toolbar-chip {
@@ -861,6 +862,32 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   .link-picker-tab-active:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+
+  /* The second class outranks Parchment's `html[data-theme=…] *` border rule;
+     the width is here because that theme overrides Tailwind's `border` too. */
+  .settings-choice-btn.settings-choice-btn-idle {
+    border-width: 1px;
+    background-color: var(--choice-bg);
+    border-color: var(--choice-border);
+    color: var(--choice-text);
+  }
+
+  .settings-choice-btn.settings-choice-btn-idle:hover {
+    background-color: var(--choice-bg-hover);
+    border-color: var(--choice-border-hover);
+    color: var(--choice-text-hover);
+  }
+
+  .settings-choice-btn.settings-choice-btn-active {
+    border-width: 1px;
+    background-color: var(--choice-active-bg);
+    border-color: var(--choice-active-border);
+    color: var(--choice-active-text);
+  }
+
+  .modal-backdrop {
+    background-color: var(--modal-scrim);
   }
 
   .emoji-picker-popover {
@@ -2904,24 +2931,6 @@ html[data-theme='emerald-noctis'] textarea::placeholder {
   color: #9c8872;
 }
 
-html[data-theme='emerald-noctis'] .settings-choice-btn-idle {
-  background: rgba(46, 38, 32, 0.82);
-  border-color: rgba(113, 94, 77, 0.48);
-  color: #c9b5a1;
-}
-
-html[data-theme='emerald-noctis'] .settings-choice-btn-idle:hover {
-  background: rgba(58, 48, 41, 0.9);
-  border-color: rgba(141, 119, 99, 0.54);
-  color: #f2e7da;
-}
-
-html[data-theme='emerald-noctis'] .settings-choice-btn-active {
-  background: rgba(0, 138, 87, 0.28);
-  border-color: rgba(0, 196, 127, 0.44);
-  color: #d9ffef;
-}
-
 html[data-theme='emerald-noctis'] .link-picker-modal .text-stone-300 {
   color: #e7ddd2;
 }
@@ -3229,24 +3238,6 @@ html[data-theme='emerald-parchment'] .tiptap code {
 html[data-theme='emerald-parchment'] .tiptap pre {
   background-color: rgba(134, 98, 62, 0.12);
   border-color: rgba(150, 112, 73, 0.34);
-}
-
-html[data-theme='emerald-parchment'] .settings-choice-btn-idle {
-  background: #f6e9d3;
-  border-color: rgba(150, 112, 74, 0.36);
-  color: #5f4730;
-}
-
-html[data-theme='emerald-parchment'] .settings-choice-btn-idle:hover {
-  background: #f8eddc;
-  border-color: rgba(132, 94, 56, 0.48);
-  color: #2f2114;
-}
-
-html[data-theme='emerald-parchment'] .settings-choice-btn-active {
-  background: #d6eee1;
-  border-color: rgba(0, 138, 87, 0.42);
-  color: #075e3d;
 }
 
 html[data-theme='emerald-parchment'] .home-item-title {

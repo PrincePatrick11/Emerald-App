@@ -98,6 +98,16 @@ html[data-theme='test-garish'] {
   --search-border: hsl(190, 90%, 45%);
   --search-inset: inset 0 1px 0 hsla(240, 90%, 70%, 0.2);
   --list-search-bg: hsl(240, 80%, 22%);
+  --choice-bg: hsl(240, 80%, 22%);
+  --choice-bg-hover: hsl(240, 80%, 30%);
+  --choice-border: hsl(190, 90%, 45%);
+  --choice-border-hover: hsl(190, 90%, 55%);
+  --choice-text: hsl(60, 70%, 62%);
+  --choice-text-hover: hsl(60, 95%, 75%);
+  --choice-active-bg: hsl(300, 80%, 28%);
+  --choice-active-border: hsl(300, 95%, 65%);
+  --choice-active-text: hsl(300, 95%, 85%);
+  --modal-scrim: hsla(240, 90%, 5%, 0.6);
   --tone-jade-bg: hsla(300, 90%, 35%, 0.4);
   --tone-jade-bg-hover: hsla(300, 90%, 35%, 0.6);
   --tone-jade-border: hsl(300, 95%, 65%);

@@ -182,7 +182,7 @@ Where the code contradicts the rules above today. No prioritisation — each poi
 | `parchment` | `#ecc685` | `#d98c34` | `#c97229` | `#874824` | `#3b1d0f` |
 | `stone` | Tailwind default, only `950: #0f0e0c` overridden | | | | |
 
-**Theme variables** (`src/themes/emerald-noctis.css`, `emerald-parchment.css`). Both files define the same 122 properties, including the edit sidebar's `--field-*`, `--primary-solid-*` and `--danger-soft-*` tokens and `Button`'s `--tone-*`. Core values:
+**Theme variables** (`src/themes/emerald-noctis.css`, `emerald-parchment.css`). Both files define the same 132 properties, including the edit sidebar's `--field-*`, `--primary-solid-*` and `--danger-soft-*` tokens `Button`'s `--tone-*` and the Settings' `--choice-*`. Core values:
 
 | Property | Emerald Noctis (dark) | Emerald Parchment (light) |
 | --- | --- | --- |

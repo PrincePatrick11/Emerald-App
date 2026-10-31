@@ -68,7 +68,7 @@ export default function Modal({
 
   return createPortal(
     <div
-      className={`fixed inset-x-0 bottom-0 ${clearsTitleBar ? 'top-10' : 'top-0'} z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4`}
+      className={`fixed inset-x-0 bottom-0 ${clearsTitleBar ? 'top-10' : 'top-0'} z-50 flex items-center justify-center modal-backdrop backdrop-blur-sm p-4`}
       onMouseDown={(e) => {
         // A thumb button would otherwise close the modal and navigate back on release.
         if (dismissible && !isHistoryButton(e) && e.target === e.currentTarget) onClose();

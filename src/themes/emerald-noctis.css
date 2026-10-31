@@ -109,6 +109,17 @@ html[data-theme='emerald-noctis'] {
   --search-inset: inset 0 1px 0 rgba(255, 241, 223, 0.06);
   /* The entry list search: borderless on the frame. */
   --list-search-bg: rgba(245, 245, 244, 0.05);
+  /* Settings' choice buttons, and the dimming behind a modal. */
+  --choice-bg: rgba(46, 38, 32, 0.82);
+  --choice-bg-hover: rgba(58, 48, 41, 0.9);
+  --choice-border: rgba(113, 94, 77, 0.48);
+  --choice-border-hover: rgba(141, 119, 99, 0.54);
+  --choice-text: #c9b5a1;
+  --choice-text-hover: #f2e7da;
+  --choice-active-bg: rgba(0, 138, 87, 0.28);
+  --choice-active-border: rgba(0, 196, 127, 0.44);
+  --choice-active-text: #d9ffef;
+  --modal-scrim: rgba(0, 0, 0, 0.5);
   /* Button's `tone` mode: tinted row actions. */
   --tone-jade-bg: rgba(0, 92, 58, 0.3);
   --tone-jade-bg-hover: rgba(0, 92, 58, 0.5);
