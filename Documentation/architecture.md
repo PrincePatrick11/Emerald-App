@@ -14,6 +14,7 @@ This file is the overview: tech stack, module map, data flow and the IPC surface
 | [`architecture/altar.md`](architecture/altar.md) | Altar UI composition |
 | [`architecture/storage.md`](architecture/storage.md) | Image storage, vault layout, vault settings |
 | [`architecture/encryption.md`](architecture/encryption.md) | Vault keys, sealed files, the SQL layer, the unlock gate, re-encryption, encrypted backups |
+| [`architecture/sync.md`](architecture/sync.md) | Sync with a server: change capture, merge rules |
 | [`architecture/appearance.md`](architecture/appearance.md) | Theming and fonts |
 | [`architecture/shell.md`](architecture/shell.md) | Window chrome, boot order, PDF export |
 
@@ -121,6 +122,7 @@ src/
 │   ├── images.ts, imageLimits.ts, shrinkImage.ts, thumbnail.ts
 │   ├── export.ts, exportData.ts, emeraldFormat.ts, altarExport.ts
 │   ├── dbBackup.ts, importStaging.ts   .emeralddb backup and restore
+│   ├── sync/                    sync with a server: `tracking.ts` (capture), `apply.ts` (merge)
 │   ├── autoBackup.ts            automatic backup: when one is due, the run
 │   ├── vaultManager.ts, vaultSettings.ts
 │   ├── altarConstants.ts        altar sizes, backgrounds, candle check
