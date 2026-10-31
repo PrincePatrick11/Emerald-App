@@ -69,7 +69,7 @@ Method:
 
 What CI covers, and what it does not:
 
-- `ci.yml` runs `cargo check --locked --all-targets` on `ubuntu-22.04`, `macos-14` and `windows-latest` on every push and pull request, so a compile error in a non-host `cfg` branch surfaces there. That workflow exists — do not propose it again.
+- `ci.yml` runs `cargo check --locked --all-targets` on `ubuntu-22.04`, `macos-15` and `windows-latest` on every push and pull request, so a compile error in a non-host `cfg` branch surfaces there. That workflow exists — do not propose it again.
 
 - `cargo check` stops before codegen and linking. Link errors, bundling (DMG, AppImage, `.deb`, NSIS/MSI), code signing and notarisation are covered by no push-triggered job.
 
