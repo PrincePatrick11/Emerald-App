@@ -28,7 +28,7 @@ Three jobs, on every push to `main` or a version branch and on every pull reques
 
 **`rust`** (matrix: `ubuntu-22.04`, `macos-15`, `windows-latest`): `cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets`, and the same again with `--features devbridge`, since the [dev bridge](security.md#the-dev-bridge) is in no build by default and the first check never sees it. Then `cargo clippy` with `-D warnings`, without the bridge. It uses the stable toolchain, so a new Rust release can bring a new lint and turn CI red without a code change: fix it or allow it where it occurs.
 
-**`mcp`** (`ubuntu-latest`) runs `python -m pytest` in `tools/mcp/` against the Chrome of the runner image. The dialog tests are skipped there, see [Development](../tools/mcp/README.md#development).
+**`mcp`** (`windows-latest`) runs `python -m pytest` in `tools/mcp/` against the runner image's Edge, the engine of WebView2. The dialog tests are skipped there, see [Development](../tools/mcp/README.md#development).
 
 The matrix is the point of the file. `src-tauri/src/pdf_export/` holds three implementations — `windows.rs`, `macos.rs`, `linux.rs` — separated by `#[cfg(target_os = "…")]`, and `lib.rs` has several macOS-gated spots. Whoever develops on Windows never compiles the other two; without the matrix a typo in `macos.rs` stays invisible until the release build goes red in public. `--locked` additionally catches `Cargo.lock` drifting from `Cargo.toml`.
 

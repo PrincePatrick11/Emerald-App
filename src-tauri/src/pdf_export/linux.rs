@@ -94,6 +94,9 @@ use tauri::AppHandle;
 use tauri::webview::{PageLoadEvent, WebviewWindowBuilder};
 use tauri::WebviewUrl;
 
+/// Taken once by whichever callback finishes the print first.
+type PdfSender = Arc<Mutex<Option<oneshot::Sender<Result<(), String>>>>>;
+
 const PAGE_LOAD_TIMEOUT: Duration = Duration::from_secs(30);
 const PRINT_TIMEOUT: Duration = Duration::from_secs(120);
 
@@ -147,7 +150,7 @@ pub async fn export_pdf(
     // and the hidden window — success or error.
     let result = async {
         // 2. Wait for the page to finish loading.
-        let _ = tokio::time::timeout(PAGE_LOAD_TIMEOUT, page_rx)
+        tokio::time::timeout(PAGE_LOAD_TIMEOUT, page_rx)
             .await
             .map_err(|_| format!(
                 "timed out after {:?} waiting for hidden WebKit webview to load the export HTML",
@@ -228,7 +231,7 @@ pub async fn export_pdf(
 fn run_print(
     webview: &webkit2gtk::WebView,
     path: &str,
-    pdf_tx: Arc<Mutex<Option<oneshot::Sender<Result<(), String>>>>>,
+    pdf_tx: PdfSender,
 ) -> Result<(), String> {
     let printer_name = find_pdf_printer_name().ok_or_else(|| {
         "no virtual PDF printer found (GTK's \"Print to File\" backend is missing or disabled)"

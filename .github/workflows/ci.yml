@@ -97,7 +97,8 @@ jobs:
 
   mcp:
     name: MCP tests
-    runs-on: ubuntu-latest
+    # Edge, the engine of WebView2. Chrome on the Ubuntu image starts no page.
+    runs-on: windows-latest
     defaults:
       run:
         working-directory: tools/mcp
@@ -110,6 +111,6 @@ jobs:
 
       - run: pip install -r requirements-dev.txt
 
-      # Drives the Chrome the runner image ships. conftest.py skips the browser
-      # tests when none is found, so a missing browser would not fail this job.
+      # conftest.py skips the browser tests when it finds no browser, so a
+      # missing browser would not fail this job.
       - run: python -m pytest

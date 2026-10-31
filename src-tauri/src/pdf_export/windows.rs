@@ -32,6 +32,9 @@ use tauri::AppHandle;
 use tauri::webview::{PageLoadEvent, WebviewWindowBuilder};
 use tauri::WebviewUrl;
 
+/// Taken once by whichever callback finishes the print first.
+type PdfSender = Arc<Mutex<Option<oneshot::Sender<Result<(), String>>>>>;
+
 /// Maximum time we'll wait for the hidden webview to finish loading the
 /// export HTML before giving up. The page is small and local; even on a
 /// cold WebView2 (~1 s init) it should be well under this. If we ever
@@ -92,7 +95,7 @@ pub async fn export_pdf(
     let page_load_result = async {
         // 2. Wait for the page to finish loading. Use a timeout so a wedged
         //    WebView2 init can't hang the export forever.
-        let _ = tokio::time::timeout(PAGE_LOAD_TIMEOUT, page_rx)
+        tokio::time::timeout(PAGE_LOAD_TIMEOUT, page_rx)
             .await
             .map_err(|_| format!(
                 "timed out after {:?} waiting for hidden webview to load the export HTML",
@@ -230,7 +233,7 @@ pub async fn export_pdf(
     Ok(())
 }
 
-fn send_err(tx: &Arc<Mutex<Option<oneshot::Sender<Result<(), String>>>>>, msg: String) {
+fn send_err(tx: &PdfSender, msg: String) {
     if let Some(tx) = tx.lock().unwrap().take() {
         let _ = tx.send(Err(msg));
     }
