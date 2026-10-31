@@ -7,14 +7,12 @@ import { displayTitle } from '../../lib/entryTitle';
 import TagInput from '../editor/TagInput';
 
 /** The page title as a heading: entries, altar and dashboards
- *  (`DashboardTitle`, Home) are deliberately the same size. One class chain,
- *  no `@apply` in `.entry-view-title`: the theme rules for `.text-stone-100`
- *  would otherwise no longer apply. */
-export const ENTRY_TITLE_HEADING_CLASSES = 'entry-view-title text-2xl font-semibold text-stone-100';
+ *  (`DashboardTitle`, Home) are deliberately the same size. One class chain. */
+export const ENTRY_TITLE_HEADING_CLASSES = 'entry-view-title text-2xl font-semibold text-primary';
 
 /** The title line as an input: entries when editing, the altar and the libraries' pages (`LibraryPageFrame`). */
 export const ENTRY_TITLE_INPUT_CLASSES =
-  `${ENTRY_TITLE_HEADING_CLASSES} w-full bg-transparent placeholder-stone-700 outline-none selectable`;
+  `${ENTRY_TITLE_HEADING_CLASSES} w-full bg-transparent placeholder:text-faint outline-none selectable`;
 
 /**
  * The narrow row above the title: on the left the way back to the overview

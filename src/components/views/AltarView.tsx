@@ -479,7 +479,7 @@ export default function AltarView() {
       )}
 
       {!altarWindowFullscreen && (
-        <div className="px-6 pt-4 pb-4 border-b border-stone-700/30">
+        <div className="px-6 pt-4 pb-4 border-b border-edge">
           {isEditing ? (
             <input
               autoFocus

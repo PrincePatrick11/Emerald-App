@@ -17,7 +17,7 @@ export default function WikiPropertiesPanel() {
   const article = activeView.id ? articles.find((a) => a.id === activeView.id) : null;
 
   if (!article) {
-    return <p className="text-xs text-stone-600 px-2 py-3">{t('properties.noEntry')}</p>;
+    return <p className="text-xs text-faint px-2 py-3">{t('properties.noEntry')}</p>;
   }
 
   if (!isEditing) {

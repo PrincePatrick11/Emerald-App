@@ -149,4 +149,34 @@ html[data-theme='emerald-noctis'] {
   --content-bar-h: 56px;
   --control-h: 30px;
   --control-h-sm: 24px;
+  /* Generic text, surfaces and edges behind the Tailwind colour names in tailwind.config.js. */
+  --text-soft: #d6d3d1;
+  --text-faint: #57534e;
+  --text-raise: #d6d3d1;
+  --text-on-accent: #70ffca;
+  --accent-text: #2dfdb0;
+  --accent-text-raise: #70ffca;
+  --success-text: #4ade80;
+  --border-default: #44403c;
+  --edge: rgba(68, 64, 60, 0.5);
+  --edge-strong: #57534e;
+  --edge-raise: rgba(120, 113, 108, 0.7);
+  --accent-edge: rgba(0, 196, 127, 0.7);
+  --well: rgba(41, 37, 36, 0.5);
+  --well-strong: rgba(41, 37, 36, 0.6);
+  --well-raise: rgba(68, 64, 60, 0.5);
+  --well-solid: #292524;
+  --well-active: #44403c;
+  --well-sunk: rgba(28, 25, 23, 0.45);
+  --well-deep: rgba(15, 14, 12, 0.35);
+  --well-tint: rgba(41, 37, 36, 0.8);
+  --well-page: #1c1917;
+  --overlay: rgba(15, 14, 12, 0.85);
+  --canvas: rgba(15, 14, 12, 0.8);
+  --accent-wash: rgba(0, 92, 58, 0.2);
+  --accent-wash-strong: rgba(0, 230, 153, 0.25);
+  --accent-track: rgba(0, 196, 127, 0.6);
+  --accent-fill: rgba(0, 138, 87, 0.3);
+  --accent-fill-strong: rgba(0, 92, 58, 0.7);
+  --danger-wash: rgba(127, 29, 29, 0.2);
 }

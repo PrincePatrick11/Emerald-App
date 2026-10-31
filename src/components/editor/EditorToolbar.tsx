@@ -104,7 +104,7 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
   };
 
   return (
-    <div className="flex items-center gap-0.5 px-4 py-2 border-b border-stone-700/60 flex-wrap">
+    <div className="flex items-center gap-0.5 px-4 py-2 border-b border-edge flex-wrap">
       <ToolbarGroup>
         <ToolbarBtn
           onClick={() => editor.chain().focus().toggleBold().run()}
@@ -285,7 +285,7 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
       </ToolbarGroup>
 
       {imageError && (
-        <span className="ml-auto text-[10px] text-red-400">{imageError}</span>
+        <span className="ml-auto text-[10px] text-danger">{imageError}</span>
       )}
     </div>
   );
@@ -298,7 +298,7 @@ function ToolbarGroup({ children }: { children: React.ReactNode }) {
 // The narrow margin is deliberate: the bar wraps when the editor area
 // gets tight, and every pixel saved pushes that wrap further out.
 function ToolbarDivider() {
-  return <div className="w-px h-4 bg-stone-700/60 mx-0.5" />;
+  return <div className="w-px h-4 bg-well-raise mx-0.5" />;
 }
 
 function ToolbarBtn({
@@ -323,10 +323,10 @@ function ToolbarBtn({
       disabled={disabled}
       className={`editor-toolbar-btn p-1 rounded-md transition-colors duration-100 ${
         active
-          ? 'editor-toolbar-btn-active bg-stone-700 text-stone-100'
+          ? 'editor-toolbar-btn-active bg-well-active text-primary'
           : disabled
-          ? 'editor-toolbar-btn-disabled text-stone-700 cursor-not-allowed'
-          : 'editor-toolbar-btn-idle text-stone-500 hover:text-stone-300 hover:bg-stone-700/60'
+          ? 'editor-toolbar-btn-disabled text-faint cursor-not-allowed'
+          : 'editor-toolbar-btn-idle text-subtle hover:text-raise hover:bg-well-raise'
       }`}
     >
       {children}

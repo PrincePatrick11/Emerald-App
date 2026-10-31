@@ -19,11 +19,11 @@ export const AltarCardPreview = memo(function AltarCardPreview({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg border border-stone-700/40 ${compact ? 'h-8 w-8' : 'w-full'}`}
+      className={`relative overflow-hidden rounded-lg border border-edge ${compact ? 'h-8 w-8' : 'w-full'}`}
       style={{ background, ...(compact ? {} : { aspectRatio: `${w}/${h}` }) }}
     >
-      <div className="absolute bottom-[28%] left-[8%] right-[8%] h-px bg-gradient-to-r from-transparent via-stone-700/50 to-transparent pointer-events-none" />
-      <div className="absolute bottom-[26%] left-[12%] right-[12%] h-px bg-gradient-to-r from-transparent via-stone-800/30 to-transparent pointer-events-none" />
+      <div className="absolute bottom-[28%] left-[8%] right-[8%] h-px bg-gradient-to-r from-transparent via-edge-strong to-transparent pointer-events-none" />
+      <div className="absolute bottom-[26%] left-[12%] right-[12%] h-px bg-gradient-to-r from-transparent via-well to-transparent pointer-events-none" />
       {previewItems.filter((placement) => !placement.hidden).slice(0, compact ? 1 : 7).map((placement) => {
         const size = compact
           ? 16

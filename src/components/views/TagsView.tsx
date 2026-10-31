@@ -69,7 +69,7 @@ function TagColorDot({ color, onPick }: { color: string; onPick?: (color: string
         {dot}
       </button>
       {open && (
-        <div className="tag-color-popover absolute left-0 top-full mt-1.5 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl p-2 flex flex-wrap gap-1.5 w-40">
+        <div className="tag-color-popover absolute left-0 top-full mt-1.5 z-50 bg-well-solid border border-edge-default rounded-lg shadow-xl p-2 flex flex-wrap gap-1.5 w-40">
           {TAG_COLORS.map((c) => (
             <button
               key={c}
@@ -343,7 +343,7 @@ export default function TagsView() {
           label={tag.name}
           meta={usage
             ? <ModuleCounts modules={TAG_MODULE_IDS} counts={usage} />
-            : <span className="text-xs text-stone-600">
+            : <span className="text-xs text-faint">
                 {templateUsage.has(tag.id) ? t('tags.onlyInTemplates') : t('tags.unused')}
               </span>}
           actions={
@@ -374,9 +374,9 @@ export default function TagsView() {
     }
     return (
       <DashboardItem view={itemView(item)} layout="row">
-        <Icon size={14} className="text-stone-500 flex-shrink-0" />
-        <span className="flex-1 text-sm text-stone-300 truncate">{displayTitle(t, meta.entryType, item.title)}</span>
-        <span className="text-xs text-parchment-500/70 flex-shrink-0">{label} · {formatEntryDate(item.updated_at)}</span>
+        <Icon size={14} className="text-subtle flex-shrink-0" />
+        <span className="flex-1 text-sm text-soft truncate">{displayTitle(t, meta.entryType, item.title)}</span>
+        <span className="text-xs text-muted flex-shrink-0">{label} · {formatEntryDate(item.updated_at)}</span>
       </DashboardItem>
     );
   };
@@ -426,7 +426,7 @@ export default function TagsView() {
         mode: 'category',
         groups,
         renderGroupHeader: renderTagHeader,
-        renderEmptyGroup: () => <p className="text-xs text-stone-700 px-1 py-1">{t('tags.unusedHint')}</p>,
+        renderEmptyGroup: () => <p className="text-xs text-faint px-1 py-1">{t('tags.unusedHint')}</p>,
         isGroupCollapsed: groupCollapsed,
         // The selection above has already decided which tags are shown — an
         // unused tag is still one without search and filter.

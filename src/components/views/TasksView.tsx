@@ -32,9 +32,9 @@ import type { Task, TaskPriority } from '../../types';
 import { useSessionState } from '../../store/sessionStore';
 
 const TASK_PRIORITY_COLORS: Record<string, string> = {
-  high: 'text-red-400',
-  medium: 'text-yellow-400',
-  low: 'text-green-400',
+  high: 'text-danger',
+  medium: 'text-warning',
+  low: 'text-success',
 };
 
 const TASK_PRIORITY_PILL_CLASSES: Record<string, string> = {
@@ -527,10 +527,10 @@ const TaskRow = memo(function TaskRow({
       >
         <button
           onClick={() => toggleComplete(task.id)}
-          className="text-stone-400 hover:text-jade-400 flex-shrink-0"
+          className="text-muted hover:text-accent-raise flex-shrink-0"
         >
           {task.completed ? (
-            <CheckSquare size={16} className="text-jade-400" />
+            <CheckSquare size={16} className="text-accent" />
           ) : (
             <Square size={16} />
           )}
@@ -555,12 +555,12 @@ const TaskRow = memo(function TaskRow({
                 if (freshTaskIds.delete(task.id)) void handleDelete();
               }
             }}
-            className="flex-1 bg-stone-800 border border-stone-600 rounded px-2 py-0.5 text-sm text-stone-200 outline-none focus:border-jade-500"
+            className="flex-1 bg-well-solid border border-edge-strong rounded px-2 py-0.5 text-sm text-secondary outline-none focus:border-accent-edge"
             autoFocus
           />
         ) : (
           <span
-            className={`flex-1 text-sm truncate cursor-default ${task.completed ? 'line-through text-stone-500' : 'text-stone-200'}`}
+            className={`flex-1 text-sm truncate cursor-default ${task.completed ? 'line-through text-subtle' : 'text-secondary'}`}
             onDoubleClick={() => {
               setEditingId(task.id);
               setEditValue(hasOwnTitle(task.title) ? task.title : '');
@@ -590,7 +590,7 @@ const TaskRow = memo(function TaskRow({
         <div className="flex items-center gap-1.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={handleCreateSubtaskLocal}
-            className="task-action-btn text-stone-500 hover:text-jade-400 p-0.5"
+            className="task-action-btn text-subtle hover:text-accent-raise p-0.5"
             title={t('tasks.addSubtask')}
           >
             <Plus size={12} />
@@ -608,7 +608,7 @@ const TaskRow = memo(function TaskRow({
 
           <button
             onClick={() => setLinkModal({ taskId: task.id })}
-            className="task-action-btn text-stone-500 hover:text-jade-400 p-0.5"
+            className="task-action-btn text-subtle hover:text-accent-raise p-0.5"
             title={t('tasks.linkEntry')}
           >
             <Link2 size={12} />
@@ -639,7 +639,7 @@ const TaskRow = memo(function TaskRow({
 
           <button
             onClick={handleDelete}
-            className="task-action-btn text-stone-500 hover:text-red-400 p-0.5"
+            className="task-action-btn text-subtle hover:text-danger p-0.5"
             title={t('contextMenu.delete')}
           >
             <Trash2 size={12} />

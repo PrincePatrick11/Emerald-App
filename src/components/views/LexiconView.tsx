@@ -115,7 +115,7 @@ function LanguageList({ onCreate, onDelete }: {
   const cards = isCardView(prefs.view);
   const renderItem = (language: Language) => {
     const meta = (
-      <span className="text-xs text-stone-500 tabular-nums flex-shrink-0">
+      <span className="text-xs text-subtle tabular-nums flex-shrink-0">
         {t('lexicon.wordCount', { count: wordCounts.get(language.id) ?? 0 })}
         {language.alphabet.length > 0 && (
           <> · {t('lexicon.letterCount', { count: language.alphabet.length })}</>
@@ -136,13 +136,13 @@ function LanguageList({ onCreate, onDelete }: {
             <div className="flex items-center gap-2 mb-2">
               <BlockGlyph icon={language.icon} size={16} />
             </div>
-            <div className="text-sm font-medium text-stone-200 truncate mb-1">{language.name}</div>
+            <div className="text-sm font-medium text-secondary truncate mb-1">{language.name}</div>
             {meta}
           </>
         ) : (
           <>
             <BlockGlyph icon={language.icon} size={14} />
-            <span className="flex-1 min-w-0 text-sm text-stone-300 truncate">{language.name}</span>
+            <span className="flex-1 min-w-0 text-sm text-soft truncate">{language.name}</span>
             {meta}
           </>
         )}

@@ -152,7 +152,7 @@ function BuiltInBlocksSection({ query }: { query: string }) {
           {/* Deliberately the small line instead of `NoResults`: the list only
               becomes empty through the search, and the large "No results" is already above. */}
           {presets.length === 0
-            ? <p className="text-xs text-stone-700 px-1 py-1">{t('search.noResults')}</p>
+            ? <p className="text-xs text-faint px-1 py-1">{t('search.noResults')}</p>
             : (
               // Tiles with a frame, but without hover and pointer: nothing can
               // be created or opened on them, they only show what exists.
@@ -165,8 +165,8 @@ function BuiltInBlocksSection({ query }: { query: string }) {
                       title={preset.descriptionKey ? t(preset.descriptionKey) : undefined}
                       className="panel flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5"
                     >
-                      <Icon size={16} className="flex-shrink-0 text-stone-400" />
-                      <span className="truncate text-sm text-stone-200">{t(preset.labelKey)}</span>
+                      <Icon size={16} className="flex-shrink-0 text-muted" />
+                      <span className="truncate text-sm text-secondary">{t(preset.labelKey)}</span>
                     </li>
                   );
                 })}
@@ -218,7 +218,7 @@ function BlockList({ usage, onCreate, onDelete }: {
     const u = usage.get(def.id);
     const fieldCount = def.elements.filter((e) => !e.archived).length;
     const unsaved = def.id in drafts && (
-      <span className="text-xs italic text-stone-500 flex-shrink-0">{t('editor.unsaved')}</span>
+      <span className="text-xs italic text-subtle flex-shrink-0">{t('editor.unsaved')}</span>
     );
     const outdatedDot = !!(u?.outdated || u?.outdatedTemplates) && (
       <span
@@ -230,7 +230,7 @@ function BlockList({ usage, onCreate, onDelete }: {
       />
     );
     const counts = (
-      <span className="text-xs text-stone-500 tabular-nums flex-shrink-0">
+      <span className="text-xs text-subtle tabular-nums flex-shrink-0">
         {t('blocks.library.fieldCount', { count: fieldCount })}
         {' · '}
         <span title={u?.entries ? t('blocks.library.usedIn', { count: u.entries }) : t('blocks.library.unused')}>
@@ -255,13 +255,13 @@ function BlockList({ usage, onCreate, onDelete }: {
               {unsaved}
               {outdatedDot}
             </div>
-            <div className="text-sm font-medium text-stone-200 truncate mb-1">{definitionLabel(t, def)}</div>
+            <div className="text-sm font-medium text-secondary truncate mb-1">{definitionLabel(t, def)}</div>
             {counts}
           </>
         ) : (
           <>
             <BlockGlyph icon={def.icon} size={14} />
-            <span className="flex-1 min-w-0 text-sm text-stone-300 truncate">{definitionLabel(t, def)}</span>
+            <span className="flex-1 min-w-0 text-sm text-soft truncate">{definitionLabel(t, def)}</span>
             {unsaved}
             {outdatedDot}
             {counts}

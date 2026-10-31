@@ -18,7 +18,7 @@ export default function BlockCheckbox({ checked, onChange, label, hint, title, t
   disabled?: boolean;
 }) {
   return (
-    <label title={title} className={`flex items-start gap-2 text-xs text-stone-400 ${disabled ? 'opacity-50' : 'cursor-pointer'}`}>
+    <label title={title} className={`flex items-start gap-2 text-xs text-muted ${disabled ? 'opacity-50' : 'cursor-pointer'}`}>
       <input
         type="checkbox"
         className={`block-checkbox mt-0.5${tone ? ` block-checkbox--${tone}` : ''}`}

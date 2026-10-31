@@ -60,7 +60,7 @@ export default function CategorySelect<C extends { id: string; emoji: string }>(
           onClick={toggle}
           aria-haspopup="listbox"
           aria-expanded={open}
-          className="tasks-category-trigger text-xs text-stone-500 hover:text-stone-300 px-1.5 py-0.5 rounded hover:bg-stone-700/50"
+          className="tasks-category-trigger text-xs text-subtle hover:text-raise px-1.5 py-0.5 rounded hover:bg-well-raise"
           title={title}
         >
           {triggerText}

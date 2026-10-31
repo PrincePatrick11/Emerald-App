@@ -138,7 +138,7 @@ export default function TranslatePanel() {
               {/* No `.panel`: the result is the counterpart to the field on the left,
                   not a content container, so the same size and the same radius
                   (design.md: what an element *is* decides). */}
-              <div className={`${FIELD_CLASSES} overflow-y-auto text-stone-300 whitespace-pre-wrap break-words`}>
+              <div className={`${FIELD_CLASSES} overflow-y-auto text-soft whitespace-pre-wrap break-words`}>
                 {result && result.segments.length > 0 ? (
                   result.segments.map((segment, i) => (
                     segment.kind === 'unknown' ? (
@@ -148,7 +148,7 @@ export default function TranslatePanel() {
                       <span
                         key={i}
                         title={t(mode === 'letters' ? 'lexicon.unmappedWord' : 'lexicon.unknownWord')}
-                        className="text-stone-500 underline decoration-dotted underline-offset-2"
+                        className="text-subtle underline decoration-dotted underline-offset-2"
                       >
                         {segment.text}
                       </span>
@@ -157,11 +157,11 @@ export default function TranslatePanel() {
                     )
                   ))
                 ) : (
-                  <span className="text-stone-600">{t('lexicon.resultPlaceholder')}</span>
+                  <span className="text-faint">{t('lexicon.resultPlaceholder')}</span>
                 )}
               </div>
               {result && result.wordCount > 0 && (
-                <p className="text-xs text-stone-600 mt-2">
+                <p className="text-xs text-faint mt-2">
                   {t('lexicon.textWordCount', { count: result.wordCount })}
                   {result.unknownCount > 0 && (
                     <> · {t(mode === 'letters' ? 'lexicon.unmappedCount' : 'lexicon.unknownCount', { count: result.unknownCount })}</>

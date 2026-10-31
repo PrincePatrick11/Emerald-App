@@ -12,7 +12,7 @@
   }
 
   * {
-    @apply border-stone-700;
+    border-color: var(--border-default);
   }
 
   body {
@@ -455,8 +455,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--primary-solid-text);
   }
 
-  /* Doubled to outrank Parchment's `html[data-theme=…] *` border rule. */
-  .btn-primary.btn-primary {
+  .btn-primary {
     border-color: var(--primary-solid-border);
   }
 
@@ -466,10 +465,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   /* Button's `tone` mode. An active jade tone is the primary look. */
-  /* Tone buttons always carry `.sidebar-action-btn`; the second class is what
-     lets `border-color` outrank Parchment's `html[data-theme=…] *` rule. Same
-     reason for the width here rather than Tailwind's `border`, which that
-     theme overrides too. */
   .sidebar-action-btn.btn-tone-jade,
   .sidebar-action-btn.btn-tone-amber,
   .sidebar-action-btn.btn-tone-danger,
@@ -792,7 +787,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
   }
 
-
   .switch-thumb {
     position: absolute;
     top: 2px;
@@ -864,8 +858,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
   }
 
-  /* The second class outranks Parchment's `html[data-theme=…] *` border rule;
-     the width is here because that theme overrides Tailwind's `border` too. */
   .settings-choice-btn.settings-choice-btn-idle {
     border-width: 1px;
     background-color: var(--choice-bg);
@@ -1071,12 +1063,12 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 }
 
 .tiptap ul[data-type="taskList"] li > label input[type="checkbox"] {
-  @apply w-4 h-4 rounded border border-stone-600 bg-stone-700
-         cursor-pointer accent-jade-500;
+  @apply w-4 h-4 rounded border border-edge-strong bg-well-active
+         cursor-pointer accent-accent;
 }
 
 .tiptap ul[data-type="taskList"] li[data-checked="true"] > div {
-  @apply line-through text-stone-500;
+  @apply line-through text-subtle;
 }
 
 .tiptap blockquote {
@@ -1119,13 +1111,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 }
 
 .tiptap a.external-link {
-  @apply text-jade-500 underline underline-offset-2 cursor-pointer hover:text-jade-400;
+  @apply text-accent underline underline-offset-2 cursor-pointer hover:text-accent-raise;
 }
 
 /* Edit mode: show a subtle ↗ indicator after external links */
 .ProseMirror[contenteditable="true"] a.external-link::after {
   content: '↗';
-  @apply text-jade-700 text-[0.6em] ml-0.5 align-super;
+  @apply text-accent text-[0.6em] ml-0.5 align-super;
   text-decoration: none;
 }
 
@@ -2461,17 +2453,6 @@ html[data-theme] .block-manager-row--idle,
 }
 
 /* ── Light Mode Tailwind bridge ───────────────────────────────────────────── */
-html[data-theme='emerald-parchment'] .bg-stone-900 { background-color: var(--bg-app); }
-html[data-theme='emerald-parchment'] .bg-stone-800 { background-color: var(--bg-surface-1); }
-html[data-theme='emerald-parchment'] .text-stone-100 { color: var(--text-primary); }
-html[data-theme='emerald-parchment'] .text-stone-200 { color: var(--text-secondary); }
-html[data-theme='emerald-parchment'] .text-stone-300,
-html[data-theme='emerald-parchment'] .text-stone-400 { color: var(--text-muted); }
-html[data-theme='emerald-parchment'] .text-stone-500,
-html[data-theme='emerald-parchment'] .text-stone-600 { color: var(--text-subtle); }
-html[data-theme='emerald-parchment'] .border-stone-700,
-html[data-theme='emerald-parchment'] .border-stone-600 { border-color: var(--border-soft); }
-
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -2589,7 +2570,6 @@ html[data-theme='emerald-parchment'] .border-stone-600 { border-color: var(--bor
   color: var(--menu-item-hover-text);
   background-color: var(--menu-item-hover-bg);
 }
-
 
 .sigil-tool-toggle {
   background-color: rgba(41, 37, 36, 0.72);
@@ -2931,19 +2911,19 @@ html[data-theme='emerald-noctis'] textarea::placeholder {
   color: #9c8872;
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal .text-stone-300 {
+html[data-theme='emerald-noctis'] .link-picker-modal .text-soft {
   color: #e7ddd2;
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal .text-stone-500 {
+html[data-theme='emerald-noctis'] .link-picker-modal .text-subtle {
   color: #9f8a75;
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal .text-stone-600 {
+html[data-theme='emerald-noctis'] .link-picker-modal .text-faint {
   color: #87715e;
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal .bg-stone-800 {
+html[data-theme='emerald-noctis'] .link-picker-modal .bg-well-solid {
   background: rgba(45, 36, 31, 0.9);
   border-color: rgba(113, 94, 77, 0.48);
 }
@@ -2986,7 +2966,7 @@ html[data-theme='emerald-noctis'] .link-picker-row .text-xs {
   color: #9f8a75;
 }
 
-html[data-theme='emerald-noctis'] .link-picker-row .text-stone-700 {
+html[data-theme='emerald-noctis'] .link-picker-row .text-faint {
   color: #7f6a57;
 }
 
@@ -3025,8 +3005,8 @@ html[data-theme='emerald-noctis'] .panel-interactive:hover .home-item-title {
    of both themes is guaranteed by construction. */
 html[data-theme='emerald-noctis'] .settings-nav-item-active,
 html[data-theme='emerald-noctis'] .right-sidebar-tab-active,
-html[data-theme='emerald-noctis'] .app-sidebar-right .bg-stone-700.text-stone-200,
-html[data-theme='emerald-noctis'] .app-sidebar-left .bg-stone-700.text-stone-200 {
+html[data-theme='emerald-noctis'] .app-sidebar-right .bg-well-active.text-secondary,
+html[data-theme='emerald-noctis'] .app-sidebar-left .bg-well-active.text-secondary {
   background: rgba(0, 138, 87, 0.24);
   color: #b8ffe2;
   border: 1px solid rgba(0, 196, 127, 0.34);
@@ -3044,28 +3024,13 @@ html[data-theme='emerald-noctis'] .altar-category-chip {
 
 html[data-theme='emerald-noctis'] .settings-nav-item-idle:hover,
 html[data-theme='emerald-noctis'] .right-sidebar-tab-idle:hover:not(:disabled),
-html[data-theme='emerald-noctis'] .app-sidebar-right .text-stone-500.hover\:text-stone-300:hover,
-html[data-theme='emerald-noctis'] .app-sidebar-left .text-stone-500.hover\:text-stone-300:hover,
+html[data-theme='emerald-noctis'] .app-sidebar-right .text-subtle.hover\:text-raise:hover,
+html[data-theme='emerald-noctis'] .app-sidebar-left .text-subtle.hover\:text-raise:hover,
 html[data-theme='emerald-noctis'] .task-action-btn:hover,
 html[data-theme='emerald-noctis'] .altar-category-chip:hover,
 html[data-theme='emerald-noctis'] .editor-toolbar-btn-idle:hover {
   color: #eadfce;
   background: rgba(104, 84, 68, 0.18);
-}
-
-html[data-theme='emerald-noctis'] .bg-jade-900\/40,
-html[data-theme='emerald-noctis'] .bg-jade-500\/20,
-html[data-theme='emerald-noctis'] .bg-jade-500\/10 {
-  background: rgba(0, 138, 87, 0.3);
-  border-color: rgba(0, 196, 127, 0.44);
-  color: #dcfff0;
-}
-
-html[data-theme='emerald-noctis'] .hover\:bg-jade-900\/60:hover,
-html[data-theme='emerald-noctis'] .hover\:bg-jade-500\/30:hover,
-html[data-theme='emerald-noctis'] .hover\:bg-jade-500\/20:hover {
-  background: rgba(0, 138, 87, 0.42);
-  color: #f2fff9;
 }
 
 html[data-theme='emerald-noctis'] .tasks-linked-entry {
@@ -3320,56 +3285,17 @@ html[data-theme='emerald-parchment'] .right-sidebar-tab-idle {
 
 html[data-theme='emerald-parchment'] .settings-nav-item-idle:hover,
 html[data-theme='emerald-parchment'] .right-sidebar-tab-idle:hover:not(:disabled),
-html[data-theme='emerald-parchment'] .app-sidebar-right .text-stone-500.hover\:text-stone-300:hover,
-html[data-theme='emerald-parchment'] .app-sidebar-left .text-stone-500.hover\:text-stone-300:hover {
+html[data-theme='emerald-parchment'] .app-sidebar-right .text-subtle.hover\:text-raise:hover,
+html[data-theme='emerald-parchment'] .app-sidebar-left .text-subtle.hover\:text-raise:hover {
   color: #2f2114;
   background: rgba(136, 97, 57, 0.12);
 }
 
-html[data-theme='emerald-parchment'] .app-sidebar-right .bg-stone-700.text-stone-200,
-html[data-theme='emerald-parchment'] .app-sidebar-left .bg-stone-700.text-stone-200 {
+html[data-theme='emerald-parchment'] .app-sidebar-right .bg-well-active.text-secondary,
+html[data-theme='emerald-parchment'] .app-sidebar-left .bg-well-active.text-secondary {
   background: #d8efe3;
   color: #0b5a3a;
   border: 1px solid rgba(0, 138, 87, 0.34);
-}
-
-html[data-theme='emerald-parchment'] .bg-jade-900\/40 {
-  background: #159165;
-  border-color: #127651;
-  color: #ecfff7;
-}
-
-html[data-theme='emerald-parchment'] button.bg-jade-900\/40,
-html[data-theme='emerald-parchment'] button.bg-jade-900\/50,
-html[data-theme='emerald-parchment'] button.bg-jade-900\/30,
-html[data-theme='emerald-parchment'] button.bg-jade-500\/20,
-html[data-theme='emerald-parchment'] button.bg-jade-500\/10 {
-  color: #ecfff7;
-}
-
-html[data-theme='emerald-parchment'] .hover\:bg-jade-900\/60:hover {
-  background: #0f7a54;
-  color: #ffffff;
-}
-
-html[data-theme='emerald-parchment'] button.hover\:bg-jade-900\/60:hover,
-html[data-theme='emerald-parchment'] button.hover\:bg-jade-500\/30:hover,
-html[data-theme='emerald-parchment'] button.hover\:bg-jade-500\/20:hover {
-  color: #ffffff;
-}
-
-html[data-theme='emerald-parchment'] .text-jade-400 {
-  color: #0a7a53;
-}
-
-html[data-theme='emerald-parchment'] .hover\:text-jade-300:hover {
-  color: #075c3f;
-}
-
-html[data-theme='emerald-parchment'] .bg-jade-500\/20,
-html[data-theme='emerald-parchment'] .bg-jade-500\/10 {
-  background: #159165;
-  border-color: #127651;
 }
 
 html[data-theme='emerald-parchment'] .sigil-canvas-shell {
@@ -3382,30 +3308,6 @@ html[data-theme='emerald-parchment'] .sigil-canvas {
     linear-gradient(rgba(152, 117, 81, 0.18) 1px, transparent 1px),
     linear-gradient(90deg, rgba(152, 117, 81, 0.18) 1px, transparent 1px);
   background-size: 30px 30px;
-}
-
-html[data-theme='emerald-parchment'] .bg-stone-800\/50,
-html[data-theme='emerald-parchment'] .bg-stone-800\/40,
-html[data-theme='emerald-parchment'] .bg-stone-900\/40,
-html[data-theme='emerald-parchment'] .bg-stone-900\/70 {
-  background-color: #f1e4cf;
-}
-
-html[data-theme='emerald-parchment'] .bg-stone-700\/40,
-html[data-theme='emerald-parchment'] .bg-stone-700\/50,
-html[data-theme='emerald-parchment'] .bg-stone-700\/60,
-html[data-theme='emerald-parchment'] .bg-stone-700\/70,
-html[data-theme='emerald-parchment'] .bg-stone-800\/60,
-html[data-theme='emerald-parchment'] .bg-stone-800\/70,
-html[data-theme='emerald-parchment'] .bg-stone-950\/80 {
-  background-color: #ebdcc5;
-}
-
-html[data-theme='emerald-parchment'] .hover\:bg-stone-800\/60:hover,
-html[data-theme='emerald-parchment'] .hover\:bg-stone-700\/40:hover,
-html[data-theme='emerald-parchment'] .hover\:bg-stone-700\/60:hover,
-html[data-theme='emerald-parchment'] .hover\:bg-stone-700\/70:hover {
-  background-color: #ebdcc5;
 }
 
 html[data-theme='emerald-parchment'] .emoji-picker-item-idle:hover,
@@ -3450,7 +3352,7 @@ html[data-theme='emerald-parchment'] .link-picker-tab-idle:hover {
 
 /* Translate the priority colours of the active menu row (TaskRow priority menu on ui/Dropdown)
    into tones that are readable on Parchment. */
-html[data-theme='emerald-parchment'] .list-toolbar-option-active.text-red-400 {
+html[data-theme='emerald-parchment'] .list-toolbar-option-active.text-danger {
   color: #b63f32;
 }
 
@@ -3517,7 +3419,7 @@ html[data-theme='emerald-parchment'] .sigil-tool-toggle {
   border-color: rgba(145, 108, 70, 0.36);
 }
 
-html[data-theme='emerald-parchment'] .sigil-tool-btn.bg-stone-700 {
+html[data-theme='emerald-parchment'] .sigil-tool-btn.bg-well-active {
   background: #d6eee1;
   color: #075e3d;
 }
@@ -3655,7 +3557,7 @@ html[data-theme='emerald-parchment'] .altar-category-chip:hover {
   background: #efdfc8;
 }
 
-html[data-theme='emerald-parchment'] .altar-category-chip.bg-stone-700 {
+html[data-theme='emerald-parchment'] .altar-category-chip.bg-well-active {
   background: #d6eee1;
   color: #0b5a3a;
   border: 1px solid rgba(0, 138, 87, 0.32);
@@ -3690,138 +3592,8 @@ html[data-theme='emerald-parchment'] .tiptap :not(pre) > code {
 
 /* ── Altar Sidebar control buttons ────────────────────────────────────────── */
 
-html[data-theme='emerald-parchment'] .bg-stone-900\/45 {
-  background-color: #f3e6cf;
-}
-
-html[data-theme='emerald-parchment'] .border-stone-700\/40,
-html[data-theme='emerald-parchment'] .border-stone-700\/50,
-html[data-theme='emerald-parchment'] .border-stone-700\/60 {
-  border-color: rgba(145, 108, 70, 0.34);
-}
-
-html[data-theme='emerald-parchment'] .border-stone-600\/70 {
-  border-color: rgba(145, 108, 70, 0.42);
-}
-
-html[data-theme='emerald-parchment'] .hover\:border-stone-500\/60:hover,
-html[data-theme='emerald-parchment'] .hover\:border-stone-500\/70:hover {
-  border-color: rgba(131, 96, 62, 0.48);
-}
-
-html[data-theme='emerald-parchment'] .hover\:border-stone-400:hover {
-  border-color: rgba(131, 96, 62, 0.56);
-}
-
-html[data-theme='emerald-parchment'] .text-jade-300 {
-  color: #ecfff7;
-}
-
-html[data-theme='emerald-parchment'] .border-jade-600\/70 {
-  border-color: rgba(0, 138, 87, 0.6);
-}
-
-html[data-theme='emerald-parchment'] .ring-jade-700\/40 {
-  --tw-ring-color: rgba(0, 138, 87, 0.4);
-}
-
-html[data-theme='emerald-parchment'] .bg-stone-700,
-html[data-theme='emerald-parchment'] .hover\:bg-stone-700:hover {
-  background-color: var(--interactive-active);
-}
-
-html[data-theme='emerald-parchment'] .bg-red-950\/30 {
-  background-color: rgba(220, 76, 63, 0.09);
-}
-
-html[data-theme='emerald-parchment'] .text-red-200 {
-  color: var(--danger-text);
-}
-
-html[data-theme='emerald-parchment'] .border-red-700\/60 {
-  border-color: var(--danger-border);
-}
-
-html[data-theme='emerald-parchment'] .hover\:border-red-500:hover {
-  border-color: var(--danger-hover-border);
-}
-
-html[data-theme='emerald-parchment'] .bg-jade-900\/30,
-html[data-theme='emerald-parchment'] .bg-jade-900\/50 {
-  background: #159165;
-  border-color: rgba(0, 138, 87, 0.6);
-  color: #ecfff7;
-}
-
-html[data-theme='emerald-parchment'] .hover\:bg-jade-900\/50:hover {
-  background: #0f7a54;
-}
-
-html[data-theme='emerald-parchment'] .border-jade-500\/60,
-html[data-theme='emerald-parchment'] .border-jade-600\/60,
-html[data-theme='emerald-parchment'] .border-jade-700\/60 {
-  border-color: rgba(0, 138, 87, 0.6);
-}
-
 /* The dragged row (placed items, block management): a touch of accent instead of night green. */
-html[data-theme='emerald-parchment'] .bg-jade-900\/20 {
-  background-color: rgba(0, 138, 87, 0.1);
-}
-
-html[data-theme='emerald-parchment'] .hover\:border-jade-500\/70:hover {
-  border-color: rgba(0, 138, 87, 0.7);
-}
-
-html[data-theme='emerald-parchment'] .text-jade-200 {
-  color: #ecfff7;
-}
-
 /* Sidebar action bar — amber "edit" tone, warmed up so it reads on the light parchment ground */
-html[data-theme='emerald-parchment'] .bg-amber-900\/30 {
-  background: #c07a1e;
-  border-color: rgba(168, 105, 24, 0.6);
-  color: #fff6e6;
-}
-
-html[data-theme='emerald-parchment'] .hover\:bg-amber-900\/50:hover {
-  background: #a5661a;
-}
-
-html[data-theme='emerald-parchment'] .border-amber-700\/60 {
-  border-color: rgba(168, 105, 24, 0.6);
-}
-
-html[data-theme='emerald-parchment'] .hover\:border-amber-500\/70:hover {
-  border-color: rgba(168, 105, 24, 0.8);
-}
-
-html[data-theme='emerald-parchment'] .ring-jade-500\/60 {
-  --tw-ring-color: rgba(0, 138, 87, 0.44);
-}
-
-html[data-theme='emerald-parchment'] .bg-stone-800\/80 {
-  background-color: rgba(145, 108, 70, 0.2);
-}
-
-html[data-theme='emerald-parchment'] .hover\:bg-stone-800\/40:hover {
-  background-color: #f1e4cf;
-}
-
-html[data-theme='emerald-parchment'] .hover\:text-stone-100:hover,
-html[data-theme='emerald-parchment'] .hover\:text-stone-300:hover {
-  color: var(--text-primary);
-}
-
-html[data-theme='emerald-parchment'] .bg-stone-950\/35 {
-  background-color: rgba(145, 108, 70, 0.1);
-}
-
-html[data-theme='emerald-parchment'] .from-stone-900 {
-  --tw-gradient-from: #d8c4a0 var(--tw-gradient-from-position);
-  --tw-gradient-to: rgba(216, 196, 160, 0) var(--tw-gradient-to-position);
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
-}
-
 html[data-theme='emerald-parchment'] .altar-cat-scroll-fade {
   width: 3.5rem;
 }
@@ -3855,3 +3627,4 @@ html[data-theme='emerald-parchment'] .emerald-mark { --mark-crown: 1; --mark-tab
    the same gradation that `--splash-sheen` makes between the themes. */
 .emerald-mark-step { stroke: rgba(255, 255, 255, 0.26); }
 html[data-theme='emerald-parchment'] .emerald-mark-step { stroke: rgba(255, 255, 255, 0.42); }
+

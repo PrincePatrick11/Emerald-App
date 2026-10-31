@@ -73,7 +73,7 @@ export function AltarLibrarySection({ search, onNewElement, onEditElement }: Pro
   // Otherwise only the search found nothing, for which the small line is enough;
   // the big "No results" is already shown above the altars.
   const emptyHint = items.length > 0
-    ? <p className="text-xs text-stone-700 px-1 py-1">{t('search.noResults')}</p>
+    ? <p className="text-xs text-faint px-1 py-1">{t('search.noResults')}</p>
     : (
       <EmptyState
         icon={Package}
@@ -120,7 +120,7 @@ export function AltarLibrarySection({ search, onNewElement, onEditElement }: Pro
                 />
               )}
               {isCollapsed ? null : group.items.length === 0
-                ? <p className="text-xs text-stone-700 px-1 py-1">{t('altar.noElements')}</p>
+                ? <p className="text-xs text-faint px-1 py-1">{t('altar.noElements')}</p>
                 : renderTiles(group.items)}
             </div>
           );

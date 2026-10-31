@@ -121,19 +121,19 @@ export function AltarItemModal({
             size="lg"
             wrapperClassName="relative flex-1"
             trigger={({ toggle }) => (
-              <button onClick={toggle} className="w-full flex items-center gap-2 bg-stone-800/60 rounded-lg px-3 py-2 text-sm hover:bg-stone-700/60 transition-colors">
+              <button onClick={toggle} className="w-full flex items-center gap-2 bg-well-strong rounded-lg px-3 py-2 text-sm hover:bg-well-raise transition-colors">
                 {imageSrc(editImageData)
                   ? <img src={imageSrc(editImageData)} alt="" className="w-6 h-6 object-contain rounded" />
                   : <span className="text-xl">{editEmoji || getCategoryEmoji(editCategory)}</span>}
-                <span className="text-xs text-stone-500">{t('altar.chooseEmoji')}</span>
+                <span className="text-xs text-subtle">{t('altar.chooseEmoji')}</span>
               </button>
             )}
           />
           <Button tone="neutral" compact title={t('altar.uploadImage')} aria-label={t('altar.uploadImage')} onClick={() => imageInputRef.current?.click()}><ImagePlus size={14} /></Button>
         </div>
-        {imageError && <p className="text-xs text-red-400">{imageError}</p>}
+        {imageError && <p className="text-xs text-danger">{imageError}</p>}
         <input ref={imageInputRef} type="file" accept={ACCEPTED_IMAGE_MIME} className="hidden" onChange={handleImageChange} />
-        <input ref={nameInputRef} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t('altar.elementName')} className="w-full bg-stone-800/60 rounded-lg px-3 py-2 text-xs text-stone-200 outline-none selectable" />
+        <input ref={nameInputRef} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t('altar.elementName')} className="w-full bg-well-strong rounded-lg px-3 py-2 text-xs text-secondary outline-none selectable" />
         <div>
           <p className="label-xs mb-1">{t('properties.category')}</p>
           <CategorySelect

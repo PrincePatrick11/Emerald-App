@@ -91,12 +91,12 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
   }
 
   const menu = open && (input || suggestions.length > 0) && (
-    <div className="absolute top-full left-0 mt-1 z-50 bg-stone-800 border border-stone-700 rounded-lg shadow-xl min-w-[160px] py-1">
+    <div className="absolute top-full left-0 mt-1 z-50 bg-well-solid border border-edge-default rounded-lg shadow-xl min-w-[160px] py-1">
       {suggestions.map((t) => (
         <button
           key={t.id}
           onMouseDown={(e) => { e.preventDefault(); addTag(t.name); }}
-          className="w-full text-left px-3 py-1.5 text-xs hover:bg-stone-700 flex items-center gap-2"
+          className="w-full text-left px-3 py-1.5 text-xs hover:bg-well-raise flex items-center gap-2"
         >
           <span
             className="w-2 h-2 rounded-full flex-shrink-0"
@@ -108,14 +108,14 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
       {trimmedInput && !inputMatchesTag && (createInline ? (
         <button
           onMouseDown={(e) => { e.preventDefault(); addTag(input); }}
-          className="w-full text-left px-3 py-1.5 text-xs text-jade-400 hover:bg-stone-700"
+          className="w-full text-left px-3 py-1.5 text-xs text-accent hover:bg-well-raise"
         >
           {t('tags.createNamed', { name: trimmedInput })}
         </button>
       ) : (
         <button
           onMouseDown={(e) => { e.preventDefault(); setOpen(false); setActiveView({ type: 'tags' }); }}
-          className="w-full text-left px-3 py-1.5 text-xs text-stone-400 hover:bg-stone-700"
+          className="w-full text-left px-3 py-1.5 text-xs text-muted hover:bg-well-raise"
         >
           {t('tags.unknownOpenDashboard', { name: trimmedInput })}
         </button>

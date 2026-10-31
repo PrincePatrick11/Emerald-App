@@ -24,8 +24,8 @@ export default function TabIconButton({ active, compact, className, children, ty
       // theme hover rules in index.css.
       className={`${compact ? 'p-1.5' : 'p-2'} rounded-md border border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
         active
-          ? 'right-sidebar-tab-active bg-stone-700 text-stone-200'
-          : 'right-sidebar-tab-idle text-stone-500 hover:enabled:text-stone-300'
+          ? 'right-sidebar-tab-active bg-well-active text-secondary'
+          : 'right-sidebar-tab-idle text-subtle hover:enabled:text-raise'
       }${className ? ` ${className}` : ''}`}
       {...rest}
     >

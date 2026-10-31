@@ -275,17 +275,17 @@ export default function WikiView() {
                 {isImageIcon(icon) ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded" /> : <span className="text-xl">{icon}</span>}
               </div>
               {renaming
-                ? renameInput('text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1')
-                : <div className="text-sm font-medium text-stone-200 truncate mb-1">{displayTitle(t, 'wiki', a.title)}</div>}
-              <div className="text-xs text-parchment-500/70">{dateStr}</div>
+                ? renameInput('text-sm font-medium text-secondary w-full bg-transparent outline-none selectable mb-1')
+                : <div className="text-sm font-medium text-secondary truncate mb-1">{displayTitle(t, 'wiki', a.title)}</div>}
+              <div className="text-xs text-muted">{dateStr}</div>
             </>
           ) : (
             <>
               <span className="text-base flex-shrink-0">{iconEl}</span>
               {renaming
-                ? renameInput('flex-1 bg-transparent text-sm text-stone-300 outline-none selectable')
-                : <span className="flex-1 text-sm text-stone-300 truncate">{displayTitle(t, 'wiki', a.title)}</span>}
-              <span className="text-xs text-parchment-500/70 flex-shrink-0">{dateStr}</span>
+                ? renameInput('flex-1 bg-transparent text-sm text-soft outline-none selectable')
+                : <span className="flex-1 text-sm text-soft truncate">{displayTitle(t, 'wiki', a.title)}</span>}
+              <span className="text-xs text-muted flex-shrink-0">{dateStr}</span>
             </>
           )}
         </DashboardItem>
@@ -412,7 +412,7 @@ export default function WikiView() {
           <img
             src={coverImage}
             alt=""
-            className="w-full max-h-48 object-cover rounded-lg border border-stone-700/40"
+            className="w-full max-h-48 object-cover rounded-lg border border-edge"
           />
         </div>
       )}

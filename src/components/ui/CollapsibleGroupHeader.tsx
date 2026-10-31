@@ -39,8 +39,8 @@ export default function CollapsibleGroupHeader({
       {leading
         ? <span className="w-5 flex items-center justify-center flex-shrink-0">{leading}</span>
         : emoji && <span className="w-5 text-center flex-shrink-0 text-base">{emoji}</span>}
-      <p className="text-xs text-stone-600 font-semibold uppercase tracking-wider flex-1">{label}</p>
-      {count != null && <span className="text-xs text-stone-500">({count})</span>}
+      <p className="text-xs text-faint font-semibold uppercase tracking-wider flex-1">{label}</p>
+      {count != null && <span className="text-xs text-subtle">({count})</span>}
       {meta}
       {/* Tinted row action in the 24px small row; 30px would bloat the
           header line. */}

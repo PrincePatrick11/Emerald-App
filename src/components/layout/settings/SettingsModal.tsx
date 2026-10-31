@@ -76,12 +76,7 @@ export default function SettingsModal({ onClose, initialPage = 'general' }: Prop
             // theme rule gives the active item a 1px border: without that
             // placeholder the column would jerk by 2px on every switch.
             //
-            // Colour and surface come exclusively from the two theme
-            // rules, no jade/stone utility as a base tone: Parchment
-            // bends `.text-jade-300` further down in the stylesheet to a light
-            // #ecfff7 — meant for dark jade surfaces. At equal
-            // specificity the later rule wins, and the active row
-            // was white on light mint.
+            // Colour and surface come exclusively from the two theme rules.
             className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md border border-transparent text-sm text-left transition-colors ${
               page === id ? 'settings-nav-item-active' : 'settings-nav-item-idle'
             }`}

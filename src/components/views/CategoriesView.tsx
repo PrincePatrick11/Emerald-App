@@ -53,7 +53,7 @@ function CategoryEditRow({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center gap-3 rounded-md border border-stone-600/70 bg-stone-800/60 px-3 py-2">
+    <div className="flex items-center gap-3 rounded-md border border-edge-strong bg-well-strong px-3 py-2">
       {/* Placeholder for the read row's drag handle — without it emoji
           and name would jump to the left when switching to edit mode. */}
       <span className="w-3 flex-shrink-0" />
@@ -279,10 +279,10 @@ export default function CategoriesView() {
         title={cat.is_builtin ? t('categories.builtinHint') : undefined}
         className={`flex items-center gap-3 rounded-md border px-3 py-2 transition-colors ${
           isDragging
-            ? 'border-jade-600/70 bg-jade-900/30 opacity-50'
+            ? 'border-accent-edge bg-accent-fill text-on-accent opacity-50'
             : highlightId === cat.id
-              ? 'border-jade-600/70 bg-jade-900/30'
-              : 'border-stone-700/40 bg-stone-800/50 hover:border-stone-500/70'
+              ? 'border-accent-edge bg-accent-fill text-on-accent'
+              : 'border-edge bg-well hover:border-edge-raise'
         }`}
       >
         {query ? (
@@ -291,13 +291,13 @@ export default function CategoriesView() {
         ) : (
           <span
             onPointerDown={(e) => startDrag(e, cat.id)}
-            className="flex-shrink-0 cursor-grab active:cursor-grabbing touch-none text-stone-600 hover:text-stone-400 transition-colors"
+            className="flex-shrink-0 cursor-grab active:cursor-grabbing touch-none text-faint hover:text-muted transition-colors"
           >
             <GripVertical size={12} />
           </span>
         )}
         <span className="w-5 text-center flex-shrink-0 text-base">{cat.emoji}</span>
-        <span className="flex-1 min-w-0 truncate text-sm text-stone-200">{categoryLabel(t, cat)}</span>
+        <span className="flex-1 min-w-0 truncate text-sm text-secondary">{categoryLabel(t, cat)}</span>
 
         <ModuleCounts modules={CATEGORY_MODULE_IDS} counts={counts} />
 
@@ -338,7 +338,7 @@ export default function CategoriesView() {
         mode: 'custom',
         render: () => (
           <div className="max-w-2xl">
-            {!query && <p className="text-xs text-stone-600 mb-3">{t('categories.dragHint')}</p>}
+            {!query && <p className="text-xs text-faint mb-3">{t('categories.dragHint')}</p>}
             {query && visualCategories.length === 0 && <NoResults query={search} onReset={() => setSearch('')} />}
             <div ref={listRef} className="space-y-1">
               {visualCategories.map(renderRow)}

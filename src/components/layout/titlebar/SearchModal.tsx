@@ -113,12 +113,12 @@ export default function SearchModal({ onClose }: { onClose: () => void }) {
       className="overflow-hidden h-[70vh]"
     >
       <div className="px-4 py-2.5 border-b flex-shrink-0" style={{ borderColor: 'var(--border-soft)' }}>
-        {/* In Parchment, `bg-stone-700/40` beats the `.sidebar-search-inner`
+        {/* In Parchment, `bg-well-raise` beats the `.sidebar-search-inner`
             override (Documentation/design.md, Known Fault Line). The entry
             list's search no longer carries the class; here it is the last
             remnant and can go once someone checks the field in Parchment. */}
-        <div className="sidebar-search-inner flex items-center gap-2 rounded-md px-2.5 h-8 bg-stone-700/40">
-          <Search size={14} className="text-stone-500 flex-shrink-0" />
+        <div className="sidebar-search-inner flex items-center gap-2 rounded-md px-2.5 h-8 bg-well-raise">
+          <Search size={14} className="text-subtle flex-shrink-0" />
           <input
             ref={inputRef}
             type="text"

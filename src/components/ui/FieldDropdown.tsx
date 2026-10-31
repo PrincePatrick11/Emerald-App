@@ -8,8 +8,8 @@ import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
  *  classes as OP_PROP_SELECT_CLASSES (the theme bridges hang on
  *  `op-prop-select`). */
 const SIDEBAR_SELECT_CLASSES =
-  'op-prop-select w-full bg-stone-800/60 rounded-md px-3 py-1 text-[13px] leading-5 text-stone-300 outline-none ' +
-  'border border-stone-700/40 focus:border-stone-600 transition-colors';
+  'op-prop-select w-full bg-well-strong rounded-md px-3 py-1 text-[13px] leading-5 text-soft outline-none ' +
+  'border border-edge focus:border-edge-strong transition-colors';
 
 interface Props<T extends string> {
   value: T;

@@ -33,12 +33,12 @@ export default function EmptyState({
   return (
     <div className={`flex flex-col items-center px-6 pt-10 pb-6 text-center${className ? ` ${className}` : ''}`}>
       {Icon && (
-        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-md border border-stone-700/60 bg-stone-800/60 text-stone-400">
+        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-md border border-edge bg-well-strong text-muted">
           <Icon size={18} />
         </div>
       )}
-      <h2 className="entry-view-title text-lg font-semibold text-stone-100">{title}</h2>
-      {description && <p className="mt-1.5 max-w-sm text-[13px] text-stone-400">{description}</p>}
+      <h2 className="entry-view-title text-lg font-semibold text-primary">{title}</h2>
+      {description && <p className="mt-1.5 max-w-sm text-[13px] text-muted">{description}</p>}
       {actionLabel && onAction && (
         // The pattern's 13px instead of the tone buttons' 11px; `!` because
         // both font sizes are arbitrary values and the order

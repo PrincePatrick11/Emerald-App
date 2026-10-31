@@ -132,7 +132,7 @@ export default function SigilDrawingCanvas({
   };
 
   return (
-    <div className="sigil-canvas-shell relative overflow-hidden rounded-xl border border-stone-700/50 bg-stone-950/80">
+    <div className="sigil-canvas-shell relative overflow-hidden rounded-xl border border-edge bg-canvas">
       <canvas
         ref={canvasRef}
         width={1200}

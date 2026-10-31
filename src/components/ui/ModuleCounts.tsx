@@ -23,7 +23,7 @@ export default function ModuleCounts<M extends EntryModuleId>({ modules, counts 
           <span
             key={id}
             title={t(MODULES[id].navLabelKey)}
-            className={`flex items-center gap-1 text-xs tabular-nums ${count ? 'text-stone-400' : 'text-stone-600'}`}
+            className={`flex items-center gap-1 text-xs tabular-nums ${count ? 'text-muted' : 'text-faint'}`}
           >
             <Icon size={12} />
             {count}

@@ -280,10 +280,10 @@ export default function OperationsView() {
                 ? <img src={iconValue} alt="" className="w-6 h-6 object-cover rounded mb-2" />
                 : <div className="text-xl mb-2">{iconValue}</div>}
               {renaming
-                ? renameInput('text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1')
-                : <div className="text-sm font-medium text-stone-200 truncate mb-1">{displayTitle(t, 'operation', op.title)}</div>}
+                ? renameInput('text-sm font-medium text-secondary w-full bg-transparent outline-none selectable mb-1')
+                : <div className="text-sm font-medium text-secondary truncate mb-1">{displayTitle(t, 'operation', op.title)}</div>}
               <div className="mt-1">
-                <span className="text-xs text-parchment-500/70">{dateStr}</span>
+                <span className="text-xs text-muted">{dateStr}</span>
               </div>
             </>
           ) : (
@@ -293,9 +293,9 @@ export default function OperationsView() {
                 : <span className="text-base flex-shrink-0">{iconValue}</span>
               }
               {renaming
-                ? renameInput('flex-1 bg-transparent text-sm text-stone-300 outline-none selectable')
-                : <span className="flex-1 text-sm text-stone-300 truncate">{displayTitle(t, 'operation', op.title)}</span>}
-              <span className="text-xs text-parchment-500/70 min-w-0 max-w-[50%] truncate">{dateStr}</span>
+                ? renameInput('flex-1 bg-transparent text-sm text-soft outline-none selectable')
+                : <span className="flex-1 text-sm text-soft truncate">{displayTitle(t, 'operation', op.title)}</span>}
+              <span className="text-xs text-muted min-w-0 max-w-[50%] truncate">{dateStr}</span>
             </>
           )}
         </DashboardItem>
@@ -421,7 +421,7 @@ export default function OperationsView() {
       // Cover image — read mode hero (deliberately after the title, unlike in the wiki)
       belowTitle={!isEditing && operation.cover_image && (
         <div className="flex-shrink-0 px-8 pt-5">
-          <img src={operation.cover_image} alt="" className="w-full max-h-48 object-cover rounded-lg border border-stone-700/40" />
+          <img src={operation.cover_image} alt="" className="w-full max-h-48 object-cover rounded-lg border border-edge" />
         </div>
       )}
       tags={{ value: tags, onChange: (newTags) => { setTags(newTags); triggerAutoSave(); } }}

@@ -262,7 +262,7 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
               {archived.map((element) => {
                 const Icon = ELEMENT_KIND_ICONS[element.kind];
                 return (
-                  <div key={element.id} className="flex items-center gap-2 text-xs text-stone-500">
+                  <div key={element.id} className="flex items-center gap-2 text-xs text-subtle">
                     <Icon size={12} className="flex-shrink-0" />
                     <span className="flex-1 truncate">{elementLabel(t, element)}</span>
                     <button
@@ -474,7 +474,7 @@ export function DeleteDefinitionModal({ definition, usage, onClose, onDeleted }:
   if (step === 'done') {
     return (
       <Modal title={title} onClose={onDeleted} bodyClassName="p-4 space-y-3">
-        <p className="text-xs text-stone-400">{notice}</p>
+        <p className="text-xs text-muted">{notice}</p>
         <div className="flex justify-end">
           <Button tone="neutral" onClick={onDeleted}>{t('common.ok')}</Button>
         </div>
@@ -486,7 +486,7 @@ export function DeleteDefinitionModal({ definition, usage, onClose, onDeleted }:
     <Modal title={title} onClose={onClose} dismissible={!busy} bodyClassName="p-4 space-y-3">
       {step === 'choose' ? (
         <>
-          <p className="text-xs text-stone-400">{t('blocks.library.deleteKeeps')}</p>
+          <p className="text-xs text-muted">{t('blocks.library.deleteKeeps')}</p>
           {copyCount > 0 && (
             <BlockCheckbox
               checked={alsoRemove}

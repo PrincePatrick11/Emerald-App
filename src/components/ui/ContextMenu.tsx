@@ -73,7 +73,7 @@ export default function ContextMenu({ x, y, actions, onClose, align = 'left', mi
       ref={ref}
       // `w-max`: at a click position near the window edge the menu would otherwise
       // shrink while being measured and end up wider than measured after being shifted.
-      className="context-menu fixed z-[9999] w-max border border-stone-700/60 rounded-lg shadow-2xl py-1"
+      className="context-menu fixed z-[9999] w-max border border-edge rounded-lg shadow-2xl py-1"
       style={{ left: pos.left, top: pos.top, minWidth }}
     >
       {actions.map((action, i) => (
@@ -89,8 +89,8 @@ export default function ContextMenu({ x, y, actions, onClose, align = 'left', mi
           onClick={() => { action.onClick(); onClose(); }}
           className={`context-menu-item w-full text-left px-3 py-2 text-xs flex items-center gap-2.5 transition-colors ${
             action.danger
-              ? 'context-menu-item-danger text-red-400 hover:text-red-300 hover:bg-red-900/20'
-              : 'context-menu-item-default text-stone-300 hover:text-stone-100 hover:bg-stone-700/50'
+              ? 'context-menu-item-danger text-danger hover:text-danger-raise hover:bg-danger-wash'
+              : 'context-menu-item-default text-soft hover:text-primary hover:bg-well-raise'
           }${action.disabled ? ' opacity-45 cursor-default pointer-events-none' : ''}`}
         >
           {action.icon}

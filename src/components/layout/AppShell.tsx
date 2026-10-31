@@ -418,7 +418,7 @@ export default function AppShell() {
             {leftListOpen && !viewLocked && (
               <div
                 onPointerDown={onLeftPointerDown}
-                className="absolute top-0 right-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"
+                className="absolute top-0 right-0 w-1 h-full cursor-col-resize z-10 hover:bg-accent-wash-strong transition-colors"
               />
             )}
           </aside>
@@ -452,7 +452,7 @@ export default function AppShell() {
             {rightSidebarOpen && !viewLocked && (
               <div
                 onPointerDown={onRightPointerDown}
-                className="absolute top-0 left-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"
+                className="absolute top-0 left-0 w-1 h-full cursor-col-resize z-10 hover:bg-accent-wash-strong transition-colors"
               />
             )}
             {/* The sheet, right half. Surface, border and radius sit on the

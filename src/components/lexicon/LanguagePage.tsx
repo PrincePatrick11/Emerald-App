@@ -64,7 +64,7 @@ export default function LanguagePage({ language, onClose, onDelete }: Props) {
 
           <div>
             <p className="label-xs mb-2">{t('lexicon.stats')}</p>
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-subtle">
               {t('lexicon.wordCount', { count: words.length })}
               {' · '}
               {t('lexicon.letterCount', { count: language.alphabet.length })}

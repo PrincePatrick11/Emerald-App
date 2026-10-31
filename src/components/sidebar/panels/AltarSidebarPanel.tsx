@@ -223,7 +223,7 @@ const noticeTimerRef = useRef<number | null>(null);
               />
               {canvasOptionsOpen && (
                 <div className="mt-2">
-                  <p className="mb-1.5 text-[11px] uppercase tracking-wider text-stone-500">{t('altar.ratio')}</p>
+                  <p className="mb-1.5 text-[11px] uppercase tracking-wider text-subtle">{t('altar.ratio')}</p>
                   <div className="grid grid-cols-3 gap-1">
                     {ALTAR_RATIOS.map((r) => {
                       const active = ratioFromResolution(activeAltar.resolution) === r;
@@ -233,8 +233,8 @@ const noticeTimerRef = useRef<number | null>(null);
                           onClick={() => updateAltarResolution(activeAltar.id, r)}
                           className={`rounded border py-1.5 text-[11px] font-medium text-center transition-colors ${
                             active
-                              ? 'border-jade-600/70 bg-jade-900/40 text-jade-300'
-                              : 'border-stone-700/60 bg-stone-900/45 text-stone-400 hover:border-stone-500/70 hover:text-stone-300'
+                              ? 'border-accent-edge bg-accent-fill text-on-accent'
+                              : 'border-edge bg-well-sunk text-muted hover:border-edge-raise hover:text-raise'
                           }`}
                         >
                           {r}
@@ -262,7 +262,7 @@ const noticeTimerRef = useRef<number | null>(null);
                       onClick={() => { if (isEditing) updateBackgroundPreset(name); }}
                       disabled={!isEditing}
                       className={`relative overflow-hidden rounded-md border transition-colors ${
-                        selected ? 'border-jade-600/70 ring-1 ring-jade-700/40' : 'border-stone-700/50 hover:border-stone-500/60'
+                        selected ? 'border-accent-edge ring-1 ring-focus' : 'border-edge hover:border-edge-raise'
                       }`}
                       title={t(`altar.backgrounds.${name}`)}
                     >
@@ -272,7 +272,7 @@ const noticeTimerRef = useRef<number | null>(null);
                         className="h-9 w-full object-cover"
                       />
                       {selected && (
-                        <span className="absolute right-1 top-1 rounded-full border border-jade-600/60 bg-jade-900/70 p-0.5 text-jade-200">
+                        <span className="absolute right-1 top-1 rounded-full border border-accent-edge bg-accent-fill-strong p-0.5 text-on-accent">
                           <Check size={8} />
                         </span>
                       )}
@@ -313,13 +313,13 @@ const noticeTimerRef = useRef<number | null>(null);
                           onClick={() => { if (isEditing) applyGradient(displayColor); }}
                           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (isEditing) applyGradient(displayColor); } }}
                           className={`relative h-9 overflow-hidden rounded-md border cursor-pointer transition-colors ${
-                            isGradientActive ? 'border-jade-600/70 ring-1 ring-jade-700/40' : 'border-stone-700/50 hover:border-stone-500/60'
+                            isGradientActive ? 'border-accent-edge ring-1 ring-focus' : 'border-edge hover:border-edge-raise'
                           }`}
                           title={t('altar.backgrounds.gradient')}
                         >
                           <div className="h-full w-full" style={{ background: generateGradientStyle(displayColor) }} />
                           {isGradientActive && (
-                            <span className="absolute right-0.5 top-0.5 rounded-full border border-jade-600/60 bg-jade-900/70 p-0.5 text-jade-200">
+                            <span className="absolute right-0.5 top-0.5 rounded-full border border-accent-edge bg-accent-fill-strong p-0.5 text-on-accent">
                               <Check size={7} />
                             </span>
                           )}
@@ -365,7 +365,7 @@ const noticeTimerRef = useRef<number | null>(null);
                         >
                               <div className="flex justify-center">
                                 <div
-                                  className="rounded-lg overflow-hidden border border-stone-700/50"
+                                  className="rounded-lg overflow-hidden border border-edge"
                                   style={{ width: previewW, height: previewH, background: generateGradientStyle(draft) }}
                                 />
                               </div>
@@ -376,7 +376,7 @@ const noticeTimerRef = useRef<number | null>(null);
                                     onClick={() => setGradientDraft(color)}
                                     title={color}
                                     className={`h-6 w-6 flex-shrink-0 rounded-full border-2 transition-all ${
-                                      draft === color ? 'border-jade-400 scale-110' : 'border-stone-600 hover:border-stone-400'
+                                      draft === color ? 'border-accent-edge scale-110' : 'border-edge-strong hover:border-edge-raise'
                                     }`}
                                     style={{ backgroundColor: color }}
                                   />
@@ -384,7 +384,7 @@ const noticeTimerRef = useRef<number | null>(null);
                                 <button
                                   title={t('altar.customColor')}
                                   className={`relative flex h-6 w-6 flex-shrink-0 cursor-pointer items-center justify-center rounded-full border-2 transition-all ${
-                                    !isPresetDraft ? 'border-jade-400 scale-110' : 'border-stone-600 hover:border-stone-400'
+                                    !isPresetDraft ? 'border-accent-edge scale-110' : 'border-edge-strong hover:border-edge-raise'
                                   }`}
                                   style={!isPresetDraft ? { backgroundColor: draft } : { backgroundColor: '#44403c' }}
                                 >
@@ -395,7 +395,7 @@ const noticeTimerRef = useRef<number | null>(null);
                                     className="absolute inset-0 h-full w-full cursor-pointer rounded-full opacity-0"
                                   />
                                   {isPresetDraft && (
-                                    <span className="text-[10px] leading-none text-stone-400 pointer-events-none">+</span>
+                                    <span className="text-[10px] leading-none text-muted pointer-events-none">+</span>
                                   )}
                                 </button>
                               </div>
@@ -420,17 +420,17 @@ const noticeTimerRef = useRef<number | null>(null);
                     }}
                     className={`relative h-9 overflow-hidden rounded-md border cursor-pointer transition-colors ${
                       activeAltar.background_image_data
-                        ? 'border-jade-600/70 ring-1 ring-jade-700/40'
-                        : 'border-stone-700/50 hover:border-stone-500/60'
+                        ? 'border-accent-edge ring-1 ring-focus'
+                        : 'border-edge hover:border-edge-raise'
                     }`}
                     title={t('altar.customBackground')}
                   >
                     <div
-                      className="h-full w-full bg-gradient-to-br from-stone-800/80 via-stone-900/70 to-stone-950/80"
+                      className="h-full w-full bg-gradient-to-br from-well-tint via-well-strong to-well-sunk"
                       style={backgroundUrl ? { backgroundImage: backgroundUrl, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
                     />
                     {activeAltar.background_image_data && (
-                      <span className="absolute right-0.5 top-0.5 rounded-full border border-jade-600/60 bg-jade-900/70 p-0.5 text-jade-200">
+                      <span className="absolute right-0.5 top-0.5 rounded-full border border-accent-edge bg-accent-fill-strong p-0.5 text-on-accent">
                         <Check size={7} />
                       </span>
                     )}
@@ -455,8 +455,8 @@ const noticeTimerRef = useRef<number | null>(null);
               <div
                 className={`relative altar-bg-preset overflow-hidden rounded-lg border ${
                   activeAltar.background_image_data
-                    ? 'border-jade-600/70 ring-1 ring-jade-700/40'
-                    : 'border-stone-700/50 opacity-85'
+                    ? 'border-accent-edge ring-1 ring-focus'
+                    : 'border-edge opacity-85'
                 }`}
                 title={t('altar.customBackground')}
               >
@@ -475,20 +475,20 @@ const noticeTimerRef = useRef<number | null>(null);
                 >
                   {!activeAltar.background_image_data && <div className="h-full w-full" />}
                 </div>
-                <div className="altar-bg-preset-label border-t border-stone-800/70 bg-stone-900/80 px-2 py-1 text-left text-[11px] text-stone-300">
+                <div className="altar-bg-preset-label border-t border-edge bg-overlay px-2 py-1 text-left text-[11px] text-soft">
                   {activeAltar.background_image_data
                     ? t('altar.customBackground')
                     : isGradientPreset(activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND)
                       ? t('altar.backgrounds.gradient')
                       : t(`altar.backgrounds.${activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND}`)}
                 </div>
-                <span className="absolute right-1.5 top-1.5 rounded-full border border-jade-600/60 bg-jade-900/70 p-0.5 text-jade-200">
+                <span className="absolute right-1.5 top-1.5 rounded-full border border-accent-edge bg-accent-fill-strong p-0.5 text-on-accent">
                   <Check size={10} />
                 </span>
               </div>
             </div>
           ))}
-          {backgroundNotice && <p className="mt-2 text-xs text-jade-300">{backgroundNotice}</p>}
+          {backgroundNotice && <p className="mt-2 text-xs text-on-accent">{backgroundNotice}</p>}
           </div>
           {isEditing && (
             <>
@@ -502,17 +502,17 @@ const noticeTimerRef = useRef<number | null>(null);
                 const overlayPercent = Math.round((activeAltar.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY) * 100);
                 const overlayColor = activeAltar.background_overlay_color ?? 'dark';
                 return (
-                  <div className="mt-2 rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2 space-y-2">
+                  <div className="mt-2 rounded-lg border border-edge bg-well-sunk px-3 py-2 space-y-2">
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] uppercase tracking-wider text-stone-500">{t('altar.backgroundOverlay')}</span>
-                        <span className="text-[11px] tabular-nums text-stone-300">{overlayPercent}%</span>
+                        <span className="text-[11px] uppercase tracking-wider text-subtle">{t('altar.backgroundOverlay')}</span>
+                        <span className="text-[11px] tabular-nums text-soft">{overlayPercent}%</span>
                       </div>
                       <div className="relative h-4 flex items-center">
-                        <div className="absolute inset-x-0 h-1 rounded-full bg-stone-800/80" />
-                        <div className="absolute left-0 h-1 rounded-full bg-jade-600/60" style={{ width: `${overlayPercent}%` }} />
+                        <div className="absolute inset-x-0 h-1 rounded-full bg-well-tint" />
+                        <div className="absolute left-0 h-1 rounded-full bg-accent-track" style={{ width: `${overlayPercent}%` }} />
                         <div
-                          className="absolute h-2.5 w-2.5 rounded-full bg-jade-500 border border-jade-400/50 shadow pointer-events-none"
+                          className="absolute h-2.5 w-2.5 rounded-full bg-accent border border-accent-edge shadow pointer-events-none"
                           style={{ left: `calc(${overlayPercent}% - 5px)` }}
                         />
                         <input
@@ -532,12 +532,12 @@ const noticeTimerRef = useRef<number | null>(null);
                           onClick={() => updateAltar(activeAltar.id, { background_overlay_color: color })}
                           className={`flex items-center justify-center gap-1.5 rounded border py-1 text-[10px] uppercase tracking-wide transition-colors ${
                             overlayColor === color
-                              ? 'border-jade-600/70 bg-jade-900/40 text-jade-300'
-                              : 'border-stone-700/60 bg-stone-900/45 text-stone-400 hover:border-stone-500/70 hover:text-stone-300'
+                              ? 'border-accent-edge bg-accent-fill text-on-accent'
+                              : 'border-edge bg-well-sunk text-muted hover:border-edge-raise hover:text-raise'
                           }`}
                         >
                           <span
-                            className="h-3 w-3 rounded-full border border-stone-600/60 flex-shrink-0"
+                            className="h-3 w-3 rounded-full border border-edge-strong flex-shrink-0"
                             style={{ background: color === 'dark' ? '#0a0a0f' : '#ffffff' }}
                           />
                           {t(`altar.overlay.${color}`)}
@@ -565,7 +565,7 @@ const noticeTimerRef = useRef<number | null>(null);
                     key={key}
                     onClick={toggle}
                     title={title}
-                    className={`flex flex-col items-center gap-0.5 rounded-md border px-1 py-1.5 transition-colors ${active ? 'border-jade-600/70 bg-jade-900/40 text-jade-300' : 'border-stone-700/60 bg-stone-900/45 text-stone-500 hover:border-stone-500/70 hover:text-stone-300'}`}
+                    className={`flex flex-col items-center gap-0.5 rounded-md border px-1 py-1.5 transition-colors ${active ? 'border-accent-edge bg-accent-fill text-on-accent' : 'border-edge bg-well-sunk text-subtle hover:border-edge-raise hover:text-raise'}`}
                   >
                     <Icon size={13} />
                     <span className="text-[9px] leading-none">{label}</span>
@@ -574,17 +574,17 @@ const noticeTimerRef = useRef<number | null>(null);
               </div>
               {/* The size also applies to snapping to the hidden grid; opacity and colour only to the visible one. */}
               {(activeAltar.grid_enabled || activeAltar.snap_to_grid || activeAltar.snap_scale_to_grid) && (
-                <div className="mt-2 rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2 space-y-2">
+                <div className="mt-2 rounded-lg border border-edge bg-well-sunk px-3 py-2 space-y-2">
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] uppercase tracking-wider text-stone-500">{t('altar.gridSize')}</span>
-                      <span className="text-[11px] tabular-nums text-stone-300">{activeAltar.grid_size}px</span>
+                      <span className="text-[11px] uppercase tracking-wider text-subtle">{t('altar.gridSize')}</span>
+                      <span className="text-[11px] tabular-nums text-soft">{activeAltar.grid_size}px</span>
                     </div>
                     <div className="relative h-4 flex items-center">
-                      <div className="absolute inset-x-0 h-1 rounded-full bg-stone-800/80" />
-                      <div className="absolute left-0 h-1 rounded-full bg-jade-600/60" style={{ width: `${((activeAltar.grid_size - 8) / 120) * 100}%` }} />
+                      <div className="absolute inset-x-0 h-1 rounded-full bg-well-tint" />
+                      <div className="absolute left-0 h-1 rounded-full bg-accent-track" style={{ width: `${((activeAltar.grid_size - 8) / 120) * 100}%` }} />
                       <div
-                        className="absolute h-2.5 w-2.5 rounded-full bg-jade-500 border border-jade-400/50 shadow pointer-events-none"
+                        className="absolute h-2.5 w-2.5 rounded-full bg-accent border border-accent-edge shadow pointer-events-none"
                         style={{ left: `calc(${((activeAltar.grid_size - 8) / 120) * 100}% - 5px)` }}
                       />
                       <input
@@ -601,14 +601,14 @@ const noticeTimerRef = useRef<number | null>(null);
                   {activeAltar.grid_enabled && <>
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] uppercase tracking-wider text-stone-500">{t('altar.gridOpacity')}</span>
-                      <span className="text-[11px] tabular-nums text-stone-300">{gridOpacityPercent}%</span>
+                      <span className="text-[11px] uppercase tracking-wider text-subtle">{t('altar.gridOpacity')}</span>
+                      <span className="text-[11px] tabular-nums text-soft">{gridOpacityPercent}%</span>
                     </div>
                     <div className="relative h-4 flex items-center">
-                      <div className="absolute inset-x-0 h-1 rounded-full bg-stone-800/80" />
-                      <div className="absolute left-0 h-1 rounded-full bg-jade-600/60" style={{ width: `${((gridOpacityPercent - 1) / 24) * 100}%` }} />
+                      <div className="absolute inset-x-0 h-1 rounded-full bg-well-tint" />
+                      <div className="absolute left-0 h-1 rounded-full bg-accent-track" style={{ width: `${((gridOpacityPercent - 1) / 24) * 100}%` }} />
                       <div
-                        className="absolute h-2.5 w-2.5 rounded-full bg-jade-500 border border-jade-400/50 shadow pointer-events-none"
+                        className="absolute h-2.5 w-2.5 rounded-full bg-accent border border-accent-edge shadow pointer-events-none"
                         style={{ left: `calc(${((gridOpacityPercent - 1) / 24) * 100}% - 5px)` }}
                       />
                       <input
@@ -623,29 +623,29 @@ const noticeTimerRef = useRef<number | null>(null);
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] uppercase tracking-wider text-stone-500">{t('altar.gridColor')}</span>
+                    <span className="text-[11px] uppercase tracking-wider text-subtle">{t('altar.gridColor')}</span>
                     <input
                       type="color"
                       value={activeAltar.grid_color}
                       disabled={!isEditing}
                       onChange={(event) => updateAltarGrid(activeAltar.id, { grid_color: event.target.value })}
-                      className="h-6 w-10 rounded border border-stone-700 bg-stone-800 p-0"
+                      className="h-6 w-10 rounded border border-edge-default bg-well-solid p-0"
                     />
                   </div>
                   </>}
                 </div>
               )}
               {activeAltar.rotation_snap_enabled && (
-                <div className="mt-2 rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2 space-y-1">
+                <div className="mt-2 rounded-lg border border-edge bg-well-sunk px-3 py-2 space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] uppercase tracking-wider text-stone-500">{t('altar.rotationSnapAngle')}</span>
-                    <span className="text-[11px] tabular-nums text-stone-300">{activeAltar.rotation_snap_angle}°</span>
+                    <span className="text-[11px] uppercase tracking-wider text-subtle">{t('altar.rotationSnapAngle')}</span>
+                    <span className="text-[11px] tabular-nums text-soft">{activeAltar.rotation_snap_angle}°</span>
                   </div>
                   <div className="relative h-4 flex items-center">
-                    <div className="absolute inset-x-0 h-1 rounded-full bg-stone-800/80" />
-                    <div className="absolute left-0 h-1 rounded-full bg-jade-600/60" style={{ width: `${((activeAltar.rotation_snap_angle - 1) / 179) * 100}%` }} />
+                    <div className="absolute inset-x-0 h-1 rounded-full bg-well-tint" />
+                    <div className="absolute left-0 h-1 rounded-full bg-accent-track" style={{ width: `${((activeAltar.rotation_snap_angle - 1) / 179) * 100}%` }} />
                     <div
-                      className="absolute h-2.5 w-2.5 rounded-full bg-jade-500 border border-jade-400/50 shadow pointer-events-none"
+                      className="absolute h-2.5 w-2.5 rounded-full bg-accent border border-accent-edge shadow pointer-events-none"
                       style={{ left: `calc(${((activeAltar.rotation_snap_angle - 1) / 179) * 100}% - 5px)` }}
                     />
                     <input
@@ -675,7 +675,7 @@ const noticeTimerRef = useRef<number | null>(null);
           />
           {placementsOpen && <div ref={listRef} className="mt-2 space-y-1 pr-1" onClick={(e) => { if (e.target === e.currentTarget) selectPlacement(null); }}>
             {sortedPlacements.length === 0 && (
-              <p className="px-2 py-2 text-xs text-stone-600">{t('altar.noElementsPlaced')}</p>
+              <p className="px-2 py-2 text-xs text-faint">{t('altar.noElementsPlaced')}</p>
             )}
             {visualPlacements.map((placement) => (
               <div key={placement.id} className="space-y-1">

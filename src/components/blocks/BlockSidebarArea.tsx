@@ -246,7 +246,7 @@ function ManagerRow({
                 if (e.key === 'Enter') e.currentTarget.blur();
                 if (e.key === 'Escape') { cancelledRef.current = true; e.currentTarget.blur(); }
               }}
-              className="block-row-rename flex-1 min-w-0 bg-transparent text-[13px] text-stone-200 outline-none selectable"
+              className="block-row-rename flex-1 min-w-0 bg-transparent text-[13px] text-secondary outline-none selectable"
             />
           </>
         ) : (

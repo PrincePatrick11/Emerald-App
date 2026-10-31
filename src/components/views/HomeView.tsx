@@ -169,7 +169,7 @@ export default function HomeView() {
       <h1 className={`${ENTRY_TITLE_HEADING_CLASSES} leading-tight truncate`}>
         {formatDayHeading(today)}
       </h1>
-      <p className="text-xs text-stone-500 truncate">
+      <p className="text-xs text-subtle truncate">
         {MOON_PHASE_SYMBOLS[moonPhase]}{' '}{t(`moonPhase.${moonPhase}`)}
       </p>
     </div>
@@ -197,11 +197,11 @@ export default function HomeView() {
             <section className="mb-8">
               <div className="flex items-center gap-2 mb-3">
                 <button onClick={() => setActiveView({ type: 'journal' })} className="flex items-center gap-2 group flex-shrink-0">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500 group-hover:text-stone-400 flex items-center gap-2 transition-colors">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-subtle group-hover:text-muted flex items-center gap-2 transition-colors">
                     <BookOpen size={12} />
                     {t('nav.journal')}
                   </h2>
-                  <span className="text-xs text-stone-600 group-hover:text-stone-400 transition-colors">{t('home.viewAll')}</span>
+                  <span className="text-xs text-faint group-hover:text-muted transition-colors">{t('home.viewAll')}</span>
                 </button>
                 <div className="ml-auto flex-shrink-0">
                   <SectionToolbar prefs={homeJournalPrefs} setPrefs={setHomeJournalPrefs} />
@@ -260,11 +260,11 @@ export default function HomeView() {
             <section className="mb-8">
               <div className="flex items-center gap-2 mb-3">
                 <button onClick={() => setActiveView({ type: 'operations' })} className="flex items-center gap-2 group flex-shrink-0">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500 group-hover:text-stone-400 flex items-center gap-2 transition-colors">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-subtle group-hover:text-muted flex items-center gap-2 transition-colors">
                     <Wand2 size={12} />
                     {t('nav.operations')}
                   </h2>
-                  <span className="text-xs text-stone-600 group-hover:text-stone-400 transition-colors">{t('home.viewAll')}</span>
+                  <span className="text-xs text-faint group-hover:text-muted transition-colors">{t('home.viewAll')}</span>
                 </button>
                 <div className="ml-auto flex-shrink-0">
                   <SectionToolbar prefs={homeOpsPrefs} setPrefs={setHomeOpsPrefs} />
@@ -331,11 +331,11 @@ export default function HomeView() {
             <section>
               <div className="flex items-center gap-2 mb-3">
                 <button onClick={() => setActiveView({ type: 'wiki' })} className="flex items-center gap-2 group flex-shrink-0">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500 group-hover:text-stone-400 flex items-center gap-2 transition-colors">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-subtle group-hover:text-muted flex items-center gap-2 transition-colors">
                     <Library size={12} />
                     {t('nav.wiki')}
                   </h2>
-                  <span className="text-xs text-stone-600 group-hover:text-stone-400 transition-colors">{t('home.viewAll')}</span>
+                  <span className="text-xs text-faint group-hover:text-muted transition-colors">{t('home.viewAll')}</span>
                 </button>
                 <div className="ml-auto flex-shrink-0">
                   <SectionToolbar prefs={homeWikiPrefs} setPrefs={setHomeWikiPrefs} />

@@ -129,10 +129,10 @@ function TemplateList({ entries, onCreate, onDelete }: {
   const renderItem = (template: Template) => {
     const count = entries.get(template.id)?.length ?? 0;
     const unsaved = template.id in drafts && (
-      <span className="text-xs italic text-stone-500 flex-shrink-0">{t('editor.unsaved')}</span>
+      <span className="text-xs italic text-subtle flex-shrink-0">{t('editor.unsaved')}</span>
     );
     const countLabel = (
-      <span className="text-xs text-stone-500 tabular-nums flex-shrink-0">{t('templates.entryCount', { count })}</span>
+      <span className="text-xs text-subtle tabular-nums flex-shrink-0">{t('templates.entryCount', { count })}</span>
     );
     return (
       <DashboardItem
@@ -150,13 +150,13 @@ function TemplateList({ entries, onCreate, onDelete }: {
               <span className="flex-1" />
               {unsaved}
             </div>
-            <div className="text-sm font-medium text-stone-200 truncate mb-1">{templateLabel(t, template)}</div>
+            <div className="text-sm font-medium text-secondary truncate mb-1">{templateLabel(t, template)}</div>
             {countLabel}
           </>
         ) : (
           <>
             <BlockGlyph icon={template.icon} size={14} />
-            <span className="flex-1 min-w-0 text-sm text-stone-300 truncate">{templateLabel(t, template)}</span>
+            <span className="flex-1 min-w-0 text-sm text-soft truncate">{templateLabel(t, template)}</span>
             {unsaved}
             {countLabel}
           </>

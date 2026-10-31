@@ -29,7 +29,7 @@ export default function ImportDestinationModal() {
             <button
               key={opt.type}
               onClick={() => choose(opt.type)}
-              className="context-menu-item-default w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-left text-stone-300 hover:text-stone-100 hover:bg-stone-700/50 transition-colors"
+              className="context-menu-item-default w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-left text-soft hover:text-primary hover:bg-well-raise transition-colors"
             >
               <span className="opacity-70">{opt.icon}</span>
               {t(opt.labelKey)}

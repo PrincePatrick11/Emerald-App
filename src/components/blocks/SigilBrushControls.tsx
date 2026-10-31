@@ -18,7 +18,7 @@ export function SigilColorSwatches({ value, onChange }: { value: string; onChang
           key={c}
           type="button"
           onClick={() => onChange(c)}
-          className={`h-7 w-7 rounded-full border-2 transition-transform ${value === c ? 'scale-105 border-stone-200' : 'border-stone-700 hover:border-stone-500'}`}
+          className={`h-7 w-7 rounded-full border-2 transition-transform ${value === c ? 'scale-105 border-contrast' : 'border-edge-default hover:border-edge-raise'}`}
           style={{ backgroundColor: c }}
           aria-label={c}
           aria-pressed={value === c}
@@ -31,7 +31,7 @@ export function SigilColorSwatches({ value, onChange }: { value: string; onChang
 export function SigilBrushSize({ value, onChange }: { value: number; onChange: (size: number) => void }) {
   const { t } = useTranslation();
   return (
-    <label className="sigil-brush-controls flex items-center gap-2 text-xs text-stone-400">
+    <label className="sigil-brush-controls flex items-center gap-2 text-xs text-muted">
       <span>{t('creation.brushSize')}</span>
       <input
         type="range"
@@ -39,9 +39,9 @@ export function SigilBrushSize({ value, onChange }: { value: number; onChange: (
         max={BRUSH_SIZE_MAX}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="sigil-brush-slider accent-jade-400"
+        className="sigil-brush-slider accent-accent"
       />
-      <span className="w-7 text-right text-stone-500">{value}</span>
+      <span className="w-7 text-right text-subtle">{value}</span>
     </label>
   );
 }

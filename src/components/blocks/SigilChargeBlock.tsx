@@ -207,7 +207,7 @@ function ChargeActions({ charge, date, onPersist }: { charge: ChargeData; date: 
   if (confirming) {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-stone-400">
+        <span className="text-xs text-muted">
           {charge.loaded
             ? t('blocks.sigil.unloadConfirm')
             : date ? t('blocks.sigil.loadConfirm', { date }) : t('blocks.sigil.loadConfirmNoDate')}
@@ -292,7 +292,7 @@ function ChargeEditor({ charge, tools, onChange }: {
       </div>
       {fixed && (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-stone-400">{t('blocks.sigil.loaded')}</span>
+          <span className="text-xs text-muted">{t('blocks.sigil.loaded')}</span>
           <Button tone="neutral" small onClick={() => onChange({ ...charge, loaded: false })}>{t('creation.unloadSigil')}</Button>
         </div>
       )}

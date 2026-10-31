@@ -39,7 +39,7 @@ const VIEWS_WITHOUT_ENTRIES: ReadonlySet<ViewId> = new Set<ViewId>(['home', 'tag
 function PropertiesContent({ activeView }: { activeView: ActiveView }) {
   const { t } = useTranslation();
   const Panel = PROPERTIES_PANELS[activeView.type];
-  if (!Panel) return <p className="text-xs text-stone-600 px-2 py-3">{t('properties.noEntry')}</p>;
+  if (!Panel) return <p className="text-xs text-faint px-2 py-3">{t('properties.noEntry')}</p>;
   return <Panel />;
 }
 

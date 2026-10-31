@@ -113,13 +113,13 @@ export default function EntryListTab<T>({
           through the main action in the right panel, not through a button here. */}
       <div className="entry-list-search-row h-14 px-3 flex-shrink-0 flex items-center">
         <div className="entry-list-search flex-1 flex items-center gap-2 rounded-md px-2.5 h-[30px] min-w-0">
-          <Search size={14} className="text-stone-500 flex-shrink-0" />
+          <Search size={14} className="text-subtle flex-shrink-0" />
           <input
             type="text"
             placeholder={t('search.placeholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="sidebar-search-input bg-transparent text-sm text-stone-300 placeholder-stone-600 outline-none w-full selectable"
+            className="sidebar-search-input bg-transparent text-sm text-soft placeholder:text-faint outline-none w-full selectable"
           />
         </div>
       </div>
@@ -129,10 +129,10 @@ export default function EntryListTab<T>({
           // Two lines in place of the first entry, without icon and button;
           // the dashboard next to it carries the large empty state.
           <div className="px-2 py-1.5">
-            <p className="text-[13px] text-stone-400">
+            <p className="text-[13px] text-muted">
               {items.length > 0 ? t('sidebar.noResultsFor', { query: searchQuery.trim() }) : emptyMessage}
             </p>
-            <p className="text-xs text-stone-600">
+            <p className="text-xs text-faint">
               {items.length > 0 ? t('sidebar.noResultsHint') : t('sidebar.emptyHint')}
             </p>
           </div>
@@ -175,7 +175,7 @@ export default function EntryListTab<T>({
                         onChange={(e) => setRenameValue(e.target.value)}
                         onBlur={commitRename}
                         onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
-                        className="w-full bg-transparent text-sm text-stone-300 outline-none selectable truncate"
+                        className="w-full bg-transparent text-sm text-soft outline-none selectable truncate"
                       />
                       {dateStr && <div className="entry-list-date text-xs">{dateStr}</div>}
                     </div>

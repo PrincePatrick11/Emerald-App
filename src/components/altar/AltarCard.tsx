@@ -34,7 +34,7 @@ function PreviewFallback({ altar, wide }: { altar: AltarRecord; wide?: boolean }
     <div className={`flex items-center justify-center ${wide ? 'h-24' : 'h-20'}`}>
       {altar.icon_data
         ? <FaviconGlyph value={altar.icon_data} className={wide ? 'h-16 w-16 text-5xl' : 'h-12 w-12 text-4xl'} />
-        : <Flame size={32} className="text-stone-600" />}
+        : <Flame size={32} className="text-faint" />}
     </div>
   );
 }
@@ -43,7 +43,7 @@ function PreviewFallback({ altar, wide }: { altar: AltarRecord; wide?: boolean }
 function ListPreviewFallback({ altar }: { altar: AltarRecord }) {
   return altar.icon_data
     ? <FaviconGlyph value={altar.icon_data} />
-    : <Flame size={14} className="text-stone-600" />;
+    : <Flame size={14} className="text-faint" />;
 }
 
 type AltarCardProps = CommonProps & {
@@ -91,9 +91,9 @@ export const AltarCard = memo(function AltarCard({
           onChange={onChangeRename}
           onCommit={onCommitRename}
           onCancel={onCancelRename}
-          className="mb-2 w-full bg-transparent text-sm font-medium text-stone-200 outline-none selectable"
+          className="mb-2 w-full bg-transparent text-sm font-medium text-secondary outline-none selectable"
         />
-        <p className="text-xs text-stone-600">{formatEntryDate(altar.updated_at)}</p>
+        <p className="text-xs text-faint">{formatEntryDate(altar.updated_at)}</p>
       </DashboardItem>
     );
   }
@@ -106,7 +106,7 @@ export const AltarCard = memo(function AltarCard({
     preview = <PreviewFallback altar={altar} wide={wide} />;
   } else if (thumbnail) {
     preview = <img src={thumbnail} alt="" draggable={false} style={{ maxHeight: base }}
-      className="w-auto max-w-full mx-auto block rounded-lg border border-stone-700/40" />;
+      className="w-auto max-w-full mx-auto block rounded-lg border border-edge" />;
   } else {
     // The live preview is a full-width aspect-ratio box; capped via
     // maxWidth instead of maxHeight, because a height-limited box would
@@ -121,9 +121,9 @@ export const AltarCard = memo(function AltarCard({
   return (
     <DashboardItem view={altarView(altar)} layout="card" onContextMenu={onContextMenu}>
       <div className="mb-3">{preview}</div>
-      <div className="text-sm font-medium text-stone-200 truncate">{displayTitle(t, 'altar', altar.title)}</div>
+      <div className="text-sm font-medium text-secondary truncate">{displayTitle(t, 'altar', altar.title)}</div>
       <div className="mt-2 flex flex-wrap gap-2 text-xs">
-        <span className="text-parchment-500/70">{formatEntryDate(altar.updated_at)}</span>
+        <span className="text-muted">{formatEntryDate(altar.updated_at)}</span>
       </div>
     </DashboardItem>
   );
@@ -150,9 +150,9 @@ export const AltarListRow = memo(function AltarListRow({
           onChange={onChangeRename}
           onCommit={onCommitRename}
           onCancel={onCancelRename}
-          className="flex-1 bg-transparent text-sm text-stone-300 outline-none selectable"
+          className="flex-1 bg-transparent text-sm text-soft outline-none selectable"
         />
-        <span className="text-xs text-parchment-500/70">{formatEntryDate(altar.updated_at)}</span>
+        <span className="text-xs text-muted">{formatEntryDate(altar.updated_at)}</span>
       </DashboardItem>
     );
   }
@@ -165,15 +165,15 @@ export const AltarListRow = memo(function AltarListRow({
     ? <ListPreviewFallback altar={altar} />
     : thumbnail
       ? <img src={thumbnail} alt="" draggable={false}
-          className="h-8 rounded object-cover border border-stone-700/40"
+          className="h-8 rounded object-cover border border-edge"
           style={{ aspectRatio: `${resW}/${resH}` }} />
       : <AltarCardPreview altar={altar} previewItems={previewItems} compact />;
 
   return (
     <DashboardItem view={altarView(altar)} layout="row" onContextMenu={onContextMenu}>
       <span className="flex-shrink-0">{preview}</span>
-      <span className="flex-1 text-sm text-stone-300 truncate">{displayTitle(t, 'altar', altar.title)}</span>
-      <span className="text-xs text-stone-600">{formatEntryDate(altar.updated_at)}</span>
+      <span className="flex-1 text-sm text-soft truncate">{displayTitle(t, 'altar', altar.title)}</span>
+      <span className="text-xs text-faint">{formatEntryDate(altar.updated_at)}</span>
     </DashboardItem>
   );
 });
