@@ -27,6 +27,22 @@ A second, smaller registry sits in `src/components/editor/SuggestionList.tsx` �
   - Import rule: content stores only (`entry`/`task`/`altar`/`tag`/`category`/ `blockDefinition`/`template`/`lexicon`) — never `uiStore`, `vaultStore` or `trashStore`, which import this module instead.
 - **`src/components/layout/moduleViews.ts`** — the component-layer half. `VIEW_COMPONENTS` maps every `ViewId` to its `React.lazy` view. Import rule: **only `MainArea` may import this file** — any other importer risks pulling every view's lazy chunk (including TipTap) into its own bundle.
 
+## Adding a Module or Table
+
+These places enumerate modules or tables and are easy to miss. Follow how the closest existing module does it: the Lexicon for a module with its own tables, Altar or Tasks for one with its own items. Leaving a place out can be right, as with the Lexicon and single-file export, but it should be a decision.
+
+- **Schema:** `src/lib/schema.ts` (the table in `TABLES`, `BASELINE_VERSION`) and a migration in `src/lib/db.ts`, see [Rules for Future Schema Changes](../database.md#rules-for-future-schema-changes). Image columns go into `IMAGE_FIELDS`.
+- **Backup:** export, filter and insert in `src/lib/dbBackup.ts`, and `BACKUP_VERSION` with a step in `migrateBackupPayload` when the shape of the rows changes. A table missing here is lost on restore without an error.
+- **Registry:** `src/lib/modules.ts`, the store's reload in `src/store/moduleWiring.ts`, the view in `src/components/layout/moduleViews.ts`.
+- **Trash:** a soft-deleted item needs `TRASH_KINDS`, `trashWiring`, and listing and emptying in `src/store/trashStore.ts`.
+- **Search:** `SearchKind` and the query in `src/lib/globalSearch.ts`, the display in `src/components/layout/titlebar/SearchResultList.tsx`.
+- **Links:** a link target goes through `src/lib/linkItems.ts` and `viewTypeForEntryType`.
+- **Files:** `src/lib/export.ts`, `src/lib/exportData.ts` and `src/lib/emeraldFormat.ts`, when the content can be exported or imported.
+- **Categories and tags:** `src/lib/categories.ts` and the reassignment in `src/store/categoryStore.ts`, `src/lib/tagRefs.ts`.
+- **Text and docs:** all four locale files, `Documentation/features.md`, `Documentation/database.md`, this file.
+
+Then run the `crosscheck` agent, see [`agents.md`](../agents.md). `npm run check:schema` compares shapes only: it does not notice that search or the Trash lack the new data.
+
 ## Entry Store
 
 Journal entries, wiki articles and operations live in one Zustand store, `useEntryStore` (`src/store/entryStore.ts`), over the one `entries` table (see [`database.md`](../database.md#entries)). The type is `Entry` with `type: EntryType` (`'journal' | 'wiki' | 'operation'`, `types/index.ts`); `TemplateEntryType` (`lib/blocks/templates.ts`) is `EntryType`, and `TaggedType` (`tagStore.ts`) is `EntryType | 'template'`.

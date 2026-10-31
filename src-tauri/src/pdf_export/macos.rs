@@ -78,7 +78,7 @@ pub async fn export_pdf(
     // and the hidden window — success or error.
     let result = async {
         // 2. Wait for the page to finish loading.
-        let _ = tokio::time::timeout(PAGE_LOAD_TIMEOUT, page_rx)
+        tokio::time::timeout(PAGE_LOAD_TIMEOUT, page_rx)
             .await
             .map_err(|_| format!(
                 "timed out after {:?} waiting for hidden WKWebView to load the export HTML",

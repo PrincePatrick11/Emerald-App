@@ -53,6 +53,8 @@ jobs:
           cache: npm
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -87,3 +89,27 @@ jobs:
       # check above never sees it.
       - name: Check Rust with the dev bridge
         run: cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets --features devbridge
+
+      # Without the bridge: its platform-gated code has known dead-code warnings
+      # outside macOS.
+      - name: Clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+
+  mcp:
+    name: MCP tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/mcp
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install -r requirements-dev.txt
+
+      # Drives the Chrome the runner image ships. conftest.py skips the browser
+      # tests when none is found, so a missing browser would not fail this job.
+      - run: python -m pytest

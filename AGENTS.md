@@ -30,12 +30,13 @@ Every fresh checkout or git worktree needs `npm install`, and its first Rust bui
 
 ## Where to Look First
 
-The long documents are references: read the section you need, not the whole file.
+The long documents are references: read the section you need, not the whole file. Where a document and the code disagree, the code is right: correct the document in the same change.
 
 | Change | Read |
 | --- | --- |
 | Database schema or migration | [Rules for Future Schema Changes](Documentation/database.md#rules-for-future-schema-changes) |
-| A module, or a new one | [`architecture/modules.md`](Documentation/architecture/modules.md) |
+| A new module or table | [Adding a Module or Table](Documentation/architecture/modules.md#adding-a-module-or-table) |
+| An existing module | [`architecture/modules.md`](Documentation/architecture/modules.md) |
 | UI | [`design.md`](Documentation/design.md) and [`components.md`](Documentation/components.md) |
 | User-visible text | [`internationalization.md`](Documentation/internationalization.md); it goes into all four locale files |
 | Tauri commands, files, keys | [`security.md`](Documentation/security.md) |

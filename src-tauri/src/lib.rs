@@ -737,6 +737,8 @@ fn set_altar_export_menu_enabled(app: tauri::AppHandle, enabled: bool) {
     }
 }
 
+// One argument per menu label: the frontend passes them by name.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 fn update_menu_labels(
     app: tauri::AppHandle,

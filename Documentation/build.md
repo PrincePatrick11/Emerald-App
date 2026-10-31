@@ -15,17 +15,19 @@ All workflows pin **Node 22**, and `package.json` records the same floor under `
 
 ## CI — the smoke detector
 
-Two jobs, on every push to `main` or a version branch and on every pull request. A short-lived work branch gets CI once it has a pull request. `cancel-in-progress` is on, so a quick follow-up push supersedes the previous run rather than queueing behind it.
+Three jobs, on every push to `main` or a version branch and on every pull request. A short-lived work branch gets CI once it has a pull request. `cancel-in-progress` is on, so a quick follow-up push supersedes the previous run rather than queueing behind it.
 
 **`frontend`** (`ubuntu-latest`, once — the frontend build is platform-independent) runs `npm run check`, the same command as locally, which runs in this order and stops at the first failure:
 
 1. `npm run check:schema` (needs `esbuild` from `devDependencies`)
 2. `npm run check:i18n` — the four locale files carry the same keys and `{{placeholder}}`s, see [`internationalization.md`](internationalization.md)
 3. `npm run check:blocks` (`scripts/check-blocks.mjs`) — the stored block format in `src/lib/blocks/blockHtml.ts` round-trips and runs under Node without a DOM
-4. `npm run check:docs` (`scripts/check-docs.mjs`) — every relative link in `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `CHANGELOG.md` and `Documentation/` points to an existing file and, with `#anchor`, to an existing heading
+4. `npm run check:docs` (`scripts/check-docs.mjs`) — every relative link in `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `Documentation/` and `tools/` points to an existing file and, with `#anchor`, to an existing heading, and a repository path in backticks exists
 5. `npm run build` — `tsc && vite build --configLoader runner`, so it carries the typecheck
 
-**`rust`** (matrix: `ubuntu-22.04`, `macos-15`, `windows-latest`): `cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets`, and the same again with `--features devbridge`, since the [dev bridge](security.md#the-dev-bridge) is in no build by default and the first check never sees it.
+**`rust`** (matrix: `ubuntu-22.04`, `macos-15`, `windows-latest`): `cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets`, and the same again with `--features devbridge`, since the [dev bridge](security.md#the-dev-bridge) is in no build by default and the first check never sees it. Then `cargo clippy` with `-D warnings`, without the bridge. It uses the stable toolchain, so a new Rust release can bring a new lint and turn CI red without a code change: fix it or allow it where it occurs.
+
+**`mcp`** (`ubuntu-latest`) runs `python -m pytest` in `tools/mcp/` against the Chrome of the runner image. The dialog tests are skipped there, see [Development](../tools/mcp/README.md#development).
 
 The matrix is the point of the file. `src-tauri/src/pdf_export/` holds three implementations — `windows.rs`, `macos.rs`, `linux.rs` — separated by `#[cfg(target_os = "…")]`, and `lib.rs` has several macOS-gated spots. Whoever develops on Windows never compiles the other two; without the matrix a typo in `macos.rs` stays invisible until the release build goes red in public. `--locked` additionally catches `Cargo.lock` drifting from `Cargo.toml`.
 
@@ -193,7 +195,7 @@ Delete this section once that release is out.
 - CI proves compilation, not bundling. Only a manual or release build does that.
 - Nothing proves the update path automatically. Checking it means publishing a prerelease and driving it from an installed build (see [Testing the updater](#testing-the-updater)).
 - The changelog extraction cannot fail — an empty section yields an empty release body silently.
-- Nothing runs clippy, and warnings do not fail a build. (`src-tauri/Cargo.toml` declares an empty `cargo-clippy` feature so that a manual clippy run compiles; CI does not use it.)
+- Clippy does not cover the dev bridge, and compiler warnings do not fail `cargo check` or a build.
 - Little is covered by automated tests. The Rust tests in `vault.rs` cover the adoption of a previous identifier's data, the vault's own JSON files (`settings.json`, `drafts.json`) and pruning of migration backups; those in `lib.rs` cover the watchdog behind closing the window and the app data allow-list of the write guard; one in `vault.rs` covers the flush rule of `write_atomic_anywhere`; those in `auto_backup.rs` cover the file name pattern and pruning; those in `db.rs` cover the SQL authorizer and the value round trip, in `crypto.rs` the sealed format and its context binding, in `keys.rs` the key file, recovery key and unlock paths, in `reencrypt.rs` the re-encryption and its crash recovery, and in `backup.rs` the backup container. `rust-tests.yml` runs them on all three platforms. The frontend has only the `check:*` scripts in CI. Everything else is verified by running the app by hand.
 - **What `rust-tests.yml` does not prove:** `vault.rs` has no `cfg(target_os)` at all, so its tests are the same everywhere. The matrix buys the three path parsers and `rename` semantics against each other — plus the Rust side being *linked* on a push, not only checked. It does **not** cover the Linux case that shaped the adoption, because that lives in Tauri's startup order rather than in our code. Only a real start on Linux shows it, which is why the [release checklist](#once-for-the-first-release-that-carries-the-new-identifier) still asks for one.
 - The apt package list for Linux exists in four workflow files. Adding a system dependency in `ci.yml` alone leaves the others red on Linux only. The keychain needs a running Secret Service on the user's machine, not in CI: nothing there exercises "remember on this device".
